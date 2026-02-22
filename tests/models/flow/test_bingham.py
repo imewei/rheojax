@@ -14,12 +14,14 @@ from rheojax.models import Bingham
 class TestBinghamBasics:
     """Test basic functionality."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test model initialization."""
         model = Bingham()
         assert "sigma_y" in model.parameters
         assert "eta_p" in model.parameters
 
+    @pytest.mark.smoke
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = Bingham()
@@ -277,6 +279,25 @@ class TestBinghamPhysicalBehavior:
         # Slope should be constant = eta_p
         slopes = np.diff(stress) / np.diff(gamma_dot)
         np.testing.assert_allclose(slopes, 2.0, rtol=1e-6)
+
+
+class TestBinghamModelFunction:
+    """Test model_function for Bayesian inference compatibility."""
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict(self):
+        """Test that model_function output matches predict."""
+        model = Bingham()
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("eta_p", 0.5)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = np.array([10.0, 0.5])  # [sigma_y, eta_p]
+
+        mf_result = np.array(model.model_function(gamma_dot, params))
+        predict_result = model.predict(gamma_dot)
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
 
 
 if __name__ == "__main__":

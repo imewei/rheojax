@@ -19,6 +19,7 @@ from rheojax.models.stz import STZConventional
 class TestSTZFlowTransient:
     """Test suite for STZ Flow and Transient protocols."""
 
+    @pytest.mark.smoke
     def test_steady_shear_prediction(self):
         """Test steady-state flow curve prediction."""
         model = STZConventional(variant="standard")
@@ -45,6 +46,7 @@ class TestSTZFlowTransient:
         # or saturate (yielding behavior)
         assert stress[-1] > stress[0]
 
+    @pytest.mark.smoke
     def test_steady_shear_approaches_yield_stress(self):
         """Test that stress saturates near sigma_y at high shear rates."""
         model = STZConventional(variant="minimal")

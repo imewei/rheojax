@@ -19,6 +19,7 @@ from rheojax.models.stz import STZConventional
 class TestSTZOscillatory:
     """Test suite for STZ SAOS and LAOS protocols."""
 
+    @pytest.mark.smoke
     def test_saos_prediction_shape(self):
         """Test SAOS prediction returns correct shape [G', G'']."""
         model = STZConventional(variant="standard")
@@ -45,6 +46,7 @@ class TestSTZOscillatory:
         assert np.all(np.isfinite(G_star))
         assert np.all(G_star >= 0)
 
+    @pytest.mark.smoke
     def test_saos_maxwell_like_behavior(self):
         """Test SAOS shows Maxwell-like viscoelastic behavior."""
         model = STZConventional(variant="standard")

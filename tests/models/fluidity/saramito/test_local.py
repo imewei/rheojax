@@ -173,20 +173,37 @@ class TestStartupFitting:
         assert np.all(fluidity > 0)
 
     @pytest.mark.smoke
-    def test_stress_overshoot(self, model_with_params):
-        """Test stress overshoot is present."""
-        t = np.linspace(0, 50, 500)
-        gamma_dot = 1.0
+    def test_stress_overshoot(self):
+        """Test stress overshoot is present (TC-018: strengthened assertion).
 
-        _, stress, _ = model_with_params.simulate_startup(t, gamma_dot)
+        Uses dedicated parameters with slow rejuvenation (b=0.005) to
+        guarantee overshoot. The key physics: stress builds elastically
+        faster than fluidity evolves, creating a transient peak.
+        """
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model.parameters.set_value("G", 1000.0)
+        model.parameters.set_value("tau_y0", 1.0)
+        model.parameters.set_value("K_HB", 1.0)
+        model.parameters.set_value("n_HB", 0.5)
+        model.parameters.set_value("f_age", 0.01)
+        model.parameters.set_value("f_flow", 0.5)
+        model.parameters.set_value("t_a", 1000.0)
+        model.parameters.set_value("b", 0.005)  # Slow rejuvenation -> overshoot
+        model.parameters.set_value("n_rej", 1.0)
 
-        # Maximum should be higher than final value (overshoot)
+        t = np.linspace(0, 20, 500)
+        gamma_dot = 10.0
+
+        _, stress, _ = model.simulate_startup(t, gamma_dot, t_wait=0.0)
+
         sigma_max = np.max(stress)
         sigma_final = stress[-1]
 
-        # For typical EVP parameters, expect overshoot
-        # This may not always occur depending on parameters
-        assert sigma_max >= sigma_final * 0.95  # At least close to final
+        # Require actual overshoot: max must exceed final by at least 5%
+        assert sigma_max > sigma_final * 1.05, (
+            f"No overshoot detected: sigma_max={sigma_max:.2f}, "
+            f"sigma_final={sigma_final:.2f}, ratio={sigma_max/sigma_final:.3f}"
+        )
 
     def test_startup_trajectory_stored(self, model_with_params):
         """Test trajectory is stored for plotting."""
@@ -389,6 +406,70 @@ class TestBayesianInterface:
 
         assert result.shape == (10, 2)
 
+    def test_model_function_startup(self):
+        """Test model_function for startup mode (TC-006)."""
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model._test_mode = "startup"
+        model._gamma_dot_applied = 1.0
+
+        t = np.linspace(0, 10, 15)
+        params = [model.parameters.get_value(k) for k in model.parameters.keys()]
+
+        result = model.model_function(t, params, test_mode="startup", gamma_dot=1.0)
+
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_relaxation(self):
+        """Test model_function for relaxation mode (TC-006).
+
+        Note: model_function passes sigma_0=None for relaxation,
+        which defaults to params['tau_y0'] inside _simulate_transient.
+        """
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model._test_mode = "relaxation"
+
+        t = np.linspace(0, 50, 15)
+        params = [model.parameters.get_value(k) for k in model.parameters.keys()]
+
+        result = model.model_function(t, params, test_mode="relaxation")
+
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_creep(self):
+        """Test model_function for creep mode (TC-006)."""
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model._test_mode = "creep"
+        model._sigma_applied = 150.0
+
+        t = np.linspace(0, 50, 15)
+        params = [model.parameters.get_value(k) for k in model.parameters.keys()]
+
+        result = model.model_function(
+            t, params, test_mode="creep", sigma_applied=150.0
+        )
+
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_laos(self):
+        """Test model_function for LAOS mode (TC-006)."""
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model._test_mode = "laos"
+        model._gamma_0 = 0.1
+        model._omega_laos = 1.0
+
+        t = np.linspace(0, 2 * np.pi, 15)
+        params = [model.parameters.get_value(k) for k in model.parameters.keys()]
+
+        result = model.model_function(
+            t, params, test_mode="laos", gamma_0=0.1, omega=1.0
+        )
+
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
 
 class TestNormalStressPredictions:
     """Tests for normal stress difference predictions."""
@@ -418,6 +499,125 @@ class TestNormalStressPredictions:
 
         # N2 should be zero for UCM
         assert np.all(N2 == 0)
+
+
+class TestFitPredictRoundtrip:
+    """Test fit->predict roundtrip for transient protocols (TC-005)."""
+
+    @pytest.fixture
+    def model_with_params(self):
+        """Create model with known parameters for roundtrip tests."""
+        model = FluiditySaramitoLocal(coupling="minimal")
+        model.parameters.set_value("G", 1e4)
+        model.parameters.set_value("tau_y0", 100.0)
+        model.parameters.set_value("K_HB", 50.0)
+        model.parameters.set_value("n_HB", 0.5)
+        model.parameters.set_value("f_age", 1e-5)
+        model.parameters.set_value("f_flow", 1e-2)
+        model.parameters.set_value("t_a", 10.0)
+        model.parameters.set_value("b", 1.0)
+        model.parameters.set_value("n_rej", 1.0)
+        return model
+
+    @pytest.mark.smoke
+    def test_flow_curve_fit_predict(self, model_with_params):
+        """Test flow_curve fit -> predict roundtrip."""
+        gamma_dot = np.logspace(-1, 1, 15)
+        sigma = model_with_params._predict_flow_curve(gamma_dot)
+
+        model_with_params.fit(gamma_dot, sigma, test_mode="flow_curve", max_iter=30)
+        pred = model_with_params.predict(gamma_dot)
+
+        assert pred.shape == sigma.shape
+        assert np.all(np.isfinite(pred))
+
+    def test_startup_predict_after_manual_fit(self, model_with_params):
+        """Test startup predict roundtrip with known parameters.
+
+        Sets internal state manually because diffrax ODE + NLSQ AD triggers
+        jvp/custom_vjp error. Verifies predict() reproduces simulate_startup().
+        """
+        t = np.linspace(0, 10, 20)
+        gamma_dot = 1.0
+        _, stress, _ = model_with_params.simulate_startup(t, gamma_dot)
+
+        # Manually set fitted state
+        model_with_params._test_mode = "startup"
+        model_with_params._gamma_dot_applied = gamma_dot
+        model_with_params._sigma_applied = None
+        model_with_params._t_wait = 0.0
+        model_with_params.fitted_ = True
+
+        pred = model_with_params.predict(t)
+
+        assert pred.shape == stress.shape
+        assert np.all(np.isfinite(pred))
+        # Predict should reproduce the simulation
+        np.testing.assert_allclose(pred, stress, rtol=1e-4)
+
+    def test_creep_predict_after_manual_fit(self, model_with_params):
+        """Test creep predict roundtrip with known parameters.
+
+        Sets internal state manually because diffrax ODE + NLSQ AD triggers
+        jvp/custom_vjp error. Verifies predict() reproduces simulate_creep().
+        """
+        t = np.linspace(0, 50, 20)
+        sigma_applied = 150.0
+        strain, _ = model_with_params.simulate_creep(t, sigma_applied)
+
+        # Manually set fitted state
+        model_with_params._test_mode = "creep"
+        model_with_params._sigma_applied = sigma_applied
+        model_with_params._gamma_dot_applied = None
+        model_with_params._t_wait = 0.0
+        model_with_params.fitted_ = True
+
+        pred = model_with_params.predict(t)
+
+        assert pred.shape == strain.shape
+        assert np.all(np.isfinite(pred))
+        # Predict should reproduce the simulation
+        np.testing.assert_allclose(pred, strain, rtol=1e-4)
+
+
+@pytest.mark.slow
+class TestBayesianSmoke:
+    """Bayesian NUTS smoke test (TC-007)."""
+
+    def test_nuts_flow_curve(self):
+        """Test NUTS inference runs for flow curve."""
+        model = FluiditySaramitoLocal(coupling="minimal")
+        gamma_dot = np.logspace(-1, 1, 15)
+        sigma = model._predict_flow_curve(gamma_dot)
+        rng = np.random.RandomState(42)
+        sigma_noisy = sigma * (1 + 0.02 * rng.randn(len(sigma)))
+
+        model.fit(gamma_dot, sigma_noisy, test_mode="flow_curve", max_iter=50)
+        result = model.fit_bayesian(
+            gamma_dot,
+            sigma_noisy,
+            test_mode="flow_curve",
+            num_warmup=10,
+            num_samples=10,
+            num_chains=1,
+            seed=42,
+        )
+
+        assert result is not None
+        assert hasattr(result, "posterior_samples")
+
+
+class TestSaramitoDMTA:
+    """Test DMTA registration for Saramito local model (TC-015)."""
+
+    @pytest.mark.smoke
+    def test_saramito_local_shear_only(self):
+        """Test Saramito local is registered as shear-only."""
+        from rheojax.core.test_modes import DeformationMode
+
+        info = ModelRegistry.get_info("fluidity_saramito_local")
+        assert DeformationMode.SHEAR in info.deformation_modes
+        assert DeformationMode.TENSION not in info.deformation_modes
 
 
 class TestHelperMethods:

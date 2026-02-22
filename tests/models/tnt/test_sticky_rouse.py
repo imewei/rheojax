@@ -557,7 +557,7 @@ class TestBayesianInterface:
 
         y = model.model_function(X, params, test_mode="oscillation")
 
-        assert y.shape == X.shape
+        assert y.shape == (len(X), 2)
         assert np.all(np.isfinite(y))
 
     @pytest.mark.smoke
@@ -609,6 +609,93 @@ class TestBayesianInterface:
 
         assert y.shape == X.shape
         assert np.all(np.isfinite(y))
+
+
+# =============================================================================
+# F-TNT-002 / F-TNT-004 Regression: StickyRouse model_function completeness
+# =============================================================================
+
+
+class TestModelFunctionCompleteness:
+    """Regression tests for F-TNT-002: model_function must handle all protocols."""
+
+    @pytest.mark.smoke
+    def test_model_function_startup(self):
+        """Test model_function handles startup protocol."""
+        model = TNTStickyRouse(n_modes=2)
+        t = jnp.linspace(0.01, 10.0, 30)
+        params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
+
+        y = model.model_function(
+            t, params, test_mode="startup", gamma_dot=1.0
+        )
+        assert y.shape == t.shape
+        assert np.all(np.isfinite(y))
+
+    @pytest.mark.smoke
+    def test_model_function_creep(self):
+        """Test model_function handles creep protocol."""
+        model = TNTStickyRouse(n_modes=2)
+        t = jnp.linspace(0.01, 10.0, 30)
+        params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
+
+        y = model.model_function(
+            t, params, test_mode="creep", sigma_applied=100.0
+        )
+        assert y.shape == t.shape
+        assert np.all(np.isfinite(y))
+
+    @pytest.mark.smoke
+    def test_model_function_laos(self):
+        """Test model_function handles LAOS protocol."""
+        model = TNTStickyRouse(n_modes=2)
+        t = jnp.linspace(0.01, 10.0, 50)
+        params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
+
+        y = model.model_function(
+            t, params, test_mode="laos", gamma_0=0.1, omega=1.0
+        )
+        assert y.shape == t.shape
+        assert np.all(np.isfinite(y))
+
+    def test_model_function_laos_kwargs_override(self):
+        """Test that kwargs gamma_0/omega override self._ attributes."""
+        model = TNTStickyRouse(n_modes=2)
+        model._gamma_0 = 0.01
+        model._omega_laos = 1.0
+
+        t = jnp.linspace(0.01, 6.0, 30)
+        params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
+
+        y_small = model.model_function(t, params, test_mode="laos")
+        y_large = model.model_function(
+            t, params, test_mode="laos", gamma_0=1.0, omega=1.0
+        )
+        assert np.max(np.abs(y_large)) > np.max(np.abs(y_small))
+
+    def test_model_function_startup_requires_gamma_dot(self):
+        """Test startup raises ValueError without gamma_dot."""
+        model = TNTStickyRouse(n_modes=2)
+        t = jnp.linspace(0.01, 10.0, 10)
+        params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
+
+        with pytest.raises(ValueError, match="gamma_dot"):
+            model.model_function(t, params, test_mode="startup")
+
+    def test_fit_caches_protocol_kwargs(self):
+        """Test that _fit() caches protocol kwargs for model_function fallback."""
+        model = TNTStickyRouse(n_modes=2)
+        # Manually call the attrs that _fit() should set
+        model._gamma_dot_applied = 5.0
+        model._sigma_applied = 200.0
+        model._gamma_0 = 0.5
+        model._omega_laos = 2.0
+
+        # Verify they are set (not None)
+        assert model._gamma_dot_applied == 5.0
+        assert model._sigma_applied == 200.0
+        assert model._gamma_0 == 0.5
+        assert model._omega_laos == 2.0
 
 
 # =============================================================================

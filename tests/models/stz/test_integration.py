@@ -21,6 +21,7 @@ from rheojax.models.stz import STZConventional
 class TestSTZIntegration:
     """Integration tests for STZ model."""
 
+    @pytest.mark.smoke
     def test_model_registry(self):
         """Test model is registered correctly."""
         from rheojax.core.registry import ModelRegistry
@@ -30,6 +31,7 @@ class TestSTZIntegration:
         assert model is not None
         assert isinstance(model, STZConventional)
 
+    @pytest.mark.smoke
     def test_variant_parameter_sets(self):
         """Test different variants have different parameter counts."""
         minimal = STZConventional(variant="minimal")
@@ -62,6 +64,7 @@ class TestSTZIntegration:
             assert y0.shape == (expected_dim,), f"{variant} has wrong dimension"
             assert jnp.all(jnp.isfinite(y0)), f"{variant} has non-finite initial state"
 
+    @pytest.mark.smoke
     def test_model_function_routing(self):
         """Test model_function correctly routes based on test_mode."""
         model = STZConventional(variant="standard")
@@ -77,6 +80,95 @@ class TestSTZIntegration:
         # Should not raise for steady_shear mode
         result = model.model_function(x, params, test_mode="steady_shear")
         assert np.all(np.isfinite(np.array(result)))
+
+    def test_model_function_startup(self):
+        """Test model_function routes startup mode with gamma_dot kwarg."""
+        model = STZConventional(variant="standard")
+        model.parameters.set_value("tau0", 1e-9)
+
+        # Time scale must match tau0=1e-9 (nanoseconds)
+        t = np.linspace(0, 1e-7, 20)
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
+
+        result = model.model_function(
+            t, params, test_mode="startup", gamma_dot=1e7
+        )
+        result_np = np.array(result)
+        assert result_np.shape == t.shape
+        assert np.all(np.isfinite(result_np))
+
+    @pytest.mark.smoke
+    def test_model_function_relaxation_sigma_0(self):
+        """Test model_function uses sigma_0 for relaxation initial condition."""
+        model = STZConventional(variant="standard")
+        model.parameters.set_value("tau0", 1e-9)
+
+        # Time scale must match tau0=1e-9 (nanoseconds)
+        t = np.linspace(0, 1e-7, 20)
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
+
+        sigma_0_val = 5e5  # Different from sigma_y (1e6)
+        result = model.model_function(
+            t, params, test_mode="relaxation", sigma_0=sigma_0_val
+        )
+        result_np = np.array(result)
+        assert result_np.shape == t.shape
+        assert np.all(np.isfinite(result_np))
+        # Initial stress should be close to sigma_0, not sigma_y
+        assert np.abs(result_np[0] - sigma_0_val) < np.abs(result_np[0] - 1e6)
+
+    def test_model_function_creep(self):
+        """Test model_function routes creep mode with sigma_applied kwarg."""
+        model = STZConventional(variant="standard")
+        model.parameters.set_value("tau0", 1e-9)
+
+        # Time scale must match tau0=1e-9 (nanoseconds)
+        t = np.linspace(0, 1e-7, 20)
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
+
+        result = model.model_function(
+            t, params, test_mode="creep", sigma_applied=1.2e6
+        )
+        result_np = np.array(result)
+        assert result_np.shape == t.shape
+        assert np.all(np.isfinite(result_np))
+
+    def test_model_function_laos(self):
+        """Test model_function routes LAOS mode with gamma_0 and omega."""
+        model = STZConventional(variant="standard")
+        model.parameters.set_value("tau0", 1e-9)
+
+        # omega must be compatible with tau0=1e-9
+        omega = 1e8  # 100 MHz
+        period = 2 * np.pi / omega
+        t = np.linspace(0, period, 50)
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
+
+        result = model.model_function(
+            t, params, test_mode="laos", gamma_0=0.1, omega=omega
+        )
+        result_np = np.array(result)
+        assert result_np.shape == t.shape
+        assert np.all(np.isfinite(result_np))
+
+    @pytest.mark.smoke
+    def test_model_function_no_mode_raises(self):
+        """Test model_function raises when test_mode is not set."""
+        model = STZConventional(variant="standard")
+        x = np.logspace(-2, 4, 10)
+        params = np.array(
+            [model.parameters.get_value(k) for k in model.parameters.keys()]
+        )
+        with pytest.raises(ValueError, match="test_mode must be set"):
+            model.model_function(x, params)
 
     def test_predict_interface(self):
         """Test _predict works after setting test_mode."""
@@ -175,6 +267,9 @@ class TestSTZIntegration:
             assert hasattr(result, "posterior_samples")
             assert result.posterior_samples is not None
 
-        except Exception as e:
-            # Some setups may not have full NumPyro configuration
+        except ImportError as e:
+            # NumPyro not installed in test environment
             pytest.skip(f"Bayesian inference not available: {e}")
+        except RuntimeError as e:
+            # NUTS sampler failures (e.g., divergences, OOM)
+            pytest.skip(f"Bayesian inference runtime error: {e}")

@@ -28,6 +28,7 @@ from rheojax.models.stz._kernels import (
 class TestSTZKernels:
     """Test suite for STZ physics kernels."""
 
+    @pytest.mark.smoke
     def test_rate_factor_C_stability(self):
         """Test rate_factor_C using log-cosh for numerical stability."""
         sigma_y = 1e6  # 1 MPa yield stress
@@ -57,6 +58,7 @@ class TestSTZKernels:
         grad_C = jax.grad(rate_factor_C, argnums=0)(sigma_y, sigma_y)
         assert jnp.isfinite(grad_C)
 
+    @pytest.mark.smoke
     def test_transition_T_stability(self):
         """Test transition_T using tanh for stability."""
         sigma_y = 1e6
@@ -80,6 +82,7 @@ class TestSTZKernels:
         t_large_neg = transition_T(-100.0 * sigma_y, sigma_y)
         assert jnp.isclose(t_large_neg, -1.0, rtol=1e-6)
 
+    @pytest.mark.smoke
     def test_stz_density_behavior(self):
         """Test STZ density Lambda = exp(-1/chi)."""
         # For chi = 0.1, Lambda = exp(-10) ~ 4.5e-5 (very small)
@@ -147,6 +150,7 @@ class TestSTZKernels:
         dLambda_eq = lambda_evolution(Lambda_eq, chi, tau_relax)
         assert jnp.isclose(dLambda_eq, 0.0, atol=1e-10)
 
+    @pytest.mark.smoke
     def test_stz_ode_rhs_shapes(self):
         """Test ODE vector field returns correct shapes for all variants."""
         # Common args
@@ -183,6 +187,7 @@ class TestSTZKernels:
         assert dy_full.shape == (4,)
         assert jnp.all(jnp.isfinite(dy_full))
 
+    @pytest.mark.smoke
     def test_plastic_rate_physical(self):
         """Test plastic strain rate has correct physical behavior."""
         sigma_y = 1e6

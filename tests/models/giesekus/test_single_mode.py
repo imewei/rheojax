@@ -163,16 +163,24 @@ class TestSAOS:
         assert np.isclose(G_prime[0], G_double_prime[0], rtol=0.01)
 
     def test_saos_magnitude(self):
-        """Test |G*| prediction via test_mode='oscillation'."""
+        """Test complex G* prediction via test_mode='oscillation'.
+
+        predict() returns complex G* = G' + iG'' (matching Maxwell convention).
+        """
         model = GiesekusSingleMode()
 
         omega = np.logspace(-2, 2, 20)
         G_star = model.predict(omega, test_mode="oscillation")
 
         G_prime, G_double_prime = model.predict_saos(omega)
-        expected = np.sqrt(G_prime**2 + G_double_prime**2)
 
-        assert np.allclose(G_star, expected)
+        # predict() returns complex G* — verify real/imag components
+        np.testing.assert_allclose(np.real(G_star), G_prime, rtol=1e-6)
+        np.testing.assert_allclose(np.imag(G_star), G_double_prime, rtol=1e-6)
+
+        # Magnitude should also match
+        expected_magnitude = np.sqrt(G_prime**2 + G_double_prime**2)
+        np.testing.assert_allclose(np.abs(G_star), expected_magnitude, rtol=1e-6)
 
 
 class TestNormalStresses:
@@ -428,6 +436,171 @@ class TestBayesianInterface:
 
         assert y.shape == (len(X), 2)  # G_prime and G_double_prime
         assert np.all(y > 0)
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict_flow_curve(self):
+        """Test model_function output matches predict for flow_curve.
+
+        Divergence means Bayesian posteriors would be computed on
+        a different likelihood than the NLSQ point estimate.
+        """
+        model = GiesekusSingleMode()
+        model.parameters.set_value("eta_p", 150.0)
+        model.parameters.set_value("lambda_1", 0.5)
+        model.parameters.set_value("alpha", 0.25)
+        model.parameters.set_value("eta_s", 5.0)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = jnp.array([150.0, 0.5, 0.25, 5.0])  # [eta_p, lambda_1, alpha, eta_s]
+
+        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict_oscillation(self):
+        """Test model_function output matches predict_saos for oscillation."""
+        model = GiesekusSingleMode()
+        model.parameters.set_value("eta_p", 100.0)
+        model.parameters.set_value("lambda_1", 1.0)
+        model.parameters.set_value("alpha", 0.3)
+        model.parameters.set_value("eta_s", 10.0)
+
+        omega = np.logspace(-2, 2, 20)
+        params = jnp.array([100.0, 1.0, 0.3, 10.0])
+
+        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        G_prime, G_double_prime = model.predict_saos(omega)
+
+        np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
+        np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)
+
+
+class TestParameterSetRoundtrip:
+    """Tests for ParameterSet→model_function roundtrip (the actual NUTS path).
+
+    During NUTS, params are built from ParameterSet.keys() iteration order,
+    NOT from hand-crafted arrays. This tests that the insertion-order-dependent
+    param building in _predict() produces correct model_function output.
+    """
+
+    @pytest.mark.smoke
+    def test_parameterset_to_model_function_flow_curve(self):
+        """Verify params built from ParameterSet.keys() match predict for flow_curve."""
+        model = GiesekusSingleMode()
+        model.parameters.set_value("eta_p", 200.0)
+        model.parameters.set_value("lambda_1", 2.0)
+        model.parameters.set_value("alpha", 0.4)
+        model.parameters.set_value("eta_s", 8.0)
+
+        gamma_dot = np.logspace(-1, 2, 15)
+
+        # Build params the way _predict() / NUTS does it
+        param_names = list(model.parameters.keys())
+        params = jnp.array(
+            [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
+        )
+
+        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
+
+    @pytest.mark.smoke
+    def test_parameterset_to_model_function_oscillation(self):
+        """Verify params built from ParameterSet.keys() match predict for oscillation."""
+        model = GiesekusSingleMode()
+        model.parameters.set_value("eta_p", 200.0)
+        model.parameters.set_value("lambda_1", 2.0)
+        model.parameters.set_value("alpha", 0.4)
+        model.parameters.set_value("eta_s", 8.0)
+
+        omega = np.logspace(-2, 2, 15)
+
+        param_names = list(model.parameters.keys())
+        params = jnp.array(
+            [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
+        )
+
+        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        G_prime, G_double_prime = model.predict_saos(omega)
+
+        np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
+        np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)
+
+
+class TestKwargsCaching:
+    """Tests for protocol kwargs caching in _fit().
+
+    Verifies that _fit() correctly stores protocol-specific kwargs
+    (gamma_dot, sigma_applied, etc.) so that model_function() can
+    read them during NUTS inference without explicit kwargs.
+    """
+
+    @pytest.mark.smoke
+    def test_fit_caches_test_mode(self):
+        """Test that _fit() stores test_mode."""
+        model = GiesekusSingleMode()
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        sigma = model.predict(gamma_dot, test_mode="flow_curve")
+
+        model.fit(gamma_dot, sigma, test_mode="flow_curve")
+        assert model._test_mode == "flow_curve"
+
+    @pytest.mark.smoke
+    def test_fit_caches_gamma_dot(self):
+        """Test that _fit() caches gamma_dot for startup/relaxation."""
+        model = GiesekusSingleMode()
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        sigma = model.predict(gamma_dot, test_mode="flow_curve")
+
+        # Pass gamma_dot as protocol kwarg (even though flow_curve doesn't use it)
+        model._fit(gamma_dot, sigma, test_mode="flow_curve", gamma_dot=10.0)
+        assert model._gamma_dot_applied == 10.0
+
+    @pytest.mark.smoke
+    def test_fit_caches_sigma_applied(self):
+        """Test that _fit() caches sigma_applied for creep."""
+        model = GiesekusSingleMode()
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        sigma = model.predict(gamma_dot, test_mode="flow_curve")
+
+        model._fit(gamma_dot, sigma, test_mode="flow_curve", sigma_applied=50.0)
+        assert model._sigma_applied == 50.0
+
+    @pytest.mark.smoke
+    def test_fit_caches_laos_params(self):
+        """Test that _fit() caches gamma_0 and omega for LAOS."""
+        model = GiesekusSingleMode()
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        sigma = model.predict(gamma_dot, test_mode="flow_curve")
+
+        model._fit(gamma_dot, sigma, test_mode="flow_curve", gamma_0=0.5, omega=1.0)
+        assert model._gamma_0 == 0.5
+        assert model._omega_laos == 1.0
+
+    @pytest.mark.smoke
+    def test_model_function_reads_cached_kwargs(self):
+        """Test model_function falls back to cached kwargs when called without explicit kwargs."""
+        model = GiesekusSingleMode()
+        model.parameters.set_value("alpha", 0.3)
+
+        # Simulate what fit_bayesian does: set attrs then call model_function
+        model._gamma_dot_applied = 10.0
+        model._test_mode = "startup"
+
+        t = np.linspace(0.01, 5, 50)
+        params = jnp.array([model.eta_p, model.lambda_1, model.alpha, model.eta_s])
+
+        # Should not raise — reads gamma_dot from self._gamma_dot_applied
+        result = model.model_function(t, params, test_mode="startup")
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
 
 
 class TestFitting:

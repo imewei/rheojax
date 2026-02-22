@@ -773,6 +773,281 @@ class TestDMTBayesian:
 # =============================================================================
 
 
+class TestF002KwargsCache:
+    """Regression tests for F-002: model_function must use cached protocol kwargs."""
+
+    @pytest.mark.smoke
+    def test_startup_kwargs_cached_after_fit(self, dmt_exponential):
+        """After _fit_transient(gamma_dot=10), model_function must use 10, not 1."""
+        t = np.linspace(0.01, 5, 50)
+        # Generate data at gamma_dot=10
+        stress_true = np.array(
+            dmt_exponential._predict_startup(t, gamma_dot=10.0, lam_init=1.0)
+        )
+        noise = stress_true * 0.01 * np.random.default_rng(42).standard_normal(len(t))
+        stress_noisy = stress_true + noise
+
+        # Fit with gamma_dot=10
+        dmt_exponential._fit_transient(t, stress_noisy, gamma_dot=10.0, lam_init=1.0)
+
+        # Verify model_function now uses gamma_dot=10 (not default 1.0)
+        assert hasattr(dmt_exponential, "_gamma_dot_applied")
+        assert dmt_exponential._gamma_dot_applied == 10.0
+        assert dmt_exponential._startup_lam_init == 1.0
+
+        # model_function output should match predict_startup at same gamma_dot
+        params = jnp.array([v.value for v in dmt_exponential.parameters.values()])
+        mf_stress = dmt_exponential.model_function(t, params, "startup")
+        predict_stress = dmt_exponential._predict_startup(t, gamma_dot=10.0)
+
+        # These should be nearly identical (both use gamma_dot=10)
+        assert jnp.allclose(jnp.array(mf_stress), jnp.array(predict_stress), rtol=0.05)
+
+    @pytest.mark.smoke
+    def test_relaxation_kwargs_cached_after_fit(self, dmt_exponential):
+        """After _fit_relaxation(sigma_init=200), model_function must use 200."""
+        t = np.linspace(0.01, 20, 100)
+        sigma_init = 200.0
+        lam_init = 0.5
+
+        # Generate synthetic relaxation data
+        _, stress_true, _ = dmt_exponential.simulate_relaxation(
+            t_end=20.0, dt=0.01, sigma_init=sigma_init, lam_init=lam_init
+        )
+        # Subsample to match t array length
+        indices = np.linspace(0, len(stress_true) - 1, len(t)).astype(int)
+        stress_data = np.array(stress_true[indices])
+
+        dmt_exponential._fit_relaxation(
+            t, stress_data, sigma_init=sigma_init, lam_init=lam_init
+        )
+
+        assert dmt_exponential._relax_sigma_init == sigma_init
+        assert dmt_exponential._relax_lam_init == lam_init
+
+    @pytest.mark.smoke
+    def test_creep_kwargs_cached_after_fit(self, dmt_exponential):
+        """After _fit_creep(sigma_0=50), model_function must use 50."""
+        sigma_0 = 50.0
+        t_end = 10.0
+        dt = 0.1
+        t = np.arange(0, t_end, dt)
+
+        # Generate creep data
+        _, gamma_true, _, _ = dmt_exponential.simulate_creep(
+            sigma_0=sigma_0, t_end=t_end, dt=dt
+        )
+        gamma_data = np.array(gamma_true)
+
+        dmt_exponential._fit_creep(t, gamma_data, sigma_0=sigma_0, lam_init=1.0)
+
+        assert dmt_exponential._sigma_applied == sigma_0
+        assert dmt_exponential._creep_lam_init == 1.0
+
+    @pytest.mark.smoke
+    def test_oscillation_kwargs_cached_after_fit(self, dmt_exponential):
+        """After _fit_oscillation(lam_0=0.8), model_function must use 0.8."""
+        omega = np.logspace(-2, 2, 30)
+        lam_0 = 0.8
+
+        G_prime, G_double_prime = dmt_exponential.predict_saos(omega, lam_0=lam_0)
+        G_star = np.array(G_prime) + 1j * np.array(G_double_prime)
+
+        dmt_exponential._fit_oscillation(omega, G_star, lam_0=lam_0)
+
+        assert dmt_exponential._saos_lam_0 == lam_0
+
+    @pytest.mark.smoke
+    def test_laos_kwargs_cached_after_fit(self, dmt_exponential):
+        """After _fit_laos, model_function must use cached gamma_0/omega."""
+        gamma_0 = 0.5
+        omega = 2.0
+
+        result = dmt_exponential.simulate_laos(
+            gamma_0=gamma_0, omega=omega, n_cycles=3, points_per_cycle=64
+        )
+        t = result["t"]
+        stress = result["stress"]
+
+        dmt_exponential._fit_laos(
+            np.array(t), np.array(stress),
+            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+        )
+
+        assert dmt_exponential._gamma_0 == gamma_0
+        assert dmt_exponential._omega_laos == omega
+        assert dmt_exponential._laos_lam_init == 1.0
+
+
+class TestFitRelaxation:
+    """Tests for _fit_relaxation implementation."""
+
+    def test_fit_relaxation_returns_self(self, dmt_exponential):
+        """_fit_relaxation returns self for fluent API."""
+        t = np.linspace(0.01, 20, 100)
+        _, stress, _ = dmt_exponential.simulate_relaxation(
+            t_end=20.0, dt=0.2, sigma_init=100.0, lam_init=0.5
+        )
+        result = dmt_exponential._fit_relaxation(
+            t, np.array(stress), sigma_init=100.0, lam_init=0.5
+        )
+        assert result is dmt_exponential
+        assert dmt_exponential._fitted
+
+    def test_fit_relaxation_produces_finite_params(self, dmt_exponential):
+        """Fitted parameters should be finite and within bounds."""
+        t = np.linspace(0.01, 20, 100)
+        _, stress, _ = dmt_exponential.simulate_relaxation(
+            t_end=20.0, dt=0.2, sigma_init=100.0, lam_init=0.5
+        )
+        dmt_exponential._fit_relaxation(
+            t, np.array(stress), sigma_init=100.0, lam_init=0.5
+        )
+        for name in dmt_exponential.parameters.keys():
+            p = dmt_exponential.parameters[name]
+            assert np.isfinite(p.value), f"Parameter {name} is not finite: {p.value}"
+            lo, hi = p.bounds
+            assert lo <= p.value <= hi, f"Parameter {name}={p.value} outside bounds [{lo}, {hi}]"
+
+
+class TestFitCreep:
+    """Tests for _fit_creep implementation."""
+
+    def test_fit_creep_returns_self(self, dmt_exponential):
+        """_fit_creep returns self for fluent API."""
+        sigma_0 = 50.0
+        _, gamma, _, _ = dmt_exponential.simulate_creep(
+            sigma_0=sigma_0, t_end=10.0, dt=0.1
+        )
+        t = np.linspace(0, 10.0, len(gamma))
+        result = dmt_exponential._fit_creep(
+            t, np.array(gamma), sigma_0=sigma_0, lam_init=1.0
+        )
+        assert result is dmt_exponential
+        assert dmt_exponential._fitted
+
+    def test_fit_creep_viscous(self, dmt_viscous):
+        """Viscous variant creep fit works."""
+        sigma_0 = 20.0
+        _, gamma, _, _ = dmt_viscous.simulate_creep(
+            sigma_0=sigma_0, t_end=5.0, dt=0.05
+        )
+        t = np.linspace(0, 5.0, len(gamma))
+        result = dmt_viscous._fit_creep(
+            t, np.array(gamma), sigma_0=sigma_0, lam_init=1.0
+        )
+        assert result is dmt_viscous
+        assert dmt_viscous._fitted
+
+
+class TestFitOscillation:
+    """Tests for _fit_oscillation implementation."""
+
+    def test_fit_oscillation_returns_self(self, dmt_exponential):
+        """_fit_oscillation returns self for fluent API."""
+        omega = np.logspace(-2, 2, 30)
+        G_prime, G_double_prime = dmt_exponential.predict_saos(omega, lam_0=1.0)
+        G_star = np.array(G_prime) + 1j * np.array(G_double_prime)
+
+        result = dmt_exponential._fit_oscillation(omega, G_star, lam_0=1.0)
+        assert result is dmt_exponential
+        assert dmt_exponential._fitted
+
+    def test_fit_oscillation_accepts_2d_input(self, dmt_exponential):
+        """_fit_oscillation accepts (N,2) input [G', G'']."""
+        omega = np.logspace(-2, 2, 20)
+        G_prime, G_double_prime = dmt_exponential.predict_saos(omega, lam_0=1.0)
+        G_2d = np.column_stack([np.array(G_prime), np.array(G_double_prime)])
+
+        result = dmt_exponential._fit_oscillation(omega, G_2d, lam_0=1.0)
+        assert result is dmt_exponential
+        assert dmt_exponential._fitted
+
+    def test_fit_oscillation_recovers_moduli(self, dmt_exponential):
+        """Fitted model should reproduce SAOS moduli."""
+        omega = np.logspace(-2, 2, 30)
+        G_prime_true, G_double_prime_true = dmt_exponential.predict_saos(omega, lam_0=1.0)
+        G_star = np.array(G_prime_true) + 1j * np.array(G_double_prime_true)
+
+        # Perturb initial params slightly
+        orig_G0 = dmt_exponential.parameters["G0"].value
+        dmt_exponential.parameters["G0"].value = orig_G0 * 1.5
+
+        dmt_exponential._fit_oscillation(omega, G_star, lam_0=1.0)
+
+        # Predict with fitted params
+        G_prime_fit, G_double_prime_fit = dmt_exponential.predict_saos(omega, lam_0=1.0)
+
+        # Should be reasonable fit (not perfect due to optimization landscape)
+        residual = np.mean(
+            (np.array(G_prime_fit) - np.array(G_prime_true)) ** 2
+            + (np.array(G_double_prime_fit) - np.array(G_double_prime_true)) ** 2
+        )
+        assert residual < 1e6, f"Fit residual too large: {residual}"
+
+
+class TestFitLAOS:
+    """Tests for _fit_laos implementation."""
+
+    def test_fit_laos_returns_self(self, dmt_exponential):
+        """_fit_laos returns self for fluent API."""
+        gamma_0 = 0.1
+        omega = 1.0
+        result = dmt_exponential.simulate_laos(
+            gamma_0=gamma_0, omega=omega, n_cycles=3, points_per_cycle=64
+        )
+        dmt_exponential._fit_laos(
+            np.array(result["t"]), np.array(result["stress"]),
+            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+        )
+        assert dmt_exponential._fitted
+
+    def test_fit_laos_viscous(self, dmt_viscous):
+        """Viscous variant LAOS fit works."""
+        gamma_0 = 0.5
+        omega = 1.0
+        result = dmt_viscous.simulate_laos(
+            gamma_0=gamma_0, omega=omega, n_cycles=3, points_per_cycle=64
+        )
+        dmt_viscous._fit_laos(
+            np.array(result["t"]), np.array(result["stress"]),
+            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+        )
+        assert dmt_viscous._fitted
+
+
+class TestPredictLAOS:
+    """Tests for LAOS predict dispatch."""
+
+    @pytest.mark.smoke
+    def test_predict_laos_dispatch(self, dmt_exponential):
+        """model._predict(t, test_mode='laos') should not raise."""
+        t = np.linspace(0, 10 * 2 * np.pi, 500)
+        stress = dmt_exponential._predict(
+            t, test_mode="laos", gamma_0=0.1, omega_laos=1.0
+        )
+        assert len(stress) > 0
+        assert np.all(np.isfinite(stress))
+
+
+class TestPublicAPIRoundTrip:
+    """Test fit() -> predict() through the public BaseModel API."""
+
+    @pytest.mark.smoke
+    def test_fit_predict_flow_curve(self, dmt_exponential):
+        """Public API round-trip for flow curve."""
+        gamma_dot = np.logspace(-1, 2, 20)
+        stress_true = dmt_exponential._predict_flow_curve(gamma_dot)
+        noise = 0.02 * stress_true * np.random.default_rng(0).standard_normal(len(gamma_dot))
+        stress_data = np.array(stress_true) + noise
+
+        dmt_exponential.fit(gamma_dot, stress_data, test_mode="flow_curve")
+        stress_pred = dmt_exponential.predict(gamma_dot, test_mode="flow_curve")
+
+        assert stress_pred.shape == stress_data.shape
+        assert np.all(np.isfinite(stress_pred))
+
+
 class TestDMTRegistry:
     """Test model registry integration."""
 

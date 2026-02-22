@@ -86,23 +86,6 @@ class TestUCMLimit:
             np.abs(N2[0]) < 1e-8 * N1[0]
         ), f"UCM should have N₂=0, got N₂/N₁={N2[0]/N1[0]:.2e}"
 
-    @pytest.mark.smoke
-    def test_ucm_n2_zero(self):
-        """Test α=0 gives N₂ = 0.
-
-        UCM predicts N₁ > 0 but N₂ = 0.
-        """
-        model = GiesekusSingleMode()
-        model.parameters.set_value("alpha", 1e-10)  # Very small α
-
-        gamma_dot = np.array([10.0])
-        N1, N2 = model.predict_normal_stresses(gamma_dot)
-
-        # N₂ should be essentially zero
-        assert (
-            np.abs(N2[0]) < 1e-8 * N1[0]
-        ), f"UCM should have N₂=0, got N₂/N₁={N2[0]/N1[0]:.2e}"
-
     def test_ucm_saos_maxwell(self):
         """Test α=0 SAOS matches Maxwell model exactly.
 

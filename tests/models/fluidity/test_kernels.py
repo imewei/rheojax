@@ -200,6 +200,41 @@ class TestFluidityKernelsODERHS:
         d_gamma = float(dy[0])
         assert d_gamma > 0
 
+    def test_local_ode_rhs_at_nonzero_stress(self):
+        """TC-027: Test ODE RHS with realistic (non-trivial) initial stress."""
+        y = jnp.array([500.0, 1e-4])  # Significant stress and fluidity
+        args = {
+            "G": 1e6,
+            "f_eq": 1e-6,
+            "f_inf": 1e-3,
+            "theta": 10.0,
+            "a": 1.0,
+            "n_rejuv": 1.0,
+            "gamma_dot": 1.0,
+        }
+        dy = fluidity_local_ode_rhs(0.0, y, args)
+        assert dy.shape == y.shape
+        assert np.all(np.isfinite(np.array(dy)))
+        # At this stress level with gamma_dot:
+        # d_sigma = G * (gamma_dot - sigma * f) = 1e6 * (1.0 - 500*1e-4) = 1e6 * 0.95 > 0
+        assert float(dy[0]) > 0
+
+    def test_local_ode_rhs_above_equilibrium(self):
+        """TC-027: Test ODE RHS when stress is above equilibrium (should relax)."""
+        y = jnp.array([1e6, 1e-3])  # Very high stress, high fluidity
+        args = {
+            "G": 1e6,
+            "f_eq": 1e-6,
+            "f_inf": 1e-3,
+            "theta": 10.0,
+            "a": 1.0,
+            "n_rejuv": 1.0,
+            "gamma_dot": 0.01,
+        }
+        dy = fluidity_local_ode_rhs(0.0, y, args)
+        # Stress should be decreasing: d_sigma = G*(0.01 - 1e6*1e-3) = G*(0.01 - 1000) < 0
+        assert float(dy[0]) < 0
+
 
 @pytest.mark.unit
 class TestFluidityKernelsPDERHS:

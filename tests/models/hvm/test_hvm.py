@@ -672,7 +672,7 @@ class TestHVMBayesian:
             dtype=jnp.float64,
         )
         result = hvm_default.model_function(omega, params, test_mode="oscillation")
-        assert result.shape == (20,)
+        assert result.shape == (20, 2)
         assert not jnp.any(jnp.isnan(result))
 
     @pytest.mark.smoke

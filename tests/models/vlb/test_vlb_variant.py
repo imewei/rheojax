@@ -484,7 +484,7 @@ class TestVLBTemperature:
             return vlb_temp.model_function(omega, p, test_mode="oscillation", T=320.0)
 
         result = predict(params)
-        assert result.shape == (20,)
+        assert result.shape == (20, 2)
         assert jnp.all(jnp.isfinite(result))
 
 

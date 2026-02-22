@@ -359,23 +359,22 @@ class TestModelFunction:
                 test_mode="flow_curve",
             )
 
-    def test_model_function_restores_parameters(self):
-        """Test that model_function restores original parameters."""
+    def test_model_function_raises_and_preserves_params(self):
+        """Test that model_function raises NotImplementedError and preserves params."""
         model = ITTMCTSchematic(epsilon=0.1)
         original_v2 = model.parameters.get_value("v2")
 
         gamma_dot = np.logspace(-1, 1, 5)
-        model.model_function(
-            gamma_dot,
-            v1=0.0,
-            v2=2.0,  # Different v2
-            Gamma=1.0,
-            gamma_c=0.1,
-            G_inf=1e6,
-            test_mode="flow_curve",
-        )
+        params_array = np.array([0.0, 2.0, 1.0, 0.1, 1e6])  # Different v2
 
-        # Original parameters should be restored
+        with pytest.raises(NotImplementedError, match="Bayesian"):
+            model.model_function(
+                gamma_dot,
+                params_array,
+                test_mode="flow_curve",
+            )
+
+        # Original parameters should be preserved (model_function raises before modifying)
         assert model.parameters.get_value("v2") == pytest.approx(original_v2, rel=1e-6)
 
 

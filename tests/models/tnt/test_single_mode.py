@@ -640,7 +640,7 @@ class TestBayesianInterface:
 
         y = model.model_function(X, params, test_mode="oscillation")
 
-        assert y.shape == X.shape
+        assert y.shape == (len(X), 2)
         assert np.all(y > 0)
 
     @pytest.mark.smoke

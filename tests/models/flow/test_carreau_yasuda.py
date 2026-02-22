@@ -14,6 +14,7 @@ from rheojax.models import CarreauYasuda
 class TestCarreauYasudaBasics:
     """Test basic functionality."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test model initialization."""
         model = CarreauYasuda()
@@ -154,6 +155,52 @@ class TestCarreauYasudaStability:
         assert np.all(np.isfinite(viscosity))
         assert np.all(viscosity >= 1.0 * 0.99)
         assert np.all(viscosity <= 100.0 * 1.01)
+
+
+class TestCarreauYasudaFitting:
+    """Test parameter fitting for CarreauYasuda model."""
+
+    def test_fit_synthetic_data(self):
+        """Test fitting with synthetic data."""
+        eta0_true = 100.0
+        eta_inf_true = 1.0
+        lambda_true = 1.0
+        n_true = 0.5
+        a_true = 1.5
+
+        gamma_dot = np.logspace(-2, 2, 50)
+        lambda_gamma = lambda_true * gamma_dot
+        factor = np.power(1.0 + np.power(lambda_gamma, a_true), (n_true - 1.0) / a_true)
+        viscosity_true = eta_inf_true + (eta0_true - eta_inf_true) * factor
+
+        model = CarreauYasuda()
+        model.fit(gamma_dot, viscosity_true)
+
+        predictions = model.predict(gamma_dot)
+        assert np.all(np.isfinite(predictions))
+        assert np.all(predictions > 0)
+
+
+class TestCarreauYasudaModelFunction:
+    """Test model_function for Bayesian inference compatibility."""
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict(self):
+        """Test that model_function output matches predict."""
+        model = CarreauYasuda()
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
+        model.parameters.set_value("a", 1.5)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = np.array([100.0, 1.0, 1.0, 0.5, 1.5])  # [eta0, eta_inf, lambda_, n, a]
+
+        mf_result = np.array(model.model_function(gamma_dot, params))
+        predict_result = model.predict(gamma_dot)
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
 
 
 if __name__ == "__main__":

@@ -171,12 +171,18 @@ class TestFluidityEvolution:
         assert df_dt > 0
 
     def test_equilibrium_at_rest(self):
-        """Test df/dt = 0 at f = f_age with no flow."""
+        """Test df/dt ≈ 0 at f = f_age with no flow.
+
+        Note: With FS-008 (driving floor raised to 1e-6 for gradient stability),
+        there is a small residual rejuvenation term even at zero driving. The
+        aging term is exactly zero at f = f_age, but the rejuvenation floor
+        contributes b * (1e-6)^n_rej * (f_flow - f) ≈ 1e-8 for these parameters.
+        """
         f_age = 1e-6
         df_dt = fluidity_evolution_saramito(f_age, 0.0, f_age, 1e-2, 10.0, 1.0, 1.0)
 
-        # Should be close to zero at equilibrium
-        assert abs(df_dt) < 1e-15
+        # Should be very small at equilibrium (residual from driving floor)
+        assert abs(df_dt) < 1e-7
 
 
 class TestYieldStressCoupling:
@@ -241,12 +247,15 @@ class TestSteadyStateFlowCurve:
 
     @pytest.mark.smoke
     def test_yield_stress_emergence(self):
-        """Test yield stress appears at low rates."""
+        """Test yield stress appears at low rates.
+
+        Note: FS-015 removed the dead G parameter from saramito_flow_curve_steady.
+        G is only used in saramito_steady_state_full for N₁ computation.
+        """
         gamma_dot = jnp.logspace(-3, 2, 50)
 
         sigma = saramito_flow_curve_steady(
             gamma_dot,
-            G=1e4,
             tau_y0=100.0,
             K_HB=50.0,
             n_HB=0.5,
@@ -268,7 +277,6 @@ class TestSteadyStateFlowCurve:
 
         sigma = saramito_flow_curve_steady(
             gamma_dot,
-            G=1e4,
             tau_y0=100.0,
             K_HB=50.0,
             n_HB=0.5,
@@ -289,7 +297,6 @@ class TestSteadyStateFlowCurve:
 
         sigma_minimal = saramito_flow_curve_steady(
             gamma_dot,
-            G=1e4,
             tau_y0=100.0,
             K_HB=50.0,
             n_HB=0.5,
@@ -303,7 +310,6 @@ class TestSteadyStateFlowCurve:
 
         sigma_full = saramito_flow_curve_steady(
             gamma_dot,
-            G=1e4,
             tau_y0=100.0,
             K_HB=50.0,
             n_HB=0.5,

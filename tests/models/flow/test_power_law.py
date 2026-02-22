@@ -280,13 +280,15 @@ class TestPowerLawNumericalStability:
         model.parameters.set_value("K", 1.0)
         model.parameters.set_value("n", 0.5)
 
-        # Zero shear rate (should give infinite viscosity for n < 1)
+        # Zero shear rate: numerical guard clamps |γ̇| >= 1e-30
+        # so η = K * (1e-30)^(n-1) = (1e-30)^(-0.5) ≈ 1e15
         gamma_dot = np.array([0.0])
 
         viscosity = model.predict(gamma_dot)
 
-        # For n < 1, η → ∞ as γ̇ → 0
-        assert np.isinf(viscosity[0])
+        # For n < 1, η → ∞ as γ̇ → 0 (guard produces very large finite value)
+        assert viscosity[0] > 1e10
+        assert np.isfinite(viscosity[0])
 
     def test_negative_shear_rates(self):
         """Test with negative shear rates (should use absolute value)."""
@@ -338,6 +340,40 @@ class TestPowerLawPerformance:
 
             assert viscosity.shape == gamma_dot.shape
             assert np.all(np.isfinite(viscosity))
+
+
+class TestPowerLawModelFunction:
+    """Test model_function for Bayesian inference compatibility."""
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict(self):
+        """Test that model_function output matches predict."""
+        model = PowerLaw()
+        model.parameters.set_value("K", 2.5)
+        model.parameters.set_value("n", 0.6)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = np.array([2.5, 0.6])  # [K, n]
+
+        mf_result = np.array(model.model_function(gamma_dot, params))
+        predict_result = model.predict(gamma_dot)
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
+
+    @pytest.mark.smoke
+    def test_model_function_is_jax_traceable(self):
+        """Test that model_function works with JAX arrays."""
+        from rheojax.core.jax_config import safe_import_jax
+
+        _, jnp = safe_import_jax()
+
+        model = PowerLaw()
+        X = jnp.logspace(-1, 2, 20)
+        params = jnp.array([1.0, 0.5])
+
+        result = model.model_function(X, params)
+        assert result.shape == X.shape
+        assert jnp.all(jnp.isfinite(result))
 
 
 if __name__ == "__main__":

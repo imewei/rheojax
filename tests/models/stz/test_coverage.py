@@ -7,6 +7,7 @@ import pytest
 from rheojax.models.stz.conventional import STZConventional
 
 
+@pytest.mark.unit
 class TestSTZCoverage:
     def setup_method(self):
         self.model = STZConventional()
@@ -16,6 +17,7 @@ class TestSTZCoverage:
         # Create complex modulus for SAOS
         self.G_star = np.ones_like(self.omega) + 1j * np.ones_like(self.omega)
 
+    @pytest.mark.smoke
     def test_fit_invalid_test_mode(self):
         """Test _fit raising ValueError for invalid test_mode."""
         # Case 1: test_mode not provided (and no internal test_mode set)
@@ -26,6 +28,7 @@ class TestSTZCoverage:
         with pytest.raises(ValueError, match="Unsupported test_mode"):
             self.model.fit(self.t, self.y, test_mode="invalid_mode")
 
+    @pytest.mark.smoke
     def test_fit_transient_missing_kwargs(self):
         """Test _fit_transient raising ValueError when missing required kwargs."""
         # Case 1: startup missing gamma_dot

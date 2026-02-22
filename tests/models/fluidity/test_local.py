@@ -90,9 +90,9 @@ class TestFluidityLocalFlowCurve:
         gamma_dot = np.logspace(-6, -3, 20)  # Very low rates
         sigma = model._predict_flow_curve(gamma_dot)
 
-        # At low rates, stress should be close to yield stress
-        # The relationship depends on model, but stress should be significant
-        assert np.mean(sigma) > 50  # Non-trivial stress
+        # TC-017: Stress should be bounded below by a fraction of yield stress
+        tau_y = model.parameters.get_value("tau_y")
+        assert np.min(sigma) > tau_y * 0.5
 
     def test_flow_curve_high_rate_behavior(self):
         """Test flow curve at high rates approaches power-law."""
@@ -107,6 +107,38 @@ class TestFluidityLocalFlowCurve:
 @pytest.mark.unit
 class TestFluidityLocalTransient:
     """Tests for FluidityLocal transient protocols."""
+
+    def test_relaxation_initial_fluidity_effect(self):
+        """TC-025: Higher f_inf (initial fluidity for relaxation) -> faster decay."""
+        model = FluidityLocal()
+        # Use short time so that differences in decay rate are captured
+        # before both reach near-zero
+        t = np.linspace(0, 5, 50)
+
+        # High f_inf -> starts at higher fluidity -> faster relaxation
+        model.parameters.set_value("f_inf", 1e-2)
+        sigma_fast = model._simulate_transient(
+            jnp.asarray(t),
+            model.get_parameter_dict(),
+            mode="relaxation",
+            gamma_dot=None,
+            sigma_applied=None,
+            sigma_0=1000.0,
+        )
+
+        # Low f_inf -> starts at lower fluidity -> slower relaxation
+        model.parameters.set_value("f_inf", 1e-5)
+        sigma_slow = model._simulate_transient(
+            jnp.asarray(t),
+            model.get_parameter_dict(),
+            mode="relaxation",
+            gamma_dot=None,
+            sigma_applied=None,
+            sigma_0=1000.0,
+        )
+
+        # Higher initial fluidity -> faster decay -> lower stress at end
+        assert np.array(sigma_fast)[-1] < np.array(sigma_slow)[-1]
 
     def test_startup_stress_overshoot(self):
         """Test startup shows stress increase from zero."""
@@ -233,6 +265,18 @@ class TestFluidityLocalOscillation:
         assert np.all(np.isfinite(strain))
         assert np.all(np.isfinite(stress))
 
+    def test_laos_linearity_limit(self):
+        """TC-014: At small amplitude, I_3/I_1 should be very small."""
+        model = FluidityLocal()
+        _, stress = model.simulate_laos(
+            gamma_0=0.001,
+            omega=1.0,
+            n_cycles=4,
+            n_points_per_cycle=256,
+        )
+        harmonics = model.extract_harmonics(stress, n_points_per_cycle=256)
+        assert harmonics["I_3_I_1"] < 0.1  # Small amplitude -> nearly linear
+
     def test_extract_harmonics(self):
         """Test harmonic extraction from LAOS."""
         model = FluidityLocal()
@@ -282,6 +326,66 @@ class TestFluidityLocalModelFunction:
         assert result.shape == (len(X), 2)
         assert np.all(np.isfinite(result))
 
+    def test_model_function_startup(self):
+        """TC-001: Test model_function for startup protocol."""
+        model = FluidityLocal()
+        model._test_mode = "startup"
+        model._gamma_dot_applied = 1.0
+        t = np.linspace(0, 10, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(t, params, test_mode="startup", gamma_dot=1.0)
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_relaxation(self):
+        """TC-001: Test model_function for relaxation protocol."""
+        model = FluidityLocal()
+        model._test_mode = "relaxation"
+        t = np.linspace(0, 50, 20)
+        params = list(model.parameters.get_values())
+        # model_function passes sigma_0=None, so _simulate_transient defaults
+        # to tau_y for the initial stress
+        result = model.model_function(t, params, test_mode="relaxation")
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_creep(self):
+        """TC-001: Test model_function for creep protocol."""
+        model = FluidityLocal()
+        model._test_mode = "creep"
+        model._sigma_applied = 1000.0
+        t = np.linspace(0, 10, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(
+            t, params, test_mode="creep", sigma_applied=1000.0
+        )
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_laos(self):
+        """TC-001: Test model_function for LAOS protocol."""
+        model = FluidityLocal()
+        model._test_mode = "laos"
+        model._gamma_0 = 0.1
+        model._omega_laos = 1.0
+
+        period = 2.0 * np.pi / 1.0
+        t = np.linspace(0, 2 * period, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(
+            t, params, test_mode="laos", gamma_0=0.1, omega=1.0
+        )
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_laos_requires_gamma_0(self):
+        """TC-004: LAOS without gamma_0/omega should raise."""
+        model = FluidityLocal()
+        t = np.linspace(0, 1, 20)
+        params = list(model.parameters.get_values())
+        with pytest.raises((ValueError, TypeError, KeyError)):
+            model.model_function(t, params, test_mode="laos")
+
 
 @pytest.mark.unit
 class TestFluidityLocalFitting:
@@ -317,3 +421,42 @@ class TestFluidityLocalFitting:
         model.fit(gamma_dot, sigma, test_mode="flow_curve", max_iter=10)
 
         assert model._test_mode == "flow_curve"
+
+    def test_rotation_alias_maps_to_flow_curve(self):
+        """TC-010: Test that 'rotation' alias is handled correctly."""
+        model = FluidityLocal()
+        gamma_dot = np.logspace(-1, 1, 10)
+        sigma = model._predict_flow_curve(gamma_dot)
+        model.fit(gamma_dot, sigma, test_mode="rotation", max_iter=10)
+        assert model._test_mode in ("rotation", "flow_curve")
+
+    def test_fit_oscillation_then_predict(self):
+        """TC-011: Test predict() call after oscillation fit()."""
+        model = FluidityLocal()
+        omega = np.logspace(-1, 1, 15)
+        G_star = model._predict_saos_jit(
+            jnp.asarray(omega),
+            model.parameters.get_value("G"),
+            model.parameters.get_value("f_eq"),
+            model.parameters.get_value("theta"),
+        )
+        G_star_np = np.array(G_star)
+        model.fit(omega, G_star_np, test_mode="oscillation", max_iter=20)
+        pred = model.predict(omega)
+        assert pred.shape == G_star_np.shape
+        assert np.all(np.isfinite(pred))
+
+    def test_fit_saos_alias(self):
+        """TC-023: Test that 'saos' alias is handled correctly."""
+        model = FluidityLocal()
+        omega = np.logspace(-1, 1, 15)
+        G_star = model._predict_saos_jit(
+            jnp.asarray(omega),
+            model.parameters.get_value("G"),
+            model.parameters.get_value("f_eq"),
+            model.parameters.get_value("theta"),
+        )
+        G_star_np = np.array(G_star)
+        model.fit(omega, G_star_np, test_mode="saos", max_iter=10)
+        # saos should be normalized to oscillation
+        assert model._test_mode in ("saos", "oscillation")

@@ -364,6 +364,81 @@ class TestModelFunction:
         assert np.all(np.isfinite(grads))
 
 
+class TestBayesianSmoke:
+    """Fast smoke tests for Bayesian pipeline (FAST_MODE compatible)."""
+
+    @pytest.mark.smoke
+    def test_bayesian_flow_curve_minimal(self):
+        """Verify Bayesian pipeline completes with minimal samples.
+
+        Uses 10 warmup + 20 samples to keep under 30s.
+        Does NOT check statistical quality — just pipeline health.
+        """
+        model = GiesekusSingleMode()
+
+        gamma_dot = np.logspace(-1, 2, 15)
+        model.parameters.set_value("eta_p", 100.0)
+        model.parameters.set_value("lambda_1", 1.0)
+        model.parameters.set_value("alpha", 0.3)
+        model.parameters.set_value("eta_s", 10.0)
+
+        sigma_true = model.predict(gamma_dot, test_mode="flow_curve")
+        rng = np.random.default_rng(42)
+        sigma_noisy = sigma_true * (1 + rng.normal(0, 0.03, len(sigma_true)))
+
+        # NLSQ warm-start
+        model.fit(gamma_dot, sigma_noisy, test_mode="flow_curve")
+
+        # Minimal Bayesian
+        result = model.fit_bayesian(
+            gamma_dot,
+            sigma_noisy,
+            test_mode="flow_curve",
+            num_warmup=10,
+            num_samples=20,
+            num_chains=1,
+            seed=42,
+        )
+
+        assert result is not None
+        assert "eta_p" in result.posterior_samples
+        assert "lambda_1" in result.posterior_samples
+        assert "alpha" in result.posterior_samples
+        assert len(result.posterior_samples["eta_p"]) == 20
+
+    @pytest.mark.smoke
+    def test_bayesian_saos_minimal(self):
+        """Verify Bayesian SAOS pipeline completes with minimal samples."""
+        model = GiesekusSingleMode()
+
+        omega = np.logspace(-1, 2, 15)
+        model.parameters.set_value("eta_p", 100.0)
+        model.parameters.set_value("lambda_1", 1.0)
+        model.parameters.set_value("eta_s", 5.0)
+
+        G_prime, G_double_prime = model.predict_saos(omega)
+        G_star = np.sqrt(G_prime**2 + G_double_prime**2)
+        rng = np.random.default_rng(42)
+        G_star_noisy = G_star * (1 + rng.normal(0, 0.03, len(G_star)))
+
+        # NLSQ warm-start
+        model.fit(omega, G_star_noisy, test_mode="oscillation")
+
+        # Minimal Bayesian
+        result = model.fit_bayesian(
+            omega,
+            G_star_noisy,
+            test_mode="oscillation",
+            num_warmup=10,
+            num_samples=20,
+            num_chains=1,
+            seed=42,
+        )
+
+        assert result is not None
+        assert len(result.posterior_samples["eta_p"]) == 20
+
+
 class TestDiagnostics:
     """Tests for MCMC diagnostics."""
 

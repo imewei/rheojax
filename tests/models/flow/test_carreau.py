@@ -15,6 +15,7 @@ from rheojax.models import Carreau
 class TestCarreauBasics:
     """Test basic functionality of Carreau model."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test model initialization."""
         model = Carreau()
@@ -28,6 +29,7 @@ class TestCarreauBasics:
         eta0 = model.parameters.get_value("eta0")
         assert eta0 == 1000.0
 
+    @pytest.mark.smoke
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = Carreau()
@@ -313,6 +315,27 @@ class TestCarreauComparison:
         expected = eta_inf + (eta0 - eta_inf) * factor
 
         np.testing.assert_allclose(viscosity, expected, rtol=1e-6)
+
+
+class TestCarreauModelFunction:
+    """Test model_function for Bayesian inference compatibility."""
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict(self):
+        """Test that model_function output matches predict."""
+        model = Carreau()
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("n", 0.5)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = np.array([100.0, 1.0, 1.0, 0.5])  # [eta0, eta_inf, lambda_, n]
+
+        mf_result = np.array(model.model_function(gamma_dot, params))
+        predict_result = model.predict(gamma_dot)
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
 
 
 if __name__ == "__main__":

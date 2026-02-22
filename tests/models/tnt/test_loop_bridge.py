@@ -512,7 +512,7 @@ class TestBayesianInterface:
 
         y = model.model_function(X, params, test_mode="oscillation")
 
-        assert y.shape == X.shape
+        assert y.shape == (len(X), 2)
         assert np.all(y > 0)
 
     @pytest.mark.smoke
@@ -691,3 +691,54 @@ class TestAnalysisMethods:
         assert len(f_B_steady) == len(gamma_dot)
         assert np.all(f_B_steady >= 0)
         assert np.all(f_B_steady <= 1)
+
+
+# =============================================================================
+# F-TNT-001 Regression: LAOS model_function kwargs
+# =============================================================================
+
+
+class TestLAOSKwargsRegression:
+    """Regression tests for F-TNT-001: LAOS branch must use kwargs, not self._."""
+
+    @pytest.mark.smoke
+    def test_model_function_laos_uses_kwargs(self):
+        """Test that model_function LAOS branch respects kwargs over self._."""
+        from rheojax.models.tnt import TNTLoopBridge
+
+        model = TNTLoopBridge()
+        # Set self._ to sentinel values
+        model._gamma_0 = 999.0
+        model._omega_laos = 999.0
+
+        X = jnp.linspace(0.01, 10.0, 50)
+        # [G, tau_b, tau_a, nu, f_B_eq, eta_s]
+        params = jnp.array([1000.0, 1.0, 0.1, 2.0, 0.7, 10.0])
+
+        # Pass different values via kwargs — these should be used, not self._
+        y_kwargs = model.model_function(
+            X, params, test_mode="laos", gamma_0=0.1, omega=1.0
+        )
+        assert y_kwargs.shape == X.shape
+        assert np.all(np.isfinite(y_kwargs))
+
+    def test_model_function_laos_kwargs_differ_from_self(self):
+        """Test that kwargs-passed gamma_0/omega actually override self._."""
+        from rheojax.models.tnt import TNTLoopBridge
+
+        model = TNTLoopBridge()
+        X = jnp.linspace(0.01, 6.0, 30)
+        params = jnp.array([1000.0, 1.0, 0.1, 2.0, 0.7, 10.0])
+
+        # First call: store via self._
+        model._gamma_0 = 0.01
+        model._omega_laos = 1.0
+        y_small = model.model_function(X, params, test_mode="laos")
+
+        # Second call: override via kwargs with larger amplitude
+        y_large = model.model_function(
+            X, params, test_mode="laos", gamma_0=1.0, omega=1.0
+        )
+
+        # Larger amplitude should produce larger peak stress
+        assert np.max(np.abs(y_large)) > np.max(np.abs(y_small))

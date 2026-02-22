@@ -15,6 +15,7 @@ from rheojax.models import HerschelBulkley
 class TestHerschelBulkleyBasics:
     """Test basic functionality of Herschel-Bulkley model."""
 
+    @pytest.mark.smoke
     def test_initialization(self):
         """Test model initialization."""
         model = HerschelBulkley()
@@ -23,6 +24,7 @@ class TestHerschelBulkleyBasics:
         assert "K" in model.parameters
         assert "n" in model.parameters
 
+    @pytest.mark.smoke
     def test_parameter_bounds(self):
         """Test parameter bounds."""
         model = HerschelBulkley()
@@ -382,6 +384,26 @@ class TestHerschelBulkleyPhysicalBehavior:
         # Should not have sudden jumps (allow for numerical yield transition)
         # At very low shear rates approaching yield, numerical precision can cause small jumps
         assert np.all(np.abs(diffs) < 15)
+
+
+class TestHerschelBulkleyModelFunction:
+    """Test model_function for Bayesian inference compatibility."""
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict(self):
+        """Test that model_function output matches predict."""
+        model = HerschelBulkley()
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("K", 2.0)
+        model.parameters.set_value("n", 0.5)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        params = np.array([10.0, 2.0, 0.5])  # [sigma_y, K, n]
+
+        mf_result = np.array(model.model_function(gamma_dot, params))
+        predict_result = model.predict(gamma_dot)
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ jax, jnp = safe_import_jax()
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
+from rheojax.core.test_modes import DeformationMode
 from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
 
 
@@ -98,6 +99,38 @@ class TestFluidityRegistration:
         """Test FluidityNonlocal can be created via factory."""
         model = ModelRegistry.create("fluidity_nonlocal")
         assert isinstance(model, FluidityNonlocal)
+
+    def test_local_protocols_actually_registered(self):
+        """TC-016: Test all 6 protocols are actually registered for FluidityLocal."""
+        info = ModelRegistry.get_info("fluidity_local")
+        assert info is not None
+        for protocol in [
+            Protocol.FLOW_CURVE,
+            Protocol.CREEP,
+            Protocol.RELAXATION,
+            Protocol.STARTUP,
+            Protocol.OSCILLATION,
+            Protocol.LAOS,
+        ]:
+            assert protocol in info.protocols, (
+                f"{protocol} missing from FluidityLocal"
+            )
+
+    def test_nonlocal_protocols_actually_registered(self):
+        """TC-016: Test all 6 protocols are actually registered for FluidityNonlocal."""
+        info = ModelRegistry.get_info("fluidity_nonlocal")
+        assert info is not None
+        for protocol in [
+            Protocol.FLOW_CURVE,
+            Protocol.CREEP,
+            Protocol.RELAXATION,
+            Protocol.STARTUP,
+            Protocol.OSCILLATION,
+            Protocol.LAOS,
+        ]:
+            assert protocol in info.protocols, (
+                f"{protocol} missing from FluidityNonlocal"
+            )
 
 
 @pytest.mark.unit
@@ -221,6 +254,138 @@ class TestFluidityBayesianInterface:
         """Test Nonlocal has fit_bayesian method from mixin."""
         model = FluidityNonlocal()
         assert hasattr(model, "fit_bayesian")
+
+
+@pytest.mark.unit
+class TestFluidityFitPredictRoundtrip:
+    """TC-003: Tests for fit->predict roundtrip across protocols."""
+
+    def test_local_flow_curve_roundtrip(self):
+        """Test fit->predict roundtrip for flow curve."""
+        model = FluidityLocal()
+        gamma_dot = np.logspace(-1, 1, 15)
+        sigma = model._predict_flow_curve(gamma_dot)
+        model.fit(gamma_dot, sigma, test_mode="flow_curve", max_iter=20)
+        sigma_pred = model.predict(gamma_dot)
+        assert sigma_pred.shape == sigma.shape
+        assert np.all(np.isfinite(sigma_pred))
+
+    def test_local_oscillation_roundtrip(self):
+        """Test fit->predict roundtrip for oscillation."""
+        model = FluidityLocal()
+        omega = np.logspace(-1, 1, 15)
+        G_star = model._predict_saos_jit(
+            jnp.asarray(omega),
+            model.parameters.get_value("G"),
+            model.parameters.get_value("f_eq"),
+            model.parameters.get_value("theta"),
+        )
+        G_star_np = np.array(G_star)
+        model.fit(omega, G_star_np, test_mode="oscillation", max_iter=20)
+        pred = model.predict(omega)
+        assert pred.shape == G_star_np.shape
+        assert np.all(np.isfinite(pred))
+
+    def test_local_startup_roundtrip(self):
+        """Test predict roundtrip for startup protocol.
+
+        Note: diffrax ODE + NLSQ has jvp/custom_vjp incompatibility,
+        so we set params manually and verify predict() works after
+        setting the required self._ attributes (simulating a completed fit).
+        """
+        model = FluidityLocal()
+        model._test_mode = "startup"
+        model._gamma_dot_applied = 1.0
+        model.fitted_ = True
+        t = np.linspace(0, 10, 15)
+        pred = model.predict(t)
+        assert pred.shape == t.shape
+        assert np.all(np.isfinite(pred))
+
+    def test_local_creep_roundtrip(self):
+        """Test predict roundtrip for creep protocol.
+
+        Note: diffrax ODE + NLSQ has jvp/custom_vjp incompatibility,
+        so we set params manually and verify predict() works after
+        setting the required self._ attributes (simulating a completed fit).
+        """
+        model = FluidityLocal()
+        model.parameters.set_value("f_eq", 1e-4)
+        model.parameters.set_value("f_inf", 1e-2)
+        model._test_mode = "creep"
+        model._sigma_applied = 1000.0
+        model.fitted_ = True
+        t = np.linspace(0, 10, 15)
+        pred = model.predict(t)
+        assert pred.shape == t.shape
+        assert np.all(np.isfinite(pred))
+
+    def test_local_relaxation_roundtrip(self):
+        """Test predict roundtrip for relaxation protocol.
+
+        Note: diffrax ODE + NLSQ has jvp/custom_vjp incompatibility,
+        so we set params manually and verify predict() works after
+        setting the required self._ attributes (simulating a completed fit).
+        """
+        model = FluidityLocal()
+        model._test_mode = "relaxation"
+        model._gamma_dot_applied = None
+        model._sigma_applied = None
+        model.fitted_ = True
+        t = np.linspace(0, 50, 15)
+        pred = model.predict(t)
+        assert pred.shape == t.shape
+        assert np.all(np.isfinite(pred))
+
+
+@pytest.mark.unit
+class TestFluidityPredictBeforeFit:
+    """TC-013: Test predict() before fit() behavior."""
+
+    def test_local_predict_before_fit_raises(self):
+        """Test FluidityLocal predict before fit raises or returns valid output."""
+        model = FluidityLocal()
+        X = np.logspace(-1, 1, 10)
+        # predict() requires test_mode to be set (either via fit or explicitly)
+        # Without it, should raise ValueError
+        with pytest.raises((ValueError, AttributeError)):
+            model.predict(X)
+
+    def test_nonlocal_predict_before_fit_raises(self):
+        """Test FluidityNonlocal predict before fit raises or returns valid output."""
+        model = FluidityNonlocal()
+        X = np.logspace(-1, 1, 10)
+        with pytest.raises((ValueError, AttributeError)):
+            model.predict(X)
+
+
+@pytest.mark.unit
+class TestFluidityDMTA:
+    """TC-015: Test DMTA deformation mode support for fluidity models."""
+
+    def test_local_supports_shear(self):
+        """Test FluidityLocal supports SHEAR deformation mode."""
+        info = ModelRegistry.get_info("fluidity_local")
+        assert info is not None
+        assert DeformationMode.SHEAR in info.deformation_modes
+
+    def test_local_supports_tension(self):
+        """Test FluidityLocal supports TENSION deformation mode."""
+        info = ModelRegistry.get_info("fluidity_local")
+        assert info is not None
+        assert DeformationMode.TENSION in info.deformation_modes
+
+    def test_nonlocal_supports_shear(self):
+        """Test FluidityNonlocal supports SHEAR deformation mode."""
+        info = ModelRegistry.get_info("fluidity_nonlocal")
+        assert info is not None
+        assert DeformationMode.SHEAR in info.deformation_modes
+
+    def test_nonlocal_supports_tension(self):
+        """Test FluidityNonlocal supports TENSION deformation mode."""
+        info = ModelRegistry.get_info("fluidity_nonlocal")
+        assert info is not None
+        assert DeformationMode.TENSION in info.deformation_modes
 
 
 @pytest.mark.unit
@@ -358,6 +523,15 @@ class TestFluidityModelComparison:
 
         np.testing.assert_allclose(G_star_local, G_star_nonlocal, rtol=1e-10)
 
+    def test_nonlocal_xi_zero_limit(self):
+        """TC-026: Test nonlocal approaches local behavior as xi -> 0."""
+        model = FluidityNonlocal(N_y=16)
+        model.parameters.set_value("xi", 1e-9)  # Very small cooperativity
+        gamma_dot = np.logspace(-1, 1, 10)
+        sigma = model._predict_flow_curve(gamma_dot)
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma > 0)
+
 
 @pytest.mark.unit
 class TestFluidityImportPaths:
@@ -384,3 +558,29 @@ class TestFluidityImportPaths:
         available = ModelRegistry.list_models()
         assert "fluidity_local" in available
         assert "fluidity_nonlocal" in available
+
+
+@pytest.mark.slow
+class TestFluidityBayesianSmoke:
+    """TC-008: Bayesian inference smoke tests."""
+
+    def test_local_bayesian_smoke(self):
+        """Bayesian smoke test for FluidityLocal."""
+        model = FluidityLocal()
+        gamma_dot = np.logspace(-1, 1, 15)
+        sigma = model._predict_flow_curve(gamma_dot)
+        sigma_noisy = sigma * (
+            1 + 0.02 * np.random.RandomState(42).randn(len(sigma))
+        )
+        model.fit(gamma_dot, sigma_noisy, test_mode="flow_curve", max_iter=50)
+        result = model.fit_bayesian(
+            gamma_dot,
+            sigma_noisy,
+            test_mode="flow_curve",
+            num_warmup=10,
+            num_samples=10,
+            num_chains=1,
+            seed=42,
+        )
+        assert result is not None
+        assert hasattr(result, "posterior_samples")

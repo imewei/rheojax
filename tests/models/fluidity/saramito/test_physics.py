@@ -105,21 +105,30 @@ class TestThixotropicOvershoot:
         assert overshoot_ratio > 1.1  # At least 10% overshoot expected
 
     def test_overshoot_increases_with_waiting(self, model):
-        """Test overshoot increases with waiting time."""
+        """Test overshoot increases with waiting time (TC-019).
+
+        The simulate_startup t_wait parameter models aging from a previously
+        rejuvenated state (f_flow). At t_wait=0, f_init = f_age (fully aged,
+        special case). For t_wait > 0: f_init = f_age + (f_flow - f_age)*exp(-t_wait/t_a).
+        So short positive t_wait = less aged (high f), long t_wait = more aged (low f).
+        """
         t = np.linspace(0, 100, 1000)
         gamma_dot = 0.1
 
-        # Short wait
-        _, stress_short, _ = model.simulate_startup(t, gamma_dot, t_wait=0.0)
+        # Short wait: recently sheared, higher initial fluidity (less structure)
+        _, stress_short, _ = model.simulate_startup(t, gamma_dot, t_wait=10.0)
         overshoot_short = np.max(stress_short) / stress_short[-1]
 
-        # Long wait (more aged structure)
-        _, stress_long, _ = model.simulate_startup(t, gamma_dot, t_wait=1000.0)
+        # Long wait: well-aged, lower initial fluidity (more structure)
+        _, stress_long, _ = model.simulate_startup(t, gamma_dot, t_wait=5000.0)
         overshoot_long = np.max(stress_long) / stress_long[-1]
 
-        # Longer wait should give larger overshoot (more aged → stronger structure)
-        # This is a key thixotropic signature
-        assert overshoot_long >= overshoot_short * 0.9  # Allow some tolerance
+        # Longer wait = more aging = stronger structure = larger overshoot
+        # This is a key thixotropic signature (TC-019: strict monotonicity)
+        assert overshoot_long > overshoot_short, (
+            f"Longer wait should produce more overshoot: "
+            f"overshoot_long={overshoot_long:.4f}, overshoot_short={overshoot_short:.4f}"
+        )
 
 
 class TestNormalStressScaling:

@@ -105,8 +105,12 @@ class TestHebraudLequeux:
         gdot = np.array([0.1, 1.0])
 
         # We just want to verify prediction works and returns large values
-        # No need to fit, just set the test mode manually
+        # No need to fit, just set the test mode and protocol kwargs manually
         model._test_mode = "steady_shear"
+        model._last_fit_kwargs = {
+            "_sigma_max": max(5.0, model.grid_sigma_factor * 100.0),
+            "_n_bins": 501,
+        }
 
         # Predict
         stress = model.predict(gdot)

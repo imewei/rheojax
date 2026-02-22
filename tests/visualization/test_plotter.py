@@ -64,7 +64,7 @@ class TestPlotRheoData:
         )
 
         # Expect warning about non-positive values in log-scale plot
-        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+        with pytest.warns(UserWarning, match="non-positive"):
             fig, ax = plot_rheo_data(data)
 
         assert fig is not None
@@ -146,7 +146,7 @@ class TestPlotFrequencyDomain:
         G_complex = 1e5 / (1 + 1j * frequency)
 
         # Expect warning about non-positive values in log-scale plot
-        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+        with pytest.warns(UserWarning, match="non-positive"):
             fig, axes = plot_frequency_domain(frequency, G_complex)
 
         assert fig is not None

@@ -300,9 +300,11 @@ class TestVLBLocalSAOS:
     def test_complex_modulus(self, vlb_local):
         """Test |G*| via predict with test_mode=oscillation."""
         omega = np.array([1.0])
-        G_star = vlb_local.predict(omega, test_mode="oscillation")
+        G_components = vlb_local.predict(omega, test_mode="oscillation")
+        # model_function returns (N, 2) = [G', G'']
+        G_star_mag = float(np.sqrt(G_components[0, 0] ** 2 + G_components[0, 1] ** 2))
         expected = np.sqrt(500.0**2 + 500.0**2)
-        assert float(G_star[0]) == pytest.approx(expected, rel=1e-10)
+        assert G_star_mag == pytest.approx(expected, rel=1e-10)
 
 
 # =============================================================================
@@ -614,7 +616,7 @@ class TestVLBBayesian:
 
         # Should not raise
         result = model.model_function(X, params, test_mode="oscillation")
-        assert result.shape == (20,)
+        assert result.shape == (20, 2)
         assert not jnp.any(jnp.isnan(result))
 
         # Also test flow curve
@@ -635,7 +637,7 @@ class TestVLBBayesian:
         params = jnp.array([500.0, 0.1, 500.0, 10.0, 0.0])
 
         result = model.model_function(X, params, test_mode="oscillation")
-        assert result.shape == (20,)
+        assert result.shape == (20, 2)
         assert not jnp.any(jnp.isnan(result))
 
     @pytest.mark.slow

@@ -239,13 +239,14 @@ class TestFIKHTestModeValidation:
         with pytest.raises(ValueError):
             model._validate_test_mode("invalid_mode")
 
-    def test_laos_maps_to_oscillation(self):
-        """Test LAOS mode maps to oscillation internally."""
+    def test_laos_maps_to_startup(self):
+        """Test LAOS mode maps to STARTUP (return mapping) internally."""
         model = FIKH(include_thermal=False)
         from rheojax.core.test_modes import TestMode
 
+        # LAOS uses return mapping like startup, not frequency-domain oscillation
         result = model._validate_test_mode("laos")
-        assert result == TestMode.OSCILLATION
+        assert result == TestMode.STARTUP
 
 
 class TestFIKHLimitingBehavior:
@@ -464,3 +465,130 @@ class TestFIKHPrecompile:
         # After precompile, prediction should be reasonably fast
         # (hard to test exact speedup, but it shouldn't be absurdly slow)
         assert elapsed < 30.0  # Should complete in under 30s
+
+
+class TestFIKHOscillation:
+    """Test FIKH oscillation (SAOS) predictions (F-026)."""
+
+    @pytest.mark.smoke
+    def test_oscillation_prediction_returns_complex(self):
+        """Test that oscillation prediction returns complex G*."""
+        model = FIKH(include_thermal=False, alpha_structure=0.7)
+        omega = jnp.array([0.1, 1.0, 10.0])
+        G_star = model.predict_oscillation(omega, gamma_0=0.01, n_cycles=3)
+        assert G_star.shape == (3,)
+        assert jnp.iscomplexobj(G_star)
+        # G' and G'' should be positive for a viscoelastic material
+        assert jnp.all(jnp.real(G_star) > 0)
+        assert jnp.all(jnp.imag(G_star) > 0)
+
+    @pytest.mark.smoke
+    def test_oscillation_via_predict(self):
+        """Test oscillation via _predict method with test_mode."""
+        model = FIKH(include_thermal=False, alpha_structure=0.7)
+        omega = jnp.array([0.1, 1.0, 10.0])
+        model._test_mode = "oscillation"
+        result = model._predict(omega, test_mode="oscillation", gamma_0=0.01)
+        assert result is not None
+        assert len(result) == 3
+
+    def test_oscillation_frequency_dependence(self):
+        """Test G* is finite and positive across frequencies."""
+        model = FIKH(include_thermal=False, alpha_structure=0.7)
+        omega = jnp.array([0.1, 1.0, 10.0])
+        G_star = model.predict_oscillation(omega, gamma_0=0.01, n_cycles=3)
+        magnitudes = jnp.abs(G_star)
+        # |G*| should be finite and positive at all frequencies
+        assert jnp.all(jnp.isfinite(magnitudes))
+        assert jnp.all(magnitudes > 0)
+
+
+class TestFIKHFitIntegration:
+    """Test fit → predict integration (F-027)."""
+
+    @pytest.mark.smoke
+    def test_fit_startup_then_predict(self):
+        """Test that fit() followed by predict() works for startup."""
+        model = FIKH(include_thermal=False, alpha_structure=0.7)
+        t = jnp.linspace(0.01, 5.0, 50)
+        strain = 0.1 * t  # linear ramp
+        # Generate synthetic data from default params
+        stress_true = model._predict_from_params(t, strain, model._get_params_dict())
+        noise = 0.01 * jnp.std(stress_true) * jax.random.normal(
+            jax.random.PRNGKey(42), shape=stress_true.shape
+        )
+        stress_data = stress_true + noise
+
+        # Fit
+        model.fit(t, stress_data, test_mode="startup", strain=strain, max_iter=50)
+
+        # Predict should use the fitted parameters
+        stress_pred = model.predict(t, test_mode="startup", strain=strain)
+        assert stress_pred.shape == stress_data.shape
+        assert jnp.all(jnp.isfinite(stress_pred))
+
+    @pytest.mark.smoke
+    def test_fit_flow_curve_then_predict(self):
+        """Test flow curve fit → predict roundtrip."""
+        model = FIKH(include_thermal=False, alpha_structure=0.7)
+        gamma_dot = jnp.logspace(-2, 2, 20)
+        # Use model to generate synthetic data
+        from rheojax.models.fikh._kernels import fikh_flow_curve_steady_state
+
+        params = model._get_params_dict()
+        sigma_true = fikh_flow_curve_steady_state(
+            gamma_dot, include_thermal=False, **params
+        )
+
+        model.fit(gamma_dot, sigma_true, test_mode="flow_curve", max_iter=20)
+        sigma_pred = model.predict(gamma_dot, test_mode="flow_curve")
+        assert sigma_pred.shape == sigma_true.shape
+        assert jnp.all(jnp.isfinite(sigma_pred))
+
+
+class TestFIKHSignSafe:
+    """Test sign_safe fix (F-001)."""
+
+    def test_sign_safe_positive(self):
+        """Test sign_safe returns +1 for positive values."""
+        from rheojax.models.fikh._kernels import sign_safe
+
+        assert sign_safe(jnp.array(1.0)) == 1.0
+        assert sign_safe(jnp.array(1e-25)) == 0.0  # Below eps (1e-20) → 0
+
+    def test_sign_safe_negative(self):
+        """Test sign_safe returns -1 for negative values."""
+        from rheojax.models.fikh._kernels import sign_safe
+
+        assert sign_safe(jnp.array(-1.0)) == -1.0
+        # F-001 fix: small negative values no longer flip to +1
+        assert sign_safe(jnp.array(-1e-30)) == 0.0  # Below eps → 0
+
+    def test_sign_safe_zero(self):
+        """Test sign_safe returns 0 for zero."""
+        from rheojax.models.fikh._kernels import sign_safe
+
+        assert sign_safe(jnp.array(0.0)) == 0.0
+
+
+class TestFIKHThermalYieldStress:
+    """Test thermal yield stress fix (F-007)."""
+
+    def test_no_double_lambda(self):
+        """Verify yield stress doesn't apply λ twice."""
+        from rheojax.models.fikh._thermal import thermal_yield_stress
+
+        sigma_y0 = 100.0
+        lam = 0.5
+        m_y = 1.0
+        T = 298.15
+        T_ref = 298.15
+        E_y = 0.0  # No temperature effect
+
+        # When called with lam=1.0 (F-007 fix in kernels), only base matters
+        result = thermal_yield_stress(sigma_y0, 1.0, m_y, T, T_ref, E_y)
+        assert jnp.isclose(result, sigma_y0, atol=1e-6)
+
+        # With lam < 1, should scale by lam^m_y
+        result_lam = thermal_yield_stress(sigma_y0, lam, m_y, T, T_ref, E_y)
+        assert jnp.isclose(result_lam, sigma_y0 * lam**m_y, atol=1e-6)

@@ -277,6 +277,20 @@ class TestStartupSimulation:
         assert "tau_xy_1" in result
         assert "tau_xy_total" in result
 
+    @pytest.mark.smoke
+    def test_startup_via_predict(self):
+        """Test startup via predict() with protocol kwargs."""
+        model = GiesekusMultiMode(n_modes=2)
+        model.set_mode_params(0, eta_p=100.0, lambda_1=1.0, alpha=0.3)
+        model.set_mode_params(1, eta_p=50.0, lambda_1=0.1, alpha=0.2)
+
+        t = np.linspace(0, 5, 50)
+        sigma = model.predict(t, test_mode="startup", gamma_dot=10.0)
+
+        assert sigma.shape == t.shape
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0)
+
 
 class TestRelaxationSpectrum:
     """Tests for relaxation spectrum analysis."""
@@ -336,11 +350,104 @@ class TestModelFunction:
         """Test model_function for SAOS."""
         model = GiesekusMultiMode(n_modes=2)
 
-        # Build params array: [eta_s, eta_p_0, eta_p_1, lambda_0, lambda_1, alpha_0, alpha_1]
-        params = jnp.array([5.0, 100.0, 50.0, 10.0, 1.0, 0.3, 0.2])
+        # Interleaved: [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1]
+        params = jnp.array([5.0, 100.0, 10.0, 0.3, 50.0, 1.0, 0.2])
 
         omega = jnp.logspace(-1, 1, 10)
         y = model.model_function(omega, params, test_mode="oscillation")
 
         assert y.shape == (len(omega), 2)  # G_prime and G_double_prime
         assert np.all(y > 0)
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict_oscillation(self):
+        """Test model_function output matches predict_saos for oscillation.
+
+        Divergence means Bayesian posteriors would be wrong.
+        """
+        model = GiesekusMultiMode(n_modes=2)
+        model.parameters.set_value("eta_s", 5.0)
+        model.set_mode_params(0, eta_p=100.0, lambda_1=10.0, alpha=0.3)
+        model.set_mode_params(1, eta_p=50.0, lambda_1=1.0, alpha=0.2)
+
+        omega = np.logspace(-2, 2, 20)
+
+        # Interleaved: [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1]
+        params = jnp.array([5.0, 100.0, 10.0, 0.3, 50.0, 1.0, 0.2])
+
+        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        G_prime, G_double_prime = model.predict_saos(omega)
+
+        np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
+        np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)
+
+    @pytest.mark.smoke
+    def test_model_function_matches_predict_flow_curve(self):
+        """Test model_function output matches predict for flow_curve."""
+        model = GiesekusMultiMode(n_modes=2)
+        model.parameters.set_value("eta_s", 5.0)
+        model.set_mode_params(0, eta_p=100.0, lambda_1=1.0, alpha=0.3)
+        model.set_mode_params(1, eta_p=50.0, lambda_1=0.1, alpha=0.2)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+
+        # Interleaved: [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1]
+        params = jnp.array([5.0, 100.0, 1.0, 0.3, 50.0, 0.1, 0.2])
+
+        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
+
+
+class TestParameterSetRoundtrip:
+    """Tests for ParameterSet→model_function roundtrip (the actual NUTS path).
+
+    During NUTS, params are built from ParameterSet.keys() iteration order.
+    The stride-3 slicing in model_function depends on this ordering being
+    [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1, ...].
+    """
+
+    @pytest.mark.smoke
+    def test_parameterset_to_model_function_flow_curve(self):
+        """Verify params built from ParameterSet.keys() match predict for flow_curve."""
+        model = GiesekusMultiMode(n_modes=3)
+        model.parameters.set_value("eta_s", 3.0)
+        model.set_mode_params(0, eta_p=200.0, lambda_1=5.0, alpha=0.35)
+        model.set_mode_params(1, eta_p=80.0, lambda_1=0.5, alpha=0.25)
+        model.set_mode_params(2, eta_p=30.0, lambda_1=0.05, alpha=0.15)
+
+        gamma_dot = np.logspace(-1, 2, 15)
+
+        # Build params the way _predict() / NUTS does it
+        param_names = list(model.parameters.keys())
+        params = jnp.array(
+            [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
+        )
+
+        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
+
+        np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
+
+    @pytest.mark.smoke
+    def test_parameterset_to_model_function_oscillation(self):
+        """Verify params built from ParameterSet.keys() match predict for oscillation."""
+        model = GiesekusMultiMode(n_modes=3)
+        model.parameters.set_value("eta_s", 3.0)
+        model.set_mode_params(0, eta_p=200.0, lambda_1=5.0, alpha=0.35)
+        model.set_mode_params(1, eta_p=80.0, lambda_1=0.5, alpha=0.25)
+        model.set_mode_params(2, eta_p=30.0, lambda_1=0.05, alpha=0.15)
+
+        omega = np.logspace(-2, 2, 15)
+
+        param_names = list(model.parameters.keys())
+        params = jnp.array(
+            [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
+        )
+
+        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        G_prime, G_double_prime = model.predict_saos(omega)
+
+        np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
+        np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)

@@ -205,6 +205,23 @@ class TestFluidityNonlocalTransient:
         assert sigma[0] > sigma[-1]
         assert sigma[0] > 500  # Started at 1000
 
+    def test_creep_strain_increases(self):
+        """TC-012: Test creep strain increases under applied stress."""
+        model = FluidityNonlocal(N_y=16)
+        model.parameters.set_value("f_eq", 1e-4)
+        model.parameters.set_value("f_inf", 1e-2)
+        t = np.linspace(0, 10, 20)
+        gamma = model._simulate_pde(
+            jnp.asarray(t),
+            model.get_parameter_dict(),
+            mode="creep",
+            gamma_dot=None,
+            sigma_applied=1000.0,
+            sigma_0=None,
+        )
+        gamma = np.array(gamma)
+        assert gamma[-1] > gamma[0]
+
 
 @pytest.mark.unit
 class TestFluidityNonlocalShearBanding:
@@ -328,6 +345,17 @@ class TestFluidityNonlocalOscillation:
         assert len(strain) == 2 * 32
         assert np.all(np.isfinite(strain))
         assert np.all(np.isfinite(stress))
+        # TC-024: Stress must be non-zero
+        assert np.max(np.abs(stress)) > 0
+
+    def test_laos_fluidity_trajectory_stored(self):
+        """TC-022: Test that LAOS stores fluidity field trajectory."""
+        model = FluidityNonlocal(N_y=16)
+        strain, stress = model.simulate_laos(
+            gamma_0=0.1, omega=1.0, n_cycles=2, n_points_per_cycle=32
+        )
+        assert model._f_field_trajectory is not None
+        assert model._f_field_trajectory.shape[1] == 16
 
 
 @pytest.mark.unit
@@ -360,6 +388,66 @@ class TestFluidityNonlocalModelFunction:
         assert result.shape == (len(X), 2)
         assert np.all(np.isfinite(result))
 
+    def test_model_function_startup(self):
+        """TC-002: Test model_function for startup protocol."""
+        model = FluidityNonlocal(N_y=16)
+        model._test_mode = "startup"
+        model._gamma_dot_applied = 1.0
+        t = np.linspace(0, 10, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(t, params, test_mode="startup", gamma_dot=1.0)
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_relaxation(self):
+        """TC-002: Test model_function for relaxation protocol."""
+        model = FluidityNonlocal(N_y=16)
+        model._test_mode = "relaxation"
+        t = np.linspace(0, 50, 20)
+        params = list(model.parameters.get_values())
+        # model_function passes sigma_0=None, so _simulate_pde defaults
+        # to tau_y for the initial stress
+        result = model.model_function(t, params, test_mode="relaxation")
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_creep(self):
+        """TC-002: Test model_function for creep protocol."""
+        model = FluidityNonlocal(N_y=16)
+        model._test_mode = "creep"
+        model._sigma_applied = 1000.0
+        t = np.linspace(0, 10, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(
+            t, params, test_mode="creep", sigma_applied=1000.0
+        )
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_model_function_laos(self):
+        """TC-002: Test model_function for LAOS protocol."""
+        model = FluidityNonlocal(N_y=16)
+        model._test_mode = "laos"
+        model._gamma_0 = 0.1
+        model._omega_laos = 1.0
+
+        period = 2.0 * np.pi / 1.0
+        t = np.linspace(0, 2 * period, 20)
+        params = list(model.parameters.get_values())
+        result = model.model_function(
+            t, params, test_mode="laos", gamma_0=0.1, omega=1.0
+        )
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_laos_requires_gamma_0(self):
+        """TC-004: LAOS without gamma_0/omega should raise."""
+        model = FluidityNonlocal(N_y=16)
+        t = np.linspace(0, 1, 20)
+        params = list(model.parameters.get_values())
+        with pytest.raises((ValueError, TypeError, KeyError)):
+            model.model_function(t, params, test_mode="laos")
+
 
 @pytest.mark.unit
 class TestFluidityNonlocalFitting:
@@ -390,7 +478,13 @@ class TestFluidityNonlocalFitting:
         # The fit may not converge perfectly with limited iterations
 
     def test_fit_uses_coarse_grid_for_transient(self):
-        """Test fitting uses coarse grid for performance."""
+        """Test fitting uses coarse grid for performance.
+
+        TC-021: Note - this test uses flow_curve which doesn't actually use
+        the spatial grid. The coarse grid optimization is only relevant for
+        transient protocols (startup/relaxation/creep) which use PDE solving.
+        The test verifies grid restoration after fitting regardless.
+        """
         model = FluidityNonlocal(N_y=64)
         original_N_y = model.N_y
 
