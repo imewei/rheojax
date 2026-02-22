@@ -165,6 +165,19 @@ class BayesianService:
                     if name in model.parameters:
                         model.parameters[name].value = value
 
+            # GUI-004 fix: Apply custom priors to fresh model.
+            # Core BayesianMixin._build_numpyro_model() reads param.prior
+            # dicts at bayesian.py:1425-1433.
+            custom_priors = kwargs.pop("custom_priors", None)
+            if custom_priors and isinstance(custom_priors, dict):
+                for name, prior_spec in custom_priors.items():
+                    if name in model.parameters:
+                        model.parameters[name].prior = prior_spec
+                logger.info(
+                    "Applied custom priors to fresh model",
+                    parameters=list(custom_priors.keys()),
+                )
+
             # F-HL-005 fix: Transfer fitted state for stateful models (HL, DMT,
             # ITT-MCT, Fluidity-Saramito, VLB, STZ, HVM, HVNM, IKH, SGR,
             # SPP, GMM) that cache protocol kwargs and grid settings in
@@ -285,7 +298,7 @@ class BayesianService:
                 logger.warning(f"Could not get InferenceData: {e}")
 
             # Extract summary diagnostics for logging
-            max_r_hat = diagnostics.get("max_rhat")
+            max_r_hat = diagnostics.get("max_r_hat")
             min_ess = diagnostics.get("min_ess")
             divergences = diagnostics.get("divergences", 0)
 
@@ -356,11 +369,9 @@ class BayesianService:
             ess = core_diag.get("ess", {})
             divergences = int(core_diag.get("divergences", 0))
             return {
-                "rhat": r_hat,
                 "r_hat": r_hat,
                 "ess": ess,
                 "divergences": divergences,
-                "max_rhat": max(r_hat.values()) if r_hat else None,
                 "max_r_hat": max(r_hat.values()) if r_hat else None,
                 "min_ess": min(ess.values()) if ess else None,
                 "warnings": [],
@@ -419,20 +430,18 @@ class BayesianService:
                 divergences = int(result.diagnostics["divergences"])
 
             diagnostics = {
-                "rhat": rhat_dict,
-                "r_hat": rhat_dict,  # alias for GUI/state consumers
+                "r_hat": rhat_dict,
                 "ess": ess_dict,
                 "divergences": divergences,
-                "max_rhat": max(rhat_dict.values()) if rhat_dict else None,
                 "max_r_hat": max(rhat_dict.values()) if rhat_dict else None,
                 "min_ess": min(ess_dict.values()) if ess_dict else None,
             }
 
             # Add warnings
             warnings = []
-            if diagnostics["max_rhat"] and diagnostics["max_rhat"] > 1.1:
+            if diagnostics["max_r_hat"] and diagnostics["max_r_hat"] > 1.1:
                 warnings.append(
-                    f"High R-hat detected: {diagnostics['max_rhat']:.3f} > 1.1"
+                    f"High R-hat detected: {diagnostics['max_r_hat']:.3f} > 1.1"
                 )
             if diagnostics["min_ess"] and diagnostics["min_ess"] < 400:
                 warnings.append(f"Low ESS detected: {diagnostics['min_ess']:.0f} < 400")
@@ -443,7 +452,7 @@ class BayesianService:
 
             logger.debug(
                 "Exiting get_diagnostics",
-                max_rhat=diagnostics["max_rhat"],
+                max_rhat=diagnostics["max_r_hat"],
                 min_ess=diagnostics["min_ess"],
                 divergences=divergences,
                 num_warnings=len(warnings),

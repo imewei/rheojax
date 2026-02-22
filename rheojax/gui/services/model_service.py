@@ -15,6 +15,7 @@ import numpy as np
 
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.state.store import FitResult
 from rheojax.logging import get_logger
 from rheojax.utils.compatibility import check_model_compatibility
 
@@ -193,9 +194,6 @@ def _is_placeholder_model(model_name: str | None) -> bool:
     key = model_name.strip().lower()
     return key == "" or key.startswith("select model")
 
-
-# Import canonical FitResult from store (single source of truth)
-from rheojax.gui.state.store import FitResult
 
 
 class ModelService:
@@ -1131,7 +1129,7 @@ class ModelService:
                 model._test_mode = test_mode
 
             # Transfer fitted model state if provided (protocol kwargs, grid settings)
-            fitted_state = model_kwargs.pop("fitted_model_state", None) if model_kwargs else None
+            fitted_state = model_kwargs.get("fitted_model_state") if model_kwargs else None
             if fitted_state and isinstance(fitted_state, dict):
                 for attr in (
                     "_last_fit_kwargs",

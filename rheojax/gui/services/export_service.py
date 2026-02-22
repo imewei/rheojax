@@ -596,11 +596,11 @@ class ExportService:
             if template == "bayesian" and "diagnostics" in state:
                 report_lines.append("## MCMC Diagnostics\n")
                 diag = state["diagnostics"]
-                if "rhat" in diag:
+                if "r_hat" in diag:
                     report_lines.append("### R-hat Statistics\n")
                     report_lines.append("| Parameter | R-hat |\n")
                     report_lines.append("|-----------|-------|\n")
-                    for param, rhat in diag["rhat"].items():
+                    for param, rhat in diag["r_hat"].items():
                         report_lines.append(f"| {param} | {rhat:.4f} |\n")
                     report_lines.append("\n")
                 if "ess" in diag:

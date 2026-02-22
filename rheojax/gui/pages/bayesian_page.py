@@ -734,6 +734,7 @@ class BayesianPage(QWidget):
             deformation_mode=deform_text if deform_text != "shear" else None,
             poisson_ratio=poisson_val if deform_text != "shear" else None,
             fitted_model_state=fitted_model_state,
+            dataset_id=self._submitted_dataset_id,
         )
 
         # Connect BayesianWorker-specific signals with QueuedConnection.

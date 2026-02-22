@@ -110,6 +110,7 @@ class BayesianWorker(QRunnable):
         deformation_mode: str | None = None,
         poisson_ratio: float | None = None,
         fitted_model_state: dict[str, Any] | None = None,
+        dataset_id: str = "",
     ):
         """Initialize Bayesian worker.
 
@@ -137,6 +138,8 @@ class BayesianWorker(QRunnable):
             Deformation mode for DMTA (e.g., 'tension', 'shear')
         poisson_ratio : float, optional
             Poisson ratio for E*-G* conversion
+        dataset_id : str, default=""
+            Dataset identifier for result association
         """
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -159,6 +162,7 @@ class BayesianWorker(QRunnable):
         self._deformation_mode = deformation_mode
         self._poisson_ratio = poisson_ratio
         self._fitted_model_state = fitted_model_state
+        self._dataset_id = dataset_id
 
         # Track progress
         self._current_stage = "warmup"
@@ -226,38 +230,6 @@ class BayesianWorker(QRunnable):
                     else:
                         logger.warning(
                             "Warm-start parameter not found in model",
-                            parameter=name,
-                        )
-
-            # GUI-004/GUI-006 fix: Apply custom priors if provided.
-            # TODO(GUI-004): This is currently a dead code path. The priors
-            # are set on `model.parameters[name].prior` here, but
-            # BayesianService.run_mcmc() creates a NEW model instance
-            # internally, discarding these assignments. Furthermore,
-            # BayesianMixin.fit_bayesian() does not read `param.prior`.
-            # Fixing the full prior pipeline requires changes to
-            # BayesianMixin (core/bayesian.py), which is outside GUI scope.
-            if self._priors:
-                # Warn the user that configured priors will not propagate
-                if any(
-                    name in model.parameters for name in self._priors
-                ):
-                    logger.warning(
-                        "User-configured priors are not yet propagated to "
-                        "NUTS inference. BayesianService creates a fresh "
-                        "model instance, discarding prior assignments.",
-                        parameters=list(self._priors.keys()),
-                    )
-                for name, prior in self._priors.items():
-                    if name in model.parameters:
-                        model.parameters[name].prior = prior
-                        logger.debug(
-                            "Applied custom prior (will be discarded by service)",
-                            parameter=name,
-                        )
-                    else:
-                        logger.warning(
-                            "Prior parameter not found in model",
                             parameter=name,
                         )
 
@@ -349,6 +321,29 @@ class BayesianWorker(QRunnable):
             if self._fitted_model_state:
                 mcmc_kwargs["fitted_model_state"] = self._fitted_model_state
 
+            # GUI-004 fix: Pass custom priors through to BayesianService,
+            # which transfers them to the fresh model before fit_bayesian().
+            # Core BayesianMixin._build_numpyro_model() reads param.prior
+            # dicts (F-001 fix in bayesian.py:1425-1433).
+            if self._priors:
+                valid_priors = {
+                    name: prior
+                    for name, prior in self._priors.items()
+                    if name in model.parameters
+                }
+                if valid_priors:
+                    mcmc_kwargs["custom_priors"] = valid_priors
+                    logger.info(
+                        "Passing custom priors to BayesianService",
+                        parameters=list(valid_priors.keys()),
+                    )
+                invalid = set(self._priors) - set(valid_priors)
+                if invalid:
+                    logger.warning(
+                        "Prior parameters not found in model",
+                        parameters=list(invalid),
+                    )
+
             # F-009 fix: Emit periodic elapsed-time updates during NUTS sampling
             # since NumPyro NUTS does not support progress callbacks.
             import threading
@@ -412,10 +407,10 @@ class BayesianWorker(QRunnable):
             # Create result
             result = BayesianResult(
                 model_name=self._model_name,
-                dataset_id="",  # Filled by BayesianPage._on_finished()
+                dataset_id=self._dataset_id,
                 posterior_samples=bayesian_result.posterior_samples,
                 summary=bayesian_result.summary,
-                r_hat=diagnostics.get("r_hat") or diagnostics.get("rhat") or {},
+                r_hat=diagnostics.get("r_hat", {}),
                 ess=diagnostics.get("ess", {}),
                 divergences=int(diagnostics.get("divergences", 0) or 0),
                 credible_intervals=credible_intervals,
@@ -425,10 +420,11 @@ class BayesianWorker(QRunnable):
                 num_samples=self._num_samples,
                 num_chains=self._num_chains,
                 inference_data=getattr(bayesian_result, "inference_data", None),
+                diagnostics_valid=bool(diagnostics.get("diagnostics_valid", True)),
             )
 
             # Log convergence diagnostics at DEBUG level
-            rhat_dict = diagnostics.get("r_hat") or diagnostics.get("rhat") or {}
+            rhat_dict = diagnostics.get("r_hat", {})
             ess_dict = diagnostics.get("ess", {})
             for param_name in bayesian_result.posterior_samples.keys():
                 r_hat = rhat_dict.get(param_name, float("nan"))

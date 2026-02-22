@@ -399,6 +399,7 @@ def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
+    store.dispatch("FITTING_FAILED", {"model_name": model_name, "dataset_id": dataset_id, "error": error})
     store.emit_signal("fit_failed", model_name, dataset_id, error)
 
 
@@ -585,6 +586,7 @@ def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
+    store.dispatch("BAYESIAN_FAILED", {"model_name": model_name, "dataset_id": dataset_id, "error": error})
     store.emit_signal("bayesian_failed", model_name, dataset_id, error)
 
 

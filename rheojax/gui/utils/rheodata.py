@@ -73,16 +73,25 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
             )
             y_arr = y_arr.astype(float) + 1j * y2_arr.astype(float)
 
-    rheo_data = RheoData(
-        x=x_arr,
-        y=y_arr,
-        x_units=metadata.get("x_units"),
-        y_units=metadata.get("y_units"),
-        domain=metadata.get("domain", "time"),
-        metadata=metadata,
-        initial_test_mode=test_mode,
-        validate=False,
-    )
+    try:
+        rheo_data = RheoData(
+            x=x_arr,
+            y=y_arr,
+            x_units=metadata.get("x_units"),
+            y_units=metadata.get("y_units"),
+            domain=metadata.get("domain", "time"),
+            metadata=metadata,
+            initial_test_mode=test_mode,
+            validate=True,
+        )
+    except ValueError as e:
+        logger.error(
+            "Data validation failed during GUI→RheoData conversion",
+            error=str(e),
+            x_shape=x_arr.shape,
+            y_shape=y_arr.shape,
+        )
+        raise
     logger.debug(
         "Created RheoData",
         x_shape=rheo_data.x.shape,

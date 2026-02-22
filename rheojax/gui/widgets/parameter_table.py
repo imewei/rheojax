@@ -5,6 +5,8 @@ Parameter Table Widget
 Interactive table for model parameter editing.
 """
 
+from dataclasses import replace
+
 from rheojax.gui.compat import (
     QBrush,
     QCheckBox,
@@ -17,8 +19,6 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from dataclasses import replace
-
 from rheojax.gui.state.store import ParameterState
 from rheojax.logging import get_logger
 

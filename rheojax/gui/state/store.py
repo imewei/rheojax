@@ -1116,7 +1116,7 @@ class StateStore:
                         model_name=model_name,
                         dataset_id=str(dataset_id),
                         posterior_samples=getattr(result, "posterior_samples", {}),
-                        r_hat=diag.get("r_hat", diag.get("rhat", {})) or getattr(result, "r_hat", {}),
+                        r_hat=diag.get("r_hat", {}) or getattr(result, "r_hat", {}),
                         ess=diag.get("ess", {}) or getattr(result, "ess", {}),
                         divergences=int(
                             diag.get("divergences", 0)
@@ -1383,10 +1383,11 @@ class StateStore:
         Returns
         -------
         DatasetState | None
-            Dataset state or None if not found
+            Cloned dataset state or None if not found
         """
         with self._lock:
-            return self._state.datasets.get(dataset_id)
+            ds = self._state.datasets.get(dataset_id)
+            return ds.clone() if ds is not None else None
 
     def get_active_dataset(self) -> DatasetState | None:
         """Get the currently active dataset.
@@ -1394,11 +1395,12 @@ class StateStore:
         Returns
         -------
         DatasetState | None
-            Active dataset state or None
+            Cloned active dataset state or None
         """
         with self._lock:
             if self._state.active_dataset_id:
-                return self._state.datasets.get(self._state.active_dataset_id)
+                ds = self._state.datasets.get(self._state.active_dataset_id)
+                return ds.clone() if ds is not None else None
             return None
 
     def get_fit_result(self, key: str) -> FitResult | None:
@@ -1412,10 +1414,11 @@ class StateStore:
         Returns
         -------
         FitResult | None
-            Fit result or None if not found
+            Cloned fit result or None if not found
         """
         with self._lock:
-            return self._state.fit_results.get(key)
+            fr = self._state.fit_results.get(key)
+            return fr.clone() if fr is not None else None
 
     def get_bayesian_result(self, key: str) -> BayesianResult | None:
         """Get Bayesian result by key.
@@ -1428,30 +1431,33 @@ class StateStore:
         Returns
         -------
         BayesianResult | None
-            Bayesian result or None if not found
+            Cloned Bayesian result or None if not found
         """
         with self._lock:
-            return self._state.bayesian_results.get(key)
+            br = self._state.bayesian_results.get(key)
+            return br.clone() if br is not None else None
 
     def get_active_fit_result(self) -> FitResult | None:
-        """Return the fit result for the active model/dataset combo."""
+        """Return cloned fit result for the active model/dataset combo."""
         with self._lock:
             state = self._state
             if not state.active_model_name or not state.active_dataset_id:
                 return None
             key = f"{state.active_model_name}_{state.active_dataset_id}"
-            return state.fit_results.get(key)
+            fr = state.fit_results.get(key)
+            return fr.clone() if fr is not None else None
 
     def get_active_bayesian_result(self) -> BayesianResult | None:
-        """Return the Bayesian result for the active model/dataset combo."""
+        """Return cloned Bayesian result for the active model/dataset combo."""
         with self._lock:
             state = self._state
             if not state.active_model_name or not state.active_dataset_id:
                 return None
             key = f"{state.active_model_name}_{state.active_dataset_id}"
-            return state.bayesian_results.get(key)
+            br = state.bayesian_results.get(key)
+            return br.clone() if br is not None else None
 
     def get_pipeline_state(self) -> PipelineState:
-        """Return the current pipeline state."""
+        """Return cloned pipeline state."""
         with self._lock:
-            return self._state.pipeline_state
+            return self._state.pipeline_state.clone()

@@ -5,6 +5,7 @@ Fit Worker
 Background worker for NLSQ model fitting operations.
 """
 
+import threading
 import time
 import traceback
 from datetime import datetime
@@ -32,6 +33,7 @@ except ImportError:
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
+from rheojax.gui.state.store import FitResult
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
@@ -39,9 +41,6 @@ jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
 
-
-# Import canonical FitResult from store (single source of truth)
-from rheojax.gui.state.store import FitResult
 
 
 class FitWorkerSignals(QObject):
@@ -149,12 +148,14 @@ class FitWorker(QRunnable):
             # thread only emits when NLSQ hasn't reported progress recently,
             # avoiding progress bar flickering from dual update sources.
             _last_nlsq_progress = time.perf_counter()
+            _progress_lock = threading.Lock()
 
             # Add progress callback that checks cancellation and emits percentage
             def progress_callback(iteration: int, loss: float, **kwargs):
                 """Progress callback for NLSQ optimization."""
                 nonlocal _last_nlsq_progress
-                _last_nlsq_progress = time.perf_counter()
+                with _progress_lock:
+                    _last_nlsq_progress = time.perf_counter()
                 self.cancel_token.check()
                 self._last_iteration = iteration
                 self._last_loss = loss
@@ -191,8 +192,6 @@ class FitWorker(QRunnable):
 
             # F-004 fix: Emit periodic elapsed-time updates for slow fits
             # (e.g., EPM lattice simulations that take 5-30 min per NLSQ).
-            import threading
-
             _fit_done = threading.Event()
             _fit_start = time.perf_counter()
 
@@ -201,7 +200,9 @@ class FitWorker(QRunnable):
                     # GUI-008 fix: Only emit elapsed time if the NLSQ callback
                     # hasn't reported progress in the last 4 seconds, to avoid
                     # both sources fighting over the progress bar.
-                    if time.perf_counter() - _last_nlsq_progress > 4.0:
+                    with _progress_lock:
+                        stale = time.perf_counter() - _last_nlsq_progress > 4.0
+                    if stale:
                         elapsed = time.perf_counter() - _fit_start
                         self.signals.progress.emit(
                             0, 0, f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)"

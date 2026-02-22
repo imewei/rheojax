@@ -155,9 +155,11 @@ class WorkerPool(QObject):
         max_threads : int, default=4
             Maximum number of concurrent worker threads
         """
-        # Skip re-initialization for singleton
-        if WorkerPool._initialized:
-            return
+        # Skip re-initialization for singleton (under lock to prevent double-init race)
+        with WorkerPool._singleton_lock:
+            if WorkerPool._initialized:
+                return
+            WorkerPool._initialized = True
 
         if not HAS_PYSIDE6:
             logger.error("PySide6 not available, cannot initialize WorkerPool")
@@ -174,7 +176,6 @@ class WorkerPool(QObject):
         self._job_start_times: dict[str, float] = {}
         self._job_lock = Lock()
 
-        WorkerPool._initialized = True
         logger.info("Worker pool initialized", max_workers=max_threads)
 
     def submit(
