@@ -636,7 +636,6 @@ class DMTLocal(DMTBase):
         self._relax_sigma_init = sigma_init
         self._relax_lam_init = lam_init
 
-        t_jax = jnp.array(t)
         stress_jax = jnp.array(stress)
         dt = float(t[1] - t[0])
         n_steps = len(t)
@@ -911,7 +910,6 @@ class DMTLocal(DMTBase):
         self._sigma_applied = sigma_0
         self._creep_lam_init = lam_init
 
-        t_jax = jnp.array(t)
         gamma_jax = jnp.array(gamma)
         dt = float(t[1] - t[0])
         n_steps = len(t)
@@ -1386,7 +1384,6 @@ class DMTLocal(DMTBase):
         t_jax = jnp.array(t)
         stress_jax = jnp.array(stress)
         dt = float(t[1] - t[0])
-        n_steps = len(t)
 
         # Compute driving strain rate
         strain_rate = gamma_0 * omega * jnp.cos(omega * t_jax)

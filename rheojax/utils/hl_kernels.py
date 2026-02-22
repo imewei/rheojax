@@ -197,27 +197,6 @@ def step_hl(
     Returns:
         Updated HLState
     """
-    P, _, _, _, _ = state
-    sigma, ds, _ = grid
-
-    # Calculate current parameters for CFL check
-    mask_yield = jnp.abs(sigma) > sigma_c
-    yield_pop = jnp.sum(P * mask_yield) * ds
-    Gamma = yield_pop / tau
-    D = alpha * Gamma
-
-    # CFL Stability Conditions
-    # 1. Advection: dt < dx / v
-    v_adv = jnp.abs(gdot) + 1e-12
-    dt_adv = ds / v_adv
-
-    # 2. Diffusion: dt < dx^2 / 2D
-    D_safe = D + 1e-12
-    dt_diff = (ds**2) / (2.0 * D_safe)
-
-    # Stable time step (safety factor 0.5)
-    dt_stable = 0.5 * jnp.minimum(dt_adv, dt_diff)
-
     # KRN-002: Use fixed conservative sub-stepping instead of dynamic
     # fori_loop bound. Dynamic n_sub from traced dt/dt_stable is invalid
     # inside lax.scan — the bound must be static. Use 10 sub-steps with
@@ -663,8 +642,6 @@ def saos_kernel(
     )
 
     # Extract last cycle
-    last_cycle_start = (n_cycles - 1) * period
-    mask = time_hist >= last_cycle_start
     # Number of points in the last cycle
     n_last = int(period / dt)
     t_last = time_hist[-n_last:]

@@ -669,7 +669,6 @@ def _make_fikh_creep_ode_rhs(include_thermal: bool):
         tau_thix = args.get("tau_thix", 1.0)
         Gamma_thix = args.get("Gamma", 0.5)
         alpha_frac = args.get("alpha_structure", 0.5)
-        eta_inf = args.get("eta_inf", 0.0)
 
         # Thermal parameters
         E_a = args.get("E_a", 5e4)

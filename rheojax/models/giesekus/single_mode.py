@@ -189,7 +189,15 @@ class GiesekusSingleMode(GiesekusBase):
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+
+        # Handle complex G* for oscillation: split into [G', G''] columns
+        # to match model_function's (N, 2) real output format
+        if test_mode == "oscillation" and np.iscomplexobj(y):
+            y_real = np.asarray(y)
+            y_jax = jnp.column_stack([jnp.asarray(y_real.real, dtype=jnp.float64),
+                                       jnp.asarray(y_real.imag, dtype=jnp.float64)])
+        else:
+            y_jax = jnp.asarray(y, dtype=jnp.float64)
 
         # Store protocol-specific inputs
         self._gamma_dot_applied = kwargs.get("gamma_dot")

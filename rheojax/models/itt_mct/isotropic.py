@@ -611,9 +611,6 @@ class ITTMCTIsotropic(ITTMCTBase):
         f_k_arr = np.array([self._compute_nonergodicity_parameter(k) for k in self.k_grid])
 
         for i, t_val in enumerate(t):
-            gamma_acc = gamma_dot * t_val
-            h = np.exp(-((gamma_acc / gamma_c) ** 2))
-
             # σ(t) = γ̇ ∫₀ᵗ G(s) ds where G(s) = G_scale × Σ_k k⁴ S²(k) Φ(k,s)
             # Compute time integral via trapezoidal rule over sub-times
             n_sub = max(20, int(t_val * 10))

@@ -31,12 +31,8 @@ from rheojax.models.ikh._kernels import (
     make_ml_ikh_creep_ode_rhs_weighted_sum,
     make_ml_ikh_maxwell_ode_rhs_per_mode,
     make_ml_ikh_maxwell_ode_rhs_weighted_sum,
-    ml_ikh_creep_ode_rhs_per_mode,
-    ml_ikh_creep_ode_rhs_weighted_sum,
     ml_ikh_flow_curve_steady_state_per_mode,
     ml_ikh_flow_curve_steady_state_weighted_sum,
-    ml_ikh_maxwell_ode_rhs_per_mode,
-    ml_ikh_maxwell_ode_rhs_weighted_sum,
     ml_ikh_scan_kernel,
     ml_ikh_weighted_sum_kernel,
 )

@@ -29,7 +29,6 @@ from rheojax.utils.hl_kernels import (
     run_relaxation,
     run_saos,
     run_startup,
-    saos_kernel,
     startup_kernel,
 )
 
