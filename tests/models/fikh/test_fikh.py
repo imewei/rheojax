@@ -514,8 +514,10 @@ class TestFIKHFitIntegration:
         strain = 0.1 * t  # linear ramp
         # Generate synthetic data from default params
         stress_true = model._predict_from_params(t, strain, model._get_params_dict())
-        noise = 0.01 * jnp.std(stress_true) * jax.random.normal(
-            jax.random.PRNGKey(42), shape=stress_true.shape
+        noise = (
+            0.01
+            * jnp.std(stress_true)
+            * jax.random.normal(jax.random.PRNGKey(42), shape=stress_true.shape)
         )
         stress_data = stress_true + noise
 

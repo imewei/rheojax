@@ -16,7 +16,6 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-
 # ── Fix A: Excel deformation_mode parity ─────────────────────────────────
 
 
@@ -255,9 +254,7 @@ class TestCascadeProvenance:
         """Direct CSV load via auto_load sets format_detected."""
         from rheojax.io import auto_load
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             f.write("frequency,modulus\n1,100\n10,200\n")
             fpath = f.name
 

@@ -870,8 +870,11 @@ class TestF002KwargsCache:
         stress = result["stress"]
 
         dmt_exponential._fit_laos(
-            np.array(t), np.array(stress),
-            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+            np.array(t),
+            np.array(stress),
+            gamma_0=gamma_0,
+            omega_laos=omega,
+            lam_init=1.0,
         )
 
         assert dmt_exponential._gamma_0 == gamma_0
@@ -907,7 +910,9 @@ class TestFitRelaxation:
             p = dmt_exponential.parameters[name]
             assert np.isfinite(p.value), f"Parameter {name} is not finite: {p.value}"
             lo, hi = p.bounds
-            assert lo <= p.value <= hi, f"Parameter {name}={p.value} outside bounds [{lo}, {hi}]"
+            assert (
+                lo <= p.value <= hi
+            ), f"Parameter {name}={p.value} outside bounds [{lo}, {hi}]"
 
 
 class TestFitCreep:
@@ -929,9 +934,7 @@ class TestFitCreep:
     def test_fit_creep_viscous(self, dmt_viscous):
         """Viscous variant creep fit works."""
         sigma_0 = 20.0
-        _, gamma, _, _ = dmt_viscous.simulate_creep(
-            sigma_0=sigma_0, t_end=5.0, dt=0.05
-        )
+        _, gamma, _, _ = dmt_viscous.simulate_creep(sigma_0=sigma_0, t_end=5.0, dt=0.05)
         t = np.linspace(0, 5.0, len(gamma))
         result = dmt_viscous._fit_creep(
             t, np.array(gamma), sigma_0=sigma_0, lam_init=1.0
@@ -966,7 +969,9 @@ class TestFitOscillation:
     def test_fit_oscillation_recovers_moduli(self, dmt_exponential):
         """Fitted model should reproduce SAOS moduli."""
         omega = np.logspace(-2, 2, 30)
-        G_prime_true, G_double_prime_true = dmt_exponential.predict_saos(omega, lam_0=1.0)
+        G_prime_true, G_double_prime_true = dmt_exponential.predict_saos(
+            omega, lam_0=1.0
+        )
         G_star = np.array(G_prime_true) + 1j * np.array(G_double_prime_true)
 
         # Perturb initial params slightly
@@ -997,8 +1002,11 @@ class TestFitLAOS:
             gamma_0=gamma_0, omega=omega, n_cycles=3, points_per_cycle=64
         )
         dmt_exponential._fit_laos(
-            np.array(result["t"]), np.array(result["stress"]),
-            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+            np.array(result["t"]),
+            np.array(result["stress"]),
+            gamma_0=gamma_0,
+            omega_laos=omega,
+            lam_init=1.0,
         )
         assert dmt_exponential._fitted
 
@@ -1010,8 +1018,11 @@ class TestFitLAOS:
             gamma_0=gamma_0, omega=omega, n_cycles=3, points_per_cycle=64
         )
         dmt_viscous._fit_laos(
-            np.array(result["t"]), np.array(result["stress"]),
-            gamma_0=gamma_0, omega_laos=omega, lam_init=1.0,
+            np.array(result["t"]),
+            np.array(result["stress"]),
+            gamma_0=gamma_0,
+            omega_laos=omega,
+            lam_init=1.0,
         )
         assert dmt_viscous._fitted
 
@@ -1038,7 +1049,11 @@ class TestPublicAPIRoundTrip:
         """Public API round-trip for flow curve."""
         gamma_dot = np.logspace(-1, 2, 20)
         stress_true = dmt_exponential._predict_flow_curve(gamma_dot)
-        noise = 0.02 * stress_true * np.random.default_rng(0).standard_normal(len(gamma_dot))
+        noise = (
+            0.02
+            * stress_true
+            * np.random.default_rng(0).standard_normal(len(gamma_dot))
+        )
         stress_data = np.array(stress_true) + noise
 
         dmt_exponential.fit(gamma_dot, stress_data, test_mode="flow_curve")

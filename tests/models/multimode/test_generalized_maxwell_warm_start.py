@@ -258,7 +258,9 @@ class TestGMMElementMinimization:
 
         # Relaxation times should span multiple decades
         tau_range = np.log10(tau_fitted.max() / tau_fitted.min())
-        assert tau_range > 1.0, f"Relaxation time range too narrow: {tau_range:.1f} decades"
+        assert (
+            tau_range > 1.0
+        ), f"Relaxation time range too narrow: {tau_range:.1f} decades"
 
         # Prediction quality: R² > 0.99
         pred = gmm.predict(time)

@@ -375,7 +375,9 @@ class TestModelFunction:
         # Interleaved: [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1]
         params = jnp.array([5.0, 100.0, 10.0, 0.3, 50.0, 1.0, 0.2])
 
-        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        mf_result = np.array(
+            model.model_function(omega, params, test_mode="oscillation")
+        )
         G_prime, G_double_prime = model.predict_saos(omega)
 
         np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
@@ -394,7 +396,9 @@ class TestModelFunction:
         # Interleaved: [eta_s, eta_p_0, lambda_0, alpha_0, eta_p_1, lambda_1, alpha_1]
         params = jnp.array([5.0, 100.0, 1.0, 0.3, 50.0, 0.1, 0.2])
 
-        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        mf_result = np.array(
+            model.model_function(gamma_dot, params, test_mode="flow_curve")
+        )
         predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
 
         np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
@@ -425,7 +429,9 @@ class TestParameterSetRoundtrip:
             [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
         )
 
-        mf_result = np.array(model.model_function(gamma_dot, params, test_mode="flow_curve"))
+        mf_result = np.array(
+            model.model_function(gamma_dot, params, test_mode="flow_curve")
+        )
         predict_result = np.array(model.predict(gamma_dot, test_mode="flow_curve"))
 
         np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
@@ -446,7 +452,9 @@ class TestParameterSetRoundtrip:
             [model.parameters.get_value(n) for n in param_names], dtype=jnp.float64
         )
 
-        mf_result = np.array(model.model_function(omega, params, test_mode="oscillation"))
+        mf_result = np.array(
+            model.model_function(omega, params, test_mode="oscillation")
+        )
         G_prime, G_double_prime = model.predict_saos(omega)
 
         np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)

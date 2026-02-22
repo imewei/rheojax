@@ -72,7 +72,9 @@ def test_pipeline_fit_model_bayesian_static():
     model = pipeline.get_model()
     assert model is not None
     if not model.fitted_:
-        pytest.xfail("NUTS did not converge on tiny synthetic dataset; acceptable for smoke")
+        pytest.xfail(
+            "NUTS did not converge on tiny synthetic dataset; acceptable for smoke"
+        )
     # Check the fitted scale parameter is positive
     sigma_sy_scale = model.parameters.get_value("sigma_sy_scale")
     assert sigma_sy_scale is not None and sigma_sy_scale > 0

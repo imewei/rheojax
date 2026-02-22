@@ -446,9 +446,7 @@ class TestBayesianInterface:
         t = np.linspace(0, 50, 15)
         params = [model.parameters.get_value(k) for k in model.parameters.keys()]
 
-        result = model.model_function(
-            t, params, test_mode="creep", sigma_applied=150.0
-        )
+        result = model.model_function(t, params, test_mode="creep", sigma_applied=150.0)
 
         assert result.shape == t.shape
         assert np.all(np.isfinite(result))

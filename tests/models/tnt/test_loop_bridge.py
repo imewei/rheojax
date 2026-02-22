@@ -659,9 +659,7 @@ class TestFitting:
         sigma_noisy = sigma_true * (1 + 0.02 * np.random.randn(len(sigma_true)))
 
         model_fit = TNTLoopBridge()
-        model_fit.fit(
-            gamma_dot, sigma_noisy, test_mode="flow_curve", method="scipy"
-        )
+        model_fit.fit(gamma_dot, sigma_noisy, test_mode="flow_curve", method="scipy")
 
         sigma_pred = model_fit.predict(gamma_dot, test_mode="flow_curve")
         r2 = 1 - np.sum((sigma_noisy - sigma_pred) ** 2) / np.sum(

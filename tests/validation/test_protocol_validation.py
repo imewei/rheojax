@@ -410,20 +410,14 @@ def _run_simulation_test(model, model_name: str, protocol: str):
     # --- Fluidity-Saramito ---
     if model_name == "fluidity_saramito_local":
         if protocol == "startup":
-            return model.simulate_startup(
-                t=np.linspace(0.01, 10, 20), gamma_dot=1.0
-            )
+            return model.simulate_startup(t=np.linspace(0.01, 10, 20), gamma_dot=1.0)
         return model.simulate_laos(
             gamma_0=1.0, omega=1.0, n_cycles=2, n_points_per_cycle=32
         )
     if model_name == "fluidity_saramito_nonlocal":
         if protocol == "startup":
-            return model.simulate_startup(
-                t=np.linspace(0.01, 10, 20), gamma_dot=1.0
-            )
-        return model.simulate_creep(
-            t=np.linspace(0.01, 50, 20), sigma_applied=100.0
-        )
+            return model.simulate_startup(t=np.linspace(0.01, 10, 20), gamma_dot=1.0)
+        return model.simulate_creep(t=np.linspace(0.01, 50, 20), sigma_applied=100.0)
 
     # --- VLB nonlocal ---
     if model_name == "vlb_nonlocal":
@@ -485,11 +479,15 @@ def _setup_and_predict(model, model_name: str, protocol: str):
         t = np.linspace(0, 4 * np.pi / omega_val, 50)
         gamma = gamma_0 * np.sin(omega_val * t)
         X = np.stack([t, gamma])
-        return _try_predict_with_test_mode(model, X, {
-            "test_mode": protocol,
-            "gamma_0": gamma_0,
-            "omega": omega_val,
-        })
+        return _try_predict_with_test_mode(
+            model,
+            X,
+            {
+                "test_mode": protocol,
+                "gamma_0": gamma_0,
+                "omega": omega_val,
+            },
+        )
 
     elif model_name == "stz_conventional":
         model._last_fit_kwargs = {

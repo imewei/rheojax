@@ -112,9 +112,7 @@ class TestFluidityRegistration:
             Protocol.OSCILLATION,
             Protocol.LAOS,
         ]:
-            assert protocol in info.protocols, (
-                f"{protocol} missing from FluidityLocal"
-            )
+            assert protocol in info.protocols, f"{protocol} missing from FluidityLocal"
 
     def test_nonlocal_protocols_actually_registered(self):
         """TC-016: Test all 6 protocols are actually registered for FluidityNonlocal."""
@@ -128,9 +126,9 @@ class TestFluidityRegistration:
             Protocol.OSCILLATION,
             Protocol.LAOS,
         ]:
-            assert protocol in info.protocols, (
-                f"{protocol} missing from FluidityNonlocal"
-            )
+            assert (
+                protocol in info.protocols
+            ), f"{protocol} missing from FluidityNonlocal"
 
 
 @pytest.mark.unit
@@ -569,9 +567,7 @@ class TestFluidityBayesianSmoke:
         model = FluidityLocal()
         gamma_dot = np.logspace(-1, 1, 15)
         sigma = model._predict_flow_curve(gamma_dot)
-        sigma_noisy = sigma * (
-            1 + 0.02 * np.random.RandomState(42).randn(len(sigma))
-        )
+        sigma_noisy = sigma * (1 + 0.02 * np.random.RandomState(42).randn(len(sigma)))
         model.fit(gamma_dot, sigma_noisy, test_mode="flow_curve", max_iter=50)
         result = model.fit_bayesian(
             gamma_dot,

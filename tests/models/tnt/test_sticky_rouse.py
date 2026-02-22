@@ -626,9 +626,7 @@ class TestModelFunctionCompleteness:
         t = jnp.linspace(0.01, 10.0, 30)
         params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
 
-        y = model.model_function(
-            t, params, test_mode="startup", gamma_dot=1.0
-        )
+        y = model.model_function(t, params, test_mode="startup", gamma_dot=1.0)
         assert y.shape == t.shape
         assert np.all(np.isfinite(y))
 
@@ -639,9 +637,7 @@ class TestModelFunctionCompleteness:
         t = jnp.linspace(0.01, 10.0, 30)
         params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
 
-        y = model.model_function(
-            t, params, test_mode="creep", sigma_applied=100.0
-        )
+        y = model.model_function(t, params, test_mode="creep", sigma_applied=100.0)
         assert y.shape == t.shape
         assert np.all(np.isfinite(y))
 
@@ -652,9 +648,7 @@ class TestModelFunctionCompleteness:
         t = jnp.linspace(0.01, 10.0, 50)
         params = jnp.array([500.0, 10.0, 500.0, 1.0, 0.1, 5.0])
 
-        y = model.model_function(
-            t, params, test_mode="laos", gamma_0=0.1, omega=1.0
-        )
+        y = model.model_function(t, params, test_mode="laos", gamma_0=0.1, omega=1.0)
         assert y.shape == t.shape
         assert np.all(np.isfinite(y))
 

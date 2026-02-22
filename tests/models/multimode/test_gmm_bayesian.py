@@ -272,9 +272,7 @@ class TestGMMBayesianPipelineBugs:
         assert result == {"n_modes": 3}
 
         # Single mode
-        result = infer_model_kwargs(
-            "generalized_maxwell", ["G_inf", "G_1", "tau_1"]
-        )
+        result = infer_model_kwargs("generalized_maxwell", ["G_inf", "G_1", "tau_1"])
         assert result == {"n_modes": 1}
 
         # Non-GMM model returns empty dict
@@ -323,16 +321,15 @@ class TestGMMBayesianPipelineBugs:
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
         model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
-        model.fit(
-            t, G_data, test_mode="relaxation", optimization_factor=1.5
-        )
+        model.fit(t, G_data, test_mode="relaxation", optimization_factor=1.5)
 
         n_final = model._n_modes
         assert n_final <= 3  # May have been reduced
 
         # Bayesian with the same model instance (Python API — already works)
         result = model.fit_bayesian(
-            t, G_data,
+            t,
+            G_data,
             test_mode="relaxation",
             num_warmup=50,
             num_samples=50,
@@ -340,10 +337,12 @@ class TestGMMBayesianPipelineBugs:
         )
 
         # Posterior should have n_final modes, not 3
-        expected_params = {f"G_{i+1}" for i in range(n_final)} | {
-            f"tau_{i+1}" for i in range(n_final)
-        } | {"G_inf"}
+        expected_params = (
+            {f"G_{i+1}" for i in range(n_final)}
+            | {f"tau_{i+1}" for i in range(n_final)}
+            | {"G_inf"}
+        )
         for name in expected_params:
-            assert name in result.posterior_samples, (
-                f"Missing {name} in posterior (n_modes={n_final})"
-            )
+            assert (
+                name in result.posterior_samples
+            ), f"Missing {name} in posterior (n_modes={n_final})"

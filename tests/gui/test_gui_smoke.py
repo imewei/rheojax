@@ -416,8 +416,12 @@ class TestStateManagement:
         from rheojax.gui.services.bayesian_service import BayesianResult as ServiceBR
         from rheojax.gui.state.store import BayesianResult as StoreBR
 
-        assert StoreBR is ServiceBR, "Service BayesianResult should be imported from store"
-        assert StoreBR is WorkerBR, "Worker BayesianResult should be imported from store"
+        assert (
+            StoreBR is ServiceBR
+        ), "Service BayesianResult should be imported from store"
+        assert (
+            StoreBR is WorkerBR
+        ), "Worker BayesianResult should be imported from store"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(

@@ -92,9 +92,7 @@ class TestSTZIntegration:
             [model.parameters.get_value(k) for k in model.parameters.keys()]
         )
 
-        result = model.model_function(
-            t, params, test_mode="startup", gamma_dot=1e7
-        )
+        result = model.model_function(t, params, test_mode="startup", gamma_dot=1e7)
         result_np = np.array(result)
         assert result_np.shape == t.shape
         assert np.all(np.isfinite(result_np))
@@ -132,9 +130,7 @@ class TestSTZIntegration:
             [model.parameters.get_value(k) for k in model.parameters.keys()]
         )
 
-        result = model.model_function(
-            t, params, test_mode="creep", sigma_applied=1.2e6
-        )
+        result = model.model_function(t, params, test_mode="creep", sigma_applied=1.2e6)
         result_np = np.array(result)
         assert result_np.shape == t.shape
         assert np.all(np.isfinite(result_np))
