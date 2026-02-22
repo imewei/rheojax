@@ -596,7 +596,9 @@ class ITTMCTSchematic(ITTMCTBase):
                 self._memory_form,
             )
 
-            sigma_arr = np.array(sigma_nonzero)  # writable copy (np.asarray → read-only JAX view)
+            sigma_arr = np.array(
+                sigma_nonzero
+            )  # writable copy (np.asarray → read-only JAX view)
 
             # NaN fallback: diffrax may fail at low γ̇ in glass state
             # (explicit solver exceeds max_steps due to stiff Prony modes).
@@ -1314,7 +1316,10 @@ class ITTMCTSchematic(ITTMCTBase):
         v2 = self.parameters.get_value("v2")
         Gamma = self.parameters.get_value("Gamma")
         current_hash = (v1, v2, Gamma)
-        if self._prony_param_hash is not None and current_hash != self._prony_param_hash:
+        if (
+            self._prony_param_hash is not None
+            and current_hash != self._prony_param_hash
+        ):
             self._prony_amplitudes = None
             self._prony_times = None
         self._prony_param_hash = current_hash

@@ -194,8 +194,14 @@ class HebraudLequeux(BaseModel):
         self._test_mode = test_mode
         # Strip optimization meta-kwargs injected by BaseModel.fit() —
         # these are consumed by _fit() and should not leak to model_function.
-        _optimization_keys = {"use_log_residuals", "use_multi_start", "n_starts",
-                              "perturb_factor", "_optimization_meta", "method"}
+        _optimization_keys = {
+            "use_log_residuals",
+            "use_multi_start",
+            "n_starts",
+            "perturb_factor",
+            "_optimization_meta",
+            "method",
+        }
         self._last_fit_kwargs = {
             k: v for k, v in kwargs.items() if k not in _optimization_keys
         }
@@ -361,9 +367,7 @@ class HebraudLequeux(BaseModel):
 
         # Store for predict/Bayesian
         _tau_val = self.parameters.get_value("tau")
-        self._last_fit_kwargs["_tau_est"] = float(
-            1.0 if _tau_val is None else _tau_val
-        )
+        self._last_fit_kwargs["_tau_est"] = float(1.0 if _tau_val is None else _tau_val)
         _sc_val = self.parameters.get_value("sigma_c")
         self._last_fit_kwargs["_sigma_c_est"] = float(
             1.0 if _sc_val is None else _sc_val
@@ -697,7 +701,12 @@ class HebraudLequeux(BaseModel):
                     x0,
                     method="Nelder-Mead",
                     callback=_callback,
-                    options={"maxfev": 60, "xatol": 0.02, "fatol": 0.005, "adaptive": True},
+                    options={
+                        "maxfev": 60,
+                        "xatol": 0.02,
+                        "fatol": 0.005,
+                        "adaptive": True,
+                    },
                 )
                 if res.fun < best_cost:
                     best_cost = res.fun

@@ -465,9 +465,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         # Add viscous background for startup (F-010: use jnp.where for trace-safety)
         if mode == "startup":
             eta_inf = params.get("eta_inf", 0.0)
-            result = result + jnp.where(
-                eta_inf > 0, eta_inf * args["gamma_dot"], 0.0
-            )
+            result = result + jnp.where(eta_inf > 0, eta_inf * args["gamma_dot"], 0.0)
 
         return result
 

@@ -223,7 +223,6 @@ class HVNMLocal(HVNMBase):
         X_phi = hvnm_guth_gold(phi)
         # Effective phi for interphase amplification
 
-
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)
 
@@ -406,7 +405,9 @@ class HVNMLocal(HVNMBase):
 
         ys = sol.ys
         assert ys is not None
-        D_int_col = ys[:, 17]  # Always 18-component state; zero when damage not included
+        D_int_col = ys[
+            :, 17
+        ]  # Always 18-component state; zero when damage not included
 
         # Compute total stress from state
         X_phi = args["X_phi"]
@@ -512,9 +513,9 @@ class HVNMLocal(HVNMBase):
 
         ys = sol.ys
         assert ys is not None
-        D_int_col = (
-            ys[:, 17]  # Always 18-component state; zero when damage not included
-        )
+        D_int_col = ys[
+            :, 17
+        ]  # Always 18-component state; zero when damage not included
         X_phi = args["X_phi"]
         X_I = args["X_I"]
         G_I_eff = args["G_I_eff"]
@@ -612,9 +613,9 @@ class HVNMLocal(HVNMBase):
 
         if return_full:
             J_t = gamma / jnp.maximum(jnp.abs(sigma_0), 1e-30)
-            D_int_col = (
-                ys[:, 17]  # Always 18-component state; zero when damage not included
-            )
+            D_int_col = ys[
+                :, 17
+            ]  # Always 18-component state; zero when damage not included
             return {
                 "time": np.asarray(t),
                 "strain": np.asarray(gamma),
@@ -682,9 +683,9 @@ class HVNMLocal(HVNMBase):
 
         ys = sol.ys
         assert ys is not None
-        D_int_col = (
-            ys[:, 17]  # Always 18-component state; zero when damage not included
-        )
+        D_int_col = ys[
+            :, 17
+        ]  # Always 18-component state; zero when damage not included
         strain = gamma_0 * jnp.sin(omega * t_jax)
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t_jax)
         X_phi = args["X_phi"]
@@ -1024,9 +1025,13 @@ class HVNMLocal(HVNMBase):
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        gamma_dot = (
+            _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        )
         _sa = kwargs.get("sigma_applied", _MISSING)
-        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        sigma_applied = (
+            _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        )
         _g0 = kwargs.get("gamma_0", _MISSING)
         gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
         _om = kwargs.get("omega", _MISSING)
@@ -1037,7 +1042,6 @@ class HVNMLocal(HVNMBase):
         phi_I = hvnm_interphase_fraction(phi, R_NP, delta_g, delta_m)
         G_I_eff = hvnm_interphase_modulus(G_E, beta_I, phi_I)
         X_phi = hvnm_guth_gold(phi)
-
 
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)

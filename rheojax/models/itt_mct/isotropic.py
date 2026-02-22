@@ -608,7 +608,9 @@ class ITTMCTIsotropic(ITTMCTBase):
         sigma = np.zeros_like(t)
 
         # Pre-compute f_k for all wave vectors
-        f_k_arr = np.array([self._compute_nonergodicity_parameter(k) for k in self.k_grid])
+        f_k_arr = np.array(
+            [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+        )
 
         for i, t_val in enumerate(t):
             # σ(t) = γ̇ ∫₀ᵗ G(s) ds where G(s) = G_scale × Σ_k k⁴ S²(k) Φ(k,s)

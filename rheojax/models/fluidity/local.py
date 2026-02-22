@@ -35,11 +35,24 @@ _MISSING = object()
 
 # FL-006: kwargs to pop before forwarding to nlsq_optimize
 _NLSQ_RESERVED = {
-    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
-    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
-    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
-    "points_per_cycle", "deformation_mode", "poisson_ratio",
-    "method", "callback",
+    "test_mode",
+    "use_log_residuals",
+    "smart_init",
+    "use_multi_start",
+    "n_starts",
+    "perturb_factor",
+    "gamma_dot",
+    "sigma_applied",
+    "gamma_0",
+    "omega",
+    "omega_laos",
+    "t_wait",
+    "n_cycles",
+    "points_per_cycle",
+    "deformation_mode",
+    "poisson_ratio",
+    "method",
+    "callback",
 }
 
 

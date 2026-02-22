@@ -943,8 +943,12 @@ class SGRGeneric(BaseModel):
 
         # Filter protocol kwargs before forwarding to NLSQ optimizer
         _SGR_RESERVED = {
-            "gamma_dot", "is_stress", "use_log_residuals",
-            "test_mode", "deformation_mode", "poisson_ratio",
+            "gamma_dot",
+            "is_stress",
+            "use_log_residuals",
+            "test_mode",
+            "deformation_mode",
+            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _SGR_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
@@ -2432,16 +2436,24 @@ class SGRGeneric(BaseModel):
         beta_rejuv = self.parameters.get_value("beta_rejuv")
         x_ss_A = self.parameters.get_value("x_ss_A")
         x_ss_n = self.parameters.get_value("x_ss_n")
-        for _name, _val in [("x_eq", x_eq), ("alpha_aging", alpha_aging),
-                             ("beta_rejuv", beta_rejuv), ("x_ss_A", x_ss_A),
-                             ("x_ss_n", x_ss_n)]:
+        for _name, _val in [
+            ("x_eq", x_eq),
+            ("alpha_aging", alpha_aging),
+            ("beta_rejuv", beta_rejuv),
+            ("x_ss_A", x_ss_A),
+            ("x_ss_n", x_ss_n),
+        ]:
             if _val is None:
-                raise ValueError(f"Parameter '{_name}' is None — set it before calling evolve_x().")
+                raise ValueError(
+                    f"Parameter '{_name}' is None — set it before calling evolve_x()."
+                )
 
         if x0 is None:
             x0 = self.parameters.get_value("x")
         if x0 is None:
-            raise ValueError("Initial x0 is None — provide x0 or set the 'x' parameter.")
+            raise ValueError(
+                "Initial x0 is None — provide x0 or set the 'x' parameter."
+            )
 
         # Integrate using Euler method
         dt = np.diff(t)

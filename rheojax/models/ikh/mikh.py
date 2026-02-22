@@ -37,7 +37,6 @@ from rheojax.models.ikh._kernels import (
 jax, jnp = safe_import_jax()
 
 
-
 # kwargs to filter before passing to nlsq_optimize
 _IKH_RESERVED = {
     "test_mode",
@@ -47,6 +46,7 @@ _IKH_RESERVED = {
     "deformation_mode",
     "poisson_ratio",
 }
+
 
 @ModelRegistry.register(
     "mikh",
@@ -342,7 +342,9 @@ class MIKH(IKHBase):
             G_double_prime = G * wt / (1 + wt**2)
 
             # Complex modulus magnitude
-            G_star_magnitude = jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
+            G_star_magnitude = jnp.sqrt(
+                jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30)
+            )
 
             return G_star_magnitude - target_magnitude
 
@@ -474,15 +476,11 @@ class MIKH(IKHBase):
 
         elif test_mode in ["creep", "relaxation"]:
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get(
-                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-            )
+            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0))
             sigma_applied = kwargs.get(
                 "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
             )
-            sigma_0 = kwargs.get(
-                "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
-            )
+            sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", 100.0))
             return self._simulate_transient(
                 t, param_dict, test_mode, gamma_dot, sigma_applied, sigma_0
             )
@@ -588,15 +586,11 @@ class MIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs, falling back to
         # cached values from _fit_ode_formulation()
-        gamma_dot = kwargs.get(
-            "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-        )
+        gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0))
         sigma_applied = kwargs.get(
             "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
         )
-        sigma_0 = kwargs.get(
-            "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
-        )
+        sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", 100.0))
 
         if mode == "flow_curve":
             gamma_dot_arr = jnp.asarray(X)

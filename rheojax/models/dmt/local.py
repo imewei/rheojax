@@ -265,12 +265,24 @@ class DMTLocal(DMTBase):
                 )
 
         # Filter protocol kwargs before forwarding to NLSQ
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
-        result = nlsq_curve_fit(model_fn, gamma_dot_np, stress_np, fit_params, **nlsq_kwargs)
+        result = nlsq_curve_fit(
+            model_fn, gamma_dot_np, stress_np, fit_params, **nlsq_kwargs
+        )
 
         # Update main parameters with fitted values
         for name in param_names:
@@ -506,10 +518,20 @@ class DMTLocal(DMTBase):
         params_array, bounds = self._get_params_for_optimization()
 
         # Filter protocol kwargs before forwarding to NLSQ
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
@@ -669,10 +691,20 @@ class DMTLocal(DMTBase):
 
         params_array, bounds = self._get_params_for_optimization()
 
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
@@ -920,6 +952,7 @@ class DMTLocal(DMTBase):
             param_dict = self._params_array_to_dict(params_array)
 
             if self.include_elasticity:
+
                 def step(state, _):
                     lam, gamma_v, lam_prev = state
                     G = elastic_modulus(lam, param_dict["G0"], param_dict["m_G"])
@@ -931,15 +964,22 @@ class DMTLocal(DMTBase):
                         )
                     else:
                         gamma_dot_v = invert_stress_for_gamma_dot_hb(
-                            sigma_0, lam,
-                            param_dict["tau_y0"], param_dict["K0"],
-                            param_dict["n_flow"], param_dict["eta_inf"],
-                            param_dict["m1"], param_dict["m2"],
+                            sigma_0,
+                            lam,
+                            param_dict["tau_y0"],
+                            param_dict["K0"],
+                            param_dict["n_flow"],
+                            param_dict["eta_inf"],
+                            param_dict["m1"],
+                            param_dict["m2"],
                         )
 
                     dlam = structure_evolution(
-                        lam, gamma_dot_v,
-                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                        lam,
+                        gamma_dot_v,
+                        param_dict["t_eq"],
+                        param_dict["a"],
+                        param_dict["c"],
                     )
                     lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                     gamma_v_new = gamma_v + dt * gamma_dot_v
@@ -948,10 +988,13 @@ class DMTLocal(DMTBase):
 
                 step = jax.checkpoint(step)
                 init_state = (
-                    jnp.float64(lam_init), jnp.float64(0.0), jnp.float64(lam_init),
+                    jnp.float64(lam_init),
+                    jnp.float64(0.0),
+                    jnp.float64(lam_init),
                 )
                 _, gamma_pred = jax.lax.scan(step, init_state, None, length=n_steps)
             else:
+
                 def step(state, _):
                     lam, gamma_acc = state
                     if self.closure == "exponential":
@@ -960,14 +1003,21 @@ class DMTLocal(DMTBase):
                         )
                     else:
                         gamma_dot = invert_stress_for_gamma_dot_hb(
-                            sigma_0, lam,
-                            param_dict["tau_y0"], param_dict["K0"],
-                            param_dict["n_flow"], param_dict["eta_inf"],
-                            param_dict["m1"], param_dict["m2"],
+                            sigma_0,
+                            lam,
+                            param_dict["tau_y0"],
+                            param_dict["K0"],
+                            param_dict["n_flow"],
+                            param_dict["eta_inf"],
+                            param_dict["m1"],
+                            param_dict["m2"],
                         )
                     dlam = structure_evolution(
-                        lam, gamma_dot,
-                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                        lam,
+                        gamma_dot,
+                        param_dict["t_eq"],
+                        param_dict["a"],
+                        param_dict["c"],
                     )
                     lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                     gamma_new = gamma_acc + dt * gamma_dot
@@ -982,10 +1032,20 @@ class DMTLocal(DMTBase):
 
         params_array, bounds = self._get_params_for_optimization()
 
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
@@ -1116,10 +1176,14 @@ class DMTLocal(DMTBase):
                 )
             else:
                 eta = viscosity_herschel_bulkley_regularized(
-                    lam_0, 1e-6,
-                    param_dict["tau_y0"], param_dict["K0"],
-                    param_dict["n_flow"], param_dict["eta_inf"],
-                    param_dict["m1"], param_dict["m2"],
+                    lam_0,
+                    1e-6,
+                    param_dict["tau_y0"],
+                    param_dict["K0"],
+                    param_dict["n_flow"],
+                    param_dict["eta_inf"],
+                    param_dict["m1"],
+                    param_dict["m2"],
                 )
 
             theta_1 = eta / jnp.maximum(G, 1e-10)
@@ -1128,15 +1192,27 @@ class DMTLocal(DMTBase):
             )
 
             res_prime = (G_prime_pred - G_prime_data) / modulus_scale
-            res_double_prime = (G_double_prime_pred - G_double_prime_data) / modulus_scale
+            res_double_prime = (
+                G_double_prime_pred - G_double_prime_data
+            ) / modulus_scale
             return jnp.concatenate([res_prime, res_double_prime])
 
         params_array, bounds = self._get_params_for_optimization()
 
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
@@ -1390,14 +1466,18 @@ class DMTLocal(DMTBase):
         stress_scale = jnp.maximum(jnp.std(stress_jax), 1.0)
 
         if self.include_elasticity:
+
             def residual_fn(params_array):
                 param_dict = self._params_array_to_dict(params_array)
 
                 def step(state, sr):
                     sigma, lam = state
                     dlam = structure_evolution(
-                        lam, sr,
-                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                        lam,
+                        sr,
+                        param_dict["t_eq"],
+                        param_dict["a"],
+                        param_dict["c"],
                     )
                     lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                     G = elastic_modulus(lam_new, param_dict["G0"], param_dict["m_G"])
@@ -1407,10 +1487,14 @@ class DMTLocal(DMTBase):
                         )
                     else:
                         eta = viscosity_herschel_bulkley_regularized(
-                            lam_new, sr,
-                            param_dict["tau_y0"], param_dict["K0"],
-                            param_dict["n_flow"], param_dict["eta_inf"],
-                            param_dict["m1"], param_dict["m2"],
+                            lam_new,
+                            sr,
+                            param_dict["tau_y0"],
+                            param_dict["K0"],
+                            param_dict["n_flow"],
+                            param_dict["eta_inf"],
+                            param_dict["m1"],
+                            param_dict["m2"],
                         )
                     theta_1 = eta / jnp.maximum(G, 1e-10)
                     dsigma = maxwell_stress_evolution(sigma, sr, G, theta_1)
@@ -1422,14 +1506,19 @@ class DMTLocal(DMTBase):
                 _, stress_pred = jax.lax.scan(step, init_state, strain_rate)
                 stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
                 return (stress_pred - stress_jax) / stress_scale
+
         else:
+
             def residual_fn(params_array):
                 param_dict = self._params_array_to_dict(params_array)
 
                 def step(lam, sr):
                     dlam = structure_evolution(
-                        lam, sr,
-                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                        lam,
+                        sr,
+                        param_dict["t_eq"],
+                        param_dict["a"],
+                        param_dict["c"],
                     )
                     lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
                     if self.closure == "exponential":
@@ -1438,26 +1527,39 @@ class DMTLocal(DMTBase):
                         )
                     else:
                         eta = viscosity_herschel_bulkley_regularized(
-                            lam_new, sr,
-                            param_dict["tau_y0"], param_dict["K0"],
-                            param_dict["n_flow"], param_dict["eta_inf"],
-                            param_dict["m1"], param_dict["m2"],
+                            lam_new,
+                            sr,
+                            param_dict["tau_y0"],
+                            param_dict["K0"],
+                            param_dict["n_flow"],
+                            param_dict["eta_inf"],
+                            param_dict["m1"],
+                            param_dict["m2"],
                         )
                     return lam_new, eta * sr
 
                 step = jax.checkpoint(step)
-                _, stress_pred = jax.lax.scan(
-                    step, jnp.float64(lam_init), strain_rate
-                )
+                _, stress_pred = jax.lax.scan(step, jnp.float64(lam_init), strain_rate)
                 stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
                 return (stress_pred - stress_jax) / stress_scale
 
         params_array, bounds = self._get_params_for_optimization()
 
-        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
-                         "sigma_0", "lam_0", "gamma_0", "omega_laos", "omega",
-                         "n_cycles", "points_per_cycle", "deformation_mode",
-                         "poisson_ratio"}
+        _dmt_reserved = {
+            "test_mode",
+            "gamma_dot",
+            "lam_init",
+            "sigma_init",
+            "sigma_0",
+            "lam_0",
+            "gamma_0",
+            "omega_laos",
+            "omega",
+            "n_cycles",
+            "points_per_cycle",
+            "deformation_mode",
+            "poisson_ratio",
+        }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
@@ -1630,7 +1732,9 @@ class DMTLocal(DMTBase):
     def _model_function_startup(self, X_jax, p_values, **kwargs):
         """Startup shear prediction: σ(t) at constant γ̇."""
         _gd = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", 1.0)
+        gamma_dot = (
+            _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", 1.0)
+        )
         lam_init = getattr(self, "_startup_lam_init", 1.0)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]
@@ -1707,7 +1811,9 @@ class DMTLocal(DMTBase):
     def _model_function_relaxation(self, X_jax, p_values, **kwargs):
         """Stress relaxation prediction: σ(t) after cessation of shear."""
         _si = kwargs.get("sigma_init", _MISSING)
-        sigma_init = _si if _si is not _MISSING else getattr(self, "_relax_sigma_init", 100.0)
+        sigma_init = (
+            _si if _si is not _MISSING else getattr(self, "_relax_sigma_init", 100.0)
+        )
         lam_init = getattr(self, "_relax_lam_init", 0.5)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]

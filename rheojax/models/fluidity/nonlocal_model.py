@@ -37,11 +37,24 @@ _MISSING = object()
 
 # FL-006: kwargs to pop before forwarding to nlsq_optimize
 _NLSQ_RESERVED = {
-    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
-    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
-    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
-    "points_per_cycle", "deformation_mode", "poisson_ratio",
-    "method", "callback",
+    "test_mode",
+    "use_log_residuals",
+    "smart_init",
+    "use_multi_start",
+    "n_starts",
+    "perturb_factor",
+    "gamma_dot",
+    "sigma_applied",
+    "gamma_0",
+    "omega",
+    "omega_laos",
+    "t_wait",
+    "n_cycles",
+    "points_per_cycle",
+    "deformation_mode",
+    "poisson_ratio",
+    "method",
+    "callback",
 }
 
 
@@ -99,9 +112,7 @@ class FluidityNonlocal(FluidityBase):
         super().__init__()
         # FL-011: Guard against N_y < 2 which causes ZeroDivisionError in dy
         if N_y < 2:
-            raise ValueError(
-                f"N_y must be >= 2 for spatial discretization, got {N_y}"
-            )
+            raise ValueError(f"N_y must be >= 2 for spatial discretization, got {N_y}")
         self.N_y = N_y
         self.gap_width = gap_width
         self.dy = gap_width / (N_y - 1)
@@ -350,8 +361,14 @@ class FluidityNonlocal(FluidityBase):
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._simulate_pde(
-                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0,
-                N_y=fit_N_y, dy=fit_dy,
+                x_data,
+                p_map,
+                mode,
+                gamma_dot,
+                sigma_applied,
+                sigma_0,
+                N_y=fit_N_y,
+                dy=fit_dy,
             )
 
         objective = create_least_squares_objective(
@@ -651,7 +668,12 @@ class FluidityNonlocal(FluidityBase):
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             _, stress = self._simulate_laos_internal(
-                x_data, p_map, gamma_0, omega, N_y=fit_N_y, dy=fit_dy,
+                x_data,
+                p_map,
+                gamma_0,
+                omega,
+                N_y=fit_N_y,
+                dy=fit_dy,
             )
             return stress
 

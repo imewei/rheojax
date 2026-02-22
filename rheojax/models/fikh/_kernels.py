@@ -313,7 +313,9 @@ def fikh_return_step_isothermal(
 
     # AF dynamic recovery contribution
     alpha_abs = jnp.abs(alpha_n)
-    af_term = gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
+    af_term = (
+        gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
+    )
 
     # Denominator for plastic multiplier
     denom = G + C - af_term
@@ -328,7 +330,10 @@ def fikh_return_step_isothermal(
     # Backstress update (Armstrong-Frederick)
     d_alpha = (
         C * d_gamma_p * sign_xi
-        - gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * alpha_n * d_gamma_p
+        - gamma_dyn
+        * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1)
+        * alpha_n
+        * d_gamma_p
     )
     alpha_next = alpha_n + d_alpha
 
@@ -464,7 +469,9 @@ def fikh_return_step_thermal(
 
     # AF contribution
     alpha_abs = jnp.abs(alpha_n)
-    af_term = gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
+    af_term = (
+        gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
+    )
 
     denom = G + C - af_term
     denom_safe = jnp.maximum(denom, G / 10.0)
@@ -477,7 +484,10 @@ def fikh_return_step_thermal(
     # Backstress update
     d_alpha = (
         C * d_gamma_p * sign_xi
-        - gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * alpha_n * d_gamma_p
+        - gamma_dyn
+        * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1)
+        * alpha_n
+        * d_gamma_p
     )
     alpha_next = alpha_n + d_alpha
 

@@ -371,26 +371,28 @@ def _make_hvnm_startup_vector_field(
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx,
-            dmu_E_yy,
-            dmu_E_xy,
-            dmu_E_nat_xx,
-            dmu_E_nat_yy,
-            dmu_E_nat_xy,
-            dmu_D_xx,
-            dmu_D_yy,
-            dmu_D_xy,
-            dgamma,
-            dD,
-            dmu_I_xx,
-            dmu_I_yy,
-            dmu_I_xy,
-            dmu_I_nat_xx,
-            dmu_I_nat_yy,
-            dmu_I_nat_xy,
-            dD_int,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+                dmu_I_xx,
+                dmu_I_yy,
+                dmu_I_xy,
+                dmu_I_nat_xx,
+                dmu_I_nat_yy,
+                dmu_I_nat_xy,
+                dD_int,
+            ]
+        )
 
     return jax.checkpoint(vector_field)
 
@@ -468,26 +470,28 @@ def _make_hvnm_relaxation_vector_field(
             )
         )
 
-        return jnp.array([
-            dmu_E_xx,
-            dmu_E_yy,
-            dmu_E_xy,
-            dmu_E_nat_xx,
-            dmu_E_nat_yy,
-            dmu_E_nat_xy,
-            dmu_D_xx,
-            dmu_D_yy,
-            dmu_D_xy,
-            0.0,
-            0.0,  # dgamma = 0, dD = 0 during relaxation
-            dmu_I_xx,
-            dmu_I_yy,
-            dmu_I_xy,
-            dmu_I_nat_xx,
-            dmu_I_nat_yy,
-            dmu_I_nat_xy,
-            0.0,  # dD_int = 0 during relaxation
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                0.0,
+                0.0,  # dgamma = 0, dD = 0 during relaxation
+                dmu_I_xx,
+                dmu_I_yy,
+                dmu_I_xy,
+                dmu_I_nat_xx,
+                dmu_I_nat_yy,
+                dmu_I_nat_xy,
+                0.0,  # dD_int = 0 during relaxation
+            ]
+        )
 
     return jax.checkpoint(vector_field)
 
@@ -621,26 +625,28 @@ def _make_hvnm_laos_vector_field(
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx,
-            dmu_E_yy,
-            dmu_E_xy,
-            dmu_E_nat_xx,
-            dmu_E_nat_yy,
-            dmu_E_nat_xy,
-            dmu_D_xx,
-            dmu_D_yy,
-            dmu_D_xy,
-            dgamma,
-            dD,
-            dmu_I_xx,
-            dmu_I_yy,
-            dmu_I_xy,
-            dmu_I_nat_xx,
-            dmu_I_nat_yy,
-            dmu_I_nat_xy,
-            dD_int,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+                dmu_I_xx,
+                dmu_I_yy,
+                dmu_I_xy,
+                dmu_I_nat_xx,
+                dmu_I_nat_yy,
+                dmu_I_nat_xy,
+                dD_int,
+            ]
+        )
 
     return jax.checkpoint(vector_field)
 
@@ -809,26 +815,28 @@ def _make_hvnm_creep_vector_field(
             0.0,
         )
 
-        return jnp.array([
-            dmu_E_xx,
-            dmu_E_yy,
-            dmu_E_xy,
-            dmu_E_nat_xx,
-            dmu_E_nat_yy,
-            dmu_E_nat_xy,
-            dmu_D_xx,
-            dmu_D_yy,
-            dmu_D_xy,
-            dgamma,
-            dD,
-            dmu_I_xx,
-            dmu_I_yy,
-            dmu_I_xy,
-            dmu_I_nat_xx,
-            dmu_I_nat_yy,
-            dmu_I_nat_xy,
-            dD_int,
-        ])
+        return jnp.array(
+            [
+                dmu_E_xx,
+                dmu_E_yy,
+                dmu_E_xy,
+                dmu_E_nat_xx,
+                dmu_E_nat_yy,
+                dmu_E_nat_xy,
+                dmu_D_xx,
+                dmu_D_yy,
+                dmu_D_xy,
+                dgamma,
+                dD,
+                dmu_I_xx,
+                dmu_I_yy,
+                dmu_I_xy,
+                dmu_I_nat_xx,
+                dmu_I_nat_yy,
+                dmu_I_nat_xy,
+                dD_int,
+            ]
+        )
 
     return jax.checkpoint(vector_field)
 

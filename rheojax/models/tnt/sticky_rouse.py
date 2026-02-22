@@ -351,9 +351,13 @@ class TNTStickyRouse(TNTBase):
         mode = test_mode or self._test_mode or "flow_curve"
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        gamma_dot = (
+            _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        )
         _sa = kwargs.get("sigma_applied", _MISSING)
-        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        sigma_applied = (
+            _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        )
         _g0 = kwargs.get("gamma_0", _MISSING)
         gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
         _om = kwargs.get("omega", _MISSING)
@@ -385,15 +389,11 @@ class TNTStickyRouse(TNTBase):
         elif mode == "creep":
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
-            return self._predict_creep(
-                X_jax, sigma_applied, G_modes, tau_eff, eta_s
-            )
+            return self._predict_creep(X_jax, sigma_applied, G_modes, tau_eff, eta_s)
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            return self._predict_laos(
-                X_jax, gamma_0, omega, G_modes, tau_eff, eta_s
-            )
+            return self._predict_laos(X_jax, gamma_0, omega, G_modes, tau_eff, eta_s)
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
             return self._predict_flow_curve_vec(X_jax, G_modes, tau_eff, eta_s)
@@ -611,14 +611,20 @@ class TNTStickyRouse(TNTBase):
             result = self._predict_relaxation_vec(x_jax, sigma_0_modes, tau_eff)
         elif test_mode == "startup":
             _gd = kwargs.get("gamma_dot", _MISSING)
-            gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+            gamma_dot = (
+                _gd
+                if _gd is not _MISSING
+                else getattr(self, "_gamma_dot_applied", None)
+            )
             if gamma_dot is None:
                 raise ValueError("gamma_dot must be provided for startup")
             self._gamma_dot_applied = gamma_dot
             result = self._predict_startup(x_jax, gamma_dot, G_modes, tau_eff, eta_s)
         elif test_mode == "creep":
             _sa = kwargs.get("sigma_applied", _MISSING)
-            sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+            sigma_applied = (
+                _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+            )
             if sigma_applied is None:
                 raise ValueError("sigma_applied must be provided for creep")
             self._sigma_applied = sigma_applied

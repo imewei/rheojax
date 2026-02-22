@@ -228,9 +228,12 @@ class FMLIKH(FIKHBase):
         # F-030: build a clean dict with only the keys the kernel expects,
         # instead of copying all params (which leaks G_0, G_1, etc.)
         mode_params = {
-            k: v for k, v in params.items()
-            if not any(k.startswith(p) and k[-1].isdigit()
-                       for p in ("G_", "eta_", "C_", "gamma_dyn_", "alpha_"))
+            k: v
+            for k, v in params.items()
+            if not any(
+                k.startswith(p) and k[-1].isdigit()
+                for p in ("G_", "eta_", "C_", "gamma_dyn_", "alpha_")
+            )
         }
 
         # Set modal parameters
@@ -501,15 +504,20 @@ class FMLIKH(FIKHBase):
                 if include_thermal:
                     T_init = params.get("T_env", params.get("T_ref", 298.15))
                     stress_i, _ = fikh_scan_kernel_thermal(
-                        t, strain,
-                        n_history=n_history, alpha=mode_alpha,
+                        t,
+                        strain,
+                        n_history=n_history,
+                        alpha=mode_alpha,
                         use_viscosity=(i == n_modes - 1),
-                        T_init=T_init, **mode_params,
+                        T_init=T_init,
+                        **mode_params,
                     )
                 else:
                     stress_i = fikh_scan_kernel_isothermal(
-                        t, strain,
-                        n_history=n_history, alpha=mode_alpha,
+                        t,
+                        strain,
+                        n_history=n_history,
+                        alpha=mode_alpha,
                         use_viscosity=(i == n_modes - 1),
                         **mode_params,
                     )
@@ -518,7 +526,9 @@ class FMLIKH(FIKHBase):
 
             # Extract last cycle via dynamic_slice (trace-safe)
             t_last = jax.lax.dynamic_slice(t, [last_cycle_start], [n_last])
-            stress_last = jax.lax.dynamic_slice(total_stress, [last_cycle_start], [n_last])
+            stress_last = jax.lax.dynamic_slice(
+                total_stress, [last_cycle_start], [n_last]
+            )
 
             # Fourier decomposition (first harmonic)
             dt = t_last[1] - t_last[0]

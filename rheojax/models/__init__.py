@@ -151,8 +151,14 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "FluidityLocal": ("rheojax.models.fluidity", "FluidityLocal"),
     "FluidityNonlocal": ("rheojax.models.fluidity", "FluidityNonlocal"),
     # Fluidity-Saramito EVP models
-    "FluiditySaramitoLocal": ("rheojax.models.fluidity.saramito", "FluiditySaramitoLocal"),
-    "FluiditySaramitoNonlocal": ("rheojax.models.fluidity.saramito", "FluiditySaramitoNonlocal"),
+    "FluiditySaramitoLocal": (
+        "rheojax.models.fluidity.saramito",
+        "FluiditySaramitoLocal",
+    ),
+    "FluiditySaramitoNonlocal": (
+        "rheojax.models.fluidity.saramito",
+        "FluiditySaramitoNonlocal",
+    ),
     # Fractional models
     "FBM": ("rheojax.models.fractional", "FBM"),
     "FJM": ("rheojax.models.fractional", "FJM"),
@@ -164,14 +170,29 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "FractionalBurgersModel": ("rheojax.models.fractional", "FractionalBurgersModel"),
     "FractionalJeffreysModel": ("rheojax.models.fractional", "FractionalJeffreysModel"),
     "FractionalKelvinVoigt": ("rheojax.models.fractional", "FractionalKelvinVoigt"),
-    "FractionalKelvinVoigtZener": ("rheojax.models.fractional", "FractionalKelvinVoigtZener"),
+    "FractionalKelvinVoigtZener": (
+        "rheojax.models.fractional",
+        "FractionalKelvinVoigtZener",
+    ),
     "FractionalMaxwellGel": ("rheojax.models.fractional", "FractionalMaxwellGel"),
     "FractionalMaxwellLiquid": ("rheojax.models.fractional", "FractionalMaxwellLiquid"),
     "FractionalMaxwellModel": ("rheojax.models.fractional", "FractionalMaxwellModel"),
-    "FractionalPoyntingThomson": ("rheojax.models.fractional", "FractionalPoyntingThomson"),
-    "FractionalZenerLiquidLiquid": ("rheojax.models.fractional", "FractionalZenerLiquidLiquid"),
-    "FractionalZenerSolidLiquid": ("rheojax.models.fractional", "FractionalZenerSolidLiquid"),
-    "FractionalZenerSolidSolid": ("rheojax.models.fractional", "FractionalZenerSolidSolid"),
+    "FractionalPoyntingThomson": (
+        "rheojax.models.fractional",
+        "FractionalPoyntingThomson",
+    ),
+    "FractionalZenerLiquidLiquid": (
+        "rheojax.models.fractional",
+        "FractionalZenerLiquidLiquid",
+    ),
+    "FractionalZenerSolidLiquid": (
+        "rheojax.models.fractional",
+        "FractionalZenerSolidLiquid",
+    ),
+    "FractionalZenerSolidSolid": (
+        "rheojax.models.fractional",
+        "FractionalZenerSolidSolid",
+    ),
     # Giesekus nonlinear viscoelastic models
     "GiesekusMultiMode": ("rheojax.models.giesekus", "GiesekusMultiMode"),
     "GiesekusSingleMode": ("rheojax.models.giesekus", "GiesekusSingleMode"),

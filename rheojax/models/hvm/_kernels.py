@@ -193,7 +193,6 @@ def hvm_ber_rate_stretch(
 # =============================================================================
 
 
-
 @jax.jit
 def hvm_exchangeable_stress(mu_E_xy: float, mu_E_nat_xy: float, G_E: float) -> float:
     """Exchangeable network (E) shear stress.

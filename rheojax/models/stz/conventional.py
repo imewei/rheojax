@@ -812,12 +812,18 @@ class STZConventional(STZBase):
         elif mode in ["startup", "relaxation", "creep"]:
             # Use sentinel to avoid swallowing falsy values (e.g. gamma_dot=0.0)
             _gd = kwargs.get("gamma_dot", _MISSING)
-            gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+            gamma_dot = (
+                _gd
+                if _gd is not _MISSING
+                else getattr(self, "_gamma_dot_applied", None)
+            )
 
             _sig = kwargs.get("sigma", _MISSING)
             if _sig is _MISSING:
                 _sig = kwargs.get("sigma_applied", _MISSING)
-            sigma = _sig if _sig is not _MISSING else getattr(self, "_sigma_applied", None)
+            sigma = (
+                _sig if _sig is not _MISSING else getattr(self, "_sigma_applied", None)
+            )
 
             _s0 = kwargs.get("sigma_0", _MISSING)
             sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_0", None)
@@ -837,7 +843,9 @@ class STZConventional(STZBase):
             _ol = kwargs.get("omega", _MISSING)
             if _ol is _MISSING:
                 _ol = kwargs.get("omega_laos", _MISSING)
-            omega_laos = _ol if _ol is not _MISSING else getattr(self, "_omega_laos", None)
+            omega_laos = (
+                _ol if _ol is not _MISSING else getattr(self, "_omega_laos", None)
+            )
             if gamma_0 is None or omega_laos is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(

@@ -420,7 +420,9 @@ def make_ml_ikh_maxwell_ode_rhs_weighted_sum(n_modes):
 
         # Backstress evolution
         alpha_abs = jnp.abs(alpha)
-        recovery = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+        recovery = (
+            gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+        )
         d_alpha = C * gamma_dot_p - recovery
 
         # Lambda evolution for each mode (share same plastic rate)
@@ -645,7 +647,9 @@ def make_ml_ikh_creep_ode_rhs_weighted_sum(n_modes):
 
         # Backstress evolution
         alpha_abs = jnp.abs(alpha)
-        recovery = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+        recovery = (
+            gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha * gamma_dot_p_abs
+        )
         d_alpha = C * gamma_dot_p - recovery
 
         # Lambda evolution for each mode

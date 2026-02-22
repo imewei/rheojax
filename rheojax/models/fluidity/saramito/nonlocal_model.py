@@ -56,11 +56,25 @@ _MISSING = object()
 
 # kwargs to strip before forwarding to nlsq_optimize (FS-005)
 _NLSQ_RESERVED = {
-    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
-    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
-    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
-    "points_per_cycle", "deformation_mode", "poisson_ratio",
-    "method", "callback", "sigma_0",
+    "test_mode",
+    "use_log_residuals",
+    "smart_init",
+    "use_multi_start",
+    "n_starts",
+    "perturb_factor",
+    "gamma_dot",
+    "sigma_applied",
+    "gamma_0",
+    "omega",
+    "omega_laos",
+    "t_wait",
+    "n_cycles",
+    "points_per_cycle",
+    "deformation_mode",
+    "poisson_ratio",
+    "method",
+    "callback",
+    "sigma_0",
 }
 
 
@@ -455,9 +469,11 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         y0 = jnp.concatenate([jnp.array([0.0]), f_field_init])
 
         term = diffrax.ODETerm(
-            jax.checkpoint(lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
-                cast(float, ti), yi, args_i
-            ))
+            jax.checkpoint(
+                lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
+                    cast(float, ti), yi, args_i
+                )
+            )
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -532,9 +548,11 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         y0 = jnp.concatenate([jnp.array([sigma_applied]), f_field_init])
 
         term = diffrax.ODETerm(
-            jax.checkpoint(lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
-                cast(float, ti), yi, args_i
-            ))
+            jax.checkpoint(
+                lambda ti, yi, args_i: saramito_nonlocal_pde_rhs(
+                    cast(float, ti), yi, args_i
+                )
+            )
         )
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
@@ -781,10 +799,18 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
 
         # FS-013: Use _MISSING sentinel to avoid stale self._ reads during NUTS
         gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        gamma_dot = (
+            gamma_dot_raw
+            if gamma_dot_raw is not _MISSING
+            else getattr(self, "_gamma_dot_applied", None)
+        )
 
         sigma_raw = kwargs.get("sigma_applied", _MISSING)
-        sigma_applied = sigma_raw if sigma_raw is not _MISSING else getattr(self, "_sigma_applied", None)
+        sigma_applied = (
+            sigma_raw
+            if sigma_raw is not _MISSING
+            else getattr(self, "_sigma_applied", None)
+        )
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve_homogeneous(X_jax, p_values)
@@ -826,8 +852,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         elif test_mode == "startup":
             # FS-004: Use _MISSING sentinel to avoid Python `or` swallowing 0.0
             gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
-            gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(
-                self, "_gamma_dot_applied", None
+            gamma_dot = (
+                gamma_dot_raw
+                if gamma_dot_raw is not _MISSING
+                else getattr(self, "_gamma_dot_applied", None)
             )
             if gamma_dot is None:
                 raise ValueError("startup prediction requires gamma_dot")
@@ -838,8 +866,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             sigma_raw = kwargs.get("sigma_applied", _MISSING)
             if sigma_raw is _MISSING:
                 sigma_raw = kwargs.get("sigma", _MISSING)
-            sigma = sigma_raw if sigma_raw is not _MISSING else getattr(
-                self, "_sigma_applied", None
+            sigma = (
+                sigma_raw
+                if sigma_raw is not _MISSING
+                else getattr(self, "_sigma_applied", None)
             )
             if sigma is None:
                 raise ValueError("creep prediction requires sigma")

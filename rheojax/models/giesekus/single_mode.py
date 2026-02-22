@@ -194,8 +194,12 @@ class GiesekusSingleMode(GiesekusBase):
         # to match model_function's (N, 2) real output format
         if test_mode == "oscillation" and np.iscomplexobj(y):
             y_real = np.asarray(y)
-            y_jax = jnp.column_stack([jnp.asarray(y_real.real, dtype=jnp.float64),
-                                       jnp.asarray(y_real.imag, dtype=jnp.float64)])
+            y_jax = jnp.column_stack(
+                [
+                    jnp.asarray(y_real.real, dtype=jnp.float64),
+                    jnp.asarray(y_real.imag, dtype=jnp.float64),
+                ]
+            )
         else:
             y_jax = jnp.asarray(y, dtype=jnp.float64)
 
@@ -337,7 +341,11 @@ class GiesekusSingleMode(GiesekusBase):
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
             # Use `if in kwargs` to avoid swallowing valid 0.0 values
-            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
+            gamma_dot = (
+                kwargs["gamma_dot"]
+                if "gamma_dot" in kwargs
+                else self._gamma_dot_applied
+            )
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(
@@ -346,7 +354,11 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "relaxation":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
+            gamma_dot = (
+                kwargs["gamma_dot"]
+                if "gamma_dot" in kwargs
+                else self._gamma_dot_applied
+            )
             if gamma_dot is None:
                 raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
             return self._simulate_relaxation_internal(
@@ -355,7 +367,11 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "creep":
             # Get sigma_applied from kwargs or instance attribute
-            sigma_applied = kwargs["sigma_applied"] if "sigma_applied" in kwargs else self._sigma_applied
+            sigma_applied = (
+                kwargs["sigma_applied"]
+                if "sigma_applied" in kwargs
+                else self._sigma_applied
+            )
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
             return self._simulate_creep_internal(

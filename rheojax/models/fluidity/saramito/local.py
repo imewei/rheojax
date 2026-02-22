@@ -58,11 +58,25 @@ _MISSING = object()
 
 # kwargs to strip before forwarding to nlsq_optimize (FS-005)
 _NLSQ_RESERVED = {
-    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
-    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
-    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
-    "points_per_cycle", "deformation_mode", "poisson_ratio",
-    "method", "callback", "sigma_0",
+    "test_mode",
+    "use_log_residuals",
+    "smart_init",
+    "use_multi_start",
+    "n_starts",
+    "perturb_factor",
+    "gamma_dot",
+    "sigma_applied",
+    "gamma_0",
+    "omega",
+    "omega_laos",
+    "t_wait",
+    "n_cycles",
+    "points_per_cycle",
+    "deformation_mode",
+    "poisson_ratio",
+    "method",
+    "callback",
+    "sigma_0",
 }
 
 
@@ -1046,19 +1060,37 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         # FS-013: Use _MISSING sentinel to avoid stale self._ reads during NUTS
         gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        gamma_dot = (
+            gamma_dot_raw
+            if gamma_dot_raw is not _MISSING
+            else getattr(self, "_gamma_dot_applied", None)
+        )
 
         sigma_raw = kwargs.get("sigma_applied", _MISSING)
-        sigma_applied = sigma_raw if sigma_raw is not _MISSING else getattr(self, "_sigma_applied", None)
+        sigma_applied = (
+            sigma_raw
+            if sigma_raw is not _MISSING
+            else getattr(self, "_sigma_applied", None)
+        )
 
         gamma_0_raw = kwargs.get("gamma_0", _MISSING)
-        gamma_0 = gamma_0_raw if gamma_0_raw is not _MISSING else getattr(self, "_gamma_0", None)
+        gamma_0 = (
+            gamma_0_raw
+            if gamma_0_raw is not _MISSING
+            else getattr(self, "_gamma_0", None)
+        )
 
         omega_raw = kwargs.get("omega", _MISSING)
-        omega = omega_raw if omega_raw is not _MISSING else getattr(self, "_omega_laos", None)
+        omega = (
+            omega_raw
+            if omega_raw is not _MISSING
+            else getattr(self, "_omega_laos", None)
+        )
 
         t_wait_raw = kwargs.get("t_wait", _MISSING)
-        t_wait = t_wait_raw if t_wait_raw is not _MISSING else getattr(self, "_t_wait", 0.0)
+        t_wait = (
+            t_wait_raw if t_wait_raw is not _MISSING else getattr(self, "_t_wait", 0.0)
+        )
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             tau_y_coupling = (

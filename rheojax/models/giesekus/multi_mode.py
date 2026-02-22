@@ -353,8 +353,12 @@ class GiesekusMultiMode(BaseModel):
         # to match model_function's (N, 2) real output format
         if test_mode == "oscillation" and np.iscomplexobj(y):
             y_real = np.asarray(y)
-            y_jax = jnp.column_stack([jnp.asarray(y_real.real, dtype=jnp.float64),
-                                       jnp.asarray(y_real.imag, dtype=jnp.float64)])
+            y_jax = jnp.column_stack(
+                [
+                    jnp.asarray(y_real.real, dtype=jnp.float64),
+                    jnp.asarray(y_real.imag, dtype=jnp.float64),
+                ]
+            )
         else:
             y_jax = jnp.asarray(y, dtype=jnp.float64)
 
@@ -417,7 +421,9 @@ class GiesekusMultiMode(BaseModel):
             for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
-        result = self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)
+        result = self.model_function(
+            x_jax, params, test_mode=test_mode, **predict_kwargs
+        )
         # model_function returns (N,2) real [G', G''] for oscillation;
         # convert to complex G* to match the established convention
         if (
@@ -475,7 +481,11 @@ class GiesekusMultiMode(BaseModel):
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
             # Use `if in kwargs` to avoid swallowing valid 0.0 values
-            gamma_dot = kwargs["gamma_dot"] if "gamma_dot" in kwargs else self._gamma_dot_applied
+            gamma_dot = (
+                kwargs["gamma_dot"]
+                if "gamma_dot" in kwargs
+                else self._gamma_dot_applied
+            )
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
             return self._simulate_startup_internal(

@@ -832,9 +832,13 @@ class HVMLocal(HVMBase):
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
-        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        gamma_dot = (
+            _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        )
         _sa = kwargs.get("sigma_applied", _MISSING)
-        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        sigma_applied = (
+            _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        )
         _g0 = kwargs.get("gamma_0", _MISSING)
         gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
         _om = kwargs.get("omega", _MISSING)

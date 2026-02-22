@@ -1179,22 +1179,16 @@ class EPMBase(BaseModel):
             "gamma_dot": protocol_kwargs.get(
                 "gamma_dot", getattr(self, "_cached_gamma_dot", 0.1)
             ),
-            "gamma": protocol_kwargs.get(
-                "gamma", getattr(self, "_cached_gamma", 0.1)
-            ),
+            "gamma": protocol_kwargs.get("gamma", getattr(self, "_cached_gamma", 0.1)),
             "stress": protocol_kwargs.get(
                 "stress", getattr(self, "_cached_stress", 1.0)
             ),
             "gamma0": protocol_kwargs.get(
                 "gamma0", getattr(self, "_cached_gamma0", 0.01)
             ),
-            "omega": protocol_kwargs.get(
-                "omega", getattr(self, "_cached_omega", 1.0)
-            ),
+            "omega": protocol_kwargs.get("omega", getattr(self, "_cached_omega", 1.0)),
         }
-        seed = protocol_kwargs.get(
-            "seed", getattr(self, "_cached_seed", 42)
-        )
+        seed = protocol_kwargs.get("seed", getattr(self, "_cached_seed", 42))
         key = jax.random.PRNGKey(seed)
 
         # Get scaled propagator (subclass must have _propagator_q_norm)
@@ -1256,8 +1250,12 @@ class EPMBase(BaseModel):
             )
         elif mode in ["oscillation", "saos"]:
             return self._model_oscillation_jit(
-                X_jax, key, propagator_q, params_array,
-                resolved_kwargs["gamma0"], resolved_kwargs["omega"],
+                X_jax,
+                key,
+                propagator_q,
+                params_array,
+                resolved_kwargs["gamma0"],
+                resolved_kwargs["omega"],
             )
         else:
             raise ValueError(f"Unknown test mode: {mode}")
@@ -1288,8 +1286,12 @@ class EPMBase(BaseModel):
             )
         elif mode in ["oscillation", "saos"]:
             return self._model_oscillation(
-                X_jax, key, propagator_q, p_values,
-                resolved_kwargs["gamma0"], resolved_kwargs["omega"],
+                X_jax,
+                key,
+                propagator_q,
+                p_values,
+                resolved_kwargs["gamma0"],
+                resolved_kwargs["omega"],
             )
         else:
             raise ValueError(f"Unknown test mode: {mode}")

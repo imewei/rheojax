@@ -784,8 +784,18 @@ def saramito_steady_state_full(
 
     # Shear stress (HB form) — respects coupling mode
     sigma_ss = saramito_flow_curve_steady(
-        gamma_dot, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej,
-        coupling_mode, tau_y_coupling, m_yield,
+        gamma_dot,
+        tau_y0,
+        K_HB,
+        n_HB,
+        f_age,
+        f_flow,
+        t_a,
+        b,
+        n_rej,
+        coupling_mode,
+        tau_y_coupling,
+        m_yield,
     )
     tau_xy = sigma_ss
 
@@ -906,7 +916,9 @@ def saramito_nonlocal_pde_rhs(
     f_avg = jnp.mean(f_field_safe)
 
     # Compute bulk yield stress for Von Mises alpha
-    tau_y_bulk_full = tau_y0 + tau_y_coupling / jnp.power(jnp.maximum(f_avg, 1e-20), m_yield)
+    tau_y_bulk_full = tau_y0 + tau_y_coupling / jnp.power(
+        jnp.maximum(f_avg, 1e-20), m_yield
+    )
     tau_y_bulk = jnp.where(coupling_mode == 1, tau_y_bulk_full, tau_y0)
 
     # FS-001: Add Von Mises alpha factor to bulk stress evolution

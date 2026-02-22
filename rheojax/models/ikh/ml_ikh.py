@@ -40,7 +40,6 @@ from rheojax.models.ikh._kernels import (
 jax, jnp = safe_import_jax()
 
 
-
 # kwargs to filter before passing to nlsq_optimize
 _MLIKH_RESERVED = {
     "test_mode",
@@ -50,6 +49,7 @@ _MLIKH_RESERVED = {
     "deformation_mode",
     "poisson_ratio",
 }
+
 
 @ModelRegistry.register(
     "ml_ikh",
@@ -589,15 +589,11 @@ class MLIKH(IKHBase):
                 jnp.asarray(X),
                 param_dict,
                 test_mode,
-                gamma_dot=kwargs.get(
-                    "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-                ),
+                gamma_dot=kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)),
                 sigma_applied=kwargs.get(
                     "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
                 ),
-                sigma_0=kwargs.get(
-                    "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
-                ),
+                sigma_0=kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", 100.0)),
             )
         else:  # startup, laos, oscillation
             times, strains = self._extract_time_strain(X, **kwargs)
@@ -766,7 +762,9 @@ class MLIKH(IKHBase):
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
 
-            G_star_magnitude = jnp.sqrt(G_prime_total**2 + G_double_prime_total**2 + 1e-30)
+            G_star_magnitude = jnp.sqrt(
+                G_prime_total**2 + G_double_prime_total**2 + 1e-30
+            )
 
             return G_star_magnitude - target_magnitude
 
@@ -800,15 +798,11 @@ class MLIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs, falling back to
         # cached values from _fit_ode_formulation()
-        gamma_dot = kwargs.get(
-            "gamma_dot", getattr(self, "_fit_gamma_dot", 1.0)
-        )
+        gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 1.0))
         sigma_applied = kwargs.get(
             "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
         )
-        sigma_0 = kwargs.get(
-            "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
-        )
+        sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", 100.0))
 
         if mode == "flow_curve":
             return self._predict_flow_curve_from_params(jnp.asarray(X), param_dict)

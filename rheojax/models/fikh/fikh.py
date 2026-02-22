@@ -346,15 +346,22 @@ class FIKH(FIKHBase):
             if include_thermal:
                 T_init = params.get("T_env", params.get("T_ref", 298.15))
                 stress, _ = fikh_scan_kernel_thermal(
-                    t, strain,
-                    n_history=n_history, alpha=alpha,
-                    use_viscosity=True, T_init=T_init, **params,
+                    t,
+                    strain,
+                    n_history=n_history,
+                    alpha=alpha,
+                    use_viscosity=True,
+                    T_init=T_init,
+                    **params,
                 )
             else:
                 stress = fikh_scan_kernel_isothermal(
-                    t, strain,
-                    n_history=n_history, alpha=alpha,
-                    use_viscosity=True, **params,
+                    t,
+                    strain,
+                    n_history=n_history,
+                    alpha=alpha,
+                    use_viscosity=True,
+                    **params,
                 )
 
             # Extract last cycle via dynamic_slice (trace-safe)
