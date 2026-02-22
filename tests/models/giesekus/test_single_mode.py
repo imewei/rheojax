@@ -651,10 +651,10 @@ class TestFitting:
         model_fit = GiesekusSingleMode()
         model_fit.fit(omega, G_star_true, test_mode="oscillation")
 
-        # Check
+        # Check — use |·|² for complex G* to get a real-valued R²
         G_star_pred = model_fit.predict(omega, test_mode="oscillation")
-        r2 = 1 - np.sum((G_star_true - G_star_pred) ** 2) / np.sum(
-            (G_star_true - np.mean(G_star_true)) ** 2
+        r2 = 1 - np.sum(np.abs(G_star_true - G_star_pred) ** 2) / np.sum(
+            np.abs(G_star_true - np.mean(G_star_true)) ** 2
         )
 
         assert r2 > 0.95

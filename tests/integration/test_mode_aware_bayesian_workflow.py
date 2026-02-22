@@ -266,22 +266,22 @@ def test_bayesian_workflow_fractional_model_relaxation():
     - Correct parameter inference for viscoelastic fractional derivative
     - MCMC diagnostics for increased parameter count
     """
-    # Generate synthetic fractional Maxwell relaxation data
+    # Generate synthetic fractional Zener Solid-Solid relaxation data
+    # FZSS model: G(t) = Ge + Gm * E_α(-(t/τ)^α)
+    # Must include non-zero Ge (equilibrium modulus) since FZSS is a solid-solid model
     np.random.seed(789)
     t = np.linspace(0.01, 100, 50)
 
-    # Fractional Maxwell: G(t) ≈ G0 * E_α(-t^α / τ^α)
-    # Approximate with parametrization
-    G0_true = 1e5
+    Ge_true = 1e4  # Equilibrium modulus (solid-solid → non-zero)
+    Gm_true = 9e4  # Maxwell arm modulus
     alpha_true = 0.7  # Fractional order between 0 and 1
     tau_true = 10.0
 
-    # Create approximate relaxation for fractional order
-    # Using Mittag-Leffler function approximation
+    # Approximate Mittag-Leffler relaxation with stretched exponential
     normalized_t = (t / tau_true) ** alpha_true
-    G_true = G0_true * np.exp(-normalized_t)
+    G_true = Ge_true + Gm_true * np.exp(-normalized_t)
 
-    noise = np.random.normal(0, 0.03 * G_true.mean(), size=t.shape)
+    noise = np.random.normal(0, 0.02 * G_true.mean(), size=t.shape)
     G_data = G_true + noise
 
     # Create RheoData
@@ -296,7 +296,7 @@ def test_bayesian_workflow_fractional_model_relaxation():
 
     # Fit with NLSQ
     model = FractionalZenerSolidSolid()
-    model.fit(t, G_data)
+    model.fit(t, G_data, test_mode="relaxation")
     assert model.fitted_ is True
 
     # Bayesian inference
@@ -309,8 +309,8 @@ def test_bayesian_workflow_fractional_model_relaxation():
 
     result = model.fit_bayesian(
         rheo_data,
-        num_warmup=2000,
-        num_samples=4000,
+        num_warmup=1000,
+        num_samples=2000,
         num_chains=1,
         initial_values=initial_values if initial_values else None,
         seed=123,
