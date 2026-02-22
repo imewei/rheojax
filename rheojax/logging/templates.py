@@ -77,7 +77,7 @@ class MessageTemplates:
     TIMING_TOTAL = "Total elapsed"
 
     # Errors (ERROR level)
-    ERROR_GENERAL = "{operation} failed"
+    ERROR_GENERAL = "{operation} encountered an error"
     ERROR_VALIDATION = "Validation failed"
     ERROR_IO = "I/O operation failed"
     ERROR_CONVERGENCE = "Convergence failed"

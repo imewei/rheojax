@@ -825,7 +825,13 @@ class ModelRegistry:
             [<Protocol.RELAXATION: 'relaxation'>, ...]
         """
         registry = cls._get_registry()
-        return registry.get_info(name, PluginType.MODEL)
+        info = registry.get_info(name, PluginType.MODEL)
+        if info is None:
+            from rheojax.models import _ensure_all_registered
+
+            _ensure_all_registered()
+            info = registry.get_info(name, PluginType.MODEL)
+        return info
 
     @classmethod
     def unregister(cls, name: str):

@@ -258,7 +258,9 @@ def _Gp_integrand_real(E: float, x: float, omega_tau0: float) -> float:
         Real part of integrand
     """
     # P(E) * E * [omega*tau0]^2 / ([omega*tau0]^2 + [exp(E/x)]^2)
-    exp_term = jnp.exp(E / x)
+    # KRN-008: Cap exp(E/x) to avoid overflow for small x
+    exp_arg = jnp.minimum(E / x, 709.0)
+    exp_term = jnp.exp(exp_arg)
     numerator = E * omega_tau0**2
     denominator = omega_tau0**2 + exp_term**2
     return rho_trap(E) * numerator / denominator
@@ -283,7 +285,9 @@ def _Gp_integrand_imag(E: float, x: float, omega_tau0: float) -> float:
         Imaginary part of integrand
     """
     # P(E) * E * [omega*tau0 * exp(E/x)] / ([omega*tau0]^2 + [exp(E/x)]^2)
-    exp_term = jnp.exp(E / x)
+    # KRN-008: Cap exp(E/x) to avoid overflow for small x
+    exp_arg = jnp.minimum(E / x, 709.0)
+    exp_term = jnp.exp(exp_arg)
     numerator = E * omega_tau0 * exp_term
     denominator = omega_tau0**2 + exp_term**2
     return rho_trap(E) * numerator / denominator

@@ -144,8 +144,8 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
         c_new = (t - sum_val) - y
         sum_new = t
 
-        # Update z_power
-        z_pow_new = z_pow * z
+        # Update z_power with overflow clamp (KRN-011)
+        z_pow_new = jnp.clip(z_pow * z, -1e300, 1e300)
 
         return sum_new, c_new, z_pow_new
 
@@ -158,13 +158,19 @@ def _ml_asymptotic_pos(z, alpha, beta):
     """
     Asymptotic expansion for large positive z (Creep mode).
     E_{a,b}(z) ~ (1/a) * z^((1-b)/a) * exp(z^(1/a))
+
+    KRN-005: Uses log-space evaluation with overflow cap to prevent inf
+    for small alpha (< 0.5) at moderate z values.
     """
     inv_alpha = 1.0 / alpha
-    exponent = z**inv_alpha
-    # Avoid overflow in z^((1-beta)/alpha) by checking sign
-    power_term = z ** ((1.0 - beta) * inv_alpha)
-    prefactor = inv_alpha * power_term
-    return prefactor * jnp.exp(exponent)
+    # Compute in log-space to avoid overflow
+    log_exponent = inv_alpha * jnp.log(jnp.maximum(z, 1e-30))
+    log_power = (1.0 - beta) * inv_alpha * jnp.log(jnp.maximum(z, 1e-30))
+    log_prefactor = jnp.log(inv_alpha) + log_power
+    # Cap the total log-result at 709 (exp(709) ≈ 8.2e307, near float64 max)
+    log_result = log_prefactor + log_exponent
+    log_result = jnp.minimum(log_result, 709.0)
+    return jnp.exp(log_result)
 
 
 def _safe_rgamma(x):

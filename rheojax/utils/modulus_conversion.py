@@ -129,6 +129,17 @@ def convert_modulus(
     _validate_poisson_ratio(poisson_ratio)
     factor = _conversion_factor(poisson_ratio)
 
+    # SUP-010: Warn for non-finite values in input data
+    data_arr = np.asarray(data) if not hasattr(data, "devices") else data
+    if hasattr(data_arr, "size") and not np.all(np.isfinite(data_arr)):
+        import warnings
+        warnings.warn(
+            "Non-finite values (NaN/Inf) detected in modulus data. "
+            "These will propagate through the conversion.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     if from_mode.is_tensile() and not to_mode.is_tensile():
         # E* -> G*: divide by factor
         logger.debug(

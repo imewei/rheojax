@@ -713,6 +713,7 @@ class BaseModel(BayesianMixin, ABC):
                 self.fitted_ = True
 
         # Set test_mode if provided (for data generation without fitting)
+        _old_test_mode = getattr(self, "_test_mode", None)
         if test_mode is not None:
             if hasattr(self, "_test_mode"):
                 self._test_mode = test_mode
@@ -771,6 +772,10 @@ class BaseModel(BayesianMixin, ABC):
                 exc_info=True,
             )
             raise
+        finally:
+            # Restore original test_mode to avoid side effect
+            if test_mode is not None and hasattr(self, "_test_mode"):
+                self._test_mode = _old_test_mode
 
     def fit_predict(self, X: ArrayLike, y: ArrayLike, **kwargs) -> ArrayLike:
         """Fit model and return predictions.
@@ -982,25 +987,25 @@ class BaseTransform(ABC):
         self.fitted_ = False
 
     @abstractmethod
-    def _transform(self, data: ArrayLike) -> ArrayLike:
+    def _transform(self, data):
         """Internal transform implementation to be overridden by subclasses.
 
         Args:
-            data: Input data to transform
+            data: Input data (RheoData or list[RheoData])
 
         Returns:
-            Transformed data
+            Transformed data (RheoData or tuple[RheoData, dict])
         """
         pass
 
-    def _inverse_transform(self, data: ArrayLike) -> ArrayLike:
+    def _inverse_transform(self, data):
         """Internal inverse transform implementation.
 
         Args:
-            data: Transformed data
+            data: Transformed data (RheoData)
 
         Returns:
-            Original data
+            Original data (RheoData)
 
         Raises:
             NotImplementedError: If inverse transform not available
@@ -1009,14 +1014,14 @@ class BaseTransform(ABC):
             f"{self.__class__.__name__} does not support inverse transform"
         )
 
-    def transform(self, data: ArrayLike) -> ArrayLike:
+    def transform(self, data):
         """Transform the data.
 
         Args:
-            data: Input data
+            data: Input data (RheoData or list[RheoData])
 
         Returns:
-            Transformed data
+            Transformed data (RheoData or tuple[RheoData, dict])
         """
         input_shape = getattr(data, "shape", None)
         logger.debug(
@@ -1049,14 +1054,14 @@ class BaseTransform(ABC):
             )
             raise
 
-    def inverse_transform(self, data: ArrayLike) -> ArrayLike:
+    def inverse_transform(self, data):
         """Apply inverse transformation.
 
         Args:
-            data: Transformed data
+            data: Transformed data (RheoData)
 
         Returns:
-            Original data
+            Original data (RheoData)
         """
         input_shape = getattr(data, "shape", None)
         logger.debug(
@@ -1089,11 +1094,11 @@ class BaseTransform(ABC):
             )
             raise
 
-    def fit(self, data: ArrayLike) -> BaseTransform:
+    def fit(self, data) -> BaseTransform:
         """Fit the transform to data (learn parameters if needed).
 
         Args:
-            data: Training data
+            data: Training data (RheoData or list[RheoData])
 
         Returns:
             self for method chaining
@@ -1118,14 +1123,14 @@ class BaseTransform(ABC):
         )
         return self
 
-    def fit_transform(self, data: ArrayLike) -> ArrayLike:
+    def fit_transform(self, data):
         """Fit to data and transform it.
 
         Args:
-            data: Input data
+            data: Input data (RheoData or list[RheoData])
 
         Returns:
-            Transformed data
+            Transformed data (RheoData or tuple[RheoData, dict])
         """
         input_shape = getattr(data, "shape", None)
         logger.debug(
@@ -1159,7 +1164,7 @@ class BaseTransform(ABC):
             Pipeline of transforms
         """
         if isinstance(other, TransformPipeline):
-            return TransformPipeline([self] + other.transforms)
+            return TransformPipeline([self] + list(other.transforms))
         elif isinstance(other, BaseTransform):
             return TransformPipeline([self, other])
         else:
@@ -1188,11 +1193,11 @@ class TransformPipeline(BaseTransform):
             transform_names=[t.__class__.__name__ for t in transforms],
         )
 
-    def _transform(self, data: ArrayLike) -> ArrayLike:
+    def _transform(self, data):
         """Apply all transforms in sequence.
 
         Args:
-            data: Input data
+            data: Input data (RheoData)
 
         Returns:
             Transformed data after all transforms
@@ -1206,17 +1211,19 @@ class TransformPipeline(BaseTransform):
                 total_steps=len(self.transforms),
                 current_transform=transform.__class__.__name__,
             )
-            result = transform.transform(result)
+            step_result = transform.transform(result)
+            # Handle tuple returns (data, extras) from mid-pipeline steps
+            result = step_result[0] if isinstance(step_result, tuple) else step_result
         return result
 
-    def _inverse_transform(self, data: ArrayLike) -> ArrayLike:
+    def _inverse_transform(self, data):
         """Apply inverse transforms in reverse order.
 
         Args:
-            data: Transformed data
+            data: Transformed data (RheoData)
 
         Returns:
-            Original data
+            Original data (RheoData)
         """
         result = data
         for i, transform in enumerate(reversed(self.transforms)):

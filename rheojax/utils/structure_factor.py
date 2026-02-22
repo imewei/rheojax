@@ -86,6 +86,14 @@ def percus_yevick_sk(
     Hansen J.P. & McDonald I.R. (2013) "Theory of Simple Liquids", 4th ed.
     """
     k = np.asarray(k, dtype=np.float64)
+
+    # KRN-013: Validate phi to prevent division by zero at phi >= 1
+    if phi <= 0 or phi >= 1:
+        raise ValueError(
+            f"Volume fraction phi must satisfy 0 < phi < 1, got phi={phi}. "
+            f"For hard spheres, physically valid range is phi < 0.64."
+        )
+
     q = k * sigma  # Dimensionless wave vector
 
     # Percus-Yevick coefficients

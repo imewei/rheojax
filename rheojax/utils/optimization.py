@@ -47,6 +47,17 @@ jax, jnp = safe_import_jax()
 
 type ArrayLike = np.ndarray | list | float
 
+# OPT-002/OPT-020: Module-level frozenset of RheoJAX-specific kwargs that must
+# be filtered before forwarding to NLSQ/SciPy optimizers (prevents TypeError).
+_RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset({
+    "test_mode", "deformation_mode", "poisson_ratio",
+    "seed", "method", "num_warmup", "num_samples", "num_chains",
+    "gamma_dot", "sigma", "sigma_applied", "gamma_0", "omega_laos",
+    "return_components", "return_full", "t_wait", "n_cycles",
+    # FIKH/FMLIKH-specific protocol kwargs (F-003)
+    "strain", "sigma_0", "T_init", "T",
+})
+
 
 def _validate_optimization_result(
     result: OptimizationResult,
@@ -66,7 +77,12 @@ def _validate_optimization_result(
     Raises:
         RuntimeError: If MSE exceeds threshold or is non-finite.
     """
-    residual_count = residuals.size if residuals.size else 1
+    if residuals.size == 0:
+        raise RuntimeError(
+            "Optimization produced empty residual vector. "
+            "Check that the objective function returns a non-empty array."
+        )
+    residual_count = residuals.size
     mse = result.fun / residual_count
     if not np.isfinite(mse) or mse > mse_threshold:
         logger.error(
@@ -145,7 +161,9 @@ def _run_scipy_least_squares(
 
     def residual_fn(values: np.ndarray) -> np.ndarray:
         res = objective(values)
-        if isinstance(res, jnp.ndarray):
+        # OPT-007: Use hasattr check instead of isinstance(res, jnp.ndarray)
+        # which is unreliable on JAX >= 0.4.7
+        if hasattr(res, "devices"):
             res = np.asarray(res)
         res = np.asarray(res, dtype=np.float64)
         # Guard against NaN/Inf from ODE solvers — replace with large finite
@@ -351,7 +369,7 @@ class OptimizationResult:
     fun: float
     jac: np.ndarray | None = None
     pcov: np.ndarray | None = None
-    success: bool = True
+    success: bool = False
     message: str = ""
     nit: int = 0
     nfev: int = 0
@@ -595,7 +613,9 @@ class OptimizationResult:
         t_val = stats.t.ppf((1 + alpha) / 2, dof)
 
         # Standard errors from covariance diagonal
-        perr = np.sqrt(np.diag(self.pcov))
+        # OPT-006: Guard against negative covariance diagonals from
+        # near-singular Jacobians
+        perr = np.sqrt(np.maximum(np.diag(self.pcov), 0.0))
 
         # Confidence intervals
         intervals = np.zeros((p, 2))
@@ -1102,12 +1122,6 @@ def nlsq_optimize(
 
     # Merge with user-provided kwargs, filtering out rheojax-specific ones
     # that are not valid NLSQ optimizer parameters (prevents TypeError in NLSQ)
-    _RHEOJAX_RESERVED_KWARGS = {
-        "test_mode", "deformation_mode", "poisson_ratio",
-        "seed", "method", "num_warmup", "num_samples", "num_chains",
-        "gamma_dot", "sigma", "sigma_applied", "gamma_0", "omega_laos",
-        "return_components", "return_full", "t_wait", "n_cycles",
-    }
     clean_kwargs = {k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS}
     nlsq_kwargs.update(clean_kwargs)
 
@@ -1137,7 +1151,10 @@ def nlsq_optimize(
         )
         result = _scipy_fallback(x0)
         result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
-        _validate_optimization_result(result)
+        # Compute residuals for validation (OPT-001)
+        residuals_fb = np.asarray(objective(result.x), dtype=np.float64)
+        result.fun = float(np.sum(residuals_fb**2))
+        _validate_optimization_result(result, residuals_fb)
         # Write back optimal params so model state reflects the fit
         parameters.set_values(result.x)
         return result
@@ -1163,7 +1180,13 @@ def nlsq_optimize(
         logger.warning(
             "NLSQ hit inner iteration limit; retrying with SciPy least_squares for stability."
         )
-        fallback_result = _scipy_fallback(x0)
+        # OPT-003: warm-start from NLSQ's best result, not stale x0
+        fallback_result = _scipy_fallback(x_opt)
+        fallback_result.message = f"[SciPy fallback] {fallback_result.message} (NLSQ inner loop limit)"
+        # OPT-004: validate the fallback result
+        residuals_fb = np.asarray(objective(fallback_result.x), dtype=np.float64)
+        fallback_result.fun = float(np.sum(residuals_fb**2))
+        _validate_optimization_result(fallback_result, residuals_fb)
         parameters.set_values(fallback_result.x)
         return fallback_result
 
@@ -1171,7 +1194,8 @@ def nlsq_optimize(
     result.x = np.asarray(result.x, dtype=np.float64)
 
     # Compute RSS = sum(residuals²)
-    result.fun = float(jnp.sum(residuals_np**2))
+    # OPT-008: Use np.sum instead of jnp.sum on numpy array to avoid host-device round-trip
+    result.fun = float(np.sum(residuals_np**2))
 
     # Guard against false "success" with astronomically large residuals
     try:
@@ -1635,7 +1659,9 @@ def nlsq_curve_fit(
     # Add workflow parameter (NLSQ 0.6.6)
     if workflow != "auto":
         curve_fit_kwargs["workflow"] = workflow
-    curve_fit_kwargs.update(kwargs)
+    # OPT-002: Filter RheoJAX-specific kwargs before forwarding to nlsq.curve_fit
+    clean_kwargs = {k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS}
+    curve_fit_kwargs.update(clean_kwargs)
 
     try:
         # Call nlsq.curve_fit() - returns CurveFitResult (tuple unpacking compatible)
@@ -1734,7 +1760,9 @@ def nlsq_curve_fit(
                 nlsq_result=None,
                 residuals=residuals,
                 y_data=y_data_np,
-                n_data=len(y_data_np),
+                # OPT-015: Use len(residuals) not len(y_data) — for complex data,
+                # residuals is 2N (real + imag parts) while y_data is N
+                n_data=len(residuals),
                 diagnostics=diagnostics,
             )
 
@@ -1884,7 +1912,8 @@ def residual_sum_of_squares(
         >>> rss = residual_sum_of_squares(y_true, y_pred)
     """
     # Use JAX operations if inputs are JAX arrays for gradient support
-    if isinstance(y_pred, jnp.ndarray) or isinstance(y_true, jnp.ndarray):
+    # OPT-013: Use hasattr check instead of isinstance(x, jnp.ndarray)
+    if hasattr(y_pred, "devices") or hasattr(y_true, "devices"):
         # Convert to JAX arrays (preserving complex type)
         y_true_jax = jnp.asarray(y_true)
         y_pred_jax = jnp.asarray(y_pred)

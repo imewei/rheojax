@@ -6,7 +6,7 @@ Custom formatters for human-readable, detailed, JSON, and scientific output.
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from rheojax.logging.config import LogFormat
@@ -140,6 +140,22 @@ class DetailedFormatter(logging.Formatter):
         super().__init__(fmt=self.FORMAT, datefmt=self.DATE_FORMAT)
         self.colorize = colorize
 
+    def formatTime(
+        self, record: logging.LogRecord, datefmt: str | None = None
+    ) -> str:
+        """Format timestamp with true microsecond precision.
+
+        Args:
+            record: LogRecord instance.
+            datefmt: Date format string (unused, uses DATE_FORMAT).
+
+        Returns:
+            Timestamp string with microseconds.
+        """
+        ct = datetime.fromtimestamp(record.created)
+        base = ct.strftime(self.DATE_FORMAT)
+        return f"{base}.{ct.microsecond:06d}"
+
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record with microseconds.
 
@@ -149,12 +165,6 @@ class DetailedFormatter(logging.Formatter):
         Returns:
             Formatted log string.
         """
-        # Add microseconds to timestamp
-        record.asctime = datetime.fromtimestamp(record.created).strftime(
-            self.DATE_FORMAT
-        )
-        record.asctime = f"{record.asctime}.{int(record.msecs * 1000):06d}"
-
         # Add extra fields
         message = record.getMessage()
         if hasattr(record, "extra") and record.extra:
@@ -192,7 +202,9 @@ class JSONFormatter(logging.Formatter):
             JSON-formatted log string.
         """
         log_data = {
-            "timestamp": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC)
+            .isoformat()
+            .replace("+00:00", "Z"),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -201,8 +213,8 @@ class JSONFormatter(logging.Formatter):
             "line": record.lineno,
         }
 
-        # Add thread info if available
-        if record.thread:
+        # Add thread info if available (thread ID can be 0 on some platforms)
+        if record.thread is not None:
             log_data["thread"] = record.thread
             log_data["thread_name"] = record.threadName
 
@@ -214,7 +226,13 @@ class JSONFormatter(logging.Formatter):
         if hasattr(record, "extra") and record.extra:
             log_data["extra"] = self._serialize_extra(record.extra)
 
-        return json.dumps(log_data, default=str, ensure_ascii=False)
+        try:
+            return json.dumps(log_data, default=str, ensure_ascii=False)
+        except RecursionError:
+            # Circular reference in extra data — fall back to safe serialization
+            log_data.pop("extra", None)
+            log_data["_serialization_error"] = "circular reference in extra fields"
+            return json.dumps(log_data, default=str, ensure_ascii=False)
 
     def _serialize_extra(self, extra: dict) -> dict:
         """Serialize extra fields for JSON output.

@@ -282,7 +282,11 @@ def _detect_from_relaxation(t: np.ndarray, G_t: np.ndarray) -> MaterialType:
 
 def _detect_from_oscillation(omega: np.ndarray, G_star: np.ndarray) -> MaterialType:
     """Detect material type from complex modulus."""
-    if G_star.shape[1] != 2:
+    # SUP-002: Handle 1D and complex inputs gracefully
+    if np.iscomplexobj(G_star):
+        # Convert complex to [real, imag] column stack
+        G_star = np.column_stack([np.real(G_star), np.imag(G_star)])
+    if G_star.ndim != 2 or G_star.shape[1] != 2:
         return MaterialType.UNKNOWN
 
     G_prime = G_star[:, 0]  # Storage modulus

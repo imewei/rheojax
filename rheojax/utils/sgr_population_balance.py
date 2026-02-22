@@ -16,7 +16,6 @@ References:
 
 from __future__ import annotations
 
-from functools import partial
 from typing import TYPE_CHECKING, NamedTuple
 
 from rheojax.core.jax_config import safe_import_jax
@@ -162,7 +161,7 @@ def initialize_equilibrium(grid: SGRPBGrid, xg: float = 1.0) -> SGRPBState:
 # ============================================================================
 
 
-@partial(jax.jit, donate_argnums=(0,))
+@jax.jit
 def advection_operator(
     P: Array,
     gamma_dot: float,
@@ -227,7 +226,7 @@ def advection_operator(
     return P_final
 
 
-@partial(jax.jit, donate_argnums=(0,))
+@jax.jit
 def yield_operator(
     P: Array,
     grid: SGRPBGrid,
@@ -283,7 +282,7 @@ def yield_operator(
     return P_after_yield, M_yield
 
 
-@partial(jax.jit, donate_argnums=(0,))
+@jax.jit
 def renewal_operator(
     P: Array,
     grid: SGRPBGrid,

@@ -6,6 +6,7 @@ for consistent logging across all RheoJAX modules.
 """
 
 import logging
+import threading
 from collections.abc import MutableMapping
 from typing import Any
 
@@ -87,8 +88,11 @@ class RheoJAXLogger(logging.LoggerAdapter):
     # merging extra context into log records.
 
 
-# Logger cache to avoid creating multiple loggers for same name
-_logger_cache: dict[str, RheoJAXLogger] = {}
+# Process-global logger cache. All modules in the same process share this
+# cache, so clear_logger_cache() affects all callers. Protected by a lock
+# for thread safety.
+_logger_cache: dict[tuple, RheoJAXLogger] = {}
+_cache_lock = threading.Lock()
 
 
 def get_logger(name: str, **context) -> RheoJAXLogger:
@@ -98,9 +102,14 @@ def get_logger(name: str, **context) -> RheoJAXLogger:
     The logger is automatically configured based on the
     current logging configuration.
 
+    Note:
+        The cache is process-global: all modules share it, and
+        ``clear_logger_cache()`` affects every caller.
+
     Args:
         name: Logger name (typically __name__).
         **context: Default context to bind to the logger.
+            Values must be representable as strings for cache keying.
 
     Returns:
         RheoJAXLogger instance.
@@ -110,25 +119,34 @@ def get_logger(name: str, **context) -> RheoJAXLogger:
         >>> logger = get_logger(__name__)
         >>> logger.info("Model fitted", R2=0.9987)
     """
-    # Check cache
-    cache_key = f"{name}:{hash(frozenset(context.items()))}"
-    if cache_key in _logger_cache:
-        return _logger_cache[cache_key]
+    # Build a collision-free cache key (no hash() — avoids hash collisions)
+    try:
+        cache_key = (name, tuple(sorted((k, str(v)) for k, v in context.items())))
+    except Exception:
+        # Unhashable context values — skip caching
+        logger = logging.getLogger(name)
+        return RheoJAXLogger(logger, context)
 
-    # Get underlying logger
-    logger = logging.getLogger(name)
+    with _cache_lock:
+        if cache_key in _logger_cache:
+            return _logger_cache[cache_key]
 
-    # Create adapter with context
-    rheojax_logger = RheoJAXLogger(logger, context)
+        # Get underlying logger
+        logger = logging.getLogger(name)
 
-    # Cache and return
-    _logger_cache[cache_key] = rheojax_logger
-    return rheojax_logger
+        # Create adapter with context
+        rheojax_logger = RheoJAXLogger(logger, context)
+
+        # Cache and return
+        _logger_cache[cache_key] = rheojax_logger
+        return rheojax_logger
 
 
 def clear_logger_cache() -> None:
     """Clear the logger cache.
 
-    Primarily useful for testing.
+    Primarily useful for testing. This is process-global — all
+    callers of ``get_logger()`` will get fresh instances afterward.
     """
-    _logger_cache.clear()
+    with _cache_lock:
+        _logger_cache.clear()

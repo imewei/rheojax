@@ -206,10 +206,14 @@ class Pipeline:
             logger, "transform", pipeline_id=self._id, transform=transform_name
         ) as ctx:
             try:
-                # Apply transform to x and y data
-                # The transform operates on the y data
-                self.data.y = transform_obj.transform(self.data.y)
+                # Apply transform to full RheoData (not raw y array)
+                # Transforms expect RheoData with x, y, metadata, domain
                 ctx["input_shape"] = len(self.data.x)
+                result = transform_obj.transform(self.data)
+                if isinstance(result, tuple):
+                    self.data = result[0]
+                else:
+                    self.data = result
             except Exception as e:
                 logger.error(
                     "Transform failed",

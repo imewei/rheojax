@@ -347,6 +347,7 @@ class BatchingExporter(LogExporter):
         self._flush_interval = flush_interval
         self._queue: queue.Queue[LogEntry] = queue.Queue(maxsize=max_queue_size)
         self._shutdown_event = threading.Event()
+        self._flush_lock = threading.Lock()
         self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
         self._flush_thread.start()
 
@@ -358,30 +359,36 @@ class BatchingExporter(LogExporter):
 
     def _flush(self) -> None:
         """Flush pending entries to the inner exporter."""
-        entries: list[LogEntry] = []
-        while not self._queue.empty() and len(entries) < self._batch_size:
-            try:
-                entries.append(self._queue.get_nowait())
-            except queue.Empty:
-                break
+        if not self._flush_lock.acquire(blocking=False):
+            return  # Another flush is already in progress
 
-        if entries:
-            try:
-                success = self._inner.export(entries)
-            except Exception as exc:  # pragma: no cover - defensive
-                logging.getLogger(__name__).error(f"Batch export failed: {exc}")
-                # best-effort requeue
-                for entry in entries:
-                    try:
-                        self._queue.put_nowait(entry)
-                    except queue.Full:
-                        break
-                return
+        try:
+            entries: list[LogEntry] = []
+            while not self._queue.empty() and len(entries) < self._batch_size:
+                try:
+                    entries.append(self._queue.get_nowait())
+                except queue.Empty:
+                    break
 
-            if success is False:
-                logging.getLogger(__name__).warning(
-                    "Inner exporter reported failure during batch flush"
-                )
+            if entries:
+                try:
+                    success = self._inner.export(entries)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logging.getLogger(__name__).error(f"Batch export failed: {exc}")
+                    # best-effort requeue (no retry loop — entries already failed once)
+                    for entry in entries:
+                        try:
+                            self._queue.put_nowait(entry)
+                        except queue.Full:
+                            break
+                    return
+
+                if success is False:
+                    logging.getLogger(__name__).warning(
+                        "Inner exporter reported failure during batch flush"
+                    )
+        finally:
+            self._flush_lock.release()
 
     def export(self, entries: list[LogEntry]) -> bool:
         """Add entries to the batch queue.
@@ -457,6 +464,8 @@ class ExportingHandler(logging.Handler):
         self._service_name = service_name
         self._service_version = service_version or self._get_version()
         self._include_trace_context = include_trace_context
+        self._otel_checked = False
+        self._otel_available = False
         self._resource = {
             "service.name": self._service_name,
             "service.version": self._service_version,
@@ -476,6 +485,20 @@ class ExportingHandler(logging.Handler):
         if not self._include_trace_context:
             return None, None
 
+        # Cache the OTel availability check to avoid repeated imports
+        # and prevent recursive logging when this handler is on the root logger
+        if not self._otel_checked:
+            self._otel_checked = True
+            try:
+                from opentelemetry import trace  # noqa: F401
+
+                self._otel_available = True
+            except ImportError:
+                self._otel_available = False
+
+        if not self._otel_available:
+            return None, None
+
         try:
             from opentelemetry import trace
 
@@ -486,10 +509,8 @@ class ExportingHandler(logging.Handler):
                     format(ctx.trace_id, "032x"),
                     format(ctx.span_id, "016x"),
                 )
-        except ImportError:
-            logging.getLogger(__name__).debug(
-                "OpenTelemetry not installed; skipping trace context"
-            )
+        except Exception:
+            pass
 
         return None, None
 

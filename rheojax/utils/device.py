@@ -163,9 +163,11 @@ def check_gpu_availability(warn: bool = True) -> bool:
             return False
 
         # Check if JAX is using GPU
-        import jax
+        # SUP-012: Use safe_import_jax() instead of direct import jax
+        from rheojax.core.jax_config import safe_import_jax
+        jax_mod, _ = safe_import_jax()
 
-        devices = jax.devices()
+        devices = jax_mod.devices()
         using_gpu = any("cuda" in str(d).lower() for d in devices)
 
         if using_gpu:

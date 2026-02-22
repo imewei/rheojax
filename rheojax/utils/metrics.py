@@ -42,6 +42,17 @@ def compute_fit_quality(
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
 
+    # SUP-001: Reject complex inputs — use r2_complex() instead
+    if np.iscomplexobj(y_true) or np.iscomplexobj(y_pred):
+        raise TypeError(
+            "compute_fit_quality does not support complex inputs. "
+            "Use r2_complex() for complex-valued data."
+        )
+
+    # SUP-006: Return NaN metrics for empty input
+    if y_true.size == 0 or y_pred.size == 0:
+        return {"R2": float("nan"), "RMSE": float("nan"), "nrmse": float("nan")}
+
     # Flatten if multi-dimensional
     if y_true.ndim > 1:
         y_true = y_true.ravel()

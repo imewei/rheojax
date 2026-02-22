@@ -89,20 +89,23 @@ def log_operation(
     except Exception as e:
         elapsed = time.perf_counter() - start_time
 
-        # Log failure
-        logger.error(
-            f"{operation} failed: {e}",
-            extra={
-                "operation": operation,
-                "phase": "end",
-                "elapsed_seconds": round(elapsed, 4),
-                "status": "error",
-                "error_type": type(e).__name__,
-                "error_message": str(e),
-                **context,
-                **completion_context,
-            },
-        )
+        # Log failure (wrapped to avoid masking the original exception)
+        try:
+            logger.error(
+                f"{operation} failed: {e}",
+                extra={
+                    "operation": operation,
+                    "phase": "end",
+                    "elapsed_seconds": round(elapsed, 4),
+                    "status": "error",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    **context,
+                    **completion_context,
+                },
+            )
+        except Exception:
+            pass  # Never mask the original exception
         raise
 
 

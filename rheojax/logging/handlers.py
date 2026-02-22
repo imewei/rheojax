@@ -102,13 +102,20 @@ class RheoJAXMemoryHandler(MemoryHandler):
     def shouldFlush(self, record: logging.LogRecord) -> bool:
         """Check if buffer should be flushed.
 
+        Extends stdlib behavior: when no target is set, caps the buffer
+        at capacity by dropping the oldest records to prevent unbounded
+        memory growth. With a target, delegates to stdlib MemoryHandler.
+
         Args:
             record: Current log record.
 
         Returns:
             True if buffer should be flushed.
         """
-        return len(self.buffer) >= self.capacity or record.levelno >= self.flushLevel
+        if self.target is None and len(self.buffer) >= self.capacity:
+            self.buffer = self.buffer[-(self.capacity - 1) :]
+            return False
+        return super().shouldFlush(record)
 
 
 class NullHandler(logging.NullHandler):

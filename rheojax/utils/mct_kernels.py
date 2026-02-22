@@ -147,7 +147,9 @@ def advected_memory_decorrelation(
     - h(γ) → 0 for |γ| >> γ_c (complete decorrelation)
     - The Gaussian form is physically motivated by isotropic strain
     """
-    gamma_normalized = gamma / gamma_c
+    # KRN-009: Guard against gamma_c=0 division
+    gamma_c_safe = jnp.maximum(gamma_c, 1e-10)
+    gamma_normalized = gamma / gamma_c_safe
     return jnp.exp(-gamma_normalized * gamma_normalized)
 
 

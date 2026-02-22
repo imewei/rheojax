@@ -218,17 +218,18 @@ def step_hl(
     # Stable time step (safety factor 0.5)
     dt_stable = 0.5 * jnp.minimum(dt_adv, dt_diff)
 
-    # Determine number of sub-steps
-    n_sub = jnp.ceil(dt / dt_stable).astype(int)
-    n_sub = jnp.maximum(n_sub, 1)
-
-    dt_sub = dt / n_sub
+    # KRN-002: Use fixed conservative sub-stepping instead of dynamic
+    # fori_loop bound. Dynamic n_sub from traced dt/dt_stable is invalid
+    # inside lax.scan — the bound must be static. Use 10 sub-steps with
+    # safety factor which is stable for typical CFL conditions.
+    n_sub_fixed = 10
+    dt_sub = dt / n_sub_fixed
 
     # Execute sub-steps
     def body_fun(i, current_state):
         return _physics_step(current_state, gdot, grid, alpha, tau, sigma_c, dt_sub)
 
-    final_state = lax.fori_loop(0, n_sub, body_fun, state)
+    final_state = lax.fori_loop(0, n_sub_fixed, body_fun, state)
 
     return final_state
 
@@ -560,7 +561,9 @@ def run_relaxation(
     stress_full = jnp.concatenate([jnp.array([init_stress]), stress_hist])
 
     sigma_t = jnp.interp(t, time_full, stress_full)
-    return sigma_t / gamma0
+    # KRN-007: Guard against gamma0=0 division
+    gamma0_safe = jnp.where(jnp.abs(gamma0) > 1e-15, gamma0, 1e-15)
+    return sigma_t / gamma0_safe
 
 
 def run_creep(

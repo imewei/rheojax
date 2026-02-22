@@ -6,6 +6,7 @@ Utilities for timing, memory tracking, and iteration logging.
 
 import functools
 import logging
+import math
 import time
 import tracemalloc
 from collections.abc import Callable
@@ -44,9 +45,8 @@ def timed(
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            nonlocal logger
-            if logger is None:
-                logger = get_logger(func.__module__)
+            # Use a local to avoid mutating the shared closure cell (thread-safe)
+            _logger = logger if logger is not None else get_logger(func.__module__)
 
             start = time.perf_counter()
 
@@ -79,7 +79,7 @@ def timed(
                 result = func(*args, **kwargs)
                 elapsed = time.perf_counter() - start
 
-                logger.log(
+                _logger.log(
                     level,
                     f"{func.__name__} completed",
                     extra={
@@ -93,7 +93,7 @@ def timed(
 
             except Exception as e:
                 elapsed = time.perf_counter() - start
-                logger.error(
+                _logger.error(
                     f"{func.__name__} failed after {elapsed:.3f}s: {e}",
                     extra={
                         **extra,
@@ -138,7 +138,10 @@ def log_memory(
         logger if logger is not None else get_logger("rheojax.metrics")
     )
 
-    tracemalloc.start()
+    # Check if tracemalloc is already running (avoid resetting another caller's peak)
+    already_tracing = tracemalloc.is_tracing()
+    if not already_tracing:
+        tracemalloc.start()
     try:
         yield
     finally:
@@ -158,7 +161,9 @@ def log_memory(
                 for stat in top_stats
             ]
 
-        tracemalloc.stop()
+        # Only stop if we started it
+        if not already_tracing:
+            tracemalloc.stop()
 
         actual_logger.log(level, f"{operation} memory usage", extra=extra)
 
@@ -316,11 +321,11 @@ class ConvergenceTracker:
         if len(self.history) < self.min_iterations:
             return False
 
-        # Check improvement
+        # Check improvement (NaN costs never count as small improvement)
         if len(self.history) >= 2:
             improvement = abs(self.history[-2] - self.history[-1])
 
-            if improvement < self.tolerance:
+            if math.isfinite(improvement) and improvement < self.tolerance:
                 self._small_improvement_count += 1
             else:
                 self._small_improvement_count = 0
@@ -353,4 +358,4 @@ class ConvergenceTracker:
         """
         if len(self.history) < 2:
             return None
-        return (self.history[0] - self.history[-1]) / len(self.history)
+        return (self.history[0] - self.history[-1]) / (len(self.history) - 1)

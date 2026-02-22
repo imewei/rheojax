@@ -152,19 +152,11 @@ def step_mc(
     3. Monte Carlo: if u < P_yield, yield and renew
     4. Stress: sigma = k * mean(ell)
     """
-    logger.debug(
-        "MC step starting",
-        time=state.time,
-        gamma_dot=gamma_dot,
-        dt=dt,
-        x=x,
-    )
     E, ell, time = state.E, state.ell, state.time
     n = E.shape[0]
 
     # --- 1. Affine Loading ---
     ell_new = ell + gamma_dot * dt
-    logger.debug("Affine loading applied", ell_mean=float(jnp.mean(ell_new)))
 
     # --- 2. Yield Rates & Survival Probability ---
     # Energy barrier: E - (1/2) * k * ell^2
@@ -176,11 +168,6 @@ def step_mc(
 
     # Survival probability (exponential form for numerical stability)
     P_surv = jnp.exp(-Gamma * dt)
-    logger.debug(
-        "Yield rates computed",
-        Gamma_mean=float(jnp.mean(Gamma)),
-        P_surv_mean=float(jnp.mean(P_surv)),
-    )
 
     # --- 3. Monte Carlo Yielding ---
     key, subkey1, subkey2 = jax.random.split(key, 3)
@@ -188,10 +175,6 @@ def step_mc(
 
     # Yield mask: True if particle yields
     yield_mask = r_draw > P_surv
-    n_yielded = int(jnp.sum(yield_mask))
-    logger.debug(
-        "Yielding evaluated", n_yielded=n_yielded, yield_fraction=n_yielded / n
-    )
 
     # --- 4. Update Yielded Particles ---
     # Reset strain to 0 for yielded particles
@@ -209,7 +192,6 @@ def step_mc(
     new_time = time + dt
 
     new_state = SGRMCState(E=E_updated, ell=ell_updated, time=new_time)
-    logger.debug("MC step complete", new_time=new_time, sigma=float(sigma))
     return new_state, sigma
 
 

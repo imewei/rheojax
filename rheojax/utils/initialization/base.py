@@ -244,7 +244,15 @@ class BaseInitializer(ABC):
         )
 
         # Step 3: Estimate model-specific parameters (abstract methods)
-        estimated_params = self._estimate_parameters(features)
+        try:
+            estimated_params = self._estimate_parameters(features)
+        except Exception as e:
+            logger.debug(
+                "Parameter estimation failed, falling back to defaults",
+                initializer=initializer_name,
+                error=str(e),
+            )
+            return False
         logger.debug(
             "Parameters estimated",
             initializer=initializer_name,

@@ -13,9 +13,12 @@ Environment Variables:
 
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+
+_VALID_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 class LogFormat(Enum):
@@ -116,19 +119,18 @@ class LogConfig:
         Returns:
             LogConfig instance with environment-based settings.
         """
-        # Get subsystem levels from environment
+        # Get subsystem levels from environment using targeted lookups
+        # instead of scanning the full os.environ dict.
         subsystem_levels = DEFAULT_SUBSYSTEM_LEVELS.copy()
-        for key, value in os.environ.items():
-            if key.startswith("RHEOJAX_LOG_") and key not in {
-                "RHEOJAX_LOG_LEVEL",
-                "RHEOJAX_LOG_FILE",
-                "RHEOJAX_LOG_FORMAT",
-                "RHEOJAX_LOG_COLORIZE",
-            }:
-                # Convert RHEOJAX_LOG_MODELS to rheojax.models
-                subsystem = key.replace("RHEOJAX_LOG_", "").lower()
-                subsystem = f"rheojax.{subsystem.replace('_', '.')}"
-                subsystem_levels[subsystem] = value.upper()
+        for subsystem_key in DEFAULT_SUBSYSTEM_LEVELS:
+            # rheojax.gui.widgets -> RHEOJAX_LOG_GUI_WIDGETS
+            env_suffix = subsystem_key.replace("rheojax.", "").replace(".", "_").upper()
+            env_key = f"RHEOJAX_LOG_{env_suffix}"
+            value = os.environ.get(env_key)
+            if value is not None:
+                level_upper = value.upper()
+                if level_upper in _VALID_LEVELS:
+                    subsystem_levels[subsystem_key] = level_upper
 
         # Parse file path
         file_path = os.environ.get("RHEOJAX_LOG_FILE")
@@ -164,22 +166,27 @@ class LogConfig:
         """
         # Check for exact match first
         if logger_name in self.subsystem_levels:
-            return getattr(logging, self.subsystem_levels[logger_name].upper())
+            return getattr(
+                logging, self.subsystem_levels[logger_name].upper(), logging.INFO
+            )
 
         # Check for parent matches (most specific first)
         parts = logger_name.split(".")
         for i in range(len(parts) - 1, 0, -1):
             parent = ".".join(parts[:i])
             if parent in self.subsystem_levels:
-                return getattr(logging, self.subsystem_levels[parent].upper())
+                return getattr(
+                    logging, self.subsystem_levels[parent].upper(), logging.INFO
+                )
 
         # Fall back to global level
-        return getattr(logging, self.level.upper())
+        return getattr(logging, self.level.upper(), logging.INFO)
 
 
-# Global configuration instance
+# Global configuration instance (protected by _config_lock)
 _config: LogConfig | None = None
 _configured: bool = False
+_config_lock = threading.Lock()
 
 
 def get_config() -> LogConfig:
@@ -189,9 +196,10 @@ def get_config() -> LogConfig:
         Current LogConfig instance.
     """
     global _config
-    if _config is None:
-        _config = LogConfig.from_env()
-    return _config
+    with _config_lock:
+        if _config is None:
+            _config = LogConfig.from_env()
+        return _config
 
 
 def configure_logging(
@@ -222,8 +230,8 @@ def configure_logging(
     """
     global _config, _configured
 
-    # Create configuration
-    _config = LogConfig(
+    # Create configuration (don't assign to _config yet — _apply_config may raise)
+    new_config = LogConfig(
         level=level,
         format=LogFormat(format.lower()) if isinstance(format, str) else format,
         file=Path(file) if file else None,
@@ -232,10 +240,12 @@ def configure_logging(
     )
 
     # Apply configuration to logging system
-    _apply_config(_config)
-    _configured = True
+    with _config_lock:
+        _apply_config(new_config)
+        _config = new_config
+        _configured = True
 
-    return _config
+    return new_config
 
 
 def _apply_config(config: LogConfig) -> None:
@@ -251,8 +261,10 @@ def _apply_config(config: LogConfig) -> None:
     root_logger = logging.getLogger("rheojax")
     root_logger.setLevel(logging.DEBUG)  # Allow all levels, filter at handler
 
-    # Remove existing handlers
-    root_logger.handlers.clear()
+    # Remove existing handlers safely (uses the logging module's internal lock)
+    for h in list(root_logger.handlers):
+        root_logger.removeHandler(h)
+        h.close()
 
     # Create and add handlers
     handlers = create_handlers(config)
@@ -264,13 +276,13 @@ def _apply_config(config: LogConfig) -> None:
     for handler in handlers:
         formatter = get_formatter(log_format, colorize=config.colorize)
         handler.setFormatter(formatter)
-        handler.setLevel(getattr(logging, config.level.upper()))
+        handler.setLevel(getattr(logging, config.level.upper(), logging.INFO))
         root_logger.addHandler(handler)
 
     # Configure subsystem loggers
     for subsystem, level in config.subsystem_levels.items():
         logger = logging.getLogger(subsystem)
-        logger.setLevel(getattr(logging, level.upper()))
+        logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # Prevent propagation to root logger
     root_logger.propagate = False
@@ -291,10 +303,19 @@ def reset_config() -> None:
     Primarily useful for testing.
     """
     global _config, _configured
-    _config = None
-    _configured = False
 
-    # Reset root logger
+    with _config_lock:
+        _config = None
+        _configured = False
+
+    # Clear cached loggers to prevent stale adapters
+    from rheojax.logging.logger import clear_logger_cache
+
+    clear_logger_cache()
+
+    # Reset root logger safely (uses the logging module's internal lock)
     root_logger = logging.getLogger("rheojax")
-    root_logger.handlers.clear()
+    for h in list(root_logger.handlers):
+        root_logger.removeHandler(h)
+        h.close()
     root_logger.setLevel(logging.WARNING)
