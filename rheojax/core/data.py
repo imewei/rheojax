@@ -247,9 +247,10 @@ class RheoData:
         logger.debug(
             "Converting RheoData to JAX arrays", from_type="numpy", to_type="jax"
         )
+        y_dtype = jnp.complex128 if np.iscomplexobj(self.y) else jnp.float64
         result = RheoData(
             x=jnp.array(self.x, dtype=jnp.float64),
-            y=jnp.array(self.y, dtype=jnp.float64),
+            y=jnp.array(self.y, dtype=y_dtype),
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,

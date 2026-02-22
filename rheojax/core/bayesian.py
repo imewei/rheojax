@@ -1404,13 +1404,27 @@ class BayesianMixin:
 
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
 
-        # Extract scale values for likelihood
-        y_real_scale = scale_info.get("y_real_scale") or 0.0
-        y_imag_scale = scale_info.get("y_imag_scale") or 0.0
-        data_scale = scale_info.get("data_scale") or 0.0
-        y_real_mean = scale_info.get("y_real_mean") or 0.0
-        y_imag_mean = scale_info.get("y_imag_mean") or 0.0
-        data_mean = scale_info.get("data_mean") or 0.0
+        # Extract scale values for likelihood (use 0.0 default for missing keys;
+        # avoid `or` which would swallow legitimate 0.0 values)
+        y_real_scale = scale_info.get("y_real_scale", 0.0)
+        y_imag_scale = scale_info.get("y_imag_scale", 0.0)
+        data_scale = scale_info.get("data_scale", 0.0)
+        y_real_mean = scale_info.get("y_real_mean", 0.0)
+        y_imag_mean = scale_info.get("y_imag_mean", 0.0)
+        data_mean = scale_info.get("data_mean", 0.0)
+        # Guard against None values from upstream (e.g. incomplete scale_info)
+        if y_real_scale is None:
+            y_real_scale = 0.0
+        if y_imag_scale is None:
+            y_imag_scale = 0.0
+        if data_scale is None:
+            data_scale = 0.0
+        if y_real_mean is None:
+            y_real_mean = 0.0
+        if y_imag_mean is None:
+            y_imag_mean = 0.0
+        if data_mean is None:
+            data_mean = 0.0
 
         def numpyro_model(X, y=None):
             """NumPyro model with test_mode captured in closure."""
