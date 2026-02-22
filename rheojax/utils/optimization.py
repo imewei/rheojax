@@ -49,14 +49,32 @@ type ArrayLike = np.ndarray | list | float
 
 # OPT-002/OPT-020: Module-level frozenset of RheoJAX-specific kwargs that must
 # be filtered before forwarding to NLSQ/SciPy optimizers (prevents TypeError).
-_RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset({
-    "test_mode", "deformation_mode", "poisson_ratio",
-    "seed", "method", "num_warmup", "num_samples", "num_chains",
-    "gamma_dot", "sigma", "sigma_applied", "gamma_0", "omega_laos",
-    "return_components", "return_full", "t_wait", "n_cycles",
-    # FIKH/FMLIKH-specific protocol kwargs (F-003)
-    "strain", "sigma_0", "T_init", "T",
-})
+_RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
+    {
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+        "seed",
+        "method",
+        "num_warmup",
+        "num_samples",
+        "num_chains",
+        "gamma_dot",
+        "sigma",
+        "sigma_applied",
+        "gamma_0",
+        "omega_laos",
+        "return_components",
+        "return_full",
+        "t_wait",
+        "n_cycles",
+        # FIKH/FMLIKH-specific protocol kwargs (F-003)
+        "strain",
+        "sigma_0",
+        "T_init",
+        "T",
+    }
+)
 
 
 def _validate_optimization_result(
@@ -1122,7 +1140,9 @@ def nlsq_optimize(
 
     # Merge with user-provided kwargs, filtering out rheojax-specific ones
     # that are not valid NLSQ optimizer parameters (prevents TypeError in NLSQ)
-    clean_kwargs = {k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS}
+    clean_kwargs = {
+        k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS
+    }
     nlsq_kwargs.update(clean_kwargs)
 
     def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
@@ -1182,7 +1202,9 @@ def nlsq_optimize(
         )
         # OPT-003: warm-start from NLSQ's best result, not stale x0
         fallback_result = _scipy_fallback(x_opt)
-        fallback_result.message = f"[SciPy fallback] {fallback_result.message} (NLSQ inner loop limit)"
+        fallback_result.message = (
+            f"[SciPy fallback] {fallback_result.message} (NLSQ inner loop limit)"
+        )
         # OPT-004: validate the fallback result
         residuals_fb = np.asarray(objective(fallback_result.x), dtype=np.float64)
         fallback_result.fun = float(np.sum(residuals_fb**2))
@@ -1660,7 +1682,9 @@ def nlsq_curve_fit(
     if workflow != "auto":
         curve_fit_kwargs["workflow"] = workflow
     # OPT-002: Filter RheoJAX-specific kwargs before forwarding to nlsq.curve_fit
-    clean_kwargs = {k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS}
+    clean_kwargs = {
+        k: v for k, v in kwargs.items() if k not in _RHEOJAX_RESERVED_KWARGS
+    }
     curve_fit_kwargs.update(clean_kwargs)
 
     try:
@@ -1803,7 +1827,9 @@ def nlsq_curve_fit(
             result = nlsq_optimize(objective, parameters, **kwargs)
 
         # Annotate that this result came from a curve_fit→nlsq_optimize fallback
-        result.message = f"[curve_fit→nlsq_optimize fallback] {getattr(result, 'message', '')}"
+        result.message = (
+            f"[curve_fit→nlsq_optimize fallback] {getattr(result, 'message', '')}"
+        )
         # Preserve y_data for R² calculation (not set by nlsq_optimize fallback)
         result.y_data = y_data_np
         result._model_fn = model_fn

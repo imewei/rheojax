@@ -133,6 +133,7 @@ def convert_modulus(
     data_arr = np.asarray(data) if not hasattr(data, "devices") else data
     if hasattr(data_arr, "size") and not np.all(np.isfinite(data_arr)):
         import warnings
+
         warnings.warn(
             "Non-finite values (NaN/Inf) detected in modulus data. "
             "These will propagate through the conversion.",

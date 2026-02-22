@@ -425,19 +425,19 @@ def mct_vertex_isotropic(
     # This is a simplified form - full calculation requires angular integration
 
     # Vectorized: compute all (i,j) pairs simultaneously via broadcasting
-    ki = k[:, None]   # (n_k, 1)
-    qj = q[None, :]   # (1, n_k)
+    ki = k[:, None]  # (n_k, 1)
+    qj = q[None, :]  # (1, n_k)
 
     # Triangle constraint: |k-q| to k+q, midpoint approximation
-    k_minus_q_min = np.abs(ki - qj)     # (n_k, n_k)
-    k_minus_q_max = ki + qj              # (n_k, n_k)
-    k_minus_q = (k_minus_q_min + k_minus_q_max) / 2   # (n_k, n_k)
+    k_minus_q_min = np.abs(ki - qj)  # (n_k, n_k)
+    k_minus_q_max = ki + qj  # (n_k, n_k)
+    k_minus_q = (k_minus_q_min + k_minus_q_max) / 2  # (n_k, n_k)
 
     # Single vectorized sk_func call on raveled grid instead of n^2 scalar calls
     s_kmq = sk_func(k_minus_q.ravel()).reshape(n_k, n_k)  # (n_k, n_k)
 
     # Vertex coupling (simplified Verlet-Weis form) — broadcast ck/cq
-    coupling = ki * ck[:, None] + qj * cq[None, :]   # (n_k, n_k)
+    coupling = ki * ck[:, None] + qj * cq[None, :]  # (n_k, n_k)
     V = sk[:, None] * sq[None, :] * s_kmq * coupling**2
 
     # Normalize by density

@@ -710,6 +710,4 @@ def run_saos(
         G_prime_list.append(Gp)
         G_double_prime_list.append(Gpp)
 
-    return jnp.column_stack(
-        [jnp.array(G_prime_list), jnp.array(G_double_prime_list)]
-    )
+    return jnp.column_stack([jnp.array(G_prime_list), jnp.array(G_double_prime_list)])

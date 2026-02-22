@@ -81,7 +81,9 @@ class FractionalMaxwellGelInitializer(BaseInitializer):
         # SUP-004: Use log-space computation to avoid overflow for alpha near 1
         exponent = 1.0 / (1.0 - alpha_init + epsilon)
         log_c_alpha = np.log(max(c_alpha_init, 1e-30))
-        log_eta = np.log(max(tau_est, 1e-30)) + np.clip(exponent * log_c_alpha, -700, 700)
+        log_eta = np.log(max(tau_est, 1e-30)) + np.clip(
+            exponent * log_c_alpha, -700, 700
+        )
         eta_init = np.exp(np.clip(log_eta, -700, 700))
         logger.debug(
             "Estimated viscosity eta from transition frequency",

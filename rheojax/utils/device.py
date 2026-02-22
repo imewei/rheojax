@@ -165,6 +165,7 @@ def check_gpu_availability(warn: bool = True) -> bool:
         # Check if JAX is using GPU
         # SUP-012: Use safe_import_jax() instead of direct import jax
         from rheojax.core.jax_config import safe_import_jax
+
         jax_mod, _ = safe_import_jax()
 
         devices = jax_mod.devices()

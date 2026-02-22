@@ -572,7 +572,9 @@ class ParameterSet:
         context: dict[str, float] | None = None
         if self._has_relative_constraints:
             context = {
-                p.name: p.value for p in self._parameters.values() if p.value is not None
+                p.name: p.value
+                for p in self._parameters.values()
+                if p.value is not None
             }
         if not param.validate(value, context):
             logger.error(
