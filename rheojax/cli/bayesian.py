@@ -308,9 +308,7 @@ def main(args: list[str] | None = None) -> int:
             "q97.5": float(jnp.percentile(samples, 97.5)),
         }
         if param_name in rhat_dict:
-            output["diagnostics"]["r_hat"][param_name] = float(
-                rhat_dict[param_name]
-            )
+            output["diagnostics"]["r_hat"][param_name] = float(rhat_dict[param_name])
         if param_name in ess_dict:
             output["diagnostics"]["ess"][param_name] = float(ess_dict[param_name])
 

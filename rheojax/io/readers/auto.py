@@ -332,9 +332,7 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
             attempted.append(reader_name)
             logger.debug("Trying reader", filepath=str(filepath), reader=reader_name)
             result = reader_func()
-            logger.debug(
-                "Reader succeeded", filepath=str(filepath), reader=reader_name
-            )
+            logger.debug("Reader succeeded", filepath=str(filepath), reader=reader_name)
             _inject_provenance(result, reader_name, attempted)
             return result
         except _FATAL_EXCEPTIONS:

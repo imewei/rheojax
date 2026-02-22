@@ -272,9 +272,7 @@ def log_numerical_issue(
             import jax.core
 
             if isinstance(arr, jax.core.Tracer):
-                logger.debug(
-                    f"Cannot check {name} for numerical issues: JAX tracer"
-                )
+                logger.debug(f"Cannot check {name} for numerical issues: JAX tracer")
                 return False
         except ImportError:
             pass

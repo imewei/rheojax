@@ -140,9 +140,7 @@ class DetailedFormatter(logging.Formatter):
         super().__init__(fmt=self.FORMAT, datefmt=self.DATE_FORMAT)
         self.colorize = colorize
 
-    def formatTime(
-        self, record: logging.LogRecord, datefmt: str | None = None
-    ) -> str:
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         """Format timestamp with true microsecond precision.
 
         Args:
