@@ -321,10 +321,15 @@ class ResidualsPanel(QWidget):
         try:
             from scipy import stats
 
+            # VIS-017: Guard against zero std (perfect fit)
+            std = np.std(self._residuals)
+            if std < 1e-15:
+                ax.text(0.5, 0.5, "Perfect fit\n(zero residuals)",
+                        ha="center", va="center", transform=ax.transAxes)
+                ax.set_title("Normal Q-Q Plot")
+                return
             # Standardize residuals
-            standardized = (self._residuals - np.mean(self._residuals)) / np.std(
-                self._residuals
-            )
+            standardized = (self._residuals - np.mean(self._residuals)) / std
 
             # Q-Q plot
             stats.probplot(standardized, dist="norm", plot=ax)
@@ -450,7 +455,11 @@ class ResidualsPanel(QWidget):
             mode="full",
         )
         autocorr = autocorr[n - 1 : n - 1 + max_lag]
-        autocorr = autocorr / autocorr[0]  # Normalize
+        # VIS-018: Guard against zero normalization (perfect fit / constant residuals)
+        if autocorr[0] < 1e-15:
+            autocorr = np.zeros_like(autocorr)
+        else:
+            autocorr = autocorr / autocorr[0]  # Normalize
 
         lags = np.arange(max_lag)
         ax.bar(lags, autocorr, width=0.8, alpha=0.7)

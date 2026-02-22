@@ -132,9 +132,10 @@ class WorkerPool(QObject):
         WorkerPool
             The singleton WorkerPool instance
         """
-        if cls._instance is None:
-            cls._instance = cls(max_threads)
-        return cls._instance
+        with cls._singleton_lock:
+            if cls._instance is None:
+                cls._instance = cls(max_threads)
+            return cls._instance
 
     @classmethod
     def reset(cls) -> None:

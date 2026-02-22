@@ -300,6 +300,12 @@ class TransformService:
                 logger.error("Unknown transform requested", transform=name)
                 raise ValueError(f"Unknown transform: {name}")
 
+            # Validate input before processing (T-007)
+            warnings = self.validate_transform_input(name, data)
+            if warnings:
+                for w in warnings:
+                    logger.warning("Transform input warning", transform=name, warning=w)
+
             def _with_provenance(result_data: RheoData) -> RheoData:
                 # Attach a simple provenance entry
                 prov_entry = {
@@ -310,9 +316,18 @@ class TransformService:
                         if isinstance(v, (int, float, str, bool))
                     },
                 }
-                history = list(result_data.metadata.get("provenance", []))
+                new_meta = dict(result_data.metadata)
+                history = list(new_meta.get("provenance", []))
                 history.append(prov_entry)
-                result_data.metadata["provenance"] = history
+                new_meta["provenance"] = history
+                # Track transform chain for reproducibility (T-013)
+                applied = list(
+                    new_meta.get("transforms_applied", [])
+                )
+                applied.append(name)
+                new_meta["transforms_applied"] = applied
+                new_meta["last_transform"] = name
+                result_data.metadata = new_meta
                 return result_data
 
             if name == "mastercurve":

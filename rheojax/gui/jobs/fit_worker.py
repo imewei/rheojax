@@ -7,7 +7,6 @@ Background worker for NLSQ model fitting operations.
 
 import time
 import traceback
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -41,62 +40,8 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
-@dataclass
-class FitResult:
-    """Results from NLSQ model fitting.
-
-    Attributes
-    ----------
-    model_name : str
-        Name of the fitted model
-    parameters : dict
-        Fitted parameter values
-    r_squared : float
-        R-squared goodness of fit
-    mpe : float
-        Mean percentage error
-    chi_squared : float
-        Chi-squared statistic
-    fit_time : float
-        Fitting duration in seconds
-    timestamp : datetime
-        When the fit was completed
-    n_iterations : int, optional
-        Number of optimization iterations
-    success : bool, optional
-        Whether optimization converged successfully
-    message : str, optional
-        Convergence message from the optimizer
-    pcov : Any, optional
-        Parameter covariance matrix
-    rmse : float, optional
-        Root mean squared error
-    mae : float, optional
-        Mean absolute error
-    aic : float, optional
-        Akaike information criterion
-    bic : float, optional
-        Bayesian information criterion
-    """
-
-    model_name: str
-    parameters: dict[str, float]
-    r_squared: float
-    mpe: float
-    chi_squared: float
-    fit_time: float
-    timestamp: datetime
-    n_iterations: int | None = None
-    success: bool = True
-    message: str = ""
-    x_fit: Any | None = None
-    y_fit: Any | None = None
-    residuals: Any | None = None
-    pcov: Any | None = None
-    rmse: float | None = None
-    mae: float | None = None
-    aic: float | None = None
-    bic: float | None = None
+# Import canonical FitResult from store (single source of truth)
+from rheojax.gui.state.store import FitResult
 
 
 class FitWorkerSignals(QObject):
@@ -200,9 +145,16 @@ class FitWorker(QRunnable):
             fit_kwargs = self._options.copy()
             max_iter = int(fit_kwargs.get("max_iter", 100)) or 100
 
+            # GUI-008 fix: Track last NLSQ callback time so the elapsed timer
+            # thread only emits when NLSQ hasn't reported progress recently,
+            # avoiding progress bar flickering from dual update sources.
+            _last_nlsq_progress = time.perf_counter()
+
             # Add progress callback that checks cancellation and emits percentage
             def progress_callback(iteration: int, loss: float, **kwargs):
                 """Progress callback for NLSQ optimization."""
+                nonlocal _last_nlsq_progress
+                _last_nlsq_progress = time.perf_counter()
                 self.cancel_token.check()
                 self._last_iteration = iteration
                 self._last_loss = loss
@@ -221,7 +173,10 @@ class FitWorker(QRunnable):
 
                 self.signals.progress.emit(percent, 100, message)
 
-            fit_kwargs["callback"] = progress_callback
+            # GUI-003 fix: Do NOT inject callback into fit_kwargs here.
+            # ModelService.fit() accepts progress_callback as a named parameter
+            # (line 204) and injects it into fit_kwargs internally (line 765-766).
+            # Injecting here would create a duplicate/conflicting "callback" key.
 
             # Delegate to ModelService for fitting
             from rheojax.gui.services.model_service import ModelService
@@ -233,13 +188,55 @@ class FitWorker(QRunnable):
                 initial_params=self._initial_params,
                 options=self._options,
             )
-            service_result = service.fit(
-                self._model_name,
-                self._data,
-                params=self._initial_params,
-                progress_callback=progress_callback,
-                **fit_kwargs,
-            )
+
+            # F-004 fix: Emit periodic elapsed-time updates for slow fits
+            # (e.g., EPM lattice simulations that take 5-30 min per NLSQ).
+            import threading
+
+            _fit_done = threading.Event()
+            _fit_start = time.perf_counter()
+
+            def _elapsed_timer():
+                while not _fit_done.wait(timeout=5.0):
+                    # GUI-008 fix: Only emit elapsed time if the NLSQ callback
+                    # hasn't reported progress in the last 4 seconds, to avoid
+                    # both sources fighting over the progress bar.
+                    if time.perf_counter() - _last_nlsq_progress > 4.0:
+                        elapsed = time.perf_counter() - _fit_start
+                        self.signals.progress.emit(
+                            0, 0, f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)"
+                        )
+
+            timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
+            timer_thread.start()
+
+            # F-MCT-008 fix: Pre-compile JIT kernels for ITT-MCT models
+            # to avoid 30-90s apparent freeze on first prediction.
+            if "itt_mct" in self._model_name:
+                self.signals.progress.emit(0, 100, "Compiling JIT kernels...")
+                try:
+                    from rheojax.core.registry import ModelRegistry
+
+                    model_cls = ModelRegistry.get(self._model_name)
+                    if model_cls is not None:
+                        tmp_model = model_cls()
+                        if hasattr(tmp_model, "precompile"):
+                            tmp_model.precompile()
+                        del tmp_model
+                except Exception:
+                    pass  # Don't block fitting if precompile fails
+
+            try:
+                service_result = service.fit(
+                    self._model_name,
+                    self._data,
+                    params=self._initial_params,
+                    progress_callback=progress_callback,
+                    **fit_kwargs,
+                )
+            finally:
+                _fit_done.set()
+                timer_thread.join(timeout=1.0)
 
             fit_time = time.perf_counter() - start_time
 
@@ -273,7 +270,7 @@ class FitWorker(QRunnable):
                 chi_squared=float(chi_squared),
                 fit_time=fit_time,
                 timestamp=datetime.now(),
-                n_iterations=n_iterations,
+                num_iterations=n_iterations,
                 success=getattr(service_result, "success", False),
                 message=getattr(service_result, "message", ""),
                 x_fit=getattr(service_result, "x_fit", None),
@@ -284,6 +281,7 @@ class FitWorker(QRunnable):
                 mae=float(metadata.get("mae", 0.0)) if metadata.get("mae") is not None else None,
                 aic=float(metadata.get("aic", 0.0)) if metadata.get("aic") is not None else None,
                 bic=float(metadata.get("bic", 0.0)) if metadata.get("bic") is not None else None,
+                metadata=metadata,
             )
 
             logger.info(

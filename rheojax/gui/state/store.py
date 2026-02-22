@@ -157,6 +157,7 @@ class BayesianResult:
     num_samples: int = 2000
     num_chains: int = 4
     inference_data: Any | None = None  # Full ArviZ InferenceData with sample_stats
+    diagnostics_valid: bool = True  # False when R-hat/ESS fell back to NaN/defaults
 
     @property
     def sampling_time(self) -> float:
@@ -170,6 +171,7 @@ class BayesianResult:
             "r_hat": self.r_hat,
             "ess": self.ess,
             "divergences": self.divergences,
+            "diagnostics_valid": self.diagnostics_valid,
         }
 
     @property
@@ -1073,6 +1075,7 @@ class StateStore:
                         x_fit=getattr(result, "x_fit", None),
                         y_fit=getattr(result, "y_fit", None),
                         residuals=getattr(result, "residuals", None),
+                        metadata=getattr(result, "metadata", None),
                     )
                 )
                 fits = state.fit_results.copy()

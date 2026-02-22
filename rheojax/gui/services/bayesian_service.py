@@ -166,9 +166,10 @@ class BayesianService:
                         model.parameters[name].value = value
 
             # F-HL-005 fix: Transfer fitted state for stateful models (HL, DMT,
-            # ITT-MCT, Fluidity-Saramito) that cache protocol kwargs and grid
-            # settings in instance variables during _fit(). Without this, the
-            # fresh model uses fallback defaults in model_function().
+            # ITT-MCT, Fluidity-Saramito, VLB, STZ, HVM, HVNM, IKH, SGR,
+            # SPP, GMM) that cache protocol kwargs and grid settings in
+            # instance variables during _fit(). Without this, the fresh
+            # model uses fallback defaults in model_function().
             fitted_state = kwargs.pop("fitted_model_state", None)
             if fitted_state and isinstance(fitted_state, dict):
                 for attr in (
@@ -194,6 +195,12 @@ class BayesianService:
                     "_laos_omega",
                     "_laos_gamma_0",
                     "_n_modes",
+                    # ITT-MCT Prony decomposition state
+                    "_prony_amplitudes",
+                    "_prony_times",
+                    "_memory_form",
+                    "_use_lorentzian",
+                    "n_prony_modes",
                 ):
                     if attr in fitted_state:
                         setattr(model, attr, fitted_state[attr])
@@ -277,16 +284,6 @@ class BayesianService:
             except Exception as e:
                 logger.warning(f"Could not get InferenceData: {e}")
 
-            # Metadata
-            metadata = {
-                "model_name": model_name,
-                "test_mode": test_mode,
-                "num_warmup": num_warmup,
-                "num_samples": num_samples,
-                "num_chains": num_chains,
-                "warm_start_used": warm_start is not None,
-            }
-
             # Extract summary diagnostics for logging
             max_r_hat = diagnostics.get("max_rhat")
             min_ess = diagnostics.get("min_ess")
@@ -295,6 +292,7 @@ class BayesianService:
             logger.info(
                 "Bayesian inference complete",
                 model=model_name,
+                warm_start_used=warm_start is not None,
                 r_hat=max_r_hat,
                 ess=min_ess,
                 divergences=divergences,

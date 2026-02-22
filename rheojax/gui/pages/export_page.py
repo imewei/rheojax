@@ -869,7 +869,7 @@ class ExportPage(QWidget):
                 if state.bayesian_results:
                     latest_bayes = list(state.bayesian_results.values())[-1]
                     report_state["diagnostics"] = {
-                        "rhat": latest_bayes.r_hat,
+                        "r_hat": latest_bayes.r_hat,
                         "ess": latest_bayes.ess,
                     }
 

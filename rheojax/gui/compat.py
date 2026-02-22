@@ -49,6 +49,7 @@ try:
         QIcon,
         QImage,
         QKeySequence,
+        QPalette,
         QPixmap,
         QShortcut,
     )
@@ -140,6 +141,7 @@ except ImportError:
             QIcon,
             QImage,
             QKeySequence,
+            QPalette,
             QPixmap,
             QShortcut,
         )
@@ -231,6 +233,7 @@ except ImportError:
                 QIcon,
                 QImage,
                 QKeySequence,
+                QPalette,
                 QPixmap,
                 QShortcut,
             )
@@ -349,6 +352,7 @@ __all__ = [
     "QIcon",
     "QImage",
     "QKeySequence",
+    "QPalette",
     "QPixmap",
     "QShortcut",
     # Widgets

@@ -35,6 +35,7 @@ from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.jobs.fit_worker import FitWorker
+from rheojax.gui.jobs.transform_worker import TransformWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.pages.bayesian_page import BayesianPage
 from rheojax.gui.pages.data_page import DataPage
@@ -1304,6 +1305,54 @@ class RheoJAXMainWindow(QMainWindow):
             )
             self.status_bar.show_message("Bayesian inference complete", 3000)
             self._auto_save_if_enabled()
+        elif job_type == "transform":
+            transform_result = result  # TransformResult dataclass
+            success = getattr(transform_result, "success", False)
+            if success:
+                transformed = getattr(transform_result, "data", None)
+                extras = getattr(transform_result, "extras", {}) or {}
+                transform_id = meta.get("transform_id", "unknown")
+                source_dataset = type(
+                    "DS",
+                    (),
+                    {
+                        "id": meta.get("source_dataset_id"),
+                        "name": meta.get("source_dataset_name", "data"),
+                        "test_mode": None,
+                    },
+                )()
+                params = meta.get("parameters", {})
+                try:
+                    self._handle_transform_result(
+                        transform_id, transformed, extras, source_dataset, params
+                    )
+                    self.store.dispatch(
+                        "SET_PIPELINE_STEP",
+                        {"step": "transform", "status": "COMPLETE"},
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Transform result handling failed",
+                        error=str(exc),
+                        exc_info=True,
+                    )
+                    self.store.dispatch(
+                        "SET_PIPELINE_STEP",
+                        {"step": "transform", "status": "ERROR"},
+                    )
+                    self.status_bar.show_message(
+                        f"Transform failed: {exc}", 8000
+                    )
+            else:
+                error_msg = getattr(transform_result, "message", "Transform failed")
+                logger.warning("Transform unsuccessful", error=error_msg)
+                self.store.dispatch(
+                    "SET_PIPELINE_STEP",
+                    {"step": "transform", "status": "ERROR"},
+                )
+                self.status_bar.show_message(
+                    f"Transform failed: {error_msg}", 5000
+                )
         self.log(f"Job {job_id} completed ({job_type})")
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
@@ -1318,6 +1367,8 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("FITTING_FAILED", {"error": str(error)})
         elif job_type == "bayesian":
             self.store.dispatch("BAYESIAN_FAILED", {"error": str(error)})
+        elif job_type == "transform":
+            self.status_bar.show_message(f"Transform failed: {error}", 8000)
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
 
@@ -1333,6 +1384,8 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch("FITTING_FAILED", {"error": "Cancelled"})
         elif job_type == "bayesian":
             self.store.dispatch("BAYESIAN_FAILED", {"error": "Cancelled"})
+        elif job_type == "transform":
+            self.log("Transform cancelled")
         self.log(f"Job {job_id} cancelled")
         self.status_bar.show_message("Job cancelled", 2000)
 
@@ -1494,7 +1547,7 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_apply_transform(
         self, transform_id: str, params: dict | None = None
     ) -> None:
-        """Handle transform application."""
+        """Handle transform application via background worker (T-009)."""
         logger.debug("Transform requested", transform_id=transform_id)
         self.store.dispatch("APPLY_TRANSFORM", {"transform_id": transform_id})
         dataset = self.store.get_active_dataset()
@@ -1507,41 +1560,94 @@ class RheoJAXMainWindow(QMainWindow):
             from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
             rheo_data = rheodata_from_dataset_state(dataset)
-            transform_service = TransformService()
-            # Use provided params or defaults from service
+
+            # Resolve default params if none provided
             if params is None:
+                transform_service = TransformService()
                 param_specs = transform_service.get_transform_params(transform_id)
                 params = {
                     name: spec.get("default")
                     for name, spec in param_specs.items()
                     if isinstance(spec, dict) and "default" in spec
                 }
-            result = transform_service.apply_transform(
+        except Exception as exc:
+            logger.error(
+                "Transform setup failed",
+                transform_id=transform_id,
+                error=str(exc),
+                exc_info=True,
+            )
+            self.status_bar.show_message(f"Transform failed: {exc}", 8000)
+            return
+
+        if not self.worker_pool:
+            # Fallback: run synchronously if WorkerPool unavailable
+            self._run_transform_sync(transform_id, rheo_data, params, dataset)
+            return
+
+        # Submit to WorkerPool for async execution (T-009)
+        self.store.dispatch(
+            "SET_PIPELINE_STEP", {"step": "transform", "status": "ACTIVE"}
+        )
+        self.status_bar.show_progress(0, 0, f"Applying {transform_id}...")
+
+        worker = TransformWorker(
+            transform_id=transform_id,
+            data=rheo_data,
+            params=params or {},
+        )
+        try:
+            job_id = self.worker_pool.submit(
+                worker,
+                on_job_registered=lambda jid: self._job_types.__setitem__(
+                    jid, "transform"
+                ),
+            )
+            self._job_metadata[job_id] = {
+                "transform_id": transform_id,
+                "source_dataset_id": dataset.id,
+                "source_dataset_name": dataset.name,
+                "parameters": params or {},
+            }
+            logger.info(
+                "Transform job submitted",
+                job_id=job_id,
+                transform_id=transform_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "Transform job submission failed",
+                error=str(exc),
+                exc_info=True,
+            )
+            self.status_bar.hide_progress()
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"}
+            )
+            self.status_bar.show_message(f"Transform failed: {exc}", 8000)
+            self.log(f"Transform failed: {exc}")
+
+    def _run_transform_sync(
+        self,
+        transform_id: str,
+        rheo_data: object,
+        params: dict | None,
+        dataset: object,
+    ) -> None:
+        """Synchronous fallback when WorkerPool is unavailable."""
+        try:
+            from rheojax.gui.services.transform_service import TransformService
+
+            result = TransformService().apply_transform(
                 transform_id, rheo_data, params=params or {}
             )
+            extras = {}
+            if isinstance(result, tuple):
+                transformed, extras = result
+            else:
+                transformed = result
 
-            # Handle tuple return (data, extras)
-            transformed = result[0] if isinstance(result, tuple) else result
-            new_id = str(uuid.uuid4())
-            self.store.dispatch(
-                "IMPORT_DATA_SUCCESS",
-                {
-                    "dataset_id": new_id,
-                    "file_path": None,
-                    "name": f"{dataset.name}-{transform_id}",
-                    "test_mode": dataset.test_mode,
-                    "x_data": getattr(transformed, "x", None),
-                    "y_data": getattr(transformed, "y", None),
-                    "metadata": getattr(transformed, "metadata", {}),
-                },
-            )
-            self.store.dispatch("TRANSFORM_COMPLETED", {"transform_id": transform_id})
-            logger.info(
-                "Transform applied", transform_id=transform_id, new_dataset_id=new_id
-            )
-            self.status_bar.show_message(f"Transform applied: {transform_id}", 2000)
-            self.log(f"Applied transform {transform_id} -> dataset {new_id}")
-            self.navigate_to("transform")
+            self._handle_transform_result(transform_id, transformed, extras, dataset, params)
         except Exception as exc:
             logger.error(
                 "Transform failed",
@@ -1552,8 +1658,68 @@ class RheoJAXMainWindow(QMainWindow):
             self.store.dispatch(
                 "SET_PIPELINE_STEP", {"step": "transform", "status": "ERROR"}
             )
-            self.status_bar.show_message(f"Transform failed: {exc}", 4000)
+            self.status_bar.show_message(f"Transform failed: {exc}", 8000)
             self.log(f"Transform failed: {exc}")
+
+    def _handle_transform_result(
+        self,
+        transform_id: str,
+        transformed: object,
+        extras: dict,
+        dataset: object,
+        params: dict | None,
+    ) -> None:
+        """Process transform output into state store (shared by async and sync paths)."""
+        # Validate transform output shape (T-008)
+        x_data = getattr(transformed, "x", None)
+        y_data = getattr(transformed, "y", None)
+        if x_data is not None and y_data is not None:
+            if len(x_data) != len(y_data):
+                raise ValueError(
+                    f"Transform output shape mismatch: "
+                    f"x={len(x_data)}, y={len(y_data)}"
+                )
+
+        # Merge transform extras into metadata (T-004)
+        metadata = {**getattr(transformed, "metadata", {})}
+        if extras:
+            metadata["_transform_extras"] = extras
+
+        # Use test_mode from transform metadata if updated (T-003)
+        new_test_mode = metadata.get("test_mode", getattr(dataset, "test_mode", None))
+
+        new_id = str(uuid.uuid4())
+        dataset_name = getattr(dataset, "name", "data")
+        self.store.dispatch(
+            "IMPORT_DATA_SUCCESS",
+            {
+                "dataset_id": new_id,
+                "file_path": None,
+                "name": f"{dataset_name}-{transform_id}",
+                "test_mode": new_test_mode,
+                "x_data": x_data,
+                "y_data": y_data,
+                "y2_data": getattr(transformed, "y2", None),
+                "metadata": metadata,
+            },
+        )
+        # Pass provenance IDs for TransformRecord (T-005)
+        source_id = getattr(dataset, "id", None)
+        self.store.dispatch(
+            "TRANSFORM_COMPLETED",
+            {
+                "transform_id": transform_id,
+                "source_dataset_id": source_id,
+                "target_dataset_id": new_id,
+                "parameters": params or {},
+            },
+        )
+        logger.info(
+            "Transform applied", transform_id=transform_id, new_dataset_id=new_id
+        )
+        self.status_bar.show_message(f"Transform applied: {transform_id}", 2000)
+        self.log(f"Applied transform {transform_id} -> dataset {new_id}")
+        self.navigate_to("transform")
 
     def _on_transform_applied_from_page(
         self, transform_name: str, dataset_id: str

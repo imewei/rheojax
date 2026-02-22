@@ -532,6 +532,45 @@ class BayesianPage(QWidget):
             if reply == QMessageBox.StandardButton.No:
                 return
 
+        # F-STZ-004 fix: Warn about STZ LAOS memory requirements for ODE-based NUTS
+        if "stz" in _mn_lower:
+            _stz_test_mode = dataset.test_mode if hasattr(dataset, "test_mode") else ""
+            if _stz_test_mode == "laos":
+                reply = QMessageBox.question(
+                    self,
+                    "STZ LAOS Memory Warning",
+                    "STZ LAOS mode uses full ODE integration with forward + "
+                    "backward solves per NUTS leapfrog step.\n\n"
+                    "This can exceed 16 GB RAM with num_chains > 1.\n"
+                    "Consider using num_chains=1 and 50-100 warmup samples "
+                    "for initial exploration.\n\n"
+                    "Continue anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
+        # F-TNT-003 fix: Warn about TNT ODE memory requirements for NUTS
+        if "tnt" in _mn_lower:
+            _tnt_test_mode = dataset.test_mode if hasattr(dataset, "test_mode") else ""
+            if _tnt_test_mode in ("startup", "creep", "laos"):
+                reply = QMessageBox.question(
+                    self,
+                    "TNT ODE Memory Warning",
+                    "TNT models use diffrax ODE integration for startup/creep/LAOS "
+                    "protocols, requiring forward + backward ODE solves per NUTS "
+                    "leapfrog step.\n\n"
+                    "This can exceed 16 GB RAM with num_chains=4.\n"
+                    "Consider using num_chains=1 and 50-100 warmup samples for "
+                    "initial exploration.\n\n"
+                    "Continue anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
         # F-MCT-002 fix: ITT-MCT models don't support Bayesian inference
         if "itt_mct" in _mn_lower or _mn_lower == "mct":
             QMessageBox.warning(
@@ -544,6 +583,37 @@ class BayesianPage(QWidget):
                 "uncertainty quantification.",
             )
             return
+
+        # F-VLB-001 fix: VLBNonlocal is simulation-only (no fit/predict)
+        if _mn_lower == "vlb_nonlocal" or "vlb nonlocal" in _mn_lower:
+            QMessageBox.warning(
+                self,
+                "Bayesian Not Supported",
+                "VLBNonlocal is a simulation-only model (PDE solver).\n\n"
+                "It does not support NLSQ fitting or Bayesian inference.\n"
+                "Use simulate_steady_shear() or simulate_startup() directly.",
+            )
+            return
+
+        # F-VLB-002 fix: Warn about VLB ODE memory for startup/creep/LAOS NUTS
+        if "vlb" in _mn_lower and _mn_lower != "vlb_nonlocal":
+            _vlb_test_mode = dataset.test_mode if hasattr(dataset, "test_mode") else ""
+            if _vlb_test_mode in ("startup", "creep", "laos"):
+                reply = QMessageBox.question(
+                    self,
+                    "VLB Memory Warning",
+                    f"VLB in {_vlb_test_mode} mode uses a 4-component ODE system "
+                    "with forward + backward solves per NUTS leapfrog step.\n\n"
+                    "VLBVariant (Bell/FENE) may require many leapfrog steps "
+                    "due to nonlinear kinetics.\n"
+                    "Consider using num_chains=1 and fewer warmup samples "
+                    "for initial exploration.\n\n"
+                    "Continue anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
 
         # Get configuration
         config = {

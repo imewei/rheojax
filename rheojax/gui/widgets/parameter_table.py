@@ -10,12 +10,15 @@ from rheojax.gui.compat import (
     QCheckBox,
     QColor,
     QHBoxLayout,
+    QPalette,
     Qt,
     QTableWidget,
     QTableWidgetItem,
     QWidget,
     Signal,
 )
+from dataclasses import replace
+
 from rheojax.gui.state.store import ParameterState
 from rheojax.logging import get_logger
 
@@ -312,7 +315,7 @@ class ParameterTable(QTableWidget):
                             font.setBold(False)
                             item.setFont(font)
 
-                    item.setForeground(QBrush(QColor(0, 0, 0)))
+                    item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
 
                 # Emit signal
                 self.parameter_changed.emit(param_name, value)
@@ -338,7 +341,7 @@ class ParameterTable(QTableWidget):
                 if value < min_val or value > max_val:
                     value_item.setForeground(QBrush(QColor(255, 0, 0)))
                 else:
-                    value_item.setForeground(QBrush(QColor(0, 0, 0)))
+                    value_item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
 
         except ValueError:
             # Invalid number - reset to previous value without cascading signals
@@ -368,7 +371,7 @@ class ParameterTable(QTableWidget):
                 font = item.font()
                 font.setBold(False)
                 item.setFont(font)
-                item.setForeground(QBrush(QColor(0, 0, 0)))
+                item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
 
             try:
                 self.itemChanged.connect(self._on_item_changed)
@@ -395,10 +398,14 @@ class ParameterTable(QTableWidget):
         # Find row
         for row in range(self.rowCount()):
             if self.item(row, 0).text() == param_name:
-                # Update styling
+                # GUI-010 fix: Use replace() to create a new ParameterState
+                # instead of mutating fixed in-place, keeping cached state
+                # consistent with immutable-by-convention dataclass pattern.
                 if param_name in self._parameter_states:
-                    param_state = self._parameter_states[param_name]
-                    param_state.fixed = is_fixed
+                    param_state = replace(
+                        self._parameter_states[param_name], fixed=is_fixed
+                    )
+                    self._parameter_states[param_name] = param_state
                     self._update_row_styling(row, param_state)
                 break
 

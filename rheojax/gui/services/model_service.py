@@ -161,6 +161,18 @@ def normalize_model_name(model_name: str) -> str:
         "stz": "stz_conventional",
         "stz conventional": "stz_conventional",
         "shear transformation zone": "stz_conventional",
+        # TNT
+        "tnt": "tnt_single_mode",
+        "tnt single": "tnt_single_mode",
+        "tnt single mode": "tnt_single_mode",
+        "tnt cates": "tnt_cates",
+        "tnt loop bridge": "tnt_loop_bridge",
+        "tnt loop-bridge": "tnt_loop_bridge",
+        "tnt multi species": "tnt_multi_species",
+        "tnt multi-species": "tnt_multi_species",
+        "tnt sticky rouse": "tnt_sticky_rouse",
+        "tnt sticky-rouse": "tnt_sticky_rouse",
+        "sticky rouse": "tnt_sticky_rouse",
     }
 
     if key in alias_map.values():

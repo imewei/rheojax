@@ -68,6 +68,9 @@ class TransformPage(QWidget):
         grid_layout = QGridLayout(grid_widget)
         grid_layout.setSpacing(Spacing.LG)
 
+        # NOTE(T-015): Hardcoded — must be updated when new transforms are
+        # registered via @TransformRegistry.register(). A future enhancement
+        # could query TransformRegistry and provide display metadata there.
         transforms = [
             (
                 "FFT",

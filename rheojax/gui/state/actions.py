@@ -248,10 +248,11 @@ def update_parameter(name: str, value: float) -> None:
 
         return AppState(**{**state.__dict__, "model_params": new_params})
 
+    model_name = store.get_state().active_model_name
     store.update_state(updater)
 
-    if store._state.active_model_name:
-        store.emit_signal("model_params_changed", store._state.active_model_name)
+    if model_name:
+        store.emit_signal("model_params_changed", model_name)
 
 
 def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> None:
@@ -286,10 +287,11 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
 
         return AppState(**{**state.__dict__, "model_params": new_params})
 
+    model_name = store.get_state().active_model_name
     store.update_state(updater)
 
-    if store._state.active_model_name:
-        store.emit_signal("model_params_changed", store._state.active_model_name)
+    if model_name:
+        store.emit_signal("model_params_changed", model_name)
 
 
 def toggle_parameter_fixed(name: str, fixed: bool) -> None:
@@ -316,10 +318,11 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
 
         return AppState(**{**state.__dict__, "model_params": new_params})
 
+    model_name = store.get_state().active_model_name
     store.update_state(updater)
 
-    if store._state.active_model_name:
-        store.emit_signal("model_params_changed", store._state.active_model_name)
+    if model_name:
+        store.emit_signal("model_params_changed", model_name)
 
 
 def reset_parameters(default_params: dict[str, ParameterState]) -> None:
@@ -335,10 +338,11 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
     def updater(state: AppState) -> AppState:
         return AppState(**{**state.__dict__, "model_params": default_params})
 
+    model_name = store.get_state().active_model_name
     store.update_state(updater)
 
-    if store._state.active_model_name:
-        store.emit_signal("model_params_changed", store._state.active_model_name)
+    if model_name:
+        store.emit_signal("model_params_changed", model_name)
 
 
 # Fit Actions
