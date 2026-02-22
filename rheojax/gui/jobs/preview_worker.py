@@ -10,7 +10,6 @@ when loading large data files.
 
 from __future__ import annotations
 
-import traceback
 from pathlib import Path
 from typing import Any
 

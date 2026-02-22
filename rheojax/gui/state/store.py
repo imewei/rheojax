@@ -677,9 +677,7 @@ class StateStore:
                     datasets[dataset_id] = ds
                 # Only update datasets — do NOT change current_tab as a side-effect.
                 # Tab navigation should be an explicit user action, not implicit.
-                return replace(
-                    state, datasets=datasets, is_modified=True
-                )
+                return replace(state, datasets=datasets, is_modified=True)
 
             return updater
 

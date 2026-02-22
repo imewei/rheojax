@@ -233,9 +233,18 @@ class BayesianService:
             # F-GMM-003: Extract protocol kwargs from data metadata
             # (mirrors model_service.fit() lines 753-766)
             _PROTOCOL_KWARGS = (
-                "gamma_dot", "sigma_applied", "sigma_0", "gamma_0",
-                "omega", "omega_laos", "strain", "gdot", "t_wait",
-                "stress_target", "gamma_pre", "n_cycles",
+                "gamma_dot",
+                "sigma_applied",
+                "sigma_0",
+                "gamma_0",
+                "omega",
+                "omega_laos",
+                "strain",
+                "gdot",
+                "t_wait",
+                "stress_target",
+                "gamma_pre",
+                "n_cycles",
             )
             if hasattr(data, "metadata") and data.metadata:
                 for key in _PROTOCOL_KWARGS:

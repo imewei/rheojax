@@ -42,7 +42,6 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
-
 class FitWorkerSignals(QObject):
     """Signals for FitWorker.
 
@@ -205,7 +204,9 @@ class FitWorker(QRunnable):
                     if stale:
                         elapsed = time.perf_counter() - _fit_start
                         self.signals.progress.emit(
-                            0, 0, f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)"
+                            0,
+                            0,
+                            f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)",
                         )
 
             timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
@@ -278,10 +279,26 @@ class FitWorker(QRunnable):
                 y_fit=getattr(service_result, "y_fit", None),
                 residuals=getattr(service_result, "residuals", None),
                 pcov=getattr(service_result, "pcov", None),
-                rmse=float(metadata.get("rmse", 0.0)) if metadata.get("rmse") is not None else None,
-                mae=float(metadata.get("mae", 0.0)) if metadata.get("mae") is not None else None,
-                aic=float(metadata.get("aic", 0.0)) if metadata.get("aic") is not None else None,
-                bic=float(metadata.get("bic", 0.0)) if metadata.get("bic") is not None else None,
+                rmse=(
+                    float(metadata.get("rmse", 0.0))
+                    if metadata.get("rmse") is not None
+                    else None
+                ),
+                mae=(
+                    float(metadata.get("mae", 0.0))
+                    if metadata.get("mae") is not None
+                    else None
+                ),
+                aic=(
+                    float(metadata.get("aic", 0.0))
+                    if metadata.get("aic") is not None
+                    else None
+                ),
+                bic=(
+                    float(metadata.get("bic", 0.0))
+                    if metadata.get("bic") is not None
+                    else None
+                ),
                 metadata=metadata,
             )
 

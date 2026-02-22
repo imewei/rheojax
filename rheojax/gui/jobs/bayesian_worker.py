@@ -194,9 +194,7 @@ class BayesianWorker(QRunnable):
             from rheojax.gui.services.model_service import infer_model_kwargs
 
             model_kwargs = (
-                infer_model_kwargs(
-                    self._model_name, list(self._warm_start.keys())
-                )
+                infer_model_kwargs(self._model_name, list(self._warm_start.keys()))
                 if self._warm_start
                 else {}
             )

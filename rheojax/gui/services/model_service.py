@@ -51,9 +51,7 @@ def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any
         # Match G_1, G_2, ... or E_1, E_2, ... (tensile DMTA)
         g_pattern = re.compile(r"^[GE]_(\d+)$")
         g_indices = [
-            int(m.group(1))
-            for name in param_names
-            if (m := g_pattern.match(name))
+            int(m.group(1)) for name in param_names if (m := g_pattern.match(name))
         ]
         if g_indices:
             n_modes = max(g_indices)
@@ -193,7 +191,6 @@ def _is_placeholder_model(model_name: str | None) -> bool:
 
     key = model_name.strip().lower()
     return key == "" or key.startswith("select model")
-
 
 
 class ModelService:
@@ -825,13 +822,28 @@ class ModelService:
             # F-002: Extract protocol-specific kwargs from data metadata
             # Models like FIKH/FMLIKH need strain, gamma_dot, sigma_applied, etc.
             _PROTOCOL_KWARGS = (
-                "strain", "gamma_dot", "sigma_applied", "sigma_0",
-                "gamma_0", "omega_laos", "omega", "T_init", "T", "n_cycles",
-                "t_wait", "return_components", "return_full",
+                "strain",
+                "gamma_dot",
+                "sigma_applied",
+                "sigma_0",
+                "gamma_0",
+                "omega_laos",
+                "omega",
+                "T_init",
+                "T",
+                "n_cycles",
+                "t_wait",
+                "return_components",
+                "return_full",
                 # HL-specific kwargs (non-standard names)
-                "gdot", "stress_target", "gamma0",
+                "gdot",
+                "stress_target",
+                "gamma0",
                 # ITT-MCT-specific kwargs
-                "gamma_pre", "use_diffrax", "t_max", "n_harmonics",
+                "gamma_pre",
+                "use_diffrax",
+                "t_max",
+                "n_harmonics",
             )
             for key in _PROTOCOL_KWARGS:
                 if key not in fit_kwargs and key in data.metadata:
@@ -1129,7 +1141,9 @@ class ModelService:
                 model._test_mode = test_mode
 
             # Transfer fitted model state if provided (protocol kwargs, grid settings)
-            fitted_state = model_kwargs.get("fitted_model_state") if model_kwargs else None
+            fitted_state = (
+                model_kwargs.get("fitted_model_state") if model_kwargs else None
+            )
             if fitted_state and isinstance(fitted_state, dict):
                 for attr in (
                     "_last_fit_kwargs",

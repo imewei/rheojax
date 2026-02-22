@@ -321,9 +321,7 @@ class TransformService:
                 history.append(prov_entry)
                 new_meta["provenance"] = history
                 # Track transform chain for reproducibility (T-013)
-                applied = list(
-                    new_meta.get("transforms_applied", [])
-                )
+                applied = list(new_meta.get("transforms_applied", []))
                 applied.append(name)
                 new_meta["transforms_applied"] = applied
                 new_meta["last_transform"] = name

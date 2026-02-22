@@ -472,7 +472,13 @@ class BayesianPage(QWidget):
         _mn_lower = model_name.lower()
         if "hebraud" in _mn_lower or "hl" == _mn_lower or _mn_lower.startswith("hl_"):
             test_mode_check = dataset.test_mode if hasattr(dataset, "test_mode") else ""
-            if test_mode_check in ("creep", "relaxation", "startup", "laos", "oscillation"):
+            if test_mode_check in (
+                "creep",
+                "relaxation",
+                "startup",
+                "laos",
+                "oscillation",
+            ):
                 reply = QMessageBox.question(
                     self,
                     "HL Memory Warning",
@@ -506,7 +512,8 @@ class BayesianPage(QWidget):
                             "per field × forward+backward passes).\n\n"
                             "Consider reducing L to 16-32 for systems with <32 GB RAM.\n\n"
                             "Continue anyway?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.Yes
+                            | QMessageBox.StandardButton.No,
                             QMessageBox.StandardButton.Yes,
                         )
                         if reply == QMessageBox.StandardButton.No:
@@ -892,7 +899,9 @@ class BayesianPage(QWidget):
             from dataclasses import replace as dc_replace
 
             stored_result = dc_replace(
-                result, model_name=str(_model), dataset_id=str(_dsid),
+                result,
+                model_name=str(_model),
+                dataset_id=str(_dsid),
             )
         except TypeError:
             logger.warning(
@@ -1260,7 +1269,11 @@ class BayesianPage(QWidget):
                 # F-HL-007 fix: Accept (N, 2) output from oscillation models
                 # (HL, GMM, etc.) that return [G', G'']. Convert to complex
                 # for the existing plotting pipeline.
-                if y_pred_arr.ndim == 2 and y_pred_arr.shape[1] == 2 and y_pred_arr.shape[0] == len(x):
+                if (
+                    y_pred_arr.ndim == 2
+                    and y_pred_arr.shape[1] == 2
+                    and y_pred_arr.shape[0] == len(x)
+                ):
                     y_pred_arr = y_pred_arr[:, 0] + 1j * y_pred_arr[:, 1]
                 if y_pred_arr.shape == x.shape:
                     y_draws.append(y_pred_arr)
@@ -1658,7 +1671,9 @@ class BayesianPage(QWidget):
         # Find result for this model
         target_result = None
         for result in state.bayesian_results.values():
-            if result.model_name == model_id or model_id in str(getattr(result, "dataset_id", "")):
+            if result.model_name == model_id or model_id in str(
+                getattr(result, "dataset_id", "")
+            ):
                 target_result = result
                 break
 

@@ -1340,9 +1340,7 @@ class RheoJAXMainWindow(QMainWindow):
                         "SET_PIPELINE_STEP",
                         {"step": "transform", "status": "ERROR"},
                     )
-                    self.status_bar.show_message(
-                        f"Transform failed: {exc}", 8000
-                    )
+                    self.status_bar.show_message(f"Transform failed: {exc}", 8000)
             else:
                 error_msg = getattr(transform_result, "message", "Transform failed")
                 logger.warning("Transform unsuccessful", error=error_msg)
@@ -1350,9 +1348,7 @@ class RheoJAXMainWindow(QMainWindow):
                     "SET_PIPELINE_STEP",
                     {"step": "transform", "status": "ERROR"},
                 )
-                self.status_bar.show_message(
-                    f"Transform failed: {error_msg}", 5000
-                )
+                self.status_bar.show_message(f"Transform failed: {error_msg}", 5000)
         self.log(f"Job {job_id} completed ({job_type})")
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
@@ -1647,7 +1643,9 @@ class RheoJAXMainWindow(QMainWindow):
             else:
                 transformed = result
 
-            self._handle_transform_result(transform_id, transformed, extras, dataset, params)
+            self._handle_transform_result(
+                transform_id, transformed, extras, dataset, params
+            )
         except Exception as exc:
             logger.error(
                 "Transform failed",

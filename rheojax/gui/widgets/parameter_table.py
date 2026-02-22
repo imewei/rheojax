@@ -315,7 +315,9 @@ class ParameterTable(QTableWidget):
                             font.setBold(False)
                             item.setFont(font)
 
-                    item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
+                    item.setForeground(
+                        QBrush(self.palette().color(QPalette.ColorRole.Text))
+                    )
 
                 # Emit signal
                 self.parameter_changed.emit(param_name, value)
@@ -341,7 +343,9 @@ class ParameterTable(QTableWidget):
                 if value < min_val or value > max_val:
                     value_item.setForeground(QBrush(QColor(255, 0, 0)))
                 else:
-                    value_item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
+                    value_item.setForeground(
+                        QBrush(self.palette().color(QPalette.ColorRole.Text))
+                    )
 
         except ValueError:
             # Invalid number - reset to previous value without cascading signals
@@ -371,7 +375,9 @@ class ParameterTable(QTableWidget):
                 font = item.font()
                 font.setBold(False)
                 item.setFont(font)
-                item.setForeground(QBrush(self.palette().color(QPalette.ColorRole.Text)))
+                item.setForeground(
+                    QBrush(self.palette().color(QPalette.ColorRole.Text))
+                )
 
             try:
                 self.itemChanged.connect(self._on_item_changed)

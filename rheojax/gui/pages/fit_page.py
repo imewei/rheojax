@@ -849,9 +849,7 @@ class FitPage(QWidget):
 
         # F-002 guard: block fitting for prediction-only models
         if not getattr(self, "_fitting_supported", True):
-            self._status_text.setText(
-                f"Model '{model_name}' does not support fitting."
-            )
+            self._status_text.setText(f"Model '{model_name}' does not support fitting.")
             self._update_fit_enabled()
             return
 

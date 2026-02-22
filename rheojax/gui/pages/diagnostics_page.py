@@ -492,7 +492,9 @@ class DiagnosticsPage(QWidget):
 
         # Get divergences (-1 = unknown/unavailable)
         display_divergences = max(result.divergences, 0)
-        values["Divergences"] = "unknown" if result.divergences == -1 else str(display_divergences)
+        values["Divergences"] = (
+            "unknown" if result.divergences == -1 else str(display_divergences)
+        )
         if display_divergences > 0:
             self._set_table_value_color(7, ColorPalette.ERROR)  # Red
         else:

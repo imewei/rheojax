@@ -324,8 +324,14 @@ class ResidualsPanel(QWidget):
             # VIS-017: Guard against zero std (perfect fit)
             std = np.std(self._residuals)
             if std < 1e-15:
-                ax.text(0.5, 0.5, "Perfect fit\n(zero residuals)",
-                        ha="center", va="center", transform=ax.transAxes)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "Perfect fit\n(zero residuals)",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                )
                 ax.set_title("Normal Q-Q Plot")
                 return
             # Standardize residuals
