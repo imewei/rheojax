@@ -275,7 +275,18 @@ class GiesekusSingleMode(GiesekusBase):
             for k, v in kwargs.items()
             if k not in ("deformation_mode", "poisson_ratio")
         }
-        return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
+        result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
+        # model_function returns (N,2) real [G', G''] for oscillation;
+        # convert to complex G* to match the established convention
+        # (Maxwell, Zener, fractional models all return complex G*)
+        if (
+            test_mode == "oscillation"
+            and hasattr(result, "ndim")
+            and result.ndim == 2
+            and result.shape[1] == 2
+        ):
+            result = result[:, 0] + 1j * result[:, 1]
+        return result
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.

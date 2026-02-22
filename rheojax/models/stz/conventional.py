@@ -29,6 +29,24 @@ jax, jnp = safe_import_jax()
 # Logger
 logger = get_logger(__name__)
 
+_MISSING = object()
+
+# kwargs to filter before passing to nlsq_optimize
+_STZ_RESERVED = {
+    "test_mode",
+    "gamma_dot",
+    "sigma_applied",
+    "sigma_0",
+    "gamma_0",
+    "omega",
+    "use_log_residuals",
+    "use_multi_start",
+    "n_starts",
+    "perturb_factor",
+    "deformation_mode",
+    "poisson_ratio",
+}
+
 
 @ModelRegistry.register(
     "stz_conventional",
@@ -70,6 +88,7 @@ class STZConventional(STZBase):
         self._omega_laos: float | None = None
         self._gamma_dot_applied: float | None = None
         self._sigma_applied: float | None = None
+        self._sigma_0: float | None = None
 
     def _fit(
         self,
@@ -160,7 +179,8 @@ class STZConventional(STZBase):
             use_log_residuals=kwargs.get("use_log_residuals", True),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _STZ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **filtered)
         if not result.success:
             raise RuntimeError(f"STZ steady shear fit failed: {result.message}")
 
@@ -218,9 +238,10 @@ class STZConventional(STZBase):
         if mode == "creep" and sigma_applied is None:
             raise ValueError("creep mode requires sigma_applied in kwargs")
 
-        # Store for prediction
+        # Store for prediction and NUTS
         self._gamma_dot_applied = gamma_dot
         self._sigma_applied = sigma_applied
+        self._sigma_0 = sigma_0
 
         # Build model function that uses ODE integration
         def model_fn(x_data, params):
@@ -239,7 +260,8 @@ class STZConventional(STZBase):
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _STZ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **filtered)
         if not result.success:
             logger.warning(f"STZ transient fit warning: {result.message}")
 
@@ -387,7 +409,7 @@ class STZConventional(STZBase):
             mode,
             self._gamma_dot_applied,
             self._sigma_applied,
-            None,  # sigma_0
+            self._sigma_0,
             self.variant,
         )
         return np.array(result)
@@ -484,7 +506,8 @@ class STZConventional(STZBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _STZ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **filtered)
         if not result.success:
             logger.warning(f"STZ SAOS fit warning: {result.message}")
 
@@ -556,7 +579,8 @@ class STZConventional(STZBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _STZ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **filtered)
         if not result.success:
             logger.warning(f"STZ LAOS fit warning: {result.message}")
 
@@ -758,10 +782,12 @@ class STZConventional(STZBase):
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
         # Ensure we have a valid mode
-        mode = test_mode or self._test_mode
+        mode = test_mode or getattr(self, "_test_mode", None)
         if mode is None:
-            # Default fallback if not specified
-            mode = "oscillation"
+            raise ValueError(
+                "test_mode must be set before calling model_function. "
+                "Call fit() first or pass test_mode explicitly."
+            )
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
@@ -784,20 +810,34 @@ class STZConventional(STZBase):
                 p_values.get("ez", 1.0),
             )
         elif mode in ["startup", "relaxation", "creep"]:
-            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_gamma_dot_applied", 1.0))
-            sigma = kwargs.get("sigma", kwargs.get("sigma_applied", getattr(self, "_sigma_applied", 0.0)))
+            # Use sentinel to avoid swallowing falsy values (e.g. gamma_dot=0.0)
+            _gd = kwargs.get("gamma_dot", _MISSING)
+            gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+
+            _sig = kwargs.get("sigma", _MISSING)
+            if _sig is _MISSING:
+                _sig = kwargs.get("sigma_applied", _MISSING)
+            sigma = _sig if _sig is not _MISSING else getattr(self, "_sigma_applied", None)
+
+            _s0 = kwargs.get("sigma_0", _MISSING)
+            sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_0", None)
             return self._simulate_transient_jit(
                 X_jax,
                 p_values,
                 mode,
                 gamma_dot,
                 sigma,
-                None,
+                sigma_0,
                 self.variant,
             )
         elif mode == "laos":
-            gamma_0 = kwargs.get("gamma_0", getattr(self, "_gamma_0", None))
-            omega_laos = kwargs.get("omega", kwargs.get("omega_laos", getattr(self, "_omega_laos", None)))
+            _g0 = kwargs.get("gamma_0", _MISSING)
+            gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+
+            _ol = kwargs.get("omega", _MISSING)
+            if _ol is _MISSING:
+                _ol = kwargs.get("omega_laos", _MISSING)
+            omega_laos = _ol if _ol is not _MISSING else getattr(self, "_omega_laos", None)
             if gamma_0 is None or omega_laos is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
@@ -805,7 +845,7 @@ class STZConventional(STZBase):
             )
             return stress
 
-        return jnp.zeros_like(X_jax)
+        raise ValueError(f"Unsupported test_mode for model_function: {mode}")
 
     # =========================================================================
     # Prediction Interface

@@ -306,10 +306,11 @@ class ITTMCTBase(BaseModel):
         # Check for explicit hints in kwargs
         if "gamma_dot" in kwargs or "shear_rate" in kwargs:
             return "flow_curve"
+        # LAOS requires BOTH gamma_0 AND omega — check before oscillation
+        if "gamma_0" in kwargs and ("omega" in kwargs or "frequency" in kwargs):
+            return "laos"
         if "omega" in kwargs or "frequency" in kwargs:
             return "oscillation"
-        if "gamma_0" in kwargs and "omega" in kwargs:
-            return "laos"
         if "sigma_applied" in kwargs:
             return "creep"
 

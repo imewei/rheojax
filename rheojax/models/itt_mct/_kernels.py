@@ -23,7 +23,13 @@ Notes
 The Volterra approach converts the integral MCT equation to ODEs using
 auxiliary variables Kᵢ for each Prony mode:
 
-    dKᵢ/dt = -Kᵢ/τᵢ + gᵢ × (source term)
+    dKᵢ/dt = -Kᵢ/τᵢ + gᵢ × m(Φ) × dΦ/dt
+
+This is the "running memory kernel Prony" form appropriate for MCT's
+state-dependent kernel m(Φ). The m(Φ) factor is evaluated at the current
+correlator value, not at a fixed reference — this is required because the
+memory kernel evolves with the correlator. For a FIXED kernel, the simpler
+dKᵢ/dt = -Kᵢ/τᵢ + gᵢ × dΦ/dt (standard Prony) would apply.
 
 The memory integral ∫₀^t m(t-s) f(s) ds becomes Σᵢ Kᵢ(t).
 
@@ -251,85 +257,6 @@ def f12_volterra_flow_curve_rhs(
     dgamma_dt = gamma_dot
 
     return jnp.concatenate([jnp.array([dphi_dt]), dK_dt, jnp.array([dgamma_dt])])
-
-
-@partial(jax.jit, static_argnames=("n_modes", "use_lorentzian", "memory_form"))
-def f12_steady_state_stress(
-    phi_steady: float,
-    gamma_dot: float,
-    G_inf: float,
-    gamma_c: float,
-    v1: float,
-    v2: float,
-    Gamma: float,
-    g: jnp.ndarray,
-    tau: jnp.ndarray,
-    n_modes: int,
-    use_lorentzian: bool = False,
-    memory_form: str = "simplified",
-) -> float:
-    """Compute steady-state stress from steady-state correlator.
-
-    The stress is given by:
-        σ = γ̇ ∫₀^∞ G(τ) dτ = γ̇ × G_inf × ∫₀^∞ Φ_ss(τ) dτ
-
-    For steady shear, the correlator depends on accumulated strain.
-
-    Parameters
-    ----------
-    phi_steady : float
-        Steady-state correlator value (may be non-zero for glass)
-    gamma_dot : float
-        Shear rate
-    G_inf : float
-        High-frequency modulus
-    gamma_c : float
-        Critical strain
-    v1, v2 : float
-        Vertex coefficients
-    Gamma : float
-        Bare relaxation rate
-    g, tau : jnp.ndarray
-        Prony parameters
-    n_modes : int
-        Number of modes
-    use_lorentzian : bool, default False
-        Use Lorentzian (True) or Gaussian (False) decorrelation
-    memory_form : str, default "simplified"
-        Memory kernel form: "simplified" or "full"
-
-    Returns
-    -------
-    float
-        Steady-state stress σ
-    """
-    # For a simple estimate, use the integral of the memory kernel
-    # Full calculation would require solving for Φ(t) and integrating
-
-    # Characteristic time scale
-    tau_eff = 1.0 / Gamma
-
-    # Strain over one relaxation time
-    gamma_eff = gamma_dot * tau_eff
-
-    # Decorrelation factor
-    h = strain_decorrelation(gamma_eff, gamma_c, use_lorentzian)
-
-    # Memory contribution
-    m = f12_memory(phi_steady * h, v1, v2)
-
-    # For full memory form, include mode-averaged additional decorrelation
-    if memory_form == "full":
-        # Average mode decorrelation: mean over Prony modes
-        gamma_modes = gamma_dot * tau
-        h_modes = strain_decorrelation(gamma_modes, gamma_c, use_lorentzian)
-        h_mode_avg = jnp.mean(h_modes)
-        m = m * h_mode_avg
-
-    # Approximate steady stress: σ ≈ G_inf × γ̇ × (Φ_ss + memory) / Γ
-    stress = G_inf * gamma_dot * (phi_steady * h + m) / Gamma
-
-    return stress
 
 
 # =============================================================================
@@ -677,14 +604,18 @@ def f12_volterra_laos_rhs(
     # Unpack state
     phi = state[0]
     K = state[1 : 1 + n_modes]
-    gamma_acc = state[1 + n_modes]  # Absolute accumulated strain
+    # state[1 + n_modes] is gamma_inst (unused in ODE, tracked for output)
     # state[2 + n_modes] is sigma (stress) - computed separately
 
-    # Current strain rate (strain itself not needed for ODE)
+    # Current oscillatory strain and strain rate
+    gamma_current = gamma_0 * jnp.sin(omega * t)
     gamma_dot_current = gamma_0 * omega * jnp.cos(omega * t)
 
-    # Strain decorrelation based on accumulated |γ|
-    h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
+    # Strain decorrelation based on INSTANTANEOUS strain magnitude
+    # (not accumulated strain, which would grow monotonically and
+    # drive h → 0 over many cycles regardless of physics)
+    gamma_inst = jnp.abs(gamma_current)
+    h_gamma = strain_decorrelation(gamma_inst, gamma_c, use_lorentzian)
     phi_advected = phi * h_gamma
 
     # Memory kernel
@@ -705,14 +636,14 @@ def f12_volterra_laos_rhs(
     else:
         dK_dt = -K / tau + g * m_phi * dphi_dt
 
-    # Accumulated strain magnitude (for decorrelation tracking)
-    dgamma_acc_dt = jnp.abs(gamma_dot_current)
+    # Track instantaneous strain magnitude (for diagnostics/output)
+    dgamma_inst_dt = gamma_0 * omega * jnp.cos(omega * t)
 
     # Stress evolution: dσ/dt = G(t) × γ̇(t)
     dsigma_dt = G_inf * phi_advected * gamma_dot_current
 
     return jnp.concatenate(
-        [jnp.array([dphi_dt]), dK_dt, jnp.array([dgamma_acc_dt, dsigma_dt])]
+        [jnp.array([dphi_dt]), dK_dt, jnp.array([dgamma_inst_dt, dsigma_dt])]
     )
 
 

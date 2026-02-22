@@ -941,7 +941,13 @@ class SGRGeneric(BaseModel):
             use_log_residuals=kwargs.get("use_log_residuals", True),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # Filter protocol kwargs before forwarding to NLSQ optimizer
+        _SGR_RESERVED = {
+            "gamma_dot", "is_stress", "use_log_residuals",
+            "test_mode", "deformation_mode", "poisson_ratio",
+        }
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _SGR_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
 
         if not result.success:
             raise RuntimeError(f"SGR GENERIC startup fitting failed: {result.message}")

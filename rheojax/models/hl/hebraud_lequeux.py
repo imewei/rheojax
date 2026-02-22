@@ -99,7 +99,7 @@ class HebraudLequeux(BaseModel):
         self.parameters.add(
             name="alpha",
             value=0.3,
-            bounds=(0.0, 1.0),
+            bounds=(1e-4, 0.9999),
             units="dimensionless",
             description="Coupling parameter (alpha < 0.5 -> yield stress)",
         )
@@ -304,7 +304,8 @@ class HebraudLequeux(BaseModel):
                 pred_safe = np.maximum(np.abs(pred), 1e-10)
                 log_resid = np.log10(pred_safe) - np.log10(target_safe)
                 return float(np.mean(log_resid**2))
-            except Exception:
+            except Exception as exc:
+                logger.debug("Flow curve cost_fn exception: %s", exc)
                 return 1e6
 
         # --- Multi-start Nelder-Mead ---
@@ -319,12 +320,16 @@ class HebraudLequeux(BaseModel):
         best_cost = np.inf
         t0 = _time.time()
 
+        # Extract callback for cancellation support (F-HL-009)
+        _callback = kwargs.get("callback")
+
         for i, x0 in enumerate(starts):
             try:
                 res = minimize(
                     cost_fn,
                     x0,
                     method="Nelder-Mead",
+                    callback=_callback,
                     options={
                         "maxfev": 40,
                         "xatol": 0.02,
@@ -356,16 +361,19 @@ class HebraudLequeux(BaseModel):
         self.parameters.set_value("sigma_c", sigma_c_fit * stress_scale)
 
         # Store for predict/Bayesian
+        _tau_val = self.parameters.get_value("tau")
         self._last_fit_kwargs["_tau_est"] = float(
-            self.parameters.get_value("tau") or 1.0
+            1.0 if _tau_val is None else _tau_val
         )
+        _sc_val = self.parameters.get_value("sigma_c")
         self._last_fit_kwargs["_sigma_c_est"] = float(
-            self.parameters.get_value("sigma_c") or 1.0
+            1.0 if _sc_val is None else _sc_val
         )
         self._last_fit_kwargs["_stress_scale"] = stress_scale
         self._last_fit_kwargs["_sigma_max_min_norm"] = sigma_max_min
         self._last_fit_kwargs["_n_bins_fit"] = n_bins_fit
-        sc_phys = float(self.parameters.get_value("sigma_c") or 1.0)
+        _sc_phys_val = self.parameters.get_value("sigma_c")
+        sc_phys = float(1.0 if _sc_phys_val is None else _sc_phys_val)
         self._last_fit_kwargs["_sigma_max"] = max(5.0, self.grid_sigma_factor * sc_phys)
 
         # Precompute per-rate schedule for Bayesian model_function.
@@ -374,7 +382,8 @@ class HebraudLequeux(BaseModel):
         sc_norm_est = (sc_phys / stress_scale) if stress_scale > 0 else 1.0
         sigma_max_norm = max(5.0 * sc_norm_est, sigma_max_min)
         ds = 2.0 * sigma_max_norm / (n_bins_fit - 1)
-        tau_est = float(self.parameters.get_value("tau") or 1.0)
+        _tau_est_val = self.parameters.get_value("tau")
+        tau_est = float(1.0 if _tau_est_val is None else _tau_est_val)
         self._last_fit_kwargs["_precomputed_schedule"] = [
             _compute_dt_and_steps_for_rate(
                 abs(float(gdot[i])), tau_est, sc_norm_est, ds=ds
@@ -439,6 +448,11 @@ class HebraudLequeux(BaseModel):
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
 
+        # Store protocol kwargs for model_function (Bayesian inference)
+        self._last_fit_kwargs["stress_target"] = float(stress_target)
+        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
+        self._last_fit_kwargs["_n_bins"] = int(n_bins)
+
     def _fit_relaxation(self, t: np.ndarray, modulus: np.ndarray, **kwargs):
         """Fit stress relaxation modulus."""
         from rheojax.utils.optimization import (
@@ -491,6 +505,11 @@ class HebraudLequeux(BaseModel):
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
 
+        # Store protocol kwargs for model_function (Bayesian inference)
+        self._last_fit_kwargs["gamma0"] = float(gamma0)
+        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
+        self._last_fit_kwargs["_n_bins"] = int(n_bins)
+
     def _fit_startup(self, t: np.ndarray, stress: np.ndarray, **kwargs):
         """Fit startup stress transient."""
         from rheojax.utils.optimization import (
@@ -539,6 +558,11 @@ class HebraudLequeux(BaseModel):
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
 
+        # Store protocol kwargs for model_function (Bayesian inference)
+        self._last_fit_kwargs["gdot"] = float(gdot)
+        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
+        self._last_fit_kwargs["_n_bins"] = int(n_bins)
+
     def _fit_laos(self, t: np.ndarray, stress: np.ndarray, **kwargs):
         """Fit LAOS stress response."""
         from rheojax.utils.optimization import (
@@ -585,6 +609,12 @@ class HebraudLequeux(BaseModel):
 
         if not result.success:
             logger.warning(f"Optimization warning: {result.message}")
+
+        # Store protocol kwargs for model_function (Bayesian inference)
+        self._last_fit_kwargs["gamma0"] = float(gamma0)
+        self._last_fit_kwargs["omega"] = float(omega)
+        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
+        self._last_fit_kwargs["_n_bins"] = int(n_bins)
 
     def _fit_oscillation(self, omega: np.ndarray, G_star: np.ndarray, **kwargs):
         """Fit SAOS oscillatory data (G', G'').
@@ -645,7 +675,8 @@ class HebraudLequeux(BaseModel):
                 log_resid_Gp = np.log10(pred_Gp) - np.log10(Gp_safe)
                 log_resid_Gpp = np.log10(pred_Gpp) - np.log10(Gpp_safe)
                 return float(np.mean(log_resid_Gp**2 + log_resid_Gpp**2))
-            except Exception:
+            except Exception as exc:
+                logger.debug("SAOS cost_fn exception: %s", exc)
                 return 1e6
 
         # Multi-start optimization
@@ -657,12 +688,16 @@ class HebraudLequeux(BaseModel):
         best_x = starts[0]
         best_cost = np.inf
 
+        # Extract callback for cancellation support (F-HL-009)
+        _callback = kwargs.get("callback")
+
         for i, x0 in enumerate(starts):
             try:
                 res = minimize(
                     cost_fn,
                     x0,
                     method="Nelder-Mead",
+                    callback=_callback,
                     options={"maxfev": 60, "xatol": 0.02, "fatol": 0.005, "adaptive": True},
                 )
                 if res.fun < best_cost:
@@ -690,6 +725,12 @@ class HebraudLequeux(BaseModel):
             f"sigma_c={sigma_c_fit:.3f}, cost={best_cost:.5f}"
         )
 
+        # Store protocol kwargs for model_function (Bayesian inference)
+        self._last_fit_kwargs["n_cycles"] = int(n_cycles)
+        self._last_fit_kwargs["gamma0"] = float(gamma0_saos)
+        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
+        self._last_fit_kwargs["_n_bins"] = int(n_bins)
+
     def _predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """Predict response using fitted parameters and stored test_mode."""
         if self._test_mode is None:
@@ -714,8 +755,8 @@ class HebraudLequeux(BaseModel):
             sigma_max_min_norm = self._last_fit_kwargs.get("_sigma_max_min_norm", 5.0)
             n_bins_pred = self._last_fit_kwargs.get("_n_bins_fit", 501)
 
-            tau_val = float(tau or 1.0)
-            sigma_c_norm = float(sigma_c or 1.0) / stress_scale
+            tau_val = float(1.0 if tau is None else tau)
+            sigma_c_norm = float(1.0 if sigma_c is None else sigma_c) / stress_scale
             sigma_max_norm = max(5.0 * sigma_c_norm, sigma_max_min_norm)
             ds = 2.0 * sigma_max_norm / (n_bins_pred - 1)
 
@@ -731,7 +772,7 @@ class HebraudLequeux(BaseModel):
             ]
             pred_norm = run_flow_curve(
                 X_jax,
-                float(alpha or 0.5),
+                float(0.5 if alpha is None else alpha),
                 tau_val,
                 sigma_c_norm,
                 0.005,
@@ -749,9 +790,9 @@ class HebraudLequeux(BaseModel):
                 run_creep(
                     X_jax,
                     float(stress_target),
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
+                    float(0.5 if alpha is None else alpha),
+                    float(1.0 if tau is None else tau),
+                    float(1.0 if sigma_c is None else sigma_c),
                     1.0,
                     dt_pred,
                     float(sigma_max),
@@ -766,9 +807,9 @@ class HebraudLequeux(BaseModel):
                 run_relaxation(
                     X_jax,
                     float(gamma0),
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
+                    float(0.5 if alpha is None else alpha),
+                    float(1.0 if tau is None else tau),
+                    float(1.0 if sigma_c is None else sigma_c),
                     dt_pred,
                     float(sigma_max),
                     int(n_bins),
@@ -782,9 +823,9 @@ class HebraudLequeux(BaseModel):
                 run_startup(
                     X_jax,
                     float(gdot),
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
+                    float(0.5 if alpha is None else alpha),
+                    float(1.0 if tau is None else tau),
+                    float(1.0 if sigma_c is None else sigma_c),
                     dt_pred,
                     float(sigma_max),
                     int(n_bins),
@@ -800,9 +841,9 @@ class HebraudLequeux(BaseModel):
                     X_jax,
                     float(gamma0),
                     float(omega),
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
+                    float(0.5 if alpha is None else alpha),
+                    float(1.0 if tau is None else tau),
+                    float(1.0 if sigma_c is None else sigma_c),
                     dt_pred,
                     float(sigma_max),
                     int(n_bins),
@@ -812,9 +853,9 @@ class HebraudLequeux(BaseModel):
             return np.array(
                 run_saos(
                     X_jax,
-                    float(alpha or 0.5),
-                    float(tau or 1.0),
-                    float(sigma_c or 1.0),
+                    float(0.5 if alpha is None else alpha),
+                    float(1.0 if tau is None else tau),
+                    float(1.0 if sigma_c is None else sigma_c),
                     sigma_max=float(sigma_max),
                     n_bins=int(n_bins),
                 )
@@ -831,7 +872,8 @@ class HebraudLequeux(BaseModel):
             X: Input array
             params: Parameter values [alpha, tau, sigma_c]
             test_mode: Override test mode
-            **kwargs: Protocol kwargs (ignored - we read from _last_fit_kwargs)
+            **kwargs: Protocol kwargs forwarded by BayesianMixin. Falls back
+                to _last_fit_kwargs for values not provided.
         """
         mode = test_mode or self._test_mode
         if mode is None:
@@ -840,10 +882,21 @@ class HebraudLequeux(BaseModel):
         alpha, tau, sigma_c = params
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
+        # Helper: read protocol kwarg from explicit kwargs (forwarded by
+        # BayesianMixin), falling back to _last_fit_kwargs, then default.
+        def _kw(key, default):
+            val = kwargs.get(key)
+            if val is not None:
+                return val
+            val = self._last_fit_kwargs.get(key)
+            if val is not None:
+                return val
+            return default
+
         # Use fixed grid for Bayesian (sigma_c is dynamic tracer, can't resize
         # in JIT). Use sigma_max from NLSQ fit if available, else conservative.
-        sigma_max = self._last_fit_kwargs.get("_sigma_max", 50.0)
-        n_bins = 201
+        sigma_max = _kw("_sigma_max", 50.0)
+        n_bins = _kw("_n_bins", 201)
 
         # Helper to get adaptive dt and n_steps safely.
         # Bayesian uses a coarser cap because forward-mode AD through
@@ -914,21 +967,29 @@ class HebraudLequeux(BaseModel):
                     per_rate_schedule=schedule,
                 )
                 return pred_norm * stress_scale
-            except Exception:
-                return run_flow_curve(
+            except Exception as exc:
+                # F-HL-017 fix: fallback also uses normalized units for
+                # consistency. Previously used raw sigma_c without rescaling.
+                logger.warning(
+                    "Flow curve normalized path failed, using fallback",
+                    error=str(exc),
+                )
+                sigma_c_norm_fb = sigma_c / stress_scale
+                pred_fb = run_flow_curve(
                     X_jax,
                     alpha,
                     tau,
-                    sigma_c,
+                    sigma_c_norm_fb,
                     dt,
-                    sigma_max,
-                    n_bins,
+                    sigma_max_norm,
+                    n_bins_bayes,
                 )
+                return pred_fb * stress_scale
 
         elif mode == "creep":
             # Creep uses tighter cap due to super-linear compilation cost
             dt, n_steps = get_dt_and_n_steps(X_jax, creep=True)
-            stress_target = self._last_fit_kwargs.get("stress_target", 1.0)
+            stress_target = _kw("stress_target", 1.0)
 
             time_hist, gamma_hist = creep_kernel(
                 n_steps, stress_target, alpha, tau, sigma_c, 1.0, dt, sigma_max, n_bins
@@ -939,7 +1000,7 @@ class HebraudLequeux(BaseModel):
 
         elif mode == "relaxation":
             dt, n_steps = get_dt_and_n_steps(X_jax)
-            gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
+            gamma0 = _kw("gamma0", 1.0)
 
             time_hist, stress_hist = relaxation_kernel(
                 n_steps, gamma0, alpha, tau, sigma_c, dt, sigma_max, n_bins
@@ -952,7 +1013,7 @@ class HebraudLequeux(BaseModel):
 
         elif mode == "startup":
             dt, n_steps = get_dt_and_n_steps(X_jax)
-            gdot = self._last_fit_kwargs.get("gdot", 1.0)
+            gdot = _kw("gdot", 1.0)
 
             time_hist, stress_hist = startup_kernel(
                 n_steps, gdot, alpha, tau, sigma_c, dt, sigma_max, n_bins
@@ -963,8 +1024,8 @@ class HebraudLequeux(BaseModel):
 
         elif mode == "laos":
             dt, n_steps = get_dt_and_n_steps(X_jax)
-            gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
-            omega = self._last_fit_kwargs.get("omega", 1.0)
+            gamma0 = _kw("gamma0", 1.0)
+            omega = _kw("omega", 1.0)
 
             time_hist, stress_hist = laos_kernel(
                 n_steps, gamma0, omega, alpha, tau, sigma_c, dt, sigma_max, n_bins
@@ -974,13 +1035,16 @@ class HebraudLequeux(BaseModel):
             return jnp.interp(X_jax, time_full, stress_full)
 
         elif mode in ("oscillation", "saos"):
-            # SAOS for Bayesian: use fewer cycles for speed
+            # SAOS for Bayesian: use stored n_cycles/gamma0 from _fit_oscillation()
+            n_cycles_bayes = int(_kw("n_cycles", 5))
+            gamma0_bayes = float(_kw("gamma0", 0.01))
             return run_saos(
                 X_jax,
                 alpha,
                 tau,
                 sigma_c,
-                n_cycles=5,
+                gamma0=gamma0_bayes,
+                n_cycles=n_cycles_bayes,
                 sigma_max=sigma_max,
                 n_bins=n_bins,
             )
@@ -990,7 +1054,8 @@ class HebraudLequeux(BaseModel):
 
     def get_phase_state(self) -> str:
         """Return the phase state based on alpha."""
-        alpha = self.parameters.get_value("alpha") or 0.3
+        _alpha_val = self.parameters.get_value("alpha")
+        alpha = 0.3 if _alpha_val is None else _alpha_val
         if alpha < 0.5:
             return "glass"
         else:

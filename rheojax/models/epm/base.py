@@ -508,7 +508,7 @@ class EPMBase(BaseModel):
 
         # Parameters (Optimizable) - use inherited self.parameters from BaseModel
         self.parameters.add(
-            "mu", mu, bounds=(0.1, 10000.0), units="Pa", description="Shear modulus"
+            "mu", mu, bounds=(0.1, 1e9), units="Pa", description="Shear modulus"
         )
         self.parameters.add(
             "tau_pl",
@@ -520,7 +520,7 @@ class EPMBase(BaseModel):
         self.parameters.add(
             "sigma_c_mean",
             sigma_c_mean,
-            bounds=(0.1, 1000.0),
+            bounds=(0.1, 1e6),
             units="Pa",
             description="Mean yield threshold",
         )
@@ -1173,8 +1173,28 @@ class EPMBase(BaseModel):
         # Convert params to array if needed
         params_array = jnp.asarray(params, dtype=jnp.float64)
 
-        # Get cached seed for reproducibility during MCMC sampling
-        seed = getattr(self, "_cached_seed", 42)
+        # F-001/F-003 fix: Resolve protocol kwargs with fallback to cached values.
+        # This ensures fit_bayesian(gamma_dot=X) uses X, not the stale default.
+        resolved_kwargs = {
+            "gamma_dot": protocol_kwargs.get(
+                "gamma_dot", getattr(self, "_cached_gamma_dot", 0.1)
+            ),
+            "gamma": protocol_kwargs.get(
+                "gamma", getattr(self, "_cached_gamma", 0.1)
+            ),
+            "stress": protocol_kwargs.get(
+                "stress", getattr(self, "_cached_stress", 1.0)
+            ),
+            "gamma0": protocol_kwargs.get(
+                "gamma0", getattr(self, "_cached_gamma0", 0.01)
+            ),
+            "omega": protocol_kwargs.get(
+                "omega", getattr(self, "_cached_omega", 1.0)
+            ),
+        }
+        seed = protocol_kwargs.get(
+            "seed", getattr(self, "_cached_seed", 42)
+        )
         key = jax.random.PRNGKey(seed)
 
         # Get scaled propagator (subclass must have _propagator_q_norm)
@@ -1190,14 +1210,14 @@ class EPMBase(BaseModel):
         # TensorialEPM (tensorial stress) uses the general model functions
         if self._is_scalar_epm():
             return self._model_function_scalar(
-                X_jax, key, propagator_q, params_array, mode
+                X_jax, key, propagator_q, params_array, mode, resolved_kwargs
             )
         else:
             # Convert params array back to dict for general model functions
             param_names = list(self.parameters.keys())
             p_values = dict(zip(param_names, params, strict=True))
             return self._model_function_general(
-                X_jax, key, propagator_q, p_values, mode
+                X_jax, key, propagator_q, p_values, mode, resolved_kwargs
             )
 
     def _model_function_scalar(
@@ -1207,6 +1227,7 @@ class EPMBase(BaseModel):
         propagator_q: jax.Array,
         params_array: jax.Array,
         mode: str,
+        resolved_kwargs: dict,
     ) -> jax.Array:
         """Model function using JIT-compiled scalar kernels (for LatticeEPM)."""
         if mode in ["flow_curve", "rotation", "steady_shear"]:
@@ -1222,23 +1243,21 @@ class EPMBase(BaseModel):
                 n_rates,
             )
         elif mode == "startup":
-            gamma_dot = getattr(self, "_cached_gamma_dot", 0.1)
             return self._model_startup_jit(
-                X_jax, key, propagator_q, params_array, gamma_dot
+                X_jax, key, propagator_q, params_array, resolved_kwargs["gamma_dot"]
             )
         elif mode == "relaxation":
-            gamma = getattr(self, "_cached_gamma", 0.1)
             return self._model_relaxation_jit(
-                X_jax, key, propagator_q, params_array, gamma
+                X_jax, key, propagator_q, params_array, resolved_kwargs["gamma"]
             )
         elif mode == "creep":
-            stress = getattr(self, "_cached_stress", 1.0)
-            return self._model_creep_jit(X_jax, key, propagator_q, params_array, stress)
+            return self._model_creep_jit(
+                X_jax, key, propagator_q, params_array, resolved_kwargs["stress"]
+            )
         elif mode in ["oscillation", "saos"]:
-            gamma0 = getattr(self, "_cached_gamma0", 0.01)
-            omega = getattr(self, "_cached_omega", 1.0)
             return self._model_oscillation_jit(
-                X_jax, key, propagator_q, params_array, gamma0, omega
+                X_jax, key, propagator_q, params_array,
+                resolved_kwargs["gamma0"], resolved_kwargs["omega"],
             )
         else:
             raise ValueError(f"Unknown test mode: {mode}")
@@ -1250,24 +1269,27 @@ class EPMBase(BaseModel):
         propagator_q: jax.Array,
         p_values: dict,
         mode: str,
+        resolved_kwargs: dict,
     ) -> jax.Array:
         """Model function using general (non-JIT) methods (for TensorialEPM)."""
         if mode in ["flow_curve", "rotation", "steady_shear"]:
             return self._model_flow_curve(X_jax, key, propagator_q, p_values)
         elif mode == "startup":
-            gamma_dot = getattr(self, "_cached_gamma_dot", 0.1)
-            return self._model_startup(X_jax, key, propagator_q, p_values, gamma_dot)
+            return self._model_startup(
+                X_jax, key, propagator_q, p_values, resolved_kwargs["gamma_dot"]
+            )
         elif mode == "relaxation":
-            gamma = getattr(self, "_cached_gamma", 0.1)
-            return self._model_relaxation(X_jax, key, propagator_q, p_values, gamma)
+            return self._model_relaxation(
+                X_jax, key, propagator_q, p_values, resolved_kwargs["gamma"]
+            )
         elif mode == "creep":
-            stress = getattr(self, "_cached_stress", 1.0)
-            return self._model_creep(X_jax, key, propagator_q, p_values, stress)
+            return self._model_creep(
+                X_jax, key, propagator_q, p_values, resolved_kwargs["stress"]
+            )
         elif mode in ["oscillation", "saos"]:
-            gamma0 = getattr(self, "_cached_gamma0", 0.01)
-            omega = getattr(self, "_cached_omega", 1.0)
             return self._model_oscillation(
-                X_jax, key, propagator_q, p_values, gamma0, omega
+                X_jax, key, propagator_q, p_values,
+                resolved_kwargs["gamma0"], resolved_kwargs["omega"],
             )
         else:
             raise ValueError(f"Unknown test mode: {mode}")

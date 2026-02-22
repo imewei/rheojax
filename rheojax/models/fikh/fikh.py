@@ -311,6 +311,7 @@ class FIKH(FIKHBase):
         """Predict complex modulus G* from parameter dictionary.
 
         Internal method used by both NLSQ fitting and Bayesian inference.
+        F-004/F-024: Vectorized via jax.vmap over frequencies (replaces Python loop).
 
         Args:
             omega: Angular frequency array.
@@ -327,46 +328,43 @@ class FIKH(FIKHBase):
         )
 
         alpha = params.get("alpha_structure", self.alpha_structure)
+        n_pts = 100 * n_cycles
+        # Static slice index for last cycle extraction
+        last_cycle_start = n_pts * (n_cycles - 1) // n_cycles
+        n_last = n_pts - last_cycle_start
 
-        G_star = []
-        for w in omega:
-            # Time array for n_cycles
+        # Close over params/options so only omega varies
+        include_thermal = self.include_thermal
+        n_history = self.n_history
+
+        def predict_single_omega(w):
+            """Compute G* at a single frequency (vmappable)."""
             period = 2 * jnp.pi / w
-            t = jnp.linspace(0, n_cycles * period, int(100 * n_cycles))
-
-            # Strain signal
+            t = jnp.linspace(0.0, n_cycles * period, n_pts)
             strain = gamma_0 * jnp.sin(w * t)
 
-            # Predict stress using appropriate kernel
-            if self.include_thermal:
+            if include_thermal:
                 T_init = params.get("T_env", params.get("T_ref", 298.15))
                 stress, _ = fikh_scan_kernel_thermal(
-                    t,
-                    strain,
-                    n_history=self.n_history,
-                    alpha=alpha,
-                    use_viscosity=True,
-                    T_init=T_init,
-                    **params,
+                    t, strain,
+                    n_history=n_history, alpha=alpha,
+                    use_viscosity=True, T_init=T_init, **params,
                 )
             else:
                 stress = fikh_scan_kernel_isothermal(
-                    t,
-                    strain,
-                    n_history=self.n_history,
-                    alpha=alpha,
-                    use_viscosity=True,
-                    **params,
+                    t, strain,
+                    n_history=n_history, alpha=alpha,
+                    use_viscosity=True, **params,
                 )
 
-            # Extract last cycle for Fourier analysis
-            last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
-            t_last = t[last_cycle_start:]
-            stress_last = stress[last_cycle_start:]
+            # Extract last cycle via dynamic_slice (trace-safe)
+            t_last = jax.lax.dynamic_slice(t, [last_cycle_start], [n_last])
+            stress_last = jax.lax.dynamic_slice(stress, [last_cycle_start], [n_last])
 
             # Fourier decomposition (first harmonic)
-            T_cycle = 2 * jnp.pi / w
+            # F-034: use dt from actual time points (not T_cycle / n_last)
             dt = t_last[1] - t_last[0]
+            T_cycle = t_last[-1] - t_last[0] + dt  # exact integration span
 
             G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
                 stress_last * jnp.sin(w * t_last), dx=dt
@@ -375,9 +373,11 @@ class FIKH(FIKHBase):
                 stress_last * jnp.cos(w * t_last), dx=dt
             )
 
-            G_star.append(G_prime + 1j * G_double_prime)
+            return jnp.array([G_prime, G_double_prime])
 
-        return jnp.array(G_star)
+        # Vectorize over all frequencies at once
+        results = jax.vmap(predict_single_omega)(omega)  # (N_omega, 2)
+        return results[:, 0] + 1j * results[:, 1]
 
     # =========================================================================
     # Prediction Methods
@@ -582,40 +582,10 @@ class FIKH(FIKHBase):
         omega_arr = jnp.asarray(omega)
         params = self._get_params_dict()
 
-        # Simulate each frequency
-        G_star = []
-        for w in omega_arr:
-            # Time array for n_cycles
-            period = 2 * jnp.pi / w
-            t = jnp.linspace(0, n_cycles * period, int(100 * n_cycles))
-
-            # Strain signal
-            strain = gamma_0 * jnp.sin(w * t)
-
-            # Predict stress
-            stress = self._predict_from_params(t, strain, params)
-
-            # Extract last cycle for Fourier analysis
-            last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
-            t_last = t[last_cycle_start:]
-            stress_last = stress[last_cycle_start:]
-
-            # Fourier decomposition (first harmonic)
-            # G' = (1/γ₀) · (2/T) ∫ σ·sin(ωt) dt
-            # G'' = (1/γ₀) · (2/T) ∫ σ·cos(ωt) dt
-            T_cycle = 2 * jnp.pi / w
-            dt = t_last[1] - t_last[0]
-
-            G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.sin(w * t_last), dx=dt
-            )
-            G_double_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.cos(w * t_last), dx=dt
-            )
-
-            G_star.append(G_prime + 1j * G_double_prime)
-
-        return jnp.array(G_star)
+        # Reuse the vectorized implementation from _predict_oscillation_from_params
+        return self._predict_oscillation_from_params(
+            omega_arr, params, gamma_0, n_cycles
+        )
 
     def predict_laos(
         self,
@@ -703,7 +673,14 @@ class FIKH(FIKHBase):
         Returns:
             Predicted values.
         """
-        mode = test_mode or self._test_mode or "startup"
+        # F-012: prefer explicit test_mode; fall back to _last_fit_kwargs
+        # (set by fit()) over stale self._test_mode to avoid wrong NUTS likelihood
+        mode = (
+            test_mode
+            or getattr(self, "_last_fit_kwargs", {}).get("test_mode")
+            or self._test_mode
+            or "startup"
+        )
 
         # Convert array to dict if needed
         if isinstance(params, (np.ndarray, jnp.ndarray)):
@@ -741,8 +718,7 @@ class FIKH(FIKHBase):
             G_star = self._predict_oscillation_from_params(
                 omega, param_dict, gamma_0, n_cycles
             )
-            # Return magnitude for comparison with |G*| target
-            return jnp.abs(G_star)
+            return jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
 
         else:
             # Strain-driven protocols (startup, laos)

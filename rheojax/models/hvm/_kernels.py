@@ -193,28 +193,6 @@ def hvm_ber_rate_stretch(
 # =============================================================================
 
 
-@jax.jit
-def hvm_permanent_stress_shear(gamma: float, G_P: float, D: float) -> float:
-    """Permanent network (P) shear stress with damage.
-
-    sigma_P = (1 - D) * G_P * gamma
-
-    Parameters
-    ----------
-    gamma : float
-        Accumulated shear strain
-    G_P : float
-        Permanent network modulus (Pa)
-    D : float
-        Damage variable [0, 1]
-
-    Returns
-    -------
-    float
-        Permanent network shear stress (Pa)
-    """
-    return (1.0 - D) * G_P * gamma
-
 
 @jax.jit
 def hvm_exchangeable_stress(mu_E_xy: float, mu_E_nat_xy: float, G_E: float) -> float:

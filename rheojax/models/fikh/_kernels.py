@@ -47,8 +47,12 @@ def macaulay(x: jnp.ndarray) -> jnp.ndarray:
 
 @jax.jit
 def sign_safe(x: jnp.ndarray, eps: float = 1e-20) -> jnp.ndarray:
-    """Sign function with regularization to avoid zero."""
-    return jnp.sign(x + eps)
+    """Sign function with regularization to avoid zero.
+
+    Maps values in (-eps, eps) to 0.0 instead of adding eps which
+    would flip the sign of small negative values (F-001).
+    """
+    return jnp.sign(jnp.where(jnp.abs(x) < eps, 0.0, x))
 
 
 # =============================================================================
@@ -309,7 +313,7 @@ def fikh_return_step_isothermal(
 
     # AF dynamic recovery contribution
     alpha_abs = jnp.abs(alpha_n)
-    af_term = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * sign_xi * alpha_n
+    af_term = gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
 
     # Denominator for plastic multiplier
     denom = G + C - af_term
@@ -324,7 +328,7 @@ def fikh_return_step_isothermal(
     # Backstress update (Armstrong-Frederick)
     d_alpha = (
         C * d_gamma_p * sign_xi
-        - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+        - gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * alpha_n * d_gamma_p
     )
     alpha_next = alpha_n + d_alpha
 
@@ -433,8 +437,10 @@ def fikh_return_step_thermal(
     eta_T = arrhenius_viscosity(eta, T_n, T_ref, E_a)
 
     # Temperature and structure dependent yield stress
+    # Structure effect is already in sigma_y_base via delta_sigma_y * lam_n;
+    # pass lam=1.0 to thermal_yield_stress to avoid double-λ (F-007)
     sigma_y_base = sigma_y0 + delta_sigma_y * lam_n
-    sigma_y_current = thermal_yield_stress(sigma_y_base, lam_n, m_y, T_n, T_ref, E_y)
+    sigma_y_current = thermal_yield_stress(sigma_y_base, 1.0, m_y, T_n, T_ref, E_y)
 
     # Shear rate
     dt_safe = jnp.maximum(dt, 1e-15)
@@ -458,7 +464,7 @@ def fikh_return_step_thermal(
 
     # AF contribution
     alpha_abs = jnp.abs(alpha_n)
-    af_term = gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * sign_xi * alpha_n
+    af_term = gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
 
     denom = G + C - af_term
     denom_safe = jnp.maximum(denom, G / 10.0)
@@ -471,7 +477,7 @@ def fikh_return_step_thermal(
     # Backstress update
     d_alpha = (
         C * d_gamma_p * sign_xi
-        - gamma_dyn * jnp.power(alpha_abs + 1e-20, m - 1) * alpha_n * d_gamma_p
+        - gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * alpha_n * d_gamma_p
     )
     alpha_next = alpha_n + d_alpha
 
@@ -586,9 +592,9 @@ def _make_fikh_maxwell_ode_rhs(include_thermal: bool):
         # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
         eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-        # Yield stress
+        # Yield stress — pass lam=1.0 to avoid double-λ (F-007)
         sigma_y_base = sigma_y0 + delta_sigma_y * lam
-        sigma_y_thermal = thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
+        sigma_y_thermal = thermal_yield_stress(sigma_y_base, 1.0, m_y, T, T_ref, E_y)
         sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
         # Effective stress
@@ -608,7 +614,7 @@ def _make_fikh_maxwell_ode_rhs(include_thermal: bool):
         # Backstress rate (Armstrong-Frederick)
         alpha_abs = jnp.abs(alpha)
         d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
-            alpha_abs + 1e-20, m - 1
+            jnp.maximum(alpha_abs, 1e-10), m - 1
         ) * alpha * jnp.abs(gamma_dot_p)
 
         # Plastic strain rate
@@ -678,9 +684,9 @@ def _make_fikh_creep_ode_rhs(include_thermal: bool):
         # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
         eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-        # Yield stress
+        # Yield stress — pass lam=1.0 to avoid double-λ (F-007)
         sigma_y_base = sigma_y0 + delta_sigma_y * lam
-        sigma_y_thermal = thermal_yield_stress(sigma_y_base, lam, m_y, T, T_ref, E_y)
+        sigma_y_thermal = thermal_yield_stress(sigma_y_base, 1.0, m_y, T, T_ref, E_y)
         sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
         # Effective stress
@@ -693,13 +699,14 @@ def _make_fikh_creep_ode_rhs(include_thermal: bool):
         f_yield = xi_abs - sigma_y
         gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
 
-        # Total strain rate
-        d_gamma = gamma_dot_p + sigma / eta_T + eta_inf * gamma_dot_p / eta_T
+        # Total strain rate: γ̇ = γ̇ᵖ + σ/η (plastic + viscous, no elastic since σ=const in creep)
+        # F-006: removed spurious eta_inf * gamma_dot_p / eta_T term
+        d_gamma = gamma_dot_p + sigma / eta_T
 
         # Backstress rate
         alpha_abs = jnp.abs(alpha)
         d_alpha = C * jnp.abs(gamma_dot_p) * sign_xi - gamma_dyn * jnp.power(
-            alpha_abs + 1e-20, m - 1
+            jnp.maximum(alpha_abs, 1e-10), m - 1
         ) * alpha * jnp.abs(gamma_dot_p)
 
         # Plastic strain rate

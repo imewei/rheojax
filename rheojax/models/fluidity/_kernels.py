@@ -66,12 +66,9 @@ def f_loc_herschel_bulkley(
     # Smooth approximation: softplus(delta_sigma / scale) * scale
     # This is equivalent to max(0, delta_sigma) but smooth
     x = delta_sigma / scale
-    # Numerically stable softplus
-    delta_smooth = scale * jnp.where(
-        x > 20.0,
-        x,  # For large x, softplus ≈ x
-        jnp.log1p(jnp.exp(x)),
-    )
+    # Use jax.nn.softplus for numerically stable implementation
+    # (handles gradient overflow that manual jnp.where pattern misses)
+    delta_smooth = scale * jax.nn.softplus(x)
 
     # Fluidity: f = γ̇ / σ, where γ̇ = ((σ - τ_y) / K)^(1/n)
     # So f = ((σ - τ_y)^(1/n) / K^(1/n)) / σ
@@ -464,9 +461,9 @@ def fluidity_local_steady_state(
     Args:
         gamma_dot: Shear rate array (1/s)
         G: Elastic modulus (Pa) - not used for steady state
-        tau_y: Yield stress (Pa) - not used directly, implicit in f_eq
-        K: Flow consistency (Pa·s^n) - not used directly
-        n_flow: Flow exponent - not used directly
+        tau_y: Yield stress (Pa) - additive yield contribution
+        K: Flow consistency (Pa·s^n) - used in HB contribution
+        n_flow: Flow exponent - used in HB contribution
         f_eq: Equilibrium fluidity (1/(Pa·s))
         f_inf: High-shear fluidity (1/(Pa·s))
         theta: Relaxation time (s)
@@ -488,8 +485,14 @@ def fluidity_local_steady_state(
 
     f_ss = numerator / (denominator + 1e-20)
 
-    # Stress: σ = γ̇ / f
-    sigma_ss = gamma_dot / (f_ss + 1e-20)
+    # Stress: σ = τ_y + γ̇ / f_ss
+    # The yield stress τ_y provides the finite stress at γ̇→0,
+    # ensuring yield-stress fluid behavior. K and n_flow contribute
+    # indirectly through the fluidity evolution (f_eq, f_inf dependence).
+    sigma_ss = tau_y + gamma_dot_abs / (f_ss + 1e-20)
+
+    # Preserve sign of gamma_dot
+    sigma_ss = sigma_ss * jnp.sign(gamma_dot + 1e-20)
 
     return sigma_ss
 

@@ -43,6 +43,8 @@ jax, jnp = safe_import_jax()
 # Module logger
 logger = get_logger(__name__)
 
+_MISSING = object()
+
 
 @ModelRegistry.register(
     "dmt_local",
@@ -197,6 +199,8 @@ class DMTLocal(DMTBase):
             return self._predict_creep(X, **kwargs)
         elif test_mode == "oscillation":
             return self._predict_oscillation(X, **kwargs)
+        elif test_mode == "laos":
+            return self._predict_laos(X, **kwargs)
         else:
             raise ValueError(f"Unknown test_mode for prediction: {test_mode}")
 
@@ -260,8 +264,13 @@ class DMTLocal(DMTBase):
                     jnp.array(x), tau_y0, K0, n_flow, eta_inf, a, c, m1, m2
                 )
 
-        # Fit using nlsq_curve_fit
-        result = nlsq_curve_fit(model_fn, gamma_dot_np, stress_np, fit_params, **kwargs)
+        # Filter protocol kwargs before forwarding to NLSQ
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = nlsq_curve_fit(model_fn, gamma_dot_np, stress_np, fit_params, **nlsq_kwargs)
 
         # Update main parameters with fitted values
         for name in param_names:
@@ -470,6 +479,10 @@ class DMTLocal(DMTBase):
         gamma_dot = kwargs.get("gamma_dot", 1.0)
         lam_init = kwargs.get("lam_init", 1.0)
 
+        # Cache for model_function (Bayesian inference bridge)
+        self._gamma_dot_applied = gamma_dot
+        self._startup_lam_init = lam_init
+
         from rheojax.utils.optimization import fit_with_nlsq
 
         t_jax = jnp.array(t)
@@ -492,7 +505,13 @@ class DMTLocal(DMTBase):
 
         params_array, bounds = self._get_params_for_optimization()
 
-        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **kwargs)
+        # Filter protocol kwargs before forwarding to NLSQ
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
 
         self._set_params_from_array(result.x)
         self._fitted = True
@@ -592,9 +611,76 @@ class DMTLocal(DMTBase):
         return np.array(t), np.array(stress), np.array(lam)
 
     def _fit_relaxation(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
-        """Fit to relaxation data."""
-        # Implementation similar to _fit_transient
-        raise NotImplementedError("Relaxation fitting not yet implemented")
+        """Fit to stress relaxation data σ(t) after cessation of shear.
+
+        Requires include_elasticity=True.
+
+        Parameters
+        ----------
+        t : array
+            Time array [s]
+        stress : array
+            Relaxing stress [Pa]
+        **kwargs
+            sigma_init : float
+                Initial stress at cessation [Pa] (default: stress[0])
+            lam_init : float
+                Initial structure at cessation (default: 0.5)
+        """
+        from rheojax.utils.optimization import fit_with_nlsq
+
+        sigma_init = kwargs.get("sigma_init", float(stress[0]))
+        lam_init = kwargs.get("lam_init", 0.5)
+
+        # Cache for model_function (Bayesian inference bridge)
+        self._relax_sigma_init = sigma_init
+        self._relax_lam_init = lam_init
+
+        t_jax = jnp.array(t)
+        stress_jax = jnp.array(stress)
+        dt = float(t[1] - t[0])
+        n_steps = len(t)
+
+        stress_scale = jnp.maximum(jnp.std(stress_jax), 1.0)
+
+        def residual_fn(params_array):
+            param_dict = self._params_array_to_dict(params_array)
+
+            def step(state, _):
+                sigma, lam = state
+                dlam = (1.0 - lam) / param_dict["t_eq"]
+                lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                G = elastic_modulus(lam_new, param_dict["G0"], param_dict["m_G"])
+                if self.closure == "exponential":
+                    eta = viscosity_exponential(
+                        lam_new, param_dict["eta_0"], param_dict["eta_inf"]
+                    )
+                else:
+                    eta = param_dict["eta_inf"]
+                theta_1 = eta / jnp.maximum(G, 1e-10)
+                dsigma = -sigma / jnp.maximum(theta_1, 1e-12)
+                sigma_new = sigma + dt * dsigma
+                return (sigma_new, lam_new), sigma_new
+
+            step = jax.checkpoint(step)
+            init_state = (jnp.float64(sigma_init), jnp.float64(lam_init))
+            _, stress_pred = jax.lax.scan(step, init_state, None, length=n_steps)
+            stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
+            return (stress_pred - stress_jax) / stress_scale
+
+        params_array, bounds = self._get_params_for_optimization()
+
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
+
+        self._set_params_from_array(result.x)
+        self._fitted = True
+
+        return self
 
     def _predict_relaxation(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict relaxation stress."""
@@ -802,8 +888,113 @@ class DMTLocal(DMTBase):
         return np.array(t), np.array(gamma), np.array(gamma_dot), np.array(lam)
 
     def _fit_creep(self, t: np.ndarray, gamma: np.ndarray, **kwargs) -> DMTLocal:
-        """Fit to creep data."""
-        raise NotImplementedError("Creep fitting not yet implemented")
+        """Fit to creep data γ(t) under constant applied stress.
+
+        Parameters
+        ----------
+        t : array
+            Time array [s]
+        gamma : array
+            Total strain array
+        **kwargs
+            sigma_0 : float
+                Applied constant stress [Pa] (default: 10.0)
+            lam_init : float
+                Initial structure parameter (default: 1.0)
+        """
+        from rheojax.utils.optimization import fit_with_nlsq
+
+        sigma_0 = kwargs.get("sigma_0", 10.0)
+        lam_init = kwargs.get("lam_init", 1.0)
+
+        # Cache for model_function (Bayesian inference bridge)
+        self._sigma_applied = sigma_0
+        self._creep_lam_init = lam_init
+
+        t_jax = jnp.array(t)
+        gamma_jax = jnp.array(gamma)
+        dt = float(t[1] - t[0])
+        n_steps = len(t)
+
+        gamma_scale = jnp.maximum(jnp.std(gamma_jax), 1e-6)
+
+        def residual_fn(params_array):
+            param_dict = self._params_array_to_dict(params_array)
+
+            if self.include_elasticity:
+                def step(state, _):
+                    lam, gamma_v, lam_prev = state
+                    G = elastic_modulus(lam, param_dict["G0"], param_dict["m_G"])
+                    gamma_e = sigma_0 / jnp.maximum(G, 1e-10)
+
+                    if self.closure == "exponential":
+                        gamma_dot_v = invert_stress_for_gamma_dot_exponential(
+                            sigma_0, lam, param_dict["eta_0"], param_dict["eta_inf"]
+                        )
+                    else:
+                        gamma_dot_v = invert_stress_for_gamma_dot_hb(
+                            sigma_0, lam,
+                            param_dict["tau_y0"], param_dict["K0"],
+                            param_dict["n_flow"], param_dict["eta_inf"],
+                            param_dict["m1"], param_dict["m2"],
+                        )
+
+                    dlam = structure_evolution(
+                        lam, gamma_dot_v,
+                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                    )
+                    lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                    gamma_v_new = gamma_v + dt * gamma_dot_v
+                    gamma_total = gamma_e + gamma_v_new
+                    return (lam_new, gamma_v_new, lam), gamma_total
+
+                step = jax.checkpoint(step)
+                init_state = (
+                    jnp.float64(lam_init), jnp.float64(0.0), jnp.float64(lam_init),
+                )
+                _, gamma_pred = jax.lax.scan(step, init_state, None, length=n_steps)
+            else:
+                def step(state, _):
+                    lam, gamma_acc = state
+                    if self.closure == "exponential":
+                        gamma_dot = invert_stress_for_gamma_dot_exponential(
+                            sigma_0, lam, param_dict["eta_0"], param_dict["eta_inf"]
+                        )
+                    else:
+                        gamma_dot = invert_stress_for_gamma_dot_hb(
+                            sigma_0, lam,
+                            param_dict["tau_y0"], param_dict["K0"],
+                            param_dict["n_flow"], param_dict["eta_inf"],
+                            param_dict["m1"], param_dict["m2"],
+                        )
+                    dlam = structure_evolution(
+                        lam, gamma_dot,
+                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                    )
+                    lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                    gamma_new = gamma_acc + dt * gamma_dot
+                    return (lam_new, gamma_new), gamma_new
+
+                step = jax.checkpoint(step)
+                init_state = (jnp.float64(lam_init), jnp.float64(0.0))
+                _, gamma_pred = jax.lax.scan(step, init_state, None, length=n_steps)
+
+            gamma_pred = jnp.clip(gamma_pred, -1e12, 1e12)
+            return (gamma_pred - gamma_jax) / gamma_scale
+
+        params_array, bounds = self._get_params_for_optimization()
+
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
+
+        self._set_params_from_array(result.x)
+        self._fitted = True
+
+        return self
 
     def _predict_creep(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict creep strain."""
@@ -875,8 +1066,86 @@ class DMTLocal(DMTBase):
     def _fit_oscillation(
         self, omega: np.ndarray, G_star: np.ndarray, **kwargs
     ) -> DMTLocal:
-        """Fit to SAOS data."""
-        raise NotImplementedError("SAOS fitting not yet implemented")
+        """Fit to SAOS data G*(ω) = G'(ω) + jG''(ω).
+
+        Requires include_elasticity=True. Assumes small amplitude so structure
+        remains at the reference level λ₀.
+
+        Parameters
+        ----------
+        omega : array
+            Angular frequency [rad/s]
+        G_star : array
+            Complex modulus data (real+imag or (N,2) array of [G', G''])
+        **kwargs
+            lam_0 : float
+                Reference structure level (default: 1.0)
+        """
+        from rheojax.utils.optimization import fit_with_nlsq
+
+        lam_0 = kwargs.get("lam_0", 1.0)
+
+        # Cache for model_function (Bayesian inference bridge)
+        self._saos_lam_0 = lam_0
+
+        omega_jax = jnp.array(omega)
+
+        # Handle complex or (N,2) input
+        G_star_np = np.asarray(G_star)
+        if np.iscomplexobj(G_star_np):
+            G_prime_data = jnp.array(np.real(G_star_np))
+            G_double_prime_data = jnp.array(np.imag(G_star_np))
+        elif G_star_np.ndim == 2 and G_star_np.shape[1] == 2:
+            G_prime_data = jnp.array(G_star_np[:, 0])
+            G_double_prime_data = jnp.array(G_star_np[:, 1])
+        else:
+            raise ValueError(
+                "G_star must be complex (G'+jG'') or shape (N,2) array [G', G'']"
+            )
+
+        # Scale for normalization
+        modulus_scale = jnp.maximum(
+            jnp.std(jnp.concatenate([G_prime_data, G_double_prime_data])), 1.0
+        )
+
+        def residual_fn(params_array):
+            param_dict = self._params_array_to_dict(params_array)
+            G = elastic_modulus(lam_0, param_dict["G0"], param_dict["m_G"])
+
+            if self.closure == "exponential":
+                eta = viscosity_exponential(
+                    lam_0, param_dict["eta_0"], param_dict["eta_inf"]
+                )
+            else:
+                eta = viscosity_herschel_bulkley_regularized(
+                    lam_0, 1e-6,
+                    param_dict["tau_y0"], param_dict["K0"],
+                    param_dict["n_flow"], param_dict["eta_inf"],
+                    param_dict["m1"], param_dict["m2"],
+                )
+
+            theta_1 = eta / jnp.maximum(G, 1e-10)
+            G_prime_pred, G_double_prime_pred = saos_moduli_maxwell(
+                omega_jax, G, theta_1, param_dict["eta_inf"]
+            )
+
+            res_prime = (G_prime_pred - G_prime_data) / modulus_scale
+            res_double_prime = (G_double_prime_pred - G_double_prime_data) / modulus_scale
+            return jnp.concatenate([res_prime, res_double_prime])
+
+        params_array, bounds = self._get_params_for_optimization()
+
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
+
+        self._set_params_from_array(result.x)
+        self._fitted = True
+
+        return self
 
     def _predict_oscillation(self, omega: np.ndarray, **kwargs) -> np.ndarray:
         """Predict complex modulus."""
@@ -1087,8 +1356,130 @@ class DMTLocal(DMTBase):
         }
 
     def _fit_laos(self, t: np.ndarray, stress: np.ndarray, **kwargs) -> DMTLocal:
-        """Fit to LAOS data."""
-        raise NotImplementedError("LAOS fitting not yet implemented")
+        """Fit to LAOS stress waveform σ(t) under oscillatory strain.
+
+        Parameters
+        ----------
+        t : array
+            Time array [s]
+        stress : array
+            Measured stress waveform [Pa]
+        **kwargs
+            gamma_0 : float
+                Strain amplitude (default: 0.1)
+            omega_laos : float
+                Angular frequency [rad/s] (default: 1.0)
+            lam_init : float
+                Initial structure parameter (default: 1.0)
+        """
+        from rheojax.utils.optimization import fit_with_nlsq
+
+        gamma_0 = kwargs.get("gamma_0", 0.1)
+        omega = kwargs.get("omega_laos", kwargs.get("omega", 1.0))
+        lam_init = kwargs.get("lam_init", 1.0)
+
+        # Cache for model_function (Bayesian inference bridge)
+        self._gamma_0 = gamma_0
+        self._omega_laos = omega
+        self._laos_lam_init = lam_init
+
+        t_jax = jnp.array(t)
+        stress_jax = jnp.array(stress)
+        dt = float(t[1] - t[0])
+        n_steps = len(t)
+
+        # Compute driving strain rate
+        strain_rate = gamma_0 * omega * jnp.cos(omega * t_jax)
+        stress_scale = jnp.maximum(jnp.std(stress_jax), 1.0)
+
+        if self.include_elasticity:
+            def residual_fn(params_array):
+                param_dict = self._params_array_to_dict(params_array)
+
+                def step(state, sr):
+                    sigma, lam = state
+                    dlam = structure_evolution(
+                        lam, sr,
+                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                    )
+                    lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                    G = elastic_modulus(lam_new, param_dict["G0"], param_dict["m_G"])
+                    if self.closure == "exponential":
+                        eta = viscosity_exponential(
+                            lam_new, param_dict["eta_0"], param_dict["eta_inf"]
+                        )
+                    else:
+                        eta = viscosity_herschel_bulkley_regularized(
+                            lam_new, sr,
+                            param_dict["tau_y0"], param_dict["K0"],
+                            param_dict["n_flow"], param_dict["eta_inf"],
+                            param_dict["m1"], param_dict["m2"],
+                        )
+                    theta_1 = eta / jnp.maximum(G, 1e-10)
+                    dsigma = maxwell_stress_evolution(sigma, sr, G, theta_1)
+                    sigma_new = sigma + dt * dsigma
+                    return (sigma_new, lam_new), sigma_new
+
+                step = jax.checkpoint(step)
+                init_state = (jnp.float64(0.0), jnp.float64(lam_init))
+                _, stress_pred = jax.lax.scan(step, init_state, strain_rate)
+                stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
+                return (stress_pred - stress_jax) / stress_scale
+        else:
+            def residual_fn(params_array):
+                param_dict = self._params_array_to_dict(params_array)
+
+                def step(lam, sr):
+                    dlam = structure_evolution(
+                        lam, sr,
+                        param_dict["t_eq"], param_dict["a"], param_dict["c"],
+                    )
+                    lam_new = jnp.clip(lam + dt * dlam, 0.0, 1.0)
+                    if self.closure == "exponential":
+                        eta = viscosity_exponential(
+                            lam_new, param_dict["eta_0"], param_dict["eta_inf"]
+                        )
+                    else:
+                        eta = viscosity_herschel_bulkley_regularized(
+                            lam_new, sr,
+                            param_dict["tau_y0"], param_dict["K0"],
+                            param_dict["n_flow"], param_dict["eta_inf"],
+                            param_dict["m1"], param_dict["m2"],
+                        )
+                    return lam_new, eta * sr
+
+                step = jax.checkpoint(step)
+                _, stress_pred = jax.lax.scan(
+                    step, jnp.float64(lam_init), strain_rate
+                )
+                stress_pred = jnp.clip(stress_pred, -1e12, 1e12)
+                return (stress_pred - stress_jax) / stress_scale
+
+        params_array, bounds = self._get_params_for_optimization()
+
+        _dmt_reserved = {"test_mode", "gamma_dot", "lam_init", "sigma_init",
+                         "sigma_0", "lam_0", "gamma_0", "omega_laos", "omega",
+                         "n_cycles", "points_per_cycle", "deformation_mode",
+                         "poisson_ratio"}
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
+        result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
+
+        self._set_params_from_array(result.x)
+        self._fitted = True
+
+        return self
+
+    def _predict_laos(self, t: np.ndarray, **kwargs) -> np.ndarray:
+        """Predict LAOS stress waveform."""
+        gamma_0 = kwargs.get("gamma_0", 0.1)
+        omega = kwargs.get("omega_laos", kwargs.get("omega", 1.0))
+        lam_init = kwargs.get("lam_init", 1.0)
+        n_cycles = kwargs.get("n_cycles", 10)
+        points_per_cycle = max(1, len(t) // n_cycles) if len(t) > n_cycles else 128
+        result = self.simulate_laos(
+            gamma_0, omega, n_cycles, points_per_cycle, lam_init
+        )
+        return result["stress"]
 
     # =========================================================================
     # Helper Methods
@@ -1180,11 +1571,11 @@ class DMTLocal(DMTBase):
         elif mode == "oscillation":
             return self._model_function_oscillation(X_jax, p_values)
         elif mode == "startup":
-            return self._model_function_startup(X_jax, p_values)
+            return self._model_function_startup(X_jax, p_values, **kwargs)
         elif mode == "relaxation":
-            return self._model_function_relaxation(X_jax, p_values)
+            return self._model_function_relaxation(X_jax, p_values, **kwargs)
         elif mode == "creep":
-            return self._model_function_creep(X_jax, p_values)
+            return self._model_function_creep(X_jax, p_values, **kwargs)
         elif mode == "laos":
             return self._model_function_laos(X_jax, p_values)
         else:
@@ -1239,9 +1630,10 @@ class DMTLocal(DMTBase):
         )
         return G_prime + 1j * G_double_prime
 
-    def _model_function_startup(self, X_jax, p_values):
+    def _model_function_startup(self, X_jax, p_values, **kwargs):
         """Startup shear prediction: σ(t) at constant γ̇."""
-        gamma_dot = getattr(self, "_gamma_dot_applied", 1.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", 1.0)
         lam_init = getattr(self, "_startup_lam_init", 1.0)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]
@@ -1315,9 +1707,10 @@ class DMTLocal(DMTBase):
 
         return stress
 
-    def _model_function_relaxation(self, X_jax, p_values):
+    def _model_function_relaxation(self, X_jax, p_values, **kwargs):
         """Stress relaxation prediction: σ(t) after cessation of shear."""
-        sigma_init = getattr(self, "_relax_sigma_init", 100.0)
+        _si = kwargs.get("sigma_init", _MISSING)
+        sigma_init = _si if _si is not _MISSING else getattr(self, "_relax_sigma_init", 100.0)
         lam_init = getattr(self, "_relax_lam_init", 0.5)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]
@@ -1348,9 +1741,12 @@ class DMTLocal(DMTBase):
         _, stress = jax.lax.scan(step, init_state, None, length=n_steps)
         return stress
 
-    def _model_function_creep(self, X_jax, p_values):
+    def _model_function_creep(self, X_jax, p_values, **kwargs):
         """Creep prediction: γ(t) at constant σ₀."""
-        sigma_0 = getattr(self, "_sigma_applied", 50.0)
+        _s0 = kwargs.get("sigma_0", _MISSING)
+        if _s0 is _MISSING:
+            _s0 = kwargs.get("sigma_applied", _MISSING)
+        sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_applied", 50.0)
         lam_init = getattr(self, "_creep_lam_init", 1.0)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]

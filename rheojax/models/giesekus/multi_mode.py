@@ -344,6 +344,8 @@ class GiesekusMultiMode(BaseModel):
 
         test_mode = kwargs.get("test_mode", self._test_mode or "oscillation")
         self._test_mode = test_mode
+        self._gamma_dot_applied = kwargs.get("gamma_dot")
+        self._sigma_applied = kwargs.get("sigma_applied")
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
         y_jax = jnp.asarray(y, dtype=jnp.float64)
@@ -407,7 +409,17 @@ class GiesekusMultiMode(BaseModel):
             for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
-        return self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)
+        result = self.model_function(x_jax, params, test_mode=test_mode, **predict_kwargs)
+        # model_function returns (N,2) real [G', G''] for oscillation;
+        # convert to complex G* to match the established convention
+        if (
+            test_mode == "oscillation"
+            and hasattr(result, "ndim")
+            and result.ndim == 2
+            and result.shape[1] == 2
+        ):
+            result = result[:, 0] + 1j * result[:, 1]
+        return result
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.

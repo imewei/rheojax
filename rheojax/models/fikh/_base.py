@@ -64,7 +64,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
     """
 
     # Protocols supported by FIKH models
-    # Note: LAOS is handled as a special case of OSCILLATION
+    # Note: LAOS uses return mapping (like startup) via _validate_test_mode
     SUPPORTED_PROTOCOLS = [
         TestMode.FLOW_CURVE,
         TestMode.STARTUP,
@@ -462,9 +462,12 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             jnp.nan * jnp.ones_like(result),
         )
 
-        # Add viscous background for startup
-        if mode == "startup" and params.get("eta_inf", 0.0) > 0:
-            result = result + params["eta_inf"] * args["gamma_dot"]
+        # Add viscous background for startup (F-010: use jnp.where for trace-safety)
+        if mode == "startup":
+            eta_inf = params.get("eta_inf", 0.0)
+            result = result + jnp.where(
+                eta_inf > 0, eta_inf * args["gamma_dot"], 0.0
+            )
 
         return result
 

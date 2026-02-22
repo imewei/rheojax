@@ -30,6 +30,18 @@ jax, jnp = safe_import_jax()
 # Logger
 logger = get_logger(__name__)
 
+# Sentinel for distinguishing "not provided" from falsy values (FL-009)
+_MISSING = object()
+
+# FL-006: kwargs to pop before forwarding to nlsq_optimize
+_NLSQ_RESERVED = {
+    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
+    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
+    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
+    "points_per_cycle", "deformation_mode", "poisson_ratio",
+    "method", "callback",
+}
+
 
 @ModelRegistry.register(
     "fluidity_local",
@@ -95,6 +107,10 @@ class FluidityLocal(FluidityBase):
             else:
                 raise ValueError("test_mode must be specified for Fluidity fitting")
 
+        # FL-001: Normalize aliases early so self._test_mode is canonical
+        if test_mode == "saos":
+            test_mode = "oscillation"
+
         with log_fit(logger, model="FluidityLocal", data_shape=X.shape) as ctx:
             self._test_mode = cast(str, test_mode)
             ctx["test_mode"] = test_mode
@@ -107,7 +123,7 @@ class FluidityLocal(FluidityBase):
                 self._fit_transient(X, y, mode="relaxation", **kwargs)
             elif test_mode == "creep":
                 self._fit_transient(X, y, mode="creep", **kwargs)
-            elif test_mode in ["oscillation", "saos"]:
+            elif test_mode == "oscillation":
                 self._fit_oscillation(X, y, **kwargs)
             elif test_mode == "laos":
                 self._fit_laos(X, y, **kwargs)
@@ -166,28 +182,18 @@ class FluidityLocal(FluidityBase):
             use_log_residuals=kwargs.get("use_log_residuals", True),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity flow curve fit warning: {result.message}")
 
+    # FL-013: _predict_flow_curve is not used by _predict() or model_function()
+    # (flow curve routing goes through fluidity_local_steady_state directly).
+    # Kept as a thin compatibility wrapper for external callers.
     def _predict_flow_curve(self, gamma_dot: np.ndarray) -> np.ndarray:
-        """Predict steady-state flow curve."""
-        gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        p = self.get_parameter_dict()
-
-        result = fluidity_local_steady_state(
-            gamma_dot_jax,
-            p["G"],
-            p["tau_y"],
-            p["K"],
-            p["n_flow"],
-            p["f_eq"],
-            p["f_inf"],
-            p["theta"],
-            p["a"],
-            p["n_rejuv"],
-        )
-        return np.array(result)
+        """Predict steady-state flow curve (compatibility wrapper)."""
+        return np.array(self._predict(gamma_dot, test_mode="flow_curve"))
 
     # =========================================================================
     # Transient Protocols (Startup, Relaxation, Creep)
@@ -237,7 +243,9 @@ class FluidityLocal(FluidityBase):
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity transient fit warning: {result.message}")
 
@@ -391,7 +399,6 @@ class FluidityLocal(FluidityBase):
                 x_data,
                 p_map["G"],
                 p_map["f_eq"],
-                p_map["theta"],
             )
 
         objective = create_least_squares_objective(
@@ -401,17 +408,21 @@ class FluidityLocal(FluidityBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity SAOS fit warning: {result.message}")
 
+    # TODO (FL-010): _predict_saos_jit is duplicated in FluidityNonlocal.
+    # Consider extracting to a shared module-level function or into _base.py.
     @staticmethod
     @jax.jit
     def _predict_saos_jit(
         omega: jnp.ndarray,
         G: float,
         f_eq: float,
-        theta: float,
+        theta: float = 0.0,  # FL-005: dead parameter, kept for backward compatibility
     ) -> jnp.ndarray:
         """SAOS prediction using linear viscoelastic approximation.
 
@@ -419,7 +430,12 @@ class FluidityLocal(FluidityBase):
         model with effective relaxation time tau_eff = 1/(G*f_eq).
 
         G*(ω) = G * (iωτ) / (1 + iωτ)
+
+        Note:
+            theta parameter is unused (FL-005) but kept for backward
+            compatibility with external callers.
         """
+        del theta  # FL-005: explicitly unused
         # Effective relaxation time
         tau_eff = 1.0 / (G * f_eq + 1e-30)
 
@@ -468,7 +484,9 @@ class FluidityLocal(FluidityBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity LAOS fit warning: {result.message}")
 
@@ -638,13 +656,25 @@ class FluidityLocal(FluidityBase):
         if mode is None:
             mode = "oscillation"
 
+        # FL-001: Normalize aliases
+        if mode == "saos":
+            mode = "oscillation"
+
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Extract protocol-specific args from kwargs or fall back to instance attrs
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
+        # FL-009: Use sentinel pattern to avoid swallowing falsy values (e.g. 0.0)
+        gamma_dot = kwargs.get("gamma_dot", _MISSING)
+        if gamma_dot is _MISSING:
+            gamma_dot = getattr(self, "_gamma_dot_applied", None)
+        sigma_applied = kwargs.get("sigma_applied", _MISSING)
+        if sigma_applied is _MISSING:
+            sigma_applied = getattr(self, "_sigma_applied", None)
+        gamma_0 = kwargs.get("gamma_0", _MISSING)
+        if gamma_0 is _MISSING:
+            gamma_0 = getattr(self, "_gamma_0", None)
+        omega = kwargs.get("omega", _MISSING)
+        if omega is _MISSING:
+            omega = getattr(self, "_omega_laos", None)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return fluidity_local_steady_state(
@@ -664,7 +694,6 @@ class FluidityLocal(FluidityBase):
                 X_jax,
                 p_values["G"],
                 p_values["f_eq"],
-                p_values["theta"],
             )
         elif mode in ["startup", "relaxation", "creep"]:
             return self._simulate_transient(
@@ -697,6 +726,10 @@ class FluidityLocal(FluidityBase):
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
 
+        # FL-001: Normalize aliases
+        if test_mode == "saos":
+            test_mode = "oscillation"
+
         if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             result = fluidity_local_steady_state(
                 X_jax,
@@ -717,7 +750,6 @@ class FluidityLocal(FluidityBase):
                 X_jax,
                 p["G"],
                 p["f_eq"],
-                p["theta"],
             )
             return np.array(result)
 

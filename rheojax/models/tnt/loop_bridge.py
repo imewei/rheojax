@@ -81,6 +81,8 @@ jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
 
+_MISSING = object()
+
 
 # =============================================================================
 # Loop-Bridge ODE Kernels
@@ -796,11 +798,15 @@ class TNTLoopBridge(TNTBase):
         eta_s = params[5]
 
         mode = test_mode or self._test_mode or "flow_curve"
-        # Extract protocol parameters from kwargs or fall back to instance attributes
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
+        # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        _sa = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        _g0 = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+        _om = kwargs.get("omega", _MISSING)
+        omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
@@ -812,7 +818,7 @@ class TNTLoopBridge(TNTBase):
             G_prime, G_double_prime = tnt_saos_moduli_vec(
                 X_jax, f_B_eq * G, tau_b, eta_s
             )
-            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
+            return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -846,8 +852,8 @@ class TNTLoopBridge(TNTBase):
                 nu,
                 f_B_eq,
                 eta_s,
-                self._gamma_0,
-                self._omega_laos,
+                gamma_0,
+                omega,
             )
             return stress
 

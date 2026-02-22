@@ -120,6 +120,8 @@ jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
 
+_MISSING = object()
+
 
 @ModelRegistry.register(
     "tnt_sticky_rouse",
@@ -347,6 +349,16 @@ class TNTStickyRouse(TNTBase):
 
         # Resolve test mode with fallback
         mode = test_mode or self._test_mode or "flow_curve"
+        # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        _sa = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        _g0 = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+        _om = kwargs.get("omega", _MISSING)
+        omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
+
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Dispatch to protocol-specific prediction
@@ -356,7 +368,7 @@ class TNTStickyRouse(TNTBase):
             # Return |G*| magnitude for fitting/Bayesian inference
             # (complex values not supported by JAX grad)
             G_star = self._predict_oscillation_vec(X_jax, G_modes, tau_eff, eta_s)
-            return jnp.abs(G_star)
+            return jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
         elif mode == "relaxation":
             # Need initial stress per mode (from fitting context)
             if not hasattr(self, "_sigma_0_modes") or self._sigma_0_modes is None:
@@ -366,6 +378,22 @@ class TNTStickyRouse(TNTBase):
             else:
                 sigma_0_modes = self._sigma_0_modes
             return self._predict_relaxation_vec(X_jax, sigma_0_modes, tau_eff)
+        elif mode == "startup":
+            if gamma_dot is None:
+                raise ValueError("startup mode requires gamma_dot")
+            return self._predict_startup(X_jax, gamma_dot, G_modes, tau_eff, eta_s)
+        elif mode == "creep":
+            if sigma_applied is None:
+                raise ValueError("creep mode requires sigma_applied")
+            return self._predict_creep(
+                X_jax, sigma_applied, G_modes, tau_eff, eta_s
+            )
+        elif mode == "laos":
+            if gamma_0 is None or omega is None:
+                raise ValueError("LAOS mode requires gamma_0 and omega")
+            return self._predict_laos(
+                X_jax, gamma_0, omega, G_modes, tau_eff, eta_s
+            )
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
             return self._predict_flow_curve_vec(X_jax, G_modes, tau_eff, eta_s)
@@ -480,6 +508,12 @@ class TNTStickyRouse(TNTBase):
         if test_mode is None:
             raise ValueError("test_mode must be specified for fitting")
 
+        # Store protocol-specific inputs
+        self._gamma_dot_applied = kwargs.get("gamma_dot")
+        self._sigma_applied = kwargs.get("sigma_applied")
+        self._gamma_0 = kwargs.get("gamma_0")
+        self._omega_laos = kwargs.get("omega")
+
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)
         y_jax = jnp.asarray(y, dtype=jnp.float64)
@@ -576,20 +610,24 @@ class TNTStickyRouse(TNTBase):
                 sigma_0_modes = self._sigma_0_modes
             result = self._predict_relaxation_vec(x_jax, sigma_0_modes, tau_eff)
         elif test_mode == "startup":
-            gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
+            _gd = kwargs.get("gamma_dot", _MISSING)
+            gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
             if gamma_dot is None:
                 raise ValueError("gamma_dot must be provided for startup")
             self._gamma_dot_applied = gamma_dot
             result = self._predict_startup(x_jax, gamma_dot, G_modes, tau_eff, eta_s)
         elif test_mode == "creep":
-            sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+            _sa = kwargs.get("sigma_applied", _MISSING)
+            sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
             if sigma_applied is None:
                 raise ValueError("sigma_applied must be provided for creep")
             self._sigma_applied = sigma_applied
             result = self._predict_creep(x_jax, sigma_applied, G_modes, tau_eff, eta_s)
         elif test_mode == "laos":
-            gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-            omega = kwargs.get("omega", self._omega_laos)
+            _g0 = kwargs.get("gamma_0", _MISSING)
+            gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+            _om = kwargs.get("omega", _MISSING)
+            omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
             if gamma_0 is None or omega is None:
                 raise ValueError("gamma_0 and omega must be provided for LAOS")
             self._gamma_0 = gamma_0

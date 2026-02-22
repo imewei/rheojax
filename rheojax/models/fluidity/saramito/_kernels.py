@@ -63,7 +63,7 @@ def von_mises_stress_2d(tau_xx: float, tau_yy: float, tau_xy: float) -> float:
 
     # Von Mises: |τ| = √(0.5 * τ:τ) for deviatoric tensor
     # Note: Some formulations use √(3/2 * τ':τ') for deviatoric part
-    # We use the direct second invariant form: √((3/2) * τ_ij * τ_ij)
+    # We use the second invariant form: √(0.5 * τ_ij * τ_ij)
     # For simple shear where τ_xy dominates: |τ| ≈ √3 * |τ_xy|
     tau_mag = jnp.sqrt(0.5 * tau_sq + 1e-30)
 
@@ -111,13 +111,9 @@ def saramito_plasticity_alpha(
     # Scale for smooth transition around yield
     scale = 0.01  # 1% smoothing region
 
-    # Numerically stable softplus
+    # Numerically stable softplus (jax.nn.softplus handles overflow internally)
     x = raw_alpha / scale
-    alpha_smooth = scale * jnp.where(
-        x > 20.0,
-        x,  # For large x, softplus ≈ x
-        jnp.log1p(jnp.exp(x)),
-    )
+    alpha_smooth = scale * jax.nn.softplus(x)
 
     # Clip to [0, 1] for numerical safety
     alpha = jnp.clip(alpha_smooth, 0.0, 1.0)
@@ -247,8 +243,9 @@ def fluidity_evolution_saramito(
     aging_rate = (f_age - f_safe) / t_a
 
     # Rejuvenation: flow-induced increase toward f_flow
-    driving_abs = jnp.abs(driving_rate)
-    rejuv_rate = b * jnp.power(driving_abs + 1e-20, n_rej) * (f_flow - f_safe)
+    # Floor at 1e-6 (not 1e-20) to prevent gradient explosion for n_rej < 1
+    driving_abs = jnp.maximum(jnp.abs(driving_rate), 1e-6)
+    rejuv_rate = b * jnp.power(driving_abs, n_rej) * (f_flow - f_safe)
 
     df_dt = aging_rate + rejuv_rate
 
@@ -524,7 +521,7 @@ def saramito_local_creep_ode_rhs(
     raw_alpha = 1.0 - ratio
     scale = 0.01
     x = raw_alpha / scale
-    alpha = scale * jnp.where(x > 20.0, x, jnp.log1p(jnp.exp(x)))
+    alpha = scale * jax.nn.softplus(x)
     alpha = jnp.clip(alpha, 0.0, 1.0)
 
     # 1. Strain evolution
@@ -634,7 +631,7 @@ def _saramito_flow_curve_steady_minimal(
 
     # Herschel-Bulkley flow curve
     sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB)
-    sigma_ss = sigma_HB * jnp.sign(gamma_dot + 1e-20)
+    sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
 
@@ -667,14 +664,13 @@ def _saramito_flow_curve_steady_full(
 
     # Herschel-Bulkley flow curve
     sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB)
-    sigma_ss = sigma_HB * jnp.sign(gamma_dot + 1e-20)
+    sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
 
 
 def saramito_flow_curve_steady(
     gamma_dot: jnp.ndarray,
-    G: float,
     tau_y0: float,
     K_HB: float,
     n_HB: float,
@@ -701,7 +697,6 @@ def saramito_flow_curve_steady(
 
     Args:
         gamma_dot: Shear rate array (1/s)
-        G: Elastic modulus (Pa) - not used in steady state, kept for API consistency
         tau_y0: Base yield stress (Pa)
         K_HB: HB consistency (Pa·s^n)
         n_HB: HB exponent (dimensionless)
@@ -750,6 +745,9 @@ def saramito_steady_state_full(
     t_a: float,
     b: float,
     n_rej: float,
+    coupling_mode: str = "minimal",
+    tau_y_coupling: float = 0.0,
+    m_yield: float = 1.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Compute steady-state stress tensor components.
 
@@ -766,16 +764,28 @@ def saramito_steady_state_full(
 
     Args:
         gamma_dot: Shear rate array (1/s)
-        G, tau_y0, ...: Model parameters
+        G: Elastic modulus (Pa) - used for N₁ computation
+        tau_y0: Base yield stress (Pa)
+        K_HB: HB consistency (Pa·s^n)
+        n_HB: HB exponent
+        f_age: Aging fluidity (1/(Pa·s))
+        f_flow: Flow fluidity (1/(Pa·s))
+        t_a: Aging timescale (s)
+        b: Rejuvenation amplitude
+        n_rej: Rejuvenation exponent
+        coupling_mode: "minimal" or "full"
+        tau_y_coupling: Yield stress coupling coefficient
+        m_yield: Yield stress fluidity exponent
 
     Returns:
         (tau_xy, tau_xx, N1) arrays
     """
     gamma_dot_abs = jnp.abs(gamma_dot) + 1e-20
 
-    # Shear stress (HB form)
+    # Shear stress (HB form) — respects coupling mode
     sigma_ss = saramito_flow_curve_steady(
-        gamma_dot, G, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej
+        gamma_dot, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej,
+        coupling_mode, tau_y_coupling, m_yield,
     )
     tau_xy = sigma_ss
 
@@ -895,17 +905,30 @@ def saramito_nonlocal_pde_rhs(
     # Average fluidity for bulk response
     f_avg = jnp.mean(f_field_safe)
 
-    # Bulk stress evolution (average over gap)
-    # Assuming homogeneous stress in Couette geometry
-    d_tau_bulk = G * (gamma_dot - tau_xy_bulk * f_avg)
+    # Compute bulk yield stress for Von Mises alpha
+    tau_y_bulk_full = tau_y0 + tau_y_coupling / jnp.power(jnp.maximum(f_avg, 1e-20), m_yield)
+    tau_y_bulk = jnp.where(coupling_mode == 1, tau_y_bulk_full, tau_y0)
+
+    # FS-001: Add Von Mises alpha factor to bulk stress evolution
+    alpha_bulk = saramito_plasticity_alpha(0.0, 0.0, tau_xy_bulk, tau_y_bulk)
+
+    # Bulk stress evolution (average over gap) with Von Mises yield
+    # Mode flag: 0=rate-controlled, 1=stress-controlled (creep pins stress)
+    mode_flag = args.get("mode_flag", 0)
+    d_tau_bulk_rate = G * gamma_dot - alpha_bulk * f_avg * tau_xy_bulk
+    d_tau_bulk = jnp.where(mode_flag == 1, 0.0, d_tau_bulk_rate)
 
     # Local yield stress (may depend on local fluidity)
     tau_y_full = tau_y0 + tau_y_coupling / jnp.power(f_field_safe, m_yield)
     tau_y_minimal = tau_y0 * jnp.ones_like(f_field_safe)
     tau_y_local = jnp.where(coupling_mode == 1, tau_y_full, tau_y_minimal)
 
-    # Local plasticity (assuming uniform stress in gap)
-    alpha_local = jnp.clip(1.0 - tau_y_local / (jnp.abs(tau_xy_bulk) + 1e-20), 0.0, 1.0)
+    # Local plasticity with softplus-based smooth alpha (avoids gradient kink at yield)
+    raw_alpha_local = 1.0 - tau_y_local / (jnp.abs(tau_xy_bulk) + 1e-20)
+    scale_local = 0.01
+    alpha_local = jnp.clip(
+        scale_local * jax.nn.softplus(raw_alpha_local / scale_local), 0.0, 1.0
+    )
 
     # Local shear rate (from force balance: σ = const across gap)
     # γ̇_local = α * f * σ

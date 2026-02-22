@@ -120,9 +120,10 @@ def caputo_derivative_l1(
         # For multi-dimensional state
         weighted_sum = jnp.einsum("k,k...->...", b_truncated, diffs_reversed)
 
-    # Normalization factor
+    # Normalization factor (F-037: guard dt=0 to avoid NaN from 0^alpha)
     gamma_factor = jax.scipy.special.gamma(2.0 - alpha)
-    dt_alpha = jnp.power(dt, alpha)
+    dt_safe = jnp.maximum(dt, 1e-15)
+    dt_alpha = jnp.power(dt_safe, alpha)
     normalization = 1.0 / (gamma_factor * dt_alpha)
 
     return normalization * weighted_sum
@@ -195,7 +196,7 @@ def initialize_history_with_value(
     return jnp.broadcast_to(initial_value, buffer.shape)
 
 
-@partial(jax.jit, static_argnums=(2,))
+@jax.jit
 def fractional_derivative_with_short_memory(
     f_current: jnp.ndarray,
     f_history: jnp.ndarray,

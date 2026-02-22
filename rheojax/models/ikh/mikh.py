@@ -37,6 +37,17 @@ from rheojax.models.ikh._kernels import (
 jax, jnp = safe_import_jax()
 
 
+
+# kwargs to filter before passing to nlsq_optimize
+_IKH_RESERVED = {
+    "test_mode",
+    "gamma_dot",
+    "sigma_applied",
+    "sigma_0",
+    "deformation_mode",
+    "poisson_ratio",
+}
+
 @ModelRegistry.register(
     "mikh",
     protocols=[
@@ -222,7 +233,8 @@ class MIKH(IKHBase):
             sigma_pred = ikh_flow_curve_steady_state(gamma_dot, **p_dict)
             return sigma_pred - sigma_target
 
-        nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _IKH_RESERVED}
+        nlsq_optimize(objective, self.parameters, **filtered)
         return self
 
     def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
@@ -236,6 +248,11 @@ class MIKH(IKHBase):
         sigma_applied = kwargs.get("sigma_applied", 100.0)
         sigma_0 = kwargs.get("sigma_0", 100.0)
 
+        # Cache protocol kwargs for model_function (NUTS reads these)
+        self._fit_gamma_dot = gamma_dot
+        self._fit_sigma_applied = sigma_applied
+        self._fit_sigma_0 = sigma_0
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=True))
@@ -247,7 +264,8 @@ class MIKH(IKHBase):
         # Force method="scipy": diffrax ODE solvers use custom_vjp which is
         # incompatible with NLSQ's forward-mode autodiff (jvp).
         kwargs["method"] = "scipy"
-        nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _IKH_RESERVED}
+        nlsq_optimize(objective, self.parameters, **filtered)
         return self
 
     def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
@@ -263,7 +281,8 @@ class MIKH(IKHBase):
             sigma_pred = self._predict_from_params(times, strains, p_dict)
             return sigma_pred - sigma_target
 
-        nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _IKH_RESERVED}
+        nlsq_optimize(objective, self.parameters, **filtered)
         return self
 
     def _fit_oscillation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MIKH":
@@ -327,7 +346,8 @@ class MIKH(IKHBase):
 
             return G_star_magnitude - target_magnitude
 
-        nlsq_optimize(objective, self.parameters, **kwargs)
+        filtered = {k: v for k, v in kwargs.items() if k not in _IKH_RESERVED}
+        nlsq_optimize(objective, self.parameters, **filtered)
         return self
 
     def _simulate_transient(
@@ -454,9 +474,15 @@ class MIKH(IKHBase):
 
         elif test_mode in ["creep", "relaxation"]:
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get("gamma_dot", 0.0)
-            sigma_applied = kwargs.get("sigma_applied", 100.0)
-            sigma_0 = kwargs.get("sigma_0", 60.0)
+            gamma_dot = kwargs.get(
+                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
+            )
+            sigma_applied = kwargs.get(
+                "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
+            )
+            sigma_0 = kwargs.get(
+                "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
+            )
             return self._simulate_transient(
                 t, param_dict, test_mode, gamma_dot, sigma_applied, sigma_0
             )
@@ -548,6 +574,7 @@ class MIKH(IKHBase):
         """NumPyro model function for Bayesian inference.
 
         Accepts protocol-specific kwargs (gamma_dot, sigma_applied, sigma_0).
+        Falls back to values cached during _fit() if not provided.
         """
         # Use stored test_mode if not provided
         mode = test_mode or self._test_mode or "startup"
@@ -559,12 +586,17 @@ class MIKH(IKHBase):
         else:
             param_dict = params
 
-        # Extract protocol-specific args from kwargs or fall back to defaults
-        gamma_dot = kwargs.get("gamma_dot", param_dict.get("_gamma_dot", 0.0))
-        sigma_applied = kwargs.get(
-            "sigma_applied", param_dict.get("_sigma_applied", 100.0)
+        # Extract protocol-specific args from kwargs, falling back to
+        # cached values from _fit_ode_formulation()
+        gamma_dot = kwargs.get(
+            "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
         )
-        sigma_0 = kwargs.get("sigma_0", param_dict.get("_sigma_0", 60.0))
+        sigma_applied = kwargs.get(
+            "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
+        )
+        sigma_0 = kwargs.get(
+            "sigma_0", getattr(self, "_fit_sigma_0", 100.0)
+        )
 
         if mode == "flow_curve":
             gamma_dot_arr = jnp.asarray(X)
@@ -588,8 +620,7 @@ class MIKH(IKHBase):
             G_prime = G * wt**2 / (1 + wt**2)
             G_double_prime = G * wt / (1 + wt**2)
 
-            # Return complex modulus magnitude
-            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
+            return jnp.column_stack([G_prime, G_double_prime])
 
         else:
             # startup/laos modes need strain computed from kwargs

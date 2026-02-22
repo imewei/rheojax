@@ -1667,9 +1667,11 @@ class SGRConventional(BaseModel):
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "startup":
             # Get gamma_dot from kwargs or instance attribute
-            gamma_dot = kwargs.get("gamma_dot") or getattr(
-                self, "_startup_gamma_dot", 1.0
-            )
+            # Priority: explicit kwarg > instance attr > default
+            # Use None sentinel (not `or`) to avoid swallowing gamma_dot=0.0
+            gamma_dot = kwargs.get("gamma_dot")
+            if gamma_dot is None:
+                gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")

@@ -225,9 +225,15 @@ class FMLIKH(FIKHBase):
             Dictionary with mode-specific parameters (G, eta, C, gamma_dyn)
             plus all shared parameters.
         """
-        mode_params = dict(params)
+        # F-030: build a clean dict with only the keys the kernel expects,
+        # instead of copying all params (which leaks G_0, G_1, etc.)
+        mode_params = {
+            k: v for k, v in params.items()
+            if not any(k.startswith(p) and k[-1].isdigit()
+                       for p in ("G_", "eta_", "C_", "gamma_dyn_", "alpha_"))
+        }
 
-        # Replace modal parameters
+        # Set modal parameters
         mode_params["G"] = params.get(f"G_{mode_idx}", 1e3)
         mode_params["eta"] = params.get(f"eta_{mode_idx}", 1e6)
         mode_params["C"] = params.get(f"C_{mode_idx}", 5e2)
@@ -449,6 +455,7 @@ class FMLIKH(FIKHBase):
         """Predict complex modulus G* from parameter dictionary.
 
         Sum contributions from all modes.
+        F-004: Vectorized via jax.vmap over frequencies (replaces Python loop).
 
         Args:
             omega: Angular frequency array.
@@ -464,54 +471,58 @@ class FMLIKH(FIKHBase):
             fikh_scan_kernel_thermal,
         )
 
-        # Get shared alpha
         alpha = params.get("alpha_structure", self.alpha_structure)
+        n_pts = 100 * n_cycles
+        last_cycle_start = n_pts * (n_cycles - 1) // n_cycles
+        n_last = n_pts - last_cycle_start
 
-        G_star_total = jnp.zeros(len(omega), dtype=complex)
+        # Close over constants for vmap
+        include_thermal = self.include_thermal
+        n_history = self.n_history
+        n_modes = self._n_modes
 
-        for w_idx, w in enumerate(omega):
-            # Time array for n_cycles
+        # Pre-compute per-mode params (Python loop — static, not over frequencies)
+        mode_params_list = [self._get_mode_params(params, i) for i in range(n_modes)]
+        mode_alphas = [mp.get("alpha_structure", alpha) for mp in mode_params_list]
+
+        def predict_single_omega(w):
+            """Compute G* at a single frequency (vmappable)."""
             period = 2 * jnp.pi / w
-            t = jnp.linspace(0, n_cycles * period, int(100 * n_cycles))
+            t = jnp.linspace(0.0, n_cycles * period, n_pts)
             strain = gamma_0 * jnp.sin(w * t)
 
-            total_stress = jnp.zeros_like(t)
+            total_stress = jnp.zeros(n_pts)
 
-            # Sum stress from all modes
-            for i in range(self._n_modes):
-                mode_params = self._get_mode_params(params, i)
-                mode_alpha = mode_params.get("alpha_structure", alpha)
+            # Sum stress from all modes (Python loop over modes — static count)
+            for i in range(n_modes):
+                mode_params = mode_params_list[i]
+                mode_alpha = mode_alphas[i]
 
-                if self.include_thermal:
+                if include_thermal:
                     T_init = params.get("T_env", params.get("T_ref", 298.15))
                     stress_i, _ = fikh_scan_kernel_thermal(
-                        t,
-                        strain,
-                        n_history=self.n_history,
-                        alpha=mode_alpha,
-                        use_viscosity=(i == self._n_modes - 1),
-                        T_init=T_init,
-                        **mode_params,
+                        t, strain,
+                        n_history=n_history, alpha=mode_alpha,
+                        use_viscosity=(i == n_modes - 1),
+                        T_init=T_init, **mode_params,
                     )
                 else:
                     stress_i = fikh_scan_kernel_isothermal(
-                        t,
-                        strain,
-                        n_history=self.n_history,
-                        alpha=mode_alpha,
-                        use_viscosity=(i == self._n_modes - 1),
+                        t, strain,
+                        n_history=n_history, alpha=mode_alpha,
+                        use_viscosity=(i == n_modes - 1),
                         **mode_params,
                     )
 
                 total_stress = total_stress + stress_i
 
-            # Extract last cycle for Fourier
-            last_cycle_start = int(len(t) * (n_cycles - 1) / n_cycles)
-            t_last = t[last_cycle_start:]
-            stress_last = total_stress[last_cycle_start:]
+            # Extract last cycle via dynamic_slice (trace-safe)
+            t_last = jax.lax.dynamic_slice(t, [last_cycle_start], [n_last])
+            stress_last = jax.lax.dynamic_slice(total_stress, [last_cycle_start], [n_last])
 
-            T_cycle = 2 * jnp.pi / w
+            # Fourier decomposition (first harmonic)
             dt = t_last[1] - t_last[0]
+            T_cycle = t_last[-1] - t_last[0] + dt
 
             G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
                 stress_last * jnp.sin(w * t_last), dx=dt
@@ -520,9 +531,10 @@ class FMLIKH(FIKHBase):
                 stress_last * jnp.cos(w * t_last), dx=dt
             )
 
-            G_star_total = G_star_total.at[w_idx].set(G_prime + 1j * G_double_prime)
+            return jnp.array([G_prime, G_double_prime])
 
-        return G_star_total
+        results = jax.vmap(predict_single_omega)(omega)  # (N_omega, 2)
+        return results[:, 0] + 1j * results[:, 1]
 
     def predict_oscillation(
         self,
@@ -588,7 +600,9 @@ class FMLIKH(FIKHBase):
         total_result = jnp.zeros_like(t)
 
         # Compute total G for distributing sigma_0 across modes
-        G_total = sum(params.get(f"G_{i}", 1e3) for i in range(self._n_modes))
+        # F-016: use jnp.sum for trace-safe summation of potentially traced values
+        G_values = jnp.array([params.get(f"G_{i}", 1e3) for i in range(self._n_modes)])
+        G_total = jnp.sum(G_values)
 
         for i in range(self._n_modes):
             mode_params = self._get_mode_params(params, i)
@@ -630,7 +644,13 @@ class FMLIKH(FIKHBase):
         **kwargs,
     ) -> jnp.ndarray:
         """Model function for Bayesian inference."""
-        mode = test_mode or self._test_mode or "startup"
+        # F-012: prefer explicit test_mode; fall back to _last_fit_kwargs
+        mode = (
+            test_mode
+            or getattr(self, "_last_fit_kwargs", {}).get("test_mode")
+            or self._test_mode
+            or "startup"
+        )
 
         if isinstance(params, (np.ndarray, jnp.ndarray)):
             param_names = list(self.parameters.keys())
@@ -650,7 +670,7 @@ class FMLIKH(FIKHBase):
             G_star = self._predict_oscillation_from_params(
                 omega, param_dict, gamma_0, n_cycles
             )
-            return jnp.abs(G_star)
+            return jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
             return self._predict_transient_multimode(X, param_dict, mode_enum, **kwargs)
         else:

@@ -235,7 +235,7 @@ class Cross(BaseModel):
 
         Args:
             X: Independent variable (shear rate γ̇)
-            params: Array of parameter values [eta0, eta_inf, K, n]
+            params: Array of parameter values [eta0, eta_inf, lambda_, m]
 
         Returns:
             Model predictions as JAX array
@@ -243,12 +243,12 @@ class Cross(BaseModel):
         # Extract parameters from array (in order they were added to ParameterSet)
         eta0 = params[0]
         eta_inf = params[1]
-        K = params[2]
-        n = params[3]
+        lambda_ = params[2]
+        m = params[3]
 
         # Flow model only supports ROTATION test mode
         # Compute prediction using the internal JAX method
-        return self._predict_viscosity(X, eta0, eta_inf, K, n)
+        return self._predict_viscosity(X, eta0, eta_inf, lambda_, m)
 
     @staticmethod
     @jax.jit

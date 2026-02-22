@@ -53,6 +53,7 @@ from rheojax.models.hvm._kernels import (
     hvm_total_stress_shear,
 )
 from rheojax.models.hvm._kernels_diffrax import (
+    _mask_failed_solution_ys,
     hvm_solve_creep,
     hvm_solve_laos,
     hvm_solve_relaxation,
@@ -62,6 +63,7 @@ from rheojax.models.hvm._kernels_diffrax import (
 jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 
 @ModelRegistry.register(
@@ -144,6 +146,13 @@ class HVMLocal(HVMBase):
         )
         self._setup_parameters()
         self._test_mode = None
+        # Protocol kwargs cached by simulate_*/fit for model_function fallback.
+        # Must be initialized to None to prevent AttributeError on fresh instances
+        # (e.g., when BayesianService creates a model without replaying simulate_*).
+        self._gamma_dot_applied: float | None = None
+        self._sigma_applied: float | None = None
+        self._gamma_0: float | None = None
+        self._omega_laos: float | None = None
         logger.info(
             "HVMLocal initialized",
             extra={
@@ -630,7 +639,7 @@ class HVMLocal(HVMBase):
         """
         t = laos_result["time"]
         stress = laos_result["stress"]
-        omega = self._omega_laos or 1.0
+        omega = self._omega_laos if self._omega_laos is not None else 1.0
 
         # Use last complete cycle(s) for FFT
         period = 2.0 * np.pi / omega
@@ -821,10 +830,15 @@ class HVMLocal(HVMBase):
         mode = test_mode or self._test_mode or "flow_curve"
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
+        # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        _sa = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        _g0 = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+        _om = kwargs.get("omega", _MISSING)
+        omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
 
         k_ber_0 = hvm_ber_rate_constant(nu_0, E_a, T)
 
@@ -835,7 +849,7 @@ class HVMLocal(HVMBase):
             G_prime, G_double_prime = hvm_saos_moduli_vec(
                 X_jax, G_P, G_E, G_D, k_ber_0, k_d_D
             )
-            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
+            return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -884,7 +898,6 @@ class HVMLocal(HVMBase):
                 include_dissociative=self._include_dissociative,
             )
             # Mask failed ODE solutions with NaN so Bayesian NaN guard rejects them
-            from rheojax.models.hvm._kernels_diffrax import _mask_failed_solution_ys
             ys = _mask_failed_solution_ys(sol)
             stress = jax.vmap(
                 lambda y: hvm_total_stress_shear(

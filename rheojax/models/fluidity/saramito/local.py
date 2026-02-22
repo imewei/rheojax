@@ -53,6 +53,18 @@ jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
 
+# Sentinel for distinguishing "not provided" from None/0.0 (FS-004/FS-013)
+_MISSING = object()
+
+# kwargs to strip before forwarding to nlsq_optimize (FS-005)
+_NLSQ_RESERVED = {
+    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
+    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
+    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
+    "points_per_cycle", "deformation_mode", "poisson_ratio",
+    "method", "callback", "sigma_0",
+}
+
 
 @ModelRegistry.register(
     "fluidity_saramito_local",
@@ -64,12 +76,7 @@ logger = logging.getLogger(__name__)
         Protocol.OSCILLATION,
         Protocol.LAOS,
     ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
+    deformation_modes=[DeformationMode.SHEAR],
 )
 class FluiditySaramitoLocal(FluiditySaramitoBase):
     r"""Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
@@ -214,7 +221,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
-        # Smart initialization
+        # Smart initialization (FS-018: consistent pop)
         if kwargs.pop("smart_init", True):
             self.initialize_from_flow_curve(gamma_dot, stress)
 
@@ -230,7 +237,6 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
             return saramito_flow_curve_steady(
                 x_data,
-                p_map["G"],
                 p_map["tau_y0"],
                 p_map["K_HB"],
                 p_map["n_HB"],
@@ -244,14 +250,17 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
                 m_yield,
             )
 
+        use_log_residuals = kwargs.pop("use_log_residuals", True)
         objective = create_least_squares_objective(
             model_fn,
             gamma_dot_jax,
             stress_jax,
-            use_log_residuals=kwargs.get("use_log_residuals", True),
+            use_log_residuals=use_log_residuals,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Saramito flow curve fit warning: {result.message}")
 
@@ -278,7 +287,6 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         result = saramito_flow_curve_steady(
             gamma_dot_jax,
-            p["G"],
             p["tau_y0"],
             p["K_HB"],
             p["n_HB"],
@@ -319,11 +327,12 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         y_jax = jnp.asarray(y, dtype=jnp.float64)
 
-        # Extract protocol-specific inputs
+        # Extract protocol-specific inputs (FS-018: consistent pop)
         gamma_dot = kwargs.pop("gamma_dot", None)
         sigma_applied = kwargs.pop("sigma_applied", None)
         sigma_0 = kwargs.pop("sigma_0", None)
         t_wait = kwargs.pop("t_wait", 0.0)
+        kwargs.pop("smart_init", None)  # FS-018: consistent across all _fit_* methods
 
         if mode == "startup" and gamma_dot is None:
             raise ValueError("startup mode requires gamma_dot in kwargs")
@@ -342,14 +351,17 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             )
             return result
 
+        use_log_residuals = kwargs.pop("use_log_residuals", False)
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             y_jax,
-            use_log_residuals=kwargs.get("use_log_residuals", False),
+            use_log_residuals=use_log_residuals,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Saramito transient fit warning: {result.message}")
 
@@ -401,12 +413,16 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             f_init = f_age  # Well-aged sample
 
         # Mode-specific setup
+        G = params["G"]
         if mode == "creep":
             # Creep: constant stress, track strain
             ode_fn = saramito_local_creep_ode_rhs
-            args["sigma_applied"] = sigma_applied if sigma_applied is not None else 0.0
+            sigma_val = sigma_applied if sigma_applied is not None else 0.0
+            args["sigma_applied"] = sigma_val
+            # FS-006: Include initial elastic jump γ_e(0) = σ₀/G
+            gamma_elastic = sigma_val / (G + 1e-20)
             # State: [γ, f]
-            y0 = jnp.array([0.0, f_init])
+            y0 = jnp.array([gamma_elastic, f_init])
         elif mode == "startup":
             # Startup: constant rate, track tensorial stress
             ode_fn = saramito_local_ode_rhs
@@ -419,9 +435,10 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             sigma_init = sigma_0 if sigma_0 is not None else params["tau_y0"]
             # Start with elevated fluidity (just flowed) and initial stress
             f_init_relax = f_flow
+            # FS-007: Initial normal stress from step strain: τ_xx(0) = σ₀²/G
+            tau_xx_init = sigma_init**2 / (G + 1e-20)
             # State: [τ_xx, τ_yy, τ_xy, f]
-            # Initial stress is in shear component
-            y0 = jnp.array([0.0, 0.0, sigma_init, f_init_relax])
+            y0 = jnp.array([tau_xx_init, 0.0, sigma_init, f_init_relax])
 
         # Diffrax setup
         term = diffrax.ODETerm(
@@ -499,6 +516,54 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         )
         return np.array(result)
 
+    def _solve_ode(
+        self,
+        ode_fn,
+        y0: jnp.ndarray,
+        t: jnp.ndarray,
+        args: dict,
+    ):
+        """Shared diffrax ODE integration helper (FS-017).
+
+        Parameters
+        ----------
+        ode_fn : callable
+            ODE right-hand side function (t, y, args) -> dy/dt
+        y0 : jnp.ndarray
+            Initial condition
+        t : jnp.ndarray
+            Time array for saveat
+        args : dict
+            ODE args dictionary
+
+        Returns
+        -------
+        diffrax.Solution
+            Solver output
+        """
+        term = diffrax.ODETerm(
+            jax.checkpoint(lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i))
+        )
+        solver = diffrax.Tsit5()
+        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
+
+        t0, t1 = t[0], t[-1]
+        dt0 = (t1 - t0) / max(len(t), 1000)
+
+        return diffrax.diffeqsolve(
+            term,
+            solver,
+            t0,
+            t1,
+            dt0,
+            y0,
+            args=args,
+            saveat=diffrax.SaveAt(ts=t),
+            stepsize_controller=stepsize_controller,
+            max_steps=10_000_000,
+            throw=False,
+        )
+
     def simulate_startup(
         self,
         t: np.ndarray,
@@ -543,28 +608,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # State: [τ_xx, τ_yy, τ_xy, f, γ]
         y0 = jnp.array([0.0, 0.0, 0.0, f_init, 0.0])
 
-        term = diffrax.ODETerm(
-            jax.checkpoint(lambda ti, yi, args_i: saramito_local_ode_rhs(cast(float, ti), yi, args_i))
-        )
-        solver = diffrax.Tsit5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
-
-        t0, t1 = t[0], t[-1]
-        dt0 = (t1 - t0) / max(len(t), 1000)
-
-        sol = diffrax.diffeqsolve(
-            term,
-            solver,
-            t0,
-            t1,
-            dt0,
-            y0,
-            args=args,
-            saveat=diffrax.SaveAt(ts=t_jax),
-            stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
-            throw=False,  # Return partial result on failure (for optimization)
-        )
+        sol = self._solve_ode(saramito_local_ode_rhs, y0, t_jax, args)
 
         # Handle solver failure
         sol_ys = jnp.where(
@@ -622,39 +666,19 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         f_age = p["f_age"]
         f_flow = p["f_flow"]
         t_a = p["t_a"]
+        G = p["G"]
 
         if t_wait > 0:
             f_init = f_age + (f_flow - f_age) * np.exp(-t_wait / t_a)
         else:
             f_init = f_age
 
+        # FS-006: Include initial elastic jump γ_e(0) = σ₀/G
+        gamma_elastic = sigma_applied / (G + 1e-20)
         # State: [γ, f]
-        y0 = jnp.array([0.0, f_init])
+        y0 = jnp.array([gamma_elastic, f_init])
 
-        term = diffrax.ODETerm(
-            jax.checkpoint(lambda ti, yi, args_i: saramito_local_creep_ode_rhs(
-                cast(float, ti), yi, args_i
-            ))
-        )
-        solver = diffrax.Tsit5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
-
-        t0, t1 = t[0], t[-1]
-        dt0 = (t1 - t0) / max(len(t), 1000)
-
-        sol = diffrax.diffeqsolve(
-            term,
-            solver,
-            t0,
-            t1,
-            dt0,
-            y0,
-            args=args,
-            saveat=diffrax.SaveAt(ts=t_jax),
-            stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
-            throw=False,  # Return partial result on failure (for optimization)
-        )
+        sol = self._solve_ode(saramito_local_creep_ode_rhs, y0, t_jax, args)
 
         # Handle solver failure
         sol_ys = jnp.where(
@@ -727,7 +751,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Saramito SAOS fit warning: {result.message}")
 
@@ -811,7 +837,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Saramito LAOS fit warning: {result.message}")
 
@@ -1016,12 +1044,21 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Extract protocol-specific args from kwargs or fall back to instance attrs
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
-        t_wait = kwargs.get("t_wait", self._t_wait)
+        # FS-013: Use _MISSING sentinel to avoid stale self._ reads during NUTS
+        gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+
+        sigma_raw = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = sigma_raw if sigma_raw is not _MISSING else getattr(self, "_sigma_applied", None)
+
+        gamma_0_raw = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = gamma_0_raw if gamma_0_raw is not _MISSING else getattr(self, "_gamma_0", None)
+
+        omega_raw = kwargs.get("omega", _MISSING)
+        omega = omega_raw if omega_raw is not _MISSING else getattr(self, "_omega_laos", None)
+
+        t_wait_raw = kwargs.get("t_wait", _MISSING)
+        t_wait = t_wait_raw if t_wait_raw is not _MISSING else getattr(self, "_t_wait", 0.0)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             tau_y_coupling = (
@@ -1031,7 +1068,6 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
             return saramito_flow_curve_steady(
                 X_jax,
-                p_values["G"],
                 p_values["tau_y0"],
                 p_values["K_HB"],
                 p_values["n_HB"],

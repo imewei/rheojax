@@ -491,9 +491,12 @@ class ITTMCTIsotropic(ITTMCTBase):
                     gamma_eff = gd / Gamma_k[j]
                     h = np.exp(-((gamma_eff / gamma_c) ** 2))
 
-                    # Correlator contribution
+                    # Correlator contribution: non-ergodic plateau (f_k)
+                    # survives under strain while ergodic part relaxes
                     f_k = self._compute_nonergodicity_parameter(k)
-                    phi_eff = f_k * h + (1 - f_k) * h
+                    tau_k = 1.0 / Gamma_k[j]
+                    t_eff = 1.0 / max(gd, 1e-15)  # Effective relaxation time
+                    phi_eff = (f_k + (1 - f_k) * np.exp(-t_eff / tau_k)) * h
 
                     # Stress contribution ∝ k⁴ S² Φ²
                     stress_k[j] = k**4 * self.S_k[j] ** 2 * phi_eff**2
@@ -604,24 +607,32 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         sigma = np.zeros_like(t)
 
+        # Pre-compute f_k for all wave vectors
+        f_k_arr = np.array([self._compute_nonergodicity_parameter(k) for k in self.k_grid])
+
         for i, t_val in enumerate(t):
             gamma_acc = gamma_dot * t_val
-            stress_k = np.zeros(len(self.k_grid))
+            h = np.exp(-((gamma_acc / gamma_c) ** 2))
 
-            for j, k in enumerate(self.k_grid):
-                h = np.exp(-((gamma_acc / gamma_c) ** 2))
-                tau_k = 1.0 / Gamma_k[j]
+            # σ(t) = γ̇ ∫₀ᵗ G(s) ds where G(s) = G_scale × Σ_k k⁴ S²(k) Φ(k,s)
+            # Compute time integral via trapezoidal rule over sub-times
+            n_sub = max(20, int(t_val * 10))
+            s_arr = np.linspace(0, t_val, n_sub)
+            integrand = np.zeros(n_sub)
 
-                f_k = self._compute_nonergodicity_parameter(k)
+            for si, s_val in enumerate(s_arr):
+                gamma_s = gamma_dot * s_val
+                h_s = np.exp(-((gamma_s / gamma_c) ** 2))
+                stress_k = np.zeros(len(self.k_grid))
+                for j, k in enumerate(self.k_grid):
+                    tau_k = 1.0 / Gamma_k[j]
+                    phi_s = f_k_arr[j] + (1 - f_k_arr[j]) * np.exp(-s_val / tau_k)
+                    phi_s *= h_s
+                    G_k = k**4 * self.S_k[j] ** 2
+                    stress_k[j] = G_k * phi_s
+                integrand[si] = np.trapezoid(stress_k, self.k_grid)
 
-                # Correlator evolution under shear
-                phi_t = f_k + (1 - f_k) * np.exp(-t_val / tau_k)
-                phi_t *= h
-
-                G_k = k**4 * self.S_k[j] ** 2
-                stress_k[j] = G_k * phi_t
-
-            sigma[i] = G_scale * gamma_dot * np.trapezoid(stress_k, self.k_grid) * t_val
+            sigma[i] = G_scale * gamma_dot * np.trapezoid(integrand, s_arr)
 
         return sigma
 
@@ -672,7 +683,7 @@ class ITTMCTIsotropic(ITTMCTBase):
             J_0 = 1.0 / G_scale
             J = J_0 + t / eta_eff
 
-        return J / sigma_applied * sigma_applied  # Normalize
+        return J
 
     def _predict_relaxation(
         self,

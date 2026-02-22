@@ -51,6 +51,9 @@ class FlowCurveParams(NamedTuple):
     """Parameters for flow curve ODE integration.
 
     Using NamedTuple for JAX compatibility (PyTree).
+    Only contains JAX-compatible types (float, jnp.ndarray).
+    Non-JAX fields (n_modes, use_lorentzian, memory_form) are
+    captured in vector field closures via make_flow_curve_*().
     """
 
     gamma_dot: float  # Shear rate
@@ -61,9 +64,6 @@ class FlowCurveParams(NamedTuple):
     G_inf: float  # High-frequency modulus
     g: jnp.ndarray  # Prony amplitudes
     tau: jnp.ndarray  # Prony times
-    n_modes: int  # Number of Prony modes
-    use_lorentzian: bool  # Use Lorentzian vs Gaussian decorrelation
-    memory_form: str  # "simplified" or "full" two-time memory
 
 
 # =============================================================================
@@ -356,7 +356,7 @@ def solve_flow_curve_single(
     memory_form: str = "simplified",
     rtol: float = 1e-5,
     atol: float = 1e-7,
-    max_steps: int = 5000,
+    max_steps: int = 16384,
 ) -> float:
     """Solve flow curve ODE for single shear rate using diffrax.
 
@@ -401,7 +401,7 @@ def solve_flow_curve_single(
         n_modes, use_lorentzian, memory_form
     )
 
-    # Bundle parameters
+    # Bundle parameters (non-JAX fields captured in vector field closure)
     params = FlowCurveParams(
         gamma_dot=gamma_dot,
         v1=v1,
@@ -411,9 +411,6 @@ def solve_flow_curve_single(
         G_inf=G_inf,
         g=g,
         tau=tau,
-        n_modes=n_modes,
-        use_lorentzian=use_lorentzian,
-        memory_form=memory_form,
     )
 
     # Initial state: [Phi=1, K_i=0, gamma=0, sigma_integral=0]
@@ -451,8 +448,16 @@ def solve_flow_curve_single(
     final_state = solution.ys[0]  # Shape: (state_dim,)
     sigma = final_state[2 + n_modes]  # The integrated stress
 
-    # Handle solver failure by returning NaN (optimization will avoid this)
-    sigma = jnp.where(solution.result == diffrax.RESULTS.successful, sigma, jnp.nan)
+    # Accept result if solver succeeded OR if max_steps was reached but
+    # the stress integral has converged. Convergence criterion: the strain
+    # decorrelation h(γ_acc) < 1e-6, meaning the stress integrand is
+    # negligible and the integral won't change further.
+    gamma_acc = final_state[1 + n_modes]
+    h_remaining = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
+    converged = h_remaining < 1e-6
+
+    solver_ok = solution.result == diffrax.RESULTS.successful
+    sigma = jnp.where(solver_ok | converged, sigma, jnp.nan)
 
     return sigma
 

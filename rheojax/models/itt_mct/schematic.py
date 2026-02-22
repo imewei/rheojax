@@ -259,6 +259,9 @@ class ITTMCTSchematic(ITTMCTBase):
             n_prony_modes=n_prony_modes,
         )
 
+        # Track physics params for Prony cache invalidation
+        self._prony_param_hash: tuple[float, ...] | None = None
+
         # Set v2 from epsilon or direct value
         if epsilon is not None and v2 is not None:
             raise ValueError("Specify either epsilon or v2, not both")
@@ -367,11 +370,14 @@ class ITTMCTSchematic(ITTMCTBase):
         t_np = np.array(t)
         t_max = t_np.max()
 
-        # Get or initialize Prony modes
+        # Get or initialize Prony modes (bootstrap with power-law seed)
         if self._prony_amplitudes is None:
-            # Use simple exponential decay for initial Prony estimate
             tau_modes = np.logspace(-3, np.log10(t_max), self.n_prony_modes)
-            g_modes = np.ones(self.n_prony_modes) / self.n_prony_modes
+            # Power-law taper preserves weight at ALL timescales,
+            # critical for MCT glass states where Φ_eq has a non-ergodic
+            # plateau. Exponent a ≈ 0.3 matches MCT critical dynamics.
+            g_modes = tau_modes ** (-0.3)
+            g_modes /= g_modes.sum()  # Normalize
             self._prony_amplitudes = g_modes
             self._prony_times = tau_modes
 
@@ -508,7 +514,8 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
-        # Initialize Prony modes if needed
+        # Invalidate Prony cache if physics params changed, then init
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -572,6 +579,9 @@ class ITTMCTSchematic(ITTMCTBase):
             gamma_dot_nonzero = gamma_dot[mask_nonzero]
 
             # Call batched diffrax solver with memory_form
+            # The ODE naturally captures yield stress through the non-zero
+            # plateau of the advected correlator in the glass state — no
+            # post-ODE sigma_y addition needed (matches scipy path).
             sigma_nonzero = solve_flow_curve_batch(
                 jnp.asarray(gamma_dot_nonzero),
                 v1,
@@ -586,21 +596,20 @@ class ITTMCTSchematic(ITTMCTBase):
                 self._memory_form,
             )
 
-            # Add yield stress contribution for glass
-            info = self.get_glass_transition_info()
-            if info["is_glass"]:
-                f_neq = info["f_neq"]
-                # Approximate: yield stress diminishes with shear
-                gamma_eff = gamma_dot_nonzero / Gamma
-                # Use model's decorrelation form
-                if self._use_lorentzian:
-                    h_gamma = 1.0 / (1.0 + (gamma_eff / gamma_c) ** 2)
-                else:
-                    h_gamma = np.exp(-((gamma_eff / gamma_c) ** 2))
-                sigma_y = G_eff * gamma_c * f_neq * (1 - h_gamma)
-                sigma_nonzero = np.asarray(sigma_nonzero) + sigma_y
+            sigma_arr = np.array(sigma_nonzero)  # writable copy (np.asarray → read-only JAX view)
 
-            sigma[mask_nonzero] = np.asarray(sigma_nonzero)
+            # NaN fallback: diffrax may fail at low γ̇ in glass state
+            # (explicit solver exceeds max_steps due to stiff Prony modes).
+            # Fall back to scipy for these points (implicit RK45 handles stiffness).
+            nan_mask = np.isnan(sigma_arr)
+            if np.any(nan_mask):
+                nan_rates = gamma_dot_nonzero[nan_mask]
+                for j, gd in enumerate(nan_rates):
+                    sigma_arr[np.where(nan_mask)[0][j]] = (
+                        self._compute_steady_state_stress(float(gd))
+                    )
+
+            sigma[mask_nonzero] = sigma_arr
 
         return sigma
 
@@ -687,6 +696,7 @@ class ITTMCTSchematic(ITTMCTBase):
         ):
             G_eff = self._microscopic_stress_prefactor
 
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -785,12 +795,19 @@ class ITTMCTSchematic(ITTMCTBase):
         G_inf = self.parameters.get_value("G_inf")
         assert G_inf is not None
 
+        # Ensure Prony modes are refined (not just bootstrap seed).
+        # Without this, _compute_equilibrium_correlator uses crude bootstrap
+        # modes → misses glass plateau → G'(ω) shows ω² instead of plateau.
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes()
+
         # Need equilibrium correlator over sufficient time range
         omega_min = omega.min()
         t_max = 100.0 / omega_min  # Cover several periods of slowest frequency
         t = np.logspace(-4, np.log10(t_max), 2000)
 
-        # Compute equilibrium correlator
+        # Compute equilibrium correlator (uses refined Prony modes)
         phi_eq = np.array(self._compute_equilibrium_correlator(jnp.array(t)))
 
         # Compute G*(ω) via Fourier transform
@@ -843,6 +860,7 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -872,6 +890,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 tau,
                 self.n_prony_modes,
                 self._use_lorentzian,
+                memory_form=self._memory_form,
             )
             return np.array(deriv)
 
@@ -924,6 +943,7 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -953,6 +973,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 tau,
                 self.n_prony_modes,
                 self._use_lorentzian,
+                memory_form=self._memory_form,
             )
             return np.array(deriv)
 
@@ -1006,6 +1027,7 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -1015,13 +1037,16 @@ class ITTMCTSchematic(ITTMCTBase):
         tau = jnp.array(self._prony_times)
 
         # Initial state after pre-shear: [Φ, K₁..K_n, σ]
-        # Use model's decorrelation form
+        # h(γ_pre) represents the decorrelated correlator after an
+        # instantaneous step strain γ_pre. The cage correlation is
+        # partially destroyed by the applied strain, so Φ(0) = h(γ_pre)
+        # rather than 1.0 — this is the standard MCT step-strain IC.
         if self._use_lorentzian:
             h_gamma = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
         else:
             h_gamma = np.exp(-((gamma_pre / gamma_c) ** 2))
         state0 = np.zeros(2 + self.n_prony_modes)
-        state0[0] = h_gamma  # Φ affected by pre-shear
+        state0[0] = h_gamma  # Φ(0) = h(γ_pre) — decorrelated by step strain
         state0[-1] = G_inf * gamma_pre * h_gamma  # Initial stress
 
         def rhs_numpy(t_val, state):
@@ -1039,6 +1064,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 tau,
                 self.n_prony_modes,
                 self._use_lorentzian,
+                memory_form=self._memory_form,
             )
             return np.array(deriv)
 
@@ -1101,6 +1127,7 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
@@ -1131,6 +1158,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 tau,
                 self.n_prony_modes,
                 self._use_lorentzian,
+                memory_form=self._memory_form,
             )
             return np.array(deriv)
 
@@ -1274,6 +1302,22 @@ class ITTMCTSchematic(ITTMCTBase):
             use_lorentzian=self._use_lorentzian,
             memory_form=self._memory_form,
         )
+
+    def _check_prony_cache(self) -> None:
+        """Invalidate Prony cache if physics parameters changed.
+
+        Tracks (v1, v2, Gamma) — when these change (e.g., during NLSQ),
+        the Prony decomposition must be recomputed since the equilibrium
+        correlator and memory kernel depend on these parameters.
+        """
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        current_hash = (v1, v2, Gamma)
+        if self._prony_param_hash is not None and current_hash != self._prony_param_hash:
+            self._prony_amplitudes = None
+            self._prony_times = None
+        self._prony_param_hash = current_hash
 
     @property
     def decorrelation_form(self) -> str:

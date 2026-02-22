@@ -51,6 +51,18 @@ jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
 
+# Sentinel for distinguishing "not provided" from None/0.0 (FS-004/FS-013)
+_MISSING = object()
+
+# kwargs to strip before forwarding to nlsq_optimize (FS-005)
+_NLSQ_RESERVED = {
+    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
+    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
+    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
+    "points_per_cycle", "deformation_mode", "poisson_ratio",
+    "method", "callback", "sigma_0",
+}
+
 
 @ModelRegistry.register(
     "fluidity_saramito_nonlocal",
@@ -240,14 +252,17 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._predict_flow_curve_homogeneous(x_data, p_map)
 
+        use_log_residuals = kwargs.pop("use_log_residuals", True)
         objective = create_least_squares_objective(
             model_fn,
             gamma_dot_jax,
             stress_jax,
-            use_log_residuals=kwargs.get("use_log_residuals", True),
+            use_log_residuals=use_log_residuals,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Nonlocal flow curve fit warning: {result.message}")
 
@@ -277,7 +292,6 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
 
         return saramito_flow_curve_steady(
             gamma_dot,
-            params["G"],
             params["tau_y0"],
             params["K_HB"],
             params["n_HB"],
@@ -331,6 +345,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         )
 
         gamma_dot = kwargs.pop("gamma_dot", None)
+        kwargs.pop("smart_init", None)  # FS-018: consistent across all _fit_* methods
         if gamma_dot is None:
             raise ValueError("startup mode requires gamma_dot")
 
@@ -351,7 +366,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             use_log_residuals=False,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Nonlocal startup fit warning: {result.message}")
 
@@ -373,6 +390,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         )
 
         sigma_applied = kwargs.pop("sigma_applied", None)
+        kwargs.pop("smart_init", None)  # FS-018: consistent across all _fit_* methods
         if sigma_applied is None:
             raise ValueError("creep mode requires sigma_applied")
 
@@ -393,7 +411,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             use_log_residuals=False,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Nonlocal creep fit warning: {result.message}")
 
@@ -425,6 +445,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         """
         args = self._get_nonlocal_pde_args(params)
         args["gamma_dot"] = gamma_dot
+        args["mode_flag"] = 0  # Rate-controlled: normal stress evolution
 
         # Initial conditions: uniform aged fluidity
         f_init = params["f_age"]
@@ -494,14 +515,13 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         f_field : jnp.ndarray
             Fluidity field at final time
         """
-        # For creep, need modified PDE with fixed stress
-        # Simplified: use homogeneous approximation with spatial storage
-        # Full implementation would require stress-controlled PDE
+        # FS-002: Use mode_flag=1 to pin bulk stress in the PDE RHS
+        # (d_tau_bulk = 0 when mode_flag == 1, preventing stress decay)
 
         args = self._get_nonlocal_pde_args(params)
         args["sigma_applied"] = sigma_applied
-        args["mode"] = 1  # stress_controlled (must be numeric for JAX tracing)
-        args["gamma_dot"] = 0.0  # Will be computed internally
+        args["mode_flag"] = 1  # stress-controlled: pins d_tau_bulk = 0
+        args["gamma_dot"] = 0.0  # Not used when mode_flag=1
 
         # Initial conditions
         f_init = params["f_age"]
@@ -759,9 +779,12 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
 
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Extract protocol-specific args from kwargs or fall back to instance attrs
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
+        # FS-013: Use _MISSING sentinel to avoid stale self._ reads during NUTS
+        gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+
+        sigma_raw = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = sigma_raw if sigma_raw is not _MISSING else getattr(self, "_sigma_applied", None)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve_homogeneous(X_jax, p_values)
@@ -801,7 +824,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             return self._predict_flow_curve(X)
         elif test_mode == "startup":
-            gamma_dot = kwargs.get("gamma_dot") or getattr(
+            # FS-004: Use _MISSING sentinel to avoid Python `or` swallowing 0.0
+            gamma_dot_raw = kwargs.get("gamma_dot", _MISSING)
+            gamma_dot = gamma_dot_raw if gamma_dot_raw is not _MISSING else getattr(
                 self, "_gamma_dot_applied", None
             )
             if gamma_dot is None:
@@ -809,7 +834,13 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             _, sigma, _ = self.simulate_startup(X, gamma_dot)
             return sigma
         elif test_mode == "creep":
-            sigma = kwargs.get("sigma") or getattr(self, "_sigma_applied", None)
+            # FS-004: Use _MISSING sentinel to avoid Python `or` swallowing 0.0
+            sigma_raw = kwargs.get("sigma_applied", _MISSING)
+            if sigma_raw is _MISSING:
+                sigma_raw = kwargs.get("sigma", _MISSING)
+            sigma = sigma_raw if sigma_raw is not _MISSING else getattr(
+                self, "_sigma_applied", None
+            )
             if sigma is None:
                 raise ValueError("creep prediction requires sigma")
             gamma, _ = self.simulate_creep(X, sigma)

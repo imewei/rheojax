@@ -32,6 +32,18 @@ jax, jnp = safe_import_jax()
 # Logger
 logger = get_logger(__name__)
 
+# Sentinel for distinguishing "not provided" from falsy values (FL-009)
+_MISSING = object()
+
+# FL-006: kwargs to pop before forwarding to nlsq_optimize
+_NLSQ_RESERVED = {
+    "test_mode", "use_log_residuals", "smart_init", "use_multi_start",
+    "n_starts", "perturb_factor", "gamma_dot", "sigma_applied",
+    "gamma_0", "omega", "omega_laos", "t_wait", "n_cycles",
+    "points_per_cycle", "deformation_mode", "poisson_ratio",
+    "method", "callback",
+}
+
 
 @ModelRegistry.register(
     "fluidity_nonlocal",
@@ -85,6 +97,11 @@ class FluidityNonlocal(FluidityBase):
             gap_width: Physical gap width in meters (default 1 mm)
         """
         super().__init__()
+        # FL-011: Guard against N_y < 2 which causes ZeroDivisionError in dy
+        if N_y < 2:
+            raise ValueError(
+                f"N_y must be >= 2 for spatial discretization, got {N_y}"
+            )
         self.N_y = N_y
         self.gap_width = gap_width
         self.dy = gap_width / (N_y - 1)
@@ -126,6 +143,10 @@ class FluidityNonlocal(FluidityBase):
             else:
                 raise ValueError("test_mode must be specified for Fluidity fitting")
 
+        # FL-001: Normalize aliases early so self._test_mode is canonical
+        if test_mode == "saos":
+            test_mode = "oscillation"
+
         with log_fit(logger, model="FluidityNonlocal", data_shape=X.shape) as ctx:
             self._test_mode = cast(str, test_mode)
             ctx["test_mode"] = test_mode
@@ -139,7 +160,7 @@ class FluidityNonlocal(FluidityBase):
                 self._fit_transient(X, y, mode="relaxation", **kwargs)
             elif test_mode == "creep":
                 self._fit_transient(X, y, mode="creep", **kwargs)
-            elif test_mode in ["oscillation", "saos"]:
+            elif test_mode == "oscillation":
                 self._fit_oscillation(X, y, **kwargs)
             elif test_mode == "laos":
                 self._fit_laos(X, y, **kwargs)
@@ -172,24 +193,29 @@ class FluidityNonlocal(FluidityBase):
             "xi": params.get("xi", 1e-5),
         }
 
-    def _get_initial_f_field(self, f_init: float | None = None) -> jnp.ndarray:
+    def _get_initial_f_field(
+        self, f_init: float | None = None, N_y: int | None = None
+    ) -> jnp.ndarray:
         """Get initial fluidity field (uniform across gap).
 
         Args:
             f_init: Initial fluidity value. If None, uses f_eq.
+            N_y: Number of grid points override. If None, uses self.N_y.
 
         Returns:
             Fluidity field array, shape (N_y,)
         """
         if f_init is None:
             f_init = self.get_initial_fluidity()
-        return jnp.ones(self.N_y) * f_init
+        n = N_y if N_y is not None else self.N_y
+        return jnp.ones(n) * f_init
 
     def _get_initial_state(
         self,
         mode: str,
         params: dict,
         sigma_0: float | None = None,
+        N_y: int | None = None,
     ) -> jnp.ndarray:
         """Get initial state vector for PDE solver.
 
@@ -208,18 +234,18 @@ class FluidityNonlocal(FluidityBase):
 
         if mode == "creep":
             # State: [γ, f_field] - strain starts at 0
-            f_field = self._get_initial_f_field(f_eq)
+            f_field = self._get_initial_f_field(f_eq, N_y=N_y)
             return jnp.concatenate([jnp.array([0.0]), f_field])
 
         elif mode == "relaxation":
             # State: [Σ, f_field] - stress starts at sigma_0, f at f_inf
             sigma_init = sigma_0 if sigma_0 is not None else params["tau_y"]
-            f_field = self._get_initial_f_field(f_inf)  # Just flowed
+            f_field = self._get_initial_f_field(f_inf, N_y=N_y)  # Just flowed
             return jnp.concatenate([jnp.array([sigma_init]), f_field])
 
         else:  # startup or laos
             # State: [Σ, f_field] - stress at 0, f at f_eq
-            f_field = self._get_initial_f_field(f_eq)
+            f_field = self._get_initial_f_field(f_eq, N_y=N_y)
             return jnp.concatenate([jnp.array([0.0]), f_field])
 
     # =========================================================================
@@ -267,26 +293,18 @@ class FluidityNonlocal(FluidityBase):
             use_log_residuals=kwargs.get("use_log_residuals", True),
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity flow curve fit warning: {result.message}")
 
+    # FL-013: _predict_flow_curve is not used by _predict() or model_function()
+    # (flow curve routing goes through fluidity_nonlocal_steady_state directly).
+    # Kept as a thin compatibility wrapper for external callers.
     def _predict_flow_curve(self, gamma_dot: np.ndarray) -> np.ndarray:
-        """Predict steady-state flow curve."""
-        gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        p = self.get_parameter_dict()
-
-        result = fluidity_nonlocal_steady_state(
-            gamma_dot_jax,
-            p["G"],
-            p["tau_y"],
-            p["K"],
-            p["n_flow"],
-            p["f_eq"],
-            p["f_inf"],
-            p["theta"],
-        )
-        return np.array(result)
+        """Predict steady-state flow curve (compatibility wrapper)."""
+        return np.array(self._predict(gamma_dot, test_mode="flow_curve"))
 
     # =========================================================================
     # Transient Protocols (Startup, Relaxation, Creep)
@@ -314,12 +332,11 @@ class FluidityNonlocal(FluidityBase):
         sigma_applied = kwargs.pop("sigma_applied", None)
         sigma_0 = kwargs.pop("sigma_0", None)
 
-        # Use coarser grid for fitting (speed optimization)
+        # FL-003: Use local variables for coarser grid instead of mutating self
+        # This avoids thread-safety issues where concurrent access could corrupt
+        # self.N_y and self.dy during fitting
         fit_N_y = kwargs.pop("fit_N_y", min(self.N_y, 32))
-        original_N_y = self.N_y
-        original_dy = self.dy
-        self.N_y = fit_N_y
-        self.dy = self.gap_width / (fit_N_y - 1)
+        fit_dy = self.gap_width / (fit_N_y - 1)
 
         if mode == "startup" and gamma_dot is None:
             raise ValueError("startup mode requires gamma_dot in kwargs")
@@ -333,7 +350,8 @@ class FluidityNonlocal(FluidityBase):
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return self._simulate_pde(
-                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0
+                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0,
+                N_y=fit_N_y, dy=fit_dy,
             )
 
         objective = create_least_squares_objective(
@@ -343,14 +361,11 @@ class FluidityNonlocal(FluidityBase):
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
-        try:
-            result = nlsq_optimize(objective, self.parameters, **kwargs)
-            if not result.success:
-                logger.warning(f"Fluidity transient fit warning: {result.message}")
-        finally:
-            # Restore original grid
-            self.N_y = original_N_y
-            self.dy = original_dy
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        if not result.success:
+            logger.warning(f"Fluidity transient fit warning: {result.message}")
 
     def _simulate_pde(
         self,
@@ -360,6 +375,8 @@ class FluidityNonlocal(FluidityBase):
         gamma_dot: float | None,
         sigma_applied: float | None,
         sigma_0: float | None,
+        N_y: int | None = None,
+        dy: float | None = None,
     ) -> jnp.ndarray:
         """Simulate PDE response using Diffrax.
 
@@ -370,11 +387,18 @@ class FluidityNonlocal(FluidityBase):
             gamma_dot: Applied shear rate (for startup)
             sigma_applied: Applied stress (for creep)
             sigma_0: Initial stress (for relaxation)
+            N_y: Grid points override (FL-003 thread safety). If None, uses self.N_y.
+            dy: Grid spacing override (FL-003 thread safety). If None, uses self.dy.
 
         Returns:
             Primary output (stress for startup/relaxation, strain for creep)
         """
+        # FL-003: Use local variables instead of self.N_y/self.dy for thread safety
+        N_y_local = N_y if N_y is not None else self.N_y
+        dy_local = dy if dy is not None else self.dy
+
         # Build args for PDE RHS
+        # FL-012: Removed dead "N_y" key — PDE kernels infer N_y from state vector shape
         args = {
             "G": params["G"],
             "tau_y": params["tau_y"],
@@ -382,8 +406,7 @@ class FluidityNonlocal(FluidityBase):
             "n_flow": params["n_flow"],
             "theta": params["theta"],
             "xi": params.get("xi", 1e-5),
-            "N_y": self.N_y,
-            "dy": self.dy,
+            "dy": dy_local,
         }
 
         # Mode-specific setup
@@ -399,8 +422,8 @@ class FluidityNonlocal(FluidityBase):
                 args["mode"] = 0  # rate_controlled
                 args["gamma_dot"] = 0.0
 
-        # Initial state
-        y0 = self._get_initial_state(mode, params, sigma_0)
+        # Initial state (uses N_y_local for grid size)
+        y0 = self._get_initial_state(mode, params, sigma_0, N_y=N_y_local)
 
         # Diffrax setup - use Dopri5 for stiff PDEs (explicit, avoids tracer issues)
         term = diffrax.ODETerm(
@@ -430,10 +453,11 @@ class FluidityNonlocal(FluidityBase):
         )
 
         # Store trajectory for analysis (skip during JAX tracing, e.g. NUTS)
+        # FL-007: Log exceptions instead of silently swallowing
         try:
             self._f_field_trajectory = np.array(sol.ys[:, 1:])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Could not store fluidity field trajectory: %s", e)
 
         # Extract primary variable (index 0)
         # For creep: strain; for startup/relaxation: stress
@@ -560,7 +584,6 @@ class FluidityNonlocal(FluidityBase):
                 x_data,
                 p_map["G"],
                 p_map["f_eq"],
-                p_map["theta"],
             )
 
         objective = create_least_squares_objective(
@@ -570,19 +593,29 @@ class FluidityNonlocal(FluidityBase):
             normalize=True,
         )
 
-        result = nlsq_optimize(objective, self.parameters, **kwargs)
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity SAOS fit warning: {result.message}")
 
+    # TODO (FL-010): _predict_saos_jit is duplicated in FluidityLocal.
+    # Consider extracting to a shared module-level function or into _base.py.
     @staticmethod
     @jax.jit
     def _predict_saos_jit(
         omega: jnp.ndarray,
         G: float,
         f_eq: float,
-        theta: float,
+        theta: float = 0.0,  # FL-005: dead parameter, kept for backward compatibility
     ) -> jnp.ndarray:
-        """SAOS prediction using linear viscoelastic approximation."""
+        """SAOS prediction using linear viscoelastic approximation.
+
+        Note:
+            theta parameter is unused (FL-005) but kept for backward
+            compatibility with external callers.
+        """
+        del theta  # FL-005: explicitly unused
         tau_eff = 1.0 / (G * f_eq + 1e-30)
         omega_tau = omega * tau_eff
         denom = 1.0 + omega_tau**2
@@ -608,19 +641,18 @@ class FluidityNonlocal(FluidityBase):
         self._gamma_0 = gamma_0
         self._omega_laos = omega
 
-        # Use coarser grid for fitting
+        # FL-003: Use local variables for coarser grid instead of mutating self
         fit_N_y = kwargs.pop("fit_N_y", min(self.N_y, 32))
-        original_N_y = self.N_y
-        original_dy = self.dy
-        self.N_y = fit_N_y
-        self.dy = self.gap_width / (fit_N_y - 1)
+        fit_dy = self.gap_width / (fit_N_y - 1)
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         sigma_jax = jnp.asarray(sigma, dtype=jnp.float64)
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
-            _, stress = self._simulate_laos_internal(x_data, p_map, gamma_0, omega)
+            _, stress = self._simulate_laos_internal(
+                x_data, p_map, gamma_0, omega, N_y=fit_N_y, dy=fit_dy,
+            )
             return stress
 
         objective = create_least_squares_objective(
@@ -630,13 +662,11 @@ class FluidityNonlocal(FluidityBase):
             normalize=True,
         )
 
-        try:
-            result = nlsq_optimize(objective, self.parameters, **kwargs)
-            if not result.success:
-                logger.warning(f"Fluidity LAOS fit warning: {result.message}")
-        finally:
-            self.N_y = original_N_y
-            self.dy = original_dy
+        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        if not result.success:
+            logger.warning(f"Fluidity LAOS fit warning: {result.message}")
 
     def _simulate_laos_internal(
         self,
@@ -644,9 +674,25 @@ class FluidityNonlocal(FluidityBase):
         params: dict,
         gamma_0: float,
         omega: float,
+        N_y: int | None = None,
+        dy: float | None = None,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
-        """Simulate LAOS response using PDE solver."""
+        """Simulate LAOS response using PDE solver.
+
+        Args:
+            t: Time array
+            params: Parameter dictionary
+            gamma_0: Strain amplitude
+            omega: Angular frequency
+            N_y: Grid points override (FL-003 thread safety). If None, uses self.N_y.
+            dy: Grid spacing override (FL-003 thread safety). If None, uses self.dy.
+        """
+        # FL-003: Use local variables instead of self.N_y/self.dy for thread safety
+        N_y_local = N_y if N_y is not None else self.N_y
+        dy_local = dy if dy is not None else self.dy
+
         # Base args
+        # FL-012: Removed dead "N_y" key — PDE kernels infer N_y from state vector shape
         base_args = {
             "G": params["G"],
             "tau_y": params["tau_y"],
@@ -654,13 +700,12 @@ class FluidityNonlocal(FluidityBase):
             "n_flow": params["n_flow"],
             "theta": params["theta"],
             "xi": params.get("xi", 1e-5),
-            "N_y": self.N_y,
-            "dy": self.dy,
+            "dy": dy_local,
             "mode": 0,  # rate_controlled
         }
 
-        # Initial state
-        y0 = self._get_initial_state("laos", params)
+        # Initial state (uses N_y_local for grid size)
+        y0 = self._get_initial_state("laos", params, N_y=N_y_local)
 
         # PDE with time-varying gamma_dot
         def laos_pde(ti, yi, args_i):
@@ -699,11 +744,12 @@ class FluidityNonlocal(FluidityBase):
         stress = jnp.where(sol.result == diffrax.RESULTS.successful, stress, jnp.nan)
 
         # Store trajectory only when not in JIT context (concrete arrays)
-        # Check if we're dealing with concrete values, not traced arrays
+        # FL-008: Use ConcretizationTypeError (modern) instead of deprecated
+        # TracerArrayConversionError
         try:
             # This will fail during JIT tracing
             self._f_field_trajectory = np.asarray(sol.ys[:, 1:])
-        except (TypeError, jax.errors.TracerArrayConversionError):
+        except (TypeError, jax.errors.ConcretizationTypeError):
             # During JIT tracing, skip storage
             pass
 
@@ -756,13 +802,25 @@ class FluidityNonlocal(FluidityBase):
         if mode is None:
             mode = "oscillation"
 
+        # FL-001: Normalize aliases
+        if mode == "saos":
+            mode = "oscillation"
+
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        # Extract protocol-specific args from kwargs or fall back to instance attrs
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
+        # FL-009: Use sentinel pattern to avoid swallowing falsy values (e.g. 0.0)
+        gamma_dot = kwargs.get("gamma_dot", _MISSING)
+        if gamma_dot is _MISSING:
+            gamma_dot = getattr(self, "_gamma_dot_applied", None)
+        sigma_applied = kwargs.get("sigma_applied", _MISSING)
+        if sigma_applied is _MISSING:
+            sigma_applied = getattr(self, "_sigma_applied", None)
+        gamma_0 = kwargs.get("gamma_0", _MISSING)
+        if gamma_0 is _MISSING:
+            gamma_0 = getattr(self, "_gamma_0", None)
+        omega = kwargs.get("omega", _MISSING)
+        if omega is _MISSING:
+            omega = getattr(self, "_omega_laos", None)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
             return fluidity_nonlocal_steady_state(
@@ -780,7 +838,6 @@ class FluidityNonlocal(FluidityBase):
                 X_jax,
                 p_values["G"],
                 p_values["f_eq"],
-                p_values["theta"],
             )
         elif mode in ["startup", "relaxation", "creep"]:
             return self._simulate_pde(
@@ -813,6 +870,10 @@ class FluidityNonlocal(FluidityBase):
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
 
+        # FL-001: Normalize aliases
+        if test_mode == "saos":
+            test_mode = "oscillation"
+
         if test_mode in ["steady_shear", "rotation", "flow_curve"]:
             result = fluidity_nonlocal_steady_state(
                 X_jax,
@@ -831,7 +892,6 @@ class FluidityNonlocal(FluidityBase):
                 X_jax,
                 p["G"],
                 p["f_eq"],
-                p["theta"],
             )
             return np.array(result)
 

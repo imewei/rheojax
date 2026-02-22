@@ -47,6 +47,7 @@ from rheojax.models.hvnm._kernels import (
     hvnm_ber_rate_constant_interphase,
     hvnm_ber_rate_constant_matrix,
     hvnm_creep_compliance_linear_vec,
+    hvnm_effective_phi,
     hvnm_guth_gold,
     hvnm_interphase_fraction,
     hvnm_interphase_modulus,
@@ -59,6 +60,7 @@ from rheojax.models.hvnm._kernels import (
     hvnm_total_stress_shear,
 )
 from rheojax.models.hvnm._kernels_diffrax import (
+    _mask_failed_solution_ys,
     hvnm_solve_creep,
     hvnm_solve_laos,
     hvnm_solve_relaxation,
@@ -68,6 +70,7 @@ from rheojax.models.hvnm._kernels_diffrax import (
 jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
 
 
 @ModelRegistry.register(
@@ -219,7 +222,7 @@ class HVNMLocal(HVNMBase):
         G_I_eff = hvnm_interphase_modulus(G_E, beta_I, phi_I)
         X_phi = hvnm_guth_gold(phi)
         # Effective phi for interphase amplification
-        from rheojax.models.hvnm._kernels import hvnm_effective_phi
+
 
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)
@@ -1019,17 +1022,22 @@ class HVNMLocal(HVNMBase):
         mode = test_mode or self._test_mode or "flow_curve"
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        gamma_dot = kwargs.get("gamma_dot", self._gamma_dot_applied)
-        sigma_applied = kwargs.get("sigma_applied", self._sigma_applied)
-        gamma_0 = kwargs.get("gamma_0", self._gamma_0)
-        omega = kwargs.get("omega", self._omega_laos)
+        # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", None)
+        _sa = kwargs.get("sigma_applied", _MISSING)
+        sigma_applied = _sa if _sa is not _MISSING else getattr(self, "_sigma_applied", None)
+        _g0 = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
+        _om = kwargs.get("omega", _MISSING)
+        omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
 
         # Compute derived quantities (JAX-traceable)
         delta_g = 1e-9
         phi_I = hvnm_interphase_fraction(phi, R_NP, delta_g, delta_m)
         G_I_eff = hvnm_interphase_modulus(G_E, beta_I, phi_I)
         X_phi = hvnm_guth_gold(phi)
-        from rheojax.models.hvnm._kernels import hvnm_effective_phi
+
 
         phi_eff = hvnm_effective_phi(phi, R_NP, delta_g)
         X_I = hvnm_guth_gold(phi_eff)
@@ -1054,7 +1062,7 @@ class HVNMLocal(HVNMBase):
                 0.0,
                 0.0,  # D=0, D_int=0
             )
-            return jnp.sqrt(jnp.maximum(G_prime**2 + G_double_prime**2, 1e-30))
+            return jnp.column_stack([G_prime, G_double_prime])
 
         elif mode == "startup":
             if gamma_dot is None:
@@ -1165,7 +1173,6 @@ class HVNMLocal(HVNMBase):
                 include_interfacial_damage=False,
             )
             # Mask failed ODE solutions with NaN so Bayesian NaN guard rejects them
-            from rheojax.models.hvnm._kernels_diffrax import _mask_failed_solution_ys
             ys = _mask_failed_solution_ys(sol)
             stress = jax.vmap(
                 lambda y: hvnm_total_stress_shear(
