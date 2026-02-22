@@ -268,8 +268,8 @@ class FFTAnalysis(BaseTransform):
                     "original_domain": "time",
                     "n_points": len(t),
                     "dt": float(dt),
-                    # Store complex coefficients for inverse transform
-                    "fft_complex": fft_result,
+                    # Store complex coefficients as serializable list (T-010)
+                    "fft_complex": fft_result.tolist(),
                 }
             )
 
@@ -343,7 +343,8 @@ class FFTAnalysis(BaseTransform):
         logger.debug("Performing inverse FFT", n_points=n_points, dt=dt)
 
         # Use the stored complex coefficients for accurate reconstruction
-        # Apply inverse FFT
+        # Convert from serializable list back to JAX array (T-010)
+        fft_complex = jnp.array(fft_complex)
         y_reconstructed = jnp.fft.irfft(fft_complex, n=n_points)
 
         # Reconstruct time array

@@ -88,7 +88,9 @@ def _ensure_numpy(data: Any) -> np.ndarray:
     Returns:
         NumPy array
     """
-    if isinstance(data, jnp.ndarray):
+    # VIS-011: Use hasattr check instead of isinstance(data, jnp.ndarray)
+    # which is unreliable on JAX >= 0.4.7
+    if hasattr(data, "devices"):
         return np.array(data)
     return np.asarray(data)
 
@@ -112,12 +114,21 @@ def _filter_positive(
     if n_removed > 0 and warn:
         import warnings
 
-        warnings.warn(
-            f"Removed {n_removed} non-positive values from log-scale plot. "
-            f"This is common for very small G'' values or measurement noise.",
-            UserWarning,
-            stacklevel=3,
-        )
+        if np.sum(positive_mask) == 0:
+            # VIS-001: All values non-positive — log plot will be empty
+            warnings.warn(
+                "All y-values are non-positive; log-scale plot will be empty. "
+                "Check data scaling or consider a linear-scale plot.",
+                UserWarning,
+                stacklevel=3,
+            )
+        else:
+            warnings.warn(
+                f"Removed {n_removed} non-positive values from log-scale plot. "
+                f"This is common for very small G'' values or measurement noise.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     return x[positive_mask], y[positive_mask]
 
@@ -236,15 +247,8 @@ def plot_time_domain(
 
         fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
+        # VIS-010: Set font sizes on axes directly instead of mutating
+        # global plt.rcParams (which permanently pollutes process state)
 
         # Plot data
         plot_kwargs = {
@@ -321,15 +325,8 @@ def plot_frequency_domain(
     try:
         style_params = _apply_style(style)
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
+        # VIS-010: Set font sizes on axes directly instead of mutating
+        # global plt.rcParams (which permanently pollutes process state)
 
         if np.iscomplexobj(y):
             # Complex data - plot G' and G'' on separate subplots
@@ -393,7 +390,8 @@ def plot_frequency_domain(
 
             fig.tight_layout()
             logger.debug("Figure created", plot_type="frequency_domain")
-            return fig, [ax]
+            # VIS-004: Return np.array for consistency with complex data path
+            return fig, np.array([ax])
 
     except Exception as e:
         logger.error(
@@ -437,15 +435,8 @@ def plot_flow_curve(
 
         fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
+        # VIS-010: Set font sizes on axes directly instead of mutating
+        # global plt.rcParams (which permanently pollutes process state)
 
         # Plot data on log-log scale
         plot_kwargs = {
@@ -519,15 +510,8 @@ def plot_residuals(
     try:
         style_params = _apply_style(style)
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
+        # VIS-010: Set font sizes on axes directly instead of mutating
+        # global plt.rcParams (which permanently pollutes process state)
 
         if y_true is not None and y_pred is not None:
             # Two subplots: data+predictions and residuals
@@ -791,8 +775,11 @@ def plot_fit_with_uncertainty(
             x_fit_plot, y_fit_plot = _filter_positive(x_fit, y_fit, warn=False)
         elif log_x:
             plot_fn = ax.semilogx
-            x_data_plot, y_data_plot = x_data, y_data
-            x_fit_plot, y_fit_plot = x_fit, y_fit
+            # VIS-002: Filter positive x values for log-x scale
+            x_mask = x_data > 0
+            x_data_plot, y_data_plot = x_data[x_mask], y_data[x_mask]
+            x_mask_fit = x_fit > 0
+            x_fit_plot, y_fit_plot = x_fit[x_mask_fit], y_fit[x_mask_fit]
         elif log_y:
             plot_fn = ax.semilogy
             x_data_plot, y_data_plot = _filter_positive(x_data, y_data)

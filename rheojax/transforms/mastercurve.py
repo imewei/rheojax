@@ -321,7 +321,14 @@ class Mastercurve(BaseTransform):
 
         # Compare exponent (b) uncertainty
         if perr_no_first[1] < perr_full[1]:
-            # Removing first point improves fit
+            # Removing first point improves fit — log truncation (T-006)
+            logger.warning(
+                "First data point removed during power-law fit "
+                "(improved exponent uncertainty)",
+                original_points=len(x),
+                removed_x_value=float(x[0]),
+                removed_y_value=float(y[0]),
+            )
             return x_no_first, y_no_first, popt_no_first, perr_no_first
         else:
             # Keep all points

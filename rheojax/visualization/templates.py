@@ -323,10 +323,11 @@ def plot_mastercurve(
         x_units = datasets[0].x_units if datasets[0].x_units else "rad/s"
         y_units = datasets[0].y_units if datasets[0].y_units else "Pa"
 
+        # VIS-009: Fix inverted label semantics — shifted when shifts applied
         ax.set_xlabel(
-            f"Frequency ({x_units})"
+            f"Shifted Frequency (a_T x {x_units})"
             if shift_factors
-            else f"Shifted Frequency (a_T x {x_units})"
+            else f"Frequency ({x_units})"
         )
         ax.set_ylabel(f"G' ({y_units})")
         ax.set_title(f"Master Curve (T_ref = {reference_temp}C)")
