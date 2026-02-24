@@ -26,6 +26,7 @@ References
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -229,7 +230,7 @@ def _write_spp_main_txt(
     precision: int,
 ) -> None:
     """Write main SPP data file in MATLAB format."""
-    with open(filepath, "w", newline="\r\n") as f:
+    with open(filepath, "w", newline="") as f:
         # Write analysis type header
         if analysis_type == "NUMERICAL":
             f.write("Data calculated via numerical differentiation\r\n")
@@ -307,7 +308,7 @@ def _write_spp_fsf_txt(
     precision: int,
 ) -> None:
     """Write Frenet-Serret frame data file in MATLAB format."""
-    with open(filepath, "w", newline="\r\n") as f:
+    with open(filepath, "w", newline="") as f:
         # Write analysis type header
         if analysis_type == "NUMERICAL":
             f.write("Data calculated via numerical differentiation\r\n")
@@ -423,6 +424,7 @@ def export_spp_hdf5(
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
         datasets_written = []
 
+        filepath.parent.mkdir(parents=True, exist_ok=True)
         with h5py.File(filepath, "w") as f:
             # Metadata group
             logger.debug(
@@ -439,7 +441,12 @@ def export_spp_hdf5(
                 meta.attrs["phase_offset_Delta"] = float(spp_results["Delta"])
             if metadata:
                 for key, value in metadata.items():
-                    meta.attrs[key] = value
+                    if isinstance(value, dict):
+                        meta.attrs[key] = json.dumps(value)
+                    elif isinstance(value, (str, int, float, bool, np.integer, np.floating)):
+                        meta.attrs[key] = value
+                    else:
+                        meta.attrs[key] = str(value)
                 logger.debug(
                     "Custom metadata stored",
                     metadata_keys=list(metadata.keys()),
@@ -816,7 +823,7 @@ def to_matlab_dict(
         )
 
         out_fsf = {
-            "info": info,
+            "info": info.copy(),
             "headers": fsf_headers,
             "data": fsf_data_out,
         }

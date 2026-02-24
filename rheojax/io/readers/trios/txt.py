@@ -933,8 +933,11 @@ def _process_data_section(
     total_points = _parse_total_points(num_points_line) if progress_callback else None
 
     # Read column headers and units
-    header_line = next(file_handle).rstrip("\n")
-    unit_line = next(file_handle).rstrip("\n")
+    try:
+        header_line = next(file_handle).rstrip("\n")
+        unit_line = next(file_handle).rstrip("\n")
+    except StopIteration:
+        raise ValueError("TRIOS TXT segment truncated: expected header and unit lines")
     line_num += 2
 
     columns, units = _parse_headers_and_units(header_line, unit_line)

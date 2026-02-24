@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,22 @@ import numpy as np
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
+
+
+def _to_python_scalar(value: Any) -> Any:
+    """Convert JAX/numpy scalars to native Python types for Excel compatibility."""
+    if isinstance(value, (int, float, str, bool)):
+        return value
+    if isinstance(value, np.generic):
+        return value.item()
+    # JAX arrays: check for .item() method (0-d arrays)
+    if hasattr(value, "item") and hasattr(value, "shape"):
+        try:
+            if value.shape == () or value.size == 1:
+                return value.item()
+        except (TypeError, ValueError):
+            pass
+    return value
 
 
 def save_excel(
@@ -56,6 +73,16 @@ def save_excel(
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
         sheets_written = []
+
+        if not results:
+            with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+                pd.DataFrame({"Info": ["No results to export"]}).to_excel(
+                    writer, sheet_name="Empty", index=False
+                )
+            ctx["sheets_written"] = ["Empty"]
+            ctx["num_sheets"] = 1
+            ctx["include_plots"] = include_plots
+            return
 
         # Create Excel writer
         with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
@@ -138,17 +165,17 @@ def _create_parameters_dataframe(parameters: dict[str, Any]) -> Any:
             data.append(
                 {
                     "Parameter": name,
-                    "Value": value.get("value", value),
+                    "Value": _to_python_scalar(value.get("value", value)),
                     "Units": value.get("units", ""),
                     "Bounds": str(value.get("bounds", "")),
                 }
             )
         else:
-            # Simple parameter value
+            # Simple parameter value (may be JAX/numpy scalar)
             data.append(
                 {
                     "Parameter": name,
-                    "Value": value,
+                    "Value": _to_python_scalar(value),
                     "Units": "",
                     "Bounds": "",
                 }
@@ -173,7 +200,7 @@ def _create_quality_dataframe(fit_quality: dict[str, Any]) -> Any:
         data.append(
             {
                 "Metric": metric,
-                "Value": value,
+                "Value": _to_python_scalar(value),
             }
         )
 
@@ -183,14 +210,34 @@ def _create_quality_dataframe(fit_quality: dict[str, Any]) -> Any:
 def _create_predictions_dataframe(predictions: np.ndarray) -> Any:
     """Create DataFrame for predictions.
 
+    Handles complex arrays (G*=G'+iG'') by splitting into separate columns.
+
     Args:
-        predictions: Array of predictions
+        predictions: Array of predictions (real or complex)
 
     Returns:
         pandas DataFrame
     """
     import pandas as pd
 
+    predictions = np.asarray(predictions)
+    if np.iscomplexobj(predictions):
+        return pd.DataFrame(
+            {
+                "Index": np.arange(len(predictions)),
+                "G' (Storage)": np.real(predictions),
+                "G'' (Loss)": np.imag(predictions),
+            }
+        )
+    if predictions.ndim == 2:
+        # GMM output returns (N, 2) real arrays [G'/E', G''/E'']
+        col_names = [f"Component_{i}" for i in range(predictions.shape[1])]
+        if predictions.shape[1] == 2:
+            col_names = ["G' (Storage)", "G'' (Loss)"]
+        df_dict = {"Index": np.arange(len(predictions))}
+        for i, name in enumerate(col_names):
+            df_dict[name] = predictions[:, i]
+        return pd.DataFrame(df_dict)
     return pd.DataFrame(
         {
             "Index": np.arange(len(predictions)),
@@ -202,14 +249,25 @@ def _create_predictions_dataframe(predictions: np.ndarray) -> Any:
 def _create_residuals_dataframe(residuals: np.ndarray) -> Any:
     """Create DataFrame for residuals.
 
+    Handles complex arrays by splitting into real/imaginary components.
+
     Args:
-        residuals: Array of residuals
+        residuals: Array of residuals (real or complex)
 
     Returns:
         pandas DataFrame
     """
     import pandas as pd
 
+    residuals = np.asarray(residuals)
+    if np.iscomplexobj(residuals):
+        return pd.DataFrame(
+            {
+                "Index": np.arange(len(residuals)),
+                "Residual (Real)": np.real(residuals),
+                "Residual (Imag)": np.imag(residuals),
+            }
+        )
     return pd.DataFrame(
         {
             "Index": np.arange(len(residuals)),
@@ -233,18 +291,18 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
     try:
         from openpyxl.drawing.image import Image as XLImage
     except ImportError:
-        logger.debug(
-            "openpyxl.drawing.image not available, skipping plot embedding",
+        logger.warning(
+            "openpyxl.drawing.image not available — plots will not be embedded. "
+            "Install openpyxl with: pip install openpyxl",
             reason="ImportError",
         )
-        # openpyxl not available, skip plot embedding
         return
 
     workbook = writer.book
 
     for plot_name, fig in plots.items():
         # Create sheet for this plot
-        sheet_name = f"Plot_{plot_name[:25]}"  # Excel sheet name limit
+        sheet_name = re.sub(r'[\\/*?\[\]:]', '_', f"Plot_{plot_name[:25]}")  # Excel sheet name limit
         logger.debug(
             "Embedding plot",
             plot_name=plot_name,
@@ -256,15 +314,18 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
 
         # Save figure to bytes buffer
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-        buf.seek(0)
-        logger.debug(
-            "Plot saved to buffer",
-            plot_name=plot_name,
-            buffer_size=buf.getbuffer().nbytes,
-        )
+        try:
+            fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+            buf.seek(0)
+            logger.debug(
+                "Plot saved to buffer",
+                plot_name=plot_name,
+                buffer_size=buf.getbuffer().nbytes,
+            )
 
-        # Create and add image to sheet
-        img = XLImage(buf)
-        img.anchor = "A1"
-        sheet.add_image(img)
+            # Create and add image to sheet
+            img = XLImage(buf)
+            img.anchor = "A1"
+            sheet.add_image(img)
+        finally:
+            buf.close()

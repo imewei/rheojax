@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -430,6 +431,7 @@ def parse_trios_excel(
         io_ctx["format"] = suffix
         io_ctx["file_size_mb"] = round(file_size_mb, 2)
 
+        wb = None
         if suffix == ".xlsx":
             wb = load_workbook(filepath, read_only=read_only, data_only=True)
             sheet_names = wb.sheetnames
@@ -443,101 +445,105 @@ def parse_trios_excel(
             )
             raise ValueError(f"Unsupported Excel format: {suffix}")
 
-        logger.debug(
-            "Workbook loaded",
-            filepath=str(filepath),
-            sheet_count=len(sheet_names),
-            sheets=sheet_names,
-        )
-
-        # Determine which sheets to parse
-        if sheet_name == "all":
-            sheets_to_parse = list(range(len(sheet_names)))
-        elif sheet_name is None:
-            sheets_to_parse = [0]
-        elif isinstance(sheet_name, int):
-            if sheet_name < 0 or sheet_name >= len(sheet_names):
-                logger.error(
-                    "Sheet index out of range",
-                    filepath=str(filepath),
-                    sheet_index=sheet_name,
-                    available=f"0-{len(sheet_names) - 1}",
-                )
-                raise ValueError(
-                    f"Sheet index {sheet_name} out of range. "
-                    f"Available: 0-{len(sheet_names) - 1}"
-                )
-            sheets_to_parse = [sheet_name]
-        elif isinstance(sheet_name, str):
-            if sheet_name not in sheet_names:
-                logger.error(
-                    "Sheet not found",
-                    filepath=str(filepath),
-                    sheet_name=sheet_name,
-                    available=sheet_names,
-                )
-                raise ValueError(
-                    f"Sheet '{sheet_name}' not found. " f"Available: {sheet_names}"
-                )
-            sheets_to_parse = [sheet_names.index(sheet_name)]
-        else:
-            logger.error(  # type: ignore[unreachable]
-                "Invalid sheet_name type",
-                filepath=str(filepath),
-                sheet_name_type=type(sheet_name).__name__,
-            )
-            raise ValueError(f"Invalid sheet_name type: {type(sheet_name)}")
-
-        # Parse sheets
-        tables: list[TRIOSTable] = []
-        global_metadata: dict[str, Any] = {}
-
-        for idx, sheet_idx in enumerate(sheets_to_parse):
-            sheet_name_str = sheet_names[sheet_idx]
+        try:
             logger.debug(
-                "Parsing sheet",
+                "Workbook loaded",
                 filepath=str(filepath),
-                sheet_name=sheet_name_str,
-                sheet_index=sheet_idx,
+                sheet_count=len(sheet_names),
+                sheets=sheet_names,
             )
 
-            if suffix == ".xlsx":
-                sheet = wb[sheet_name_str]
+            # Determine which sheets to parse
+            if sheet_name == "all":
+                sheets_to_parse = list(range(len(sheet_names)))
+            elif sheet_name is None:
+                sheets_to_parse = [0]
+            elif isinstance(sheet_name, int):
+                if sheet_name < 0 or sheet_name >= len(sheet_names):
+                    logger.error(
+                        "Sheet index out of range",
+                        filepath=str(filepath),
+                        sheet_index=sheet_name,
+                        available=f"0-{len(sheet_names) - 1}",
+                    )
+                    raise ValueError(
+                        f"Sheet index {sheet_name} out of range. "
+                        f"Available: 0-{len(sheet_names) - 1}"
+                    )
+                sheets_to_parse = [sheet_name]
+            elif isinstance(sheet_name, str):
+                if sheet_name not in sheet_names:
+                    logger.error(
+                        "Sheet not found",
+                        filepath=str(filepath),
+                        sheet_name=sheet_name,
+                        available=sheet_names,
+                    )
+                    raise ValueError(
+                        f"Sheet '{sheet_name}' not found. " f"Available: {sheet_names}"
+                    )
+                sheets_to_parse = [sheet_names.index(sheet_name)]
             else:
-                sheet = _XlrdSheetWrapper(wb.sheet_by_index(sheet_idx))
+                logger.error(  # type: ignore[unreachable]
+                    "Invalid sheet_name type",
+                    filepath=str(filepath),
+                    sheet_name_type=type(sheet_name).__name__,
+                )
+                raise ValueError(f"Invalid sheet_name type: {type(sheet_name)}")
 
-            try:
-                table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
-            except Exception:
-                logger.error(
-                    "Failed to parse sheet",
+            # Parse sheets
+            tables: list[TRIOSTable] = []
+            global_metadata: dict[str, Any] = {}
+
+            for idx, sheet_idx in enumerate(sheets_to_parse):
+                sheet_name_str = sheet_names[sheet_idx]
+                logger.debug(
+                    "Parsing sheet",
                     filepath=str(filepath),
                     sheet_name=sheet_name_str,
-                    exc_info=True,
+                    sheet_index=sheet_idx,
                 )
-                raise
 
-            # Add sheet name to table metadata
-            table.units["_sheet_name"] = sheet_name_str
+                if suffix == ".xlsx":
+                    sheet = wb[sheet_name_str]
+                else:
+                    sheet = _XlrdSheetWrapper(wb.sheet_by_index(sheet_idx))
 
-            tables.append(table)
-            logger.debug(
-                "Sheet parsed",
-                filepath=str(filepath),
-                sheet_name=sheet_name_str,
-                rows=len(table.df),
-                columns=len(table.df.columns),
-            )
+                try:
+                    table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
+                except Exception:
+                    logger.error(
+                        "Failed to parse sheet",
+                        filepath=str(filepath),
+                        sheet_name=sheet_name_str,
+                        exc_info=True,
+                    )
+                    raise
 
-            # Merge metadata (first sheet metadata is primary)
-            if idx == 0:
-                global_metadata = sheet_metadata
-            else:
-                # Store per-sheet metadata
-                global_metadata[f"sheet_{sheet_idx}_metadata"] = sheet_metadata
+                # Add sheet name to table via dedicated field
+                table.sheet_name = sheet_name_str
 
-        if suffix == ".xlsx" and not read_only:
-            wb.close()
+                tables.append(table)
+                logger.debug(
+                    "Sheet parsed",
+                    filepath=str(filepath),
+                    sheet_name=sheet_name_str,
+                    rows=len(table.df),
+                    columns=len(table.df.columns),
+                )
+
+                # Merge metadata (first sheet metadata is primary)
+                if idx == 0:
+                    global_metadata = sheet_metadata
+                else:
+                    # Store per-sheet metadata
+                    global_metadata[f"sheet_{sheet_idx}_metadata"] = sheet_metadata
+        finally:
+            if wb is not None:
+                if suffix == ".xlsx":
+                    wb.close()
+                elif suffix == ".xls" and hasattr(wb, "release_resources"):
+                    wb.release_resources()
 
         if not tables:
             logger.error("No data tables found", filepath=str(filepath))
@@ -573,8 +579,11 @@ class _XlrdSheetWrapper:
                 self.value = value
 
         try:
-            # xlrd uses 0-based indexing
-            return CellWrapper(self._sheet.cell_value(row - 1, column - 1))
+            r, c = row - 1, column - 1
+            # xlrd XL_CELL_EMPTY == 0
+            if self._sheet.cell_type(r, c) == 0:
+                return CellWrapper(None)
+            return CellWrapper(self._sheet.cell_value(r, c))
         except IndexError:
             return CellWrapper(None)
 
@@ -626,7 +635,7 @@ def load_trios_excel(
     for table in trios_file.tables:
         df = table.df
         units = table.units
-        sheet_name_str = units.pop("_sheet_name", "Sheet1")
+        sheet_name_str = table.sheet_name
 
         # Detect or use provided test mode
         detected_mode = test_mode or detect_test_type(df)
@@ -644,6 +653,12 @@ def load_trios_excel(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
+                msg = (
+                    f"Skipping TRIOS Excel segment {seg_idx} in sheet "
+                    f"'{sheet_name_str}': could not determine x/y columns. "
+                    f"Available columns: {list(seg_df.columns)}"
+                )
+                warnings.warn(msg, stacklevel=2)
                 logger.warning(
                     f"Could not determine x/y columns for segment {seg_idx} "
                     f"in sheet '{sheet_name_str}'. "

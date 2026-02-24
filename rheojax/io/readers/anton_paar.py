@@ -284,30 +284,6 @@ def _detect_decimal_separator(text_sample: str) -> str:
     return "."
 
 
-def _normalize_numeric_text(text: str, decimal_sep: str) -> str:
-    """Normalize numeric text to use dot as decimal separator.
-
-    Args:
-        text: Text with numeric values
-        decimal_sep: Current decimal separator
-
-    Returns:
-        Text with normalized decimal separators
-    """
-    if decimal_sep == ",":
-        # Remove thousands separator (period), then convert comma to period
-        text = text.replace(".", "")
-        text = text.replace(",", ".")
-    else:
-        # Remove thousands separator (comma) — repeat to handle "1,234,567"
-        while True:
-            new_text = re.sub(r"(\d),(\d{3})\b", r"\1\2", text)
-            if new_text == text:
-                break
-            text = new_text
-    return text
-
-
 # =============================================================================
 # Global Metadata Extraction (T012)
 # =============================================================================
@@ -565,7 +541,7 @@ def parse_rheocompass_intervals(
 
     # Detect encoding (using cached version for repeated file access)
     if encoding is None:
-        encoding = _detect_encoding_cached(str(filepath))
+        encoding = _detect_encoding_cached(str(Path(filepath).resolve()))
 
     # Read entire file
     with open(filepath, encoding=encoding, errors="replace") as f:

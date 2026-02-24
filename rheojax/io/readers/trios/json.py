@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -131,11 +132,21 @@ def parse_trios_json(
         logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    # Read and parse JSON
+    # Read and parse JSON with encoding cascade
     logger.debug("Reading JSON file", filepath=str(filepath))
     try:
-        with open(filepath, encoding="utf-8") as f:
-            data = json.load(f)
+        raw_bytes = filepath.read_bytes()
+        text = None
+        for enc in ("utf-8-sig", "utf-8", "latin-1"):
+            try:
+                text = raw_bytes.decode(enc)
+                logger.debug("JSON decoded with encoding", encoding=enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if text is None:
+            text = raw_bytes.decode("latin-1")  # latin-1 never fails
+        data = json.loads(text)
         logger.debug("JSON parsed successfully", num_keys=len(data))
     except json.JSONDecodeError as e:
         logger.error(
@@ -301,6 +312,12 @@ def load_trios_json(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
+                msg = (
+                    f"Skipping TRIOS JSON segment {seg_idx} (result {res_idx}): "
+                    f"could not determine x/y columns. "
+                    f"Available columns: {list(seg_df.columns)}"
+                )
+                warnings.warn(msg, stacklevel=2)
                 logger.warning(
                     "Could not determine x/y columns",
                     result_index=res_idx,

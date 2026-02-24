@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 import os
 import tempfile
 from pathlib import Path
@@ -16,6 +17,9 @@ logger = get_logger(__name__)
 
 # Types that HDF5 can natively store as attributes
 _HDF5_SCALAR_TYPES = (str, int, float, bool, np.integer, np.floating, np.bool_)
+
+# Sentinel for None values in HDF5 attributes
+_NONE_SENTINEL = "__rheojax_None__"
 
 
 def save_hdf5(
@@ -57,6 +61,9 @@ def save_hdf5(
         raise ImportError(
             "h5py is required for HDF5 writing. Install with: pip install h5py"
         ) from exc
+
+    if not (0 <= compression_level <= 9):
+        raise ValueError(f"compression_level must be 0-9, got {compression_level}")
 
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -128,6 +135,15 @@ def save_hdf5(
                 f.attrs["domain"] = data.domain
                 logger.debug("Domain stored", domain=data.domain)
 
+                # Store test_mode and deformation_mode as top-level attrs
+                # (belt-and-suspenders: also in metadata dict)
+                test_mode = data.test_mode
+                if test_mode:
+                    f.attrs["test_mode"] = str(test_mode)
+                deformation_mode = data.deformation_mode
+                if deformation_mode:
+                    f.attrs["deformation_mode"] = str(deformation_mode)
+
                 # Store metadata
                 if data.metadata:
                     metadata_group = f.create_group("metadata")
@@ -191,8 +207,13 @@ def _write_metadata_recursive(
 
         if value is None:
             # None is not HDF5-storable; store as sentinel string
-            group.attrs[key] = "__None__"
+            group.attrs[key] = _NONE_SENTINEL
             continue
+
+        # Convert enum values to their underlying Python type
+        # (h5py can't serialize str-enum subclasses directly)
+        if isinstance(value, enum.Enum):
+            value = value.value
 
         if isinstance(value, dict):
             subgroup = group.create_group(key)
@@ -203,7 +224,12 @@ def _write_metadata_recursive(
 
         if isinstance(value, (list, tuple)):
             try:
-                group.attrs[key] = np.array(value)
+                if value and all(isinstance(v, str) for v in value):
+                    import h5py
+
+                    group.attrs.create(key, value, dtype=h5py.string_dtype())
+                else:
+                    group.attrs[key] = np.array(value)
             except (TypeError, ValueError):
                 # Lists of mixed types — fall back to string
                 group.attrs[key] = str(value)
@@ -309,6 +335,15 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                     metadata_keys=list(metadata.keys()),
                 )
 
+            # Restore test_mode/deformation_mode from top-level attrs
+            # into metadata (belt-and-suspenders with metadata dict)
+            test_mode = f.attrs.get("test_mode", None)
+            if test_mode and "test_mode" not in metadata:
+                metadata["test_mode"] = test_mode
+            deformation_mode = f.attrs.get("deformation_mode", None)
+            if deformation_mode and "deformation_mode" not in metadata:
+                metadata["deformation_mode"] = deformation_mode
+
             ctx["data_points"] = len(x)
             ctx["has_metadata"] = bool(metadata)
             ctx["domain"] = domain
@@ -319,6 +354,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                 x_units=x_units,
                 y_units=y_units,
                 domain=domain,
+                initial_test_mode=metadata.get("test_mode"),
                 metadata=metadata,
                 validate=True,
             )
@@ -337,15 +373,18 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
 
     # Read attributes
     for key, value in group.attrs.items():
-        # Restore None values from sentinel
-        if isinstance(value, str) and value == "__None__":
+        # h5py may return bytes instead of str on some platforms
+        if isinstance(value, bytes):
+            value = value.decode("utf-8")
+        # Restore None values from sentinel (backward-compatible with old "__None__")
+        if isinstance(value, str) and value in (_NONE_SENTINEL, "__None__"):
             metadata[key] = None
         else:
             metadata[key] = value
 
     # Read subgroups
     for key in group.keys():
-        if isinstance(group[key], type(group)):  # It's a group
+        if hasattr(group[key], "attrs") and hasattr(group[key], "keys"):  # It's a group
             metadata[key] = _read_metadata_recursive(group[key])
         else:  # It's a dataset
             metadata[key] = group[key][:]

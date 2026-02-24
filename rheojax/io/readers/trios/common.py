@@ -56,6 +56,7 @@ class TRIOSTable:
     units: dict[str, str]
     df: pd.DataFrame
     step_values: list[int] | None = None
+    sheet_name: str = "Sheet1"
 
 
 @dataclass
@@ -624,7 +625,7 @@ def detect_step_column(
         for candidate in candidates:
             if candidate in col_lower:
                 # Verify it contains integer-like values
-                if df[col].dtype in (int, "int64") or df[col].nunique() < 20:
+                if pd.api.types.is_integer_dtype(df[col]) or df[col].nunique() < 20:
                     return col
     return None
 
@@ -657,7 +658,19 @@ def construct_complex_modulus(
 
     Returns:
         Complex array representing G*
+
+    Raises:
+        ValueError: If arrays have different shapes
     """
+    g_prime = np.asarray(g_prime, dtype=np.float64)
+    g_double_prime = np.asarray(g_double_prime, dtype=np.float64)
+
+    if g_prime.shape != g_double_prime.shape:
+        raise ValueError(
+            f"G' and G'' arrays must have the same shape. "
+            f"Got G'.shape={g_prime.shape}, G''.shape={g_double_prime.shape}"
+        )
+
     return g_prime + 1j * g_double_prime
 
 
@@ -695,7 +708,8 @@ def segment_to_rheodata(
     # If not explicitly set, infer from y_column name
     if "deformation_mode" not in metadata:
         y_col_lower = (segment.y_column or "").lower()
-        if "tensile" in y_col_lower or y_col_lower.startswith("e"):
+        _TENSILE_PREFIXES = {"e'", "e''", "e*", "tensile", "young", "e_prime", "e_double_prime"}
+        if any(y_col_lower.startswith(t) for t in _TENSILE_PREFIXES):
             metadata["deformation_mode"] = "tension"
 
     if segment.auxiliary_columns:

@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import re
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -92,6 +93,8 @@ def detect_delimiter(content: str) -> str:
     """Detect delimiter (tab vs comma) from file content.
 
     TRIOS CSV files typically use tabs, but may use commas.
+    Metadata lines (Step/Procedure/Instrument/etc.) are skipped
+    as they may use different delimiters than the actual data.
 
     Args:
         content: First few lines of file content
@@ -99,8 +102,18 @@ def detect_delimiter(content: str) -> str:
     Returns:
         Delimiter character ('\t' or ',')
     """
-    # Count occurrences in first few lines
-    lines = content.split("\n")[:10]
+    _METADATA_PREFIXES = (
+        "step", "procedure", "instrument", "sample",
+        "date", "time", "geometry", "filename", "operator",
+        "rundate", "gap", "temperature", "number of points",
+    )
+    # Filter out metadata lines, then sample from last 5 non-metadata lines
+    all_lines = content.split("\n")
+    data_lines = [
+        line for line in all_lines[:20]
+        if line.strip() and not line.strip().lower().startswith(_METADATA_PREFIXES)
+    ]
+    lines = data_lines[-5:] if data_lines else all_lines[:10]
     tab_count = sum(line.count("\t") for line in lines)
     comma_count = sum(line.count(",") for line in lines)
 
@@ -442,7 +455,14 @@ def parse_trios_csv(
                     # First column is often "Data point" label - skip
                     if val_clean.lower().startswith("data"):
                         continue
-                    row.append(np.nan)
+                    # Try to parse as number; fall back to NaN
+                    try:
+                        cleaned = val_clean
+                        if decimal_separator == ",":
+                            cleaned = cleaned.replace(",", ".")
+                        row.append(float(cleaned))
+                    except ValueError:
+                        row.append(np.nan)
                 elif not val_clean:
                     row.append(np.nan)
                 else:
@@ -596,6 +616,11 @@ def load_trios_csv(
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
             if x_col is None or y_col is None:
+                msg = (
+                    f"Skipping TRIOS CSV segment {seg_idx}: could not determine "
+                    f"x/y columns. Available columns: {list(seg_df.columns)}"
+                )
+                warnings.warn(msg, stacklevel=2)
                 logger.warning(
                     "Could not determine x/y columns",
                     segment_index=seg_idx,
