@@ -499,15 +499,18 @@ class WorkerPool(QObject):
                 self._on_job_completed(job_id, result)
             else:
                 logger.error(
-                    "Worker completed but job_id lookup failed (sender=%s). "
-                    "Emitting as failure to surface the error rather than "
-                    "silently dropping the result.",
+                    "Worker completed but job_id lookup failed (sender=%s).",
                     self.sender(),
                 )
+                # Clean up stale jobs to prevent is_busy() from being stuck
+                with self._job_lock:
+                    if self._active_jobs:
+                        stale_id = next(iter(self._active_jobs))
+                        logger.warning("Cleaning up stale job %s", stale_id)
+                        self._cleanup_job(stale_id)
                 self.job_failed.emit(
                     "",
-                    "Worker completed but job ID could not be determined. "
-                    "Result may be lost. This indicates a worker lifecycle issue.",
+                    "Worker completed but job ID could not be determined."
                 )
 
     @Slot(str)

@@ -228,7 +228,7 @@ class BayesianService:
 
             # Determine test mode
             if test_mode is None:
-                test_mode = data.metadata.get("test_mode", "oscillation")
+                test_mode = (data.metadata or {}).get("test_mode", "oscillation")
 
             # F-GMM-003: Extract protocol kwargs from data metadata
             # (mirrors model_service.fit() lines 753-766)
@@ -452,6 +452,9 @@ class BayesianService:
                 "max_r_hat": max(rhat_dict.values()) if rhat_dict else None,
                 "min_ess": min(ess_dict.values()) if ess_dict else None,
             }
+            diagnostics["diagnostics_valid"] = (
+                core_diag.get("diagnostics_valid", True) if isinstance(core_diag, dict) else True
+            )
 
             # Add warnings
             warnings = []

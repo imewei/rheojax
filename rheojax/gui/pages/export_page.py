@@ -614,12 +614,13 @@ class ExportPage(QWidget):
                     config["template"] != "None",
                 ]
             )
+            total_steps = max(total_steps, 1)
             current_step = 0
+            active_id = state.active_dataset_id  # Moved here — used by all export branches
 
             # Export parameters (filtered to active dataset)
             if config["include_parameters"] and state.fit_results:
                 progress.setLabelText("Exporting parameters...")
-                active_id = state.active_dataset_id
                 for result_id, result in state.fit_results.items():
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
                     if active_id and dataset_id_of_result != active_id:

@@ -575,10 +575,10 @@ class StateStore:
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock to prevent deadlocks.
-        # Pass a shallow clone (snapshot) so that subscribers cannot mutate
+        # Pass a deep clone (snapshot) so that subscribers cannot mutate
         # the live state object. Nested dispatches triggered by a subscriber
         # will still update self._state and be visible to subsequent reads.
-        state_snapshot = copy.copy(self._state)
+        state_snapshot = self._state.clone()
         for subscriber in subscribers:
             try:
                 subscriber(state_snapshot)
@@ -737,9 +737,7 @@ class StateStore:
 
                 datasets = state.datasets.copy()
                 datasets[dataset_id] = ds
-                return replace(
-                    state, datasets=datasets, current_tab="data", is_modified=True
-                )
+                return replace(state, datasets=datasets, is_modified=True)
 
             return updater
 

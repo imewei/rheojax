@@ -225,138 +225,158 @@ class PlotService:
         logger.info("Generating plot", plot_type="fit")
 
         try:
-            self._apply_style_context(style)
-            fig = Figure(figsize=(8, 6))
-            ax = fig.add_subplot(111)
-            palette = (
-                self._get_palette(style) if (style or "").lower() == "dark" else None
-            )
-
-            x = np.asarray(data.x)
-            y = np.asarray(data.y)
-            y_fit = fit_result.y_fit
-            if y_fit is None or (hasattr(y_fit, "__len__") and len(y_fit) == 0):
-                raise ValueError("FitResult does not contain y_fit data")
-            y_fit = np.asarray(y_fit)
-            if y_fit.size == 0 or y_fit.shape[0] != x.shape[0]:
-                raise ValueError(
-                    f"y_fit shape {y_fit.shape} incompatible with x shape {x.shape}"
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                fig = Figure(figsize=(8, 6))
+                ax = fig.add_subplot(111)
+                palette = (
+                    self._get_palette(style) if (style or "").lower() == "dark" else None
                 )
 
-            # Check for covariance matrix (for uncertainty bands)
-            pcov = getattr(fit_result, "pcov", None)
-            has_uncertainty = pcov is not None and np.all(np.isfinite(pcov))
-
-            # Determine test mode
-            if test_mode is None:
-                test_mode = data.metadata.get("test_mode", "oscillation")
-
-            logger.debug(
-                "Fit plot configuration",
-                data_shape=x.shape,
-                has_uncertainty=has_uncertainty,
-                resolved_test_mode=test_mode,
-            )
-
-            # Helper: compute uncertainty band for real-valued fits
-            def _compute_band(x_vals, y_vals):
-                """Compute +/-1.96*sigma band if pcov available (RSS approximation).
-
-                GUI-IO-017 NOTE: This uncertainty band uses the root-sum-square
-                (RSS) of relative parameter errors applied uniformly across all
-                y-values.  It does NOT account for parameter correlations or
-                local model sensitivity (i.e. it is not a true propagated
-                uncertainty), so it MUST NOT be interpreted as a statistical
-                confidence interval.  The band is purely indicative of the
-                overall parameter uncertainty magnitude.  For proper uncertainty
-                quantification use Bayesian inference (fit_bayesian) which
-                produces posterior-derived credible intervals.
-                """
-                if not has_uncertainty:
-                    return None, None
-                try:
-                    param_std = np.sqrt(np.diag(pcov))
-                    param_vals = np.array(
-                        list(fit_result.parameters.values()), dtype=float
-                    )
-                    # Root-sum-square of relative parameter uncertainties
-                    rel_sq = (param_std / (np.abs(param_vals) + 1e-10)) ** 2
-                    rss = np.sqrt(np.sum(rel_sq))
-                    sigma_y = np.abs(y_vals) * rss
-                    z = 1.96  # 95% CI approximation (see NOTE above)
-                    return y_vals - z * sigma_y, y_vals + z * sigma_y
-                except Exception:
-                    return None, None
-
-            # Plot based on test mode
-            if test_mode == "oscillation":
-                # Plot G' and G" for oscillation
-                if np.iscomplexobj(y):
-                    G_prime = np.real(y)
-                    # Some datasets/models may use sign conventions; ensure log-safe positivity.
-                    G_double_prime = np.abs(np.imag(y))
-                    G_prime_fit = np.real(y_fit)
-                    G_double_prime_fit = np.abs(np.imag(y_fit))
-
-                    # Avoid log-scale issues with zeros.
-                    positive = np.concatenate(
-                        [
-                            np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
-                            np.ravel(
-                                G_double_prime[
-                                    np.isfinite(G_double_prime) & (G_double_prime > 0)
-                                ]
-                            ),
-                        ]
-                    )
-                    eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
-                    G_prime = np.maximum(G_prime, eps)
-                    G_double_prime = np.maximum(G_double_prime, eps)
-                    G_prime_fit = np.maximum(G_prime_fit, eps)
-                    G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
-
-                    ax.loglog(
-                        x,
-                        G_prime,
-                        "o",
-                        label="G' (data)",
-                        color=palette[0] if palette else None,
-                    )
-                    ax.loglog(
-                        x,
-                        G_double_prime,
-                        "s",
-                        label='G" (data)',
-                        color=palette[1] if palette else None,
-                    )
-                    ax.loglog(
-                        x,
-                        G_prime_fit,
-                        "-",
-                        label="G' (fit)",
-                        color=palette[0] if palette else None,
-                    )
-                    ax.loglog(
-                        x,
-                        G_double_prime_fit,
-                        "-",
-                        label='G" (fit)',
-                        color=palette[1] if palette else None,
+                x = np.asarray(data.x)
+                y = np.asarray(data.y)
+                y_fit = fit_result.y_fit
+                if y_fit is None or (hasattr(y_fit, "__len__") and len(y_fit) == 0):
+                    raise ValueError("FitResult does not contain y_fit data")
+                y_fit = np.asarray(y_fit)
+                if y_fit.size == 0 or y_fit.shape[0] != x.shape[0]:
+                    raise ValueError(
+                        f"y_fit shape {y_fit.shape} incompatible with x shape {x.shape}"
                     )
 
-                    ax.set_xlabel("Frequency (rad/s)")
-                    ax.set_ylabel("Modulus (Pa)")
-                else:
-                    # Complex modulus magnitude
+                # Check for covariance matrix (for uncertainty bands)
+                pcov = getattr(fit_result, "pcov", None)
+                has_uncertainty = pcov is not None and np.all(np.isfinite(pcov))
+
+                # Determine test mode
+                if test_mode is None:
+                    test_mode = data.metadata.get("test_mode", "oscillation")
+
+                logger.debug(
+                    "Fit plot configuration",
+                    data_shape=x.shape,
+                    has_uncertainty=has_uncertainty,
+                    resolved_test_mode=test_mode,
+                )
+
+                # Helper: compute uncertainty band for real-valued fits
+                def _compute_band(x_vals, y_vals):
+                    """Compute +/-1.96*sigma band if pcov available (RSS approximation).
+
+                    GUI-IO-017 NOTE: This uncertainty band uses the root-sum-square
+                    (RSS) of relative parameter errors applied uniformly across all
+                    y-values.  It does NOT account for parameter correlations or
+                    local model sensitivity (i.e. it is not a true propagated
+                    uncertainty), so it MUST NOT be interpreted as a statistical
+                    confidence interval.  The band is purely indicative of the
+                    overall parameter uncertainty magnitude.  For proper uncertainty
+                    quantification use Bayesian inference (fit_bayesian) which
+                    produces posterior-derived credible intervals.
+                    """
+                    if not has_uncertainty:
+                        return None, None
+                    try:
+                        param_std = np.sqrt(np.diag(pcov))
+                        param_vals = np.array(
+                            list(fit_result.parameters.values()), dtype=float
+                        )
+                        # Root-sum-square of relative parameter uncertainties
+                        rel_sq = (param_std / (np.abs(param_vals) + 1e-10)) ** 2
+                        rss = np.sqrt(np.sum(rel_sq))
+                        sigma_y = np.abs(y_vals) * rss
+                        z = 1.96  # 95% CI approximation (see NOTE above)
+                        return y_vals - z * sigma_y, y_vals + z * sigma_y
+                    except Exception:
+                        return None, None
+
+                # Plot based on test mode
+                if test_mode == "oscillation":
+                    # Plot G' and G" for oscillation
+                    if np.iscomplexobj(y):
+                        G_prime = np.real(y)
+                        # Some datasets/models may use sign conventions; ensure log-safe positivity.
+                        G_double_prime = np.abs(np.imag(y))
+                        G_prime_fit = np.real(y_fit)
+                        G_double_prime_fit = np.abs(np.imag(y_fit))
+
+                        # Avoid log-scale issues with zeros.
+                        positive = np.concatenate(
+                            [
+                                np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
+                                np.ravel(
+                                    G_double_prime[
+                                        np.isfinite(G_double_prime) & (G_double_prime > 0)
+                                    ]
+                                ),
+                            ]
+                        )
+                        eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
+                        G_prime = np.maximum(G_prime, eps)
+                        G_double_prime = np.maximum(G_double_prime, eps)
+                        G_prime_fit = np.maximum(G_prime_fit, eps)
+                        G_double_prime_fit = np.maximum(G_double_prime_fit, eps)
+
+                        ax.loglog(
+                            x,
+                            G_prime,
+                            "o",
+                            label="G' (data)",
+                            color=palette[0] if palette else None,
+                        )
+                        ax.loglog(
+                            x,
+                            G_double_prime,
+                            "s",
+                            label='G" (data)',
+                            color=palette[1] if palette else None,
+                        )
+                        ax.loglog(
+                            x,
+                            G_prime_fit,
+                            "-",
+                            label="G' (fit)",
+                            color=palette[0] if palette else None,
+                        )
+                        ax.loglog(
+                            x,
+                            G_double_prime_fit,
+                            "-",
+                            label='G" (fit)',
+                            color=palette[1] if palette else None,
+                        )
+
+                        ax.set_xlabel("Frequency (rad/s)")
+                        ax.set_ylabel("Modulus (Pa)")
+                    else:
+                        # Complex modulus magnitude
+                        ax.loglog(
+                            x, y, "o", label="Data", color=palette[0] if palette else None
+                        )
+                        ax.loglog(
+                            x,
+                            y_fit,
+                            "-",
+                            label="Fit",
+                            color=palette[1] if palette else None,
+                        )
+
+                        # Add uncertainty band
+                        y_lo, y_hi = _compute_band(x, y_fit)
+                        if y_lo is not None and y_hi is not None:
+                            y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                            ax.fill_between(
+                                x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                            )
+
+                        ax.set_xlabel("Frequency (rad/s)")
+                        ax.set_ylabel("|G*| (Pa)")
+
+                elif test_mode == "relaxation":
                     ax.loglog(
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.loglog(
-                        x,
-                        y_fit,
-                        "-",
-                        label="Fit",
-                        color=palette[1] if palette else None,
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
                     )
 
                     # Add uncertainty band
@@ -367,102 +387,83 @@ class PlotService:
                             x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
                         )
 
-                    ax.set_xlabel("Frequency (rad/s)")
-                    ax.set_ylabel("|G*| (Pa)")
+                    ax.set_xlabel("Time (s)")
+                    ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
 
-            elif test_mode == "relaxation":
-                ax.loglog(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.loglog(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
-
-                # Add uncertainty band
-                y_lo, y_hi = _compute_band(x, y_fit)
-                if y_lo is not None and y_hi is not None:
-                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(
-                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                elif test_mode == "creep":
+                    ax.loglog(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
+                    )
+                    ax.loglog(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
                     )
 
-                ax.set_xlabel("Time (s)")
-                ax.set_ylabel("Relaxation Modulus G(t) (Pa)")
+                    # Add uncertainty band
+                    y_lo, y_hi = _compute_band(x, y_fit)
+                    if y_lo is not None and y_hi is not None:
+                        y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                        ax.fill_between(
+                            x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                        )
 
-            elif test_mode == "creep":
-                ax.loglog(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.loglog(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
+                    ax.set_xlabel("Time (s)")
+                    ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
-                # Add uncertainty band
-                y_lo, y_hi = _compute_band(x, y_fit)
-                if y_lo is not None and y_hi is not None:
-                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(
-                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                elif test_mode in ("flow", "flow_curve", "rotation"):
+                    ax.loglog(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
+                    )
+                    ax.loglog(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
                     )
 
-                ax.set_xlabel("Time (s)")
-                ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
+                    # Add uncertainty band
+                    y_lo, y_hi = _compute_band(x, y_fit)
+                    if y_lo is not None and y_hi is not None:
+                        y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                        ax.fill_between(
+                            x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                        )
 
-            elif test_mode in ("flow", "flow_curve", "rotation"):
-                ax.loglog(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.loglog(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
+                    ax.set_xlabel("Shear Rate (1/s)")
+                    ax.set_ylabel("Viscosity (Pa.s)")
 
-                # Add uncertainty band
-                y_lo, y_hi = _compute_band(x, y_fit)
-                if y_lo is not None and y_hi is not None:
-                    y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
-                    ax.fill_between(
-                        x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
+                elif test_mode == "startup":
+                    ax.plot(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
                     )
+                    ax.plot(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                    )
+                    ax.set_xlabel("Time (s)")
+                    ax.set_ylabel("Stress (Pa)")
 
-                ax.set_xlabel("Shear Rate (1/s)")
-                ax.set_ylabel("Viscosity (Pa.s)")
+                elif test_mode == "laos":
+                    ax.plot(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
+                    )
+                    ax.plot(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                    )
+                    ax.set_xlabel("Strain")
+                    ax.set_ylabel("Stress (Pa)")
 
-            elif test_mode == "startup":
-                ax.plot(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.plot(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
-                ax.set_xlabel("Time (s)")
-                ax.set_ylabel("Stress (Pa)")
+                else:
+                    # Generic fallback for unknown test modes
+                    ax.plot(
+                        x, y, "o", label="Data", color=palette[0] if palette else None
+                    )
+                    ax.plot(
+                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                    )
+                    ax.set_xlabel(data.x_units or "X")
+                    ax.set_ylabel(data.y_units or "Y")
 
-            elif test_mode == "laos":
-                ax.plot(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.plot(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
-                ax.set_xlabel("Strain")
-                ax.set_ylabel("Stress (Pa)")
+                ax.legend()
+                ax.set_title(f"{fit_result.model_name} Model Fit")
 
-            else:
-                # Generic fallback for unknown test modes
-                ax.plot(
-                    x, y, "o", label="Data", color=palette[0] if palette else None
-                )
-                ax.plot(
-                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
-                )
-                ax.set_xlabel(data.x_units or "X")
-                ax.set_ylabel(data.y_units or "Y")
-
-            ax.legend()
-            ax.set_title(f"{fit_result.model_name} Model Fit")
-
-            # Apply style
-            self.apply_style(fig, style)
+                # Apply style
+                self.apply_style(fig, style)
 
             logger.info("Plot generated", plot_type="fit")
             logger.debug("create_fit_plot completed successfully")
@@ -496,44 +497,45 @@ class PlotService:
         logger.info("Generating plot", plot_type="residual")
 
         try:
-            self._apply_style_context(style)
-            palette = self._get_palette(style)
-            fig = Figure(figsize=(8, 8))
-            ax1 = fig.add_subplot(2, 1, 1)
-            ax2 = fig.add_subplot(2, 1, 2, sharex=ax1)
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                palette = self._get_palette(style)
+                fig = Figure(figsize=(8, 8))
+                ax1 = fig.add_subplot(2, 1, 1)
+                ax2 = fig.add_subplot(2, 1, 2, sharex=ax1)
 
-            x = np.asarray(data.x)
-            residuals = fit_result.residuals
-            if residuals is None:
-                raise ValueError("FitResult does not contain residuals")
-            residuals = np.asarray(residuals)
+                x = np.asarray(data.x)
+                residuals = fit_result.residuals
+                if residuals is None:
+                    raise ValueError("FitResult does not contain residuals")
+                residuals = np.asarray(residuals)
 
-            logger.debug(
-                "Residual plot data", data_points=len(x), residual_shape=residuals.shape
-            )
+                logger.debug(
+                    "Residual plot data", data_points=len(x), residual_shape=residuals.shape
+                )
 
-            # Determine x-axis scale from test mode
-            test_mode = data.metadata.get("test_mode", "")
-            use_log_x = test_mode in (
-                "oscillation", "relaxation", "creep", "flow_curve", "rotation",
-            )
+                # Determine x-axis scale from test mode
+                test_mode = data.metadata.get("test_mode", "")
+                use_log_x = test_mode in (
+                    "oscillation", "relaxation", "creep", "flow_curve", "rotation",
+                )
 
-            # Residuals vs x
-            if use_log_x:
-                ax1.semilogx(x, residuals, "o", color=palette[0])
-            else:
-                ax1.plot(x, residuals, "o", color=palette[0])
-            ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
-            ax1.set_ylabel("Residuals")
-            ax1.set_title("Residual Analysis")
+                # Residuals vs x
+                if use_log_x:
+                    ax1.semilogx(x, residuals, "o", color=palette[0])
+                else:
+                    ax1.plot(x, residuals, "o", color=palette[0])
+                ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
+                ax1.set_ylabel("Residuals")
+                ax1.set_title("Residual Analysis")
 
-            # Residual histogram
-            ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
-            ax2.set_xlabel("Residual Value")
-            ax2.set_ylabel("Count")
-            ax2.set_title("Residual Distribution")
+                # Residual histogram
+                ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
+                ax2.set_xlabel("Residual Value")
+                ax2.set_ylabel("Count")
+                ax2.set_title("Residual Distribution")
 
-            fig.tight_layout()
+                fig.tight_layout()
 
             logger.info("Plot generated", plot_type="residual")
             logger.debug("create_residual_plot completed successfully")
@@ -569,7 +571,6 @@ class PlotService:
         logger.debug("create_arviz_plot called", plot_type=plot_type, style=style)
         logger.info("Generating plot", plot_type=f"arviz_{plot_type}")
 
-        self._apply_style_context(style)
         try:
             import arviz as az
         except ImportError:
@@ -579,59 +580,60 @@ class PlotService:
                 "arviz", "Bayesian diagnostic plots", "pip install arviz"
             )
         try:
-
-            # Convert to InferenceData (preserve chain structure if available)
-            posterior_samples = result.posterior_samples
-            num_chains = getattr(result, "num_chains", None)
-            idata_dict = {}
-            for k, v in posterior_samples.items():
-                v = np.asarray(v)
-                if v.ndim == 1:
-                    if num_chains and num_chains > 1 and v.shape[0] % num_chains == 0:
-                        idata_dict[k] = v.reshape(num_chains, -1)
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                # Convert to InferenceData (preserve chain structure if available)
+                posterior_samples = result.posterior_samples
+                num_chains = getattr(result, "num_chains", None)
+                idata_dict = {}
+                for k, v in posterior_samples.items():
+                    v = np.asarray(v)
+                    if v.ndim == 1:
+                        if num_chains and num_chains > 1 and v.shape[0] % num_chains == 0:
+                            idata_dict[k] = v.reshape(num_chains, -1)
+                        else:
+                            idata_dict[k] = v.reshape(1, -1)
                     else:
-                        idata_dict[k] = v.reshape(1, -1)
-                else:
-                    idata_dict[k] = v
-            idata = az.from_dict(idata_dict)
+                        idata_dict[k] = v
+                idata = az.from_dict(idata_dict)
 
-            logger.debug(
-                "ArviZ InferenceData created", parameters=list(posterior_samples.keys())
-            )
+                logger.debug(
+                    "ArviZ InferenceData created", parameters=list(posterior_samples.keys())
+                )
 
-            def _extract_figure(axes_result: Any) -> Figure:
-                """Extract Figure from ArviZ axes (single Axes, ndarray, or list)."""
-                import numpy as _np
+                def _extract_figure(axes_result: Any) -> Figure:
+                    """Extract Figure from ArviZ axes (single Axes, ndarray, or list)."""
+                    import numpy as _np
 
-                if hasattr(axes_result, "figure"):
-                    return axes_result.figure
-                if isinstance(axes_result, _np.ndarray) and axes_result.size > 0:
-                    return axes_result.ravel()[0].figure
-                if isinstance(axes_result, list) and axes_result:
-                    first = axes_result[0]
-                    if isinstance(first, _np.ndarray) and first.size > 0:
-                        return first.ravel()[0].figure
-                    if hasattr(first, "figure"):
-                        return first.figure
-                return plt.gcf()
+                    if hasattr(axes_result, "figure"):
+                        return axes_result.figure
+                    if isinstance(axes_result, _np.ndarray) and axes_result.size > 0:
+                        return axes_result.ravel()[0].figure
+                    if isinstance(axes_result, list) and axes_result:
+                        first = axes_result[0]
+                        if isinstance(first, _np.ndarray) and first.size > 0:
+                            return first.ravel()[0].figure
+                        if hasattr(first, "figure"):
+                            return first.figure
+                    return plt.gcf()
 
-            # Create plot based on type
-            plot_funcs = {
-                "trace": az.plot_trace,
-                "pair": az.plot_pair,
-                "forest": az.plot_forest,
-                "energy": az.plot_energy,
-                "autocorr": az.plot_autocorr,
-                "rank": az.plot_rank,
-                "ess": az.plot_ess,
-            }
+                # Create plot based on type
+                plot_funcs = {
+                    "trace": az.plot_trace,
+                    "pair": az.plot_pair,
+                    "forest": az.plot_forest,
+                    "energy": az.plot_energy,
+                    "autocorr": az.plot_autocorr,
+                    "rank": az.plot_rank,
+                    "ess": az.plot_ess,
+                }
 
-            if plot_type not in plot_funcs:
-                logger.error(f"Unknown ArviZ plot type: {plot_type}")
-                raise ValueError(f"Unknown plot type: {plot_type}")
+                if plot_type not in plot_funcs:
+                    logger.error(f"Unknown ArviZ plot type: {plot_type}")
+                    raise ValueError(f"Unknown plot type: {plot_type}")
 
-            axes_result = plot_funcs[plot_type](idata, **kwargs)
-            fig = _extract_figure(axes_result)
+                axes_result = plot_funcs[plot_type](idata, **kwargs)
+                fig = _extract_figure(axes_result)
 
             logger.info("Plot generated", plot_type=f"arviz_{plot_type}")
             logger.debug(

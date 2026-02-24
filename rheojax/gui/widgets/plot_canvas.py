@@ -454,6 +454,9 @@ class PlotCanvas(QWidget):
         """Show tooltip for nearby data points (vectorized distance)."""
         if not self._plot_data:
             return
+        total_pts = sum(len(d[0]) for d in self._plot_data)
+        if total_pts > 5000:
+            return
 
         min_dist = float("inf")
         nearest_point = None

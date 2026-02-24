@@ -747,6 +747,16 @@ class BayesianPage(QWidget):
         if active_fit and hasattr(active_fit, "metadata") and active_fit.metadata:
             fitted_model_state = active_fit.metadata.get("fitted_model_state")
 
+        # Disconnect previous worker signals before connecting new ones to
+        # prevent duplicate slots if the user re-runs inference.
+        if self._current_worker is not None:
+            try:
+                self._current_worker.signals.completed.disconnect()
+                self._current_worker.signals.failed.disconnect()
+                self._current_worker.signals.progress.disconnect()
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected or never connected
+
         self._current_worker = BayesianWorker(
             model_name=model_name,
             data=self._submitted_dataset_snapshot,
@@ -946,7 +956,14 @@ class BayesianPage(QWidget):
             )
         # store_bayesian_result dispatches STORE_BAYESIAN_RESULT, whose
         # reducer already sets pipeline step to COMPLETE.
-        store_bayesian_result(stored_result)
+        self._store.dispatch(
+            "STORE_BAYESIAN_RESULT",
+            {
+                "model_name": stored_result.model_name,
+                "dataset_id": stored_result.dataset_id,
+                "result": stored_result,
+            },
+        )
 
         # Update diagnostics display
         self._update_diagnostics(result)

@@ -403,8 +403,9 @@ class BayesianWorker(QRunnable):
             credible_intervals = {}
             for param_name, samples in bayesian_result.posterior_samples.items():
                 # Compute 95% credible interval
-                lower = float(jnp.percentile(samples, 2.5))
-                upper = float(jnp.percentile(samples, 97.5))
+                samples_flat = jnp.asarray(samples).ravel()
+                lower = float(jnp.percentile(samples_flat, 2.5))
+                upper = float(jnp.percentile(samples_flat, 97.5))
                 credible_intervals[param_name] = (lower, upper)
 
             # Create result
