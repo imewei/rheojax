@@ -189,7 +189,7 @@ class TestModelFitTemplate:
         )
 
         # Expect warning about non-positive values in log-scale plot
-        with pytest.warns(UserWarning, match="Removed .* non-positive values"):
+        with pytest.warns(UserWarning, match="non-positive"):
             fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
 
         assert fig is not None

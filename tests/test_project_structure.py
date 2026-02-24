@@ -252,5 +252,198 @@ class TestCICD:
         assert ci_workflow.exists(), "Missing ci.yml workflow"
 
 
+class TestPhysicsFormulaReferences:
+    """Ensure all kernel files have equation references (Eq.) for traceability."""
+
+    @pytest.mark.smoke
+    def test_kernel_files_have_equation_references(self):
+        """Every *_kernels.py file should cite at least one equation."""
+        import pathlib
+
+        kernel_files = list(pathlib.Path("rheojax/utils").glob("*_kernels*.py"))
+        kernel_files.extend(pathlib.Path("rheojax/models").rglob("*_kernels*.py"))
+
+        missing_refs = []
+        for kf in kernel_files:
+            content = kf.read_text()
+            # Check for equation references (Eq., equation, Eqn.)
+            if not any(ref in content for ref in ["Eq.", "equation", "Eqn.", "eq.", "eqn."]):
+                missing_refs.append(str(kf))
+
+        assert not missing_refs, (
+            f"Kernel files without equation references:\n"
+            + "\n".join(f"  - {f}" for f in missing_refs)
+            + "\nEvery kernel function should cite its source paper and equation number."
+        )
+
+
+class TestPredictPurity:
+    """Verify that predict() does not corrupt model state across calls."""
+
+    @pytest.mark.smoke
+    def test_predict_does_not_reset_fitted_to_false(self):
+        """predict() on an already-fitted model must NOT reset fitted_=False."""
+        from rheojax.models import Maxwell
+        import numpy as np
+
+        model = Maxwell()
+        t = np.logspace(-2, 2, 50)
+        G_t = np.exp(-t / 1.0) * 1e4  # synthetic relaxation data
+
+        # Fit the model to establish fitted_ = True
+        model.fit(t, G_t, test_mode='relaxation')
+        assert model.fitted_, "Model should be fitted after fit()"
+
+        # Now call predict — it must not reset fitted_ to False
+        model.predict(t, test_mode='relaxation')
+
+        assert model.fitted_, (
+            "predict() reset fitted_=False on an already-fitted model. "
+            "This breaks warm-start and GUI state consistency."
+        )
+
+    @pytest.mark.smoke
+    def test_predict_does_not_change_parameter_values(self):
+        """predict() must not mutate parameter values."""
+        from rheojax.models import Maxwell
+        import numpy as np
+
+        model = Maxwell()
+        t = np.logspace(-2, 2, 50)
+        G_t = np.exp(-t / 1.0) * 1e4  # synthetic relaxation data
+        model.fit(t, G_t, test_mode='relaxation')
+
+        # Capture fitted parameter values
+        fitted_values = {
+            name: model.parameters.get_value(name)
+            for name in model.parameters
+        }
+
+        # Call predict — parameters should not change
+        model.predict(t, test_mode='relaxation')
+
+        for name, original_val in fitted_values.items():
+            current_val = model.parameters.get_value(name)
+            assert current_val == original_val, (
+                f"predict() mutated parameter '{name}': "
+                f"{original_val} -> {current_val}. "
+                "predict() must be a pure read of model state."
+            )
+
+    @pytest.mark.smoke
+    def test_predict_does_not_change_test_mode(self):
+        """predict(test_mode=X) should not permanently change self._test_mode."""
+        from rheojax.models import Maxwell
+        import numpy as np
+
+        model = Maxwell()
+        t = np.logspace(-2, 2, 50)
+        G_t = np.exp(-t / 1.0) * 1e4
+        model.fit(t, G_t, test_mode='relaxation')
+
+        original_mode = getattr(model, '_test_mode', None)
+
+        # Predict with a different mode
+        model.predict(t, test_mode='creep')
+
+        # _test_mode should be restored to the fitted mode
+        current_mode = getattr(model, '_test_mode', None)
+        assert current_mode == original_mode, (
+            f"predict() changed _test_mode from {original_mode!r} to {current_mode!r}. "
+            "predict() should restore _test_mode after execution."
+        )
+
+
+class TestJnpRollBan:
+    """Prevent jnp.roll in PDE stencil code (causes periodic boundary artifacts)."""
+
+    @pytest.mark.smoke
+    def test_no_jnp_roll_in_pde_solvers(self):
+        """jnp.roll should not be used in PDE solvers — use zero-padded ghost cells."""
+        import pathlib
+        import re
+
+        # Files that should NOT use jnp.roll for PDE stencils
+        pde_files = [
+            "rheojax/utils/hl_kernels.py",
+            "rheojax/utils/sgr_population_balance.py",
+            "rheojax/utils/epm_kernels.py",
+            "rheojax/utils/epm_kernels_tensorial.py",
+        ]
+
+        violations = []
+        for filepath in pde_files:
+            path = pathlib.Path(filepath)
+            if not path.exists():
+                continue
+            content = path.read_text()
+            # Find jnp.roll usage (excluding comments)
+            for i, line in enumerate(content.split('\n'), 1):
+                stripped = line.strip()
+                if stripped.startswith('#'):
+                    continue
+                if 'jnp.roll' in stripped:
+                    violations.append(f"  {filepath}:{i}: {stripped}")
+
+        assert not violations, (
+            "jnp.roll found in PDE solver files (causes periodic boundary contamination):\n"
+            + "\n".join(violations)
+            + "\n\nUse zero-padded ghost cells instead. See U-005/U-006 in the RCA report."
+        )
+
+
+class TestDatasetIdPropagation:
+    """Ensure dataset_id propagates through the fit pipeline for warm-start."""
+
+    @pytest.mark.smoke
+    def test_fit_result_has_dataset_id_field(self):
+        """FitResult dataclass should have a dataset_id field."""
+        # Import FitResult — it may be defined in different locations
+        try:
+            from rheojax.gui.state.store import FitResult
+        except ImportError:
+            pytest.skip("GUI module not available")
+
+        import dataclasses
+
+        field_names = [f.name for f in dataclasses.fields(FitResult)]
+        assert "dataset_id" in field_names, (
+            "FitResult must have a dataset_id field for multi-dataset warm-start support"
+        )
+
+    @pytest.mark.smoke
+    def test_fit_worker_accepts_dataset_id(self):
+        """FitWorker should accept and propagate dataset_id."""
+        try:
+            from rheojax.gui.jobs.fit_worker import FitWorker
+            import inspect
+
+            sig = inspect.signature(FitWorker.__init__)
+            assert "dataset_id" in sig.parameters, (
+                "FitWorker.__init__ must accept dataset_id parameter"
+            )
+        except ImportError:
+            pytest.skip("GUI module not available")
+
+
+class TestThreadAffinity:
+    """Ensure StateStore checks thread affinity on creation."""
+
+    @pytest.mark.smoke
+    def test_state_store_has_thread_check(self):
+        """StateStore should warn if created from non-main thread."""
+        import pathlib
+
+        store_path = pathlib.Path("rheojax/gui/state/store.py")
+        if not store_path.exists():
+            pytest.skip("GUI module not available")
+
+        content = store_path.read_text()
+        assert "QThread" in content and "currentThread" in content, (
+            "StateStore must check QThread.currentThread() to prevent "
+            "incorrect signal thread affinity. See G-015 in the RCA report."
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

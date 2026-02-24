@@ -83,7 +83,7 @@ class TestRheoDataCreation:
         x = np.array([1, 2, 3])
         y = np.array([10, 20])
 
-        with pytest.raises(ValueError, match="x and y must have the same shape"):
+        with pytest.raises(ValueError, match="x and y must have the same first dimension"):
             RheoData(x=x, y=y)
 
 

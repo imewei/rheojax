@@ -8,8 +8,11 @@ integration.
 import numpy as np
 import pytest
 
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
 from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
+
+jax, jnp = safe_import_jax()
 
 
 class TestNLSQOptimizer:
@@ -486,7 +489,7 @@ class TestNLSQIllConditionedProblems:
         # Function with local minima: sin(x) + x/10
         def objective(values):
             x = values[0]
-            return np.sin(x) + x / 10.0
+            return jnp.sin(x) + x / 10.0
 
         # Run optimization
         result = nlsq_optimize(objective, params, use_jax=True, max_iter=1000)
