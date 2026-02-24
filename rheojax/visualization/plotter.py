@@ -24,6 +24,27 @@ jax, jnp = safe_import_jax()
 # Module logger
 logger = get_logger(__name__)
 
+
+def _modulus_labels(
+    data: RheoData | None = None,
+    y_units: str | None = None,
+) -> tuple[str, str, str]:
+    """Return (storage_label, loss_label, generic_label) based on deformation mode.
+
+    For tension/bending/compression → E'/E''/Modulus; otherwise G'/G''/Modulus.
+    """
+    deformation = None
+    if data is not None:
+        deformation = getattr(data, "deformation_mode", None) or data.metadata.get(
+            "deformation_mode"
+        )
+
+    units = y_units or (data.y_units if data else None) or "Pa"
+
+    if deformation in ("tension", "bending", "compression"):
+        return f"E' ({units})", f'E" ({units})', f"Modulus ({units})"
+    return f"G' ({units})", f'G" ({units})', f"Modulus ({units})"
+
 # Default plotting style parameters
 DEFAULT_STYLE = {
     "figure.figsize": (8, 6),
@@ -108,7 +129,11 @@ def _filter_positive(
     Returns:
         Tuple of (filtered_x, filtered_y) with only positive y values
     """
-    positive_mask = y > 0
+    # VIS-P2-007: Guard against complex arrays — comparison y > 0 is undefined for complex
+    if np.iscomplexobj(y):
+        raise TypeError("_filter_positive received complex y array; extract real/imag first")
+
+    positive_mask = np.isfinite(y) & (y > 0)
     n_removed = len(y) - np.sum(positive_mask)
 
     if n_removed > 0 and warn:
@@ -161,27 +186,47 @@ def plot_rheo_data(
         test_mode = data.metadata.get("test_mode", "")
 
         # Select plot type based on domain and test mode
-        if data.domain == "frequency" or test_mode == "oscillation":
-            # Complex modulus data
-            if np.iscomplexobj(data.y):
-                result = plot_frequency_domain(
-                    _ensure_numpy(data.x),
-                    _ensure_numpy(data.y),
-                    x_units=data.x_units,
-                    y_units=data.y_units,
-                    style=style,
-                    **kwargs,
-                )
-            else:
-                result = plot_time_domain(
-                    _ensure_numpy(data.x),
-                    _ensure_numpy(data.y),
-                    x_units=data.x_units,
-                    y_units=data.y_units,
-                    style=style,
-                    **kwargs,
-                )
-        elif test_mode == "rotation" or data.x_units in ["1/s", "s^-1"]:
+        # VIS-P1-004: Forward deformation mode for E'/G' label selection
+        deformation_mode = kwargs.pop("deformation_mode", None)
+        if deformation_mode is None:
+            deformation_mode = getattr(data, "deformation_mode", None) or data.metadata.get(
+                "deformation_mode"
+            )
+
+        # VIS-P2-003: Detect frequency-domain data even when y is real (e.g., only G' stored)
+        is_freq_domain = (
+            getattr(data, 'domain', None) == 'frequency'
+            or data.metadata.get('test_mode') in ('oscillation', 'frequency_sweep')
+        )
+
+        if is_freq_domain or np.iscomplexobj(data.y):
+            # Frequency-domain data — pass deformation_mode for label selection
+            freq_kwargs = dict(kwargs)
+            if deformation_mode:
+                freq_kwargs["deformation_mode"] = deformation_mode
+
+            result = plot_frequency_domain(
+                _ensure_numpy(data.x),
+                _ensure_numpy(data.y),
+                x_units=data.x_units,
+                y_units=data.y_units,
+                style=style,
+                **freq_kwargs,
+            )
+        elif test_mode in ("startup", "laos"):
+            # Startup and LAOS: time/strain vs stress (linear axes)
+            result = plot_time_domain(
+                _ensure_numpy(data.x),
+                _ensure_numpy(data.y),
+                x_units=data.x_units,
+                y_units=data.y_units,
+                style=style,
+                **kwargs,
+            )
+        elif test_mode in ("rotation", "flow_curve") or data.x_units in [
+            "1/s",
+            "s^-1",
+        ]:
             # Flow curve data
             result = plot_flow_curve(
                 _ensure_numpy(data.x),
@@ -264,11 +309,19 @@ def plot_time_domain(
 
         # Set labels
         x_label = f"Time ({x_units})" if x_units else "Time"
-        y_label = (
-            f"Stress ({y_units})"
-            if y_units and "Pa" in y_units
-            else f"y ({y_units})" if y_units else "y"
-        )
+        # VIS-P2-008: Use exact match for stress units to avoid "Pa.s" → "Stress (Pa.s)"
+        if y_units:
+            y_units_stripped = y_units.strip()
+            if y_units_stripped in ("Pa", "kPa", "MPa", "GPa"):
+                y_label = f"Stress ({y_units})"
+            elif "Pa" in y_units_stripped and (
+                "s" in y_units_stripped or "\u00b7" in y_units_stripped
+            ):
+                y_label = f"Viscosity ({y_units})"
+            else:
+                y_label = f"y ({y_units})"
+        else:
+            y_label = "y"
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
 
@@ -315,7 +368,9 @@ def plot_frequency_domain(
         x_units: Units for frequency axis
         y_units: Units for modulus
         style: Plotting style
-        **kwargs: Additional keyword arguments for matplotlib plot
+        **kwargs: Additional keyword arguments for matplotlib plot.
+            deformation_mode: str, optional — 'tension'/'bending'/'compression'
+            causes labels to show E'/E'' instead of G'/G''.
 
     Returns:
         Tuple of (Figure, Axes) or (Figure, array of Axes) for complex data
@@ -328,8 +383,15 @@ def plot_frequency_domain(
         # VIS-010: Set font sizes on axes directly instead of mutating
         # global plt.rcParams (which permanently pollutes process state)
 
+        # VIS-P1-004: Deformation-mode aware labels (E' vs G')
+        deformation_mode = kwargs.pop("deformation_mode", None)
+        is_tensile = deformation_mode in ("tension", "bending", "compression")
+        units = y_units or "Pa"
+        storage_sym = "E'" if is_tensile else "G'"
+        loss_sym = 'E"' if is_tensile else 'G"'
+
         if np.iscomplexobj(y):
-            # Complex data - plot G' and G'' on separate subplots
+            # Complex data - plot storage and loss on separate subplots
             fig, axes = plt.subplots(
                 2,
                 1,
@@ -349,20 +411,24 @@ def plot_frequency_domain(
             }
             plot_kwargs.update(kwargs)
 
-            # G' (storage modulus)
+            # VIS-P0-001 / VIS-P0-002: Strip keys that are passed explicitly to avoid
+            # "multiple values for keyword argument" TypeError
+            plot_kwargs_safe = {k: v for k, v in plot_kwargs.items() if k not in ('label', 'color')}
+
+            # Storage modulus
             x_gp, gp = _filter_positive(x, np.real(y), warn=True)
-            axes[0].loglog(x_gp, gp, **plot_kwargs, label="G'")
-            axes[0].set_ylabel(f"G' ({y_units})" if y_units else "G' (Pa)")
+            axes[0].loglog(x_gp, gp, **plot_kwargs_safe, label=storage_sym)
+            axes[0].set_ylabel(f"{storage_sym} ({units})")
             axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
             axes[0].legend()
 
-            # G'' (loss modulus)
+            # Loss modulus
             x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
-            axes[1].loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
+            axes[1].loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_sym, color="C1")
             axes[1].set_xlabel(
                 f"Frequency ({x_units})" if x_units else "Frequency (rad/s)"
             )
-            axes[1].set_ylabel(f'G" ({y_units})' if y_units else 'G" (Pa)')
+            axes[1].set_ylabel(f"{loss_sym} ({units})")
             axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
             axes[1].legend()
 
@@ -390,8 +456,8 @@ def plot_frequency_domain(
 
             fig.tight_layout()
             logger.debug("Figure created", plot_type="frequency_domain")
-            # VIS-004: Return np.array for consistency with complex data path
-            return fig, np.array([ax])
+            # VIS-P2-002: Return plain ax so callers can use ax.set_xlabel() etc. directly
+            return fig, ax
 
     except Exception as e:
         logger.error(
@@ -677,6 +743,11 @@ def compute_uncertainty_band(
             logger.debug("Einsum failed for variance computation, returning None")
             return y_fit, None, None
 
+        # VIS-P2-001: Guard against Inf/NaN from ill-conditioned covariance matrix
+        if not np.all(np.isfinite(sigma_y)):
+            logger.warning("Non-finite uncertainty from ill-conditioned covariance matrix")
+            return y_fit, None, None
+
         # Compute z-score for confidence interval
         z = norm.ppf(1 - (1 - confidence) / 2)
 
@@ -763,6 +834,18 @@ def plot_fit_with_uncertainty(
         y_data = _ensure_numpy(y_data)
         x_fit = _ensure_numpy(x_fit)
         y_fit = _ensure_numpy(y_fit)
+
+        # VIS-P1-004: Validate uncertainty bound lengths before attempting fill_between
+        if y_lower is not None and y_upper is not None:
+            if len(y_lower) != len(x_fit) or len(y_upper) != len(x_fit):
+                logger.warning(
+                    "Uncertainty bounds length mismatch, skipping uncertainty band",
+                    x_fit_len=len(x_fit),
+                    y_lower_len=len(y_lower),
+                    y_upper_len=len(y_upper),
+                )
+                y_lower = None
+                y_upper = None
 
         def scatter_fn(x, y, **kw):
             return ax.scatter(x, y, **kw)
@@ -970,7 +1053,8 @@ def save_figure(
                 )
 
         # Validate format
-        supported_formats = {"pdf", "svg", "png", "eps"}
+        # VIS-P3-002: Expanded to include all common matplotlib-supported raster formats
+        supported_formats = {"pdf", "svg", "png", "eps", "tiff", "tif", "jpg", "jpeg", "webp"}
         format_lower = format.lower()
         if format_lower not in supported_formats:
             raise ValueError(

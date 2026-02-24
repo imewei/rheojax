@@ -12,8 +12,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 
 def _plot_scalar_lattice(
@@ -195,6 +198,11 @@ def animate_stress_evolution(
         Matplotlib FuncAnimation object.
     """
     history = np.array(stress_history)
+
+    # VIS-P1-007: guard against empty history before unpacking shape
+    if history.shape[0] == 0:
+        raise ValueError("stress_history has no frames (shape[0] == 0)")
+
     n_frames, L, _ = history.shape
 
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -534,7 +542,7 @@ def animate_tensorial_evolution(
             for i in range(3):
                 images[i].set_array(stress_history[frame, i])
                 axes[i].set_title(f"{labels[i]} - t={time[frame]:.3f}")
-            return images
+            return tuple(images)
 
         anim = animation.FuncAnimation(
             fig, update, frames=T, interval=interval, blit=True

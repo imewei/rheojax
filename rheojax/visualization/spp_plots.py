@@ -30,6 +30,12 @@ from rheojax.logging import get_logger
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+else:
+    # Import Axes at runtime for isinstance checks
+    try:
+        from matplotlib.axes import Axes
+    except ImportError:
+        Axes = None
 
 # Module logger
 logger = get_logger(__name__)
@@ -100,9 +106,12 @@ def plot_lissajous(
             ax1 = ax2 = ax
 
         # Normalize if amplitudes provided
-        strain_plot = strain / gamma_0 if gamma_0 else strain
+        # VIS-P2-005: use explicit None checks to avoid silently skipping omega=0.0
+        strain_plot = strain / gamma_0 if gamma_0 is not None else strain
         rate_plot = (
-            strain_rate / (gamma_0 * omega) if (gamma_0 and omega) else strain_rate
+            strain_rate / (gamma_0 * omega)
+            if (gamma_0 is not None and omega is not None and omega != 0.0)
+            else strain_rate
         )
         stress_plot = stress
 
@@ -120,7 +129,7 @@ def plot_lissajous(
         # Plot sigma vs gamma (elastic Lissajous)
         ax1.plot(strain_plot, stress_plot, linewidth=linewidth, **kwargs)
         ax1.set_xlabel(
-            r"$\gamma/\gamma_0$" if gamma_0 else r"$\gamma$", fontsize=fontsize
+            r"$\gamma/\gamma_0$" if gamma_0 is not None else r"$\gamma$", fontsize=fontsize
         )
         ax1.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
         ax1.set_title("Elastic Lissajous", fontsize=fontsize + 2)
@@ -132,7 +141,7 @@ def plot_lissajous(
         ax2.set_xlabel(
             (
                 r"$\dot{\gamma}/\dot{\gamma}_0$"
-                if (gamma_0 and omega)
+                if (gamma_0 is not None and omega is not None and omega != 0.0)
                 else r"$\dot{\gamma}$ (1/s)"
             ),
             fontsize=fontsize,
@@ -200,6 +209,14 @@ def plot_cole_cole(
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
             fig = ax.get_figure()
+
+        # VIS-P3-002: Guard against empty arrays
+        if len(Gp_t) == 0 or len(Gpp_t) == 0:
+            ax.text(
+                0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes
+            )
+            ax.set_title("Cole-Cole Diagram")
+            return fig
 
         if time is None:
             time = np.arange(len(Gp_t))
@@ -296,6 +313,13 @@ def plot_moduli_evolution(
         else:
             if isinstance(ax, tuple):
                 axes = list(ax)
+            elif Axes is not None and isinstance(ax, Axes):
+                # VIS-P1-002: single Axes passed — only valid when n_plots == 1
+                if n_plots > 1:
+                    raise ValueError(
+                        f"Single Axes provided but {n_plots} subplots needed for the requested data"
+                    )
+                axes = [ax]
             else:
                 axes = [ax]
             fig = axes[0].get_figure()
@@ -393,6 +417,12 @@ def plot_harmonic_spectrum(
             fig, ax = plt.subplots(figsize=(8, 4))
         else:
             fig = ax.get_figure()
+
+        # VIS-P1-006: guard against zero harmonics or empty amplitudes
+        if n_harmonics == 0 or len(amplitudes) == 0:
+            logger.warning("No harmonics to plot", n_harmonics=n_harmonics, n_amplitudes=len(amplitudes))
+            ax.set_title("Harmonic Spectrum (empty)")
+            return fig
 
         if n_harmonics is None:
             n_harmonics = len(amplitudes)
@@ -697,7 +727,10 @@ def create_spp_report(
         # Extract results
         Gp_t = np.asarray(spp_results["Gp_t"])
         Gpp_t = np.asarray(spp_results["Gpp_t"])
-        delta_t = np.asarray(spp_results["delta_t"])
+        # VIS-P1-003: delta_t is optional — skip its subplot if absent
+        delta_t = (
+            np.asarray(spp_results["delta_t"]) if "delta_t" in spp_results else None
+        )
 
         # Compute strain rate
         strain_rate = (
@@ -745,12 +778,15 @@ def create_spp_report(
         ax5.set_ylabel(r"$G''(t)$ (Pa)")
         ax5.set_title(r"Loss Modulus $G''(t)$")
 
-        ax6.plot(time, np.degrees(delta_t), "g-", linewidth=1.5)
-        ax6.set_xlabel("Time (s)")
-        ax6.set_ylabel(r"$\delta(t)$ (deg)")
-        ax6.set_title(r"Phase Angle $\delta(t)$")
-        ax6.axhline(45, color="gray", linestyle=":", linewidth=0.5)
-        ax6.axhline(90, color="gray", linestyle="--", linewidth=0.5)
+        if delta_t is not None:
+            ax6.plot(time, np.degrees(delta_t), "g-", linewidth=1.5)
+            ax6.set_xlabel("Time (s)")
+            ax6.set_ylabel(r"$\delta(t)$ (deg)")
+            ax6.set_title(r"Phase Angle $\delta(t)$")
+            ax6.axhline(45, color="gray", linestyle=":", linewidth=0.5)
+            ax6.axhline(90, color="gray", linestyle="--", linewidth=0.5)
+        else:
+            ax6.set_visible(False)
 
         plt.tight_layout()
 

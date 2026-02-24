@@ -22,6 +22,7 @@ from rheojax.visualization.plotter import (
     _apply_style,
     _ensure_numpy,
     _filter_positive,
+    _modulus_labels,
     plot_frequency_domain,
     plot_residuals,
     plot_time_domain,
@@ -64,8 +65,9 @@ def plot_stress_strain(
 
         # For long time ranges, log scale is often more informative
         x_data = _ensure_numpy(data.x)
-        if len(x_data) > 0 and np.min(x_data) > 0:
-            x_range = np.max(x_data) / np.min(x_data)
+        positive_x = x_data[x_data > 0]
+        if len(positive_x) > 0:
+            x_range = np.max(positive_x) / np.min(positive_x)
             if x_range > 100:  # More than 2 decades
                 log_x = True
 
@@ -131,19 +133,31 @@ def plot_modulus_frequency(
         x_data = _ensure_numpy(data.x)
         y_data = _ensure_numpy(data.y)
 
+        # VIS-P1-004: Deformation-mode aware labels
+        storage_label, loss_label, _generic = _modulus_labels(data)
+        # Pop deformation_mode so it doesn't leak to matplotlib
+        deformation_mode = kwargs.pop("deformation_mode", None)
+        if deformation_mode is None:
+            deformation_mode = getattr(data, "deformation_mode", None) or data.metadata.get(
+                "deformation_mode"
+            )
+
         if separate_axes and np.iscomplexobj(y_data):
-            # Two separate axes for G' and G''
+            # Two separate axes for storage/loss modulus
+            freq_kwargs = dict(kwargs)
+            if deformation_mode:
+                freq_kwargs["deformation_mode"] = deformation_mode
             fig, axes = plot_frequency_domain(
                 x_data,
                 y_data,
                 x_units=data.x_units,
                 y_units=data.y_units,
                 style=style,
-                **kwargs,
+                **freq_kwargs,
             )
 
-            axes[0].set_title("Storage Modulus (G')")
-            axes[1].set_title("Loss Modulus (G'')")
+            axes[0].set_title(f"Storage Modulus ({storage_label.split(' ')[0]})")
+            axes[1].set_title(f"Loss Modulus ({loss_label.split(' ')[0]})")
 
             logger.debug("Figure created", plot_type="modulus_frequency")
             return fig, axes
@@ -153,15 +167,11 @@ def plot_modulus_frequency(
 
             fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-            # Set font sizes
-            plt.rcParams.update(
-                {
-                    "font.size": style_params["font.size"],
-                    "axes.labelsize": style_params["axes.labelsize"],
-                    "xtick.labelsize": style_params["xtick.labelsize"],
-                    "ytick.labelsize": style_params["ytick.labelsize"],
-                }
-            )
+            # VIS-P0-001: Apply font sizes per-axes (not global rcParams)
+            ax.xaxis.label.set_fontsize(style_params["axes.labelsize"])
+            ax.yaxis.label.set_fontsize(style_params["axes.labelsize"])
+            ax.tick_params(axis="x", labelsize=style_params["xtick.labelsize"])
+            ax.tick_params(axis="y", labelsize=style_params["ytick.labelsize"])
 
             plot_kwargs = {
                 "linewidth": style_params["lines.linewidth"],
@@ -176,8 +186,8 @@ def plot_modulus_frequency(
                 # Plot both on same axes
                 x_gp, gp = _filter_positive(x_data, np.real(y_data), warn=True)
                 x_gpp, gpp = _filter_positive(x_data, np.imag(y_data), warn=True)
-                ax.loglog(x_gp, gp, **plot_kwargs, label="G'")
-                ax.loglog(x_gpp, gpp, **plot_kwargs, label='G"', color="C1")
+                ax.loglog(x_gp, gp, **plot_kwargs, label=storage_label)
+                ax.loglog(x_gpp, gpp, **plot_kwargs, label=loss_label, color="C1")
                 ax.legend()
             else:
                 x_filtered, y_filtered = _filter_positive(x_data, y_data, warn=True)
@@ -245,20 +255,19 @@ def plot_mastercurve(
         n_datasets=len(datasets),
     )
 
+    if not datasets:
+        raise ValueError("plot_mastercurve requires at least one dataset")
+
     try:
         style_params = _apply_style(style)
 
         fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
+        # VIS-P0-001: Apply font sizes per-axes (not global rcParams)
+        ax.xaxis.label.set_fontsize(style_params["axes.labelsize"])
+        ax.yaxis.label.set_fontsize(style_params["axes.labelsize"])
+        ax.tick_params(axis="x", labelsize=style_params["xtick.labelsize"])
+        ax.tick_params(axis="y", labelsize=style_params["ytick.labelsize"])
 
         # Get reference temperature
         if reference_temp is None:
@@ -271,6 +280,9 @@ def plot_mastercurve(
             temp = data.metadata.get("temperature", None)
             x_data = _ensure_numpy(data.x)
             y_data = _ensure_numpy(data.y)
+
+            # VIS-P0-003: strip keys that are passed explicitly to avoid conflicts
+            mc_kwargs = {k: v for k, v in kwargs.items() if k not in ("color", "label")}
 
             # Apply shift factor if provided
             if shift_factors is not None and temp in shift_factors:
@@ -291,6 +303,7 @@ def plot_mastercurve(
 
             # Plot (handle complex data)
             if np.iscomplexobj(y_data):
+                # VIS-P2-004: Plot G' (storage modulus)
                 x_filt, y_filt = _filter_positive(
                     x_shifted, np.real(y_data), warn=False
                 )
@@ -303,8 +316,25 @@ def plot_mastercurve(
                     markerfacecolor="none",
                     markeredgewidth=1.0,
                     label=label,
-                    **kwargs,
+                    **mc_kwargs,
                 )
+                # VIS-P2-004: Plot G'' (loss modulus) with square markers
+                x_filt_pp, y_filt_pp = _filter_positive(
+                    x_shifted, np.imag(y_data), warn=False
+                )
+                if len(x_filt_pp) > 0:
+                    ax.loglog(
+                        x_filt_pp,
+                        y_filt_pp,
+                        "s",
+                        color=colors[i],
+                        alpha=0.6,
+                        markersize=style_params["lines.markersize"],
+                        markerfacecolor="none",
+                        markeredgewidth=1.0,
+                        label=f"{label} (loss)",
+                        **mc_kwargs,
+                    )
             else:
                 x_filt, y_filt = _filter_positive(x_shifted, y_data, warn=False)
                 ax.loglog(
@@ -316,7 +346,7 @@ def plot_mastercurve(
                     markerfacecolor="none",
                     markeredgewidth=1.0,
                     label=label,
-                    **kwargs,
+                    **mc_kwargs,
                 )
 
         # Labels
@@ -329,7 +359,10 @@ def plot_mastercurve(
             if shift_factors
             else f"Frequency ({x_units})"
         )
-        ax.set_ylabel(f"G' ({y_units})")
+        # Use deformation-mode aware labels
+        # _modulus_labels() already embeds units (e.g. "G' (Pa)"), so use directly
+        mc_storage_label, _, _ = _modulus_labels(datasets[0])
+        ax.set_ylabel(mc_storage_label)
         ax.set_title(f"Master Curve (T_ref = {reference_temp}C)")
         ax.legend(loc="best", fontsize=style_params["legend.fontsize"])
         ax.grid(True, which="both", alpha=0.3, linestyle="--")
@@ -391,19 +424,18 @@ def plot_model_fit(
     try:
         style_params = _apply_style(style)
 
-        # Set font sizes
-        plt.rcParams.update(
-            {
-                "font.size": style_params["font.size"],
-                "axes.labelsize": style_params["axes.labelsize"],
-                "xtick.labelsize": style_params["xtick.labelsize"],
-                "ytick.labelsize": style_params["ytick.labelsize"],
-            }
-        )
-
         x_data = _ensure_numpy(data.x)
         y_data = _ensure_numpy(data.y)
         y_pred = _ensure_numpy(predictions)
+
+        # VIS-P1-005: Validate that data and predictions have matching shapes
+        if len(y_data) != len(y_pred):
+            raise ValueError(
+                f"Data and predictions shape mismatch: data={y_data.shape}, predictions={y_pred.shape}"
+            )
+
+        # Deformation-mode aware labels (E'/E'' for DMTA, G'/G'' for shear)
+        fit_storage_label, fit_loss_label, _ = _modulus_labels(data)
 
         if show_residuals:
             # Two subplots: fit and residuals
@@ -442,7 +474,7 @@ def plot_model_fit(
                     linewidth=style_params["lines.linewidth"],
                 )
                 axes[0, 0].set_ylabel(
-                    f"G' ({data.y_units})" if data.y_units else "G' (Pa)"
+                    f"{fit_storage_label} ({data.y_units})" if data.y_units else f"{fit_storage_label} (Pa)"
                 )
                 axes[0, 0].legend()
                 axes[0, 0].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -473,7 +505,7 @@ def plot_model_fit(
                     color="C1",
                 )
                 axes[0, 1].set_ylabel(
-                    f'G" ({data.y_units})' if data.y_units else 'G" (Pa)'
+                    f'{fit_loss_label} ({data.y_units})' if data.y_units else f'{fit_loss_label} (Pa)'
                 )
                 axes[0, 1].legend()
                 axes[0, 1].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -497,7 +529,7 @@ def plot_model_fit(
                     if data.x_units
                     else "Frequency (rad/s)"
                 )
-                axes[1, 0].set_ylabel("G' Residuals (%)")
+                axes[1, 0].set_ylabel(f"{fit_storage_label} Residuals (%)")
                 axes[1, 0].grid(True, alpha=0.3, linestyle="--")
 
                 # G'' residuals
@@ -520,7 +552,7 @@ def plot_model_fit(
                     if data.x_units
                     else "Frequency (rad/s)"
                 )
-                axes[1, 1].set_ylabel('G" Residuals (%)')
+                axes[1, 1].set_ylabel(f'{fit_loss_label} Residuals (%)')
                 axes[1, 1].grid(True, alpha=0.3, linestyle="--")
 
                 if model_name:
@@ -591,7 +623,9 @@ def plot_model_fit(
                     else "Frequency (rad/s)"
                 )
                 axes[0].set_ylabel(
-                    f"G' ({data.y_units})" if data.y_units else "G' (Pa)"
+                    f"{fit_storage_label} ({data.y_units})"
+                    if data.y_units
+                    else f"{fit_storage_label} (Pa)"
                 )
                 axes[0].legend()
                 axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -627,7 +661,9 @@ def plot_model_fit(
                     else "Frequency (rad/s)"
                 )
                 axes[1].set_ylabel(
-                    f'G" ({data.y_units})' if data.y_units else 'G" (Pa)'
+                    f'{fit_loss_label} ({data.y_units})'
+                    if data.y_units
+                    else f'{fit_loss_label} (Pa)'
                 )
                 axes[1].legend()
                 axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -716,11 +752,13 @@ def apply_template_style(ax: Axes, style: str = "default", **kwargs: Any) -> Non
         for label in ax.get_yticklabels():
             label.set_fontsize(style_params["ytick.labelsize"])
 
-        # Update line widths and marker sizes
+        # Update line widths and marker sizes (tolerance for float comparison)
+        default_lw = plt.rcParams["lines.linewidth"]
+        default_ms = plt.rcParams["lines.markersize"]
         for line in ax.get_lines():
-            if line.get_linewidth() == plt.rcParams["lines.linewidth"]:
+            if abs(line.get_linewidth() - default_lw) < 0.01:
                 line.set_linewidth(style_params["lines.linewidth"])
-            if line.get_markersize() == plt.rcParams["lines.markersize"]:
+            if abs(line.get_markersize() - default_ms) < 0.01:
                 line.set_markersize(style_params["lines.markersize"])
 
         # Grid

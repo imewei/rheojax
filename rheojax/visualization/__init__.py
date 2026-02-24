@@ -19,6 +19,8 @@ from rheojax.visualization.epm_plots import (
     plot_von_mises_field,
 )
 from rheojax.visualization.plotter import (
+    compute_uncertainty_band,
+    plot_fit_with_uncertainty,
     plot_flow_curve,
     plot_frequency_domain,
     plot_residuals,
@@ -108,6 +110,8 @@ __all__ = [
     "plot_flow_curve",
     "plot_residuals",
     "save_figure",
+    "compute_uncertainty_band",
+    "plot_fit_with_uncertainty",
     # Template functions
     "plot_stress_strain",
     "plot_modulus_frequency",
