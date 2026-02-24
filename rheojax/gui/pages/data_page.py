@@ -8,6 +8,8 @@ Data loading, visualization, and preprocessing interface.
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from rheojax.gui.compat import (
     QComboBox,
     QDragEnterEvent,
@@ -29,6 +31,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.jobs.import_worker import ImportWorker
 from rheojax.gui.jobs.preview_worker import PreviewWorker
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, Typography
 from rheojax.gui.services.data_service import DataService
@@ -78,6 +81,8 @@ class DataPage(QWidget):
         self._data_service = DataService()
         self._current_file_path: Path | None = None
         self._preview_data: list[list] | None = None
+        self._active_preview_worker: PreviewWorker | None = None
+        self._active_import_worker: ImportWorker | None = None
         self.setup_ui()
 
     def setup_ui(self) -> None:
@@ -299,7 +304,7 @@ class DataPage(QWidget):
         mode_layout.addWidget(QLabel("Test Mode:"))
         self._test_mode_combo = QComboBox()
         self._test_mode_combo.addItems(
-            ["Auto-detect", "oscillation", "relaxation", "creep", "rotation"]
+            ["Auto-detect", "oscillation", "relaxation", "creep", "flow_curve", "startup", "laos"]
         )
         self._test_mode_combo.currentTextChanged.connect(
             lambda text: logger.debug(
@@ -375,6 +380,15 @@ class DataPage(QWidget):
         logger.debug("Data loading triggered", filepath=file_path, page="DataPage")
         path_obj = Path(file_path)
 
+        if not path_obj.exists():
+            logger.warning("File not found", filepath=file_path)
+            QMessageBox.warning(
+                self,
+                "File Not Found",
+                f"The selected file does not exist:\n{file_path}",
+            )
+            return
+
         # Memory guard: warn on large files (>50 MB)
         size_bytes = path_obj.stat().st_size
         if size_bytes > 50 * 1024 * 1024:
@@ -421,6 +435,7 @@ class DataPage(QWidget):
         )
         worker.signals.completed.connect(self._on_preview_loaded)
         worker.signals.failed.connect(self._on_preview_failed)
+        self._active_preview_worker = worker
         QThreadPool.globalInstance().start(worker)
 
     def _on_preview_loaded(self, preview_result: dict) -> None:
@@ -443,7 +458,9 @@ class DataPage(QWidget):
         if self._current_file_path:
             self._file_name_label.setText(f"File: {self._current_file_path.name}")
 
-        # Detect file format for user feedback
+        # Detect file format for user feedback (lightweight I/O — reads only
+        # the first 2 KB of the file header; acceptable here since it's
+        # user-triggered and fast)
         detected_format = self._detect_file_format()
         metadata["format"] = detected_format
 
@@ -565,85 +582,89 @@ class DataPage(QWidget):
 
     def _update_column_mappers(self, columns: list[str]) -> None:
         """Update column mapper dropdowns with smart suggestions."""
+        if not columns:
+            return
+
         # Clear and repopulate
         for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
             combo.blockSignals(True)
             combo.clear()
 
-        self._x_combo.addItems(columns)
-        self._y_combo.addItems(columns)
-        self._y2_combo.addItem("None")
-        self._y2_combo.addItems(columns)
-        self._temp_combo.addItem("None")
-        self._temp_combo.addItems(columns)
+        try:
+            self._x_combo.addItems(columns)
+            self._y_combo.addItems(columns)
+            self._y2_combo.addItem("None")
+            self._y2_combo.addItems(columns)
+            self._temp_combo.addItem("None")
+            self._temp_combo.addItems(columns)
 
-        # Use DataService column suggestions for smarter auto-mapping
-        suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
-        if self._current_file_path:
-            try:
-                suggestions = self._data_service.get_column_suggestions(
-                    self._current_file_path
-                )
-            except Exception:
-                pass  # Fall back to simple matching
+            # Use DataService column suggestions for smarter auto-mapping
+            suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
+            if self._current_file_path:
+                try:
+                    suggestions = self._data_service.get_column_suggestions(
+                        self._current_file_path
+                    )
+                except Exception:
+                    pass  # Fall back to simple matching
 
-        # Apply suggestions or fallback to simple matching
-        x_suggestions = suggestions.get("x_suggestions", [])
-        y_suggestions = suggestions.get("y_suggestions", [])
-        y2_suggestions = suggestions.get("y2_suggestions", [])
+            # Apply suggestions or fallback to simple matching
+            x_suggestions = suggestions.get("x_suggestions", [])
+            y_suggestions = suggestions.get("y_suggestions", [])
+            y2_suggestions = suggestions.get("y2_suggestions", [])
 
-        # Select first suggested X column
-        if x_suggestions:
-            for idx, col in enumerate(columns):
-                if col in x_suggestions:
-                    self._x_combo.setCurrentIndex(idx)
-                    break
-        else:
-            # Fallback: simple matching
-            for idx, col in enumerate(columns):
-                col_lower = col.lower()
-                if any(x in col_lower for x in ["time", "freq", "omega", "angular"]):
-                    self._x_combo.setCurrentIndex(idx)
-                    break
-
-        # Select first suggested Y column
-        if y_suggestions:
-            for idx, col in enumerate(columns):
-                if col in y_suggestions:
-                    self._y_combo.setCurrentIndex(idx)
-                    break
-        else:
-            # Fallback: simple matching (avoid loss modulus)
-            for idx, col in enumerate(columns):
-                col_lower = col.lower()
-                if any(y in col_lower for y in ["g'", "storage", "stress", "modulus"]):
-                    if "loss" not in col_lower and "''" not in col:
-                        self._y_combo.setCurrentIndex(idx)
+            # Select first suggested X column
+            if x_suggestions:
+                for idx, col in enumerate(columns):
+                    if col in x_suggestions:
+                        self._x_combo.setCurrentIndex(idx)
+                        break
+            else:
+                # Fallback: simple matching
+                for idx, col in enumerate(columns):
+                    col_lower = col.lower()
+                    if any(x in col_lower for x in ["time", "freq", "omega", "angular"]):
+                        self._x_combo.setCurrentIndex(idx)
                         break
 
-        # Select first suggested Y2 column
-        if y2_suggestions:
-            for idx, col in enumerate(columns):
-                if col in y2_suggestions:
-                    self._y2_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
-                    break
-        else:
-            # Fallback: simple matching for loss modulus
+            # Select first suggested Y column
+            if y_suggestions:
+                for idx, col in enumerate(columns):
+                    if col in y_suggestions:
+                        self._y_combo.setCurrentIndex(idx)
+                        break
+            else:
+                # Fallback: simple matching (avoid loss modulus)
+                for idx, col in enumerate(columns):
+                    col_lower = col.lower()
+                    if any(y in col_lower for y in ["g'", "storage", "stress", "modulus"]):
+                        if "loss" not in col_lower and "''" not in col:
+                            self._y_combo.setCurrentIndex(idx)
+                            break
+
+            # Select first suggested Y2 column
+            if y2_suggestions:
+                for idx, col in enumerate(columns):
+                    if col in y2_suggestions:
+                        self._y2_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
+                        break
+            else:
+                # Fallback: simple matching for loss modulus
+                for idx, col in enumerate(columns):
+                    col_lower = col.lower()
+                    if any(y2 in col_lower for y2 in ["g''", "loss", "gdoubleprime"]):
+                        self._y2_combo.setCurrentIndex(idx + 1)
+                        break
+
+            # Temperature column detection
             for idx, col in enumerate(columns):
                 col_lower = col.lower()
-                if any(y2 in col_lower for y2 in ["g''", "loss", "gdoubleprime"]):
-                    self._y2_combo.setCurrentIndex(idx + 1)
+                if any(t in col_lower for t in ["temp", "temperature"]):
+                    self._temp_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
                     break
-
-        # Temperature column detection
-        for idx, col in enumerate(columns):
-            col_lower = col.lower()
-            if any(t in col_lower for t in ["temp", "temperature"]):
-                self._temp_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
-                break
-
-        for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
-            combo.blockSignals(False)
+        finally:
+            for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
+                combo.blockSignals(False)
 
     def _reset_mapping(self) -> None:
         """Reset column mapping to defaults."""
@@ -655,11 +676,7 @@ class DataPage(QWidget):
             self._update_column_mappers(headers)
 
     def _apply_import(self) -> None:
-        """Apply column mapping and import data."""
-        import uuid
-
-        from rheojax.io import auto_load
-
+        """Apply column mapping and import data via background worker."""
         if not self._current_file_path:
             return
 
@@ -673,109 +690,151 @@ class DataPage(QWidget):
         if test_mode == "Auto-detect":
             test_mode = None  # Let service auto-detect
 
-        # Import via service
-        try:
-            # Use auto_load directly to handle both single and multi-segment files
-            load_kwargs = {}
-            if x_col:
-                load_kwargs["x_col"] = x_col
-            if y_col:
-                load_kwargs["y_col"] = y_col
-            if y2_col:
-                load_kwargs["y2_col"] = y2_col
+        # Show loading state
+        self._file_name_label.setText(f"Importing: {self._current_file_path.name}...")
 
-            result = auto_load(str(self._current_file_path), **load_kwargs)
+        # Launch background worker
+        worker = ImportWorker(
+            data_service=self._data_service,
+            file_path=self._current_file_path,
+            x_col=x_col or None,
+            y_col=y_col or None,
+            y2_col=y2_col,
+            test_mode=test_mode,
+        )
+        worker.signals.completed.connect(
+            lambda datasets: self._on_import_completed(datasets, test_mode)
+        )
+        worker.signals.failed.connect(self._on_import_failed)
+        self._active_import_worker = worker
+        QThreadPool.globalInstance().start(worker)
 
-            # Handle multi-segment files (TRIOS can return list[RheoData])
-            if isinstance(result, list):
-                datasets = result
-            else:
-                datasets = [result]
+    def _on_import_completed(self, datasets: list, test_mode: str | None) -> None:
+        """Handle successful import (called on main thread via signal)."""
+        import uuid
 
-            store = StateStore()
+        _VALID_TEST_MODES = {
+            "oscillation",
+            "relaxation",
+            "creep",
+            "flow_curve",
+            "startup",
+            "laos",
+            "rotation",
+            "unknown",
+        }
+        _TEST_MODE_ALIASES = {
+            "rotation": "flow_curve",
+        }
 
-            _VALID_TEST_MODES = {
-                "oscillation",
-                "relaxation",
-                "creep",
-                "flow_curve",
-                "startup",
-                "laos",
-                "unknown",
-            }
-            first_dataset_id: str | None = None
+        store = StateStore()
+        first_dataset_id: str | None = None
 
-            for idx, rheo_data in enumerate(datasets):
-                # Auto-detect test mode if not specified
-                detected_mode = test_mode
-                if detected_mode is None:
-                    detected_mode = self._data_service.detect_test_mode(rheo_data)
+        for idx, rheo_data in enumerate(datasets):
+            # Auto-detect test mode if not specified
+            detected_mode = test_mode
+            if detected_mode is None:
+                detected_mode = self._data_service.detect_test_mode(rheo_data)
 
-                # Validate test_mode against known modes
-                if detected_mode and detected_mode not in _VALID_TEST_MODES:
-                    logger.warning(
-                        "Unknown test_mode detected, defaulting to 'oscillation'",
-                        detected=detected_mode,
-                    )
-                    detected_mode = "oscillation"
-
-                # Generate dataset_id
-                dataset_id = str(uuid.uuid4())
-                if first_dataset_id is None:
-                    first_dataset_id = dataset_id
-
-                # Segment name for multi-segment files
-                if len(datasets) > 1:
-                    name = f"{self._current_file_path.stem}_segment_{idx + 1}"
-                else:
-                    name = self._current_file_path.stem
-
-                # Register dataset in state store
-                store.dispatch(
-                    "IMPORT_DATA_SUCCESS",
-                    {
-                        "dataset_id": dataset_id,
-                        "file_path": str(self._current_file_path),
-                        "name": name,
-                        "test_mode": detected_mode or "unknown",
-                        "x_data": rheo_data.x,
-                        "y_data": rheo_data.y,
-                        "y2_data": getattr(rheo_data, "y2", None),
-                        "metadata": getattr(rheo_data, "metadata", {}),
-                    },
+            # Map legacy test_mode aliases
+            if detected_mode in _TEST_MODE_ALIASES:
+                logger.debug(
+                    "Mapping legacy test_mode",
+                    from_mode=detected_mode,
+                    to_mode=_TEST_MODE_ALIASES[detected_mode],
                 )
+                detected_mode = _TEST_MODE_ALIASES[detected_mode]
 
-            # For multi-segment files, ensure the first segment is active
-            if len(datasets) > 1 and first_dataset_id:
-                store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id})
+            # Validate test_mode against known modes
+            if detected_mode and detected_mode not in _VALID_TEST_MODES:
+                logger.warning(
+                    "Unknown test_mode detected, defaulting to 'unknown'",
+                    detected=detected_mode,
+                )
+                detected_mode = "unknown"
 
-            # Log successful import
-            logger.info(
-                "Data import completed",
-                filepath=str(self._current_file_path),
-                dataset_count=len(datasets),
-                record_count=sum(len(ds.x) for ds in datasets),
-                page="DataPage",
-            )
+            # Generate dataset_id
+            dataset_id = str(uuid.uuid4())
+            if first_dataset_id is None:
+                first_dataset_id = dataset_id
 
-            # Notify user if multiple segments were imported
+            # Segment name for multi-segment files
             if len(datasets) > 1:
-                self._file_name_label.setText(
-                    f"Imported {len(datasets)} segments from {self._current_file_path.name}"
-                )
+                name = f"{self._current_file_path.stem}_segment_{idx + 1}"
+            else:
+                name = self._current_file_path.stem
 
-            self.apply_mapping.emit()
-            self._store.dispatch("SET_TAB", {"tab": "transform"})
-
-        except Exception as e:
-            logger.error(
-                "Failed to import data",
-                filepath=str(self._current_file_path),
-                error=str(e),
-                page="DataPage",
-                exc_info=True,
+            # Register dataset in state store.
+            # For complex oscillation data, split into real G' (y_data) and
+            # real G'' (y2_data) so both converters reconstruct correctly.
+            # F-IO-R3-009: avoids storing redundant complex + real.
+            is_complex = np.iscomplexobj(rheo_data.y)
+            store.dispatch(
+                "IMPORT_DATA_SUCCESS",
+                {
+                    "dataset_id": dataset_id,
+                    "file_path": str(self._current_file_path),
+                    "name": name,
+                    "test_mode": detected_mode or "unknown",
+                    "x_data": rheo_data.x,
+                    "y_data": (
+                        np.real(rheo_data.y)
+                        if is_complex
+                        else rheo_data.y
+                    ),
+                    "y2_data": (
+                        np.imag(rheo_data.y)
+                        if is_complex
+                        else None
+                    ),
+                    "metadata": getattr(rheo_data, "metadata", {}),
+                },
             )
-            self._file_name_label.setText(f"Import error: {str(e)}")
+
+        # For multi-segment files, ensure the first segment is active
+        if len(datasets) > 1 and first_dataset_id:
+            store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id})
+
+        # Log successful import
+        logger.info(
+            "Data import completed",
+            filepath=str(self._current_file_path),
+            dataset_count=len(datasets),
+            record_count=sum(len(ds.x) for ds in datasets),
+            page="DataPage",
+        )
+
+        # Notify user if multiple segments were imported
+        if len(datasets) > 1:
+            self._file_name_label.setText(
+                f"Imported {len(datasets)} segments from {self._current_file_path.name}"
+            )
+        else:
+            self._file_name_label.setText(f"File: {self._current_file_path.name}")
+
+        self.apply_mapping.emit()
+        try:
+            self._store.dispatch("SET_TAB", {"tab": "transform"})
+        except Exception as tab_err:
+            logger.warning("Failed to switch tab", error=str(tab_err))
+
+    def _on_import_failed(self, error_msg: str) -> None:
+        """Handle failed import (called on main thread via signal)."""
+        logger.error(
+            "Failed to import data",
+            filepath=str(self._current_file_path),
+            error=error_msg,
+            page="DataPage",
+        )
+        self._file_name_label.setText(f"Import error: {error_msg}")
+        store = StateStore()
+        store.dispatch(
+            "IMPORT_DATA_FAILED",
+            {
+                "file_path": str(self._current_file_path),
+                "error": error_msg,
+            },
+        )
 
     def load_dataset(self, file_path: str) -> None:
         """Load dataset from file.
@@ -807,13 +866,23 @@ class DataPage(QWidget):
         y_vals = dataset.y_data if dataset.y_data is not None else []
         y2_vals = dataset.y2_data if dataset.y2_data is not None else []
 
+        # If y is complex, extract real/imag for display (F-IO-R3-005)
+        y_arr = np.asarray(y_vals) if len(y_vals) > 0 else np.array([])
+        if np.iscomplexobj(y_arr):
+            y_display = np.real(y_arr)
+            y2_display = np.imag(y_arr)
+            has_y2 = True
+        else:
+            y_display = y_arr
+            y2_display = np.asarray(y2_vals) if y2_vals is not None and len(y2_vals) > 0 else None
+            has_y2 = y2_display is not None and len(y2_display) > 0
+
         # Determine columns
         headers = ["x", "y"]
-        has_y2 = y2_vals is not None and len(y2_vals) > 0
         if has_y2:
             headers.append("y2")
 
-        rows = min(len(x_vals), len(y_vals), 100)
+        rows = min(len(x_vals), len(y_display), 100)
 
         self._preview_table.clear()
         self._preview_table.setRowCount(rows)
@@ -822,9 +891,9 @@ class DataPage(QWidget):
 
         for i in range(rows):
             self._preview_table.setItem(i, 0, QTableWidgetItem(str(x_vals[i])))
-            self._preview_table.setItem(i, 1, QTableWidgetItem(str(y_vals[i])))
+            self._preview_table.setItem(i, 1, QTableWidgetItem(str(y_display[i])))
             if has_y2:
-                self._preview_table.setItem(i, 2, QTableWidgetItem(str(y2_vals[i])))
+                self._preview_table.setItem(i, 2, QTableWidgetItem(str(y2_display[i])))
 
         # Update column mappers to reflect the loaded dataset
         self._update_column_mappers(headers)
@@ -919,15 +988,25 @@ class DataPage(QWidget):
                 **kwargs,
             )
 
-            # Persist back into state as a modified dataset
+            # Persist back into state as a modified dataset.
+            # Same split convention as import: real y_data + real y2_data.
+            is_complex = np.iscomplexobj(processed.y)
             payload = {
                 "dataset_id": dataset.id,
                 "file_path": str(dataset.file_path) if dataset.file_path else None,
                 "name": dataset.name,
                 "test_mode": processed.metadata.get("test_mode", dataset.test_mode),
                 "x_data": processed.x,
-                "y_data": processed.y,
-                "y2_data": getattr(processed, "y2", None),
+                "y_data": (
+                    np.real(np.asarray(processed.y))
+                    if is_complex
+                    else processed.y
+                ),
+                "y2_data": (
+                    np.imag(np.asarray(processed.y))
+                    if is_complex
+                    else None
+                ),
                 "metadata": processed.metadata,
             }
             store.dispatch("IMPORT_DATA_SUCCESS", payload)
@@ -1000,8 +1079,14 @@ class DropZone(QFrame):
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle drop event."""
         if event.mimeData().hasUrls():
-            url = event.mimeData().urls()[0]
-            file_path = url.toLocalFile()
+            file_path = None
+            for url in event.mimeData().urls():
+                candidate = url.toLocalFile()
+                if candidate:
+                    file_path = candidate
+                    break
+            if not file_path:
+                return
             logger.debug("File selected", filepath=file_path, page="DataPage")
             self.file_dropped.emit(file_path)
             event.acceptProposedAction()

@@ -83,13 +83,19 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
                 f"y={y_arr.shape}, y2={y2_arr.shape}"
             )
 
+    # Derive domain from metadata, falling back to test_mode-based inference
+    # so oscillation data always gets domain="frequency".  F-IO-R3-004.
+    domain = metadata.get("domain")
+    if not domain:
+        domain = "frequency" if (test_mode or "") == "oscillation" else "time"
+
     try:
         rheo_data = RheoData(
             x=x_arr,
             y=y_arr,
             x_units=metadata.get("x_units"),
             y_units=metadata.get("y_units"),
-            domain=metadata.get("domain", "time"),
+            domain=domain,
             metadata=metadata,
             initial_test_mode=test_mode,
             validate=True,

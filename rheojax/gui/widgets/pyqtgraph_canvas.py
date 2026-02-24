@@ -58,17 +58,20 @@ class PyQtGraphCanvas(QWidget):
     >>> canvas.set_log_scale(x=True, y=True)  # doctest: +SKIP
     """
 
-    # Default colors for data series (rheology-friendly palette)
-    COLORS = [
-        "#1f77b4",  # Blue - typically G' (storage modulus)
-        "#d62728",  # Red - typically G'' (loss modulus)
-        "#2ca02c",  # Green - fits/predictions
-        "#ff7f0e",  # Orange - secondary data
-        "#9467bd",  # Purple
-        "#8c564b",  # Brown
-        "#e377c2",  # Pink
-        "#7f7f7f",  # Gray
-    ]
+    @property
+    def COLORS(self) -> list[str]:
+        """Dynamic color palette based on current theme."""
+        from rheojax.gui.resources.styles.tokens import themed
+
+        return [
+            themed("CHART_1"),  # Blue - typically G'
+            themed("CHART_5"),  # Red - typically G''
+            themed("CHART_3"),  # Green - fits/predictions
+            themed("CHART_4"),  # Orange - secondary data
+            themed("CHART_2"),  # Purple
+            themed("CHART_6"),  # Pink
+            themed("TEXT_SECONDARY"),  # Gray
+        ]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the PyQtGraph canvas.
@@ -98,13 +101,18 @@ class PyQtGraphCanvas(QWidget):
             antialias=True,
             useOpenGL=True,  # GPU acceleration
             enableExperimental=True,
-            background="w",  # White background
-            foreground="k",  # Black foreground
         )
 
-        # Create plot widget
-        self._plot_widget = PlotWidget()
+        from rheojax.gui.resources.styles.tokens import themed
+
+        # Create plot widget with themed background
+        self._plot_widget = PlotWidget(background=themed("BG_BASE"))
         self._plot_item = self._plot_widget.getPlotItem()
+        
+        # Apply themed foreground to axes
+        foreground = themed("TEXT_PRIMARY")
+        self._plot_item.getAxis("left").setPen(foreground)
+        self._plot_item.getAxis("bottom").setPen(foreground)
 
         # Enable grid
         self._plot_item.showGrid(x=True, y=True, alpha=0.3)

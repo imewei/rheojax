@@ -73,6 +73,8 @@ class ColumnMapperDialog(QDialog):
         self.setMinimumSize(600, 500)
 
         self._setup_ui()
+        # Intentional: load data during __init__ before exec_() so the modal
+        # dialog is fully populated when it first becomes visible to the user.
         self._load_data()
 
         logger.debug(

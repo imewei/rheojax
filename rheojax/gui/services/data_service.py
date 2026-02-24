@@ -49,10 +49,53 @@ class DataService:
             ".xls",
             ".dat",
             ".tri",
+            ".json",
+            ".tsv",
         ]
         logger.debug(
             "DataService initialized",
             supported_formats=self._supported_formats,
+        )
+
+    def to_rheo_data(self, dataset: Any) -> RheoData:
+        """Convert a DatasetState to a RheoData object.
+
+        Combines y_data and y2_data into complex G* for oscillation data.
+
+        Parameters
+        ----------
+        dataset : DatasetState
+            Dataset state from the store
+
+        Returns
+        -------
+        RheoData
+            Converted data object
+        """
+        x = np.asarray(dataset.x_data) if dataset.x_data is not None else None
+        y = np.asarray(dataset.y_data) if dataset.y_data is not None else None
+
+        # Combine G' + iG'' for oscillation data — only if y is not already
+        # complex (readers return complex y when they detect a modulus pair,
+        # so combining again would double-count G'').  F-IO-R3-001.
+        if dataset.y2_data is not None and y is not None and not np.iscomplexobj(y):
+            y2 = np.asarray(dataset.y2_data)
+            y = y + 1j * y2
+
+        # Determine domain from test_mode
+        test_mode = dataset.test_mode or "unknown"
+        domain = "frequency" if test_mode == "oscillation" else "time"
+
+        metadata = dict(dataset.metadata) if dataset.metadata else {}
+        metadata.setdefault("test_mode", test_mode)
+
+        return RheoData(
+            x=x,
+            y=y,
+            domain=domain,
+            initial_test_mode=test_mode,
+            metadata=metadata,
+            validate=True,
         )
 
     def load_file(
@@ -127,11 +170,28 @@ class DataService:
                 kwargs["y_col"] = y_col
             if y2_col:
                 kwargs["y2_col"] = y2_col
+            # Forward test_mode so readers can use it as a column-selection
+            # hint (e.g. TRIOS select_xy_columns).  F-IO-R4-003.
+            if test_mode:
+                kwargs.setdefault("test_mode", test_mode)
 
             logger.debug("Calling auto_load", filepath=str(file_path), kwargs=kwargs)
             data = auto_load(str(file_path), **kwargs)
 
-            # Ensure we have RheoData
+            # Ensure we have a single RheoData
+            if isinstance(data, list):
+                # Multi-segment file (e.g. TRIOS) — return first segment
+                if not data:
+                    raise ValueError(f"No data segments loaded from {file_path}")
+                if len(data) > 1:
+                    logger.info(
+                        "Multi-segment file: returning first segment. "
+                        "Use load_file_multi() to get all segments.",
+                        filepath=str(file_path),
+                        num_segments=len(data),
+                    )
+                data = data[0]
+
             if not isinstance(data, RheoData):
                 # Convert to RheoData if needed
                 if hasattr(data, "x") and hasattr(data, "y"):
@@ -159,12 +219,13 @@ class DataService:
                 filepath=str(file_path),
                 n_records=n_records,
             )
+            y_for_stats = np.abs(data.y) if np.iscomplexobj(data.y) else data.y
             logger.debug(
                 "load_file completed",
                 filepath=str(file_path),
                 n_records=n_records,
                 x_range=(float(np.min(data.x)), float(np.max(data.x))),
-                y_range=(float(np.min(data.y)), float(np.max(data.y))),
+                y_range=(float(np.min(y_for_stats)), float(np.max(y_for_stats))),
             )
             return data
 
@@ -180,6 +241,76 @@ class DataService:
                 exc_info=True,
             )
             raise ValueError(f"Failed to load file: {e}") from e
+
+    def load_file_multi(
+        self,
+        file_path: str | Path,
+        x_col: str | None = None,
+        y_col: str | None = None,
+        y2_col: str | None = None,
+        test_mode: str | None = None,
+        **kwargs: Any,
+    ) -> list[RheoData]:
+        """Load data from file, returning all segments.
+
+        Like :meth:`load_file` but always returns a list, which is
+        needed for TRIOS multi-segment files.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path to data file
+        x_col, y_col, y2_col : str, optional
+            Column names for CSV/Excel files
+        test_mode : str, optional
+            Test mode override
+        **kwargs
+            Additional loader arguments
+
+        Returns
+        -------
+        list[RheoData]
+            One or more loaded datasets
+        """
+        file_path = Path(file_path)
+        logger.debug("load_file_multi called", file_path=str(file_path))
+
+        if x_col and y_col:
+            kwargs["x_col"] = x_col
+            kwargs["y_col"] = y_col
+        if y2_col:
+            kwargs["y2_col"] = y2_col
+        if test_mode:
+            kwargs.setdefault("test_mode", test_mode)
+
+        data = auto_load(str(file_path), **kwargs)
+
+        # Normalise to list
+        datasets: list[RheoData] = data if isinstance(data, list) else [data]
+
+        result: list[RheoData] = []
+        for ds in datasets:
+            if not isinstance(ds, RheoData):
+                if hasattr(ds, "x") and hasattr(ds, "y"):
+                    ds = RheoData(x=ds.x, y=ds.y)
+                else:
+                    continue
+
+            if test_mode:
+                ds.metadata["test_mode"] = test_mode
+
+            ds = self._convert_units(ds)
+            result.append(ds)
+
+        if not result:
+            raise ValueError(f"No valid data segments loaded from {file_path}")
+
+        logger.info(
+            "Data loaded (multi)",
+            filepath=str(file_path),
+            num_segments=len(result),
+        )
+        return result
 
     def preview_file(
         self, file_path: str | Path, max_rows: int = 100
@@ -228,20 +359,26 @@ class DataService:
                     filepath=str(file_path),
                 )
                 data_obj = auto_load(str(file_path))
+                # auto_load may return a list for multi-segment files (F-IO-R4-005)
+                if isinstance(data_obj, list):
+                    data_obj = data_obj[0] if data_obj else None
                 if not isinstance(data_obj, RheoData):
                     logger.error(
                         "Unsupported preview format",
                         filepath=str(file_path),
-                        data_type=type(data_obj).__name__,
+                        data_type=type(data_obj).__name__ if data_obj else "None",
                     )
                     raise ValueError("Unsupported preview format")
 
                 headers = ["x", "y"]
                 rows = min(max_rows, len(data_obj.x))
-                if hasattr(data_obj, "y2") and data_obj.y2 is not None:
+                y_arr = np.asarray(data_obj.y)
+                # RheoData stores complex modulus as G'+iG'' in y
+                # (no separate .y2 attribute).  F-IO-R4-006.
+                if np.iscomplexobj(y_arr):
                     headers.append("y2")
                     data = [
-                        [data_obj.x[i], data_obj.y[i], data_obj.y2[i]]
+                        [data_obj.x[i], float(np.real(y_arr[i])), float(np.imag(y_arr[i]))]
                         for i in range(rows)
                     ]
                 else:
@@ -334,7 +471,7 @@ class DataService:
             domain=data.domain,
             metadata=data.metadata,
             initial_test_mode=data.metadata.get("test_mode"),
-            validate=False,
+            validate=True,
         )
 
     def detect_test_mode(self, data: RheoData) -> str:
@@ -390,9 +527,41 @@ class DataService:
         # This prevents exponential decay from being misclassified as flow
         y_diff = np.diff(y)
 
-        # Relaxation: decreasing modulus over time (monotonically decreasing)
+        # Flow: shear rate vs viscosity/stress (power-law relationship)
+        # Check BEFORE monotonic tests because shear-thinning flow curves
+        # are monotonically decreasing and would otherwise be misclassified
+        # as relaxation.  Flow data has *positive* x (shear rate) in a
+        # power-law relationship across several decades.
+        if x_min > 0 and len(x) > 5:
+            try:
+                mask = (x > 0) & (y > 0)
+                if np.sum(mask) > 5:
+                    log_x = np.log10(x[mask])
+                    log_y = np.log10(y[mask])
+                    correlation = np.corrcoef(log_x, log_y)[0, 1]
+                    x_decades = log_x.max() - log_x.min()
+                    # Strong *negative* power-law over ≥3 decades → flow
+                    # (shear-thinning: η decreasing with γ̇).
+                    # NOTE: Shear-thickening (positive correlation) is not yet
+                    # detected here — it would need x-spacing analysis to
+                    # distinguish from creep.  F-IO-R3-006.
+                    if correlation < -0.9 and x_decades >= 1.0:
+                        logger.debug(
+                            "Detected flow: power-law correlation",
+                            correlation=float(correlation),
+                            x_decades=float(x_decades),
+                        )
+                        return "flow"
+            except Exception as exc:
+                logger.debug(
+                    "Flow detection failed on log-log correlation",
+                    error=str(exc),
+                )
+
+        # Relaxation: decreasing modulus over time (mostly monotonically decreasing)
         # Typical: G(t) = G0 * exp(-t/tau)
-        if len(y) > 3 and np.all(y_diff <= 0):
+        # Allow up to 5% non-monotonic points for noise tolerance
+        if len(y) > 3 and np.sum(y_diff <= 0) >= 0.95 * len(y_diff):
             if x_min >= 0:  # Time-like x-axis (non-negative)
                 # Additional check: y values should span significant range
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
@@ -403,9 +572,10 @@ class DataService:
                     )
                     return "relaxation"
 
-        # Creep: increasing compliance/strain over time (monotonically increasing)
+        # Creep: increasing compliance/strain over time (mostly monotonically increasing)
         # Typical: J(t) = J0 * (1 - exp(-t/tau))
-        if len(y) > 3 and np.all(y_diff >= 0):
+        # Allow up to 5% non-monotonic points for noise tolerance
+        if len(y) > 3 and np.sum(y_diff >= 0) >= 0.95 * len(y_diff):
             if x_min >= 0:  # Time-like x-axis (non-negative)
                 # Additional check: y values should show significant growth
                 y_range_ratio = np.max(y) / (np.min(y) + 1e-10)
@@ -416,34 +586,9 @@ class DataService:
                     )
                     return "creep"
 
-        # Flow: shear rate vs viscosity/stress (power-law relationship)
-        # Only check if data is NOT monotonic (already handled above)
-        if x_min > 0 and len(x) > 5:
-            # Check for power-law relationship in log-log space
-            try:
-                # Filter positive values for log
-                mask = (x > 0) & (y > 0)
-                if np.sum(mask) > 5:
-                    log_x = np.log10(x[mask])
-                    log_y = np.log10(y[mask])
-                    correlation = np.corrcoef(log_x, log_y)[0, 1]
-                    # Only classify as flow if there's variation in y (not monotonic)
-                    if abs(correlation) > 0.9 and not (
-                        np.all(y_diff >= 0) or np.all(y_diff <= 0)
-                    ):
-                        logger.debug(
-                            "Detected flow: power-law correlation",
-                            correlation=float(correlation),
-                        )
-                        return "flow"
-            except Exception as exc:
-                logger.debug(
-                    "Flow detection failed on log-log correlation",
-                    error=str(exc),
-                )
-
         # Oscillation: frequency sweep with log-spaced x-axis
-        if x_min > 0.001 and x_max < 10000:
+        # x_min threshold relaxed to 1e-6 for sub-mHz DMA data.  F-IO-R4-008.
+        if x_min > 1e-6 and x_max < 1e6:
             if len(x) > 10:
                 # Check if logarithmically spaced (typical for frequency sweeps)
                 try:
@@ -478,16 +623,24 @@ class DataService:
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
+        is_complex = np.iscomplexobj(y)
+        y_real = np.real(y) if is_complex else y
+        y_abs = np.abs(y) if is_complex else y
+
         # Check for NaN or Inf
         if np.any(~np.isfinite(x)):
             warnings.append("X-axis contains NaN or Inf values")
-        if np.any(~np.isfinite(y)):
-            warnings.append("Y-axis contains NaN or Inf values")
+        if is_complex:
+            if np.any(np.isnan(y_real)) or np.any(np.isnan(np.imag(y))):
+                warnings.append("Y-axis contains NaN values")
+        else:
+            if np.any(~np.isfinite(y)):
+                warnings.append("Y-axis contains NaN or Inf values")
 
-        # Check for negative values where inappropriate
+        # Check for negative values where inappropriate (not meaningful for complex)
         if np.any(x < 0):
             warnings.append("X-axis contains negative values (check if appropriate)")
-        if np.any(y < 0):
+        if not is_complex and np.any(y < 0):
             warnings.append("Y-axis contains negative values (check if appropriate)")
 
         # Check for sufficient data points
@@ -500,27 +653,27 @@ class DataService:
         if len(np.unique(x)) < len(x):
             warnings.append("X-axis contains duplicate values")
 
-        # Check for zero values (can cause log issues)
+        # Check for zero values (can cause log issues; not meaningful for complex)
         if np.any(x == 0):
             warnings.append(
                 "X-axis contains zero values (may cause issues with log plots)"
             )
-        if np.any(y == 0):
+        if not is_complex and np.any(y == 0):
             warnings.append(
                 "Y-axis contains zero values (may cause issues with log plots)"
             )
 
-        # Check data range
+        # Check data range (use magnitude for complex)
         x_range = np.ptp(x)
-        y_range = np.ptp(y)
+        y_range = np.ptp(y_abs)
 
         if x_range == 0:
             warnings.append("X-axis has no variation (constant values)")
         if y_range == 0:
             warnings.append("Y-axis has no variation (constant values)")
 
-        # Check for outliers (simple IQR method)
-        if len(y) > 4:
+        # Check for outliers (simple IQR method; not meaningful for complex)
+        if not is_complex and len(y) > 4:
             q1, q3 = np.percentile(y, [25, 75])
             iqr = q3 - q1
             if iqr > 0:

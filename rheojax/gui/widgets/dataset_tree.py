@@ -53,6 +53,7 @@ class DatasetTree(QTreeWidget):
     dataset_selected = Signal(str)
     file_selected = Signal(str, Path)
     context_menu_requested = Signal(QPoint)
+    context_action_triggered = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize dataset tree.

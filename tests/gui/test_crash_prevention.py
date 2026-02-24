@@ -201,6 +201,7 @@ class TestWidgetRenderingSafety:
         assert table.rowCount() == 2
 
 
+@pytest.mark.gui
 @pytest.mark.crash_test
 class TestSubprocessCrashDetection:
     """Subprocess-based tests that detect potential crashes."""
@@ -315,6 +316,7 @@ class TestSubprocessCrashDetection:
         assert "SUCCESS" in result.stdout
 
 
+@pytest.mark.gui
 @pytest.mark.crash_test
 class TestRegressionCrashPrevention:
     """Regression tests for specific crash bugs that were fixed."""

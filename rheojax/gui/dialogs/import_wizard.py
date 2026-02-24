@@ -273,21 +273,28 @@ class ColumnMappingPage(QWizardPage):
     def _load_columns(self, file_path: str) -> None:
         """Load columns from file."""
         try:
-            # Read file to get columns
-            path = Path(file_path)
-            if path.suffix.lower() in [".csv", ".txt"]:
-                from rheojax.io.readers.csv_reader import detect_csv_delimiter
-
-                delimiter = detect_csv_delimiter(file_path)
-                df = pd.read_csv(file_path, sep=delimiter, nrows=5)
-            elif path.suffix.lower() in [".xlsx", ".xls"]:
-                df = pd.read_excel(file_path, nrows=5)
+            # Read file to get columns (cache on wizard to avoid duplicate reads)
+            wizard = self.wizard()
+            cache_key = str(file_path)
+            if hasattr(wizard, "_cached_df") and getattr(wizard, "_cached_file_path", None) == cache_key:
+                df = wizard._cached_df
             else:
-                # For TRIOS or other formats, try CSV first
-                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+                path = Path(file_path)
+                if path.suffix.lower() in [".csv", ".txt"]:
+                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
 
-                delimiter = detect_csv_delimiter(file_path)
-                df = pd.read_csv(file_path, sep=delimiter, nrows=5)
+                    delimiter = detect_csv_delimiter(file_path)
+                    df = pd.read_csv(file_path, sep=delimiter, nrows=5)
+                elif path.suffix.lower() in [".xlsx", ".xls"]:
+                    df = pd.read_excel(file_path, nrows=5)
+                else:
+                    # For TRIOS or other formats, try CSV first
+                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                    delimiter = detect_csv_delimiter(file_path)
+                    df = pd.read_csv(file_path, sep=delimiter, nrows=5)
+                wizard._cached_df = df
+                wizard._cached_file_path = cache_key
 
             columns = list(df.columns)
             logger.debug(
@@ -392,7 +399,9 @@ class TestModeSelectionPage(QWizardPage):
                 "oscillation",
                 "relaxation",
                 "creep",
-                "flow",
+                "flow_curve",
+                "startup",
+                "laos",
             ]
         )
         self.test_mode_combo.setEnabled(False)
@@ -519,19 +528,28 @@ class PreviewConfirmPage(QWizardPage):
     ) -> None:
         """Load preview data."""
         try:
-            path = Path(file_path)
-            if path.suffix.lower() in [".csv", ".txt"]:
-                from rheojax.io.readers.csv_reader import detect_csv_delimiter
-
-                delimiter = detect_csv_delimiter(file_path)
-                df = pd.read_csv(file_path, sep=delimiter, nrows=10)
-            elif path.suffix.lower() in [".xlsx", ".xls"]:
-                df = pd.read_excel(file_path, nrows=10)
+            # Use cached DataFrame from wizard if available (same file, but
+            # we need more rows for preview so re-read with nrows=10)
+            wizard = self.wizard()
+            cache_key = str(file_path)
+            if hasattr(wizard, "_cached_preview_df") and getattr(wizard, "_cached_preview_path", None) == cache_key:
+                df = wizard._cached_preview_df
             else:
-                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+                path = Path(file_path)
+                if path.suffix.lower() in [".csv", ".txt"]:
+                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
 
-                delimiter = detect_csv_delimiter(file_path)
-                df = pd.read_csv(file_path, sep=delimiter, nrows=10)
+                    delimiter = detect_csv_delimiter(file_path)
+                    df = pd.read_csv(file_path, sep=delimiter, nrows=10)
+                elif path.suffix.lower() in [".xlsx", ".xls"]:
+                    df = pd.read_excel(file_path, nrows=10)
+                else:
+                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                    delimiter = detect_csv_delimiter(file_path)
+                    df = pd.read_csv(file_path, sep=delimiter, nrows=10)
+                wizard._cached_preview_df = df
+                wizard._cached_preview_path = cache_key
 
             # Select relevant columns
             cols = [x_col, y_col]
@@ -614,6 +632,11 @@ class ImportWizard(QWizard):
 
     def _on_finished(self, result: int) -> None:
         """Handle wizard finished."""
+        # Clear cached DataFrames to free memory (F-IO-R2-010)
+        for attr in ("_cached_df", "_cached_file_path", "_cached_preview_df", "_cached_preview_path"):
+            if hasattr(self, attr):
+                setattr(self, attr, None)
+
         if result == QWizard.DialogCode.Accepted.value:
             logger.debug("Options applied", dialog=self.__class__.__name__)
         else:

@@ -139,6 +139,29 @@ class TestDesignTokenUsage:
             "should use ColorPalette.CHART_* or similar"
         )
 
+    @pytest.mark.smoke
+    def test_pyqtgraph_canvas_uses_theme_tokens(self) -> None:
+        """PyQtGraphCanvas should use theme tokens for background and colors, not hardcoded strings."""
+        import inspect
+
+        from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
+
+        source = inspect.getsource(PyQtGraphCanvas)
+        
+        # Verify no hardcoded hex strings remain for colors
+        assert (
+            'background="w"' not in source
+        ), 'Hardcoded background="w" found — should use themed("BG_BASE")'
+        assert (
+            'foreground="k"' not in source
+        ), 'Hardcoded foreground="k" found — should use themed("TEXT_PRIMARY")'
+        assert (
+            '"#1f77b4"' not in source
+        ), 'Hardcoded color "#1f77b4" found — should use themed("CHART_1")'
+        assert (
+            "themed(" in source
+        ), "PyQtGraphCanvas must use themed() for dynamic colors"
+
 
 # =============================================================================
 # Keyboard Accessibility Tests
