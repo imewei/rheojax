@@ -42,10 +42,7 @@ def detect_data_range_decades(x: np.ndarray) -> float:
     x_min = np.min(x_positive)
     x_max = np.max(x_positive)
 
-    if x_min <= 0 or x_max <= 0:
-        logger.debug("Invalid min/max after filtering", x_min=x_min, x_max=x_max)
-        return 0.0
-
+    # x_min and x_max are guaranteed > 0 by x_positive construction above
     decades = float(np.log10(x_max / x_min))
     logger.debug(
         "Data range computed",
@@ -271,8 +268,127 @@ def suggest_optimization_strategy(
     return strategy
 
 
+def check_nan_inf(
+    data: np.ndarray,
+    label: str = "data",
+) -> dict[str, object]:
+    """Check for NaN/Inf values and return a diagnostic dictionary.
+
+    Args:
+        data: Array to inspect (any shape; will be flattened internally).
+        label: Human-readable name for this array used in the returned dict.
+
+    Returns:
+        Dictionary with keys:
+            - 'label': The provided label string.
+            - 'n_nan': Number of NaN values.
+            - 'n_inf': Number of Inf values (±∞).
+            - 'has_issues': True if any NaN or Inf is present.
+            - 'fraction_clean': Fraction of finite values in [0, 1].
+
+    Example:
+        >>> arr = np.array([1.0, np.nan, np.inf, 2.0])
+        >>> result = check_nan_inf(arr, label="G_star")
+        >>> result['n_nan']
+        1
+        >>> result['has_issues']
+        True
+    """
+    flat = np.asarray(data).ravel()
+    n_nan = int(np.sum(np.isnan(flat)))
+    n_inf = int(np.sum(np.isinf(flat)))
+    total = max(len(flat), 1)
+    result = {
+        "label": label,
+        "n_nan": n_nan,
+        "n_inf": n_inf,
+        "has_issues": n_nan > 0 or n_inf > 0,
+        "fraction_clean": 1.0 - (n_nan + n_inf) / total,
+    }
+    if result["has_issues"]:
+        logger.info(
+            "Data quality issue detected",
+            label=label,
+            n_nan=n_nan,
+            n_inf=n_inf,
+            fraction_clean=result["fraction_clean"],
+        )
+    else:
+        logger.debug("Data quality OK", label=label, n_points=total)
+    return result
+
+
+def check_monotonicity(
+    x: np.ndarray,
+    threshold: float = 0.95,
+) -> dict[str, object]:
+    """Check whether an array is approximately monotonic.
+
+    An array is considered monotonic if at least *threshold* fraction of
+    consecutive differences share the same sign.
+
+    Args:
+        x: 1-D array to check.
+        threshold: Minimum fraction of steps that must be consistently
+            increasing or decreasing to classify as monotonic (default: 0.95).
+
+    Returns:
+        Dictionary with keys:
+            - 'is_monotonic': True if the dominant direction exceeds threshold.
+            - 'direction': 'increasing', 'decreasing', 'constant', or 'mixed'.
+            - 'fraction': Fraction of steps in the dominant direction.
+
+    Example:
+        >>> x = np.array([1.0, 2.0, 3.0, 2.9, 4.0])
+        >>> result = check_monotonicity(x, threshold=0.95)
+        >>> result['direction']
+        'increasing'
+    """
+    x = np.asarray(x)
+    if len(x) < 2:
+        return {"is_monotonic": True, "direction": "constant", "fraction": 1.0}
+
+    diffs = np.diff(x)
+    n_total = len(diffs)
+    n_inc = int(np.sum(diffs > 0))
+    n_dec = int(np.sum(diffs < 0))
+
+    frac_inc = n_inc / n_total
+    frac_dec = n_dec / n_total
+
+    if frac_inc >= threshold:
+        result: dict[str, object] = {
+            "is_monotonic": True,
+            "direction": "increasing",
+            "fraction": frac_inc,
+        }
+    elif frac_dec >= threshold:
+        result = {
+            "is_monotonic": True,
+            "direction": "decreasing",
+            "fraction": frac_dec,
+        }
+    else:
+        result = {
+            "is_monotonic": False,
+            "direction": "mixed",
+            "fraction": max(frac_inc, frac_dec),
+        }
+
+    logger.debug(
+        "Monotonicity check",
+        direction=result["direction"],
+        is_monotonic=result["is_monotonic"],
+        fraction=result["fraction"],
+        n_total=n_total,
+    )
+    return result
+
+
 __all__ = [
     "detect_data_range_decades",
     "check_wide_frequency_range",
     "suggest_optimization_strategy",
+    "check_nan_inf",
+    "check_monotonicity",
 ]

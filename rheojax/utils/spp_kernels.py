@@ -83,6 +83,9 @@ def apparent_cage_modulus(
     Apparent cage modulus is the instantaneous elastic response, normalized
     by strain amplitude: G_cage(t) = stress(t) / gamma0 * sign(strain(t)).
 
+    Reference: Rogers et al. (2012) J. Rheol. 56(1).
+    Eq. (1): G'_cage(t) = sigma(t) / gamma_0 * sign(gamma(t))
+
     Parameters
     ----------
     stress : Array
@@ -468,10 +471,13 @@ def harmonic_reconstruction_full(
     An1_stress = 2 * jnp.real(fft_stress) / L
     Bn1_stress = -2 * jnp.imag(fft_stress) / L
 
-    # Zero the DC component
+    # Zero the DC component for both An (cosine) and Bn (sine) coefficients
     An1_strain = An1_strain.at[0].set(0.0)
+    Bn1_strain = Bn1_strain.at[0].set(0.0)
     An1_rate = An1_rate.at[0].set(0.0)
+    Bn1_rate = Bn1_rate.at[0].set(0.0)
     An1_stress = An1_stress.at[0].set(0.0)
+    Bn1_stress = Bn1_stress.at[0].set(0.0)
 
     # Compute phase offset Delta from strain fundamental
     An_fund = An1_strain[p]
@@ -768,19 +774,21 @@ def spp_fourier_analysis(
     # Complex modulus and phase angle
     G_star_t = jnp.sqrt(Gp_t**2 + Gpp_t**2 + 1e-30)
     tan_delta_t = Gpp_t / jnp.maximum(jnp.abs(Gp_t), eps) * jnp.sign(Gp_t)
-    is_Gp_neg = Gp_t < 0
-    delta_t = jnp.arctan(tan_delta_t) + jnp.pi * is_Gp_neg
+    # Phase angle via arctan2 — handles all four quadrants correctly
+    # Ref: Rogers 2012, SPP framework, Eq. (5)
+    delta_t = jnp.arctan2(Gpp_t, Gp_t)
 
-    # Phase angle rate (MATLAB formula)
-    # Normalize derivatives by omega for delta_t_dot calculation
+    # Phase angle rate — Rogers 2012, Eq. (8)
+    # delta_t_dot = (sigma' * sigma''' - sigma''^2) / (sigma'^2 + sigma''^2)
+    # where prime = d/dt normalized by omega
     rd_tn = rd / omega
     rdd_tn = rdd / omega**2
     rddd_tn = rddd / omega**3
-    delta_t_dot = (
-        -rd_tn[:, 2]
-        * (rddd_tn[:, 2] + rd_tn[:, 2])
-        / (jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps))
-    )
+    sigma_prime = rd_tn[:, 2]       # dσ/dt normalized
+    sigma_dprime = rdd_tn[:, 2]     # d²σ/dt² normalized
+    sigma_tprime = rddd_tn[:, 2]    # d³σ/dt³ normalized
+    denom = jnp.maximum(sigma_prime**2 + sigma_dprime**2, eps)
+    delta_t_dot = (sigma_prime * sigma_tprime - sigma_dprime**2) / denom
 
     # Displacement stress
     disp_stress = stress_recon - (Gp_t * strain_recon + Gpp_t * rate_recon)
@@ -1734,19 +1742,21 @@ def spp_numerical_analysis(
 
     # Loss tangent and phase angle
     tan_delta_t = Gpp_t / jnp.maximum(jnp.abs(Gp_t), eps) * jnp.sign(Gp_t)
-    is_Gp_neg = Gp_t < 0
-    delta_t = jnp.arctan(tan_delta_t) + jnp.pi * is_Gp_neg
+    # Phase angle via arctan2 — handles all four quadrants correctly
+    # Ref: Rogers 2012, SPP framework, Eq. (5)
+    delta_t = jnp.arctan2(Gpp_t, Gp_t)
 
-    # Phase angle rate (MATLAB formula)
-    # Normalize derivatives by omega for delta_t_dot calculation
+    # Phase angle rate — Rogers 2012, Eq. (8)
+    # delta_t_dot = (sigma' * sigma''' - sigma''^2) / (sigma'^2 + sigma''^2)
+    # where prime = d/dt normalized by omega
     rd_tn = rd / omega_scalar
     rdd_tn = rdd / omega_scalar**2
     rddd_tn = rddd / omega_scalar**3
-    delta_t_dot = (
-        -rd_tn[:, 2]
-        * (rddd_tn[:, 2] + rd_tn[:, 2])
-        / (jnp.maximum(rdd_tn[:, 2] ** 2 + rd_tn[:, 2] ** 2, eps))
-    )
+    sigma_prime = rd_tn[:, 2]       # dσ/dt normalized
+    sigma_dprime = rdd_tn[:, 2]     # d²σ/dt² normalized
+    sigma_tprime = rddd_tn[:, 2]    # d³σ/dt³ normalized
+    denom = jnp.maximum(sigma_prime**2 + sigma_dprime**2, eps)
+    delta_t_dot = (sigma_prime * sigma_tprime - sigma_dprime**2) / denom
 
     # Displacement stress (MATLAB formula)
     disp_stress = stress_arr - (Gp_t * strain_arr + Gpp_t * strain_rate_normalized)

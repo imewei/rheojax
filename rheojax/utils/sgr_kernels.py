@@ -90,15 +90,10 @@ def rho_trap(E: "float | Array") -> "float | Array":
     - This distribution leads to power-law rheology for 1 < x < 2
     - For E < 0, returns 0 (unphysical)
     """
-    E_arr = jnp.atleast_1d(jnp.asarray(E, dtype=jnp.float64))
-
-    # Exponential distribution (zero for negative energies)
-    rho = jnp.where(E_arr >= 0, jnp.exp(-E_arr), 0.0)
-
-    # Return scalar if input was scalar
-    if jnp.ndim(E) == 0:
-        return rho[0]
-    return rho
+    E_arr = jnp.asarray(E, dtype=jnp.float64)
+    # JIT-safe: no Python-level branch on ndim; let callers handle shape
+    # Ref: Sollich 1998, Eq. (3): rho(E) = exp(-E) for E >= 0
+    return jnp.where(E_arr >= 0, jnp.exp(-E_arr), 0.0)
 
 
 # ============================================================================
@@ -160,7 +155,6 @@ def _G0_compute(x: float, n_points: int = 128, E_max: float = 20.0) -> float:
     return integral
 
 
-@jax.jit
 def G0(x: "float | Array") -> "float | Array":
     """
     Equilibrium modulus for SGR model.
@@ -186,13 +180,13 @@ def G0(x: "float | Array") -> "float | Array":
     >>> from rheojax.utils.sgr_kernels import G0
     >>>
     >>> # Glass transition region (x ≈ 1)
-    >>> G0(1.0)  # ≈ 0.368
+    >>> G0(1.0)  # Returns equilibrium modulus at glass transition
     >>>
     >>> # Power-law fluid (1 < x < 2)
-    >>> G0(1.5)  # ≈ 0.472
+    >>> G0(1.5)  # Power-law fluid region
     >>>
     >>> # Newtonian limit (x >= 2)
-    >>> G0(2.0)  # ≈ 0.541
+    >>> G0(2.0)  # Near Newtonian limit
     >>>
     >>> # Array evaluation
     >>> x_vals = jnp.array([1.2, 1.5, 1.8, 2.0])
@@ -217,21 +211,9 @@ def G0(x: "float | Array") -> "float | Array":
     from solid-like (x<1) to fluid-like (x>1) behavior.
     """
     x_arr = jnp.atleast_1d(jnp.asarray(x, dtype=jnp.float64))
-
-    # Validate input
-    x_safe = jnp.maximum(x_arr, 1e-10)  # Avoid division by zero
-
-    # Determine if scalar or array
-    is_scalar = jnp.ndim(x) == 0
-
-    if is_scalar:
-        # Single value - direct computation
-        result = _G0_compute(x_safe[0])
-        return result
-    else:
-        # Array - vectorize
-        result = jax.vmap(_G0_compute)(x_safe)
-        return result
+    x_safe = jnp.maximum(x_arr, 1e-10)
+    result = jax.vmap(_G0_compute)(x_safe)
+    return result[0] if jnp.ndim(x) == 0 else result
 
 
 # ============================================================================
@@ -332,7 +314,6 @@ def _Gp_quadrature(
     return G_prime, G_double_prime
 
 
-@jax.jit
 def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]":
     """
     Frequency-dependent complex modulus for SGR model.
@@ -399,27 +380,26 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     x_safe = jnp.maximum(x_arr, 1e-10)
     omega_safe = jnp.maximum(omega_arr, 1e-10)
 
-    # Determine if we need to vectorize
     is_x_scalar = jnp.ndim(x) == 0
     is_omega_scalar = jnp.ndim(omega_tau0) == 0
 
     if is_x_scalar and is_omega_scalar:
-        # Both scalars - direct computation
-        G_prime, G_double_prime = _Gp_quadrature(x_safe[0], omega_safe[0])
-        return G_prime, G_double_prime
+        # Both scalars — vmap over a length-1 array then squeeze
+        results = jax.vmap(lambda w: _Gp_quadrature(x_safe[0], w))(omega_safe)
+        return results[0][0], results[1][0]
 
     elif is_x_scalar:
-        # x scalar, omega array - vectorize over omega
+        # x scalar, omega array — vectorize over omega
         results = jax.vmap(lambda w: _Gp_quadrature(x_safe[0], w))(omega_safe)
         return results[0], results[1]
 
     elif is_omega_scalar:
-        # omega scalar, x array - vectorize over x
+        # omega scalar, x array — vectorize over x
         results = jax.vmap(lambda x_val: _Gp_quadrature(x_val, omega_safe[0]))(x_safe)
         return results[0], results[1]
 
     else:
-        # Both arrays - ensure same shape and vectorize
+        # Both arrays — ensure same shape and vectorize
         if x_arr.shape != omega_arr.shape:
             raise ValueError(
                 f"x and omega_tau0 must have same shape, got {x_arr.shape} and {omega_arr.shape}"

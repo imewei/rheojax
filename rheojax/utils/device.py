@@ -251,13 +251,14 @@ def get_device_info() -> dict:
         "recommended_package": None,
     }
 
-    # JAX info
+    # JAX info — use safe_import_jax() per project convention
     try:
-        import jax
+        from rheojax.core.jax_config import safe_import_jax
 
-        info["jax_version"] = jax.__version__
-        info["jax_backend"] = jax.default_backend()
-        devices = jax.devices()
+        jax_mod, _ = safe_import_jax()
+        info["jax_version"] = jax_mod.__version__
+        info["jax_backend"] = jax_mod.default_backend()
+        devices = jax_mod.devices()
         info["devices"] = [str(d) for d in devices]
         info["gpu_count"] = sum(1 for d in devices if "cuda" in str(d).lower())
         info["using_gpu"] = info["gpu_count"] > 0
@@ -352,11 +353,14 @@ def print_device_summary() -> None:
     print("==================")
 
     try:
-        import jax
+        # SUP-012: Use safe_import_jax() instead of direct import jax
+        from rheojax.core.jax_config import safe_import_jax
 
-        print(f"JAX version: {jax.__version__}")
+        jax_mod, _ = safe_import_jax()
 
-        devices = jax.devices()
+        print(f"JAX version: {jax_mod.__version__}")
+
+        devices = jax_mod.devices()
         print(f"Devices: {devices}")
 
         has_gpu = any(
@@ -364,7 +368,7 @@ def print_device_summary() -> None:
         )
 
         if has_gpu:
-            print("Using: GPU acceleration ✓")
+            print("Using: GPU acceleration")
 
             # Try to get GPU memory info
             mem_info = get_gpu_memory_info()

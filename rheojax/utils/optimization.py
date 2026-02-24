@@ -73,6 +73,12 @@ _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
         "sigma_0",
         "T_init",
         "T",
+        # Additional protocol kwargs (R3-U-005)
+        "omega",
+        "lam_init",
+        "lam_0",
+        "sigma_init",
+        "points_per_cycle",
     }
 )
 

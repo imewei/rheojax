@@ -63,7 +63,12 @@ def compute_fit_quality(
     ss_res = np.sum(residuals**2)
     ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
 
-    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    if ss_tot > 0:
+        r2 = 1.0 - ss_res / ss_tot
+    elif ss_res == 0.0:
+        r2 = 1.0  # Perfect fit on constant data
+    else:
+        r2 = 0.0  # Non-zero residuals on constant data
     rmse = np.sqrt(np.mean(residuals**2))
 
     # Normalized RMSE
@@ -86,7 +91,14 @@ def r2_complex(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     Returns
     -------
     float
-        Coefficient of determination computed on magnitudes.
+        Coefficient of determination computed on magnitudes |G*|.
+
+    Note
+    ----
+    This metric evaluates magnitude fit only. Phase errors (e.g., correct
+    |G*| but wrong tan(δ)) are not captured. For phase-sensitive evaluation,
+    use :func:`r2_complex_components` which averages R² over the real and
+    imaginary components independently.
     """
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
@@ -97,3 +109,50 @@ def r2_complex(y_true: ArrayLike, y_pred: ArrayLike) -> float:
         y_pred = np.abs(y_pred)
 
     return compute_fit_quality(y_true, y_pred)["R2"]
+
+
+def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
+    """Compute R² for complex data using separate real and imaginary components.
+
+    Returns the arithmetic mean of R²(real) and R²(imag), capturing both
+    magnitude and phase accuracy. A model that fits |G*| perfectly but has
+    the wrong phase angle will score lower here than with :func:`r2_complex`.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Observed complex values (e.g., G* = G' + i·G'').
+    y_pred : array-like
+        Predicted complex values.
+
+    Returns
+    -------
+    float
+        Average R² across real (G') and imaginary (G'') components.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> omega = np.logspace(-2, 2, 50)
+    >>> G_star = omega * 1j  # Pure viscous
+    >>> r2_complex_components(G_star, G_star)
+    1.0
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    if not np.iscomplexobj(y_true) and not np.iscomplexobj(y_pred):
+        ss_res = np.sum((y_true - y_pred) ** 2)
+        ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+        return 1.0 - ss_res / max(float(ss_tot), 1e-30)
+
+    ss_res_real = np.sum((np.real(y_true) - np.real(y_pred)) ** 2)
+    ss_tot_real = np.sum((np.real(y_true) - np.mean(np.real(y_true))) ** 2)
+
+    ss_res_imag = np.sum((np.imag(y_true) - np.imag(y_pred)) ** 2)
+    ss_tot_imag = np.sum((np.imag(y_true) - np.mean(np.imag(y_true))) ** 2)
+
+    r2_real = 1.0 - ss_res_real / max(float(ss_tot_real), 1e-30)
+    r2_imag = 1.0 - ss_res_imag / max(float(ss_tot_imag), 1e-30)
+
+    return (r2_real + r2_imag) / 2.0

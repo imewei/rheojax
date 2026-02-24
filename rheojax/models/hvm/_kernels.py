@@ -44,7 +44,11 @@ State Vector Convention (simple shear, 11 components)
 References
 ----------
 - Vernerey, Long, & Brighenti (2017). JMPS 107, 1-20.
+  Eq. (8): dmu^E_nat/dt = k_BER*(mu^E - mu^E_nat) — natural-state evolution (vitrimer hallmark)
+  Eq. (11): sigma_E = G_E * (mu^E - mu^E_nat) — stress via tensor difference
 - Meng, Simon, Niu, McKenna, & Hallinan (2019). Macromolecules 52, 8.
+  Eq. (3): k_BER = nu_0 * exp(-E_a/RT) — Arrhenius bond exchange rate
+  Eq. (5): tau_v = 1/(2*k_BER) — vitrimer relaxation time (factor-of-2)
 - Stukalin et al. (2013). Macromolecules 46, 7525-7541.
 """
 

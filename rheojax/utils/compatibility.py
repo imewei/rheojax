@@ -77,10 +77,18 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     # Remove any invalid values
     valid = np.isfinite(t) & np.isfinite(G_t) & (t > 0) & (G_t > 0)
     if np.sum(valid) < 10:
-        logger.debug(
-            "Insufficient valid data points after filtering",
-            n_valid=int(np.sum(valid)),
-        )
+        n_non_positive = int(np.sum(np.asarray(G_t) <= 0))
+        if n_non_positive > 0:
+            logger.info(
+                "Cannot classify decay type: G(t) contains non-positive values",
+                n_non_positive=n_non_positive,
+                data_range=(float(np.min(G_t)), float(np.max(G_t))),
+            )
+        else:
+            logger.debug(
+                "Insufficient valid data points after filtering",
+                n_valid=int(np.sum(valid)),
+            )
         return DecayType.UNKNOWN
 
     t = t[valid]
@@ -92,10 +100,13 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     G_t = G_t[sort_idx]
 
     # 1. Check for exponential decay: log(G) vs t should be linear
+    # Normalize t to [0,1] so R² is comparable with the log-log power-law R²
     slope_exp = 0.0
     try:
         log_G = np.log(np.maximum(G_t, 1e-30))
-        slope_exp, intercept_exp, r_exp, _, _ = linregress(t, log_G)
+        t_range = t.max() - t.min()
+        t_norm = (t - t.min()) / (t_range + 1e-30) if t_range > 0 else t
+        slope_exp, intercept_exp, r_exp, _, _ = linregress(t_norm, log_G)
         r_exp_sq = r_exp**2
         logger.debug(
             "Exponential fit",

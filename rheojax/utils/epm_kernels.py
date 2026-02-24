@@ -22,8 +22,11 @@ jax, jnp = safe_import_jax()
 def make_propagator_q(L_x: int, L_y: int, shear_modulus: float = 1.0) -> jax.Array:
     """Create the quadrupolar Eshelby propagator in Fourier space.
 
-    G(q) = -4 * mu * (qx * qy)^2 / (q^2)^2 for q != 0
+    G(q) = -2 * mu * (qx * qy)^2 / |q|^4 for q != 0
     G(0) = 0
+
+    Reference: Talamali et al. (2011) Phys. Rev. E 84, 016115.
+    Eq. (6): G(q) = -2*mu*(qx*qy)^2/|q|^4 — quadrupolar Eshelby propagator.
 
     Args:
         L_x: Lattice size in x.
@@ -44,9 +47,10 @@ def make_propagator_q(L_x: int, L_y: int, shear_modulus: float = 1.0) -> jax.Arr
     valid_mask = Q2 > 0
     safe_Q2 = jnp.where(valid_mask, Q2, 1.0)
 
-    # Standard scalar EPM propagator (quadrupolar)
+    # Eshelby propagator for 2D scalar EPM
+    # Ref: Picard, Ajdari, Lequeux, Bocquet 2004, Eq. (6): G(q) = -2μ·qx²qy²/|q|⁴
     propagator_q = jnp.where(
-        valid_mask, -4.0 * shear_modulus * (QX**2 * QY**2) / (safe_Q2**2), 0.0
+        valid_mask, -2.0 * shear_modulus * (QX**2 * QY**2) / (safe_Q2**2), 0.0
     )
 
     # Explicitly enforce zero mean redistribution at q=0
@@ -204,7 +208,7 @@ def epm_step(
     # Note: The propagator G already includes the factor 'mu' if derived from stress balance,
     # or strictly G describes stress-from-strain.
     # In standard form (Nicolas 2018): dSigma/dt = mu*gdot - mu*gdot_p + G_stress_from_strain * gdot_p
-    # Our propagator factory generates G_stress_from_strain (includes -4*mu factor).
+    # Our propagator factory generates G_stress_from_strain (includes -2*mu factor).
     redistribution_rate = solve_elastic_propagator(plastic_strain_rate, propagator_q)
 
     total_stress_rate = loading_rate + relaxation_rate + redistribution_rate

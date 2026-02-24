@@ -596,12 +596,22 @@ def warm_start_from_n_modes(
             operation="passthrough",
         )
 
-    # Case 3: Increase modes (edge case, pad with small values)
+    # Case 3: Increase modes (edge case, pad relative to existing tau values)
     else:
-        # Pad with small positive values
         n_pad = n_target - n_current
-        E_i_target = np.concatenate([E_i, np.full(n_pad, 1e3)])
-        tau_i_target = np.concatenate([tau_i, np.logspace(-2, 2, n_pad)])
+        # Pad tau values relative to existing range (data-aware)
+        TAU_LB, TAU_UB = 1e-6, 1e6
+        tau_min_existing = max(tau_i.min() / 10.0, TAU_LB)
+        tau_max_existing = min(tau_i.max() * 10.0, TAU_UB)
+        E_i_target = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
+        tau_i_target = np.concatenate(
+            [
+                tau_i,
+                np.logspace(
+                    np.log10(tau_min_existing), np.log10(tau_max_existing), n_pad
+                ),
+            ]
+        )
         logger.debug(
             "Warm-start: increasing modes",
             n_current=n_current,

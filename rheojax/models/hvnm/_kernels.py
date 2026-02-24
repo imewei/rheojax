@@ -33,8 +33,14 @@ State Vector Convention (simple shear, 17 components without D_int)
 References
 ----------
 - Vernerey, Long, & Brighenti (2017). JMPS 107, 1-20.
+  Eq. (8): dmu_nat/dt = k_BER*(mu - mu_nat) — natural-state evolution equation
+  Eq. (11): sigma_net = G * (mu - mu_nat) — network stress from tensor difference
 - Li, Zhao, Duan, Zhang, Liu (2024). Langmuir 40, 7550-7560.
+  Eq. (3): k_BER^int = nu_0^int * exp(-E_a^int/RT) — interphase bond exchange rate
+  Eq. (5): tau_I = 1/(2*k_BER^int) — interphase relaxation time (factor-of-2)
 - Karim, Vernerey, Sain (2025). Macromolecules 58, 4899-4912.
+  Eq. (2): X(phi) = 1 + 2.5*phi + 14.1*phi^2 — Guth-Gold amplification factor
+  Eq. (7): sigma_total = G_P*X(phi)*mu_P + G_E*(mu_E - mu_E_nat) + G_I*(mu_I - mu_I_nat)
 - Papon, Montes et al. (2012). Soft Matter 8, 4090-4096.
 """
 

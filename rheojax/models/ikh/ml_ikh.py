@@ -589,7 +589,7 @@ class MLIKH(IKHBase):
                 jnp.asarray(X),
                 param_dict,
                 test_mode,
-                gamma_dot=kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)),
+                gamma_dot=kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", float("nan"))),
                 sigma_applied=kwargs.get(
                     "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
                 ),

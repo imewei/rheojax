@@ -10,6 +10,14 @@ Key Components:
 - Yield criteria: von Mises (isotropic) and Hill (anisotropic)
 - Component-wise Prandtl-Reuss flow rule for plastic strain evolution
 - Full tensorial EPM time-stepping kernel
+
+References
+----------
+Budrikis & Zapperi (2013) Universality and Localization in Classical and Quantum EPM.
+Phys. Rev. E 88, 062403.
+Eq. (1): tensorial Eshelby propagator G_ij(q) for 2D plane-strain redistribution.
+Eq. (3): von Mises yield criterion J_2 = (1/2)*s_ij*s_ij >= sigma_c^2/3.
+Eq. (5): Prandtl-Reuss plastic flow depsilon_ij = d_lambda * s_ij / (2*sigma_c).
 """
 
 from __future__ import annotations
@@ -98,11 +106,16 @@ def make_tensorial_propagator_q(L: int, nu: float, mu: float = 1.0) -> jax.Array
     # For shear: 2 * (qx * qy)² / q⁴ pattern
     G_xyxy = -4.0 * mu * (QX**2 * QY**2) / (safe_Q2**2)
 
-    # G_xxxy: Normal-shear coupling
-    G_xxxy = prefactor * coupling_factor * qx_hat * qy_hat
+    # G_xxxy: Normal-shear coupling (σ_xx ↔ ε_xy)
+    # From Eshelby tensor G_ijkl with i=x, j=x, k=x, l=y:
+    #   G_xxxy ∝ C_xxkl * qk * ql / |q|² → qx_hat² * qy_hat
+    # (Budrikis & Zapperi 2013, Eq. 1; Picard et al. 2004)
+    G_xxxy = prefactor * coupling_factor * qx_hat * qx_hat * qy_hat
 
-    # G_yyxy: Normal-shear coupling
-    G_yyxy = prefactor * coupling_factor * qy_hat * qx_hat
+    # G_yyxy: Normal-shear coupling (σ_yy ↔ ε_xy)
+    # From Eshelby tensor G_ijkl with i=y, j=y, k=x, l=y:
+    #   G_yyxy ∝ C_yykl * qk * ql / |q|² → qy_hat² * qx_hat
+    G_yyxy = prefactor * coupling_factor * qy_hat * qy_hat * qx_hat
 
     # Assemble the propagator (ensuring symmetry)
     # Apply valid_mask to zero out invalid entries
@@ -151,6 +164,7 @@ def compute_von_mises_stress(stress_tensor: jax.Array, nu: float) -> jax.Array:
 
     sigma_eff = jnp.sqrt(
         (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2 + 6 * sigma_xy**2) / 2.0
+        + 1e-30
     )
 
     return sigma_eff
@@ -197,6 +211,7 @@ def compute_hill_stress(
     sigma_eff = jnp.sqrt(
         hill_H * (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2)
         + 2 * hill_N * sigma_xy**2
+        + 1e-30
     )
 
     return sigma_eff

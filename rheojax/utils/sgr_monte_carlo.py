@@ -159,8 +159,9 @@ def step_mc(
     ell_new = ell + gamma_dot * dt
 
     # --- 2. Yield Rates & Survival Probability ---
-    # Energy barrier: E - (1/2) * k * ell^2
-    barrier = E - 0.5 * k * ell_new**2
+    # Energy barrier at START of step (Kramers rate theory)
+    # Ref: Sollich 1998, Section 3 — yield rate uses instantaneous strain, not future
+    barrier = E - 0.5 * k * ell**2  # Use ell (start-of-step), not ell_new
     barrier_safe = jnp.maximum(barrier, 0.0)  # Barrier cannot be negative
 
     # Yielding rate

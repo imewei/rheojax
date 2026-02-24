@@ -191,26 +191,26 @@ def advection_operator(
     # Calculate Courant number for full step
     c_total = gamma_dot * dt / dell
 
-    # Determine number of sub-steps needed (safety factor 0.9)
-    # n_substeps >= |c_total| / 0.9
-    n_substeps = jnp.ceil(jnp.abs(c_total) / 0.9).astype(int)
-    n_substeps = jnp.maximum(n_substeps, 1)
-
-    # Sub-step parameters
-    # c_sub will be < 0.9 in magnitude
-    c_sub = c_total / n_substeps
+    # Fixed sub-step count for JIT-static loop bound
+    # 25 sub-steps ensures CFL stability for typical gamma_dot * dt / dell values
+    n_sub_fixed = 25
+    c_sub = c_total / n_sub_fixed
 
     def body_fn(_, P_curr):
-        # Upwind scheme (handles both positive and negative gamma_dot)
-        # Using c_sub directly (signed)
+        # Upwind scheme with zero-padded ghost cells (no periodic wrap)
+        # Ref: LeVeque, "Finite Volume Methods for Hyperbolic Problems", Ch. 4
 
-        # If gamma_dot > 0 (c_sub > 0): forward difference
-        # P_new[j] = P[j] - c*(P[j] - P[j-1])
-        fwd = P_curr - c_sub * (P_curr - jnp.roll(P_curr, 1, axis=1))
+        # Forward (gamma_dot > 0): upstream = left neighbor, zero ghost at left boundary
+        P_left = jnp.concatenate(
+            [jnp.zeros((P_curr.shape[0], 1)), P_curr[:, :-1]], axis=1
+        )
+        fwd = P_curr - c_sub * (P_curr - P_left)
 
-        # If gamma_dot < 0 (c_sub < 0): backward difference
-        # P_new[j] = P[j] - c*(P[j+1] - P[j])
-        bwd = P_curr - c_sub * (jnp.roll(P_curr, -1, axis=1) - P_curr)
+        # Backward (gamma_dot < 0): upstream = right neighbor, zero ghost at right boundary
+        P_right = jnp.concatenate(
+            [P_curr[:, 1:], jnp.zeros((P_curr.shape[0], 1))], axis=1
+        )
+        bwd = P_curr - c_sub * (P_right - P_curr)
 
         P_next = jnp.where(gamma_dot >= 0, fwd, bwd)
 
@@ -220,8 +220,8 @@ def advection_operator(
 
         return P_next
 
-    # Run sub-steps
-    P_final = jax.lax.fori_loop(0, n_substeps, body_fn, P)
+    # Run sub-steps with fixed bound for JIT compatibility
+    P_final = jax.lax.fori_loop(0, n_sub_fixed, body_fn, P)
 
     return P_final
 

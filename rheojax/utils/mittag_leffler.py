@@ -127,15 +127,52 @@ def mittag_leffler_e2(
 
 
 def _ml_taylor(z, alpha, beta, n_iter=300):
+    r"""Taylor series: E_{a,b}(z) = \sum_{k=0}^{N} z^k / \Gamma(a k + b).
+
+    For real z, uses vectorized log-space computation via ``gammaln`` to ensure
+    clean JAX gradients (the ``fori_loop`` overflow clamp produced inf in the
+    unused ``jnp.where`` branch, corrupting the backward pass — see KRN-011).
+
+    For complex z, falls back to iterative Kahan summation with overflow clamp
+    (gradient w.r.t. complex z is not required by current use cases).
     """
-    Taylor series expansion: E_{a,b}(z) = sum_{k=0}^N z^k / Gamma(a*k + b)
-    Using Kahan summation for reduced cancellation error.
-    """
+    if jnp.iscomplexobj(z):
+        return _ml_taylor_complex(z, alpha, beta, n_iter)
+
+    # --- Real z: vectorized log-space computation ---
+    k = jnp.arange(n_iter, dtype=jnp.float64)
+    gamma_args = alpha * k + beta
+
+    # log|z^k| = k * log|z|;  k=0 term is always z^0 = 1 → log = 0
+    abs_z = jnp.abs(z)
+    safe_abs_z = jnp.maximum(abs_z, 1e-300)
+    log_abs_z = jnp.log(safe_abs_z)
+    log_zpow = jnp.where(k == 0, 0.0, k * log_abs_z)
+
+    # log Gamma via gammaln — never overflows (unlike jax_gamma for large args)
+    log_gamma = jax.scipy.special.gammaln(gamma_args)
+
+    # log|term_k| = log|z^k| - lgamma(a*k + b), clamped to avoid exp overflow
+    log_abs_terms = log_zpow - log_gamma
+    log_abs_terms = jnp.minimum(log_abs_terms, 700.0)
+    abs_terms = jnp.exp(log_abs_terms)
+
+    # Zero out when z ≈ 0 and k > 0 (z^k → 0, but log-space gives artefacts)
+    abs_terms = jnp.where((k > 0) & (abs_z < 1e-300), 0.0, abs_terms)
+
+    # Sign: z^k = |z|^k for z >= 0,  (-1)^k |z|^k for z < 0
+    neg_sign = jnp.where(k % 2 == 0, 1.0, -1.0)
+    sign = jnp.where(z >= 0, 1.0, neg_sign)
+
+    return jnp.sum(sign * abs_terms)
+
+
+def _ml_taylor_complex(z, alpha, beta, n_iter=300):
+    """Iterative Taylor series for complex z (Kahan summation + overflow clamp)."""
 
     def body(k, state):
         sum_val, c_val, z_pow = state
 
-        # Calculate term
         term = z_pow / jax_gamma(alpha * k + beta)
 
         # Kahan summation step
@@ -146,9 +183,10 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
 
         # Update z_power with overflow clamp (KRN-011)
         z_pow_raw = z_pow * z
-        # For complex z, clamp magnitude; for real z, clamp value directly
         abs_val = jnp.abs(z_pow_raw)
-        scale = jnp.where(abs_val > 1e300, 1e300 / jnp.maximum(abs_val, 1e-300), 1.0)
+        scale = jnp.where(
+            abs_val > 1e300, 1e300 / jnp.maximum(abs_val, 1e-300), 1.0
+        )
         z_pow_new = z_pow_raw * scale
 
         return sum_new, c_new, z_pow_new
@@ -178,23 +216,34 @@ def _ml_asymptotic_pos(z, alpha, beta):
 
 
 def _safe_rgamma(x):
+    """Compute 1/Gamma(x) safely, returning 0 at poles (negative integers).
+
+    Uses "safe-where" pattern (guarded inputs, no lax.cond) so that JAX
+    auto-diff produces finite gradients in BOTH branches even though only
+    one branch's value is selected.  Ref: DLMF 5.2 — 1/Γ(z).
+
+    For x < 0.5  (reflection):  1/Γ(z) = sin(πz) · Γ(1−z) / π
+        Since z < 0.5 ⟹ 1−z > 0.5, Γ(1−z) has no poles.
+    For x ≥ 0.5 (standard):  1/Γ(z) directly, no poles for z > 0.
     """
-    Computes 1/Gamma(x) safely, returning 0 at poles (negative integers) with correct gradients.
+    is_reflection = x < 0.5
 
-    Uses reflection formula for x < 0.5:
-    1/Gamma(z) = Gamma(1-z) * sin(pi*z) / pi
-    """
+    # --- Standard branch: 1/Gamma(x) for x >= 0.5 ---
+    # Guard: when reflection is active, use x=1.0 (safe) to avoid NaN grads
+    x_std = jnp.where(is_reflection, 1.0, x)
+    x_std = jnp.clip(x_std, 1e-10, 170.0)
+    g_std = jax_gamma(x_std)
+    val_std = 1.0 / jnp.maximum(g_std, 1e-300)
 
-    # Reflection formula is valid everywhere but numerically better for x < 0.5
-    # and handles poles at 0, -1, -2... where sin(pi*z) = 0.
-    def _reflection(z):
-        return (jax_gamma(1.0 - z) * jnp.sin(jnp.pi * z)) / jnp.pi
+    # --- Reflection branch: sin(πz) * Gamma(1-z) / π for x < 0.5 ---
+    # Guard: when standard is active, use refl_arg=1.0 (safe) to avoid NaN grads
+    refl_arg = jnp.where(is_reflection, 1.0 - x, 1.0)
+    refl_arg = jnp.clip(refl_arg, 0.5, 170.0)  # 1-x > 0.5 when x < 0.5
+    g_refl = jax_gamma(refl_arg)
+    sin_val = jnp.sin(jnp.pi * jnp.where(is_reflection, x, 0.0))
+    val_refl = sin_val * g_refl / jnp.pi
 
-    def _standard(z):
-        return 1.0 / jax_gamma(z)
-
-    # Use reflection for z < 0.5 to avoid poles in standard gamma
-    return jax.lax.cond(x < 0.5, _reflection, _standard, operand=x)
+    return jnp.where(is_reflection, val_refl, val_std)
 
 
 def _ml_asymptotic_neg(z, alpha, beta, n_terms=20):

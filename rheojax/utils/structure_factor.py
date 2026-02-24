@@ -133,8 +133,8 @@ def percus_yevick_sk(
     # Structure factor (guard against divergence when c_k → 1 near MCT transition)
     S_k = 1.0 / np.maximum(1.0 - c_k, 1e-10)
 
-    # Handle k=0 limit: S(0) = kT χT (compressibility)
-    S_0 = (1 - eta) ** 4 / ((1 + 2 * eta) ** 2 + eta3 * (eta - 4))
+    # Handle k=0 limit: S(0) = (1-η)⁴/(1+2η)² (PY compressibility route)
+    S_0 = (1 - eta) ** 4 / (1 + 2 * eta) ** 2
     S_k = np.where(np.abs(q) < 1e-10, S_0, S_k)
 
     return S_k
@@ -193,8 +193,8 @@ def percus_yevick_sk_jax(
     c_k = -24 * eta * (term1 + term2 + term3)
     S_k = 1.0 / jnp.maximum(1.0 - c_k, 1e-10)
 
-    # k=0 limit
-    S_0 = (1 - eta) ** 4 / ((1 + 2 * eta) ** 2 + eta3 * (eta - 4))
+    # k=0 limit: PY compressibility route
+    S_0 = (1 - eta) ** 4 / (1 + 2 * eta) ** 2
     S_k = jnp.where(jnp.abs(q) < 1e-10, S_0, S_k)
 
     return S_k

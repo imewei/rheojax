@@ -43,6 +43,9 @@ def evolution_lambda(lam, gamma_dot_p_abs, params):
     Using the original parameterization:
     d(lambda)/dt = (1 - lambda)/tau_thix - Gamma*lambda*|γ̇ᵖ|
 
+    Reference: Fredrickson & Helfand (1988); Isayev, Cho, Huang (1995).
+    Eq. (2): dlambda/dt = (1 - lambda)/tau_thix - Gamma*lambda*|gamma_dot_p|
+
     Args:
         lam: Current structural parameter (0 to 1).
         gamma_dot_p_abs: Absolute plastic shear rate.

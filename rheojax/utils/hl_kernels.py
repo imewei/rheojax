@@ -120,22 +120,21 @@ def _physics_step(
 
     # A. Advection (Upwind - drift due to shear)
     # Flux J = v*P = gdot*P
-    # First order upwind scheme
-
-    # Efficient upwind implementation using roll
-    # If gdot > 0, flow is rightward, use P[i] - P[i-1]
-    # If gdot < 0, flow is leftward, use P[i+1] - P[i]
+    # First order upwind scheme with zero-padded ghost cells (no periodic wrap)
+    # Ref: LeVeque, "Finite Volume Methods for Hyperbolic Problems", Ch. 4
+    P_left = jnp.concatenate([jnp.zeros(1), P[:-1]])
+    P_right = jnp.concatenate([P[1:], jnp.zeros(1)])
 
     # Rightward flow (gdot > 0): -v * (P[i] - P[i-1])/dx
-    grad_upwind_pos = (P - jnp.roll(P, 1)) / ds
+    grad_upwind_pos = (P - P_left) / ds
     # Leftward flow (gdot < 0): -v * (P[i+1] - P[i])/dx
-    grad_upwind_neg = (jnp.roll(P, -1) - P) / ds
+    grad_upwind_neg = (P_right - P) / ds
 
     dP_adv = -gdot * jnp.where(gdot > 0, grad_upwind_pos, grad_upwind_neg)
 
-    # B. Diffusion (Central Difference)
+    # B. Diffusion (Central Difference) with zero-padded ghost cells
     # D * d2P/dsigma2
-    dP_diff = D * (jnp.roll(P, 1) - 2.0 * P + jnp.roll(P, -1)) / (ds**2)
+    dP_diff = D * (P_left - 2.0 * P + P_right) / (ds**2)
 
     # C. Yielding (Sink)
     # -(1/tau) * P  where |sigma| > sigma_c
@@ -199,9 +198,10 @@ def step_hl(
     """
     # KRN-002: Use fixed conservative sub-stepping instead of dynamic
     # fori_loop bound. Dynamic n_sub from traced dt/dt_stable is invalid
-    # inside lax.scan — the bound must be static. Use 10 sub-steps with
-    # safety factor which is stable for typical CFL conditions.
-    n_sub_fixed = 10
+    # inside lax.scan — the bound must be static. Use 25 sub-steps which
+    # satisfies CFL (dt_sub * |gdot| / ds < 1) up to ~2.5x higher shear
+    # rates than n_sub=10. For extreme shear rates, callers should reduce dt.
+    n_sub_fixed = 25
     dt_sub = dt / n_sub_fixed
 
     # Execute sub-steps
