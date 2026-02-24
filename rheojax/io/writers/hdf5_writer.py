@@ -240,7 +240,12 @@ def _write_metadata_recursive(
             continue
 
         if isinstance(value, np.ndarray):
-            group.attrs[key] = value
+            # HDF5 attributes have a 64 KB size limit; store large arrays
+            # as datasets within the metadata group instead.
+            if value.nbytes > 60_000:
+                group.create_dataset(key, data=value)
+            else:
+                group.attrs[key] = value
             continue
 
         if isinstance(value, _HDF5_SCALAR_TYPES):

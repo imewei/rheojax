@@ -27,6 +27,8 @@ References
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -38,6 +40,79 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     pass
+
+
+# ============================================================================
+# Shared Data-Extraction Helper
+# ============================================================================
+
+
+def _extract_spp_arrays(
+    spp_results: dict, n_points: int | None = None
+) -> dict[str, np.ndarray]:
+    """Extract and validate the SPP data arrays from a results dict.
+
+    Parameters
+    ----------
+    spp_results : dict
+        Output from spp_numerical_analysis() or spp_fourier_analysis()
+    n_points : int, optional
+        Expected number of data points. Inferred from the first available
+        array when not provided.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Mapping of canonical key names to 1-D NumPy arrays, all of length
+        ``n_points``. Missing keys are filled with zeros (or derived values
+        where applicable).
+    """
+    if n_points is None:
+        for key in ("Gp_t", "Gpp_t", "time_new", "strain_recon"):
+            if key in spp_results:
+                n_points = len(np.asarray(spp_results[key]))
+                break
+        else:
+            n_points = 0
+
+    def _get(key: str, default_val: float = 0.0) -> np.ndarray:
+        return np.asarray(spp_results.get(key, np.full(n_points, default_val)))
+
+    Gp_t = _get("Gp_t")
+    Gpp_t = _get("Gpp_t")
+
+    return {
+        "time": _get("time_new"),
+        "strain": _get("strain_recon"),
+        "rate": _get("rate_recon"),
+        "stress": _get("stress_recon"),
+        "Gp_t": Gp_t,
+        "Gpp_t": Gpp_t,
+        "G_star_t": np.asarray(
+            spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2))
+        ),
+        "tan_delta_t": np.asarray(
+            spp_results.get(
+                "tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)
+            )
+        ),
+        "delta_t": np.asarray(
+            spp_results.get(
+                "delta_t",
+                np.arctan(
+                    spp_results.get(
+                        "tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)
+                    )
+                ),
+            )
+        ),
+        "disp_stress": _get("disp_stress"),
+        "eq_strain_est": _get("eq_strain_est"),
+        "Gp_t_dot": _get("Gp_t_dot"),
+        "Gpp_t_dot": _get("Gpp_t_dot"),
+        "G_speed": _get("G_speed"),
+        "delta_t_dot": _get("delta_t_dot"),
+    }
 
 
 # ============================================================================
@@ -110,24 +185,23 @@ def export_spp_txt(
         omega=omega,
     )
 
-    # Extract data arrays
-    time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
-    strain = np.asarray(spp_results.get("strain_recon", np.zeros(len(time))))
-    rate = np.asarray(spp_results.get("rate_recon", np.zeros(len(time))))
-    stress = np.asarray(spp_results.get("stress_recon", np.zeros(len(time))))
-    Gp_t = np.asarray(spp_results["Gp_t"])
-    Gpp_t = np.asarray(spp_results["Gpp_t"])
-    G_star_t = np.asarray(spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2)))
-    tan_delta_t = np.asarray(
-        spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
-    )
-    delta_t = np.asarray(spp_results.get("delta_t", np.arctan(tan_delta_t)))
-    disp_stress = np.asarray(spp_results.get("disp_stress", np.zeros(len(time))))
-    eq_strain_est = np.asarray(spp_results.get("eq_strain_est", np.zeros(len(time))))
-    Gp_t_dot = np.asarray(spp_results.get("Gp_t_dot", np.zeros(len(time))))
-    Gpp_t_dot = np.asarray(spp_results.get("Gpp_t_dot", np.zeros(len(time))))
-    G_speed = np.asarray(spp_results.get("G_speed", np.zeros(len(time))))
-    delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
+    # Extract data arrays via shared helper
+    arrays = _extract_spp_arrays(spp_results)
+    time = arrays["time"]
+    strain = arrays["strain"]
+    rate = arrays["rate"]
+    stress = arrays["stress"]
+    Gp_t = arrays["Gp_t"]
+    Gpp_t = arrays["Gpp_t"]
+    G_star_t = arrays["G_star_t"]
+    tan_delta_t = arrays["tan_delta_t"]
+    delta_t = arrays["delta_t"]
+    disp_stress = arrays["disp_stress"]
+    eq_strain_est = arrays["eq_strain_est"]
+    Gp_t_dot = arrays["Gp_t_dot"]
+    Gpp_t_dot = arrays["Gpp_t_dot"]
+    G_speed = arrays["G_speed"]
+    delta_t_dot = arrays["delta_t_dot"]
 
     logger.debug(
         "Building 15-column SPP data matrix",
@@ -425,76 +499,94 @@ def export_spp_hdf5(
         datasets_written = []
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        with h5py.File(filepath, "w") as f:
-            # Metadata group
-            logger.debug(
-                "Writing metadata group",
-                omega=omega,
-                gamma_0=gamma_0,
-                analysis_type=analysis_type,
-            )
-            meta = f.create_group("metadata")
-            meta.attrs["omega"] = omega
-            meta.attrs["gamma_0"] = gamma_0
-            meta.attrs["analysis_type"] = analysis_type
-            if "Delta" in spp_results:
-                meta.attrs["phase_offset_Delta"] = float(spp_results["Delta"])
-            if metadata:
-                for key, value in metadata.items():
-                    if isinstance(value, dict):
-                        meta.attrs[key] = json.dumps(value)
-                    elif isinstance(value, (str, int, float, bool, np.integer, np.floating)):
-                        meta.attrs[key] = value
-                    else:
-                        meta.attrs[key] = str(value)
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(filepath.parent), suffix=".hdf5.tmp"
+        )
+        os.close(tmp_fd)
+        try:
+            with h5py.File(tmp_path, "w") as f:
+                # Metadata group
                 logger.debug(
-                    "Custom metadata stored",
-                    metadata_keys=list(metadata.keys()),
+                    "Writing metadata group",
+                    omega=omega,
+                    gamma_0=gamma_0,
+                    analysis_type=analysis_type,
                 )
+                meta = f.create_group("metadata")
+                meta.attrs["omega"] = omega
+                meta.attrs["gamma_0"] = gamma_0
+                meta.attrs["analysis_type"] = analysis_type
+                if "Delta" in spp_results:
+                    meta.attrs["phase_offset_Delta"] = float(spp_results["Delta"])
+                if metadata:
+                    for key, value in metadata.items():
+                        if isinstance(value, dict):
+                            meta.attrs[key] = json.dumps(value)
+                        elif isinstance(
+                            value, (str, int, float, bool, np.integer, np.floating)
+                        ):
+                            meta.attrs[key] = value
+                        else:
+                            meta.attrs[key] = str(value)
+                    logger.debug(
+                        "Custom metadata stored",
+                        metadata_keys=list(metadata.keys()),
+                    )
 
-            # Main SPP data group
-            logger.debug("Writing spp_data group")
-            spp_data = f.create_group("spp_data")
-            spp_keys_written = []
-            for key in [
-                "Gp_t",
-                "Gpp_t",
-                "G_star_t",
-                "tan_delta_t",
-                "delta_t",
-                "disp_stress",
-                "eq_strain_est",
-                "Gp_t_dot",
-                "Gpp_t_dot",
-                "G_speed",
-                "delta_t_dot",
-            ]:
-                if key in spp_results:
-                    spp_data.create_dataset(key, data=np.asarray(spp_results[key]))
-                    spp_keys_written.append(key)
-            datasets_written.extend(spp_keys_written)
-            logger.debug("SPP data datasets written", datasets=spp_keys_written)
+                # Main SPP data group
+                logger.debug("Writing spp_data group")
+                spp_data = f.create_group("spp_data")
+                spp_keys_written = []
+                for key in [
+                    "Gp_t",
+                    "Gpp_t",
+                    "G_star_t",
+                    "tan_delta_t",
+                    "delta_t",
+                    "disp_stress",
+                    "eq_strain_est",
+                    "Gp_t_dot",
+                    "Gpp_t_dot",
+                    "G_speed",
+                    "delta_t_dot",
+                ]:
+                    if key in spp_results:
+                        spp_data.create_dataset(key, data=np.asarray(spp_results[key]))
+                        spp_keys_written.append(key)
+                datasets_written.extend(spp_keys_written)
+                logger.debug("SPP data datasets written", datasets=spp_keys_written)
 
-            # Waveforms group
-            logger.debug("Writing waveforms group")
-            waveforms = f.create_group("waveforms")
-            waveform_keys_written = []
-            for key in ["time_new", "strain_recon", "rate_recon", "stress_recon"]:
-                if key in spp_results:
-                    waveforms.create_dataset(key, data=np.asarray(spp_results[key]))
-                    waveform_keys_written.append(key)
-            datasets_written.extend(waveform_keys_written)
-            logger.debug("Waveform datasets written", datasets=waveform_keys_written)
+                # Waveforms group
+                logger.debug("Writing waveforms group")
+                waveforms = f.create_group("waveforms")
+                waveform_keys_written = []
+                for key in ["time_new", "strain_recon", "rate_recon", "stress_recon"]:
+                    if key in spp_results:
+                        waveforms.create_dataset(
+                            key, data=np.asarray(spp_results[key])
+                        )
+                        waveform_keys_written.append(key)
+                datasets_written.extend(waveform_keys_written)
+                logger.debug("Waveform datasets written", datasets=waveform_keys_written)
 
-            # Frenet-Serret frame group
-            if "T_vec" in spp_results:
-                logger.debug("Writing frenet_serret group")
-                fsf = f.create_group("frenet_serret")
-                fsf.create_dataset("T_vec", data=np.asarray(spp_results["T_vec"]))
-                fsf.create_dataset("N_vec", data=np.asarray(spp_results["N_vec"]))
-                fsf.create_dataset("B_vec", data=np.asarray(spp_results["B_vec"]))
-                datasets_written.extend(["T_vec", "N_vec", "B_vec"])
-                logger.debug("Frenet-Serret frame datasets written")
+                # Frenet-Serret frame group
+                if "T_vec" in spp_results:
+                    logger.debug("Writing frenet_serret group")
+                    fsf = f.create_group("frenet_serret")
+                    fsf.create_dataset("T_vec", data=np.asarray(spp_results["T_vec"]))
+                    fsf.create_dataset("N_vec", data=np.asarray(spp_results["N_vec"]))
+                    fsf.create_dataset("B_vec", data=np.asarray(spp_results["B_vec"]))
+                    datasets_written.extend(["T_vec", "N_vec", "B_vec"])
+                    logger.debug("Frenet-Serret frame datasets written")
+
+            os.replace(tmp_path, str(filepath))
+            tmp_path = None  # prevent cleanup
+        finally:
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
         ctx["datasets_written"] = len(datasets_written)
         ctx["has_fsf"] = "T_vec" in spp_results
@@ -579,7 +671,7 @@ def export_spp_csv(
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
         # Write to CSV
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
             # Header
             logger.debug(
                 "Writing CSV header",
@@ -660,24 +752,23 @@ def to_matlab_dict(
         omega=omega,
     )
 
-    # Extract data arrays
-    time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
-    strain = np.asarray(spp_results.get("strain_recon", np.zeros(len(time))))
-    rate = np.asarray(spp_results.get("rate_recon", np.zeros(len(time))))
-    stress = np.asarray(spp_results.get("stress_recon", np.zeros(len(time))))
-    Gp_t = np.asarray(spp_results["Gp_t"])
-    Gpp_t = np.asarray(spp_results["Gpp_t"])
-    G_star_t = np.asarray(spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2)))
-    tan_delta_t = np.asarray(
-        spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
-    )
-    delta_t = np.asarray(spp_results.get("delta_t", np.arctan(tan_delta_t)))
-    disp_stress = np.asarray(spp_results.get("disp_stress", np.zeros(len(time))))
-    eq_strain_est = np.asarray(spp_results.get("eq_strain_est", np.zeros(len(time))))
-    Gp_t_dot = np.asarray(spp_results.get("Gp_t_dot", np.zeros(len(time))))
-    Gpp_t_dot = np.asarray(spp_results.get("Gpp_t_dot", np.zeros(len(time))))
-    G_speed = np.asarray(spp_results.get("G_speed", np.zeros(len(time))))
-    delta_t_dot = np.asarray(spp_results.get("delta_t_dot", np.zeros(len(time))))
+    # Extract data arrays via shared helper
+    arrays = _extract_spp_arrays(spp_results)
+    time = arrays["time"]
+    strain = arrays["strain"]
+    rate = arrays["rate"]
+    stress = arrays["stress"]
+    Gp_t = arrays["Gp_t"]
+    Gpp_t = arrays["Gpp_t"]
+    G_star_t = arrays["G_star_t"]
+    tan_delta_t = arrays["tan_delta_t"]
+    delta_t = arrays["delta_t"]
+    disp_stress = arrays["disp_stress"]
+    eq_strain_est = arrays["eq_strain_est"]
+    Gp_t_dot = arrays["Gp_t_dot"]
+    Gpp_t_dot = arrays["Gpp_t_dot"]
+    G_speed = arrays["G_speed"]
+    delta_t_dot = arrays["delta_t_dot"]
 
     logger.debug(
         "Building MATLAB 15-column data matrix",

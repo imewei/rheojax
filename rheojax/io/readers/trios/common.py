@@ -604,6 +604,11 @@ def convert_unit(
     return values, source_unit or target_unit
 
 
+_STEP_NAME_PATTERN = re.compile(
+    r"step|segment|interval|block|run|sequence", re.IGNORECASE
+)
+
+
 def detect_step_column(
     df: pd.DataFrame,
     candidates: list[str] | None = None,
@@ -620,13 +625,20 @@ def detect_step_column(
     if candidates is None:
         candidates = STEP_COLUMN_CANDIDATES
 
+    # Priority 1: exact candidate name match + integer-dtype check
     for col in df.columns:
         col_lower = col.lower().strip()
         for candidate in candidates:
             if candidate in col_lower:
-                # Verify it contains integer-like values
-                if pd.api.types.is_integer_dtype(df[col]) or df[col].nunique() < 20:
+                if pd.api.types.is_integer_dtype(df[col]):
                     return col
+
+    # Priority 2: name-pattern guard to prevent false positives from the
+    # broad `nunique() < 20` heuristic on arbitrary low-cardinality columns.
+    for col in df.columns:
+        if _STEP_NAME_PATTERN.search(str(col)) and df[col].nunique() < 20:
+            return col
+
     return None
 
 
@@ -723,6 +735,7 @@ def segment_to_rheodata(
         x_units=segment.x_units,
         y_units=segment.y_units,
         domain=domain,
+        initial_test_mode=segment.test_mode,
         metadata=metadata,
         validate=validate,
     )

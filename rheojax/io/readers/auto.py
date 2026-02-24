@@ -56,7 +56,7 @@ _EXCEL_KWARGS = {
     "y_col",
     "y_cols",
     "test_mode",
-    "sheet_name",
+    "sheet",      # was "sheet_name" — must match load_excel() param name
     "validate",
 }
 _ANTON_PAAR_KWARGS = {

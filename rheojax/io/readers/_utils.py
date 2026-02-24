@@ -95,7 +95,8 @@ _TEST_MODE_PATTERNS: dict[str, list[re.Pattern]] = {
         for p in [
             r"shear\s*[-_]?\s*rate",
             r"viscosity",
-            r"eta",
+            r"(?<![a-z])eta(?![a-z])",  # word-bounded: avoids "theta", "beta", "zeta"
+            r"η",  # Greek eta (Unicode viscosity symbol)
             r"γ̇",
             r"gamma[-_]?dot",
         ]
@@ -227,14 +228,6 @@ def detect_domain(
             # Check for exact match or unit at boundary to avoid false positives
             # e.g., "1/s" should not match time domain
             if x_units_lower == time_unit or x_units_lower.endswith(f" {time_unit}"):
-                logger.debug(
-                    "Domain detected from time unit",
-                    domain="time",
-                    matched_unit=time_unit,
-                )
-                return "time"
-            # Handle standalone 's' or 'min'
-            if time_unit in {"s", "sec", "min", "ms"} and x_units_lower in {time_unit}:
                 logger.debug(
                     "Domain detected from time unit",
                     domain="time",

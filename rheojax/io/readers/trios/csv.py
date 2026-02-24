@@ -439,6 +439,24 @@ def parse_trios_csv(
     # Extract units
     units = extract_units_from_header(header, unit_row)
 
+    # Determine whether the first column is a non-numeric label column BEFORE
+    # parsing any data rows.  This ensures the col_offset is applied uniformly
+    # to every row, preventing rows from being 1 element shorter than the header.
+    first_col_is_label = (
+        header[0].lower() in {"variables", "data point"}
+        or header[0].lower().startswith("data")
+    )
+    col_offset = 1 if first_col_is_label else 0
+
+    # Trim the header once, consistently with the data parsing below.
+    if first_col_is_label:
+        header = header[1:]
+        units = {
+            k: v
+            for k, v in units.items()
+            if k.lower() != "variables" and not k.lower().startswith("data")
+        }
+
     # Parse data rows
     data_rows = []
     for i in range(data_start, len(lines)):
@@ -447,23 +465,14 @@ def parse_trios_csv(
             break
 
         parts = line.split(delimiter)
-        if len(parts) == len(header):
+        if len(parts) == len(header) + col_offset:
             row = []
             for j, val in enumerate(parts):
+                if j < col_offset:
+                    # Skip label column consistently for ALL rows
+                    continue
                 val_clean = val.strip()
-                if j == 0:
-                    # First column is often "Data point" label - skip
-                    if val_clean.lower().startswith("data"):
-                        continue
-                    # Try to parse as number; fall back to NaN
-                    try:
-                        cleaned = val_clean
-                        if decimal_separator == ",":
-                            cleaned = cleaned.replace(",", ".")
-                        row.append(float(cleaned))
-                    except ValueError:
-                        row.append(np.nan)
-                elif not val_clean:
+                if not val_clean:
                     row.append(np.nan)
                 else:
                     try:
@@ -480,15 +489,6 @@ def parse_trios_csv(
         raise ValueError("No data rows found in TRIOS CSV file")
 
     logger.debug("Data rows parsed", num_rows=len(data_rows))
-
-    # Adjust header to match data (skip first column if it's a label)
-    if header[0].lower() == "variables" or header[0].lower().startswith("data"):
-        header = header[1:]
-        units = {
-            k: v
-            for k, v in units.items()
-            if k.lower() != "variables" and not k.lower().startswith("data")
-        }
 
     # Create DataFrame
     df = pd.DataFrame(data_rows, columns=header[: len(data_rows[0])])

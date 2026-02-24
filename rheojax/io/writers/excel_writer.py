@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -75,72 +77,99 @@ def save_excel(
         sheets_written = []
 
         if not results:
-            with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-                pd.DataFrame({"Info": ["No results to export"]}).to_excel(
-                    writer, sheet_name="Empty", index=False
-                )
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                dir=str(filepath.parent), suffix=".tmp.xlsx"
+            )
+            os.close(tmp_fd)
+            try:
+                with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+                    pd.DataFrame({"Info": ["No results to export"]}).to_excel(
+                        writer, sheet_name="Empty", index=False
+                    )
+                os.replace(tmp_path, str(filepath))
+                tmp_path = None  # prevent cleanup
+            finally:
+                if tmp_path is not None:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
             ctx["sheets_written"] = ["Empty"]
             ctx["num_sheets"] = 1
             ctx["include_plots"] = include_plots
             return
 
-        # Create Excel writer
-        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
-            # Write parameters sheet
-            if "parameters" in results:
-                logger.debug(
-                    "Creating parameters dataframe",
-                    num_parameters=len(results["parameters"]),
-                )
-                params_df = _create_parameters_dataframe(results["parameters"])
-                params_df.to_excel(writer, sheet_name="Parameters", index=False)
-                sheets_written.append("Parameters")
-                logger.debug("Parameters sheet written", rows=len(params_df))
+        # Create Excel writer with atomic write (temp file + replace)
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(filepath.parent), suffix=".tmp.xlsx"
+        )
+        os.close(tmp_fd)
+        try:
+            with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+                # Write parameters sheet
+                if "parameters" in results:
+                    logger.debug(
+                        "Creating parameters dataframe",
+                        num_parameters=len(results["parameters"]),
+                    )
+                    params_df = _create_parameters_dataframe(results["parameters"])
+                    params_df.to_excel(writer, sheet_name="Parameters", index=False)
+                    sheets_written.append("Parameters")
+                    logger.debug("Parameters sheet written", rows=len(params_df))
 
-            # Write fit quality sheet
-            if "fit_quality" in results:
-                logger.debug(
-                    "Creating fit quality dataframe",
-                    num_metrics=len(results["fit_quality"]),
-                )
-                quality_df = _create_quality_dataframe(results["fit_quality"])
-                quality_df.to_excel(writer, sheet_name="Fit Quality", index=False)
-                sheets_written.append("Fit Quality")
-                logger.debug("Fit Quality sheet written", rows=len(quality_df))
+                # Write fit quality sheet
+                if "fit_quality" in results:
+                    logger.debug(
+                        "Creating fit quality dataframe",
+                        num_metrics=len(results["fit_quality"]),
+                    )
+                    quality_df = _create_quality_dataframe(results["fit_quality"])
+                    quality_df.to_excel(writer, sheet_name="Fit Quality", index=False)
+                    sheets_written.append("Fit Quality")
+                    logger.debug("Fit Quality sheet written", rows=len(quality_df))
 
-            # Write predictions sheet
-            if "predictions" in results:
-                logger.debug(
-                    "Creating predictions dataframe",
-                    num_predictions=len(results["predictions"]),
-                )
-                pred_df = _create_predictions_dataframe(results["predictions"])
-                pred_df.to_excel(writer, sheet_name="Predictions", index=False)
-                sheets_written.append("Predictions")
-                logger.debug("Predictions sheet written", rows=len(pred_df))
+                # Write predictions sheet
+                if "predictions" in results:
+                    logger.debug(
+                        "Creating predictions dataframe",
+                        num_predictions=len(results["predictions"]),
+                    )
+                    pred_df = _create_predictions_dataframe(results["predictions"])
+                    pred_df.to_excel(writer, sheet_name="Predictions", index=False)
+                    sheets_written.append("Predictions")
+                    logger.debug("Predictions sheet written", rows=len(pred_df))
 
-            # Write residuals sheet
-            if "residuals" in results:
-                logger.debug(
-                    "Creating residuals dataframe",
-                    num_residuals=len(results["residuals"]),
-                )
-                resid_df = _create_residuals_dataframe(results["residuals"])
-                resid_df.to_excel(writer, sheet_name="Residuals", index=False)
-                sheets_written.append("Residuals")
-                logger.debug("Residuals sheet written", rows=len(resid_df))
+                # Write residuals sheet
+                if "residuals" in results:
+                    logger.debug(
+                        "Creating residuals dataframe",
+                        num_residuals=len(results["residuals"]),
+                    )
+                    resid_df = _create_residuals_dataframe(results["residuals"])
+                    resid_df.to_excel(writer, sheet_name="Residuals", index=False)
+                    sheets_written.append("Residuals")
+                    logger.debug("Residuals sheet written", rows=len(resid_df))
 
-            # Embed plots if requested
-            if include_plots and "plots" in results:
-                logger.debug(
-                    "Embedding plots",
-                    num_plots=len(results["plots"]),
-                )
-                _embed_plots(writer, results["plots"])
-                sheets_written.extend(
-                    [f"Plot_{name[:25]}" for name in results["plots"].keys()]
-                )
-                logger.debug("Plots embedded", plot_names=list(results["plots"].keys()))
+                # Embed plots if requested
+                if include_plots and "plots" in results:
+                    logger.debug(
+                        "Embedding plots",
+                        num_plots=len(results["plots"]),
+                    )
+                    _embed_plots(writer, results["plots"])
+                    sheets_written.extend(
+                        [f"Plot_{name[:25]}" for name in results["plots"].keys()]
+                    )
+                    logger.debug("Plots embedded", plot_names=list(results["plots"].keys()))
+
+            os.replace(tmp_path, str(filepath))
+            tmp_path = None  # prevent cleanup
+        finally:
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
         ctx["sheets_written"] = sheets_written
         ctx["num_sheets"] = len(sheets_written)

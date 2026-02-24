@@ -216,6 +216,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                 y_units=first_chunk.y_units,
                 domain=first_chunk.domain,
                 metadata=first_chunk.metadata,
+                initial_test_mode=first_chunk.test_mode,
                 validate=kwargs.get("validate_data", True),
             )
 
@@ -289,6 +290,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                     y_units=first_chunk.y_units,
                     domain=first_chunk.domain,
                     metadata=first_chunk.metadata,
+                    initial_test_mode=first_chunk.test_mode,
                     validate=kwargs.get("validate_data", True),
                 )
 
@@ -1084,6 +1086,7 @@ def _process_remaining_rows(
     last_progress_report = 0
     expected_columns = len(columns) + 1  # +1 for the row label we skip
     max_col_needed = max(x_col, y_col, y_col2 if y_col2 is not None else 0)
+    _skipped_rows = 0
 
     for line in file_handle:
         line_num += 1
@@ -1141,7 +1144,14 @@ def _process_remaining_rows(
                     current_y.clear()
 
         except (ValueError, IndexError):
+            _skipped_rows += 1
             continue
+
+    if _skipped_rows > 0:
+        logger.warning(
+            "Skipped malformed rows in TRIOS TXT file",
+            skipped_rows=_skipped_rows,
+        )
 
     # Yield remaining data as final chunk
     if current_x:

@@ -172,7 +172,9 @@ def load_csv(
         if len(cols_needed) == (1 + (1 if y_col is not None else len(y_cols or []))):
             usecols = cols_needed
 
-    # Read CSV file with tolerant encoding/dialect handling
+    # Read CSV file with tolerant encoding/dialect handling.
+    # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
+    # so that silent corruption is caught and logged before falling back.
     read_kwargs = dict(
         sep=delimiter,
         header=header,
@@ -188,19 +190,29 @@ def load_csv(
 
     with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
         try:
-            logger.debug("Reading CSV file", encoding=default_encoding)
-            df = pd.read_csv(filepath, **read_kwargs)
+            # Try strict encoding first to detect corruption early
+            logger.debug("Reading CSV file (strict encoding)", encoding=default_encoding)
+            df = pd.read_csv(filepath, **{**read_kwargs, "encoding_errors": "strict"})
         except UnicodeDecodeError:
-            read_kwargs["encoding"] = "utf-16le"
-            tried_utf16 = True
-            logger.info(
-                "Encoding fallback triggered",
+            # Strict failed — fall back to replacement characters with a warning
+            logger.warning(
+                "Encoding errors in CSV file — using replacement characters",
                 filepath=str(filepath),
-                from_encoding=default_encoding,
-                to_encoding="utf-16le",
+                encoding=default_encoding,
             )
-            df = pd.read_csv(filepath, **read_kwargs)
-            used_encoding = "utf-16le"
+            try:
+                df = pd.read_csv(filepath, **read_kwargs)
+            except UnicodeDecodeError:
+                read_kwargs["encoding"] = "utf-16le"
+                tried_utf16 = True
+                logger.info(
+                    "Encoding fallback triggered",
+                    filepath=str(filepath),
+                    from_encoding=default_encoding,
+                    to_encoding="utf-16le",
+                )
+                df = pd.read_csv(filepath, **read_kwargs)
+                used_encoding = "utf-16le"
         except Exception as e:
             # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
             if not tried_utf16:
@@ -230,6 +242,14 @@ def load_csv(
                     exc_info=True,
                 )
                 raise ValueError(f"Failed to parse CSV file: {e}") from e
+
+        # Check for encoding replacement artifacts even after a "successful" read
+        if df.apply(lambda col: col.astype(str).str.contains("\ufffd", na=False)).any().any():
+            logger.warning(
+                "Encoding replacement characters (\ufffd) detected in CSV file — "
+                "some values may be corrupted",
+                filepath=str(filepath),
+            )
 
         io_ctx["rows"] = len(df)
         io_ctx["columns"] = len(df.columns)
@@ -402,11 +422,47 @@ def _get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
 
 
 def _to_float(arr: np.ndarray) -> np.ndarray:
-    """Convert array to float, handling European decimal comma."""
+    """Convert array to float, handling European decimal comma and US thousands.
+
+    Samples up to 20 non-empty values with separators to determine locale format,
+    avoiding misdetection when the first value is a plain integer:
+    - "1,234.56" (US thousands): remove commas
+    - "1.234,56" (EU thousands+decimal): remove dots, comma→dot
+    - "1,56" (EU decimal only): comma→dot
+    - "1.56" (standard): no change
+    """
     arr = np.array(arr)
     if arr.dtype.kind in {"U", "S", "O"}:
-        # Handle European decimal comma by replacement if needed
-        arr = np.char.replace(arr.astype(str), ",", ".")
+        str_arr = arr.astype(str)
+        # Sample up to 20 non-empty values with a separator for locale detection
+        samples = []
+        for s in str_arr.flat:
+            s_stripped = s.strip()
+            if s_stripped and ("," in s_stripped or "." in s_stripped):
+                samples.append(s_stripped)
+                if len(samples) >= 20:
+                    break
+
+        # Determine format from samples
+        has_both = any("," in s and "." in s for s in samples)
+        has_comma_only = any("," in s and "." not in s for s in samples)
+
+        if has_both:
+            # Pick format from first sample with both separators
+            sample = next(s for s in samples if "," in s and "." in s)
+            last_comma = sample.rfind(",")
+            last_dot = sample.rfind(".")
+            if last_comma > last_dot:
+                # EU: 1.234,56 — dot=thousands, comma=decimal
+                str_arr = np.char.replace(str_arr, ".", "")
+                str_arr = np.char.replace(str_arr, ",", ".")
+            else:
+                # US: 1,234.56 — comma=thousands, dot=decimal
+                str_arr = np.char.replace(str_arr, ",", "")
+        elif has_comma_only:
+            # EU decimal only: 1,56 → 1.56
+            str_arr = np.char.replace(str_arr, ",", ".")
+        arr = str_arr
     return arr.astype(float)
 
 
