@@ -127,7 +127,7 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
     omega_mid = omega[idx_mid]
 
     # Estimate alpha from slope at transition
-    alpha_estimate = d_log_G[idx_mid]
+    alpha_estimate = abs(d_log_G[idx_mid])
     alpha_estimate = np.clip(
         alpha_estimate, PARAM_BOUNDS.min_alpha, PARAM_BOUNDS.max_alpha
     )

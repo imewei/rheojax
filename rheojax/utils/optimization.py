@@ -84,8 +84,9 @@ _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
 
 
 def _validate_optimization_result(
-    result: OptimizationResult,
+    result: "OptimizationResult",
     residuals: np.ndarray,
+    y_data: np.ndarray | None = None,
     mse_threshold: float = 1e6,
 ) -> None:
     """Validate optimization result against pathological outcomes.
@@ -96,6 +97,9 @@ def _validate_optimization_result(
     Args:
         result: OptimizationResult to validate (uses result.fun for RSS).
         residuals: Residual vector at the optimal point.
+        y_data: Original y data array. When provided, uses len(y_data) as the
+            observation count so that complex data (where residuals has length
+            2N) is not penalised with an inflated denominator.
         mse_threshold: Maximum allowed mean squared error (default: 1e6).
 
     Raises:
@@ -106,7 +110,7 @@ def _validate_optimization_result(
             "Optimization produced empty residual vector. "
             "Check that the objective function returns a non-empty array."
         )
-    residual_count = residuals.size
+    residual_count = len(y_data) if y_data is not None else residuals.size
     mse = result.fun / residual_count
     if not np.isfinite(mse) or mse > mse_threshold:
         logger.error(
@@ -476,7 +480,7 @@ class OptimizationResult:
         if n is None or n == 0:
             return None
 
-        p = len(self.x)
+        p = self.x.size
         if n - p - 1 <= 0:
             logger.warning("Not enough degrees of freedom for adjusted R².")
             return np.nan
@@ -543,7 +547,7 @@ class OptimizationResult:
         if n is None or n == 0:
             return None
 
-        k = len(self.x)
+        k = self.x.size
         residuals = np.asarray(self.residuals)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
@@ -580,7 +584,7 @@ class OptimizationResult:
         if n is None or n == 0:
             return None
 
-        k = len(self.x)
+        k = self.x.size
         residuals = np.asarray(self.residuals)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
@@ -628,7 +632,7 @@ class OptimizationResult:
             if self.n_data is not None
             else (len(self.residuals) if self.residuals is not None else 0)
         )
-        p = len(self.x)
+        p = self.x.size
 
         # Degrees of freedom
         dof = max(n - p, 1)
@@ -667,7 +671,7 @@ class OptimizationResult:
         if self.pcov is None:
             return None
 
-        return np.sqrt(np.diag(self.pcov))
+        return np.sqrt(np.maximum(np.diag(self.pcov), 0.0))
 
     def prediction_interval(
         self,
@@ -736,7 +740,7 @@ class OptimizationResult:
             if self.n_data is not None
             else (len(self.residuals) if self.residuals is not None else 0)
         )
-        p = len(self.x)
+        p = self.x.size
         dof = max(n - p, 1)
 
         # t-value for prediction interval
@@ -1451,7 +1455,7 @@ def nlsq_multistart_optimize(
                             f"Success: {result.success}"
                         )
 
-                    if result.success and result.fun < best_cost:
+                    if result.fun < best_cost:
                         best_result = result
                         best_cost = result.fun
                         logger.debug(
@@ -1485,7 +1489,7 @@ def nlsq_multistart_optimize(
                 if verbose:
                     logger.info(f"  Cost: {result.fun:.3e}, Success: {result.success}")
 
-                if result.success and result.fun < best_cost:
+                if result.fun < best_cost:
                     best_result = result
                     best_cost = result.fun
                     logger.debug(
@@ -1790,9 +1794,10 @@ def nlsq_curve_fit(
                 nlsq_result=None,
                 residuals=residuals,
                 y_data=y_data_np,
-                # OPT-015: Use len(residuals) not len(y_data) — for complex data,
-                # residuals is 2N (real + imag parts) while y_data is N
-                n_data=len(residuals),
+                # UTIL-011: Use len(y_data_np) not len(residuals) — for complex data,
+                # residuals is 2N (real + imag parts concatenated) while actual
+                # observations are N. AIC/BIC must use the observation count N.
+                n_data=len(y_data_np),
                 diagnostics=diagnostics,
             )
 

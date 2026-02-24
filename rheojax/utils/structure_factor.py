@@ -377,6 +377,7 @@ def mct_vertex_isotropic(
     q: np.ndarray,
     phi: float,
     sk_func: Callable | None = None,
+    sigma: float = 1.0,
 ) -> np.ndarray:
     """Compute isotropic MCT vertex V(k,q) after angular integration.
 
@@ -441,7 +442,7 @@ def mct_vertex_isotropic(
     V = sk[:, None] * sq[None, :] * s_kmq * coupling**2
 
     # Normalize by density
-    n_density = 6 * phi / np.pi  # Number density for unit diameter
+    n_density = 6 * phi / (np.pi * sigma**3)
     V *= n_density / (16 * np.pi**2)
 
     return V

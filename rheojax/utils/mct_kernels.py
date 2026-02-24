@@ -42,8 +42,8 @@ logger = get_logger(__name__)
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel(
     phi: jax.Array,
-    v1: float,
-    v2: float,
+    v1: "jax.Array | float",
+    v2: "jax.Array | float",
 ) -> jax.Array:
     """Compute F₁₂ schematic model memory kernel.
 
@@ -85,8 +85,8 @@ def f12_memory_kernel(
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel_derivative(
     phi: jax.Array,
-    v1: float,
-    v2: float,
+    v1: "jax.Array | float",
+    v2: "jax.Array | float",
 ) -> jax.Array:
     """Compute derivative of F₁₂ memory kernel with respect to Φ.
 
@@ -117,7 +117,7 @@ def f12_memory_kernel_derivative(
 @partial(jax.jit, static_argnames=())
 def advected_memory_decorrelation(
     gamma: jax.Array,
-    gamma_c: float,
+    gamma_c: "jax.Array | float",
 ) -> jax.Array:
     """Compute strain decorrelation function h(γ).
 
@@ -157,7 +157,7 @@ def advected_memory_decorrelation(
 def advected_correlator(
     phi_eq: jax.Array,
     gamma: jax.Array,
-    gamma_c: float,
+    gamma_c: "jax.Array | float",
 ) -> jax.Array:
     """Compute advected correlator Φ(t,t') under shear.
 
@@ -237,12 +237,13 @@ def two_time_strain_decorrelation(
     Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
     Fuchs M. & Cates M.E. (2003) Faraday Discuss. 123, 267
     """
+    gamma_c_safe = jnp.maximum(gamma_c, 1e-10)
     if use_lorentzian:
-        h_total = 1.0 / (1.0 + (gamma_total / gamma_c) ** 2)
-        h_since_s = 1.0 / (1.0 + (gamma_since_s / gamma_c) ** 2)
+        h_total = 1.0 / (1.0 + (gamma_total / gamma_c_safe) ** 2)
+        h_since_s = 1.0 / (1.0 + (gamma_since_s / gamma_c_safe) ** 2)
     else:
-        h_total = jnp.exp(-((gamma_total / gamma_c) ** 2))
-        h_since_s = jnp.exp(-((gamma_since_s / gamma_c) ** 2))
+        h_total = jnp.exp(-((gamma_total / gamma_c_safe) ** 2))
+        h_since_s = jnp.exp(-((gamma_since_s / gamma_c_safe) ** 2))
 
     return h_total * h_since_s
 
@@ -307,7 +308,8 @@ def prony_decompose_memory(
     m_t = np.asarray(m_t)
 
     # Filter valid data (positive kernel values)
-    valid_mask = (t > 0) & (m_t > 1e-15)
+    m_scale = np.max(np.abs(m_t)) if len(m_t) > 0 else 1.0
+    valid_mask = (t > 0) & (m_t > 1e-10 * max(m_scale, 1e-30))
     if valid_mask.sum() < n_modes:
         logger.warning(
             f"Only {valid_mask.sum()} valid points for {n_modes} modes. "
@@ -650,7 +652,10 @@ def glass_transition_criterion(
             f_neq = brentq(_f_neq_eq, 1e-8, 1.0 - 1e-8)
         except ValueError:
             # Algebraic fallback if brentq fails to bracket a root
-            f_neq = max(0.0, (1.0 - v1) / v2)
+            if v2 > 0 and v2_critical > 0:
+                f_neq = max(0.0, 1.0 - (v2_critical / v2) ** 0.5)
+            else:
+                f_neq = 0.0
     else:
         f_neq = 0.0
 
@@ -916,14 +921,13 @@ def solve_equilibrium_correlator_f12(
         phi_new = phi + dt * dphi_dt
         phi_new = jnp.clip(phi_new, 0.0, 1.0)  # Physical bounds
 
-        # Shift dphi_dt history: store current derivative at front
-        dphi_dt_hist_new = jnp.roll(dphi_dt_hist, 1)
-        dphi_dt_hist_new = dphi_dt_hist_new.at[0].set(dphi_dt)
+        # Circular buffer: write current derivative at position t_idx % n_hist
+        dphi_dt_hist_new = dphi_dt_hist.at[t_idx % n_hist].set(dphi_dt)
 
         return (phi_new, dphi_dt_hist_new, t_idx + 1), phi_new
 
     # Initialize
-    n_hist = min(1000, n_steps)  # Keep last 1000 steps
+    n_hist = 1000  # Fixed size, independent of n_steps
     phi_init = 1.0
     # Initialize dphi_dt history to zeros (correct: derivative starts at zero)
     # Previously was jnp.ones(n_hist) causing jnp.diff → all-zeros memory integral
@@ -932,7 +936,7 @@ def solve_equilibrium_correlator_f12(
     # Run integration
     (phi_final, _, _), phi_trajectory = jax.lax.scan(
         scan_step,
-        (phi_init, dphi_dt_hist_init, 0),
+        (phi_init, dphi_dt_hist_init, jnp.int32(0)),
         None,
         length=n_steps,
     )

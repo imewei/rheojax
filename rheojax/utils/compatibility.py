@@ -275,7 +275,7 @@ def _detect_from_relaxation(t: np.ndarray, G_t: np.ndarray) -> MaterialType:
 
     # For non-power-law materials, use decay ratio
     G_final = np.mean(G_t[-5:])  # Average last 5 points
-    G_initial = G_t[0]
+    G_initial = np.mean(G_t[:5]) if len(G_t) >= 5 else G_t[0]
     decay_ratio = G_final / G_initial
 
     if decay_ratio > 0.5:

@@ -487,7 +487,10 @@ def softmax_penalty(E_i: ArrayLike, scale: float = 1.0):
         3.13e+02  # Small penalty for finite positive values
     """
     E_arr = jnp.asarray(E_i)
-    penalty = scale * jnp.sum(jnp.log(1.0 + jnp.exp(-E_arr / scale)))
+    x = -E_arr / scale
+    penalty = scale * jnp.sum(
+        jnp.where(x > 0, x + jnp.log1p(jnp.exp(-x)), jnp.log1p(jnp.exp(x)))
+    )
     # Return JAX array (do not convert to Python float for gradient compatibility)
     return penalty
 
@@ -599,19 +602,30 @@ def warm_start_from_n_modes(
     # Case 3: Increase modes (edge case, pad relative to existing tau values)
     else:
         n_pad = n_target - n_current
-        # Pad tau values relative to existing range (data-aware)
+        # Pad taus extending beyond existing range
         TAU_LB, TAU_UB = 1e-6, 1e6
-        tau_min_existing = max(tau_i.min() / 10.0, TAU_LB)
-        tau_max_existing = min(tau_i.max() * 10.0, TAU_UB)
-        E_i_target = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
-        tau_i_target = np.concatenate(
-            [
-                tau_i,
-                np.logspace(
-                    np.log10(tau_min_existing), np.log10(tau_max_existing), n_pad
-                ),
-            ]
+        tau_min_new = max(tau_i.min() / (10.0 ** max(n_pad, 1)), TAU_LB)
+        tau_max_new = min(tau_i.max() * (10.0 ** max(n_pad, 1)), TAU_UB)
+        new_taus_candidates = np.logspace(
+            np.log10(tau_min_new), np.log10(tau_max_new), n_pad * 3
         )
+        # Filter out taus too close to existing ones
+        new_taus = new_taus_candidates[
+            ~np.any(
+                np.abs(
+                    np.log10(new_taus_candidates[:, None])
+                    - np.log10(tau_i[None, :])
+                ) < 0.3,
+                axis=1,
+            )
+        ][:n_pad]
+        if len(new_taus) < n_pad:
+            # Fallback: extend beyond existing range
+            new_taus = np.logspace(
+                np.log10(max(tau_i.max() * 2, TAU_LB)), np.log10(TAU_UB), n_pad
+            )
+        E_i_target = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
+        tau_i_target = np.concatenate([tau_i, new_taus])
         logger.debug(
             "Warm-start: increasing modes",
             n_current=n_current,

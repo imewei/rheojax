@@ -33,6 +33,8 @@ References
 from functools import partial
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
@@ -141,10 +143,11 @@ def _G0_compute(x: float, n_points: int = 128, E_max: float = 20.0) -> float:
     float
         G0(x) equilibrium modulus
     """
-    # Use logarithmic spacing for better sampling
-    E_lin = jnp.linspace(0, E_max, n_points // 2)
-    E_log = jnp.logspace(-3, jnp.log10(E_max), n_points // 2)
-    E_grid = jnp.sort(jnp.concatenate([E_lin, E_log]))
+    # Pre-compute energy grid outside of JAX tracing using NumPy (static args
+    # guarantee n_points and E_max are concrete at trace time).
+    E_lin = np.linspace(0, E_max, n_points // 2)
+    E_log = np.logspace(-3, np.log10(E_max), n_points // 2)
+    E_grid = jnp.asarray(np.sort(np.concatenate([E_lin, E_log])))
 
     # Compute integrand values
     integrand_vals = jax.vmap(lambda E: _G0_integrand(E, x))(E_grid)
@@ -298,10 +301,11 @@ def _Gp_quadrature(
     tuple[float, float]
         (G_prime, G_double_prime) - real and imaginary parts
     """
-    # Use logarithmic spacing for better sampling
-    E_lin = jnp.linspace(0, E_max, n_points // 2)
-    E_log = jnp.logspace(-3, jnp.log10(E_max), n_points // 2)
-    E_grid = jnp.sort(jnp.concatenate([E_lin, E_log]))
+    # Pre-compute energy grid outside of JAX tracing using NumPy (static args
+    # guarantee n_points and E_max are concrete at trace time).
+    E_lin = np.linspace(0, E_max, n_points // 2)
+    E_log = np.logspace(-3, np.log10(E_max), n_points // 2)
+    E_grid = jnp.asarray(np.sort(np.concatenate([E_lin, E_log])))
 
     # Compute integrands
     integrand_real = jax.vmap(lambda E: _Gp_integrand_real(E, x, omega_tau0))(E_grid)
