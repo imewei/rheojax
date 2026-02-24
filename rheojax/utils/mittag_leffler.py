@@ -145,7 +145,11 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
         sum_new = t
 
         # Update z_power with overflow clamp (KRN-011)
-        z_pow_new = jnp.clip(z_pow * z, -1e300, 1e300)
+        z_pow_raw = z_pow * z
+        # For complex z, clamp magnitude; for real z, clamp value directly
+        abs_val = jnp.abs(z_pow_raw)
+        scale = jnp.where(abs_val > 1e300, 1e300 / jnp.maximum(abs_val, 1e-300), 1.0)
+        z_pow_new = z_pow_raw * scale
 
         return sum_new, c_new, z_pow_new
 

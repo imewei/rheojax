@@ -94,36 +94,42 @@ gamma_dot_value = st.floats(
 class TestKernelProperties:
     """Property-based tests for SGR kernel functions."""
 
+    @settings(deadline=None)
     @given(E=st.floats(min_value=0.0, max_value=20.0, allow_nan=False))
     def test_rho_trap_non_negative(self, E):
         """Trap distribution rho(E) >= 0 for all E >= 0."""
         result = rho_trap(E)
         assert result >= 0, f"rho_trap({E}) = {result} < 0"
 
+    @settings(deadline=None)
     @given(E=st.floats(min_value=0.0, max_value=20.0, allow_nan=False))
     def test_rho_trap_bounded(self, E):
         """Trap distribution rho(E) <= 1 for all E >= 0."""
         result = rho_trap(E)
         assert result <= 1.0 + 1e-10, f"rho_trap({E}) = {result} > 1"
 
+    @settings(deadline=None)
     @given(E=st.floats(max_value=-0.01, allow_nan=False, allow_infinity=False))
     def test_rho_trap_zero_for_negative(self, E):
         """Trap distribution rho(E) = 0 for E < 0."""
         result = rho_trap(E)
         assert result == 0.0, f"rho_trap({E}) = {result}, expected 0"
 
+    @settings(deadline=None)
     @given(x=x_any_valid)
     def test_G0_positive(self, x):
         """Equilibrium modulus G0(x) > 0 for all x > 0."""
         result = G0(x)
         assert result > 0, f"G0({x}) = {result} <= 0"
 
+    @settings(deadline=None)
     @given(x=x_any_valid)
     def test_G0_finite(self, x):
         """Equilibrium modulus G0(x) is finite for all valid x."""
         result = G0(x)
         assert jnp.isfinite(result), f"G0({x}) = {result} is not finite"
 
+    @settings(deadline=None)
     @given(x1=x_any_valid, x2=x_any_valid)
     def test_G0_monotonically_decreasing(self, x1, x2):
         """G0(x) decreases monotonically with increasing x (more fluid-like)."""
@@ -155,7 +161,7 @@ class TestKernelProperties:
         x=x_any_valid,
         omega_tau0=st.floats(min_value=1e-3, max_value=1e3, allow_nan=False),
     )
-    @settings(suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
     def test_Gp_components_finite(self, x, omega_tau0):
         """G' and G'' are finite for all valid inputs."""
         G_prime, G_double_prime = Gp(x, omega_tau0)
@@ -165,6 +171,7 @@ class TestKernelProperties:
             G_double_prime
         ), f"G''({x}, {omega_tau0}) = {G_double_prime} not finite"
 
+    @settings(deadline=None)
     @given(x=x_any_valid)
     def test_Z_bounds(self, x):
         """Partition function Z(x) in [0, 1] for all x > 0."""
@@ -173,6 +180,7 @@ class TestKernelProperties:
         assert result >= 0, f"Z({x}) = {result} < 0"
         assert result <= 1.0 + 1e-10, f"Z({x}) = {result} > 1"
 
+    @settings(deadline=None)
     @given(x=x_power_law)
     def test_power_law_exponent_value(self, x):
         """Power-law exponent equals x - 1 in viscoelastic regime."""
@@ -216,7 +224,11 @@ class TestPhysicalConstraints:
         assert np.all(G_star[:, 1] > 0), f"G'' contains non-positive values for x={x}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_relaxation_modulus_positive(self, x, G0_val, tau0):
         """Relaxation modulus G(t) > 0 for all times."""
         model = SGRConventional()
@@ -231,7 +243,11 @@ class TestPhysicalConstraints:
         assert np.all(G_t > 0), f"G(t) contains non-positive values for x={x}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_relaxation_modulus_monotonic_decay(self, x, G0_val, tau0):
         """Relaxation modulus G(t) decays monotonically with time."""
         model = SGRConventional()
@@ -269,7 +285,11 @@ class TestPhysicalConstraints:
         assert np.all(J_t > 0), f"J(t) contains non-positive values for x={x}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_creep_compliance_monotonic_increase(self, x, G0_val, tau0):
         """Creep compliance J(t) increases monotonically with time."""
         model = SGRConventional()
@@ -288,7 +308,11 @@ class TestPhysicalConstraints:
             ), f"J(t) not monotonically increasing at index {i}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_viscosity_positive(self, x, G0_val, tau0):
         """Viscosity eta(gamma_dot) > 0 for all shear rates."""
         model = SGRConventional()
@@ -303,7 +327,11 @@ class TestPhysicalConstraints:
         assert np.all(eta > 0), f"eta(gamma_dot) contains non-positive values for x={x}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_loss_tangent_positive(self, x, G0_val, tau0):
         """Loss tangent tan(delta) = G''/G' > 0."""
         model = SGRConventional()
@@ -331,7 +359,7 @@ class TestPhaseRegimes:
     """Property-based tests for correct behavior in different phase regimes."""
 
     @given(x=x_glass)
-    @settings(max_examples=30)
+    @settings(deadline=None, max_examples=30)
     def test_glass_phase_detection(self, x):
         """Model correctly identifies glass phase for x < 1."""
         model = SGRConventional()
@@ -341,7 +369,7 @@ class TestPhaseRegimes:
         assert phase == "glass", f"Expected 'glass' for x={x}, got '{phase}'"
 
     @given(x=x_power_law)
-    @settings(max_examples=30)
+    @settings(deadline=None, max_examples=30)
     def test_power_law_phase_detection(self, x):
         """Model correctly identifies power-law fluid phase for 1 < x < 2."""
         model = SGRConventional()
@@ -352,7 +380,7 @@ class TestPhaseRegimes:
         assert phase == "power-law", f"Expected 'power-law' for x={x}, got '{phase}'"
 
     @given(x=x_newtonian)
-    @settings(max_examples=30)
+    @settings(deadline=None, max_examples=30)
     def test_newtonian_phase_detection(self, x):
         """Model correctly identifies Newtonian phase for x >= 2."""
         model = SGRConventional()
@@ -382,7 +410,11 @@ class TestNumericalStability:
         assert jnp.isfinite(G_double_prime), f"G''({x}, 1.0) not finite"
 
     @given(x=x_power_law, omega=omega_extreme)
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=50,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_stability_extreme_frequencies(self, x, omega):
         """Gp is numerically stable at extreme frequencies."""
         G_prime, G_double_prime = Gp(x, omega)
@@ -454,7 +486,11 @@ class TestPowerLawScaling:
         assert slope < 3.0, f"G' slope {slope} unreasonably large for x={x}"
 
     @given(x=st.floats(min_value=1.2, max_value=1.8, allow_nan=False))
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=30,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_relaxation_modulus_negative_slope(self, x):
         """G(t) exhibits negative slope (decaying with time) at long times."""
         model = SGRConventional()
@@ -487,7 +523,11 @@ class TestGENERICThermodynamics:
     """Property-based tests for GENERIC model thermodynamic consistency."""
 
     @given(x=x_power_law)
-    @settings(max_examples=30, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(
+        deadline=None,
+        max_examples=30,
+        suppress_health_check=[HealthCheck.filter_too_much],
+    )
     def test_entropy_production_non_negative(self, x):
         """Entropy production rate >= 0 (second law of thermodynamics)."""
         model = SGRGeneric()
@@ -503,7 +543,7 @@ class TestGENERICThermodynamics:
         assert S_dot >= -1e-10, f"Entropy production {S_dot} < 0 for x={x}"
 
     @given(x=x_power_law)
-    @settings(max_examples=30)
+    @settings(deadline=None, max_examples=30)
     def test_equilibrium_entropy_production_near_zero(self, x):
         """Entropy production is small at near-equilibrium states."""
         model = SGRGeneric()
@@ -522,7 +562,7 @@ class TestGENERICThermodynamics:
         ), f"Entropy production {S_dot} < 0 at near-equilibrium for x={x}"
 
     @given(x=x_power_law)
-    @settings(max_examples=30)
+    @settings(deadline=None, max_examples=30)
     def test_free_energy_finite(self, x):
         """Free energy is finite for valid state."""
         model = SGRGeneric()

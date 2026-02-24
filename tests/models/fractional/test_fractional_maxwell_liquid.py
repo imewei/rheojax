@@ -75,13 +75,14 @@ class TestFractionalMaxwellLiquidRelaxation:
         assert np.sum(diffs < 0) > 0.8 * len(diffs)
 
     def test_relaxation_short_time_power_law(self):
-        """G(t) ~ Gm * t^(-α) at short times."""
+        """G(t) ~ Gm * t^(-α) at short times (t >> tau_alpha)."""
         model = FractionalMaxwellLiquid()
         model.parameters.set_value("Gm", 1e6)
         model.parameters.set_value("alpha", 0.5)
-        model.parameters.set_value("tau_alpha", 10.0)
+        # Use small tau_alpha so that t >> tau → power-law regime G(t) ~ t^(-alpha)
+        model.parameters.set_value("tau_alpha", 0.001)
 
-        t = np.logspace(-3, -1, 20)
+        t = np.logspace(-1, 1, 20)
         data = RheoData(x=t, y=np.zeros_like(t), domain="time")
         data.metadata["test_mode"] = "relaxation"
         result = model.predict(data)
@@ -89,7 +90,7 @@ class TestFractionalMaxwellLiquidRelaxation:
         log_t = np.log10(t)
         log_G = np.log10(result.y)
         slope = np.polyfit(log_t, log_G, 1)[0]
-        assert np.abs(slope - (-0.5)) < 0.3
+        assert np.abs(slope - (-0.5)) < 0.1
 
     def test_relaxation_alpha_dependence(self):
         model = FractionalMaxwellLiquid()

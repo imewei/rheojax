@@ -276,9 +276,11 @@ class TestSAOS:
         G_star = model.predict(omega, test_mode="oscillation")
 
         G_prime, G_double_prime = model.predict_saos(omega)
-        expected = np.sqrt(G_prime**2 + G_double_prime**2)
 
-        assert np.allclose(G_star, expected)
+        # predict() returns (N, 2) column-stacked [G', G'']
+        assert G_star.shape == (20, 2)
+        assert np.allclose(G_star[:, 0], G_prime)
+        assert np.allclose(G_star[:, 1], G_double_prime)
 
     @pytest.mark.smoke
     def test_saos_terminal_scaling(self):

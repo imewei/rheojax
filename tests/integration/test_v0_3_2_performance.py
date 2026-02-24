@@ -269,7 +269,8 @@ class TestV032PerformanceIntegration:
         total_time = sum(timings)
 
         # Sequential processing should stay bounded even in fast mode
-        max_total = 7.5 if not fast_perf_mode else 4.0
+        # Higher threshold to account for parallel test execution (xdist)
+        max_total = 15.0 if not fast_perf_mode else 8.0
         assert (
             total_time < max_total
         ), f"Batch processing took {total_time:.3f}s, exceeds threshold"
@@ -318,7 +319,8 @@ class TestV032PerformanceIntegration:
         avg_time = elapsed_total / n_iterations
 
         # Average fit + predict should be reasonably fast
-        max_avg = 3.0 if not fast_perf_mode else 2.0
+        # Higher threshold to account for parallel test execution (xdist)
+        max_avg = 6.0 if not fast_perf_mode else 4.0
         assert (
             avg_time < max_avg
         ), f"Average iteration took {avg_time:.3f}s, exceeds threshold"

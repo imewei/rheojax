@@ -204,14 +204,22 @@ class TestConfiguration:
         assert "name" in config["project"]
         assert config["project"]["name"] == "rheojax"
 
-    def test_pytest_ini_exists(self):
-        """Test that pytest.ini configuration exists."""
+    def test_pytest_config_exists(self):
+        """Test that pytest configuration exists (in pyproject.toml)."""
         import rheojax
 
         project_root = Path(rheojax.__file__).parent.parent
-        pytest_ini = project_root / "pytest.ini"
+        pyproject = project_root / "pyproject.toml"
 
-        assert pytest_ini.exists(), "Missing pytest.ini"
+        assert pyproject.exists(), "Missing pyproject.toml"
+        # Verify pytest config section exists in pyproject.toml
+        import tomllib
+
+        with open(pyproject, "rb") as f:
+            config = tomllib.load(f)
+        assert (
+            "tool" in config and "pytest" in config["tool"]
+        ), "Missing [tool.pytest] in pyproject.toml"
 
     def test_pre_commit_config_exists(self):
         """Test that pre-commit configuration exists."""
