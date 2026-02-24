@@ -334,6 +334,12 @@ class BaseModel(BayesianMixin, ABC):
         # Store data for potential Bayesian inference
         self.X_data = X
         self.y_data = y
+        # Normalize to raw arrays for consistency — fit_bayesian() must always
+        # see ndarrays here regardless of whether fit() received RheoData or arrays.
+        if hasattr(self.X_data, "x"):  # RheoData
+            self.X_data = self.X_data.x
+        if hasattr(self.y_data, "y"):  # RheoData
+            self.y_data = self.y_data.y
 
         # Auto-detect optimization strategy
         use_log_residuals, use_multi_start = self._detect_optimization_strategy(
@@ -456,11 +462,13 @@ class BaseModel(BayesianMixin, ABC):
 
         logger.info("Starting NLSQ precompilation", model=self.__class__.__name__)
 
-        # Save current state
+        # Save current state (params, fitted, test_mode, fit kwargs)
         saved_params = {
             name: self.parameters.get_value(name) for name in self.parameters
         }
         saved_fitted = self.fitted_
+        saved_test_mode = getattr(self, "_test_mode", None)
+        saved_last_fit_kwargs = dict(getattr(self, "_last_fit_kwargs", None) or {})
 
         # Generate dummy data if not provided
         if X is None:
@@ -485,7 +493,13 @@ class BaseModel(BayesianMixin, ABC):
         for name, value in saved_params.items():
             if value is not None:
                 self.parameters.set_value(name, value)
+            else:
+                # Restore to unset state — bypass bounds validation by writing
+                # directly to the internal slot so validators don't reject None
+                self.parameters._parameters[name]._value = None
         self.fitted_ = saved_fitted
+        self._test_mode = saved_test_mode
+        self._last_fit_kwargs = saved_last_fit_kwargs
 
         logger.info(
             "NLSQ precompilation completed",
@@ -609,6 +623,10 @@ class BaseModel(BayesianMixin, ABC):
         # Store data for model_function access
         self.X_data = X
         self.y_data = y
+        if hasattr(self.X_data, "x"):
+            self.X_data = self.X_data.x
+        if hasattr(self.y_data, "y"):
+            self.y_data = self.y_data.y
 
         # Auto warm-start from NLSQ if available and no explicit initial values
         if initial_values is None and self.fitted_:
@@ -702,17 +720,20 @@ class BaseModel(BayesianMixin, ABC):
             kwargs=kwargs,
         )
 
-        if not self.fitted_ and len(self.parameters) > 0:
-            # Check if we have parameters set manually
+        # Check if parameters are set manually (allow predict without fit)
+        # but do NOT permanently mutate self.fitted_ — predict() must be read-only
+        _effectively_fitted = self.fitted_
+        if not _effectively_fitted and len(self.parameters) > 0:
             if not any(p.value is None for p in self.parameters._parameters.values()):
-                # Parameters are set, consider it fitted
+                _effectively_fitted = True
                 logger.debug(
-                    "Auto-marking model as fitted (parameters set manually)",
+                    "Parameters set manually — proceeding with predict "
+                    "(model not marked as fitted)",
                     model=self.__class__.__name__,
                 )
-                self.fitted_ = True
 
         # Set test_mode if provided (for data generation without fitting)
+        _had_test_mode = hasattr(self, "_test_mode")
         _old_test_mode = getattr(self, "_test_mode", None)
         if test_mode is not None:
             if hasattr(self, "_test_mode"):
@@ -735,9 +756,12 @@ class BaseModel(BayesianMixin, ABC):
                             del stripped[key]
                     try:
                         result = self._predict(X, **stripped)
-                    except TypeError:
-                        # Final fallback: bare call (13+ models have _predict(self, X) only)
-                        result = self._predict(X)
+                    except TypeError as e2:
+                        if "unexpected keyword argument" in str(e2):
+                            # Final fallback: bare call (13+ models have _predict(self, X) only)
+                            result = self._predict(X)
+                        else:
+                            raise  # Real TypeError from _predict logic — don't swallow
                 else:
                     raise
 
@@ -774,7 +798,7 @@ class BaseModel(BayesianMixin, ABC):
             raise
         finally:
             # Restore original test_mode to avoid side effect
-            if test_mode is not None and hasattr(self, "_test_mode"):
+            if test_mode is not None and _had_test_mode:
                 self._test_mode = _old_test_mode
 
     def fit_predict(self, X: ArrayLike, y: ArrayLike, **kwargs) -> ArrayLike:
@@ -864,7 +888,7 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Dictionary of parameter names and values
         """
-        if hasattr(self, "parameters") and self.parameters:
+        if hasattr(self, "parameters") and len(self.parameters) > 0:
             return {
                 name: self.parameters[name].value for name in self.parameters.keys()
             }
@@ -942,7 +966,7 @@ class BaseModel(BayesianMixin, ABC):
         """
         return {
             "class": self.__class__.__name__,
-            "parameters": self.parameters.to_dict() if self.parameters else {},
+            "parameters": self.parameters.to_dict() if hasattr(self, "parameters") and len(self.parameters) > 0 else {},
             "fitted": self.fitted_,
         }
 

@@ -6,6 +6,7 @@ and optimization support for rheological models.
 
 from __future__ import annotations
 
+import math
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -645,12 +646,24 @@ class ParameterSet:
             if param.value is not None:
                 values.append(param.value)
             else:
+                # Use geometric mean of positive bounds for scale-invariant default;
+                # fall back to arithmetic midpoint for bounds that include zero or
+                # are negative.  0.0 is outside bounds for most parameters and
+                # causes NLSQ to start from an infeasible point.
+                lo, hi = param.bounds if param.bounds else (0.0, 1.0)
+                lo = lo if lo is not None else 0.0
+                hi = hi if hi is not None else 1.0
+                if lo > 0 and hi > 0:
+                    default = math.sqrt(lo * hi)
+                else:
+                    default = (lo + hi) / 2.0
                 logger.warning(
-                    "Parameter has no value set, defaulting to 0.0",
+                    "Parameter has no value set, using bounds midpoint",
                     parameter=name,
                     bounds=param.bounds,
+                    default=default,
                 )
-                values.append(0.0)
+                values.append(default)
         if logger.isEnabledFor(10):  # logging.DEBUG == 10
             logger.debug(
                 "Getting all parameter values",

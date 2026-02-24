@@ -28,22 +28,29 @@ import threading
 import warnings
 from typing import Any
 
-# Suppress matplotlib font glyph warnings globally
-# Justification: These warnings are purely cosmetic - plots render correctly,
-# the glyph is just displayed as a box or skipped. Common when using Unicode
-# subscripts (e.g., σ₀, τ₀) with fonts that lack those glyphs. This is harmless
-# for headless batch runs and provides no actionable information to users.
-warnings.filterwarnings(
-    "ignore",
-    message="Glyph.*missing from.*font",
-    category=UserWarning,
-)
-
 # Thread-safe singleton for validation results
 _validation_lock = threading.Lock()
 _validation_done = False
 _jax_module = None
 _jnp_module = None
+
+
+def suppress_glyph_warnings() -> None:
+    """Suppress matplotlib font glyph warnings.
+
+    These warnings are purely cosmetic — plots render correctly, the glyph is
+    just displayed as a box or skipped. Common when using Unicode subscripts
+    (e.g., σ₀, τ₀) with fonts that lack those glyphs. This is harmless for
+    headless batch runs and provides no actionable information to users.
+
+    Call explicitly rather than relying on module-level side effects.
+    ``safe_import_jax()`` calls this automatically.
+    """
+    warnings.filterwarnings(
+        "ignore",
+        message="Glyph.*missing from.*font",
+        category=UserWarning,
+    )
 
 
 def verify_float64() -> None:
@@ -144,6 +151,9 @@ def safe_import_jax() -> tuple[Any, Any]:
                 f"This may indicate a JAX version incompatibility.\n"
                 f"Please check that JAX 0.8.0 is installed and NLSQ >= 0.2.1."
             ) from e
+
+        # Suppress cosmetic matplotlib glyph warnings (safe to call repeatedly)
+        suppress_glyph_warnings()
 
         # Cache the modules for future calls
         _jax_module = jax

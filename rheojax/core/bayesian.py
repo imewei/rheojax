@@ -468,6 +468,7 @@ class BayesianMixin:
                 float(jnp.mean(jnp.abs(y_imag))) if y_imag.size else 0.0
             )
 
+            scale_info["n_real"] = int(y_real.shape[0])
             y_jax = jnp.concatenate([y_real, y_imag])
         else:
             y_np = np.asarray(y_array, dtype=np.float64)
@@ -846,7 +847,9 @@ class BayesianMixin:
             model_comparison={},
         )
 
-    def sample_prior(self, num_samples: int = 1000) -> dict[str, np.ndarray]:
+    def sample_prior(
+        self, num_samples: int = 1000, seed: int | None = None
+    ) -> dict[str, np.ndarray]:
         """Sample from prior distributions over parameter bounds.
 
         Samples from uniform prior distributions defined by parameter bounds.
@@ -855,6 +858,7 @@ class BayesianMixin:
 
         Args:
             num_samples: Number of samples to draw from prior (default: 1000)
+            seed: Random seed for reproducibility (default: None)
 
         Returns:
             Dictionary mapping parameter names to arrays of prior samples.
@@ -866,16 +870,17 @@ class BayesianMixin:
 
         Example:
             >>> model = MyModel()
-            >>> prior_samples = model.sample_prior(num_samples=500)
+            >>> prior_samples = model.sample_prior(num_samples=500, seed=42)
             >>> print(prior_samples["a"].shape)  # (500,)
         """
-        logger.debug("Sampling prior", num_samples=num_samples)
+        logger.debug("Sampling prior", num_samples=num_samples, seed=seed)
         if not hasattr(self, "parameters"):
             logger.error("Missing 'parameters' attribute for prior sampling")
             raise AttributeError(
                 "Class must have 'parameters' attribute (ParameterSet)"
             )
 
+        rng = np.random.default_rng(seed)
         prior_samples = {}
 
         for param_name in self.parameters:
@@ -892,7 +897,7 @@ class BayesianMixin:
             lower, upper = param.bounds
 
             # Sample from uniform distribution over bounds
-            samples = np.random.uniform(low=lower, high=upper, size=num_samples).astype(
+            samples = rng.uniform(low=lower, high=upper, size=num_samples).astype(
                 np.float64
             )
 
@@ -1198,6 +1203,11 @@ class BayesianMixin:
             if key in protocol_keys_all:
                 protocol_kwargs[key] = nuts_kwargs.pop(key)
 
+        # Save _test_mode BEFORE any mutation so it can be restored on error.
+        # fit_bayesian() should not permanently change the model's test_mode —
+        # subsequent calls to fit() or predict() must see the original mode.
+        _saved_test_mode = getattr(self, "_test_mode", None)
+
         with log_bayesian(
             logger,
             model=model_name,
@@ -1205,108 +1215,113 @@ class BayesianMixin:
             num_samples=num_samples,
             num_chains=num_chains,
         ) as log_ctx:
-            # Phase 1: Validation
-            self._validate_bayesian_requirements()
-            self._validate_parameter_bounds()
+            try:
+                # Phase 1: Validation
+                self._validate_bayesian_requirements()
+                self._validate_parameter_bounds()
 
-            # Phase 2: Resolve test_mode and extract data
-            X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
-            y_array = y_from_rheo if y_from_rheo is not None else y
-            self._test_mode = test_mode  # Cache for future calls
+                # Phase 2: Resolve test_mode and extract data
+                X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
+                y_array = y_from_rheo if y_from_rheo is not None else y
+                self._test_mode = test_mode  # Cache for future calls
 
-            # Merge protocol kwargs into _last_fit_kwargs.
-            # Preserve values set by NLSQ _fit() (e.g., internal metadata like
-            # _stress_scale, _tau_est); only override keys explicitly passed
-            # to fit_bayesian(). Never clear protocol kwargs from _fit() —
-            # they are the ground truth for the model_function.
-            if protocol_kwargs:
-                if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:  # type: ignore[has-type]
-                    self._last_fit_kwargs = {}
-                self._last_fit_kwargs.update(protocol_kwargs)
+                # Merge protocol kwargs into _last_fit_kwargs.
+                # Preserve values set by NLSQ _fit() (e.g., internal metadata like
+                # _stress_scale, _tau_est); only override keys explicitly passed
+                # to fit_bayesian(). Never clear protocol kwargs from _fit() —
+                # they are the ground truth for the model_function.
+                if protocol_kwargs:
+                    if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:  # type: ignore[has-type]
+                        self._last_fit_kwargs = {}
+                    self._last_fit_kwargs.update(protocol_kwargs)
 
-            logger.info(
-                "Bayesian inference started",
-                model=model_name,
-                test_mode=str(test_mode),
-                num_warmup=num_warmup,
-                num_samples=num_samples,
-                num_chains=num_chains,
-            )
+                logger.info(
+                    "Bayesian inference started",
+                    model=model_name,
+                    test_mode=str(test_mode),
+                    num_warmup=num_warmup,
+                    num_samples=num_samples,
+                    num_chains=num_chains,
+                )
 
-            # Phase 3: Prepare JAX data
-            jax_data = self._prepare_jax_data(X_array, y_array)
-            X_jax = jax_data["X_jax"]
-            y_jax = jax_data["y_jax"]
-            is_complex_data = jax_data["is_complex"]
-            scale_info = jax_data["scale_info"]
+                # Phase 3: Prepare JAX data
+                jax_data = self._prepare_jax_data(X_array, y_array)
+                X_jax = jax_data["X_jax"]
+                y_jax = jax_data["y_jax"]
+                is_complex_data = jax_data["is_complex"]
+                scale_info = jax_data["scale_info"]
 
-            # Phase 4: Get parameter bounds
-            param_names = list(self.parameters)
-            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
+                # Phase 4: Get parameter bounds
+                param_names = list(self.parameters)
+                param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
 
-            # Phase 5: Build NumPyro model (closure captures test_mode)
-            numpyro_model = self._build_numpyro_model(
-                param_names=param_names,
-                param_bounds=param_bounds,
-                test_mode=test_mode,
-                is_complex_data=is_complex_data,
-                scale_info=scale_info,
-                **protocol_kwargs,
-            )
+                # Phase 5: Build NumPyro model (closure captures test_mode)
+                numpyro_model = self._build_numpyro_model(
+                    param_names=param_names,
+                    param_bounds=param_bounds,
+                    test_mode=test_mode,
+                    is_complex_data=is_complex_data,
+                    scale_info=scale_info,
+                    **protocol_kwargs,
+                )
 
-            # Phase 6: Apply NUTS kwargs overrides
-            nuts_overrides = getattr(self, "bayesian_nuts_kwargs", None)
-            if callable(nuts_overrides):
-                overrides = nuts_overrides()
-                if isinstance(overrides, dict):
-                    for key, value in overrides.items():
-                        nuts_kwargs.setdefault(key, value)
+                # Phase 6: Apply NUTS kwargs overrides
+                nuts_overrides = getattr(self, "bayesian_nuts_kwargs", None)
+                if callable(nuts_overrides):
+                    overrides = nuts_overrides()
+                    if isinstance(overrides, dict):
+                        for key, value in overrides.items():
+                            nuts_kwargs.setdefault(key, value)
 
-            # Phase 7: Build warm-start values
-            warm_start_values = self._build_warm_start_values(
-                param_names=param_names,
-                param_bounds=param_bounds,
-                initial_values=initial_values,
-                scale_info=scale_info,
-                is_complex=is_complex_data,
-            )
+                # Phase 7: Build warm-start values
+                warm_start_values = self._build_warm_start_values(
+                    param_names=param_names,
+                    param_bounds=param_bounds,
+                    initial_values=initial_values,
+                    scale_info=scale_info,
+                    is_complex=is_complex_data,
+                )
 
-            # Phase 8: Run NUTS sampling with multi-chain parallelization
-            mcmc = self._run_nuts_sampling(
-                numpyro_model=numpyro_model,
-                X_jax=X_jax,
-                y_jax=y_jax,
-                warm_start_values=warm_start_values,
-                num_warmup=num_warmup,
-                num_samples=num_samples,
-                num_chains=num_chains,
-                nuts_kwargs=nuts_kwargs,
-                seed=seed,
-            )
+                # Phase 8: Run NUTS sampling with multi-chain parallelization
+                mcmc = self._run_nuts_sampling(
+                    numpyro_model=numpyro_model,
+                    X_jax=X_jax,
+                    y_jax=y_jax,
+                    warm_start_values=warm_start_values,
+                    num_warmup=num_warmup,
+                    num_samples=num_samples,
+                    num_chains=num_chains,
+                    nuts_kwargs=nuts_kwargs,
+                    seed=seed,
+                )
 
-            # Phase 9: Process results
-            result = self._process_mcmc_results(
-                mcmc, param_names, num_samples, num_chains
-            )
+                # Phase 9: Process results
+                result = self._process_mcmc_results(
+                    mcmc, param_names, num_samples, num_chains
+                )
 
-            # Add diagnostics to log context
-            log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
-            r_hat_vals = result.diagnostics.get("r_hat", {}).values()
-            ess_vals = result.diagnostics.get("ess", {}).values()
-            max_r_hat = max((v for v in r_hat_vals if np.isfinite(v)), default=1.0)
-            min_ess = min((v for v in ess_vals if np.isfinite(v)), default=0.0)
-            log_ctx["r_hat_max"] = max_r_hat
-            log_ctx["ess_min"] = min_ess
+                # Add diagnostics to log context
+                log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
+                r_hat_vals = result.diagnostics.get("r_hat", {}).values()
+                ess_vals = result.diagnostics.get("ess", {}).values()
+                max_r_hat = max((v for v in r_hat_vals if np.isfinite(v)), default=1.0)
+                min_ess = min((v for v in ess_vals if np.isfinite(v)), default=0.0)
+                log_ctx["r_hat_max"] = max_r_hat
+                log_ctx["ess_min"] = min_ess
 
-            logger.info(
-                "Bayesian inference completed",
-                model=model_name,
-                divergences=result.diagnostics.get("divergences", 0),
-                r_hat_max=max_r_hat,
-                ess_min=min_ess,
-            )
+                logger.info(
+                    "Bayesian inference completed",
+                    model=model_name,
+                    divergences=result.diagnostics.get("divergences", 0),
+                    r_hat_max=max_r_hat,
+                    ess_min=min_ess,
+                )
 
-            return result
+                return result
+            finally:
+                # Restore _test_mode even if MCMC raises — fit_bayesian() must
+                # not permanently mutate the model's test_mode state.
+                self._test_mode = _saved_test_mode
 
     @staticmethod
     def _prior_dict_to_dist(prior_spec: dict, dist_module):
@@ -1405,26 +1420,15 @@ class BayesianMixin:
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
 
         # Extract scale values for likelihood (use 0.0 default for missing keys;
-        # avoid `or` which would swallow legitimate 0.0 values)
-        y_real_scale = scale_info.get("y_real_scale", 0.0)
-        y_imag_scale = scale_info.get("y_imag_scale", 0.0)
-        data_scale = scale_info.get("data_scale", 0.0)
-        y_real_mean = scale_info.get("y_real_mean", 0.0)
-        y_imag_mean = scale_info.get("y_imag_mean", 0.0)
-        data_mean = scale_info.get("data_mean", 0.0)
-        # Guard against None values from upstream (e.g. incomplete scale_info)
-        if y_real_scale is None:
-            y_real_scale = 0.0
-        if y_imag_scale is None:
-            y_imag_scale = 0.0
-        if data_scale is None:
-            data_scale = 0.0
-        if y_real_mean is None:
-            y_real_mean = 0.0
-        if y_imag_mean is None:
-            y_imag_mean = 0.0
-        if data_mean is None:
-            data_mean = 0.0
+        # avoid `or` which would swallow legitimate 0.0 values).
+        # Guaranteed non-None by _prepare_jax_data; defensive guards kept for
+        # robustness against incomplete scale_info from custom subclasses.
+        y_real_scale = scale_info.get("y_real_scale", 0.0) or 0.0
+        y_imag_scale = scale_info.get("y_imag_scale", 0.0) or 0.0
+        data_scale = scale_info.get("data_scale", 0.0) or 0.0
+        y_real_mean = scale_info.get("y_real_mean", 0.0) or 0.0
+        y_imag_mean = scale_info.get("y_imag_mean", 0.0) or 0.0
+        data_mean = scale_info.get("data_mean", 0.0) or 0.0
 
         def numpyro_model(X, y=None):
             """NumPyro model with test_mode captured in closure."""
@@ -1517,7 +1521,7 @@ class BayesianMixin:
             if is_complex_data:
                 pred_real = jnp.real(predictions_raw)
                 pred_imag = jnp.imag(predictions_raw)
-                n = len(y) // 2
+                n = scale_info.get("n_real", len(y) // 2)
                 y_real_obs, y_imag_obs = y[:n], y[n:]
 
                 # Exponential priors on noise (inflated scale for robustness)
@@ -1655,7 +1659,10 @@ class BayesianMixin:
             all_valid = all_valid and ess_ok
 
             try:
-                divergences = mcmc.get_extra_fields()["diverging"]
+                try:
+                    divergences = mcmc.get_extra_fields(group_by_chain=True)["diverging"]
+                except TypeError:
+                    divergences = mcmc.get_extra_fields()["diverging"]
                 num_divergences = int(np.sum(divergences))
             except (KeyError, AttributeError):
                 logger.warning(

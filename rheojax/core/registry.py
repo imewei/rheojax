@@ -388,8 +388,11 @@ class Registry:
                     module_name = filename[:-3]
                     self.discover(module_name)
         finally:
-            # Remove temporary path
-            sys.path.pop(0)
+            # Remove temporary path (use remove() not pop(0) for thread safety)
+            try:
+                sys.path.remove(path)
+            except ValueError:
+                pass
 
     def create_instance(
         self, name: str, plugin_type: PluginType | str, *args, **kwargs

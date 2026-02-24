@@ -100,7 +100,7 @@ class TestModeEnum(StrEnum):
         elif protocol == Protocol.SAOS:  # type: ignore[attr-defined]
             return cls.OSCILLATION
         elif protocol == Protocol.LAOS:
-            return cls.OSCILLATION  # LAOS is a type of oscillation
+            return cls.LAOS
         return cls.UNKNOWN  # type: ignore[unreachable]
 
     def to_protocol(self) -> Protocol | None:

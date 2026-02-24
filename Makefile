@@ -7,7 +7,7 @@
         test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
         format lint type-check check quick docs build publish info version \
-        verify verify-fast install-hooks
+        verify verify-fast install-hooks check-equations
 
 # Configuration
 PYTHON := python
@@ -129,6 +129,7 @@ help:
 	@echo "  $(CYAN)type-check$(RESET)       Run type checking (mypy)"
 	@echo "  $(CYAN)check$(RESET)            Run all checks (format + lint + type)"
 	@echo "  $(CYAN)quick$(RESET)            Fast iteration: format + smoke tests (~30s-2min)"
+	@echo "  $(CYAN)check-equations$(RESET)  Verify all kernel files cite equation references"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)PRE-PUSH VERIFICATION$(RESET)"
 	@echo "  $(CYAN)verify$(RESET)           Run FULL local CI (lint + type + smoke tests) - use before push"
@@ -773,3 +774,28 @@ install-hooks:
 	@echo "  git commit -m 'msg'  → runs pre-commit hooks"
 	@echo "  git push             → triggers GitHub Actions CI"
 	@echo "  make verify          → full local verification (recommended before push)"
+
+# ===================
+# Physics equation reference gate
+# ===================
+check-equations:
+	@echo "$(BOLD)$(BLUE)Checking kernel files for equation references...$(RESET)"
+	@failed=0; \
+	for f in rheojax/utils/*_kernels*.py; do \
+		if ! grep -qiE '(Eq\.|equation|Eqn\.)' "$$f" 2>/dev/null; then \
+			echo "$(RED)MISSING: $$f$(RESET)"; \
+			failed=1; \
+		fi; \
+	done; \
+	for f in $$(find rheojax/models -name '*_kernels*.py'); do \
+		if ! grep -qiE '(Eq\.|equation|Eqn\.)' "$$f" 2>/dev/null; then \
+			echo "$(RED)MISSING: $$f$(RESET)"; \
+			failed=1; \
+		fi; \
+	done; \
+	if [ "$$failed" = "1" ]; then \
+		echo "$(RED)ERROR: Some kernel files lack equation references$(RESET)"; \
+		echo "Every kernel function should cite its source paper and equation number."; \
+		exit 1; \
+	fi; \
+	echo "$(BOLD)$(GREEN)✓ All kernel files have equation references$(RESET)"

@@ -100,8 +100,8 @@ class RheoData:
         # Persist explicitly provided test mode into metadata and internal cache
         if initial_test_mode is not None:
             self._explicit_test_mode = initial_test_mode
-            self.metadata.setdefault("test_mode", initial_test_mode)
-            self.metadata.setdefault("detected_test_mode", initial_test_mode)
+            self.metadata["test_mode"] = initial_test_mode
+            self.metadata["detected_test_mode"] = initial_test_mode
         elif self.metadata and "test_mode" in self.metadata:
             self._explicit_test_mode = self.metadata.get("test_mode")
 
@@ -125,8 +125,8 @@ class RheoData:
             y_dtype=str(y_array.dtype),
         )
 
-        # Validate shapes
-        if x_array.shape != y_array.shape:
+        # Validate shapes — allow (N,) x with (N,2) y for DMTA/GMM complex data
+        if x_array.shape[0] != y_array.shape[0]:
             logger.error(
                 "Shape mismatch between x and y data",
                 x_shape=x_array.shape,
@@ -134,7 +134,8 @@ class RheoData:
                 exc_info=True,
             )
             raise ValueError(
-                f"x and y must have the same shape. Got x: {x_array.shape}, y: {y_array.shape}"
+                f"x and y must have the same first dimension. "
+                f"Got x: {x_array.shape}, y: {y_array.shape}"
             )
 
         # Validate data if requested
@@ -692,7 +693,18 @@ class RheoData:
         )
         new_x = self._ensure_array(new_x)
 
-        if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
+        if np.iscomplexobj(self.y):
+            # Complex data: interpolate real and imaginary parts separately.
+            # jnp.interp and np.interp do not support complex arrays — the
+            # imaginary part would be silently discarded.
+            if isinstance(self.x, jnp.ndarray):
+                new_y_real = jnp.interp(new_x, self.x, jnp.real(self.y))
+                new_y_imag = jnp.interp(new_x, self.x, jnp.imag(self.y))
+            else:
+                new_y_real = np.interp(new_x, self.x, np.real(self.y))
+                new_y_imag = np.interp(new_x, self.x, np.imag(self.y))
+            new_y = new_y_real + 1j * new_y_imag
+        elif isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             # Use JAX interpolation
             new_y = jnp.interp(new_x, self.x, self.y)
         else:
@@ -750,7 +762,17 @@ class RheoData:
         # Simple moving average
         kernel = np.ones(window_size) / window_size
 
-        if isinstance(self.y, jnp.ndarray):
+        if np.iscomplexobj(self.y):
+            # Complex data: convolve real and imaginary parts separately.
+            # jnp.convolve and np.convolve may not handle complex arrays correctly.
+            if isinstance(self.y, jnp.ndarray):
+                smoothed_real = jnp.convolve(jnp.real(self.y), kernel, mode="same")
+                smoothed_imag = jnp.convolve(jnp.imag(self.y), kernel, mode="same")
+            else:
+                smoothed_real = np.convolve(np.real(self.y), kernel, mode="same")
+                smoothed_imag = np.convolve(np.imag(self.y), kernel, mode="same")
+            smoothed_y = smoothed_real + 1j * smoothed_imag
+        elif isinstance(self.y, jnp.ndarray):
             # Use JAX convolution
             smoothed_y = jnp.convolve(self.y, kernel, mode="same")
         else:
@@ -775,11 +797,14 @@ class RheoData:
             RheoData with derivative values
         """
         logger.debug("Computing numerical derivative")
-        if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
-            # Use JAX gradient
+        if np.iscomplexobj(self.y):
+            if isinstance(self.y, jnp.ndarray):
+                dy_dx = jnp.gradient(jnp.real(self.y), self.x) + 1j * jnp.gradient(jnp.imag(self.y), self.x)
+            else:
+                dy_dx = np.gradient(np.real(self.y), self.x) + 1j * np.gradient(np.imag(self.y), self.x)
+        elif isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             dy_dx = jnp.gradient(self.y, self.x)
         else:
-            # Use NumPy gradient
             dy_dx = np.gradient(self.y, self.x)
 
         return RheoData(
