@@ -222,11 +222,8 @@ class FractionalMaxwellModel(BaseModel):
         # Clip to reasonable range for compliance values
         J_t_clipped = jnp.clip(J_t, epsilon, 1e10)
 
-        # Ensure monotonicity: creep compliance must increase with time
-        # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
-        J_t_monotonic = jnp.maximum.accumulate(J_t_clipped)
-
-        return J_t_monotonic
+        # Monotonicity enforced by physical parameter bounds, not in NUTS path
+        return J_t_clipped
 
     def _predict_oscillation_jax(
         self, omega: jnp.ndarray, c1: float, alpha: float, beta: float, tau: float

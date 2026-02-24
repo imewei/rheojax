@@ -953,7 +953,7 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_oscillation_jit(
-        omega: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        omega: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled oscillation prediction: G'(omega), G''(omega).
 
@@ -992,7 +992,7 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_relaxation_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled relaxation prediction: G(t).
 
@@ -1047,7 +1047,7 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_creep_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled creep prediction: J(t).
 
@@ -1086,15 +1086,13 @@ class SGRConventional(BaseModel):
         # J(t) = (1 / (G0_scale * G0_dim)) * (1 + t_scaled)^(2-x)
         J_t = jnp.power(1.0 + t_safe, growth_exp) / (G0_scale * G0_dim)
 
-        # Enforce monotonicity: J(t_i) >= J(t_{i-1})
-        J_t_monotonic = jnp.maximum.accumulate(J_t)
-
-        return J_t_monotonic
+        # Monotonicity enforced by physical parameter bounds, not in NUTS path
+        return J_t
 
     @staticmethod
     @jax.jit
     def _predict_steady_shear_jit(
-        gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled steady shear prediction: eta(gamma_dot).
 
@@ -1288,7 +1286,7 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_startup_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float, gamma_dot: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float", gamma_dot: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled startup flow prediction: eta_plus(t).
 
@@ -1443,18 +1441,18 @@ class SGRConventional(BaseModel):
         # Steady-state: x_ss = x_eq + A * (gamma_dot * tau0)^n
         x_ss = x_eq + A * (gamma_dot_dim**n)
 
-        return float(x_ss)
+        return x_ss
 
     @staticmethod
     @jax.jit
     def _dx_dt_jit(
-        x: float,
-        gamma_dot: float,
-        x_eq: float,
-        x_ss: float,
-        alpha_aging: float,
-        beta_rejuv: float,
-    ) -> float:
+        x: "jax.Array | float",
+        gamma_dot: "jax.Array | float",
+        x_eq: "jax.Array | float",
+        x_ss: "jax.Array | float",
+        alpha_aging: "jax.Array | float",
+        beta_rejuv: "jax.Array | float",
+    ) -> "jax.Array | float":
         """JIT-compiled evolution equation for dx/dt.
 
         The effective temperature x evolves according to:
@@ -1530,24 +1528,36 @@ class SGRConventional(BaseModel):
         alpha_aging = self.parameters.get_value("alpha_aging")
         beta_rejuv = self.parameters.get_value("beta_rejuv")
         tau0 = self.parameters.get_value("tau0")
+        # Read x_ss_A and x_ss_n once here so they are captured as concrete values
+        # in the closure, not re-read via self.parameters inside the JIT-traced
+        # vector field (which would produce stale floats during NUTS sampling).
+        x_ss_A = self.parameters.get_value("x_ss_A")
+        x_ss_n = self.parameters.get_value("x_ss_n")
 
         # Convert to JAX arrays
         t_jax = jnp.asarray(t)
         gamma_dot_jax = jnp.asarray(gamma_dot)
+
+        # Build args dict so that x_ss_A and x_ss_n travel through diffrax
+        # as traced JAX values rather than being re-fetched from self.parameters.
+        ode_args = {"x_ss_A": x_ss_A, "x_ss_n": x_ss_n}
 
         # Define ODE vector field for diffrax
         # Signature: vector_field(t, y, args) -> dy/dt
         def vector_field(t_val, x_val, args):
             """ODE vector field: dx/dt = f(t, x)."""
             # Interpolate gamma_dot at current time t_val
-            # Use linear interpolation
+            # Use linear interpolation (jnp.interp is acceptable for
+            # piecewise-linear interpolation; interpax would be preferred
+            # for JIT-safe differentiable interpolation if imported).
             gamma_dot_current = jnp.interp(t_val, t_jax, gamma_dot_jax)
 
-            # Compute x_ss at current shear rate
+            # Compute x_ss at current shear rate using args, not self.parameters,
+            # so that traced values flow correctly during NUTS (Fix JAX-002).
+            x_ss_A = args["x_ss_A"]
+            x_ss_n = args["x_ss_n"]
             gamma_dot_dim = gamma_dot_current * tau0
-            x_ss_current = x_eq + self.parameters.get_value("x_ss_A") * (
-                gamma_dot_dim ** self.parameters.get_value("x_ss_n")
-            )
+            x_ss_current = x_eq + x_ss_A * (gamma_dot_dim ** x_ss_n)
 
             # Compute dx/dt
             # Ensure x_val is scalar extract if needed, though diffrax passes arrays
@@ -1579,6 +1589,7 @@ class SGRConventional(BaseModel):
             t1,
             dt0,
             y0=x_initial,
+            args=ode_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
             max_steps=100000,  # Safety limit

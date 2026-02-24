@@ -231,11 +231,8 @@ class FractionalMaxwellGel(BaseModel):
         # J(t) = (1/c_alpha) * t^alpha * E(...)
         J_t = (1.0 / c_alpha) * jnp.power(t_safe, alpha_safe) * ml_value
 
-        # Ensure monotonicity: creep compliance must increase with time
-        # Use cumulative maximum to enforce J(t_i) >= J(t_{i-1})
-        J_t_monotonic = jnp.maximum.accumulate(J_t)
-
-        return J_t_monotonic
+        # Monotonicity enforced by physical parameter bounds, not in NUTS path
+        return J_t
 
     @staticmethod
     @jax.jit

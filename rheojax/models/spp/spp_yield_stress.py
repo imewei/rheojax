@@ -454,10 +454,10 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_oscillation(
         gamma_0: Array,
-        G_cage: float,
-        sigma_sy_scale: float,
-        sigma_sy_exp: float,
-        eta_inf: float,
+        G_cage: "jax.Array | float",
+        sigma_sy_scale: "jax.Array | float",
+        sigma_sy_exp: "jax.Array | float",
+        eta_inf: "jax.Array | float",
     ) -> Array:
         """Predict static yield stress for amplitude sweep.
 
@@ -489,8 +489,8 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_dynamic_yield(
         gamma_0: Array,
-        sigma_dy_scale: float,
-        sigma_dy_exp: float,
+        sigma_dy_scale: "jax.Array | float",
+        sigma_dy_exp: "jax.Array | float",
     ) -> Array:
         """Predict dynamic yield stress for amplitude sweep.
 
@@ -502,9 +502,9 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_rotation(
         gamma_dot: Array,
-        sigma_dy: float,
-        eta_inf: float,
-        n_power_law: float,
+        sigma_dy: "jax.Array | float",
+        eta_inf: "jax.Array | float",
+        n_power_law: "jax.Array | float",
     ) -> Array:
         """Predict stress for steady shear flow.
 

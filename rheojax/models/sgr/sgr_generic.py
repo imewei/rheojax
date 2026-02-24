@@ -1182,7 +1182,7 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_creep_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled creep prediction: J(t).
 
@@ -1211,15 +1211,13 @@ class SGRGeneric(BaseModel):
         growth_exp = x - 1.0
         J_t = jnp.power(1.0 + t_safe, growth_exp) / (G0_scale * G0_dim)
 
-        # Enforce monotonicity for physical creep
-        J_t_monotonic = jnp.maximum.accumulate(J_t)
-
-        return J_t_monotonic
+        # Monotonicity enforced by physical parameter bounds, not in NUTS path
+        return J_t
 
     @staticmethod
     @jax.jit
     def _predict_steady_shear_jit(
-        gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled steady shear prediction: sigma(gamma_dot).
 
@@ -1254,7 +1252,7 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_startup_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float, gamma_dot: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float", gamma_dot: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled startup flow prediction: eta_plus(t).
 
@@ -1293,7 +1291,7 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_oscillation_jit(
-        omega: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        omega: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled oscillation prediction: G'(omega), G''(omega).
 
@@ -1327,7 +1325,7 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_relaxation_jit(
-        t: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled relaxation prediction: G(t).
 
@@ -1359,7 +1357,7 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_viscosity_jit(
-        gamma_dot: jnp.ndarray, x: float, G0_scale: float, tau0: float
+        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
     ) -> jnp.ndarray:
         """JIT-compiled viscosity prediction: eta(gamma_dot).
 
