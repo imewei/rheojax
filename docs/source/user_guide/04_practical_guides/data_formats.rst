@@ -10,6 +10,12 @@ Data Format Reference
    fitting analyses and transforms. Use this as a technical specification when
    preparing data for analysis.
 
+   **Version**: v0.6.0 — 53 models | 7 transforms | 5 readers | 3 writers
+
+.. contents:: On this page
+   :local:
+   :depth: 2
+
 Core Data Container: RheoData
 -----------------------------
 
@@ -26,11 +32,17 @@ Constructor Signature
        x,                          # Independent variable (time, frequency, shear rate)
        y,                          # Dependent variable (real or complex)
        domain='time',              # 'time' or 'frequency'
-       x_units=None,               # e.g., 's', 'rad/s', '1/s'
+       x_units=None,               # e.g., 's', 'rad/s', '1/s', 'Hz'
        y_units=None,               # e.g., 'Pa', '1/Pa', 'Pa·s'
-       initial_test_mode=None,     # 'relaxation', 'creep', 'oscillation', 'rotation'
+       initial_test_mode=None,     # 'relaxation', 'creep', 'oscillation', 'flow_curve',
+                                   # 'startup', 'laos', 'rotation' (legacy)
        metadata=None,              # dict with additional context
+       validate=True,              # Validate on creation (NaN, shape, monotonicity)
    )
+
+**Accepted array types**: NumPy ndarray, JAX ndarray, list, tuple (auto-coerced)
+
+**Float precision**: float64 enforced (critical for NLSQ numerical stability)
 
 Key Fields
 ~~~~~~~~~~
@@ -62,24 +74,123 @@ Key Fields
      - Explicit test mode; auto-detected if not provided
    * - ``metadata``
      - dict | None
-     - Additional context (temperature, strain amplitude, etc.)
+     - Additional context (temperature, deformation_mode, poisson_ratio, etc.)
+   * - ``validate``
+     - bool
+     - If True (default), validates NaN, Inf, shape matching on creation
 
-Oscillation Data Properties
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Data Access Properties
+~~~~~~~~~~~~~~~~~~~~~~
 
-For complex modulus data (oscillation), ``RheoData`` provides convenient properties:
+.. list-table::
+   :header-rows: 1
+   :widths: 30 15 55
+
+   * - Property
+     - Type
+     - Description
+   * - ``.test_mode``
+     - str
+     - Auto-detected or explicit test mode
+   * - ``.deformation_mode``
+     - str
+     - From metadata; defaults to ``"shear"``
+   * - ``.shape``
+     - tuple
+     - Shape of y data
+   * - ``.is_complex``
+     - bool
+     - True if y is complex
+
+**Complex modulus properties** (for oscillation data where y = G' + iG''):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Property
+     - Description
+   * - ``.storage_modulus`` / ``.y_real``
+     - G' (storage modulus) or E' for DMTA
+   * - ``.loss_modulus`` / ``.y_imag``
+     - G'' (loss modulus) or E'' for DMTA
+   * - ``.modulus``
+     - |G*| = sqrt(G'² + G''²)
+   * - ``.tan_delta``
+     - tan(δ) = G''/G'
+   * - ``.storage_modulus_label``
+     - ``"G'"`` (shear) or ``"E'"`` (tensile)
+   * - ``.loss_modulus_label``
+     - ``"G''"`` (shear) or ``"E''"`` (tensile)
+
+Methods
+~~~~~~~
+
+**Conversion**:
 
 .. code-block:: python
 
-   # Access real and imaginary parts
-   G_prime = data.storage_modulus   # G' (also: data.y_real)
-   G_double_prime = data.loss_modulus  # G'' (also: data.y_imag)
+   jax_data = data.to_jax()          # Convert to JAX arrays (cached)
+   np_data = data.to_numpy()         # Convert to NumPy arrays (zero-copy when possible)
+   data_copy = data.copy()           # Deep copy
+   d = data.to_dict()                # Serialize to dict
+   data = RheoData.from_dict(d)      # Deserialize
 
-   # Loss tangent
-   tan_delta = data.tan_delta       # G'' / G'
+**Data manipulation**:
 
-Fitting Analyses: The Four Test Modes
--------------------------------------
+.. code-block:: python
+
+   resampled = data.resample(n_points=200)      # Resample (log-spaced freq, linear time)
+   interped = data.interpolate(new_x)           # Interpolate to new x values
+   smoothed = data.smooth(window_size=5)         # Moving average
+   deriv = data.derivative()                     # Numerical dy/dx
+   integ = data.integral()                       # Cumulative trapezoid
+   sliced = data.slice(start=0.1, end=100.0)    # Slice by x-value range
+
+**Operators**: indexing ``[i]``, slicing ``[a:b]``, ``+``, ``-``, ``*``
+
+Validation Rules
+~~~~~~~~~~~~~~~~
+
+When ``validate=True`` (default), RheoData checks:
+
+- ``x`` and ``y`` must have the same shape → ``ValueError``
+- No NaN values → ``ValueError``
+- No Inf values → ``ValueError``
+- Non-monotonic x → Warning (not error)
+- Negative frequency values in oscillation domain → Warning
+
+Disable validation for intermediate computation: ``RheoData(..., validate=False)``
+
+.. _test_modes_reference:
+
+Test Modes: 8 Protocols
+-----------------------
+
+RheoJAX supports 8 test modes, corresponding to different rheological experiments.
+Models declare which protocols they support via the registry.
+
+.. code-block:: python
+
+   from rheojax.core.test_modes import TestModeEnum, DeformationMode
+
+   # All test modes
+   TestModeEnum.RELAXATION     # "relaxation"
+   TestModeEnum.CREEP          # "creep"
+   TestModeEnum.OSCILLATION    # "oscillation"
+   TestModeEnum.FLOW_CURVE     # "flow_curve"
+   TestModeEnum.STARTUP        # "startup"
+   TestModeEnum.LAOS           # "laos"
+   TestModeEnum.ROTATION       # "rotation" (legacy alias for flow_curve)
+   TestModeEnum.UNKNOWN        # "unknown"
+
+**Auto-detection priority**:
+
+1. Explicit ``metadata['test_mode']`` if provided
+2. Domain + units: ``domain='frequency'`` or ``x_units='rad/s'`` → oscillation
+3. ``x_units`` containing ``'1/s'`` or ``'s^-1'`` → flow_curve
+4. Monotonicity: decreasing y → relaxation, increasing y → creep
+5. Fallback → unknown
 
 Relaxation
 ~~~~~~~~~~
@@ -135,7 +246,8 @@ Stress relaxation measures how stress decays over time under constant strain.
    model = Maxwell()
    model.fit(data)
 
-**Compatible models**: Maxwell, Zener, Springpot, all Fractional models, Generalized Maxwell
+**Compatible models**: Maxwell, Zener, Springpot, all Fractional models, Generalized Maxwell,
+IKH, FIKH, DMT, SGR, HVM, HVNM, TNT, VLB, ITT-MCT, and more (40+ models)
 
 Creep
 ~~~~~
@@ -165,6 +277,9 @@ Creep measures how strain increases over time under constant stress.
    * - **test_mode**
      - ``'creep'``
      - Auto-detected if y increases
+   * - **Kwargs**
+     - ``sigma_applied`` (float, Pa)
+     - Required for ODE models (IKH, DMT, EPM, etc.)
 
 **Example**:
 
@@ -183,7 +298,11 @@ Creep measures how strain increases over time under constant stress.
        initial_test_mode='creep',
    )
 
-**Compatible models**: Maxwell, Zener, Springpot, all Fractional models
+   # For ODE models, sigma_applied is required
+   model.fit(t, J_t, test_mode='creep', sigma_applied=100.0)
+
+**Compatible models**: Maxwell, Zener, Springpot, all Fractional models, IKH, DMT, EPM,
+Fluidity-Saramito, HVM, HVNM, TNT, VLB, ITT-MCT
 
 Oscillation (SAOS)
 ~~~~~~~~~~~~~~~~~~
@@ -241,7 +360,7 @@ Small-amplitude oscillatory shear measures frequency-dependent viscoelasticity.
    print(f"G' range: {data.storage_modulus.min():.0f} - {data.storage_modulus.max():.0f} Pa")
    print(f"G'' range: {data.loss_modulus.min():.0f} - {data.loss_modulus.max():.0f} Pa")
 
-**Alternative: separate :math:`G'` and :math:`G''` arrays**:
+**Alternative: separate G' and G'' arrays**:
 
 .. code-block:: python
 
@@ -249,7 +368,8 @@ Small-amplitude oscillatory shear measures frequency-dependent viscoelasticity.
    G_star = G_prime + 1j * G_double_prime
    data = RheoData(x=omega, y=G_star, domain='frequency')
 
-**Compatible models**: Maxwell, Zener, Springpot, all Fractional models, SGR models, Generalized Maxwell
+**Compatible models**: Maxwell, Zener, Springpot, all Fractional models, SGR models,
+Generalized Maxwell, IKH, FIKH, DMT, Giesekus, HVM, HVNM, TNT, VLB, ITT-MCT (41+ models)
 
 DMTA / DMA Oscillation (Tensile)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -259,6 +379,8 @@ Dynamic Mechanical Thermal Analysis measures frequency-dependent viscoelasticity
 **Physical setup**: Apply sinusoidal tensile (or bending) deformation, measure force response
 
 **Output**: Complex Young's modulus :math:`E^*(\omega) = E'(\omega) + i E''(\omega)`
+
+**Conversion**: :math:`E^* = 2(1 + \nu) \cdot G^*` where :math:`\nu` is Poisson's ratio
 
 .. list-table::
    :header-rows: 1
@@ -285,6 +407,36 @@ Dynamic Mechanical Thermal Analysis measures frequency-dependent viscoelasticity
    * - **poisson_ratio**
      - float (e.g., 0.5 for rubber)
      - Required for E* → G* conversion
+
+**Deformation modes**:
+
+.. code-block:: python
+
+   from rheojax.core.test_modes import DeformationMode
+
+   DeformationMode.SHEAR         # "shear" — rotational rheometer (G*)
+   DeformationMode.TENSION       # "tension" — DMTA tensile (E*)
+   DeformationMode.BENDING       # "bending" — DMA bending (E*)
+   DeformationMode.COMPRESSION   # "compression" — compression DMA (E*)
+
+**Poisson's ratio presets**:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20
+
+   * - Material
+     - ν
+   * - rubber / elastomer / hydrogel
+     - 0.50
+   * - semicrystalline
+     - 0.40
+   * - thermoset
+     - 0.38
+   * - glassy_polymer
+     - 0.35
+   * - metal / foam
+     - 0.30
 
 **Example with E* data**:
 
@@ -318,28 +470,18 @@ and sets ``deformation_mode='tension'`` in metadata:
    data = load_csv("dmta_data.csv", x_col="f", y_cols=["E' (Pa)", "E'' (Pa)"])
    print(data.deformation_mode)  # "tension" (auto-detected)
 
-**Poisson's ratio presets**: Use ``POISSON_PRESETS`` for common materials:
-
-.. code-block:: python
-
-   from rheojax.utils.modulus_conversion import POISSON_PRESETS
-
-   nu = POISSON_PRESETS["rubber"]            # 0.50
-   nu = POISSON_PRESETS["glassy_polymer"]    # 0.35
-   nu = POISSON_PRESETS["semicrystalline"]   # 0.40
-
 **Compatible models**: All 41 oscillation-capable models (Classical, Fractional, SGR, IKH, HVM, HVNM, etc.)
 
 See :doc:`/models/dmta/index` for the complete DMTA guide.
 
-Rotation (Steady Shear Flow)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Flow Curve (Steady Shear)
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Steady shear flow measures viscosity as a function of shear rate.
+Steady shear flow measures stress as a function of shear rate at equilibrium.
 
 **Physical setup**: Apply constant shear rate, measure steady-state stress
 
-**Output**: Viscosity :math:`\eta(\dot{\gamma})` or stress :math:`\sigma(\dot{\gamma})`
+**Output**: Stress :math:`\sigma(\dot{\gamma})` or viscosity :math:`\eta(\dot{\gamma})`
 
 .. list-table::
    :header-rows: 1
@@ -350,42 +492,171 @@ Steady shear flow measures viscosity as a function of shear rate.
      - Notes
    * - **x**
      - shear rate :math:`\dot{\gamma}` (1/s)
-     - Positive
+     - Positive, typically log-spaced
    * - **y**
-     - viscosity :math:`\eta` (Pa·s) or stress :math:`\sigma` (Pa)
+     - stress :math:`\sigma` (Pa) or viscosity :math:`\eta` (Pa·s)
      - Real
    * - **domain**
-     - ``'time'`` (or unspecified)
-     - Technically "shear_rate" domain
+     - ``'time'``
+     -
    * - **test_mode**
-     - ``'rotation'``
-     - Auto-detected from units
+     - ``'flow_curve'``
+     - Auto-detected from x_units
+
+.. note::
+
+   The legacy test mode ``'rotation'`` is automatically converted to ``'flow_curve'``.
+   New code should always use ``'flow_curve'``.
 
 **Example**:
 
 .. code-block:: python
 
-   from rheojax.models import PowerLaw, CarreauYasuda
+   from rheojax.models import PowerLaw, HerschelBulkley
 
-   # Flow curve: viscosity vs shear rate
+   # Flow curve: stress vs shear rate
    gamma_dot = np.logspace(-2, 3, 50)  # 0.01 to 1000 1/s
-
-   # Shear-thinning behavior
-   eta = 1000 * gamma_dot**(-0.5)  # Power-law fluid
+   sigma = 50.0 + 10.0 * gamma_dot**0.5  # Herschel-Bulkley-like
 
    data = RheoData(
        x=gamma_dot,
-       y=eta,
+       y=sigma,
        x_units='1/s',
-       y_units='Pa·s',
-       initial_test_mode='rotation',
+       y_units='Pa',
+       initial_test_mode='flow_curve',
    )
 
-   # Fit flow models
-   model = PowerLaw()
+   # Fit Herschel-Bulkley model
+   model = HerschelBulkley()
    model.fit(data)
 
-**Compatible models**: PowerLaw, HerschelBulkley, Bingham, Carreau, CarreauYasuda, Cross
+**Compatible models**: PowerLaw, HerschelBulkley, Bingham, Carreau, CarreauYasuda, Cross,
+plus all ODE models (Giesekus, TNT, DMT, IKH, Fluidity, SGR, HVM, STZ, etc.) — 32+ models
+
+Startup (Transient Shear)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Startup flow measures the transient stress response when a constant shear rate
+is suddenly applied. The stress often shows an **overshoot** before reaching
+steady state — a signature of thixotropy or polymer entanglement.
+
+**Physical setup**: Apply constant shear rate at t=0, measure stress growth
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 30 50
+
+   * - Field
+     - Value
+     - Notes
+   * - **x**
+     - stacked ``[t, γ]``, shape ``(2, N)``
+     - Time (s) and cumulative strain (γ = γ̇·t)
+   * - **y**
+     - transient stress ``σ(t)`` (Pa)
+     - Real, 1D array of shape ``(N,)``
+   * - **domain**
+     - ``'time'``
+     -
+   * - **test_mode**
+     - ``'startup'``
+     - Must be specified explicitly
+   * - **gamma_dot**
+     - float (1/s), **REQUIRED** kwarg
+     - Constant applied shear rate
+
+.. important::
+
+   The ``gamma_dot`` keyword argument is **required** for startup mode. It is
+   used both during fitting and during Bayesian inference (NUTS). Models cache
+   it internally for the ``model_function()`` used by NumPyro.
+
+**Example**:
+
+.. code-block:: python
+
+   from rheojax.models import TNTSingleMode
+
+   gamma_dot = 10.0  # 1/s
+   t = np.linspace(0, 5.0, 80)
+   gamma = gamma_dot * t
+
+   # Stack time and strain as (2, N) array
+   X = np.stack([t, gamma])  # shape (2, 80)
+
+   # Fit model with required gamma_dot kwarg
+   model = TNTSingleMode()
+   model.fit(X, sigma, test_mode='startup', gamma_dot=gamma_dot)
+
+   # Predict
+   sigma_pred = model.predict(X, test_mode='startup', gamma_dot=gamma_dot)
+
+**Compatible models**: TNT (5 variants), DMT, IKH, FIKH, EPM, Fluidity, Fluidity-Saramito,
+Giesekus, HVM, HVNM, STZ, VLB, ITT-MCT, HL — 26+ models
+
+LAOS (Large Amplitude Oscillatory Shear)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+LAOS applies sinusoidal strain at amplitudes large enough to probe nonlinear
+rheological behavior. The stress response contains higher harmonics (3ω, 5ω, ...)
+that encode information about yielding, shear-thinning, and microstructural changes.
+
+**Physical setup**: Apply large-amplitude sinusoidal strain, measure nonlinear stress
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 30 50
+
+   * - Field
+     - Value
+     - Notes
+   * - **x**
+     - time ``t`` (s)
+     - Multiple oscillation cycles
+   * - **y**
+     - stress ``σ(t)`` (Pa)
+     - Real, non-sinusoidal
+   * - **domain**
+     - ``'time'``
+     -
+   * - **test_mode**
+     - ``'laos'``
+     - Must be specified explicitly
+   * - **gamma_0**
+     - float, **REQUIRED** kwarg
+     - Strain amplitude
+   * - **omega**
+     - float (rad/s), **REQUIRED** kwarg
+     - Angular frequency
+   * - **n_cycles**
+     - int, optional (default 5–10)
+     - Number of oscillation cycles
+
+.. important::
+
+   Both ``gamma_0`` and ``omega`` are **required** keyword arguments for LAOS mode.
+   ``n_cycles`` controls how many oscillation periods are simulated.
+
+**Example**:
+
+.. code-block:: python
+
+   from rheojax.models import TNTSingleMode
+
+   gamma_0, omega, n_cycles = 0.5, 1.0, 5
+   T = 2 * np.pi / omega
+   t = np.linspace(0, n_cycles * T, n_cycles * 80)
+
+   # Fit experimental LAOS stress data
+   model = TNTSingleMode()
+   model.fit(t, stress_data, test_mode='laos', gamma_0=gamma_0, omega=omega)
+
+   # Or generate synthetic LAOS data via model
+   result = model.simulate_laos(t=None, gamma_0=0.5, omega=1.0, n_cycles=3)
+   # Returns: {'t': array, 'strain': array, 'stress': array, 'strain_rate': array}
+
+**Compatible models**: TNT (5), Giesekus, IKH, FIKH, DMT, Fluidity-Saramito,
+HVM, HVNM, STZ, VLB, SGR, ITT-MCT, HL, SPP — 26+ models
 
 Transform Analyses
 ------------------
@@ -412,41 +683,39 @@ Collapses frequency sweeps at different temperatures onto a master curve.
    * - **Output**
      - Collapsed mastercurve + shift factors dict
 
-**Example**:
+**Constructor**:
 
 .. code-block:: python
 
    from rheojax.transforms import Mastercurve
 
-   # Create datasets at different temperatures
+   mc = Mastercurve(
+       reference_temp=298.15,     # Reference temperature (K)
+       method='wlf',              # 'wlf', 'arrhenius', 'manual'
+       C1=17.44,                  # WLF parameter C1
+       C2=51.6,                   # WLF parameter C2 (K)
+       E_a=None,                  # Activation energy (J/mol) — for Arrhenius
+       auto_shift=False,          # Power-law intersection method
+   )
+
+**Example**:
+
+.. code-block:: python
+
    datasets = [
-       RheoData(
-           x=omega,
-           y=G_star_273K,
-           domain='frequency',
-           metadata={'temperature': 273.15},  # Required!
-       ),
-       RheoData(
-           x=omega,
-           y=G_star_298K,
-           domain='frequency',
-           metadata={'temperature': 298.15},
-       ),
-       RheoData(
-           x=omega,
-           y=G_star_323K,
-           domain='frequency',
-           metadata={'temperature': 323.15},
-       ),
+       RheoData(x=omega, y=G_star_273K, domain='frequency',
+                metadata={'temperature': 273.15}),
+       RheoData(x=omega, y=G_star_298K, domain='frequency',
+                metadata={'temperature': 298.15}),
+       RheoData(x=omega, y=G_star_323K, domain='frequency',
+                metadata={'temperature': 323.15}),
    ]
 
-   # Apply TTS
    mc = Mastercurve(reference_temp=298.15, method='wlf')
    mastercurve, shift_factors = mc.transform(datasets)
 
-   # Or with auto-shift optimization
-   mc_auto = Mastercurve(reference_temp=298.15, auto_shift=True)
-   mastercurve, shifts = mc_auto.transform(datasets)
+**Additional methods**: ``get_shift_factor(T)``, ``optimize_wlf_parameters(datasets, C1, C2)``,
+``compute_overlap_error(datasets)``
 
 SRFS (Strain-Rate Frequency Superposition)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -477,31 +746,21 @@ Collapses flow curves at different reference shear rates (for SGR materials).
    from rheojax.transforms import SRFS
 
    datasets = [
-       RheoData(
-           x=gamma_dot_1,
-           y=eta_1,
-           metadata={'reference_gamma_dot': 0.1},  # Required!
-       ),
-       RheoData(
-           x=gamma_dot_2,
-           y=eta_2,
-           metadata={'reference_gamma_dot': 1.0},
-       ),
-       RheoData(
-           x=gamma_dot_3,
-           y=eta_3,
-           metadata={'reference_gamma_dot': 10.0},
-       ),
+       RheoData(x=gamma_dot_1, y=eta_1,
+                metadata={'reference_gamma_dot': 0.1}),
+       RheoData(x=gamma_dot_2, y=eta_2,
+                metadata={'reference_gamma_dot': 1.0}),
+       RheoData(x=gamma_dot_3, y=eta_3,
+                metadata={'reference_gamma_dot': 10.0}),
    ]
 
-   # Apply SRFS with SGR parameters
    srfs = SRFS(reference_gamma_dot=1.0)
    mastercurve, shifts = srfs.transform(
-       datasets,
-       x=1.5,       # SGR noise temperature
-       tau0=1e-3,   # SGR attempt time
-       return_shifts=True,
+       datasets, x=1.5, tau0=1e-3, return_shifts=True,
    )
+
+**Additional methods**: ``compute_shift_factor(gamma_dot, x, tau0)``,
+``detect_shear_banding(gamma_dot, sigma)``
 
 OWChirp (LAOS Wavelet Analysis)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -531,23 +790,9 @@ Performs time-frequency analysis of Large Amplitude Oscillatory Shear data.
 
    from rheojax.transforms import OWChirp
 
-   # LAOS stress response (nonlinear, with harmonics)
-   omega = 1.0  # rad/s
-   t = np.linspace(0, 10 * 2 * np.pi / omega, 10000)
-   stress = 100 * np.sin(omega * t) + 20 * np.sin(3 * omega * t)  # With 3rd harmonic
-
-   data = RheoData(
-       x=t,
-       y=stress,
-       domain='time',
-       x_units='s',
-       y_units='Pa',
-       metadata={'test_mode': 'oscillation'},
-   )
-
-   # Apply OWChirp transform
    owchirp = OWChirp(
        n_frequencies=100,
+       frequency_range=(1e-2, 1e2),
        extract_harmonics=True,
        max_harmonic=7,
    )
@@ -557,6 +802,8 @@ Performs time-frequency analysis of Large Amplitude Oscillatory Shear data.
    harmonics = owchirp.get_harmonics(data)
    print(f"Fundamental: {harmonics['fundamental']}")
    print(f"Third harmonic: {harmonics['third']}")
+
+**Additional methods**: ``get_time_frequency_map(data) → (t, frequencies, coefficients)``
 
 SPP Decomposer (LAOS Yield Stress Analysis)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -573,7 +820,7 @@ and nonlinear viscoelastic parameters from LAOS data.
    * - **Input**
      - Time-domain LAOS stress signal
    * - **x**
-     - time ``t`` (s)
+     - time ``t`` (s), uniformly spaced
    * - **y**
      - stress :math:`\sigma(t)` (Pa) - **real**
    * - **domain**
@@ -591,45 +838,17 @@ and nonlinear viscoelastic parameters from LAOS data.
 
    from rheojax.transforms import SPPDecomposer
 
-   omega = 1.0     # rad/s
-   gamma_0 = 1.0   # strain amplitude
-
-   # Time and LAOS stress data
-   t = np.linspace(0, 4 * np.pi, 2000)
-   strain = gamma_0 * np.sin(omega * t)
-   stress = 100.0 * strain + 20.0 * np.sin(3 * omega * t)  # Nonlinear response
-
-   data = RheoData(
-       x=t,
-       y=stress,
-       domain='time',
-       x_units='s',
-       y_units='Pa',
-       metadata={
-           'test_mode': 'oscillation',
-           'omega': omega,
-           'gamma_0': gamma_0,
-           'strain': strain,  # Optional: measured strain
-       },
-   )
-
-   # Apply SPP decomposition
-   spp = SPPDecomposer(
-       omega=omega,
-       gamma_0=gamma_0,
-       n_harmonics=39,
-   )
+   spp = SPPDecomposer(omega=1.0, gamma_0=1.0, n_harmonics=39)
    result = spp.transform(data)
 
    # Access results
    sigma_sy, sigma_dy = spp.get_yield_stresses()
-   print(f"Static yield stress: {sigma_sy:.2f} Pa")
-   print(f"Dynamic yield stress: {sigma_dy:.2f} Pa")
-
    metrics = spp.get_nonlinearity_metrics()
-   print(f"I3/I1 ratio: {metrics['I3_I1_ratio']:.4f}")
-   print(f"S-factor: {metrics['S_factor']:.4f}")
-   print(f"T-factor: {metrics['T_factor']:.4f}")
+   # → {'I3_I1_ratio', 'S_factor', 'T_factor'}
+
+   # Convenience function
+   from rheojax.transforms import spp_analyze
+   results = spp_analyze(stress, time, omega=1.0, gamma_0=1.0, n_harmonics=5)
 
 FFT Analysis (Spectral Analysis)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -659,24 +878,13 @@ Converts time-domain signals to frequency domain using Fast Fourier Transform.
 
    from rheojax.transforms import FFTAnalysis
 
-   # Time-domain relaxation data
-   t = np.linspace(0, 100, 10000)
-   G_t = 1e5 * np.exp(-t / 10.0)
-
-   data = RheoData(x=t, y=G_t, domain='time')
-
-   # Apply FFT analysis
-   fft = FFTAnalysis(
-       window='hann',
-       detrend=True,
-       return_psd=False,
-       normalize=True,
-   )
+   fft = FFTAnalysis(window='hann', detrend=True, return_psd=False, normalize=True)
    freq_data = fft.transform(data)
 
    # Find characteristic time from peak frequency
    tau_char = fft.get_characteristic_time(freq_data)
-   print(f"Characteristic time: {tau_char:.2f} s")
+
+**Additional methods**: ``find_peaks(freq_data, prominence=0.1, n_peaks=5)``
 
 Mutation Number (Relaxation Quantification)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -703,10 +911,7 @@ the degree of time-dependence.
    * - **Output**
      - Mutation number :math:`\Delta \in [0, 1]`
 
-**Interpretation**:
-
-- :math:`\Delta \to 0`: Elastic solid (no relaxation)
-- :math:`\Delta \to 1`: Viscous fluid (complete relaxation)
+**Interpretation**: :math:`\Delta \to 0` = elastic solid, :math:`\Delta \to 1` = viscous fluid
 
 **Example**:
 
@@ -714,21 +919,15 @@ the degree of time-dependence.
 
    from rheojax.transforms import MutationNumber
 
-   data = RheoData(
-       x=t,
-       y=G_t,
-       domain='time',
-       initial_test_mode='relaxation',
-   )
-
    mutation = MutationNumber(integration_method='trapz')
    delta = mutation.calculate(data)
-   print(f"Mutation number: {delta:.4f}")
+
+**Additional methods**: ``get_relaxation_time(data)``, ``get_equilibrium_modulus(data)``
 
 Smooth Derivative (Numerical Differentiation)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Computes noise-robust derivatives using Savitzky-Golay filtering.
+Computes noise-robust derivatives using Savitzky-Golay filtering or splines.
 
 .. list-table::
    :header-rows: 1
@@ -751,108 +950,219 @@ Computes noise-robust derivatives using Savitzky-Golay filtering.
 
    from rheojax.transforms import SmoothDerivative
 
-   # Noisy creep compliance data
-   J_t = t + 0.1 * np.random.randn(len(t))
-   data = RheoData(x=t, y=J_t, domain='time')
-
-   # Compute smooth first derivative
    deriv = SmoothDerivative(
-       method='savgol',
+       method='savgol',       # 'savgol', 'finite_diff', 'spline', 'total_variation'
        window_length=11,
        polyorder=3,
-       deriv=1,
+       deriv=1,               # Derivative order
    )
    dJ_dt = deriv.transform(data)
 
-   # Compute second derivative
-   deriv2 = SmoothDerivative(window_length=15, polyorder=4, deriv=2)
-   d2J_dt2 = deriv2.transform(data)
+**Additional methods**: ``estimate_noise_level(data)``
 
-Quick Reference Table
----------------------
+Model Fitting Data Interface
+----------------------------
+
+All 53 models follow the scikit-learn API pattern. The data format requirements
+depend on the test mode.
+
+.. code-block:: python
+
+   # Point estimation (NLSQ)
+   model.fit(
+       X,                              # x-data array or RheoData object
+       y=None,                         # y-data (ignored if X is RheoData)
+       test_mode='oscillation',        # Required for multi-protocol models
+       deformation_mode=None,          # 'tension' for DMTA
+       poisson_ratio=None,             # Required with deformation_mode
+       method='nlsq',                  # 'nlsq', 'scipy', 'auto'
+       **kwargs                        # Protocol kwargs: gamma_dot, sigma_applied, etc.
+   )
+
+   # Prediction
+   y_pred = model.predict(
+       X,
+       test_mode=None,                 # Defaults to fitted test_mode
+       **kwargs
+   )
+
+   # Bayesian inference (warm-starts from fit() parameters)
+   result = model.fit_bayesian(
+       X, y=None,
+       num_warmup=1000,
+       num_samples=2000,
+       num_chains=4,                   # Default: 4 chains
+       seed=42,                        # Reproducibility
+       test_mode='oscillation',
+       **kwargs
+   )
+
+   # Credible intervals
+   intervals = model.get_credible_intervals(
+       result.posterior_samples, credibility=0.95
+   )
+
+.. warning::
+
+   Protocol kwargs like ``gamma_dot``, ``sigma_applied``, ``gamma_0``, and ``omega``
+   are **critical for Bayesian inference**. Models cache them internally so that
+   ``model_function()`` can access them during NUTS sampling when kwargs are not
+   passed explicitly. Always provide these in both ``fit()`` and ``fit_bayesian()``.
+
+Quick Reference Tables
+----------------------
+
+Test Mode Data Formats
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
-   :widths: 15 12 13 20 20 20
+   :widths: 14 18 18 8 8 16 18
 
-   * - Analysis
-     - Test Mode
-     - Domain
-     - x
-     - y
-     - Key Metadata
-   * - **Relaxation**
-     - ``relaxation``
-     - ``time``
-     - t (s)
-     - G(t) (Pa)
-     - --
-   * - **Creep**
-     - ``creep``
-     - ``time``
-     - t (s)
-     - J(t) (1/Pa)
-     - --
-   * - **Oscillation**
-     - ``oscillation``
-     - ``frequency``
-     - omega (rad/s)
-     - G*(omega) (Pa) **complex**
-     - --
-   * - **Rotation**
-     - ``rotation``
-     - ``time``
-     - gamma_dot (1/s)
-     - eta (Pa·s) or sigma (Pa)
-     - --
+   * - Test Mode
+     - X Data
+     - Y Data
+     - X Units
+     - Y Units
+     - Required Kwargs
+     - Auto-Detection
+   * - **relaxation**
+     - time (1D)
+     - G(t) (1D)
+     - s
+     - Pa
+     - —
+     - y decreasing
+   * - **creep**
+     - time (1D)
+     - J(t) (1D)
+     - s
+     - 1/Pa
+     - ``sigma_applied`` (ODE)
+     - y increasing
+   * - **oscillation**
+     - frequency (1D)
+     - G*(ω) complex
+     - rad/s
+     - Pa
+     - —
+     - domain='frequency'
    * - **DMTA**
-     - ``oscillation``
-     - ``frequency``
-     - omega (rad/s)
-     - E*(omega) (Pa) **complex**
+     - frequency (1D)
+     - E*(ω) complex
+     - rad/s
+     - Pa
      - ``deformation_mode``, ``poisson_ratio``
+     - E'/E'' columns
+   * - **flow_curve**
+     - shear rate (1D)
+     - σ (1D)
+     - 1/s
+     - Pa
+     - —
+     - x_units='1/s'
+   * - **startup**
+     - [t, γ] stacked (2,N)
+     - σ(t) (1D)
+     - s, —
+     - Pa
+     - ``gamma_dot`` (**required**)
+     - must specify
+   * - **laos**
+     - time (1D)
+     - σ(t) (1D)
+     - s
+     - Pa
+     - ``gamma_0``, ``omega`` (**required**)
+     - must specify
+
+Transform Data Formats
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 12 12 16 22 20
+
+   * - Transform
+     - Input Domain
+     - X
+     - Y
+     - Required Metadata
+     - Output
    * - **Mastercurve**
-     - --
-     - ``frequency``
-     - omega
+     - frequency
+     - ω
      - G*
-     - ``temperature``
+     - ``temperature`` (K)
+     - Shifted mastercurve
    * - **SRFS**
-     - --
-     - --
-     - gamma_dot
-     - eta
+     - any
+     - γ̇
+     - η or σ
      - ``reference_gamma_dot``
+     - Shifted mastercurve
    * - **OWChirp**
-     - --
-     - ``time``
+     - time
      - t
-     - sigma(t)
-     - --
-   * - **SPP**
-     - --
-     - ``time``
+     - σ(t)
+     - —
+     - Freq spectrum
+   * - **SPP Decomposer**
+     - time
      - t
-     - sigma(t)
-     - ``omega``, ``gamma_0``, ``strain``
-   * - **FFT**
-     - --
-     - ``time``
+     - σ(t)
+     - ``omega``, ``gamma_0``
+     - Stress + SPP metrics
+   * - **FFT Analysis**
+     - time
      - t
      - signal
-     - --
-   * - **Mutation**
-     - ``relaxation``
-     - ``time``
+     - —
+     - Freq spectrum
+   * - **Mutation Number**
+     - time
      - t
      - G(t)
-     - --
-   * - **Derivative**
-     - --
+     - —
+     - Scalar Δ ∈ [0,1]
+   * - **Smooth Derivative**
      - any
      - x
      - y
-     - --
+     - —
+     - dy/dx
+
+Model Protocol Support
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Protocols Supported
+     - Count
+     - Examples
+   * - All 6 (relax, creep, osc, flow, startup, laos)
+     - 26
+     - TNT, HVM, HVNM, IKH, FIKH, DMT, Giesekus, SGR, Fluidity-Saramito, ...
+   * - 5 (no LAOS)
+     - 2
+     - Lattice EPM, Tensorial EPM
+   * - 4 (relax, creep, osc, flow)
+     - 4
+     - Maxwell, Zener, Fractional Jeffreys, FML
+   * - 3
+     - 12
+     - SpringPot, Giesekus Multi, fractional models, nonlocal variants
+   * - 2
+     - 1
+     - SPP (FLOW_CURVE + LAOS only)
+   * - 1 (flow only)
+     - 6
+     - PowerLaw, Carreau, Cross, HB, CarreauYasuda, Casson
+   * - **DMTA-compatible**
+     - **41**
+     - All models with OSCILLATION protocol
 
 Common Patterns
 ---------------
@@ -873,7 +1183,7 @@ JAX Array Conversion
    G_numpy = np.asarray(data.y)
 
    # Or use the convenience method
-   t_np, G_np = data.to_numpy()
+   np_data = data.to_numpy()
 
 Test Mode Auto-Detection
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -906,7 +1216,7 @@ Explicit test mode specification is recommended for clarity:
 Working with Complex Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For oscillation data, you can construct complex arrays in several ways:
+For oscillation data, construct complex arrays:
 
 .. code-block:: python
 
@@ -936,7 +1246,9 @@ For oscillation data, you can construct complex arrays in several ways:
 Further Reading
 ---------------
 
-- :doc:`data_io` -- Loading data from instrument files
-- :doc:`../01_fundamentals/test_modes` -- Conceptual overview of test modes
-- :doc:`/api/core` -- Full API reference for RheoData
-- :doc:`/api/transforms` -- Full API reference for transforms
+- :doc:`data_io` — Loading data from instrument files
+- :doc:`trios_format` — TA Instruments TRIOS format (detailed)
+- :doc:`pipeline_api` — Pipeline API for fluent workflows
+- :doc:`/api/core` — Full API reference for RheoData
+- :doc:`/api/transforms` — Full API reference for transforms
+- :doc:`/models/dmta/index` — DMTA guide
