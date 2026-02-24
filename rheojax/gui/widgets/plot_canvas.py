@@ -135,8 +135,9 @@ class PlotCanvas(QWidget):
             alpha=0.7,
         )
 
-        # Store data for tooltips
-        self._plot_data.append((x, y, label))
+        # Store data for tooltips — convert to numpy to avoid stale JAX DeviceArray
+        # references after jax.clear_caches()
+        self._plot_data.append((np.asarray(x), np.asarray(y), label))
 
         logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
@@ -324,7 +325,15 @@ class PlotCanvas(QWidget):
 
     def _on_scroll(self, event) -> None:
         """Handle mouse wheel zoom (log-scale aware)."""
+        if event.inaxes is None:
+            return
         if event.inaxes != self.axes:
+            return
+
+        # Guard against None coordinates when cursor is near axes border
+        xdata = event.xdata
+        ydata = event.ydata
+        if xdata is None or ydata is None:
             return
 
         logger.debug(
@@ -340,10 +349,6 @@ class PlotCanvas(QWidget):
         # Get current limits
         xlim = self.axes.get_xlim()
         ylim = self.axes.get_ylim()
-
-        # Get mouse position in data coordinates
-        xdata = event.xdata
-        ydata = event.ydata
 
         # Calculate new limits based on scale type
         if self.axes.get_xscale() == "log":
@@ -446,50 +451,52 @@ class PlotCanvas(QWidget):
         self._show_tooltip(event.xdata, event.ydata)
 
     def _show_tooltip(self, x: float, y: float) -> None:
-        """Show tooltip for nearby data points."""
+        """Show tooltip for nearby data points (vectorized distance)."""
         if not self._plot_data:
             return
 
-        # Find nearest point
         min_dist = float("inf")
         nearest_point = None
         nearest_label = ""
 
+        xlim = self.axes.get_xlim()
+        ylim = self.axes.get_ylim()
+        log_x = self.axes.get_xscale() == "log"
+        log_y = self.axes.get_yscale() == "log"
+        x_range = (
+            (np.log10(xlim[1]) - np.log10(xlim[0])) if log_x else (xlim[1] - xlim[0])
+        )
+        y_range = (
+            (np.log10(ylim[1]) - np.log10(ylim[0])) if log_y else (ylim[1] - ylim[0])
+        )
+        if abs(x_range) < 1e-30 or abs(y_range) < 1e-30:
+            return
+
+        x_val = np.log10(x) if log_x else x
+        y_val = np.log10(y) if log_y else y
+
         for data_x, data_y, label in self._plot_data:
-            # Calculate distance in display coordinates
-            xlim = self.axes.get_xlim()
-            ylim = self.axes.get_ylim()
-            x_range = (
-                (np.log10(xlim[1]) - np.log10(xlim[0]))
-                if self.axes.get_xscale() == "log"
-                else (xlim[1] - xlim[0])
+            dx_arr = np.asarray(data_x, dtype=float)
+            dy_arr = np.asarray(data_y, dtype=float)
+            if log_x:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    dx_arr = np.log10(dx_arr)
+            if log_y:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    dy_arr = np.log10(dy_arr)
+
+            dist_arr = np.sqrt(
+                ((x_val - dx_arr) / x_range) ** 2
+                + ((y_val - dy_arr) / y_range) ** 2
             )
-            y_range = (
-                (np.log10(ylim[1]) - np.log10(ylim[0]))
-                if self.axes.get_yscale() == "log"
-                else (ylim[1] - ylim[0])
-            )
-            if abs(x_range) < 1e-30 or abs(y_range) < 1e-30:
+            valid = np.isfinite(dist_arr)
+            if not np.any(valid):
                 continue
-
-            for i in range(len(data_x)):
-                # Convert to display coordinates for distance calculation
-                if self.axes.get_xscale() == "log":
-                    dx = (np.log10(x) - np.log10(data_x[i])) / x_range
-                else:
-                    dx = (x - data_x[i]) / x_range
-
-                if self.axes.get_yscale() == "log":
-                    dy = (np.log10(y) - np.log10(data_y[i])) / y_range
-                else:
-                    dy = (y - data_y[i]) / y_range
-
-                dist = np.sqrt(dx**2 + dy**2)
-
-                if dist < min_dist:
-                    min_dist = dist
-                    nearest_point = (data_x[i], data_y[i])
-                    nearest_label = label
+            idx = int(np.nanargmin(np.where(valid, dist_arr, np.inf)))
+            if dist_arr[idx] < min_dist:
+                min_dist = float(dist_arr[idx])
+                nearest_point = (data_x[idx], data_y[idx])
+                nearest_label = label
 
         # Show tooltip if point is close enough (within 5% of plot range)
         if min_dist < 0.05:

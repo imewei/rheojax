@@ -307,7 +307,11 @@ class TransformService:
                     logger.warning("Transform input warning", transform=name, warning=w)
 
             def _with_provenance(result_data: RheoData) -> RheoData:
-                # Attach a simple provenance entry
+                # G-017 fix: Build provenance on a copy of metadata and return
+                # a new RheoData rather than mutating result_data.metadata in-
+                # place.  In-place mutation breaks callers that retain a
+                # reference to the pre-provenance object (e.g., undo stacks,
+                # caches).
                 prov_entry = {
                     "transform": name,
                     "params": {
@@ -325,8 +329,18 @@ class TransformService:
                 applied.append(name)
                 new_meta["transforms_applied"] = applied
                 new_meta["last_transform"] = name
-                result_data.metadata = new_meta
-                return result_data
+                # Return a new RheoData with the updated metadata dict;
+                # do NOT assign back to result_data.metadata.
+                return RheoData(
+                    x=result_data.x,
+                    y=result_data.y,
+                    x_units=result_data.x_units,
+                    y_units=result_data.y_units,
+                    domain=result_data.domain,
+                    initial_test_mode=new_meta.get("test_mode"),
+                    metadata=new_meta,
+                    validate=False,
+                )
 
             if name == "mastercurve":
                 # Mastercurve requires multiple datasets
@@ -569,7 +583,27 @@ class TransformService:
                 logger.error("Transform not implemented", transform=name)
                 raise ValueError(f"Transform {name} not implemented")
 
+        except (ValueError, TypeError):
+            # GUI-IO-024: Re-raise user-facing validation errors as-is so
+            # callers can distinguish them from unexpected failures and
+            # surface meaningful messages in the UI without wrapping.
+            logger.error(
+                "Transform failed (validation error)",
+                transform=name,
+                exc_info=True,
+            )
+            raise
+        except MemoryError:
+            # Re-raise OOM errors as-is so callers can handle them
+            # separately (e.g. reduce dataset size, free caches).
+            logger.error(
+                "Transform failed (out of memory)",
+                transform=name,
+                exc_info=True,
+            )
+            raise
         except Exception as e:
+            # Only unknown/unexpected errors are wrapped as RuntimeError.
             logger.error(
                 "Transform failed",
                 transform=name,

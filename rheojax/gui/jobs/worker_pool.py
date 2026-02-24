@@ -8,7 +8,7 @@ Thread pool for executing background jobs with progress tracking using PySide6.
 import time
 import uuid
 from collections.abc import Callable
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any
 
 try:
@@ -109,7 +109,7 @@ class WorkerPool(QObject):
     job_failed = Signal(str, str)  # job_id, error_message
     job_cancelled = Signal(str)  # job_id
 
-    _singleton_lock = Lock()
+    _singleton_lock = RLock()
 
     def __new__(cls, max_threads: int = 4) -> "WorkerPool":
         """Create or return singleton instance."""
@@ -480,10 +480,11 @@ class WorkerPool(QObject):
                 if pool_job_id in self._active_jobs:
                     return pool_job_id
 
-        # Slow path: dict reverse-lookup
-        for job_id, signals in list(self._job_signals.items()):
-            if signals is sender:
-                return job_id
+        # Slow path: dict reverse-lookup (under lock)
+        with self._job_lock:
+            for job_id, signals in list(self._job_signals.items()):
+                if signals is sender:
+                    return job_id
         return None
 
     @Slot(object)
@@ -499,12 +500,15 @@ class WorkerPool(QObject):
             else:
                 logger.error(
                     "Worker completed but job_id lookup failed (sender=%s). "
-                    "Emitting with synthetic job_id to avoid silent loss.",
+                    "Emitting as failure to surface the error rather than "
+                    "silently dropping the result.",
                     self.sender(),
                 )
-                # Emit with empty job_id so downstream handlers can still
-                # process the result rather than silently dropping it.
-                self.job_completed.emit("", result)
+                self.job_failed.emit(
+                    "",
+                    "Worker completed but job ID could not be determined. "
+                    "Result may be lost. This indicates a worker lifecycle issue.",
+                )
 
     @Slot(str)
     def _on_worker_failed(self, error_message: str) -> None:

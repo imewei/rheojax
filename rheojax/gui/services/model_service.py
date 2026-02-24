@@ -873,8 +873,16 @@ class ModelService:
             model.fit(x, y, **fit_kwargs)
             logger.debug("Model fit completed", model=model_name)
 
-            # Get fitted values
-            y_pred = model.predict(x)
+            # Get fitted values — forward deformation_mode/poisson_ratio so that
+            # DMTA models return E* (tensile) rather than G* (shear).
+            _post_fit_predict_kwargs: dict = {"test_mode": test_mode}
+            _dm = fit_kwargs.get("deformation_mode")
+            if _dm:
+                _post_fit_predict_kwargs["deformation_mode"] = _dm
+            _pr = fit_kwargs.get("poisson_ratio")
+            if _pr is not None:
+                _post_fit_predict_kwargs["poisson_ratio"] = _pr
+            y_pred = model.predict(x, **_post_fit_predict_kwargs)
 
             # Calculate residuals
             if np.iscomplexobj(y):
@@ -1173,14 +1181,32 @@ class ModelService:
                     if attr in fitted_state:
                         setattr(model, attr, fitted_state[attr])
 
-            # Predict
-            if test_mode is None:
-                result = model.predict(x_values)
-            else:
+            # Predict — forward deformation_mode/poisson_ratio so that DMTA models
+            # return E* (tensile) rather than G* (shear) on the predict path.
+            last_fit = getattr(model, "_last_fit_kwargs", {}) or {}
+            _pred_kwargs: dict = {}
+            if test_mode is not None:
+                _pred_kwargs["test_mode"] = test_mode
+            _dm = last_fit.get("deformation_mode") or (
+                model_kwargs.get("deformation_mode") if model_kwargs else None
+            )
+            if _dm:
+                _pred_kwargs["deformation_mode"] = _dm
+            _pr = last_fit.get("poisson_ratio") or (
+                model_kwargs.get("poisson_ratio") if model_kwargs else None
+            )
+            if _pr is not None:
+                _pred_kwargs["poisson_ratio"] = _pr
+            try:
+                result = model.predict(x_values, **_pred_kwargs)
+            except TypeError:
+                # Backward compatibility for model implementations without **kwargs.
+                _basic: dict = {}
+                if test_mode is not None:
+                    _basic["test_mode"] = test_mode
                 try:
-                    result = model.predict(x_values, test_mode=test_mode)
+                    result = model.predict(x_values, **_basic)
                 except TypeError:
-                    # Backward compatibility for model implementations without test_mode.
                     result = model.predict(x_values)
 
             logger.debug(

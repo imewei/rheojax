@@ -20,6 +20,8 @@ try:
     from pyqtgraph import PlotWidget, mkBrush, mkPen
 
     PYQTGRAPH_AVAILABLE = True
+    # Configure once at import time (not per-instance)
+    pg.setConfigOptions(antialias=True, useOpenGL=True, enableExperimental=True)
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
 
@@ -95,13 +97,6 @@ class PyQtGraphCanvas(QWidget):
             )
 
         logger.debug("Initializing", class_name=self.__class__.__name__)
-
-        # Configure pyqtgraph for scientific plotting
-        pg.setConfigOptions(
-            antialias=True,
-            useOpenGL=True,  # GPU acceleration
-            enableExperimental=True,
-        )
 
         from rheojax.gui.resources.styles.tokens import themed
 
@@ -242,6 +237,12 @@ class PyQtGraphCanvas(QWidget):
         PlotDataItem
             The created plot item
         """
+        # Convert any JAX/non-NumPy arrays to NumPy before pyqtgraph.
+        # np.asarray() is a no-op for plain NumPy arrays and is future-proof
+        # against JAX >=0.4.14 where hasattr(.devices) no longer works reliably.
+        x = np.asarray(x)
+        y = np.asarray(y)
+
         if color is None:
             color = self.COLORS[self._color_index % len(self.COLORS)]
             self._color_index += 1
@@ -300,6 +301,12 @@ class PyQtGraphCanvas(QWidget):
         PlotDataItem
             The created plot item
         """
+        # Convert any JAX/non-NumPy arrays to NumPy before pyqtgraph.
+        # np.asarray() is a no-op for plain NumPy arrays and is future-proof
+        # against JAX >=0.4.14 where hasattr(.devices) no longer works reliably.
+        x = np.asarray(x)
+        y = np.asarray(y)
+
         if color is None:
             color = self.COLORS[self._color_index % len(self.COLORS)]
             self._color_index += 1
@@ -370,8 +377,15 @@ class PyQtGraphCanvas(QWidget):
             self._crosshair_v.show()
             self._crosshair_h.show()
 
+            # Convert from log10 space back to data coordinates for display
+            display_x, display_y = x, y
+            if self._plot_item.ctrl.logXCheck.isChecked():
+                display_x = 10**x
+            if self._plot_item.ctrl.logYCheck.isChecked():
+                display_y = 10**y
+
             # Update coordinate label
-            self._coord_label.setText(f"x={x:.4g}, y={y:.4g}")
+            self._coord_label.setText(f"x={display_x:.4g}, y={display_y:.4g}")
             self._coord_label.setPos(x, y)
             self._coord_label.show()
         else:

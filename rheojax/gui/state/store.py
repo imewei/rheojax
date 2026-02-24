@@ -322,6 +322,20 @@ class StateStore:
     def __new__(cls) -> "StateStore":
         with cls._singleton_lock:
             if cls._instance is None:
+                # G-015: Verify StateStore is created on the main Qt thread so all
+                # signals have correct thread affinity for cross-thread delivery.
+                try:
+                    from PySide6.QtCore import QCoreApplication, QThread
+
+                    app = QCoreApplication.instance()
+                    if app is not None and QThread.currentThread() != app.thread():
+                        logger.warning(
+                            "StateStore created from non-main thread. "
+                            "Qt signals may have incorrect thread affinity.",
+                            current_thread=str(QThread.currentThread()),
+                        )
+                except ImportError:
+                    pass  # PySide6 not available (e.g., headless test environment)
                 cls._instance = super().__new__(cls)
                 cls._instance._state = AppState()
                 cls._instance._signals = StateSignals()
@@ -561,12 +575,13 @@ class StateStore:
             subscribers = list(self._subscribers)
 
         # Notify subscribers outside the lock to prevent deadlocks.
-        # Always read self._state (not a snapshot) so that if a subscriber
-        # triggers a nested dispatch, remaining subscribers see the latest
-        # state rather than a stale pre-nested-dispatch snapshot.
+        # Pass a shallow clone (snapshot) so that subscribers cannot mutate
+        # the live state object. Nested dispatches triggered by a subscriber
+        # will still update self._state and be visible to subsequent reads.
+        state_snapshot = copy.copy(self._state)
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed",
@@ -742,18 +757,22 @@ class StateStore:
 
         if action_type == "SET_ACTIVE_MODEL":
             model_name = action.get("model_name")
+            model_params = action.get("model_params")
 
             def updater(state: AppState) -> AppState:
-                return replace(state, active_model_name=model_name, is_modified=True)
+                kwargs: dict[str, Any] = {"active_model_name": model_name, "is_modified": True}
+                if model_params is not None:
+                    kwargs["model_params"] = model_params
+                return replace(state, **kwargs)
 
             return updater
 
         if action_type == "SET_TAB" or action_type == "NAVIGATE_TAB":
-            default_tab = getattr(self, "_state", AppState()).current_tab
-            tab = action.get("tab", default_tab)
+            tab = action.get("tab")
 
             def updater(state: AppState) -> AppState:
-                return replace(state, current_tab=tab)
+                resolved_tab = tab if tab is not None else state.current_tab
+                return replace(state, current_tab=resolved_tab)
 
             return updater
 
@@ -1155,6 +1174,18 @@ class StateStore:
 
             return updater
 
+        if action_type == "UPDATE_PREFERENCES":
+            prefs = action
+
+            def updater(state: AppState) -> AppState:
+                updates: dict[str, Any] = {}
+                for key in ("theme", "auto_save_enabled", "last_export_dir", "current_seed"):
+                    if key in prefs:
+                        updates[key] = prefs[key]
+                return replace(state, **updates) if updates else state
+
+            return updater
+
         return None
 
     def subscribe(self, callback: Callable[[AppState], None]) -> None:
@@ -1222,13 +1253,15 @@ class StateStore:
                 redo_stack_size=len(self._redo_stack),
             )
 
-            # Copy subscribers list
+            # Copy subscribers list and capture snapshot inside the lock
             subscribers = list(self._subscribers)
+            state_snapshot = copy.copy(self._state)
 
-        # Notify subscribers outside the lock
+        # Notify subscribers outside the lock using snapshot to prevent stale
+        # references if a nested dispatch replaces self._state mid-iteration.
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed during undo",
@@ -1267,13 +1300,15 @@ class StateStore:
                 redo_stack_size=len(self._redo_stack),
             )
 
-            # Copy subscribers list
+            # Copy subscribers list and capture snapshot inside the lock
             subscribers = list(self._subscribers)
+            state_snapshot = copy.copy(self._state)
 
-        # Notify subscribers outside the lock
+        # Notify subscribers outside the lock using snapshot to prevent stale
+        # references if a nested dispatch replaces self._state mid-iteration.
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed during redo",
@@ -1354,13 +1389,16 @@ class StateStore:
                     changed_keys=changed_keys,
                 )
 
-            # Copy subscriber list to avoid mutation during iteration
+            # Copy subscriber list and capture snapshot inside the lock to
+            # prevent stale references if a nested dispatch replaces
+            # self._state while subscribers are being notified.
             subscribers = list(self._subscribers)
+            state_snapshot = copy.copy(self._state)
 
-        # Notify subscribers outside the lock (read self._state for freshness)
+        # Notify subscribers outside the lock using snapshot
         for subscriber in subscribers:
             try:
-                subscriber(self._state)
+                subscriber(state_snapshot)
             except Exception:
                 logger.error(
                     "Subscriber callback failed during batch update",

@@ -463,14 +463,30 @@ class DataService:
             )
 
         logger.debug("_convert_units completed")
+        # Preserve deformation_mode and poisson_ratio stored in metadata so
+        # that DMTA data keeps its tensile-mode context after unit conversion.
+        metadata = dict(data.metadata)
+        deformation_mode = getattr(data, "deformation_mode", None)
+        if deformation_mode and deformation_mode != "shear":
+            # deformation_mode property reads from metadata["deformation_mode"];
+            # write it back explicitly so the new RheoData inherits it.
+            metadata["deformation_mode"] = deformation_mode
+        # poisson_ratio is stored in metadata by the BaseModel fit boundary.
+        # getattr falls back to None for plain RheoData objects that have no
+        # explicit poisson_ratio attribute beyond what is in metadata.
+        poisson_ratio = metadata.get("poisson_ratio") or getattr(
+            data, "_poisson_ratio", None
+        )
+        if poisson_ratio is not None:
+            metadata["poisson_ratio"] = poisson_ratio
         return RheoData(
             x=x,
             y=y,
             x_units=x_units or None,
             y_units=y_units or None,
             domain=data.domain,
-            metadata=data.metadata,
-            initial_test_mode=data.metadata.get("test_mode"),
+            metadata=metadata,
+            initial_test_mode=metadata.get("test_mode"),
             validate=True,
         )
 
@@ -540,15 +556,70 @@ class DataService:
                     log_y = np.log10(y[mask])
                     correlation = np.corrcoef(log_x, log_y)[0, 1]
                     x_decades = log_x.max() - log_x.min()
-                    # Strong *negative* power-law over ≥3 decades → flow
-                    # (shear-thinning: η decreasing with γ̇).
-                    # NOTE: Shear-thickening (positive correlation) is not yet
-                    # detected here — it would need x-spacing analysis to
-                    # distinguish from creep.  F-IO-R3-006.
-                    if correlation < -0.9 and x_decades >= 1.0:
+
+                    # Guard: distinguish flow (shear-thinning power law)
+                    # from relaxation (exponential decay) and creep.
+                    # Key discriminators (F-IO-R5):
+                    #   1. X-spacing: flow uses log-spaced shear rates (CV<0.3),
+                    #      relaxation/creep uses linearly-spaced time (CV>1)
+                    #   2. Log-log linearity: power law |corr|>0.98,
+                    #      exponential |corr|≈0.84
+                    y_diff_local = np.diff(y[mask])
+                    is_mostly_decreasing = (
+                        len(y_diff_local) > 0
+                        and np.sum(y_diff_local <= 0) >= 0.9 * len(y_diff_local)
+                    )
+
+                    # Detect log-spaced x (typical for shear-rate sweeps)
+                    log_diffs = np.diff(log_x)
+                    is_log_spaced = len(log_diffs) > 2 and (
+                        np.std(log_diffs)
+                        / (np.mean(np.abs(log_diffs)) + 1e-10)
+                        < 0.3
+                    )
+
+                    # True power law: perfectly linear in log-log space
+                    is_true_power_law = abs(correlation) > 0.98
+
+                    # Primary check: strong negative log-log correlation
+                    # spanning at least 1.5 decades.
+                    # If data is monotonically decreasing, require BOTH
+                    # true power-law linearity AND log-spaced x to
+                    # distinguish from exponential relaxation.
+                    if (
+                        correlation < -0.7
+                        and x_decades >= 1.5
+                        and (
+                            not is_mostly_decreasing
+                            or (is_true_power_law and is_log_spaced)
+                        )
+                    ):
                         logger.debug(
                             "Detected flow: power-law correlation",
                             correlation=float(correlation),
+                            x_decades=float(x_decades),
+                        )
+                        return "flow"
+
+                    # Secondary check: wide shear-rate range (≥3 decades)
+                    # with log-spaced x and weakly negative correlation.
+                    # Require log-spaced x to exclude linearly-spaced
+                    # time-domain data (relaxation/creep).
+                    # GUI-IO-018: Also exclude monotonically decreasing data
+                    # (e.g. log-spaced relaxation experiments) which satisfies
+                    # the wide-range log-spaced criteria but is NOT a flow
+                    # curve.  If data is monotonically decreasing we do NOT
+                    # apply this secondary flow promotion.
+                    if (
+                        x_decades >= 3.0
+                        and np.all(y[mask] > 0)
+                        and np.all(x[mask] > 0)
+                        and is_log_spaced
+                        and correlation < 0.5
+                        and not is_mostly_decreasing
+                    ):
+                        logger.debug(
+                            "Detected flow: wide shear-rate range (>=3 decades)",
                             x_decades=float(x_decades),
                         )
                         return "flow"
@@ -596,8 +667,26 @@ class DataService:
                     if len(log_x) > 5:
                         log_spacing = np.diff(log_x)
                         if np.std(log_spacing) < 0.3:  # Uniform in log space
-                            logger.debug("Detected oscillation: log-spaced x-axis")
-                            return "oscillation"
+                            # GUI-IO-018: Guard against misclassifying log-spaced
+                            # relaxation data as oscillation. Monotonically
+                            # decreasing y with >80% of diffs negative strongly
+                            # indicates relaxation even when x is log-spaced.
+                            y_real_check = (
+                                np.real(y) if np.iscomplexobj(y) else y
+                            )
+                            y_diffs_check = np.diff(y_real_check)
+                            if (
+                                len(y_diffs_check) > 2
+                                and np.sum(y_diffs_check < 0)
+                                > 0.8 * len(y_diffs_check)
+                            ):
+                                logger.debug(
+                                    "Skipping oscillation: log-spaced x but y "
+                                    "is monotonically decreasing (likely relaxation)"
+                                )
+                            else:
+                                logger.debug("Detected oscillation: log-spaced x-axis")
+                                return "oscillation"
                 except Exception as exc:
                     logger.debug("Oscillation detection failed", error=str(exc))
 
@@ -1000,7 +1089,15 @@ class DataService:
             polyorder = kwargs.get("polyorder", min(2, window_length - 1))
 
             if len(y) >= window_length:
-                y = savgol_filter(y, window_length, polyorder)
+                # G-009 fix: savgol_filter does not support complex arrays.
+                # Split into real and imaginary parts, smooth each independently,
+                # then recombine.
+                if np.iscomplexobj(y):
+                    y_real = savgol_filter(np.real(y), window_length, polyorder)
+                    y_imag = savgol_filter(np.imag(y), window_length, polyorder)
+                    y = y_real + 1j * y_imag
+                else:
+                    y = savgol_filter(y, window_length, polyorder)
                 logger.info(
                     "Applied Savitzky-Golay smoothing",
                     window_length=window_length,

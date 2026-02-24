@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from rheojax.gui.compat import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -63,6 +64,8 @@ class ExportPage(QWidget):
 
     def _dataset_to_rheodata(self, dataset: Any) -> Any:
         """Convert DatasetState into RheoData for export."""
+        import numpy as np
+
         from rheojax.core.data import RheoData
 
         metadata = dict(getattr(dataset, "metadata", {}) or {})
@@ -72,9 +75,24 @@ class ExportPage(QWidget):
         if getattr(dataset, "file_path", None):
             metadata.setdefault("file", str(dataset.file_path))
 
+        # Propagate deformation_mode/poisson_ratio from AppState into metadata
+        app_state = self._store.get_state()
+        deformation_mode = getattr(app_state, "deformation_mode", "shear")
+        if deformation_mode != "shear":
+            metadata.setdefault("deformation_mode", deformation_mode)
+            metadata.setdefault(
+                "poisson_ratio", getattr(app_state, "poisson_ratio", 0.5)
+            )
+
+        # Reconstruct complex modulus G* = G' + i·G'' when y2_data is present
+        y = dataset.y_data
+        y2 = getattr(dataset, "y2_data", None)
+        if y2 is not None and y is not None:
+            y = np.asarray(y) + 1j * np.asarray(y2)
+
         return RheoData(
             x=dataset.x_data,
-            y=dataset.y_data,
+            y=y,
             metadata=metadata,
             initial_test_mode=metadata.get("test_mode"),
             validate=False,
@@ -603,7 +621,8 @@ class ExportPage(QWidget):
                 progress.setLabelText("Exporting parameters...")
                 active_id = state.active_dataset_id
                 for result_id, result in state.fit_results.items():
-                    if active_id and not result_id.endswith(active_id):
+                    dataset_id_of_result = getattr(result, "dataset_id", result_id)
+                    if active_id and dataset_id_of_result != active_id:
                         continue
                     filepath = output_dir / f"parameters_{result_id}.{data_format}"
                     self._export_service.export_parameters(
@@ -620,7 +639,8 @@ class ExportPage(QWidget):
             if config["include_intervals"] and state.bayesian_results:
                 progress.setLabelText("Exporting credible intervals...")
                 for result_id, result in state.bayesian_results.items():
-                    if active_id and not result_id.endswith(active_id):
+                    dataset_id_of_result = getattr(result, "dataset_id", result_id)
+                    if active_id and dataset_id_of_result != active_id:
                         continue
                     filepath = (
                         output_dir / f"credible_intervals_{result_id}.{data_format}"
@@ -647,7 +667,8 @@ class ExportPage(QWidget):
             if config["include_posteriors"] and state.bayesian_results:
                 progress.setLabelText("Exporting posterior samples...")
                 for result_id, result in state.bayesian_results.items():
-                    if active_id and not result_id.endswith(active_id):
+                    dataset_id_of_result = getattr(result, "dataset_id", result_id)
+                    if active_id and dataset_id_of_result != active_id:
                         continue
                     filepath = (
                         output_dir / f"posterior_samples_{result_id}.{data_format}"
@@ -703,11 +724,11 @@ class ExportPage(QWidget):
                                 fit_fig, fit_path, dpi=fig_dpi
                             )
                             exported_files.append(str(fit_path))
-
-                            # Close figure to free memory
-                            import matplotlib.pyplot as plt
-
-                            plt.close(fit_fig)
+                            fit_fig.clf()
+                            del fit_fig
+                            QApplication.processEvents()
+                            if progress.wasCanceled():
+                                return
 
                             # Create and export residuals plot
                             residuals_fig = self._plot_service.create_residual_plot(
@@ -720,7 +741,11 @@ class ExportPage(QWidget):
                                 residuals_fig, residuals_path, dpi=fig_dpi
                             )
                             exported_files.append(str(residuals_path))
-                            plt.close(residuals_fig)
+                            residuals_fig.clf()
+                            del residuals_fig
+                            QApplication.processEvents()
+                            if progress.wasCanceled():
+                                return
 
                         except Exception as e:
                             logger.warning(
@@ -739,9 +764,11 @@ class ExportPage(QWidget):
                             trace_fig, trace_path, dpi=fig_dpi
                         )
                         exported_files.append(str(trace_path))
-                        import matplotlib.pyplot as plt
-
-                        plt.close(trace_fig)
+                        trace_fig.clf()
+                        del trace_fig
+                        QApplication.processEvents()
+                        if progress.wasCanceled():
+                            return
 
                         # Forest plot
                         forest_fig = self._plot_service.create_arviz_plot(
@@ -752,7 +779,11 @@ class ExportPage(QWidget):
                             forest_fig, forest_path, dpi=fig_dpi
                         )
                         exported_files.append(str(forest_path))
-                        plt.close(forest_fig)
+                        forest_fig.clf()
+                        del forest_fig
+                        QApplication.processEvents()
+                        if progress.wasCanceled():
+                            return
 
                         # Pair plot
                         pair_fig = self._plot_service.create_arviz_plot(
@@ -763,7 +794,11 @@ class ExportPage(QWidget):
                             pair_fig, pair_path, dpi=fig_dpi
                         )
                         exported_files.append(str(pair_path))
-                        plt.close(pair_fig)
+                        pair_fig.clf()
+                        del pair_fig
+                        QApplication.processEvents()
+                        if progress.wasCanceled():
+                            return
 
                     except Exception as e:
                         logger.warning(

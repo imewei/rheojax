@@ -435,7 +435,7 @@ class TestModeSelectionPage(QWizardPage):
 
     def _on_auto_detect_changed(self, state: int) -> None:
         """Handle auto-detect checkbox change."""
-        enabled = state != Qt.CheckState.Checked.value
+        enabled = state != int(Qt.CheckState.Checked)
         self.test_mode_combo.setEnabled(enabled)
         logger.debug(
             "Option changed",

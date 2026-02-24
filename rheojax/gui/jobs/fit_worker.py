@@ -93,6 +93,7 @@ class FitWorker(QRunnable):
         initial_params: dict[str, float] | None = None,
         options: dict[str, Any] | None = None,
         cancel_token: CancellationToken | None = None,
+        dataset_id: str = "",
     ):
         """Initialize fit worker.
 
@@ -108,6 +109,9 @@ class FitWorker(QRunnable):
             Fitting options (max_iter, ftol, xtol, etc.)
         cancel_token : CancellationToken, optional
             Token for cancellation support
+        dataset_id : str, optional
+            Dataset identifier for warm-start correlation across multi-dataset
+            workflows. Propagated into FitResult for downstream consumers.
         """
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -123,6 +127,7 @@ class FitWorker(QRunnable):
         self._data = data
         self._initial_params = initial_params or {}
         self._options = options or {}
+        self._dataset_id = dataset_id
 
         # Track progress
         self._last_iteration = 0
@@ -275,6 +280,7 @@ class FitWorker(QRunnable):
                 num_iterations=n_iterations,
                 success=getattr(service_result, "success", False),
                 message=getattr(service_result, "message", ""),
+                dataset_id=self._dataset_id,
                 x_fit=getattr(service_result, "x_fit", None),
                 y_fit=getattr(service_result, "y_fit", None),
                 residuals=getattr(service_result, "residuals", None),

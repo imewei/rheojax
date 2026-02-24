@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -35,8 +36,12 @@ def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
             sanitized[key] = _sanitize_metadata(value)
         elif isinstance(value, (str, int, float, bool, type(None), list)):
             sanitized[key] = value
+        elif hasattr(value, "devices"):
+            # VIS-P2-006: JAX DeviceArray → convert to Python scalar or list
+            arr = np.asarray(value)
+            sanitized[key] = arr.item() if arr.ndim == 0 else arr.tolist()
         else:
-            # Fallback: convert to string (datetime, Path, JAX arrays, etc.)
+            # Fallback: convert to string (datetime, Path, etc.)
             sanitized[key] = str(value)
     return sanitized
 
@@ -109,10 +114,14 @@ class ExportService:
         try:
             # Extract parameters (convert JAX/NumPy arrays to Python floats)
             if hasattr(result, "parameters"):
-                params = {
-                    k: float(np.asarray(v)) if hasattr(v, "__array__") else v
-                    for k, v in result.parameters.items()
-                }
+                params = {}
+                for k, v in result.parameters.items():
+                    if hasattr(v, "__array__"):
+                        # VIS-P2-013: Handle both scalars and arrays (e.g. GMM mode weights)
+                        arr = np.asarray(v)
+                        params[k] = arr.item() if arr.ndim == 0 else arr.tolist()
+                    else:
+                        params[k] = v
                 logger.debug("Extracted parameters from result.parameters")
             elif hasattr(result, "posterior_samples"):
                 # For Bayesian results, use posterior means
@@ -300,7 +309,10 @@ class ExportService:
             posterior_samples = {
                 k: np.asarray(v) for k, v in result.posterior_samples.items()
             }
-            num_samples = len(next(iter(posterior_samples.values())))
+            _first_samples = next(iter(posterior_samples.values()), None)
+            if _first_samples is None:
+                raise ValueError("posterior_samples is empty — nothing to export")
+            num_samples = len(_first_samples)
             logger.debug(
                 "Exporting posterior samples",
                 num_params=len(posterior_samples),
@@ -407,11 +419,19 @@ class ExportService:
 
                 # Save metadata as JSON
                 metadata_path = tmpdir_path / "metadata.json"
+                # GUI-IO-010: Standardise to UTC ISO-8601 timestamp so that
+                # save_project and generate_report produce consistent formats.
+                # Previously used str(np.datetime64("now")) which is naïve
+                # local time; datetime.now(timezone.utc) is always UTC.
                 metadata = {
                     "version": "1.0",
                     "model_name": state.get("model_name"),
                     "test_mode": state.get("test_mode"),
-                    "timestamp": str(np.datetime64("now")),
+                    "deformation_mode": state.get("deformation_mode", "shear"),
+                    "poisson_ratio": state.get("poisson_ratio", 0.5),
+                    "timestamp": datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    ),
                 }
 
                 with open(metadata_path, "w", encoding="utf-8") as f:
@@ -427,13 +447,43 @@ class ExportService:
                 # Save parameters as JSON
                 if "parameters" in state and state["parameters"]:
                     params_path = tmpdir_path / "parameters.json"
-                    params_json = {
-                        k: float(np.asarray(v)) if hasattr(v, "__array__") else v
-                        for k, v in state["parameters"].items()
-                    }
+                    params_json = {}
+                    for k, v in state["parameters"].items():
+                        if hasattr(v, "__array__"):
+                            arr = np.asarray(v)
+                            params_json[k] = arr.item() if arr.ndim == 0 else arr.tolist()
+                        else:
+                            params_json[k] = v
                     with open(params_path, "w", encoding="utf-8") as f:
                         json.dump(params_json, f, indent=2)
                     logger.debug("Wrote project parameters")
+
+                # VIS-P2-014: Save posterior samples if present
+                if "posterior_samples" in state and state["posterior_samples"]:
+                    try:
+                        import h5py
+
+                        posterior_path = tmpdir_path / "posterior.hdf5"
+                        with h5py.File(posterior_path, "w") as hf:
+                            for k, v in state["posterior_samples"].items():
+                                hf.create_dataset(k, data=np.asarray(v))
+                        logger.debug("Wrote posterior samples to project")
+                    except ImportError:
+                        logger.debug("h5py unavailable, skipping posterior export")
+
+                # VIS-P2-014: Save fit result metadata if present
+                if "fit_result" in state and state["fit_result"] is not None:
+                    fit_meta_path = tmpdir_path / "fit_result.json"
+                    fr = state["fit_result"]
+                    fit_meta = {
+                        "model_name": getattr(fr, "model_name", None),
+                        "test_mode": getattr(fr, "test_mode", None),
+                        "r_squared": float(getattr(fr, "r_squared", 0.0)),
+                        "success": getattr(fr, "success", False),
+                    }
+                    with open(fit_meta_path, "w", encoding="utf-8") as f:
+                        json.dump(fit_meta, f, indent=2)
+                    logger.debug("Wrote fit result metadata to project")
 
                 # Create ZIP archive
                 with ZipFile(path, "w") as zipf:
@@ -494,8 +544,14 @@ class ExportService:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmpdir_path = Path(tmpdir)
 
-                # Extract ZIP
+                # Extract ZIP (with path traversal guard — VIS-P2-007)
                 with ZipFile(path, "r") as zipf:
+                    for member in zipf.namelist():
+                        dest = (tmpdir_path / member).resolve()
+                        if not str(dest).startswith(str(tmpdir_path.resolve())):
+                            raise ValueError(
+                                f"Zip path traversal detected: {member}"
+                            )
                     zipf.extractall(tmpdir_path)
                 logger.debug("Extracted ZIP archive")
 
@@ -520,6 +576,28 @@ class ExportService:
                     with open(params_path) as f:
                         state["parameters"] = json.load(f)
                     logger.debug("Loaded project parameters")
+
+                # VIS-P2-014: Load posterior samples if present
+                posterior_path = tmpdir_path / "posterior.hdf5"
+                if posterior_path.exists():
+                    try:
+                        import h5py
+
+                        posterior = {}
+                        with h5py.File(posterior_path, "r") as hf:
+                            for k in hf.keys():
+                                posterior[k] = np.array(hf[k])
+                        state["posterior_samples"] = posterior
+                        logger.debug("Loaded posterior samples from project")
+                    except ImportError:
+                        logger.debug("h5py unavailable, skipping posterior load")
+
+                # VIS-P2-014: Load fit result metadata if present
+                fit_meta_path = tmpdir_path / "fit_result.json"
+                if fit_meta_path.exists():
+                    with open(fit_meta_path) as f:
+                        state["fit_result"] = json.load(f)
+                    logger.debug("Loaded fit result metadata")
 
             file_size = os.path.getsize(path)
             logger.info(
@@ -577,7 +655,8 @@ class ExportService:
             # Generate Markdown content first
             report_lines = []
             report_lines.append("# RheoJAX Analysis Report\n")
-            report_lines.append(f"**Generated:** {np.datetime64('now')}\n\n")
+            _ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            report_lines.append(f"**Generated:** {_ts}\n\n")
 
             if "model_name" in state:
                 report_lines.append(f"## Model: {state['model_name']}\n")
@@ -617,21 +696,38 @@ class ExportService:
             )
 
             if path.suffix.lower() == ".pdf":
-                # Render a minimal PDF page with text content
+                # Render a minimal PDF with automatic page-break support.
+                # GUI-IO-019: Many-parameter models (e.g. GMM with 40+ params)
+                # overflowed a single page when all lines were placed on one
+                # axes.  Now a new page is started whenever y approaches the
+                # bottom margin, preventing text from being clipped.
                 import matplotlib.pyplot as plt
                 from matplotlib.backends.backend_pdf import PdfPages
 
+                def _new_page(pdf_handle, figures):
+                    """Create a new blank axes page and append to figures list."""
+                    _fig, _ax = plt.subplots(figsize=(8.5, 11))
+                    _ax.axis("off")
+                    figures.append((_fig, _ax))
+                    return _fig, _ax, 0.97  # y starts near top
+
                 with PdfPages(path) as pdf:
-                    fig, ax = plt.subplots(figsize=(8.5, 11))
-                    ax.axis("off")
-                    y = 1.0
+                    figures = []
+                    fig, ax, y = _new_page(pdf, figures)
                     for line in report_lines:
                         for subline in line.split("\n"):
+                            # GUI-IO-019: page-break when near bottom margin
+                            if y < 0.05:
+                                pdf.savefig(fig, bbox_inches="tight")
+                                plt.close(fig)
+                                figures.pop()
+                                fig, ax, y = _new_page(pdf, figures)
                             if not subline:
                                 y -= 0.03
                                 continue
                             ax.text(0.02, y, subline, ha="left", va="top", fontsize=10)
                             y -= 0.03
+                    # Save the last (or only) page
                     pdf.savefig(fig, bbox_inches="tight")
                     plt.close(fig)
                 logger.debug("Wrote report to PDF")

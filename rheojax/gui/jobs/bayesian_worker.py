@@ -199,10 +199,15 @@ class BayesianWorker(QRunnable):
                 else {}
             )
 
+            # G-014 note: The model is instantiated twice — once here for prior
+            # validation (checking that prior parameter names exist on the model)
+            # and a second time inside BayesianService.run_mcmc() for the actual
+            # NUTS sampling.  Both instantiations use the same model_kwargs so
+            # their configurations are consistent.
             try:
                 model = ModelRegistry.create(self._model_name, **model_kwargs)
                 logger.debug(
-                    "Model created from registry",
+                    "Model created from registry (for prior validation)",
                     model=self._model_name,
                     model_kwargs=model_kwargs or None,
                 )

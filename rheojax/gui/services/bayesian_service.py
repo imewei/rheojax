@@ -327,9 +327,16 @@ class BayesianService:
                 success=True,
             )
 
+            # dataset_id is intentionally empty here: BayesianService operates at
+            # model scope and has no knowledge of which dataset is being analysed.
+            # BayesianWorker._on_finished() sets the real dataset_id on the result
+            # before dispatching it to the StateStore.  The StateStore reducer guards
+            # against empty dataset_id (``if not dataset_id: return state``), so the
+            # worker MUST populate this field — failing to do so would silently drop
+            # the result.
             return BayesianResult(
                 model_name=model_name,
-                dataset_id="",  # Filled by BayesianPage
+                dataset_id="",  # Set by BayesianWorker._on_finished() before dispatch
                 posterior_samples=posterior_samples,
                 summary=result.summary,
                 r_hat=diagnostics.get("r_hat", {}),
@@ -473,6 +480,9 @@ class BayesianService:
             from rheojax.gui.utils._dependency_guard import require_dependency
 
             require_dependency("arviz", "Bayesian diagnostics", "pip install arviz")
+            # G-010 fix: always return a valid dict so callers are never left
+            # with an implicit None return when arviz is absent.
+            return {"error": "arviz not installed", "diagnostics_valid": False}
         except Exception as e:
             logger.error(f"Diagnostic calculation failed: {e}", exc_info=True)
             return {"error": str(e), "diagnostics_valid": False}

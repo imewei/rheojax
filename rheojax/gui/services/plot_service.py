@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -40,6 +41,11 @@ class PlotService:
     >>> service.apply_style(fig, 'publication')
     """
 
+    # R3-G-006: Class-level lock so all PlotService instances share a single
+    # mutex for plt.rcParams mutations. Instance-level locks allowed concurrent
+    # export threads from different instances to corrupt each other's style context.
+    _rcparams_lock: threading.Lock = threading.Lock()
+
     def __init__(self) -> None:
         """Initialize plot service."""
         logger.debug("Initializing PlotService")
@@ -52,6 +58,10 @@ class PlotService:
         self._style_cache = {
             name: load_plot_style(name) for name in available_plot_styles()
         }
+        # G-008 fix: Cache parsed RC param dicts keyed by style text so the
+        # NamedTemporaryFile + rc_params_from_file round-trip only happens once
+        # per unique style string rather than on every plot call.
+        self._rc_cache: dict[str, dict] = {}
 
         # Wong colorblind-safe palette
         self._colorblind_palette = [
@@ -216,7 +226,8 @@ class PlotService:
 
         try:
             self._apply_style_context(style)
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig = Figure(figsize=(8, 6))
+            ax = fig.add_subplot(111)
             palette = (
                 self._get_palette(style) if (style or "").lower() == "dark" else None
             )
@@ -249,21 +260,30 @@ class PlotService:
 
             # Helper: compute uncertainty band for real-valued fits
             def _compute_band(x_vals, y_vals):
-                """Compute +/-2sigma band if pcov available."""
+                """Compute +/-1.96*sigma band if pcov available (RSS approximation).
+
+                GUI-IO-017 NOTE: This uncertainty band uses the root-sum-square
+                (RSS) of relative parameter errors applied uniformly across all
+                y-values.  It does NOT account for parameter correlations or
+                local model sensitivity (i.e. it is not a true propagated
+                uncertainty), so it MUST NOT be interpreted as a statistical
+                confidence interval.  The band is purely indicative of the
+                overall parameter uncertainty magnitude.  For proper uncertainty
+                quantification use Bayesian inference (fit_bayesian) which
+                produces posterior-derived credible intervals.
+                """
                 if not has_uncertainty:
                     return None, None
                 try:
-                    # Use finite difference on y_fit to approximate band
-                    # This is simpler than full error propagation
-                    # Uncertainty ~ sqrt(diag(pcov)) projected to y space
                     param_std = np.sqrt(np.diag(pcov))
-                    # Rough approximation: scale y_fit by relative param uncertainty
-                    rel_uncertainty = np.mean(
-                        param_std
-                        / (np.abs(list(fit_result.parameters.values())) + 1e-10)
+                    param_vals = np.array(
+                        list(fit_result.parameters.values()), dtype=float
                     )
-                    sigma_y = np.abs(y_vals) * rel_uncertainty
-                    z = 1.96  # 95% CI
+                    # Root-sum-square of relative parameter uncertainties
+                    rel_sq = (param_std / (np.abs(param_vals) + 1e-10)) ** 2
+                    rss = np.sqrt(np.sum(rel_sq))
+                    sigma_y = np.abs(y_vals) * rss
+                    z = 1.96  # 95% CI approximation (see NOTE above)
                     return y_vals - z * sigma_y, y_vals + z * sigma_y
                 except Exception:
                     return None, None
@@ -388,7 +408,7 @@ class PlotService:
                 ax.set_xlabel("Time (s)")
                 ax.set_ylabel("Creep Compliance J(t) (1/Pa)")
 
-            elif test_mode == "flow":
+            elif test_mode in ("flow", "flow_curve", "rotation"):
                 ax.loglog(
                     x, y, "o", label="Data", color=palette[0] if palette else None
                 )
@@ -407,6 +427,37 @@ class PlotService:
                 ax.set_xlabel("Shear Rate (1/s)")
                 ax.set_ylabel("Viscosity (Pa.s)")
 
+            elif test_mode == "startup":
+                ax.plot(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.plot(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Stress (Pa)")
+
+            elif test_mode == "laos":
+                ax.plot(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.plot(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
+                ax.set_xlabel("Strain")
+                ax.set_ylabel("Stress (Pa)")
+
+            else:
+                # Generic fallback for unknown test modes
+                ax.plot(
+                    x, y, "o", label="Data", color=palette[0] if palette else None
+                )
+                ax.plot(
+                    x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                )
+                ax.set_xlabel(data.x_units or "X")
+                ax.set_ylabel(data.y_units or "Y")
+
             ax.legend()
             ax.set_title(f"{fit_result.model_name} Model Fit")
 
@@ -419,7 +470,6 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create fit plot: {e}", exc_info=True)
-            plt.close("all")
             raise
 
     def create_residual_plot(
@@ -448,7 +498,9 @@ class PlotService:
         try:
             self._apply_style_context(style)
             palette = self._get_palette(style)
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+            fig = Figure(figsize=(8, 8))
+            ax1 = fig.add_subplot(2, 1, 1)
+            ax2 = fig.add_subplot(2, 1, 2, sharex=ax1)
 
             x = np.asarray(data.x)
             residuals = fit_result.residuals
@@ -460,8 +512,17 @@ class PlotService:
                 "Residual plot data", data_points=len(x), residual_shape=residuals.shape
             )
 
+            # Determine x-axis scale from test mode
+            test_mode = data.metadata.get("test_mode", "")
+            use_log_x = test_mode in (
+                "oscillation", "relaxation", "creep", "flow_curve", "rotation",
+            )
+
             # Residuals vs x
-            ax1.semilogx(x, residuals, "o", color=palette[0])
+            if use_log_x:
+                ax1.semilogx(x, residuals, "o", color=palette[0])
+            else:
+                ax1.plot(x, residuals, "o", color=palette[0])
             ax1.axhline(0, color="k", linestyle="--", alpha=0.5)
             ax1.set_ylabel("Residuals")
             ax1.set_title("Residual Analysis")
@@ -469,7 +530,7 @@ class PlotService:
             # Residual histogram
             ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
             ax2.set_xlabel("Residual Value")
-            ax2.set_ylabel("Frequency")
+            ax2.set_ylabel("Count")
             ax2.set_title("Residual Distribution")
 
             fig.tight_layout()
@@ -480,7 +541,6 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create residual plot: {e}", exc_info=True)
-            plt.close("all")
             raise
 
     def create_arviz_plot(
@@ -520,12 +580,19 @@ class PlotService:
             )
         try:
 
-            # Convert to InferenceData
+            # Convert to InferenceData (preserve chain structure if available)
             posterior_samples = result.posterior_samples
-            idata_dict = {
-                k: v.reshape(1, -1) if v.ndim == 1 else v
-                for k, v in posterior_samples.items()
-            }
+            num_chains = getattr(result, "num_chains", None)
+            idata_dict = {}
+            for k, v in posterior_samples.items():
+                v = np.asarray(v)
+                if v.ndim == 1:
+                    if num_chains and num_chains > 1 and v.shape[0] % num_chains == 0:
+                        idata_dict[k] = v.reshape(num_chains, -1)
+                    else:
+                        idata_dict[k] = v.reshape(1, -1)
+                else:
+                    idata_dict[k] = v
             idata = az.from_dict(idata_dict)
 
             logger.debug(
@@ -574,7 +641,6 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"ArviZ plot failed: {e}", exc_info=True)
-            plt.close("all")  # Prevent figure leak on error
             raise RuntimeError(f"Plot creation failed: {e}") from e
 
     def create_data_plot(
@@ -605,7 +671,8 @@ class PlotService:
         try:
             self._apply_style_context(style)
             palette = self._get_palette(style)
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig = Figure(figsize=(8, 6))
+            ax = fig.add_subplot(111)
 
             x = np.asarray(data.x)
             y = np.asarray(data.y)
@@ -654,20 +721,43 @@ class PlotService:
 
         except Exception as e:
             logger.error(f"Failed to create data plot: {e}", exc_info=True)
-            plt.close("all")
             raise
 
-    def _apply_style_context(self, style: str) -> None:
-        """Apply RC params from bundled styles if available."""
-        logger.debug("Applying style context", style=style)
+    def _get_rc_params(self, style: str) -> dict:
+        """Return a copy of the RC params dict for *style*.
+
+        GUI-IO-006: This method replaces the old ``_apply_style_context``
+        pattern of mutating global ``plt.rcParams`` and immediately releasing
+        the lock before figure creation.  That pattern allowed Thread B to
+        overwrite rcParams between the lock release and the Figure constructor
+        call in Thread A.
+
+        Callers should use the returned dict with ``plt.rc_context()``::
+
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                fig = Figure(...)
+
+        This confines the rcParams mutation to the duration of figure
+        construction, eliminating the cross-thread window entirely.
+
+        The parsed RC dict is cached per unique style text (G-008 fix) so
+        that the NamedTemporaryFile + rc_params_from_file round-trip only
+        occurs once per unique style string.  The cache is populated under
+        ``self._rcparams_lock`` (R2-G-007 fix) for thread safety.
+        """
+        logger.debug("Getting RC params for style", style=style)
         style_name = style or "default"
         if style_name == "default":
-            plt.rcParams.update(plt.rcParamsDefault)
-            return
+            return {}
         style_text = self._style_cache.get(style_name, "")
-        if style_text:
-            plt.rcParams.update(plt.rcParamsDefault)
-            # rc_params_from_file expects a path; write to temp file
+        if not style_text:
+            return {}
+        with self._rcparams_lock:
+            if style_text in self._rc_cache:
+                logger.debug("RC params served from cache", style=style_name)
+                return dict(self._rc_cache[style_text])
+            # First time: parse via temp file, then cache the result.
             with tempfile.NamedTemporaryFile(
                 "w", suffix=".mplstyle", delete=False
             ) as tmp:
@@ -675,16 +765,72 @@ class PlotService:
                 tmp_path = tmp.name
             try:
                 rc = rc_params_from_file(tmp_path)
-                plt.rcParams.update(rc)
-                logger.debug("Style context applied from cache", style=style_name)
+                self._rc_cache[style_text] = dict(rc)
+                logger.debug("RC params parsed and cached", style=style_name)
+                return dict(rc)
             finally:
                 try:
                     os.remove(tmp_path)
                 except OSError as exc:
                     logger.debug("Failed to remove temp style file: %s", exc)
-        else:
-            plt.style.use("default")
-            logger.debug("Using default matplotlib style")
+
+    def _apply_style_context(self, style: str) -> None:
+        """Apply RC params from bundled styles if available.
+
+        GUI-IO-006 NOTE: This method mutates global ``plt.rcParams`` and
+        releases the lock before figure creation, creating a narrow race
+        window where Thread B can overwrite rcParams between this call and the
+        Figure constructor in the caller.  For new plot methods, prefer the
+        thread-safe pattern::
+
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                fig = Figure(...)
+
+        Kept for backward compatibility with existing callers that call
+        ``_apply_style_context`` before Figure creation.
+
+        G-008 fix: Parsed RC dicts are cached in ``self._rc_cache``.
+        R2-G-007 fix: All ``plt.rcParams`` mutations serialised through
+        ``self._rcparams_lock``.
+        """
+        logger.debug("Applying style context", style=style)
+        style_name = style or "default"
+        with self._rcparams_lock:
+            if style_name == "default":
+                plt.rcParams.update(plt.rcParamsDefault)
+                return
+            style_text = self._style_cache.get(style_name, "")
+            if style_text:
+                plt.rcParams.update(plt.rcParamsDefault)
+                # Return immediately from cache when the style has been parsed before.
+                if style_text in self._rc_cache:
+                    plt.rcParams.update(self._rc_cache[style_text])
+                    logger.debug(
+                        "Style context served from RC cache", style=style_name
+                    )
+                    return
+                # First time: parse via temp file, then cache the result.
+                with tempfile.NamedTemporaryFile(
+                    "w", suffix=".mplstyle", delete=False
+                ) as tmp:
+                    tmp.write(style_text)
+                    tmp_path = tmp.name
+                try:
+                    rc = rc_params_from_file(tmp_path)
+                    self._rc_cache[style_text] = dict(rc)
+                    plt.rcParams.update(rc)
+                    logger.debug(
+                        "Style context parsed and cached", style=style_name
+                    )
+                finally:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError as exc:
+                        logger.debug("Failed to remove temp style file: %s", exc)
+            else:
+                plt.style.use("default")
+                logger.debug("Using default matplotlib style")
 
     def _get_palette(self, style: str) -> list[str]:
         """Return palette respecting style."""

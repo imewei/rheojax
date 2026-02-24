@@ -650,6 +650,23 @@ class BayesianPage(QWidget):
         # If no dataset loaded, try preset dataset path
         if dataset is None and self._preset_dataset_path:
             try:
+                import logging as _logging
+                import os as _os
+
+                _preset_logger = _logging.getLogger(__name__)
+                _preset_logger.info(
+                    "Loading preset dataset: %s", self._preset_dataset_path
+                )
+                _file_size = (
+                    _os.path.getsize(self._preset_dataset_path)
+                    if _os.path.exists(self._preset_dataset_path)
+                    else 0
+                )
+                if _file_size > 10 * 1024 * 1024:  # > 10 MB
+                    _preset_logger.warning(
+                        "Large preset file (%d MB) — consider pre-loading",
+                        _file_size // (1024 * 1024),
+                    )
                 rheo_data = self._data_service.load_file(self._preset_dataset_path)
                 dataset_id = str(uuid.uuid4())
                 self._store.dispatch(
@@ -717,9 +734,10 @@ class BayesianPage(QWidget):
         deform_text = self._deformation_combo.currentText().lower()
         poisson_val = self._poisson_spin.value()
 
-        # Snapshot the dataset to prevent TOCTOU mutation if the user
-        # changes the active selection while inference is running.
-        dataset_snapshot = dataset.clone()
+        # G-005 fix: self._submitted_dataset_snapshot (set above) serves as
+        # both the TOCTOU-safe snapshot for posterior plotting
+        # (_update_fit_plot_from_posterior) and the snapshot passed to
+        # BayesianWorker.  The separate dataset_snapshot clone was redundant.
 
         # F-HL-005 fix: Extract fitted model state from FitResult so
         # stateful models (HL, DMT, ITT-MCT) can restore _last_fit_kwargs,
@@ -731,7 +749,7 @@ class BayesianPage(QWidget):
 
         self._current_worker = BayesianWorker(
             model_name=model_name,
-            data=dataset_snapshot,
+            data=self._submitted_dataset_snapshot,
             num_warmup=config.get("num_warmup", 1000),
             num_samples=config.get("num_samples", 2000),
             num_chains=config.get("num_chains", 4),

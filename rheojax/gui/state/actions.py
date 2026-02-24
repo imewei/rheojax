@@ -5,6 +5,7 @@ and emit appropriate signals for UI reactivity.
 """
 
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -78,13 +79,11 @@ def load_dataset(
     def updater(state: AppState) -> AppState:
         new_datasets = state.datasets.copy()
         new_datasets[dataset_id] = dataset
-        return AppState(
-            **{
-                **state.__dict__,
-                "datasets": new_datasets,
-                "active_dataset_id": dataset_id,
-                "is_modified": True,
-            }
+        return replace(
+            state,
+            datasets=new_datasets,
+            active_dataset_id=dataset_id,
+            is_modified=True,
         )
 
     store.update_state(updater)
@@ -125,15 +124,13 @@ def remove_dataset(dataset_id: str) -> None:
             if v.dataset_id != dataset_id
         }
 
-        return AppState(
-            **{
-                **state.__dict__,
-                "datasets": new_datasets,
-                "active_dataset_id": new_active,
-                "fit_results": new_fit_results,
-                "bayesian_results": new_bayesian_results,
-                "is_modified": True,
-            }
+        return replace(
+            state,
+            datasets=new_datasets,
+            active_dataset_id=new_active,
+            fit_results=new_fit_results,
+            bayesian_results=new_bayesian_results,
+            is_modified=True,
         )
 
     store.update_state(updater)
@@ -154,7 +151,7 @@ def set_active_dataset(dataset_id: str) -> None:
     def updater(state: AppState) -> AppState:
         if dataset_id not in state.datasets:
             return state
-        return AppState(**{**state.__dict__, "active_dataset_id": dataset_id})
+        return replace(state, active_dataset_id=dataset_id)
 
     store.update_state(updater)
 
@@ -178,14 +175,12 @@ def update_dataset(dataset_id: str, **updates) -> None:
             return state
 
         dataset = state.datasets[dataset_id]
-        updated_dataset = DatasetState(**{**dataset.__dict__, **updates})
+        updated_dataset = replace(dataset, **updates)
 
         new_datasets = state.datasets.copy()
         new_datasets[dataset_id] = updated_dataset
 
-        return AppState(
-            **{**state.__dict__, "datasets": new_datasets, "is_modified": True}
-        )
+        return replace(state, datasets=new_datasets, is_modified=True)
 
     store.update_state(updater)
 
@@ -198,8 +193,8 @@ def update_dataset(dataset_id: str, **updates) -> None:
 def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None:
     """Select a model and initialize parameters.
 
-    Uses update_state directly (no reducer for model_params yet) but
-    still emits model_selected signal for downstream UI reactivity.
+    Routes through dispatch() so the SET_ACTIVE_MODEL reducer handles both
+    active_model_name and model_params in a single atomic update.
 
     Parameters
     ----------
@@ -209,19 +204,7 @@ def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None
         Model parameters
     """
     store = StateStore()
-
-    def updater(state: AppState) -> AppState:
-        return AppState(
-            **{
-                **state.__dict__,
-                "active_model_name": model_name,
-                "model_params": parameters,
-            }
-        )
-
-    store.update_state(updater)
-    # Also dispatch SET_ACTIVE_MODEL so the reducer + signal path fires
-    store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_name})
+    store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_name, "model_params": parameters})
 
 
 def update_parameter(name: str, value: float) -> None:
@@ -241,12 +224,12 @@ def update_parameter(name: str, value: float) -> None:
             return state
 
         param = state.model_params[name]
-        updated_param = ParameterState(**{**param.__dict__, "value": value})
+        updated_param = replace(param, value=value)
 
         new_params = state.model_params.copy()
         new_params[name] = updated_param
 
-        return AppState(**{**state.__dict__, "model_params": new_params})
+        return replace(state, model_params=new_params)
 
     model_name = store.get_state().active_model_name
     store.update_state(updater)
@@ -274,18 +257,12 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
             return state
 
         param = state.model_params[name]
-        updated_param = ParameterState(
-            **{
-                **param.__dict__,
-                "min_bound": float(min_bound),
-                "max_bound": float(max_bound),
-            }
-        )
+        updated_param = replace(param, min_bound=float(min_bound), max_bound=float(max_bound))
 
         new_params = state.model_params.copy()
         new_params[name] = updated_param
 
-        return AppState(**{**state.__dict__, "model_params": new_params})
+        return replace(state, model_params=new_params)
 
     model_name = store.get_state().active_model_name
     store.update_state(updater)
@@ -311,12 +288,12 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
             return state
 
         param = state.model_params[name]
-        updated_param = ParameterState(**{**param.__dict__, "fixed": bool(fixed)})
+        updated_param = replace(param, fixed=bool(fixed))
 
         new_params = state.model_params.copy()
         new_params[name] = updated_param
 
-        return AppState(**{**state.__dict__, "model_params": new_params})
+        return replace(state, model_params=new_params)
 
     model_name = store.get_state().active_model_name
     store.update_state(updater)
@@ -336,7 +313,7 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(**{**state.__dict__, "model_params": default_params})
+        return replace(state, model_params=default_params)
 
     model_name = store.get_state().active_model_name
     store.update_state(updater)
@@ -698,7 +675,7 @@ def set_jax_device(device: str) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(**{**state.__dict__, "jax_device": device})
+        return replace(state, jax_device=device)
 
     store.update_state(updater)
 
@@ -718,9 +695,7 @@ def update_jax_memory(used: int, total: int) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(
-            **{**state.__dict__, "jax_memory_used": used, "jax_memory_total": total}
-        )
+        return replace(state, jax_memory_used=used, jax_memory_total=total)
 
     store.update_state(updater, track_undo=False, emit_signal=False)
 
@@ -741,7 +716,7 @@ def set_theme(theme: str) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(**{**state.__dict__, "theme": theme})
+        return replace(state, theme=theme)
 
     store.update_state(updater, track_undo=False)
 
@@ -759,7 +734,7 @@ def set_seed(seed: int) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(**{**state.__dict__, "current_seed": seed})
+        return replace(state, current_seed=seed)
 
     store.update_state(updater, track_undo=False)
 
@@ -775,7 +750,7 @@ def set_auto_save(enabled: bool) -> None:
     store = StateStore()
 
     def updater(state: AppState) -> AppState:
-        return AppState(**{**state.__dict__, "auto_save_enabled": enabled})
+        return replace(state, auto_save_enabled=enabled)
 
     store.update_state(updater, track_undo=False)
 
@@ -799,14 +774,12 @@ def save_project(path: Path) -> None:
         recent.insert(0, path)
         recent = recent[:10]  # Keep last 10
 
-        return AppState(
-            **{
-                **state.__dict__,
-                "project_path": path,
-                "project_name": path.stem,
-                "is_modified": False,
-                "recent_projects": recent,
-            }
+        return replace(
+            state,
+            project_path=path,
+            project_name=path.stem,
+            is_modified=False,
+            recent_projects=recent,
         )
 
     store.update_state(updater, track_undo=False)
@@ -831,14 +804,12 @@ def load_project(path: Path, state: AppState) -> None:
     recent.insert(0, path)
     recent = recent[:10]
 
-    updated_state = AppState(
-        **{
-            **state.__dict__,
-            "project_path": path,
-            "project_name": path.stem,
-            "is_modified": False,
-            "recent_projects": recent,
-        }
+    updated_state = replace(
+        state,
+        project_path=path,
+        project_name=path.stem,
+        is_modified=False,
+        recent_projects=recent,
     )
 
     store.update_state(lambda _: updated_state, track_undo=False)
@@ -883,7 +854,7 @@ def add_transform_record(
     def updater(state: AppState) -> AppState:
         new_history = state.transform_history.copy()
         new_history.append(record)
-        return AppState(**{**state.__dict__, "transform_history": new_history})
+        return replace(state, transform_history=new_history)
 
     store.update_state(updater)
 

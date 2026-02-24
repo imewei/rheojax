@@ -456,20 +456,50 @@ class ArvizCanvas(BaseArviZWidget):
             if "\t" in suptitle:
                 fig.suptitle(suptitle.replace("\t", "  "))
 
+    @staticmethod
+    def _close_new_figures(pre_fignums: set[int]) -> None:
+        """Close only figures created since *pre_fignums* was captured."""
+        import matplotlib.pyplot as plt
+
+        for num in list(plt.get_fignums()):
+            if num not in pre_fignums:
+                plt.close(num)
+
+    def _arviz_plot(self, plot_fn, *args, **kwargs) -> None:
+        """Run an ArviZ plot function, copy its figure, and clean up only new figures.
+
+        Extracts the figure from the ArviZ return value instead of relying on
+        plt.gcf(), which is non-deterministic when multiple ArviZ calls run
+        concurrently and may return the wrong figure.
+        """
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        pre = set(plt.get_fignums())
+        result = plot_fn(*args, **kwargs)
+
+        # Extract figure from ArviZ return value rather than using plt.gcf()
+        fig = None
+        if hasattr(result, "figure"):
+            fig = result.figure
+        elif isinstance(result, np.ndarray) and result.size > 0:
+            ax_item = result.ravel()[0]
+            if hasattr(ax_item, "figure"):
+                fig = ax_item.figure
+
+        if fig is None:
+            # Last resort fallback — least reliable under concurrency
+            fig = plt.gcf()
+
+        self._copy_arviz_figure(fig)
+        self._close_new_figures(pre)
+
     def _plot_trace(self) -> None:
         """Generate trace plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            # Close any previous ArviZ figures to avoid memory leaks
-            plt.close("all")
-
-            # Let ArviZ create its own figure (it doesn't accept figure= kwarg)
-            az.plot_trace(self._inference_data)
-
-            # Get the figure ArviZ created and copy to our managed figure
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(az.plot_trace, self._inference_data)
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -482,12 +512,7 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate pair plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-
-            # Check if inference data has sample_stats with diverging info
-            # before requesting divergences plot
             has_divergences = (
                 self._inference_data is not None
                 and hasattr(self._inference_data, "sample_stats")
@@ -495,8 +520,9 @@ class ArvizCanvas(BaseArviZWidget):
                 and "diverging" in self._inference_data.sample_stats
             )
 
-            az.plot_pair(self._inference_data, divergences=has_divergences)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(
+                az.plot_pair, self._inference_data, divergences=has_divergences
+            )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -509,11 +535,13 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate forest plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-            az.plot_forest(self._inference_data, hdi_prob=self._hdi_prob, combined=True)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(
+                az.plot_forest,
+                self._inference_data,
+                hdi_prob=self._hdi_prob,
+                combined=True,
+            )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -526,11 +554,10 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate posterior plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-            az.plot_posterior(self._inference_data, hdi_prob=self._hdi_prob)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(
+                az.plot_posterior, self._inference_data, hdi_prob=self._hdi_prob
+            )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -547,9 +574,7 @@ class ArvizCanvas(BaseArviZWidget):
         """
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            # Check if sample_stats exists with energy diagnostic
             if not self._has_sample_stats_energy():
                 self._plot_fallback(
                     "Energy plot requires MCMC sample statistics.\n\n"
@@ -559,9 +584,7 @@ class ArvizCanvas(BaseArviZWidget):
                 )
                 return
 
-            plt.close("all")
-            az.plot_energy(self._inference_data)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(az.plot_energy, self._inference_data)
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -591,11 +614,8 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate rank plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-            az.plot_rank(self._inference_data)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(az.plot_rank, self._inference_data)
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -608,11 +628,8 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate ESS plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-            az.plot_ess(self._inference_data)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(az.plot_ess, self._inference_data)
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -625,11 +642,8 @@ class ArvizCanvas(BaseArviZWidget):
         """Generate autocorrelation plot."""
         try:
             import arviz as az
-            import matplotlib.pyplot as plt
 
-            plt.close("all")
-            az.plot_autocorr(self._inference_data)
-            self._copy_arviz_figure(plt.gcf())
+            self._arviz_plot(az.plot_autocorr, self._inference_data)
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -727,7 +741,9 @@ class ArvizCanvas(BaseArviZWidget):
         self._figure.clear()
         self._inference_data = None
         self._status_label.setText("No data loaded")
-        self._canvas.draw()
+        if hasattr(self, "_nav_toolbar") and self._nav_toolbar is not None:
+            self._nav_toolbar.update()
+        self._canvas.draw_idle()
 
         logger.info(
             "Canvas cleared",
