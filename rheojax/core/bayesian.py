@@ -441,6 +441,7 @@ class BayesianMixin:
             y_shape=y_array.shape if hasattr(y_array, "shape") else None,
         )
         X_jax = jnp.asarray(X_array, dtype=jnp.float64)
+        y_array = np.asarray(y_array) if not isinstance(y_array, (np.ndarray, jnp.ndarray)) else y_array
         is_complex = jnp.iscomplexobj(y_array)
         logger.debug("Data is complex", is_complex=bool(is_complex))
 
@@ -454,6 +455,12 @@ class BayesianMixin:
             # Single conversion to JAX, then compute real/imag components
             # Avoids redundant CPU→JAX conversion (10-20% overhead reduction)
             y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
+            if y_complex.dtype != jnp.complex128:
+                logger.warning(
+                    "complex128 downcast detected — GPU may not support float64 complex. "
+                    "Bayesian oscillation fits may lose precision.",
+                    actual_dtype=str(y_complex.dtype),
+                )
             y_real = jnp.real(y_complex)
             y_imag = jnp.imag(y_complex)
 
@@ -596,7 +603,7 @@ class BayesianMixin:
         warm_start: dict[str, float] = {}
         for name in param_names:
             candidate = None
-            if initial_values and name in initial_values:
+            if initial_values is not None and name in initial_values:
                 candidate = initial_values[name]
             else:
                 candidate = self.parameters.get_value(name)
@@ -611,7 +618,7 @@ class BayesianMixin:
             if "sigma_imag" not in warm_start:
                 warm_start["sigma_imag"] = max(y_imag_scale * 0.1, 1e-6)
         else:
-            data_scale = scale_info.get("data_scale") or 1.0
+            data_scale = scale_info.get("data_scale", 0.0) or 0.0
             if "sigma" not in warm_start:
                 warm_start["sigma"] = max(data_scale * 0.1, 1e-6)
 
@@ -895,6 +902,8 @@ class BayesianMixin:
                 )
 
             lower, upper = param.bounds
+            lower = float(lower) if lower is not None else -1e10
+            upper = float(upper) if upper is not None else 1e10
 
             # Sample from uniform distribution over bounds
             samples = rng.uniform(low=lower, high=upper, size=num_samples).astype(
@@ -1093,7 +1102,7 @@ class BayesianMixin:
                 num_warmup=1,
                 num_samples=1,
                 num_chains=1,
-                nuts_kwargs={"progress_bar": False},
+                nuts_kwargs={"progress_bar": False, "target_accept_prob": 0.5},
                 seed=0,
             )
         except Exception as e:
@@ -1304,8 +1313,10 @@ class BayesianMixin:
                 log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
                 r_hat_vals = result.diagnostics.get("r_hat", {}).values()
                 ess_vals = result.diagnostics.get("ess", {}).values()
-                max_r_hat = max((v for v in r_hat_vals if np.isfinite(v)), default=1.0)
-                min_ess = min((v for v in ess_vals if np.isfinite(v)), default=0.0)
+                _finite_r_hats = [v for v in r_hat_vals if np.isfinite(v)]
+                max_r_hat = max(_finite_r_hats) if _finite_r_hats else float("nan")
+                _finite_ess = [v for v in ess_vals if np.isfinite(v)]
+                min_ess = min(_finite_ess) if _finite_ess else float("nan")
                 log_ctx["r_hat_max"] = max_r_hat
                 log_ctx["ess_min"] = min_ess
 
@@ -1397,10 +1408,12 @@ class BayesianMixin:
 
         prior_factory = getattr(self, "bayesian_prior_factory", None)
         # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)
-        _has_param_priors = any(
-            getattr(p, "prior", None) is not None
-            for p in getattr(getattr(self, "parameters", None), "values", lambda: [])()
-        )
+        _param_set = getattr(self, "parameters", None)
+        _has_param_priors = False
+        if _param_set is not None and hasattr(_param_set, "values"):
+            _has_param_priors = any(
+                getattr(p, "prior", None) is not None for p in _param_set.values()
+            )
         # Skip cache when prior_factory or param-level priors are set
         if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
             cache_key = (
@@ -1409,7 +1422,7 @@ class BayesianMixin:
                 tuple(param_names),
                 tuple(sorted(protocol_kwargs.items())),
                 tuple(sorted(param_bounds.items())),
-                tuple(sorted(scale_info.items())),
+                tuple(sorted((k, v if v is not None else 0.0) for k, v in scale_info.items())),
             )
             if cache_key in self._closure_cache:
                 self._closure_cache.move_to_end(cache_key)
@@ -1430,6 +1443,29 @@ class BayesianMixin:
         y_imag_mean = scale_info.get("y_imag_mean", 0.0) or 0.0
         data_mean = scale_info.get("data_mean", 0.0) or 0.0
 
+        # Capture priors at closure-build time (not re-read at trace time)
+        _captured_priors = {}
+        if hasattr(self, "parameters"):
+            for _pname in param_names:
+                _pobj = self.parameters.get(_pname)
+                if _pobj is not None:
+                    _captured_priors[_pname] = getattr(_pobj, "prior", None)
+
+        # Determine if model returns 2-column real array (for complex reconstruction)
+        _model_returns_2col = False
+        try:
+            _test_X = jnp.ones(2, dtype=jnp.float64)
+            _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
+            _test_pred = self.model_function(_test_X, _test_params, test_mode, **protocol_kwargs)
+            _model_returns_2col = (
+                hasattr(_test_pred, "ndim")
+                and _test_pred.ndim == 2
+                and _test_pred.shape[1] == 2
+                and jnp.isrealobj(_test_pred)
+            )
+        except Exception:
+            pass
+
         def numpyro_model(X, y=None):
             """NumPyro model with test_mode captured in closure."""
             # Sample parameters from priors
@@ -1441,14 +1477,13 @@ class BayesianMixin:
                     custom_dist = prior_factory(name, lower, upper)
 
                 # F-001 fix: Check Parameter.prior dict (set by GUI PriorsEditor)
-                if custom_dist is None and hasattr(self, "parameters"):
-                    param_obj = self.parameters.get(name)
-                    if param_obj is not None:
-                        param_prior = getattr(param_obj, "prior", None)
-                        if param_prior is not None and isinstance(param_prior, dict):
-                            custom_dist = BayesianMixin._prior_dict_to_dist(
-                                param_prior, dist
-                            )
+                # Use _captured_priors to avoid re-reading self.parameters at trace time
+                if custom_dist is None:
+                    param_prior = _captured_priors.get(name)
+                    if param_prior is not None and isinstance(param_prior, dict):
+                        custom_dist = BayesianMixin._prior_dict_to_dist(
+                            param_prior, dist
+                        )
 
                 if custom_dist is not None:
                     params_dict[name] = numpyro.sample(name, custom_dist)
@@ -1503,14 +1538,10 @@ class BayesianMixin:
 
             # Normalize oscillation predictions: some models return (N,2) real
             # arrays [G', G''] instead of complex G' + 1j*G''
-            if (
-                jnp.isrealobj(predictions_raw)
-                and predictions_raw.ndim == 2
-                and predictions_raw.shape[1] == 2
-            ):
+            if _model_returns_2col:
                 if is_complex_data:
                     # Convert [G', G''] → complex G* for joint real/imag fitting
-                    predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
+                    predictions_raw = predictions_raw[:, 0] + jnp.array(1j, dtype=jnp.complex128) * predictions_raw[:, 1]
                 else:
                     # Data is |G*| (scalar) — compute magnitude from components
                     predictions_raw = jnp.sqrt(

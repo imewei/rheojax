@@ -208,7 +208,9 @@ class RheoData:
                     warnings.warn("x-axis is not monotonic", UserWarning, stacklevel=2)
             elif isinstance(self.x, jnp.ndarray):
                 diffs = jnp.diff(self.x)
-                if not (jnp.all(diffs > 0) or jnp.all(diffs < 0)):
+                is_increasing = bool(jnp.all(diffs > 0))
+                is_decreasing = bool(jnp.all(diffs < 0))
+                if not (is_increasing or is_decreasing):
                     logger.debug("x-axis is not monotonic")
                     warnings.warn("x-axis is not monotonic", UserWarning, stacklevel=2)
 
@@ -316,6 +318,9 @@ class RheoData:
         """
         logger.debug("Updating metadata", keys=list(metadata.keys()))
         self.metadata.update(metadata)
+        # Invalidate JAX cache since metadata snapshot is now stale
+        if hasattr(self, "_jax_cache"):
+            super().__setattr__("_jax_cache", None)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
@@ -407,7 +412,7 @@ class RheoData:
         return None
 
     @property
-    def y_real(self) -> np.ndarray:
+    def y_real(self) -> "np.ndarray | jnp_typing.ndarray":
         """Get real component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the storage
@@ -428,7 +433,7 @@ class RheoData:
         return self.y
 
     @property
-    def y_imag(self) -> np.ndarray:
+    def y_imag(self) -> "np.ndarray | jnp_typing.ndarray":
         """Get imaginary component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the loss
@@ -906,20 +911,20 @@ class RheoData:
             Sliced RheoData
         """
         logger.debug("Slicing data by x range", start=start, end=end)
-        x_array = _coerce_ndarray(self.x)
-        y_array = _coerce_ndarray(self.y)
+        # Use np.asarray only for mask computation — preserves JAX or NumPy array type
+        x_np = np.asarray(self.x)
 
-        mask = np.ones_like(x_array, dtype=bool)
+        mask = np.ones_like(x_np, dtype=bool)
 
         if start is not None:
-            mask &= x_array >= start
+            mask &= x_np >= start
         if end is not None:
-            mask &= x_array <= end
+            mask &= x_np <= end
 
-        sliced_x = x_array[mask]
-        sliced_y = y_array[mask]
+        sliced_x = self.x[mask]
+        sliced_y = self.y[mask]
 
-        logger.debug("Sliced data", original_size=len(x_array), new_size=len(sliced_x))
+        logger.debug("Sliced data", original_size=len(x_np), new_size=len(sliced_x))
 
         return RheoData(
             x=sliced_x,

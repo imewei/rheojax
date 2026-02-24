@@ -385,18 +385,18 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
         return list(dict.fromkeys(modes))
 
     # Fallback to legacy detection if no protocols registered
-    try:
-        if info is None:
-            # Unknown model, return common modes
-            return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
-        model_cls = info.plugin_class
-    except (KeyError, ValueError):
+    if info is None:
+        # Unknown model, return common modes
         return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
+    model_cls = info.plugin_class
 
     # Check for supported_test_modes attribute (legacy)
     if hasattr(model_cls, "supported_test_modes"):
         modes = model_cls.supported_test_modes
-        return [TestMode(m) if isinstance(m, str) else m for m in modes]
+        try:
+            return [TestMode(m) if isinstance(m, str) else m for m in modes]
+        except (ValueError, KeyError):
+            return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 
     # Check for _fit method and infer from docstring or signature (legacy)
     if hasattr(model_cls, "_fit"):

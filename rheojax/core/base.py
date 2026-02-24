@@ -288,7 +288,8 @@ class BaseModel(BayesianMixin, ABC):
             >>> model.fit(mastercurve, None, use_multi_start=True, n_starts=10)  # Multi-start
         """
         # Get data shape for logging
-        data_shape = getattr(X, "shape", None) or (len(X),)
+        _shape = getattr(X, "shape", None)
+        data_shape = _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
         logger.debug(
             "Entering fit",
             model=self.__class__.__name__,
@@ -329,7 +330,8 @@ class BaseModel(BayesianMixin, ABC):
                     poisson_ratio=poisson_ratio,
                 )
         else:
-            self._deformation_mode = None
+            # Preserve previously stored deformation_mode if not explicitly provided
+            pass
 
         # Store data for potential Bayesian inference
         self.X_data = X
@@ -385,7 +387,10 @@ class BaseModel(BayesianMixin, ABC):
             r2 = None
             if logger.isEnabledFor(logging.DEBUG):
                 try:
-                    r2 = self.score(X, y)
+                    from rheojax.core.data import RheoData as _RheoData
+                    _X_score = X.x if isinstance(X, _RheoData) else X
+                    _y_score = X.y if isinstance(X, _RheoData) else y
+                    r2 = self.score(_X_score, _y_score)
                 except Exception as exc:
                     logger.debug(
                         "R² computation failed after fit",
@@ -576,7 +581,8 @@ class BaseModel(BayesianMixin, ABC):
             ... )
         """
         # Get data shape for logging
-        data_shape = getattr(X, "shape", None) or (len(X),)
+        _shape = getattr(X, "shape", None)
+        data_shape = _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
         logger.debug(
             "Entering fit_bayesian",
             model=self.__class__.__name__,
@@ -630,9 +636,11 @@ class BaseModel(BayesianMixin, ABC):
 
         # Auto warm-start from NLSQ if available and no explicit initial values
         if initial_values is None and self.fitted_:
-            # Extract current parameter values as initial values
+            # Extract current parameter values as initial values, filtering out None
             initial_values = {
-                name: self.parameters.get_value(name) for name in self.parameters
+                name: v
+                for name in self.parameters
+                if (v := self.parameters.get_value(name)) is not None
             }
             logger.debug(
                 "Using NLSQ warm-start for Bayesian inference",

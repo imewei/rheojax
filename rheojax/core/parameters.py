@@ -53,7 +53,7 @@ class ParameterConstraint:
     value: float | None = None  # For fixed constraints
     relation: str | None = None  # For relative constraints
     other_param: str | None = None  # For relative constraints
-    validator: Callable | None = None  # For custom constraints
+    validator: Callable[[float], bool] | None = None  # For custom constraints
 
     def validate(self, value: float, context: dict[str, float] | None = None) -> bool:
         """Check if value satisfies the constraint.
@@ -246,6 +246,12 @@ class Parameter:
             self._value = None
             self._was_clamped = False
             return
+
+        if hasattr(val, "aval"):  # JAX tracer check
+            raise TypeError(
+                f"Cannot set parameter value to a JAX traced value. "
+                "Call set_value() outside of @jax.jit."
+            )
 
         try:
             numeric_val = float(val)
@@ -915,6 +921,9 @@ class ParameterSet:
             self._parameters[key] = value
             if key not in self._order:
                 self._order.append(key)
+            if not self._has_relative_constraints and value.constraints:
+                if any(c.type == "relative" for c in value.constraints):
+                    self._has_relative_constraints = True
         else:
             # Set value only
             if key not in self._parameters:
@@ -959,6 +968,11 @@ class ParameterSet:
                 param = Parameter.from_dict(param_data_with_name)
                 params._parameters[name] = param
                 params._order.append(name)
+        for _param in params._parameters.values():
+            if not params._has_relative_constraints and _param.constraints:
+                if any(c.type == "relative" for c in _param.constraints):
+                    params._has_relative_constraints = True
+                    break
         return params
 
 

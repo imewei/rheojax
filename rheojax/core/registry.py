@@ -696,7 +696,7 @@ class ModelRegistry:
         >>> models = ModelRegistry.find(protocol='relaxation')
     """
 
-    _registry = None
+    _registry: "Registry | None" = None
 
     @classmethod
     def _get_registry(cls) -> Registry:
@@ -862,7 +862,7 @@ class TransformRegistry:
         >>> transforms = TransformRegistry.find(type='spectral')
     """
 
-    _registry = None
+    _registry: "Registry | None" = None
 
     @classmethod
     def _get_registry(cls) -> Registry:
