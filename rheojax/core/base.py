@@ -382,6 +382,13 @@ class BaseModel(BayesianMixin, ABC):
             self._fit(X, y, method=method, **kwargs)
             self.fitted_ = True
 
+            # Strip optimization kwargs so they don't leak to model_function
+            _opt_keys = ("use_log_residuals", "use_multi_start", "n_starts", "perturb_factor")
+            _lfk = getattr(self, "_last_fit_kwargs", None)
+            if isinstance(_lfk, dict):
+                for _ok in _opt_keys:
+                    _lfk.pop(_ok, None)
+
             # Log fit completion with key metrics
             # Only compute R² when DEBUG logging is active — for ODE models
             # score() triggers a full predict() call costing 100ms+.
@@ -504,7 +511,8 @@ class BaseModel(BayesianMixin, ABC):
                 self.parameters._parameters[name].value = None
         self.fitted_ = saved_fitted
         self._test_mode = saved_test_mode
-        self._last_fit_kwargs = saved_last_fit_kwargs
+        # Restore None if _last_fit_kwargs was originally absent/None
+        self._last_fit_kwargs = saved_last_fit_kwargs if saved_last_fit_kwargs else None
 
         logger.info(
             "NLSQ precompilation completed",

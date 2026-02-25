@@ -205,9 +205,9 @@ class BayesianResult:
                 return idata
             energy_field = None
             if isinstance(extra_fields, dict):
-                energy_field = extra_fields.get("energy") or extra_fields.get(
-                    "potential_energy"
-                )
+                energy_field = extra_fields.get("energy")
+                if energy_field is None:
+                    energy_field = extra_fields.get("potential_energy")
 
             if energy_field is None:
                 return idata
@@ -923,10 +923,17 @@ class BayesianMixin:
             lower = float(lower) if lower is not None else -1e10
             upper = float(upper) if upper is not None else 1e10
 
-            # Sample from uniform distribution over bounds
-            samples = rng.uniform(low=lower, high=upper, size=num_samples).astype(
-                np.float64
-            )
+            # Respect user-specified prior distribution if available
+            prior = getattr(param, "prior", None)
+            if isinstance(prior, dict) and prior.get("type") == "beta":
+                a_val = float(prior.get("a", 2.0))
+                b_val = float(prior.get("b", 2.0))
+                unit_samples = rng.beta(a=a_val, b=b_val, size=num_samples)
+                samples = (lower + unit_samples * (upper - lower)).astype(np.float64)
+            else:
+                samples = rng.uniform(low=lower, high=upper, size=num_samples).astype(
+                    np.float64
+                )
 
             prior_samples[param_name] = samples
 
@@ -1220,6 +1227,12 @@ class BayesianMixin:
             "n_cycles",
             "gdot",
             "t_wait",
+            # Structure/initial-state kwargs for thixotropic models (DMT, etc.)
+            "lam_init",
+            "lam_0",
+            "sigma_init",
+            # LAOS oscillation frequency (distinct from oscillation omega)
+            "omega_laos",
             # Also accept non-underscore aliases
             "gamma0",
             "sigma0",
@@ -1355,7 +1368,10 @@ class BayesianMixin:
             finally:
                 # Restore _test_mode even if MCMC raises — fit_bayesian() must
                 # not permanently mutate the model's test_mode state.
-                self._test_mode = _saved_test_mode
+                # Only set _test_mode if it existed before; avoid creating it
+                # as None on fresh models that never had the attribute.
+                if _saved_test_mode is not None or hasattr(self, "_test_mode"):
+                    self._test_mode = _saved_test_mode
                 # Only revert _last_fit_kwargs on failure — on success, the
                 # merged protocol_kwargs must persist for subsequent predict()
                 # and model_function() calls.
@@ -1427,9 +1443,11 @@ class BayesianMixin:
         rebuilding identical closures during repeated fit_bayesian() calls.
         Skips caching when protocol_kwargs contains ndarrays (captured by ref).
         """
-        # Skip cache when ndarrays in kwargs — closure captures them by reference
+        # Skip cache when ndarrays in kwargs — closure captures them by reference.
+        # Check both NumPy and JAX arrays (JAX arrays are not hashable).
         has_ndarray_kwargs = any(
-            isinstance(v, np.ndarray) for v in protocol_kwargs.values()
+            isinstance(v, np.ndarray) or hasattr(v, "devices")
+            for v in protocol_kwargs.values()
         )
         if not hasattr(self, "_closure_cache"):
             self._closure_cache: OrderedDict = OrderedDict()

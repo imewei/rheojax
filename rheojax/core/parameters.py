@@ -57,7 +57,10 @@ class ParameterConstraint:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize constraint to a dictionary."""
-        d: dict[str, Any] = {"type": self.type, "min_value": self.min_value, "max_value": self.max_value}
+        d: dict[str, Any] = {"type": self.type}
+        if self.type == "bounds":
+            d["min_value"] = self.min_value
+            d["max_value"] = self.max_value
         if self.relation is not None:
             d["relation"] = self.relation
         if self.other_param is not None:
@@ -123,6 +126,9 @@ class ParameterConstraint:
 
         elif self.type == "custom" and self.validator:
             return self.validator(value)
+
+        elif self.type not in {"bounds", "positive", "integer", "fixed", "relative", "custom"}:
+            raise ValueError(f"Unknown constraint type: {self.type!r}")
 
         return True
 
@@ -636,15 +642,15 @@ class ParameterSet:
             raise KeyError(f"Parameter '{name}' not found")
 
         min_val, max_val = bounds
-        if min_val >= max_val:
+        if min_val > max_val:
             logger.error(
-                "Invalid bounds: min >= max",
+                "Invalid bounds: min > max",
                 parameter=name,
                 min_val=min_val,
                 max_val=max_val,
             )
             raise ValueError(
-                f"Invalid bounds: min ({min_val}) must be < max ({max_val})"
+                f"Invalid bounds: min ({min_val}) must be <= max ({max_val})"
             )
 
         param = self._parameters[name]

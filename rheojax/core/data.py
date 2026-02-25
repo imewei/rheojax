@@ -176,10 +176,10 @@ class RheoData:
                 logger.error("x data contains non-finite values")
                 raise ValueError("x data contains non-finite values")
         elif isinstance(self.x, jnp.ndarray):
-            if jnp.any(jnp.isnan(self.x)):
+            if bool(jnp.any(jnp.isnan(self.x))):
                 logger.error("x data contains NaN values")
                 raise ValueError("x data contains NaN values")
-            if not jnp.all(jnp.isfinite(self.x)):
+            if not bool(jnp.all(jnp.isfinite(self.x))):
                 logger.error("x data contains non-finite values")
                 raise ValueError("x data contains non-finite values")
 
@@ -191,10 +191,10 @@ class RheoData:
                 logger.error("y data contains non-finite values")
                 raise ValueError("y data contains non-finite values")
         elif isinstance(self.y, jnp.ndarray):
-            if jnp.any(jnp.isnan(self.y)):
+            if bool(jnp.any(jnp.isnan(self.y))):
                 logger.error("y data contains NaN values")
                 raise ValueError("y data contains NaN values")
-            if not jnp.all(jnp.isfinite(self.y)):
+            if not bool(jnp.all(jnp.isfinite(self.y))):
                 logger.error("y data contains non-finite values")
                 raise ValueError("y data contains non-finite values")
 
@@ -224,7 +224,7 @@ class RheoData:
                         stacklevel=2,
                     )
             elif isinstance(self.y, jnp.ndarray):
-                if jnp.any(jnp.real(self.y) < 0):
+                if bool(jnp.any(jnp.real(self.y) < 0)):
                     logger.debug("y data contains negative values in frequency domain")
                     warnings.warn(
                         "y data contains negative values in frequency domain",
@@ -860,12 +860,13 @@ class RheoData:
         """
         logger.debug("Computing numerical integral")
         if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
-            # Use JAX cumulative trapezoid
-            from jax.scipy.integrate import (
-                cumulative_trapezoid,
+            # JAX has no cumulative_trapezoid; compute manually via
+            # trapezoidal rule: I[0]=0, I[k] = I[k-1] + (y[k-1]+y[k])/2 * dx[k]
+            dx = jnp.diff(self.x)
+            avg_y = (self.y[:-1] + self.y[1:]) / 2.0
+            integrated = jnp.concatenate(
+                [jnp.zeros(1, dtype=self.y.dtype), jnp.cumsum(avg_y * dx)]
             )
-
-            integrated = cumulative_trapezoid(self.y, self.x, initial=0)
         else:
             # Use NumPy/SciPy cumulative trapezoid
             from scipy.integrate import cumulative_trapezoid
