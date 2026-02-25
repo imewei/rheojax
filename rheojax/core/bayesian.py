@@ -19,6 +19,7 @@ Example:
 
 from __future__ import annotations
 
+import copy
 import warnings
 from collections import OrderedDict
 from collections.abc import Callable
@@ -186,7 +187,10 @@ class BayesianResult:
         def _ensure_energy(idata):
             """Guarantee energy diagnostic exists for ArviZ energy plots."""
             sample_stats = getattr(idata, "sample_stats", None)
-            if sample_stats is None or hasattr(sample_stats, "energy"):
+            if sample_stats is None:
+                logger.debug("sample_stats not present — energy injection skipped")
+                return idata
+            if hasattr(sample_stats, "energy"):
                 return idata
 
             try:
@@ -441,7 +445,14 @@ class BayesianMixin:
             y_shape=y_array.shape if hasattr(y_array, "shape") else None,
         )
         X_jax = jnp.asarray(X_array, dtype=jnp.float64)
-        y_array = np.asarray(y_array) if not isinstance(y_array, (np.ndarray, jnp.ndarray)) else y_array
+        # R5-JAX-006: `isinstance(y_array, jnp.ndarray)` is unreliable in
+        # JAX >= 0.4.7 where jnp.ndarray is an alias for jax.Array (an abstract
+        # base class) — isinstance checks against it are deprecated and may
+        # return False for valid JAX arrays.  Use duck-typing instead:
+        # presence of `.devices` distinguishes a JAX array from NumPy/Python
+        # objects (pattern established in optimization.py).
+        if not (isinstance(y_array, np.ndarray) or hasattr(y_array, "devices")):
+            y_array = np.asarray(y_array)
         is_complex = jnp.iscomplexobj(y_array)
         logger.debug("Data is complex", is_complex=bool(is_complex))
 
@@ -815,6 +826,10 @@ class BayesianMixin:
             if name in samples:
                 posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
 
+        noise_params = [k for k in samples if k not in param_names and k.startswith("sigma")]
+        for name in noise_params:
+            posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
+
         # Chain-grouped samples for diagnostics (avoids reshape assumption)
         grouped_samples = {}
         if samples_grouped is not None:
@@ -823,6 +838,9 @@ class BayesianMixin:
                     grouped_samples[name] = np.asarray(
                         samples_grouped[name], dtype=np.float64
                     )
+            noise_params_grouped = [k for k in samples_grouped if k not in param_names and k.startswith("sigma")]
+            for name in noise_params_grouped:
+                grouped_samples[name] = np.asarray(samples_grouped[name], dtype=np.float64)
 
         # Compute summary statistics
         summary = {}
@@ -839,7 +857,7 @@ class BayesianMixin:
 
         diagnostics = self._compute_diagnostics(
             mcmc,
-            grouped_samples if grouped_samples else posterior_samples,
+            grouped_samples if len(grouped_samples) > 0 else posterior_samples,
             num_samples=num_samples,
             num_chains=num_chains,
         )
@@ -1216,6 +1234,9 @@ class BayesianMixin:
         # fit_bayesian() should not permanently change the model's test_mode —
         # subsequent calls to fit() or predict() must see the original mode.
         _saved_test_mode = getattr(self, "_test_mode", None)
+        _saved_last_fit_kwargs = copy.deepcopy(getattr(self, "_last_fit_kwargs", None) or {})
+
+        _fit_bayesian_succeeded = False
 
         with log_bayesian(
             logger,
@@ -1310,6 +1331,7 @@ class BayesianMixin:
                 )
 
                 # Add diagnostics to log context
+                # NOTE: divergences may be -1 (unknown) when diagnostics fail; 0 = clean
                 log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
                 r_hat_vals = result.diagnostics.get("r_hat", {}).values()
                 ess_vals = result.diagnostics.get("ess", {}).values()
@@ -1328,11 +1350,17 @@ class BayesianMixin:
                     ess_min=min_ess,
                 )
 
+                _fit_bayesian_succeeded = True
                 return result
             finally:
                 # Restore _test_mode even if MCMC raises — fit_bayesian() must
                 # not permanently mutate the model's test_mode state.
                 self._test_mode = _saved_test_mode
+                # Only revert _last_fit_kwargs on failure — on success, the
+                # merged protocol_kwargs must persist for subsequent predict()
+                # and model_function() calls.
+                if not _fit_bayesian_succeeded:
+                    self._last_fit_kwargs = _saved_last_fit_kwargs
 
     @staticmethod
     def _prior_dict_to_dist(prior_spec: dict, dist_module):
@@ -1416,13 +1444,26 @@ class BayesianMixin:
             )
         # Skip cache when prior_factory or param-level priors are set
         if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
+            # R5-JAX-007: scale_info values may be JAX Device arrays when a
+            # subclass populates scale_info directly from JAX computations.
+            # JAX arrays are not hashable (raises TypeError in tuple/sorted).
+            # Coerce every value to a plain Python float so the cache key is
+            # always hashable, while preserving None → 0.0 sentinel.
+            def _to_hashable(v):
+                if v is None:
+                    return 0.0
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return repr(v)
+
             cache_key = (
                 str(test_mode),
                 is_complex_data,
                 tuple(param_names),
                 tuple(sorted(protocol_kwargs.items())),
                 tuple(sorted(param_bounds.items())),
-                tuple(sorted((k, v if v is not None else 0.0) for k, v in scale_info.items())),
+                tuple(sorted((_to_hashable(k), _to_hashable(v)) for k, v in scale_info.items())),
             )
             if cache_key in self._closure_cache:
                 self._closure_cache.move_to_end(cache_key)
@@ -1451,20 +1492,44 @@ class BayesianMixin:
                 if _pobj is not None:
                     _captured_priors[_pname] = getattr(_pobj, "prior", None)
 
-        # Determine if model returns 2-column real array (for complex reconstruction)
-        _model_returns_2col = False
-        try:
-            _test_X = jnp.ones(2, dtype=jnp.float64)
-            _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
-            _test_pred = self.model_function(_test_X, _test_params, test_mode, **protocol_kwargs)
-            _model_returns_2col = (
-                hasattr(_test_pred, "ndim")
-                and _test_pred.ndim == 2
-                and _test_pred.shape[1] == 2
-                and jnp.isrealobj(_test_pred)
-            )
-        except Exception:
-            pass
+        # R5-JAX-002: Determine if model returns 2-column real array [G', G'']
+        # instead of complex G* (used for complex reconstruction in the likelihood).
+        #
+        # The previous implementation called self.model_function() with dummy
+        # inputs, which: (a) could mutate self._ state in unusual subclasses,
+        # (b) triggered an extra JIT compilation with wrong shapes (wasting ~1-5s
+        # on first call), and (c) was called on every cache miss, not just once.
+        #
+        # Fix: cache the result in scale_info["model_returns_2col"] the first
+        # time it is probed.  Subsequent calls to _build_numpyro_model (e.g.,
+        # when the closure cache misses) reuse the cached value without re-probing.
+        # The probe itself is now guard-wrapped against _test_mode mutation by
+        # saving/restoring self._test_mode before/after the call.
+        if "model_returns_2col" in scale_info:
+            _model_returns_2col = bool(scale_info["model_returns_2col"])
+        else:
+            _model_returns_2col = False
+            _saved_probe_test_mode = getattr(self, "_test_mode", None)
+            try:
+                _test_X = jnp.ones(2, dtype=jnp.float64)
+                _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
+                _test_pred = self.model_function(_test_X, _test_params, test_mode, **protocol_kwargs)
+                _model_returns_2col = (
+                    hasattr(_test_pred, "ndim")
+                    and _test_pred.ndim == 2
+                    and _test_pred.shape[1] == 2
+                    and jnp.isrealobj(_test_pred)
+                )
+            except Exception:
+                pass
+            finally:
+                # Restore test_mode in case model_function set self._test_mode
+                # as a side effect (defensive guard — should not normally happen
+                # because model_function is designed to be stateless).
+                if hasattr(self, "_test_mode"):
+                    self._test_mode = _saved_probe_test_mode
+            # Cache in scale_info so the probe is only run once per fit_bayesian call
+            scale_info["model_returns_2col"] = int(_model_returns_2col)
 
         def numpyro_model(X, y=None):
             """NumPyro model with test_mode captured in closure."""
@@ -1541,7 +1606,7 @@ class BayesianMixin:
             if _model_returns_2col:
                 if is_complex_data:
                     # Convert [G', G''] → complex G* for joint real/imag fitting
-                    predictions_raw = predictions_raw[:, 0] + jnp.array(1j, dtype=jnp.complex128) * predictions_raw[:, 1]
+                    predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
                 else:
                     # Data is |G*| (scalar) — compute magnitude from components
                     predictions_raw = jnp.sqrt(
@@ -1552,7 +1617,14 @@ class BayesianMixin:
             if is_complex_data:
                 pred_real = jnp.real(predictions_raw)
                 pred_imag = jnp.imag(predictions_raw)
-                n = scale_info.get("n_real", len(y) // 2)
+                # R5-JAX-005: Never call len() on `y` inside numpyro_model —
+                # `y` is a JAX array at trace time and len() raises TypeError.
+                # scale_info["n_real"] is always set by _prepare_jax_data() at
+                # line 478 for complex data; the fallback `len(y) // 2` was
+                # only safe because scale_info is always populated before the
+                # closure is built.  Remove the fallback so a missing n_real
+                # raises an explicit KeyError rather than a cryptic tracer error.
+                n = scale_info["n_real"]
                 y_real_obs, y_imag_obs = y[:n], y[n:]
 
                 # Exponential priors on noise (inflated scale for robustness)

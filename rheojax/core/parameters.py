@@ -55,6 +55,17 @@ class ParameterConstraint:
     other_param: str | None = None  # For relative constraints
     validator: Callable[[float], bool] | None = None  # For custom constraints
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize constraint to a dictionary."""
+        d: dict[str, Any] = {"type": self.type, "min_value": self.min_value, "max_value": self.max_value}
+        if self.relation is not None:
+            d["relation"] = self.relation
+        if self.other_param is not None:
+            d["other_param"] = self.other_param
+        if self.value is not None:
+            d["value"] = self.value
+        return d
+
     def validate(self, value: float, context: dict[str, float] | None = None) -> bool:
         """Check if value satisfies the constraint.
 
@@ -209,7 +220,6 @@ class Parameter:
                     "Invalid bounds: lower > upper",
                     parameter=self.name,
                     bounds=(lower, upper),
-                    exc_info=True,
                 )
                 raise ValueError(
                     f"Invalid bounds for parameter '{self.name}': {(lower, upper)}"
@@ -247,11 +257,19 @@ class Parameter:
             self._was_clamped = False
             return
 
-        if hasattr(val, "aval"):  # JAX tracer check
-            raise TypeError(
-                f"Cannot set parameter value to a JAX traced value. "
-                "Call set_value() outside of @jax.jit."
-            )
+        # R5-JAX-002: Use isinstance check instead of hasattr duck-typing.
+        # The old guard (hasattr "aval") also rejected concrete jax.Array
+        # scalars which have .aval but are NOT tracers.
+        try:
+            import jax.core as _jax_core
+
+            if isinstance(val, _jax_core.Tracer):
+                raise TypeError(
+                    "Cannot set parameter value to a JAX traced value. "
+                    "Call set_value() outside of @jax.jit."
+                )
+        except ImportError:
+            pass
 
         try:
             numeric_val = float(val)
@@ -271,7 +289,6 @@ class Parameter:
                 "Non-finite value received",
                 parameter=self.name,
                 value=numeric_val,
-                exc_info=True,
             )
             raise ValueError(f"Parameter '{self.name}' received non-finite value")
 
@@ -323,7 +340,6 @@ class Parameter:
                     parameter=self.name,
                     value=numeric_val,
                     bounds=self.bounds,
-                    exc_info=True,
                 )
                 raise ValueError(f"Value {numeric_val} out of bounds {self.bounds}")
 
@@ -364,24 +380,27 @@ class Parameter:
         """Make Parameter hashable for use as dict keys.
 
         Returns:
-            Hash based on name, value, bounds, and units
+            Hash based on immutable identity attributes only
         """
-        return hash((self.name, self.value, self.bounds, self.units))
+        return hash((self.name, self.bounds, self.units))
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another Parameter.
+
+        Matches __hash__: identity-based on (name, bounds, units).
+        Value is excluded because it changes during fitting while the
+        parameter identity remains the same.
 
         Args:
             other: Object to compare with
 
         Returns:
-            True if parameters are equal
+            True if parameters have the same identity
         """
         if not isinstance(other, Parameter):
             return NotImplemented
         return (
             self.name == other.name
-            and self.value == other.value
             and self.bounds == other.bounds
             and self.units == other.units
         )
@@ -398,14 +417,7 @@ class Parameter:
         if self.prior is not None:
             d["prior"] = self.prior
         if self.constraints:
-            d["constraints"] = [
-                {
-                    "type": c.type,
-                    "min_value": getattr(c, "min_value", None),
-                    "max_value": getattr(c, "max_value", None),
-                }
-                for c in self.constraints
-            ]
+            d["constraints"] = [c.to_dict() for c in self.constraints]
         return d
 
     @classmethod
@@ -429,6 +441,9 @@ class Parameter:
                         type=c_data["type"],
                         min_value=c_data.get("min_value"),
                         max_value=c_data.get("max_value"),
+                        relation=c_data.get("relation"),
+                        other_param=c_data.get("other_param"),
+                        value=c_data.get("value"),
                     )
                 )
         if data.get("prior") is not None:
@@ -569,7 +584,6 @@ class ParameterSet:
                 "Parameter not found",
                 parameter=name,
                 available_params=list(self._parameters.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Parameter '{name}' not found")
 
@@ -588,7 +602,6 @@ class ParameterSet:
                 "Value violates constraints",
                 parameter=name,
                 value=value,
-                exc_info=True,
             )
             raise ValueError(
                 f"Value {value} violates constraints for parameter '{name}'"
@@ -619,7 +632,6 @@ class ParameterSet:
                 "Parameter not found",
                 parameter=name,
                 available_params=list(self._parameters.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Parameter '{name}' not found")
 
@@ -630,7 +642,6 @@ class ParameterSet:
                 parameter=name,
                 min_val=min_val,
                 max_val=max_val,
-                exc_info=True,
             )
             raise ValueError(
                 f"Invalid bounds: min ({min_val}) must be < max ({max_val})"
@@ -701,7 +712,6 @@ class ParameterSet:
                         "Unknown parameter in dict",
                         parameter=name,
                         available_params=list(self._parameters.keys()),
-                        exc_info=True,
                     )
                     raise ValueError(f"Unknown parameter: {name}")
                 self.set_value(name, float(value))
@@ -712,7 +722,6 @@ class ParameterSet:
                     "Wrong number of values",
                     expected=len(self._order),
                     got=len(values),
-                    exc_info=True,
                 )
                 raise ValueError(
                     f"Expected {len(self._order)} values, got {len(values)}"
@@ -887,7 +896,6 @@ class ParameterSet:
                 "Parameter not found in subscript access",
                 parameter=key,
                 available_params=list(self._parameters.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Parameter '{key}' not found in ParameterSet")
         return self._parameters[key]
@@ -931,7 +939,6 @@ class ParameterSet:
                     "Parameter not found for subscript assignment",
                     parameter=key,
                     available_params=list(self._parameters.keys()),
-                    exc_info=True,
                 )
                 raise KeyError(
                     f"Parameter '{key}' not found. Use add() to create new parameters."
@@ -1056,7 +1063,6 @@ class SharedParameterSet:
                 "Shared parameter not found for linking",
                 parameter=param_name,
                 available_params=list(self._shared.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Shared parameter '{param_name}' not found")
 
@@ -1080,7 +1086,6 @@ class SharedParameterSet:
                 "Shared parameter not found for linking",
                 parameter=param_name,
                 available_params=list(self._shared.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Shared parameter '{param_name}' not found")
 
@@ -1108,7 +1113,6 @@ class SharedParameterSet:
                 "Shared parameter not found",
                 parameter=name,
                 available_params=list(self._shared.keys()),
-                exc_info=True,
             )
             raise KeyError(f"Shared parameter '{name}' not found")
 
@@ -1120,7 +1124,6 @@ class SharedParameterSet:
                 "Value violates constraints for shared parameter",
                 parameter=name,
                 value=value,
-                exc_info=True,
             )
             raise ValueError(
                 f"Value {value} violates constraints for parameter '{name}'"
@@ -1262,7 +1265,6 @@ class ParameterOptimizer:
         if self.objective is None:
             logger.error(
                 "No objective function set",
-                exc_info=True,
             )
             raise ValueError("No objective function set")
 

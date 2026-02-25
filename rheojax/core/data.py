@@ -34,7 +34,7 @@ type ArrayLike = np.ndarray | jnp_typing.ndarray | list | tuple
 def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
     """Convert any array-like input to a NumPy array for scalar ops."""
     if data is None:
-        logger.error("Array data is None during conversion", exc_info=True)
+        logger.error("Array data is None during conversion")
         raise ValueError("Array data must be initialized before conversion")
     if isinstance(data, np.ndarray):
         return data
@@ -106,7 +106,7 @@ class RheoData:
             self._explicit_test_mode = self.metadata.get("test_mode")
 
         if self.x is None or self.y is None:
-            logger.error("x and y data must be provided", exc_info=True)
+            logger.error("x and y data must be provided")
             raise ValueError("x and y data must be provided")
 
         # Convert to arrays
@@ -131,7 +131,6 @@ class RheoData:
                 "Shape mismatch between x and y data",
                 x_shape=x_array.shape,
                 y_shape=y_array.shape,
-                exc_info=True,
             )
             raise ValueError(
                 f"x and y must have the same first dimension. "
@@ -171,32 +170,32 @@ class RheoData:
         # Check for NaN values first (NaN is also non-finite)
         if isinstance(self.x, np.ndarray):
             if np.any(np.isnan(self.x)):
-                logger.error("x data contains NaN values", exc_info=True)
+                logger.error("x data contains NaN values")
                 raise ValueError("x data contains NaN values")
             if not np.all(np.isfinite(self.x)):
-                logger.error("x data contains non-finite values", exc_info=True)
+                logger.error("x data contains non-finite values")
                 raise ValueError("x data contains non-finite values")
         elif isinstance(self.x, jnp.ndarray):
             if jnp.any(jnp.isnan(self.x)):
-                logger.error("x data contains NaN values", exc_info=True)
+                logger.error("x data contains NaN values")
                 raise ValueError("x data contains NaN values")
             if not jnp.all(jnp.isfinite(self.x)):
-                logger.error("x data contains non-finite values", exc_info=True)
+                logger.error("x data contains non-finite values")
                 raise ValueError("x data contains non-finite values")
 
         if isinstance(self.y, np.ndarray):
             if np.any(np.isnan(self.y)):
-                logger.error("y data contains NaN values", exc_info=True)
+                logger.error("y data contains NaN values")
                 raise ValueError("y data contains NaN values")
             if not np.all(np.isfinite(self.y)):
-                logger.error("y data contains non-finite values", exc_info=True)
+                logger.error("y data contains non-finite values")
                 raise ValueError("y data contains non-finite values")
         elif isinstance(self.y, jnp.ndarray):
             if jnp.any(jnp.isnan(self.y)):
-                logger.error("y data contains NaN values", exc_info=True)
+                logger.error("y data contains NaN values")
                 raise ValueError("y data contains NaN values")
             if not jnp.all(jnp.isfinite(self.y)):
-                logger.error("y data contains non-finite values", exc_info=True)
+                logger.error("y data contains non-finite values")
                 raise ValueError("y data contains non-finite values")
 
         # Check for monotonic x-axis
@@ -330,16 +329,21 @@ class RheoData:
         """
         logger.debug("Converting RheoData to dictionary")
         x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)
-        y_data = self.y.tolist() if hasattr(self.y, "tolist") else list(self.y)
+        y_arr = np.asarray(self.y)
 
-        data_dict = {
+        data_dict: dict[str, Any] = {
             "x": x_data,
-            "y": y_data,
             "x_units": self.x_units,
             "y_units": self.y_units,
             "domain": self.domain,
             "metadata": self.metadata,
         }
+
+        if np.iscomplexobj(y_arr):
+            data_dict["y_real"] = np.real(y_arr).tolist()
+            data_dict["y_imag"] = np.imag(y_arr).tolist()
+        else:
+            data_dict["y"] = y_arr.tolist()
 
         if self._explicit_test_mode is not None:
             data_dict["test_mode"] = self._explicit_test_mode
@@ -360,9 +364,14 @@ class RheoData:
         metadata = data_dict.get("metadata", {}) or {}
         test_mode = data_dict.get("test_mode")
 
+        if "y_real" in data_dict and "y_imag" in data_dict:
+            y = np.array(data_dict["y_real"]) + 1j * np.array(data_dict["y_imag"])
+        else:
+            y = np.array(data_dict["y"])
+
         return cls(
             x=np.array(data_dict["x"]),
-            y=np.array(data_dict["y"]),
+            y=y,
             x_units=data_dict.get("x_units"),
             y_units=data_dict.get("y_units"),
             domain=data_dict.get("domain", "time"),
@@ -608,8 +617,12 @@ class RheoData:
     def __add__(self, other):
         """Add two RheoData objects or scalar."""
         if isinstance(other, RheoData):
-            if not np.array_equal(self.x, other.x):
-                logger.error("x-axes must match for addition", exc_info=True)
+            try:
+                _axes_equal = np.array_equal(np.asarray(self.x), np.asarray(other.x))
+            except Exception:
+                _axes_equal = bool(jnp.all(self.x == other.x))
+            if not _axes_equal:
+                logger.error("x-axes must match for addition")
                 raise ValueError("x-axes must match for addition")
             return RheoData(
                 x=self.x,
@@ -636,8 +649,12 @@ class RheoData:
     def __sub__(self, other):
         """Subtract two RheoData objects or scalar."""
         if isinstance(other, RheoData):
-            if not np.array_equal(self.x, other.x):
-                logger.error("x-axes must match for subtraction", exc_info=True)
+            try:
+                _axes_equal = np.array_equal(np.asarray(self.x), np.asarray(other.x))
+            except Exception:
+                _axes_equal = bool(jnp.all(self.x == other.x))
+            if not _axes_equal:
+                logger.error("x-axes must match for subtraction")
                 raise ValueError("x-axes must match for subtraction")
             return RheoData(
                 x=self.x,
@@ -664,8 +681,12 @@ class RheoData:
     def __mul__(self, other):
         """Multiply by scalar or another RheoData."""
         if isinstance(other, RheoData):
-            if not np.array_equal(self.x, other.x):
-                logger.error("x-axes must match for multiplication", exc_info=True)
+            try:
+                _axes_equal = np.array_equal(np.asarray(self.x), np.asarray(other.x))
+            except Exception:
+                _axes_equal = bool(jnp.all(self.x == other.x))
+            if not _axes_equal:
+                logger.error("x-axes must match for multiplication")
                 raise ValueError("x-axes must match for multiplication")
             y_result = self.y * other.y
         else:
@@ -740,7 +761,11 @@ class RheoData:
         x_array = _coerce_ndarray(self.x)
 
         if self.domain == "frequency":
-            # Log-spaced for frequency domain
+            if x_array.min() <= 0:
+                raise ValueError(
+                    f"Cannot resample in log-space: x contains non-positive values "
+                    f"(min={float(x_array.min()):.3g}). Ensure all x > 0 for frequency domain."
+                )
             new_x = np.logspace(
                 np.log10(x_array.min()), np.log10(x_array.max()), n_points
             )
@@ -876,7 +901,7 @@ class RheoData:
             )
             return self.copy()
 
-        logger.error("Frequency domain conversion not yet implemented", exc_info=True)
+        logger.error("Frequency domain conversion not yet implemented")
         # This would use FFT transform when implemented
         raise NotImplementedError(
             "Frequency domain conversion will be implemented with transforms"
@@ -893,7 +918,7 @@ class RheoData:
             warnings.warn("Data is already in time domain", UserWarning, stacklevel=2)
             return self.copy()
 
-        logger.error("Time domain conversion not yet implemented", exc_info=True)
+        logger.error("Time domain conversion not yet implemented")
         # This would use inverse FFT transform when implemented
         raise NotImplementedError(
             "Time domain conversion will be implemented with transforms"
@@ -926,7 +951,7 @@ class RheoData:
 
         logger.debug("Sliced data", original_size=len(x_np), new_size=len(sliced_x))
 
-        return RheoData(
+        result = RheoData(
             x=sliced_x,
             y=sliced_y,
             x_units=self.x_units,
@@ -936,3 +961,13 @@ class RheoData:
             metadata=self.metadata.copy(),
             validate=False,
         )
+
+        if len(result.x) == 0:
+            import warnings as _warnings
+
+            _warnings.warn(
+                f"RheoData.slice(start={start}, end={end}) produced an empty result.",
+                stacklevel=2,
+            )
+
+        return result

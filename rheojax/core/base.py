@@ -338,9 +338,10 @@ class BaseModel(BayesianMixin, ABC):
         self.y_data = y
         # Normalize to raw arrays for consistency — fit_bayesian() must always
         # see ndarrays here regardless of whether fit() received RheoData or arrays.
-        if hasattr(self.X_data, "x"):  # RheoData
+        from rheojax.core.data import RheoData as _RheoData
+        if isinstance(self.X_data, _RheoData):
             self.X_data = self.X_data.x
-        if hasattr(self.y_data, "y"):  # RheoData
+        if isinstance(self.y_data, _RheoData):
             self.y_data = self.y_data.y
 
         # Auto-detect optimization strategy
@@ -389,7 +390,7 @@ class BaseModel(BayesianMixin, ABC):
                 try:
                     from rheojax.core.data import RheoData as _RheoData
                     _X_score = X.x if isinstance(X, _RheoData) else X
-                    _y_score = X.y if isinstance(X, _RheoData) else y
+                    _y_score = y
                     r2 = self.score(_X_score, _y_score)
                 except Exception as exc:
                     logger.debug(
@@ -473,7 +474,8 @@ class BaseModel(BayesianMixin, ABC):
         }
         saved_fitted = self.fitted_
         saved_test_mode = getattr(self, "_test_mode", None)
-        saved_last_fit_kwargs = dict(getattr(self, "_last_fit_kwargs", None) or {})
+        _raw = getattr(self, "_last_fit_kwargs", None)
+        saved_last_fit_kwargs = dict(_raw) if _raw is not None else {}
 
         # Generate dummy data if not provided
         if X is None:
@@ -499,9 +501,7 @@ class BaseModel(BayesianMixin, ABC):
             if value is not None:
                 self.parameters.set_value(name, value)
             else:
-                # Restore to unset state — bypass bounds validation by writing
-                # directly to the internal slot so validators don't reject None
-                self.parameters._parameters[name]._value = None
+                self.parameters._parameters[name].value = None
         self.fitted_ = saved_fitted
         self._test_mode = saved_test_mode
         self._last_fit_kwargs = saved_last_fit_kwargs
@@ -607,6 +607,11 @@ class BaseModel(BayesianMixin, ABC):
                         test_mode = X.metadata.get("test_mode", None)
                     X = X.x
 
+            if deformation_mode is None:
+                deformation_mode = getattr(self, "_deformation_mode", None)
+                if deformation_mode is not None:
+                    poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
+
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
                 deformation_mode = DeformationMode(deformation_mode)
@@ -629,9 +634,11 @@ class BaseModel(BayesianMixin, ABC):
         # Store data for model_function access
         self.X_data = X
         self.y_data = y
-        if hasattr(self.X_data, "x"):
+        from rheojax.core.data import RheoData as _RheoData
+
+        if isinstance(self.X_data, _RheoData):
             self.X_data = self.X_data.x
-        if hasattr(self.y_data, "y"):
+        if isinstance(self.y_data, _RheoData):
             self.y_data = self.y_data.y
 
         # Auto warm-start from NLSQ if available and no explicit initial values
