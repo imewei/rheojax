@@ -851,7 +851,7 @@ def get_microscopic_stress_prefactor(
 
 
 @partial(jax.jit, static_argnames=("n_steps",))
-def solve_equilibrium_correlator_f12(
+def _solve_equilibrium_correlator_f12_jit(
     t_array: jax.Array,
     v1: float,
     v2: float,
@@ -889,7 +889,7 @@ def solve_equilibrium_correlator_f12(
     Uses a simple explicit Euler scheme with decimation for the memory integral.
     For production use, consider adaptive time stepping or Volterra ODE approach.
     """
-    t_max = jnp.max(t_array)
+    t_max = jnp.maximum(jnp.max(t_array), 1e-30)
     dt = t_max / n_steps
 
     def scan_step(carry, _):
@@ -909,7 +909,7 @@ def solve_equilibrium_correlator_f12(
         #   m(f_neq) · ∫₀^t ∂Φ/∂s ds = m(Φ_current) · Σ dphi_dt · dt.
         # This simplification is EXACT for the equilibrium (f_neq) case and does
         # NOT apply to transient correlators, where Φ(t-s) varies with s.
-        m_phi_scalar = f12_memory_kernel(jnp.array([phi]), v1, v2)[0]
+        m_phi_scalar = f12_memory_kernel(phi, v1, v2)
         # Approximate: convolve stored dphi/dt values with memory kernel weight
         # (simplified: use current m_phi as representative weight across history)
         memory_integral = m_phi_scalar * jnp.sum(dphi_dt_hist) * dt
@@ -927,7 +927,15 @@ def solve_equilibrium_correlator_f12(
         return (phi_new, dphi_dt_hist_new, t_idx + 1), phi_new
 
     # Initialize
-    n_hist = 1000  # Fixed size, independent of n_steps
+    # n_hist is the circular buffer size for dΦ/dt history used in the memory
+    # integral approximation.  Ideally n_hist = n_steps to retain the full
+    # convolution from t=0, but large n_hist significantly increases JIT
+    # compilation time and scan carry cost.  n_hist=1000 truncates to the most
+    # recent 1000 steps — acceptable when the memory kernel m(Φ) has decayed
+    # to negligible amplitude over that window (typical for MCT near the glass
+    # transition).  For quantitatively precise results far above T_g, increase
+    # n_hist or use the Prony-decomposition solver instead.
+    n_hist = min(n_steps, 1000)
     phi_init = 1.0
     # Initialize dphi_dt history to zeros (correct: derivative starts at zero)
     # Previously was jnp.ones(n_hist) causing jnp.diff → all-zeros memory integral
@@ -941,8 +949,26 @@ def solve_equilibrium_correlator_f12(
         length=n_steps,
     )
 
-    # Interpolate to requested times
-    t_integration = jnp.linspace(0, t_max, n_steps)
-    phi_at_times = jnp.interp(t_array, t_integration, phi_trajectory)
+    # R6-UTIL-002: phi_trajectory[i] = Φ((i+1)*dt), so the integration grid
+    # starts at dt, not 0.  Prepend t=0 with Φ(0)=1 for correct interpolation.
+    t_integration = jnp.concatenate([jnp.array([0.0]), jnp.linspace(dt, t_max, n_steps)])
+    phi_full = jnp.concatenate([jnp.array([1.0]), phi_trajectory])
+    from interpax import interp1d
+
+    phi_at_times = interp1d(t_integration, phi_full, method="cubic")(t_array)
 
     return phi_at_times
+
+
+def solve_equilibrium_correlator_f12(
+    t_array: jax.Array,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    n_steps: int = 10000,
+) -> jax.Array:
+    """Public wrapper for _solve_equilibrium_correlator_f12_jit with empty-array guard."""
+    t_array = jnp.asarray(t_array)
+    if t_array.shape[0] == 0:
+        return jnp.array([])
+    return _solve_equilibrium_correlator_f12_jit(t_array, v1, v2, Gamma, n_steps)

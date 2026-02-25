@@ -216,7 +216,13 @@ def G0(x: "float | Array") -> "float | Array":
     x_arr = jnp.atleast_1d(jnp.asarray(x, dtype=jnp.float64))
     x_safe = jnp.maximum(x_arr, 1e-10)
     result = jax.vmap(_G0_compute)(x_safe)
-    return result[0] if jnp.ndim(x) == 0 else result
+    # R5-JAX-001: Replace Python `if jnp.ndim(x) == 0` with unconditional
+    # jnp.squeeze().  When x is scalar, atleast_1d wraps it to shape (1,) so
+    # result has shape (1,); squeeze removes that dimension to restore scalar
+    # output.  When x is already an array of shape (N,), result is (N,) and
+    # squeeze is a no-op.  This removes the Python branch entirely, making G0()
+    # safe to call inside JIT regardless of whether x is a concrete or traced value.
+    return jnp.squeeze(result)
 
 
 # ============================================================================
@@ -384,32 +390,37 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     x_safe = jnp.maximum(x_arr, 1e-10)
     omega_safe = jnp.maximum(omega_arr, 1e-10)
 
-    is_x_scalar = jnp.ndim(x) == 0
+    # R5-JAX-001: Replace Python if/elif on jnp.ndim() with a single unified
+    # vmap path.  Python-if on ndim() freezes the branch at trace time, so
+    # calling Gp() inside a JIT function with a scalar-vs-array input depending
+    # on a traced value would silently produce wrong output shapes.
+    #
+    # Unified strategy: always vmap over omega_safe (length >= 1).
+    # • If x is scalar: broadcast to length-1 and let vmap walk omega.
+    # • If x and omega are arrays: must be the same length (existing contract).
+    # • Scalar squeeze is deferred to the caller via jnp.squeeze on 0-d inputs.
+    is_x_scalar = jnp.ndim(x) == 0  # Python int — safe at eager / closure time
     is_omega_scalar = jnp.ndim(omega_tau0) == 0
 
-    if is_x_scalar and is_omega_scalar:
-        # Both scalars — vmap over a length-1 array then squeeze
+    if is_x_scalar:
+        # x scalar — broadcast x across all omega values
         results = jax.vmap(lambda w: _Gp_quadrature(x_safe[0], w))(omega_safe)
-        return results[0][0], results[1][0]
-
-    elif is_x_scalar:
-        # x scalar, omega array — vectorize over omega
-        results = jax.vmap(lambda w: _Gp_quadrature(x_safe[0], w))(omega_safe)
-        return results[0], results[1]
-
     elif is_omega_scalar:
         # omega scalar, x array — vectorize over x
         results = jax.vmap(lambda x_val: _Gp_quadrature(x_val, omega_safe[0]))(x_safe)
-        return results[0], results[1]
-
     else:
-        # Both arrays — ensure same shape and vectorize
+        # x array and omega array — must match shape
         if x_arr.shape != omega_arr.shape:
             raise ValueError(
                 f"x and omega_tau0 must have same shape, got {x_arr.shape} and {omega_arr.shape}"
             )
         results = jax.vmap(_Gp_quadrature)(x_safe, omega_safe)
-        return results[0], results[1]
+
+    # Squeeze the length-1 axis when both inputs were scalars so callers
+    # that pass scalar (x, omega) get a scalar back, matching prior behaviour.
+    if is_x_scalar and is_omega_scalar:
+        return results[0][0], results[1][0]
+    return results[0], results[1]
 
 
 # ============================================================================
@@ -471,13 +482,23 @@ def Z(x: float, omega_tau0: "float | Array") -> "float | Array":
 
     Z_val = x_safe / (x_safe + 1.0)
 
-    # Return scalar or array matching omega_tau0 shape
-    omega_arr = jnp.atleast_1d(jnp.asarray(omega_tau0))
-    if jnp.ndim(omega_tau0) == 0:
-        return Z_val
-    else:
-        # Broadcast to match omega shape
-        return jnp.full_like(omega_arr, Z_val)
+    # R5-JAX-001: Replace Python if on jnp.ndim() with NumPy-style broadcasting.
+    # The original code dispatched via `if jnp.ndim(omega_tau0) == 0` which
+    # freezes one branch inside JIT when omega_tau0 is a traced value.
+    #
+    # Z(x) is frequency-independent; omega_tau0 is included only for API
+    # consistency (e.g., callers that pass (x, omega) pairs uniformly).
+    # The output shape should follow standard broadcast rules between x and
+    # omega_tau0:
+    #   - Z(scalar x, scalar omega)  → scalar
+    #   - Z(scalar x, array omega)   → array of omega.shape (all same value)
+    #   - Z(array x, scalar omega)   → array of x.shape
+    #   - Z(array x, array omega)    → broadcast(x.shape, omega.shape)
+    #
+    # jnp.broadcast_shapes() + broadcast_to handles all four cases without
+    # any Python branch on ndim, making this safe inside JIT.
+    out_shape = jnp.broadcast_shapes(jnp.shape(x), jnp.shape(omega_tau0))
+    return jnp.broadcast_to(Z_val, out_shape)
 
 
 # ============================================================================

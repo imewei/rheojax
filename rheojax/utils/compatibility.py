@@ -103,33 +103,35 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     # Normalize t to [0,1] so R² is comparable with the log-log power-law R²
     slope_exp = 0.0
     try:
-        log_G = np.log(np.maximum(G_t, 1e-30))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_G = np.log(np.maximum(G_t, 1e-30))
         t_range = t.max() - t.min()
         t_norm = (t - t.min()) / (t_range + 1e-30) if t_range > 0 else t
         slope_exp, intercept_exp, r_exp, _, _ = linregress(t_norm, log_G)
-        r_exp_sq = r_exp**2
+        r_exp_sq = float(r_exp**2) if np.isfinite(r_exp) else 0.0
         logger.debug(
             "Exponential fit",
             r_squared=float(r_exp_sq),
             slope=float(slope_exp),
         )
-    except (ValueError, RuntimeWarning) as e:
+    except ValueError as e:
         r_exp_sq = 0.0
         logger.debug("Exponential fit failed", error=str(e))
 
     # 2. Check for power-law decay: log(G) vs log(t) should be linear
     slope_pow = 0.0
     try:
-        log_t = np.log(np.maximum(t, 1e-30))
-        log_G = np.log(np.maximum(G_t, 1e-30))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            log_t = np.log(np.maximum(t, 1e-30))
+            log_G = np.log(np.maximum(G_t, 1e-30))
         slope_pow, intercept_pow, r_pow, _, _ = linregress(log_t, log_G)
-        r_pow_sq = r_pow**2
+        r_pow_sq = float(r_pow**2) if np.isfinite(r_pow) else 0.0
         logger.debug(
             "Power-law fit",
             r_squared=float(r_pow_sq),
             slope=float(slope_pow),
         )
-    except (ValueError, RuntimeWarning) as e:
+    except ValueError as e:
         r_pow_sq = 0.0
         logger.debug("Power-law fit failed", error=str(e))
 
@@ -147,7 +149,7 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
             slope_stretch, _, r_stretch, _, _ = linregress(
                 log_t[valid_stretch], log_log[valid_stretch]
             )
-            r_stretch_sq = r_stretch**2
+            r_stretch_sq = float(r_stretch**2) if np.isfinite(r_stretch) else 0.0
             logger.debug(
                 "Stretched exponential fit",
                 r_squared=float(r_stretch_sq),

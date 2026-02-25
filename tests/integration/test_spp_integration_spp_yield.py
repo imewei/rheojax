@@ -21,6 +21,7 @@ def _make_dataset(omega: float, gamma_0: float, scale: float = 100.0, exp: float
     )
 
 
+@pytest.mark.integration
 def test_pipeline_fit_model_nlsq_static():
     omega = 1.5
     gamma_levels = [0.2, 0.4, 0.8]
@@ -56,25 +57,17 @@ def test_pipeline_fit_model_bayesian_static():
     model = pipeline.get_model()
     model.parameters.set_value("noise", 10.0)
 
-    # Bayesian refinement (small sample count to keep test light)
-    # Note: pipeline.fit_model() creates a fresh model each call, so the NLSQ
-    # warm-start above is not propagated. On tiny synthetic data, NUTS may fail.
-    try:
-        pipeline.fit_model(
-            bayesian=True,
-            yield_type="static",
-            num_warmup=150,
-            num_samples=200,
-        )
-    except (RuntimeError, Exception):
-        pytest.xfail("NUTS failed on tiny synthetic dataset; acceptable for smoke")
+    # Bayesian refinement with NLSQ warm-start (model reused, not recreated)
+    pipeline.fit_model(
+        bayesian=True,
+        yield_type="static",
+        num_warmup=150,
+        num_samples=200,
+    )
 
     model = pipeline.get_model()
     assert model is not None
-    if not model.fitted_:
-        pytest.xfail(
-            "NUTS did not converge on tiny synthetic dataset; acceptable for smoke"
-        )
+    assert model.fitted_
     # Check the fitted scale parameter is positive
     sigma_sy_scale = model.parameters.get_value("sigma_sy_scale")
     assert sigma_sy_scale is not None and sigma_sy_scale > 0

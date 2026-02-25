@@ -620,12 +620,18 @@ def warm_start_from_n_modes(
             )
         ][:n_pad]
         if len(new_taus) < n_pad:
-            # Fallback: extend beyond existing range
-            new_taus = np.logspace(
-                np.log10(max(tau_i.max() * 2, TAU_LB)), np.log10(TAU_UB), n_pad
-            )
-        E_i_target = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
-        tau_i_target = np.concatenate([tau_i, new_taus])
+            # Fallback: extend beyond existing range (clamp to valid logspace bounds)
+            tau_upper = min(tau_i.max() * 2, TAU_UB)
+            tau_lower = max(tau_i.min() / 2, TAU_LB)
+            if tau_lower >= tau_upper:
+                tau_lower = TAU_LB
+                tau_upper = TAU_UB
+            new_taus = np.logspace(np.log10(tau_lower), np.log10(tau_upper), n_pad)
+        tau_i_combined = np.concatenate([tau_i, new_taus])
+        sort_idx = np.argsort(tau_i_combined)
+        tau_i_target = tau_i_combined[sort_idx]
+        E_i_combined = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
+        E_i_target = E_i_combined[sort_idx]
         logger.debug(
             "Warm-start: increasing modes",
             n_current=n_current,

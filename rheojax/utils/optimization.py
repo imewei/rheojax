@@ -193,7 +193,10 @@ def _run_scipy_least_squares(
         # which is unreliable on JAX >= 0.4.7
         if hasattr(res, "devices"):
             res = np.asarray(res)
-        res = np.asarray(res, dtype=np.float64)
+        res = np.asarray(res)
+        if np.iscomplexobj(res):
+            res = np.concatenate([np.real(res), np.imag(res)])
+        res = res.astype(np.float64)
         # Guard against NaN/Inf from ODE solvers — replace with large finite
         # penalty so scipy can still attempt to optimize (gradient-guided away
         # from the bad region). Without this, scipy raises ValueError at init.
@@ -441,13 +444,24 @@ class OptimizationResult:
         y_data = np.asarray(self.y_data)
         residuals = np.asarray(self.residuals)
 
-        if np.iscomplexobj(y_data):
-            y_data = np.abs(y_data)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
 
-        ss_res = np.sum(residuals**2)
-        ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+        if len(residuals) == 2 * len(y_data):
+            half = len(y_data)
+            ss_res = np.sum(residuals[:half] ** 2) + np.sum(residuals[half:] ** 2)
+            if np.iscomplexobj(y_data):
+                ss_tot = (
+                    np.sum((y_data.real - np.mean(y_data.real)) ** 2)
+                    + np.sum((y_data.imag - np.mean(y_data.imag)) ** 2)
+                )
+            else:
+                ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+        else:
+            ss_res = np.sum(residuals**2)
+            if np.iscomplexobj(y_data):
+                y_data = np.abs(y_data)
+            ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
 
         if ss_tot == 0:
             logger.warning(
@@ -1182,7 +1196,13 @@ def nlsq_optimize(
         result = _scipy_fallback(x0)
         result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
         # Compute residuals for validation (OPT-001)
-        residuals_fb = np.asarray(objective(result.x), dtype=np.float64)
+        _residuals_fb_raw = np.asarray(objective(result.x))
+        if np.iscomplexobj(_residuals_fb_raw):
+            residuals_fb = np.concatenate(
+                [np.real(_residuals_fb_raw), np.imag(_residuals_fb_raw)]
+            ).astype(np.float64)
+        else:
+            residuals_fb = _residuals_fb_raw.astype(np.float64)
         result.fun = float(np.sum(residuals_fb**2))
         _validate_optimization_result(result, residuals_fb)
         # Write back optimal params so model state reflects the fit
@@ -1191,8 +1211,13 @@ def nlsq_optimize(
 
     # Compute residuals at optimal point for covariance scaling
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
-    residuals_raw = objective(x_opt)
-    residuals_np: np.ndarray = np.asarray(residuals_raw, dtype=np.float64)
+    residuals_raw = np.asarray(objective(x_opt))
+    if np.iscomplexobj(residuals_raw):
+        residuals_np: np.ndarray = np.concatenate(
+            [np.real(residuals_raw), np.imag(residuals_raw)]
+        ).astype(np.float64)
+    else:
+        residuals_np: np.ndarray = residuals_raw.astype(np.float64)
 
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
     result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
@@ -1216,7 +1241,13 @@ def nlsq_optimize(
             f"[SciPy fallback] {fallback_result.message} (NLSQ inner loop limit)"
         )
         # OPT-004: validate the fallback result
-        residuals_fb = np.asarray(objective(fallback_result.x), dtype=np.float64)
+        _residuals_fb_raw = np.asarray(objective(fallback_result.x))
+        if np.iscomplexobj(_residuals_fb_raw):
+            residuals_fb = np.concatenate(
+                [np.real(_residuals_fb_raw), np.imag(_residuals_fb_raw)]
+            ).astype(np.float64)
+        else:
+            residuals_fb = _residuals_fb_raw.astype(np.float64)
         fallback_result.fun = float(np.sum(residuals_fb**2))
         _validate_optimization_result(fallback_result, residuals_fb)
         parameters.set_values(fallback_result.x)
@@ -1270,6 +1301,7 @@ def nlsq_multistart_optimize(
     verbose: bool = False,
     parallel: bool = True,
     n_workers: int | None = None,
+    y_data: np.ndarray | None = None,
     **kwargs,
 ) -> OptimizationResult:
     """Multi-start optimization to escape local minima.
@@ -1361,9 +1393,8 @@ def nlsq_multistart_optimize(
         return best_result
 
     # Generate all perturbed starting points
-    def generate_perturbed_values(seed: int) -> list[float]:
-        """Generate perturbed initial values with specific seed for reproducibility."""
-        rng = np.random.RandomState(seed)
+    def generate_perturbed_values(rng: np.random.Generator) -> list[float]:
+        """Generate perturbed initial values using the provided RNG."""
         perturbed = []
         for orig_val, bounds in zip(original_values, bounds_list, strict=True):
             if bounds is None or (bounds[0] is None and bounds[1] is None):
@@ -1421,7 +1452,11 @@ def nlsq_multistart_optimize(
             return start_idx, None
 
     # Prepare all starting points
-    all_starts = [generate_perturbed_values(seed=i * 42) for i in range(1, n_starts)]
+    root_rng = np.random.default_rng(seed=42)
+    all_starts = [
+        generate_perturbed_values(np.random.default_rng(root_rng.integers(2**31)))
+        for _ in range(1, n_starts)
+    ]
 
     if parallel and n_starts > 2:
         # Parallel execution for additional starts
@@ -1505,6 +1540,9 @@ def nlsq_multistart_optimize(
 
     # Restore best parameters
     parameters.set_values(best_result.x)
+
+    if y_data is not None and best_result.y_data is None:
+        best_result.y_data = np.asarray(y_data)
 
     logger.info(
         "Multi-start optimization completed",
