@@ -153,9 +153,15 @@ class MastercurvePipeline(Pipeline):
         Returns:
             Merged RheoData
         """
-        # Add temperature metadata to each dataset
-        for data, temp in zip(datasets, temperatures, strict=False):
-            data.metadata["temperature"] = temp
+        # Add temperature metadata to copies (avoid mutating caller's datasets)
+        datasets = [
+            RheoData(
+                x=d.x, y=d.y,
+                x_units=d.x_units, y_units=d.y_units,
+                metadata={**d.metadata, "temperature": temp},
+            )
+            for d, temp in zip(datasets, temperatures, strict=False)
+        ]
 
         # For simplicity, concatenate all data
         # In practice, this would be more sophisticated
@@ -309,8 +315,11 @@ class ModelComparisonPipeline(Pipeline):
                 else:
                     y_pred_magnitude = y_pred
 
-                # Calculate metrics using magnitude (real values)
-                residuals = y - y_pred_magnitude
+                # Calculate metrics using magnitude (real values).
+                # For complex y (oscillation data), compare magnitudes to
+                # avoid complex residuals that produce wrong RMSE.
+                y_for_residuals = np.abs(y) if np.iscomplexobj(y) else y
+                residuals = y_for_residuals - y_pred_magnitude
 
                 # Try to use NLSQ result properties (NLSQ 0.6.0 CurveFitResult compatible)
                 # Falls back to manual computation if result not available

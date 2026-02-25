@@ -175,6 +175,10 @@ class Maxwell(BaseModel):
                 offset = float(np.median(y_np[-tail:]))
                 y_np = y_np - offset
                 self._relaxation_offset = offset
+                # Store in _last_fit_kwargs for Bayesian pipeline forwarding
+                if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
+                    self._last_fit_kwargs = {}
+                self._last_fit_kwargs["_relaxation_offset"] = offset
                 logger.debug(
                     "Applied relaxation offset correction",
                     offset=offset,
@@ -446,11 +450,16 @@ class Maxwell(BaseModel):
         if test_mode is None:
             test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
-        # Dispatch to appropriate prediction method
+        # Dispatch to appropriate prediction method.
+        # Read offset from kwargs (forwarded by NUTS closure) if available,
+        # otherwise fall back to self._ (correct when fit_bayesian follows
+        # fit on the same data — the recommended workflow).
+        _relaxation_offset = kwargs.get(
+            "_relaxation_offset", getattr(self, "_relaxation_offset", 0.0)
+        )
+
         if test_mode == TestMode.RELAXATION:
-            return self._predict_relaxation(X, G0, eta) + getattr(
-                self, "_relaxation_offset", 0.0
-            )
+            return self._predict_relaxation(X, G0, eta) + _relaxation_offset
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(X, G0, eta)
         elif test_mode == TestMode.OSCILLATION:

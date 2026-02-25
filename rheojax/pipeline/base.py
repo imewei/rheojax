@@ -719,7 +719,7 @@ class Pipeline:
             >>> pipeline2 = pipeline.clone()
         """
         new_pipeline = Pipeline(data=self.data.copy() if self.data else None)
-        new_pipeline.steps = self.steps.copy()
+        new_pipeline.steps = copy.deepcopy(self.steps)
         new_pipeline.history = self.history.copy()
         new_pipeline._last_model = (
             copy.deepcopy(self._last_model) if self._last_model is not None else None

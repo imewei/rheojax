@@ -424,7 +424,7 @@ class FractionalKelvinVoigt(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Internal predict implementation.
 
         Args:

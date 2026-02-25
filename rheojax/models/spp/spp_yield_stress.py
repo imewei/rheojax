@@ -364,7 +364,7 @@ class SPPYieldStress(BaseModel):
         self.parameters.set_value("n_power_law", np.clip(n_est, 0.01, 2.0))
         self.parameters.set_value("eta_inf", np.clip(eta_est, 1e-9, 1e6))
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict stress using fitted parameters.
 
         Parameters

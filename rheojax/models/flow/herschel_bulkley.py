@@ -141,7 +141,7 @@ class HerschelBulkley(BaseModel):
                 # Fit power law to corrected data: log(σ - σ_y) = log(K) + n*log(γ̇)
                 # Use middle to high shear rate region
                 start_idx = len(X_sorted) // 4
-                log_gamma = np.log(np.abs(X_sorted[start_idx:]))
+                log_gamma = np.log(np.maximum(np.abs(X_sorted[start_idx:]), 1e-30))
                 log_stress = np.log(y_corrected[start_idx:])
 
                 logger.debug(
@@ -202,11 +202,12 @@ class HerschelBulkley(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict stress for given shear rates.
 
         Args:
             X: Shear rate data (γ̇)
+            **kwargs: Additional keyword arguments (deformation_mode, etc.)
 
         Returns:
             Predicted stress σ(γ̇)

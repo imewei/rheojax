@@ -280,7 +280,8 @@ class BayesianPipeline(Pipeline):
             )
 
             # Add diagnostics to context
-            ctx["divergences"] = result.diagnostics.get("divergences") or 0
+            _div = result.diagnostics.get("divergences")
+            ctx["divergences"] = _div if _div is not None else 0
             if "r_hat" in result.diagnostics:
                 r_hat_values = list(result.diagnostics["r_hat"].values())
                 ctx["r_hat_max"] = max(r_hat_values) if r_hat_values else None
@@ -293,19 +294,20 @@ class BayesianPipeline(Pipeline):
         self._diagnostics = result.diagnostics
 
         # Add to history
+        _div_hist = result.diagnostics.get("divergences")
         self.history.append(
             (
                 "fit_bayesian",
                 num_samples,
                 num_warmup,
-                result.diagnostics.get("divergences") or 0,
+                _div_hist if _div_hist is not None else 0,
             )
         )
 
         logger.info(
             "Bayesian inference completed",
             model=model_name,
-            divergences=result.diagnostics.get("divergences") or 0,
+            divergences=_div_hist if _div_hist is not None else 0,
             num_samples=num_samples,
             num_chains=num_chains,
         )

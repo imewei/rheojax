@@ -512,7 +512,7 @@ class FractionalZenerSolidSolid(BaseModel):
             logging.debug(f"Relaxation initialization failed: {exc}")
             return False
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:  # type: ignore[override]
+    def _predict(self, X: jnp.ndarray, **kwargs) -> jnp.ndarray:
         """Predict response for given input.
 
         Parameters

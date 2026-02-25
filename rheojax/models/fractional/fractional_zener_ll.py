@@ -525,7 +525,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         )
         return self
 
-    def _predict(self, X: jnp.ndarray) -> jnp.ndarray:  # type: ignore[override]
+    def _predict(self, X: jnp.ndarray, **kwargs) -> jnp.ndarray:
         """Predict response for given input.
 
         Parameters

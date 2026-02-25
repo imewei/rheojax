@@ -226,7 +226,7 @@ class Carreau(BaseModel):
 
         return self
 
-    def _predict(self, X: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict viscosity for given shear rates.
 
         Args:

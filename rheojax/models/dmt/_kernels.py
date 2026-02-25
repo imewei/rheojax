@@ -696,8 +696,8 @@ def invert_stress_for_gamma_dot_hb(
     tau_y = yield_stress(lam, tau_y0, m1)
     K = consistency(lam, K0, m2)
 
-    # Below yield: no flow
-    below_yield = sigma_0 <= tau_y
+    # Below yield: no flow (use jnp.less_equal for JIT safety)
+    below_yield = jnp.less_equal(sigma_0, tau_y)
 
     # Initial guess (power-law approximation)
     sigma_excess = jnp.maximum(sigma_0 - tau_y, 1e-12)
