@@ -277,6 +277,7 @@ def parse_excel_sheet(
     sheet: Any,
     filepath: str,
     table_index: int = 0,
+    sheet_name: str = "Sheet1",
 ) -> tuple[TRIOSTable, dict[str, Any]]:
     """Parse a single Excel sheet into a TRIOSTable.
 
@@ -284,6 +285,7 @@ def parse_excel_sheet(
         sheet: openpyxl worksheet object
         filepath: Original file path (for error messages)
         table_index: Index of this table
+        sheet_name: Name of the sheet being parsed
 
     Returns:
         Tuple of (TRIOSTable, metadata dict)
@@ -330,9 +332,13 @@ def parse_excel_sheet(
             else:
                 val_str = str(cell).strip()
                 if val_str.lower().startswith("data"):
-                    # Skip "Data point" labels
-                    continue
-                if not val_str:
+                    # VIS-EXL-001: Use elif chain so "data"-prefixed cells
+                    # append exactly one NaN and do NOT fall through to the
+                    # else branch (which would append a second NaN, making
+                    # row_data longer than headers and causing the row to be
+                    # silently discarded at the length-mismatch guard below).
+                    row_data.append(np.nan)
+                elif not val_str:
                     row_data.append(np.nan)
                 else:
                     try:
@@ -361,21 +367,37 @@ def parse_excel_sheet(
     df = pd.DataFrame(data_rows, columns=headers)
 
     # Remove columns that are all NaN
+    n_cols_before = len(df.columns)
     df = df.dropna(axis=1, how="all")
+    n_dropped = n_cols_before - len(df.columns)
+    if n_dropped > 0:
+        logger.info(
+            "Dropped all-NaN columns",
+            n_dropped=n_dropped,
+            remaining=len(df.columns),
+        )
 
     # Detect step column
     step_col = detect_step_column(df)
     step_values = None
     if step_col:
+        n_step_total = len(df[step_col])
         step_values = df[step_col].dropna().unique().astype(int).tolist()
+        n_step_nan = n_step_total - len(df[step_col].dropna())
+        if n_step_nan > 0:
+            logger.debug(
+                "Step values with NaN excluded",
+                n_nan=n_step_nan,
+                n_total=n_step_total,
+            )
 
-    # Create TRIOSTable
     table = TRIOSTable(
         table_index=table_index,
         header=list(df.columns),
         units={k: v for k, v in units.items() if k in df.columns},
         df=df,
         step_values=step_values,
+        sheet_name=sheet_name,
     )
 
     return table, metadata
@@ -510,7 +532,9 @@ def parse_trios_excel(
                     sheet = _XlrdSheetWrapper(wb.sheet_by_index(sheet_idx))
 
                 try:
-                    table, sheet_metadata = parse_excel_sheet(sheet, str(filepath), idx)
+                    table, sheet_metadata = parse_excel_sheet(
+                        sheet, str(filepath), idx, sheet_name=sheet_name_str
+                    )
                 except Exception:
                     logger.error(
                         "Failed to parse sheet",
@@ -519,9 +543,6 @@ def parse_trios_excel(
                         exc_info=True,
                     )
                     raise
-
-                # Add sheet name to table via dedicated field
-                table.sheet_name = sheet_name_str
 
                 tables.append(table)
                 logger.debug(
@@ -580,8 +601,8 @@ class _XlrdSheetWrapper:
 
         try:
             r, c = row - 1, column - 1
-            # xlrd XL_CELL_EMPTY == 0
-            if self._sheet.cell_type(r, c) == 0:
+            cell_type = self._sheet.cell_type(r, c)
+            if cell_type in (0, 5):  # XL_CELL_EMPTY or XL_CELL_ERROR
                 return CellWrapper(None)
             return CellWrapper(self._sheet.cell_value(r, c))
         except IndexError:
@@ -667,7 +688,13 @@ def load_trios_excel(
                 continue
 
             # Extract data
-            x_data = seg_df[x_col].values.astype(float)
+            try:
+                x_data = seg_df[x_col].values.astype(float)
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Column '{x_col}' contains non-numeric data that cannot be converted to float. "
+                    f"Sample values: {seg_df[x_col].head(3).tolist()}"
+                ) from e
 
             # Get units
             x_units = units.get(x_col, "")
@@ -675,8 +702,20 @@ def load_trios_excel(
 
             # Handle complex modulus case
             if y2_col is not None:
-                y_real = seg_df[y_col].values.astype(float)
-                y_imag = seg_df[y2_col].values.astype(float)
+                try:
+                    y_real = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
+                try:
+                    y_imag = seg_df[y2_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y2_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y2_col].head(3).tolist()}"
+                    ) from e
 
                 # Convert units if needed
                 y_units_orig = units.get(y_col, "Pa")
@@ -689,7 +728,13 @@ def load_trios_excel(
                 y_units = "Pa"
                 is_complex = True
             else:
-                y_data = seg_df[y_col].values.astype(float)
+                try:
+                    y_data = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
                 is_complex = False
 
             # Convert x units (e.g., Hz to rad/s)

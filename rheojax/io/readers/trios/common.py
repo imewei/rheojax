@@ -404,6 +404,14 @@ def detect_test_type(
             # For now, default to creep if strain is the dependent variable
             logger.debug("Detected test type: creep (fallback from stress/strain)")
             return "creep"
+        if has_column("shear_stress"):
+            # Time + stress without strain → default to relaxation
+            logger.debug("Detected test type: relaxation (fallback from time+stress)")
+            return "relaxation"
+        if has_column("shear_strain"):
+            # Time + strain without stress → default to creep
+            logger.debug("Detected test type: creep (fallback from time+strain)")
+            return "creep"
 
     logger.debug("Could not detect test type, returning unknown")
     return "unknown"
@@ -543,6 +551,37 @@ def select_xy_columns(
                 y2_col=y2_col,
             )
 
+    # Fallback: if test_mode didn't produce matches, try all modes
+    if (x_col is None or y_col is None) and test_mode == "unknown":
+        logger.debug("Trying all modes as fallback for unknown test_mode")
+        for fallback_mode in ["relaxation", "creep", "oscillation", "rotation"]:
+            fb_x = []
+            for _name, mapping in column_mappings.items():
+                if mapping.is_x_candidate and fallback_mode in mapping.applicable_modes:
+                    for pattern in mapping.patterns:
+                        for i, col in enumerate(columns_lower):
+                            if re.match(pattern, col, re.IGNORECASE):
+                                fb_x.append((mapping.priority, columns[i]))
+            fb_y = []
+            for _name, mapping in column_mappings.items():
+                if mapping.is_y_candidate and fallback_mode in mapping.applicable_modes:
+                    for pattern in mapping.patterns:
+                        for i, col in enumerate(columns_lower):
+                            if re.match(pattern, col, re.IGNORECASE):
+                                fb_y.append((mapping.priority, columns[i], _name))
+            fb_x.sort(key=lambda x: x[0])
+            fb_y.sort(key=lambda x: x[0])
+            if fb_x and fb_y:
+                x_col = fb_x[0][1]
+                y_col = fb_y[0][1]
+                logger.debug(
+                    "Fallback mode matched",
+                    fallback_mode=fallback_mode,
+                    x_col=x_col,
+                    y_col=y_col,
+                )
+                break
+
     if x_col is None or y_col is None:
         logger.warning(
             f"Could not determine x/y columns for test mode '{test_mode}'. "
@@ -583,10 +622,20 @@ def convert_unit(
         return values, target_unit
 
     # Look up conversion
+    # IO-R6-004: Case-insensitive lookup to handle "HZ", "Rad/s", etc.
     source_key = source_unit.strip()
+    if source_key not in conversions:
+        # Try case-insensitive match
+        source_lower = source_key.lower()
+        for key in conversions:
+            if key.lower() == source_lower:
+                source_key = key
+                break
     if source_key in conversions:
         converted_target, factor = conversions[source_key]
-        if converted_target == target_unit or target_unit in converted_target:
+        # R6-IO-005: Strict equality (not `in`) — avoids "Pa" matching "Pa.s".
+        # Case-insensitive source lookup above handles casing; target must match exactly.
+        if converted_target == target_unit:
             logger.debug(
                 "Converting units",
                 source_unit=source_unit,
@@ -720,8 +769,8 @@ def segment_to_rheodata(
     # If not explicitly set, infer from y_column name
     if "deformation_mode" not in metadata:
         y_col_lower = (segment.y_column or "").lower()
-        _TENSILE_PREFIXES = {"e'", "e''", "e*", "tensile", "young", "e_prime", "e_double_prime"}
-        if any(y_col_lower.startswith(t) for t in _TENSILE_PREFIXES):
+        _TENSILE_TOKENS = {"e'", "e''", "e*", "tensile", "young", "e_prime", "e_double_prime"}
+        if any(t in y_col_lower for t in _TENSILE_TOKENS):
             metadata["deformation_mode"] = "tension"
 
     if segment.auxiliary_columns:

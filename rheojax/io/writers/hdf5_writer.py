@@ -387,11 +387,16 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
         else:
             metadata[key] = value
 
+    # VIS-HDF-001: Move import to top of function (not inside for loop).
+    # Python caches modules so repeated imports are cheap, but placing import
+    # inside a loop is misleading and signals incomplete refactoring.
+    import h5py
+
     # Read subgroups
     for key in group.keys():
-        if hasattr(group[key], "attrs") and hasattr(group[key], "keys"):  # It's a group
+        if isinstance(group[key], h5py.Group):
             metadata[key] = _read_metadata_recursive(group[key])
-        else:  # It's a dataset
+        else:
             metadata[key] = group[key][:]
 
     return metadata

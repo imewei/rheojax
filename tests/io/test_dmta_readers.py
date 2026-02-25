@@ -48,6 +48,20 @@ def test_detect_none_for_generic_columns():
     assert result is None
 
 
+@pytest.mark.xfail(reason="bending column detection not yet implemented", strict=False)
+def test_detect_deformation_mode_bending_columns():
+    """Test deformation mode detection for bending column names."""
+    result = detect_deformation_mode_from_columns(["E_bending", "loss_modulus_bending"])
+    assert result == "bending"
+
+
+@pytest.mark.xfail(reason="compression column detection not yet implemented", strict=False)
+def test_detect_deformation_mode_compression_columns():
+    """Test deformation mode detection for compression column names."""
+    result = detect_deformation_mode_from_columns(["E_compression", "stress_compression"])
+    assert result == "compression"
+
+
 @pytest.mark.smoke
 def test_detect_tension_from_units():
     """E* in units string should help detect tension."""

@@ -48,6 +48,9 @@ def test_auto_load_excel_fallback_on_dat(tmp_path: Path):
     data = auto_load(excel_path, x_col="time", y_col="stress")
     assert len(data.x) == 2
     assert np.isclose(data.y[1], 4.0)
+    # Verify actual column values are correct (guards against pandas index offset)
+    np.testing.assert_allclose(data.x, [1.0, 2.0], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [3.0, 4.0], rtol=1e-10)
 
 
 def test_load_csv_quoted_semicolon_with_preamble(tmp_path: Path):
@@ -67,3 +70,23 @@ def test_load_csv_utf16_tab(tmp_path: Path):
 
     data = load_csv(csv_path, x_col=0, y_col=1, delimiter="\t", header=0)
     assert np.isclose(data.y[0], 5.5)
+
+
+def test_load_csv_comment_preamble_autodetect(tmp_path: Path):
+    """Test automatic detection of # comment preamble lines."""
+    csv_path = tmp_path / "preamble.csv"
+    csv_path.write_text("# comment1\n# comment2\ntime,stress\n1.0,100\n2.0,200\n")
+    data = load_csv(str(csv_path), x_col="time", y_col="stress")
+    assert len(data.x) == 2
+    np.testing.assert_allclose(data.x, [1.0, 2.0], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [100.0, 200.0], rtol=1e-10)
+
+
+def test_load_csv_semicolon_values(tmp_path: Path):
+    """Test that column values are correctly extracted after delimiter detection."""
+    csv_path = tmp_path / "simple.csv"
+    _write(csv_path, "time,stress\n1.0,3.0\n2.0,4.0\n")
+
+    data = load_csv(csv_path, x_col="time", y_col="stress")
+    np.testing.assert_allclose(data.x, [1.0, 2.0], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [3.0, 4.0], rtol=1e-10)

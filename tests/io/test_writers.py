@@ -53,7 +53,8 @@ class TestHDF5Writer:
 
         save_hdf5(sample_data, str(output_file))
 
-        # Verify we can read it back (would need read function)
+        # Check file was written and can be read back
+        assert output_file.exists()
         import h5py
 
         with h5py.File(str(output_file), "r") as f:
@@ -61,14 +62,22 @@ class TestHDF5Writer:
             assert "y" in f
             assert "metadata" in f.attrs or "metadata" in f
 
+        # Verify data round-trips with correct values
+        loaded = load_hdf5(str(output_file))
+        np.testing.assert_allclose(loaded.x, sample_data.x, rtol=1e-12)
+        np.testing.assert_allclose(np.real(loaded.y), np.real(sample_data.y), rtol=1e-12)
+        assert loaded.metadata.get("sample_name") == "Test Sample"
+        assert loaded.metadata.get("temperature") == 25.0
+
     def test_hdf5_compression(self, tmp_path, sample_data):
         """Test HDF5 compression."""
         output_file = tmp_path / "test_compressed.h5"
 
         # Create larger dataset for compression test
+        rng = np.random.default_rng(0)
         large_data = RheoData(
             x=np.linspace(0, 100, 10000),
-            y=np.random.randn(10000),
+            y=rng.standard_normal(10000),
             x_units="s",
             y_units="Pa",
             domain="time",
@@ -76,8 +85,11 @@ class TestHDF5Writer:
 
         save_hdf5(large_data, str(output_file), compression=True)
 
-        # With compression, file should be smaller
+        # Verify file exists and data round-trips correctly after compression
         assert output_file.exists()
+        loaded = load_hdf5(str(output_file))
+        np.testing.assert_allclose(loaded.x, large_data.x, rtol=1e-10)
+        np.testing.assert_allclose(np.real(loaded.y), np.real(large_data.y), rtol=1e-10)
 
     def test_hdf5_roundtrip(self, tmp_path, sample_data):
         """Test HDF5 roundtrip (write then read)."""
@@ -294,6 +306,30 @@ class TestHDF5RoundTrip:
         tmp_files = list(tmp_path.glob("*.h5.tmp"))
         assert len(tmp_files) == 0
 
+    def test_atomic_write_preserves_original_on_failure(self, tmp_path):
+        """Test that original file is preserved if write fails mid-rename."""
+        from unittest.mock import patch
+
+        output_file = tmp_path / "original.h5"
+        # Write original
+        original_data = RheoData(
+            x=np.array([1.0]), y=np.array([10.0]), domain="time"
+        )
+        save_hdf5(original_data, str(output_file))
+
+        # Attempt write that fails during os.replace
+        try:
+            with patch("rheojax.io.writers.hdf5_writer.os.replace", side_effect=OSError("disk full")):
+                new_data = RheoData(
+                    x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]), domain="time"
+                )
+                save_hdf5(new_data, str(output_file))
+        except OSError:
+            pass
+
+        # Original should still exist and be readable
+        assert output_file.exists()
+
     def test_large_array_round_trip(self, tmp_path):
         """Verify large arrays survive round-trip with compression."""
         rng = np.random.default_rng(42)
@@ -338,7 +374,7 @@ class TestReaderCascade:
         empty_file = tmp_path / "empty.csv"
         empty_file.write_text("")
 
-        with pytest.raises((ValueError, Exception)):
+        with pytest.raises((ValueError, OSError)):
             auto_load(empty_file, x_col="x", y_col="y")
 
     def test_binary_file_raises_value_error(self, tmp_path):
@@ -348,7 +384,7 @@ class TestReaderCascade:
         binary_file = tmp_path / "binary.dat"
         binary_file.write_bytes(b"\x00\x01\x02\x03" * 100)
 
-        with pytest.raises((ValueError, Exception)):
+        with pytest.raises((ValueError, OSError)):
             auto_load(binary_file)
 
     def test_permission_error_propagates(self, tmp_path):

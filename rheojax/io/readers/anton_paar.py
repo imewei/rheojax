@@ -246,7 +246,7 @@ def _detect_encoding(filepath: Path) -> str:
 def _detect_encoding_cached(filepath_str: str) -> str:
     """Detect encoding with mtime-aware caching.
 
-    Re-runs detection when the file modification time changes so that a
+    Re-runs detection when the file modification time or size changes so that a
     file overwritten in the same process does not receive stale results.
 
     Args:
@@ -255,17 +255,20 @@ def _detect_encoding_cached(filepath_str: str) -> str:
     Returns:
         Detected encoding string
     """
-    mtime = Path(filepath_str).stat().st_mtime
-    return _detect_encoding_impl(filepath_str, mtime)
+    stat = Path(filepath_str).stat()
+    mtime = stat.st_mtime
+    file_size = stat.st_size
+    return _detect_encoding_impl(filepath_str, mtime, file_size)
 
 
 @lru_cache(maxsize=128)
-def _detect_encoding_impl(filepath_str: str, mtime: float) -> str:
-    """Cached implementation keyed on path + modification time.
+def _detect_encoding_impl(filepath_str: str, mtime: float, file_size: int) -> str:
+    """Cached implementation keyed on path + modification time + file size.
 
     Args:
         filepath_str: File path as string
         mtime: File modification time (invalidates cache on file change)
+        file_size: File size in bytes (additional cache invalidation key)
 
     Returns:
         Detected encoding string
@@ -294,9 +297,22 @@ def _detect_decimal_separator(text_sample: str) -> str:
     dot_pattern = re.findall(r"\d\.\d", text_sample)
     comma_pattern = re.findall(r"\d,\d", text_sample)
 
-    if len(comma_pattern) > len(dot_pattern) * 2:
-        return ","
-    return "."
+    dot_count = len(dot_pattern)
+    comma_count = len(comma_pattern)
+
+    if comma_count > dot_count * 2:
+        decimal_sep = ","
+    else:
+        decimal_sep = "."
+
+    if decimal_sep == "," and abs(comma_count - dot_count) < 5:
+        warnings.warn(
+            f"Decimal separator detection is uncertain (commas={comma_count}, dots={dot_count}). "
+            f"Assuming '{decimal_sep}'. Pass decimal_sep= explicitly if incorrect.",
+            stacklevel=3,
+        )
+
+    return decimal_sep
 
 
 # =============================================================================
@@ -480,7 +496,16 @@ def _parse_single_interval(
             p = p.strip()
             if not p:
                 continue
-            # Normalize decimal separator
+            # IO-R6-001: Normalize decimal separator safely.
+            # Try parsing as-is first (handles both "0.5" and "1000.5").
+            # Only apply EU normalization (remove thousands dots, convert comma)
+            # if direct parsing fails.
+            try:
+                row_values.append(float(p))
+            except ValueError:
+                pass
+            else:
+                continue
             if decimal_sep == ",":
                 p = p.replace(".", "").replace(",", ".")
             try:
@@ -493,6 +518,15 @@ def _parse_single_interval(
             data_rows.append(row_values)
         elif row_values and len(row_values) > 0:
             # Partial row - pad with NaN
+            n_missing = len(column_headers) - len(row_values)
+            logger.warning(
+                "Partial row padded with NaN",
+                interval=interval_idx,
+                row_index=len(data_rows),
+                expected_cols=len(column_headers),
+                actual_cols=len(row_values),
+                n_padded=n_missing,
+            )
             while len(row_values) < len(column_headers):
                 row_values.append(float("nan"))
             data_rows.append(row_values)
@@ -632,6 +666,10 @@ def parse_rheocompass_intervals(
         n_skipped=n_skipped,
     )
 
+    global_metadata["skipped_intervals"] = [(idx, reason) for idx, reason in skipped_intervals]
+    global_metadata["n_intervals_total"] = n_total
+    global_metadata["n_intervals_skipped"] = n_skipped
+
     return global_metadata, blocks
 
 
@@ -743,7 +781,7 @@ def _compute_compliance(df: pd.DataFrame) -> pd.DataFrame:
         stress = df["shear_stress"].values
         # Avoid division by zero
         with np.errstate(divide="ignore", invalid="ignore"):
-            compliance = np.where(stress != 0, strain / stress, 0.0)
+            compliance = np.where(stress != 0, strain / stress, np.nan)
         df = df.copy()
         df["compliance"] = compliance
         logger.debug("Computed compliance J(t) = strain/stress")
@@ -766,9 +804,11 @@ def _compute_relaxation_modulus(df: pd.DataFrame) -> pd.DataFrame:
     if "shear_stress" in df.columns and "shear_strain" in df.columns:
         stress = df["shear_stress"].values
         strain = df["shear_strain"].values
-        # Avoid division by zero
+        # Avoid division by zero — use NaN (not 0.0) at t=0 where strain is zero.
+        # IO-R6-009: 0.0 fabricates a physically nonsensical G(t)=0 that biases
+        # downstream NLSQ/Bayesian fits. NaN correctly signals "undefined".
         with np.errstate(divide="ignore", invalid="ignore"):
-            modulus = np.where(strain != 0, stress / strain, 0.0)
+            modulus = np.where(strain != 0, stress / strain, np.nan)
         df = df.copy()
         df["relaxation_modulus"] = modulus
         logger.debug("Computed relaxation modulus G(t) = stress/strain")
@@ -1522,8 +1562,9 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
         )
 
         # Add temperature if available
+        # IO-R6-002: Use `is not None` to avoid swallowing temperature=0.0
         temp = rheo_data.metadata.get("temperature")
-        if temp:
+        if temp is not None:
             rows.append(
                 {
                     "Property": f"Interval {interval_idx} - Temperature",

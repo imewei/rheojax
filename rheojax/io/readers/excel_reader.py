@@ -169,11 +169,13 @@ def load_excel(
         df = pd.read_excel(
             filepath, sheet_name=sheet, header=header, usecols=usecols, **kwargs
         )
+    except (ImportError, KeyError):
+        raise
     except Exception as e:
         logger.error(
             "Failed to parse Excel file", filepath=str(filepath), exc_info=True
         )
-        raise ValueError(f"Failed to parse Excel file: {e}") from e
+        raise ValueError(f"Error reading Excel columns: {e}") from e
 
     logger.debug("Excel file read successfully", n_rows=len(df), n_cols=len(df.columns))
 
@@ -223,6 +225,13 @@ def load_excel(
         )
     else:
         valid_idx = np.flatnonzero(~(np.isnan(x_data) | np.isnan(y_data)))
+    n_dropped = len(x_data) - len(valid_idx)
+    if n_dropped > 0:
+        logger.warning(
+            "Dropped NaN rows during loading",
+            n_dropped=n_dropped,
+            n_total=len(x_data),
+        )
     x_data = np.take(x_data, valid_idx)
     y_data = np.take(y_data, valid_idx)
 

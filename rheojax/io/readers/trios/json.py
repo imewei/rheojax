@@ -209,7 +209,7 @@ def load_trios_json(
     return_all_segments: bool = False,
     test_mode: str | None = None,
     result_index: int = 0,
-    validate_schema: bool = True,
+    validate_json_schema: bool = True,
     validate: bool = True,
 ) -> RheoData | list[RheoData]:
     """Load TRIOS JSON export file.
@@ -222,7 +222,7 @@ def load_trios_json(
         return_all_segments: Return list for multi-step files
         test_mode: Override auto-detection ("creep", "relaxation", "oscillation", "rotation")
         result_index: Result set index to load (default: 0, or -1 for all)
-        validate_schema: Validate against TRIOS schema (default: True)
+        validate_json_schema: Validate against TRIOS schema (default: True)
         validate: Validate RheoData on creation
 
     Returns:
@@ -245,7 +245,7 @@ def load_trios_json(
     logger.info("Loading TRIOS JSON file", filepath=str(filepath))
 
     # Parse JSON file
-    experiment, base_metadata = parse_trios_json(filepath, validate=validate_schema)
+    experiment, base_metadata = parse_trios_json(filepath, validate=validate_json_schema)
 
     if experiment.n_results == 0:
         logger.error("No results found in file", filepath=str(filepath))
@@ -336,7 +336,13 @@ def load_trios_json(
             )
 
             # Extract data
-            x_data = seg_df[x_col].values.astype(float)
+            try:
+                x_data = seg_df[x_col].values.astype(float)
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Column '{x_col}' contains non-numeric data that cannot be converted to float. "
+                    f"Sample values: {seg_df[x_col].head(3).tolist()}"
+                ) from e
 
             # Get units
             x_units = units.get(x_col, "")
@@ -344,8 +350,20 @@ def load_trios_json(
 
             # Handle complex modulus case
             if y2_col is not None:
-                y_real = seg_df[y_col].values.astype(float)
-                y_imag = seg_df[y2_col].values.astype(float)
+                try:
+                    y_real = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
+                try:
+                    y_imag = seg_df[y2_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y2_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y2_col].head(3).tolist()}"
+                    ) from e
 
                 # Convert units if needed
                 y_units_orig = units.get(y_col, "Pa")
@@ -358,7 +376,13 @@ def load_trios_json(
                 y_units = "Pa"
                 is_complex = True
             else:
-                y_data = seg_df[y_col].values.astype(float)
+                try:
+                    y_data = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
                 is_complex = False
 
             # Convert x units (e.g., Hz to rad/s)

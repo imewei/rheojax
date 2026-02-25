@@ -172,6 +172,19 @@ def load_csv(
         if len(cols_needed) == (1 + (1 if y_col is not None else len(y_cols or []))):
             usecols = cols_needed
 
+    # Auto-detect comment preamble: if file starts with '#' lines and user
+    # hasn't explicitly set a comment character, pass comment='#' to pandas.
+    comment_char = kwargs.pop("comment", None)
+    if comment_char is None and header == 0:
+        try:
+            with open(filepath, encoding=default_encoding, errors="replace") as _f:
+                first_line = _f.readline()
+            if first_line.startswith("#"):
+                comment_char = "#"
+                logger.debug("Auto-detected '#' comment preamble")
+        except Exception:
+            pass  # If we can't peek, proceed without comment detection
+
     # Read CSV file with tolerant encoding/dialect handling.
     # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
     # so that silent corruption is caught and logged before falling back.
@@ -182,6 +195,7 @@ def load_csv(
         encoding_errors="replace",
         engine="python",
         usecols=usecols,
+        comment=comment_char,
         **kwargs,
     )
     tried_utf16 = False
@@ -243,12 +257,28 @@ def load_csv(
                 )
                 raise ValueError(f"Failed to parse CSV file: {e}") from e
 
-        # Check for encoding replacement artifacts even after a "successful" read
-        if df.apply(lambda col: col.astype(str).str.contains("\ufffd", na=False)).any().any():
+        # VIS-CSV-001: Check for encoding replacement artifacts without
+        # materialising .astype(str) twice per column. Cache col_str and reuse
+        # it for both the detection pass and the numeric-corruption check.
+        affected_cols: list[str] = []
+        for col in df.columns:
+            col_str = df[col].astype(str)  # single materialisation per column
+            if col_str.str.contains("\ufffd", na=False).any():
+                affected_cols.append(col)
+                # Reuse col_str — no second astype(str) needed
+                sample = col_str.str.replace("\ufffd", "", regex=False)
+                if sample.str.match(r"^[\d.eE+\-,\s]*\d[\d.eE+\-,\s]*$", na=False).any():
+                    raise ValueError(
+                        f"Encoding corruption detected in numeric column '{col}'. "
+                        f"The file may need to be re-exported with UTF-8 encoding. "
+                        f"Affected file: {filepath}"
+                    )
+        if affected_cols:
             logger.warning(
-                "Encoding replacement characters (\ufffd) detected in CSV file — "
+                "Encoding replacement characters (\\ufffd) detected in CSV file — "
                 "some values may be corrupted",
                 filepath=str(filepath),
+                affected_columns=affected_cols,
             )
 
         io_ctx["rows"] = len(df)
@@ -303,6 +333,13 @@ def load_csv(
         )
     else:
         valid_idx = np.flatnonzero(~(np.isnan(x_data) | np.isnan(y_data)))
+    n_dropped = len(x_data) - len(valid_idx)
+    if n_dropped > 0:
+        logger.warning(
+            "Dropped NaN rows during loading",
+            n_dropped=n_dropped,
+            n_total=len(x_data),
+        )
     x_data = np.take(x_data, valid_idx)
     y_data = np.take(y_data, valid_idx)
 
@@ -463,7 +500,20 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
             # EU decimal only: 1,56 → 1.56
             str_arr = np.char.replace(str_arr, ",", ".")
         arr = str_arr
-    return arr.astype(float)
+    try:
+        result = arr.astype(float)
+    except (ValueError, TypeError):
+        result = pd.to_numeric(pd.Series(arr.ravel()), errors="coerce").values.astype(float)
+    nan_ratio = np.isnan(result).sum() / max(len(result), 1)
+    if nan_ratio > 0.5:
+        logger.warning(
+            "More than 50%% of values could not be converted to float — "
+            "decimal separator detection may be incorrect. "
+            "Consider specifying the decimal separator explicitly.",
+            nan_ratio=f"{nan_ratio:.1%}",
+            n_total=len(result),
+        )
+    return result
 
 
 def _detect_delimiter(filepath: Path) -> str:
@@ -477,7 +527,7 @@ def _detect_delimiter(filepath: Path) -> str:
                     sample, delimiters=[",", "\t", ";", "|", " "]  # type: ignore[arg-type]
                 )
                 return dialect.delimiter
-            except Exception:
+            except csv.Error:
                 pass
     except FileNotFoundError:
         raise

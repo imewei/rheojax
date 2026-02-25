@@ -70,6 +70,34 @@ logger = get_logger(__name__)
 # Auto-chunking threshold (5 MB)
 AUTO_CHUNK_THRESHOLD_MB = 5.0
 
+# VIS-TXT-001: Encoding helpers for TRIOS TXT files.
+# EU-locale TA Instruments instruments (DE, FR, NL) export Latin-1/CP-1252.
+_TXT_ENCODING_CASCADE = ("utf-8-sig", "utf-8", "latin-1")
+
+
+def _detect_txt_encoding(filepath: Path) -> str:
+    """Probe the first 4096 bytes to select the best encoding for a TXT file."""
+    raw = filepath.read_bytes()[:4096]
+    for enc in _TXT_ENCODING_CASCADE:
+        try:
+            raw.decode(enc)
+            return enc
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return "latin-1"  # guaranteed fallback (never raises on 8-bit data)
+
+
+def _read_file_with_encoding_cascade(filepath: Path) -> str:
+    """Read entire TXT file using the best detected encoding."""
+    encoding = _detect_txt_encoding(filepath)
+    logger.debug("Detected TXT encoding", filepath=str(filepath), encoding=encoding)
+    try:
+        return filepath.read_text(encoding=encoding)
+    except UnicodeDecodeError:
+        # Final fallback: latin-1 never raises on 8-bit data
+        return filepath.read_text(encoding="latin-1", errors="replace")
+
+
 # Unit conversion factors
 UNIT_CONVERSIONS = {
     "MPa": ("Pa", 1e6),
@@ -308,9 +336,11 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                 raise ValueError("No data chunks returned from chunked reader")
 
     # Read file contents
+    # VIS-TXT-001: Use encoding cascade (UTF-8-sig → UTF-8 → Latin-1) to
+    # handle EU-locale TA Instruments TXT exports that use Latin-1/CP-1252.
+    # Hardcoded UTF-8 with errors="replace" silently corrupts non-UTF-8 bytes.
     logger.debug("Reading file in full mode", filepath=str(filepath))
-    with open(filepath, encoding="utf-8", errors="replace") as f:
-        content = f.read()
+    content = _read_file_with_encoding_cascade(filepath)
 
     # Split into lines
     lines = content.split("\n")
@@ -458,8 +488,10 @@ def load_trios_chunked(
     validate_data = kwargs.get("validate_data", True)
 
     # First pass: extract metadata and locate segments without loading all data
+    # VIS-TXT-001: Use encoding cascade for the chunked path as well.
     logger.debug("First pass: scanning for segments", filepath=str(filepath))
-    with open(filepath, encoding="utf-8", errors="replace") as f:
+    detected_encoding = _detect_txt_encoding(filepath)
+    with open(filepath, encoding=detected_encoding, errors="replace") as f:
         # Read only header portion for metadata (first 100 lines typically sufficient)
         header_lines = []
         for i, line in enumerate(f):
@@ -785,6 +817,7 @@ def _create_rheodata_chunk(
         x_units=x_units,
         y_units=y_units,
         domain=domain,
+        initial_test_mode=metadata.get("test_mode"),
         metadata=metadata.copy(),
         validate=validate,
     )
@@ -1275,8 +1308,10 @@ def _parse_segment(
         return None
 
     header_line = segment_lines[header_offset].strip()
+    # Use rstrip only — the leading tab on the unit row is meaningful
+    # (column 0 is the row label with no unit).
     unit_line = (
-        segment_lines[header_offset + 1].strip()
+        segment_lines[header_offset + 1].rstrip()
         if header_offset + 1 < len(segment_lines)
         else ""
     )
@@ -1405,6 +1440,7 @@ def _parse_segment(
         x_units=x_units,
         y_units=y_units,
         domain=domain,
+        initial_test_mode=test_mode,
         metadata=segment_metadata,
         validate=True,
     )

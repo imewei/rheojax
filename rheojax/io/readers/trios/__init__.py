@@ -201,7 +201,8 @@ def load_trios(
             return_all_segments=return_all_segments,
             test_mode=test_mode,
             result_index=result_index,
-            validate_schema=validate_schema,
+            # IO-R6-003: Parameter name is validate_json_schema (not validate_schema)
+            validate_json_schema=validate_schema,
             validate=validate,
             **kwargs,
         )

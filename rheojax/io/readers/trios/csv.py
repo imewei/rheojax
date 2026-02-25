@@ -80,13 +80,7 @@ def detect_encoding(filepath: Path) -> str:
         filepath=str(filepath),
         tried_encodings=ENCODING_CASCADE,
     )
-    raise UnicodeDecodeError(
-        "utf-8",
-        b"",
-        0,
-        1,
-        f"Could not decode file with any of: {ENCODING_CASCADE}",
-    )
+    raise ValueError(f"Could not decode {filepath} with any of the attempted encodings")
 
 
 def detect_delimiter(content: str) -> str:
@@ -424,7 +418,11 @@ def parse_trios_csv(
     if data_start < len(lines):
         next_line = lines[data_start]
         parts = next_line.split(delimiter)
-        # Unit row typically has no leading label and contains unit strings
+        # VIS-CSV2-001: Strengthen unit-row detection to require positive
+        # evidence (at least one cell looks like a unit string) in addition to
+        # the negative check (not numeric). This prevents non-numeric, non-
+        # "data" text values (e.g., "N/A", "undefined", "--") from being
+        # falsely consumed as unit rows, which silently drops the first data row.
         if parts and not parts[0].strip().lower().startswith("data"):
             # Check if it looks like units (not numeric values)
             is_unit_row = True
@@ -432,6 +430,21 @@ def parse_trios_csv(
                 if p.strip() and _is_numeric(p.strip()):
                     is_unit_row = False
                     break
+            # Require positive evidence: at least one cell contains a known
+            # unit substring. This rules out annotation/label rows.
+            if is_unit_row:
+                _UNIT_SUBSTRINGS = {
+                    "Pa", "Hz", "rad", "°C", "°F", "K", "/s", "%",
+                    "1/", "mN", "mPa", "kPa", "MPa", "N·m", "N.m",
+                    "J/", "W/", "m²", "m2", "mm", "μm", "nm",
+                }
+                non_empty_parts = [p.strip() for p in parts[:6] if p.strip()]
+                has_unit_evidence = any(
+                    any(u in p for u in _UNIT_SUBSTRINGS)
+                    for p in non_empty_parts
+                )
+                if not has_unit_evidence:
+                    is_unit_row = False
             if is_unit_row:
                 unit_row = parts
                 data_start += 1
@@ -458,14 +471,25 @@ def parse_trios_csv(
         }
 
     # Parse data rows
+    # IO-R6-006: Previously, both empty lines AND `[`-prefixed lines terminated
+    # parsing. Fix: empty lines → continue (skip blank separators between step
+    # sections); `[`-prefixed lines still break (end of current table).
     data_rows = []
+    expected_cols = len(header) + col_offset
+    skipped_rows = 0
     for i in range(data_start, len(lines)):
         line = lines[i].strip()
-        if not line or line.startswith("["):
+        if line.startswith("["):
+            # Section header — end of this table's data
             break
+        if not line:
+            # IO-R6-007: Skip blank separator lines within multi-step data
+            # blocks.  TRIOS multi-step CSV exports commonly have blank lines
+            # between step sections.  Breaking here would silently truncate data.
+            continue
 
         parts = line.split(delimiter)
-        if len(parts) == len(header) + col_offset:
+        if len(parts) == expected_cols:
             row = []
             for j, val in enumerate(parts):
                 if j < col_offset:
@@ -483,6 +507,14 @@ def parse_trios_csv(
                         row.append(np.nan)
             if row:
                 data_rows.append(row)
+        else:
+            skipped_rows += 1
+
+    if skipped_rows > 0:
+        warnings.warn(
+            f"Skipped {skipped_rows} malformed rows (expected {expected_cols} columns) in {filepath}",
+            stacklevel=3,
+        )
 
     if not data_rows:
         logger.error("No data rows found", filepath=str(filepath))
@@ -491,7 +523,22 @@ def parse_trios_csv(
     logger.debug("Data rows parsed", num_rows=len(data_rows))
 
     # Create DataFrame
-    df = pd.DataFrame(data_rows, columns=header[: len(data_rows[0])])
+    # IO-R6-007: Warn if header is wider than data rows (instead of silent truncation).
+    # Pad short rows with NaN to preserve all columns.
+    n_data_cols = len(data_rows[0]) if data_rows else 0
+    n_header_cols = len(header)
+    if n_data_cols < n_header_cols:
+        logger.warning(
+            "Data rows narrower than header — padding with NaN",
+            header_cols=n_header_cols,
+            data_cols=n_data_cols,
+            dropped_headers=header[n_data_cols:],
+        )
+        for row in data_rows:
+            row.extend([np.nan] * (n_header_cols - len(row)))
+    elif n_data_cols > n_header_cols:
+        header = header + [f"col_{i}" for i in range(n_header_cols, n_data_cols)]
+    df = pd.DataFrame(data_rows, columns=header[:max(n_data_cols, n_header_cols)])
     logger.debug("DataFrame created", shape=df.shape, columns=list(df.columns))
 
     # Detect step column
@@ -637,7 +684,13 @@ def load_trios_csv(
             )
 
             # Extract data
-            x_data = seg_df[x_col].values.astype(float)
+            try:
+                x_data = seg_df[x_col].values.astype(float)
+            except (ValueError, TypeError) as e:
+                raise ValueError(
+                    f"Column '{x_col}' contains non-numeric data that cannot be converted to float. "
+                    f"Sample values: {seg_df[x_col].head(3).tolist()}"
+                ) from e
 
             # Get units
             x_units = units.get(x_col, "")
@@ -645,8 +698,20 @@ def load_trios_csv(
 
             # Handle complex modulus case
             if y2_col is not None:
-                y_real = seg_df[y_col].values.astype(float)
-                y_imag = seg_df[y2_col].values.astype(float)
+                try:
+                    y_real = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
+                try:
+                    y_imag = seg_df[y2_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y2_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y2_col].head(3).tolist()}"
+                    ) from e
 
                 # Convert units if needed
                 y_units_orig = units.get(y_col, "Pa")
@@ -659,7 +724,13 @@ def load_trios_csv(
                 y_units = "Pa"
                 is_complex = True
             else:
-                y_data = seg_df[y_col].values.astype(float)
+                try:
+                    y_data = seg_df[y_col].values.astype(float)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Column '{y_col}' contains non-numeric data that cannot be converted to float. "
+                        f"Sample values: {seg_df[y_col].head(3).tolist()}"
+                    ) from e
                 is_complex = False
 
             # Convert x units (e.g., Hz to rad/s)

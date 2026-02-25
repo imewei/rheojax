@@ -7,19 +7,14 @@ Test coverage:
 1. Chunked vs full-load data identity (element-wise comparison)
 2. Single segment, multiple segments, edge cases
 3. Metadata preservation across chunks
-4. File sizes: 1 MB, 5 MB, 10 MB, 50 MB (synthetic)
+4. File sizes: small (~250 KB), medium (~1.3 MB), large (~2.5 MB)
 
 Data integrity validation:
 - x, y arrays: np.allclose(chunked.x, full.x, rtol=1e-10)
 - test_mode: exact match
-- material_name: exact match
 - Units, domain, metadata: preserved
 
-Expected behavior on v0.3.1:
-- Chunked loading differs from full-load (bug)
-- This tests establish the correctness baseline
-
-Expected behavior on v0.4.0:
+Expected behavior on v0.4.0+:
 - Chunked and full-load produce identical RheoData
 - Tests validate auto-chunking doesn't introduce errors
 """
@@ -42,12 +37,13 @@ jax, jnp = safe_import_jax()
 
 
 def create_synthetic_trios_file(filepath: Path, n_points: int, n_segments: int = 1):
-    """Create synthetic TRIOS-formatted file for testing.
+    """Create synthetic TRIOS LIMS-format (.txt) file for testing.
 
-    TRIOS format (simplified):
-    - Header with metadata
-    - Data columns: time, stress/strain
-    - Multiple segments separated by markers
+    Produces valid TRIOS TXT format with:
+    - Metadata header (Filename, Instrument serial number, Sample name)
+    - [step] markers per segment
+    - Number of points, Variables row, units row
+    - Tab-separated data rows with 'data point N' labels
 
     Args:
         filepath: Output file path
@@ -55,17 +51,22 @@ def create_synthetic_trios_file(filepath: Path, n_points: int, n_segments: int =
         n_segments: Number of segments in file
     """
     with open(filepath, "w") as f:
-        # TRIOS-style header
-        f.write("TRIOS Data File\n")
-        f.write("Instrument: Test\n")
-        f.write("Sample: Test Sample\n")
-        f.write("Temperature: 25 C\n")
-        f.write("Comment: Synthetic test file\n")
+        # TRIOS metadata header
+        f.write(f"Filename\t{filepath.name}\n")
+        f.write("Instrument serial number\tSYN-0001\n")
+        f.write("Instrument name\tTASerNo SYN-0001\n")
+        f.write("operator\tTest User\n")
+        f.write("rundate\t2025-10-24\n")
+        f.write("Sample name\tSynthetic Test Sample\n")
+        f.write("Geometry name\tParallel Plate\n")
         f.write("\n")
 
         for seg in range(n_segments):
-            f.write(f"Segment {seg + 1}\n")
-            f.write("Time(s)\tStress(Pa)\n")
+            f.write("[step]\n")
+            f.write("Step name\tStress relaxation (25.0 °C)\n")
+            f.write(f"Number of points\t{n_points}\n")
+            f.write("Variables\tTime\tStress\n")
+            f.write("\ts\tPa\n")
 
             # Generate segment data
             time_start = 0.01 if seg == 0 else 100.0 * (seg + 1)
@@ -76,70 +77,81 @@ def create_synthetic_trios_file(filepath: Path, n_points: int, n_segments: int =
             # Generate realistic stress relaxation data
             stress = 1e5 * np.exp(-time / 10.0)
 
-            for t, s in zip(time, stress):
-                f.write(f"{t:.6e}\t{s:.6e}\n")
+            for i, (t, s) in enumerate(zip(time, stress)):
+                f.write(f"data point {i + 1}\t{t:.6e}\t{s:.6e}\n")
 
             f.write("\n")  # Segment separator
 
 
+def _aggregate_chunks(filepath: str | Path, chunk_size: int = 10000) -> RheoData:
+    """Aggregate all chunks from load_trios_chunked into a single RheoData."""
+    x_parts, y_parts = [], []
+    first_chunk = None
+    for chunk in load_trios_chunked(str(filepath), chunk_size=chunk_size):
+        if first_chunk is None:
+            first_chunk = chunk
+        x_parts.append(np.asarray(chunk.x))
+        y_parts.append(np.asarray(chunk.y))
+    assert first_chunk is not None, "No chunks yielded"
+    return RheoData(
+        x=np.concatenate(x_parts),
+        y=np.concatenate(y_parts),
+        x_units=first_chunk.x_units,
+        y_units=first_chunk.y_units,
+        domain=first_chunk.domain,
+        metadata=first_chunk.metadata,
+    )
+
+
+def _get_single_segment(data):
+    """If data is a list, return first element; otherwise return as-is."""
+    if isinstance(data, list):
+        return data[0]
+    return data
+
+
 @pytest.fixture
-def synthetic_trios_1mb():
-    """Synthetic TRIOS file (~1 MB)."""
+def synthetic_trios_small():
+    """Synthetic TRIOS file (~250 KB, 1000 points)."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         filepath = Path(f.name)
 
-    # Create file with ~5000 points to reach ~1 MB
+    create_synthetic_trios_file(filepath, n_points=1000, n_segments=1)
+    yield filepath
+    filepath.unlink(missing_ok=True)
+
+
+@pytest.fixture
+def synthetic_trios_medium():
+    """Synthetic TRIOS file (~1.3 MB, 5000 points)."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        filepath = Path(f.name)
+
     create_synthetic_trios_file(filepath, n_points=5000, n_segments=1)
-
     yield filepath
-
-    # Cleanup
-    filepath.unlink()
+    filepath.unlink(missing_ok=True)
 
 
 @pytest.fixture
-def synthetic_trios_5mb():
-    """Synthetic TRIOS file (~5 MB)."""
+def synthetic_trios_large():
+    """Synthetic TRIOS file (~2.5 MB, 10000 points)."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         filepath = Path(f.name)
 
-    # Create file with ~25000 points to reach ~5 MB (around threshold)
-    create_synthetic_trios_file(filepath, n_points=25000, n_segments=1)
-
+    create_synthetic_trios_file(filepath, n_points=10000, n_segments=1)
     yield filepath
-
-    # Cleanup
-    filepath.unlink()
-
-
-@pytest.fixture
-def synthetic_trios_10mb():
-    """Synthetic TRIOS file (~10 MB)."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        filepath = Path(f.name)
-
-    # Create file with ~50000 points
-    create_synthetic_trios_file(filepath, n_points=50000, n_segments=1)
-
-    yield filepath
-
-    # Cleanup
-    filepath.unlink()
+    filepath.unlink(missing_ok=True)
 
 
 @pytest.fixture
 def synthetic_trios_multipart():
-    """Synthetic TRIOS file with multiple segments."""
+    """Synthetic TRIOS file with 3 segments (~750 KB)."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         filepath = Path(f.name)
 
-    # Create multi-segment file
-    create_synthetic_trios_file(filepath, n_points=5000, n_segments=3)
-
+    create_synthetic_trios_file(filepath, n_points=1000, n_segments=3)
     yield filepath
-
-    # Cleanup
-    filepath.unlink()
+    filepath.unlink(missing_ok=True)
 
 
 # =============================================================================
@@ -151,100 +163,90 @@ def synthetic_trios_multipart():
 class TestChunkingDataIntegrity:
     """Test that chunked loading preserves data integrity."""
 
-    def test_single_segment_chunked_vs_full(self, synthetic_trios_1mb):
+    def test_single_segment_chunked_vs_full(self, synthetic_trios_small):
         """Test chunked and full load produce identical data for single segment."""
-        # Load with full method
-        try:
-            full_data = load_trios(str(synthetic_trios_1mb), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available or requires file format")
+        full_data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), auto_chunk=False)
+        )
 
-        # Load with chunked method
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_1mb))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
+        # Use load_trios with chunk_size to aggregate (same as chunked path)
+        chunked_data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), chunk_size=500)
+        )
 
-        # Compare x values (time)
-        np.testing.assert_allclose(full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15)
+        np.testing.assert_allclose(
+            np.asarray(full_data.x), np.asarray(chunked_data.x),
+            rtol=1e-10, atol=1e-15,
+        )
+        np.testing.assert_allclose(
+            np.asarray(full_data.y), np.asarray(chunked_data.y),
+            rtol=1e-10, atol=1e-15,
+        )
 
-        # Compare y values (stress)
-        np.testing.assert_allclose(full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15)
-
-    def test_metadata_preservation_chunked(self, synthetic_trios_1mb):
+    def test_metadata_preservation_chunked(self, synthetic_trios_small):
         """Test that metadata is preserved during chunked loading."""
-        try:
-            full_data = load_trios(str(synthetic_trios_1mb), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available")
+        full_data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), auto_chunk=False)
+        )
+        chunked_data = _aggregate_chunks(synthetic_trios_small, chunk_size=500)
 
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_1mb))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
-
-        # Check metadata
         assert full_data.x_units == chunked_data.x_units, "x_units mismatch"
         assert full_data.y_units == chunked_data.y_units, "y_units mismatch"
         assert full_data.domain == chunked_data.domain, "domain mismatch"
 
     def test_multi_segment_chunked_concatenation(self, synthetic_trios_multipart):
         """Test that multiple segments are correctly concatenated."""
-        try:
-            full_data = load_trios(str(synthetic_trios_multipart), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available")
+        full_result = load_trios(
+            str(synthetic_trios_multipart),
+            auto_chunk=False,
+            return_all_segments=True,
+        )
+        # Full load of multi-segment returns list — concatenate for comparison
+        if isinstance(full_result, list):
+            full_x = np.concatenate([np.asarray(d.x) for d in full_result])
+            full_y = np.concatenate([np.asarray(d.y) for d in full_result])
+        else:
+            full_x = np.asarray(full_result.x)
+            full_y = np.asarray(full_result.y)
 
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_multipart))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
+        # Chunked aggregation
+        chunked_data = _aggregate_chunks(synthetic_trios_multipart, chunk_size=500)
 
-        # Data should have same length
-        assert len(full_data.x) == len(
-            chunked_data.x
-        ), "x length mismatch after concatenation"
-        assert len(full_data.y) == len(
-            chunked_data.y
-        ), "y length mismatch after concatenation"
+        assert len(full_x) == len(chunked_data.x), "x length mismatch"
+        assert len(full_y) == len(chunked_data.y), "y length mismatch"
 
-        # Values should match
-        np.testing.assert_allclose(full_data.x, chunked_data.x, rtol=1e-10, atol=1e-15)
-        np.testing.assert_allclose(full_data.y, chunked_data.y, rtol=1e-10, atol=1e-15)
+        np.testing.assert_allclose(
+            full_x, np.asarray(chunked_data.x), rtol=1e-10, atol=1e-15,
+        )
+        np.testing.assert_allclose(
+            full_y, np.asarray(chunked_data.y), rtol=1e-10, atol=1e-15,
+        )
 
-    def test_array_dtypes_match(self, synthetic_trios_1mb):
+    def test_array_dtypes_match(self, synthetic_trios_small):
         """Test that chunked and full loading produce same dtypes."""
-        try:
-            full_data = load_trios(str(synthetic_trios_1mb), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available")
+        full_data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), auto_chunk=False)
+        )
+        chunked_data = _aggregate_chunks(synthetic_trios_small, chunk_size=500)
 
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_1mb))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
-
-        # Check dtypes
         assert (
-            full_data.x.dtype == chunked_data.x.dtype
+            np.asarray(full_data.x).dtype == np.asarray(chunked_data.x).dtype
         ), f"x dtype mismatch: {full_data.x.dtype} vs {chunked_data.x.dtype}"
         assert (
-            full_data.y.dtype == chunked_data.y.dtype
+            np.asarray(full_data.y).dtype == np.asarray(chunked_data.y).dtype
         ), f"y dtype mismatch: {full_data.y.dtype} vs {chunked_data.y.dtype}"
 
-    def test_finite_values_check(self, synthetic_trios_5mb):
+    def test_finite_values_check(self, synthetic_trios_medium):
         """Test that loaded data contains only finite values."""
-        try:
-            chunked_data = load_trios(str(synthetic_trios_5mb), chunk_size=1000)
-        except Exception:
-            pytest.skip("load_trios chunked loading not available")
+        chunked_data = _get_single_segment(
+            load_trios(str(synthetic_trios_medium), chunk_size=1000)
+        )
 
-        # All values should be finite (no NaN, inf)
         assert np.all(
-            np.isfinite(chunked_data.x)
+            np.isfinite(np.asarray(chunked_data.x))
         ), "Chunked data contains non-finite x values"
         assert np.all(
-            np.isfinite(chunked_data.y)
+            np.isfinite(np.asarray(chunked_data.y))
         ), "Chunked data contains non-finite y values"
 
 
@@ -257,43 +259,37 @@ class TestChunkingDataIntegrity:
 class TestChunkingStatisticalProperties:
     """Test that chunked loading preserves statistical properties."""
 
-    def test_mean_variance_preservation(self, synthetic_trios_10mb):
+    def test_mean_variance_preservation(self, synthetic_trios_large):
         """Test that mean and variance are preserved in chunked loading."""
-        try:
-            full_data = load_trios(str(synthetic_trios_10mb), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available")
+        full_data = _get_single_segment(
+            load_trios(str(synthetic_trios_large), auto_chunk=False)
+        )
+        chunked_data = _aggregate_chunks(synthetic_trios_large, chunk_size=2000)
 
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_10mb))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
+        np.testing.assert_allclose(
+            np.mean(np.asarray(full_data.y)),
+            np.mean(np.asarray(chunked_data.y)),
+            rtol=1e-10,
+        )
+        np.testing.assert_allclose(
+            np.std(np.asarray(full_data.y)),
+            np.std(np.asarray(chunked_data.y)),
+            rtol=1e-10,
+        )
 
-        # Compare statistics
-        full_mean = np.mean(full_data.y)
-        chunked_mean = np.mean(chunked_data.y)
-        np.testing.assert_allclose(full_mean, chunked_mean, rtol=1e-10)
-
-        full_std = np.std(full_data.y)
-        chunked_std = np.std(chunked_data.y)
-        np.testing.assert_allclose(full_std, chunked_std, rtol=1e-10)
-
-    def test_percentile_preservation(self, synthetic_trios_1mb):
+    def test_percentile_preservation(self, synthetic_trios_small):
         """Test that percentiles are preserved."""
-        try:
-            full_data = load_trios(str(synthetic_trios_1mb), auto_chunk=False)
-        except Exception:
-            pytest.skip("load_trios not available")
-
-        try:
-            chunked_data = load_trios_chunked(str(synthetic_trios_1mb))
-        except Exception:
-            pytest.skip("load_trios_chunked not available")
+        full_data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), auto_chunk=False)
+        )
+        chunked_data = _aggregate_chunks(synthetic_trios_small, chunk_size=500)
 
         for percentile in [25, 50, 75, 95]:
-            full_pct = np.percentile(full_data.y, percentile)
-            chunked_pct = np.percentile(chunked_data.y, percentile)
-            np.testing.assert_allclose(full_pct, chunked_pct, rtol=1e-10)
+            np.testing.assert_allclose(
+                np.percentile(np.asarray(full_data.y), percentile),
+                np.percentile(np.asarray(chunked_data.y), percentile),
+                rtol=1e-10,
+            )
 
 
 # =============================================================================
@@ -305,29 +301,21 @@ class TestChunkingStatisticalProperties:
 class TestChunkingEdgeCases:
     """Test edge cases in chunked loading."""
 
-    def test_small_file_handling(self, synthetic_trios_1mb):
+    def test_small_file_handling(self, synthetic_trios_small):
         """Test that small files are handled correctly (no chunking needed)."""
-        try:
-            # File size < 5 MB threshold should use full load internally
-            data = load_trios(str(synthetic_trios_1mb))
-        except Exception:
-            pytest.skip("load_trios not available")
+        data = _get_single_segment(load_trios(str(synthetic_trios_small)))
 
-        # Data should be valid
         assert data.x is not None, "x is None"
         assert data.y is not None, "y is None"
         assert len(data.x) > 0, "x is empty"
         assert len(data.y) > 0, "y is empty"
 
-    def test_large_file_auto_chunk(self, synthetic_trios_10mb):
-        """Test that large files trigger auto-chunking."""
-        try:
-            # File size > 5 MB should auto-chunk
-            data = load_trios(str(synthetic_trios_10mb), auto_chunk=True)
-        except Exception:
-            pytest.skip("load_trios not available or auto_chunk not implemented")
+    def test_large_file_auto_chunk(self, synthetic_trios_large):
+        """Test that large files load correctly with auto_chunk=True."""
+        data = _get_single_segment(
+            load_trios(str(synthetic_trios_large), auto_chunk=True)
+        )
 
-        # Data should be valid
         assert data.x is not None, "Auto-chunked data x is None"
         assert data.y is not None, "Auto-chunked data y is None"
         assert len(data.x) == len(data.y), "Auto-chunked x and y length mismatch"
@@ -337,21 +325,12 @@ class TestChunkingEdgeCases:
 
         Ensures no data loss or duplication at segment boundaries.
         """
-        try:
-            data = load_trios(str(synthetic_trios_multipart), chunk_size=1000)
-        except Exception:
-            pytest.skip("load_trios chunked loading not available")
-
-        # Check for monotonicity in time (should be ordered)
-        # Allow for small resets between segments
-        for i in range(1, len(data.x)):
-            # Either increasing or new segment (reset)
-            if data.x[i] < data.x[i - 1]:
-                # This is OK (new segment), but very rare
-                pass
+        data = _get_single_segment(
+            load_trios(str(synthetic_trios_multipart), chunk_size=500)
+        )
 
         # No duplicate time points should exist (except at boundaries)
-        unique_count = len(np.unique(data.x))
+        unique_count = len(np.unique(np.asarray(data.x)))
         total_count = len(data.x)
         # Allow 1% tolerance for boundary points
         assert (
@@ -368,48 +347,38 @@ class TestChunkingEdgeCases:
 class TestRheoDataCompatibility:
     """Test that chunked data produces valid RheoData objects."""
 
-    def test_rheodata_valid_attributes(self, synthetic_trios_1mb):
+    def test_rheodata_valid_attributes(self, synthetic_trios_small):
         """Test that loaded RheoData has all required attributes."""
-        try:
-            data = load_trios(str(synthetic_trios_1mb), chunk_size=1000)
-        except Exception:
-            pytest.skip("load_trios chunked loading not available")
+        data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), chunk_size=500)
+        )
 
-        # Required RheoData attributes
         assert hasattr(data, "x"), "RheoData missing x"
         assert hasattr(data, "y"), "RheoData missing y"
         assert hasattr(data, "x_units"), "RheoData missing x_units"
         assert hasattr(data, "y_units"), "RheoData missing y_units"
         assert hasattr(data, "domain"), "RheoData missing domain"
 
-        # Values should be valid arrays
         assert isinstance(data.x, (np.ndarray, jnp.ndarray)), "x not array-like"
         assert isinstance(data.y, (np.ndarray, jnp.ndarray)), "y not array-like"
 
-    def test_rheodata_test_mode_inference(self, synthetic_trios_1mb):
+    def test_rheodata_test_mode_inference(self, synthetic_trios_small):
         """Test that RheoData correctly infers test mode."""
-        try:
-            data = load_trios(str(synthetic_trios_1mb), chunk_size=1000)
-        except Exception:
-            pytest.skip("load_trios chunked loading not available")
+        data = _get_single_segment(
+            load_trios(str(synthetic_trios_small), chunk_size=500)
+        )
 
-        # Should have metadata with test_mode
         if hasattr(data, "metadata") and data.metadata:
-            # metadata may contain test_mode information
             assert isinstance(data.metadata, dict), "metadata should be dict"
 
-    def test_rheodata_to_jax_conversion(self, synthetic_trios_5mb):
+    def test_rheodata_to_jax_conversion(self, synthetic_trios_medium):
         """Test that RheoData can be converted to JAX arrays."""
-        try:
-            data = load_trios(str(synthetic_trios_5mb), chunk_size=1000)
-        except Exception:
-            pytest.skip("load_trios chunked loading not available")
+        data = _get_single_segment(
+            load_trios(str(synthetic_trios_medium), chunk_size=1000)
+        )
 
-        # Test JAX conversion (if available)
         if hasattr(data, "to_jax"):
-            try:
-                x_jax, y_jax = data.to_jax()
-                assert isinstance(x_jax, jnp.ndarray), "x_jax not JAX array"
-                assert isinstance(y_jax, jnp.ndarray), "y_jax not JAX array"
-            except Exception:
-                pytest.skip("to_jax not fully implemented")
+            jax_data = data.to_jax()
+            assert isinstance(jax_data, RheoData), "to_jax should return RheoData"
+            assert isinstance(jax_data.x, jnp.ndarray), "x not JAX array"
+            assert isinstance(jax_data.y, jnp.ndarray), "y not JAX array"

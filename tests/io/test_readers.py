@@ -96,11 +96,30 @@ data point 2	2.0	200
     @pytest.mark.smoke
     def test_trios_unit_conversion(self):
         """Test TRIOS unit conversion (MPa→Pa, %→unitless)."""
-        # This test would verify unit conversion logic
-        # For now, just check that the function exists
         from rheojax.io.readers.trios import convert_units
 
         assert callable(convert_units)
+
+    def test_trios_unit_conversion_values(self):
+        """Test actual unit conversion values."""
+        from rheojax.io.readers.trios.common import convert_unit
+
+        values = np.array([1.0])
+
+        # MPa -> Pa: factor 1e6
+        result, unit = convert_unit(values, "MPa", "Pa")
+        np.testing.assert_allclose(result, [1e6])
+        assert unit == "Pa"
+
+        # kPa -> Pa: factor 1000
+        result_kpa, unit_kpa = convert_unit(values, "kPa", "Pa")
+        np.testing.assert_allclose(result_kpa, [1000.0])
+        assert unit_kpa == "Pa"
+
+        # Same unit: no conversion applied
+        result_same, unit_same = convert_unit(values, "Pa", "Pa")
+        np.testing.assert_allclose(result_same, [1.0])
+        assert unit_same == "Pa"
 
     @pytest.mark.smoke
     def test_trios_multiple_segments(self, tmp_path):
@@ -127,7 +146,12 @@ data point 2	4.0	400
         data = load_trios(str(test_file))
 
         # Should handle multiple segments
-        assert isinstance(data, (RheoData, list))
+        if isinstance(data, list):
+            assert all(isinstance(d, RheoData) for d in data)
+            assert len(data) >= 1
+        else:
+            assert isinstance(data, RheoData)
+            assert len(data.x) > 0
 
     @pytest.mark.smoke
     def test_trios_error_handling(self, tmp_path):
@@ -136,7 +160,7 @@ data point 2	4.0	400
         test_file = tmp_path / "malformed.txt"
         test_file.write_text(malformed_content)
 
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, OSError, IOError)):
             load_trios(str(test_file))
 
 
@@ -159,8 +183,8 @@ class TestCSVReader:
         assert isinstance(data, RheoData)
         assert len(data.x) == 4
         assert len(data.y) == 4
-        np.testing.assert_array_equal(data.x, [1.0, 2.0, 3.0, 4.0])
-        np.testing.assert_array_equal(data.y, [100.0, 200.0, 300.0, 400.0])
+        np.testing.assert_allclose(data.x, [1.0, 2.0, 3.0, 4.0], rtol=1e-10)
+        np.testing.assert_allclose(data.y, [100.0, 200.0, 300.0, 400.0], rtol=1e-10)
 
     def test_csv_delimiter_detection(self, tmp_path):
         """Test CSV delimiter auto-detection."""
@@ -202,12 +226,22 @@ class TestCSVReader:
         assert data.x_units == "Hz"
         assert data.y_units == "Pa"
 
-
-_openpyxl = pytest.importorskip("openpyxl", reason="openpyxl required for Excel tests")
+    @pytest.mark.smoke
+    def test_csv_y_cols_complex(self, tmp_path):
+        """Test loading CSV with y_cols for complex data."""
+        csv_file = tmp_path / "complex.csv"
+        csv_file.write_text("freq,Gp,Gpp\n1.0,1000,100\n10.0,500,200\n")
+        data = load_csv(str(csv_file), x_col="freq", y_cols=["Gp", "Gpp"])
+        assert np.iscomplexobj(data.y)
+        assert len(data.x) == 2
 
 
 class TestExcelReader:
     """Tests for Excel reader (7.5)."""
+
+    @pytest.fixture(autouse=True)
+    def _require_openpyxl(self):
+        pytest.importorskip("openpyxl", reason="openpyxl required for Excel tests")
 
     def _create_excel(self, filepath, data_dict, sheet_name="Sheet1"):
         """Helper to create an Excel file from a dict of columns."""
@@ -304,6 +338,10 @@ class TestAntonPaarReader:
         assert "loss_modulus" in data.metadata["columns"]
         assert len(data.x) == 2
 
+        # Check actual converted values are finite (kPa -> Pa conversion)
+        if hasattr(data, "y") and data.y is not None:
+            assert np.all(np.isfinite(np.real(data.y)))
+
     def test_anton_paar_frequency_units(self, tmp_path):
         """Hz frequency input is normalized to rad/s."""
 
@@ -392,4 +430,19 @@ data point 1	1.0	100
 
         data = auto_load(tsv_file, x_col="Time", y_col="Creep Compliance")
         assert isinstance(data, RheoData)
-        assert len(data.x) == 2
+        assert len(data.x) == 2  # verify correct number of rows parsed
+
+    def test_auto_load_trios_content_csv_extension(self, tmp_path):
+        """Test auto_load with TRIOS-format data in a .csv file."""
+        trios_file = tmp_path / "data.csv"
+        trios_file.write_text(
+            "Filename\tdata.csv\nInstrument serial number\t4010-1234\n\n"
+            "[step]\nVariables\tTime\tStress\n\ts\tPa\n"
+            "data point 1\t1.0\t100\n"
+        )
+        data = auto_load(str(trios_file))
+        assert isinstance(data, (RheoData, list))
+        if isinstance(data, list):
+            data = data[0]
+        assert len(data.x) >= 1
+        np.testing.assert_allclose(data.x[0], 1.0, rtol=1e-10)

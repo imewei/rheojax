@@ -89,6 +89,24 @@ def _translate_y2_col(kwargs: dict[str, Any]) -> dict[str, Any]:
     return kw
 
 
+def _has_trios_metadata(result: RheoData | list[RheoData]) -> bool:
+    """Check if TRIOS parse result contains TRIOS-specific metadata.
+
+    A plain CSV/Excel file with columns like 'time' and 'stress' can be
+    parsed by the TRIOS reader, but won't have TRIOS-specific metadata
+    (Filename, Instrument serial number, etc.).  This guard prevents
+    auto_load from misclassifying generic files as TRIOS.
+    """
+    targets = result if isinstance(result, list) else [result]
+    trios_keys = {"filename", "instrument_serial_number", "instrument_name",
+                  "sample_name", "geometry", "geometry_type", "operator", "run_date"}
+    for r in targets:
+        md = getattr(r, "metadata", None) or {}
+        if trios_keys & set(md.keys()):
+            return True
+    return False
+
+
 def _inject_provenance(
     result: RheoData | list[RheoData],
     format_detected: str,
@@ -100,7 +118,7 @@ def _inject_provenance(
         if hasattr(r, "metadata") and isinstance(r.metadata, dict):
             r.metadata["format_detected"] = format_detected
             if len(readers_attempted) > 1:
-                r.metadata["readers_attempted"] = readers_attempted
+                r.metadata["readers_attempted"] = list(readers_attempted)  # store a copy
 
 
 def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
@@ -171,6 +189,8 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             # Try TRIOS Excel first, then generic Excel
             try:
                 result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+                if not _has_trios_metadata(result):
+                    raise ValueError("No TRIOS metadata found")
                 _inject_provenance(result, "trios", ["trios"])
             except _FATAL_EXCEPTIONS:
                 raise
@@ -294,6 +314,12 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
         attempted.append("trios")
         logger.debug("Trying TRIOS reader for CSV", filepath=str(filepath))
         result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+        # Guard: only accept as TRIOS if TRIOS-specific metadata was found.
+        # A plain CSV with common column names (time, stress) can be parsed
+        # by the TRIOS reader but isn't a real TRIOS file.
+        if not _has_trios_metadata(result):
+            logger.debug("TRIOS parse succeeded but no TRIOS metadata — falling back")
+            raise ValueError("No TRIOS metadata found")
         logger.debug("TRIOS reader succeeded for CSV", filepath=str(filepath))
         _inject_provenance(result, "trios", attempted)
         return result
@@ -333,8 +359,11 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
     Returns:
         RheoData object
     """
-    # Check if x_col and y_col are specified
-    if "x_col" not in kwargs or "y_col" not in kwargs:
+    # Check if x_col and y_col/y_cols are specified
+    # IO-R6-011: Also check y_cols (plural) — _translate_y2_col sets y_cols for
+    # modulus pairs. Without this guard, auto-detection overwrites the intended
+    # y_cols with a spurious y_col from heuristic column scanning.
+    if "x_col" not in kwargs or ("y_col" not in kwargs and "y_cols" not in kwargs):
         # Try to auto-detect common column names
         import pandas as pd
 
@@ -396,13 +425,19 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                     "Please specify x_col and y_col."
                 )
 
-            kwargs["x_col"] = x_col
+            # VIS-AUTO-001: Only set x_col when the caller did NOT supply one.
+            # The entry condition (line 366) allows auto-detect when y is
+            # missing even if x_col was already provided; unconditionally
+            # overwriting x_col would silently replace the caller's column
+            # specifier with a heuristic guess.
+            if "x_col" not in kwargs:
+                kwargs["x_col"] = x_col
             if y_col != "FOUND_PAIR":
                 kwargs["y_col"] = y_col
             logger.debug(
                 "Auto-detected columns",
                 filepath=str(filepath),
-                x_col=x_col,
+                x_col=kwargs.get("x_col"),
                 y_col=y_col if y_col != "FOUND_PAIR" else kwargs.get("y_cols"),
             )
 
@@ -416,8 +451,11 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                 f"Could not auto-detect columns: {e}. Please specify x_col and y_col."
             ) from e
 
-    translated = _translate_y2_col(kwargs)
-    result = load_csv(filepath, **_filter_kwargs(translated, _CSV_KWARGS))
+    # R6-IO-003: _translate_y2_col is applied in auto_load() before _try_csv,
+    # but warn if a future direct caller passes y2_col here unexpectedly.
+    if "y2_col" in kwargs:
+        logger.warning("y2_col passed to _try_csv — should have been translated by auto_load")
+    result = load_csv(filepath, **_filter_kwargs(kwargs, _CSV_KWARGS))
     _inject_provenance(result, "csv", ["csv"])
     return result
 
@@ -434,8 +472,11 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
     """
     logger.debug("Trying Excel reader", filepath=str(filepath))
 
-    # Auto-detect columns if not specified
-    if "x_col" not in kwargs or "y_col" not in kwargs:
+    # Auto-detect columns if not specified.
+    # IO-R6-008: Also check for y_cols — after _translate_y2_col() in auto_load(),
+    # y_col is removed and y_cols is set instead.  Without this guard, the
+    # auto-detection branch runs and may overwrite the caller-specified columns.
+    if "x_col" not in kwargs or ("y_col" not in kwargs and "y_cols" not in kwargs):
         import pandas as pd
 
         try:
@@ -494,8 +535,9 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
                 "Please specify x_col and y_col."
             ) from e
 
-    translated = _translate_y2_col(kwargs)
-    result = load_excel(filepath, **_filter_kwargs(translated, _EXCEL_KWARGS))
+    # IO-R6-008: _translate_y2_col is already called at auto_load() entry —
+    # calling it again here is a no-op but misleading.  Use kwargs directly.
+    result = load_excel(filepath, **_filter_kwargs(kwargs, _EXCEL_KWARGS))
     _inject_provenance(result, "excel", ["excel"])
     return result
 

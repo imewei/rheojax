@@ -73,7 +73,12 @@ def _extract_spp_arrays(
                 n_points = len(np.asarray(spp_results[key]))
                 break
         else:
-            n_points = 0
+            # IO-R6-005: Raise instead of silently producing 15 empty arrays
+            raise ValueError(
+                "Cannot normalize SPP results: no length-bearing key found "
+                "(expected at least one of Gp_t, Gpp_t, time_new, strain_recon). "
+                f"Available keys: {sorted(spp_results.keys())}"
+            )
 
     def _get(key: str, default_val: float = 0.0) -> np.ndarray:
         return np.asarray(spp_results.get(key, np.full(n_points, default_val)))
@@ -249,7 +254,9 @@ def export_spp_txt(
         ctx["analysis_type"] = analysis_type
 
     # Write Frenet-Serret frame file if requested
-    if include_fsf and "T_vec" in spp_results:
+    # IO-R6-009: Guard all three FSF vectors to prevent KeyError
+    _fsf_keys_txt = ("T_vec", "N_vec", "B_vec")
+    if include_fsf and all(k in spp_results for k in _fsf_keys_txt):
         logger.debug(
             "Building Frenet-Serret frame data matrix",
             data_points=len(time),
@@ -304,69 +311,76 @@ def _write_spp_main_txt(
     precision: int,
 ) -> None:
     """Write main SPP data file in MATLAB format."""
-    with open(filepath, "w", newline="") as f:
-        # Write analysis type header
-        if analysis_type == "NUMERICAL":
-            f.write("Data calculated via numerical differentiation\r\n")
-        else:
-            f.write("Data calculated via Fourier domain filtering\r\n")
+    tmp_path = filepath.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", newline="") as f:
+            # Write analysis type header
+            if analysis_type == "NUMERICAL":
+                f.write("Data calculated via numerical differentiation\r\n")
+            else:
+                f.write("Data calculated via Fourier domain filtering\r\n")
 
-        # Write parameters
-        f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
-        if n_harmonics is not None:
-            f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
-        if n_cycles is not None:
-            f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
-        if step_size is not None:
-            f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
-        if num_mode is not None:
-            if num_mode == 1:
-                f.write("Standard differentiation\r\n")
-            elif num_mode == 2:
-                f.write("Looped differentiation\r\n")
+            # Write parameters
+            f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
+            if n_harmonics is not None:
+                f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
+            if n_cycles is not None:
+                f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
+            if step_size is not None:
+                f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
+            if num_mode is not None:
+                if num_mode == 1:
+                    f.write("Standard differentiation\r\n")
+                elif num_mode == 2:
+                    f.write("Looped differentiation\r\n")
 
-        # Write column headers (matching MATLAB exactly)
-        headers1 = [
-            "Time",
-            "Strain",
-            "Rate",
-            "Stress",
-            "G'_t",
-            'G"_t',
-            "|G*_t|",
-            "tan(delta_t)",
-            "delta_t",
-            "displacement stress",
-            "est. elastic stress",
-            "dG'_{t}/dt",
-            'dG"_{t}/dt',
-            "Speed",
-            "norm. PAV",
-        ]
-        headers2 = [
-            "[s]",
-            "[-]",
-            "[1/s]",
-            "[Pa]",
-            "[Pa]",
-            "[Pa]",
-            "[Pa]",
-            "[]",
-            "[rad]",
-            "[Pa]",
-            "[Pa]",
-            "[Pa/s]",
-            "[Pa/s]",
-            "[Pa/s]",
-            "[]",
-        ]
-        f.write("\t".join(headers1) + "\r\n")
-        f.write("\t".join(headers2) + "\r\n")
+            # Write column headers (matching MATLAB exactly)
+            headers1 = [
+                "Time",
+                "Strain",
+                "Rate",
+                "Stress",
+                "G'_t",
+                'G"_t',
+                "|G*_t|",
+                "tan(delta_t)",
+                "delta_t",
+                "displacement stress",
+                "est. elastic stress",
+                "dG'_{t}/dt",
+                'dG"_{t}/dt',
+                "Speed",
+                "norm. PAV",
+            ]
+            headers2 = [
+                "[s]",
+                "[-]",
+                "[1/s]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa]",
+                "[]",
+                "[rad]",
+                "[Pa]",
+                "[Pa]",
+                "[Pa/s]",
+                "[Pa/s]",
+                "[Pa/s]",
+                "[]",
+            ]
+            f.write("\t".join(headers1) + "\r\n")
+            f.write("\t".join(headers2) + "\r\n")
 
-        # Write data rows
-        fmt = f"%.{precision}f"
-        for row in data:
-            f.write("\t".join(fmt % val for val in row) + "\r\n")
+            # Write data rows
+            fmt = f"%.{precision}f"
+            for row in data:
+                f.write("\t".join(fmt % val for val in row) + "\r\n")
+        os.replace(tmp_path, filepath)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def _write_spp_fsf_txt(
@@ -382,57 +396,64 @@ def _write_spp_fsf_txt(
     precision: int,
 ) -> None:
     """Write Frenet-Serret frame data file in MATLAB format."""
-    with open(filepath, "w", newline="") as f:
-        # Write analysis type header
-        if analysis_type == "NUMERICAL":
-            f.write("Data calculated via numerical differentiation\r\n")
-        else:
-            f.write("Data calculated via Fourier domain filtering\r\n")
+    tmp_path = filepath.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", newline="") as f:
+            # Write analysis type header
+            if analysis_type == "NUMERICAL":
+                f.write("Data calculated via numerical differentiation\r\n")
+            else:
+                f.write("Data calculated via Fourier domain filtering\r\n")
 
-        # Write parameters
-        f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
-        if n_harmonics is not None:
-            f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
-        if n_cycles is not None:
-            f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
-        if step_size is not None:
-            f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
-        if num_mode is not None:
-            if num_mode == 1:
-                f.write("Standard differentiation\r\n")
-            elif num_mode == 2:
-                f.write("Looped differentiation\r\n")
+            # Write parameters
+            f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
+            if n_harmonics is not None:
+                f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
+            if n_cycles is not None:
+                f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
+            if step_size is not None:
+                f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
+            if num_mode is not None:
+                if num_mode == 1:
+                    f.write("Standard differentiation\r\n")
+                elif num_mode == 2:
+                    f.write("Looped differentiation\r\n")
 
-        # Write column headers (matching MATLAB exactly)
-        headers1 = [
-            "Tangent(x)",
-            "Tangent(y)",
-            "Tangent(z)",
-            "Normal(x)",
-            "Normal(y)",
-            "Normal(z)",
-            "Binormal(x)",
-            "Binormal(y)",
-            "Binormal(z)",
-        ]
-        headers2 = [
-            "[-]",
-            "[1/s]",
-            "[Pa]",
-            "[-]",
-            "[1/s]",
-            "[Pa]",
-            "[-]",
-            "[1/s]",
-            "[Pa]",
-        ]
-        f.write("\t".join(headers1) + "\r\n")
-        f.write("\t".join(headers2) + "\r\n")
+            # Write column headers (matching MATLAB exactly)
+            headers1 = [
+                "Tangent(x)",
+                "Tangent(y)",
+                "Tangent(z)",
+                "Normal(x)",
+                "Normal(y)",
+                "Normal(z)",
+                "Binormal(x)",
+                "Binormal(y)",
+                "Binormal(z)",
+            ]
+            headers2 = [
+                "[-]",
+                "[1/s]",
+                "[Pa]",
+                "[-]",
+                "[1/s]",
+                "[Pa]",
+                "[-]",
+                "[1/s]",
+                "[Pa]",
+            ]
+            f.write("\t".join(headers1) + "\r\n")
+            f.write("\t".join(headers2) + "\r\n")
 
-        # Write data rows
-        fmt = f"%.{precision}f"
-        for row in data:
-            f.write("\t".join(fmt % val for val in row) + "\r\n")
+            # Write data rows
+            fmt = f"%.{precision}f"
+            for row in data:
+                f.write("\t".join(fmt % val for val in row) + "\r\n")
+        os.replace(tmp_path, filepath)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
 
 
 # ============================================================================
@@ -570,12 +591,15 @@ def export_spp_hdf5(
                 logger.debug("Waveform datasets written", datasets=waveform_keys_written)
 
                 # Frenet-Serret frame group
-                if "T_vec" in spp_results:
+                # IO-R6-009: Guard all three FSF vectors — if T_vec is present
+                # but N_vec/B_vec are missing, KeyError would destroy the entire
+                # HDF5 write (including valid spp_data already written).
+                _fsf_keys = ("T_vec", "N_vec", "B_vec")
+                if all(k in spp_results for k in _fsf_keys):
                     logger.debug("Writing frenet_serret group")
                     fsf = f.create_group("frenet_serret")
-                    fsf.create_dataset("T_vec", data=np.asarray(spp_results["T_vec"]))
-                    fsf.create_dataset("N_vec", data=np.asarray(spp_results["N_vec"]))
-                    fsf.create_dataset("B_vec", data=np.asarray(spp_results["B_vec"]))
+                    for k in _fsf_keys:
+                        fsf.create_dataset(k, data=np.asarray(spp_results[k]))
                     datasets_written.extend(["T_vec", "N_vec", "B_vec"])
                     logger.debug("Frenet-Serret frame datasets written")
 
@@ -632,7 +656,14 @@ def export_spp_csv(
 
     # Build column dict
     columns = {}
-    time = np.asarray(spp_results.get("time_new", np.arange(len(spp_results["Gp_t"]))))
+    if "time_new" in spp_results:
+        time = np.asarray(spp_results["time_new"])
+    elif "Gp_t" in spp_results:
+        time = np.arange(len(spp_results["Gp_t"]))
+    else:
+        raise ValueError(
+            "spp_results must contain 'time_new' or 'Gp_t' to determine array length"
+        )
     columns["time"] = time
 
     for key in [
@@ -654,7 +685,9 @@ def export_spp_csv(
         if key in spp_results:
             columns[key] = np.asarray(spp_results[key])
 
-    if include_fsf and "T_vec" in spp_results:
+    # IO-R6-009: Guard all three FSF vectors to prevent KeyError
+    _fsf_keys_csv = ("T_vec", "N_vec", "B_vec")
+    if include_fsf and all(k in spp_results for k in _fsf_keys_csv):
         logger.debug("Including Frenet-Serret frame columns")
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
@@ -670,23 +703,30 @@ def export_spp_csv(
         columns["B_z"] = B_vec[:, 2]
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
-        # Write to CSV
-        with open(filepath, "w", encoding="utf-8", newline="") as f:
-            # Header
-            logger.debug(
-                "Writing CSV header",
-                num_columns=len(columns),
-                column_names=list(columns.keys()),
-            )
-            f.write(",".join(columns.keys()) + "\n")
-            # Data
-            data = np.column_stack(list(columns.values()))
-            logger.debug(
-                "Writing CSV data rows",
-                data_shape=data.shape,
-            )
-            for row in data:
-                f.write(",".join(f"{val:.7g}" for val in row) + "\n")
+        # Atomic write: write to temp file, then os.replace()
+        tmp_path = filepath.with_suffix(".csv.tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8", newline="") as f:
+                # Header
+                logger.debug(
+                    "Writing CSV header",
+                    num_columns=len(columns),
+                    column_names=list(columns.keys()),
+                )
+                f.write(",".join(columns.keys()) + "\n")
+                # Data
+                data = np.column_stack(list(columns.values()))
+                logger.debug(
+                    "Writing CSV data rows",
+                    data_shape=data.shape,
+                )
+                for row in data:
+                    f.write(",".join(f"{val:.7g}" for val in row) + "\n")
+            os.replace(tmp_path, filepath)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+            raise
 
         ctx["data_rows"] = len(data)
         ctx["columns"] = len(columns)
@@ -865,7 +905,9 @@ def to_matlab_dict(
     # Build FSF structure if available
     result = {"out_spp": out_spp}
 
-    if "T_vec" in spp_results:
+    # IO-R6-009: Guard all three FSF vectors to prevent KeyError
+    _fsf_keys_mat = ("T_vec", "N_vec", "B_vec")
+    if all(k in spp_results for k in _fsf_keys_mat):
         logger.debug("Building Frenet-Serret frame structure")
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
