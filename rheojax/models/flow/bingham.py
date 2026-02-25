@@ -275,8 +275,13 @@ class Bingham(BaseModel):
         # Compute viscosity above yield
         viscosity_above_yield = sigma_y / (abs_gamma_dot + threshold) + eta_p
 
-        # Apply yield condition
-        return jnp.where(abs_gamma_dot > threshold, viscosity_above_yield, jnp.inf)
+        # Apply yield condition.
+        # R5-JAX-004: jnp.inf in the false branch corrupts gradients under NUTS
+        # because jnp.where evaluates both branches before selecting.
+        # Use a large finite sentinel (1e30 Pa·s) instead — physically equivalent
+        # (zero-shear-rate apparent viscosity is not physically meaningful) and
+        # gradient-safe because 1e30 has finite autodiff.
+        return jnp.where(abs_gamma_dot > threshold, viscosity_above_yield, 1e30)
 
     def predict_viscosity(self, gamma_dot: np.ndarray) -> np.ndarray:
         """Predict apparent viscosity for given shear rates.

@@ -17,6 +17,7 @@ Example:
 
 from __future__ import annotations
 
+import copy
 import uuid
 import warnings
 from pathlib import Path
@@ -308,12 +309,13 @@ class Pipeline:
         ) as ctx:
             try:
                 model_obj.fit(X, y, **fit_kwargs)
-                score = model_obj.score(X, y)
-                ctx["r_squared"] = score
-
-                # Store fitted model
                 self._last_model = model_obj
                 self.steps.append(("fit", model_obj))
+                try:
+                    score = model_obj.score(X, y)
+                except Exception:
+                    score = float("nan")
+                ctx["r_squared"] = score
                 self.history.append(("fit", model_name, score))
             except Exception as e:
                 logger.error(
@@ -719,7 +721,9 @@ class Pipeline:
         new_pipeline = Pipeline(data=self.data.copy() if self.data else None)
         new_pipeline.steps = self.steps.copy()
         new_pipeline.history = self.history.copy()
-        new_pipeline._last_model = self._last_model
+        new_pipeline._last_model = (
+            copy.deepcopy(self._last_model) if self._last_model is not None else None
+        )
         logger.debug(
             "Pipeline cloned",
             original_id=self._id,

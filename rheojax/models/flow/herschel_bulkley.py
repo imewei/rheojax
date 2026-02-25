@@ -271,8 +271,11 @@ class HerschelBulkley(BaseModel):
         # σ(γ̇) = 0 for |γ̇| ≤ threshold (below yield)
         abs_gamma_dot = jnp.abs(gamma_dot)
 
-        # Compute stress above yield
-        stress_above_yield = sigma_y + K * jnp.power(abs_gamma_dot, n)
+        # Compute stress above yield.
+        # R5-GRAD-001: Add epsilon to avoid infinite gradient at abs_gamma_dot=0
+        # when n < 1.  jnp.where evaluates both branches, so the power-law term
+        # is differentiated even in the below-yield branch.
+        stress_above_yield = sigma_y + K * jnp.power(abs_gamma_dot + 1e-30, n)
 
         # Apply yield condition using jnp.where
         return jnp.where(abs_gamma_dot > threshold, stress_above_yield, 0.0)
@@ -302,12 +305,18 @@ class HerschelBulkley(BaseModel):
         abs_gamma_dot = jnp.abs(gamma_dot)
 
         # Compute viscosity above yield
+        # R5-GRAD-001: epsilon guards infinite gradient at abs_gamma_dot=0 for n < 1
         viscosity_above_yield = sigma_y / (abs_gamma_dot + threshold) + K * jnp.power(
-            abs_gamma_dot, n - 1.0
+            abs_gamma_dot + 1e-30, n - 1.0
         )
 
-        # Apply yield condition
-        return jnp.where(abs_gamma_dot > threshold, viscosity_above_yield, jnp.inf)
+        # Apply yield condition.
+        # R5-JAX-004: jnp.inf in the false branch corrupts gradients under NUTS
+        # because jnp.where evaluates both branches before selecting.
+        # Use a large finite sentinel (1e30 Pa·s) instead — physically equivalent
+        # (zero-shear-rate apparent viscosity is not physically meaningful) and
+        # gradient-safe because 1e30 has finite autodiff.
+        return jnp.where(abs_gamma_dot > threshold, viscosity_above_yield, 1e30)
 
     def predict_viscosity(self, gamma_dot: np.ndarray) -> np.ndarray:
         """Predict apparent viscosity for given shear rates.

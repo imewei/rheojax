@@ -116,7 +116,8 @@ def viscosity_herschel_bulkley_regularized(
     yield_term = tau_y * (1.0 - jnp.exp(-m_reg * gamma_dot_abs)) / gamma_dot_abs
 
     # Power-law term
-    power_term = K * jnp.power(gamma_dot_abs, n_flow - 1.0)
+    # R5-GRAD-001: epsilon guards infinite gradient at gamma_dot_abs=0 for n_flow < 1
+    power_term = K * jnp.power(gamma_dot_abs + 1e-30, n_flow - 1.0)
 
     return yield_term + power_term + eta_inf
 
@@ -366,6 +367,14 @@ def rhs_viscous_rate_control(t, state, args):
 def rhs_maxwell_rate_control(t, state, args):
     """RHS for DMT-Maxwell under rate control (shear rate prescribed).
 
+    .. deprecated::
+        R5-JAX-008: This function is dead code — it is never called from
+        ``local.py`` which uses lax.scan step-functions that close over
+        ``self.closure`` directly.  The ``args["closure"] == "exponential"``
+        dispatch here also uses a Python string comparison on a dict value
+        that could become a JAX tracer inside JIT.  Kept for API compatibility
+        only; do NOT call this from inside a JIT-traced context.
+
     State vector: [σ, λ, γ]
     - σ: Shear stress
     - λ: Structure parameter
@@ -385,6 +394,14 @@ def rhs_maxwell_rate_control(t, state, args):
     array
         [dσ/dt, dλ/dt, dγ/dt]
     """
+    import warnings
+
+    warnings.warn(
+        "rhs_maxwell_rate_control is deprecated; do not call from JIT contexts",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     sigma, lam, gamma = state
     gamma_dot = args["gamma_dot"]
 
@@ -423,6 +440,10 @@ def rhs_maxwell_rate_control(t, state, args):
 
 def rhs_maxwell_relaxation(t, state, args):
     """RHS for DMT-Maxwell stress relaxation (γ̇ = 0 after step strain).
+
+    .. deprecated::
+        R5-JAX-008: Same as ``rhs_maxwell_rate_control`` — dead code.
+        See that function's deprecation note for details.
 
     State vector: [σ, λ]
     - σ: Shear stress (relaxing)
@@ -691,9 +712,16 @@ def invert_stress_for_gamma_dot_hb(
         gamma_dot_new = gamma_dot * sigma_0 / jnp.maximum(sigma_pred, 1e-12)
         return jnp.clip(gamma_dot_new, 1e-12, 1e8)
 
-    gamma_dot = gamma_dot_init
-    for _ in range(n_iter):
-        gamma_dot = iterate(gamma_dot)
+    # R5-JAX-003: Replace Python for-loop with jax.lax.fori_loop.
+    # A Python for-loop unrolls 10x into the trace graph, creating large JIT
+    # artefacts and making recompilation expensive when n_iter changes.
+    # fori_loop keeps the graph compact: O(1) XLA operations vs O(n_iter).
+    gamma_dot = jax.lax.fori_loop(
+        0,
+        n_iter,
+        lambda _i, gd: iterate(gd),
+        gamma_dot_init,
+    )
 
     # If below yield, return near-zero
     return jnp.where(below_yield, 1e-12, gamma_dot)

@@ -227,18 +227,27 @@ class BayesianPipeline(Pipeline):
         initial_values = None
         if self._last_model.fitted_:
             initial_values = {
-                name: self._last_model.parameters.get_value(name)
+                name: v
                 for name in self._last_model.parameters
+                if (v := self._last_model.parameters.get_value(name)) is not None
             }
             logger.debug(
                 "Using NLSQ warm-start",
                 n_initial_values=len(initial_values),
             )
 
-        # Get test_mode from data metadata if available
+        # Get test_mode from data metadata if available, converting string to
+        # TestMode enum so model_function dispatch (== TestMode.X) works correctly.
         test_mode = None
         if hasattr(self.data, "metadata") and self.data.metadata is not None:
             test_mode = self.data.metadata.get("test_mode")
+        if test_mode is not None and isinstance(test_mode, str):
+            from rheojax.core.test_modes import TestMode
+
+            try:
+                test_mode = TestMode[test_mode.upper()]
+            except KeyError:
+                pass  # Leave as string; model will handle or raise
 
         model_name = self._last_model.__class__.__name__
 
@@ -271,7 +280,7 @@ class BayesianPipeline(Pipeline):
             )
 
             # Add diagnostics to context
-            ctx["divergences"] = result.diagnostics.get("divergences", 0)
+            ctx["divergences"] = result.diagnostics.get("divergences") or 0
             if "r_hat" in result.diagnostics:
                 r_hat_values = list(result.diagnostics["r_hat"].values())
                 ctx["r_hat_max"] = max(r_hat_values) if r_hat_values else None
@@ -289,14 +298,14 @@ class BayesianPipeline(Pipeline):
                 "fit_bayesian",
                 num_samples,
                 num_warmup,
-                result.diagnostics.get("divergences", 0),
+                result.diagnostics.get("divergences") or 0,
             )
         )
 
         logger.info(
             "Bayesian inference completed",
             model=model_name,
-            divergences=result.diagnostics.get("divergences", 0),
+            divergences=result.diagnostics.get("divergences") or 0,
             num_samples=num_samples,
             num_chains=num_chains,
         )
@@ -544,8 +553,9 @@ class BayesianPipeline(Pipeline):
             samples = posterior_samples[param]
 
             # Plot trace
-            alpha = plot_kwargs.pop("alpha", 0.7)
-            ax.plot(samples, alpha=alpha, **plot_kwargs)
+            _kwargs = plot_kwargs.copy()
+            alpha = _kwargs.pop("alpha", 0.7)
+            ax.plot(samples, alpha=alpha, **_kwargs)
 
             # Add mean line
             mean = self._bayesian_result.summary[param]["mean"]

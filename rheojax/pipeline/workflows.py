@@ -207,29 +207,27 @@ class MastercurvePipeline(Pipeline):
                 denominator = C2 + temp - self.reference_temp
                 if abs(denominator) < 1e-10:
                     logger.warning(
-                        "Temperature at WLF singularity",
+                        "Temperature at WLF singularity; skipping shift (using 1.0)",
                         temp=temp,
                         reference_temp=self.reference_temp,
                         C2=C2,
                     )
-                    shift = np.inf
+                    shift = 1.0
                 else:
                     log_shift = -C1 * (temp - self.reference_temp) / denominator
                     shift = 10**log_shift
 
             self.shift_factors[float(temp)] = shift
 
-        # Apply shifts to x data
+        # Apply shifts to x data (vectorized per temperature group)
         shifted_x = self.data.x.copy()
-        for i, temp in enumerate(temps):
-            shift = self.shift_factors[float(temp)]
-            shifted_x = (
-                shifted_x.at[i].set(shifted_x[i] / shift)
-                if isinstance(shifted_x, jnp.ndarray)
-                else shifted_x
-            )
-            if isinstance(shifted_x, np.ndarray):
-                shifted_x[i] = shifted_x[i] / shift
+        for unique_temp in np.unique(temps):
+            mask = temps == unique_temp
+            shift = self.shift_factors[float(unique_temp)]
+            if isinstance(shifted_x, jnp.ndarray):
+                shifted_x = shifted_x.at[mask].set(shifted_x[mask] / shift)
+            else:
+                shifted_x[mask] = shifted_x[mask] / shift
 
         self.data.x = shifted_x
 
@@ -946,7 +944,18 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         else:
             sigma_array = np.array(self._sigma_dy_values)
 
-        self.model = SPPYieldStress()
+        # R6-PIPE-001: Only reuse warm-start if yield_type matches the prior fit
+        _prior_yield_type = getattr(self, "_last_fit_yield_type", None)
+        if (
+            bayesian
+            and hasattr(self, "model")
+            and self.model is not None
+            and self.model.fitted_
+            and _prior_yield_type == yield_type
+        ):
+            pass  # Reuse NLSQ-fitted model for warm-start
+        else:
+            self.model = SPPYieldStress()
 
         try:
             if bayesian:
@@ -967,6 +976,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
                 )
                 self.history.append(("fit_nlsq", yield_type, "complete"))
 
+            self._last_fit_yield_type = yield_type
             total_time = time.perf_counter() - start_time
             logger.info(
                 "SPP model fitting complete",

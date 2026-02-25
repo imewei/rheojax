@@ -206,7 +206,7 @@ class Maxwell(BaseModel):
                     return self._predict_creep(x, G0, eta)
                 elif test_mode == TestMode.OSCILLATION:
                     return self._predict_oscillation(x, G0, eta)
-                elif test_mode == TestMode.ROTATION:
+                elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
                     return self._predict_rotation(x, G0, eta)
                 else:
                     raise ValueError(f"Unsupported test mode: {test_mode}")
@@ -242,15 +242,22 @@ class Maxwell(BaseModel):
 
             # Validate optimization succeeded
             if not result.success:
-                logger.error(
-                    "Optimization failed",
-                    message=result.message,
-                    iterations=getattr(result, "nit", None),
-                )
-                raise RuntimeError(
-                    f"Optimization failed: {result.message}. "
-                    f"Try adjusting initial values, bounds, or max_iter."
-                )
+                if not np.isfinite(result.fun) or result.fun > 1e6 * len(x_np):
+                    logger.error(
+                        "Optimization failed",
+                        message=result.message,
+                        iterations=getattr(result, "nit", None),
+                    )
+                    raise RuntimeError(
+                        f"Optimization failed: {result.message}. "
+                        f"Try adjusting initial values, bounds, or max_iter."
+                    )
+                else:
+                    logger.warning(
+                        "Optimization did not fully converge",
+                        message=result.message,
+                        model=self.__class__.__name__,
+                    )
 
             self.fitted_ = True
 
@@ -428,7 +435,14 @@ class Maxwell(BaseModel):
         eta = params[1]
 
         # Use explicit test_mode parameter (closure-captured in fit_bayesian)
-        # Fall back to self._test_mode only for backward compatibility
+        # Fall back to self._test_mode only for backward compatibility.
+        # R5-JAX-009: This Python-level TestMode dispatch is safe ONLY because
+        # `test_mode` is a concrete Python enum value captured at closure-build
+        # time by BayesianMixin._build_numpyro_model().  It must NEVER be a
+        # JAX tracer — passing a traced test_mode into model_function would
+        # freeze one branch at trace time and silently produce wrong predictions.
+        # All 20+ models share this pattern; enforce by keeping model_function
+        # signatures as `test_mode: TestMode | str | None` (never jnp.ndarray).
         if test_mode is None:
             test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
@@ -441,7 +455,7 @@ class Maxwell(BaseModel):
             return self._predict_creep(X, G0, eta)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(X, G0, eta)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(X, G0, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
