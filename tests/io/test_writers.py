@@ -454,3 +454,52 @@ class TestCSVReaderEdgeCases:
         result = load_csv(csv_file, x_col="time", y_col="stress", delimiter=";")
         assert isinstance(result, RheoData)
         assert len(result.x) == 2
+
+
+# ---------------------------------------------------------------------------
+# Coverage Gap-4: HDF5 test_mode / deformation_mode round-trip
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
+class TestHDF5ModeRoundTrip:
+    """Gap-4: test_mode and deformation_mode survive HDF5 write → read."""
+
+    @pytest.mark.smoke
+    def test_test_mode_round_trip(self, tmp_path):
+        """test_mode stored as top-level attr and recovered on load."""
+        data = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([10.0, 20.0, 30.0]),
+            metadata={"test_mode": "oscillation"},
+        )
+        filepath = tmp_path / "mode_rt.h5"
+        save_hdf5(data, str(filepath))
+        loaded = load_hdf5(str(filepath))
+        assert loaded.metadata.get("test_mode") == "oscillation"
+
+    def test_deformation_mode_round_trip(self, tmp_path):
+        """deformation_mode stored as top-level attr and recovered on load."""
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([100.0, 200.0]),
+            metadata={"deformation_mode": "tension", "test_mode": "oscillation"},
+        )
+        filepath = tmp_path / "deformation_rt.h5"
+        save_hdf5(data, str(filepath))
+        loaded = load_hdf5(str(filepath))
+        assert loaded.metadata.get("deformation_mode") == "tension"
+        assert loaded.metadata.get("test_mode") == "oscillation"
+
+    def test_missing_modes_no_error(self, tmp_path):
+        """Data without explicit test_mode/deformation_mode still loads cleanly."""
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([10.0, 20.0]),
+        )
+        filepath = tmp_path / "no_mode.h5"
+        save_hdf5(data, str(filepath))
+        loaded = load_hdf5(str(filepath))
+        assert isinstance(loaded, RheoData)
+        # RheoData auto-detects test_mode, so it may be present;
+        # the key assertion is that round-trip doesn't error
+        assert len(loaded.x) == 2

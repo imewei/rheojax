@@ -268,7 +268,7 @@ def _detect_from_relaxation(t: np.ndarray, G_t: np.ndarray) -> MaterialType:
         # Distinguish based on equilibrium modulus
         G_final = np.mean(G_t[-5:])  # Average last 5 points
         G_initial = G_t[0]
-        decay_ratio = G_final / G_initial
+        decay_ratio = G_final / G_initial if G_initial != 0 else 0.0
 
         if decay_ratio > 0.3:  # Significant final modulus
             return MaterialType.VISCOELASTIC_SOLID

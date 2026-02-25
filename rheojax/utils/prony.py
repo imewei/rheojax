@@ -604,8 +604,12 @@ def warm_start_from_n_modes(
         n_pad = n_target - n_current
         # Pad taus extending beyond existing range
         TAU_LB, TAU_UB = 1e-6, 1e6
-        tau_min_new = max(tau_i.min() / (10.0 ** max(n_pad, 1)), TAU_LB)
-        tau_max_new = min(tau_i.max() * (10.0 ** max(n_pad, 1)), TAU_UB)
+        if len(tau_i) == 0:
+            tau_min_new = TAU_LB
+            tau_max_new = TAU_UB
+        else:
+            tau_min_new = max(tau_i.min() / (10.0 ** max(n_pad, 1)), TAU_LB)
+            tau_max_new = min(tau_i.max() * (10.0 ** max(n_pad, 1)), TAU_UB)
         new_taus_candidates = np.logspace(
             np.log10(tau_min_new), np.log10(tau_max_new), n_pad * 3
         )

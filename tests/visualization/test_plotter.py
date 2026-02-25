@@ -431,3 +431,75 @@ def test_plot_fit_with_uncertainty_existing_ax():
     assert returned_fig is None or returned_fig is fig_outer
     assert returned_ax is ax
     plt.close(fig_outer)
+
+
+# ---------------------------------------------------------------------------
+# Coverage Gap-6: _modulus_labels for bending/compression/metadata
+# ---------------------------------------------------------------------------
+
+class TestModulusLabels:
+    """Gap-6: _modulus_labels returns E'/E'' for tension/bending/compression."""
+
+    @pytest.mark.smoke
+    def test_default_shear_labels(self):
+        """No deformation mode → G'/G'' labels."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        s, l, g = _modulus_labels()
+        assert "G'" in s
+        assert 'G"' in l
+
+    def test_tension_labels(self):
+        """deformation_mode='tension' → E'/E'' labels."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        data = RheoData(
+            x=np.array([1.0]), y=np.array([1.0]),
+            metadata={"deformation_mode": "tension"},
+        )
+        s, l, g = _modulus_labels(data=data)
+        assert "E'" in s
+        assert 'E"' in l
+
+    def test_bending_labels(self):
+        """deformation_mode='bending' → E'/E'' labels."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        data = RheoData(
+            x=np.array([1.0]), y=np.array([1.0]),
+            metadata={"deformation_mode": "bending"},
+        )
+        s, l, g = _modulus_labels(data=data)
+        assert "E'" in s
+        assert 'E"' in l
+
+    def test_compression_labels(self):
+        """deformation_mode='compression' → E'/E'' labels."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        data = RheoData(
+            x=np.array([1.0]), y=np.array([1.0]),
+            metadata={"deformation_mode": "compression"},
+        )
+        s, l, g = _modulus_labels(data=data)
+        assert "E'" in s
+        assert 'E"' in l
+
+    def test_custom_units(self):
+        """y_units kwarg reflected in label."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        s, l, g = _modulus_labels(y_units="MPa")
+        assert "MPa" in s
+        assert "MPa" in l
+
+    def test_metadata_deformation_mode(self):
+        """deformation_mode from metadata dict is picked up."""
+        from rheojax.visualization.plotter import _modulus_labels
+
+        data = RheoData(
+            x=np.array([1.0]), y=np.array([1.0]),
+            metadata={"deformation_mode": "compression"},
+        )
+        s, _, _ = _modulus_labels(data=data)
+        assert "E'" in s

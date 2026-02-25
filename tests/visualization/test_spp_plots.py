@@ -589,3 +589,66 @@ class TestSPPPlotEdgeCases:
         fig = plot_cole_cole(Gp, Gpp)
         assert fig is not None
         plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# Coverage Gap-5: strain_rate_normalized path in create_spp_report
+# ---------------------------------------------------------------------------
+
+class TestSPPReportStrainRateNormalized:
+    """Gap-5: create_spp_report uses strain_rate_normalized when present."""
+
+    @pytest.mark.smoke
+    def test_strain_rate_normalized_override(self, laos_signals, spp_results):
+        """When strain_rate_normalized is provided, it overrides computed rate."""
+        n = laos_signals["n_pts"]
+        # Add strain_rate_normalized to SPP results
+        spp_with_norm = dict(spp_results)
+        spp_with_norm["strain_rate_normalized"] = np.ones(n) * 0.5
+
+        fig = create_spp_report(
+            strain=laos_signals["strain"],
+            stress=laos_signals["stress"],
+            spp_results=spp_with_norm,
+            gamma_0=laos_signals["gamma_0"],
+            omega=laos_signals["omega"],
+        )
+        assert fig is not None
+        plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# Coverage Gap-7: plot_moduli_evolution single-Axes ValueError
+# ---------------------------------------------------------------------------
+
+class TestModuliEvolutionSingleAxes:
+    """Gap-7: plot_moduli_evolution raises ValueError for single Axes with multi-panel."""
+
+    @pytest.mark.smoke
+    def test_single_axes_raises_value_error(self, spp_results):
+        """Single Axes with n_plots > 1 raises ValueError."""
+        _, single_ax = plt.subplots()
+        time = np.linspace(0, 2 * np.pi, len(spp_results["Gp_t"]))
+        with pytest.raises(ValueError, match="subplots needed"):
+            plot_moduli_evolution(
+                time=time,
+                Gp_t=spp_results["Gp_t"],
+                Gpp_t=spp_results["Gpp_t"],
+                delta_t=spp_results["delta_t"],
+                ax=single_ax,
+            )
+        plt.close("all")
+
+    def test_tuple_axes_accepted(self, spp_results):
+        """Tuple of axes for multi-panel works correctly."""
+        time = np.linspace(0, 2 * np.pi, len(spp_results["Gp_t"]))
+        fig, axes = plt.subplots(3, 1)
+        result_fig = plot_moduli_evolution(
+            time=time,
+            Gp_t=spp_results["Gp_t"],
+            Gpp_t=spp_results["Gpp_t"],
+            delta_t=spp_results["delta_t"],
+            ax=tuple(axes),
+        )
+        assert result_fig is not None
+        plt.close("all")

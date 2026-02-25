@@ -446,3 +446,144 @@ data point 1	1.0	100
             data = data[0]
         assert len(data.x) >= 1
         np.testing.assert_allclose(data.x[0], 1.0, rtol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Coverage Gap Tests (Round 7)
+# ---------------------------------------------------------------------------
+
+class TestHasTriosMetadataNegative:
+    """Gap-1: _has_trios_metadata returns False for non-TRIOS data."""
+
+    @pytest.mark.smoke
+    def test_generic_csv_no_trios_metadata(self):
+        """RheoData without TRIOS-specific metadata keys → False."""
+        from rheojax.io.readers.auto import _has_trios_metadata
+
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([10.0, 20.0]),
+            metadata={"source": "generic_csv", "encoding": "utf-8"},
+        )
+        assert _has_trios_metadata(data) is False
+
+    def test_empty_metadata(self):
+        """RheoData with empty metadata → False."""
+        from rheojax.io.readers.auto import _has_trios_metadata
+
+        data = RheoData(x=np.array([1.0]), y=np.array([1.0]), metadata={})
+        assert _has_trios_metadata(data) is False
+
+    def test_list_of_generic_data(self):
+        """List of RheoData without TRIOS keys → False."""
+        from rheojax.io.readers.auto import _has_trios_metadata
+
+        items = [
+            RheoData(x=np.array([1.0]), y=np.array([1.0]), metadata={"foo": "bar"}),
+            RheoData(x=np.array([2.0]), y=np.array([2.0]), metadata={"baz": 42}),
+        ]
+        assert _has_trios_metadata(items) is False
+
+    def test_positive_with_trios_key(self):
+        """RheoData with a TRIOS key → True."""
+        from rheojax.io.readers.auto import _has_trios_metadata
+
+        data = RheoData(
+            x=np.array([1.0]),
+            y=np.array([1.0]),
+            metadata={"instrument_serial_number": "4010-0001"},
+        )
+        assert _has_trios_metadata(data) is True
+
+
+class TestTranslateY2Col:
+    """Gap-2: _translate_y2_col bridges GUI y2_col → reader y_cols."""
+
+    @pytest.mark.smoke
+    def test_y2_col_translation(self):
+        """y2_col + y_col → y_cols=[y_col, y2_col]."""
+        from rheojax.io.readers.auto import _translate_y2_col
+
+        kw = {"y_col": "G'", "y2_col": 'G"', "x_col": "freq"}
+        result = _translate_y2_col(kw)
+        assert result["y_cols"] == ["G'", 'G"']
+        assert "y_col" not in result
+        assert "y2_col" not in result
+        assert result["x_col"] == "freq"
+
+    def test_no_y2_col_passthrough(self):
+        """Without y2_col, kwargs pass through unchanged."""
+        from rheojax.io.readers.auto import _translate_y2_col
+
+        kw = {"y_col": "stress", "x_col": "time"}
+        result = _translate_y2_col(kw)
+        assert result == kw
+
+    def test_y_cols_already_present(self):
+        """y_cols takes precedence over y2_col."""
+        from rheojax.io.readers.auto import _translate_y2_col
+
+        kw = {"y_col": "G'", "y2_col": 'G"', "y_cols": ["E'", 'E"']}
+        result = _translate_y2_col(kw)
+        assert result["y_cols"] == ["E'", 'E"']
+
+    def test_does_not_mutate_caller(self):
+        """Caller's dict is never mutated."""
+        from rheojax.io.readers.auto import _translate_y2_col
+
+        original = {"y_col": "G'", "y2_col": 'G"'}
+        _translate_y2_col(original)
+        assert "y2_col" in original  # original untouched
+
+
+class TestDetectModulusPair:
+    """Gap-3: _detect_modulus_pair direct tests for ambiguous column names."""
+
+    @pytest.mark.smoke
+    def test_e_prime_double_prime(self):
+        """E' and E'' detected as DMTA pair."""
+        from rheojax.io.readers.auto import _detect_modulus_pair
+
+        cols = ["freq (Hz)", "E' (Pa)", 'E" (Pa)']
+        result = _detect_modulus_pair(cols, [c.lower() for c in cols])
+        assert result is not None
+        assert result[0] == "E' (Pa)"
+        assert result[1] == 'E" (Pa)'
+
+    def test_g_prime_double_prime(self):
+        """G' and G'' detected as shear pair."""
+        from rheojax.io.readers.auto import _detect_modulus_pair
+
+        cols = ["omega", "G' (Pa)", "G'' (Pa)"]
+        result = _detect_modulus_pair(cols, [c.lower() for c in cols])
+        assert result is not None
+        assert result[0] == "G' (Pa)"
+        assert result[1] == "G'' (Pa)"
+
+    def test_storage_loss_generic(self):
+        """'Storage Modulus' / 'Loss Modulus' pattern detected."""
+        from rheojax.io.readers.auto import _detect_modulus_pair
+
+        cols = ["freq", "Storage Modulus (Pa)", "Loss Modulus (Pa)"]
+        result = _detect_modulus_pair(cols, [c.lower() for c in cols])
+        assert result is not None
+        assert "Storage" in result[0]
+        assert "Loss" in result[1]
+
+    def test_no_pair_returns_none(self):
+        """Columns without modulus patterns → None."""
+        from rheojax.io.readers.auto import _detect_modulus_pair
+
+        cols = ["time", "stress", "strain"]
+        result = _detect_modulus_pair(cols, [c.lower() for c in cols])
+        assert result is None
+
+    def test_e_stor_e_loss(self):
+        """E_stor / E_loss pyvisco-style columns detected."""
+        from rheojax.io.readers.auto import _detect_modulus_pair
+
+        cols = ["freq", "E_stor", "E_loss"]
+        result = _detect_modulus_pair(cols, [c.lower() for c in cols])
+        assert result is not None
+        assert result[0] == "E_stor"
+        assert result[1] == "E_loss"

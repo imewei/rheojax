@@ -1181,11 +1181,13 @@ class TestImportDispatchSplitsComplex:
             pytest.skip("data_page.py not found")
 
         code = src.read_text()
-        # The dispatch must use np.real for y_data when complex
-        assert "np.real(rheo_data.y)" in code, (
+        # The dispatch must use np.real for y_data when complex.
+        # After GUI-009 fix, data is first converted via np.asarray then
+        # split with np.real(y_np) / np.imag(y_np).
+        assert "np.real(" in code and "y_data" in code, (
             "Import dispatch must store np.real(y) as y_data for complex data"
         )
-        assert "np.imag(rheo_data.y)" in code, (
+        assert "np.imag(" in code and "y2_data" in code, (
             "Import dispatch must store np.imag(y) as y2_data for complex data"
         )
 
