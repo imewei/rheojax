@@ -407,12 +407,20 @@ class ExportPage(QWidget):
         elif self._template_combo.currentText().lower().startswith("pdf"):
             self._preview_list.addItem(f"{output_dir}/report.pdf")
 
-        # Generate a lightweight thumbnail preview
+        # Generate a lightweight thumbnail preview.
+        # Close any previous preview figure to avoid memory leak.
+        if hasattr(self, "_preview_fig") and self._preview_fig is not None:
+            import matplotlib.pyplot as plt
+
+            plt.close(self._preview_fig)
+            self._preview_fig = None
+
         try:
             from matplotlib.backends.backend_agg import FigureCanvasAgg
             from matplotlib.figure import Figure
 
             fig = Figure(figsize=(3.2, 2.2))
+            self._preview_fig = fig
             canvas = FigureCanvasAgg(fig)
             ax = fig.add_subplot(111)
             ax.axis("off")

@@ -842,6 +842,10 @@ class DataPage(QWidget):
             # real G'' (y2_data) so both converters reconstruct correctly.
             # F-IO-R3-009: avoids storing redundant complex + real.
             is_complex = np.iscomplexobj(rheo_data.y)
+            # Convert JAX arrays to NumPy at the state dispatch boundary
+            # to avoid per-element device sync in show_dataset() / str(x[i]).
+            x_np = np.asarray(rheo_data.x)
+            y_np = np.asarray(rheo_data.y)
             store.dispatch(
                 "IMPORT_DATA_SUCCESS",
                 {
@@ -849,14 +853,14 @@ class DataPage(QWidget):
                     "file_path": str(self._current_file_path),
                     "name": name,
                     "test_mode": detected_mode or "unknown",
-                    "x_data": rheo_data.x,
+                    "x_data": x_np,
                     "y_data": (
-                        np.real(rheo_data.y)
+                        np.real(y_np)
                         if is_complex
-                        else rheo_data.y
+                        else y_np
                     ),
                     "y2_data": (
-                        np.imag(rheo_data.y)
+                        np.imag(y_np)
                         if is_complex
                         else None
                     ),

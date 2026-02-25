@@ -1437,7 +1437,7 @@ class StateStore:
             # prevent stale references if a nested dispatch replaces
             # self._state while subscribers are being notified.
             subscribers = list(self._subscribers)
-            state_snapshot = copy.copy(self._state)
+            state_snapshot = self._state.clone()
 
         # Notify subscribers outside the lock using snapshot
         for subscriber in subscribers:
