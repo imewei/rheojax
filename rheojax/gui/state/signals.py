@@ -9,6 +9,18 @@ from typing import Any
 from rheojax.gui.compat import QObject, Signal
 from rheojax.logging import get_logger
 
+try:
+    from PySide6.QtCore import Slot
+except ImportError:
+    # Fallback decorator when PySide6 is unavailable (headless/test environment)
+    def Slot(*args, **kwargs):  # type: ignore[misc]
+        """No-op Slot decorator for non-Qt environments."""
+
+        def decorator(fn):
+            return fn
+
+        return decorator
+
 logger = get_logger(__name__)
 
 
@@ -109,6 +121,16 @@ class StateSignals(QObject):
         """Initialize signal emitters."""
         super().__init__()
 
+    @Slot()
+    def _emit_state_changed(self) -> None:
+        """Slot invoked via QMetaObject.invokeMethod to emit state_changed.
+
+        This method is the target of QueuedConnection invocations from
+        update_state() so that the signal is always emitted on the main
+        Qt thread, regardless of which thread triggered the state update.
+        """
+        self.state_changed.emit()
+
     def emit_signal(self, signal_name: str, *args: Any) -> None:
         """Emit a signal by name with logging.
 
@@ -124,10 +146,11 @@ class StateSignals(QObject):
             logger.debug("Signal emitted", signal=signal_name, args=args)
             signal.emit(*args)
         else:
+            # GUI-R6-004: Remove exc_info=True — there is no active exception here,
+            # so exc_info produces a misleading NoneType traceback in logs.
             logger.error(
                 "Attempted to emit unknown signal",
                 signal=signal_name,
-                exc_info=True,
             )
 
     def connect_signal(self, signal_name: str, handler: Callable[..., Any]) -> bool:
@@ -152,10 +175,12 @@ class StateSignals(QObject):
             signal.connect(handler)
             return True
         else:
+            # GUI-R6-008: Removed exc_info=True — no active exception here.
+            # The signal_name lookup failure is a programming error, not a
+            # caught exception.
             logger.error(
                 "Attempted to connect to unknown signal",
                 signal=signal_name,
-                exc_info=True,
             )
             return False
 

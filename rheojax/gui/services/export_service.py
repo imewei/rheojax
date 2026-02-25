@@ -100,6 +100,12 @@ class ExportService:
             format=format,
         )
         path = Path(path)
+        if path.exists() and not os.access(path, os.W_OK):
+            raise PermissionError(f"No write permission for: {path}")
+        if not path.parent.exists():
+            raise FileNotFoundError(f"Directory does not exist: {path.parent}")
+        if not os.access(path.parent, os.W_OK):
+            raise PermissionError(f"No write permission for directory: {path.parent}")
 
         if format is None:
             format = path.suffix.lstrip(".")
@@ -227,6 +233,11 @@ class ExportService:
             Auto-detected from extension if None
         **kwargs
             Additional savefig options
+
+        Note
+        ----
+        The caller retains ownership of ``fig``. Call ``plt.close(fig)``
+        after export if the figure is no longer needed to prevent memory leaks.
         """
         logger.debug(
             "Entering export_figure",
@@ -235,6 +246,12 @@ class ExportService:
             format=format,
         )
         path = Path(path)
+        if path.exists() and not os.access(path, os.W_OK):
+            raise PermissionError(f"No write permission for: {path}")
+        if not path.parent.exists():
+            raise FileNotFoundError(f"Directory does not exist: {path.parent}")
+        if not os.access(path.parent, os.W_OK):
+            raise PermissionError(f"No write permission for directory: {path.parent}")
 
         if format is None:
             format = path.suffix.lstrip(".")
@@ -548,7 +565,9 @@ class ExportService:
                 with ZipFile(path, "r") as zipf:
                     for member in zipf.namelist():
                         dest = (tmpdir_path / member).resolve()
-                        if not str(dest).startswith(str(tmpdir_path.resolve())):
+                        try:
+                            dest.relative_to(tmpdir_path.resolve())
+                        except ValueError:
                             raise ValueError(
                                 f"Zip path traversal detected: {member}"
                             )
@@ -716,8 +735,11 @@ class ExportService:
                     fig, ax, y = _new_page(pdf, figures)
                     for line in report_lines:
                         for subline in line.split("\n"):
-                            # GUI-IO-019: page-break when near bottom margin
-                            if y < 0.05:
+                            # GUI-IO-019: page-break when near bottom margin.
+                            # Safety margin set to 0.08 (not 0.05) to account
+                            # for variable-height text (e.g. multi-line labels,
+                            # large fonts) that may exceed the nominal 0.03 step.
+                            if y < 0.08:
                                 pdf.savefig(fig, bbox_inches="tight")
                                 plt.close(fig)
                                 figures.pop()

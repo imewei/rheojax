@@ -80,6 +80,13 @@ class DataService:
         # so combining again would double-count G'').  F-IO-R3-001.
         if dataset.y2_data is not None and y is not None and not np.iscomplexobj(y):
             y2 = np.asarray(dataset.y2_data)
+            if np.any(y2 < 0):
+                logger.warning(
+                    "Negative loss modulus values detected — sign convention may be inverted. "
+                    "Some data formats store -G''. Consider flipping the sign.",
+                    n_negative=int(np.sum(y2 < 0)),
+                    total=len(y2),
+                )
             y = y + 1j * y2
 
         # Determine domain from test_mode
@@ -467,16 +474,20 @@ class DataService:
         # that DMTA data keeps its tensile-mode context after unit conversion.
         metadata = dict(data.metadata)
         deformation_mode = getattr(data, "deformation_mode", None)
-        if deformation_mode and deformation_mode != "shear":
+        # Preserve all deformation modes (including "shear") so that DMTA data
+        # retains its tensile-mode context and shear data is not silently dropped
+        # after unit conversion (GUI-013).
+        if deformation_mode is not None:
             # deformation_mode property reads from metadata["deformation_mode"];
             # write it back explicitly so the new RheoData inherits it.
             metadata["deformation_mode"] = deformation_mode
         # poisson_ratio is stored in metadata by the BaseModel fit boundary.
         # getattr falls back to None for plain RheoData objects that have no
         # explicit poisson_ratio attribute beyond what is in metadata.
-        poisson_ratio = metadata.get("poisson_ratio") or getattr(
-            data, "_poisson_ratio", None
-        )
+        # Use explicit None check instead of `or` to preserve 0.0 (GUI-004).
+        poisson_ratio = metadata.get("poisson_ratio")
+        if poisson_ratio is None:
+            poisson_ratio = getattr(data, "_poisson_ratio", None)
         if poisson_ratio is not None:
             metadata["poisson_ratio"] = poisson_ratio
         return RheoData(
@@ -496,13 +507,23 @@ class DataService:
         Analyzes column names, data ranges, and characteristics to determine
         the most likely test mode.
 
-        Detection priority:
+        Detection priority: oscillation > flow > creep > relaxation > unknown
+        Each check is exclusive — first match wins.
+
+        Detailed priority order:
         1. Explicit metadata
         2. Domain indicator (frequency -> oscillation)
         3. Complex data (oscillation)
-        4. Monotonic trends (relaxation/creep) - checked BEFORE flow
-        5. Power-law relationship (flow)
-        6. Log-spaced x-axis (oscillation frequency sweep)
+        4. Flow: strong negative log-log correlation (< -0.7) spanning >= 1.5
+           decades AND (not monotonically decreasing OR true power-law with
+           log-spaced x).  Checked before relaxation/creep because shear-
+           thinning flow curves are monotonically decreasing and would
+           otherwise be misclassified.
+        5. Relaxation: y monotonically decreasing (>= 95%) AND x >= 0 AND
+           NOT already matched as flow.
+        6. Creep: y monotonically increasing (>= 95%) AND x >= 0.
+        7. Log-spaced x-axis (oscillation frequency sweep) AND y not
+           monotonically decreasing.
 
         Parameters
         ----------
@@ -860,7 +881,10 @@ class DataService:
             )
 
             # X-axis patterns (frequency, time, rate)
-            # Exclude temperature which contains 't'
+            # Exclude temperature which contains 't'.
+            # Exclude matching uses substring check intentionally — compound names
+            # like "frequency_temperature" ARE temperature columns and should be
+            # excluded from X-axis candidates.
             x_patterns = [
                 "time",
                 "freq",

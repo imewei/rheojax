@@ -140,12 +140,16 @@ class WorkerPool(QObject):
     @classmethod
     def reset(cls) -> None:
         """Reset the singleton instance (useful for testing)."""
-        logger.debug("Resetting worker pool singleton")
-        if cls._instance is not None:
-            cls._instance.shutdown(wait=False)
-        cls._instance = None
-        cls._initialized = False
-        logger.debug("Worker pool singleton reset complete")
+        # GUI-R6-010: Acquire _singleton_lock for the entire operation to
+        # prevent races where another thread calls instance() between the
+        # check and clear.
+        with cls._singleton_lock:
+            logger.debug("Resetting worker pool singleton")
+            if cls._instance is not None:
+                cls._instance.shutdown(wait=False)
+            cls._instance = None
+            cls._initialized = False
+            logger.debug("Worker pool singleton reset complete")
 
     def __init__(self, max_threads: int = 4):
         """Initialize worker pool.
@@ -496,21 +500,28 @@ class WorkerPool(QObject):
             # Fallback: try to find job_id from worker attribute
             job_id = self._job_id_from_result_fallback()
             if job_id:
+                with self._job_lock:
+                    if job_id not in self._active_jobs:
+                        logger.warning("Stale job %s — skipping cleanup", job_id)
+                        return
                 self._on_job_completed(job_id, result)
             else:
                 logger.error(
                     "Worker completed but job_id lookup failed (sender=%s).",
                     self.sender(),
                 )
-                # Clean up stale jobs to prevent is_busy() from being stuck
                 with self._job_lock:
+                    active_count = len(self._active_jobs)
                     if self._active_jobs:
-                        stale_id = next(iter(self._active_jobs))
-                        logger.warning("Cleaning up stale job %s", stale_id)
-                        self._cleanup_job(stale_id)
+                        logger.error(
+                            "Worker completed but job_id is unresolvable; %d active jobs remain",
+                            active_count,
+                        )
                 self.job_failed.emit(
                     "",
-                    "Worker completed but job ID could not be determined."
+                    f"Worker completed but job ID could not be determined "
+                    f"({active_count} concurrent jobs active). "
+                    f"This may indicate a race condition in job tracking.",
                 )
 
     @Slot(str)
@@ -521,6 +532,10 @@ class WorkerPool(QObject):
         else:
             job_id = self._job_id_from_result_fallback()
             if job_id:
+                with self._job_lock:
+                    if job_id not in self._active_jobs:
+                        logger.warning("Stale job %s — skipping cleanup", job_id)
+                        return
                 self._on_job_failed(job_id, error_message)
             else:
                 logger.error(
@@ -538,6 +553,10 @@ class WorkerPool(QObject):
         else:
             job_id = self._job_id_from_result_fallback()
             if job_id:
+                with self._job_lock:
+                    if job_id not in self._active_jobs:
+                        logger.warning("Stale job %s — skipping cleanup", job_id)
+                        return
                 self._on_job_cancelled(job_id)
 
     def _job_id_from_result_fallback(self) -> str | None:

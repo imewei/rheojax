@@ -134,13 +134,14 @@ class DataPage(QWidget):
         example_layout = QHBoxLayout(example_group)
         self._example_combo = QComboBox()
         self._example_combo.setPlaceholderText("Select an example dataset")
+        _PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # rheojax/
         self._example_paths = {
-            "Polypropylene Relaxation (basic)": "examples/data/experimental/polypropylene_relaxation.csv",
-            "Polystyrene Creep (basic)": "examples/data/experimental/polystyrene_creep.csv",
-            "Frequency Sweep TTS (mastercurve)": "examples/data/experimental/frequency_sweep_tts.txt",
-            "Multi-technique (advanced)": "examples/data/experimental/multi_technique.txt",
-            "OWChirp TTS": "examples/data/experimental/owchirp_tts.txt",
-            "OWChirp TCS": "examples/data/experimental/owchirp_tcs.txt",
+            "Polypropylene Relaxation (basic)": str(_PACKAGE_ROOT / "examples/data/experimental/polypropylene_relaxation.csv"),
+            "Polystyrene Creep (basic)": str(_PACKAGE_ROOT / "examples/data/experimental/polystyrene_creep.csv"),
+            "Frequency Sweep TTS (mastercurve)": str(_PACKAGE_ROOT / "examples/data/experimental/frequency_sweep_tts.txt"),
+            "Multi-technique (advanced)": str(_PACKAGE_ROOT / "examples/data/experimental/multi_technique.txt"),
+            "OWChirp TTS": str(_PACKAGE_ROOT / "examples/data/experimental/owchirp_tts.txt"),
+            "OWChirp TCS": str(_PACKAGE_ROOT / "examples/data/experimental/owchirp_tcs.txt"),
         }
         for label in self._example_paths:
             self._example_combo.addItem(label)
@@ -389,8 +390,16 @@ class DataPage(QWidget):
             )
             return
 
-        # Memory guard: warn on large files (>50 MB)
+        # Memory guard: hard limit at 500 MB, soft warning at 50 MB
         size_bytes = path_obj.stat().st_size
+        if size_bytes > 500 * 1024 * 1024:  # 500 MB hard limit
+            QMessageBox.critical(
+                self,
+                "File Too Large",
+                f"File size ({size_bytes / (1024**2):.0f} MB) exceeds the 500 MB limit.\n"
+                "Consider splitting the file or using chunked loading.",
+            )
+            return
         if size_bytes > 50 * 1024 * 1024:
             resp = QMessageBox.warning(
                 self,
@@ -428,13 +437,35 @@ class DataPage(QWidget):
         self._file_name_label.setText(f"Loading: {self._current_file_path.name}...")
         self._preview_table.setEnabled(False)
 
+        if hasattr(self, '_active_preview_worker') and self._active_preview_worker is not None:
+            # Disconnect signals from old worker to prevent stale callbacks
+            try:
+                self._active_preview_worker.signals.completed.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                self._active_preview_worker.signals.failed.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            self._active_preview_worker = None
+
+        # R6-GUI-008: Generation counter to discard results from stale workers
+        if not hasattr(self, "_preview_generation"):
+            self._preview_generation = 0
+        self._preview_generation += 1
+        gen = self._preview_generation
+
         worker = PreviewWorker(
             data_service=self._data_service,
             file_path=self._current_file_path,
             max_rows=100,
         )
-        worker.signals.completed.connect(self._on_preview_loaded)
-        worker.signals.failed.connect(self._on_preview_failed)
+        worker.signals.completed.connect(
+            lambda result, g=gen: self._on_preview_loaded(result) if g == self._preview_generation else None
+        )
+        worker.signals.failed.connect(
+            lambda err, g=gen: self._on_preview_failed(err) if g == self._preview_generation else None
+        )
         self._active_preview_worker = worker
         QThreadPool.globalInstance().start(worker)
 
@@ -458,9 +489,10 @@ class DataPage(QWidget):
         if self._current_file_path:
             self._file_name_label.setText(f"File: {self._current_file_path.name}")
 
-        # Detect file format for user feedback (lightweight I/O — reads only
-        # the first 2 KB of the file header; acceptable here since it's
-        # user-triggered and fast)
+        # Detect file format for user feedback.
+        # NOTE: Reads first 2KB from file on main thread. Acceptable for local
+        # files; may briefly block UI for network-mounted paths.
+        # TODO(perf): Move _detect_file_format() into PreviewWorker to avoid blocking main thread
         detected_format = self._detect_file_format()
         metadata["format"] = detected_format
 
@@ -481,7 +513,13 @@ class DataPage(QWidget):
         # Populate data
         for row_idx, row_data in enumerate(self._preview_data):
             for col_idx, value in enumerate(row_data):
-                item = QTableWidgetItem(str(value))
+                if isinstance(value, np.ndarray):
+                    display_value = f"[{len(value)} values]"
+                elif isinstance(value, (list, tuple)) and len(str(value)) > 50:
+                    display_value = f"[{len(value)} items]"
+                else:
+                    display_value = str(value)
+                item = QTableWidgetItem(display_value)
                 self._preview_table.setItem(row_idx, col_idx, item)
 
         # Update column mappers
@@ -523,6 +561,7 @@ class DataPage(QWidget):
         self._file_size_label.setText("")
         self._preview_table.clear()
         self._metadata_text.clear()
+        QMessageBox.critical(self, "Preview Failed", f"Failed to preview file:\n\n{error_msg}")
 
     def _detect_file_format(self) -> str:
         """Detect the file format for user feedback."""
@@ -535,10 +574,21 @@ class DataPage(QWidget):
         # Check for TRIOS patterns
         if suffix == ".txt":
             try:
-                with open(
-                    self._current_file_path, encoding="utf-8", errors="ignore"
-                ) as f:
-                    first_lines = f.read(2000)
+                first_lines = ""
+                for encoding in ("utf-8", "utf-16", "latin-1"):
+                    try:
+                        with open(
+                            self._current_file_path, encoding=encoding, errors="strict"
+                        ) as f:
+                            first_lines = f.read(2000)
+                        break
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+                else:
+                    with open(
+                        self._current_file_path, encoding="utf-8", errors="replace"
+                    ) as f:
+                        first_lines = f.read(2000)
                 if "trios" in first_lines.lower() or "[file" in first_lines.lower():
                     return "TA Instruments TRIOS"
                 if (
@@ -552,10 +602,21 @@ class DataPage(QWidget):
 
         if suffix == ".csv":
             try:
-                with open(
-                    self._current_file_path, encoding="utf-8", errors="ignore"
-                ) as f:
-                    first_lines = f.read(2000)
+                first_lines = ""
+                for encoding in ("utf-8", "utf-16", "latin-1"):
+                    try:
+                        with open(
+                            self._current_file_path, encoding=encoding, errors="strict"
+                        ) as f:
+                            first_lines = f.read(2000)
+                        break
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+                else:
+                    with open(
+                        self._current_file_path, encoding="utf-8", errors="replace"
+                    ) as f:
+                        first_lines = f.read(2000)
                 if (
                     "rheometer" in first_lines.lower()
                     or "rheocompass" in first_lines.lower()
@@ -690,6 +751,18 @@ class DataPage(QWidget):
         if test_mode == "Auto-detect":
             test_mode = None  # Let service auto-detect
 
+        # Validate column selections before launching worker
+        if not x_col or not y_col:
+            QMessageBox.warning(self, "Invalid Selection", "Please select both X and Y columns.")
+            return
+        if x_col == y_col:
+            QMessageBox.warning(
+                self,
+                "Invalid Selection",
+                "X and Y columns must be different.",
+            )
+            return
+
         # Show loading state
         self._file_name_label.setText(f"Importing: {self._current_file_path.name}...")
 
@@ -800,7 +873,7 @@ class DataPage(QWidget):
             "Data import completed",
             filepath=str(self._current_file_path),
             dataset_count=len(datasets),
-            record_count=sum(len(ds.x) for ds in datasets),
+            record_count=sum(len(ds.x_data) if ds.x_data is not None else 0 for ds in datasets),
             page="DataPage",
         )
 
@@ -808,6 +881,12 @@ class DataPage(QWidget):
         if len(datasets) > 1:
             self._file_name_label.setText(
                 f"Imported {len(datasets)} segments from {self._current_file_path.name}"
+            )
+            QMessageBox.information(
+                self,
+                "Multi-Segment File",
+                f"Imported {len(datasets)} segments from the file.\n"
+                f"The first segment is now active.",
             )
         else:
             self._file_name_label.setText(f"File: {self._current_file_path.name}")
@@ -826,7 +905,9 @@ class DataPage(QWidget):
             error=error_msg,
             page="DataPage",
         )
+        self._preview_data = None
         self._file_name_label.setText(f"Import error: {error_msg}")
+        QMessageBox.critical(self, "Import Failed", f"Failed to load file:\n\n{error_msg}")
         store = StateStore()
         store.dispatch(
             "IMPORT_DATA_FAILED",

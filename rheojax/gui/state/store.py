@@ -86,11 +86,16 @@ class DatasetState:
     created_at: datetime = field(default_factory=datetime.now)
 
     def clone(self) -> "DatasetState":
-        """Create a deep copy of this dataset state."""
+        """Create a deep copy of this dataset state.
+
+        NOTE: x_data/y_data/y2_data are shared references by design to avoid
+        copying large arrays. Data should be converted to NumPy at the import
+        boundary (DataService/ImportWorker) so these are never live JAX device arrays.
+        """
         return replace(
             self,
             metadata=copy.deepcopy(self.metadata),
-            x_data=self.x_data,  # Keep reference to JAX arrays
+            x_data=self.x_data,  # Keep reference to avoid copying large arrays (GUI-010)
             y_data=self.y_data,
             y2_data=self.y2_data,
         )
@@ -352,8 +357,12 @@ class StateStore:
     @classmethod
     def reset(cls) -> None:
         """Reset the singleton instance (useful for testing)."""
-        logger.debug("Resetting store singleton", class_name=cls.__name__)
-        cls._instance = None
+        # GUI-R6-006: Acquire _singleton_lock for the entire operation to
+        # prevent races where another thread calls instance() between the
+        # check and clear (mirrors WorkerPool.reset() pattern).
+        with cls._singleton_lock:
+            logger.debug("Resetting store singleton", class_name=cls.__name__)
+            cls._instance = None
 
     def get_state(self) -> AppState:
         """Get the current application state (read-only).
@@ -435,7 +444,13 @@ class StateStore:
             if reducer is not None:
                 self.update_state(reducer, emit_signal=True)
 
-            # Emit relevant signals for UI reactivity
+            # Domain signals are emitted intentionally outside the lock to avoid
+            # deadlocks: a signal consumer that calls dispatch() or get_state()
+            # would deadlock if the lock were still held here.  Consumers must
+            # therefore snapshot the values they need from the action payload
+            # directly rather than re-reading store state from within a signal
+            # handler, as a concurrent dispatch may have already advanced
+            # self._state by the time the handler runs.
             if action_type == "SET_ACTIVE_MODEL":
                 model_name = action.get("model_name", "")
                 self.emit_signal("model_selected", model_name)
@@ -461,13 +476,14 @@ class StateStore:
                 error = action.get("error", "")
                 model_name = action.get("model_name", "")
                 dataset_id = action.get("dataset_id", "")
+                # GUI-R6-008: Removed exc_info=True — there is no active
+                # exception here; this is a dispatch handler, not a catch block.
                 logger.error(
                     "Fitting failed",
                     action_type=action_type,
                     model_name=model_name,
                     dataset_id=dataset_id,
                     error=error,
-                    exc_info=True,
                 )
                 # F-005 fix: pass model_name and dataset_id (not empty strings)
                 self.emit_signal("fit_failed", model_name, dataset_id, error)
@@ -488,13 +504,20 @@ class StateStore:
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
+                # GUI-R6-005: Extract model_name/dataset_id so subscribers can
+                # update the correct UI state (empty strings caused stale "in
+                # progress" indicators).
+                model_name = action.get("model_name", "")
+                dataset_id = action.get("dataset_id", "")
+                # GUI-R6-008: Removed exc_info=True — no active exception here
                 logger.error(
                     "Bayesian inference failed",
                     action_type=action_type,
+                    model_name=model_name,
+                    dataset_id=dataset_id,
                     error=error,
-                    exc_info=True,
                 )
-                self.emit_signal("bayesian_failed", "", "", error)
+                self.emit_signal("bayesian_failed", model_name, dataset_id, error)
 
             elif action_type == "STORE_BAYESIAN_RESULT":
                 payload = action.get("payload", action)
@@ -527,11 +550,11 @@ class StateStore:
 
             elif action_type == "IMPORT_DATA_FAILED":
                 error = action.get("error", "")
+                # GUI-R6-008: Removed exc_info=True — no active exception here
                 logger.error(
                     "Data import failed",
                     action_type=action_type,
                     error=error,
-                    exc_info=True,
                 )
 
     def update_state(
@@ -573,12 +596,16 @@ class StateStore:
 
             # Copy subscriber list to avoid mutation during iteration
             subscribers = list(self._subscribers)
+            state_snapshot = self._state.clone()
 
         # Notify subscribers outside the lock to prevent deadlocks.
         # Pass a deep clone (snapshot) so that subscribers cannot mutate
         # the live state object. Nested dispatches triggered by a subscriber
         # will still update self._state and be visible to subsequent reads.
-        state_snapshot = self._state.clone()
+        # IMPORTANT (GUI-003): The snapshot passed to subscribers may become
+        # stale if a subscriber triggers a nested dispatch that further mutates
+        # self._state.  Subscribers that need the latest state must call
+        # self.get_state() rather than relying on the snapshot argument.
         for subscriber in subscribers:
             try:
                 subscriber(state_snapshot)
@@ -589,9 +616,22 @@ class StateStore:
                     exc_info=True,
                 )
 
-        # Emit Qt signal if available
+        # Emit Qt signal via QueuedConnection to ensure delivery on the main
+        # thread regardless of which thread calls update_state() (GUI-005).
+        # QueuedConnection posts the call to the event loop of the signal's
+        # owning thread (main thread) so it is safe to call from workers.
         if emit_signal:
-            self.emit_signal("state_changed")
+            try:
+                from PySide6.QtCore import QMetaObject, Qt
+
+                QMetaObject.invokeMethod(
+                    self._signals,
+                    "_emit_state_changed",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+            except (ImportError, RuntimeError, AttributeError):
+                # Fall back to direct emit when Qt is unavailable (headless/tests)
+                self.emit_signal("state_changed")
 
     def _get_changed_keys(self, old_state: AppState, new_state: AppState) -> list[str]:
         """Compute which top-level keys changed between two states."""
@@ -623,7 +663,12 @@ class StateStore:
         ]:
             old_val = getattr(old_state, attr, None)
             new_val = getattr(new_state, attr, None)
-            if old_val != new_val:
+            if old_val is new_val:
+                continue
+            try:
+                if old_val != new_val:
+                    changed.append(attr)
+            except (ValueError, TypeError):
                 changed.append(attr)
         return changed
 
@@ -697,44 +742,19 @@ class StateStore:
             return updater
 
         if action_type == "AUTO_DETECT_TEST_MODE":
+            target_id = action.get("dataset_id")
+            inferred = action.get("inferred_mode")
 
             def updater(state: AppState) -> AppState:
-                dataset_id = state.active_dataset_id
+                dataset_id = target_id or state.active_dataset_id
                 if not dataset_id or dataset_id not in state.datasets:
                     return state
-
+                if not inferred:
+                    return state
                 ds = state.datasets[dataset_id].clone()
-                if ds.x_data is None or ds.y_data is None:
-                    return state
-                try:
-                    from rheojax.core.data import RheoData
-                    from rheojax.gui.services.data_service import DataService
-
-                    svc = DataService()
-                    inferred = svc.detect_test_mode(
-                        RheoData(
-                            x=ds.x_data,
-                            y=ds.y_data,
-                            y_units=None,
-                            x_units=None,
-                            domain=ds.metadata.get("domain", "time"),
-                            metadata=ds.metadata,
-                            validate=False,
-                        )
-                    )
-                    if inferred:
-                        ds.test_mode = inferred
-                        ds.metadata = {**ds.metadata, "test_mode": inferred}
-                        ds.is_modified = True
-                except Exception:
-                    logger.error(
-                        "Auto-detect test mode failed",
-                        dataset_id=dataset_id,
-                        exc_info=True,
-                    )
-                    # Leave dataset unchanged on failure
-                    return state
-
+                ds.test_mode = inferred
+                ds.metadata = {**ds.metadata, "test_mode": inferred}
+                ds.is_modified = True
                 datasets = state.datasets.copy()
                 datasets[dataset_id] = ds
                 return replace(state, datasets=datasets, is_modified=True)
@@ -920,10 +940,13 @@ class StateStore:
             return updater
 
         if action_type == "SET_ACTIVE_DATASET":
+            # Support both flat action and payload-wrapped dispatch (GUI-017)
+            dataset_id = action.get("dataset_id") or (action.get("payload") or {}).get(
+                "dataset_id"
+            )
 
             def updater(state: AppState) -> AppState:
-                dataset_id = action.get("dataset_id")
-                if dataset_id in state.datasets:
+                if dataset_id and dataset_id in (state.datasets or {}):
                     return replace(state, active_dataset_id=dataset_id)
                 return state
 
@@ -1101,6 +1124,8 @@ class StateStore:
                 pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
                 pipeline.current_step = PipelineStep.FIT
 
+                # R6-GUI-011: Explicitly set active model/dataset so downstream
+                # UI code (export, plot selection) knows the current context.
                 return replace(
                     state,
                     fit_results=fits,
@@ -1134,8 +1159,9 @@ class StateStore:
                         r_hat=diag.get("r_hat", {}) or getattr(result, "r_hat", {}),
                         ess=diag.get("ess", {}) or getattr(result, "ess", {}),
                         divergences=int(
-                            diag.get("divergences", 0)
-                            or getattr(result, "divergences", 0)
+                            diag.get("divergences")
+                            if diag.get("divergences") is not None
+                            else getattr(result, "divergences", 0)
                         ),
                         credible_intervals=getattr(result, "credible_intervals", {}),
                         mcmc_time=float(
@@ -1253,7 +1279,7 @@ class StateStore:
 
             # Copy subscribers list and capture snapshot inside the lock
             subscribers = list(self._subscribers)
-            state_snapshot = copy.copy(self._state)
+            state_snapshot = self._state.clone()
 
         # Notify subscribers outside the lock using snapshot to prevent stale
         # references if a nested dispatch replaces self._state mid-iteration.
@@ -1267,7 +1293,17 @@ class StateStore:
                     exc_info=True,
                 )
 
-        self.emit_signal("state_changed")
+        # Emit via QueuedConnection for thread safety (matches update_state path)
+        try:
+            from PySide6.QtCore import QMetaObject, Qt
+
+            QMetaObject.invokeMethod(
+                self._signals,
+                "_emit_state_changed",
+                Qt.ConnectionType.QueuedConnection,
+            )
+        except (ImportError, RuntimeError, AttributeError):
+            self.emit_signal("state_changed")
 
         return True
 
@@ -1300,7 +1336,7 @@ class StateStore:
 
             # Copy subscribers list and capture snapshot inside the lock
             subscribers = list(self._subscribers)
-            state_snapshot = copy.copy(self._state)
+            state_snapshot = self._state.clone()
 
         # Notify subscribers outside the lock using snapshot to prevent stale
         # references if a nested dispatch replaces self._state mid-iteration.
@@ -1314,7 +1350,17 @@ class StateStore:
                     exc_info=True,
                 )
 
-        self.emit_signal("state_changed")
+        # Emit via QueuedConnection for thread safety (matches update_state path)
+        try:
+            from PySide6.QtCore import QMetaObject, Qt
+
+            QMetaObject.invokeMethod(
+                self._signals,
+                "_emit_state_changed",
+                Qt.ConnectionType.QueuedConnection,
+            )
+        except (ImportError, RuntimeError, AttributeError):
+            self.emit_signal("state_changed")
 
         return True
 

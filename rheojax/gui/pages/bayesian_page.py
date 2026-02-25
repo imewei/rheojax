@@ -51,6 +51,7 @@ from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.actions import (
     bayesian_failed,
+    fail_bayesian,
     start_bayesian,
     store_bayesian_result,
     update_bayesian_progress,
@@ -92,7 +93,7 @@ class BayesianPage(QWidget):
         self._store = StateStore()
         self._bayesian_service = BayesianService()
         self._model_service = ModelService()
-        self._worker_pool = WorkerPool()
+        self._worker_pool = WorkerPool.instance()
         self._current_worker: BayesianWorker | None = None
         self._is_running = False
         self._current_preset: str = "custom"
@@ -684,6 +685,11 @@ class BayesianPage(QWidget):
                 )
                 dataset = self._store.get_dataset(dataset_id)
             except Exception:
+                logger.warning(
+                    "Failed to load preset dataset",
+                    filepath=str(self._preset_dataset_path),
+                    exc_info=True,
+                )
                 dataset = None
 
         if dataset is None:
@@ -755,7 +761,7 @@ class BayesianPage(QWidget):
                 self._current_worker.signals.failed.disconnect()
                 self._current_worker.signals.progress.disconnect()
             except (RuntimeError, TypeError):
-                pass  # Already disconnected or never connected
+                logger.debug("Signal already disconnected", exc_info=True)
 
         self._current_worker = BayesianWorker(
             model_name=model_name,
@@ -1010,13 +1016,19 @@ class BayesianPage(QWidget):
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
 
-        self._store.dispatch(bayesian_failed(error_msg))
+        fail_bayesian(
+            model_name=getattr(self, "_submitted_model_name", ""),
+            dataset_id=getattr(self, "_submitted_dataset_id", ""),
+            error=error_msg,
+        )
         self._status_text.append(f"Error: {error_msg}")
+        # GUI-R6-023: This is a Qt slot receiving an error string, not an
+        # except block, so exc_info=True would log a misleading unrelated
+        # exception (or None). Removed exc_info here.
         logger.error(
             "Bayesian inference error",
             error_msg=error_msg,
             page="BayesianPage",
-            exc_info=True,
         )
         QMessageBox.critical(self, "Inference Error", error_msg)
 
@@ -1140,9 +1152,16 @@ class BayesianPage(QWidget):
 
     def _set_fit_plot_figure(self, fig) -> None:
         """Replace the Fit Plot canvas figure."""
+        old_fig = self._fit_plot_canvas.figure
+        if old_fig is not None and old_fig is not fig:
+            # R6-GUI-002: Don't plt.close() a figure that was embedded in a
+            # FigureCanvasQTAgg — it destroys the C++ object while the canvas
+            # may still reference it. Just clear the old figure instead.
+            old_fig.clear()
+
         self._fit_plot_canvas.figure = fig
         self._fit_plot_canvas.canvas.figure = fig
-        self._fit_plot_canvas.axes = fig.gca()
+        self._fit_plot_canvas.axes = fig.get_axes()[0] if fig.get_axes() else None
         self._fit_plot_canvas.canvas.draw_idle()
         self._fit_plot_placeholder.hide()
 
@@ -1356,7 +1375,9 @@ class BayesianPage(QWidget):
 
         fit_like = SimpleNamespace(model_name=model_name, y_fit=y_center)
 
-        fig = PlotService().create_fit_plot(
+        if not hasattr(self, "_plot_service") or self._plot_service is None:
+            self._plot_service = PlotService()
+        fig = self._plot_service.create_fit_plot(
             rheo_data,
             fit_like,
             style="default",

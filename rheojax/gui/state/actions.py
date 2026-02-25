@@ -218,8 +218,10 @@ def update_parameter(name: str, value: float) -> None:
         New parameter value
     """
     store = StateStore()
+    captured_model_name = [None]
 
     def updater(state: AppState) -> AppState:
+        captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
             return state
 
@@ -231,8 +233,8 @@ def update_parameter(name: str, value: float) -> None:
 
         return replace(state, model_params=new_params)
 
-    model_name = store.get_state().active_model_name
     store.update_state(updater)
+    model_name = captured_model_name[0]
 
     if model_name:
         store.emit_signal("model_params_changed", model_name)
@@ -251,8 +253,10 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
         New maximum bound
     """
     store = StateStore()
+    captured_model_name = [None]
 
     def updater(state: AppState) -> AppState:
+        captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
             return state
 
@@ -264,8 +268,8 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
 
         return replace(state, model_params=new_params)
 
-    model_name = store.get_state().active_model_name
     store.update_state(updater)
+    model_name = captured_model_name[0]
 
     if model_name:
         store.emit_signal("model_params_changed", model_name)
@@ -282,8 +286,10 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
         Whether the parameter is fixed
     """
     store = StateStore()
+    captured_model_name = [None]
 
     def updater(state: AppState) -> AppState:
+        captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
             return state
 
@@ -295,8 +301,8 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
 
         return replace(state, model_params=new_params)
 
-    model_name = store.get_state().active_model_name
     store.update_state(updater)
+    model_name = captured_model_name[0]
 
     if model_name:
         store.emit_signal("model_params_changed", model_name)
@@ -376,11 +382,13 @@ def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
+    # GUI-R6-009: dispatch() already emits fit_failed in the FITTING_FAILED
+    # handler — the explicit emit_signal here was a duplicate causing
+    # connected slots (error dialogs, counters) to fire twice.
     store.dispatch(
         "FITTING_FAILED",
         {"model_name": model_name, "dataset_id": dataset_id, "error": error},
     )
-    store.emit_signal("fit_failed", model_name, dataset_id, error)
 
 
 def set_active_model(model_name: str) -> dict:
@@ -566,11 +574,12 @@ def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
     """
     store = StateStore()
 
+    # GUI-R6-009: dispatch() already emits bayesian_failed in the
+    # BAYESIAN_FAILED handler — removed duplicate emit_signal.
     store.dispatch(
         "BAYESIAN_FAILED",
         {"model_name": model_name, "dataset_id": dataset_id, "error": error},
     )
-    store.emit_signal("bayesian_failed", model_name, dataset_id, error)
 
 
 def update_bayesian_progress(progress: float) -> dict:

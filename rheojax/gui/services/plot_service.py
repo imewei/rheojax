@@ -671,51 +671,52 @@ class PlotService:
         logger.info("Generating plot", plot_type="data")
 
         try:
-            self._apply_style_context(style)
-            palette = self._get_palette(style)
-            fig = Figure(figsize=(8, 6))
-            ax = fig.add_subplot(111)
+            rc = self._get_rc_params(style)
+            with plt.rc_context(rc):
+                palette = self._get_palette(style)
+                fig = Figure(figsize=(8, 6))
+                ax = fig.add_subplot(111)
 
-            x = np.asarray(data.x)
-            y = np.asarray(data.y)
+                x = np.asarray(data.x)
+                y = np.asarray(data.y)
 
-            if test_mode is None:
-                test_mode = data.metadata.get("test_mode", "unknown")
+                if test_mode is None:
+                    test_mode = data.metadata.get("test_mode", "unknown")
 
-            logger.debug(
-                "Data plot configuration",
-                data_shape=x.shape,
-                is_complex=np.iscomplexobj(y),
-                resolved_test_mode=test_mode,
-            )
-
-            # Plot based on type
-            if np.iscomplexobj(y):
-                G_prime = np.abs(np.real(y))
-                G_double_prime = np.abs(np.imag(y))
-                eps = 1e-30  # Floor to avoid log(0)
-                ax.loglog(
-                    x, np.maximum(G_prime, eps), "o", label="G'", color=palette[0]
+                logger.debug(
+                    "Data plot configuration",
+                    data_shape=x.shape,
+                    is_complex=np.iscomplexobj(y),
+                    resolved_test_mode=test_mode,
                 )
-                ax.loglog(
-                    x,
-                    np.maximum(G_double_prime, eps),
-                    "s",
-                    label='G"',
-                    color=palette[1],
-                )
-                ax.set_xlabel(data.x_units or "Frequency (rad/s)")
-                ax.set_ylabel(data.y_units or "Modulus (Pa)")
-            else:
-                ax.loglog(x, y, "o", color=palette[0])
-                ax.set_xlabel(data.x_units or "X")
-                ax.set_ylabel(data.y_units or "Y")
 
-            ax.set_title(f"Rheological Data ({test_mode})")
-            if np.iscomplexobj(y):
-                ax.legend()
+                # Plot based on type
+                if np.iscomplexobj(y):
+                    G_prime = np.abs(np.real(y))
+                    G_double_prime = np.abs(np.imag(y))
+                    eps = 1e-30  # Floor to avoid log(0)
+                    ax.loglog(
+                        x, np.maximum(G_prime, eps), "o", label="G'", color=palette[0]
+                    )
+                    ax.loglog(
+                        x,
+                        np.maximum(G_double_prime, eps),
+                        "s",
+                        label='G"',
+                        color=palette[1],
+                    )
+                    ax.set_xlabel(data.x_units or "Frequency (rad/s)")
+                    ax.set_ylabel(data.y_units or "Modulus (Pa)")
+                else:
+                    ax.loglog(x, y, "o", color=palette[0])
+                    ax.set_xlabel(data.x_units or "X")
+                    ax.set_ylabel(data.y_units or "Y")
 
-            self.apply_style(fig, style)
+                ax.set_title(f"Rheological Data ({test_mode})")
+                if np.iscomplexobj(y):
+                    ax.legend()
+
+                self.apply_style(fig, style)
 
             logger.info("Plot generated", plot_type="data")
             logger.debug("create_data_plot completed successfully")
@@ -833,6 +834,12 @@ class PlotService:
             else:
                 plt.style.use("default")
                 logger.debug("Using default matplotlib style")
+
+    def invalidate_style_cache(self) -> None:
+        """Clear the RC params cache, forcing re-parse on next use."""
+        with self._rcparams_lock:
+            self._rc_cache.clear()
+        logger.debug("RC params cache invalidated")
 
     def _get_palette(self, style: str) -> list[str]:
         """Return palette respecting style."""

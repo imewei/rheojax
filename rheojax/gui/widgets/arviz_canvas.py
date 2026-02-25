@@ -331,7 +331,43 @@ class ArvizCanvas(BaseArviZWidget):
             widget=self.__class__.__name__,
             has_data=idata is not None,
         )
+        # Disable plot types that are invalid for current data
+        self._update_plot_type_availability()
         self._refresh_plot()
+
+    def _update_plot_type_availability(self) -> None:
+        """Enable/disable plot types based on available data."""
+        if self._inference_data is None:
+            return
+
+        try:
+            # Count number of parameters in posterior
+            posterior = getattr(self._inference_data, "posterior", None)
+            if posterior is not None:
+                n_params = len(list(posterior.data_vars))
+            else:
+                n_params = 0
+        except Exception:
+            n_params = 0
+
+        for idx in range(self._type_combo.count()):
+            plot_id = self._type_combo.itemData(idx)
+            # Pair plot requires at least 2 parameters
+            enabled = True
+            if plot_id == "pair" and n_params < 2:
+                enabled = False
+            # Energy plot requires sample_stats
+            if plot_id == "energy" and not self._has_sample_stats_energy():
+                enabled = False
+
+            # Use Qt item flags to enable/disable
+            model = self._type_combo.model()
+            item = model.item(idx)
+            if item is not None:
+                if enabled:
+                    item.setEnabled(True)
+                else:
+                    item.setEnabled(False)
 
     def set_hdi_prob(self, prob: float) -> None:
         """Set HDI probability for credible intervals.
@@ -451,10 +487,12 @@ class ArvizCanvas(BaseArviZWidget):
                         text.set_text(label_text.replace("\t", "  "))
 
         # Sanitize suptitle if present
-        if fig._suptitle and fig._suptitle.get_text():
-            suptitle = fig._suptitle.get_text()
-            if "\t" in suptitle:
-                fig.suptitle(suptitle.replace("\t", "  "))
+        # GUI-R6-008: Use getattr for private _suptitle (may not exist in all matplotlib versions)
+        suptitle_obj = getattr(fig, "_suptitle", None)
+        if suptitle_obj is not None:
+            suptitle_text = suptitle_obj.get_text()
+            if suptitle_text and "\t" in suptitle_text:
+                fig.suptitle(suptitle_text.replace("\t", "  "))
 
     @staticmethod
     def _close_new_figures(pre_fignums: set[int]) -> None:
@@ -486,10 +524,24 @@ class ArvizCanvas(BaseArviZWidget):
             ax_item = result.ravel()[0]
             if hasattr(ax_item, "figure"):
                 fig = ax_item.figure
+        elif isinstance(result, list) and result:
+            # GUI-R6-007: Some ArviZ versions return list-of-axes
+            first = result[0]
+            if isinstance(first, np.ndarray) and first.size > 0:
+                fig = first.ravel()[0].figure
+            elif hasattr(first, "figure"):
+                fig = first.figure
 
         if fig is None:
-            # Last resort fallback — least reliable under concurrency
-            fig = plt.gcf()
+            logger.error(
+                "ArviZ plot function returned unrecognized result type: %s. "
+                "Cannot extract figure safely under concurrency.",
+                type(result).__name__,
+            )
+            raise RuntimeError(
+                f"ArviZ plot function returned unrecognized result type: {type(result).__name__}. "
+                "Cannot extract figure safely under concurrency."
+            )
 
         self._copy_arviz_figure(fig)
         self._close_new_figures(pre)

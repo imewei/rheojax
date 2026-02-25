@@ -765,8 +765,8 @@ class RheoJAXMainWindow(QMainWindow):
         logger.info("Application shutdown complete")
         event.accept()
 
-    @Slot()
-    def _on_state_changed(self, state: AppState) -> None:
+    @Slot(object)
+    def _on_state_changed(self, state) -> None:
         """Handle state changes from store.
 
         Parameters
@@ -976,10 +976,12 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _do_import(self, config: dict) -> None:
         """Perform the deferred file import (blocking I/O)."""
+        # TODO: Use ImportWorker for non-blocking file import
         try:
             from rheojax.gui.services.data_service import DataService
 
             service = DataService()
+            QApplication.processEvents()  # Keep UI responsive during service init
             rheo_data = service.load_file(
                 file_path=config["file_path"],
                 x_col=config.get("x_column"),
@@ -1033,7 +1035,8 @@ class RheoJAXMainWindow(QMainWindow):
         try:
             from rheojax.gui.services.export_service import ExportService
 
-            fit_result = self.store.get_active_fit_result()
+            state = self.store.get_state()
+            fit_result = next(iter(state.fit_results.values()), None) if state.fit_results else None
             if fit_result:
                 path, _ = QFileDialog.getSaveFileName(
                     self, "Export Fit Parameters", "", "CSV (*.csv);;JSON (*.json)"
@@ -1458,16 +1461,59 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_auto_detect_mode(self) -> None:
         """Handle auto-detect test mode action."""
         logger.debug("Auto-detect test mode action triggered")
-        self.store.dispatch("AUTO_DETECT_TEST_MODE")
-        # Refresh the Data page preview with any inferred mode
-        active = self.store.get_state().active_dataset_id
-        if active:
+        state = self.store.get_state()
+        dataset_id = state.active_dataset_id
+        inferred_mode: str | None = None
+        if dataset_id and dataset_id in state.datasets:
+            ds = state.datasets[dataset_id]
+            if ds.x_data is not None and ds.y_data is not None:
+                # R6-GUI-006: Defer detect_test_mode to avoid blocking the main
+                # thread with statistical analysis on large datasets.
+                def _do_detect(ds_ref=ds, did=dataset_id):
+                    try:
+                        from rheojax.core.data import RheoData
+                        from rheojax.gui.services.data_service import DataService
+
+                        svc = DataService()
+                        mode = svc.detect_test_mode(
+                            RheoData(
+                                x=ds_ref.x_data,
+                                y=ds_ref.y_data,
+                                y_units=None,
+                                x_units=None,
+                                domain=ds_ref.metadata.get("domain", "time"),
+                                metadata=ds_ref.metadata,
+                                validate=False,
+                            )
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "Auto-detect test mode failed", error=str(exc), exc_info=True
+                        )
+                        self.log(f"Auto-detect test mode failed: {exc}")
+                        self.status_bar.show_message("Auto-detect test mode failed", 2500)
+                        return
+                    self.store.dispatch(
+                        "AUTO_DETECT_TEST_MODE",
+                        {"dataset_id": did, "inferred_mode": mode},
+                    )
+                    if did:
+                        try:
+                            self.data_page.show_dataset(did)
+                        except Exception:
+                            pass
+
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, _do_detect)
+                return
+        if dataset_id:
             try:
-                self.data_page.show_dataset(active)
-                inferred_mode = self.store.get_state().datasets.get(active).test_mode
-                logger.info("Auto-detected test mode", mode=inferred_mode)
+                self.data_page.show_dataset(dataset_id)
+                resolved_mode = self.store.get_state().datasets.get(dataset_id).test_mode
+                logger.info("Auto-detected test mode", mode=resolved_mode)
                 self.status_bar.show_message(
-                    f"Auto-detected test mode: {inferred_mode}", 2500
+                    f"Auto-detected test mode: {resolved_mode}", 2500
                 )
             except Exception as exc:
                 logger.error(

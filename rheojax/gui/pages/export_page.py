@@ -61,6 +61,11 @@ class ExportPage(QWidget):
         self._export_service = ExportService()
         self._plot_service = PlotService()
         self.setup_ui()
+        # R6-GUI-001: Use QueuedConnection so _perform_export runs after the
+        # current event handler returns, preventing button-click blocking.
+        from PySide6.QtCore import Qt
+
+        self.export_requested.connect(self._perform_export, Qt.ConnectionType.QueuedConnection)
 
     def _dataset_to_rheodata(self, dataset: Any) -> Any:
         """Convert DatasetState into RheoData for export."""
@@ -458,10 +463,12 @@ class ExportPage(QWidget):
         output_dir.mkdir(parents=True, exist_ok=True)
         exported = []
         total_size = 0
-        for name, ds in datasets.items():
+        for dataset_uuid, ds in datasets.items():
+            safe_name = getattr(ds, "name", None) or dataset_uuid
+            safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_name)
             try:
                 rheojax = self._dataset_to_rheodata(ds)
-                file_path = output_dir / f"{name}.{data_ext}"
+                file_path = output_dir / f"{safe_name}.{data_ext}"
                 self._export_service.export_data(rheojax, file_path, data_ext)
                 exported.append(str(file_path))
                 # Get file size if available
@@ -469,7 +476,7 @@ class ExportPage(QWidget):
                     total_size += file_path.stat().st_size
             except Exception as e:
                 logger.error(
-                    f"Failed to export dataset {name}: {e}",
+                    f"Failed to export dataset {safe_name}: {e}",
                     exc_info=True,
                 )
 
@@ -539,6 +546,22 @@ class ExportPage(QWidget):
         if self._check_raw_data.isChecked() and not state.datasets:
             return False, "No datasets loaded. Import data first."
 
+        active_id = getattr(state, "active_dataset_id", None)
+        # R6-GUI-004: Only validate Bayesian result presence when Bayesian
+        # export checkboxes are actually selected.
+        _needs_bayesian = (
+            self._check_intervals.isChecked()
+            or self._check_posteriors.isChecked()
+            or self._check_diagnostics.isChecked()
+        )
+        if _needs_bayesian and active_id and state.bayesian_results:
+            has_bayesian_for_active = any(
+                getattr(r, "dataset_id", k) == active_id
+                for k, r in state.bayesian_results.items()
+            )
+            if not has_bayesian_for_active:
+                return False, "No Bayesian results for the active dataset."
+
         return True, ""
 
     def _get_export_config(self) -> dict[str, Any]:
@@ -576,11 +599,7 @@ class ExportPage(QWidget):
             page="ExportPage",
         )
 
-        # Emit signal for main window to handle
         self.export_requested.emit(config)
-
-        # Also perform export directly
-        self._perform_export(config)
 
     def _perform_export(self, config: dict[str, Any]) -> None:
         """Perform the actual export operation.
@@ -590,6 +609,9 @@ class ExportPage(QWidget):
         config : dict
             Export configuration
         """
+        # TODO(perf): Move figure generation and file I/O into ExportWorker to avoid blocking main thread
+        import matplotlib.pyplot as plt
+
         state = self._store.get_state()
         output_dir = config["output_dir"]
         data_format = config["data_format"]
@@ -615,6 +637,8 @@ class ExportPage(QWidget):
                 ]
             )
             total_steps = max(total_steps, 1)
+            # NOTE: Progress granularity is per-category (not per-file).
+            # Single-category exports show 100% immediately after completion.
             current_step = 0
             active_id = state.active_dataset_id  # Moved here — used by all export branches
 
@@ -632,6 +656,7 @@ class ExportPage(QWidget):
                     exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -643,23 +668,22 @@ class ExportPage(QWidget):
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
                     if active_id and dataset_id_of_result != active_id:
                         continue
-                    filepath = (
-                        output_dir / f"credible_intervals_{result_id}.{data_format}"
-                    )
                     # Export intervals as parameters-like structure
                     intervals = getattr(result, "credible_intervals", None)
                     if intervals:
                         import json
 
+                        json_filepath = output_dir / f"credible_intervals_{result_id}.json"
                         intervals_dict = {
                             k: {"lower": v[0], "upper": v[1]}
                             for k, v in intervals.items()
                         }
-                        with open(filepath.with_suffix(".json"), "w") as f:
+                        with open(json_filepath, "w") as f:
                             json.dump(intervals_dict, f, indent=2)
-                        exported_files.append(str(filepath))
+                        exported_files.append(str(json_filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -678,6 +702,7 @@ class ExportPage(QWidget):
                     exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -726,6 +751,7 @@ class ExportPage(QWidget):
                             )
                             exported_files.append(str(fit_path))
                             fit_fig.clf()
+                            plt.close(fit_fig)
                             del fit_fig
                             QApplication.processEvents()
                             if progress.wasCanceled():
@@ -743,6 +769,7 @@ class ExportPage(QWidget):
                             )
                             exported_files.append(str(residuals_path))
                             residuals_fig.clf()
+                            plt.close(residuals_fig)
                             del residuals_fig
                             QApplication.processEvents()
                             if progress.wasCanceled():
@@ -766,6 +793,7 @@ class ExportPage(QWidget):
                         )
                         exported_files.append(str(trace_path))
                         trace_fig.clf()
+                        plt.close(trace_fig)
                         del trace_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -781,6 +809,7 @@ class ExportPage(QWidget):
                         )
                         exported_files.append(str(forest_path))
                         forest_fig.clf()
+                        plt.close(forest_fig)
                         del forest_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -796,6 +825,7 @@ class ExportPage(QWidget):
                         )
                         exported_files.append(str(pair_path))
                         pair_fig.clf()
+                        plt.close(pair_fig)
                         del pair_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -817,12 +847,19 @@ class ExportPage(QWidget):
                 progress.setLabelText("Exporting diagnostics...")
                 import json
 
+                def _json_safe_dict(d):
+                    """Convert numpy scalars to Python floats for JSON serialization."""
+                    if not isinstance(d, dict):
+                        return float(d) if hasattr(d, "item") else d
+                    return {k: _json_safe_dict(v) for k, v in d.items()}
+
                 for result_id, result in state.bayesian_results.items():
                     filepath = output_dir / f"diagnostics_{result_id}.json"
+                    # GUI-R6-006: Convert numpy.float64 to float for JSON
                     diagnostics = {
-                        "r_hat": result.r_hat,
-                        "ess": result.ess,
-                        "divergences": result.divergences,
+                        "r_hat": _json_safe_dict(result.r_hat),
+                        "ess": _json_safe_dict(result.ess),
+                        "divergences": int(result.divergences) if hasattr(result.divergences, "item") else result.divergences,
                         "num_warmup": result.num_warmup,
                         "num_samples": result.num_samples,
                     }
@@ -831,6 +868,7 @@ class ExportPage(QWidget):
                     exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -846,6 +884,7 @@ class ExportPage(QWidget):
                         exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -870,6 +909,7 @@ class ExportPage(QWidget):
                 exported_files.append(str(filepath))
                 current_step += 1
                 progress.setValue(int(current_step / total_steps * 100))
+                QApplication.processEvents()
 
             if progress.wasCanceled():
                 return
@@ -898,11 +938,17 @@ class ExportPage(QWidget):
 
                 # Add parameters from latest fit
                 if state.fit_results:
+                    # NOTE: Using last-inserted dict entry as "latest" result.
+                    # This works because Python 3.7+ dicts preserve insertion order,
+                    # and results are always appended (never re-inserted).
                     latest_fit = list(state.fit_results.values())[-1]
                     report_state["parameters"] = latest_fit.parameters
 
                 # Add diagnostics from latest Bayesian result
                 if state.bayesian_results:
+                    # NOTE: Using last-inserted dict entry as "latest" result.
+                    # This works because Python 3.7+ dicts preserve insertion order,
+                    # and results are always appended (never re-inserted).
                     latest_bayes = list(state.bayesian_results.values())[-1]
                     report_state["diagnostics"] = {
                         "r_hat": latest_bayes.r_hat,

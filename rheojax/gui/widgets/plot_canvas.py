@@ -135,9 +135,12 @@ class PlotCanvas(QWidget):
             alpha=0.7,
         )
 
-        # Store data for tooltips — convert to numpy to avoid stale JAX DeviceArray
-        # references after jax.clear_caches()
-        self._plot_data.append((np.asarray(x), np.asarray(y), label))
+        # Deep-copy to detach from JAX DeviceArray backing store.
+        # np.asarray() alone returns a zero-copy view that becomes stale
+        # when jax.clear_caches() is called by the Bayesian worker.
+        # GUI-R6-001: Preserve complex dtype for oscillation G* data —
+        # np.array(y, dtype=float) silently drops the imaginary part (G'').
+        self._plot_data.append((np.array(x, dtype=float, copy=True), np.array(y, copy=True), label))
 
         logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
@@ -393,6 +396,9 @@ class PlotCanvas(QWidget):
             return
 
         if event.button == 1:  # Left click
+            # GUI-R6-002: Guard against None xdata/ydata at axes boundaries
+            if event.xdata is None or event.ydata is None:
+                return
             logger.debug(
                 "User interaction",
                 widget=self.__class__.__name__,
@@ -423,7 +429,13 @@ class PlotCanvas(QWidget):
 
         # Handle panning
         if self._panning and self._pan_start is not None:
+            # GUI-R6-003: Guard against None or zero coordinates during panning
+            if event.xdata is None or event.ydata is None:
+                return
             if self.axes.get_xscale() == "log":
+                if self._pan_start[0] is None or self._pan_start[0] <= 0 or event.xdata <= 0:
+                    self._panning = False
+                    return
                 # Log scale panning
                 factor_x = event.xdata / self._pan_start[0]
                 xlim = self.axes.get_xlim()
@@ -454,6 +466,8 @@ class PlotCanvas(QWidget):
         """Show tooltip for nearby data points (vectorized distance)."""
         if not self._plot_data:
             return
+        # NOTE: np.asarray is zero-copy here since stored data is already NumPy (copy=True in plot_data).
+        # The total_pts > 5000 guard disables ALL tooltips if combined series exceed 5000 points.
         total_pts = sum(len(d[0]) for d in self._plot_data)
         if total_pts > 5000:
             return
@@ -483,10 +497,12 @@ class PlotCanvas(QWidget):
             dy_arr = np.asarray(data_y, dtype=float)
             if log_x:
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    dx_arr = np.log10(dx_arr)
+                    pos_mask_x = dx_arr > 0
+                    dx_arr = np.where(pos_mask_x, np.log10(dx_arr), np.inf)
             if log_y:
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    dy_arr = np.log10(dy_arr)
+                    pos_mask_y = dy_arr > 0
+                    dy_arr = np.where(pos_mask_y, np.log10(dy_arr), np.inf)
 
             dist_arr = np.sqrt(
                 ((x_val - dx_arr) / x_range) ** 2
