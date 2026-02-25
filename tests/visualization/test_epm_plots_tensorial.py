@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.visualization.epm_plots import (
+    animate_stress_evolution,
     animate_tensorial_evolution,
     plot_lattice_fields,
     plot_normal_stress_field,
@@ -28,6 +29,7 @@ class TestTensorialAutoDetection:
     @pytest.mark.smoke
     def test_plot_lattice_fields_scalar_detection(self):
         """Test that plot_lattice_fields auto-detects scalar (L, L) stress."""
+        np.random.seed(42)
         L = 32
         stress_scalar = np.random.randn(L, L)
         thresholds = np.abs(np.random.randn(L, L)) + 0.5
@@ -43,6 +45,7 @@ class TestTensorialAutoDetection:
     @pytest.mark.smoke
     def test_plot_lattice_fields_tensor_detection(self):
         """Test that plot_lattice_fields auto-detects tensorial (3, L, L) stress."""
+        np.random.seed(42)
         L = 32
         stress_tensor = np.random.randn(3, L, L)
         thresholds = np.abs(np.random.randn(L, L)) + 0.5
@@ -57,6 +60,7 @@ class TestTensorialAutoDetection:
 
     def test_plot_lattice_fields_invalid_shape(self):
         """Test that invalid stress shape raises ValueError."""
+        np.random.seed(42)
         stress_invalid = np.random.randn(5, 32, 32)
 
         with pytest.raises(ValueError, match="Invalid stress shape"):
@@ -69,6 +73,7 @@ class TestTensorialFieldPlots:
     @pytest.mark.smoke
     def test_plot_tensorial_fields_layout(self):
         """Test that plot_tensorial_fields creates 3-panel layout."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
 
@@ -82,6 +87,7 @@ class TestTensorialFieldPlots:
 
     def test_plot_tensorial_fields_titles(self):
         """Test that tensorial field panels have correct LaTeX titles."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
 
@@ -97,6 +103,7 @@ class TestTensorialFieldPlots:
 
     def test_plot_tensorial_fields_colormap(self):
         """Test that tensorial fields use coolwarm diverging colormap."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
 
@@ -117,7 +124,8 @@ class TestNormalStressPlots:
     def test_plot_normal_stress_field_computation(self):
         """Test that plot_normal_stress_field computes N₁ correctly."""
         L = 32
-        stress = np.random.randn(3, L, L)
+        rng = np.random.RandomState(42)
+        stress = rng.randn(3, L, L)
         nu = 0.48
 
         fig, ax = plot_normal_stress_field(stress, nu=nu)
@@ -125,13 +133,18 @@ class TestNormalStressPlots:
         assert fig is not None
         assert ax is not None
 
-        # Verify N₁ computation manually
+        # Verify N₁ computation manually and check plotted data matches
         N1_expected = stress[0] - stress[1]
+        im = ax.get_images()
+        if im:
+            plotted_data = im[0].get_array()
+            np.testing.assert_allclose(plotted_data, N1_expected, atol=1e-10)
 
         plt.close(fig)
 
     def test_plot_normal_stress_field_title(self):
         """Test that normal stress field has LaTeX label."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
 
@@ -165,6 +178,7 @@ class TestVonMisesPlots:
     @pytest.mark.smoke
     def test_plot_von_mises_field_layout(self):
         """Test that plot_von_mises_field creates 2-panel layout."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
         thresholds = np.abs(np.random.randn(L, L)) + 0.5
@@ -177,6 +191,7 @@ class TestVonMisesPlots:
 
     def test_plot_von_mises_field_colormaps(self):
         """Test that von Mises panels use correct colormaps."""
+        np.random.seed(42)
         L = 32
         stress = np.random.randn(3, L, L)
         thresholds = np.abs(np.random.randn(L, L)) + 0.5
@@ -202,6 +217,7 @@ class TestTensorialAnimation:
     @pytest.mark.smoke
     def test_animate_tensorial_all_components(self):
         """Test animation with all components."""
+        np.random.seed(42)
         L = 16
         T = 10
         stress_history = np.random.randn(T, 3, L, L)
@@ -214,10 +230,15 @@ class TestTensorialAnimation:
         assert anim is not None
         # Should have 3 plot axes + 3 colorbar axes = 6 axes for 'all' components
         assert len(anim._fig.axes) == 6
+        # Verify it is a proper FuncAnimation
+        from matplotlib.animation import FuncAnimation
+
+        assert isinstance(anim, FuncAnimation)
         plt.close(anim._fig)
 
     def test_animate_tensorial_single_component(self):
         """Test animation with single component (e.g., 'xx')."""
+        np.random.seed(42)
         L = 16
         T = 10
         stress_history = np.random.randn(T, 3, L, L)
@@ -230,10 +251,15 @@ class TestTensorialAnimation:
         assert anim is not None
         # Should have 1 plot axis + 1 colorbar axis = 2 axes for single component
         assert len(anim._fig.axes) == 2
+        # Verify it is a proper FuncAnimation
+        from matplotlib.animation import FuncAnimation
+
+        assert isinstance(anim, FuncAnimation)
         plt.close(anim._fig)
 
     def test_animate_tensorial_von_mises(self):
         """Test animation of von Mises effective stress."""
+        np.random.seed(42)
         L = 16
         T = 10
         stress_history = np.random.randn(T, 3, L, L)
@@ -246,4 +272,24 @@ class TestTensorialAnimation:
         assert anim is not None
         # Should have 1 plot axis + 1 colorbar axis = 2 axes
         assert len(anim._fig.axes) == 2
+        # Verify it is a proper FuncAnimation
+        from matplotlib.animation import FuncAnimation
+
+        assert isinstance(anim, FuncAnimation)
         plt.close(anim._fig)
+
+    def test_animate_stress_evolution_basic(self):
+        """Test animate_stress_evolution with scalar stress history."""
+        hist = np.random.RandomState(42).randn(5, 8, 8)
+        anim = animate_stress_evolution(hist, interval=100)
+        assert anim is not None
+        plt.close(anim._fig)
+
+    def test_animate_tensorial_invalid_component_raises(self):
+        """Test that an unrecognised component name raises ValueError."""
+        history = {
+            "stress": np.random.RandomState(42).randn(5, 3, 8, 8),
+            "time": np.linspace(0, 1, 5),
+        }
+        with pytest.raises(ValueError, match="[Uu]nknown|[Ii]nvalid"):
+            animate_tensorial_evolution(history, component="invalid")

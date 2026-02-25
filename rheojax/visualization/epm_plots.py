@@ -45,6 +45,9 @@ def _plot_scalar_lattice(
 
     # Stress Plot
     max_stress = np.max(np.abs(stress))
+    # VIZ-009: prevent degenerate (zero-range) colormap
+    if max_stress == 0.0:
+        max_stress = 1.0
     im1 = ax1.imshow(
         stress, cmap=cmap_stress, vmin=-max_stress, vmax=max_stress, origin="lower"
     )
@@ -89,7 +92,10 @@ def _plot_tensorial_lattice(
     fig.suptitle(title)
 
     # Find global stress scale for consistent colormaps
+    # VIZ-R6-007: Guard against all-zero stress (degenerate vmin=vmax=0)
     max_stress = np.max(np.abs(stress))
+    if max_stress == 0.0:
+        max_stress = 1.0
 
     # Component labels
     labels = [r"$\sigma_{xx}$", r"$\sigma_{yy}$", r"$\sigma_{xy}$"]
@@ -104,18 +110,18 @@ def _plot_tensorial_lattice(
             origin="lower",
         )
         axes[i].set_title(labels[i])
-        plt.colorbar(im, ax=axes[i])
+        fig.colorbar(im, ax=axes[i])
         axes[i].set_xlabel("x")
         axes[i].set_ylabel("y")
 
     # Threshold plot
     im_thresh = axes[3].imshow(thresholds, cmap=cmap_thresh, origin="lower")
     axes[3].set_title(r"Yield Thresholds $\sigma_c$")
-    plt.colorbar(im_thresh, ax=axes[3])
+    fig.colorbar(im_thresh, ax=axes[3])
     axes[3].set_xlabel("x")
     axes[3].set_ylabel("y")
 
-    plt.tight_layout()
+    fig.tight_layout()
     return fig
 
 
@@ -209,6 +215,9 @@ def animate_stress_evolution(
 
     # Determine global limits for stable coloring
     max_val = np.max(np.abs(history))
+    # VIZ-009: prevent degenerate (zero-range) colormap
+    if max_val == 0.0:
+        max_val = 1.0
 
     im = ax.imshow(
         history[0],
@@ -231,8 +240,17 @@ def animate_stress_evolution(
     )
 
     if save_path:
-        # Requires ffmpeg or imagemagick installed
-        anim.save(save_path)
+        # VIZ-015: wrap save() so missing writers produce a clear error, not a cryptic traceback
+        try:
+            anim.save(save_path)
+        except Exception as e:
+            logger.error(
+                "Failed to save animation — check that the required writer "
+                "(ffmpeg for .mp4, Pillow for .gif) is installed",
+                save_path=str(save_path),
+                error=str(e),
+            )
+            raise
 
     return anim
 
@@ -265,13 +283,17 @@ def plot_tensorial_fields(
     if ax is None:
         fig, axes = plt.subplots(1, 3, figsize=figsize)
     else:
-        if not isinstance(ax, (list, np.ndarray)) or len(ax) != 3:
-            raise ValueError("If ax provided, must be list/array of 3 axes")
-        axes = ax
+        # VIZ-010: accept tuple in addition to list/ndarray
+        if not isinstance(ax, (list, tuple, np.ndarray)) or len(ax) != 3:
+            raise ValueError("If ax provided, must be a sequence of 3 axes")
+        axes = list(ax)
         fig = axes[0].get_figure()
 
     # Find global stress scale for consistent colormaps
     max_stress = np.max(np.abs(stress))
+    # VIZ-009: prevent degenerate (zero-range) colormap
+    if max_stress == 0.0:
+        max_stress = 1.0
 
     # Component labels with LaTeX
     labels = [r"$\sigma_{xx}$", r"$\sigma_{yy}$", r"$\sigma_{xy}$"]
@@ -291,7 +313,8 @@ def plot_tensorial_fields(
         axes[i].set_xlabel("x")
         axes[i].set_ylabel("y")
 
-    plt.tight_layout()
+    # VIZ-004: use fig.tight_layout() instead of plt.tight_layout() (uses gcf())
+    fig.tight_layout()
     return fig, list(axes)
 
 
@@ -331,14 +354,18 @@ def plot_normal_stress_field(
         fig = ax.get_figure()
 
     # Plot with symmetric colormap centered at 0
+    # VIZ-R6-008: Guard against all-zero N1 (degenerate vmin=vmax=0)
     max_N1 = np.max(np.abs(N1))
+    if max_N1 == 0.0:
+        max_N1 = 1.0
     im = ax.imshow(N1, cmap=cmap, vmin=-max_N1, vmax=max_N1, origin="lower", **kwargs)
     ax.set_title(r"$N_1 = \sigma_{xx} - \sigma_{yy}$")
-    plt.colorbar(im, ax=ax, label=r"$N_1$")
+    fig.colorbar(im, ax=ax, label=r"$N_1$")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
-    plt.tight_layout()
+    # VIZ-004: use fig.tight_layout() instead of plt.tight_layout() (uses gcf())
+    fig.tight_layout()
     return fig, ax
 
 
@@ -393,8 +420,11 @@ def plot_von_mises_field(
     if ax is None:
         fig, axes = plt.subplots(1, 2, figsize=figsize)
     else:
-        if not isinstance(ax, (list, np.ndarray)) or len(ax) != 2:
-            raise ValueError("If ax provided, must be list/array of 2 axes")
+        # VIS-EPM-002: Accept tuple in addition to list/ndarray — consistent
+        # with plot_tensorial_fields. `fig, (ax1, ax2) = plt.subplots(1, 2)`
+        # produces a tuple, which was previously rejected.
+        if not isinstance(ax, (list, tuple, np.ndarray)) or len(ax) != 2:
+            raise ValueError("If ax provided, must be list/tuple/array of 2 axes")
         axes = ax
         fig = axes[0].get_figure()
 
@@ -406,9 +436,10 @@ def plot_von_mises_field(
     axes[0].set_ylabel("y")
 
     # Right panel: σ_eff/σ_c with RdYlGn_r centered at 1
-    # Clip to reasonable range for visualization
+    # F-024: vmax is data-driven — preserves default of 2.0 for typical data but
+    # extends the colormap range for high-stress regions (99th percentile).
     vmin = 0.0
-    vmax = 2.0
+    vmax = max(2.0, float(np.nanpercentile(sigma_normalized, 99)))
     im2 = axes[1].imshow(
         sigma_normalized,
         cmap="RdYlGn_r",
@@ -422,7 +453,8 @@ def plot_von_mises_field(
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
 
-    plt.tight_layout()
+    # VIZ-004: use fig.tight_layout() instead of plt.tight_layout() (uses gcf())
+    fig.tight_layout()
     return fig, list(axes)
 
 
@@ -460,6 +492,15 @@ def plot_normal_stress_ratio(
     else:
         fig = ax.get_figure()
 
+    # VIZ-017: warn about negative ratio values that loglog will silently drop
+    negative_count = np.sum(ratio < 0)
+    if negative_count > 0:
+        logger.warning(
+            "N1/sigma_xy ratio has %d negative values; these will be absent from loglog plot. "
+            "Consider using a linear or semilogy scale for signed data.",
+            negative_count,
+        )
+
     # Log-log plot
     ax.loglog(shear_rates, ratio, marker="o", **kwargs)
     ax.set_xlabel(r"Shear Rate $\dot{\gamma}$ (1/s)")
@@ -467,7 +508,8 @@ def plot_normal_stress_ratio(
     ax.set_title("Normal Stress Ratio")
     ax.grid(True, which="both", alpha=0.3)
 
-    plt.tight_layout()
+    # VIZ-004: use fig.tight_layout() instead of plt.tight_layout() (uses gcf())
+    fig.tight_layout()
     return fig, ax
 
 
@@ -520,7 +562,12 @@ def animate_tensorial_evolution(
         fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
         # Find global limits
+        # VIS-EPM-001: Guard against zero-stress initial states — same fix as
+        # animate_stress_evolution (line 219). Without this, vmin=vmax=0
+        # produces a degenerate colormap and matplotlib normalization warning.
         max_stress = np.max(np.abs(stress_history))
+        if max_stress == 0.0:
+            max_stress = 1.0
 
         labels = [r"$\sigma_{xx}$", r"$\sigma_{yy}$", r"$\sigma_{xy}$"]
         images = []
@@ -609,15 +656,26 @@ def animate_tensorial_evolution(
         # Import von Mises function
         from rheojax.utils.epm_kernels_tensorial import compute_von_mises_stress
 
-        # Compute von Mises for all frames
-        vm_history = []
-        for t_idx in range(T):
-            stress_reshaped = np.moveaxis(stress_history[t_idx], 0, -1)
-            stress_jax = jnp.array(stress_reshaped)
-            sigma_eff = compute_von_mises_stress(stress_jax, nu)
-            vm_history.append(np.array(sigma_eff))
-
-        vm_history_arr = np.array(vm_history)
+        # VIZ-021: vectorize von Mises computation with vmap instead of O(T) Python loop
+        try:
+            stress_all = np.moveaxis(stress_history, 1, -1)  # (T, L, L, 3)
+            stress_jax_all = jnp.array(stress_all)
+            compute_vm_batch = jax.vmap(compute_von_mises_stress, in_axes=(0, None))
+            vm_history_arr = np.array(compute_vm_batch(stress_jax_all, nu))
+        except (
+            jax.errors.TracerBoolConversionError,
+            jax.errors.ConcretizationTypeError,
+            NotImplementedError,
+            ValueError,
+        ):
+            # Fallback to sequential loop if vmap fails (e.g., tracing issues)
+            vm_history = []
+            for t_idx in range(T):
+                stress_reshaped = np.moveaxis(stress_history[t_idx], 0, -1)
+                stress_jax = jnp.array(stress_reshaped)
+                sigma_eff = compute_von_mises_stress(stress_jax, nu)
+                vm_history.append(np.array(sigma_eff))
+            vm_history_arr = np.array(vm_history)
         max_vm = np.max(vm_history_arr)
 
         im = ax.imshow(
@@ -647,6 +705,16 @@ def animate_tensorial_evolution(
         )
 
     if save_path:
-        anim.save(save_path)
+        # VIZ-015: wrap save() so missing writers produce a clear error, not a cryptic traceback
+        try:
+            anim.save(save_path)
+        except Exception as e:
+            logger.error(
+                "Failed to save animation — check that the required writer "
+                "(ffmpeg for .mp4, Pillow for .gif) is installed",
+                save_path=str(save_path),
+                error=str(e),
+            )
+            raise
 
     return anim

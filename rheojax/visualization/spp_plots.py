@@ -96,6 +96,18 @@ def plot_lissajous(
     try:
         plt = _ensure_matplotlib()
 
+        # VIZ-R6-009: Convert JAX arrays to numpy for matplotlib compatibility
+        strain = np.asarray(strain)
+        strain_rate = np.asarray(strain_rate)
+        stress = np.asarray(stress)
+
+        # VIZ-R6-010: Validate input lengths for clear error messages
+        if strain.shape != stress.shape:
+            raise ValueError(
+                f"strain and stress must have the same shape, "
+                f"got {strain.shape} and {stress.shape}"
+            )
+
         if ax is None:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
         elif isinstance(ax, tuple):
@@ -151,7 +163,7 @@ def plot_lissajous(
         ax2.axhline(0, color="gray", linestyle="--", linewidth=0.5)
         ax2.axvline(0, color="gray", linestyle="--", linewidth=0.5)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         logger.debug("Figure created", plot_type="lissajous")
         return fig
@@ -173,6 +185,7 @@ def plot_cole_cole(
     ax: Axes | None = None,
     colormap: str = "viridis",
     show_trajectory: bool = True,
+    aspect: str | None = "equal",
     **kwargs,
 ) -> Figure:
     """
@@ -192,6 +205,9 @@ def plot_cole_cole(
         Colormap name for trajectory coloring
     show_trajectory : bool
         If True, show as colored trajectory. If False, show as scatter.
+    aspect : str or None
+        Aspect ratio for the axes. Defaults to 'equal' for a square Cole-Cole plot.
+        Pass None to let matplotlib choose automatically.
     **kwargs
         Additional keyword arguments
 
@@ -205,10 +221,28 @@ def plot_cole_cole(
     try:
         plt = _ensure_matplotlib()
 
+        # VIZ-R6-009: Convert JAX arrays to numpy for matplotlib compatibility
+        Gp_t = np.asarray(Gp_t)
+        Gpp_t = np.asarray(Gpp_t)
+        if time is not None:
+            time = np.asarray(time)
+
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
             fig = ax.get_figure()
+
+        # F-023: Validate that G'(t) and G''(t) have matching lengths
+        if len(Gp_t) != len(Gpp_t):
+            raise ValueError(
+                f"G'(t) and G''(t) must have the same length, "
+                f"got {len(Gp_t)} and {len(Gpp_t)}"
+            )
+        if time is not None and len(time) != len(Gp_t):
+            raise ValueError(
+                f"time and G'(t) must have the same length, "
+                f"got {len(time)} and {len(Gp_t)}"
+            )
 
         # VIS-P3-002: Guard against empty arrays
         if len(Gp_t) == 0 or len(Gpp_t) == 0:
@@ -244,7 +278,9 @@ def plot_cole_cole(
         ax.set_ylabel(r"$G''(t)$ (Pa)", fontsize=12)
         ax.set_title("Cole-Cole Diagram", fontsize=14)
         ax.legend(loc="upper right")
-        ax.set_aspect("equal", adjustable="box")
+        # VIZ-014: make equal aspect optional so callers can use non-square axes
+        if aspect is not None:
+            ax.set_aspect(aspect, adjustable="box")
 
         # Add reference lines
         ax.axhline(0, color="gray", linestyle="--", linewidth=0.5)
@@ -302,14 +338,22 @@ def plot_moduli_evolution(
     try:
         plt = _ensure_matplotlib()
 
+        # VIZ-R6-009: Convert JAX arrays to numpy for matplotlib compatibility
+        time = np.asarray(time)
+        Gp_t = np.asarray(Gp_t)
+        Gpp_t = np.asarray(Gpp_t)
+        if delta_t is not None:
+            delta_t = np.asarray(delta_t)
+        if G_speed is not None:
+            G_speed = np.asarray(G_speed)
+
         n_plots = (
             2 + (1 if delta_t is not None else 0) + (1 if G_speed is not None else 0)
         )
 
         if ax is None:
+            # VIZ-019: removed unreachable `if n_plots == 1` block — n_plots is always >= 2
             fig, axes = plt.subplots(n_plots, 1, figsize=(8, 3 * n_plots), sharex=True)
-            if n_plots == 1:
-                axes = [axes]
         else:
             if isinstance(ax, tuple):
                 axes = list(ax)
@@ -360,7 +404,7 @@ def plot_moduli_evolution(
 
         axes[-1].set_xlabel("Time (s)")
         fig.suptitle("Time-Resolved Moduli Evolution", fontsize=14)
-        plt.tight_layout()
+        fig.tight_layout()
 
         logger.debug("Figure created", plot_type="moduli_evolution")
         return fig
@@ -418,6 +462,10 @@ def plot_harmonic_spectrum(
         else:
             fig = ax.get_figure()
 
+        # VIZ-020: guard against negative n_harmonics
+        if n_harmonics is not None and n_harmonics < 0:
+            raise ValueError(f"n_harmonics must be non-negative, got {n_harmonics}")
+
         # VIS-P1-006: guard against zero harmonics or empty amplitudes
         if n_harmonics == 0 or len(amplitudes) == 0:
             logger.warning("No harmonics to plot", n_harmonics=n_harmonics, n_amplitudes=len(amplitudes))
@@ -432,9 +480,24 @@ def plot_harmonic_spectrum(
         amps = amplitudes[:n_harmonics]
         harmonics = [2 * i + 1 for i in range(n_harmonics)]  # 1, 3, 5, ...
 
-        if normalize and amps[0] > 0:
-            amps = amps / amps[0]
-            ylabel = r"$I_n/I_1$"
+        if normalize:
+            if amps[0] > 0:
+                amps = amps / amps[0]
+                ylabel = r"$I_n/I_1$"
+            else:
+                # VIS-SPP2-001: Warn when normalize=True cannot be applied
+                # (zero or negative fundamental). Silent fallback to absolute
+                # amplitudes is confusing — ylabel would say Pa but caller
+                # expected normalized output.
+                import warnings
+
+                warnings.warn(
+                    "normalize=True requested but fundamental amplitude is <= 0; "
+                    "plotting absolute amplitudes instead.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                ylabel = r"$I_n$ (Pa)"
         else:
             ylabel = r"$I_n$ (Pa)"
 
@@ -445,15 +508,20 @@ def plot_harmonic_spectrum(
         ax.set_xticks(harmonics)
 
         # Add value labels on bars
+        # VIZ-R6-012: Handle negative amplitude bars — place label below bar tip
         for bar, amp in zip(bars, amps, strict=False):
             height = bar.get_height()
+            if height >= 0:
+                y_offset, valign = 3, "bottom"
+            else:
+                y_offset, valign = -3, "top"
             ax.annotate(
                 f"{amp:.3f}",
                 xy=(bar.get_x() + bar.get_width() / 2, height),
-                xytext=(0, 3),
+                xytext=(0, y_offset),
                 textcoords="offset points",
                 ha="center",
-                va="bottom",
+                va=valign,
                 fontsize=8,
             )
 
@@ -514,8 +582,21 @@ def plot_3d_trajectory(
     """
     logger.debug("Generating plot", plot_type="3d_trajectory", show_frame=show_frame)
 
+    # VIZ-005: guard against division by zero before normalization
+    if omega == 0.0:
+        raise ValueError("omega must be non-zero for 3D trajectory normalization")
+
     try:
         plt = _ensure_matplotlib()
+
+        # VIZ-R6-009: Convert JAX arrays to numpy for matplotlib compatibility
+        strain = np.asarray(strain)
+        strain_rate = np.asarray(strain_rate)
+        stress = np.asarray(stress)
+
+        # VIZ-R6-010: Guard against empty arrays
+        if len(strain) == 0:
+            raise ValueError("strain array is empty — cannot plot 3D trajectory")
 
         if ax is None:
             fig = plt.figure(figsize=(10, 8))
@@ -711,6 +792,12 @@ def create_spp_report(
         save_path=save_path,
     )
 
+    # VIZ-006: guard against division by zero in period and normalization computations
+    if omega == 0.0:
+        raise ValueError("omega must be non-zero for SPP report (period would be infinite)")
+    if gamma_0 == 0.0:
+        raise ValueError("gamma_0 must be non-zero for SPP report normalization")
+
     try:
         plt = _ensure_matplotlib()
 
@@ -723,6 +810,10 @@ def create_spp_report(
         ax4 = fig.add_subplot(2, 3, 4)  # G'(t)
         ax5 = fig.add_subplot(2, 3, 5)  # G''(t)
         ax6 = fig.add_subplot(2, 3, 6)  # delta(t)
+
+        # VIZ-R6-009: Convert JAX arrays to numpy for matplotlib compatibility
+        strain = np.asarray(strain)
+        stress = np.asarray(stress)
 
         # Extract results
         Gp_t = np.asarray(spp_results["Gp_t"])
@@ -741,7 +832,22 @@ def create_spp_report(
         if "strain_rate_normalized" in spp_results:
             strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega
 
-        time = np.linspace(0, 2 * np.pi / omega, len(strain))
+        # VIS-SPP-001: Reconcile strain/stress/strain_rate to SPP result length
+        # (Gp_t). SPP analysis trims endpoints, so Gp_t may be shorter than
+        # strain. Trim all waveform arrays to the same length to ensure
+        # consistent time bases across all subplot panels.
+        if len(Gp_t) != len(strain):
+            logger.warning(
+                "SPP results length (%d) differs from strain length (%d) — "
+                "trimming waveform arrays to SPP result length for consistent plots",
+                len(Gp_t),
+                len(strain),
+            )
+            trim = len(Gp_t)
+            strain = strain[:trim]
+            stress = stress[:trim]
+            strain_rate = strain_rate[:trim]
+        time = np.linspace(0, 2 * np.pi / omega, len(Gp_t))
 
         # Lissajous plots
         ax1.plot(strain / gamma_0, stress, "b-", linewidth=1.5)
@@ -788,7 +894,7 @@ def create_spp_report(
         else:
             ax6.set_visible(False)
 
-        plt.tight_layout()
+        fig.tight_layout()
 
         if save_path:
             fig.savefig(save_path, dpi=300, bbox_inches="tight")

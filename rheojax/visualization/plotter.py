@@ -35,8 +35,8 @@ def _modulus_labels(
     """
     deformation = None
     if data is not None:
-        deformation = getattr(data, "deformation_mode", None) or data.metadata.get(
-            "deformation_mode"
+        deformation = getattr(data, "deformation_mode", None) or (
+            data.metadata.get("deformation_mode") if data.metadata else None
         )
 
     units = y_units or (data.y_units if data else None) or "Pa"
@@ -46,8 +46,24 @@ def _modulus_labels(
     return f"G' ({units})", f'G" ({units})', f"Modulus ({units})"
 
 # Default plotting style parameters
+# Module constants for consistent plot styling
+# Note: _GRID_ALPHA and _GRID_LINESTYLE are also used (with inline literals) in
+# templates.py, spp_plots.py, and epm_plots.py.
+_GRID_ALPHA = 0.3
+_GRID_LINESTYLE = "--"
+
+# Default figure sizes (can be overridden per-call via figsize parameter)
+_DEFAULT_FIGSIZE = (8, 6)
+_PUBLICATION_FIGSIZE = (6, 4.5)
+_PRESENTATION_FIGSIZE = (10, 7)
+
+# Explicit viscosity unit set for y-label heuristic in plot_time_domain()
+_VISCOSITY_UNITS: frozenset[str] = frozenset(
+    {"Pa·s", "Pa.s", "Pa*s", "Pa s", "mPa·s", "mPa.s"}
+)
+
 DEFAULT_STYLE = {
-    "figure.figsize": (8, 6),
+    "figure.figsize": _DEFAULT_FIGSIZE,
     "font.size": 11,
     "axes.labelsize": 12,
     "axes.titlesize": 13,
@@ -59,7 +75,7 @@ DEFAULT_STYLE = {
 }
 
 PUBLICATION_STYLE = {
-    "figure.figsize": (6, 4.5),
+    "figure.figsize": _PUBLICATION_FIGSIZE,
     "font.size": 10,
     "axes.labelsize": 11,
     "axes.titlesize": 12,
@@ -71,7 +87,7 @@ PUBLICATION_STYLE = {
 }
 
 PRESENTATION_STYLE = {
-    "figure.figsize": (10, 7),
+    "figure.figsize": _PRESENTATION_FIGSIZE,
     "font.size": 14,
     "axes.labelsize": 16,
     "axes.titlesize": 18,
@@ -137,17 +153,27 @@ def _filter_positive(
     n_removed = len(y) - np.sum(positive_mask)
 
     if n_removed > 0 and warn:
-        import warnings
-
         if np.sum(positive_mask) == 0:
-            # VIS-001: All values non-positive — log plot will be empty
+            # F-022: All values non-positive — return original data so the caller
+            # gets something to plot rather than empty arrays that create blank plots.
+            # Matplotlib will mask non-positive values on log scale by itself.
+            import warnings
+
+            logger.warning(
+                "All y-values are non-positive; log-scale plot will be empty "
+                "(matplotlib drops non-positive values). "
+                "Check data scaling or use a linear-scale plot.",
+            )
             warnings.warn(
                 "All y-values are non-positive; log-scale plot will be empty. "
-                "Check data scaling or consider a linear-scale plot.",
+                "Check data scaling or use a linear-scale plot.",
                 UserWarning,
                 stacklevel=3,
             )
+            return x, y
         else:
+            import warnings
+
             warnings.warn(
                 f"Removed {n_removed} non-positive values from log-scale plot. "
                 f"This is common for very small G'' values or measurement noise.",
@@ -187,6 +213,7 @@ def plot_rheo_data(
 
         # Select plot type based on domain and test mode
         # VIS-P1-004: Forward deformation mode for E'/G' label selection
+        kwargs = dict(kwargs)
         deformation_mode = kwargs.pop("deformation_mode", None)
         if deformation_mode is None:
             deformation_mode = getattr(data, "deformation_mode", None) or data.metadata.get(
@@ -305,17 +332,29 @@ def plot_time_domain(
         }
         plot_kwargs.update(kwargs)
 
-        ax.plot(x, y, **plot_kwargs)
+        # VIZ-R6-003: Filter non-positive x before plotting when log_x is set,
+        # otherwise t=0 anchors the x-axis at 0 and breaks the log scale display.
+        x_plot, y_plot = x, y
+        if log_x:
+            pos_mask = np.isfinite(x) & (x > 0)
+            if not np.all(pos_mask) and np.any(pos_mask):
+                x_plot, y_plot = x[pos_mask], y[pos_mask]
+
+        ax.plot(x_plot, y_plot, **plot_kwargs)
 
         # Set labels
         x_label = f"Time ({x_units})" if x_units else "Time"
-        # VIS-P2-008: Use exact match for stress units to avoid "Pa.s" → "Stress (Pa.s)"
+        # VIS-P2-008 / F-035: Explicit unit sets prevent misclassification of edge cases
         if y_units:
             y_units_stripped = y_units.strip()
             if y_units_stripped in ("Pa", "kPa", "MPa", "GPa"):
                 y_label = f"Stress ({y_units})"
+            elif y_units_stripped in _VISCOSITY_UNITS:
+                y_label = f"Viscosity ({y_units})"
             elif "Pa" in y_units_stripped and (
-                "s" in y_units_stripped or "\u00b7" in y_units_stripped
+                "\u00b7s" in y_units_stripped
+                or ".s" in y_units_stripped
+                or "*s" in y_units_stripped
             ):
                 y_label = f"Viscosity ({y_units})"
             else:
@@ -332,7 +371,7 @@ def plot_time_domain(
             ax.set_yscale("log")
 
         # Grid
-        ax.grid(True, which="both", alpha=0.3, linestyle="--")
+        ax.grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
 
         fig.tight_layout()
 
@@ -340,6 +379,10 @@ def plot_time_domain(
         return fig, ax
 
     except Exception as e:
+        # VIZ-R6-002: Guard against fig not yet assigned (e.g. _apply_style raises)
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate time_domain plot",
             plot_type="time_domain",
@@ -356,7 +399,7 @@ def plot_frequency_domain(
     y_units: str | None = None,
     style: str = "default",
     **kwargs: Any,
-) -> tuple[Figure, Axes | np.ndarray]:
+) -> tuple[Figure, np.ndarray]:
     """Plot frequency-domain rheological data (complex modulus).
 
     For complex data, creates two subplots for G' (storage modulus) and
@@ -373,7 +416,9 @@ def plot_frequency_domain(
             causes labels to show E'/E'' instead of G'/G''.
 
     Returns:
-        Tuple of (Figure, Axes) or (Figure, array of Axes) for complex data
+        Tuple of (Figure, np.ndarray of Axes). For complex data the array has
+        shape (2,); for real data it has shape (1,) so callers can always
+        index the result uniformly (e.g. ``axes[0]``).
     """
     logger.debug("Generating plot", plot_type="frequency_domain", style=style)
 
@@ -384,6 +429,7 @@ def plot_frequency_domain(
         # global plt.rcParams (which permanently pollutes process state)
 
         # VIS-P1-004: Deformation-mode aware labels (E' vs G')
+        kwargs = dict(kwargs)
         deformation_mode = kwargs.pop("deformation_mode", None)
         is_tensile = deformation_mode in ("tension", "bending", "compression")
         units = y_units or "Pa"
@@ -412,24 +458,29 @@ def plot_frequency_domain(
             plot_kwargs.update(kwargs)
 
             # VIS-P0-001 / VIS-P0-002: Strip keys that are passed explicitly to avoid
-            # "multiple values for keyword argument" TypeError
+            # "multiple values for keyword argument" TypeError.
+            # VIZ-016: Prefer user-supplied label/color over the automatic defaults.
+            user_storage_label = kwargs.pop("label", None)
+            user_color = kwargs.pop("color", None)
             plot_kwargs_safe = {k: v for k, v in plot_kwargs.items() if k not in ('label', 'color')}
 
             # Storage modulus
             x_gp, gp = _filter_positive(x, np.real(y), warn=True)
-            axes[0].loglog(x_gp, gp, **plot_kwargs_safe, label=storage_sym)
+            axes[0].loglog(x_gp, gp, **plot_kwargs_safe, label=user_storage_label or storage_sym)
             axes[0].set_ylabel(f"{storage_sym} ({units})")
-            axes[0].grid(True, which="both", alpha=0.3, linestyle="--")
+            axes[0].grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
             axes[0].legend()
 
             # Loss modulus
+            # VIZ-R6-001: Use distinct label for loss modulus subplot
             x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
-            axes[1].loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_sym, color="C1")
+            loss_label = f"{user_storage_label} (loss)" if user_storage_label else loss_sym
+            axes[1].loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_label, color=user_color or "C1")
             axes[1].set_xlabel(
                 f"Frequency ({x_units})" if x_units else "Frequency (rad/s)"
             )
             axes[1].set_ylabel(f"{loss_sym} ({units})")
-            axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
+            axes[1].grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
             axes[1].legend()
 
             fig.tight_layout()
@@ -452,14 +503,18 @@ def plot_frequency_domain(
             ax.loglog(x_filtered, y_filtered, **plot_kwargs)
             ax.set_xlabel(f"Frequency ({x_units})" if x_units else "Frequency (rad/s)")
             ax.set_ylabel(f"Modulus ({y_units})" if y_units else "Modulus (Pa)")
-            ax.grid(True, which="both", alpha=0.3, linestyle="--")
+            ax.grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
 
             fig.tight_layout()
             logger.debug("Figure created", plot_type="frequency_domain")
-            # VIS-P2-002: Return plain ax so callers can use ax.set_xlabel() etc. directly
-            return fig, ax
+            # F-013: Wrap single ax in an array for consistent return type with complex branch
+            return fig, np.array([ax])
 
     except Exception as e:
+        # VIZ-R6-002: Guard against fig not yet assigned
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate frequency_domain plot",
             plot_type="frequency_domain",
@@ -522,13 +577,21 @@ def plot_flow_curve(
         if x_label is None:
             x_label = f"Shear Rate ({x_units})" if x_units else "Shear Rate (1/s)"
         if y_label is None:
-            y_label = f"Viscosity ({y_units})" if y_units else "Viscosity (Pa.s)"
+            # VIZ-R6-005: Infer stress vs viscosity label from units
+            if y_units:
+                y_stripped = y_units.strip()
+                if y_stripped in ("Pa", "kPa", "MPa", "GPa"):
+                    y_label = f"Stress ({y_units})"
+                else:
+                    y_label = f"Viscosity ({y_units})"
+            else:
+                y_label = "Viscosity (Pa.s)"
 
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
 
         # Grid
-        ax.grid(True, which="both", alpha=0.3, linestyle="--")
+        ax.grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
 
         fig.tight_layout()
 
@@ -536,6 +599,10 @@ def plot_flow_curve(
         return fig, ax
 
     except Exception as e:
+        # VIZ-R6-002: Guard against fig not yet assigned
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate flow_curve plot",
             plot_type="flow_curve",
@@ -647,6 +714,9 @@ def plot_residuals(
             return fig, ax
 
     except Exception as e:
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)  # prevent memory leak
         logger.error(
             "Failed to generate residuals plot",
             plot_type="residuals",
@@ -692,6 +762,13 @@ def compute_uncertainty_band(
         >>> popt = np.array([2.0, 1.0])
         >>> pcov = np.array([[0.01, 0.0], [0.0, 0.05]])
         >>> y_fit, y_lo, y_hi = compute_uncertainty_band(model, x, popt, pcov)
+
+    Note
+    ----
+    Complex-valued ``y_fit`` is not supported for uncertainty bands.
+    If ``y_fit`` is complex, the function returns ``(y_fit, None, None)``
+    and logs a debug message. Callers should check for ``None`` before
+    using ``y_lower`` and ``y_upper``.
     """
     logger.debug(
         "Computing uncertainty band",
@@ -707,14 +784,13 @@ def compute_uncertainty_band(
         popt = np.asarray(popt, dtype=np.float64)
         pcov = np.asarray(pcov, dtype=np.float64)
 
-        # Compute y_fit
-        y_fit = np.asarray(model_fn(x_pred, popt), dtype=np.float64)
-
-        # Handle complex output (e.g., G* = G' + iG'')
-        if np.iscomplexobj(y_fit):
-            # Return None for complex - uncertainty bands are harder to interpret
+        # Compute y_fit — check complex BEFORE forcing float64 dtype,
+        # since np.asarray(..., dtype=float64) silently truncates complex values.
+        y_fit_raw = model_fn(x_pred, popt)
+        if np.iscomplexobj(np.asarray(y_fit_raw)):
             logger.debug("Complex output detected, skipping uncertainty band")
-            return y_fit, None, None
+            return np.asarray(y_fit_raw), None, None
+        y_fit = np.asarray(y_fit_raw, dtype=np.float64)
 
         # Compute Jacobian: J[i, j] = dy[i] / dparam[j]
         # Use finite differences for robustness
@@ -823,6 +899,14 @@ def plot_fit_with_uncertainty(
     logger.debug("Generating plot", plot_type="fit_with_uncertainty", style=style)
 
     try:
+        # VIZ-002: Reject complex inputs early — _filter_positive raises TypeError on complex
+        # and log-scale operations are undefined. Callers should plot G'/G'' separately.
+        if np.iscomplexobj(np.asarray(y_data)) or np.iscomplexobj(np.asarray(y_fit)):
+            raise ValueError(
+                "plot_fit_with_uncertainty does not support complex data. "
+                "Plot G' and G'' components separately."
+            )
+
         style_params = _apply_style(style)
 
         # Create figure if no axes provided
@@ -835,11 +919,12 @@ def plot_fit_with_uncertainty(
         x_fit = _ensure_numpy(x_fit)
         y_fit = _ensure_numpy(y_fit)
 
-        # VIS-P1-004: Validate uncertainty bound lengths before attempting fill_between
+        # F-030: Validate uncertainty bound lengths before attempting fill_between.
+        # Log at error level so callers are clearly notified of the data problem.
         if y_lower is not None and y_upper is not None:
             if len(y_lower) != len(x_fit) or len(y_upper) != len(x_fit):
-                logger.warning(
-                    "Uncertainty bounds length mismatch, skipping uncertainty band",
+                logger.error(
+                    "Uncertainty bounds length mismatch — bounds will not be plotted",
                     x_fit_len=len(x_fit),
                     y_lower_len=len(y_lower),
                     y_upper_len=len(y_upper),
@@ -938,6 +1023,9 @@ def plot_fit_with_uncertainty(
         return fig, ax
 
     except Exception as e:
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)  # prevent memory leak (only when we created the figure)
         logger.error(
             "Failed to generate fit_with_uncertainty plot",
             plot_type="fit_with_uncertainty",
@@ -968,7 +1056,8 @@ def save_figure(
     filepath : str or Path
         Output file path. Format inferred from extension if not specified.
     format : str, optional
-        Output format ('pdf', 'svg', 'png', 'eps'). If None, inferred from filepath extension.
+        File format. Supported: 'pdf', 'svg', 'png', 'eps', 'tiff', 'jpg', 'webp'.
+        Auto-detected from file extension if None.
     dpi : int, default=300
         Resolution for raster formats (PNG). Ignored for vector formats (PDF, SVG, EPS).
         Common values:
@@ -1032,9 +1121,12 @@ def save_figure(
     - SVG: Vector format, editable in Inkscape/Illustrator
     - PNG: Raster format, good for presentations and web
     - EPS: Vector format, legacy publication format
+    - TIFF: Raster format, lossless, common in scientific publishing
+    - JPG/JPEG: Raster format, lossy, good for photos
+    - WEBP: Raster format, modern lossy/lossless, good for web
 
-    DPI only affects raster formats (PNG). Vector formats (PDF, SVG, EPS) are
-    resolution-independent.
+    DPI only affects raster formats (PNG, TIFF, JPG, WEBP). Vector formats
+    (PDF, SVG, EPS) are resolution-independent.
     """
     logger.debug("Saving figure", filepath=str(filepath), format=format, dpi=dpi)
 
@@ -1062,12 +1154,10 @@ def save_figure(
                 f"Supported formats: {', '.join(sorted(supported_formats))}."
             )
 
-        # Ensure directory exists
-        if not filepath.parent.exists():
-            raise OSError(
-                f"Directory does not exist: {filepath.parent}. "
-                "Create directory before saving."
-            )
+        # VIS-PLT-001: Auto-create parent directory (consistent with save_hdf5
+        # and export_spp_txt which both use mkdir). Raising OSError when the
+        # directory is missing is surprising for callers saving to a new path.
+        filepath.parent.mkdir(parents=True, exist_ok=True)
 
         # Save figure
         fig.savefig(

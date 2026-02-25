@@ -158,6 +158,11 @@ class TestMastercurveTemplate:
         assert ax is not None
         plt.close(fig)
 
+    def test_mastercurve_empty_raises(self):
+        """Test that an empty dataset list raises ValueError."""
+        with pytest.raises(ValueError, match="requires at least one"):
+            plot_mastercurve([])
+
 
 class TestModelFitTemplate:
     """Test model fit plotting template."""
@@ -181,20 +186,39 @@ class TestModelFitTemplate:
     def test_plot_fit_without_residuals(self):
         """Test plotting model fit without residuals."""
         frequency = np.logspace(-2, 2, 50)
-        G_data = 1e5 / (1 + 1j * frequency)
+        # Use proper Maxwell G* so both G' and G'' are positive
+        G0 = 1e5
+        G_data = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (1 + frequency**2)
         G_fit = G_data * 1.02
 
         data = RheoData(
             x=frequency, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency"
         )
 
-        # Expect warning about non-positive values in log-scale plot
-        with pytest.warns(UserWarning, match="non-positive"):
-            fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
+        fig, ax = plot_model_fit(data, G_fit, show_residuals=False)
 
         assert fig is not None
         assert ax is not None
         plt.close(fig)
+
+    def test_plot_fit_complex_with_residuals(self):
+        """Test that complex data with residuals produces a 2x2 axes layout."""
+        freq = np.logspace(-2, 2, 30)
+        # Use proper Maxwell G* so both G' and G'' are positive
+        G0 = 1e5
+        G_data = G0 * freq**2 / (1 + freq**2) + 1j * G0 * freq / (1 + freq**2)
+        G_fit = G_data * 1.05
+        data = RheoData(x=freq, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency")
+        fig, axes = plot_model_fit(data, G_fit, show_residuals=True)
+        assert axes.shape == (2, 2)
+        plt.close(fig)
+
+    def test_plot_model_fit_shape_mismatch(self):
+        """Test that mismatched data and predictions lengths raise ValueError."""
+        freq = np.logspace(-1, 1, 10)
+        data = RheoData(x=freq, y=np.ones(10), domain="frequency")
+        with pytest.raises(ValueError, match="[Mm]ismatch|[Ss]hape"):
+            plot_model_fit(data, np.ones(5))
 
 
 class TestTemplateStyles:
@@ -211,6 +235,8 @@ class TestTemplateStyles:
     def test_apply_publication_style(self):
         """Test applying publication style."""
         fig, ax = plt.subplots()
+        ax.set_xlabel("X Label")
+        ax.plot([1, 2], [1, 2])
         apply_template_style(ax, style="publication")
 
         assert fig is not None
@@ -221,6 +247,8 @@ class TestTemplateStyles:
     def test_apply_presentation_style(self):
         """Test applying presentation style."""
         fig, ax = plt.subplots()
+        ax.set_xlabel("X Label")
+        ax.plot([1, 2], [1, 2])
         apply_template_style(ax, style="presentation")
 
         assert fig is not None
@@ -231,7 +259,11 @@ class TestTemplateStyles:
     def test_invalid_style_fallback(self):
         """Test that invalid style falls back to default."""
         fig, ax = plt.subplots()
+        ax.set_xlabel("X Label")
+        ax.plot([1, 2], [1, 2])
         apply_template_style(ax, style="invalid_style")
 
         assert fig is not None
+        # Check that default style was applied (not nothing)
+        assert ax.xaxis.label.get_fontsize() > 0
         plt.close(fig)

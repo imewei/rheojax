@@ -95,6 +95,10 @@ def plot_stress_strain(
         return fig, ax
 
     except Exception as e:
+        # VIZ-R6-004: Close figure on error to prevent memory leak
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate stress_strain plot",
             plot_type="stress_strain",
@@ -186,8 +190,10 @@ def plot_modulus_frequency(
                 # Plot both on same axes
                 x_gp, gp = _filter_positive(x_data, np.real(y_data), warn=True)
                 x_gpp, gpp = _filter_positive(x_data, np.imag(y_data), warn=True)
-                ax.loglog(x_gp, gp, **plot_kwargs, label=storage_label)
-                ax.loglog(x_gpp, gpp, **plot_kwargs, label=loss_label, color="C1")
+                # VIZ-003: strip label/color from plot_kwargs to avoid TypeError on duplicate kwargs
+                plot_kwargs_safe = {k: v for k, v in plot_kwargs.items() if k not in ("label", "color")}
+                ax.loglog(x_gp, gp, **plot_kwargs_safe, label=storage_label)
+                ax.loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_label, color="C1")
                 ax.legend()
             else:
                 x_filtered, y_filtered = _filter_positive(x_data, y_data, warn=True)
@@ -207,6 +213,10 @@ def plot_modulus_frequency(
             return fig, ax
 
     except Exception as e:
+        # VIZ-R6-004: Close figure on error to prevent memory leak
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate modulus_frequency plot",
             plot_type="modulus_frequency",
@@ -359,10 +369,15 @@ def plot_mastercurve(
             if shift_factors
             else f"Frequency ({x_units})"
         )
+        # VIZ-013: use generic "Modulus" label for complex data (both G' and G'' plotted)
         # Use deformation-mode aware labels
         # _modulus_labels() already embeds units (e.g. "G' (Pa)"), so use directly
-        mc_storage_label, _, _ = _modulus_labels(datasets[0])
-        ax.set_ylabel(mc_storage_label)
+        mc_storage_label, _, mc_generic_label = _modulus_labels(datasets[0])
+        has_complex = any(np.iscomplexobj(_ensure_numpy(d.y)) for d in datasets)
+        if has_complex:
+            ax.set_ylabel(mc_generic_label)
+        else:
+            ax.set_ylabel(mc_storage_label)
         ax.set_title(f"Master Curve (T_ref = {reference_temp}C)")
         ax.legend(loc="best", fontsize=style_params["legend.fontsize"])
         ax.grid(True, which="both", alpha=0.3, linestyle="--")
@@ -373,6 +388,10 @@ def plot_mastercurve(
         return fig, ax
 
     except Exception as e:
+        # VIZ-R6-004: Close figure on error to prevent memory leak
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate mastercurve plot",
             plot_type="mastercurve",
@@ -511,13 +530,19 @@ def plot_model_fit(
                 axes[0, 1].grid(True, which="both", alpha=0.3, linestyle="--")
 
                 # G' residuals
+                # F-020: Use max(|data|) as fallback denominator to avoid huge % residuals
                 residuals_gp = np.real(y_data) - np.real(y_pred)
+                denom_fallback_gp = np.maximum(np.max(np.abs(np.real(y_data))), 1e-12)
                 gp_denom = np.where(
-                    np.abs(np.real(y_data)) > 1e-12, np.real(y_data), 1.0
+                    np.abs(np.real(y_data)) > 1e-12, np.real(y_data), denom_fallback_gp
                 )
+                # VIZ-011: apply the same positive mask used when plotting G' data
+                # R6-VIZ-001: Match data panel filter (y_data > 0 only), not
+                # additionally y_pred > 0 which makes the residual panel shorter
+                pos_mask_gp = np.isfinite(np.real(y_data)) & (np.real(y_data) > 0)
                 axes[1, 0].semilogx(
-                    x_data,
-                    residuals_gp / gp_denom * 100,
+                    x_data[pos_mask_gp],
+                    (residuals_gp / gp_denom * 100)[pos_mask_gp],
                     "o",
                     markersize=style_params["lines.markersize"],
                     markerfacecolor="none",
@@ -533,13 +558,17 @@ def plot_model_fit(
                 axes[1, 0].grid(True, alpha=0.3, linestyle="--")
 
                 # G'' residuals
+                # F-020: Use max(|data|) as fallback denominator to avoid huge % residuals
                 residuals_gpp = np.imag(y_data) - np.imag(y_pred)
+                denom_fallback_gpp = np.maximum(np.max(np.abs(np.imag(y_data))), 1e-12)
                 gpp_denom = np.where(
-                    np.abs(np.imag(y_data)) > 1e-12, np.imag(y_data), 1.0
+                    np.abs(np.imag(y_data)) > 1e-12, np.imag(y_data), denom_fallback_gpp
                 )
+                # VIZ-011: apply the same positive mask used when plotting G'' data
+                pos_mask_gpp = np.isfinite(np.imag(y_data)) & (np.imag(y_data) > 0)
                 axes[1, 1].semilogx(
-                    x_data,
-                    residuals_gpp / gpp_denom * 100,
+                    x_data[pos_mask_gpp],
+                    (residuals_gpp / gpp_denom * 100)[pos_mask_gpp],
                     "o",
                     markersize=style_params["lines.markersize"],
                     markerfacecolor="none",
@@ -680,9 +709,25 @@ def plot_model_fit(
             else:
                 fig, ax = plt.subplots(figsize=style_params["figure.figsize"])
 
+                # VIZ-012: infer log scale from domain / test_mode metadata
+                is_log = getattr(data, "domain", None) == "frequency" or (
+                    data.metadata or {}
+                ).get("test_mode") in ("oscillation", "rotation", "flow_curve")
+
+                # VIZ-R6-006: Filter non-positive values BEFORE plotting when log
+                # scale will be applied, to prevent blank axes from t=0 or y<=0.
+                xd, yd, xp, yp = x_data, y_data, x_data, y_pred
+                if is_log:
+                    pos_mask = np.isfinite(y_data) & (y_data > 0) & np.isfinite(x_data) & (x_data > 0)
+                    if not np.all(pos_mask) and np.any(pos_mask):
+                        xd, yd = x_data[pos_mask], y_data[pos_mask]
+                    pred_mask = np.isfinite(y_pred) & (y_pred > 0) & np.isfinite(x_data) & (x_data > 0)
+                    if not np.all(pred_mask) and np.any(pred_mask):
+                        xp, yp = x_data[pred_mask], y_pred[pred_mask]
+
                 ax.plot(
-                    x_data,
-                    y_data,
+                    xd,
+                    yd,
                     "o",
                     label="Data",
                     markersize=style_params["lines.markersize"],
@@ -690,12 +735,16 @@ def plot_model_fit(
                     markeredgewidth=1.0,
                 )
                 ax.plot(
-                    x_data,
-                    y_pred,
+                    xp,
+                    yp,
                     "-",
                     label="Model",
                     linewidth=style_params["lines.linewidth"],
                 )
+
+                if is_log:
+                    ax.set_xscale("log")
+                    ax.set_yscale("log")
 
                 ax.set_xlabel(f"x ({data.x_units})" if data.x_units else "x")
                 ax.set_ylabel(f"y ({data.y_units})" if data.y_units else "y")
@@ -710,6 +759,10 @@ def plot_model_fit(
                 return fig, ax
 
     except Exception as e:
+        # VIZ-R6-004: Close figure on error to prevent memory leak
+        _fig = locals().get("fig")
+        if _fig is not None:
+            plt.close(_fig)
         logger.error(
             "Failed to generate model_fit plot",
             plot_type="model_fit",

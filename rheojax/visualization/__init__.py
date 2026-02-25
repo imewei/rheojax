@@ -36,17 +36,6 @@ from rheojax.visualization.templates import (
     plot_stress_strain,
 )
 
-# Automatically suppress font glyph warnings on module import
-# Justification: These warnings are purely cosmetic - plots render correctly,
-# the glyph is just displayed as a box or skipped. This is harmless for
-# headless batch runs. The warning provides no actionable information.
-warnings.filterwarnings(
-    "ignore",
-    message="Glyph.*missing from.*font",
-    category=UserWarning,
-)
-
-
 def configure_matplotlib(
     unicode_safe: bool = True,
     suppress_font_warnings: bool = True,
@@ -88,13 +77,20 @@ def configure_matplotlib(
             "sans-serif",
         ]
 
-    # Suppress font glyph warnings if requested
+    # Suppress font glyph warnings if requested.
     # Justification: These warnings are purely cosmetic - the plot renders
     # correctly, the glyph is just displayed as a box or skipped. This is
     # harmless for headless batch runs.
+    # VIZ-022: Provide the "always" path so callers can undo a prior suppression.
     if suppress_font_warnings:
         warnings.filterwarnings(
             "ignore",
+            message="Glyph.*missing from.*font",
+            category=UserWarning,
+        )
+    else:
+        warnings.filterwarnings(
+            "default",
             message="Glyph.*missing from.*font",
             category=UserWarning,
         )
