@@ -187,6 +187,12 @@ class PipelineBuilder:
 
         pipeline = Pipeline()
 
+        if not validate:
+            # Skip eager execution — return an unconfigured Pipeline shell so
+            # callers can inspect the builder output without requiring valid
+            # data / model state.
+            return pipeline
+
         for step_type, step_kwargs in self.steps:
             if step_type == "load":
                 pipeline.load(**step_kwargs)

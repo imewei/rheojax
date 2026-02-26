@@ -9,6 +9,13 @@ import tempfile
 import numpy as np
 import pytest
 
+try:
+    import h5py  # noqa: F401
+
+    _h5py_available = True
+except ImportError:
+    _h5py_available = False
+
 from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
@@ -169,9 +176,6 @@ class TestPipelineBuilderValidation:
         pipeline = builder.build()
         assert isinstance(pipeline, Pipeline)
 
-    @pytest.mark.xfail(
-        reason="build() executes pipeline regardless of validate flag. validate only controls structure checking."
-    )
     def test_skip_validation(self, temp_csv_file):
         """Test building without validation."""
         builder = PipelineBuilder()
@@ -198,8 +202,9 @@ class TestPipelineBuilderExecution:
         assert pipeline.data is not None
         assert pipeline._last_model is not None
 
-    @pytest.mark.skip(
-        reason="h5py is an optional dependency - install with: pip install h5py"
+    @pytest.mark.skipif(
+        not _h5py_available,
+        reason="h5py is an optional dependency - install with: pip install h5py",
     )
     def test_build_with_save(self, temp_csv_file):
         """Test building pipeline with save step.
