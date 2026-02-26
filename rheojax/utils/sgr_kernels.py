@@ -95,7 +95,9 @@ def rho_trap(E: "float | Array") -> "float | Array":
     E_arr = jnp.asarray(E, dtype=jnp.float64)
     # JIT-safe: no Python-level branch on ndim; let callers handle shape
     # Ref: Sollich 1998, Eq. (3): rho(E) = exp(-E) for E >= 0
-    return jnp.where(E_arr >= 0, jnp.exp(-E_arr), 0.0)
+    # R8-SGR-003: clamp E for safe exp to avoid inf in jnp.where VJP
+    E_safe = jnp.where(E_arr >= 0, E_arr, 0.0)
+    return jnp.where(E_arr >= 0, jnp.exp(-E_safe), 0.0)
 
 
 # ============================================================================
@@ -241,19 +243,26 @@ def _Gp_integrand_real(E: float, x: float, omega_tau0: float) -> float:
     x : float
         Effective noise temperature
     omega_tau0 : float
-        Dimensionless frequency omega * tau0
+        Dimensionless frequency omega * tau0 (= z = omega * tau0)
 
     Returns
     -------
     float
         Real part of integrand
+
+    Notes
+    -----
+    Correct SGR physics (Sollich 1998): tau_E = tau0 * exp(E/x), so
+    omega*tau_E = omega_tau0 * exp(E/x).
+
+    G'(omega) = integral rho(E) * E * (omega*tau_E)^2 / (1 + (omega*tau_E)^2) dE
     """
-    # P(E) * E * [omega*tau0]^2 / ([omega*tau0]^2 + [exp(E/x)]^2)
-    # KRN-008: Cap exp(E/x) to avoid overflow for small x
+    # KRN-008 / R10-SGR-KRN-001: tau_E = tau0 * exp(E/x), so omega*tau_E = z*exp(E/x)
+    # Cap E/x to avoid overflow; omega_tau0 * exp(E/x) is the dimensionless product.
     exp_arg = jnp.minimum(E / x, 709.0)
-    exp_term = jnp.exp(exp_arg)
-    numerator = E * omega_tau0**2
-    denominator = omega_tau0**2 + exp_term**2
+    tau_E_z = omega_tau0 * jnp.exp(exp_arg)
+    numerator = E * tau_E_z**2
+    denominator = 1.0 + tau_E_z**2
     return rho_trap(E) * numerator / denominator
 
 
@@ -268,19 +277,25 @@ def _Gp_integrand_imag(E: float, x: float, omega_tau0: float) -> float:
     x : float
         Effective noise temperature
     omega_tau0 : float
-        Dimensionless frequency omega * tau0
+        Dimensionless frequency omega * tau0 (= z = omega * tau0)
 
     Returns
     -------
     float
         Imaginary part of integrand
+
+    Notes
+    -----
+    Correct SGR physics (Sollich 1998): tau_E = tau0 * exp(E/x), so
+    omega*tau_E = omega_tau0 * exp(E/x).
+
+    G''(omega) = integral rho(E) * E * (omega*tau_E) / (1 + (omega*tau_E)^2) dE
     """
-    # P(E) * E * [omega*tau0 * exp(E/x)] / ([omega*tau0]^2 + [exp(E/x)]^2)
-    # KRN-008: Cap exp(E/x) to avoid overflow for small x
+    # KRN-008 / R10-SGR-KRN-001: tau_E = tau0 * exp(E/x), so omega*tau_E = z*exp(E/x)
     exp_arg = jnp.minimum(E / x, 709.0)
-    exp_term = jnp.exp(exp_arg)
-    numerator = E * omega_tau0 * exp_term
-    denominator = omega_tau0**2 + exp_term**2
+    tau_E_z = omega_tau0 * jnp.exp(exp_arg)
+    numerator = E * tau_E_z
+    denominator = 1.0 + tau_E_z**2
     return rho_trap(E) * numerator / denominator
 
 
@@ -329,9 +344,12 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     Frequency-dependent complex modulus for SGR model.
 
     Computes the dimensionless complex modulus G*(omega) = G'(omega) + i*G''(omega):
-        Gp(x, z) = integral_0^inf rho(E) * E * [i*z] / [i*z + exp(E/x)] dE
 
-    where z = omega * tau0 is the dimensionless frequency.
+        G'(omega)  = integral_0^inf rho(E) * E * (z*exp(E/x))^2 / (1 + (z*exp(E/x))^2) dE
+        G''(omega) = integral_0^inf rho(E) * E * (z*exp(E/x))   / (1 + (z*exp(E/x))^2) dE
+
+    where z = omega * tau0 is the dimensionless frequency and tau_E = tau0 * exp(E/x)
+    is the trap-energy-dependent relaxation time (Sollich 1998, Eq. 19).
 
     Parameters
     ----------
@@ -386,6 +404,10 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     x_arr = jnp.atleast_1d(jnp.asarray(x, dtype=jnp.float64))
     omega_arr = jnp.atleast_1d(jnp.asarray(omega_tau0, dtype=jnp.float64))
 
+    # R8-OPT-004: validate shapes before JIT-traced dispatch
+    if not (jnp.ndim(x) == 0 or jnp.ndim(omega_tau0) == 0) and x_arr.shape != omega_arr.shape:
+        raise ValueError(f"Shape mismatch: x {x_arr.shape} vs omega {omega_arr.shape}")
+
     # Validate inputs
     x_safe = jnp.maximum(x_arr, 1e-10)
     omega_safe = jnp.maximum(omega_arr, 1e-10)
@@ -409,11 +431,7 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
         # omega scalar, x array — vectorize over x
         results = jax.vmap(lambda x_val: _Gp_quadrature(x_val, omega_safe[0]))(x_safe)
     else:
-        # x array and omega array — must match shape
-        if x_arr.shape != omega_arr.shape:
-            raise ValueError(
-                f"x and omega_tau0 must have same shape, got {x_arr.shape} and {omega_arr.shape}"
-            )
+        # x array and omega array — shape already validated above
         results = jax.vmap(_Gp_quadrature)(x_safe, omega_safe)
 
     # Squeeze the length-1 axis when both inputs were scalars so callers

@@ -238,12 +238,16 @@ def two_time_strain_decorrelation(
     Fuchs M. & Cates M.E. (2003) Faraday Discuss. 123, 267
     """
     gamma_c_safe = jnp.maximum(gamma_c, 1e-10)
-    if use_lorentzian:
-        h_total = 1.0 / (1.0 + (gamma_total / gamma_c_safe) ** 2)
-        h_since_s = 1.0 / (1.0 + (gamma_since_s / gamma_c_safe) ** 2)
-    else:
-        h_total = jnp.exp(-((gamma_total / gamma_c_safe) ** 2))
-        h_since_s = jnp.exp(-((gamma_since_s / gamma_c_safe) ** 2))
+    # R8-MCT-001u: use jnp.where for JIT safety with traced booleans
+    # (use_lorentzian is static_argname so this is fine either way, but
+    # jnp.where avoids Python branching that would be invalid for traced values)
+    lorentz_total = 1.0 / (1.0 + (gamma_total / gamma_c_safe) ** 2)
+    gauss_total = jnp.exp(-((gamma_total / gamma_c_safe) ** 2))
+    h_total = jnp.where(use_lorentzian, lorentz_total, gauss_total)
+
+    lorentz_since_s = 1.0 / (1.0 + (gamma_since_s / gamma_c_safe) ** 2)
+    gauss_since_s = jnp.exp(-((gamma_since_s / gamma_c_safe) ** 2))
+    h_since_s = jnp.where(use_lorentzian, lorentz_since_s, gauss_since_s)
 
     return h_total * h_since_s
 
@@ -319,6 +323,14 @@ def prony_decompose_memory(
 
     t_valid = t[valid_mask]
     m_valid = m_t[valid_mask]
+
+    # R8-PRONY-003: guard against all-zero/negative kernel values
+    if len(t_valid) == 0:
+        logger.error(
+            "prony_decompose_memory: no valid data points (all m_t <= 0 or t <= 0). "
+            "Returning zero Prony series."
+        )
+        return np.zeros(n_modes), np.logspace(-3, 3, n_modes)
 
     if method == "log_spacing":
         return _prony_log_spacing(t_valid, m_valid, n_modes)
@@ -466,6 +478,7 @@ def _prony_leastsq_robust(
         # Accept near-converged solutions: a small residual cost relative to the
         # number of data points indicates the fit is acceptable despite hitting
         # max_nfev or a tolerance threshold (e.g. status=2,3).
+        # R8-OPT-003: scipy result.cost = 0.5 * RSS (not full RSS)
         if result.cost < 1e-6 * len(m_valid):
             logger.warning(
                 "Prony fit did not fully converge but residual is acceptable",
@@ -971,4 +984,22 @@ def solve_equilibrium_correlator_f12(
     t_array = jnp.asarray(t_array)
     if t_array.shape[0] == 0:
         return jnp.array([])
+    # R8-MCT-002: warn about constant-kernel approximation in glass phase
+    if v2 > 4.0:
+        logger.warning(
+            "Glass phase detected (v2=%.2f > 4). Correlator solver uses "
+            "simplified constant-kernel approximation. Results may be "
+            "inaccurate for intermediate times. Use Prony-based Volterra "
+            "solver for quantitative accuracy.", v2
+        )
+    # R10-MCT-001: warn in fluid phase where constant-kernel approximation also
+    # introduces error for intermediate times (Φ(t) is not yet at its long-time
+    # limit during the transient decay, so m(Φ_current) ≠ m(Φ(t-s)) for s < t).
+    else:
+        logger.info(
+            "Fluid phase (v2=%.2f < 4). Constant-kernel approximation used "
+            "in correlator solver. Results are quantitatively accurate at "
+            "long times (Φ → 0) but may deviate for intermediate times. "
+            "Use Prony-based Volterra solver for higher accuracy.", v2
+        )
     return _solve_equilibrium_correlator_f12_jit(t_array, v1, v2, Gamma, n_steps)

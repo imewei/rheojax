@@ -131,7 +131,12 @@ def convert_modulus(
 
     # SUP-010: Warn for non-finite values in input data
     data_arr = np.asarray(data) if not hasattr(data, "devices") else data
-    if hasattr(data_arr, "size") and not np.all(np.isfinite(data_arr)):
+    # R8-MOD-001: use JAX-native isfinite for JAX arrays to avoid device transfer
+    if hasattr(data_arr, "devices"):
+        all_finite = bool(jnp.all(jnp.isfinite(data_arr)))
+    else:
+        all_finite = bool(np.all(np.isfinite(np.asarray(data_arr))))
+    if hasattr(data_arr, "size") and not all_finite:
         import warnings
 
         warnings.warn(

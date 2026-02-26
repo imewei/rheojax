@@ -447,11 +447,26 @@ def select_optimal_n(
 
     # If no N satisfies threshold (shouldn't happen), return smallest N
     n_opt = min(n_sorted)
-    logger.info(
-        "Selected minimum N (no N satisfied threshold)",
-        n_opt=n_opt,
-        r2_at_n_opt=r2_values[n_opt],
-    )
+    # R8-PRONY-002: warn when falling back to minimum N
+    if max(r2_values.values()) > 0:
+        logger.warning(
+            "select_optimal_n: no N satisfies R\u00b2 threshold %.4f. "
+            "Returning minimum N=%d (R\u00b2=%.4f). Consider adjusting optimization_factor.",
+            r2_threshold,
+            n_opt,
+            r2_values.get(n_opt, float("nan")),
+        )
+    else:
+        # R10-PRONY-001: r2_max <= 0 means the best fit is worse than a flat line —
+        # this is a strong signal of data quality issues or a fundamentally wrong model.
+        # Elevate from info to warning so it is not silently overlooked.
+        logger.warning(
+            "select_optimal_n: best R\u00b2=%.4f is non-positive (fit worse than "
+            "flat-line baseline). Returning minimum N=%d. Check data quality and "
+            "model choice.",
+            r2_max,
+            n_opt,
+        )
     return n_opt
 
 
@@ -634,7 +649,9 @@ def warm_start_from_n_modes(
         tau_i_combined = np.concatenate([tau_i, new_taus])
         sort_idx = np.argsort(tau_i_combined)
         tau_i_target = tau_i_combined[sort_idx]
-        E_i_combined = np.concatenate([E_i, np.full(n_pad, E_i.mean())])
+        # R8-PRONY-001: guard against empty E_i from corrupted params
+        E_fill = E_i.mean() if len(E_i) > 0 else 1e4
+        E_i_combined = np.concatenate([E_i, np.full(n_pad, E_fill)])
         E_i_target = E_i_combined[sort_idx]
         logger.debug(
             "Warm-start: increasing modes",

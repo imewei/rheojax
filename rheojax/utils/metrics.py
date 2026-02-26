@@ -141,6 +141,14 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
 
+    # R3-U-004: detect effectively-real complex data to avoid inflated R² from zero imaginary
+    if np.iscomplexobj(y_true) or np.iscomplexobj(y_pred):
+        max_imag_true = np.max(np.abs(np.imag(y_true))) if np.iscomplexobj(y_true) else 0.0
+        max_imag_pred = np.max(np.abs(np.imag(y_pred))) if np.iscomplexobj(y_pred) else 0.0
+        if max_imag_true < 1e-15 and max_imag_pred < 1e-15:
+            y_true = np.real(y_true)
+            y_pred = np.real(y_pred)
+
     if not np.iscomplexobj(y_true) and not np.iscomplexobj(y_pred):
         ss_res = np.sum((y_true - y_pred) ** 2)
         ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)

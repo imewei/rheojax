@@ -99,6 +99,14 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     t = t[sort_idx]
     G_t = G_t[sort_idx]
 
+    # R8-COMPAT-001: narrow time windows give unreliable decay classification.
+    # Threshold: 0.5 decades (~3x time range) catches near-constant data
+    # while preserving classification for short-duration industrial QC tests.
+    t_span_decades = np.log10(t.max() / max(t.min(), 1e-30))
+    if t_span_decades < 0.5:
+        logger.info("Time span < 0.5 decades; decay type classification unreliable")
+        return DecayType.UNKNOWN
+
     # 1. Check for exponential decay: log(G) vs t should be linear
     # Normalize t to [0,1] so R² is comparable with the log-log power-law R²
     slope_exp = 0.0
@@ -188,11 +196,15 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
             )
             return DecayType.POWER_LAW
 
-    # Stretched exponential
-    if r_stretch_sq > threshold_high:
+    # Stretched exponential: R² must be high AND the slope (β exponent) must be ≤ 1.
+    # R10-COMPAT-001: without the slope guard, compressed exponentials (β > 1) are
+    # misclassified as STRETCHED because log(-log(G/G0)) vs log(t) is also linear for
+    # β > 1 — the only distinction is the slope magnitude.
+    if r_stretch_sq > threshold_high and 0 < slope_stretch <= 1.0:
         logger.info(
             "Detected stretched exponential decay",
             r_squared=float(r_stretch_sq),
+            beta_exponent=float(slope_stretch),
         )
         return DecayType.STRETCHED
 
@@ -278,7 +290,8 @@ def _detect_from_relaxation(t: np.ndarray, G_t: np.ndarray) -> MaterialType:
     # For non-power-law materials, use decay ratio
     G_final = np.mean(G_t[-5:])  # Average last 5 points
     G_initial = np.mean(G_t[:5]) if len(G_t) >= 5 else G_t[0]
-    decay_ratio = G_final / G_initial
+    # R8-COMPAT-002: guard against zero G_initial
+    decay_ratio = G_final / G_initial if G_initial != 0 else 0.0
 
     if decay_ratio > 0.5:
         # Finite equilibrium modulus → solid-like

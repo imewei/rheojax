@@ -87,7 +87,7 @@ def _validate_optimization_result(
     result: "OptimizationResult",
     residuals: np.ndarray,
     y_data: np.ndarray | None = None,
-    mse_threshold: float = 1e6,
+    mse_threshold: float = 1e18,
 ) -> None:
     """Validate optimization result against pathological outcomes.
 
@@ -100,7 +100,12 @@ def _validate_optimization_result(
         y_data: Original y data array. When provided, uses len(y_data) as the
             observation count so that complex data (where residuals has length
             2N) is not penalised with an inflated denominator.
-        mse_threshold: Maximum allowed mean squared error (default: 1e6).
+        mse_threshold: Maximum allowed mean squared error (default: 1e18).
+            The default accommodates GPa-scale moduli data where raw residuals
+            can be O(1e9 Pa), yielding MSS/N ~ O(1e18 Pa²).
+            For normalized residuals the threshold is effectively unbounded
+            (RSS/N ≈ O(1) << 1e18).  Only truly diverged fits (non-finite or
+            beyond 1e18) are rejected.
 
     Raises:
         RuntimeError: If MSE exceeds threshold or is non-finite.
@@ -111,6 +116,10 @@ def _validate_optimization_result(
             "Check that the objective function returns a non-empty array."
         )
     residual_count = len(y_data) if y_data is not None else residuals.size
+    # R10-OPT-001: threshold raised from 1e6 to 1e18 so that raw-residual fits
+    # on GPa-scale DMTA data (MSE ~ 1e18 Pa²) are not rejected as failures.
+    # The check remains in place to catch genuinely diverged optimizations
+    # (non-finite result.fun or values beyond 1e18).
     mse = result.fun / residual_count
     if not np.isfinite(mse) or mse > mse_threshold:
         logger.error(
@@ -1543,6 +1552,9 @@ def nlsq_multistart_optimize(
 
     if y_data is not None and best_result.y_data is None:
         best_result.y_data = np.asarray(y_data)
+    # R8-OPT-002: also set n_data for AIC/BIC/adj_R² computation
+    if y_data is not None and getattr(best_result, "n_data", None) is None:
+        best_result.n_data = len(np.asarray(y_data))
 
     logger.info(
         "Multi-start optimization completed",

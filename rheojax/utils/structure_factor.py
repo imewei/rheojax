@@ -418,8 +418,11 @@ def mct_vertex_isotropic(
     sq = sk_func(q)
 
     # Direct correlation function
-    ck = 1.0 - 1.0 / sk
-    cq = 1.0 - 1.0 / sq
+    # R3-U-006: include number density factor in direct correlation function
+    # c(k) = (1 - 1/S(k)) / n, not (1 - 1/S(k))
+    n_density = 6 * phi / (np.pi * sigma**3)
+    ck = (1.0 - 1.0 / np.maximum(sk, 1e-10)) / n_density
+    cq = (1.0 - 1.0 / np.maximum(sq, 1e-10)) / n_density
 
     # Simplified vertex for isotropic case
     # V(k,q) ∝ n * S(k) * S(q) * [k·q c(|k-q|) + k c(k) + q c(q)]²
@@ -437,12 +440,15 @@ def mct_vertex_isotropic(
     # Single vectorized sk_func call on raveled grid instead of n^2 scalar calls
     s_kmq = sk_func(k_minus_q.ravel()).reshape(n_k, n_k)  # (n_k, n_k)
 
-    # Vertex coupling (simplified Verlet-Weis form) — broadcast ck/cq
-    coupling = ki * ck[:, None] + qj * cq[None, :]  # (n_k, n_k)
+    # R10-MCT-002: include c(|k-q|) term for the full MCT vertex coupling.
+    # The correct isotropic vertex (Hansen-McDonald Ch. 12) is:
+    #   coupling = k*c(k) + q*c(q) + |k-q|*c(|k-q|)
+    # where c(k) = (1 - 1/S(k)) / n_density.
+    c_kmq = (1.0 - 1.0 / np.maximum(s_kmq, 1e-10)) / n_density  # (n_k, n_k)
+    coupling = ki * ck[:, None] + qj * cq[None, :] + k_minus_q * c_kmq  # (n_k, n_k)
     V = sk[:, None] * sq[None, :] * s_kmq * coupling**2
 
-    # Normalize by density
-    n_density = 6 * phi / (np.pi * sigma**3)
+    # Normalize by density (n_density already computed above for c(k) correction)
     V *= n_density / (16 * np.pi**2)
 
     return V
