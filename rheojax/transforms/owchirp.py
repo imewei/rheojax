@@ -213,17 +213,34 @@ class OWChirp(BaseTransform):
 
         coefficients_list = []
 
-        for freq in frequencies:
-            # Create wavelet centered at middle
-            t_center = (t[0] + t[-1]) / 2.0
-            wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
+        # R10-OWC-002: Zero-pad to 2× length for linear (non-circular) correlation.
+        # The FFT-based cross-correlation is circular by default; zero-padding to at
+        # least 2N prevents wrap-around aliasing in the time domain.
+        n_orig = len(t)
+        n_pad = 2 * n_orig
 
-            # FFT-based convolution
-            signal_fft = jnp.fft.fft(signal)
-            wavelet_fft = jnp.fft.fft(wavelet)
+        for freq in frequencies:
+            # Center wavelet at t=0 for correct FFT cross-correlation (R10-OWC-002).
+            # Centering at the signal midpoint shifts the phase of the output by a
+            # frequency-dependent amount, causing systematic wavelet centering errors.
+            wavelet = self._chirp_wavelet(t, 0.0, freq, self.wavelet_width)
+
+            # Zero-pad signal and wavelet to 2N
+            signal_padded = jnp.pad(signal, (0, n_pad - n_orig))
+            wavelet_padded = jnp.pad(wavelet, (0, n_pad - n_orig))
+
+            # FFT-based cross-correlation (conj of wavelet in frequency domain)
+            signal_fft = jnp.fft.fft(signal_padded)
+            wavelet_fft = jnp.fft.fft(wavelet_padded)
             conv = jnp.fft.ifft(signal_fft * jnp.conj(wavelet_fft))
 
-            coefficients_list.append(conv)
+            # Trim to original length
+            conv_trimmed = conv[:n_orig]
+
+            # Apply 1/√f scale normalization (standard L² CWT normalization)
+            conv_normalized = conv_trimmed / jnp.sqrt(float(freq))
+
+            coefficients_list.append(conv_normalized)
 
         coefficients = jnp.stack(coefficients_list, axis=0)
 
@@ -323,7 +340,9 @@ class OWChirp(BaseTransform):
                 "wavelet_width": self.wavelet_width,
                 "n_frequencies": self.n_frequencies,
                 "frequency_range": self.frequency_range,
-                "time_frequency_map": True,  # Full 2D map available
+                # R9-OWC-001: Only the time-averaged spectrum is returned by
+                # _transform(). The full 2D map requires get_time_frequency_map().
+                "time_frequency_map": False,
             }
         )
 
