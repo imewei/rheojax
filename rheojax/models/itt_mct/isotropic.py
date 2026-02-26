@@ -34,6 +34,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import numpy as np
+import scipy.integrate
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
@@ -252,15 +253,20 @@ class ITTMCTIsotropic(ITTMCTBase):
     def _compute_vertex(self) -> None:
         """Compute MCT vertex function V(k,q)."""
         phi = self.parameters.get_value("phi")
+        sigma_d = self.parameters.get_value("sigma_d")
 
         assert phi is not None
+        assert sigma_d is not None
 
-        # Simplified vertex computation
+        # R10-ISM-004: pass sigma=sigma_d so S(k) in the vertex uses the correct
+        # physical particle diameter. Without this, percus_yevick_sk defaults to
+        # sigma=1 (dimensionless) while k_grid is in physical units (1/m), causing
+        # a dimensional mismatch that shifts the S(k) peak by orders of magnitude.
         self.vertex = mct_vertex_isotropic(
             self.k_grid,
             self.k_grid,
             phi,
-            sk_func=lambda k: percus_yevick_sk(k, phi),
+            sk_func=lambda k: percus_yevick_sk(k, phi, sigma=sigma_d),
         )
 
     def update_structure_factor(
@@ -321,14 +327,24 @@ class ITTMCTIsotropic(ITTMCTBase):
         # Full MCT would require solving coupled equations
         phi_eq = np.zeros((n_t, n_k))
 
-        for i, k_val in enumerate(self.k_grid):
+        # R10-ISM-001: hoist glass check and f(k) array computation out of loop.
+        # get_glass_transition_info() and _compute_nonergodicity_parameter() were
+        # previously called O(n_k) times inside the loop, even though is_glass is
+        # constant and f_k only depends on the wave vector index.
+        info = self.get_glass_transition_info()
+        is_glass = info["is_glass"]
+        if is_glass:
+            f_k_arr = np.array(
+                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+            )
+
+        for i in range(n_k):
             # Simple exponential for now (full MCT is more complex)
             phi_eq[:, i] = np.exp(-Gamma_k[i] * t_np)
 
             # Glass state: plateau at f(k)
-            info = self.get_glass_transition_info()
-            if info["is_glass"]:
-                f_k = self._compute_nonergodicity_parameter(k_val)
+            if is_glass:
+                f_k = f_k_arr[i]
                 phi_eq[:, i] = f_k + (1 - f_k) * phi_eq[:, i]
 
         return jnp.array(phi_eq)
@@ -465,44 +481,76 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert kBT is not None
         assert gamma_c is not None
 
-        # Bare relaxation rates
+        # Bare relaxation rates: Γ(k) = k²D₀/S(k)
         Gamma_k = self.k_grid**2 * D0 / self.S_k
+        tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
 
         # Modulus scale
         G_scale = kBT / sigma_d**3
 
+        # R10-ISM-001: hoist glass check and f(k) once, shared across all γ̇ values.
+        info = self.get_glass_transition_info()
+        is_glass = info["is_glass"]
+        if is_glass:
+            f_k_arr = np.array(
+                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+            )
+        else:
+            f_k_arr = np.zeros(len(self.k_grid))
+
         sigma = np.zeros_like(gamma_dot)
+
+        # R10-ISM-003: correct ITT-MCT flow curve uses full time integral
+        # σ(γ̇) = γ̇ · ∫₀^∞ G(t) · h(γ̇t) dt
+        # where G(t) = G_scale · Σ_k k⁴ S(k)² · Φ(k,t)²
+        # and h(γ) = exp(-(γ/γ_c)²) is the strain decorrelation.
+        # Using a single t_eff = 1/γ̇ was an O(1)-point approximation
+        # that misses the entire shape of G(t) and underestimates the
+        # integral by orders of magnitude near the glass transition.
+        #
+        # Use t_max = 100 * tau_k_max to cover full correlator decay.
+        # The h(γ̇t) factor suppresses contributions beyond t ~ gamma_c/gamma_dot,
+        # so the integral naturally converges even for the glass state.
+        t_max_global = float(100.0 * tau_k_arr.max())
+
+        # Linear time grid is more stable for the exponential × Gaussian integrand
+        t_int = np.linspace(0.0, t_max_global, 500)
+
+        # Pre-compute G(t) on the shared grid (vectorized over k using broadcasting)
+        # phi_k shape: (n_t, n_k)
+        exp_decay = np.exp(-t_int[:, None] / tau_k_arr[None, :])  # (n_t, n_k)
+        if is_glass:
+            phi_k_eq = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
+        else:
+            phi_k_eq = exp_decay  # (n_t, n_k)
+
+        # G_k weights: k⁴ S(k)²
+        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
+
+        # G(t) = G_scale · Σ_k G_k · Φ(k,t)²  shape: (n_t,)
+        G_t = G_scale * np.sum(G_k_weights[None, :] * phi_k_eq**2, axis=1)
 
         for i, gd in enumerate(gamma_dot):
             if gd < 1e-15:
-                # Zero shear limit
-                info = self.get_glass_transition_info()
-                if info["is_glass"]:
-                    # Yield stress estimate
-                    sigma[i] = G_scale * gamma_c * 0.1
+                # Zero shear rate: yield stress for glass, zero for fluid.
+                # Estimate: σ_y ≈ G_scale · gamma_c · Σ_k G_k·f_k² / Σ_k G_k (weighted plateau)
+                if is_glass:
+                    G_k_total = float(np.sum(G_k_weights))
+                    if G_k_total > 0:
+                        sigma[i] = G_scale * gamma_c * float(
+                            np.sum(G_k_weights * f_k_arr**2)
+                        ) / G_k_total * 0.1
                 else:
                     sigma[i] = 0.0
-            else:
-                # Compute stress from k-space integration
-                stress_k = np.zeros(len(self.k_grid))
+                continue
 
-                for j, k in enumerate(self.k_grid):
-                    # Characteristic strain
-                    gamma_eff = gd / Gamma_k[j]
-                    h = np.exp(-((gamma_eff / gamma_c) ** 2))
+            # Strain decorrelation on the time grid: h(γ̇t)
+            gamma_t = gd * t_int
+            h_t = np.exp(-((gamma_t / gamma_c) ** 2))
 
-                    # Correlator contribution: non-ergodic plateau (f_k)
-                    # survives under strain while ergodic part relaxes
-                    f_k = self._compute_nonergodicity_parameter(k)
-                    tau_k = 1.0 / Gamma_k[j]
-                    t_eff = 1.0 / max(gd, 1e-15)  # Effective relaxation time
-                    phi_eff = (f_k + (1 - f_k) * np.exp(-t_eff / tau_k)) * h
-
-                    # Stress contribution ∝ k⁴ S² Φ²
-                    stress_k[j] = k**4 * self.S_k[j] ** 2 * phi_eff**2
-
-                # Integrate over k
-                sigma[i] = G_scale * gd * np.trapezoid(stress_k, self.k_grid)
+            # σ = γ̇ · ∫ G(t) · h(γ̇t) dt
+            integrand = G_t * h_t
+            sigma[i] = gd * np.trapezoid(integrand, t_int)
 
         return sigma
 
@@ -536,34 +584,65 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert kBT is not None
         assert sigma_d is not None
 
-        # Bare relaxation rates
+        # Bare relaxation rates: Γ(k) = k²D₀/S(k)
         Gamma_k = self.k_grid**2 * D0 / self.S_k
+        tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
 
         G_scale = kBT / sigma_d**3
 
+        # R10-ISM-001: hoist glass check once.
+        info = self.get_glass_transition_info()
+        is_glass = info["is_glass"]
+        if is_glass:
+            f_k_arr = np.array(
+                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+            )
+        else:
+            f_k_arr = np.zeros(len(self.k_grid))
+
+        # R10-ISM-004/005: replace the Maxwell approximation
+        # G'(ω) = Σ_k G_k·[f_k + (1-f_k)·ω²τ²/(1+ω²τ²)] with the correct
+        # Fourier transform of G(t) = G_scale·Σ_k G_k·Φ(k,t)².
+        #
+        # The Maxwell formula misses the f_k² plateau contribution and the
+        # cross-term 2f_k(1-f_k) in Φ². With Φ(k,t) = f_k + (1-f_k)e^{-t/τ_k}:
+        # Φ² = f_k² + 2f_k(1-f_k)e^{-t/τ_k} + (1-f_k)²e^{-2t/τ_k}
+        # FT gives three contributions: G_e plateau, mode at τ_k, mode at τ_k/2.
+        # We compute the Fourier integral numerically on a dense time grid so all
+        # contributions (including the elastic plateau from f_k²) are captured.
+        #
+        # Numerical strategy for each omega: use a per-frequency linear grid that
+        # covers the correlator decay (t_max = 100*tau_k_max) with enough points
+        # to resolve the oscillation period 2π/ω (at least 20 points per period).
+        # This avoids Nyquist aliasing when omega is large.
+        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
         G_prime = np.zeros_like(omega)
         G_double_prime = np.zeros_like(omega)
 
-        for i, w in enumerate(omega):
-            g_prime_k = np.zeros(len(self.k_grid))
-            g_double_prime_k = np.zeros(len(self.k_grid))
+        for idx, w in enumerate(omega):
+            t_max_w = float(100.0 * tau_k_arr.max())
+            # Ensure >= 20 points per oscillation period (Nyquist × 10 safety margin)
+            T_period = 2.0 * np.pi / w
+            n_t_w = max(2000, int(np.ceil(20.0 * t_max_w / T_period)))
+            n_t_w = min(n_t_w, 50000)  # Cap to avoid excessive memory use
 
-            for j, k in enumerate(self.k_grid):
-                # Maxwell-like contribution from each k-mode
-                tau_k = 1.0 / Gamma_k[j]
-                wt = w * tau_k
+            t_w = np.linspace(0.0, t_max_w, n_t_w)
 
-                f_k = self._compute_nonergodicity_parameter(k)
-                G_k = k**4 * self.S_k[j] ** 2
+            # G(t) = G_scale · Σ_k k⁴ S(k)² · Φ(k,t)²  (vectorized over k)
+            exp_decay = np.exp(-t_w[:, None] / tau_k_arr[None, :])
+            if is_glass:
+                phi_k_w = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
+            else:
+                phi_k_w = exp_decay
+            G_t_w = G_scale * np.sum(G_k_weights[None, :] * phi_k_w**2, axis=1)
 
-                # G'(ω) = G_k × [f_k + (1-f_k) × ω²τ²/(1+ω²τ²)]
-                g_prime_k[j] = G_k * (f_k + (1 - f_k) * wt**2 / (1 + wt**2))
-
-                # G''(ω) = G_k × (1-f_k) × ωτ/(1+ω²τ²)
-                g_double_prime_k[j] = G_k * (1 - f_k) * wt / (1 + wt**2)
-
-            G_prime[i] = G_scale * np.trapezoid(g_prime_k, self.k_grid)
-            G_double_prime[i] = G_scale * np.trapezoid(g_double_prime_k, self.k_grid)
+            # Numerical Fourier transform:
+            # G'(ω) = ω ∫₀^∞ G(t) sin(ωt) dt
+            # G''(ω) = ω ∫₀^∞ G(t) cos(ωt) dt
+            sin_wt = np.sin(w * t_w)
+            cos_wt = np.cos(w * t_w)
+            G_prime[idx] = w * np.trapezoid(G_t_w * sin_wt, t_w)
+            G_double_prime[idx] = w * np.trapezoid(G_t_w * cos_wt, t_w)
 
         if return_components:
             return np.column_stack([G_prime, G_double_prime])
@@ -602,35 +681,52 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert gamma_c is not None
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
+        tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
         G_scale = kBT / sigma_d**3
 
-        sigma = np.zeros_like(t)
+        # R10-ISM-001: hoist glass check and f(k) out of any inner loop.
+        info = self.get_glass_transition_info()
+        is_glass = info["is_glass"]
+        if is_glass:
+            f_k_arr = np.array(
+                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+            )
+        else:
+            f_k_arr = np.zeros(len(self.k_grid))
 
-        # Pre-compute f_k for all wave vectors
-        f_k_arr = np.array(
-            [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+        # R10-ISM-002: replace triple-nested Python loop with vectorized computation.
+        # Old code: O(n_t × n_sub × n_k) Python iterations where n_sub varied per t.
+        # New code: O(1) numpy calls. We precompute G(t) on a shared fine grid,
+        # then integrate σ(t) = γ̇ · ∫₀ᵗ G(s) · h(γ̇s) ds via cumulative trapezoid.
+        t_max_val = float(np.max(t))
+        n_fine = max(500, 2 * len(t))
+        t_fine = np.linspace(0.0, t_max_val, n_fine)
+
+        # phi_k_fine shape: (n_fine, n_k) — vectorized over k via broadcasting
+        exp_decay = np.exp(-t_fine[:, None] / tau_k_arr[None, :])
+        if is_glass:
+            phi_k_fine = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
+        else:
+            phi_k_fine = exp_decay
+
+        # G_k weights: k⁴ S(k)²
+        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
+
+        # G(t_fine) = G_scale · Σ_k G_k · Φ(k,t)²   shape: (n_fine,)
+        G_t_fine = G_scale * np.sum(G_k_weights[None, :] * phi_k_fine**2, axis=1)
+
+        # Strain decorrelation on the fine grid
+        gamma_t_fine = gamma_dot * t_fine
+        h_t_fine = np.exp(-((gamma_t_fine / gamma_c) ** 2))
+
+        # Cumulative integral: σ(t) = γ̇ · ∫₀ᵗ G(s) · h(γ̇s) ds
+        integrand_fine = G_t_fine * h_t_fine
+        sigma_cumulative = gamma_dot * scipy.integrate.cumulative_trapezoid(
+            integrand_fine, t_fine, initial=0.0
         )
 
-        for i, t_val in enumerate(t):
-            # σ(t) = γ̇ ∫₀ᵗ G(s) ds where G(s) = G_scale × Σ_k k⁴ S²(k) Φ(k,s)
-            # Compute time integral via trapezoidal rule over sub-times
-            n_sub = max(20, int(t_val * 10))
-            s_arr = np.linspace(0, t_val, n_sub)
-            integrand = np.zeros(n_sub)
-
-            for si, s_val in enumerate(s_arr):
-                gamma_s = gamma_dot * s_val
-                h_s = np.exp(-((gamma_s / gamma_c) ** 2))
-                stress_k = np.zeros(len(self.k_grid))
-                for j, k in enumerate(self.k_grid):
-                    tau_k = 1.0 / Gamma_k[j]
-                    phi_s = f_k_arr[j] + (1 - f_k_arr[j]) * np.exp(-s_val / tau_k)
-                    phi_s *= h_s
-                    G_k = k**4 * self.S_k[j] ** 2
-                    stress_k[j] = G_k * phi_s
-                integrand[si] = np.trapezoid(stress_k, self.k_grid)
-
-            sigma[i] = G_scale * gamma_dot * np.trapezoid(integrand, s_arr)
+        # Interpolate cumulative stress to the requested time points
+        sigma = np.interp(t, t_fine, sigma_cumulative)
 
         return sigma
 

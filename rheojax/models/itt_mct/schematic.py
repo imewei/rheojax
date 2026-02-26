@@ -954,10 +954,16 @@ class ITTMCTSchematic(ITTMCTBase):
         tau = jnp.array(self._prony_times)
 
         # Initial state: [Φ, K₁..K_n, γ, γ̇]
+        # R10-SCH-001: correct creep IC.
+        # At t=0⁺ there is an instantaneous elastic strain jump γ_e(0) = σ₀/G_inf
+        # (the "elastic jump" in a Maxwell-type creep experiment).
+        # The shear rate γ̇ starts at 0 — it evolves from the constraint equation.
+        # Setting state0[-1] = sigma_applied/G_inf was assigning this elastic strain
+        # to γ̇ instead of γ, giving a physically wrong initial condition.
         state0 = np.zeros(3 + self.n_prony_modes)
         state0[0] = 1.0  # Φ(0) = 1
-        state0[-2] = 0.0  # γ(0) = 0
-        state0[-1] = sigma_applied / G_inf  # Initial γ̇ estimate
+        state0[-2] = sigma_applied / G_inf  # γ(0) = σ₀/G_inf (elastic jump)
+        state0[-1] = 0.0  # γ̇(0) = 0 (rate starts from rest)
 
         def rhs_numpy(t_val, state):
             state_jax = jnp.array(state)
@@ -1082,12 +1088,14 @@ class ITTMCTSchematic(ITTMCTBase):
         # Extract stress
         sigma = sol.y[-1, :]
 
-        # Add residual stress for glass state
-        info = self.get_glass_transition_info()
-        if info["is_glass"]:
-            f_neq = info["f_neq"]
-            sigma_residual = G_inf * gamma_pre * f_neq * h_gamma
-            sigma = np.maximum(sigma, sigma_residual)
+        # R10-SCH-002: remove the np.maximum clamp for the glass state.
+        # The ODE already captures the non-ergodic plateau through the initial
+        # condition state0[0] = h(γ_pre) and the Volterra memory kernel. Applying
+        # sigma = np.maximum(sigma, sigma_residual) was double-applying the glass
+        # contribution AND suppressing the physical β-relaxation dip (the transient
+        # below the long-time plateau) which is a key MCT signature in glass states.
+        # The ODE naturally converges to the correct long-time plateau via the
+        # non-ergodic correlator.
 
         return sigma
 
