@@ -25,6 +25,12 @@ from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
+# NOTE: Action creators in this module use two patterns:
+#   1. Factory functions (return dict): start_bayesian(), start_fitting()
+#   2. Effector functions (dispatch directly): store_bayesian_result(), fail_bayesian()
+# Callers must dispatch() factory results but NOT dispatch effector results.
+# R8-NEW-010: consider standardizing to one pattern in future refactor.
+
 # Dataset Actions
 
 

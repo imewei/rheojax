@@ -429,6 +429,23 @@ class StateStore:
         payload : Any, optional
             Optional payload when using string-based dispatch.
         """
+        # R8-NEW-007: warn if dispatched from non-main thread
+        try:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            if app and QThread.currentThread() != app.thread():
+                import logging as _logging
+
+                _logging.getLogger(__name__).warning(
+                    "dispatch() called from worker thread for action '%s'. "
+                    "Use QMetaObject.invokeMethod for thread safety.",
+                    action if isinstance(action, str) else action.get("type", "?"),
+                )
+        except (ImportError, RuntimeError):
+            pass
+
         if isinstance(action, str):
             if isinstance(payload, dict):
                 action = {"type": action, **payload}
@@ -629,7 +646,7 @@ class StateStore:
                     "_emit_state_changed",
                     Qt.ConnectionType.QueuedConnection,
                 )
-            except (ImportError, RuntimeError, AttributeError):
+            except (ImportError, RuntimeError, AttributeError, TypeError):
                 # Fall back to direct emit when Qt is unavailable (headless/tests)
                 self.emit_signal("state_changed")
 
@@ -1187,11 +1204,12 @@ class StateStore:
                 pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.COMPLETE
                 pipeline.current_step = PipelineStep.BAYESIAN
 
+                # R8-NEW-009: don't overwrite active_model_name / active_dataset_id
+                # on Bayesian completion — the user may have switched selection
+                # while inference was running in the background.
                 return replace(
                     state,
                     bayesian_results=bayes,
-                    active_dataset_id=dataset_id,
-                    active_model_name=model_name,
                     pipeline_state=pipeline,
                     is_modified=True,
                 )
@@ -1302,7 +1320,7 @@ class StateStore:
                 "_emit_state_changed",
                 Qt.ConnectionType.QueuedConnection,
             )
-        except (ImportError, RuntimeError, AttributeError):
+        except (ImportError, RuntimeError, AttributeError, TypeError):
             self.emit_signal("state_changed")
 
         return True
@@ -1359,7 +1377,7 @@ class StateStore:
                 "_emit_state_changed",
                 Qt.ConnectionType.QueuedConnection,
             )
-        except (ImportError, RuntimeError, AttributeError):
+        except (ImportError, RuntimeError, AttributeError, TypeError):
             self.emit_signal("state_changed")
 
         return True
@@ -1450,7 +1468,17 @@ class StateStore:
                     exc_info=True,
                 )
 
-        self.emit_signal("state_changed")
+        # R8-NEW-004: use QueuedConnection for thread safety (matches update_state pattern)
+        try:
+            from PySide6.QtCore import QMetaObject, Qt
+
+            QMetaObject.invokeMethod(
+                self._signals,
+                "_emit_state_changed",
+                Qt.ConnectionType.QueuedConnection,
+            )
+        except (ImportError, RuntimeError, AttributeError, TypeError):
+            self.emit_signal("state_changed")
 
     def get_dataset(self, dataset_id: str) -> DatasetState | None:
         """Get dataset by ID.

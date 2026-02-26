@@ -50,10 +50,7 @@ from rheojax.gui.services.data_service import DataService
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.actions import (
-    bayesian_failed,
-    fail_bayesian,
     start_bayesian,
-    store_bayesian_result,
     update_bayesian_progress,
 )
 from rheojax.gui.state.store import BayesianResult, StateStore
@@ -758,10 +755,25 @@ class BayesianPage(QWidget):
         if self._current_worker is not None:
             try:
                 self._current_worker.signals.completed.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+            try:
                 self._current_worker.signals.failed.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+            try:
                 self._current_worker.signals.progress.disconnect()
-            except (RuntimeError, TypeError):
-                logger.debug("Signal already disconnected", exc_info=True)
+            except (TypeError, RuntimeError):
+                pass
+            # R8-NEW-002: also disconnect stage_changed and divergence_detected
+            try:
+                self._current_worker.signals.stage_changed.disconnect()
+            except (TypeError, RuntimeError, AttributeError):
+                pass
+            try:
+                self._current_worker.signals.divergence_detected.disconnect()
+            except (TypeError, RuntimeError, AttributeError):
+                pass
 
         self._current_worker = BayesianWorker(
             model_name=model_name,
@@ -1016,10 +1028,16 @@ class BayesianPage(QWidget):
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
 
-        fail_bayesian(
-            model_name=getattr(self, "_submitted_model_name", ""),
-            dataset_id=getattr(self, "_submitted_dataset_id", ""),
-            error=error_msg,
+        # Dispatch BAYESIAN_FAILED directly — BayesianPage owns the Bayesian
+        # job lifecycle (submitted via _worker_pool.submit, not main_window),
+        # so main_window._on_job_failed has no _job_types entry for it.
+        self._store.dispatch(
+            "BAYESIAN_FAILED",
+            {
+                "model_name": getattr(self, "_submitted_model_name", None) or "unknown",
+                "dataset_id": getattr(self, "_submitted_dataset_id", None) or "unknown",
+                "error": error_msg,
+            },
         )
         self._status_text.append(f"Error: {error_msg}")
         # GUI-R6-023: This is a Qt slot receiving an error string, not an

@@ -438,6 +438,9 @@ class DataPage(QWidget):
         self._preview_table.setEnabled(False)
 
         if hasattr(self, '_active_preview_worker') and self._active_preview_worker is not None:
+            # R6-GUI-008: cancel previous preview worker before starting new one
+            if hasattr(self._active_preview_worker, "cancel_token") and self._active_preview_worker.cancel_token is not None:
+                self._active_preview_worker.cancel_token.cancel()
             # Disconnect signals from old worker to prevent stale callbacks
             try:
                 self._active_preview_worker.signals.completed.disconnect()

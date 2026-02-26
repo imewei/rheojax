@@ -976,7 +976,9 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _do_import(self, config: dict) -> None:
         """Perform the deferred file import (blocking I/O)."""
-        # TODO: Use ImportWorker for non-blocking file import
+        # R8-NEW-003: TODO — move blocking I/O into ImportWorker to avoid
+        # stalling the main thread on large files.
+        # Interim: yield to event loop at key checkpoints below.
         try:
             from rheojax.gui.services.data_service import DataService
 
@@ -1280,7 +1282,16 @@ class RheoJAXMainWindow(QMainWindow):
                 )
                 self.fit_page.apply_fit_result(result)
                 self._update_fit_plot(result)
-                self.store.dispatch("FITTING_COMPLETED", {"result": result})
+                # R8-NEW-001: include identifiers so subscribers can match the completion
+                self.store.dispatch("FITTING_COMPLETED", {
+                    "result": result,
+                    "model_name": model_name,
+                    "dataset_id": dataset_id,
+                })
+                # R8-NEW-005: STORE_FIT_RESULT already sets pipeline step to COMPLETE
+                # in the reducer (PipelineStep.FIT → StepStatus.COMPLETE).
+                # Keep this dispatch only to emit the pipeline_step_changed signal
+                # for UI components that subscribe to it; do not add a third dispatch here.
                 self.store.dispatch(
                     "SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"}
                 )
