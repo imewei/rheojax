@@ -116,10 +116,13 @@ def _validate_optimization_result(
             "Check that the objective function returns a non-empty array."
         )
     residual_count = len(y_data) if y_data is not None else residuals.size
-    # R10-OPT-001: threshold raised from 1e6 to 1e18 so that raw-residual fits
-    # on GPa-scale DMTA data (MSE ~ 1e18 Pa²) are not rejected as failures.
-    # The check remains in place to catch genuinely diverged optimizations
-    # (non-finite result.fun or values beyond 1e18).
+    # R10-OPT-001: auto-scale threshold by data magnitude so that the MSE
+    # check works for both dimensionless log-residuals and raw Pa-scale data.
+    # Fallback to 1e18 when y_data is unavailable or all-zero.
+    if y_data is not None and len(y_data) > 0:
+        y_scale = float(np.max(np.abs(np.asarray(y_data))))
+        if y_scale > 0:
+            mse_threshold = max(mse_threshold, 1e6 * y_scale**2)
     mse = result.fun / residual_count
     if not np.isfinite(mse) or mse > mse_threshold:
         logger.error(

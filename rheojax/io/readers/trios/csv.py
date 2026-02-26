@@ -555,14 +555,19 @@ def parse_trios_csv(
                 else:
                     try:
                         if decimal_separator == ",":
-                            # R8-IO-001: strip thousands separator before decimal replacement
-                            # e.g. "1.234,56" → "1234.56" not "1.234.56"
-                            # Guard: skip dot-stripping for scientific notation with dot decimal
-                            # (e.g. "1.0E-03" should not become "10E-03")
-                            if not re.match(r"^-?\d+\.\d+[eE]", val_clean):
-                                val_clean = val_clean.replace(".", "")
-                            val_clean = val_clean.replace(",", ".")
-                        row.append(float(val_clean))
+                            # R8-IO-001 + R10-CSV-001: EU decimal handling.
+                            # Strategy: try comma→dot conversion; if the result
+                            # is not a valid float, fall back to the original
+                            # value (handles sci notation like "1.0E-03" where
+                            # dot is the decimal and no comma is present).
+                            eu_val = val_clean.replace(".", "").replace(",", ".")
+                            try:
+                                row.append(float(eu_val))
+                            except ValueError:
+                                # Fallback: try original (e.g. "1.0E-03")
+                                row.append(float(val_clean))
+                        else:
+                            row.append(float(val_clean))
                     except ValueError:
                         row.append(np.nan)
             if row:

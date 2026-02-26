@@ -287,9 +287,16 @@ class BatchPipeline:
                 new_model = model_cls()
                 X = np.array(pipeline.data.x)
                 y = np.array(pipeline.data.y)
-                fit_kwargs_replay = dict(getattr(step_obj, "_last_fit_kwargs", None) or {})
-                # Strip internal tracking keys that are not valid fit() kwargs
-                for _k in ("method",):
+                _lfk = getattr(step_obj, "_last_fit_kwargs", None)
+                fit_kwargs_replay = dict(_lfk) if _lfk is not None else {}
+                # Strip internal tracking keys and protocol-specific kwargs
+                # that should not be replayed from the template to new datasets.
+                _batch_strip_keys = {
+                    "method", "gamma_dot", "sigma_init", "lam_init",
+                    "sigma_0", "lam_0", "gamma_0", "omega_laos",
+                    "n_cycles", "points_per_cycle",
+                }
+                for _k in _batch_strip_keys:
                     fit_kwargs_replay.pop(_k, None)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
