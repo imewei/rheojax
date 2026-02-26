@@ -323,15 +323,19 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
         Default parameter states
     """
     store = StateStore()
+    _model_name: list[str | None] = [None]
 
     def updater(state: AppState) -> AppState:
+        # R10-AC-002: Read model_name inside the updater closure (under the
+        # store lock) to eliminate the TOCTOU race between get_state() and
+        # update_state() where active_model_name could change in between.
+        _model_name[0] = state.active_model_name
         return replace(state, model_params=default_params)
 
-    model_name = store.get_state().active_model_name
     store.update_state(updater)
 
-    if model_name:
-        store.emit_signal("model_params_changed", model_name)
+    if _model_name[0]:
+        store.emit_signal("model_params_changed", _model_name[0])
 
 
 # Fit Actions

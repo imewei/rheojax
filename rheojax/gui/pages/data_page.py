@@ -437,6 +437,15 @@ class DataPage(QWidget):
         self._file_name_label.setText(f"Loading: {self._current_file_path.name}...")
         self._preview_table.setEnabled(False)
 
+        # R10-DA-001: Increment generation BEFORE cancelling the old worker so
+        # that any in-flight result from the old worker sees a stale generation
+        # number and is discarded — prevents the cancel/generation race condition
+        # where a result arrives between the cancel call and the increment.
+        if not hasattr(self, "_preview_generation"):
+            self._preview_generation = 0
+        self._preview_generation += 1
+        gen = self._preview_generation
+
         if hasattr(self, '_active_preview_worker') and self._active_preview_worker is not None:
             # R6-GUI-008: cancel previous preview worker before starting new one
             if hasattr(self._active_preview_worker, "cancel_token") and self._active_preview_worker.cancel_token is not None:
@@ -451,12 +460,6 @@ class DataPage(QWidget):
             except (RuntimeError, TypeError):
                 pass
             self._active_preview_worker = None
-
-        # R6-GUI-008: Generation counter to discard results from stale workers
-        if not hasattr(self, "_preview_generation"):
-            self._preview_generation = 0
-        self._preview_generation += 1
-        gen = self._preview_generation
 
         worker = PreviewWorker(
             data_service=self._data_service,
@@ -778,10 +781,16 @@ class DataPage(QWidget):
             y2_col=y2_col,
             test_mode=test_mode,
         )
+        # R10-STO-002: Use QueuedConnection to guarantee the callback runs on
+        # the main thread — ImportWorker emits signals from a worker thread.
         worker.signals.completed.connect(
-            lambda datasets: self._on_import_completed(datasets, test_mode)
+            lambda datasets: self._on_import_completed(datasets, test_mode),
+            Qt.ConnectionType.QueuedConnection,
         )
-        worker.signals.failed.connect(self._on_import_failed)
+        worker.signals.failed.connect(
+            self._on_import_failed,
+            Qt.ConnectionType.QueuedConnection,
+        )
         self._active_import_worker = worker
         QThreadPool.globalInstance().start(worker)
 

@@ -746,15 +746,41 @@ class RheoJAXMainWindow(QMainWindow):
                 self.worker_pool.shutdown(wait=True, timeout_ms=5000)
         except Exception:
             pass
+        # R10-MW-003: Disconnect all domain signals to prevent delivery to
+        # destroyed widgets during Qt object teardown.
         try:
-            signals = self.store.signals
+            signals = self.store._signals
             if signals is not None:
-                import warnings
-
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    signals.state_changed.disconnect()
-        except (TypeError, RuntimeError):
+                for signal_name in [
+                    "state_changed",
+                    "dataset_added",
+                    "dataset_removed",
+                    "dataset_updated",
+                    "dataset_selected",
+                    "model_selected",
+                    "model_params_changed",
+                    "fit_started",
+                    "fit_completed",
+                    "fit_failed",
+                    "fit_progress",
+                    "bayesian_started",
+                    "bayesian_completed",
+                    "bayesian_failed",
+                    "bayesian_progress",
+                    "pipeline_step_changed",
+                    "theme_changed",
+                    "transform_applied",
+                    "jax_device_changed",
+                    "jax_memory_updated",
+                    "project_saved",
+                    "project_loaded",
+                ]:
+                    if hasattr(signals, signal_name):
+                        try:
+                            getattr(signals, signal_name).disconnect()
+                        except (TypeError, RuntimeError):
+                            pass
+        except Exception:
             pass
 
         # Drain pending queued events to prevent delivery to destroyed widgets
@@ -1288,13 +1314,10 @@ class RheoJAXMainWindow(QMainWindow):
                     "model_name": model_name,
                     "dataset_id": dataset_id,
                 })
-                # R8-NEW-005: STORE_FIT_RESULT already sets pipeline step to COMPLETE
-                # in the reducer (PipelineStep.FIT → StepStatus.COMPLETE).
-                # Keep this dispatch only to emit the pipeline_step_changed signal
-                # for UI components that subscribe to it; do not add a third dispatch here.
-                self.store.dispatch(
-                    "SET_PIPELINE_STEP", {"step": "fit", "status": "COMPLETE"}
-                )
+                # R10-MW-001: Removed redundant SET_PIPELINE_STEP dispatch.
+                # STORE_FIT_RESULT reducer already sets PipelineStep.FIT →
+                # StepStatus.COMPLETE, and FITTING_COMPLETED reducer does the same.
+                # A third dispatch is unnecessary and causes triple state churn.
                 self.status_bar.show_message("Fit complete", 3000)
                 self._auto_save_if_enabled()
             else:

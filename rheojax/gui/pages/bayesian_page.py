@@ -693,6 +693,15 @@ class BayesianPage(QWidget):
             QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
 
+        # R10-BP-001: Capture submission identifiers immediately after the last
+        # early-exit guard so they are always coherent with the worker that is
+        # about to be created.  Placing these before the start_bayesian dispatch
+        # guarantees that any subscriber reacting to the dispatch reads the
+        # correct identifiers (not stale values from a prior run).
+        self._submitted_dataset_id = dataset.id
+        self._submitted_model_name = model_name
+        self._submitted_dataset_snapshot = dataset.clone()
+
         # Update state
         self._store.dispatch(start_bayesian(model_name, dataset.id))
 
@@ -712,14 +721,6 @@ class BayesianPage(QWidget):
                     model_name=model_name,
                     dataset_id=dataset.id,
                 )
-
-        # Capture dataset_id, model_name, and a dataset snapshot at submission
-        # time to avoid TOCTOU race if active selection changes before
-        # _on_finished runs. The snapshot is used for posterior plotting
-        # (GUI-011 fix).
-        self._submitted_dataset_id = dataset.id
-        self._submitted_model_name = model_name
-        self._submitted_dataset_snapshot = dataset.clone()
 
         # Log inference start
         logger.info(
@@ -1318,7 +1319,16 @@ class BayesianPage(QWidget):
 
         y_draws: list[np.ndarray] = []
         # F-HL-005 fix: Pass fitted_model_state via model_kwargs for predict()
-        active_fit = self._store.get_active_fit_result()
+        # R10-BP-002: Use the submitted identifiers (not the current active
+        # selection) so the correct fit result is fetched even when the user
+        # has switched selection while Bayesian inference was running.
+        _submitted_mn = getattr(self, "_submitted_model_name", None)
+        _submitted_did = getattr(self, "_submitted_dataset_id", None)
+        if _submitted_mn and _submitted_did:
+            _fit_key = f"{_submitted_mn}_{_submitted_did}"
+            active_fit = self._store.get_fit_result(_fit_key)
+        else:
+            active_fit = self._store.get_active_fit_result()
         if active_fit and hasattr(active_fit, "metadata") and active_fit.metadata:
             _fms = active_fit.metadata.get("fitted_model_state")
             if _fms:
@@ -1493,7 +1503,7 @@ class BayesianPage(QWidget):
             },
             parent=self,
         )
-        if dialog.exec_() == dialog.DialogCode.Accepted:
+        if dialog.exec() == dialog.DialogCode.Accepted:  # R10-BP-003: exec_() deprecated in PySide6
             options = dialog.get_options()
             self._preset_priors = options.get("priors", self._preset_priors)
             logger.debug(

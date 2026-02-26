@@ -349,6 +349,7 @@ class StateStore:
                 cls._instance._redo_stack = []
                 cls._instance._max_undo_size = 50
                 cls._instance._lock = RLock()  # Thread safety lock
+                cls._instance._dispatching = False  # R10-STO-004: reentrancy guard
                 logger.debug(
                     "Initializing store", class_name=cls.__name__, max_undo_size=50
                 )
@@ -397,6 +398,10 @@ class StateStore:
     def emit_signal(self, signal_name: str, *args) -> None:
         """Emit a named signal if available.
 
+        Thread-safe: if called from a non-main thread, defers emission to the
+        main-thread event loop via QTimer.singleShot to prevent cross-thread
+        signal delivery violations (R10-STO-001).
+
         Parameters
         ----------
         signal_name : str
@@ -404,8 +409,25 @@ class StateStore:
         *args
             Arguments forwarded to the signal's ``emit()`` method.
         """
-        if self._signals and hasattr(self._signals, signal_name):
-            getattr(self._signals, signal_name).emit(*args)
+        if not self._signals or not hasattr(self._signals, signal_name):
+            return
+        signal = getattr(self._signals, signal_name)
+
+        # R10-STO-001: ensure domain signals are always emitted on the main thread.
+        try:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() != app.thread():
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, lambda s=signal, a=args: s.emit(*a))
+                return
+        except (ImportError, RuntimeError):
+            pass  # Qt unavailable (headless/test) — fall through to direct emit
+
+        signal.emit(*args)
 
     def dispatch(self, action: Any, payload: Any | None = None) -> None:
         """Dispatch an action to update state.
@@ -623,15 +645,28 @@ class StateStore:
         # stale if a subscriber triggers a nested dispatch that further mutates
         # self._state.  Subscribers that need the latest state must call
         # self.get_state() rather than relying on the snapshot argument.
-        for subscriber in subscribers:
-            try:
-                subscriber(state_snapshot)
-            except Exception:
-                logger.error(
-                    "Subscriber callback failed",
-                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                    exc_info=True,
-                )
+        #
+        # R10-STO-004: reentrancy guard — if a subscriber triggers a nested
+        # dispatch (which calls update_state again), we skip the inner
+        # subscriber notification to prevent delivering a stale mid-update
+        # snapshot to all subscribers.  The outer notification loop already
+        # holds the only coherent post-update snapshot; nested state changes
+        # are picked up by subsequent top-level dispatches.
+        if self._dispatching:
+            return
+        self._dispatching = True
+        try:
+            for subscriber in subscribers:
+                try:
+                    subscriber(state_snapshot)
+                except Exception:
+                    logger.error(
+                        "Subscriber callback failed",
+                        subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                        exc_info=True,
+                    )
+        finally:
+            self._dispatching = False
 
         # Emit Qt signal via QueuedConnection to ensure delivery on the main
         # thread regardless of which thread calls update_state() (GUI-005).
@@ -1141,13 +1176,14 @@ class StateStore:
                 pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
                 pipeline.current_step = PipelineStep.FIT
 
-                # R6-GUI-011: Explicitly set active model/dataset so downstream
-                # UI code (export, plot selection) knows the current context.
+                # R10-STO-003: Do NOT overwrite active_dataset_id / active_model_name
+                # here — the user may have switched selection while the worker was
+                # running, and clobbering their choice causes silent TOCTOU bugs.
+                # Downstream UI components that need the fit context should use
+                # get_fit_result(key) with the submitted identifiers directly.
                 return replace(
                     state,
                     fit_results=fits,
-                    active_dataset_id=dataset_id,
-                    active_model_name=model_name,
                     pipeline_state=pipeline,
                     is_modified=True,
                 )
