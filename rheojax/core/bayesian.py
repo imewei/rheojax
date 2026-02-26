@@ -402,6 +402,12 @@ class BayesianMixin:
 
             if test_mode is None:
                 stored_mode = getattr(self, "_test_mode", None)
+                # R10-BAY-002: Also check _last_fit_kwargs as a second fallback.
+                # _fit() stores test_mode there; this covers the case where
+                # _test_mode was not set but _fit() has run.
+                if stored_mode is None:
+                    _lfk = getattr(self, "_last_fit_kwargs", None) or {}
+                    stored_mode = _lfk.get("test_mode", None)
                 if stored_mode is not None:
                     test_mode = stored_mode
                     logger.debug("Using stored test mode", test_mode=str(test_mode))
@@ -826,7 +832,9 @@ class BayesianMixin:
             if name in samples:
                 posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
 
-        noise_params = [k for k in samples if k not in param_names and k.startswith("sigma")]
+        noise_params = [
+            k for k in samples if k not in param_names and k.startswith("sigma")
+        ]
         for name in noise_params:
             posterior_samples[name] = np.asarray(samples[name], dtype=np.float64)
 
@@ -838,9 +846,15 @@ class BayesianMixin:
                     grouped_samples[name] = np.asarray(
                         samples_grouped[name], dtype=np.float64
                     )
-            noise_params_grouped = [k for k in samples_grouped if k not in param_names and k.startswith("sigma")]
+            noise_params_grouped = [
+                k
+                for k in samples_grouped
+                if k not in param_names and k.startswith("sigma")
+            ]
             for name in noise_params_grouped:
-                grouped_samples[name] = np.asarray(samples_grouped[name], dtype=np.float64)
+                grouped_samples[name] = np.asarray(
+                    samples_grouped[name], dtype=np.float64
+                )
 
         # Compute summary statistics
         summary = {}
@@ -1027,6 +1041,7 @@ class BayesianMixin:
         X: np.ndarray | RheoData | None = None,
         y: np.ndarray | None = None,
         test_mode: str | TestMode | None = None,
+        num_chains: int = 4,
     ) -> float:
         """Precompile NUTS kernel to eliminate JIT overhead in subsequent calls.
 
@@ -1084,77 +1099,91 @@ class BayesianMixin:
         elif isinstance(test_mode, str):
             test_mode = TestMode(test_mode.lower())
 
-        # Validate requirements
-        self._validate_bayesian_requirements()
-        self._validate_parameter_bounds()
+        # R10-BAY-005: Save/restore _test_mode to prevent permanent mutation.
+        # _build_numpyro_model and _run_nuts_sampling may set self._test_mode
+        # as a side effect; precompile_bayesian() must leave model state intact.
+        _had_test_mode = hasattr(self, "_test_mode")
+        _saved_test_mode = getattr(self, "_test_mode", None)
 
-        # Prepare JAX data
-        jax_data = self._prepare_jax_data(X_array, y_array)
-        is_complex_data = jax_data["is_complex"]
-
-        # Get parameter info
-        param_names = list(self.parameters)
-        param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
-
-        # Build NumPyro model
-        numpyro_model = self._build_numpyro_model(
-            param_names=param_names,
-            param_bounds=param_bounds,
-            test_mode=test_mode,
-            is_complex_data=is_complex_data,
-            scale_info=jax_data["scale_info"],
-        )
-
-        # Build warm-start values
-        warm_start_values = self._build_warm_start_values(
-            param_names=param_names,
-            param_bounds=param_bounds,
-            initial_values=None,
-            scale_info=jax_data["scale_info"],
-            is_complex=is_complex_data,
-        )
-
-        # Time the compilation
-        start_time = time.perf_counter()
-
-        # Trigger JIT compilation with minimal sampling
         try:
-            self._run_nuts_sampling(
-                numpyro_model=numpyro_model,
-                X_jax=jax_data["X_jax"],
-                y_jax=jax_data["y_jax"],
-                warm_start_values=warm_start_values,
-                num_warmup=1,
-                num_samples=1,
-                num_chains=1,
-                nuts_kwargs={"progress_bar": False, "target_accept_prob": 0.5},
-                seed=0,
+            # Validate requirements
+            self._validate_bayesian_requirements()
+            self._validate_parameter_bounds()
+
+            # Prepare JAX data
+            jax_data = self._prepare_jax_data(X_array, y_array)
+            is_complex_data = jax_data["is_complex"]
+
+            # Get parameter info
+            param_names = list(self.parameters)
+            param_bounds = self._get_parameter_bounds(X_array, y_array, test_mode)
+
+            # Build NumPyro model
+            numpyro_model = self._build_numpyro_model(
+                param_names=param_names,
+                param_bounds=param_bounds,
+                test_mode=test_mode,
+                is_complex_data=is_complex_data,
+                scale_info=jax_data["scale_info"],
             )
-        except Exception as e:
-            logger.warning(
-                "Precompilation sampling failed — subsequent fit_bayesian() "
-                "may also fail",
-                error=str(e),
+
+            # Build warm-start values
+            warm_start_values = self._build_warm_start_values(
+                param_names=param_names,
+                param_bounds=param_bounds,
+                initial_values=None,
+                scale_info=jax_data["scale_info"],
+                is_complex=is_complex_data,
             )
-            # Do NOT mark as precompiled if sampling failed
-            return time.perf_counter() - start_time
 
-        compile_time = time.perf_counter() - start_time
+            # Time the compilation
+            start_time = time.perf_counter()
 
-        # Cache the model key for reference (per-instance dict)
-        precompile_key = (str(test_mode), is_complex_data)
-        if not hasattr(self, "_precompiled_models"):
-            self._precompiled_models = {}
-        self._precompiled_models[precompile_key] = True
+            # Trigger JIT compilation with minimal sampling
+            # BAY-007: use caller-specified num_chains to match production default (4)
+            try:
+                self._run_nuts_sampling(
+                    numpyro_model=numpyro_model,
+                    X_jax=jax_data["X_jax"],
+                    y_jax=jax_data["y_jax"],
+                    warm_start_values=warm_start_values,
+                    num_warmup=1,
+                    num_samples=1,
+                    num_chains=num_chains,
+                    nuts_kwargs={"progress_bar": False, "target_accept_prob": 0.5},
+                    seed=0,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Precompilation sampling failed — subsequent fit_bayesian() "
+                    "may also fail",
+                    error=str(e),
+                )
+                # Do NOT mark as precompiled if sampling failed
+                return time.perf_counter() - start_time
 
-        logger.info(
-            "Bayesian precompilation completed",
-            compile_time_seconds=compile_time,
-            test_mode=str(test_mode),
-            is_complex=is_complex_data,
-        )
+            compile_time = time.perf_counter() - start_time
 
-        return compile_time
+            # Cache the model key for reference (per-instance dict)
+            precompile_key = (str(test_mode), is_complex_data)
+            if not hasattr(self, "_precompiled_models"):
+                self._precompiled_models = {}
+            self._precompiled_models[precompile_key] = True
+
+            logger.info(
+                "Bayesian precompilation completed",
+                compile_time_seconds=compile_time,
+                test_mode=str(test_mode),
+                is_complex=is_complex_data,
+            )
+
+            return compile_time
+        finally:
+            # Restore _test_mode regardless of success or failure
+            if _had_test_mode:
+                self._test_mode = _saved_test_mode
+            elif hasattr(self, "_test_mode"):
+                del self._test_mode
 
     def fit_bayesian(
         self,
@@ -1237,6 +1266,10 @@ class BayesianMixin:
             "gamma0",
             "sigma0",
             "stress_target",
+            # DMTA boundary kwargs — consumed by BaseModel.fit(), must not leak
+            # to NUTS. E*→G* conversion is already applied to self.y_data by fit().
+            "deformation_mode",
+            "poisson_ratio",
         }
 
         for key in list(nuts_kwargs):
@@ -1246,8 +1279,11 @@ class BayesianMixin:
         # Save _test_mode BEFORE any mutation so it can be restored on error.
         # fit_bayesian() should not permanently change the model's test_mode —
         # subsequent calls to fit() or predict() must see the original mode.
+        _had_test_mode = hasattr(self, "_test_mode")  # BAY-004: track if attr existed
         _saved_test_mode = getattr(self, "_test_mode", None)
-        _saved_last_fit_kwargs = copy.deepcopy(getattr(self, "_last_fit_kwargs", None) or {})
+        _saved_last_fit_kwargs = copy.deepcopy(
+            getattr(self, "_last_fit_kwargs", None) or {}
+        )
 
         _fit_bayesian_succeeded = False
 
@@ -1274,7 +1310,10 @@ class BayesianMixin:
                 # to fit_bayesian(). Never clear protocol kwargs from _fit() —
                 # they are the ground truth for the model_function.
                 if protocol_kwargs:
-                    if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:  # type: ignore[has-type]
+                    if (
+                        not hasattr(self, "_last_fit_kwargs")
+                        or self._last_fit_kwargs is None
+                    ):  # type: ignore[has-type]
                         self._last_fit_kwargs = {}
                     self._last_fit_kwargs.update(protocol_kwargs)
 
@@ -1366,16 +1405,13 @@ class BayesianMixin:
                 _fit_bayesian_succeeded = True
                 return result
             finally:
-                # Restore _test_mode even if MCMC raises — fit_bayesian() must
-                # not permanently mutate the model's test_mode state.
-                # Only set _test_mode if it existed before; avoid creating it
-                # as None on fresh models that never had the attribute.
-                if _saved_test_mode is not None or hasattr(self, "_test_mode"):
-                    self._test_mode = _saved_test_mode
-                # Only revert _last_fit_kwargs on failure — on success, the
-                # merged protocol_kwargs must persist for subsequent predict()
-                # and model_function() calls.
+                # Only revert state on failure — on success, _test_mode and
+                # _last_fit_kwargs must persist for subsequent predict() calls.
                 if not _fit_bayesian_succeeded:
+                    if _had_test_mode:
+                        self._test_mode = _saved_test_mode
+                    elif hasattr(self, "_test_mode"):
+                        del self._test_mode
                     self._last_fit_kwargs = _saved_last_fit_kwargs
 
     @staticmethod
@@ -1449,6 +1485,8 @@ class BayesianMixin:
             isinstance(v, np.ndarray) or hasattr(v, "devices")
             for v in protocol_kwargs.values()
         )
+        # R8-BAY-008: initialize eagerly; avoid lazy hasattr pattern which can
+        # create per-instance shadowing of a class-level dict in edge cases
         if not hasattr(self, "_closure_cache"):
             self._closure_cache: OrderedDict = OrderedDict()
 
@@ -1475,14 +1513,30 @@ class BayesianMixin:
                 except (TypeError, ValueError):
                     return repr(v)
 
-            cache_key = (
-                str(test_mode),
-                is_complex_data,
-                tuple(param_names),
-                tuple(sorted(protocol_kwargs.items())),
-                tuple(sorted(param_bounds.items())),
-                tuple(sorted((_to_hashable(k), _to_hashable(v)) for k, v in scale_info.items())),
-            )
+            # R10-BAY-004: sorted() can raise TypeError when protocol_kwargs values
+            # are non-comparable types (e.g., arrays, custom objects). Guard with
+            # try/except and fall through to cache_key = None to skip caching.
+            try:
+                _pk_key = tuple(sorted(protocol_kwargs.items()))
+            except TypeError:
+                _pk_key = None
+
+            if _pk_key is None:
+                cache_key = None
+            else:
+                cache_key = (
+                    str(test_mode),
+                    is_complex_data,
+                    tuple(param_names),
+                    _pk_key,
+                    tuple(sorted(param_bounds.items())),
+                    tuple(
+                        sorted(
+                            (_to_hashable(k), _to_hashable(v))
+                            for k, v in scale_info.items()
+                        )
+                    ),
+                )
             if cache_key in self._closure_cache:
                 self._closure_cache.move_to_end(cache_key)
                 return self._closure_cache[cache_key]
@@ -1529,17 +1583,28 @@ class BayesianMixin:
             _model_returns_2col = False
             _saved_probe_test_mode = getattr(self, "_test_mode", None)
             try:
-                _test_X = jnp.ones(2, dtype=jnp.float64)
+                # BAY-006: use actual data shape for probe, not hardcoded 2
+                _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
+                _test_X = jnp.ones(_n_probe, dtype=jnp.float64)
                 _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
-                _test_pred = self.model_function(_test_X, _test_params, test_mode, **protocol_kwargs)
+                _test_pred = self.model_function(
+                    _test_X, _test_params, test_mode, **protocol_kwargs
+                )
                 _model_returns_2col = (
                     hasattr(_test_pred, "ndim")
                     and _test_pred.ndim == 2
                     and _test_pred.shape[1] == 2
                     and jnp.isrealobj(_test_pred)
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                # R10-BAY-001: Log the probe failure instead of silently swallowing it.
+                # A probe failure means _model_returns_2col defaults to False, which
+                # may cause incorrect likelihood construction for 2-column models.
+                logger.warning(
+                    "model_function probe failed — defaulting _model_returns_2col=False",
+                    error=str(exc),
+                    test_mode=str(test_mode),
+                )
             finally:
                 # Restore test_mode in case model_function set self._test_mode
                 # as a side effect (defensive guard — should not normally happen
@@ -1589,6 +1654,18 @@ class BayesianMixin:
                             name,
                             dist.TransformedDistribution(beta_base, beta_trans),
                         )
+                elif (
+                    lower is not None
+                    and upper is not None
+                    and abs(float(upper) - float(lower)) < 1e-9
+                ):
+                    # PARAMS-001: fixed parameter — use deterministic instead of Uniform.
+                    # Absolute epsilon 1e-9 covers float64 arithmetic noise from bounds
+                    # that should be equal but diverge through roundtrip conversions,
+                    # while staying well below any intentionally-distinct small range.
+                    # Python float comparison (not jnp.isclose) avoids TracerBoolConversionError.
+                    param_val = numpyro.deterministic(name, lower)
+                    params_dict[name] = param_val
                 else:
                     params_dict[name] = numpyro.sample(
                         name, dist.Uniform(low=lower, high=upper)
@@ -1781,7 +1858,9 @@ class BayesianMixin:
 
             try:
                 try:
-                    divergences = mcmc.get_extra_fields(group_by_chain=True)["diverging"]
+                    divergences = mcmc.get_extra_fields(group_by_chain=True)[
+                        "diverging"
+                    ]
                 except TypeError:
                     divergences = mcmc.get_extra_fields()["diverging"]
                 num_divergences = int(np.sum(divergences))

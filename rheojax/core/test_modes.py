@@ -97,8 +97,7 @@ class TestModeEnum(StrEnum):
             return cls.STARTUP
         elif protocol == Protocol.OSCILLATION:
             return cls.OSCILLATION
-        elif protocol == Protocol.SAOS:  # type: ignore[attr-defined]
-            return cls.OSCILLATION
+        # R8-TM-001: Protocol.SAOS does not exist in Protocol enum — branch deleted
         elif protocol == Protocol.LAOS:
             return cls.LAOS
         return cls.UNKNOWN  # type: ignore[unreachable]

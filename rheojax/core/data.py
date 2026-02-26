@@ -529,7 +529,7 @@ class RheoData:
         """Automatically detect or retrieve test mode.
 
         The test mode is detected based on data characteristics and cached
-        in metadata. If already detected, returns the cached value. If
+        in a private field. If already detected, returns the cached value. If
         explicitly set in metadata['test_mode'], returns that value.
 
         Returns:
@@ -539,11 +539,14 @@ class RheoData:
         if self._explicit_test_mode is not None:
             return self._explicit_test_mode
 
+        # R8-DATA-001: check private cache first, avoid shared metadata dict
+        _cached = getattr(self, "_detected_test_mode", None)
+        if _cached is not None:
+            return _cached
+
         # Check if already set in metadata (explicit or previously detected)
         if "test_mode" in self.metadata:
             return self.metadata["test_mode"]
-        if "detected_test_mode" in self.metadata:
-            return self.metadata["detected_test_mode"]
 
         # Lazy import to avoid circular dependency
         from rheojax.core.test_modes import detect_test_mode
@@ -552,9 +555,8 @@ class RheoData:
         logger.debug("Detecting test mode from data characteristics")
         mode = detect_test_mode(self)
 
-        # Cache in metadata only — don't set _explicit_test_mode to avoid
-        # conflating detected and explicitly-set modes
-        self.metadata["detected_test_mode"] = mode
+        # R8-DATA-001: cache in private field, not shared metadata dict
+        self._detected_test_mode = mode
 
         logger.debug("Test mode detected", test_mode=mode)
 

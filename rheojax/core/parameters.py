@@ -524,6 +524,12 @@ class ParameterSet:
                 value=value,
                 bounds=bounds,
             )
+        # R8-PARAMS-002: warn on silent overwrite
+        if name in self._parameters:
+            warnings.warn(
+                f"Parameter '{name}' already exists and will be overwritten",
+                stacklevel=2,
+            )
         param = Parameter(
             name=name,
             value=value,
@@ -967,6 +973,8 @@ class ParameterSet:
 
         Uses Parameter.from_dict() to preserve constraints (not just bounds).
         """
+        # R8-PARAMS-003: NOTE — _was_clamped and _clamp_on_set flags are not
+        # preserved across serialization. Clamping behavior may differ after round-trip.
         if logger.isEnabledFor(10):  # logging.DEBUG == 10
             logger.debug(
                 "Creating ParameterSet from dict",

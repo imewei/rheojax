@@ -302,13 +302,17 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.core.data import RheoData
 
             if isinstance(X, RheoData):
-                deformation_mode = X.metadata.get("deformation_mode", None)
-                # When auto-detecting tensile mode from RheoData, extract x/y
-                # so that downstream _fit() uses the converted y, not RheoData.y
-                if deformation_mode is not None:
-                    if y is None:
-                        y = X.y
-                    X = X.x
+                # BASE-001: always extract arrays from RheoData for consistent _fit() input
+                _metadata = X.metadata
+                deformation_mode = _metadata.get("deformation_mode", None)
+                # R10-BASE-001: propagate test_mode from RheoData metadata into kwargs
+                # so that _fit() and model_function see the correct protocol.
+                if "test_mode" in _metadata and "test_mode" not in kwargs:
+                    kwargs["test_mode"] = _metadata["test_mode"]
+                # Extract x/y so _fit() always receives raw arrays, not RheoData
+                if y is None:
+                    y = X.y
+                X = X.x
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -480,6 +484,7 @@ class BaseModel(BayesianMixin, ABC):
             name: self.parameters.get_value(name) for name in self.parameters
         }
         saved_fitted = self.fitted_
+        _had_test_mode = hasattr(self, "_test_mode")  # BASE-003: track if attr existed
         saved_test_mode = getattr(self, "_test_mode", None)
         _raw = getattr(self, "_last_fit_kwargs", None)
         saved_last_fit_kwargs = dict(_raw) if _raw is not None else {}
@@ -510,7 +515,11 @@ class BaseModel(BayesianMixin, ABC):
             else:
                 self.parameters._parameters[name].value = None
         self.fitted_ = saved_fitted
-        self._test_mode = saved_test_mode
+        # BASE-003: only restore _test_mode if the attribute existed before
+        if _had_test_mode:
+            self._test_mode = saved_test_mode
+        elif hasattr(self, "_test_mode"):
+            del self._test_mode
         # Restore None if _last_fit_kwargs was originally absent/None
         self._last_fit_kwargs = saved_last_fit_kwargs if saved_last_fit_kwargs else None
 
@@ -768,23 +777,38 @@ class BaseModel(BayesianMixin, ABC):
             try:
                 result = self._predict(X, **kwargs)
             except TypeError as e:
-                if "unexpected keyword argument" in str(e):
-                    # Progressive kwargs stripping for models whose _predict()
-                    # doesn't accept all kwargs. First strip the offending kwarg,
-                    # then fall back to bare _predict(X) as last resort.
-                    offending = str(e)
-                    stripped = dict(kwargs)
-                    for key in list(stripped):
-                        if key in offending:
-                            del stripped[key]
-                    try:
-                        result = self._predict(X, **stripped)
-                    except TypeError as e2:
-                        if "unexpected keyword argument" in str(e2):
-                            # Final fallback: bare call (13+ models have _predict(self, X) only)
-                            result = self._predict(X)
-                        else:
-                            raise  # Real TypeError from _predict logic — don't swallow
+                err_msg = str(e)
+                if "unexpected keyword argument" in err_msg:
+                    # BASE-002: only strip kwargs we explicitly injected, not internal errors
+                    import re
+                    _match = re.search(r"'(\w+)'", err_msg)
+                    _injected_keys = {"test_mode", "deformation_mode", "poisson_ratio"}
+                    if _match and _match.group(1) in _injected_keys:
+                        # Safe to strip — this is a kwarg we injected
+                        stripped = dict(kwargs)
+                        stripped.pop(_match.group(1), None)
+                        try:
+                            result = self._predict(X, **stripped)
+                        except TypeError as e2:
+                            if "unexpected keyword argument" in str(e2):
+                                # Final fallback: bare call (13+ models have _predict(self, X) only)
+                                result = self._predict(X)
+                            else:
+                                raise  # Real TypeError from _predict logic — don't swallow
+                    else:
+                        # Progressive stripping for any other unexpected kwarg
+                        stripped = dict(kwargs)
+                        for key in list(stripped):
+                            if key in err_msg:
+                                del stripped[key]
+                        try:
+                            result = self._predict(X, **stripped)
+                        except TypeError as e2:
+                            if "unexpected keyword argument" in str(e2):
+                                # Final fallback: bare call (13+ models have _predict(self, X) only)
+                                result = self._predict(X)
+                            else:
+                                raise  # Real TypeError from _predict logic — don't swallow
                 else:
                     raise
 
@@ -820,9 +844,13 @@ class BaseModel(BayesianMixin, ABC):
             )
             raise
         finally:
-            # Restore original test_mode to avoid side effect
-            if test_mode is not None and _had_test_mode:
-                self._test_mode = _old_test_mode
+            # R10-BASE-002: Restore original _test_mode to avoid side effects.
+            # If _test_mode was created as a side effect during _predict(), delete it.
+            if test_mode is not None:
+                if _had_test_mode:
+                    self._test_mode = _old_test_mode
+                elif hasattr(self, "_test_mode"):
+                    del self._test_mode
 
     def fit_predict(self, X: ArrayLike, y: ArrayLike, **kwargs) -> ArrayLike:
         """Fit model and return predictions.

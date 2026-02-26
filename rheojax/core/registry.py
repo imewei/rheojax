@@ -362,10 +362,22 @@ class Registry:
             if inspect.isclass(obj):
                 # Check if it's a model
                 if hasattr(obj, "fit") and hasattr(obj, "predict"):
-                    self.register(name, obj, PluginType.MODEL, validate=False)
+                    try:
+                        self.register(name, obj, PluginType.MODEL, validate=False)
+                    except ValueError as e:
+                        if "already registered" in str(e):
+                            pass  # Expected: duplicate class during discovery
+                        else:
+                            raise
                 # Check if it's a transform
                 elif hasattr(obj, "transform"):
-                    self.register(name, obj, PluginType.TRANSFORM, validate=False)
+                    try:
+                        self.register(name, obj, PluginType.TRANSFORM, validate=False)
+                    except ValueError as e:
+                        if "already registered" in str(e):
+                            pass  # Expected: duplicate class during discovery
+                        else:
+                            raise
 
     def discover_directory(self, path: str):
         """Discover plugins in a directory.
