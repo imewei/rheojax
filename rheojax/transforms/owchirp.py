@@ -20,8 +20,9 @@ from rheojax.logging import get_logger
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-# Import Array for runtime isinstance checks
-from jax import Array
+# Runtime Array type — accessed through the jax module returned by safe_import_jax()
+# (bare `from jax import Array` bypasses the float64 enforcement contract)
+Array = jax.Array
 
 # Module logger
 logger = get_logger(__name__)
@@ -304,7 +305,14 @@ class OWChirp(BaseTransform):
         coefficients = self._optimized_wavelet_transform(t, signal, frequencies)
 
         # Compute magnitude spectrum (average over time)
+        # R8-OWC-001: averaging over time axis discards time-localization information;
+        # for time-resolved analysis, use the full 2D coefficients array directly.
         logger.debug("Computing magnitude spectrum")
+        logger.info(
+            "Wavelet coefficients averaged over time axis. "
+            "For time-resolved analysis, use the raw coefficients from "
+            "_optimized_wavelet_transform() before averaging."
+        )
         spectrum = jnp.mean(jnp.abs(coefficients), axis=1)
 
         # Create metadata

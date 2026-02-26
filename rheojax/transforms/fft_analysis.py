@@ -219,6 +219,35 @@ class FFTAnalysis(BaseTransform):
                 logger.debug("Applying detrending")
                 y = self._detrend_data(y)
 
+            # Compute frequencies and check spacing before windowing/FFT
+            n = len(t)
+            if n < 2:
+                raise ValueError("FFT requires at least 2 data points")
+            # R8-FFT-001: use median diff for robust dt estimation (handles log-spaced time)
+            dt_values = np.diff(np.asarray(t))
+            dt = float(np.median(dt_values))
+            if dt <= 0:
+                raise ValueError(
+                    "Time array must be monotonically increasing for FFT "
+                    f"(got dt={dt:.3e})"
+                )
+            if np.std(dt_values) / dt > 0.1:  # >10% variation in spacing
+                logger.warning(
+                    "Non-uniform time spacing detected (std/mean=%.2f). "
+                    "FFT requires uniform spacing — interpolating to uniform grid.",
+                    np.std(dt_values) / dt,
+                )
+                t_np = np.asarray(t)
+                y_np = np.asarray(y)
+                t_uniform = np.linspace(float(t_np[0]), float(t_np[-1]), n)
+                y = jnp.array(np.interp(t_uniform, t_np, y_np))
+                t = jnp.array(t_uniform)
+                dt = float(t_uniform[1] - t_uniform[0])
+            # R9-FFT-002: recompute n after resampling so rfftfreq and window
+            # length stay consistent with the (possibly resampled) y array.
+            n = len(y)
+            freqs = jnp.fft.rfftfreq(n, d=dt)
+
             # Apply window function
             logger.debug("Applying window function", window=self.window)
             window = self._get_window(len(y))
@@ -228,18 +257,6 @@ class FFTAnalysis(BaseTransform):
             # Use rfft for real signals (more efficient)
             logger.debug("Computing FFT")
             fft_result = jnp.fft.rfft(y_windowed)
-
-            # Compute frequencies
-            n = len(t)
-            if n < 2:
-                raise ValueError("FFT requires at least 2 data points")
-            dt = (t[-1] - t[0]) / (n - 1)  # Average sampling interval
-            if dt <= 0:
-                raise ValueError(
-                    "Time array must be monotonically increasing for FFT "
-                    f"(got dt={float(dt):.3e})"
-                )
-            freqs = jnp.fft.rfftfreq(n, d=dt)
 
             # Compute magnitude or PSD
             if self.return_psd:
@@ -253,6 +270,9 @@ class FFTAnalysis(BaseTransform):
 
             # Normalize if requested
             if self.normalize and not self.return_psd:
+                # R8-FFT-002: NOTE — normalize=True scales spectrum to [0,1], discarding
+                # physical amplitude units. For quantitative analysis, use normalize=False
+                # and apply 2/N correction manually if needed.
                 logger.debug("Normalizing spectrum")
                 max_val = jnp.max(spectrum)
                 spectrum = jnp.where(max_val > 1e-12, spectrum / max_val, spectrum)
