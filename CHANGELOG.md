@@ -250,6 +250,30 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 - **Updated** `CLAUDE.md` with current dependency versions (JAX >=0.8.3, NLSQ >=0.6.8, ArviZ >=0.23.4)
 - **Updated** all CUDA references codebase-wide from "CUDA 12.1-12.9" to "CUDA 12+ or 13+"
 
+### Added - Robustness & Correctness Fixes (Round 9-10)
+- **Core**: 
+  - Added support for tracking `potential_energy` fields during Bayesian sampling.
+  - Resolved cache race-conditions between inferred test modes and explicit setter logic.
+  - Enhanced float64 epsilon tolerance for deterministic parameter bounds dynamically scaling to magnitude to prevent True/False inference tracer failures.
+  - Exposed safety `overwrite` flag in Parameter registry creation.
+- **Models**:
+  - Vectorized isotropic ITT-MCT vertices using optimal Gauss-Legendre quadrature (O(N^2) evaluation, completely vectorized).
+  - Fixed SGR GENERIC and conventional steady flow stress returning viscosity by enforcing stress dimension return.
+  - Corrected schematic creep initial conditions which mistakenly assigned elastic jumps to strain rate rather than initial absolute strain.
+  - Corrected erroneous schema stress clamps suppressing glass $\beta$-relaxation.
+- **IO**: 
+  - Extended DMTA detect_deformation_mode_from_columns heuristics to gracefully extract dynamic `bending` and `compression` mode test types.
+  - Hardened Trios float parsing against European `,` parsing bugs corrupting scientific numbers.
+  - Implemented 0-d numpy scalar fallback unwrap to cleanly serialize scalar parameters into recursive nested HDF5 metadata dictionaries without exception tracing.
+- **Pipeline and GUI**:
+  - Auto-scaled NLSQ Mean-Squared Error threshold bounds in optimization solvers to properly account for initial values >10^6 natively (e.g. valid DMTA datasets at the GPa baseline, MSE ~10^18).
+  - Corrected the `builder` to dynamically unroll `validate=False` without requiring underlying valid structure arrays to construct dummy pipes.
+  - Restored multi-thread state reentrancy guard isolation isolating StateStore dispatch emissions for independent execution streams (resolves signal crossfire locks).
+  - Isolated signal teardown memory cleanup procedures to single windows.
+  - Eliminated parameter generation generation conditions in asynchronous live GUI thread render previews.
+- **Transforms**:
+  - Injected 2x zero padding onto OWChirp wavelet boundaries resolving circular aliasing behavior during frequency cross-correlation arrays.
+
 ### Test Organization
 - **Reorganized** test files into subdirectories by model family (`tests/models/<family>/`)
   - classical/, dmt/, epm/, flow/, fractional/, hl/, ikh/, multimode/, sgr/, spp/, vlb/
