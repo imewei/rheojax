@@ -768,7 +768,9 @@ class BayesianMixin:
                     **mcmc_kwargs,
                 )
             rng_key = jax.random.PRNGKey(rng_seed)
-            sampler.run(rng_key, X_jax, y_jax)
+            sampler.run(
+                rng_key, X_jax, y_jax, extra_fields=("potential_energy",)
+            )
             return sampler
 
         try:
