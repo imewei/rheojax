@@ -131,29 +131,41 @@ class TestFrequencyDependentModulus:
     """Test Gp(x, z) frequency-dependent complex modulus."""
 
     def test_Gp_power_law_scaling(self):
-        """Test G' ~ G'' ~ omega^(x-1) for 1 < x < 2."""
-        x = 1.5  # Power-law exponent should be 0.5
+        """Test SGR Gp physical behavior for 1 < x < 2.
 
-        # Frequency sweep over 2 decades
-        omega_tau0_vals = jnp.logspace(-1, 1, 20)
+        With the corrected Sollich 1998 formula (tau_E = tau0 * exp(E/x)):
+        - G'(omega) increases monotonically toward the elastic plateau G0(x).
+        - G''(omega) has a peak at an intermediate frequency and is NOT
+          monotonically increasing across a wide frequency sweep. The power-law
+          G' ~ G'' ~ omega^(x-1) applies only in the low-frequency sub-plateau
+          regime (omega*tau0 << 1).
+        """
+        x = 1.5  # Power-law regime: x in (1, 2)
 
-        # Compute G', G''
-        G_prime, G_double_prime = jax.vmap(lambda w: Gp(x, w))(omega_tau0_vals)
+        # Low-frequency sweep (omega*tau0 << 1) where power-law applies
+        omega_tau0_low = jnp.logspace(-3, -1, 20)
+        G_prime_low, G_double_prime_low = jax.vmap(lambda w: Gp(x, w))(omega_tau0_low)
 
-        # Fit power-law exponent in log-log space
-        log_omega = jnp.log10(omega_tau0_vals[5:-5])  # Exclude edges
-        log_G_prime = jnp.log10(G_prime[5:-5])
-        log_G_double_prime = jnp.log10(G_double_prime[5:-5])
+        # Fit G' power-law slope in low-frequency log-log space
+        log_omega = jnp.log10(omega_tau0_low[3:-3])
+        alpha_prime = jnp.polyfit(log_omega, jnp.log10(G_prime_low[3:-3]), 1)[0]
 
-        # Linear fit: log(G) = alpha * log(omega) + const
-        alpha_prime = jnp.polyfit(log_omega, log_G_prime, 1)[0]
-        alpha_double_prime = jnp.polyfit(log_omega, log_G_double_prime, 1)[0]
+        # G' slope should be positive (increasing toward plateau) in low-freq regime
+        assert 0 < alpha_prime < 2, f"G' slope {alpha_prime} not in (0, 2)"
 
-        # Expected exponent: x - 1 = 0.5
-        # Note: Numerical integration may not perfectly match theory
-        # Just verify reasonable power-law behavior (positive slope)
-        assert 0 < alpha_prime < 2  # Reasonable power-law range
-        assert 0 < alpha_double_prime < 2
+        # Full sweep: G'' must always be positive (physical constraint)
+        omega_tau0_full = jnp.logspace(-2, 2, 50)
+        G_prime_full, G_double_prime_full = jax.vmap(lambda w: Gp(x, w))(omega_tau0_full)
+        assert jnp.all(G_prime_full > 0), "G' must be positive at all frequencies"
+        assert jnp.all(G_double_prime_full > 0), "G'' must be positive at all frequencies"
+
+        # G' approaches plateau at high frequency (elastic limit)
+        assert float(G_prime_full[-1]) > float(G_prime_full[0]), "G' should increase with omega"
+
+        # G'' has a peak at intermediate frequency (not monotone over full range)
+        # This is the physically correct SGR behavior (Sollich 1998)
+        gpp_peak = jnp.max(G_double_prime_full)
+        assert float(gpp_peak) > float(G_double_prime_full[0]), "G'' should peak above low-freq value"
 
     def test_Gp_multiple_x_values(self):
         """Test power-law scaling for different x values."""

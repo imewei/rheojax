@@ -1987,10 +1987,10 @@ class SGRGeneric(BaseModel):
             )
 
         if sigma is None:
-            # Compute viscosity from model
+            # Compute stress directly from model (predict returns sigma for steady_shear).
+            # R10-SGR-002: _predict_steady_shear now returns sigma (stress), not eta.
             self._test_mode = "steady_shear"
-            eta = self.predict(gamma_dot)
-            sigma = eta * gamma_dot
+            sigma = self.predict(gamma_dot)
 
         # Detect shear banding
         is_banding, banding_info = _detect_banding(gamma_dot, sigma, warn=True)
@@ -2034,9 +2034,9 @@ class SGRGeneric(BaseModel):
             gamma_dot = np.logspace(-2, 3, n_points)
 
         if sigma is None:
+            # R10-SGR-002: _predict_steady_shear now returns sigma (stress), not eta.
             self._test_mode = "steady_shear"
-            eta = self.predict(gamma_dot)
-            sigma = eta * gamma_dot
+            sigma = self.predict(gamma_dot)
 
         # Compute coexistence
         coexistence = compute_shear_band_coexistence(
