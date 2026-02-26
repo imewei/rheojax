@@ -746,38 +746,23 @@ class RheoJAXMainWindow(QMainWindow):
                 self.worker_pool.shutdown(wait=True, timeout_ms=5000)
         except Exception:
             pass
-        # R10-MW-003: Disconnect all domain signals to prevent delivery to
-        # destroyed widgets during Qt object teardown.
+        # R10-MW-003: Disconnect only THIS window's signal connections to prevent
+        # delivery to destroyed widgets during Qt object teardown.  We disconnect
+        # specific slots rather than calling .disconnect() with no args, which
+        # would strip ALL connections on the singleton StateSignals — breaking
+        # any other objects (BayesianPage, DataPage) still connected.
         try:
             signals = self.store._signals
             if signals is not None:
-                for signal_name in [
-                    "state_changed",
-                    "dataset_added",
-                    "dataset_removed",
-                    "dataset_updated",
-                    "dataset_selected",
-                    "model_selected",
-                    "model_params_changed",
-                    "fit_started",
-                    "fit_completed",
-                    "fit_failed",
-                    "fit_progress",
-                    "bayesian_started",
-                    "bayesian_completed",
-                    "bayesian_failed",
-                    "bayesian_progress",
-                    "pipeline_step_changed",
-                    "theme_changed",
-                    "transform_applied",
-                    "jax_device_changed",
-                    "jax_memory_updated",
-                    "project_saved",
-                    "project_loaded",
-                ]:
+                _slot_map = [
+                    ("theme_changed", self._apply_theme),
+                    ("dataset_added", self._on_dataset_added),
+                    ("pipeline_step_changed", self._on_pipeline_step_changed),
+                ]
+                for signal_name, slot in _slot_map:
                     if hasattr(signals, signal_name):
                         try:
-                            getattr(signals, signal_name).disconnect()
+                            getattr(signals, signal_name).disconnect(slot)
                         except (TypeError, RuntimeError):
                             pass
         except Exception:

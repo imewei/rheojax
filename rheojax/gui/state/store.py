@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
+import threading
 from threading import Lock, RLock
 from typing import Any, Optional
 
@@ -349,7 +350,11 @@ class StateStore:
                 cls._instance._redo_stack = []
                 cls._instance._max_undo_size = 50
                 cls._instance._lock = RLock()  # Thread safety lock
-                cls._instance._dispatching = False  # R10-STO-004: reentrancy guard
+                # R10-STO-004: per-thread reentrancy guard — threading.local
+                # ensures that a worker-thread dispatch does not block the
+                # main-thread dispatch or vice versa, while still preventing
+                # recursive subscriber notification within the same thread.
+                cls._instance._dispatch_tls = threading.local()
                 logger.debug(
                     "Initializing store", class_name=cls.__name__, max_undo_size=50
                 )
@@ -646,15 +651,20 @@ class StateStore:
         # self._state.  Subscribers that need the latest state must call
         # self.get_state() rather than relying on the snapshot argument.
         #
-        # R10-STO-004: reentrancy guard — if a subscriber triggers a nested
-        # dispatch (which calls update_state again), we skip the inner
-        # subscriber notification to prevent delivering a stale mid-update
-        # snapshot to all subscribers.  The outer notification loop already
-        # holds the only coherent post-update snapshot; nested state changes
-        # are picked up by subsequent top-level dispatches.
-        if self._dispatching:
+        # R10-STO-004: per-thread reentrancy guard — if a subscriber triggers
+        # a nested dispatch (which calls update_state again on the SAME thread),
+        # we queue the nested snapshot for delivery after the outer loop finishes
+        # instead of silently dropping it.  Using threading.local ensures that
+        # a worker-thread dispatch does not interfere with a concurrent
+        # main-thread dispatch.
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            # Queue nested state change for delivery after outer loop
+            if not hasattr(tls, "pending"):
+                tls.pending = []
+            tls.pending.append((subscribers, state_snapshot))
             return
-        self._dispatching = True
+        tls.dispatching = True
         try:
             for subscriber in subscribers:
                 try:
@@ -665,8 +675,22 @@ class StateStore:
                         subscriber=getattr(subscriber, "__name__", str(subscriber)),
                         exc_info=True,
                     )
+            # Drain any nested dispatches that were queued during this loop
+            while hasattr(tls, "pending") and tls.pending:
+                pending_subs, pending_snap = tls.pending.pop(0)
+                for subscriber in pending_subs:
+                    try:
+                        subscriber(pending_snap)
+                    except Exception:
+                        logger.error(
+                            "Subscriber callback failed (queued)",
+                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                            exc_info=True,
+                        )
         finally:
-            self._dispatching = False
+            tls.dispatching = False
+            if hasattr(tls, "pending"):
+                tls.pending.clear()
 
         # Emit Qt signal via QueuedConnection to ensure delivery on the main
         # thread regardless of which thread calls update_state() (GUI-005).
