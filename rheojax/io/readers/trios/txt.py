@@ -291,6 +291,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             for chunk in load_trios_chunked(
                 filepath,
                 chunk_size=10000,
+                segment_index=0,  # Only first segment — matches non-chunked behavior
                 progress_callback=progress_callback,
                 **kwargs,
             ):
@@ -492,11 +493,11 @@ def load_trios_chunked(
     logger.debug("First pass: scanning for segments", filepath=str(filepath))
     detected_encoding = _detect_txt_encoding(filepath)
     with open(filepath, encoding=detected_encoding, errors="replace") as f:
-        # Read only header portion for metadata (first 100 lines typically sufficient)
+        # Read only header portion for metadata (first 500 lines typically sufficient)
         header_lines = []
         for i, line in enumerate(f):
             header_lines.append(line.rstrip("\n"))
-            if i >= 100:
+            if i >= 500:  # was 100 — match _extract_metadata's 500-line scan
                 break
 
         # Extract metadata from header
@@ -560,6 +561,7 @@ def load_trios_chunked(
             chunk_size,
             validate_data,
             progress_callback,
+            encoding=detected_encoding,
         )
 
 
@@ -864,6 +866,7 @@ def _read_segment_chunked(
     chunk_size: int,
     validate_data: bool,
     progress_callback: Callable | None = None,
+    encoding: str = "utf-8",
 ):
     """Read a single segment in chunks (internal generator).
 
@@ -875,11 +878,12 @@ def _read_segment_chunked(
         chunk_size: Number of data points per chunk
         validate_data: Whether to validate each chunk
         progress_callback: Optional progress callback (current_points, total_points)
+        encoding: File encoding (should match encoding detected by caller)
 
     Yields:
         RheoData: Chunks of segment data
     """
-    with open(filepath, encoding="utf-8", errors="replace") as f:
+    with open(filepath, encoding=encoding, errors="replace") as f:
         # Skip to segment start
         for _ in range(seg_start):
             next(f)
@@ -1226,7 +1230,8 @@ def _extract_metadata(lines: list[str]) -> dict:
         "geometry_type": r"Geometry type\s+(.*)",
     }
 
-    for line in lines[:100]:  # Check first 100 lines for metadata
+    # IO-009: extend metadata scan window for multi-step TRIOS files
+    for line in lines[:500]:  # was 100
         for key, pattern in patterns.items():
             match = re.match(pattern, line, re.IGNORECASE)
             if match:

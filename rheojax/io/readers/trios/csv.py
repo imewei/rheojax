@@ -83,36 +83,73 @@ def detect_encoding(filepath: Path) -> str:
     raise ValueError(f"Could not decode {filepath} with any of the attempted encodings")
 
 
-def detect_delimiter(content: str) -> str:
+def detect_delimiter(content: str, decimal_separator: str = ".") -> str:
     """Detect delimiter (tab vs comma) from file content.
 
     TRIOS CSV files typically use tabs, but may use commas.
     Metadata lines (Step/Procedure/Instrument/etc.) are skipped
     as they may use different delimiters than the actual data.
 
+    When ``decimal_separator`` is ``","`` (EU locale), comma counts are inflated
+    because every decimal number contributes a comma. In that case, any non-zero
+    tab count is a stronger signal than the raw comma count.
+
     Args:
         content: First few lines of file content
+        decimal_separator: Decimal separator used in the file ("." or ",")
 
     Returns:
         Delimiter character ('\t' or ',')
     """
     _METADATA_PREFIXES = (
-        "step", "procedure", "instrument", "sample",
-        "date", "time", "geometry", "filename", "operator",
-        "rundate", "gap", "temperature", "number of points",
+        "step",
+        "procedure",
+        "instrument",
+        "sample",
+        "date",
+        "time",
+        "geometry",
+        "filename",
+        "operator",
+        "rundate",
+        "gap",
+        "temperature",
+        "number of points",
     )
-    # Filter out metadata lines, then sample from last 5 non-metadata lines
+    # Filter out metadata lines and section markers, then sample from last 5 non-metadata lines
     all_lines = content.split("\n")
     data_lines = [
-        line for line in all_lines[:20]
-        if line.strip() and not line.strip().lower().startswith(_METADATA_PREFIXES)
+        line
+        for line in all_lines[:20]
+        if line.strip()
+        and not line.strip().lower().startswith(_METADATA_PREFIXES)
+        and not line.strip().startswith("[")  # Skip [step] / section markers
     ]
-    lines = data_lines[-5:] if data_lines else all_lines[:10]
+    if not data_lines:
+        # R8-IO-004: extend search past metadata instead of falling back to it
+        extended = [
+            line
+            for line in all_lines[20:60]
+            if line.strip()
+            and not line.strip().lower().startswith(_METADATA_PREFIXES)
+            and not line.strip().startswith("[")  # Skip [step] / section markers
+        ]
+        if extended:
+            lines = extended[-5:]
+        else:
+            logger.debug("Could not detect delimiter from content; defaulting to tab")
+            return "\t"
+    else:
+        lines = data_lines[-5:]
     tab_count = sum(line.count("\t") for line in lines)
     comma_count = sum(line.count(",") for line in lines)
 
-    # Prefer tabs for TRIOS files (typical format)
-    if tab_count >= comma_count:
+    # EU decimal correction: when decimal_separator is comma and tabs exist,
+    # most commas are decimal separators, not delimiters — prefer tab.
+    if decimal_separator == "," and tab_count > 0:
+        delimiter = "\t"
+    elif tab_count >= comma_count:
+        # Prefer tabs for TRIOS files (typical format)
         delimiter = "\t"
     else:
         delimiter = ","
@@ -395,7 +432,7 @@ def parse_trios_csv(
 
     # Detect delimiter
     if delimiter is None:
-        delimiter = detect_delimiter(content)
+        delimiter = detect_delimiter(content, decimal_separator=decimal_separator)
 
     # Parse metadata and find header row
     metadata, header_start = parse_metadata_header(lines, delimiter)
@@ -434,14 +471,32 @@ def parse_trios_csv(
             # unit substring. This rules out annotation/label rows.
             if is_unit_row:
                 _UNIT_SUBSTRINGS = {
-                    "Pa", "Hz", "rad", "°C", "°F", "K", "/s", "%",
-                    "1/", "mN", "mPa", "kPa", "MPa", "N·m", "N.m",
-                    "J/", "W/", "m²", "m2", "mm", "μm", "nm",
+                    "Pa",
+                    "Hz",
+                    "rad",
+                    "°C",
+                    "°F",
+                    "K",
+                    "/s",
+                    "%",
+                    "1/",
+                    "mN",
+                    "mPa",
+                    "kPa",
+                    "MPa",
+                    "N·m",
+                    "N.m",
+                    "J/",
+                    "W/",
+                    "m²",
+                    "m2",
+                    "mm",
+                    "μm",
+                    "nm",
                 }
                 non_empty_parts = [p.strip() for p in parts[:6] if p.strip()]
                 has_unit_evidence = any(
-                    any(u in p for u in _UNIT_SUBSTRINGS)
-                    for p in non_empty_parts
+                    any(u in p for u in _UNIT_SUBSTRINGS) for p in non_empty_parts
                 )
                 if not has_unit_evidence:
                     is_unit_row = False
@@ -455,10 +510,9 @@ def parse_trios_csv(
     # Determine whether the first column is a non-numeric label column BEFORE
     # parsing any data rows.  This ensures the col_offset is applied uniformly
     # to every row, preventing rows from being 1 element shorter than the header.
-    first_col_is_label = (
-        header[0].lower() in {"variables", "data point"}
-        or header[0].lower().startswith("data")
-    )
+    first_col_is_label = header[0].lower() in {"variables", "data point"} or header[
+        0
+    ].lower().startswith("data")
     col_offset = 1 if first_col_is_label else 0
 
     # Trim the header once, consistently with the data parsing below.
@@ -501,6 +555,12 @@ def parse_trios_csv(
                 else:
                     try:
                         if decimal_separator == ",":
+                            # R8-IO-001: strip thousands separator before decimal replacement
+                            # e.g. "1.234,56" → "1234.56" not "1.234.56"
+                            # Guard: skip dot-stripping for scientific notation with dot decimal
+                            # (e.g. "1.0E-03" should not become "10E-03")
+                            if not re.match(r"^-?\d+\.\d+[eE]", val_clean):
+                                val_clean = val_clean.replace(".", "")
                             val_clean = val_clean.replace(",", ".")
                         row.append(float(val_clean))
                     except ValueError:
@@ -538,7 +598,7 @@ def parse_trios_csv(
             row.extend([np.nan] * (n_header_cols - len(row)))
     elif n_data_cols > n_header_cols:
         header = header + [f"col_{i}" for i in range(n_header_cols, n_data_cols)]
-    df = pd.DataFrame(data_rows, columns=header[:max(n_data_cols, n_header_cols)])
+    df = pd.DataFrame(data_rows, columns=header[: max(n_data_cols, n_header_cols)])
     logger.debug("DataFrame created", shape=df.shape, columns=list(df.columns))
 
     # Detect step column

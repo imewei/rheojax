@@ -381,6 +381,26 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
         # h5py may return bytes instead of str on some platforms
         if isinstance(value, bytes):
             value = value.decode("utf-8")
+        # R8-IO-003: decode numpy arrays of bytes from h5py string_dtype()
+        elif hasattr(value, "dtype") and hasattr(value, "tolist"):
+            try:
+                items = value.tolist()
+                if not isinstance(items, list):
+                    # 0-d array: tolist() returns a scalar — unwrap to Python str
+                    if isinstance(items, bytes):
+                        value = items.decode("utf-8")
+                    elif isinstance(items, str):
+                        value = items
+                    # scalar value will fall through to sentinel check below
+                elif items and isinstance(items[0], bytes):
+                    value = [
+                        v.decode("utf-8") if isinstance(v, bytes) else str(v)
+                        for v in items
+                    ]
+                elif items and isinstance(items[0], str):
+                    value = items  # already decoded, convert from numpy to list
+            except (AttributeError, UnicodeDecodeError):
+                pass
         # Restore None values from sentinel (backward-compatible with old "__None__")
         if isinstance(value, str) and value in (_NONE_SENTINEL, "__None__"):
             metadata[key] = None

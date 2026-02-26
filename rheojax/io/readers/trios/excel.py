@@ -60,6 +60,34 @@ logger = get_logger(__name__)
 # File size threshold for read-only mode (5 MB)
 LARGE_FILE_THRESHOLD_MB = 5.0
 
+# Known unit substrings for positive-evidence unit-row detection in Excel files.
+# A non-numeric row is only treated as a unit row when at least one cell contains
+# one of these substrings (prevents annotation/label rows from being consumed).
+_UNIT_SUBSTRINGS_EXCEL = {
+    "Pa",
+    "Hz",
+    "rad",
+    "°C",
+    "°F",
+    "K",
+    "/s",
+    "%",
+    "1/",
+    "mN",
+    "mPa",
+    "kPa",
+    "MPa",
+    "N·m",
+    "N.m",
+    "J/",
+    "W/",
+    "m²",
+    "m2",
+    "mm",
+    "μm",
+    "nm",
+}
+
 
 def _check_excel_dependencies(filepath: Path) -> None:
     """Check that required Excel libraries are available.
@@ -213,7 +241,7 @@ def _is_numeric(s: str) -> bool:
 def extract_units_from_excel(
     sheet: Any,
     header_row: int,
-) -> tuple[list[str], dict[str, str]]:
+) -> tuple[list[str], dict[str, str], bool]:
     """Parse column headers and units from Excel sheet.
 
     Units may be in parentheses in the header or in a separate row.
@@ -223,10 +251,12 @@ def extract_units_from_excel(
         header_row: Header row index (1-based)
 
     Returns:
-        Tuple of (column names list, units dict)
+        Tuple of (column names list, units dict, had_unit_row)
     """
     headers: list[str] = []
     units: dict[str, str] = {}
+    # R8-IO-002: track whether a dedicated unit row was found
+    had_unit_row = False
 
     # Read header row
     for col_idx in range(1, sheet.max_column + 1):
@@ -255,12 +285,28 @@ def extract_units_from_excel(
             # If first cell is not numeric and not a data label, it might be units
             if not _is_numeric(first_val) and not first_val.lower().startswith("data"):
                 is_unit_row = True
-                # Verify a few columns
+                # Verify a few columns (negative evidence: no numeric values)
                 for col_idx in range(2, min(len(headers) + 1, 6)):
                     cell = sheet.cell(row=next_row, column=col_idx).value
                     if cell is not None and _is_numeric(str(cell).strip()):
                         is_unit_row = False
                         break
+
+                # Require positive evidence: at least one cell contains a known unit
+                # substring. This rules out annotation/label rows that happen to be
+                # non-numeric (e.g. "N/A", "undefined", "--").
+                if is_unit_row:
+                    all_vals = [
+                        str(sheet.cell(row=next_row, column=c).value or "").strip()
+                        for c in range(1, min(len(headers) + 1, 7))
+                    ]
+                    has_unit_evidence = any(
+                        any(u in v for u in _UNIT_SUBSTRINGS_EXCEL)
+                        for v in all_vals
+                        if v
+                    )
+                    if not has_unit_evidence:
+                        is_unit_row = False
 
                 if is_unit_row:
                     for col_idx, header in enumerate(headers, start=1):
@@ -269,8 +315,9 @@ def extract_units_from_excel(
                             unit = str(unit_cell).strip()
                             if unit:
                                 units[header] = unit
+                    had_unit_row = True
 
-    return headers, units
+    return headers, units, had_unit_row
 
 
 def parse_excel_sheet(
@@ -297,7 +344,7 @@ def parse_excel_sheet(
     header_row = detect_excel_header_row(sheet, header_row)
 
     # Get headers and units
-    headers, units = extract_units_from_excel(sheet, header_row)
+    headers, units, had_unit_row = extract_units_from_excel(sheet, header_row)
 
     if not headers:
         raise ValueError(f"No column headers found in sheet '{sheet.title}'")
@@ -305,14 +352,31 @@ def parse_excel_sheet(
     # Determine data start row
     data_start = header_row + 1
 
-    # Check if next row after header is units
-    if data_start <= sheet.max_row:
-        first_data_cell = sheet.cell(row=data_start, column=1).value
-        if first_data_cell is not None:
-            val_str = str(first_data_cell).strip()
-            # If not numeric, might be unit row
-            if not _is_numeric(val_str) and not val_str.lower().startswith("data"):
-                data_start += 1
+    if had_unit_row:
+        # R8-IO-002: unit row already detected by extract_units_from_excel, skip it
+        data_start += 1
+    else:
+        # Secondary check: if the first row after header is non-numeric it may be
+        # a unit row that wasn't caught above (e.g. single-column files).
+        # Require positive evidence to avoid consuming annotation rows.
+        if data_start <= sheet.max_row:
+            first_data_cell = sheet.cell(row=data_start, column=1).value
+            if first_data_cell is not None:
+                val_str = str(first_data_cell).strip()
+                if not _is_numeric(val_str) and not val_str.lower().startswith("data"):
+                    # Positive-evidence guard: at least one cell must contain a
+                    # known unit substring before advancing data_start.
+                    sec_vals = [
+                        str(sheet.cell(row=data_start, column=c).value or "").strip()
+                        for c in range(1, min(len(headers) + 1, 7))
+                    ]
+                    has_unit_evidence = any(
+                        any(u in v for u in _UNIT_SUBSTRINGS_EXCEL)
+                        for v in sec_vals
+                        if v
+                    )
+                    if has_unit_evidence:
+                        data_start += 1
 
     # Read data rows
     data_rows: list[list[float]] = []
