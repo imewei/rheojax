@@ -378,78 +378,185 @@ def mct_vertex_isotropic(
     phi: float,
     sk_func: Callable | None = None,
     sigma: float = 1.0,
+    n_quad: int = 8,
 ) -> np.ndarray:
     """Compute isotropic MCT vertex V(k,q) after angular integration.
 
-    The full MCT vertex is V(k,q,|k-q|) but for isotropic systems, we
-    integrate over the angle between k and q to get V(k,q).
+    Integrates the MCT coupling over the angle between k and q using
+    Gauss-Legendre quadrature on the triangle-constraint interval for
+    p = |k-q_vec|, which runs from p_min = |k-q| to p_max = k+q via
+    the law of cosines.
+
+    The coupling vertex at each angle (Götze 2009, Franosch et al. 1997)
+    is:
+
+        C(k, q, p) = alpha_q(k,q,p) * c(q) + alpha_p(k,q,p) * c(p)
+
+    where the geometric projection coefficients are:
+
+        alpha_q(k,q,p) = (k² + q² - p²) / (2k)
+        alpha_p(k,q,p) = (k² - q² + p²) / (2k)
+
+    and c(k) = (1 - 1/S(k)) / n_density is the direct correlation
+    function.  The p-integral contributes to V(k,q) as:
+
+        I(k,q) = ∫_{|k-q|}^{k+q} dp · p · S(p) · C(k,q,p)²
+
+    The full discretised vertex (absorbing S(q), n_density, and the
+    q-integration weight q² Δq) is:
+
+        V(k, q) = [n_density * S(k) / (32π²k⁴)] * q² * Δq * S(q) * I(k,q)
+
+    The outer q-sum then gives the MCT memory kernel contribution:
+
+        m(k,t) = ∑_q V(k,q) * Φ(q,t)²
 
     Parameters
     ----------
     k : np.ndarray
         Wave vector magnitudes (1D array of length n_k)
     q : np.ndarray
-        Second wave vector magnitudes (same length as k)
+        Second wave vector magnitudes (same length as k, uniform spacing)
     phi : float
         Volume fraction
     sk_func : callable, optional
         Function sk_func(k) returning S(k). If None, uses Percus-Yevick.
+    sigma : float, default 1.0
+        Hard-sphere diameter; used for n_density and the default sk_func.
+    n_quad : int, default 8
+        Number of Gauss-Legendre quadrature points for the p-integral.
 
     Returns
     -------
     np.ndarray
-        Vertex V(k,q) as 2D array of shape (n_k, n_k)
+        Vertex V(k,q) as 2D array of shape (n_k, n_k).  Non-negative.
 
     Notes
     -----
-    The vertex function encodes how density fluctuations at different
-    length scales couple in the MCT memory kernel. It depends on S(k)
-    and the direct correlation function c(k) = 1 - 1/S(k).
+    The loop over n_quad quadrature points (8 iterations) is explicit;
+    all (n_k, n_k) pairs are handled in a single vectorized NumPy
+    operation per iteration.  sk_func is called once per GL point on a
+    raveled (n_k * n_k) array — O(n_k²) per quadrature point.
+
+    Degenerate triangles (k=0 or q=0) give p_min = p_max, so
+    half_range = 0 and the integral is zero.  The k=0 row is also
+    zeroed explicitly via the k⁴ prefactor guard.
+
+    References
+    ----------
+    Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids", OUP,
+      eq. 2.73 (angular integration of MCT vertex).
+    Franosch T. et al. (1997) Phys. Rev. E 55, 7153.
     """
     if sk_func is None:
 
-        def sk_func(kk):
-            return percus_yevick_sk(kk, phi)
+        def sk_func(kk, _sigma=sigma):
+            return percus_yevick_sk(kk, phi, sigma=_sigma)
 
+    k = np.asarray(k, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
     n_k = len(k)
 
-    # Get S(k) and S(q)
-    sk = sk_func(k)
-    sq = sk_func(q)
+    # Number density: n = 6φ / (π σ³)
+    n_density = 6.0 * phi / (np.pi * sigma**3)
 
-    # Direct correlation function
-    # R3-U-006: include number density factor in direct correlation function
-    # c(k) = (1 - 1/S(k)) / n, not (1 - 1/S(k))
-    n_density = 6 * phi / (np.pi * sigma**3)
-    ck = (1.0 - 1.0 / np.maximum(sk, 1e-10)) / n_density
-    cq = (1.0 - 1.0 / np.maximum(sq, 1e-10)) / n_density
+    # q-spacing for the uniform integration grid (Δq in the q-sum weight)
+    dq = float(q[1] - q[0]) if n_k > 1 else float(q[0])
 
-    # Simplified vertex for isotropic case
-    # V(k,q) ∝ n * S(k) * S(q) * [k·q c(|k-q|) + k c(k) + q c(q)]²
-    # This is a simplified form - full calculation requires angular integration
+    # -------------------------------------------------------------------------
+    # On-grid structure factors and direct correlation functions
+    # -------------------------------------------------------------------------
+    sk = sk_func(k)   # (n_k,)
+    sq = sk_func(q)   # (n_k,)
 
-    # Vectorized: compute all (i,j) pairs simultaneously via broadcasting
-    ki = k[:, None]  # (n_k, 1)
-    qj = q[None, :]  # (1, n_k)
+    # c(k) = (1 - 1/S(k)) / n_density  (R3-U-006: includes number density)
+    cq = (1.0 - 1.0 / np.maximum(sq, 1e-30)) / n_density  # (n_k,)
 
-    # Triangle constraint: |k-q| to k+q, midpoint approximation
-    k_minus_q_min = np.abs(ki - qj)  # (n_k, n_k)
-    k_minus_q_max = ki + qj  # (n_k, n_k)
-    k_minus_q = (k_minus_q_min + k_minus_q_max) / 2  # (n_k, n_k)
+    # -------------------------------------------------------------------------
+    # Gauss-Legendre nodes and weights on [-1, 1]
+    # -------------------------------------------------------------------------
+    xi, w_gl = np.polynomial.legendre.leggauss(n_quad)
+    # xi shape (n_quad,); w_gl shape (n_quad,); sum(w_gl) = 2.0
 
-    # Single vectorized sk_func call on raveled grid instead of n^2 scalar calls
-    s_kmq = sk_func(k_minus_q.ravel()).reshape(n_k, n_k)  # (n_k, n_k)
+    # -------------------------------------------------------------------------
+    # Broadcast shapes for vectorised (n_k, n_k) computation
+    # -------------------------------------------------------------------------
+    ki = k[:, None]   # (n_k, 1)
+    qj = q[None, :]   # (1, n_k)
 
-    # R10-MCT-002: include c(|k-q|) term for the full MCT vertex coupling.
-    # The correct isotropic vertex (Hansen-McDonald Ch. 12) is:
-    #   coupling = k*c(k) + q*c(q) + |k-q|*c(|k-q|)
-    # where c(k) = (1 - 1/S(k)) / n_density.
-    c_kmq = (1.0 - 1.0 / np.maximum(s_kmq, 1e-10)) / n_density  # (n_k, n_k)
-    coupling = ki * ck[:, None] + qj * cq[None, :] + k_minus_q * c_kmq  # (n_k, n_k)
-    V = sk[:, None] * sq[None, :] * s_kmq * coupling**2
+    # Triangle-constraint integration limits (Götze 2009 eq. 2.73)
+    p_min = np.abs(ki - qj)          # (n_k, n_k)
+    p_max = ki + qj                  # (n_k, n_k)
 
-    # Normalize by density (n_density already computed above for c(k) correction)
-    V *= n_density / (16 * np.pi**2)
+    # Change-of-variables p = p_mid + half_range * xi_l, xi_l ∈ [-1, 1]
+    half_range = 0.5 * (p_max - p_min)  # (n_k, n_k); = 0 when k=0 or q=0
+    p_mid      = 0.5 * (p_max + p_min)  # (n_k, n_k)
+
+    # Broadcast S(q) and c(q) — constant across the p-integral for fixed (k,q)
+    sq_2d  = sq[None, :]   # (1, n_k)
+    cq_2d  = cq[None, :]   # (1, n_k)
+
+    # Guard 1/(2k) projection denominators; k=0 row is zeroed at the end
+    k_safe = np.maximum(ki, 1e-30)   # (n_k, 1)
+    ki_sq  = ki * ki                 # (n_k, 1)
+    qj_sq  = qj * qj                 # (1, n_k)
+
+    # -------------------------------------------------------------------------
+    # Gauss-Legendre quadrature over p ∈ [p_min, p_max]:
+    #   I(k,q) = ∑_l w_l * half_range * p_l * S(p_l) * C(k,q,p_l)²
+    # -------------------------------------------------------------------------
+    integral = np.zeros((n_k, n_k), dtype=np.float64)
+
+    for xi_l, w_l in zip(xi, w_gl):
+        # Quadrature abscissa in physical units: shape (n_k, n_k)
+        p_l = p_mid + half_range * xi_l
+
+        # S(p_l): batched sk_func call via ravel/reshape (O(n_k²) per GL point)
+        s_pl = sk_func(p_l.ravel()).reshape(n_k, n_k)   # (n_k, n_k)
+
+        # c(p_l) = (1 - 1/S(p_l)) / n_density
+        c_pl = (1.0 - 1.0 / np.maximum(s_pl, 1e-30)) / n_density  # (n_k, n_k)
+
+        # Geometric projection coefficients (law of cosines):
+        #   alpha_q = (k² + q² - p²) / (2k)   [projection onto q direction]
+        #   alpha_p = (k² - q² + p²) / (2k)   [projection onto p direction]
+        p_l_sq  = p_l * p_l                                          # (n_k, n_k)
+        alpha_q = (ki_sq + qj_sq - p_l_sq) / (2.0 * k_safe)        # (n_k, n_k)
+        alpha_p = (ki_sq - qj_sq + p_l_sq) / (2.0 * k_safe)        # (n_k, n_k)
+
+        # MCT coupling vertex: C(k,q,p) = alpha_q * c(q) + alpha_p * c(p)
+        C_kqp = alpha_q * cq_2d + alpha_p * c_pl                    # (n_k, n_k)
+
+        # Integrand: p * S(q) * S(p) * C(k,q,p)²
+        integrand_l = p_l * sq_2d * s_pl * C_kqp * C_kqp           # (n_k, n_k)
+
+        # Accumulate: Jacobian of variable transform is half_range
+        integral += w_l * half_range * integrand_l
+
+    # -------------------------------------------------------------------------
+    # Assemble the discretised vertex matrix:
+    #   V(k,q) = [n_density * S(k) / (32π²k⁴)] * q² * Δq * S(q) * I(k,q)
+    #
+    # The q² * Δq factor is the q-integration weight so that
+    #   m(k,t) = ∑_q V(k,q) * Φ(q,t)²
+    # is a plain matrix-vector product (no extra weights needed at call sites).
+    # -------------------------------------------------------------------------
+    k4_safe = np.maximum(ki_sq * ki_sq, 1e-30)    # (n_k, 1), guards k=0
+
+    V = (
+        (n_density * sk[:, None] / (32.0 * np.pi**2 * k4_safe))
+        * (qj_sq * dq)   # q² Δq integration weight
+        * integral        # p-integral I(k,q), already contains S(q) factor
+    )
+
+    # Zero out k=0 row explicitly (no coupling at zero wavevector)
+    k_zero_mask = k < 1e-30   # (n_k,)
+    V[k_zero_mask, :] = 0.0
+
+    # Numerical guard: C² and S > 0 guarantee non-negativity in exact arithmetic;
+    # floating-point noise near S(k) → ∞ (MCT glass transition) can produce
+    # tiny negative values — clamp to zero.
+    V = np.maximum(V, 0.0)
 
     return V
 

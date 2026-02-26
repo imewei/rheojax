@@ -31,10 +31,12 @@ Brader J.M. et al. (2009) Proc. Natl. Acad. Sci. 106, 15186
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Literal
 
 import numpy as np
 import scipy.integrate
+from scipy.optimize import nnls
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
@@ -298,56 +300,243 @@ class ITTMCTIsotropic(ITTMCTBase):
         self,
         t: jnp.ndarray,
     ) -> jnp.ndarray:
-        """Compute equilibrium k-resolved correlator Φ(k,t).
+        """Compute equilibrium k-resolved correlator Φ(k,t) via Volterra ODE.
+
+        Solves the MCT Volterra integral equation:
+
+            dΦ(k,t)/dt + Γ(k)[Φ(k,t) + ∫₀ᵗ m(k,t-s) · dΦ(k,s)/ds ds] = 0
+
+        with memory kernel m(k,t) = Σ_q V(k,q) · Φ(q,t)² using the
+        precomputed vertex matrix self.vertex.
+
+        The Volterra integral is converted to an ODE system via Prony
+        decomposition with M auxiliary variables per k-mode:
+
+            dΦ(k)/dt = -Γ(k) × [Φ(k) + Σᵢ Kᵢ(k)]
+            m(k)     = Σ_q V(k,q) × Φ(q)²
+            dKᵢ(k)/dt = -Kᵢ(k)/τᵢ + gᵢ × m(k) × dΦ(k)/dt
+
+        State vector: [Φ(k₀),...,Φ(k_{N-1}), K₁(k₀),...,K₁(k_{N-1}),
+                        ..., K_M(k₀),...,K_M(k_{N-1})]
+        Total state size: N_k × (1 + N_prony)
+
+        The ODE is solved in dimensionless units (σ=1, D₀=1, t̃=t·D₀/σ²)
+        for numerical stability. The vertex is recomputed in dimensionless
+        units to avoid the large magnitudes arising from physical k-units
+        (1/m). Results are interpolated back to the requested physical time.
 
         Parameters
         ----------
         t : jnp.ndarray
-            Time array
+            Time array in physical units (s)
 
         Returns
         -------
         jnp.ndarray
             Equilibrium correlator Φ(k,t) with shape (n_t, n_k)
+
+        Notes
+        -----
+        The dimensionless vertex is computed from the dimensionless k-grid
+        k̃ = k·σ_d, satisfying Ṽ(k̃,q̃) which avoids large physical-unit
+        magnitudes. Bare dimensionless relaxation rates are Γ̃(k̃) = k̃²/S(k̃).
+
+        Prony weights (g) are determined by NNLS fitting of a normalised
+        exponential proxy for the memory kernel decay. The time constants
+        (τ) are log-spaced from 0.1/Γ̃_max to max(2·t_max, 10/Γ̃_min).
+        Fallback to equal weights gᵢ = 1/N if NNLS returns a zero solution.
+
+        A fallback to bare-exponential correlators is used if solve_ivp
+        fails, preserving backward-compatible qualitative behavior.
+
+        References
+        ----------
+        Fuchs M. & Cates M.E. (2009) J. Rheol. 53, 957
+        Götze W. (2009) "Complex Dynamics of Glass-Forming Liquids"
         """
-        # For ISM, we solve coupled equations for each k
-        # Simplified: use single-mode approximation
         D0 = self.parameters.get_value("D0")
+        sigma_d = self.parameters.get_value("sigma_d")
+        phi = self.parameters.get_value("phi")
 
         assert D0 is not None
+        assert sigma_d is not None
+        assert phi is not None
 
-        t_np = np.array(t)
-        n_t = len(t_np)
+        t_np = np.asarray(t, dtype=np.float64)
         n_k = len(self.k_grid)
+        n_prony = self.n_prony_modes
 
-        # Bare relaxation rates: Γ(k) = k² D0 / S(k)
-        Gamma_k = self.k_grid**2 * D0 / self.S_k
+        # ---------------------------------------------------------------
+        # Dimensionless units: k̃ = k·σ_d, t̃ = t·D₀/σ_d²
+        # Prevents the physical-unit vertex from causing overflow in the
+        # ODE solver (physical V entries are O(10¹²) vs dimensionless O(1)).
+        # ---------------------------------------------------------------
+        k_dim = self.k_grid * sigma_d           # dimensionless wave vectors
+        S_k_dim = self.S_k                      # S(k) is dimensionless
 
-        # Simplified: exponential decay modulated by S(k)
-        # Full MCT would require solving coupled equations
-        phi_eq = np.zeros((n_t, n_k))
+        # Dimensionless bare relaxation rates Γ̃(k̃) = k̃² / S(k̃)
+        Gamma_dim = k_dim**2 / np.maximum(S_k_dim, 1e-12)
 
-        # R10-ISM-001: hoist glass check and f(k) array computation out of loop.
-        # get_glass_transition_info() and _compute_nonergodicity_parameter() were
-        # previously called O(n_k) times inside the loop, even though is_glass is
-        # constant and f_k only depends on the wave vector index.
-        info = self.get_glass_transition_info()
-        is_glass = info["is_glass"]
-        if is_glass:
-            f_k_arr = np.array(
-                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+        # Dimensionless vertex V̈(k̃,q̃): recomputed with σ=1 so entries are
+        # O(1)–O(100), compatible with the ODE step-size constraints.
+        sk_func_dim = lambda k_arg: percus_yevick_sk(k_arg, phi, sigma=1.0)
+        V_dim = mct_vertex_isotropic(
+            k_dim, k_dim, phi, sk_func=sk_func_dim, sigma=1.0
+        )
+
+        # ---------------------------------------------------------------
+        # Prony parameters: log-spaced τ covering requested time range
+        # τ_min = 0.1/Γ̃_max  (shorter than fastest mode)
+        # τ_max = max(2·t̃_req, 10/Γ̃_min)  (longer than slowest mode)
+        # ---------------------------------------------------------------
+        Gamma_min = max(float(Gamma_dim.min()), 1e-10)
+        Gamma_max = max(float(Gamma_dim.max()), 1e-10)
+        tau_min = max(0.1 / Gamma_max, 1e-10)
+
+        # Physical t_max converted to dimensionless
+        t_dim_max = float(np.max(t_np)) * D0 / sigma_d**2
+        tau_max = max(t_dim_max * 2.0, 10.0 / Gamma_min)
+        tau_max = max(tau_max, tau_min * 1e5)
+
+        tau_arr = np.logspace(np.log10(tau_min), np.log10(tau_max), n_prony)
+
+        # Prony weights via NNLS: fit normalised exponential proxy
+        # Proxy: exp(-Γ_eff · t̃) where Γ_eff is the geometric-mean rate
+        Gamma_eff = float(np.exp(0.5 * (np.log(Gamma_min) + np.log(Gamma_max))))
+        n_fit_pts = max(50, 5 * n_prony)
+        t_fit = np.logspace(np.log10(tau_min), np.log10(tau_max * 0.5), n_fit_pts)
+        m_proxy = np.exp(-Gamma_eff * t_fit)
+        A_fit = np.exp(-t_fit[:, None] / tau_arr[None, :])
+        g_raw, _ = nnls(A_fit, m_proxy)
+        g_sum = float(g_raw.sum())
+        if g_sum < 1e-12:
+            g_arr = np.ones(n_prony) / n_prony  # fallback: equal weights
+        else:
+            g_arr = g_raw / g_sum               # normalise: Σᵢ gᵢ = 1
+
+        logger.debug(
+            "ISM correlator: n_k=%d, n_prony=%d, "
+            "tau=[%.2e, %.2e], g_nnz=%d/%d",
+            n_k, n_prony, tau_arr[0], tau_arr[-1],
+            int(np.count_nonzero(g_arr > 1e-14 * g_arr.max())), n_prony,
+        )
+
+        # ---------------------------------------------------------------
+        # Volterra ODE system in dimensionless time
+        # ---------------------------------------------------------------
+        state_size = n_k * (1 + n_prony)
+
+        def _volterra_rhs(t_var: float, y: np.ndarray) -> np.ndarray:
+            """ODE right-hand side for k-resolved MCT Volterra equation."""
+            phi_k = np.clip(y[:n_k], 0.0, 1.0)
+
+            # Prony auxiliary variables: K[i, k], shape (n_prony, n_k)
+            K_mat = y[n_k:].reshape(n_prony, n_k)
+            K_sum = K_mat.sum(axis=0)                 # (n_k,)
+
+            # Memory kernel: m(k) = Σ_q V(k,q) · Φ(q)²
+            m_k = V_dim @ (phi_k * phi_k)             # (n_k,)
+
+            # Correlator evolution: dΦ/dt = -Γ̃(k) × [Φ(k) + Σᵢ Kᵢ(k)]
+            dphi_dt = -Gamma_dim * (phi_k + K_sum)    # (n_k,)
+
+            dy = np.empty(state_size)
+            dy[:n_k] = dphi_dt
+
+            # Prony mode evolution: dKᵢ/dt = -Kᵢ/τᵢ + gᵢ × m(k) × dΦ/dt
+            for i in range(n_prony):
+                offset = n_k * (1 + i)
+                dy[offset : offset + n_k] = (
+                    -K_mat[i] / tau_arr[i] + g_arr[i] * m_k * dphi_dt
+                )
+
+            return dy
+
+        # Initial conditions: Φ(k, 0) = 1 (fully correlated), Kᵢ(k, 0) = 0
+        y0 = np.zeros(state_size)
+        y0[:n_k] = 1.0
+
+        # Integration span in dimensionless time
+        t_dim_end = max(t_dim_max * 1.001, tau_max * 1.01)
+
+        # t_eval: convert physical time to dimensionless, restrict to (0, t_dim_end)
+        t_eval_dim = t_np * (D0 / sigma_d**2)
+        mask_positive = t_eval_dim > 0.0
+        t_eval_valid = np.unique(
+            np.clip(t_eval_dim[mask_positive], 0.0, t_dim_end * 0.9999)
+        )
+        if len(t_eval_valid) == 0:
+            t_eval_valid = np.array([t_dim_end * 0.5])
+
+        # Solve using Radau (L-stable implicit Runge-Kutta), appropriate for
+        # stiff systems such as MCT near the glass transition.
+        # Suppress overflow warnings from the numerical Jacobian estimation:
+        # Radau uses finite differences to build the Jacobian matrix. For
+        # large state values (e.g. the initial memory kernel at t≈0), the
+        # finite-difference step can temporarily exceed the float64 range in
+        # the "factor increase" heuristic. These overflows are benign —
+        # the solver self-corrects on the next step.
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                sol = scipy.integrate.solve_ivp(
+                    _volterra_rhs,
+                    (0.0, t_dim_end),
+                    y0,
+                    method="Radau",
+                    t_eval=t_eval_valid,
+                    rtol=1e-5,
+                    atol=1e-8,
+                    dense_output=False,
+                )
+            solver_ok = sol.success
+        except Exception as exc:
+            logger.warning(
+                "ISM Volterra ODE raised an exception (%s). "
+                "Using bare-exponential fallback.",
+                exc,
             )
+            sol = None
+            solver_ok = False
 
-        for i in range(n_k):
-            # Simple exponential for now (full MCT is more complex)
-            phi_eq[:, i] = np.exp(-Gamma_k[i] * t_np)
+        if not solver_ok:
+            msg = (
+                getattr(sol, "message", "solver exception")
+                if sol is not None
+                else "solver exception"
+            )
+            logger.warning(
+                "ISM Volterra solver did not converge (%s). "
+                "Falling back to bare-exponential (Brownian) correlator. "
+                "Increase n_prony_modes or check vertex for numerical issues.",
+                msg,
+            )
+            # Fallback: bare Brownian dynamics (no MCT memory)
+            Gamma_phys = self.k_grid**2 * D0 / np.maximum(S_k_dim, 1e-12)
+            phi_fallback = np.exp(
+                -t_np[:, None] * Gamma_phys[None, :]
+            )  # shape (n_t, n_k)
+            return jnp.array(phi_fallback)
 
-            # Glass state: plateau at f(k)
-            if is_glass:
-                f_k = f_k_arr[i]
-                phi_eq[:, i] = f_k + (1 - f_k) * phi_eq[:, i]
+        # ---------------------------------------------------------------
+        # Reconstruct correlator on the full requested time grid
+        # t=0 → Φ(k,0) = 1 by initial condition
+        # t>0 → interpolate from ODE solution
+        # ---------------------------------------------------------------
+        phi_out = np.ones((len(t_np), n_k))
 
-        return jnp.array(phi_eq)
+        if len(sol.t) > 0:
+            for ik in range(n_k):
+                phi_interp = np.interp(
+                    t_eval_dim[mask_positive],
+                    sol.t,
+                    sol.y[ik],
+                )
+                phi_out[mask_positive, ik] = phi_interp
+
+        phi_out = np.clip(phi_out, 0.0, 1.0)
+
+        return jnp.array(phi_out)
 
     def _compute_nonergodicity_parameter(self, k: float) -> float:
         """Compute non-ergodicity parameter f(k) for glass state.

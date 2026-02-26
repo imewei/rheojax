@@ -996,7 +996,7 @@ def solve_equilibrium_correlator_f12(
     # introduces error for intermediate times (Φ(t) is not yet at its long-time
     # limit during the transient decay, so m(Φ_current) ≠ m(Φ(t-s)) for s < t).
     else:
-        logger.info(
+        logger.debug(
             "Fluid phase (v2=%.2f < 4). Constant-kernel approximation used "
             "in correlator solver. Results are quantitatively accurate at "
             "long times (Φ → 0) but may deviate for intermediate times. "
