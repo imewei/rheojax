@@ -52,18 +52,18 @@ def _plot_scalar_lattice(
         stress, cmap=cmap_stress, vmin=-max_stress, vmax=max_stress, origin="lower"
     )
     ax1.set_title(r"Stress Field $\sigma_{ij}$")
-    plt.colorbar(im1, ax=ax1)
+    fig.colorbar(im1, ax=ax1)
     ax1.set_xlabel("x")
     ax1.set_ylabel("y")
 
     # Threshold Plot
     im2 = ax2.imshow(thresholds, cmap=cmap_thresh, origin="lower")
     ax2.set_title(r"Yield Thresholds $\sigma_c$")
-    plt.colorbar(im2, ax=ax2)
+    fig.colorbar(im2, ax=ax2)
     ax2.set_xlabel("x")
     ax2.set_ylabel("y")
 
-    plt.tight_layout()
+    fig.tight_layout()
     return fig
 
 
@@ -228,7 +228,7 @@ def animate_stress_evolution(
         animated=True,
     )
     ax.set_title("Time Step: 0")
-    plt.colorbar(im, ax=ax, label=r"Stress $\sigma$")
+    fig.colorbar(im, ax=ax, label=r"Stress $\sigma$")
 
     def update(frame):
         im.set_array(history[frame])
@@ -309,7 +309,7 @@ def plot_tensorial_fields(
             **kwargs,
         )
         axes[i].set_title(labels[i])
-        plt.colorbar(im, ax=axes[i])
+        fig.colorbar(im, ax=axes[i])
         axes[i].set_xlabel("x")
         axes[i].set_ylabel("y")
 
@@ -431,7 +431,7 @@ def plot_von_mises_field(
     # Left panel: σ_eff with viridis (sequential)
     im1 = axes[0].imshow(sigma_eff, cmap="viridis", origin="lower", **kwargs)
     axes[0].set_title(r"von Mises $\sigma_{\mathrm{eff}}$")
-    plt.colorbar(im1, ax=axes[0], label=r"$\sigma_{\mathrm{eff}}$")
+    fig.colorbar(im1, ax=axes[0], label=r"$\sigma_{\mathrm{eff}}$")
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
 
@@ -449,7 +449,7 @@ def plot_von_mises_field(
         **kwargs,
     )
     axes[1].set_title(r"Normalized Stress $\sigma_{\mathrm{eff}} / \sigma_c$")
-    plt.colorbar(im2, ax=axes[1], label=r"$\sigma_{\mathrm{eff}} / \sigma_c$")
+    fig.colorbar(im2, ax=axes[1], label=r"$\sigma_{\mathrm{eff}} / \sigma_c$")
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
 
@@ -582,7 +582,7 @@ def animate_tensorial_evolution(
                 animated=True,
             )
             axes[i].set_title(f"{labels[i]} - t={time[0]:.3f}")
-            plt.colorbar(im, ax=axes[i])
+            fig.colorbar(im, ax=axes[i])
             images.append(im)
 
         def update(frame):
@@ -610,7 +610,7 @@ def animate_tensorial_evolution(
             animated=True,
         )
         ax.set_title(f"$\\sigma_{{{component}}}$ - t={time[0]:.3f}")
-        plt.colorbar(im, ax=ax)
+        fig.colorbar(im, ax=ax)
 
         def update(frame):
             im.set_array(stress_history[frame, idx])
@@ -638,7 +638,7 @@ def animate_tensorial_evolution(
             animated=True,
         )
         ax.set_title(f"$N_1$ - t={time[0]:.3f}")
-        plt.colorbar(im, ax=ax, label=r"$N_1$")
+        fig.colorbar(im, ax=ax, label=r"$N_1$")
 
         def update(frame):
             im.set_array(N1_history[frame])
@@ -667,6 +667,8 @@ def animate_tensorial_evolution(
             jax.errors.ConcretizationTypeError,
             NotImplementedError,
             ValueError,
+            RuntimeError,  # R8-VIZ-001: XLA OOM: "RESOURCE_EXHAUSTED"
+            MemoryError,  # host-side allocation failure
         ):
             # Fallback to sequential loop if vmap fails (e.g., tracing issues)
             vm_history = []
@@ -687,7 +689,7 @@ def animate_tensorial_evolution(
             animated=True,
         )
         ax.set_title(f"$\\sigma_{{\\mathrm{{eff}}}}$ - t={time[0]:.3f}")
-        plt.colorbar(im, ax=ax, label=r"$\sigma_{\mathrm{eff}}$")
+        fig.colorbar(im, ax=ax, label=r"$\sigma_{\mathrm{eff}}$")
 
         def update(frame):
             im.set_array(vm_history_arr[frame])
