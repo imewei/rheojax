@@ -308,6 +308,23 @@ class Pipeline:
             data_shape=X.shape,  # type: ignore[union-attr]
         ) as ctx:
             try:
+                # PB-001: auto-propagate test_mode from loaded data metadata
+                if hasattr(self, "data") and self.data is not None:
+                    _meta = getattr(self.data, "metadata", None)
+                    if _meta:
+                        if "test_mode" not in fit_kwargs:
+                            _tm = _meta.get("test_mode")
+                            if _tm:
+                                fit_kwargs["test_mode"] = _tm
+                        # R9-PIPE-DMT: propagate deformation_mode for DMTA data
+                        if "deformation_mode" not in fit_kwargs:
+                            _dm = _meta.get("deformation_mode")
+                            if _dm:
+                                fit_kwargs["deformation_mode"] = _dm
+                        if "poisson_ratio" not in fit_kwargs:
+                            _pr = _meta.get("poisson_ratio")
+                            if _pr is not None:
+                                fit_kwargs["poisson_ratio"] = _pr
                 model_obj.fit(X, y, **fit_kwargs)
                 self._last_model = model_obj
                 self.steps.append(("fit", model_obj))
@@ -752,11 +769,7 @@ class Pipeline:
         n_steps = len(self.history)
         has_data = self.data is not None
         has_model = self._last_model is not None
-        return (
-            f"Pipeline(steps={n_steps}, "
-            f"has_data={has_data}, "
-            f"has_model={has_model})"
-        )
+        return f"Pipeline(steps={n_steps}, has_data={has_data}, has_model={has_model})"
 
 
 __all__ = ["Pipeline"]

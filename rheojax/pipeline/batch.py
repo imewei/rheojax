@@ -13,6 +13,7 @@ Example:
 
 from __future__ import annotations
 
+import copy
 import warnings
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -76,7 +77,7 @@ class BatchPipeline:
         self,
         file_paths: Iterable[str | Path],
         format: str = "auto",
-        parallel: bool = True,
+        parallel: bool = False,
         n_workers: int | None = None,
         **load_kwargs,
     ) -> BatchPipeline:
@@ -85,7 +86,10 @@ class BatchPipeline:
         Args:
             file_paths: List of file paths to process
             format: File format for loading
-            parallel: Whether to use parallel processing (default: True)
+            parallel: Whether to use parallel processing.
+                Default False: JAX JIT cache is not thread-safe with concurrent
+                ThreadPoolExecutor. Set True only for I/O-bound pipelines without
+                JAX JIT calls (e.g., loading + simple numpy transforms).
             n_workers: Number of parallel workers (default: min(4, cpu_count))
             **load_kwargs: Additional arguments for data loading
 
@@ -93,6 +97,8 @@ class BatchPipeline:
             self for method chaining
 
         Example:
+            >>> batch.process_files(['data1.csv', 'data2.csv'])
+            >>> # Parallel mode (use with caution — JAX JIT not thread-safe):
             >>> batch.process_files(['data1.csv', 'data2.csv'], parallel=True)
         """
         import os
@@ -270,12 +276,48 @@ class BatchPipeline:
         with log_pipeline_stage(logger, "load", filepath=str(path)):
             pipeline.load(path, format=format, **load_kwargs)
 
-        # Execute template steps (transforms, fits, etc.)
-        # The template should already have the steps configured
-        # We just need to execute them on the new data
+        # R10-BATCH-001: Replay template steps on the newly loaded data.
+        # Steps are recorded as ("fit", model_obj) or ("transform", transform_obj)
+        # tuples. For each step we create a fresh model/transform of the same class
+        # and re-fit/re-transform on the new dataset, preserving fit kwargs that were
+        # stored in _last_fit_kwargs by the model itself.
+        for step_action, step_obj in self.template_pipeline.steps:
+            if step_action in ("fit", "fit_nlsq"):
+                model_cls = type(step_obj)
+                new_model = model_cls()
+                X = np.array(pipeline.data.x)
+                y = np.array(pipeline.data.y)
+                fit_kwargs_replay = dict(getattr(step_obj, "_last_fit_kwargs", None) or {})
+                # Strip internal tracking keys that are not valid fit() kwargs
+                for _k in ("method",):
+                    fit_kwargs_replay.pop(_k, None)
+                new_model.fit(X, y, **fit_kwargs_replay)
+                pipeline._last_model = new_model
+                pipeline.steps.append((step_action, new_model))
+                logger.debug(
+                    "Replayed fit step",
+                    model=model_cls.__name__,
+                    filepath=str(path),
+                )
+            elif step_action == "transform":
+                # Re-apply the same transform instance to the pipeline's current data
+                try:
+                    transform_cls = type(step_obj)
+                    new_transform = copy.deepcopy(step_obj)
+                    pipeline.data = new_transform.transform(pipeline.data)
+                    pipeline.steps.append((step_action, new_transform))
+                    logger.debug(
+                        "Replayed transform step",
+                        transform=transform_cls.__name__,
+                        filepath=str(path),
+                    )
+                except Exception as _te:
+                    logger.warning(
+                        "Transform replay failed; skipping",
+                        transform=type(step_obj).__name__,
+                        error=str(_te),
+                    )
 
-        # For now, we'll execute the history of the template
-        # This is simplified - a full implementation would clone and execute steps
         result = pipeline.get_result()
 
         # Compute metrics if model was fitted
@@ -295,9 +337,10 @@ class BatchPipeline:
                 metrics["model"] = model.__class__.__name__
 
                 # Calculate RMSE
+                # R8-PIPE-005: handle complex oscillation data in RMSE
                 y_pred = model.predict(X)
-                residuals = y - y_pred
-                metrics["rmse"] = float(np.sqrt(np.mean(residuals**2)))
+                residuals = np.asarray(y) - np.asarray(y_pred)
+                metrics["rmse"] = float(np.sqrt(np.mean(np.abs(residuals) ** 2)))
 
                 ctx["r_squared"] = metrics["r_squared"]
                 ctx["rmse"] = metrics["rmse"]
@@ -313,9 +356,8 @@ class BatchPipeline:
         Returns:
             New Pipeline instance
         """
-        # For now, create a new pipeline
-        # A full implementation would deep copy the pipeline configuration
-        return Pipeline()
+        # R8-PIPE-002: implement clone instead of returning empty Pipeline
+        return copy.deepcopy(pipeline)
 
     def get_results(self) -> list[tuple[Path, RheoData, dict[str, Any]]]:
         """Get all processing results.

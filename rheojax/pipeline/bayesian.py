@@ -137,10 +137,42 @@ class BayesianPipeline(Pipeline):
                 else "unknown"
             ),
         ) as ctx:
+            # BP-002: auto-propagate test_mode and deformation_mode from data metadata
+            if hasattr(self, "data") and self.data is not None:
+                _meta = getattr(self.data, "metadata", None)
+                if _meta:
+                    if "test_mode" not in nlsq_kwargs:
+                        _tm = _meta.get("test_mode")
+                        if _tm:
+                            nlsq_kwargs["test_mode"] = _tm
+                    # R9-PIPE-DMT: propagate deformation_mode for DMTA data
+                    if "deformation_mode" not in nlsq_kwargs:
+                        _dm = _meta.get("deformation_mode")
+                        if _dm:
+                            nlsq_kwargs["deformation_mode"] = _dm
+                    if "poisson_ratio" not in nlsq_kwargs:
+                        _pr = _meta.get("poisson_ratio")
+                        if _pr is not None:
+                            nlsq_kwargs["poisson_ratio"] = _pr
             model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
             r_squared = model_obj.score(X, y)
             ctx["r_squared"] = r_squared
             ctx["n_parameters"] = len(model_obj.parameters)
+
+        # R10-PIPE-BAY-001: Write resolved deformation_mode and poisson_ratio back
+        # to data.metadata so fit_bayesian() can propagate them without the caller
+        # having to repeat these kwargs on the Bayesian call.
+        if self.data is not None and self.data.metadata is not None:
+            _dm_resolved = nlsq_kwargs.get("deformation_mode") or (
+                self.data.metadata.get("deformation_mode")
+            )
+            if _dm_resolved is not None:
+                self.data.metadata["deformation_mode"] = _dm_resolved
+            _pr_resolved = nlsq_kwargs.get("poisson_ratio")
+            if _pr_resolved is None:
+                _pr_resolved = self.data.metadata.get("poisson_ratio")
+            if _pr_resolved is not None:
+                self.data.metadata["poisson_ratio"] = _pr_resolved
 
         # Store fitted model
         self._last_model = model_obj
@@ -236,18 +268,20 @@ class BayesianPipeline(Pipeline):
                 n_initial_values=len(initial_values),
             )
 
-        # Get test_mode from data metadata if available, converting string to
-        # TestMode enum so model_function dispatch (== TestMode.X) works correctly.
+        # Get test_mode and deformation_mode from data metadata if available.
+        # Convert test_mode string to TestMode enum for model_function dispatch.
         test_mode = None
+        deformation_mode = None
+        poisson_ratio = None
         if hasattr(self.data, "metadata") and self.data.metadata is not None:
             test_mode = self.data.metadata.get("test_mode")
-        if test_mode is not None and isinstance(test_mode, str):
-            from rheojax.core.test_modes import TestMode
-
-            try:
-                test_mode = TestMode[test_mode.upper()]
-            except KeyError:
-                pass  # Leave as string; model will handle or raise
+            # R9-PIPE-DMT: propagate deformation_mode for DMTA data
+            deformation_mode = self.data.metadata.get("deformation_mode")
+            _pr = self.data.metadata.get("poisson_ratio")
+            if _pr is not None:
+                poisson_ratio = _pr
+        # test_mode is passed as-is to fit_bayesian(), which handles
+        # str → TestMode conversion internally (bayesian.py:1093-1094).
 
         model_name = self._last_model.__class__.__name__
 
@@ -268,16 +302,19 @@ class BayesianPipeline(Pipeline):
             num_samples=num_samples,
             num_chains=num_chains,
         ) as ctx:
-            result = self._last_model.fit_bayesian(
-                X,
-                y,
-                test_mode=test_mode,
-                num_warmup=num_warmup,
-                num_samples=num_samples,
-                num_chains=num_chains,
-                initial_values=initial_values,
-                **nuts_kwargs,
-            )
+            _bay_kwargs: dict = {
+                "test_mode": test_mode,
+                "num_warmup": num_warmup,
+                "num_samples": num_samples,
+                "num_chains": num_chains,
+                "initial_values": initial_values,
+            }
+            if deformation_mode is not None:
+                _bay_kwargs["deformation_mode"] = deformation_mode
+            if poisson_ratio is not None:
+                _bay_kwargs["poisson_ratio"] = poisson_ratio
+            _bay_kwargs.update(nuts_kwargs)
+            result = self._last_model.fit_bayesian(X, y, **_bay_kwargs)
 
             # Add diagnostics to context
             _div = result.diagnostics.get("divergences")

@@ -153,12 +153,13 @@ class MastercurvePipeline(Pipeline):
         Returns:
             Merged RheoData
         """
-        # Add temperature metadata to copies (avoid mutating caller's datasets)
+        # Add temperature metadata to copies (avoid mutating caller's datasets).
+        # Guard against None metadata on programmatic RheoData (R10-WF-002).
         datasets = [
             RheoData(
                 x=d.x, y=d.y,
                 x_units=d.x_units, y_units=d.y_units,
-                metadata={**d.metadata, "temperature": temp},
+                metadata={**(d.metadata or {}), "temperature": temp},
             )
             for d, temp in zip(datasets, temperatures, strict=False)
         ]
@@ -230,10 +231,11 @@ class MastercurvePipeline(Pipeline):
         for unique_temp in np.unique(temps):
             mask = temps == unique_temp
             shift = self.shift_factors[float(unique_temp)]
+            # R8-PIPE-001: multiply (not divide) by shift factor for TTS
             if isinstance(shifted_x, jnp.ndarray):
-                shifted_x = shifted_x.at[mask].set(shifted_x[mask] / shift)
+                shifted_x = shifted_x.at[mask].set(shifted_x[mask] * shift)
             else:
-                shifted_x[mask] = shifted_x[mask] / shift
+                shifted_x[mask] = shifted_x[mask] * shift
 
         self.data.x = shifted_x
 
@@ -340,13 +342,16 @@ class ModelComparisonPipeline(Pipeline):
                     aic = nlsq_result.aic if nlsq_result.aic is not None else np.inf
                     bic = nlsq_result.bic if nlsq_result.bic is not None else np.inf
                 else:
-                    # Fallback: Calculate metrics manually
+                    # Fallback: Calculate metrics manually.
+                    # R10-WF-003: use magnitude for ss_tot to avoid TypeError when
+                    # y is complex (oscillation data returns G* = G' + iG'').
                     rmse = np.sqrt(np.mean(residuals**2))
 
                     # Calculate R² manually (avoid calling model.score())
-                    ss_res = np.sum(residuals**2)
-                    ss_tot = np.sum((y - np.mean(y)) ** 2)
-                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+                    ss_res = float(np.sum(residuals**2))
+                    y_for_ss = np.abs(y) if np.iscomplexobj(y) else y
+                    ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+                    r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
 
                     # Calculate AIC/BIC manually
                     n = len(y)
@@ -509,8 +514,10 @@ class CreepToRelaxationPipeline(Pipeline):
         )
         start_time = time.perf_counter()
 
+        # R8-PIPE-004: guard against None metadata on programmatic RheoData
+        metadata = getattr(creep_data, "metadata", None) or {}
         # Validate test mode
-        test_mode = creep_data.metadata.get("test_mode", "").lower()
+        test_mode = metadata.get("test_mode", "").lower()
         if test_mode and test_mode != "creep":
             warnings.warn(
                 f"Input appears to be {test_mode} data, not creep. "
@@ -567,7 +574,7 @@ class CreepToRelaxationPipeline(Pipeline):
             y_units="Pa" if not self.data.y_units else self.data.y_units,
             domain=self.data.domain,
             metadata={
-                **self.data.metadata,
+                **(self.data.metadata or {}),
                 "test_mode": "relaxation",
                 "conversion_method": "approximate",
             },
