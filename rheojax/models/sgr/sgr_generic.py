@@ -262,7 +262,7 @@ class SGRGeneric(BaseModel):
         assert x is not None
 
         # Compute dimensionless equilibrium modulus
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
 
         # Effective modulus depends on structure
         G_eff = G0_val * G0_dim * lam
@@ -331,7 +331,7 @@ class SGRGeneric(BaseModel):
         assert G0_val is not None
         assert tau0 is not None
         assert x is not None
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
 
         # Coupling strength for stress-strain relationship
         # L_12 ~ G_eff / tau0 for Maxwell-like coupling
@@ -373,7 +373,7 @@ class SGRGeneric(BaseModel):
         assert G0_val is not None
         assert tau0 is not None
         assert x is not None
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
 
         # Effective modulus and relaxation rate
         G_eff = G0_val * G0_dim * lam
@@ -1182,7 +1182,10 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_creep_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        t: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled creep prediction: J(t).
 
@@ -1217,7 +1220,10 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_steady_shear_jit(
-        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        gamma_dot: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled steady shear prediction: sigma(gamma_dot).
 
@@ -1252,7 +1258,11 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_startup_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float", gamma_dot: "jax.Array | float"
+        t: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
+        gamma_dot: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled startup flow prediction: eta_plus(t).
 
@@ -1275,9 +1285,19 @@ class SGRGeneric(BaseModel):
             return G0_scale * G0_dim * tau0 * jnp.log(1.0 + t_safe)
 
         def x_not_one(_):
-            return (
+            result = (
                 G0_scale * G0_dim * tau0 * ((jnp.power(1.0 + t_safe, exp) - 1.0) / exp)
             )
+            # R10-SGR-004: clamp to steady-state viscosity for x > 1 to prevent
+            # divergence when exp > 0 (x > 1, including the Newtonian regime x >= 2).
+            # At steady state: eta_0 = G0 * tau0 / (x - 1) for x > 1.
+            exp_safe = jnp.where(exp > 0, exp, 1.0)  # avoid division by zero
+            eta_ss = jnp.where(
+                exp > 0,
+                G0_scale * G0_dim * tau0 / exp_safe,
+                jnp.inf,
+            )
+            return jnp.minimum(result, eta_ss)
 
         eta_plus = jax.lax.cond(
             jnp.abs(exp) < 1e-6,
@@ -1291,7 +1311,10 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_oscillation_jit(
-        omega: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        omega: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled oscillation prediction: G'(omega), G''(omega).
 
@@ -1325,7 +1348,10 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_relaxation_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        t: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled relaxation prediction: G(t).
 
@@ -1357,7 +1383,10 @@ class SGRGeneric(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_viscosity_jit(
-        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        gamma_dot: jnp.ndarray,
+        x: "jax.Array | float",
+        G0_scale: "jax.Array | float",
+        tau0: "jax.Array | float",
     ) -> jnp.ndarray:
         """JIT-compiled viscosity prediction: eta(gamma_dot).
 
@@ -1414,8 +1443,12 @@ class SGRGeneric(BaseModel):
         Raises:
             ValueError: If test_mode not set (model not fitted)
         """
-        # Get test_mode from kwargs or instance attribute
-        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        # Get test_mode from kwargs or instance attribute.
+        # R10-SGR-001: use explicit None check instead of `or` to avoid swallowing
+        # falsy-but-valid test_mode strings (e.g. an empty string, though unlikely).
+        test_mode = kwargs.get("test_mode")
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
 
@@ -1429,6 +1462,30 @@ class SGRGeneric(BaseModel):
             return self._predict_creep(X)
         elif test_mode == "startup":
             return self._predict_startup(X)
+        elif test_mode in ("laos", "oscillation_laos"):
+            # R8-SGR-001: wire LAOS protocol to simulate_laos()
+            gamma_0 = kwargs.get("gamma_0", getattr(self, "_gamma_0", 0.1))
+            omega = kwargs.get(
+                "omega_laos", kwargs.get("omega", getattr(self, "_omega_laos", 1.0))
+            )
+            n_cycles = kwargs.get("n_cycles", getattr(self, "_n_cycles", 2))
+            n_points_per_cycle = 256
+            _strain, stress = self.simulate_laos(
+                gamma_0=gamma_0,
+                omega=omega,
+                n_cycles=n_cycles,
+                n_points_per_cycle=n_points_per_cycle,
+            )
+            # simulate_laos returns (strain, stress), not (time, stress).
+            # Always interpolate to the user's X grid — a length coincidence
+            # does not guarantee the internal and user grids align.
+            period = 2.0 * np.pi / omega
+            t_internal = np.linspace(
+                0, n_cycles * period, n_cycles * n_points_per_cycle, endpoint=False
+            )
+            X_arr = np.asarray(X)
+            stress_arr = np.asarray(stress)
+            return np.interp(X_arr, t_internal, stress_arr)
         else:
             raise ValueError(f"Unknown test_mode: {test_mode}")
 
@@ -1469,22 +1526,24 @@ class SGRGeneric(BaseModel):
         return np.array(G_t_jax)
 
     def _predict_steady_shear(self, gamma_dot: np.ndarray) -> np.ndarray:
-        """Predict viscosity in steady shear mode.
+        """Predict stress in steady shear mode.
 
         Args:
             gamma_dot: Shear rate array (1/s)
 
         Returns:
-            Viscosity array (Pa.s)
+            Stress array (Pa) — consistent with the fit path (_fit_steady_shear_mode).
         """
         x = self.parameters.get_value("x")
         G0_scale = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
 
         gamma_dot_jax = jnp.asarray(gamma_dot)
-        eta_jax = self._predict_viscosity_jit(gamma_dot_jax, x, G0_scale, tau0)
+        # R10-SGR-002: use _predict_steady_shear_jit (stress output) so that fit
+        # and predict are consistent.  _predict_viscosity_jit returns eta, not sigma.
+        sigma_jax = self._predict_steady_shear_jit(gamma_dot_jax, x, G0_scale, tau0)
 
-        return np.array(eta_jax)
+        return np.array(sigma_jax)
 
     def _predict_creep(self, t: np.ndarray) -> np.ndarray:
         """Predict creep compliance J(t)."""
@@ -1547,6 +1606,12 @@ class SGRGeneric(BaseModel):
             if gamma_dot is None:
                 gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
+        elif mode in ("laos", "oscillation_laos"):
+            # R8-SGR-001: LAOS not supported in NUTS (OOM for Bayesian), raise informative error
+            raise NotImplementedError(
+                "LAOS mode is not supported in model_function for Bayesian inference. "
+                "Use _predict() / predict() directly after fitting."
+            )
         else:
             raise ValueError(f"Unsupported test mode: {mode}")
 
@@ -2049,13 +2114,13 @@ class SGRGeneric(BaseModel):
         # sigma(t) = G' * gamma_0 * sin(omega*t) + G'' * gamma_0 * cos(omega*t)
         stress = G_prime * strain + (G_double_prime / omega) * strain_rate
 
-        # Add weak nonlinearity based on SGR physics for large amplitudes
-        # Large strains can cause local yielding events in SGR
-        # Approximate this by adding strain-softening at large |gamma|
-        if gamma_0 > 0.1:  # Only for larger amplitudes
-            # Strain-softening factor: reduces stress at high strains
-            softening = 1.0 - 0.1 * (np.abs(strain) / gamma_0) ** 2
-            stress = stress * softening
+        # Add weak nonlinearity based on SGR physics.
+        # R10-SGR-003: apply softening at ALL amplitudes — the SGR model is inherently
+        # nonlinear and produces a non-zero third harmonic even for gamma_0 <= 0.1.
+        # The old gamma_0 > 0.1 gate suppressed nonlinearity entirely in the small-
+        # amplitude regime, yielding zero third harmonic (physically wrong for SGR).
+        softening = 1.0 - 0.1 * (np.abs(strain) / max(gamma_0, 1e-10)) ** 2
+        stress = stress * softening
 
         return strain, stress
 
@@ -2322,7 +2387,7 @@ class SGRGeneric(BaseModel):
         assert G0_val is not None
         assert tau0 is not None
         assert x is not None
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
 
         # Coupling strength for stress-strain relationship
         G_eff = G0_val * G0_dim * lam
@@ -2358,7 +2423,7 @@ class SGRGeneric(BaseModel):
         assert G0_val is not None
         assert tau0 is not None
         assert x is not None
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
 
         # Effective modulus and relaxation rate
         G_eff = G0_val * G0_dim * lam
@@ -2503,7 +2568,7 @@ class SGRGeneric(BaseModel):
         G0_val = self.parameters.get_value("G0")
         assert G0_val is not None
         assert x is not None
-        G0_dim = float(G0(x))
+        G0_dim = G0(x)  # R10-SGR-005: removed float() to preserve JAX traceability
         G_eff = G0_val * G0_dim * lam
 
         # dU/d(sigma) = sigma / G_eff

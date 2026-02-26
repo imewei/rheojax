@@ -825,8 +825,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         if return_components:
             return np.column_stack([G_prime, G_double_prime])
-        else:
-            return np.sqrt(G_prime**2 + G_double_prime**2)
+        return np.sqrt(G_prime**2 + G_double_prime**2)
 
     def _predict_startup(
         self,
