@@ -134,6 +134,26 @@ _SHEAR_MODULUS_PATTERNS: list[re.Pattern] = [
     ]
 ]
 
+_BENDING_MODULUS_PATTERNS: list[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"E[-_]?bend",  # E_bending, E-bend
+        r"bending",  # bending (keyword)
+        r"modulus[-_\s]*bend",  # modulus_bending
+        r"flexural",  # Flexural modulus (synonym)
+    ]
+]
+
+_COMPRESSION_MODULUS_PATTERNS: list[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"E[-_]?comp",  # E_compression, E-comp
+        r"compression",  # compression (keyword)
+        r"modulus[-_\s]*comp",  # modulus_compression
+        r"compressive",  # Compressive modulus
+    ]
+]
+
 # Unit pattern for extraction
 _UNIT_PATTERN = re.compile(r"^(.+?)\s*\(([^)]+)\)$")
 
@@ -372,6 +392,10 @@ def detect_deformation_mode_from_columns(
 
     tensile_score = sum(1 for p in _TENSILE_MODULUS_PATTERNS if p.search(all_text))
     shear_score = sum(1 for p in _SHEAR_MODULUS_PATTERNS if p.search(all_text))
+    bending_score = sum(1 for p in _BENDING_MODULUS_PATTERNS if p.search(all_text))
+    compression_score = sum(
+        1 for p in _COMPRESSION_MODULUS_PATTERNS if p.search(all_text)
+    )
 
     # Also check units string for E or G indicators
     if y_units:
@@ -380,25 +404,27 @@ def detect_deformation_mode_from_columns(
         if re.search(r"\bG['\"\*]", y_units):
             shear_score += 1
 
-    if tensile_score > 0 and shear_score == 0:
+    scores = {
+        "tension": tensile_score,
+        "shear": shear_score,
+        "bending": bending_score,
+        "compression": compression_score,
+    }
+    nonzero = {k: v for k, v in scores.items() if v > 0}
+
+    if len(nonzero) == 1:
+        mode = next(iter(nonzero))
         logger.debug(
-            "Deformation mode detected as tension",
-            tensile_score=tensile_score,
+            "Deformation mode detected",
+            mode=mode,
+            score=nonzero[mode],
             y_headers=y_headers,
         )
-        return "tension"
-    elif shear_score > 0 and tensile_score == 0:
-        logger.debug(
-            "Deformation mode detected as shear",
-            shear_score=shear_score,
-            y_headers=y_headers,
-        )
-        return "shear"
+        return mode
 
     logger.debug(
         "Deformation mode ambiguous or unknown",
-        tensile_score=tensile_score,
-        shear_score=shear_score,
+        scores=scores,
         y_headers=y_headers,
     )
     return None
