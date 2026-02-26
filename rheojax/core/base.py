@@ -631,6 +631,12 @@ class BaseModel(BayesianMixin, ABC):
                 deformation_mode = getattr(self, "_deformation_mode", None)
                 if deformation_mode is not None:
                     poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
+                    logger.warning(
+                        "fit_bayesian() using deformation_mode='%s' from prior "
+                        "fit(). Pass deformation_mode explicitly if this is not "
+                        "intended.",
+                        str(deformation_mode),
+                    )
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):

@@ -560,8 +560,11 @@ class RheoData:
         logger.debug("Detecting test mode from data characteristics")
         mode = detect_test_mode(self)
 
-        # R8-DATA-001: cache in private field, not shared metadata dict
+        # R8-DATA-001: cache in private field AND metadata for observability.
+        # Metadata cache allows downstream code to check detected mode without
+        # triggering re-detection, consistent with __post_init__ behavior.
         self._detected_test_mode = mode
+        self.metadata["detected_test_mode"] = mode
 
         logger.debug("Test mode detected", test_mode=mode)
 

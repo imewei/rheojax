@@ -406,7 +406,9 @@ class BayesianMixin:
                 # _fit() stores test_mode there; this covers the case where
                 # _test_mode was not set but _fit() has run.
                 if stored_mode is None:
-                    _lfk = getattr(self, "_last_fit_kwargs", None) or {}
+                    _lfk = getattr(self, "_last_fit_kwargs", None)
+                    if _lfk is None:
+                        _lfk = {}
                     stored_mode = _lfk.get("test_mode", None)
                 if stored_mode is not None:
                     test_mode = stored_mode
@@ -1657,12 +1659,14 @@ class BayesianMixin:
                 elif (
                     lower is not None
                     and upper is not None
-                    and abs(float(upper) - float(lower)) < 1e-9
+                    and abs(float(upper) - float(lower))
+                    < 1e-9 * max(abs(float(lower)), abs(float(upper)), 1.0)
                 ):
                     # PARAMS-001: fixed parameter — use deterministic instead of Uniform.
-                    # Absolute epsilon 1e-9 covers float64 arithmetic noise from bounds
-                    # that should be equal but diverge through roundtrip conversions,
-                    # while staying well below any intentionally-distinct small range.
+                    # Relative epsilon 1e-9 × max(|lo|, |hi|, 1) covers float64 arithmetic
+                    # noise from bounds that should be equal but diverge through roundtrip
+                    # conversions, while staying well below any intentionally-distinct range.
+                    # The floor of 1.0 ensures near-zero params use absolute 1e-9 tolerance.
                     # Python float comparison (not jnp.isclose) avoids TracerBoolConversionError.
                     param_val = numpyro.deterministic(name, lower)
                     params_dict[name] = param_val
