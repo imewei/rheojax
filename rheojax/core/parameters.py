@@ -501,6 +501,7 @@ class ParameterSet:
         units: str | None = None,
         description: str | None = None,
         constraints: list[ParameterConstraint] | None = None,
+        overwrite: bool = False,
     ) -> Parameter:
         """Add a parameter to the set.
 
@@ -511,6 +512,8 @@ class ParameterSet:
             units: Parameter units
             description: Parameter description
             constraints: List of constraints
+            overwrite: If True, silently overwrite an existing parameter without
+                emitting a warning. Default is False (warns on overwrite).
 
         Returns:
             The created Parameter object
@@ -524,8 +527,9 @@ class ParameterSet:
                 value=value,
                 bounds=bounds,
             )
-        # R8-PARAMS-002: warn on silent overwrite
-        if name in self._parameters:
+        # R8-PARAMS-002: warn on silent overwrite (unless overwrite=True is explicit)
+        # R10-PARAMS-001: expose overwrite flag so callers can suppress the warning
+        if name in self._parameters and not overwrite:
             warnings.warn(
                 f"Parameter '{name}' already exists and will be overwritten",
                 stacklevel=2,
