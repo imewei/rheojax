@@ -386,12 +386,14 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
             try:
                 items = value.tolist()
                 if not isinstance(items, list):
-                    # 0-d array: tolist() returns a scalar — unwrap to Python str
+                    # 0-d array: tolist() returns a scalar — unwrap to Python native type
                     if isinstance(items, bytes):
                         value = items.decode("utf-8")
                     elif isinstance(items, str):
                         value = items
-                    # scalar value will fall through to sentinel check below
+                    else:
+                        # int, float, bool, None — unwrap from 0-d numpy array
+                        value = items
                 elif items and isinstance(items[0], bytes):
                     value = [
                         v.decode("utf-8") if isinstance(v, bytes) else str(v)
