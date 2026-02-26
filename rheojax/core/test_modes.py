@@ -301,7 +301,17 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
         # If change < 5% of magnitude, consider it flat
         # Flat time-domain data is more likely relaxation (reached equilibrium) than creep
         if relative_change < 0.05:
-            # Default to relaxation for flat data in time domain
+            # R10-TESTMODE-001: Warn before defaulting — flat data could be creep
+            # that has reached a plateau, and silent defaulting would give wrong
+            # posteriors for Bayesian inference. Caller can suppress by setting
+            # metadata['test_mode'] explicitly.
+            warnings.warn(
+                "Time-domain data is nearly flat (relative change < 5%). "
+                "Defaulting to 'relaxation'. Set test_mode explicitly if "
+                "this is creep data.",
+                UserWarning,
+                stacklevel=2,
+            )
             return TestModeEnum.RELAXATION
 
         # Check for monotonic behavior

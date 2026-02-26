@@ -316,6 +316,11 @@ class RheoData:
             metadata: Dictionary of metadata to add/update
         """
         logger.debug("Updating metadata", keys=list(metadata.keys()))
+        # R10-DATA-001: Invalidate auto-detection cache when test_mode is updated.
+        # Otherwise get_test_mode() continues returning the stale detected value
+        # even after the caller explicitly sets metadata["test_mode"].
+        if "test_mode" in metadata:
+            self._detected_test_mode = None
         self.metadata.update(metadata)
         # Invalidate JAX cache since metadata snapshot is now stale
         if hasattr(self, "_jax_cache"):

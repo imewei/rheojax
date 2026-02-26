@@ -334,8 +334,11 @@ class BaseModel(BayesianMixin, ABC):
                     poisson_ratio=poisson_ratio,
                 )
         else:
-            # Preserve previously stored deformation_mode if not explicitly provided
-            pass
+            # R10-BASE-003: Clear stale tensile mode when a new fit provides no
+            # deformation_mode. Without this, predict() would incorrectly return
+            # E* after a subsequent shear fit. Always sync _deformation_mode with
+            # the current fit's resolved value (None = shear/default).
+            self._deformation_mode = None
 
         # Store data for potential Bayesian inference
         self.X_data = X
