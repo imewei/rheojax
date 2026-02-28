@@ -251,7 +251,7 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 - **Updated** all CUDA references codebase-wide from "CUDA 12.1-12.9" to "CUDA 12+ or 13+"
 
 ### Added - Robustness & Correctness Fixes (Round 9-10)
-- **Core**: 
+- **Core**:
   - Added support for tracking `potential_energy` fields during Bayesian sampling.
   - Resolved cache race-conditions between inferred test modes and explicit setter logic.
   - Enhanced float64 epsilon tolerance for deterministic parameter bounds dynamically scaling to magnitude to prevent True/False inference tracer failures.
@@ -261,7 +261,7 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
   - Fixed SGR GENERIC and conventional steady flow stress returning viscosity by enforcing stress dimension return.
   - Corrected schematic creep initial conditions which mistakenly assigned elastic jumps to strain rate rather than initial absolute strain.
   - Corrected erroneous schema stress clamps suppressing glass $\beta$-relaxation.
-- **IO**: 
+- **IO**:
   - Extended DMTA detect_deformation_mode_from_columns heuristics to gracefully extract dynamic `bending` and `compression` mode test types.
   - Hardened Trios float parsing against European `,` parsing bugs corrupting scientific numbers.
   - Implemented 0-d numpy scalar fallback unwrap to cleanly serialize scalar parameters into recursive nested HDF5 metadata dictionaries without exception tracing.
