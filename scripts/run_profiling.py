@@ -18,7 +18,10 @@ import gc
 import importlib
 import os
 import pstats
+import subprocess
+import sys
 import time
+import tracemalloc
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from io import StringIO
@@ -298,6 +301,156 @@ def run_cprofile(model_key: str) -> str:
     return stream.getvalue()
 
 
+# -- Ported Benchmarks from profile_comprehensive.py --------------------------
+
+
+def profile_imports():
+    print("\n" + "=" * 70)
+    print("  SUITE: IMPORT TIME BREAKDOWN")
+    print("=" * 70)
+
+    result = subprocess.run(
+        [sys.executable, "-X", "importtime", "-c", "import rheojax"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    lines = result.stderr.strip().split("\n")
+
+    # Parse top-level cumulative imports
+    imports = []
+    for line in lines:
+        if "|" in line:
+            parts = line.split("|")
+            if len(parts) >= 3:
+                try:
+                    self_us = int(parts[0].replace("import time:", "").strip())
+                    cum_us = int(parts[1].strip())
+                    pkg = parts[2].strip()
+                    imports.append((cum_us, self_us, pkg))
+                except ValueError:
+                    continue
+
+    imports.sort(key=lambda x: x[0], reverse=True)
+    print("\n  Top 20 imports by cumulative time:")
+    print(f"  {'Package':<50} {'Cumul (ms)':>10} {'Self (ms)':>10}")
+    print("  " + "-" * 72)
+    for cum, self_t, pkg in imports[:20]:
+        print(f"  {pkg:<50} {cum/1000:>10.1f} {self_t/1000:>10.1f}")
+
+    total_ms = imports[0][0] / 1000 if imports else 0
+    print(f"\n  Total import time: {total_ms:.0f} ms")
+
+
+def profile_memory():
+    print("\n" + "=" * 70)
+    print("  SUITE: MEMORY ALLOCATION (tracemalloc)")
+    print("=" * 70)
+
+    from rheojax.core.jax_config import safe_import_jax
+
+    jax, jnp = safe_import_jax()
+    from rheojax.models import Maxwell
+
+    np.random.seed(42)
+    t = np.logspace(-2, 2, 200)
+    G_data = 1000 * np.exp(-t) + np.random.normal(0, 5, 200)
+
+    # Measure Maxwell fit
+    gc.collect()
+    tracemalloc.start()
+    snap_before = tracemalloc.take_snapshot()
+
+    model = Maxwell()
+    model.fit(t, G_data, test_mode="relaxation")
+
+    snap_after = tracemalloc.take_snapshot()
+    top_stats = snap_after.compare_to(snap_before, "lineno")
+
+    print("\n  Top 15 memory allocations during Maxwell.fit():")
+    print(f"  {'File:Line':<65} {'Size (KB)':>10}")
+    print("  " + "-" * 77)
+    for stat in top_stats[:15]:
+        filepath = str(stat.traceback)
+        if "rheojax/" in filepath:
+            filepath = "rheojax/" + filepath.split("rheojax/")[-1]
+        elif "site-packages/" in filepath:
+            filepath = ".../" + filepath.split("site-packages/")[-1]
+        filepath = filepath[:63]
+        size_kb = stat.size_diff / 1024
+        print(f"  {filepath:<65} {size_kb:>10.1f}")
+
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"\n  Current memory: {current / 1024 / 1024:.1f} MB")
+    print(f"  Peak memory:    {peak / 1024 / 1024:.1f} MB")
+    tracemalloc.stop()
+    return peak
+
+
+def profile_io():
+    print("\n" + "=" * 70)
+    print("  SUITE: I/O PATH ANALYSIS")
+    print("=" * 70)
+
+    from rheojax.core.jax_config import safe_import_jax
+    from rheojax.core.data import RheoData
+
+    jax, jnp = safe_import_jax()
+    np.random.seed(42)
+    sizes = [100, 1000, 10000, 100000]
+
+    print("\n  RheoData creation time:")
+    print(f"  {'N points':<15} {'Create (ms)':>12} {'to_jax (ms)':>12}")
+    print("  " + "-" * 42)
+
+    class SimpleTimer:
+        def __init__(self):
+            self.start = 0.0
+            self.elapsed = 0.0
+        def __enter__(self):
+            self.start = time.perf_counter()
+            return self
+        def __exit__(self, *_):
+            self.elapsed = time.perf_counter() - self.start
+
+    for n in sizes:
+        X = np.linspace(0.01, 100, n)
+        y = np.random.normal(100, 10, n)
+
+        with SimpleTimer() as t_create:
+            for _ in range(100):
+                _rd = RheoData(x=X, y=y, metadata={"test_mode": "relaxation"})
+
+        with SimpleTimer() as t_jax:
+            for _ in range(100):
+                _x_jax = jnp.asarray(X)
+                _y_jax = jnp.asarray(y)
+
+        print(f"  {n:<15} {t_create.elapsed*10:>12.3f} {t_jax.elapsed*10:>12.3f}")
+
+    # Test CSV reader if available
+    try:
+        import csv
+        import tempfile
+        from rheojax.io import load_csv
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+            writer = csv.writer(f)
+            writer.writerow(["time", "stress"])
+            for i in range(1000):
+                writer.writerow([i * 0.01, np.random.normal(100, 10)])
+            fname = f.name
+
+        with SimpleTimer() as t_csv:
+            for _ in range(10):
+                _data = load_csv(fname, x_col="time", y_col="stress")
+
+        print(f"\n  CSV reader (1000 rows, 10 iterations): {t_csv.elapsed*100:.1f} ms/read")
+        os.unlink(fname)
+    except Exception as e:
+        print(f"\n  CSV reader test skipped: {e}")
+
+
 # -- Report generation ---------------------------------------------------------
 
 
@@ -404,24 +557,30 @@ def print_report(all_timings: dict[str, list[TimingResult]]) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Profile RheoJAX pipeline bottlenecks")
+    parser = argparse.ArgumentParser(description="Profile RheoJAX performance bottlenecks")
+    parser.add_argument(
+        "--suite",
+        choices=["pipeline", "memory", "imports", "io", "all"],
+        default="pipeline",
+        help="Which benchmarking suite to run (default: pipeline)",
+    )
     parser.add_argument(
         "--model",
         choices=list(MODEL_CONFIGS.keys()) + ["all"],
         default="all",
-        help="Model to profile (default: all)",
+        help="Model to profile (pipeline suite only; default: all)",
     )
     parser.add_argument(
-        "--skip-bayesian", action="store_true", help="Skip Bayesian inference"
+        "--skip-bayesian", action="store_true", help="Skip Bayesian inference (pipeline suite only)"
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Include cProfile output"
+        "--verbose", action="store_true", help="Include cProfile output (pipeline suite only)"
     )
     parser.add_argument(
-        "--warmup", type=int, default=100, help="NUTS warmup iterations"
+        "--warmup", type=int, default=100, help="NUTS warmup iterations (pipeline suite only)"
     )
     parser.add_argument(
-        "--samples", type=int, default=200, help="NUTS sample iterations"
+        "--samples", type=int, default=200, help="NUTS sample iterations (pipeline suite only)"
     )
     parser.add_argument("--chains", type=int, default=1, help="Number of MCMC chains")
     args = parser.parse_args()
@@ -429,9 +588,20 @@ def main():
     # Suppress JAX/NumPyro logging noise
     os.environ.setdefault("JAX_LOG_LEVEL", "WARNING")
 
-    models_to_profile = (
-        list(MODEL_CONFIGS.keys()) if args.model == "all" else [args.model]
-    )
+    if args.suite in ("imports", "all"):
+        profile_imports()
+
+    if args.suite in ("memory", "all"):
+        profile_memory()
+
+    if args.suite in ("io", "all"):
+        profile_io()
+        
+    models_to_profile = []
+    if args.suite in ("pipeline", "all"):
+        models_to_profile = (
+            list(MODEL_CONFIGS.keys()) if args.model == "all" else [args.model]
+        )
 
     all_timings: dict[str, list[TimingResult]] = {}
     for model_key in models_to_profile:
