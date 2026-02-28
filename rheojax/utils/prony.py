@@ -632,9 +632,9 @@ def warm_start_from_n_modes(
         new_taus = new_taus_candidates[
             ~np.any(
                 np.abs(
-                    np.log10(new_taus_candidates[:, None])
-                    - np.log10(tau_i[None, :])
-                ) < 0.3,
+                    np.log10(new_taus_candidates[:, None]) - np.log10(tau_i[None, :])
+                )
+                < 0.3,
                 axis=1,
             )
         ][:n_pad]

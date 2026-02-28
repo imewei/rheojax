@@ -510,8 +510,8 @@ class ArvizCanvas(BaseArviZWidget):
         plt.gcf(), which is non-deterministic when multiple ArviZ calls run
         concurrently and may return the wrong figure.
         """
-        import numpy as np
         import matplotlib.pyplot as plt
+        import numpy as np
 
         pre = set(plt.get_fignums())
         result = plot_fn(*args, **kwargs)

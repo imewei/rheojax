@@ -312,7 +312,7 @@ class Zener(BaseModel):
             return self._predict_creep(X, Ge, Gm, eta)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(X, Ge, Gm, eta)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(X, Ge, Gm, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
@@ -401,9 +401,9 @@ class Zener(BaseModel):
     def _predict_rotation(
         gamma_dot: jnp.ndarray, Ge: float, Gm: float, eta: float
     ) -> jnp.ndarray:
-        """Predict steady shear viscosity eta(gamma_dot).
+        """Predict steady shear stress sigma(gamma_dot).
 
-        Theory: eta(gamma_dot) = eta (constant, Newtonian behavior)
+        Theory: sigma = eta * gamma_dot (Newtonian flow)
 
         Args:
             gamma_dot: Shear rate array (1/s)
@@ -412,9 +412,9 @@ class Zener(BaseModel):
             eta: Viscosity (Pa·s)
 
         Returns:
-            Viscosity eta in Pa·s (constant array)
+            Shear stress in Pa
         """
-        return eta * jnp.ones_like(gamma_dot)
+        return eta * gamma_dot
 
     def get_relaxation_time(self) -> float:
         """Get characteristic relaxation time tau = eta/G_m.

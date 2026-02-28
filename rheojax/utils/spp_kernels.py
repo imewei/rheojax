@@ -751,24 +751,35 @@ def spp_fourier_analysis(
     mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1))
     mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
 
-    # Instantaneous moduli (MATLAB formula)
-    Gp_t = (
-        -rd_x_rdd[:, 0]
-        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
-        * jnp.sign(rd_x_rdd[:, 2])
+    # R11-SPP-KRN-001: Avoid sign(0)=0 at Frenet degeneracy
+    denom = rd_x_rdd[:, 2]
+    Gp_t = jnp.where(
+        jnp.abs(denom) > eps,
+        -rd_x_rdd[:, 0] / denom,
+        jnp.nan,  # Explicit NaN at degeneracy for callers to handle
     )
-    Gpp_t = (
-        -rd_x_rdd[:, 1]
-        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
-        * jnp.sign(rd_x_rdd[:, 2])
+    Gpp_t = jnp.where(
+        jnp.abs(denom) > eps,
+        -rd_x_rdd[:, 1] / denom,
+        jnp.nan,  # Explicit NaN at degeneracy for callers to handle
     )
 
     # Moduli rates (MATLAB formula)
     # Gp_t_dot = -rd[:,1] * (rddd · rd_x_rdd) / rd_x_rdd[:,2]²
     # Gpp_t_dot = rd[:,0] * (rddd · rd_x_rdd) / rd_x_rdd[:,2]²
     rddd_dot_rd_x_rdd = jnp.sum(rddd * rd_x_rdd, axis=1)
-    Gp_t_dot = -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
-    Gpp_t_dot = rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
+    denom_sq = rd_x_rdd[:, 2] ** 2
+    denom_valid = jnp.abs(rd_x_rdd[:, 2]) > eps
+    Gp_t_dot = jnp.where(
+        denom_valid,
+        -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(denom_sq, eps),
+        jnp.nan,
+    )
+    Gpp_t_dot = jnp.where(
+        denom_valid,
+        rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(denom_sq, eps),
+        jnp.nan,
+    )
     G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2 + 1e-30)
 
     # Complex modulus and phase angle
@@ -784,9 +795,9 @@ def spp_fourier_analysis(
     rd_tn = rd / omega
     rdd_tn = rdd / omega**2
     rddd_tn = rddd / omega**3
-    sigma_prime = rd_tn[:, 2]       # dσ/dt normalized
-    sigma_dprime = rdd_tn[:, 2]     # d²σ/dt² normalized
-    sigma_tprime = rddd_tn[:, 2]    # d³σ/dt³ normalized
+    sigma_prime = rd_tn[:, 2]  # dσ/dt normalized
+    sigma_dprime = rdd_tn[:, 2]  # d²σ/dt² normalized
+    sigma_tprime = rddd_tn[:, 2]  # d³σ/dt³ normalized
     denom = jnp.maximum(sigma_prime**2 + sigma_dprime**2, eps)
     delta_t_dot = (sigma_prime * sigma_tprime - sigma_dprime**2) / denom
 
@@ -1715,26 +1726,37 @@ def spp_numerical_analysis(
     mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1))
     mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
 
-    # Instantaneous moduli from cross-product (MATLAB formula)
+    # R11-SPP-KRN-001: Avoid sign(0)=0 at Frenet degeneracy
     # G'_t = -rd_x_rdd[:,0] / rd_x_rdd[:,2]
     # G''_t = -rd_x_rdd[:,1] / rd_x_rdd[:,2]
-    Gp_t = (
-        -rd_x_rdd[:, 0]
-        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
-        * jnp.sign(rd_x_rdd[:, 2])
+    denom = rd_x_rdd[:, 2]
+    Gp_t = jnp.where(
+        jnp.abs(denom) > eps,
+        -rd_x_rdd[:, 0] / denom,
+        jnp.nan,  # Explicit NaN at degeneracy for callers to handle
     )
-    Gpp_t = (
-        -rd_x_rdd[:, 1]
-        / jnp.maximum(jnp.abs(rd_x_rdd[:, 2]), eps)
-        * jnp.sign(rd_x_rdd[:, 2])
+    Gpp_t = jnp.where(
+        jnp.abs(denom) > eps,
+        -rd_x_rdd[:, 1] / denom,
+        jnp.nan,  # Explicit NaN at degeneracy for callers to handle
     )
 
     # Moduli rates (MATLAB formula - Gap 4)
     # Gp_t_dot = -rd[:,1] * (rddd · rd_x_rdd) / rd_x_rdd[:,2]²
     # Gpp_t_dot = rd[:,0] * (rddd · rd_x_rdd) / rd_x_rdd[:,2]²
     rddd_dot_rd_x_rdd = jnp.sum(rddd * rd_x_rdd, axis=1)
-    Gp_t_dot = -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
-    Gpp_t_dot = rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(rd_x_rdd[:, 2] ** 2, eps)
+    denom_sq = rd_x_rdd[:, 2] ** 2
+    denom_valid = jnp.abs(rd_x_rdd[:, 2]) > eps
+    Gp_t_dot = jnp.where(
+        denom_valid,
+        -rd[:, 1] * rddd_dot_rd_x_rdd / jnp.maximum(denom_sq, eps),
+        jnp.nan,
+    )
+    Gpp_t_dot = jnp.where(
+        denom_valid,
+        rd[:, 0] * rddd_dot_rd_x_rdd / jnp.maximum(denom_sq, eps),
+        jnp.nan,
+    )
     G_speed = jnp.sqrt(Gp_t_dot**2 + Gpp_t_dot**2 + 1e-30)
 
     # Complex modulus magnitude
@@ -1752,9 +1774,9 @@ def spp_numerical_analysis(
     rd_tn = rd / omega_scalar
     rdd_tn = rdd / omega_scalar**2
     rddd_tn = rddd / omega_scalar**3
-    sigma_prime = rd_tn[:, 2]       # dσ/dt normalized
-    sigma_dprime = rdd_tn[:, 2]     # d²σ/dt² normalized
-    sigma_tprime = rddd_tn[:, 2]    # d³σ/dt³ normalized
+    sigma_prime = rd_tn[:, 2]  # dσ/dt normalized
+    sigma_dprime = rdd_tn[:, 2]  # d²σ/dt² normalized
+    sigma_tprime = rddd_tn[:, 2]  # d³σ/dt³ normalized
     denom = jnp.maximum(sigma_prime**2 + sigma_dprime**2, eps)
     delta_t_dot = (sigma_prime * sigma_tprime - sigma_dprime**2) / denom
 

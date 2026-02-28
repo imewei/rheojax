@@ -1077,7 +1077,8 @@ class GeneralizedMaxwell(BaseModel):
         Raises:
             ValueError: If test_mode not set (model not fitted)
         """
-        test_mode = self._test_mode or kwargs.get("test_mode")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else self._test_mode
         if test_mode is None:
             raise ValueError("Model not fitted. Call fit() first.")
 

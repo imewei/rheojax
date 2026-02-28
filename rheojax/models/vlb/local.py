@@ -239,7 +239,8 @@ class VLBLocal(VLBBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -330,7 +331,8 @@ class VLBLocal(VLBBase):
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         # Extract and store protocol-specific parameters from kwargs
@@ -388,7 +390,7 @@ class VLBLocal(VLBBase):
         G0 = params[0]
         k_d = params[1]
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Extract protocol parameters

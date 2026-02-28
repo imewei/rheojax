@@ -138,7 +138,20 @@ class TransformWorker(QRunnable):
     def run(self) -> None:
         """Execute transform in background thread."""
         try:
-            logger.info("Transform worker started", transform=self._transform_id)
+            # Determine input shape for logging
+            if isinstance(self._data, list):
+                input_shape = f"list[{len(self._data)}]"
+            elif hasattr(self._data, "x") and self._data.x is not None:
+                input_shape = str(getattr(self._data.x, "shape", len(self._data.x)))
+            else:
+                input_shape = type(self._data).__name__
+
+            logger.info(
+                "Transform worker started",
+                transform=self._transform_id,
+                input_shape=input_shape,
+                params=self._params,
+            )
             start_time = time.perf_counter()
 
             self.signals.progress.emit(0, 100, f"Starting {self._transform_id}...")
@@ -151,9 +164,11 @@ class TransformWorker(QRunnable):
             service = TransformService()
 
             self.signals.progress.emit(10, 100, "Validating input...")
+            logger.debug("Transform input validated", transform=self._transform_id)
 
             # Apply transform
             self.signals.progress.emit(20, 100, f"Running {self._transform_id}...")
+            logger.debug("Transform execution started", transform=self._transform_id)
 
             result = service.apply_transform(
                 self._transform_id, self._data, params=self._params
@@ -171,6 +186,14 @@ class TransformWorker(QRunnable):
 
             transform_time = time.perf_counter() - start_time
 
+            # Determine output shape for logging
+            if isinstance(transformed, list):
+                output_shape = f"list[{len(transformed)}]"
+            elif hasattr(transformed, "x") and transformed.x is not None:
+                output_shape = str(getattr(transformed.x, "shape", len(transformed.x)))
+            else:
+                output_shape = type(transformed).__name__
+
             self.signals.progress.emit(100, 100, "Complete")
 
             transform_result = TransformResult(
@@ -186,6 +209,8 @@ class TransformWorker(QRunnable):
             logger.info(
                 "Transform worker complete",
                 transform=self._transform_id,
+                output_shape=output_shape,
+                extras_keys=list(extras.keys()) if extras else [],
                 total_time=transform_time,
             )
 

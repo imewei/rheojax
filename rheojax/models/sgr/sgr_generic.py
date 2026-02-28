@@ -1183,9 +1183,9 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_creep_jit(
         t: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled creep prediction: J(t).
 
@@ -1221,9 +1221,9 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_steady_shear_jit(
         gamma_dot: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled steady shear prediction: sigma(gamma_dot).
 
@@ -1259,10 +1259,10 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_startup_jit(
         t: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
-        gamma_dot: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
+        gamma_dot: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled startup flow prediction: eta_plus(t).
 
@@ -1312,9 +1312,9 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_oscillation_jit(
         omega: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled oscillation prediction: G'(omega), G''(omega).
 
@@ -1349,9 +1349,9 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_relaxation_jit(
         t: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled relaxation prediction: G(t).
 
@@ -1384,9 +1384,9 @@ class SGRGeneric(BaseModel):
     @jax.jit
     def _predict_viscosity_jit(
         gamma_dot: jnp.ndarray,
-        x: "jax.Array | float",
-        G0_scale: "jax.Array | float",
-        tau0: "jax.Array | float",
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled viscosity prediction: eta(gamma_dot).
 
@@ -1765,6 +1765,44 @@ class SGRGeneric(BaseModel):
         # Flag for thixotropy mode
         self._thixotropy_enabled = True
 
+    @staticmethod
+    @jax.jit
+    def _evolve_lambda_jit(
+        t_jax: jnp.ndarray,
+        gamma_dot_abs: jnp.ndarray,
+        lambda_initial: float,
+        k_build: float,
+        k_break: float,
+    ) -> jnp.ndarray:
+        # Compute dt array
+        dt = jnp.diff(t_jax, prepend=t_jax[0])
+
+        # lax.scan step function
+        def step(lambda_prev, inputs):
+            dt_i, gdot_i = inputs
+
+            # dy/dt = A - B*y with exponential integrator
+            A = k_build
+            B = k_build + k_break * gdot_i
+
+            # Exact exponential integration for B > 0; linear for B ≈ 0
+            lambda_ss = A / jnp.maximum(B, 1e-30)
+            decay = jnp.exp(-B * dt_i)
+            lambda_exp = lambda_ss + (lambda_prev - lambda_ss) * decay
+            lambda_lin = lambda_prev + A * dt_i
+
+            lambda_new = jnp.where(B > 1e-12, lambda_exp, lambda_lin)
+            lambda_new = jnp.clip(lambda_new, 0.0, 1.0)
+
+            return lambda_new, lambda_new
+
+        # Scan over time steps (skip first step where dt=0)
+        _, lambda_steps = jax.lax.scan(
+            step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:])
+        )
+
+        return jnp.concatenate([jnp.array([lambda_initial]), lambda_steps])
+
     def evolve_lambda(
         self,
         t: np.ndarray,
@@ -1808,42 +1846,17 @@ class SGRGeneric(BaseModel):
         # Get thixotropy parameters
         k_build = self.parameters.get_value("k_build")
         k_break = self.parameters.get_value("k_break")
+        assert k_build is not None and k_break is not None
 
-        # Compute dt array
         t_jax = jnp.asarray(t)
-        dt = jnp.diff(t_jax, prepend=t_jax[0])
         gamma_dot_abs = jnp.abs(jnp.asarray(gamma_dot))
 
-        # lax.scan step function
-        def step(lambda_prev, inputs):
-            dt_i, gdot_i = inputs
-
-            # dy/dt = A - B*y with exponential integrator
-            A = k_build
-            B = k_build + k_break * gdot_i
-
-            # Exact exponential integration for B > 0; linear for B ≈ 0
-            lambda_ss = A / jnp.maximum(B, 1e-30)
-            decay = jnp.exp(-B * dt_i)
-            lambda_exp = lambda_ss + (lambda_prev - lambda_ss) * decay
-            lambda_lin = lambda_prev + A * dt_i
-
-            lambda_new = jnp.where(B > 1e-12, lambda_exp, lambda_lin)
-            lambda_new = jnp.clip(lambda_new, 0.0, 1.0)
-
-            return lambda_new, lambda_new
-
-        # Scan over time steps (skip first step where dt=0)
-        _, lambda_steps = jax.lax.scan(
-            step, jnp.float64(lambda_initial), (dt[1:], gamma_dot_abs[1:])
+        # Call JIT-compiled scanner
+        lambda_t_jax = self._evolve_lambda_jit(
+            t_jax, gamma_dot_abs, lambda_initial, k_build, k_break
         )
 
-        # Prepend initial value
-        lambda_t = np.asarray(
-            jnp.concatenate([jnp.array([lambda_initial]), lambda_steps])
-        )
-
-        # Store trajectory
+        lambda_t = np.asarray(lambda_t_jax)
         self._lambda_trajectory = lambda_t
 
         return lambda_t

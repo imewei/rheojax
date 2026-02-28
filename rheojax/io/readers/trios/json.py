@@ -245,7 +245,9 @@ def load_trios_json(
     logger.info("Loading TRIOS JSON file", filepath=str(filepath))
 
     # Parse JSON file
-    experiment, base_metadata = parse_trios_json(filepath, validate=validate_json_schema)
+    experiment, base_metadata = parse_trios_json(
+        filepath, validate=validate_json_schema
+    )
 
     if experiment.n_results == 0:
         logger.error("No results found in file", filepath=str(filepath))
@@ -385,9 +387,11 @@ def load_trios_json(
                     ) from e
                 is_complex = False
 
-            # Convert x units (e.g., Hz to rad/s)
+            # Convert x units (e.g., Hz to rad/s for oscillation, ensure 1/s for rotation)
             if detected_mode == "oscillation":
                 x_data, x_units = convert_unit(x_data, x_units, "rad/s")
+            elif detected_mode == "rotation":
+                x_data, x_units = convert_unit(x_data, x_units, "1/s")
 
             # Remove NaN values
             if is_complex:
@@ -403,6 +407,11 @@ def load_trios_json(
             y_data = y_data[valid_mask]
 
             if len(x_data) == 0:
+                logger.warning(
+                    "Segment has 0 valid data points after NaN filtering; skipping",
+                    segment_index=seg_idx,
+                    result_index=res_idx,
+                )
                 continue
 
             # Determine default x_units based on test mode

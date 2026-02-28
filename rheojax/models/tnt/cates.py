@@ -279,7 +279,8 @@ class TNTCates(TNTBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -347,7 +348,8 @@ class TNTCates(TNTBase):
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         # Extract and store protocol-specific parameters from kwargs
@@ -398,7 +400,7 @@ class TNTCates(TNTBase):
         # Compute effective relaxation time
         tau_d = jnp.sqrt(jnp.maximum(tau_rep * tau_break, 1e-30))
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
         gamma_dot = (

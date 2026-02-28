@@ -50,14 +50,16 @@ _CSV_KWARGS = {
     "delimiter",
     "encoding",
     "validate",
+    "deformation_mode",
 }
 _EXCEL_KWARGS = {
     "x_col",
     "y_col",
     "y_cols",
     "test_mode",
-    "sheet",      # was "sheet_name" — must match load_excel() param name
+    "sheet",  # was "sheet_name" — must match load_excel() param name
     "validate",
+    "deformation_mode",
 }
 _ANTON_PAAR_KWARGS = {
     "test_mode",
@@ -98,8 +100,16 @@ def _has_trios_metadata(result: RheoData | list[RheoData]) -> bool:
     auto_load from misclassifying generic files as TRIOS.
     """
     targets = result if isinstance(result, list) else [result]
-    trios_keys = {"filename", "instrument_serial_number", "instrument_name",
-                  "sample_name", "geometry", "geometry_type", "operator", "run_date"}
+    trios_keys = {
+        "filename",
+        "instrument_serial_number",
+        "instrument_name",
+        "sample_name",
+        "geometry",
+        "geometry_type",
+        "operator",
+        "run_date",
+    }
     for r in targets:
         md = getattr(r, "metadata", None) or {}
         if trios_keys & set(md.keys()):
@@ -118,7 +128,9 @@ def _inject_provenance(
         if hasattr(r, "metadata") and isinstance(r.metadata, dict):
             r.metadata["format_detected"] = format_detected
             if len(readers_attempted) > 1:
-                r.metadata["readers_attempted"] = list(readers_attempted)  # store a copy
+                r.metadata["readers_attempted"] = list(
+                    readers_attempted
+                )  # store a copy
 
 
 def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
@@ -186,11 +198,16 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             # fall back to generic CSV reader for non-TRIOS CSV files.
             result = _try_trios_then_csv(filepath, **kwargs)
         elif extension in [".xlsx", ".xls"]:
-            # Try TRIOS Excel first, then generic Excel
+            # Try TRIOS Excel first, then generic Excel.
+            # Suppress warnings during speculative TRIOS parsing.
             try:
-                result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+                with warnings.catch_warnings(record=True) as caught:
+                    warnings.simplefilter("always")
+                    result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
                 if not _has_trios_metadata(result):
                     raise ValueError("No TRIOS metadata found")
+                for w in caught:
+                    warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
                 _inject_provenance(result, "trios", ["trios"])
             except _FATAL_EXCEPTIONS:
                 raise
@@ -245,11 +262,17 @@ def _try_trios_then_anton_then_csv(
     """
     attempted: list[str] = []
 
-    # Try TRIOS first (filter kwargs to prevent unexpected keyword warnings)
+    # Try TRIOS first (filter kwargs to prevent unexpected keyword warnings).
+    # Suppress warnings during speculative parsing — if the reader fails,
+    # its warnings (e.g. "could not determine x/y columns") are noise.
     try:
         attempted.append("trios")
         logger.debug("Trying TRIOS reader", filepath=str(filepath))
-        result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+        for w in caught:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
         logger.debug("TRIOS reader succeeded", filepath=str(filepath))
         _inject_provenance(result, "trios", attempted)
         return result
@@ -257,14 +280,18 @@ def _try_trios_then_anton_then_csv(
         raise
     except Exception as e:
         logger.debug("TRIOS reader failed", filepath=str(filepath), error=str(e))
-        warnings.warn(
-            f"TRIOS reader failed: {e}. Trying Anton Paar reader.", stacklevel=2
-        )
 
+    # NOTE: .txt dispatch tries TRIOS → Anton Paar → CSV. If a TRIOS file
+    # fails the TRIOS reader (encoding/format issue), Anton Paar may succeed
+    # on tab-separated numeric data with incorrect column mapping.
     try:
         attempted.append("anton_paar")
         logger.debug("Trying Anton Paar reader", filepath=str(filepath))
-        result = load_anton_paar(filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = load_anton_paar(filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS))
+        for w in caught:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
         logger.debug("Anton Paar reader succeeded", filepath=str(filepath))
         _inject_provenance(result, "anton_paar", attempted)
         return result
@@ -272,9 +299,6 @@ def _try_trios_then_anton_then_csv(
         raise
     except Exception as e:
         logger.debug("Anton Paar reader failed", filepath=str(filepath), error=str(e))
-        warnings.warn(
-            f"Anton Paar reader failed: {e}. Trying CSV reader.", stacklevel=2
-        )
 
     # Try CSV as fallback
     try:
@@ -309,23 +333,31 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
     """
     attempted: list[str] = []
 
-    # Try TRIOS first (handles TRIOS-exported CSV files)
+    # Try TRIOS first (handles TRIOS-exported CSV files).
+    # Suppress warnings during speculative parsing — if the reader fails,
+    # its warnings (e.g. "could not determine x/y columns") are noise.
     try:
         attempted.append("trios")
         logger.debug("Trying TRIOS reader for CSV", filepath=str(filepath))
-        result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
         # Guard: only accept as TRIOS if TRIOS-specific metadata was found.
         # A plain CSV with common column names (time, stress) can be parsed
         # by the TRIOS reader but isn't a real TRIOS file.
         if not _has_trios_metadata(result):
             logger.debug("TRIOS parse succeeded but no TRIOS metadata — falling back")
             raise ValueError("No TRIOS metadata found")
+        # Reader succeeded — re-emit its warnings
+        for w in caught:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
         logger.debug("TRIOS reader succeeded for CSV", filepath=str(filepath))
         _inject_provenance(result, "trios", attempted)
         return result
     except _FATAL_EXCEPTIONS:
         raise
     except Exception as e:
+        # Reader failed — its captured warnings are discarded
         logger.debug(
             "TRIOS reader failed for CSV, trying generic CSV",
             filepath=str(filepath),
@@ -454,7 +486,9 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
     # R6-IO-003: _translate_y2_col is applied in auto_load() before _try_csv,
     # but warn if a future direct caller passes y2_col here unexpectedly.
     if "y2_col" in kwargs:
-        logger.warning("y2_col passed to _try_csv — should have been translated by auto_load")
+        logger.warning(
+            "y2_col passed to _try_csv — should have been translated by auto_load"
+        )
     result = load_csv(filepath, **_filter_kwargs(kwargs, _CSV_KWARGS))
     _inject_provenance(result, "csv", ["csv"])
     return result
@@ -525,7 +559,10 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
                     "Please specify x_col and y_col."
                 )
 
-            kwargs["x_col"] = x_col
+            # R11-AUTO-001: Only set x_col when the caller did NOT supply one.
+            # Same guard as _try_csv() — see VIS-AUTO-001.
+            if "x_col" not in kwargs:
+                kwargs["x_col"] = x_col
             if y_col != "FOUND_PAIR":
                 kwargs["y_col"] = y_col
 
@@ -560,7 +597,12 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
             "trios",
             lambda: load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS)),
         ),
-        ("anton_paar", lambda: load_anton_paar(filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS))),
+        (
+            "anton_paar",
+            lambda: load_anton_paar(
+                filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS)
+            ),
+        ),
         ("csv", lambda: _try_csv(filepath, **kwargs)),
         (
             "excel",
@@ -574,13 +616,23 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
         try:
             attempted.append(reader_name)
             logger.debug("Trying reader", filepath=str(filepath), reader=reader_name)
-            result = reader_func()
+            # Capture warnings during speculative parsing — re-emit only
+            # if this reader succeeds (failed readers' warnings are noise).
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                result = reader_func()
+            # Reader succeeded — re-emit its warnings
+            for w in caught:
+                warnings.warn_explicit(
+                    w.message, w.category, w.filename, w.lineno
+                )
             logger.debug("Reader succeeded", filepath=str(filepath), reader=reader_name)
             _inject_provenance(result, reader_name, attempted)
             return result
         except _FATAL_EXCEPTIONS:
             raise
         except Exception as e:
+            # Reader failed — its captured warnings are discarded
             logger.debug(
                 "Reader failed",
                 filepath=str(filepath),
@@ -625,7 +677,7 @@ def _detect_modulus_pair(
         # E'/E'' (DMTA) — loss checked first via ordering below
         (
             re.compile(r"^e['\u2032](?!['\u2032])", re.IGNORECASE),
-            re.compile(r'^e(?:[' "'" r'\u2032]{2}|["\u201d\u2033])', re.IGNORECASE),
+            re.compile(r"^e(?:[" "'" r'\u2032]{2}|["\u201d\u2033])', re.IGNORECASE),
         ),
         # E_stor/E_loss (pyvisco style)
         (
@@ -635,7 +687,7 @@ def _detect_modulus_pair(
         # G'/G'' (shear)
         (
             re.compile(r"^g['\u2032](?!['\u2032])", re.IGNORECASE),
-            re.compile(r'^g(?:[' "'" r'\u2032]{2}|["\u201d\u2033])', re.IGNORECASE),
+            re.compile(r"^g(?:[" "'" r'\u2032]{2}|["\u201d\u2033])', re.IGNORECASE),
         ),
         # G_stor/G_loss
         (

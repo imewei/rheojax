@@ -11,13 +11,13 @@ that read or modify state are protected by the lock.
 """
 
 import copy
+import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-import threading
 from threading import Lock, RLock
 from typing import Any, Optional
 
@@ -93,6 +93,19 @@ class DatasetState:
         copying large arrays. Data should be converted to NumPy at the import
         boundary (DataService/ImportWorker) so these are never live JAX device arrays.
         """
+        import numpy as np
+
+        # R12-C-011: Enforce NumPy-at-boundary contract — x_data/y_data must be
+        # NumPy arrays (or None) by the time they reach the store.  JAX device
+        # arrays must be converted in DataService/ImportWorker before storage.
+        assert isinstance(self.x_data, (np.ndarray, type(None))), (
+            f"x_data must be a NumPy array or None, got {type(self.x_data).__name__}. "
+            "Convert to NumPy at the import boundary before storing in the state."
+        )
+        assert isinstance(self.y_data, (np.ndarray, type(None))), (
+            f"y_data must be a NumPy array or None, got {type(self.y_data).__name__}. "
+            "Convert to NumPy at the import boundary before storing in the state."
+        )
         return replace(
             self,
             metadata=copy.deepcopy(self.metadata),
@@ -205,7 +218,10 @@ class BayesianResult:
             credible_intervals=copy.deepcopy(self.credible_intervals),
             posterior_samples=self.posterior_samples,  # Large arrays — reference
             inference_data=self.inference_data,  # ArviZ InferenceData — reference
-            summary=self.summary,  # Summary dict — reference (read-only)
+            # R12-C-010: shallow-copy summary so that two clones do not share the
+            # same dict object; callers can safely add/remove top-level keys.
+            # Values (nested dicts of floats) remain shared references.
+            summary=self.summary.copy() if self.summary else None,
         )
 
 
@@ -381,13 +397,19 @@ class StateStore:
     def set_signals(self, signals: Any) -> None:
         """Set the Qt signals object for state change notifications.
 
+        Thread-safe: Protected by RLock to prevent a worker thread from reading
+        a partially-assigned signals object while the main thread writes it.
+
         Parameters
         ----------
         signals : StateSignals
             StateSignals instance with Qt signals
         """
         logger.debug("Setting signals object", signals_type=type(signals).__name__)
-        self._signals = signals
+        # R12-C-009: Wrap assignment in lock so concurrent readers never observe
+        # a partially-initialised signals object.
+        with self._lock:
+            self._signals = signals
 
     @property
     def signals(self) -> Any:
@@ -398,7 +420,8 @@ class StateStore:
         StateSignals or None
             StateSignals instance if set, None otherwise
         """
-        return self._signals
+        with self._lock:
+            return self._signals
 
     def emit_signal(self, signal_name: str, *args) -> None:
         """Emit a named signal if available.
@@ -457,6 +480,8 @@ class StateStore:
             Optional payload when using string-based dispatch.
         """
         # R8-NEW-007: warn if dispatched from non-main thread
+        _worker_thread_violation = False
+        _action_label = ""
         try:
             from PySide6.QtCore import QThread
             from PySide6.QtWidgets import QApplication
@@ -465,13 +490,27 @@ class StateStore:
             if app and QThread.currentThread() != app.thread():
                 import logging as _logging
 
+                _action_label = (
+                    action if isinstance(action, str) else action.get("type", "?")
+                )
                 _logging.getLogger(__name__).warning(
                     "dispatch() called from worker thread for action '%s'. "
                     "Use QMetaObject.invokeMethod for thread safety.",
-                    action if isinstance(action, str) else action.get("type", "?"),
+                    _action_label,
                 )
+                _worker_thread_violation = True
         except (ImportError, RuntimeError):
             pass
+        # R11-STO-002: Hard-fail in debug mode to catch thread violations
+        # (raised outside the try/except so it is not swallowed)
+        if _worker_thread_violation:
+            import os
+
+            if os.environ.get("RHEOJAX_DEBUG"):
+                raise RuntimeError(
+                    f"dispatch('{_action_label}') called from worker thread. "
+                    "Use QMetaObject.invokeMethod for thread safety."
+                )
 
         if isinstance(action, str):
             if isinstance(payload, dict):
@@ -483,7 +522,12 @@ class StateStore:
 
         if isinstance(action, dict) and "type" in action:
             action_type = action["type"]
-            logger.debug("Dispatching action", action_type=action_type)
+            payload_keys = [k for k in action if k != "type"]
+            logger.debug(
+                "Dispatching action",
+                action_type=action_type,
+                payload_keys=payload_keys,
+            )
             reducer = self._reduce_action(action_type, action)
             if reducer is not None:
                 self.update_state(reducer, emit_signal=True)
@@ -650,6 +694,15 @@ class StateStore:
         # stale if a subscriber triggers a nested dispatch that further mutates
         # self._state.  Subscribers that need the latest state must call
         # self.get_state() rather than relying on the snapshot argument.
+        #
+        # WARNING (R12-C-001): Subscriber callbacks execute synchronously on
+        # the calling thread.  Callers from worker threads must use
+        # QueuedConnection signal relay rather than calling dispatch() or
+        # update_state() directly to ensure UI updates run on the main thread.
+        #
+        # R12-C-003: The subscriber list is captured once (above, inside the
+        # lock); subscribe/unsubscribe calls during iteration take effect on
+        # the next dispatch, not the current one.
         #
         # R10-STO-004: per-thread reentrancy guard — if a subscriber triggers
         # a nested dispatch (which calls update_state again on the SAME thread),
@@ -854,7 +907,10 @@ class StateStore:
             model_params = action.get("model_params")
 
             def updater(state: AppState) -> AppState:
-                kwargs: dict[str, Any] = {"active_model_name": model_name, "is_modified": True}
+                kwargs: dict[str, Any] = {
+                    "active_model_name": model_name,
+                    "is_modified": True,
+                }
                 if model_params is not None:
                     kwargs["model_params"] = model_params
                 return replace(state, **kwargs)
@@ -947,10 +1003,15 @@ class StateStore:
             return updater
 
         if action_type == "UNDO":
+            # R12-C-005: UNDO bypasses update_state() — undo() acquires the
+            # lock and runs subscriber notifications itself via the TLS guard.
+            # Returning None tells dispatch() not to call update_state() again.
             self.undo()
             return None
 
         if action_type == "REDO":
+            # R12-C-005: Same as UNDO — redo() manages its own lock and
+            # subscriber notification path.
             self.redo()
             return None
 
@@ -1281,13 +1342,22 @@ class StateStore:
 
             def updater(state: AppState) -> AppState:
                 updates: dict[str, Any] = {}
-                for key in ("theme", "auto_save_enabled", "last_export_dir", "current_seed"):
+                for key in (
+                    "theme",
+                    "auto_save_enabled",
+                    "last_export_dir",
+                    "current_seed",
+                ):
                     if key in prefs:
                         updates[key] = prefs[key]
                 return replace(state, **updates) if updates else state
 
             return updater
 
+        logger.warning(
+            "Unhandled action type — no reducer registered",
+            action_type=action_type,
+        )
         return None
 
     def subscribe(self, callback: Callable[[AppState], None]) -> None:
@@ -1333,6 +1403,12 @@ class StateStore:
 
         Thread-safe: Protected by RLock.
 
+        Note (R12-C-006): undo/redo emit state_changed but do NOT re-emit
+        domain signals (dataset_added, fit_completed, etc.).  Subscribers
+        should read from the store rather than relying on domain signals for
+        state tracking, as domain signals are only emitted by the original
+        action dispatchers and will not fire again on undo/redo.
+
         Returns
         -------
         bool
@@ -1359,17 +1435,41 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # Notify subscribers outside the lock using snapshot to prevent stale
-        # references if a nested dispatch replaces self._state mid-iteration.
-        for subscriber in subscribers:
+        # R11-STO-001: Notify subscribers outside the lock using the same TLS
+        # reentrancy guard as update_state() to prevent recursive subscriber
+        # notification when a subscriber triggers a nested dispatch.
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            if not hasattr(tls, "pending"):
+                tls.pending = []
+            tls.pending.append((subscribers, state_snapshot))
+        else:
+            tls.dispatching = True
             try:
-                subscriber(state_snapshot)
-            except Exception:
-                logger.error(
-                    "Subscriber callback failed during undo",
-                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                    exc_info=True,
-                )
+                for subscriber in subscribers:
+                    try:
+                        subscriber(state_snapshot)
+                    except Exception:
+                        logger.error(
+                            "Subscriber callback failed during undo",
+                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                            exc_info=True,
+                        )
+                while hasattr(tls, "pending") and tls.pending:
+                    pending_subs, pending_snap = tls.pending.pop(0)
+                    for sub in pending_subs:
+                        try:
+                            sub(pending_snap)
+                        except Exception:
+                            logger.error(
+                                "Subscriber callback failed (queued)",
+                                subscriber=getattr(sub, "__name__", str(sub)),
+                                exc_info=True,
+                            )
+            finally:
+                tls.dispatching = False
+                if hasattr(tls, "pending"):
+                    tls.pending.clear()
 
         # Emit via QueuedConnection for thread safety (matches update_state path)
         try:
@@ -1416,17 +1516,39 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # Notify subscribers outside the lock using snapshot to prevent stale
-        # references if a nested dispatch replaces self._state mid-iteration.
-        for subscriber in subscribers:
+        # R11-STO-001: Same TLS reentrancy guard as undo() and update_state().
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            if not hasattr(tls, "pending"):
+                tls.pending = []
+            tls.pending.append((subscribers, state_snapshot))
+        else:
+            tls.dispatching = True
             try:
-                subscriber(state_snapshot)
-            except Exception:
-                logger.error(
-                    "Subscriber callback failed during redo",
-                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                    exc_info=True,
-                )
+                for subscriber in subscribers:
+                    try:
+                        subscriber(state_snapshot)
+                    except Exception:
+                        logger.error(
+                            "Subscriber callback failed during redo",
+                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                            exc_info=True,
+                        )
+                while hasattr(tls, "pending") and tls.pending:
+                    pending_subs, pending_snap = tls.pending.pop(0)
+                    for sub in pending_subs:
+                        try:
+                            sub(pending_snap)
+                        except Exception:
+                            logger.error(
+                                "Subscriber callback failed (queued)",
+                                subscriber=getattr(sub, "__name__", str(sub)),
+                                exc_info=True,
+                            )
+            finally:
+                tls.dispatching = False
+                if hasattr(tls, "pending"):
+                    tls.pending.clear()
 
         # Emit via QueuedConnection for thread safety (matches update_state path)
         try:
@@ -1517,16 +1639,46 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # Notify subscribers outside the lock using snapshot
-        for subscriber in subscribers:
+        # Notify subscribers outside the lock using the same TLS reentrancy guard
+        # as update_state() to prevent recursive subscriber notification when a
+        # subscriber triggers a nested dispatch on the same thread.
+        # R12-C-004: batch_update() now has the same TLS guard as update_state().
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            # Queue for delivery after the outer dispatch loop finishes
+            if not hasattr(tls, "pending"):
+                tls.pending = []
+            tls.pending.append((subscribers, state_snapshot))
+        else:
+            tls.dispatching = True
             try:
-                subscriber(state_snapshot)
-            except Exception:
-                logger.error(
-                    "Subscriber callback failed during batch update",
-                    subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                    exc_info=True,
-                )
+                for subscriber in subscribers:
+                    try:
+                        subscriber(state_snapshot)
+                    except Exception:
+                        logger.error(
+                            "Subscriber callback failed during batch update",
+                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                            exc_info=True,
+                        )
+                # Drain any nested dispatches queued during this loop
+                while hasattr(tls, "pending") and tls.pending:
+                    pending_subs, pending_snap = tls.pending.pop(0)
+                    for subscriber in pending_subs:
+                        try:
+                            subscriber(pending_snap)
+                        except Exception:
+                            logger.error(
+                                "Subscriber callback failed in batch_update (pending)",
+                                subscriber=getattr(
+                                    subscriber, "__name__", str(subscriber)
+                                ),
+                                exc_info=True,
+                            )
+            finally:
+                tls.dispatching = False
+                if hasattr(tls, "pending"):
+                    tls.pending.clear()
 
         # R8-NEW-004: use QueuedConnection for thread safety (matches update_state pattern)
         try:

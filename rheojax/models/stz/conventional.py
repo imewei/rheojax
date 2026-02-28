@@ -84,6 +84,7 @@ class STZConventional(STZBase):
             variant: Model variant ('minimal', 'standard', 'full')
         """
         super().__init__(variant=variant)
+        self._test_mode: str | None = None
         self._gamma_0: float | None = None
         self._omega_laos: float | None = None
         self._gamma_dot_applied: float | None = None
@@ -106,7 +107,7 @@ class STZConventional(STZBase):
         test_mode = kwargs.get("test_mode")
         if test_mode is None:
             # Fallback for compatibility or explicit check
-            if hasattr(self, "_test_mode") and self._test_mode:
+            if hasattr(self, "_test_mode") and self._test_mode is not None:
                 test_mode = self._test_mode
             else:
                 raise ValueError("test_mode must be specified for STZ fitting")
@@ -289,6 +290,9 @@ class STZConventional(STZBase):
         Returns:
             Stress (for startup/relaxation) or strain (for creep)
         """
+        # R11-STZ-001: `variant` must remain a Python-level static dispatch key.
+        # DO NOT move it into the ODE args dict — strings are not valid JAX types
+        # and will crash under jax.checkpoint.
         # Build args dict for stz_ode_rhs
         args = {
             "G0": params["G0"],
@@ -399,7 +403,7 @@ class STZConventional(STZBase):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
 
-        mode = mode or self._test_mode
+        mode = mode if mode is not None else self._test_mode
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
@@ -782,7 +786,7 @@ class STZConventional(STZBase):
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
         # Ensure we have a valid mode
-        mode = test_mode or getattr(self, "_test_mode", None)
+        mode = test_mode if test_mode is not None else getattr(self, "_test_mode", None)
         if mode is None:
             raise ValueError(
                 "test_mode must be set before calling model_function. "
@@ -864,6 +868,15 @@ class STZConventional(STZBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
         p_values = {k: self.parameters.get_value(k) for k in self.parameters.keys()}
 
+        # Extract transient parameters from kwargs if provided (for direct predict without fit)
+        if self._test_mode in ["startup", "relaxation", "creep"]:
+            if self._gamma_dot_applied is None:
+                self._gamma_dot_applied = kwargs.get("gamma_dot")
+            if self._sigma_applied is None:
+                self._sigma_applied = kwargs.get("sigma_applied")
+            if self._sigma_0 is None:
+                self._sigma_0 = kwargs.get("sigma_0")
+
         if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
             result = self._predict_steady_shear_jit(
                 X_jax,
@@ -890,6 +903,12 @@ class STZConventional(STZBase):
             return self._predict_transient(X)
 
         elif self._test_mode == "laos":
+            # Extract LAOS parameters from kwargs if provided
+            if self._gamma_0 is None:
+                self._gamma_0 = kwargs.get("gamma_0")
+            if self._omega_laos is None:
+                self._omega_laos = kwargs.get("omega")
+
             if self._gamma_0 is None or self._omega_laos is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(

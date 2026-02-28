@@ -65,7 +65,9 @@ class ExportPage(QWidget):
         # current event handler returns, preventing button-click blocking.
         from PySide6.QtCore import Qt
 
-        self.export_requested.connect(self._perform_export, Qt.ConnectionType.QueuedConnection)
+        self.export_requested.connect(
+            self._perform_export, Qt.ConnectionType.QueuedConnection
+        )
 
     def _dataset_to_rheodata(self, dataset: Any) -> Any:
         """Convert DatasetState into RheoData for export."""
@@ -359,6 +361,11 @@ class ExportPage(QWidget):
             self, "Select Output Directory", initial_dir
         )
         if directory:
+            logger.debug(
+                "Output directory selected",
+                output_dir=directory,
+                page="ExportPage",
+            )
             self._output_dir_edit.setText(directory)
 
     def _get_data_extension(self) -> str:
@@ -409,10 +416,11 @@ class ExportPage(QWidget):
 
         # Generate a lightweight thumbnail preview.
         # Close any previous preview figure to avoid memory leak.
+        # R11-EXP-001: _preview_fig is a non-pyplot Figure() — plt.close() is
+        # a no-op on it.  Use clf() + del for proper cleanup.
         if hasattr(self, "_preview_fig") and self._preview_fig is not None:
-            import matplotlib.pyplot as plt
-
-            plt.close(self._preview_fig)
+            self._preview_fig.clf()
+            del self._preview_fig
             self._preview_fig = None
 
         try:
@@ -473,7 +481,9 @@ class ExportPage(QWidget):
         total_size = 0
         for dataset_uuid, ds in datasets.items():
             safe_name = getattr(ds, "name", None) or dataset_uuid
-            safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_name)
+            safe_name = "".join(
+                c if c.isalnum() or c in "-_." else "_" for c in safe_name
+            )
             try:
                 rheojax = self._dataset_to_rheodata(ds)
                 file_path = output_dir / f"{safe_name}.{data_ext}"
@@ -597,13 +607,27 @@ class ExportPage(QWidget):
         # Validate
         is_valid, error_msg = self._validate_export()
         if not is_valid:
+            logger.warning(
+                "Export validation failed",
+                reason=error_msg,
+                page="ExportPage",
+            )
             QMessageBox.warning(self, "Export Validation", error_msg)
             return
 
         config = self._get_export_config()
-        logger.debug(
-            "Export triggered",
-            format=config["data_format"],
+        content_types = [
+            k.replace("include_", "")
+            for k, v in config.items()
+            if k.startswith("include_") and v
+        ]
+        logger.info(
+            "Export requested",
+            output_dir=str(config["output_dir"]),
+            data_format=config["data_format"],
+            figure_format=config["figure_format"],
+            content_types=content_types,
+            dpi=config["dpi"],
             page="ExportPage",
         )
 
@@ -617,12 +641,21 @@ class ExportPage(QWidget):
         config : dict
             Export configuration
         """
-        # TODO(perf): Move figure generation and file I/O into ExportWorker to avoid blocking main thread
-        import matplotlib.pyplot as plt
-
+        # TODO(perf): Move figure generation and file I/O into ExportWorker.
+        # Currently blocks main thread — processEvents() mitigates but doesn't
+        # prevent ANR on large exports (>10 figures).
         state = self._store.get_state()
         output_dir = config["output_dir"]
         data_format = config["data_format"]
+        logger.debug(
+            "Export operation started",
+            output_dir=str(output_dir),
+            data_format=data_format,
+            num_datasets=len(getattr(state, "datasets", {}) or {}),
+            num_fit_results=len(getattr(state, "fit_results", {}) or {}),
+            num_bayesian_results=len(getattr(state, "bayesian_results", {}) or {}),
+            page="ExportPage",
+        )
 
         # Create progress dialog
         progress = QProgressDialog("Exporting...", "Cancel", 0, 100, self)
@@ -648,7 +681,9 @@ class ExportPage(QWidget):
             # NOTE: Progress granularity is per-category (not per-file).
             # Single-category exports show 100% immediately after completion.
             current_step = 0
-            active_id = state.active_dataset_id  # Moved here — used by all export branches
+            active_id = (
+                state.active_dataset_id
+            )  # Moved here — used by all export branches
 
             # Export parameters (filtered to active dataset)
             if config["include_parameters"] and state.fit_results:
@@ -681,7 +716,9 @@ class ExportPage(QWidget):
                     if intervals:
                         import json
 
-                        json_filepath = output_dir / f"credible_intervals_{result_id}.json"
+                        json_filepath = (
+                            output_dir / f"credible_intervals_{result_id}.json"
+                        )
                         intervals_dict = {
                             k: {"lower": v[0], "upper": v[1]}
                             for k, v in intervals.items()
@@ -700,6 +737,9 @@ class ExportPage(QWidget):
             if config["include_posteriors"] and state.bayesian_results:
                 progress.setLabelText("Exporting posterior samples...")
                 for result_id, result in state.bayesian_results.items():
+                    # R11-EXP-003: Skip results without posterior samples
+                    if not getattr(result, "posterior_samples", None):
+                        continue
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
                     if active_id and dataset_id_of_result != active_id:
                         continue
@@ -758,8 +798,8 @@ class ExportPage(QWidget):
                                 fit_fig, fit_path, dpi=fig_dpi
                             )
                             exported_files.append(str(fit_path))
+                            # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                             fit_fig.clf()
-                            plt.close(fit_fig)
                             del fit_fig
                             QApplication.processEvents()
                             if progress.wasCanceled():
@@ -776,8 +816,8 @@ class ExportPage(QWidget):
                                 residuals_fig, residuals_path, dpi=fig_dpi
                             )
                             exported_files.append(str(residuals_path))
+                            # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                             residuals_fig.clf()
-                            plt.close(residuals_fig)
                             del residuals_fig
                             QApplication.processEvents()
                             if progress.wasCanceled():
@@ -790,6 +830,9 @@ class ExportPage(QWidget):
 
                 # Export Bayesian diagnostic plots
                 for result_id, bayes_result in state.bayesian_results.items():
+                    # R11-EXP-003: Skip results without posterior samples
+                    if not getattr(bayes_result, "posterior_samples", None):
+                        continue
                     try:
                         # Trace plot
                         trace_fig = self._plot_service.create_arviz_plot(
@@ -800,8 +843,8 @@ class ExportPage(QWidget):
                             trace_fig, trace_path, dpi=fig_dpi
                         )
                         exported_files.append(str(trace_path))
+                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                         trace_fig.clf()
-                        plt.close(trace_fig)
                         del trace_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -816,8 +859,8 @@ class ExportPage(QWidget):
                             forest_fig, forest_path, dpi=fig_dpi
                         )
                         exported_files.append(str(forest_path))
+                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                         forest_fig.clf()
-                        plt.close(forest_fig)
                         del forest_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -832,8 +875,8 @@ class ExportPage(QWidget):
                             pair_fig, pair_path, dpi=fig_dpi
                         )
                         exported_files.append(str(pair_path))
+                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                         pair_fig.clf()
-                        plt.close(pair_fig)
                         del pair_fig
                         QApplication.processEvents()
                         if progress.wasCanceled():
@@ -867,7 +910,11 @@ class ExportPage(QWidget):
                     diagnostics = {
                         "r_hat": _json_safe_dict(result.r_hat),
                         "ess": _json_safe_dict(result.ess),
-                        "divergences": int(result.divergences) if hasattr(result.divergences, "item") else result.divergences,
+                        "divergences": (
+                            int(result.divergences)
+                            if hasattr(result.divergences, "item")
+                            else result.divergences
+                        ),
                         "num_warmup": result.num_warmup,
                         "num_samples": result.num_samples,
                     }

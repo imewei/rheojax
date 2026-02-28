@@ -10,9 +10,11 @@ from rheojax.gui.compat import QObject, Signal
 from rheojax.logging import get_logger
 
 try:
-    from PySide6.QtCore import Slot
+    from PySide6.QtCore import Qt, Slot
 except ImportError:
-    # Fallback decorator when PySide6 is unavailable (headless/test environment)
+    # Fallback stubs when PySide6 is unavailable (headless/test environment)
+    Qt = None  # type: ignore[assignment]
+
     def Slot(*args, **kwargs):  # type: ignore[misc]
         """No-op Slot decorator for non-Qt environments."""
 
@@ -20,6 +22,7 @@ except ImportError:
             return fn
 
         return decorator
+
 
 logger = get_logger(__name__)
 
@@ -172,6 +175,10 @@ class StateSignals(QObject):
         if signal is not None:
             handler_name = getattr(handler, "__name__", repr(handler))
             logger.debug("Signal connected", signal=signal_name, handler=handler_name)
+            # Use AutoConnection (Qt default) — it selects DirectConnection
+            # for same-thread and QueuedConnection for cross-thread automatically.
+            # Worker-originated signals that need explicit QueuedConnection are
+            # connected at the call site (e.g. MainWindow._init_worker_pool).
             signal.connect(handler)
             return True
         else:
@@ -225,9 +232,10 @@ class StateSignals(QObject):
                 )
                 return False
         else:
+            # R11-SIG-001: Removed exc_info=True — no active exception here;
+            # matches the corrected pattern in connect_signal() and emit_signal().
             logger.error(
                 "Attempted to disconnect from unknown signal",
                 signal=signal_name,
-                exc_info=True,
             )
             return False

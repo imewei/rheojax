@@ -20,9 +20,8 @@ from rheojax.logging import get_logger
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-# Runtime Array type — accessed through the jax module returned by safe_import_jax()
-# (bare `from jax import Array` bypasses the float64 enforcement contract)
-Array = jax.Array
+# Import Array for runtime isinstance checks
+from jax import Array
 
 # Module logger
 logger = get_logger(__name__)
@@ -180,7 +179,8 @@ class OWChirp(BaseTransform):
             for j, t_center in enumerate(t):
                 wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
                 # Inner product
-                dt = t[1] - t[0] if len(t) > 1 else 1.0
+                # R11-OWC-003: Use median dt for robustness to non-uniform sampling
+                dt = float(jnp.median(jnp.diff(t))) if len(t) > 1 else 1.0
                 coeff = jnp.sum(signal * jnp.conj(wavelet)) * dt
                 coefficients = coefficients.at[i, j].set(coeff)
 
@@ -209,7 +209,9 @@ class OWChirp(BaseTransform):
         """
         if len(t) < 2:
             raise ValueError("Wavelet transform requires at least 2 time points")
-        dt = t[1] - t[0]
+        dt_arr = jnp.diff(t)
+        dt = float(jnp.median(dt_arr))
+        # R11-OWC-001: Use median dt for robustness to non-uniform sampling
 
         coefficients_list = []
 
@@ -304,6 +306,9 @@ class OWChirp(BaseTransform):
             logger.debug("Converting complex signal to real part")
             signal = jnp.real(signal)
 
+        # R11-OWC-002: Remove DC offset to prevent spurious low-frequency peak
+        signal = signal - jnp.mean(signal)
+
         # Generate frequency array (log-spaced)
         logger.debug(
             "Generating frequency array",
@@ -394,6 +399,9 @@ class OWChirp(BaseTransform):
         if jnp.iscomplexobj(signal):
             signal = jnp.real(signal)
 
+        # R11-OWC-002: Remove DC offset to prevent spurious low-frequency peak
+        signal = signal - jnp.mean(signal)
+
         # Generate frequencies
         frequencies = jnp.logspace(
             jnp.log10(self.frequency_range[0]),
@@ -451,20 +459,29 @@ class OWChirp(BaseTransform):
             # Find peak in spectrum
             from scipy.signal import find_peaks
 
-            peaks, properties = find_peaks(spectrum, prominence=0.1 * np.max(spectrum))
+            # Use lower prominence threshold (1% of max) to detect peaks more reliably
+            peaks, properties = find_peaks(spectrum, prominence=0.01 * np.max(spectrum))
 
             if len(peaks) == 0:
-                logger.error("Could not detect fundamental frequency in spectrum")
-                raise ValueError("Could not detect fundamental frequency")
-
-            # Fundamental is typically the strongest peak
-            strongest_peak = peaks[np.argmax(spectrum[peaks])]
-            fundamental_freq = freqs[strongest_peak]
-            logger.debug(
-                "Fundamental frequency detected",
-                fundamental_freq=fundamental_freq,
-                n_peaks_found=len(peaks),
-            )
+                # Fallback: use the frequency with maximum amplitude
+                logger.debug(
+                    "No peaks detected with prominence threshold, using max amplitude"
+                )
+                max_idx = np.argmax(spectrum)
+                fundamental_freq = float(freqs[max_idx])
+                logger.debug(
+                    "Fundamental frequency from max amplitude",
+                    fundamental_freq=fundamental_freq,
+                )
+            else:
+                # Fundamental is typically the strongest peak
+                strongest_peak = peaks[np.argmax(spectrum[peaks])]
+                fundamental_freq = float(freqs[strongest_peak])
+                logger.debug(
+                    "Fundamental frequency detected",
+                    fundamental_freq=fundamental_freq,
+                    n_peaks_found=len(peaks),
+                )
 
         # Extract harmonics
         harmonics = {}

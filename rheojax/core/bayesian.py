@@ -322,7 +322,14 @@ class BayesianMixin:
     # =========================================================================
 
     def _validate_bayesian_requirements(self) -> None:
-        """Validate that required attributes exist for Bayesian inference."""
+        """Validate that required attributes exist for Bayesian inference.
+
+        R12-B-007: The ordering — check 'parameters' before 'model_function' —
+        is intentional and safe.  'parameters' is always set in __init__ so the
+        check is fast and cheap.  Checking it first ensures a clear AttributeError
+        (rather than a confusing downstream KeyError) when the mixin is used on a
+        class that forgot to call super().__init__().
+        """
         logger.debug("Validating Bayesian requirements")
         if not hasattr(self, "parameters"):
             logger.error("Missing 'parameters' attribute for Bayesian inference")
@@ -378,6 +385,19 @@ class BayesianMixin:
     ) -> tuple[np.ndarray, np.ndarray | None, TestMode]:
         """Resolve test_mode and extract data arrays from input.
 
+        Priority order for the returned y_array (R12-B-003):
+          1. y extracted from a RheoData X object (highest priority — data and
+             labels travel together, avoiding accidental mismatches).
+          2. The caller's explicit ``y`` parameter (used when X is a plain array).
+          3. ``None`` — the caller is responsible for supplying y from another source.
+
+        The resolved test_mode follows a similar hierarchy:
+          1. Explicit ``test_mode`` argument passed by the caller.
+          2. Mode detected from RheoData metadata / auto-detection.
+          3. ``self._test_mode`` stored from a prior NLSQ fit().
+          4. ``self._last_fit_kwargs["test_mode"]`` as a secondary NLSQ fallback.
+          5. ``TestMode.RELAXATION`` as the final default (with a UserWarning).
+
         Returns:
             Tuple of (X_array, y_array, resolved_test_mode)
         """
@@ -401,6 +421,11 @@ class BayesianMixin:
             y_array = None  # Will be set from y parameter
 
             if test_mode is None:
+                # R12-B-013: three-tier fallback when X is a plain array and
+                # no explicit test_mode was supplied:
+                #   Tier 1 — self._test_mode set by a previous fit() call.
+                #   Tier 2 — self._last_fit_kwargs["test_mode"] stored by _fit().
+                #   Tier 3 — TestMode.RELAXATION hard default with a UserWarning.
                 stored_mode = getattr(self, "_test_mode", None)
                 # R10-BAY-002: Also check _last_fit_kwargs as a second fallback.
                 # _fit() stores test_mode there; this covers the case where
@@ -768,9 +793,9 @@ class BayesianMixin:
                     **mcmc_kwargs,
                 )
             rng_key = jax.random.PRNGKey(rng_seed)
-            sampler.run(
-                rng_key, X_jax, y_jax, extra_fields=("potential_energy",)
-            )
+            # R12-B-009: include "diverging" so _process_mcmc_results can report
+            # per-transition divergence counts without a second MCMC.get_extra_fields() call.
+            sampler.run(rng_key, X_jax, y_jax, extra_fields=("potential_energy", "diverging"))
             return sampler
 
         try:
@@ -1283,8 +1308,17 @@ class BayesianMixin:
         # Save _test_mode BEFORE any mutation so it can be restored on error.
         # fit_bayesian() should not permanently change the model's test_mode —
         # subsequent calls to fit() or predict() must see the original mode.
+        # R12-B-011: _test_mode is intentionally a dynamic attribute (not defined in
+        # __init__) so that models that have never been fitted have no _test_mode,
+        # distinguishing "unfitted" from "fitted with RELAXATION mode".  hasattr()
+        # checks are therefore required rather than checking `is None`.
         _had_test_mode = hasattr(self, "_test_mode")  # BAY-004: track if attr existed
         _saved_test_mode = getattr(self, "_test_mode", None)
+        # R12-B-005: deepcopy is intentional safety — _last_fit_kwargs may contain
+        # mutable objects (arrays, sub-dicts) that get mutated during sampling.
+        # The copy is only used on the failure path (in the finally block) to
+        # revert the dict to its pre-Bayesian state; the overhead is acceptable
+        # because it happens once per fit_bayesian() call, not per NUTS step.
         _saved_last_fit_kwargs = copy.deepcopy(
             getattr(self, "_last_fit_kwargs", None) or {}
         )
@@ -1300,13 +1334,27 @@ class BayesianMixin:
         ) as log_ctx:
             try:
                 # Phase 1: Validation
+                # R12-B-016: double validation (requirements then bounds) is
+                # intentional — _validate_bayesian_requirements() checks structural
+                # prerequisites (NumPyro availability, parameter set existence) while
+                # _validate_parameter_bounds() checks numeric bound consistency.
+                # Separating them gives clearer error messages and allows subclasses
+                # to override only the relevant check.
                 self._validate_bayesian_requirements()
                 self._validate_parameter_bounds()
 
                 # Phase 2: Resolve test_mode and extract data
                 X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
                 y_array = y_from_rheo if y_from_rheo is not None else y
-                self._test_mode = test_mode  # Cache for future calls
+                # R12-B-004: Design decision — on success, _test_mode is permanently
+                # updated to the Bayesian test_mode so that subsequent predict() calls
+                # use the correct mode without requiring re-specification.  The old
+                # NLSQ _test_mode is restored in the finally block only on failure.
+                # If the caller needs to revert to the NLSQ mode, call fit() again.
+                # R12-B-019: _test_mode is stored as a TestMode enum (resolved by
+                # _resolve_test_mode).  All model code should compare with
+                # TestMode members using `==` rather than string equality.
+                self._test_mode = test_mode
 
                 # Merge protocol kwargs into _last_fit_kwargs.
                 # Preserve values set by NLSQ _fit() (e.g., internal metadata like
@@ -1317,7 +1365,7 @@ class BayesianMixin:
                     if (
                         not hasattr(self, "_last_fit_kwargs")
                         or self._last_fit_kwargs is None
-                    ):  # type: ignore[has-type]
+                    ):
                         self._last_fit_kwargs = {}
                     self._last_fit_kwargs.update(protocol_kwargs)
 
@@ -1411,6 +1459,11 @@ class BayesianMixin:
             finally:
                 # Only revert state on failure — on success, _test_mode and
                 # _last_fit_kwargs must persist for subsequent predict() calls.
+                # R12-B-020: The asymmetry between the success path (state kept) and
+                # the failure path (state reverted) is intentional.  On success the
+                # Bayesian test_mode and protocol kwargs become the new ground truth
+                # so that predict() works without re-specifying arguments.  On failure
+                # we restore the NLSQ state so a previously-fitted model remains usable.
                 if not _fit_bayesian_succeeded:
                     if _had_test_mode:
                         self._test_mode = _saved_test_mode
@@ -1585,6 +1638,11 @@ class BayesianMixin:
             _model_returns_2col = bool(scale_info["model_returns_2col"])
         else:
             _model_returns_2col = False
+            # R12-B-018: track whether _test_mode existed before the probe so
+            # the finally block can restore the exact prior state instead of
+            # unconditionally setting _test_mode=None when the attribute was
+            # absent before the probe call.
+            _had_probe_test_mode = hasattr(self, "_test_mode")
             _saved_probe_test_mode = getattr(self, "_test_mode", None)
             try:
                 # BAY-006: use actual data shape for probe, not hardcoded 2
@@ -1610,11 +1668,13 @@ class BayesianMixin:
                     test_mode=str(test_mode),
                 )
             finally:
-                # Restore test_mode in case model_function set self._test_mode
-                # as a side effect (defensive guard — should not normally happen
-                # because model_function is designed to be stateless).
-                if hasattr(self, "_test_mode"):
+                # Restore _test_mode to its exact pre-probe state.
+                # R12-B-018: if the attribute did not exist before the probe, delete it
+                # rather than setting it to None (which would create a spurious attribute).
+                if _had_probe_test_mode:
                     self._test_mode = _saved_probe_test_mode
+                elif hasattr(self, "_test_mode"):
+                    del self._test_mode
             # Cache in scale_info so the probe is only run once per fit_bayesian call
             scale_info["model_returns_2col"] = int(_model_returns_2col)
 
@@ -1805,11 +1865,25 @@ class BayesianMixin:
                     samples_shaped = samples_arr.reshape(1, -1)
                 result_dict[name] = float(diagnostic_fn(samples_shaped))
             except Exception as exc:
+                # R12-B-008: log array size and chain count to help diagnose
+                # reshape failures caused by unexpected sample counts (e.g., thinning
+                # or early stopping causing total_samples % num_chains != 0).
+                logger.debug(
+                    "Posterior reshape failed for parameter",
+                    parameter=name,
+                    array_size=getattr(samples_arr, "size", None),
+                    num_chains=num_chains,
+                )
                 logger.warning(
                     f"{label} computation failed for parameter",
                     parameter=name,
                     error=str(exc),
                 )
+                # R12-B-010: NaN fallback is correct here — it signals "diagnostic
+                # unavailable" to the caller without hiding genuine failures.
+                # Downstream code (e.g., _compute_diagnostics) filters NaN values
+                # when computing summary statistics (max R-hat, min ESS), so a NaN
+                # for one parameter does not silently corrupt the aggregate.
                 result_dict[name] = float("nan")
                 all_succeeded = False
         return result_dict, all_succeeded

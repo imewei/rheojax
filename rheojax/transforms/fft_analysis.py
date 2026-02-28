@@ -240,6 +240,8 @@ class FFTAnalysis(BaseTransform):
                 t_np = np.asarray(t)
                 y_np = np.asarray(y)
                 t_uniform = np.linspace(float(t_np[0]), float(t_np[-1]), n)
+                # R9-FFT-001: TODO — Replace np.interp with interpax.interp1d for JIT compatibility.
+                # Currently safe since this runs before jnp.fft.rfft (outside JIT).
                 y = jnp.array(np.interp(t_uniform, t_np, y_np))
                 t = jnp.array(t_uniform)
                 dt = float(t_uniform[1] - t_uniform[0])
@@ -270,9 +272,9 @@ class FFTAnalysis(BaseTransform):
 
             # Normalize if requested
             if self.normalize and not self.return_psd:
-                # R8-FFT-002: NOTE — normalize=True scales spectrum to [0,1], discarding
-                # physical amplitude units. For quantitative analysis, use normalize=False
-                # and apply 2/N correction manually if needed.
+                # R8-FFT-002: normalize=True scales spectrum to [0,1], discarding physical
+                # amplitude units. For quantitative harmonic analysis, use normalize=False.
+                # Consider changing default to normalize=False in a future version.
                 logger.debug("Normalizing spectrum")
                 max_val = jnp.max(spectrum)
                 spectrum = jnp.where(max_val > 1e-12, spectrum / max_val, spectrum)

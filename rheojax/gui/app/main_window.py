@@ -332,11 +332,24 @@ class RheoJAXMainWindow(QMainWindow):
             self.log(f"Worker pool unavailable: {exc}")
             return
 
-        self.worker_pool.job_started.connect(self._on_job_started)
-        self.worker_pool.job_progress.connect(self._on_job_progress)
-        self.worker_pool.job_completed.connect(self._on_job_completed)
-        self.worker_pool.job_failed.connect(self._on_job_failed)
-        self.worker_pool.job_cancelled.connect(self._on_job_cancelled)
+        # R12-C-008: Use explicit QueuedConnection so that WorkerPool signals
+        # emitted from background threads are always delivered on the main Qt
+        # event-loop thread, preventing cross-thread slot invocation violations.
+        self.worker_pool.job_started.connect(
+            self._on_job_started, Qt.ConnectionType.QueuedConnection
+        )
+        self.worker_pool.job_progress.connect(
+            self._on_job_progress, Qt.ConnectionType.QueuedConnection
+        )
+        self.worker_pool.job_completed.connect(
+            self._on_job_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self.worker_pool.job_failed.connect(
+            self._on_job_failed, Qt.ConnectionType.QueuedConnection
+        )
+        self.worker_pool.job_cancelled.connect(
+            self._on_job_cancelled, Qt.ConnectionType.QueuedConnection
+        )
 
     def _connect_file_menu(self) -> None:
         """Connect File menu actions."""
@@ -685,9 +698,9 @@ class RheoJAXMainWindow(QMainWindow):
         if page_name.lower() in page_map:
             from_page = self.tabs.tabText(self.tabs.currentIndex())
             to_page = page_name.capitalize()
-            logger.debug("Page navigation", from_page=from_page, to_page=to_page)
             self.tabs.setCurrentIndex(page_map[page_name.lower()])
             self.store.dispatch("SET_TAB", {"tab": page_name.lower()})
+            logger.info("Page navigated", from_page=from_page, to_page=to_page)
             self.log(f"Navigated to {page_name.capitalize()} page")
 
     def log(self, message: str) -> None:
@@ -733,19 +746,27 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Cleanup: stop workers and disconnect state signals to prevent
         # callbacks during teardown
+        state = self.store.get_state()
+        dataset_count = len(state.datasets) if state.datasets else 0
+        fit_count = len(state.fit_results) if state.fit_results else 0
+        logger.info(
+            "Application closing",
+            datasets=dataset_count,
+            fit_results=fit_count,
+        )
         self.log("Shutting down...")
 
         # Unsubscribe state store callback to prevent post-destroy invocation
         try:
             self.store.unsubscribe(self._on_state_changed)
         except Exception:
-            pass
+            logger.debug("State unsubscribe failed during shutdown", exc_info=True)
 
         try:
             if hasattr(self, "worker_pool"):
                 self.worker_pool.shutdown(wait=True, timeout_ms=5000)
         except Exception:
-            pass
+            logger.debug("Worker pool shutdown failed during cleanup", exc_info=True)
         # R10-MW-003: Disconnect only THIS window's signal connections to prevent
         # delivery to destroyed widgets during Qt object teardown.  We disconnect
         # specific slots rather than calling .disconnect() with no args, which
@@ -766,7 +787,7 @@ class RheoJAXMainWindow(QMainWindow):
                         except (TypeError, RuntimeError):
                             pass
         except Exception:
-            pass
+            logger.debug("Signal disconnect failed during shutdown", exc_info=True)
 
         # Drain pending queued events to prevent delivery to destroyed widgets
         from rheojax.gui.compat import QApplication
@@ -802,8 +823,14 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Update workflow mode
         if state.workflow_mode != self._current_workflow_mode:
+            previous_mode = self._current_workflow_mode
             self._current_workflow_mode = state.workflow_mode
             self._update_tabs_visibility(self._current_workflow_mode)
+            logger.info(
+                "Workflow mode changed",
+                from_mode=previous_mode.name,
+                to_mode=self._current_workflow_mode.name,
+            )
             self.log(f"Switched to {self._current_workflow_mode.name.title()} Workflow")
 
     # -------------------------------------------------------------------------
@@ -1049,7 +1076,11 @@ class RheoJAXMainWindow(QMainWindow):
             from rheojax.gui.services.export_service import ExportService
 
             state = self.store.get_state()
-            fit_result = next(iter(state.fit_results.values()), None) if state.fit_results else None
+            fit_result = (
+                next(iter(state.fit_results.values()), None)
+                if state.fit_results
+                else None
+            )
             if fit_result:
                 path, _ = QFileDialog.getSaveFileName(
                     self, "Export Fit Parameters", "", "CSV (*.csv);;JSON (*.json)"
@@ -1294,11 +1325,14 @@ class RheoJAXMainWindow(QMainWindow):
                 self.fit_page.apply_fit_result(result)
                 self._update_fit_plot(result)
                 # R8-NEW-001: include identifiers so subscribers can match the completion
-                self.store.dispatch("FITTING_COMPLETED", {
-                    "result": result,
-                    "model_name": model_name,
-                    "dataset_id": dataset_id,
-                })
+                self.store.dispatch(
+                    "FITTING_COMPLETED",
+                    {
+                        "result": result,
+                        "model_name": model_name,
+                        "dataset_id": dataset_id,
+                    },
+                )
                 # R10-MW-001: Removed redundant SET_PIPELINE_STEP dispatch.
                 # STORE_FIT_RESULT reducer already sets PipelineStep.FIT →
                 # StepStatus.COMPLETE, and FITTING_COMPLETED reducer does the same.
@@ -1309,9 +1343,8 @@ class RheoJAXMainWindow(QMainWindow):
                 error_msg = getattr(result, "message", "Fit failed")
                 logger.warning("Fit unsuccessful", error=error_msg)
                 self.store.dispatch("FITTING_FAILED", {"error": error_msg})
-                self.store.dispatch(
-                    "SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"}
-                )
+                # R11-MW-003: FITTING_FAILED reducer already sets pipeline
+                # step to ERROR; no separate SET_PIPELINE_STEP needed.
                 self.status_bar.show_message(f"Fit failed: {error_msg}", 5000)
         elif job_type == "bayesian":
             self.store.dispatch(
@@ -1322,9 +1355,7 @@ class RheoJAXMainWindow(QMainWindow):
                     "model_name": model_name,
                 },
             )
-            self.store.dispatch(
-                "SET_PIPELINE_STEP", {"step": "bayesian", "status": "COMPLETE"}
-            )
+            # R11-BP-001: STORE_BAYESIAN_RESULT reducer already sets pipeline to COMPLETE
             self.status_bar.show_message("Bayesian inference complete", 3000)
             self._auto_save_if_enabled()
         elif job_type == "transform":
@@ -1377,15 +1408,17 @@ class RheoJAXMainWindow(QMainWindow):
         job_type = self._job_types.pop(job_id, "")
         logger.error("Job failed", job_id=job_id, job_type=job_type, error=error)
         self.status_bar.hide_progress()
-        if job_type:
-            self.store.dispatch(
-                "SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"}
-            )
+        # R11-MW-002: FITTING_FAILED/BAYESIAN_FAILED reducers already handle
+        # the pipeline step transition to ERROR, so no standalone
+        # SET_PIPELINE_STEP dispatch is needed for fit/bayesian.
         if job_type == "fit":
             self.store.dispatch("FITTING_FAILED", {"error": str(error)})
         elif job_type == "bayesian":
             self.store.dispatch("BAYESIAN_FAILED", {"error": str(error)})
         elif job_type == "transform":
+            self.store.dispatch(
+                "SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"}
+            )
             self.status_bar.show_message(f"Transform failed: {error}", 8000)
         self.log(f"Job {job_id} failed: {error}")
         self.status_bar.show_message(f"Job failed: {error}", 5000)
@@ -1482,7 +1515,6 @@ class RheoJAXMainWindow(QMainWindow):
         logger.debug("Auto-detect test mode action triggered")
         state = self.store.get_state()
         dataset_id = state.active_dataset_id
-        inferred_mode: str | None = None
         if dataset_id and dataset_id in state.datasets:
             ds = state.datasets[dataset_id]
             if ds.x_data is not None and ds.y_data is not None:
@@ -1507,10 +1539,14 @@ class RheoJAXMainWindow(QMainWindow):
                         )
                     except Exception as exc:
                         logger.error(
-                            "Auto-detect test mode failed", error=str(exc), exc_info=True
+                            "Auto-detect test mode failed",
+                            error=str(exc),
+                            exc_info=True,
                         )
                         self.log(f"Auto-detect test mode failed: {exc}")
-                        self.status_bar.show_message("Auto-detect test mode failed", 2500)
+                        self.status_bar.show_message(
+                            "Auto-detect test mode failed", 2500
+                        )
                         return
                     self.store.dispatch(
                         "AUTO_DETECT_TEST_MODE",
@@ -1520,7 +1556,11 @@ class RheoJAXMainWindow(QMainWindow):
                         try:
                             self.data_page.show_dataset(did)
                         except Exception:
-                            pass
+                            logger.debug(
+                                "Data page refresh after auto-detect failed",
+                                dataset_id=did,
+                                exc_info=True,
+                            )
 
                 from PySide6.QtCore import QTimer
 
@@ -1529,7 +1569,9 @@ class RheoJAXMainWindow(QMainWindow):
         if dataset_id:
             try:
                 self.data_page.show_dataset(dataset_id)
-                resolved_mode = self.store.get_state().datasets.get(dataset_id).test_mode
+                resolved_mode = (
+                    self.store.get_state().datasets.get(dataset_id).test_mode
+                )
                 logger.info("Auto-detected test mode", mode=resolved_mode)
                 self.status_bar.show_message(
                     f"Auto-detected test mode: {resolved_mode}", 2500
@@ -1739,8 +1781,7 @@ class RheoJAXMainWindow(QMainWindow):
         if x_data is not None and y_data is not None:
             if len(x_data) != len(y_data):
                 raise ValueError(
-                    f"Transform output shape mismatch: "
-                    f"x={len(x_data)}, y={len(y_data)}"
+                    f"Transform output shape mismatch: x={len(x_data)}, y={len(y_data)}"
                 )
 
         # Merge transform extras into metadata (T-004)
@@ -1868,6 +1909,10 @@ class RheoJAXMainWindow(QMainWindow):
                     else:
                         init_params_dict[str(key)] = float(value)
             except Exception:
+                logger.debug(
+                    "Failed to normalize initial_params from payload; will try state",
+                    exc_info=True,
+                )
                 init_params_dict = None
         if init_params_dict is None:
             # Use current state values if present.
@@ -1877,7 +1922,15 @@ class RheoJAXMainWindow(QMainWindow):
                     init_params_dict = {
                         name: float(p.value) for name, p in state_params.items()
                     }
+                    logger.debug(
+                        "Initial params loaded from state",
+                        param_count=len(init_params_dict),
+                    )
                 except Exception:
+                    logger.debug(
+                        "Failed to load initial params from state; will use defaults",
+                        exc_info=True,
+                    )
                     init_params_dict = None
         if init_params_dict is None:
             # Fall back to defaults.
@@ -1888,7 +1941,17 @@ class RheoJAXMainWindow(QMainWindow):
                 init_params_dict = {
                     name: float(p.value) for name, p in defaults.items()
                 }
+                logger.debug(
+                    "Initial params loaded from model defaults",
+                    model_name=model_name,
+                    param_count=len(init_params_dict),
+                )
             except Exception:
+                logger.debug(
+                    "Failed to load model defaults; fitting without initial params",
+                    model_name=model_name,
+                    exc_info=True,
+                )
                 init_params_dict = None
 
         if not isinstance(options, dict):

@@ -176,7 +176,10 @@ class Maxwell(BaseModel):
                 y_np = y_np - offset
                 self._relaxation_offset = offset
                 # Store in _last_fit_kwargs for Bayesian pipeline forwarding
-                if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
+                if (
+                    not hasattr(self, "_last_fit_kwargs")
+                    or self._last_fit_kwargs is None
+                ):
                     self._last_fit_kwargs = {}
                 self._last_fit_kwargs["_relaxation_offset"] = offset
                 logger.debug(
@@ -538,9 +541,9 @@ class Maxwell(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_rotation(gamma_dot: jnp.ndarray, G0: float, eta: float) -> jnp.ndarray:
-        """Predict steady shear viscosity eta(gamma_dot).
+        """Predict steady shear stress sigma(gamma_dot).
 
-        Theory: eta(gamma_dot) = eta (constant, Newtonian behavior)
+        Theory: sigma = eta * gamma_dot (Newtonian flow)
 
         Args:
             gamma_dot: Shear rate array (1/s)
@@ -548,9 +551,9 @@ class Maxwell(BaseModel):
             eta: Viscosity (Pa·s)
 
         Returns:
-            Viscosity eta in Pa·s (constant array)
+            Shear stress in Pa
         """
-        return eta * jnp.ones_like(gamma_dot)
+        return eta * gamma_dot
 
     def get_relaxation_time(self) -> float:
         """Get characteristic relaxation time tau = eta/G0.

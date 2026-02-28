@@ -450,7 +450,8 @@ class FractionalMaxwellGel(BaseModel):
         alpha = self.parameters.get_value("alpha")
         eta = self.parameters.get_value("eta")
 
-        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             result = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
         elif test_mode in ("creep", TestMode.CREEP):
@@ -568,7 +569,7 @@ class FractionalMaxwellGel(BaseModel):
             x = jnp.asarray(X)
 
             # Normalize test_mode to string
-            mode = test_mode or "relaxation"
+            mode = test_mode if test_mode is not None else "relaxation"
             if hasattr(mode, "value"):
                 mode = mode.value
 

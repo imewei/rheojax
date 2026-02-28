@@ -162,6 +162,9 @@ class BayesianPipeline(Pipeline):
         # R10-PIPE-BAY-001: Write resolved deformation_mode and poisson_ratio back
         # to data.metadata so fit_bayesian() can propagate them without the caller
         # having to repeat these kwargs on the Bayesian call.
+        # R12-E-005 (part): ensure metadata dict exists before writing test_mode.
+        if self.data is not None and self.data.metadata is None:
+            self.data.metadata = {}
         if self.data is not None and self.data.metadata is not None:
             _dm_resolved = nlsq_kwargs.get("deformation_mode") or (
                 self.data.metadata.get("deformation_mode")
@@ -173,6 +176,16 @@ class BayesianPipeline(Pipeline):
                 _pr_resolved = self.data.metadata.get("poisson_ratio")
             if _pr_resolved is not None:
                 self.data.metadata["poisson_ratio"] = _pr_resolved
+            # R12-E-005: write resolved test_mode back to metadata so
+            # fit_bayesian() reads the correct mode without the caller
+            # having to repeat the kwarg.
+            _resolved_tm = getattr(model_obj, "_test_mode", None)
+            if _resolved_tm is not None:
+                self.data.metadata["test_mode"] = (
+                    _resolved_tm.value
+                    if hasattr(_resolved_tm, "value")
+                    else str(_resolved_tm)
+                )
 
         # Store fitted model
         self._last_model = model_obj

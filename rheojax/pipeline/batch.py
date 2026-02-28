@@ -122,6 +122,21 @@ class BatchPipeline:
         )
 
         if parallel:
+            import warnings as _batch_warnings
+
+            has_fit_steps = any(
+                step_action in ("fit", "fit_nlsq")
+                for step_action, _ in self.template_pipeline.steps
+            )
+            if has_fit_steps:
+                _batch_warnings.warn(
+                    "parallel=True with a fitting pipeline may cause JAX JIT compilation "
+                    "races between threads. Set parallel=False for pipelines that call "
+                    "model.fit().",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
             # Parallel processing with ThreadPoolExecutor
             if n_workers is None:
                 n_workers = min(4, os.cpu_count() or 1)
@@ -272,15 +287,26 @@ class BatchPipeline:
         pipeline = self._clone_pipeline(self.template_pipeline)
         path = Path(file_path)
 
+        # R11-BATCH-001: Clear template-copied steps before load+replay to avoid
+        # duplicates.  Reset before load() so the load step itself is not mixed
+        # with stale template steps.
+        pipeline.steps = []
+        pipeline._last_model = None
+
         # Load data
         with log_pipeline_stage(logger, "load", filepath=str(path)):
             pipeline.load(path, format=format, **load_kwargs)
+
+        # R12-E-006: pre-initialize metrics so transform replay errors can be
+        # recorded inside the loop below before fit metrics are appended.
+        metrics: dict[str, Any] = {}
 
         # R10-BATCH-001: Replay template steps on the newly loaded data.
         # Steps are recorded as ("fit", model_obj) or ("transform", transform_obj)
         # tuples. For each step we create a fresh model/transform of the same class
         # and re-fit/re-transform on the new dataset, preserving fit kwargs that were
         # stored in _last_fit_kwargs by the model itself.
+        fit_kwargs_replay: dict[str, Any] = {}
         for step_action, step_obj in self.template_pipeline.steps:
             if step_action in ("fit", "fit_nlsq"):
                 model_cls = type(step_obj)
@@ -292,12 +318,28 @@ class BatchPipeline:
                 # Strip internal tracking keys and protocol-specific kwargs
                 # that should not be replayed from the template to new datasets.
                 _batch_strip_keys = {
-                    "method", "gamma_dot", "sigma_init", "lam_init",
-                    "sigma_0", "lam_0", "gamma_0", "omega_laos",
-                    "n_cycles", "points_per_cycle",
+                    # NOTE: "method" is intentionally NOT stripped — ODE models
+                    # that require method="scipy" must preserve this in replay.
+                    "gamma_dot",
+                    "sigma_init",
+                    "lam_init",
+                    "sigma_0",
+                    "lam_0",
+                    "gamma_0",
+                    "omega_laos",
+                    "n_cycles",
+                    "points_per_cycle",
                 }
                 for _k in _batch_strip_keys:
                     fit_kwargs_replay.pop(_k, None)
+                # R12-E-003: forward deformation_mode and poisson_ratio from
+                # the template model so DMTA fits are replayed correctly.
+                _deformation_mode = getattr(step_obj, "_deformation_mode", None)
+                if _deformation_mode is not None:
+                    fit_kwargs_replay.setdefault("deformation_mode", _deformation_mode)
+                _poisson_ratio = getattr(step_obj, "_poisson_ratio", None)
+                if _poisson_ratio is not None:
+                    fit_kwargs_replay.setdefault("poisson_ratio", _poisson_ratio)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
                 pipeline.steps.append((step_action, new_model))
@@ -307,11 +349,21 @@ class BatchPipeline:
                     filepath=str(path),
                 )
             elif step_action == "transform":
-                # Re-apply the same transform instance to the pipeline's current data
+                # Re-apply the transform to the pipeline's current data.
+                # NOTE: deepcopy carries fitted state from the template (e.g.
+                # shift_factors in Mastercurve).  This is intentional for
+                # transforms that should reuse the template's fitted params,
+                # but wrong for transforms that must re-fit per dataset.
                 try:
                     transform_cls = type(step_obj)
                     new_transform = copy.deepcopy(step_obj)
                     pipeline.data = new_transform.transform(pipeline.data)
+                    # Propagate test_mode from data metadata into replay kwargs
+                    # so that a subsequent fit step picks it up correctly.
+                    if pipeline.data is not None and hasattr(pipeline.data, "metadata"):
+                        _tm = (pipeline.data.metadata or {}).get("test_mode")
+                        if _tm and "test_mode" not in fit_kwargs_replay:
+                            fit_kwargs_replay["test_mode"] = _tm
                     pipeline.steps.append((step_action, new_transform))
                     logger.debug(
                         "Replayed transform step",
@@ -319,16 +371,17 @@ class BatchPipeline:
                         filepath=str(path),
                     )
                 except Exception as _te:
-                    logger.warning(
-                        "Transform replay failed; skipping",
+                    # R12-E-006: elevate to ERROR — downstream fit uses unprocessed data
+                    logger.error(
+                        "Transform replay failed; skipping — downstream fit uses unprocessed data",
                         transform=type(step_obj).__name__,
                         error=str(_te),
                     )
+                    metrics["transform_replay_failed"] = True
 
         result = pipeline.get_result()
 
         # Compute metrics if model was fitted
-        metrics: dict[str, Any] = {}
         if pipeline._last_model is not None:
             model = pipeline._last_model
             X = np.array(result.x)

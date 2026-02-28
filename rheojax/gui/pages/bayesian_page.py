@@ -451,10 +451,20 @@ class BayesianPage(QWidget):
 
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
-        logger.debug("Inference triggered", page="BayesianPage")
         state = self._store.get_state()
         model_name = state.active_model_name
         dataset = self._store.get_active_dataset()
+        logger.info(
+            "Run Bayesian clicked",
+            model_name=model_name,
+            dataset_id=getattr(dataset, "id", None),
+            dataset_test_mode=getattr(dataset, "test_mode", None),
+            num_warmup=self._warmup_spin.value(),
+            num_samples=self._samples_spin.value(),
+            num_chains=self._chains_spin.value(),
+            warm_start=self._warmstart_check.isChecked(),
+            page="BayesianPage",
+        )
 
         if not model_name:
             QMessageBox.warning(
@@ -711,6 +721,12 @@ class BayesianPage(QWidget):
             warm_start_dict = self._select_warm_start_params(model_name, dataset.id)
             if warm_start_dict:
                 self._status_text.append(f"Using NLSQ warm-start: {warm_start_dict}")
+                logger.debug(
+                    "NLSQ warm-start params selected",
+                    model_name=model_name,
+                    param_values=warm_start_dict,
+                    page="BayesianPage",
+                )
             else:
                 self._status_text.append(
                     "Warning: warm-start requested but no NLSQ fit found for "
@@ -795,6 +811,9 @@ class BayesianPage(QWidget):
         # WorkerPool.submit() separately connects completed/failed for job
         # lifecycle tracking; the connections below are for page-level UI
         # updates and are NOT duplicates.
+        # NOTE: BayesianWorker signals are connected both here (page-level UI)
+        # and in WorkerPool.submit() (pool-level cleanup). Both handlers fire
+        # on completion. Order is non-deterministic but both are idempotent.
         self._current_worker.signals.progress.connect(
             self._on_worker_progress, Qt.ConnectionType.QueuedConnection
         )
@@ -809,6 +828,19 @@ class BayesianPage(QWidget):
         )
         self._current_worker.signals.divergence_detected.connect(
             self._on_divergence, Qt.ConnectionType.QueuedConnection
+        )
+
+        logger.debug(
+            "MCMC worker created",
+            model_name=model_name,
+            dataset_id=self._submitted_dataset_id,
+            num_warmup=config.get("num_warmup", 1000),
+            num_samples=config.get("num_samples", 2000),
+            num_chains=config.get("num_chains", 4),
+            has_warm_start=warm_start_dict is not None,
+            has_priors=bool(config.get("priors")),
+            deformation_mode=deform_text,
+            page="BayesianPage",
         )
 
         # Use submit() method, not start()
@@ -855,6 +887,11 @@ class BayesianPage(QWidget):
     def _on_progress(self, percent: int, message: str) -> None:
         """Handle overall progress update (legacy slot for compatibility).
 
+        # Two progress paths exist:
+        # 1. _on_progress: legacy, via WorkerPool's generic progress relay
+        # 2. _on_worker_progress: direct from BayesianWorker signal
+        # Both dispatch to StateStore. This is intentional for backward compatibility.
+
         Parameters
         ----------
         percent : int
@@ -896,6 +933,7 @@ class BayesianPage(QWidget):
         stage : str
             Current stage ('warmup' or 'sampling')
         """
+        logger.debug("MCMC stage changed", stage=stage, page="BayesianPage")
         self._status_text.append(f"Stage: {stage}")
 
     @Slot(int)
@@ -909,6 +947,11 @@ class BayesianPage(QWidget):
         """
         self._divergence_label.setText(f"Divergences: {count}")
         if count > 0:
+            logger.warning(
+                "Divergent transitions detected",
+                divergence_count=count,
+                page="BayesianPage",
+            )
             self._divergence_label.setStyleSheet(
                 f"color: {ColorPalette.ERROR}; font-weight: bold;"
             )
@@ -945,7 +988,7 @@ class BayesianPage(QWidget):
         try:
             from dataclasses import replace as dc_replace
 
-            stored_result = dc_replace(
+            result = dc_replace(
                 result,
                 model_name=str(_model),
                 dataset_id=str(_dsid),
@@ -956,7 +999,7 @@ class BayesianPage(QWidget):
                 "falling back to manual construction",
                 exc_info=True,
             )
-            stored_result = BayesianResult(
+            result = BayesianResult(
                 model_name=str(_model),
                 dataset_id=str(_dsid),
                 posterior_samples=getattr(result, "posterior_samples", {}),
@@ -973,16 +1016,7 @@ class BayesianPage(QWidget):
                 inference_data=getattr(result, "inference_data", None),
                 diagnostics_valid=bool(getattr(result, "diagnostics_valid", True)),
             )
-        # store_bayesian_result dispatches STORE_BAYESIAN_RESULT, whose
-        # reducer already sets pipeline step to COMPLETE.
-        self._store.dispatch(
-            "STORE_BAYESIAN_RESULT",
-            {
-                "model_name": stored_result.model_name,
-                "dataset_id": stored_result.dataset_id,
-                "result": stored_result,
-            },
-        )
+        # R11-BP-001: Store dispatch handled by main_window._on_job_completed
 
         # Update diagnostics display
         self._update_diagnostics(result)
@@ -1001,15 +1035,38 @@ class BayesianPage(QWidget):
         # Update credible intervals table
         self._update_intervals_table(result)
 
-        # Log inference completion
+        # Log inference completion with diagnostics summary
         sampling_time = getattr(result, "sampling_time", 0.0)
+        _rhat = result.r_hat or {}
+        _ess = result.ess or {}
+        _divergences = int(getattr(result, "divergences", 0) or 0)
+        _max_rhat = max(_rhat.values()) if _rhat else None
+        _min_ess = min(_ess.values()) if _ess else None
         logger.info(
             "Bayesian inference completed",
             model_name=model_name,
             dataset_id=dataset_id,
             sampling_time=sampling_time,
+            divergences=_divergences,
+            max_rhat=_max_rhat,
+            min_ess=_min_ess,
+            num_params=len(_rhat),
             page="BayesianPage",
         )
+        if _max_rhat is not None and _max_rhat > 1.1:
+            logger.warning(
+                "R-hat above convergence threshold",
+                max_rhat=_max_rhat,
+                threshold=1.1,
+                page="BayesianPage",
+            )
+        if _min_ess is not None and _min_ess < 400:
+            logger.warning(
+                "ESS below recommended threshold",
+                min_ess=_min_ess,
+                threshold=400,
+                page="BayesianPage",
+            )
 
         self._status_text.append("Bayesian inference completed successfully!")
         self._status_text.append(f"Sampling time: {sampling_time:.2f}s")
@@ -1072,6 +1129,13 @@ class BayesianPage(QWidget):
         result : BayesianResult
             Inference result
         """
+        logger.debug(
+            "Updating diagnostics display",
+            has_rhat=bool(result.diagnostics.get("r_hat")),
+            has_ess=bool(result.diagnostics.get("ess")),
+            divergences=result.diagnostics.get("divergences", 0),
+            page="BayesianPage",
+        )
         # R-hat
         rhat = result.diagnostics.get("r_hat", {})
         if rhat:
@@ -1170,17 +1234,25 @@ class BayesianPage(QWidget):
             self._intervals_table.setItem(row, 3, upper_item)
 
     def _set_fit_plot_figure(self, fig) -> None:
-        """Replace the Fit Plot canvas figure."""
-        old_fig = self._fit_plot_canvas.figure
-        if old_fig is not None and old_fig is not fig:
-            # R6-GUI-002: Don't plt.close() a figure that was embedded in a
-            # FigureCanvasQTAgg — it destroys the C++ object while the canvas
-            # may still reference it. Just clear the old figure instead.
-            old_fig.clear()
+        """Replace the Fit Plot canvas figure.
 
-        self._fit_plot_canvas.figure = fig
+        Swaps both the widget's .figure attribute and the underlying
+        FigureCanvasQTAgg.figure reference atomically to ensure they stay
+        in sync. The old figure is cleared after reassignment to release
+        resources without destroying the canvas C++ object.
+
+        R6-GUI-002: Don't plt.close() a figure embedded in FigureCanvasQTAgg
+        — it destroys the C++ object while the canvas may still reference it.
+        Clear instead.
+        """
+        # Capture old figure from the canvas (authoritative reference)
+        fig_old = self._fit_plot_canvas.canvas.figure
+        # Atomically swap figure — set canvas.figure first, then widget attribute
         self._fit_plot_canvas.canvas.figure = fig
+        self._fit_plot_canvas.figure = fig
         self._fit_plot_canvas.axes = fig.get_axes()[0] if fig.get_axes() else None
+        if fig_old is not None and fig_old is not fig:
+            fig_old.clear()  # Release old figure resources
         self._fit_plot_canvas.canvas.draw_idle()
         self._fit_plot_placeholder.hide()
 
@@ -1503,7 +1575,9 @@ class BayesianPage(QWidget):
             },
             parent=self,
         )
-        if dialog.exec() == dialog.DialogCode.Accepted:  # R10-BP-003: exec_() deprecated in PySide6
+        if (
+            dialog.exec() == dialog.DialogCode.Accepted
+        ):  # R10-BP-003: exec_() deprecated in PySide6
             options = dialog.get_options()
             self._preset_priors = options.get("priors", self._preset_priors)
             logger.debug(

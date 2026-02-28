@@ -474,7 +474,8 @@ class TNTSingleMode(TNTBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -542,7 +543,8 @@ class TNTSingleMode(TNTBase):
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         # Extract and store protocol-specific parameters from kwargs
@@ -593,7 +595,7 @@ class TNTSingleMode(TNTBase):
         # Unpack variant parameters (dummy values for inactive variants)
         vp = self._unpack_variant_params(params)
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)

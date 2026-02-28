@@ -666,7 +666,9 @@ def parse_rheocompass_intervals(
         n_skipped=n_skipped,
     )
 
-    global_metadata["skipped_intervals"] = [(idx, reason) for idx, reason in skipped_intervals]
+    global_metadata["skipped_intervals"] = [
+        (idx, reason) for idx, reason in skipped_intervals
+    ]
     global_metadata["n_intervals_total"] = n_total
     global_metadata["n_intervals_skipped"] = n_skipped
 
@@ -865,6 +867,9 @@ def _is_column_constant(series: pd.Series, threshold: float = 0.01) -> bool:
         return True
 
     std_val = np.std(values)
+    # Absolute tolerance for near-zero data
+    if std_val < 1e-10:
+        return True
     return (std_val / mean_val) < threshold
 
 
@@ -1192,7 +1197,11 @@ def _interval_to_rheodata_oscillation(
             y = mapped_df["tensile_storage_modulus"].values
             deformation_mode = "tension"
         else:
-            y = np.zeros(len(mapped_df))
+            raise ValueError(
+                "Oscillation data requires 'storage_modulus'/'loss_modulus' or "
+                "'tensile_storage_modulus'/'tensile_loss_modulus' columns. "
+                f"Available columns: {list(mapped_df.columns)}"
+            )
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa
@@ -1255,8 +1264,11 @@ def _interval_to_rheodata_rotation(
         y = mapped_df["shear_stress"].values
         y_units = mapped_units.get("shear_stress", "Pa")
     else:
-        y = np.zeros(len(mapped_df))
-        y_units = "Pa.s"
+        raise ValueError(
+            f"Rotation interval has no recognized y-data column "
+            f"(expected 'viscosity' or 'shear_stress'). "
+            f"Available columns: {list(mapped_df.columns)}"
+        )
 
     x_units = mapped_units.get("shear_rate", "1/s")
 
@@ -1356,10 +1368,18 @@ def load_anton_paar(
         mapped_df, mapped_units = _map_columns_to_canonical(block.df, block.units)
 
         # Handle custom x/y column selection
-        if x_col is not None and x_col in mapped_df.columns:
-            pass  # Will be used in converter
-        if y_col is not None and y_col in mapped_df.columns:
-            pass  # Will be used in converter
+        if x_col is not None and x_col not in mapped_df.columns:
+            logger.warning(
+                "x_col override is not supported for Anton Paar format; "
+                "column selection is automatic based on test mode",
+                x_col=x_col,
+            )
+        if y_col is not None and y_col not in mapped_df.columns:
+            logger.warning(
+                "y_col override is not supported for Anton Paar format; "
+                "column selection is automatic based on test mode",
+                y_col=y_col,
+            )
 
         # Detect or use specified test mode
         detected_mode = test_mode

@@ -315,7 +315,8 @@ class VLBMultiNetwork(VLBBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -406,7 +407,8 @@ class VLBMultiNetwork(VLBBase):
         -------
         jnp.ndarray
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         if "gamma_dot" in kwargs:
@@ -458,7 +460,7 @@ class VLBMultiNetwork(VLBBase):
         """
         G_modes, kd_modes, eta_s, G_e = self._unpack_mode_params(params)
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
         gamma_dot = (

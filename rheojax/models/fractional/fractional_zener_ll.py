@@ -546,11 +546,16 @@ class FractionalZenerLiquidLiquid(BaseModel):
         gamma = self.parameters.get_value("gamma")
         tau = self.parameters.get_value("tau")
 
-        # Auto-detect test mode based on input characteristics
-        # NOTE: This is a heuristic - explicit test_mode is recommended
-        # Default to relaxation for time-domain data
-        # Oscillation should typically use RheoData with domain='frequency'
-        return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
+        # Dispatch based on test_mode
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        if test_mode in ("oscillation",):
+            return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+        elif test_mode in ("creep",):
+            return self._predict_creep(X, c1, c2, alpha, beta, gamma, tau)
+        else:
+            # Default to relaxation
+            return self._predict_relaxation(X, c1, c2, alpha, beta, gamma, tau)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
@@ -565,8 +570,6 @@ class FractionalZenerLiquidLiquid(BaseModel):
         Returns:
             Model predictions as JAX array
         """
-        from rheojax.core.test_modes import TestMode
-
         # Extract parameters from array (in order they were added to ParameterSet)
         c1 = params[0]
         c2 = params[1]
@@ -575,10 +578,10 @@ class FractionalZenerLiquidLiquid(BaseModel):
         gamma = params[4]
         tau = params[5]
 
-        # Use test_mode from last fit if available, otherwise default to OSCILLATION
+        # Use test_mode from last fit if available, otherwise default to oscillation
         # Get test_mode value BEFORE entering JIT region to avoid tracing issues
         if test_mode is None:
-            test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
+            test_mode = getattr(self, "_test_mode", "oscillation")
 
         # Convert to string representation for comparison (JAX-safe)
         if hasattr(test_mode, "value"):

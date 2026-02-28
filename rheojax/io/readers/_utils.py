@@ -138,9 +138,9 @@ _BENDING_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
         r"E[-_]?bend",  # E_bending, E-bend
-        r"bending",  # bending (keyword)
+        r"\bbending\b",  # bending (keyword, word-bounded)
         r"modulus[-_\s]*bend",  # modulus_bending
-        r"flexural",  # Flexural modulus (synonym)
+        r"\bflexural\b",  # Flexural modulus (synonym, word-bounded)
     ]
 ]
 
@@ -148,9 +148,9 @@ _COMPRESSION_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
         r"E[-_]?comp",  # E_compression, E-comp
-        r"compression",  # compression (keyword)
+        r"\bcompression\b",  # compression (keyword, word-bounded)
         r"modulus[-_\s]*comp",  # modulus_compression
-        r"compressive",  # Compressive modulus
+        r"\bcompressive\b",  # Compressive modulus (word-bounded)
     ]
 ]
 
@@ -386,7 +386,9 @@ def detect_deformation_mode_from_columns(
 
     Returns:
         'tension' if tensile modulus detected, 'shear' if shear modulus
-        detected, None if ambiguous or unknown.
+        detected, 'bending' if bending/flexural modulus detected,
+        'compression' if compressive modulus detected, or None if
+        ambiguous or unknown.
     """
     all_text = " ".join(y_headers)
 
@@ -411,6 +413,26 @@ def detect_deformation_mode_from_columns(
         "compression": compression_score,
     }
     nonzero = {k: v for k, v in scores.items() if v > 0}
+
+    # R11-DMTA-001: Geometry-specific modes (bending/compression) override
+    # generic tensile when both match, because bending/compression column
+    # names (e.g. "E_bending") also trigger tensile E-patterns.
+    if bending_score > 0:
+        logger.debug(
+            "Deformation mode detected (bending overrides tensile)",
+            mode="bending",
+            scores=scores,
+            y_headers=y_headers,
+        )
+        return "bending"
+    if compression_score > 0:
+        logger.debug(
+            "Deformation mode detected (compression overrides tensile)",
+            mode="compression",
+            scores=scores,
+            y_headers=y_headers,
+        )
+        return "compression"
 
     if len(nonzero) == 1:
         mode = next(iter(nonzero))

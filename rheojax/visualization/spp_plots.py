@@ -141,7 +141,8 @@ def plot_lissajous(
         # Plot sigma vs gamma (elastic Lissajous)
         ax1.plot(strain_plot, stress_plot, linewidth=linewidth, **kwargs)
         ax1.set_xlabel(
-            r"$\gamma/\gamma_0$" if gamma_0 is not None else r"$\gamma$", fontsize=fontsize
+            r"$\gamma/\gamma_0$" if gamma_0 is not None else r"$\gamma$",
+            fontsize=fontsize,
         )
         ax1.set_ylabel(r"$\sigma$ (Pa)", fontsize=fontsize)
         ax1.set_title("Elastic Lissajous", fontsize=fontsize + 2)
@@ -468,7 +469,11 @@ def plot_harmonic_spectrum(
 
         # VIS-P1-006: guard against zero harmonics or empty amplitudes
         if n_harmonics == 0 or len(amplitudes) == 0:
-            logger.warning("No harmonics to plot", n_harmonics=n_harmonics, n_amplitudes=len(amplitudes))
+            logger.warning(
+                "No harmonics to plot",
+                n_harmonics=n_harmonics,
+                n_amplitudes=len(amplitudes),
+            )
             ax.set_title("Harmonic Spectrum (empty)")
             return fig
 
@@ -794,7 +799,9 @@ def create_spp_report(
 
     # VIZ-006: guard against division by zero in period and normalization computations
     if omega == 0.0:
-        raise ValueError("omega must be non-zero for SPP report (period would be infinite)")
+        raise ValueError(
+            "omega must be non-zero for SPP report (period would be infinite)"
+        )
     if gamma_0 == 0.0:
         raise ValueError("gamma_0 must be non-zero for SPP report normalization")
 
@@ -824,13 +831,12 @@ def create_spp_report(
         )
 
         # Compute strain rate
-        strain_rate = (
-            gamma_0
-            * omega
-            * np.cos(omega * np.linspace(0, 2 * np.pi / omega, len(strain)))
-        )
         if "strain_rate_normalized" in spp_results:
             strain_rate = np.asarray(spp_results["strain_rate_normalized"]) * omega
+        else:
+            # R11-SPP-VIZ-001: Use numerical derivative for non-ideal LAOS
+            dt = (2 * np.pi / omega) / max(len(strain) - 1, 1)
+            strain_rate = np.gradient(strain, dt)
 
         # VIS-SPP-001: Reconcile strain/stress/strain_rate to SPP result length
         # (Gp_t). SPP analysis trims endpoints, so Gp_t may be shorter than

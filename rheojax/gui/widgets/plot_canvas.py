@@ -140,7 +140,16 @@ class PlotCanvas(QWidget):
         # when jax.clear_caches() is called by the Bayesian worker.
         # GUI-R6-001: Preserve complex dtype for oscillation G* data —
         # np.array(y, dtype=float) silently drops the imaginary part (G'').
-        self._plot_data.append((np.array(x, dtype=float, copy=True), np.array(y, copy=True), label))
+        x_copy = np.array(x, dtype=float, copy=True)
+        y_copy = np.array(y, copy=True)
+        # R11-PC-001: Replace existing entry for same label to avoid
+        # accumulating stale copies on repeated plot_data() calls.
+        for i, (_, _, existing_label) in enumerate(self._plot_data):
+            if existing_label == label:
+                self._plot_data[i] = (x_copy, y_copy, label)
+                break
+        else:
+            self._plot_data.append((x_copy, y_copy, label))
 
         logger.debug("Rendering", widget=self.__class__.__name__)
         self.canvas.draw_idle()
@@ -433,7 +442,11 @@ class PlotCanvas(QWidget):
             if event.xdata is None or event.ydata is None:
                 return
             if self.axes.get_xscale() == "log":
-                if self._pan_start[0] is None or self._pan_start[0] <= 0 or event.xdata <= 0:
+                if (
+                    self._pan_start[0] is None
+                    or self._pan_start[0] <= 0
+                    or event.xdata <= 0
+                ):
                     self._panning = False
                     return
                 # Log scale panning
@@ -505,8 +518,7 @@ class PlotCanvas(QWidget):
                     dy_arr = np.where(pos_mask_y, np.log10(dy_arr), np.inf)
 
             dist_arr = np.sqrt(
-                ((x_val - dx_arr) / x_range) ** 2
-                + ((y_val - dy_arr) / y_range) ** 2
+                ((x_val - dx_arr) / x_range) ** 2 + ((y_val - dy_arr) / y_range) ** 2
             )
             valid = np.isfinite(dist_arr)
             if not np.any(valid):

@@ -157,8 +157,10 @@ class MastercurvePipeline(Pipeline):
         # Guard against None metadata on programmatic RheoData (R10-WF-002).
         datasets = [
             RheoData(
-                x=d.x, y=d.y,
-                x_units=d.x_units, y_units=d.y_units,
+                x=d.x,
+                y=d.y,
+                x_units=d.x_units,
+                y_units=d.y_units,
                 metadata={**(d.metadata or {}), "temperature": temp},
             )
             for d, temp in zip(datasets, temperatures, strict=False)
@@ -673,7 +675,7 @@ class FrequencyToTimePipeline(Pipeline):
                 y_units=frequency_data.y_units,
                 domain="time",
                 metadata={
-                    **frequency_data.metadata,
+                    **(frequency_data.metadata or {}),
                     "conversion": "frequency_to_time",
                     "original_domain": "frequency",
                 },

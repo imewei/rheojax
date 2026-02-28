@@ -142,9 +142,9 @@ def plot_modulus_frequency(
         # Pop deformation_mode so it doesn't leak to matplotlib
         deformation_mode = kwargs.pop("deformation_mode", None)
         if deformation_mode is None:
-            deformation_mode = getattr(data, "deformation_mode", None) or data.metadata.get(
-                "deformation_mode"
-            )
+            deformation_mode = getattr(
+                data, "deformation_mode", None
+            ) or data.metadata.get("deformation_mode")
 
         if separate_axes and np.iscomplexobj(y_data):
             # Two separate axes for storage/loss modulus
@@ -191,7 +191,9 @@ def plot_modulus_frequency(
                 x_gp, gp = _filter_positive(x_data, np.real(y_data), warn=True)
                 x_gpp, gpp = _filter_positive(x_data, np.imag(y_data), warn=True)
                 # VIZ-003: strip label/color from plot_kwargs to avoid TypeError on duplicate kwargs
-                plot_kwargs_safe = {k: v for k, v in plot_kwargs.items() if k not in ("label", "color")}
+                plot_kwargs_safe = {
+                    k: v for k, v in plot_kwargs.items() if k not in ("label", "color")
+                }
                 ax.loglog(x_gp, gp, **plot_kwargs_safe, label=storage_label)
                 ax.loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_label, color="C1")
                 ax.legend()
@@ -493,7 +495,9 @@ def plot_model_fit(
                     linewidth=style_params["lines.linewidth"],
                 )
                 axes[0, 0].set_ylabel(
-                    f"{fit_storage_label} ({data.y_units})" if data.y_units else f"{fit_storage_label} (Pa)"
+                    f"{fit_storage_label} ({data.y_units})"
+                    if data.y_units
+                    else f"{fit_storage_label} (Pa)"
                 )
                 axes[0, 0].legend()
                 axes[0, 0].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -524,7 +528,9 @@ def plot_model_fit(
                     color="C1",
                 )
                 axes[0, 1].set_ylabel(
-                    f'{fit_loss_label} ({data.y_units})' if data.y_units else f'{fit_loss_label} (Pa)'
+                    f"{fit_loss_label} ({data.y_units})"
+                    if data.y_units
+                    else f"{fit_loss_label} (Pa)"
                 )
                 axes[0, 1].legend()
                 axes[0, 1].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -581,7 +587,7 @@ def plot_model_fit(
                     if data.x_units
                     else "Frequency (rad/s)"
                 )
-                axes[1, 1].set_ylabel(f'{fit_loss_label} Residuals (%)')
+                axes[1, 1].set_ylabel(f"{fit_loss_label} Residuals (%)")
                 axes[1, 1].grid(True, alpha=0.3, linestyle="--")
 
                 if model_name:
@@ -690,9 +696,9 @@ def plot_model_fit(
                     else "Frequency (rad/s)"
                 )
                 axes[1].set_ylabel(
-                    f'{fit_loss_label} ({data.y_units})'
+                    f"{fit_loss_label} ({data.y_units})"
                     if data.y_units
-                    else f'{fit_loss_label} (Pa)'
+                    else f"{fit_loss_label} (Pa)"
                 )
                 axes[1].legend()
                 axes[1].grid(True, which="both", alpha=0.3, linestyle="--")
@@ -718,10 +724,20 @@ def plot_model_fit(
                 # scale will be applied, to prevent blank axes from t=0 or y<=0.
                 xd, yd, xp, yp = x_data, y_data, x_data, y_pred
                 if is_log:
-                    pos_mask = np.isfinite(y_data) & (y_data > 0) & np.isfinite(x_data) & (x_data > 0)
+                    pos_mask = (
+                        np.isfinite(y_data)
+                        & (y_data > 0)
+                        & np.isfinite(x_data)
+                        & (x_data > 0)
+                    )
                     if not np.all(pos_mask) and np.any(pos_mask):
                         xd, yd = x_data[pos_mask], y_data[pos_mask]
-                    pred_mask = np.isfinite(y_pred) & (y_pred > 0) & np.isfinite(x_data) & (x_data > 0)
+                    pred_mask = (
+                        np.isfinite(y_pred)
+                        & (y_pred > 0)
+                        & np.isfinite(x_data)
+                        & (x_data > 0)
+                    )
                     if not np.all(pred_mask) and np.any(pred_mask):
                         xp, yp = x_data[pred_mask], y_pred[pred_mask]
 

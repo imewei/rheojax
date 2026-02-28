@@ -1659,7 +1659,7 @@ class DMTLocal(DMTBase):
             Predicted response (stress, strain, or complex modulus)
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
-        mode = test_mode or self._test_mode
+        mode = test_mode if test_mode is not None else self._test_mode
         if mode is None:
             mode = "flow_curve"
 

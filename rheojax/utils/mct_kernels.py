@@ -42,8 +42,8 @@ logger = get_logger(__name__)
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel(
     phi: jax.Array,
-    v1: "jax.Array | float",
-    v2: "jax.Array | float",
+    v1: jax.Array | float,
+    v2: jax.Array | float,
 ) -> jax.Array:
     """Compute F₁₂ schematic model memory kernel.
 
@@ -85,8 +85,8 @@ def f12_memory_kernel(
 @partial(jax.jit, static_argnames=())
 def f12_memory_kernel_derivative(
     phi: jax.Array,
-    v1: "jax.Array | float",
-    v2: "jax.Array | float",
+    v1: jax.Array | float,
+    v2: jax.Array | float,
 ) -> jax.Array:
     """Compute derivative of F₁₂ memory kernel with respect to Φ.
 
@@ -117,7 +117,7 @@ def f12_memory_kernel_derivative(
 @partial(jax.jit, static_argnames=())
 def advected_memory_decorrelation(
     gamma: jax.Array,
-    gamma_c: "jax.Array | float",
+    gamma_c: jax.Array | float,
 ) -> jax.Array:
     """Compute strain decorrelation function h(γ).
 
@@ -157,7 +157,7 @@ def advected_memory_decorrelation(
 def advected_correlator(
     phi_eq: jax.Array,
     gamma: jax.Array,
-    gamma_c: "jax.Array | float",
+    gamma_c: jax.Array | float,
 ) -> jax.Array:
     """Compute advected correlator Φ(t,t') under shear.
 
@@ -964,7 +964,9 @@ def _solve_equilibrium_correlator_f12_jit(
 
     # R6-UTIL-002: phi_trajectory[i] = Φ((i+1)*dt), so the integration grid
     # starts at dt, not 0.  Prepend t=0 with Φ(0)=1 for correct interpolation.
-    t_integration = jnp.concatenate([jnp.array([0.0]), jnp.linspace(dt, t_max, n_steps)])
+    t_integration = jnp.concatenate(
+        [jnp.array([0.0]), jnp.linspace(dt, t_max, n_steps)]
+    )
     phi_full = jnp.concatenate([jnp.array([1.0]), phi_trajectory])
     from interpax import interp1d
 
@@ -990,16 +992,19 @@ def solve_equilibrium_correlator_f12(
             "Glass phase detected (v2=%.2f > 4). Correlator solver uses "
             "simplified constant-kernel approximation. Results may be "
             "inaccurate for intermediate times. Use Prony-based Volterra "
-            "solver for quantitative accuracy.", v2
+            "solver for quantitative accuracy.",
+            v2,
         )
     # R10-MCT-001: warn in fluid phase where constant-kernel approximation also
     # introduces error for intermediate times (Φ(t) is not yet at its long-time
     # limit during the transient decay, so m(Φ_current) ≠ m(Φ(t-s)) for s < t).
     else:
-        logger.debug(
+        # R11-MCT-001: Log at INFO (not DEBUG) so users are aware of the approximation
+        logger.info(
             "Fluid phase (v2=%.2f < 4). Constant-kernel approximation used "
             "in correlator solver. Results are quantitatively accurate at "
             "long times (Φ → 0) but may deviate for intermediate times. "
-            "Use Prony-based Volterra solver for higher accuracy.", v2
+            "Use Prony-based Volterra solver for higher accuracy.",
+            v2,
         )
     return _solve_equilibrium_correlator_f12_jit(t_array, v1, v2, Gamma, n_steps)

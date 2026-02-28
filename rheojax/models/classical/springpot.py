@@ -289,7 +289,11 @@ class SpringPot(BaseModel):
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(x_data, c_alpha, alpha)
         else:
-            raise ValueError(f"Unsupported test mode: {test_mode}")
+            supported = [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
+            raise ValueError(
+                f"Unsupported test mode: {test_mode}. "
+                f"SpringPot supports: {', '.join(supported)}"
+            )
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.

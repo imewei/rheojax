@@ -134,7 +134,10 @@ def save_excel(
                         "Creating predictions dataframe",
                         num_predictions=len(results["predictions"]),
                     )
-                    pred_df = _create_predictions_dataframe(results["predictions"])
+                    pred_df = _create_predictions_dataframe(
+                        results["predictions"],
+                        deformation_mode=results.get("deformation_mode"),
+                    )
                     pred_df.to_excel(writer, sheet_name="Predictions", index=False)
                     sheets_written.append("Predictions")
                     logger.debug("Predictions sheet written", rows=len(pred_df))
@@ -160,7 +163,9 @@ def save_excel(
                     sheets_written.extend(
                         [f"Plot_{name[:25]}" for name in results["plots"].keys()]
                     )
-                    logger.debug("Plots embedded", plot_names=list(results["plots"].keys()))
+                    logger.debug(
+                        "Plots embedded", plot_names=list(results["plots"].keys())
+                    )
 
             os.replace(tmp_path, str(filepath))
             tmp_path = None  # prevent cleanup
@@ -236,13 +241,20 @@ def _create_quality_dataframe(fit_quality: dict[str, Any]) -> Any:
     return pd.DataFrame(data)
 
 
-def _create_predictions_dataframe(predictions: np.ndarray) -> Any:
+def _create_predictions_dataframe(
+    predictions: np.ndarray,
+    deformation_mode: str | None = None,
+) -> Any:
     """Create DataFrame for predictions.
 
-    Handles complex arrays (G*=G'+iG'') by splitting into separate columns.
+    Handles complex arrays (G*=G'+iG'' or E*=E'+iE'') by splitting into
+    separate columns. Column labels use the appropriate modulus prefix
+    based on the deformation mode.
 
     Args:
         predictions: Array of predictions (real or complex)
+        deformation_mode: Deformation mode ('tension', 'bending',
+            'compression', or None for shear). Controls column label prefix.
 
     Returns:
         pandas DataFrame
@@ -250,19 +262,20 @@ def _create_predictions_dataframe(predictions: np.ndarray) -> Any:
     import pandas as pd
 
     predictions = np.asarray(predictions)
+    prefix = "E" if deformation_mode in {"tension", "bending", "compression"} else "G"
     if np.iscomplexobj(predictions):
         return pd.DataFrame(
             {
                 "Index": np.arange(len(predictions)),
-                "G' (Storage)": np.real(predictions),
-                "G'' (Loss)": np.imag(predictions),
+                f"{prefix}' (Storage)": np.real(predictions),
+                f"{prefix}'' (Loss)": np.imag(predictions),
             }
         )
     if predictions.ndim == 2:
         # GMM output returns (N, 2) real arrays [G'/E', G''/E'']
         col_names = [f"Component_{i}" for i in range(predictions.shape[1])]
         if predictions.shape[1] == 2:
-            col_names = ["G' (Storage)", "G'' (Loss)"]
+            col_names = [f"{prefix}' (Storage)", f"{prefix}'' (Loss)"]
         df_dict = {"Index": np.arange(len(predictions))}
         for i, name in enumerate(col_names):
             df_dict[name] = predictions[:, i]
@@ -331,7 +344,9 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
 
     for plot_name, fig in plots.items():
         # Create sheet for this plot
-        sheet_name = re.sub(r'[\\/*?\[\]:]', '_', f"Plot_{plot_name[:25]}")  # Excel sheet name limit
+        sheet_name = re.sub(
+            r"[\\/*?\[\]:]", "_", f"Plot_{plot_name[:25]}"
+        )  # Excel sheet name limit
         logger.debug(
             "Embedding plot",
             plot_name=plot_name,

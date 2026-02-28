@@ -84,7 +84,7 @@ _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
 
 
 def _validate_optimization_result(
-    result: "OptimizationResult",
+    result: OptimizationResult,
     residuals: np.ndarray,
     y_data: np.ndarray | None = None,
     mse_threshold: float = 1e18,
@@ -463,9 +463,8 @@ class OptimizationResult:
             half = len(y_data)
             ss_res = np.sum(residuals[:half] ** 2) + np.sum(residuals[half:] ** 2)
             if np.iscomplexobj(y_data):
-                ss_tot = (
-                    np.sum((y_data.real - np.mean(y_data.real)) ** 2)
-                    + np.sum((y_data.imag - np.mean(y_data.imag)) ** 2)
+                ss_tot = np.sum((y_data.real - np.mean(y_data.real)) ** 2) + np.sum(
+                    (y_data.imag - np.mean(y_data.imag)) ** 2
                 )
             else:
                 ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
@@ -1225,11 +1224,11 @@ def nlsq_optimize(
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
     residuals_raw = np.asarray(objective(x_opt))
     if np.iscomplexobj(residuals_raw):
-        residuals_np: np.ndarray = np.concatenate(
+        residuals_np = np.concatenate(
             [np.real(residuals_raw), np.imag(residuals_raw)]
         ).astype(np.float64)
     else:
-        residuals_np: np.ndarray = residuals_raw.astype(np.float64)
+        residuals_np = residuals_raw.astype(np.float64)
 
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
     result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
@@ -1521,7 +1520,7 @@ def nlsq_multistart_optimize(
             logger.debug("Starting multi-start attempt", attempt=i + 1, total=n_starts)
             if verbose:
                 logger.info(
-                    f"Multi-start optimization: Attempt {i+1} (random perturbation)"
+                    f"Multi-start optimization: Attempt {i + 1} (random perturbation)"
                 )
 
             start_idx, result = run_single_optimization(i, perturbed_values)
@@ -1548,7 +1547,7 @@ def nlsq_multistart_optimize(
                         logger.info(f"  -> New best! Cost: {best_cost:.3e}")
             else:
                 if verbose:
-                    logger.warning(f"  Attempt {i+1} failed")
+                    logger.warning(f"  Attempt {i + 1} failed")
 
     # Restore best parameters
     parameters.set_values(best_result.x)

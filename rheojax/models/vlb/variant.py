@@ -360,7 +360,8 @@ class VLBVariant(VLBBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -427,7 +428,8 @@ class VLBVariant(VLBBase):
 
     def _predict(self, X, **kwargs):
         """Predict response from fitted model."""
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Store protocol-specific parameters from kwargs
@@ -495,7 +497,7 @@ class VLBVariant(VLBBase):
             k_d_0 = vlb_arrhenius_shift(k_d_0, E_a, T, T_ref)
             G0 = vlb_thermal_modulus(G0, T, T_ref)
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Protocol parameters

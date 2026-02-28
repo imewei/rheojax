@@ -98,8 +98,6 @@ def percus_yevick_sk(
 
     # Percus-Yevick coefficients
     eta = phi  # Often use eta = phi for PY
-    eta2 = eta * eta
-    eta3 = eta * eta2
 
     # Coefficients for direct correlation function c(r)
     # c(r) = -(a + b*r/σ + c*(r/σ)³) for r < σ, 0 otherwise
@@ -164,8 +162,6 @@ def percus_yevick_sk_jax(
     """
     q = k * sigma
     eta = phi
-    eta2 = eta * eta
-    eta3 = eta * eta2
 
     denom = (1 - eta) ** 4
     a_coeff = (1 + 2 * eta) ** 2 / denom
@@ -466,8 +462,8 @@ def mct_vertex_isotropic(
     # -------------------------------------------------------------------------
     # On-grid structure factors and direct correlation functions
     # -------------------------------------------------------------------------
-    sk = sk_func(k)   # (n_k,)
-    sq = sk_func(q)   # (n_k,)
+    sk = sk_func(k)  # (n_k,)
+    sq = sk_func(q)  # (n_k,)
 
     # c(k) = (1 - 1/S(k)) / n_density  (R3-U-006: includes number density)
     cq = (1.0 - 1.0 / np.maximum(sq, 1e-30)) / n_density  # (n_k,)
@@ -481,25 +477,25 @@ def mct_vertex_isotropic(
     # -------------------------------------------------------------------------
     # Broadcast shapes for vectorised (n_k, n_k) computation
     # -------------------------------------------------------------------------
-    ki = k[:, None]   # (n_k, 1)
-    qj = q[None, :]   # (1, n_k)
+    ki = k[:, None]  # (n_k, 1)
+    qj = q[None, :]  # (1, n_k)
 
     # Triangle-constraint integration limits (Götze 2009 eq. 2.73)
-    p_min = np.abs(ki - qj)          # (n_k, n_k)
-    p_max = ki + qj                  # (n_k, n_k)
+    p_min = np.abs(ki - qj)  # (n_k, n_k)
+    p_max = ki + qj  # (n_k, n_k)
 
     # Change-of-variables p = p_mid + half_range * xi_l, xi_l ∈ [-1, 1]
     half_range = 0.5 * (p_max - p_min)  # (n_k, n_k); = 0 when k=0 or q=0
-    p_mid      = 0.5 * (p_max + p_min)  # (n_k, n_k)
+    p_mid = 0.5 * (p_max + p_min)  # (n_k, n_k)
 
     # Broadcast S(q) and c(q) — constant across the p-integral for fixed (k,q)
-    sq_2d  = sq[None, :]   # (1, n_k)
-    cq_2d  = cq[None, :]   # (1, n_k)
+    sq_2d = sq[None, :]  # (1, n_k)
+    cq_2d = cq[None, :]  # (1, n_k)
 
     # Guard 1/(2k) projection denominators; k=0 row is zeroed at the end
-    k_safe = np.maximum(ki, 1e-30)   # (n_k, 1)
-    ki_sq  = ki * ki                 # (n_k, 1)
-    qj_sq  = qj * qj                 # (1, n_k)
+    k_safe = np.maximum(ki, 1e-30)  # (n_k, 1)
+    ki_sq = ki * ki  # (n_k, 1)
+    qj_sq = qj * qj  # (1, n_k)
 
     # -------------------------------------------------------------------------
     # Gauss-Legendre quadrature over p ∈ [p_min, p_max]:
@@ -507,12 +503,12 @@ def mct_vertex_isotropic(
     # -------------------------------------------------------------------------
     integral = np.zeros((n_k, n_k), dtype=np.float64)
 
-    for xi_l, w_l in zip(xi, w_gl):
+    for xi_l, w_l in zip(xi, w_gl, strict=True):
         # Quadrature abscissa in physical units: shape (n_k, n_k)
         p_l = p_mid + half_range * xi_l
 
         # S(p_l): batched sk_func call via ravel/reshape (O(n_k²) per GL point)
-        s_pl = sk_func(p_l.ravel()).reshape(n_k, n_k)   # (n_k, n_k)
+        s_pl = sk_func(p_l.ravel()).reshape(n_k, n_k)  # (n_k, n_k)
 
         # c(p_l) = (1 - 1/S(p_l)) / n_density
         c_pl = (1.0 - 1.0 / np.maximum(s_pl, 1e-30)) / n_density  # (n_k, n_k)
@@ -520,15 +516,15 @@ def mct_vertex_isotropic(
         # Geometric projection coefficients (law of cosines):
         #   alpha_q = (k² + q² - p²) / (2k)   [projection onto q direction]
         #   alpha_p = (k² - q² + p²) / (2k)   [projection onto p direction]
-        p_l_sq  = p_l * p_l                                          # (n_k, n_k)
-        alpha_q = (ki_sq + qj_sq - p_l_sq) / (2.0 * k_safe)        # (n_k, n_k)
-        alpha_p = (ki_sq - qj_sq + p_l_sq) / (2.0 * k_safe)        # (n_k, n_k)
+        p_l_sq = p_l * p_l  # (n_k, n_k)
+        alpha_q = (ki_sq + qj_sq - p_l_sq) / (2.0 * k_safe)  # (n_k, n_k)
+        alpha_p = (ki_sq - qj_sq + p_l_sq) / (2.0 * k_safe)  # (n_k, n_k)
 
         # MCT coupling vertex: C(k,q,p) = alpha_q * c(q) + alpha_p * c(p)
-        C_kqp = alpha_q * cq_2d + alpha_p * c_pl                    # (n_k, n_k)
+        C_kqp = alpha_q * cq_2d + alpha_p * c_pl  # (n_k, n_k)
 
         # Integrand: p * S(q) * S(p) * C(k,q,p)²
-        integrand_l = p_l * sq_2d * s_pl * C_kqp * C_kqp           # (n_k, n_k)
+        integrand_l = p_l * sq_2d * s_pl * C_kqp * C_kqp  # (n_k, n_k)
 
         # Accumulate: Jacobian of variable transform is half_range
         integral += w_l * half_range * integrand_l
@@ -541,16 +537,16 @@ def mct_vertex_isotropic(
     #   m(k,t) = ∑_q V(k,q) * Φ(q,t)²
     # is a plain matrix-vector product (no extra weights needed at call sites).
     # -------------------------------------------------------------------------
-    k4_safe = np.maximum(ki_sq * ki_sq, 1e-30)    # (n_k, 1), guards k=0
+    k4_safe = np.maximum(ki_sq * ki_sq, 1e-30)  # (n_k, 1), guards k=0
 
     V = (
         (n_density * sk[:, None] / (32.0 * np.pi**2 * k4_safe))
-        * (qj_sq * dq)   # q² Δq integration weight
-        * integral        # p-integral I(k,q), already contains S(q) factor
+        * (qj_sq * dq)  # q² Δq integration weight
+        * integral  # p-integral I(k,q), already contains S(q) factor
     )
 
     # Zero out k=0 row explicitly (no coupling at zero wavevector)
-    k_zero_mask = k < 1e-30   # (n_k,)
+    k_zero_mask = k < 1e-30  # (n_k,)
     V[k_zero_mask, :] = 0.0
 
     # Numerical guard: C² and S > 0 guarantee non-negativity in exact arithmetic;

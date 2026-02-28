@@ -95,10 +95,21 @@ class ImportWorker(QRunnable):
     def run(self) -> None:
         """Execute file import in background thread."""
         try:
-            logger.debug(
+            file_size = self._file_path.stat().st_size if self._file_path.exists() else -1
+            file_suffix = self._file_path.suffix.lower()
+            logger.info(
                 "Import worker started",
                 filepath=str(self._file_path),
+                file_size_bytes=file_size,
+                file_format=file_suffix,
+                x_col=self._x_col,
+                y_col=self._y_col,
+                y2_col=self._y2_col,
+                test_mode=self._test_mode,
             )
+
+            # NOTE: Cancellation is not implemented for ImportWorker — the file
+            # I/O call below is synchronous and non-interruptible.
 
             datasets = self._data_service.load_file_multi(
                 self._file_path,
@@ -108,10 +119,28 @@ class ImportWorker(QRunnable):
                 test_mode=self._test_mode,
             )
 
-            logger.debug(
+            total_rows = sum(
+                len(ds.x) for ds in datasets
+                if hasattr(ds, "x") and ds.x is not None
+            )
+            detected_modes = []
+            for ds in datasets:
+                mode = getattr(ds, "test_mode", None)
+                if not mode and hasattr(ds, "metadata") and ds.metadata:
+                    mode = ds.metadata.get("detected_test_mode")
+                detected_modes.append(mode)
+            logger.info(
                 "Import worker completed",
                 filepath=str(self._file_path),
                 num_segments=len(datasets),
+                total_rows=total_rows,
+                detected_test_modes=detected_modes,
+            )
+            logger.debug(
+                "Import column mapping result",
+                x_col_used=self._x_col,
+                y_col_used=self._y_col,
+                y2_col_used=self._y2_col,
             )
 
             self.signals.completed.emit(datasets)
@@ -121,6 +150,7 @@ class ImportWorker(QRunnable):
             logger.error(
                 "Import worker failed",
                 filepath=str(self._file_path),
+                exception_type=type(e).__name__,
                 error=error_msg,
                 exc_info=True,
             )

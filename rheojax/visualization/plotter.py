@@ -45,6 +45,7 @@ def _modulus_labels(
         return f"E' ({units})", f'E" ({units})', f"Modulus ({units})"
     return f"G' ({units})", f'G" ({units})', f"Modulus ({units})"
 
+
 # Default plotting style parameters
 # Module constants for consistent plot styling
 # Note: _GRID_ALPHA and _GRID_LINESTYLE are also used (with inline literals) in
@@ -147,7 +148,9 @@ def _filter_positive(
     """
     # VIS-P2-007: Guard against complex arrays — comparison y > 0 is undefined for complex
     if np.iscomplexobj(y):
-        raise TypeError("_filter_positive received complex y array; extract real/imag first")
+        raise TypeError(
+            "_filter_positive received complex y array; extract real/imag first"
+        )
 
     positive_mask = np.isfinite(y) & (y > 0)
     n_removed = len(y) - np.sum(positive_mask)
@@ -216,14 +219,16 @@ def plot_rheo_data(
         kwargs = dict(kwargs)
         deformation_mode = kwargs.pop("deformation_mode", None)
         if deformation_mode is None:
-            deformation_mode = getattr(data, "deformation_mode", None) or data.metadata.get(
-                "deformation_mode"
-            )
+            deformation_mode = getattr(
+                data, "deformation_mode", None
+            ) or data.metadata.get("deformation_mode")
 
         # VIS-P2-003: Detect frequency-domain data even when y is real (e.g., only G' stored)
-        is_freq_domain = (
-            getattr(data, 'domain', None) == 'frequency'
-            or data.metadata.get('test_mode') in ('oscillation', 'frequency_sweep')
+        is_freq_domain = getattr(
+            data, "domain", None
+        ) == "frequency" or data.metadata.get("test_mode") in (
+            "oscillation",
+            "frequency_sweep",
         )
 
         if is_freq_domain or np.iscomplexobj(data.y):
@@ -462,25 +467,41 @@ def plot_frequency_domain(
             # VIZ-016: Prefer user-supplied label/color over the automatic defaults.
             user_storage_label = kwargs.pop("label", None)
             user_color = kwargs.pop("color", None)
-            plot_kwargs_safe = {k: v for k, v in plot_kwargs.items() if k not in ('label', 'color')}
+            plot_kwargs_safe = {
+                k: v for k, v in plot_kwargs.items() if k not in ("label", "color")
+            }
 
             # Storage modulus
             x_gp, gp = _filter_positive(x, np.real(y), warn=True)
-            axes[0].loglog(x_gp, gp, **plot_kwargs_safe, label=user_storage_label or storage_sym)
+            axes[0].loglog(
+                x_gp, gp, **plot_kwargs_safe, label=user_storage_label or storage_sym
+            )
             axes[0].set_ylabel(f"{storage_sym} ({units})")
-            axes[0].grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
+            axes[0].grid(
+                True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE
+            )
             axes[0].legend()
 
             # Loss modulus
             # VIZ-R6-001: Use distinct label for loss modulus subplot
             x_gpp, gpp = _filter_positive(x, np.imag(y), warn=True)
-            loss_label = f"{user_storage_label} (loss)" if user_storage_label else loss_sym
-            axes[1].loglog(x_gpp, gpp, **plot_kwargs_safe, label=loss_label, color=user_color or "C1")
+            loss_label = (
+                f"{user_storage_label} (loss)" if user_storage_label else loss_sym
+            )
+            axes[1].loglog(
+                x_gpp,
+                gpp,
+                **plot_kwargs_safe,
+                label=loss_label,
+                color=user_color or "C1",
+            )
             axes[1].set_xlabel(
                 f"Frequency ({x_units})" if x_units else "Frequency (rad/s)"
             )
             axes[1].set_ylabel(f"{loss_sym} ({units})")
-            axes[1].grid(True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE)
+            axes[1].grid(
+                True, which="both", alpha=_GRID_ALPHA, linestyle=_GRID_LINESTYLE
+            )
             axes[1].legend()
 
             fig.tight_layout()
@@ -821,7 +842,9 @@ def compute_uncertainty_band(
 
         # VIS-P2-001: Guard against Inf/NaN from ill-conditioned covariance matrix
         if not np.all(np.isfinite(sigma_y)):
-            logger.warning("Non-finite uncertainty from ill-conditioned covariance matrix")
+            logger.warning(
+                "Non-finite uncertainty from ill-conditioned covariance matrix"
+            )
             return y_fit, None, None
 
         # Compute z-score for confidence interval
@@ -1146,7 +1169,17 @@ def save_figure(
 
         # Validate format
         # VIS-P3-002: Expanded to include all common matplotlib-supported raster formats
-        supported_formats = {"pdf", "svg", "png", "eps", "tiff", "tif", "jpg", "jpeg", "webp"}
+        supported_formats = {
+            "pdf",
+            "svg",
+            "png",
+            "eps",
+            "tiff",
+            "tif",
+            "jpg",
+            "jpeg",
+            "webp",
+        }
         format_lower = format.lower()
         if format_lower not in supported_formats:
             raise ValueError(

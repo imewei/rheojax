@@ -200,6 +200,10 @@ class FitWorker(QRunnable):
             _fit_start = time.perf_counter()
 
             def _elapsed_timer():
+                # NOTE: PySide6 handles signal emission from non-Qt threads correctly
+                # via internal thread detection. This timer emits progress signals from
+                # a raw threading.Thread, which relies on PySide6's AutoConnection
+                # resolving to QueuedConnection for cross-thread delivery.
                 while not _fit_done.wait(timeout=5.0):
                     # GUI-008 fix: Only emit elapsed time if the NLSQ callback
                     # hasn't reported progress in the last 4 seconds, to avoid
@@ -243,7 +247,9 @@ class FitWorker(QRunnable):
                 )
             finally:
                 _fit_done.set()
-                timer_thread.join(timeout=1.0)
+                timer_thread.join(timeout=3.0)
+                if timer_thread.is_alive():
+                    logger.debug("Timer thread did not stop within timeout")
 
             fit_time = time.perf_counter() - start_time
 

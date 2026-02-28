@@ -177,7 +177,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         """
         test_mode = kwargs.get("test_mode")
         if test_mode is None:
-            if hasattr(self, "_test_mode") and self._test_mode:
+            if hasattr(self, "_test_mode") and self._test_mode is not None:
                 test_mode = self._test_mode
             else:
                 raise ValueError("test_mode must be specified for Saramito fitting")
@@ -515,7 +515,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
-        mode = mode or self._test_mode
+        mode = mode if mode is not None else self._test_mode
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
@@ -1052,7 +1052,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             Predicted response
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
-        mode = test_mode or self._test_mode
+        mode = test_mode if test_mode is not None else self._test_mode
         if mode is None:
             mode = "flow_curve"
 
@@ -1159,7 +1159,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         p = self.get_parameter_dict()
 
         # Get test_mode from kwargs or instance attribute
-        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
 

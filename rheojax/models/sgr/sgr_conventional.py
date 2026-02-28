@@ -953,7 +953,10 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_oscillation_jit(
-        omega: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        omega: jnp.ndarray,
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled oscillation prediction: G'(omega), G''(omega).
 
@@ -992,7 +995,10 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_relaxation_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        t: jnp.ndarray,
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled relaxation prediction: G(t).
 
@@ -1047,7 +1053,10 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_creep_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        t: jnp.ndarray,
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled creep prediction: J(t).
 
@@ -1089,10 +1098,16 @@ class SGRConventional(BaseModel):
         # Monotonicity enforced by physical parameter bounds, not in NUTS path
         return J_t
 
+    # NOTE: SGR FLOW_CURVE returns steady-state viscosity eta(gamma_dot), not stress sigma.
+    # This is the physically meaningful SGR quantity. For stress, multiply by gamma_dot.
+
     @staticmethod
     @jax.jit
     def _predict_steady_shear_jit(
-        gamma_dot: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float"
+        gamma_dot: jnp.ndarray,
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled steady shear prediction: eta(gamma_dot).
 
@@ -1151,9 +1166,19 @@ class SGRConventional(BaseModel):
             ValueError: If test_mode not set (model not fitted)
         """
         # Get test_mode from kwargs or instance attribute
-        test_mode = kwargs.get("test_mode") or getattr(self, "_test_mode", None)
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
+
+        # Extract LAOS parameters from kwargs if provided
+        if test_mode == "laos":
+            gamma_0 = kwargs.get("gamma_0")
+            omega = kwargs.get("omega")
+            if gamma_0 is not None:
+                self._gamma_0 = gamma_0
+            if omega is not None:
+                self._omega_laos = omega
 
         # Route to appropriate prediction method
         if test_mode == "oscillation":
@@ -1286,7 +1311,11 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _predict_startup_jit(
-        t: jnp.ndarray, x: "jax.Array | float", G0_scale: "jax.Array | float", tau0: "jax.Array | float", gamma_dot: "jax.Array | float"
+        t: jnp.ndarray,
+        x: jax.Array | float,
+        G0_scale: jax.Array | float,
+        tau0: jax.Array | float,
+        gamma_dot: jax.Array | float,
     ) -> jnp.ndarray:
         """JIT-compiled startup flow prediction: eta_plus(t).
 
@@ -1368,7 +1397,12 @@ class SGRConventional(BaseModel):
         tau0 = self.parameters.get_value("tau0")
 
         # Get stored shear rate (set during fit)
-        gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+        gamma_dot = getattr(self, "_startup_gamma_dot", None)
+        if gamma_dot is None:
+            raise RuntimeError(
+                "SGRConventional._predict_startup: gamma_dot not provided and "
+                "_startup_gamma_dot not cached. Call fit() with startup data first."
+            )
 
         # Convert to JAX arrays
         t_jax = jnp.asarray(t)
@@ -1446,13 +1480,13 @@ class SGRConventional(BaseModel):
     @staticmethod
     @jax.jit
     def _dx_dt_jit(
-        x: "jax.Array | float",
-        gamma_dot: "jax.Array | float",
-        x_eq: "jax.Array | float",
-        x_ss: "jax.Array | float",
-        alpha_aging: "jax.Array | float",
-        beta_rejuv: "jax.Array | float",
-    ) -> "jax.Array | float":
+        x: jax.Array | float,
+        gamma_dot: jax.Array | float,
+        x_eq: jax.Array | float,
+        x_ss: jax.Array | float,
+        alpha_aging: jax.Array | float,
+        beta_rejuv: jax.Array | float,
+    ) -> jax.Array | float:
         """JIT-compiled evolution equation for dx/dt.
 
         The effective temperature x evolves according to:
@@ -1557,7 +1591,7 @@ class SGRConventional(BaseModel):
             x_ss_A = args["x_ss_A"]
             x_ss_n = args["x_ss_n"]
             gamma_dot_dim = gamma_dot_current * tau0
-            x_ss_current = x_eq + x_ss_A * (gamma_dot_dim ** x_ss_n)
+            x_ss_current = x_eq + x_ss_A * (gamma_dot_dim**x_ss_n)
 
             # Compute dx/dt
             # Ensure x_val is scalar extract if needed, though diffrax passes arrays
@@ -1682,7 +1716,13 @@ class SGRConventional(BaseModel):
             # Use None sentinel (not `or`) to avoid swallowing gamma_dot=0.0
             gamma_dot = kwargs.get("gamma_dot")
             if gamma_dot is None:
-                gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+                gamma_dot = getattr(self, "_startup_gamma_dot", None)
+            if gamma_dot is None:
+                # R11-SGR-001: Require explicit gamma_dot — silent 1.0 default masks bugs
+                raise RuntimeError(
+                    "SGRConventional.model_function: gamma_dot not provided and "
+                    "_startup_gamma_dot not cached. Call fit() with startup data first."
+                )
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         else:
             raise ValueError(f"Unsupported test mode: {mode}")

@@ -981,7 +981,7 @@ class EPMBase(BaseModel):
         # Extract and cache test mode
         test_mode = kwargs.get("test_mode")
         if test_mode is None:
-            if hasattr(self, "_test_mode") and self._test_mode:
+            if hasattr(self, "_test_mode") and self._test_mode is not None:
                 test_mode = self._test_mode
             else:
                 raise ValueError("test_mode must be specified for EPM fitting")
@@ -1165,7 +1165,7 @@ class EPMBase(BaseModel):
             JAX array of predictions (stress, modulus, or strain depending on mode)
         """
         # Resolve test mode
-        mode = test_mode or getattr(self, "_test_mode", "flow_curve")
+        mode = test_mode if test_mode is not None else getattr(self, "_test_mode", "flow_curve")
 
         # Ensure JAX array (no numpy conversion for traceability)
         X_jax = jnp.asarray(X, dtype=jnp.float64)

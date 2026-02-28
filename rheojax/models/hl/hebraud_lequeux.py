@@ -883,7 +883,7 @@ class HebraudLequeux(BaseModel):
             **kwargs: Protocol kwargs forwarded by BayesianMixin. Falls back
                 to _last_fit_kwargs for values not provided.
         """
-        mode = test_mode or self._test_mode
+        mode = test_mode if test_mode is not None else self._test_mode
         if mode is None:
             raise ValueError("test_mode required for Bayesian inference")
 

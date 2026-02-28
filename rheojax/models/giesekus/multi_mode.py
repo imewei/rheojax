@@ -342,7 +342,8 @@ class GiesekusMultiMode(BaseModel):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "oscillation")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "oscillation")
         self._test_mode = test_mode
         self._gamma_dot_applied = kwargs.get("gamma_dot")
         self._sigma_applied = kwargs.get("sigma_applied")
@@ -407,7 +408,8 @@ class GiesekusMultiMode(BaseModel):
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "oscillation")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "oscillation")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         param_names = list(self.parameters.keys())
@@ -454,7 +456,7 @@ class GiesekusMultiMode(BaseModel):
         jnp.ndarray
             Predicted response
         """
-        mode = test_mode or self._test_mode or "oscillation"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "oscillation")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Parse parameters - interleaved order:

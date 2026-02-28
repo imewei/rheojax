@@ -20,6 +20,9 @@ from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
+# R11-REG-001: Lock for discover_directory sys.path mutation
+_discover_lock = threading.Lock()
+
 
 class PluginType(Enum):
     """Types of plugins that can be registered."""
@@ -388,23 +391,25 @@ class Registry:
         if not os.path.exists(path):
             return
 
-        # Add path to Python path temporarily
+        # R11-REG-001: Wrap sys.path mutation in a lock to prevent races
+        # when multiple threads discover directories concurrently.
         import sys
 
-        sys.path.insert(0, path)
+        with _discover_lock:
+            sys.path.insert(0, path)
 
-        try:
-            # Scan for Python files
-            for filename in os.listdir(path):
-                if filename.endswith(".py") and not filename.startswith("_"):
-                    module_name = filename[:-3]
-                    self.discover(module_name)
-        finally:
-            # Remove temporary path (use remove() not pop(0) for thread safety)
             try:
-                sys.path.remove(path)
-            except ValueError:
-                pass
+                # Scan for Python files
+                for filename in os.listdir(path):
+                    if filename.endswith(".py") and not filename.startswith("_"):
+                        module_name = filename[:-3]
+                        self.discover(module_name)
+            finally:
+                # Remove temporary path (use remove() not pop(0) for thread safety)
+                try:
+                    sys.path.remove(path)
+                except ValueError:
+                    pass
 
     def create_instance(
         self, name: str, plugin_type: PluginType | str, *args, **kwargs
@@ -708,7 +713,7 @@ class ModelRegistry:
         >>> models = ModelRegistry.find(protocol='relaxation')
     """
 
-    _registry: "Registry | None" = None
+    _registry: Registry | None = None
 
     @classmethod
     def _get_registry(cls) -> Registry:
@@ -874,7 +879,7 @@ class TransformRegistry:
         >>> transforms = TransformRegistry.find(type='spectral')
     """
 
-    _registry: "Registry | None" = None
+    _registry: Registry | None = None
 
     @classmethod
     def _get_registry(cls) -> Registry:

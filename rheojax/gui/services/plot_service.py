@@ -230,7 +230,9 @@ class PlotService:
                 fig = Figure(figsize=(8, 6))
                 ax = fig.add_subplot(111)
                 palette = (
-                    self._get_palette(style) if (style or "").lower() == "dark" else None
+                    self._get_palette(style)
+                    if (style or "").lower() == "dark"
+                    else None
                 )
 
                 x = np.asarray(data.x)
@@ -305,12 +307,17 @@ class PlotService:
                                 np.ravel(G_prime[np.isfinite(G_prime) & (G_prime > 0)]),
                                 np.ravel(
                                     G_double_prime[
-                                        np.isfinite(G_double_prime) & (G_double_prime > 0)
+                                        np.isfinite(G_double_prime)
+                                        & (G_double_prime > 0)
                                     ]
                                 ),
                             ]
                         )
-                        eps = float(np.nanmin(positive)) * 1e-12 if positive.size else 1e-30
+                        eps = (
+                            float(np.nanmin(positive)) * 1e-12
+                            if positive.size
+                            else 1e-30
+                        )
                         G_prime = np.maximum(G_prime, eps)
                         G_double_prime = np.maximum(G_double_prime, eps)
                         G_prime_fit = np.maximum(G_prime_fit, eps)
@@ -350,7 +357,11 @@ class PlotService:
                     else:
                         # Complex modulus magnitude
                         ax.loglog(
-                            x, y, "o", label="Data", color=palette[0] if palette else None
+                            x,
+                            y,
+                            "o",
+                            label="Data",
+                            color=palette[0] if palette else None,
                         )
                         ax.loglog(
                             x,
@@ -363,7 +374,9 @@ class PlotService:
                         # Add uncertainty band
                         y_lo, y_hi = _compute_band(x, y_fit)
                         if y_lo is not None and y_hi is not None:
-                            y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
+                            y_lo = np.maximum(
+                                y_lo, 1e-30
+                            )  # Ensure positive for log scale
                             ax.fill_between(
                                 x, y_lo, y_hi, alpha=0.3, color="C0", label="95% CI"
                             )
@@ -376,7 +389,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.loglog(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
 
                     # Add uncertainty band
@@ -395,7 +412,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.loglog(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
 
                     # Add uncertainty band
@@ -414,7 +435,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.loglog(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
 
                     # Add uncertainty band
@@ -433,7 +458,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.plot(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
                     ax.set_xlabel("Time (s)")
                     ax.set_ylabel("Stress (Pa)")
@@ -443,7 +472,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.plot(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
                     ax.set_xlabel("Strain")
                     ax.set_ylabel("Stress (Pa)")
@@ -454,7 +487,11 @@ class PlotService:
                         x, y, "o", label="Data", color=palette[0] if palette else None
                     )
                     ax.plot(
-                        x, y_fit, "-", label="Fit", color=palette[1] if palette else None
+                        x,
+                        y_fit,
+                        "-",
+                        label="Fit",
+                        color=palette[1] if palette else None,
                     )
                     ax.set_xlabel(data.x_units or "X")
                     ax.set_ylabel(data.y_units or "Y")
@@ -511,13 +548,19 @@ class PlotService:
                 residuals = np.asarray(residuals)
 
                 logger.debug(
-                    "Residual plot data", data_points=len(x), residual_shape=residuals.shape
+                    "Residual plot data",
+                    data_points=len(x),
+                    residual_shape=residuals.shape,
                 )
 
                 # Determine x-axis scale from test mode
                 test_mode = data.metadata.get("test_mode", "")
                 use_log_x = test_mode in (
-                    "oscillation", "relaxation", "creep", "flow_curve", "rotation",
+                    "oscillation",
+                    "relaxation",
+                    "creep",
+                    "flow_curve",
+                    "rotation",
                 )
 
                 # Residuals vs x
@@ -530,7 +573,9 @@ class PlotService:
                 ax1.set_title("Residual Analysis")
 
                 # Residual histogram
-                ax2.hist(residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black")
+                ax2.hist(
+                    residuals, bins=30, color=palette[1], alpha=0.7, edgecolor="black"
+                )
                 ax2.set_xlabel("Residual Value")
                 ax2.set_ylabel("Count")
                 ax2.set_title("Residual Distribution")
@@ -589,7 +634,11 @@ class PlotService:
                 for k, v in posterior_samples.items():
                     v = np.asarray(v)
                     if v.ndim == 1:
-                        if num_chains and num_chains > 1 and v.shape[0] % num_chains == 0:
+                        if (
+                            num_chains
+                            and num_chains > 1
+                            and v.shape[0] % num_chains == 0
+                        ):
                             idata_dict[k] = v.reshape(num_chains, -1)
                         else:
                             idata_dict[k] = v.reshape(1, -1)
@@ -598,7 +647,8 @@ class PlotService:
                 idata = az.from_dict(idata_dict)
 
                 logger.debug(
-                    "ArviZ InferenceData created", parameters=list(posterior_samples.keys())
+                    "ArviZ InferenceData created",
+                    parameters=list(posterior_samples.keys()),
                 )
 
                 def _extract_figure(axes_result: Any) -> Figure:
@@ -809,9 +859,7 @@ class PlotService:
                 # Return immediately from cache when the style has been parsed before.
                 if style_text in self._rc_cache:
                     plt.rcParams.update(self._rc_cache[style_text])
-                    logger.debug(
-                        "Style context served from RC cache", style=style_name
-                    )
+                    logger.debug("Style context served from RC cache", style=style_name)
                     return
                 # First time: parse via temp file, then cache the result.
                 with tempfile.NamedTemporaryFile(
@@ -823,9 +871,7 @@ class PlotService:
                     rc = rc_params_from_file(tmp_path)
                     self._rc_cache[style_text] = dict(rc)
                     plt.rcParams.update(rc)
-                    logger.debug(
-                        "Style context parsed and cached", style=style_name
-                    )
+                    logger.debug("Style context parsed and cached", style=style_name)
                 finally:
                     try:
                         os.remove(tmp_path)

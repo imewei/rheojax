@@ -103,7 +103,7 @@ class PyQtGraphCanvas(QWidget):
         # Create plot widget with themed background
         self._plot_widget = PlotWidget(background=themed("BG_BASE"))
         self._plot_item = self._plot_widget.getPlotItem()
-        
+
         # Apply themed foreground to axes
         foreground = themed("TEXT_PRIMARY")
         self._plot_item.getAxis("left").setPen(foreground)

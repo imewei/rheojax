@@ -385,7 +385,11 @@ class DataService:
                 if np.iscomplexobj(y_arr):
                     headers.append("y2")
                     data = [
-                        [data_obj.x[i], float(np.real(y_arr[i])), float(np.imag(y_arr[i]))]
+                        [
+                            data_obj.x[i],
+                            float(np.real(y_arr[i])),
+                            float(np.imag(y_arr[i])),
+                        ]
                         for i in range(rows)
                     ]
                 else:
@@ -586,17 +590,14 @@ class DataService:
                     #   2. Log-log linearity: power law |corr|>0.98,
                     #      exponential |corr|≈0.84
                     y_diff_local = np.diff(y[mask])
-                    is_mostly_decreasing = (
-                        len(y_diff_local) > 0
-                        and np.sum(y_diff_local <= 0) >= 0.9 * len(y_diff_local)
-                    )
+                    is_mostly_decreasing = len(y_diff_local) > 0 and np.sum(
+                        y_diff_local <= 0
+                    ) >= 0.9 * len(y_diff_local)
 
                     # Detect log-spaced x (typical for shear-rate sweeps)
                     log_diffs = np.diff(log_x)
                     is_log_spaced = len(log_diffs) > 2 and (
-                        np.std(log_diffs)
-                        / (np.mean(np.abs(log_diffs)) + 1e-10)
-                        < 0.3
+                        np.std(log_diffs) / (np.mean(np.abs(log_diffs)) + 1e-10) < 0.3
                     )
 
                     # True power law: perfectly linear in log-log space
@@ -692,15 +693,11 @@ class DataService:
                             # relaxation data as oscillation. Monotonically
                             # decreasing y with >80% of diffs negative strongly
                             # indicates relaxation even when x is log-spaced.
-                            y_real_check = (
-                                np.real(y) if np.iscomplexobj(y) else y
-                            )
+                            y_real_check = np.real(y) if np.iscomplexobj(y) else y
                             y_diffs_check = np.diff(y_real_check)
-                            if (
-                                len(y_diffs_check) > 2
-                                and np.sum(y_diffs_check < 0)
-                                > 0.8 * len(y_diffs_check)
-                            ):
+                            if len(y_diffs_check) > 2 and np.sum(
+                                y_diffs_check < 0
+                            ) > 0.8 * len(y_diffs_check):
                                 logger.debug(
                                     "Skipping oscillation: log-spaced x but y "
                                     "is monotonically decreasing (likely relaxation)"

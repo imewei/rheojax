@@ -143,8 +143,12 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
 
     # R3-U-004: detect effectively-real complex data to avoid inflated R² from zero imaginary
     if np.iscomplexobj(y_true) or np.iscomplexobj(y_pred):
-        max_imag_true = np.max(np.abs(np.imag(y_true))) if np.iscomplexobj(y_true) else 0.0
-        max_imag_pred = np.max(np.abs(np.imag(y_pred))) if np.iscomplexobj(y_pred) else 0.0
+        max_imag_true = (
+            np.max(np.abs(np.imag(y_true))) if np.iscomplexobj(y_true) else 0.0
+        )
+        max_imag_pred = (
+            np.max(np.abs(np.imag(y_pred))) if np.iscomplexobj(y_pred) else 0.0
+        )
         if max_imag_true < 1e-15 and max_imag_pred < 1e-15:
             y_true = np.real(y_true)
             y_pred = np.real(y_pred)
@@ -152,7 +156,10 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     if not np.iscomplexobj(y_true) and not np.iscomplexobj(y_pred):
         ss_res = np.sum((y_true - y_pred) ** 2)
         ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
-        return 1.0 - ss_res / max(float(ss_tot), 1e-30)
+        # R11-METRICS-001: Handle constant data (ss_tot == 0) without returning -1e30
+        if ss_tot == 0.0:
+            return 1.0 if ss_res == 0.0 else -1.0
+        return 1.0 - ss_res / float(ss_tot)
 
     ss_res_real = np.sum((np.real(y_true) - np.real(y_pred)) ** 2)
     ss_tot_real = np.sum((np.real(y_true) - np.mean(np.real(y_true))) ** 2)
@@ -160,7 +167,14 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     ss_res_imag = np.sum((np.imag(y_true) - np.imag(y_pred)) ** 2)
     ss_tot_imag = np.sum((np.imag(y_true) - np.mean(np.imag(y_true))) ** 2)
 
-    r2_real = 1.0 - ss_res_real / max(float(ss_tot_real), 1e-30)
-    r2_imag = 1.0 - ss_res_imag / max(float(ss_tot_imag), 1e-30)
+    # R11-METRICS-001: Handle constant data per component
+    if ss_tot_real == 0.0:
+        r2_real = 1.0 if ss_res_real == 0.0 else -1.0
+    else:
+        r2_real = 1.0 - ss_res_real / float(ss_tot_real)
+    if ss_tot_imag == 0.0:
+        r2_imag = 1.0 if ss_res_imag == 0.0 else -1.0
+    else:
+        r2_imag = 1.0 - ss_res_imag / float(ss_tot_imag)
 
     return (r2_real + r2_imag) / 2.0

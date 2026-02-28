@@ -205,7 +205,9 @@ def load_csv(
     with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
         try:
             # Try strict encoding first to detect corruption early
-            logger.debug("Reading CSV file (strict encoding)", encoding=default_encoding)
+            logger.debug(
+                "Reading CSV file (strict encoding)", encoding=default_encoding
+            )
             df = pd.read_csv(filepath, **{**read_kwargs, "encoding_errors": "strict"})
         except UnicodeDecodeError:
             # Strict failed — fall back to replacement characters with a warning
@@ -267,7 +269,9 @@ def load_csv(
                 affected_cols.append(col)
                 # Reuse col_str — no second astype(str) needed
                 sample = col_str.str.replace("\ufffd", "", regex=False)
-                if sample.str.match(r"^[\d.eE+\-,\s]*\d[\d.eE+\-,\s]*$", na=False).any():
+                if sample.str.match(
+                    r"^[\d.eE+\-,\s]*\d[\d.eE+\-,\s]*$", na=False
+                ).any():
                     raise ValueError(
                         f"Encoding corruption detected in numeric column '{col}'. "
                         f"The file may need to be re-exported with UTF-8 encoding. "
@@ -341,7 +345,10 @@ def load_csv(
             n_total=len(x_data),
         )
     x_data = np.take(x_data, valid_idx)
-    y_data = np.take(y_data, valid_idx)
+    if y_data.ndim > 1:
+        y_data = y_data[valid_idx]
+    else:
+        y_data = np.take(y_data, valid_idx)
 
     if len(x_data) == 0:
         logger.error(
@@ -503,7 +510,9 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
     try:
         result = arr.astype(float)
     except (ValueError, TypeError):
-        result = pd.to_numeric(pd.Series(arr.ravel()), errors="coerce").values.astype(float)
+        result = pd.to_numeric(pd.Series(arr.ravel()), errors="coerce").values.astype(
+            float
+        )
     nan_ratio = np.isnan(result).sum() / max(len(result), 1)
     if nan_ratio > 0.5:
         logger.warning(

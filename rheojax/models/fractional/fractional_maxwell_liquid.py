@@ -513,7 +513,8 @@ class FractionalMaxwellLiquid(BaseModel):
         alpha = self.parameters.get_value("alpha")
         tau_alpha = self.parameters.get_value("tau_alpha")
 
-        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             result = self._predict_oscillation_jax(x, Gm, alpha, tau_alpha)
         elif test_mode in ("creep", TestMode.CREEP):
@@ -564,6 +565,9 @@ class FractionalMaxwellLiquid(BaseModel):
             # Return complex array for oscillation mode
             complex_result = self._predict_oscillation_jax(X, **params_dict)
             return complex_result[..., 0] + 1j * complex_result[..., 1]
+        elif test_mode in ("rotation", "flow_curve"):
+            # FML: no yield stress, so flow curve falls back to relaxation-based prediction
+            return self._predict_relaxation_jax(X, **params_dict)
         else:
             # Default to relaxation for unknown modes
             return self._predict_relaxation_jax(X, **params_dict)
@@ -642,7 +646,7 @@ class FractionalMaxwellLiquid(BaseModel):
             x = jnp.asarray(X)
 
             # Normalize test_mode to string
-            mode = test_mode or "relaxation"
+            mode = test_mode if test_mode is not None else getattr(self, "_test_mode", "relaxation")
             if hasattr(mode, "value"):
                 mode = mode.value
 

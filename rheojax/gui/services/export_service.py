@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -446,9 +446,7 @@ class ExportService:
                     "test_mode": state.get("test_mode"),
                     "deformation_mode": state.get("deformation_mode", "shear"),
                     "poisson_ratio": state.get("poisson_ratio", 0.5),
-                    "timestamp": datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%dT%H:%M:%SZ"
-                    ),
+                    "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 }
 
                 with open(metadata_path, "w", encoding="utf-8") as f:
@@ -468,7 +466,9 @@ class ExportService:
                     for k, v in state["parameters"].items():
                         if hasattr(v, "__array__"):
                             arr = np.asarray(v)
-                            params_json[k] = arr.item() if arr.ndim == 0 else arr.tolist()
+                            params_json[k] = (
+                                arr.item() if arr.ndim == 0 else arr.tolist()
+                            )
                         else:
                             params_json[k] = v
                     with open(params_path, "w", encoding="utf-8") as f:
@@ -570,7 +570,7 @@ class ExportService:
                         except ValueError:
                             raise ValueError(
                                 f"Zip path traversal detected: {member}"
-                            )
+                            ) from None
                     zipf.extractall(tmpdir_path)
                 logger.debug("Extracted ZIP archive")
 
@@ -674,7 +674,7 @@ class ExportService:
             # Generate Markdown content first
             report_lines = []
             report_lines.append("# RheoJAX Analysis Report\n")
-            _ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            _ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
             report_lines.append(f"**Generated:** {_ts}\n\n")
 
             if "model_name" in state:

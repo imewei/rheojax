@@ -298,6 +298,9 @@ TRIOS_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     "hz": ("rad/s", 2 * math.pi),
     "Hz": ("rad/s", 2 * math.pi),
     "1/hz": ("rad/s", 2 * math.pi),
+    "1/Hz": ("rad/s", 2 * math.pi),
+    "Rad/s": ("rad/s", 1.0),
+    "rad/S": ("rad/s", 1.0),
     # Time
     "ms": ("s", 0.001),
     "min": ("s", 60.0),
@@ -310,6 +313,11 @@ TRIOS_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     # Viscosity
     "mPa·s": ("Pa.s", 0.001),
     "mPa.s": ("Pa.s", 0.001),
+    # Rotation / shear rate
+    "rpm": ("1/s", 1.0 / 60.0),
+    "RPM": ("1/s", 1.0 / 60.0),
+    "rev/min": ("1/s", 1.0 / 60.0),
+    "rev/s": ("1/s", 1.0),
     # Dimensionless
     "%": ("dimensionless", 0.01),
 }
@@ -769,7 +777,15 @@ def segment_to_rheodata(
     # If not explicitly set, infer from y_column name
     if "deformation_mode" not in metadata:
         y_col_lower = (segment.y_column or "").lower()
-        _TENSILE_TOKENS = {"e'", "e''", "e*", "tensile", "young", "e_prime", "e_double_prime"}
+        _TENSILE_TOKENS = {
+            "e'",
+            "e''",
+            "e*",
+            "tensile",
+            "young",
+            "e_prime",
+            "e_double_prime",
+        }
         if any(t in y_col_lower for t in _TENSILE_TOKENS):
             metadata["deformation_mode"] = "tension"
 

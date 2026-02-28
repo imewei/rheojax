@@ -225,6 +225,8 @@ class Pipeline:
                 )
                 raise
 
+        # R12-E-002: append to steps so batch replay can replay transforms
+        self.steps.append(("transform", transform_obj))
         self.history.append(("transform", transform_name))
         return self
 
@@ -250,15 +252,14 @@ class Pipeline:
         self,
         model: str | BaseModel,
         method: str = "auto",
-        use_jax: bool = True,
         **fit_kwargs,
     ) -> Pipeline:
         """Fit a model to the data.
 
         Args:
             model: Model name (string) or Model instance
-            method: Optimization method ('auto', 'L-BFGS-B', etc.)
-            use_jax: Whether to use JAX gradients for optimization
+            method: Optimization method passed to model.fit() ('nlsq', 'scipy', 'auto').
+                Default 'auto' lets the model choose.
             **fit_kwargs: Additional arguments passed to optimizer
 
         Returns:
@@ -325,6 +326,8 @@ class Pipeline:
                             _pr = _meta.get("poisson_ratio")
                             if _pr is not None:
                                 fit_kwargs["poisson_ratio"] = _pr
+                # R12-E-001: forward method kwarg to model.fit()
+                fit_kwargs["method"] = method
                 model_obj.fit(X, y, **fit_kwargs)
                 self._last_model = model_obj
                 self.steps.append(("fit", model_obj))
@@ -487,6 +490,23 @@ class Pipeline:
             raise ValueError("No data to save. Call load() first.")
 
         path = Path(file_path)
+
+        # R12-E-007: include fitted model parameters in data metadata before saving
+        if self.steps:
+            _last_fit_steps = [s for s in self.steps if s[0] in ("fit", "fit_nlsq")]
+            if _last_fit_steps:
+                _fit_model = _last_fit_steps[-1][1]
+                if hasattr(_fit_model, "parameters"):
+                    if self.data.metadata is None:
+                        self.data.metadata = {}
+                    for _pname in _fit_model.parameters.keys():
+                        try:
+                            self.data.metadata[f"fitted_{_pname}"] = float(
+                                _fit_model.parameters.get_value(_pname)
+                            )
+                        except (TypeError, ValueError):
+                            pass
+                    self.data.metadata["fitted_model"] = type(_fit_model).__name__
 
         with log_pipeline_stage(
             logger,

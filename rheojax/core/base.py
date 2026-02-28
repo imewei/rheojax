@@ -289,7 +289,11 @@ class BaseModel(BayesianMixin, ABC):
         """
         # Get data shape for logging
         _shape = getattr(X, "shape", None)
-        data_shape = _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+        data_shape = (
+            _shape
+            if _shape is not None
+            else (len(X) if hasattr(X, "__len__") else (1,))
+        )
         logger.debug(
             "Entering fit",
             model=self.__class__.__name__,
@@ -346,6 +350,7 @@ class BaseModel(BayesianMixin, ABC):
         # Normalize to raw arrays for consistency — fit_bayesian() must always
         # see ndarrays here regardless of whether fit() received RheoData or arrays.
         from rheojax.core.data import RheoData as _RheoData
+
         if isinstance(self.X_data, _RheoData):
             self.X_data = self.X_data.x
         if isinstance(self.y_data, _RheoData):
@@ -358,7 +363,9 @@ class BaseModel(BayesianMixin, ABC):
 
         # Pass optimization strategy to _fit via kwargs.
         # These are consumed by _fit() and should NOT leak to model_function.
-        # Models' _fit() implementations should pop these before storing _last_fit_kwargs.
+        # R12-B-006: Cleanup happens here in base.py (see the _lfk.pop() loop
+        # after self._fit() returns), NOT in individual model _fit() implementations.
+        # The stale comment about models popping these themselves was misleading.
         kwargs["use_log_residuals"] = use_log_residuals
         kwargs["use_multi_start"] = use_multi_start
         kwargs["n_starts"] = n_starts
@@ -390,22 +397,41 @@ class BaseModel(BayesianMixin, ABC):
             self.fitted_ = True
 
             # Strip optimization kwargs so they don't leak to model_function
-            _opt_keys = ("use_log_residuals", "use_multi_start", "n_starts", "perturb_factor")
+            _opt_keys = (
+                "use_log_residuals",
+                "use_multi_start",
+                "n_starts",
+                "perturb_factor",
+            )
             _lfk = getattr(self, "_last_fit_kwargs", None)
             if isinstance(_lfk, dict):
                 for _ok in _opt_keys:
                     _lfk.pop(_ok, None)
 
             # Log fit completion with key metrics
-            # Only compute R² when DEBUG logging is active — for ODE models
-            # score() triggers a full predict() call costing 100ms+.
+            # Only compute R² when DEBUG logging is active.
+            # R6-OPT-001: Extract R² from NLSQ residual to avoid 100ms+ predict overhead.
             r2 = None
             if logger.isEnabledFor(logging.DEBUG):
                 try:
                     from rheojax.core.data import RheoData as _RheoData
+
                     _X_score = X.x if isinstance(X, _RheoData) else X
                     _y_score = y
-                    r2 = self.score(_X_score, _y_score)
+
+                    if getattr(self, "_nlsq_result", None) is not None and self._nlsq_result.fun is not None:
+                        # R11-BASE-002: fun is a residual array, not a scalar cost.
+                        # Compute ss_res = sum(residuals^2) instead of float(fun).
+                        fun = np.asarray(self._nlsq_result.fun)
+                        ss_res = float(np.sum(np.abs(fun) ** 2))
+                        y_arr = np.asarray(_y_score)
+                        ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
+                        if ss_tot > 0:
+                            r2 = 1.0 - (ss_res / ss_tot)
+                        else:
+                            r2 = 1.0 if ss_res == 0.0 else None
+                    else:
+                        r2 = self.score(_X_score, _y_score)
                 except Exception as exc:
                     logger.debug(
                         "R² computation failed after fit",
@@ -602,7 +628,11 @@ class BaseModel(BayesianMixin, ABC):
         """
         # Get data shape for logging
         _shape = getattr(X, "shape", None)
-        data_shape = _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+        data_shape = (
+            _shape
+            if _shape is not None
+            else (len(X) if hasattr(X, "__len__") else (1,))
+        )
         logger.debug(
             "Entering fit_bayesian",
             model=self.__class__.__name__,
@@ -614,17 +644,36 @@ class BaseModel(BayesianMixin, ABC):
         )
 
         # Handle deformation mode for Bayesian: convert E* -> G* before NUTS
-        if deformation_mode is None:
-            from rheojax.core.data import RheoData
+        # R11-BASE-001: Extract y and test_mode from RheoData unconditionally,
+        # not only inside the deformation_mode branch.
+        from rheojax.core.data import RheoData
 
+        if isinstance(X, RheoData):
+            if y is None:
+                y = X.y
+            # R12-B-002: Use X.test_mode property which checks _explicit_test_mode,
+            # the private cache, and metadata in priority order — instead of reading
+            # metadata dict directly which would miss explicitly set modes.
+            if test_mode is None:
+                test_mode = X.test_mode
+            # Extract deformation_mode from RheoData metadata while X is still a
+            # RheoData object; this must happen before the X.x extraction below so
+            # the deformation_mode block still has access to the metadata.
+            if deformation_mode is None:
+                deformation_mode = X.metadata.get("deformation_mode", None)
+            # R12-B-001: Always extract x data from RheoData at this point so that
+            # subsequent isinstance(X, RheoData) checks are no longer needed.
+            # This ensures X is always a plain array before the deformation_mode
+            # block, avoiding a subtle bug where deformation_mode=None would leave
+            # X as a RheoData object past the conversion step.
+            X = jnp.array(X.x)
+
+        if deformation_mode is None:
             if isinstance(X, RheoData):
+                # This branch is now only reachable if X was not a RheoData above
+                # (i.e., the caller passed a plain array, not a RheoData object).
                 deformation_mode = X.metadata.get("deformation_mode", None)
                 if deformation_mode is not None:
-                    if y is None:
-                        y = X.y
-                    # Preserve test_mode from RheoData before stripping to raw array
-                    if test_mode is None:
-                        test_mode = X.metadata.get("test_mode", None)
                     X = X.x
 
             if deformation_mode is None:
@@ -790,6 +839,7 @@ class BaseModel(BayesianMixin, ABC):
                 if "unexpected keyword argument" in err_msg:
                     # BASE-002: only strip kwargs we explicitly injected, not internal errors
                     import re
+
                     _match = re.search(r"'(\w+)'", err_msg)
                     _injected_keys = {"test_mode", "deformation_mode", "poisson_ratio"}
                     if _match and _match.group(1) in _injected_keys:
@@ -1026,7 +1076,11 @@ class BaseModel(BayesianMixin, ABC):
         """
         return {
             "class": self.__class__.__name__,
-            "parameters": self.parameters.to_dict() if hasattr(self, "parameters") and len(self.parameters) > 0 else {},
+            "parameters": (
+                self.parameters.to_dict()
+                if hasattr(self, "parameters") and len(self.parameters) > 0
+                else {}
+            ),
             "fitted": self.fitted_,
         }
 

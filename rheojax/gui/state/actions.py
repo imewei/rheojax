@@ -30,6 +30,13 @@ logger = get_logger(__name__)
 #   2. Effector functions (dispatch directly): store_bayesian_result(), fail_bayesian()
 # Callers must dispatch() factory results but NOT dispatch effector results.
 # R8-NEW-010: consider standardizing to one pattern in future refactor.
+#
+# NOTE (R12-C-002): Effector actions call update_state() then emit_signal() as
+# two separate operations.  A concurrent dispatch between them is possible but
+# benign: the signal argument (e.g., dataset_id) is still valid even if state
+# has advanced.  Subscribers reading store state from a signal handler should
+# call get_state() to obtain the latest snapshot rather than relying on the
+# signal argument to fully describe the current state.
 
 # Dataset Actions
 
@@ -70,6 +77,13 @@ def load_dataset(
     store = StateStore()
     dataset_id = str(uuid.uuid4())
 
+    logger.debug(
+        "load_dataset called",
+        name=name,
+        test_mode=test_mode,
+        file_path=str(file_path),
+    )
+
     dataset = DatasetState(
         id=dataset_id,
         name=name,
@@ -94,6 +108,15 @@ def load_dataset(
 
     store.update_state(updater)
 
+    n_points = len(x_data) if hasattr(x_data, "__len__") else 0
+    logger.info(
+        "Dataset loaded",
+        dataset_id=dataset_id,
+        name=name,
+        n_points=n_points,
+        test_mode=test_mode,
+    )
+
     store.emit_signal("dataset_added", dataset_id)
     store.emit_signal("dataset_selected", dataset_id)
 
@@ -109,6 +132,7 @@ def remove_dataset(dataset_id: str) -> None:
         Dataset identifier
     """
     store = StateStore()
+    logger.debug("remove_dataset called", dataset_id=dataset_id)
 
     def updater(state: AppState) -> AppState:
         new_datasets = state.datasets.copy()
@@ -141,6 +165,7 @@ def remove_dataset(dataset_id: str) -> None:
 
     store.update_state(updater)
 
+    logger.info("Dataset removed", dataset_id=dataset_id)
     store.emit_signal("dataset_removed", dataset_id)
 
 
@@ -153,9 +178,13 @@ def set_active_dataset(dataset_id: str) -> None:
         Dataset identifier
     """
     store = StateStore()
+    logger.debug("set_active_dataset called", dataset_id=dataset_id)
 
     def updater(state: AppState) -> AppState:
         if dataset_id not in state.datasets:
+            logger.warning(
+                "set_active_dataset: dataset not found", dataset_id=dataset_id
+            )
             return state
         return replace(state, active_dataset_id=dataset_id)
 
@@ -175,9 +204,15 @@ def update_dataset(dataset_id: str, **updates) -> None:
         Properties to update
     """
     store = StateStore()
+    logger.debug(
+        "update_dataset called", dataset_id=dataset_id, update_keys=list(updates.keys())
+    )
 
     def updater(state: AppState) -> AppState:
         if dataset_id not in state.datasets:
+            logger.warning(
+                "update_dataset: dataset not found", dataset_id=dataset_id
+            )
             return state
 
         dataset = state.datasets[dataset_id]
@@ -210,7 +245,13 @@ def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None
         Model parameters
     """
     store = StateStore()
-    store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_name, "model_params": parameters})
+    logger.debug(
+        "select_model called", model_name=model_name, n_params=len(parameters)
+    )
+    store.dispatch(
+        "SET_ACTIVE_MODEL", {"model_name": model_name, "model_params": parameters}
+    )
+    logger.info("Model selected", model_name=model_name, n_params=len(parameters))
 
 
 def update_parameter(name: str, value: float) -> None:
@@ -225,10 +266,12 @@ def update_parameter(name: str, value: float) -> None:
     """
     store = StateStore()
     captured_model_name = [None]
+    logger.debug("update_parameter called", name=name, value=value)
 
     def updater(state: AppState) -> AppState:
         captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
+            logger.warning("update_parameter: param not found", name=name)
             return state
 
         param = state.model_params[name]
@@ -260,14 +303,23 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
     """
     store = StateStore()
     captured_model_name = [None]
+    logger.debug(
+        "update_parameter_bounds called",
+        name=name,
+        min_bound=min_bound,
+        max_bound=max_bound,
+    )
 
     def updater(state: AppState) -> AppState:
         captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
+            logger.warning("update_parameter_bounds: param not found", name=name)
             return state
 
         param = state.model_params[name]
-        updated_param = replace(param, min_bound=float(min_bound), max_bound=float(max_bound))
+        updated_param = replace(
+            param, min_bound=float(min_bound), max_bound=float(max_bound)
+        )
 
         new_params = state.model_params.copy()
         new_params[name] = updated_param
@@ -293,10 +345,12 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
     """
     store = StateStore()
     captured_model_name = [None]
+    logger.debug("toggle_parameter_fixed called", name=name, fixed=fixed)
 
     def updater(state: AppState) -> AppState:
         captured_model_name[0] = state.active_model_name
         if name not in state.model_params:
+            logger.warning("toggle_parameter_fixed: param not found", name=name)
             return state
 
         param = state.model_params[name]
@@ -324,6 +378,7 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
     """
     store = StateStore()
     _model_name: list[str | None] = [None]
+    logger.debug("reset_parameters called", n_params=len(default_params))
 
     def updater(state: AppState) -> AppState:
         # R10-AC-002: Read model_name inside the updater closure (under the
@@ -335,6 +390,11 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
     store.update_state(updater)
 
     if _model_name[0]:
+        logger.info(
+            "Parameters reset to defaults",
+            model_name=_model_name[0],
+            n_params=len(default_params),
+        )
         store.emit_signal("model_params_changed", _model_name[0])
 
 
@@ -352,6 +412,9 @@ def start_fit(model_name: str, dataset_id: str) -> None:
         Dataset identifier
     """
     store = StateStore()
+    logger.info(
+        "Fit started", model_name=model_name, dataset_id=dataset_id
+    )
 
     store.emit_signal("fit_started", model_name, dataset_id)
 
@@ -368,13 +431,27 @@ def store_fit_result(result: FitResult) -> None:
         Fit result
     """
     store = StateStore()
+    model_name = getattr(result, "model_name", "unknown")
+    dataset_id = getattr(result, "dataset_id", "unknown")
+    logger.debug(
+        "store_fit_result called",
+        model_name=model_name,
+        dataset_id=dataset_id,
+    )
     store.dispatch(
         "STORE_FIT_RESULT",
         {
-            "model_name": getattr(result, "model_name", "unknown"),
-            "dataset_id": getattr(result, "dataset_id", "unknown"),
+            "model_name": model_name,
+            "dataset_id": dataset_id,
             "result": result,
         },
+    )
+    logger.info(
+        "Fit result stored",
+        model_name=model_name,
+        dataset_id=dataset_id,
+        success=getattr(result, "success", None),
+        r_squared=getattr(result, "r_squared", None),
     )
 
 
@@ -391,6 +468,12 @@ def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
         Error message
     """
     store = StateStore()
+    logger.error(
+        "Fit failed",
+        model_name=model_name,
+        dataset_id=dataset_id,
+        error=error,
+    )
 
     # GUI-R6-009: dispatch() already emits fit_failed in the FITTING_FAILED
     # handler — the explicit emit_signal here was a duplicate causing
@@ -560,13 +643,27 @@ def store_bayesian_result(result: BayesianResult) -> None:
         Bayesian result
     """
     store = StateStore()
+    model_name = getattr(result, "model_name", "unknown")
+    dataset_id = getattr(result, "dataset_id", "unknown")
+    logger.debug(
+        "store_bayesian_result called",
+        model_name=model_name,
+        dataset_id=dataset_id,
+    )
     store.dispatch(
         "STORE_BAYESIAN_RESULT",
         {
-            "model_name": getattr(result, "model_name", "unknown"),
-            "dataset_id": getattr(result, "dataset_id", "unknown"),
+            "model_name": model_name,
+            "dataset_id": dataset_id,
             "result": result,
         },
+    )
+    logger.info(
+        "Bayesian result stored",
+        model_name=model_name,
+        dataset_id=dataset_id,
+        divergences=getattr(result, "divergences", None),
+        mcmc_time=getattr(result, "mcmc_time", None),
     )
 
 
@@ -583,6 +680,12 @@ def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
         Error message
     """
     store = StateStore()
+    logger.error(
+        "Bayesian inference failed",
+        model_name=model_name,
+        dataset_id=dataset_id,
+        error=error,
+    )
 
     # GUI-R6-009: dispatch() already emits bayesian_failed in the
     # BAYESIAN_FAILED handler — removed duplicate emit_signal.
@@ -674,6 +777,9 @@ def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
         New status
     """
     store = StateStore()
+    logger.debug(
+        "set_pipeline_step called", step=step.name, status=status.name
+    )
     store.dispatch(
         "SET_PIPELINE_STEP",
         {"step": step.name, "status": status.name},
@@ -692,6 +798,7 @@ def set_jax_device(device: str) -> None:
         Device name (cpu, cuda, tpu)
     """
     store = StateStore()
+    logger.info("JAX device set", device=device)
 
     def updater(state: AppState) -> AppState:
         return replace(state, jax_device=device)
@@ -733,6 +840,7 @@ def set_theme(theme: str) -> None:
         Theme name (light, dark)
     """
     store = StateStore()
+    logger.info("Theme changed", theme=theme)
 
     def updater(state: AppState) -> AppState:
         return replace(state, theme=theme)
@@ -751,6 +859,7 @@ def set_seed(seed: int) -> None:
         Random seed
     """
     store = StateStore()
+    logger.debug("set_seed called", seed=seed)
 
     def updater(state: AppState) -> AppState:
         return replace(state, current_seed=seed)
@@ -786,6 +895,7 @@ def save_project(path: Path) -> None:
         Project file path
     """
     store = StateStore()
+    logger.debug("save_project called", path=str(path))
 
     def updater(state: AppState) -> AppState:
         # Add to recent projects
@@ -803,6 +913,7 @@ def save_project(path: Path) -> None:
 
     store.update_state(updater, track_undo=False)
 
+    logger.info("Project saved", path=str(path))
     store.emit_signal("project_saved", str(path))
 
 
@@ -814,26 +925,40 @@ def load_project(path: Path, state: AppState) -> None:
     path : Path
         Project file path
     state : AppState
-        Loaded application state
+        Loaded application state (used as the base for the new store state)
     """
     store = StateStore()
-
-    # Add to recent projects
-    recent = [p for p in state.recent_projects if p != path]
-    recent.insert(0, path)
-    recent = recent[:10]
-
-    updated_state = replace(
-        state,
-        project_path=path,
-        project_name=path.stem,
-        is_modified=False,
-        recent_projects=recent,
+    logger.debug(
+        "load_project called",
+        path=str(path),
+        n_datasets=len(state.datasets),
     )
 
-    store.update_state(lambda _: updated_state, track_undo=False)
+    # R12-C-012: Use an updater function that reads current_state from the
+    # store rather than capturing the caller-supplied snapshot in a lambda.
+    # This prevents a TOCTOU race where a concurrent dispatch modifies
+    # recent_projects between load_project() being called and update_state()
+    # applying the change — the updater always works from the latest state.
+    def _load_project_updater(current_state: AppState) -> AppState:
+        recent = [p for p in current_state.recent_projects if p != path]
+        recent.insert(0, path)
+        recent = recent[:10]
+        return replace(
+            state,  # start from the loaded snapshot (full project state)
+            project_path=path,
+            project_name=path.stem,
+            is_modified=False,
+            recent_projects=recent,
+        )
+
+    store.update_state(_load_project_updater, track_undo=False)
     store.clear_history()  # Clear undo history on load
 
+    logger.info(
+        "Project loaded",
+        path=str(path),
+        n_datasets=len(state.datasets),
+    )
     store.emit_signal("project_loaded", str(path))
 
 
@@ -860,6 +985,13 @@ def add_transform_record(
         Random seed used
     """
     store = StateStore()
+    logger.debug(
+        "add_transform_record called",
+        transform_name=transform_name,
+        source_id=source_id,
+        target_id=target_id,
+        seed=seed,
+    )
 
     record = TransformRecord(
         timestamp=datetime.now(),
@@ -877,4 +1009,10 @@ def add_transform_record(
 
     store.update_state(updater)
 
+    logger.info(
+        "Transform record added",
+        transform_name=transform_name,
+        source_id=source_id,
+        target_id=target_id,
+    )
     store.emit_signal("transform_applied", transform_name, target_id)

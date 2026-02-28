@@ -163,8 +163,7 @@ def compute_von_mises_stress(stress_tensor: jax.Array, nu: float) -> jax.Array:
     diff_zz_xx = sigma_zz - sigma_xx
 
     sigma_eff = jnp.sqrt(
-        (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2 + 6 * sigma_xy**2) / 2.0
-        + 1e-30
+        (diff_xx_yy**2 + diff_yy_zz**2 + diff_zz_xx**2 + 6 * sigma_xy**2) / 2.0 + 1e-30
     )
 
     return sigma_eff
@@ -249,6 +248,7 @@ def compute_plastic_strain_rate(
     tau_pl_shear: float,
     tau_pl_normal: float,
     yield_mask: jax.Array,
+    nu: float = 0.5,
 ) -> jax.Array:
     """Compute component-wise plastic strain rate using Prandtl-Reuss flow rule.
 
@@ -265,6 +265,8 @@ def compute_plastic_strain_rate(
         tau_pl_shear: Plastic relaxation time for shear.
         tau_pl_normal: Plastic relaxation time for normal stresses.
         yield_mask: Binary or smooth mask (0=elastic, 1=yielding), shape (...,).
+        nu: Poisson's ratio for plane-strain σ_zz = ν(σ_xx + σ_yy). Default 0.5
+            (incompressible).
 
     Returns:
         Plastic strain rate [ε̇ᵖ_xx, ε̇ᵖ_yy, ε̇ᵖ_xy], shape (..., 3).
@@ -273,8 +275,9 @@ def compute_plastic_strain_rate(
     sigma_yy = stress_tensor[..., 1]
     sigma_xy = stress_tensor[..., 2]
 
-    # Deviatoric normal stresses (incompressible plastic flow)
-    mean_stress = (sigma_xx + sigma_yy) / 2.0
+    # Plane-strain: sigma_zz = nu * (sigma_xx + sigma_yy)
+    sigma_zz = nu * (sigma_xx + sigma_yy)
+    mean_stress = (sigma_xx + sigma_yy + sigma_zz) / 3.0
     dev_xx = sigma_xx - mean_stress
     dev_yy = sigma_yy - mean_stress
 
@@ -394,7 +397,7 @@ def tensorial_epm_step(
 
     # 3. Compute plastic strain rate
     eps_dot_p = compute_plastic_strain_rate(
-        stress_reshaped, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask
+        stress_reshaped, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask, nu
     )  # (L, L, 3)
 
     # Reshape back to (3, L, L) for propagator application

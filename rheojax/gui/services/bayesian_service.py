@@ -183,6 +183,10 @@ class BayesianService:
             # SPP, GMM) that cache protocol kwargs and grid settings in
             # instance variables during _fit(). Without this, the fresh
             # model uses fallback defaults in model_function().
+            # NOTE: JAX arrays in fitted_model_state are shared by reference
+            # (no deep copy). The risk of mutation is mitigated by the UI
+            # disabling re-fit while NUTS is running, so the main thread
+            # will not modify the fitted model's state during NUTS.
             fitted_state = kwargs.pop("fitted_model_state", None)
             if fitted_state and isinstance(fitted_state, dict):
                 for attr in (
@@ -453,7 +457,9 @@ class BayesianService:
                 "min_ess": min(ess_dict.values()) if ess_dict else None,
             }
             diagnostics["diagnostics_valid"] = (
-                core_diag.get("diagnostics_valid", True) if isinstance(core_diag, dict) else True
+                core_diag.get("diagnostics_valid", True)
+                if isinstance(core_diag, dict)
+                else True
             )
 
             # Add warnings

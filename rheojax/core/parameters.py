@@ -127,7 +127,14 @@ class ParameterConstraint:
         elif self.type == "custom" and self.validator:
             return self.validator(value)
 
-        elif self.type not in {"bounds", "positive", "integer", "fixed", "relative", "custom"}:
+        elif self.type not in {
+            "bounds",
+            "positive",
+            "integer",
+            "fixed",
+            "relative",
+            "custom",
+        }:
             raise ValueError(f"Unknown constraint type: {self.type!r}")
 
         return True
@@ -203,7 +210,8 @@ class Parameter:
     def bounds(self, new_bounds: tuple[float, float] | None) -> None:
         """Set parameter bounds and sync any bounds constraint."""
         self._bounds = new_bounds
-        # Sync bounds constraint if constraints list exists
+        # Sync ALL bounds constraints — iterate the full list so that every
+        # "bounds" constraint is updated, not only the first one.
         if hasattr(self, "constraints"):
             for c in self.constraints:
                 if hasattr(c, "type") and c.type == "bounds":
@@ -213,7 +221,6 @@ class Parameter:
                     else:
                         c.min_value = None
                         c.max_value = None
-                    break
 
     def _initialize(self, value: float | None) -> None:
         """Validate parameter after initialization."""
@@ -232,8 +239,10 @@ class Parameter:
                 )
             self.bounds = (lower, upper)
 
-        # Add bounds as constraint if specified and not already present
-        if self.bounds:
+        # Add bounds as constraint if specified and not already present.
+        # R12-B-015: use `is not None` instead of truthiness check so that a
+        # bounds tuple of (0.0, 0.0) — while degenerate — is still handled.
+        if self.bounds is not None:
             has_bounds_constraint = any(c.type == "bounds" for c in self.constraints)
             if not has_bounds_constraint:
                 self.constraints.insert(
@@ -299,7 +308,7 @@ class Parameter:
             raise ValueError(f"Parameter '{self.name}' received non-finite value")
 
         clamped_during_init = False
-        if self.bounds:
+        if self.bounds is not None:
             lower, upper = self.bounds
             _debug = logger.isEnabledFor(10)  # logging.DEBUG == 10
             if _debug:
@@ -352,6 +361,10 @@ class Parameter:
         if self._clamp_on_set:
             self._was_clamped = clamped_during_init
         else:
+            # R12-B-017: _was_clamped is only meaningful at initialization time
+            # (when _clamp_on_set=True). For all subsequent set_value() calls it
+            # is reset to False because clamping is not applied — out-of-bounds
+            # values raise ValueError instead.
             self._was_clamped = False
 
         self._value = numeric_val

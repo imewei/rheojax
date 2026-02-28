@@ -476,7 +476,8 @@ class FractionalPoyntingThomson(BaseModel):
         tau = self.parameters.get_value("tau")
 
         # Dispatch based on test_mode if set, otherwise auto-detect
-        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, Ge, Gk, alpha, tau)
         elif test_mode in ("relaxation", TestMode.RELAXATION):

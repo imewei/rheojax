@@ -36,6 +36,7 @@ from rheojax.visualization.templates import (
     plot_stress_strain,
 )
 
+
 def configure_matplotlib(
     unicode_safe: bool = True,
     suppress_font_warnings: bool = True,

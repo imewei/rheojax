@@ -405,7 +405,10 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     omega_arr = jnp.atleast_1d(jnp.asarray(omega_tau0, dtype=jnp.float64))
 
     # R8-OPT-004: validate shapes before JIT-traced dispatch
-    if not (jnp.ndim(x) == 0 or jnp.ndim(omega_tau0) == 0) and x_arr.shape != omega_arr.shape:
+    if (
+        not (jnp.ndim(x) == 0 or jnp.ndim(omega_tau0) == 0)
+        and x_arr.shape != omega_arr.shape
+    ):
         raise ValueError(f"Shape mismatch: x {x_arr.shape} vs omega {omega_arr.shape}")
 
     # Validate inputs
@@ -421,7 +424,9 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     # • If x is scalar: broadcast to length-1 and let vmap walk omega.
     # • If x and omega are arrays: must be the same length (existing contract).
     # • Scalar squeeze is deferred to the caller via jnp.squeeze on 0-d inputs.
-    is_x_scalar = jnp.ndim(x) == 0  # Python int — safe at eager / closure time
+    # R11-SGR-KRN-001: jnp.ndim() returns a Python int (not a tracer),
+    # so this Python if is resolved at call time. Safe inside and outside JIT.
+    is_x_scalar = jnp.ndim(x) == 0
     is_omega_scalar = jnp.ndim(omega_tau0) == 0
 
     if is_x_scalar:

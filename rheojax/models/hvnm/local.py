@@ -896,7 +896,8 @@ class HVNMLocal(HVNMBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -958,7 +959,8 @@ class HVNMLocal(HVNMBase):
 
     def _predict(self, X, **kwargs):
         """Predict response using fitted parameters."""
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         param_values = jnp.array(
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
@@ -1020,7 +1022,7 @@ class HVNMLocal(HVNMBase):
         R_NP = p_dict.get("R_NP", 20e-9)
         delta_m = p_dict.get("delta_m", 10e-9)
 
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)

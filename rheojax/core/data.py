@@ -104,6 +104,11 @@ class RheoData:
             self.metadata["detected_test_mode"] = initial_test_mode
         elif self.metadata and "test_mode" in self.metadata:
             self._explicit_test_mode = self.metadata.get("test_mode")
+            # R12-B-012: also populate "detected_test_mode" in the elif path so
+            # that callers which read metadata["detected_test_mode"] (e.g. test
+            # assertions and the GUI) see the same value regardless of whether
+            # the mode was set at construction time or pre-populated in metadata.
+            self.metadata["detected_test_mode"] = self._explicit_test_mode
 
         if self.x is None or self.y is None:
             logger.error("x and y data must be provided")
@@ -184,6 +189,9 @@ class RheoData:
                 raise ValueError("x data contains non-finite values")
 
         if isinstance(self.y, np.ndarray):
+            # Note: For complex arrays, np.isnan() returns True if EITHER
+            # real or imaginary part is NaN. This is intentional — partial
+            # NaN in complex modulus data is not physically meaningful.
             if np.any(np.isnan(self.y)):
                 logger.error("y data contains NaN values")
                 raise ValueError("y data contains NaN values")
@@ -321,6 +329,8 @@ class RheoData:
         # even after the caller explicitly sets metadata["test_mode"].
         if "test_mode" in metadata:
             self._detected_test_mode = None
+            self._explicit_test_mode = metadata["test_mode"]  # R11-DATA-001: sync
+            self.metadata.pop("detected_test_mode", None)  # R11-DATA-002: clear stale
         self.metadata.update(metadata)
         # Invalidate JAX cache since metadata snapshot is now stale
         if hasattr(self, "_jax_cache"):
@@ -426,7 +436,7 @@ class RheoData:
         return None
 
     @property
-    def y_real(self) -> "np.ndarray | jnp_typing.ndarray":
+    def y_real(self) -> np.ndarray | jnp_typing.ndarray:
         """Get real component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the storage
@@ -447,7 +457,7 @@ class RheoData:
         return self.y
 
     @property
-    def y_imag(self) -> "np.ndarray | jnp_typing.ndarray":
+    def y_imag(self) -> np.ndarray | jnp_typing.ndarray:
         """Get imaginary component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the loss
@@ -839,9 +849,13 @@ class RheoData:
         logger.debug("Computing numerical derivative")
         if np.iscomplexobj(self.y):
             if isinstance(self.y, jnp.ndarray):
-                dy_dx = jnp.gradient(jnp.real(self.y), self.x) + 1j * jnp.gradient(jnp.imag(self.y), self.x)
+                dy_dx = jnp.gradient(jnp.real(self.y), self.x) + 1j * jnp.gradient(
+                    jnp.imag(self.y), self.x
+                )
             else:
-                dy_dx = np.gradient(np.real(self.y), self.x) + 1j * np.gradient(np.imag(self.y), self.x)
+                dy_dx = np.gradient(np.real(self.y), self.x) + 1j * np.gradient(
+                    np.imag(self.y), self.x
+                )
         elif isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
             dy_dx = jnp.gradient(self.y, self.x)
         else:

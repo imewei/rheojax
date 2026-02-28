@@ -185,7 +185,8 @@ class GiesekusSingleMode(GiesekusBase):
             nlsq_optimize,
         )
 
-        test_mode = kwargs.get("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -277,7 +278,8 @@ class GiesekusSingleMode(GiesekusBase):
         jnp.ndarray
             Predicted response
         """
-        test_mode = kwargs.pop("test_mode", self._test_mode or "flow_curve")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
@@ -285,7 +287,7 @@ class GiesekusSingleMode(GiesekusBase):
         fwd_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("deformation_mode", "poisson_ratio")
+            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) real [G', G''] for oscillation;
@@ -322,7 +324,7 @@ class GiesekusSingleMode(GiesekusBase):
             Predicted response
         """
         eta_p, lambda_1, alpha, eta_s = params
-        mode = test_mode or self._test_mode or "flow_curve"
+        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:

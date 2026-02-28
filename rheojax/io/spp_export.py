@@ -97,9 +97,7 @@ def _extract_spp_arrays(
             spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2))
         ),
         "tan_delta_t": np.asarray(
-            spp_results.get(
-                "tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)
-            )
+            spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
         ),
         "delta_t": np.asarray(
             spp_results.get(
@@ -321,7 +319,7 @@ def _write_spp_main_txt(
                 f.write("Data calculated via Fourier domain filtering\r\n")
 
             # Write parameters
-            f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
+            f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
             if n_harmonics is not None:
                 f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
             if n_cycles is not None:
@@ -406,7 +404,7 @@ def _write_spp_fsf_txt(
                 f.write("Data calculated via Fourier domain filtering\r\n")
 
             # Write parameters
-            f.write(f"Frequency:\t{omega:.{precision}f}\r\n")
+            f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
             if n_harmonics is not None:
                 f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
             if n_cycles is not None:
@@ -583,12 +581,12 @@ def export_spp_hdf5(
                 waveform_keys_written = []
                 for key in ["time_new", "strain_recon", "rate_recon", "stress_recon"]:
                     if key in spp_results:
-                        waveforms.create_dataset(
-                            key, data=np.asarray(spp_results[key])
-                        )
+                        waveforms.create_dataset(key, data=np.asarray(spp_results[key]))
                         waveform_keys_written.append(key)
                 datasets_written.extend(waveform_keys_written)
-                logger.debug("Waveform datasets written", datasets=waveform_keys_written)
+                logger.debug(
+                    "Waveform datasets written", datasets=waveform_keys_written
+                )
 
                 # Frenet-Serret frame group
                 # IO-R6-009: Guard all three FSF vectors — if T_vec is present
@@ -713,7 +711,9 @@ def export_spp_csv(
                     num_columns=len(columns),
                     column_names=list(columns.keys()),
                 )
-                f.write(",".join(columns.keys()) + "\n")
+                # R11-SPP-IO-001: Use CRLF to match MATLAB convention
+                # (consistent with export_spp_txt)
+                f.write(",".join(columns.keys()) + "\r\n")
                 # Data
                 data = np.column_stack(list(columns.values()))
                 logger.debug(
@@ -721,7 +721,7 @@ def export_spp_csv(
                     data_shape=data.shape,
                 )
                 for row in data:
-                    f.write(",".join(f"{val:.7g}" for val in row) + "\n")
+                    f.write(",".join(f"{val:.7g}" for val in row) + "\r\n")
             os.replace(tmp_path, filepath)
         except Exception:
             if tmp_path.exists():

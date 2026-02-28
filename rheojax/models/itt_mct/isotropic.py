@@ -371,18 +371,18 @@ class ITTMCTIsotropic(ITTMCTBase):
         # Prevents the physical-unit vertex from causing overflow in the
         # ODE solver (physical V entries are O(10¹²) vs dimensionless O(1)).
         # ---------------------------------------------------------------
-        k_dim = self.k_grid * sigma_d           # dimensionless wave vectors
-        S_k_dim = self.S_k                      # S(k) is dimensionless
+        k_dim = self.k_grid * sigma_d  # dimensionless wave vectors
+        S_k_dim = self.S_k  # S(k) is dimensionless
 
         # Dimensionless bare relaxation rates Γ̃(k̃) = k̃² / S(k̃)
         Gamma_dim = k_dim**2 / np.maximum(S_k_dim, 1e-12)
 
         # Dimensionless vertex V̈(k̃,q̃): recomputed with σ=1 so entries are
         # O(1)–O(100), compatible with the ODE step-size constraints.
-        sk_func_dim = lambda k_arg: percus_yevick_sk(k_arg, phi, sigma=1.0)
-        V_dim = mct_vertex_isotropic(
-            k_dim, k_dim, phi, sk_func=sk_func_dim, sigma=1.0
-        )
+        def sk_func_dim(k_arg):
+            return percus_yevick_sk(k_arg, phi, sigma=1.0)
+
+        V_dim = mct_vertex_isotropic(k_dim, k_dim, phi, sk_func=sk_func_dim, sigma=1.0)
 
         # ---------------------------------------------------------------
         # Prony parameters: log-spaced τ covering requested time range
@@ -412,13 +412,16 @@ class ITTMCTIsotropic(ITTMCTBase):
         if g_sum < 1e-12:
             g_arr = np.ones(n_prony) / n_prony  # fallback: equal weights
         else:
-            g_arr = g_raw / g_sum               # normalise: Σᵢ gᵢ = 1
+            g_arr = g_raw / g_sum  # normalise: Σᵢ gᵢ = 1
 
         logger.debug(
-            "ISM correlator: n_k=%d, n_prony=%d, "
-            "tau=[%.2e, %.2e], g_nnz=%d/%d",
-            n_k, n_prony, tau_arr[0], tau_arr[-1],
-            int(np.count_nonzero(g_arr > 1e-14 * g_arr.max())), n_prony,
+            "ISM correlator: n_k=%d, n_prony=%d, tau=[%.2e, %.2e], g_nnz=%d/%d",
+            n_k,
+            n_prony,
+            tau_arr[0],
+            tau_arr[-1],
+            int(np.count_nonzero(g_arr > 1e-14 * g_arr.max())),
+            n_prony,
         )
 
         # ---------------------------------------------------------------
@@ -432,13 +435,13 @@ class ITTMCTIsotropic(ITTMCTBase):
 
             # Prony auxiliary variables: K[i, k], shape (n_prony, n_k)
             K_mat = y[n_k:].reshape(n_prony, n_k)
-            K_sum = K_mat.sum(axis=0)                 # (n_k,)
+            K_sum = K_mat.sum(axis=0)  # (n_k,)
 
             # Memory kernel: m(k) = Σ_q V(k,q) · Φ(q)²
-            m_k = V_dim @ (phi_k * phi_k)             # (n_k,)
+            m_k = V_dim @ (phi_k * phi_k)  # (n_k,)
 
             # Correlator evolution: dΦ/dt = -Γ̃(k) × [Φ(k) + Σᵢ Kᵢ(k)]
-            dphi_dt = -Gamma_dim * (phi_k + K_sum)    # (n_k,)
+            dphi_dt = -Gamma_dim * (phi_k + K_sum)  # (n_k,)
 
             dy = np.empty(state_size)
             dy[:n_k] = dphi_dt
@@ -726,9 +729,13 @@ class ITTMCTIsotropic(ITTMCTBase):
                 if is_glass:
                     G_k_total = float(np.sum(G_k_weights))
                     if G_k_total > 0:
-                        sigma[i] = G_scale * gamma_c * float(
-                            np.sum(G_k_weights * f_k_arr**2)
-                        ) / G_k_total * 0.1
+                        sigma[i] = (
+                            G_scale
+                            * gamma_c
+                            * float(np.sum(G_k_weights * f_k_arr**2))
+                            / G_k_total
+                            * 0.1
+                        )
                 else:
                     sigma[i] = 0.0
                 continue
@@ -1007,6 +1014,8 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         sigma = np.zeros_like(t)
 
+        # R11-ISM-001: TODO — Vectorize over (t, k) dimensions using jnp broadcasting
+        # for better performance. Current double Python loop is O(n_t * n_k).
         for i, t_val in enumerate(t):
             stress_k = np.zeros(len(self.k_grid))
 
@@ -1065,6 +1074,8 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         sigma = np.zeros_like(t)
 
+        # R11-ISM-001: TODO — Vectorize over (t, k) dimensions using jnp broadcasting
+        # for better performance. Current double Python loop is O(n_t * n_k).
         for i, t_val in enumerate(t):
             gamma_t = gamma_0 * np.sin(omega * t_val)
             gamma_dot_t = gamma_0 * omega * np.cos(omega * t_val)

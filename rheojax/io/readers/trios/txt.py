@@ -209,6 +209,25 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         # Aggregate chunks on-the-fly
         progress_callback = kwargs.pop("progress_callback", None)
 
+        # R11-TXT-002: Default to segment_index=0 if not provided, and warn
+        # if multiple segments are detected but segment_index is not specified.
+        if "segment_index" not in kwargs:
+            # Quick scan to count segments for the warning
+            _enc = _detect_txt_encoding(filepath)
+            _seg_count = 0
+            with open(filepath, encoding=_enc, errors="replace") as _f:
+                for _line in _f:
+                    if re.match(r"\[step\]", _line, re.IGNORECASE):
+                        _seg_count += 1
+            if _seg_count > 1:
+                logger.warning(
+                    "Multiple segments detected but segment_index not specified; "
+                    "defaulting to segment_index=0 (all segments will be merged)",
+                    filepath=str(filepath),
+                    num_segments=_seg_count,
+                )
+            kwargs["segment_index"] = 0
+
         x_parts = []
         y_parts = []
         first_chunk = None
@@ -305,6 +324,15 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 
             logger.debug("Auto-chunking complete", num_chunks=chunk_count)
 
+            # R11-TXT-001: Auto-chunk currently only returns segment 0.
+            # TODO: support multi-segment via return_all_segments.
+            if kwargs.get("return_all_segments", False):
+                logger.warning(
+                    "return_all_segments is not supported in auto-chunk mode; "
+                    "only segment 0 is returned. Use auto_chunk=False for multi-segment files.",
+                    filepath=str(filepath),
+                )
+
             # Aggregate chunks into single RheoData object
             if first_chunk is not None:
                 # Concatenate all chunk data
@@ -318,7 +346,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                     x_units=first_chunk.x_units,
                     y_units=first_chunk.y_units,
                     domain=first_chunk.domain,
-                    metadata=first_chunk.metadata,
+                    metadata=first_chunk.metadata.copy(),
                     initial_test_mode=first_chunk.test_mode,
                     validate=kwargs.get("validate_data", True),
                 )
@@ -497,7 +525,7 @@ def load_trios_chunked(
         header_lines = []
         for i, line in enumerate(f):
             header_lines.append(line.rstrip("\n"))
-            if i >= 500:  # was 100 — match _extract_metadata's 500-line scan
+            if i >= 499:  # R11-TXT-004: 0-based index, so 499 = 500th line
                 break
 
         # Extract metadata from header
@@ -976,7 +1004,9 @@ def _process_data_section(
         header_line = next(file_handle).rstrip("\n")
         unit_line = next(file_handle).rstrip("\n")
     except StopIteration:
-        raise ValueError("TRIOS TXT segment truncated: expected header and unit lines")
+        raise ValueError(
+            "TRIOS TXT segment truncated: expected header and unit lines"
+        ) from None
     line_num += 2
 
     columns, units = _parse_headers_and_units(header_line, unit_line)
@@ -1002,9 +1032,15 @@ def _process_data_section(
         warnings.warn(f"Could not determine x/y columns from: {columns}", stacklevel=2)
         return
 
+    if y_col2 is not None and y_col2 >= sample_array.shape[1]:
+        logger.warning("y_col2 index out of bounds; treating as non-complex data")
+        y_col2 = None
+        y_units2 = None
+
     # Build segment metadata
     domain, test_mode = _infer_domain_and_mode(
-        columns[x_col], columns[y_col], x_units, y_units
+        columns[x_col], columns[y_col], x_units, y_units,
+        all_columns=columns,
     )
     segment_metadata = _build_segment_metadata(
         metadata, test_mode, columns, units, step_temperature
@@ -1382,6 +1418,11 @@ def _parse_segment(
         warnings.warn(f"Could not determine x/y columns from: {columns}", stacklevel=2)
         return None
 
+    if y_col2 is not None and y_col2 >= data_array.shape[1]:
+        logger.warning("y_col2 index out of bounds; treating as non-complex data")
+        y_col2 = None
+        y_units2 = None
+
     # Extract x data
     x_data = data_array[:, x_col]
 
@@ -1426,7 +1467,8 @@ def _parse_segment(
 
     # Determine domain and test mode
     domain, test_mode = _infer_domain_and_mode(
-        columns[x_col], columns[y_col], x_units, y_units
+        columns[x_col], columns[y_col], x_units, y_units,
+        all_columns=columns,
     )
 
     # Update metadata
@@ -1434,6 +1476,16 @@ def _parse_segment(
     segment_metadata["test_mode"] = test_mode
     segment_metadata["columns"] = columns
     segment_metadata["units"] = units
+
+    # Detect deformation mode from column names
+    col_names_lower = [c.lower() for c in columns]
+    if any(
+        "tensile" in c
+        or c.startswith("e' ") or c == "e'"
+        or c.startswith("e'' ") or c == "e''"
+        for c in col_names_lower
+    ):
+        segment_metadata["deformation_mode"] = "tension"
 
     # Add temperature if found
     if step_temperature is not None:
@@ -1484,6 +1536,10 @@ def _determine_xy_columns(
     ]
 
     y_priorities = [
+        "tensile storage modulus",
+        "tensile loss modulus",
+        "e' ",
+        "e'' ",
         "storage modulus",
         "loss modulus",
         "stress",
@@ -1506,15 +1562,16 @@ def _determine_xy_columns(
             break
 
     # Check for BOTH storage and loss modulus (for complex modulus construction)
+    # Also handles tensile (E'/E'') patterns for DMTA data
     storage_col = None
     loss_col = None
     for i, col in enumerate(columns_lower):
-        if "storage modulus" in col and i != x_col:
+        if ("storage modulus" in col or "tensile storage modulus" in col or col.startswith("e' ")) and i != x_col:
             storage_col = i
-        elif "loss modulus" in col and i != x_col:
+        elif ("loss modulus" in col or "tensile loss modulus" in col or col.startswith("e'' ")) and i != x_col:
             loss_col = i
 
-    # If we have both G' and G'', use them to construct complex modulus
+    # If we have both G' and G'' (or E' and E''), use them to construct complex modulus
     if storage_col is not None and loss_col is not None:
         x_units = units[x_col] if x_col < len(units) else ""
         y_units = units[storage_col] if storage_col < len(units) else ""
@@ -1552,7 +1609,8 @@ def _determine_xy_columns(
 
 
 def _infer_domain_and_mode(
-    x_name: str, y_name: str, x_units: str, y_units: str
+    x_name: str, y_name: str, x_units: str, y_units: str,
+    all_columns: list[str] | None = None,
 ) -> tuple:
     """Infer domain and test mode from column names and units.
 
@@ -1561,6 +1619,8 @@ def _infer_domain_and_mode(
         y_name: Y column name
         x_units: X units
         y_units: Y units
+        all_columns: All column names in the segment (used to detect
+            paired G'/G'' for disambiguating oscillation vs relaxation)
 
     Returns:
         Tuple of (domain, test_mode)
@@ -1574,7 +1634,21 @@ def _infer_domain_and_mode(
             return "frequency", "oscillation"
 
     # Time domain
-    if "time" in x_lower or "s" == x_units.lower():
+    # R11-TXT-003: Match "step time" as well as plain "time" by checking
+    # individual words via split() to avoid false matches on substrings.
+    x_words = x_lower.split()
+    if "time" in x_words or "s" == x_units.lower():
+        # R11-TXT-003: "Storage Modulus" vs time is only oscillation when a
+        # paired "Loss Modulus" column exists (time-sweep SAOS).  Without
+        # the pair, TRIOS may label the relaxation modulus G(t) as
+        # "Storage Modulus", so fall through to the generic modulus check.
+        if "storage" in y_lower:
+            has_loss_pair = False
+            if all_columns is not None:
+                has_loss_pair = any("loss" in c.lower() for c in all_columns)
+            if has_loss_pair:
+                return "time", "oscillation"
+            # No loss pair → fall through to modulus check (relaxation)
         if "stress" in y_lower:
             # Check if strain or stress in name
             if "relax" in y_lower:

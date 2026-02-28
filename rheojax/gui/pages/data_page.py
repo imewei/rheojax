@@ -136,12 +136,25 @@ class DataPage(QWidget):
         self._example_combo.setPlaceholderText("Select an example dataset")
         _PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # rheojax/
         self._example_paths = {
-            "Polypropylene Relaxation (basic)": str(_PACKAGE_ROOT / "examples/data/experimental/polypropylene_relaxation.csv"),
-            "Polystyrene Creep (basic)": str(_PACKAGE_ROOT / "examples/data/experimental/polystyrene_creep.csv"),
-            "Frequency Sweep TTS (mastercurve)": str(_PACKAGE_ROOT / "examples/data/experimental/frequency_sweep_tts.txt"),
-            "Multi-technique (advanced)": str(_PACKAGE_ROOT / "examples/data/experimental/multi_technique.txt"),
-            "OWChirp TTS": str(_PACKAGE_ROOT / "examples/data/experimental/owchirp_tts.txt"),
-            "OWChirp TCS": str(_PACKAGE_ROOT / "examples/data/experimental/owchirp_tcs.txt"),
+            "Polypropylene Relaxation (basic)": str(
+                _PACKAGE_ROOT
+                / "examples/data/experimental/polypropylene_relaxation.csv"
+            ),
+            "Polystyrene Creep (basic)": str(
+                _PACKAGE_ROOT / "examples/data/experimental/polystyrene_creep.csv"
+            ),
+            "Frequency Sweep TTS (mastercurve)": str(
+                _PACKAGE_ROOT / "examples/data/experimental/frequency_sweep_tts.txt"
+            ),
+            "Multi-technique (advanced)": str(
+                _PACKAGE_ROOT / "examples/data/experimental/multi_technique.txt"
+            ),
+            "OWChirp TTS": str(
+                _PACKAGE_ROOT / "examples/data/experimental/owchirp_tts.txt"
+            ),
+            "OWChirp TCS": str(
+                _PACKAGE_ROOT / "examples/data/experimental/owchirp_tcs.txt"
+            ),
         }
         for label in self._example_paths:
             self._example_combo.addItem(label)
@@ -305,7 +318,15 @@ class DataPage(QWidget):
         mode_layout.addWidget(QLabel("Test Mode:"))
         self._test_mode_combo = QComboBox()
         self._test_mode_combo.addItems(
-            ["Auto-detect", "oscillation", "relaxation", "creep", "flow_curve", "startup", "laos"]
+            [
+                "Auto-detect",
+                "oscillation",
+                "relaxation",
+                "creep",
+                "flow_curve",
+                "startup",
+                "laos",
+            ]
         )
         self._test_mode_combo.currentTextChanged.connect(
             lambda text: logger.debug(
@@ -378,8 +399,15 @@ class DataPage(QWidget):
 
     def _on_file_dropped(self, file_path: str) -> None:
         """Handle file drop or selection."""
-        logger.debug("Data loading triggered", filepath=file_path, page="DataPage")
         path_obj = Path(file_path)
+        suffix = path_obj.suffix.lower() if path_obj.suffix else "unknown"
+        logger.info(
+            "File selected for import",
+            filepath=file_path,
+            extension=suffix,
+            size_bytes=path_obj.stat().st_size if path_obj.exists() else 0,
+            page="DataPage",
+        )
 
         if not path_obj.exists():
             logger.warning("File not found", filepath=file_path)
@@ -432,6 +460,11 @@ class DataPage(QWidget):
         """
         if not self._current_file_path:
             return
+        logger.debug(
+            "Starting async preview load",
+            filepath=str(self._current_file_path),
+            page="DataPage",
+        )
 
         # Show loading state
         self._file_name_label.setText(f"Loading: {self._current_file_path.name}...")
@@ -446,9 +479,15 @@ class DataPage(QWidget):
         self._preview_generation += 1
         gen = self._preview_generation
 
-        if hasattr(self, '_active_preview_worker') and self._active_preview_worker is not None:
+        if (
+            hasattr(self, "_active_preview_worker")
+            and self._active_preview_worker is not None
+        ):
             # R6-GUI-008: cancel previous preview worker before starting new one
-            if hasattr(self._active_preview_worker, "cancel_token") and self._active_preview_worker.cancel_token is not None:
+            if (
+                hasattr(self._active_preview_worker, "cancel_token")
+                and self._active_preview_worker.cancel_token is not None
+            ):
                 self._active_preview_worker.cancel_token.cancel()
             # Disconnect signals from old worker to prevent stale callbacks
             try:
@@ -461,16 +500,29 @@ class DataPage(QWidget):
                 pass
             self._active_preview_worker = None
 
+        # Sharing self._data_service with PreviewWorker is safe: DataService.preview_file()
+        # and DataService.load_file_multi() are stateless with respect to instance variables
+        # — they only read self._supported_formats (set once in __init__, never mutated).
+        # No per-call state is written back to the service instance, so concurrent workers
+        # can safely share a single DataService without synchronization.
         worker = PreviewWorker(
             data_service=self._data_service,
             file_path=self._current_file_path,
             max_rows=100,
         )
         worker.signals.completed.connect(
-            lambda result, g=gen: self._on_preview_loaded(result) if g == self._preview_generation else None
+            lambda result, g=gen: (
+                self._on_preview_loaded(result)
+                if g == self._preview_generation
+                else None
+            ),
+            Qt.ConnectionType.QueuedConnection,
         )
         worker.signals.failed.connect(
-            lambda err, g=gen: self._on_preview_failed(err) if g == self._preview_generation else None
+            lambda err, g=gen: (
+                self._on_preview_failed(err) if g == self._preview_generation else None
+            ),
+            Qt.ConnectionType.QueuedConnection,
         )
         self._active_preview_worker = worker
         QThreadPool.globalInstance().start(worker)
@@ -501,6 +553,12 @@ class DataPage(QWidget):
         # TODO(perf): Move _detect_file_format() into PreviewWorker to avoid blocking main thread
         detected_format = self._detect_file_format()
         metadata["format"] = detected_format
+        logger.debug(
+            "File format detected",
+            filepath=str(self._current_file_path),
+            detected_format=detected_format,
+            page="DataPage",
+        )
 
         # Update table
         self._preview_table.clear()
@@ -567,7 +625,9 @@ class DataPage(QWidget):
         self._file_size_label.setText("")
         self._preview_table.clear()
         self._metadata_text.clear()
-        QMessageBox.critical(self, "Preview Failed", f"Failed to preview file:\n\n{error_msg}")
+        QMessageBox.critical(
+            self, "Preview Failed", f"Failed to preview file:\n\n{error_msg}"
+        )
 
     def _detect_file_format(self) -> str:
         """Detect the file format for user feedback."""
@@ -651,6 +711,12 @@ class DataPage(QWidget):
         """Update column mapper dropdowns with smart suggestions."""
         if not columns:
             return
+        logger.debug(
+            "Updating column mappers",
+            num_columns=len(columns),
+            columns=columns[:10],
+            page="DataPage",
+        )
 
         # Clear and repopulate
         for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
@@ -666,7 +732,11 @@ class DataPage(QWidget):
             self._temp_combo.addItems(columns)
 
             # Use DataService column suggestions for smarter auto-mapping
-            suggestions = {"x_suggestions": [], "y_suggestions": [], "y2_suggestions": []}
+            suggestions = {
+                "x_suggestions": [],
+                "y_suggestions": [],
+                "y2_suggestions": [],
+            }
             if self._current_file_path:
                 try:
                     suggestions = self._data_service.get_column_suggestions(
@@ -690,7 +760,9 @@ class DataPage(QWidget):
                 # Fallback: simple matching
                 for idx, col in enumerate(columns):
                     col_lower = col.lower()
-                    if any(x in col_lower for x in ["time", "freq", "omega", "angular"]):
+                    if any(
+                        x in col_lower for x in ["time", "freq", "omega", "angular"]
+                    ):
                         self._x_combo.setCurrentIndex(idx)
                         break
 
@@ -704,7 +776,9 @@ class DataPage(QWidget):
                 # Fallback: simple matching (avoid loss modulus)
                 for idx, col in enumerate(columns):
                     col_lower = col.lower()
-                    if any(y in col_lower for y in ["g'", "storage", "stress", "modulus"]):
+                    if any(
+                        y in col_lower for y in ["g'", "storage", "stress", "modulus"]
+                    ):
                         if "loss" not in col_lower and "''" not in col:
                             self._y_combo.setCurrentIndex(idx)
                             break
@@ -729,8 +803,22 @@ class DataPage(QWidget):
                 if any(t in col_lower for t in ["temp", "temperature"]):
                     self._temp_combo.setCurrentIndex(idx + 1)  # +1 for "None" option
                     break
+
+            logger.debug(
+                "Column mapping auto-applied",
+                x_selected=self._x_combo.currentText(),
+                y_selected=self._y_combo.currentText(),
+                y2_selected=self._y2_combo.currentText(),
+                used_service_suggestions=bool(x_suggestions or y_suggestions),
+                page="DataPage",
+            )
         finally:
-            for combo in [self._x_combo, self._y_combo, self._y2_combo, self._temp_combo]:
+            for combo in [
+                self._x_combo,
+                self._y_combo,
+                self._y2_combo,
+                self._temp_combo,
+            ]:
                 combo.blockSignals(False)
 
     def _reset_mapping(self) -> None:
@@ -757,9 +845,21 @@ class DataPage(QWidget):
         if test_mode == "Auto-detect":
             test_mode = None  # Let service auto-detect
 
+        logger.info(
+            "Import initiated",
+            filepath=str(self._current_file_path),
+            x_col=x_col,
+            y_col=y_col,
+            y2_col=y2_col,
+            test_mode=test_mode or "auto-detect",
+            page="DataPage",
+        )
+
         # Validate column selections before launching worker
         if not x_col or not y_col:
-            QMessageBox.warning(self, "Invalid Selection", "Please select both X and Y columns.")
+            QMessageBox.warning(
+                self, "Invalid Selection", "Please select both X and Y columns."
+            )
             return
         if x_col == y_col:
             QMessageBox.warning(
@@ -866,16 +966,8 @@ class DataPage(QWidget):
                     "name": name,
                     "test_mode": detected_mode or "unknown",
                     "x_data": x_np,
-                    "y_data": (
-                        np.real(y_np)
-                        if is_complex
-                        else y_np
-                    ),
-                    "y2_data": (
-                        np.imag(y_np)
-                        if is_complex
-                        else None
-                    ),
+                    "y_data": (np.real(y_np) if is_complex else y_np),
+                    "y2_data": (np.imag(y_np) if is_complex else None),
                     "metadata": getattr(rheo_data, "metadata", {}),
                 },
             )
@@ -889,7 +981,9 @@ class DataPage(QWidget):
             "Data import completed",
             filepath=str(self._current_file_path),
             dataset_count=len(datasets),
-            record_count=sum(len(ds.x_data) if ds.x_data is not None else 0 for ds in datasets),
+            record_count=sum(
+                len(ds.x_data) if ds.x_data is not None else 0 for ds in datasets
+            ),
             page="DataPage",
         )
 
@@ -923,7 +1017,9 @@ class DataPage(QWidget):
         )
         self._preview_data = None
         self._file_name_label.setText(f"Import error: {error_msg}")
-        QMessageBox.critical(self, "Import Failed", f"Failed to load file:\n\n{error_msg}")
+        QMessageBox.critical(
+            self, "Import Failed", f"Failed to load file:\n\n{error_msg}"
+        )
         store = StateStore()
         store.dispatch(
             "IMPORT_DATA_FAILED",
@@ -971,7 +1067,11 @@ class DataPage(QWidget):
             has_y2 = True
         else:
             y_display = y_arr
-            y2_display = np.asarray(y2_vals) if y2_vals is not None and len(y2_vals) > 0 else None
+            y2_display = (
+                np.asarray(y2_vals)
+                if y2_vals is not None and len(y2_vals) > 0
+                else None
+            )
             has_y2 = y2_display is not None and len(y2_display) > 0
 
         # Determine columns
@@ -1095,15 +1195,9 @@ class DataPage(QWidget):
                 "test_mode": processed.metadata.get("test_mode", dataset.test_mode),
                 "x_data": processed.x,
                 "y_data": (
-                    np.real(np.asarray(processed.y))
-                    if is_complex
-                    else processed.y
+                    np.real(np.asarray(processed.y)) if is_complex else processed.y
                 ),
-                "y2_data": (
-                    np.imag(np.asarray(processed.y))
-                    if is_complex
-                    else None
-                ),
+                "y2_data": (np.imag(np.asarray(processed.y)) if is_complex else None),
                 "metadata": processed.metadata,
             }
             store.dispatch("IMPORT_DATA_SUCCESS", payload)

@@ -13,3 +13,9 @@ cleanup_lock = threading.Lock()
 # Both worker types share the same lock to prevent concurrent jax.clear_caches()
 fit_cleanup_lock = cleanup_lock
 bayesian_cleanup_lock = cleanup_lock
+
+# NOTE: cleanup_lock serializes jax.clear_caches() between worker threads
+# but does NOT synchronize with main-thread predict() calls. The main
+# thread should not call model.predict() while a worker's finally block
+# is running. In practice, this is safe because the completion signal
+# triggers main-thread predict only after the worker fully returns.

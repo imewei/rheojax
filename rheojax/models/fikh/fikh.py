@@ -224,6 +224,11 @@ class FIKH(FIKHBase):
         sigma_0 = kwargs.get("sigma_0", 100.0)
         T_init = kwargs.get("T_init", None)
 
+        # Cache protocol kwargs so model_function() can retrieve them during NUTS
+        self._fit_gamma_dot = gamma_dot
+        self._fit_sigma_applied = sigma_applied
+        self._fit_sigma_0 = sigma_0
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=False))
@@ -271,6 +276,10 @@ class FIKH(FIKHBase):
         y_arr = jnp.asarray(y)
         gamma_0 = kwargs.get("gamma_0", 0.01)
         n_cycles = kwargs.get("n_cycles", 5)
+
+        # Cache protocol kwargs so model_function() can retrieve them during NUTS
+        self._fit_gamma_0 = gamma_0
+        self._fit_n_cycles = n_cycles
 
         # Determine if fitting to complex or magnitude
         is_complex = jnp.iscomplexobj(y_arr)
@@ -450,7 +459,8 @@ class FIKH(FIKHBase):
         Returns:
             Predicted values.
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "startup")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "startup")
         mode = self._validate_test_mode(test_mode)
         params = self._get_params_dict()
 
@@ -680,14 +690,16 @@ class FIKH(FIKHBase):
         Returns:
             Predicted values.
         """
-        # F-012: prefer explicit test_mode; fall back to _last_fit_kwargs
+        # Prefer explicit test_mode; fall back to _last_fit_kwargs
         # (set by fit()) over stale self._test_mode to avoid wrong NUTS likelihood
-        mode = (
-            test_mode
-            or getattr(self, "_last_fit_kwargs", {}).get("test_mode")
-            or self._test_mode
-            or "startup"
-        )
+        if test_mode is not None:
+            mode = test_mode
+        elif getattr(self, "_last_fit_kwargs", {}).get("test_mode") is not None:
+            mode = self._last_fit_kwargs["test_mode"]
+        elif self._test_mode is not None:
+            mode = self._test_mode
+        else:
+            mode = "startup"
 
         # Convert array to dict if needed
         if isinstance(params, (np.ndarray, jnp.ndarray)):
@@ -708,11 +720,13 @@ class FIKH(FIKHBase):
 
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get("gamma_dot", param_dict.pop("_gamma_dot", 0.0))
-            sigma_applied = kwargs.get(
-                "sigma_applied", param_dict.pop("_sigma_applied", 100.0)
+            gamma_dot = kwargs.get(
+                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
             )
-            sigma_0 = kwargs.get("sigma_0", param_dict.pop("_sigma_0", 60.0))
+            sigma_applied = kwargs.get(
+                "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
+            )
+            sigma_0 = kwargs.get("sigma_0", getattr(self, "_fit_sigma_0", 60.0))
             return self._simulate_transient(
                 t, param_dict, mode_enum.value, gamma_dot, sigma_applied, sigma_0
             )
@@ -720,8 +734,8 @@ class FIKH(FIKHBase):
         elif mode_enum == TestMode.OSCILLATION:
             # Frequency-domain SAOS: X is omega, return |G*| for Bayesian fitting
             omega = jnp.asarray(X)
-            gamma_0 = kwargs.get("gamma_0", param_dict.pop("_gamma_0", 0.01))
-            n_cycles = kwargs.get("n_cycles", param_dict.pop("_n_cycles", 5))
+            gamma_0 = kwargs.get("gamma_0", getattr(self, "_fit_gamma_0", 0.01))
+            n_cycles = kwargs.get("n_cycles", getattr(self, "_fit_n_cycles", 5))
             G_star = self._predict_oscillation_from_params(
                 omega, param_dict, gamma_0, n_cycles
             )

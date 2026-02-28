@@ -563,7 +563,8 @@ class FractionalJeffreysModel(BaseModel):
             and alpha is not None
             and tau1 is not None
         )
-        test_mode = getattr(self, "_test_mode", None) or kwargs.get("test_mode")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
         elif test_mode in ("relaxation", TestMode.RELAXATION):
@@ -628,7 +629,12 @@ class FractionalJeffreysModel(BaseModel):
             return self._predict_creep(X, eta1, eta2, alpha, tau1)
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
-        elif test_mode == TestMode.ROTATION:
+        elif test_mode in (
+            TestMode.ROTATION,
+            TestMode.FLOW_CURVE,
+            "rotation",
+            "flow_curve",
+        ):
             return self._predict_rotation(X, eta1, eta2, alpha, tau1)
         else:
             # Default to relaxation mode for Jeffreys model

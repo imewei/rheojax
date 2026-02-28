@@ -446,8 +446,13 @@ class MIKH(IKHBase):
         )
 
         # Add viscous contribution for startup
-        if mode == "startup" and params.get("eta_inf", 0.0) > 0:
-            result = result + params["eta_inf"] * args["gamma_dot"]
+        if mode == "startup":
+            eta_inf_val = params.get("eta_inf", 0.0)
+            result = result + jnp.where(
+                jnp.greater(eta_inf_val, 0.0),
+                eta_inf_val * args["gamma_dot"],
+                jnp.zeros_like(result),
+            )
 
         return result
 
@@ -466,7 +471,8 @@ class MIKH(IKHBase):
                 - creep: time array (requires sigma_applied)
             **kwargs: Additional parameters (test_mode, gamma_dot, etc.)
         """
-        test_mode = kwargs.get("test_mode", self._test_mode or "startup")
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "startup")
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 
@@ -476,7 +482,9 @@ class MIKH(IKHBase):
 
         elif test_mode in ["creep", "relaxation"]:
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", float("nan")))
+            gamma_dot = kwargs.get(
+                "gamma_dot", getattr(self, "_fit_gamma_dot", float("nan"))
+            )
             sigma_applied = kwargs.get(
                 "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
             )
@@ -575,7 +583,11 @@ class MIKH(IKHBase):
         Falls back to values cached during _fit() if not provided.
         """
         # Use stored test_mode if not provided
-        mode = test_mode or self._test_mode or "startup"
+        if test_mode is None:
+            test_mode = getattr(self, "_test_mode", None)
+        if test_mode is None:
+            test_mode = "startup"
+        mode = test_mode
 
         # Convert array to dict for kernel
         if isinstance(params, (np.ndarray, jnp.ndarray)):
@@ -586,7 +598,9 @@ class MIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs, falling back to
         # cached values from _fit_ode_formulation()
-        gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", float("nan")))
+        gamma_dot = kwargs.get(
+            "gamma_dot", getattr(self, "_fit_gamma_dot", float("nan"))
+        )
         sigma_applied = kwargs.get(
             "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
         )

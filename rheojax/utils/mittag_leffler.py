@@ -160,6 +160,10 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
     # Zero out when z ≈ 0 and k > 0 (z^k → 0, but log-space gives artefacts)
     abs_terms = jnp.where((k > 0) & (abs_z < 1e-300), 0.0, abs_terms)
 
+    # R11-ML-001: Zero out negligible terms to avoid unnecessary computation
+    max_term = jnp.max(abs_terms)
+    abs_terms = jnp.where(abs_terms < 1e-30 * max_term, 0.0, abs_terms)
+
     # Sign: z^k = |z|^k for z >= 0,  (-1)^k |z|^k for z < 0
     neg_sign = jnp.where(k % 2 == 0, 1.0, -1.0)
     sign = jnp.where(z >= 0, 1.0, neg_sign)
@@ -184,9 +188,7 @@ def _ml_taylor_complex(z, alpha, beta, n_iter=300):
         # Update z_power with overflow clamp (KRN-011)
         z_pow_raw = z_pow * z
         abs_val = jnp.abs(z_pow_raw)
-        scale = jnp.where(
-            abs_val > 1e300, 1e300 / jnp.maximum(abs_val, 1e-300), 1.0
-        )
+        scale = jnp.where(abs_val > 1e300, 1e300 / jnp.maximum(abs_val, 1e-300), 1.0)
         z_pow_new = z_pow_raw * scale
 
         return sum_new, c_new, z_pow_new

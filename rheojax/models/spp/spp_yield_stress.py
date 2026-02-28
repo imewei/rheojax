@@ -252,6 +252,10 @@ class SPPYieldStress(BaseModel):
         self._test_mode = test_mode
         yield_type = kwargs.get("yield_type", "static")
         self._yield_type = yield_type
+        # Persist yield_type for Bayesian pipeline forwarding
+        if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
+            self._last_fit_kwargs = {}
+        self._last_fit_kwargs["yield_type"] = self._yield_type
 
         if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
             self._fit_oscillation(X_array, y_array, yield_type)
@@ -436,10 +440,11 @@ class SPPYieldStress(BaseModel):
         sigma_dy_exp = params[4]
         eta_inf = params[5]
         n_power_law = params[6]
-        # noise = params[7]  # Used only in likelihood
+        # noise = params[7]  — observation noise; used by BayesianMixin as the last
+        # parameter for the likelihood sigma. Not used directly in model_function predictions.
 
         if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
-            yield_type = getattr(self, "_yield_type", "static")
+            yield_type = kwargs.get("yield_type", getattr(self, "_yield_type", "static"))
             if yield_type == "dynamic":
                 return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
             return self._predict_oscillation(
@@ -454,10 +459,10 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_oscillation(
         gamma_0: Array,
-        G_cage: "jax.Array | float",
-        sigma_sy_scale: "jax.Array | float",
-        sigma_sy_exp: "jax.Array | float",
-        eta_inf: "jax.Array | float",
+        G_cage: jax.Array | float,
+        sigma_sy_scale: jax.Array | float,
+        sigma_sy_exp: jax.Array | float,
+        eta_inf: jax.Array | float,
     ) -> Array:
         """Predict static yield stress for amplitude sweep.
 
@@ -489,8 +494,8 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_dynamic_yield(
         gamma_0: Array,
-        sigma_dy_scale: "jax.Array | float",
-        sigma_dy_exp: "jax.Array | float",
+        sigma_dy_scale: jax.Array | float,
+        sigma_dy_exp: jax.Array | float,
     ) -> Array:
         """Predict dynamic yield stress for amplitude sweep.
 
@@ -502,9 +507,9 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_rotation(
         gamma_dot: Array,
-        sigma_dy: "jax.Array | float",
-        eta_inf: "jax.Array | float",
-        n_power_law: "jax.Array | float",
+        sigma_dy: jax.Array | float,
+        eta_inf: jax.Array | float,
+        n_power_law: jax.Array | float,
     ) -> Array:
         """Predict stress for steady shear flow.
 

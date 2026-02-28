@@ -347,6 +347,11 @@ class BayesianWorker(QRunnable):
                         parameters=list(invalid),
                     )
 
+            # Done with the validation model instance — free its JAX memory
+            # before NUTS starts.  BayesianService.run_mcmc() creates a
+            # separate model internally for sampling.
+            del model
+
             # F-009 fix: Emit periodic elapsed-time updates during NUTS sampling
             # since NumPyro NUTS does not support progress callbacks.
             import threading
@@ -355,6 +360,10 @@ class BayesianWorker(QRunnable):
             _nuts_start = time.perf_counter()
 
             def _elapsed_timer():
+                # NOTE: PySide6 handles signal emission from non-Qt threads correctly
+                # via internal thread detection. This timer emits progress signals from
+                # a raw threading.Thread, which relies on PySide6's AutoConnection
+                # resolving to QueuedConnection for cross-thread delivery.
                 while not _nuts_done.wait(timeout=5.0):
                     elapsed = time.perf_counter() - _nuts_start
                     self.signals.progress.emit(
@@ -378,7 +387,9 @@ class BayesianWorker(QRunnable):
                 )
             finally:
                 _nuts_done.set()
-                timer_thread.join(timeout=1.0)
+                timer_thread.join(timeout=3.0)
+                if timer_thread.is_alive():
+                    logger.debug("Timer thread did not stop within timeout")
 
             sampling_time = time.perf_counter() - start_time
 

@@ -437,15 +437,26 @@ class FractionalKelvinVoigt(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X)
 
-        # Handle raw array input (assume relaxation mode)
+        # Handle raw array input with test_mode dispatch
+        _kw_mode = kwargs.get("test_mode")
+        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+
         x = jnp.asarray(X)
         Ge = self.parameters.get_value("Ge")
         c_alpha = self.parameters.get_value("c_alpha")
         alpha = self.parameters.get_value("alpha")
         assert Ge is not None and c_alpha is not None and alpha is not None
 
-        result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
-        return np.array(result)
+        if test_mode in ("oscillation",):
+            result = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
+            return np.array(result)
+        elif test_mode in ("creep",):
+            result = self._predict_creep_jax(x, Ge, c_alpha, alpha)
+            return np.array(result)
+        else:
+            # Default to relaxation
+            result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
+            return np.array(result)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """Model function for Bayesian inference.
@@ -562,7 +573,7 @@ class FractionalKelvinVoigt(BaseModel):
             x = jnp.asarray(X)
 
             # Route to appropriate prediction method based on test_mode
-            mode = test_mode or "relaxation"
+            mode = test_mode if test_mode is not None else "relaxation"
             if mode == "relaxation":
                 result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
             elif mode == "creep":

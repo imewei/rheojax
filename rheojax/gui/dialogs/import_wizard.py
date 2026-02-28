@@ -276,7 +276,10 @@ class ColumnMappingPage(QWizardPage):
             # Read file to get columns (cache on wizard to avoid duplicate reads)
             wizard = self.wizard()
             cache_key = str(file_path)
-            if hasattr(wizard, "_cached_df") and getattr(wizard, "_cached_file_path", None) == cache_key:
+            if (
+                hasattr(wizard, "_cached_df")
+                and getattr(wizard, "_cached_file_path", None) == cache_key
+            ):
                 df = wizard._cached_df
             else:
                 path = Path(file_path)
@@ -532,7 +535,10 @@ class PreviewConfirmPage(QWizardPage):
             # we need more rows for preview so re-read with nrows=10)
             wizard = self.wizard()
             cache_key = str(file_path)
-            if hasattr(wizard, "_cached_preview_df") and getattr(wizard, "_cached_preview_path", None) == cache_key:
+            if (
+                hasattr(wizard, "_cached_preview_df")
+                and getattr(wizard, "_cached_preview_path", None) == cache_key
+            ):
                 df = wizard._cached_preview_df
             else:
                 path = Path(file_path)
@@ -633,7 +639,12 @@ class ImportWizard(QWizard):
     def _on_finished(self, result: int) -> None:
         """Handle wizard finished."""
         # Clear cached DataFrames to free memory (F-IO-R2-010)
-        for attr in ("_cached_df", "_cached_file_path", "_cached_preview_df", "_cached_preview_path"):
+        for attr in (
+            "_cached_df",
+            "_cached_file_path",
+            "_cached_preview_df",
+            "_cached_preview_path",
+        ):
             if hasattr(self, attr):
                 setattr(self, attr, None)
 
