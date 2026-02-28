@@ -5,6 +5,8 @@ Main Application Window
 Central window coordinating pages, state, and services with dock-based layout.
 """
 
+import os
+import threading
 import uuid
 import webbrowser
 from pathlib import Path
@@ -762,11 +764,34 @@ class RheoJAXMainWindow(QMainWindow):
         except Exception:
             logger.debug("State unsubscribe failed during shutdown", exc_info=True)
 
+        # Attempt graceful worker shutdown with a generous timeout.
+        # If workers are still running after the timeout (e.g. NUTS sampling
+        # stuck in JIT-compiled XLA code that cannot be interrupted), schedule
+        # a hard os._exit() to prevent the process from hanging indefinitely
+        # when QThreadPool's destructor tries an infinite waitForDone().
+        _workers_stopped = True
         try:
             if hasattr(self, "worker_pool"):
-                self.worker_pool.shutdown(wait=True, timeout_ms=5000)
+                self.worker_pool.shutdown(wait=True, timeout_ms=10000)
+                if self.worker_pool.is_busy():
+                    _workers_stopped = False
         except Exception:
             logger.debug("Worker pool shutdown failed during cleanup", exc_info=True)
+
+        if not _workers_stopped:
+            logger.warning(
+                "Workers still running after shutdown timeout — "
+                "scheduling forced exit to prevent zombie process"
+            )
+            # Give Qt a brief moment to drain signals, then force-exit.
+            # os._exit() bypasses QThreadPool destructor's infinite wait.
+            def _force_exit():
+                logger.warning("Force-exiting process (stuck workers)")
+                os._exit(0)
+
+            _force_timer = threading.Timer(2.0, _force_exit)
+            _force_timer.daemon = True
+            _force_timer.start()
         # R10-MW-003: Disconnect only THIS window's signal connections to prevent
         # delivery to destroyed widgets during Qt object teardown.  We disconnect
         # specific slots rather than calling .disconnect() with no args, which
@@ -1311,6 +1336,11 @@ class RheoJAXMainWindow(QMainWindow):
         dataset_id = meta.get("dataset_id") or state.active_dataset_id
         model_name = meta.get("model_name") or state.active_model_name
         if job_type == "fit":
+            # Subprocess workers return a plain dict — reconstruct FitResult
+            if isinstance(result, dict) and not isinstance(result, FitResult):
+                from rheojax.gui.jobs.process_adapter import fit_result_from_dict
+
+                result = fit_result_from_dict(result)
             fit_success = getattr(result, "success", False)
             if fit_success:
                 # Persist result in state and refresh UI
@@ -1966,11 +1996,14 @@ class RheoJAXMainWindow(QMainWindow):
         self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ACTIVE"})
         self.status_bar.show_progress(0, 0, "Fitting model...")
 
-        worker = FitWorker(
+        from rheojax.gui.jobs.process_adapter import make_fit_worker
+
+        worker = make_fit_worker(
             model_name=model_name,
             data=rheo_data,
             initial_params=init_params_dict,
             options=options,
+            dataset_id=dataset.id,
         )
         try:
             job_id = self.worker_pool.submit(

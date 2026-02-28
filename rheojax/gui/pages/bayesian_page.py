@@ -503,20 +503,26 @@ class BayesianPage(QWidget):
                     return
 
         # F-006 fix: Warn about EPM memory requirements for large lattices
+        # R13-GUI-005: Use lightweight class name check instead of full
+        # instantiation to avoid blocking main thread.
         if "epm" in _mn_lower:
             try:
                 from rheojax.core.registry import ModelRegistry
 
                 model_cls = ModelRegistry.get(model_name)
-                if model_cls is not None:
-                    tmp = model_cls()
-                    lattice_L = getattr(tmp, "L", 64)
-                    if lattice_L > 32:
+                if model_cls is not None and model_cls.__name__ in (
+                    "LatticeEPM",
+                    "MeanFieldEPM",
+                ):
+                    # LatticeEPM default L=64 requires significant memory
+                    default_L = 64 if "Lattice" in model_cls.__name__ else 32
+                    if default_L > 32:
                         reply = QMessageBox.question(
                             self,
                             "EPM Memory Warning",
-                            f"EPM model with L={lattice_L} lattice requires significant "
-                            f"memory for Bayesian inference (~{lattice_L**2 * 8 // 1024} KB "
+                            f"EPM model with default L={default_L} lattice requires "
+                            f"significant memory for Bayesian inference "
+                            f"(~{default_L**2 * 8 // 1024} KB "
                             "per field × forward+backward passes).\n\n"
                             "Consider reducing L to 16-32 for systems with <32 GB RAM.\n\n"
                             "Continue anyway?",
@@ -655,59 +661,148 @@ class BayesianPage(QWidget):
         if self._preset_priors:
             config["priors"] = self._preset_priors
 
-        # If no dataset loaded, try preset dataset path
+        # R13-GUI-001: If no dataset loaded, try preset dataset path using
+        # ImportWorker to avoid blocking the main thread with file I/O.
         if dataset is None and self._preset_dataset_path:
-            try:
-                import logging as _logging
-                import os as _os
+            import os as _os
 
-                _preset_logger = _logging.getLogger(__name__)
-                _preset_logger.info(
-                    "Loading preset dataset: %s", self._preset_dataset_path
+            logger.info(
+                "Loading preset dataset asynchronously: %s",
+                self._preset_dataset_path,
+            )
+            _file_size = (
+                _os.path.getsize(self._preset_dataset_path)
+                if _os.path.exists(self._preset_dataset_path)
+                else 0
+            )
+            if _file_size > 10 * 1024 * 1024:  # > 10 MB
+                logger.warning(
+                    "Large preset file (%d MB) — loading in background",
+                    _file_size // (1024 * 1024),
                 )
-                _file_size = (
-                    _os.path.getsize(self._preset_dataset_path)
-                    if _os.path.exists(self._preset_dataset_path)
-                    else 0
-                )
-                if _file_size > 10 * 1024 * 1024:  # > 10 MB
-                    _preset_logger.warning(
-                        "Large preset file (%d MB) — consider pre-loading",
-                        _file_size // (1024 * 1024),
+
+            from rheojax.gui.compat import QThreadPool
+
+            from rheojax.gui.jobs.import_worker import ImportWorker
+
+            preset_worker = ImportWorker(
+                data_service=self._data_service,
+                file_path=Path(self._preset_dataset_path),
+            )
+            # Stash config and model_name for the callback
+            self._pending_preset_config = config
+            self._pending_preset_model_name = model_name
+
+            def _on_preset_loaded(datasets_list):
+                """Handle preset dataset load completion on main thread."""
+                try:
+                    # R13-FIX-005: Guard against use-after-delete if the page
+                    # widget was destroyed while the ImportWorker was running.
+                    try:
+                        self.isVisible()
+                    except RuntimeError:
+                        return
+                    if not datasets_list:
+                        QMessageBox.warning(self, "No Data", "Preset dataset was empty.")
+                        return
+                    rheo_data = datasets_list[0]
+                    _dataset_id = str(uuid.uuid4())
+                    self._store.dispatch(
+                        "IMPORT_DATA_SUCCESS",
+                        {
+                            "dataset_id": _dataset_id,
+                            "file_path": self._preset_dataset_path,
+                            "name": Path(self._preset_dataset_path).stem,
+                            "test_mode": rheo_data.metadata.get(
+                                "test_mode", "oscillation"
+                            ),
+                            "x_data": rheo_data.x,
+                            "y_data": rheo_data.y,
+                            "y2_data": getattr(rheo_data, "y2", None),
+                            "metadata": getattr(rheo_data, "metadata", {}),
+                        },
                     )
-                rheo_data = self._data_service.load_file(self._preset_dataset_path)
-                dataset_id = str(uuid.uuid4())
-                self._store.dispatch(
-                    "IMPORT_DATA_SUCCESS",
-                    {
-                        "dataset_id": dataset_id,
-                        "file_path": self._preset_dataset_path,
-                        "name": Path(self._preset_dataset_path).stem,
-                        "test_mode": rheo_data.metadata.get("test_mode", "oscillation"),
-                        "x_data": rheo_data.x,
-                        "y_data": rheo_data.y,
-                        "y2_data": getattr(rheo_data, "y2", None),
-                        "metadata": getattr(rheo_data, "metadata", {}),
-                    },
-                )
-                dataset = self._store.get_dataset(dataset_id)
-            except Exception:
+                    _ds = self._store.get_dataset(_dataset_id)
+                    if _ds is None:
+                        QMessageBox.warning(
+                            self, "No Data", "Failed to register preset dataset."
+                        )
+                        return
+                    # Re-trigger the inference run with the loaded dataset
+                    self._continue_bayesian_with_dataset(
+                        _ds,
+                        self._pending_preset_model_name,
+                        self._pending_preset_config,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to process preset dataset",
+                        filepath=str(self._preset_dataset_path),
+                        exc_info=True,
+                    )
+
+            def _on_preset_failed(error_msg):
+                # R13-FIX-005: Guard against use-after-delete.
+                try:
+                    self.isVisible()
+                except RuntimeError:
+                    return
                 logger.warning(
                     "Failed to load preset dataset",
                     filepath=str(self._preset_dataset_path),
-                    exc_info=True,
+                    error=error_msg,
                 )
-                dataset = None
+                QMessageBox.warning(
+                    self,
+                    "Preset Load Failed",
+                    f"Could not load preset dataset: {error_msg}",
+                )
+
+            # R13-FIX-004: Use QueuedConnection so callbacks accessing Qt
+            # widgets and StateStore run on the main thread, not the
+            # ImportWorker's pool thread.
+            preset_worker.signals.completed.connect(
+                _on_preset_loaded, Qt.ConnectionType.QueuedConnection
+            )
+            preset_worker.signals.failed.connect(
+                _on_preset_failed, Qt.ConnectionType.QueuedConnection
+            )
+            self._status_text.append("Loading preset dataset...")
+            QThreadPool.globalInstance().start(preset_worker)
+            return  # Will continue in _continue_bayesian_with_dataset
 
         if dataset is None:
             QMessageBox.warning(self, "No Data", "Please load a dataset first.")
             return
 
-        # R10-BP-001: Capture submission identifiers immediately after the last
-        # early-exit guard so they are always coherent with the worker that is
-        # about to be created.  Placing these before the start_bayesian dispatch
-        # guarantees that any subscriber reacting to the dispatch reads the
-        # correct identifiers (not stale values from a prior run).
+        # Delegate to the shared continuation method (R13-GUI-001)
+        self._continue_bayesian_with_dataset(dataset, model_name, config)
+
+    def _continue_bayesian_with_dataset(
+        self,
+        dataset: Any,
+        model_name: str,
+        config: dict[str, Any],
+    ) -> None:
+        """Continue Bayesian inference after async preset dataset load (R13-GUI-001).
+
+        This method contains the second half of _run_bayesian, starting from
+        the point where a dataset has been obtained. It is called either
+        directly from _run_bayesian (normal path) or from the
+        _on_preset_loaded callback (async preset path).
+
+        Parameters
+        ----------
+        dataset : DatasetState
+            Loaded dataset
+        model_name : str
+            Model name
+        config : dict
+            Inference configuration
+        """
+        state = self._store.get_state()
+
+        # R10-BP-001: Capture submission identifiers
         self._submitted_dataset_id = dataset.id
         self._submitted_model_name = model_name
         self._submitted_dataset_snapshot = dataset.clone()
@@ -715,7 +810,7 @@ class BayesianPage(QWidget):
         # Update state
         self._store.dispatch(start_bayesian(model_name, dataset.id))
 
-        # Handle warm_start: convert bool to dict (get NLSQ params) or None
+        # Handle warm_start
         warm_start_dict: dict[str, float] | None = None
         if config.get("warm_start", False):
             warm_start_dict = self._select_warm_start_params(model_name, dataset.id)
@@ -738,7 +833,6 @@ class BayesianPage(QWidget):
                     dataset_id=dataset.id,
                 )
 
-        # Log inference start
         logger.info(
             "Bayesian inference started",
             model_name=model_name,
@@ -754,21 +848,13 @@ class BayesianPage(QWidget):
         deform_text = self._deformation_combo.currentText().lower()
         poisson_val = self._poisson_spin.value()
 
-        # G-005 fix: self._submitted_dataset_snapshot (set above) serves as
-        # both the TOCTOU-safe snapshot for posterior plotting
-        # (_update_fit_plot_from_posterior) and the snapshot passed to
-        # BayesianWorker.  The separate dataset_snapshot clone was redundant.
-
-        # F-HL-005 fix: Extract fitted model state from FitResult so
-        # stateful models (HL, DMT, ITT-MCT) can restore _last_fit_kwargs,
-        # _fit_data_metadata, etc. on the fresh Bayesian model instance.
+        # F-HL-005 fix: Extract fitted model state
         fitted_model_state = None
         active_fit = self._store.get_active_fit_result()
         if active_fit and hasattr(active_fit, "metadata") and active_fit.metadata:
             fitted_model_state = active_fit.metadata.get("fitted_model_state")
 
-        # Disconnect previous worker signals before connecting new ones to
-        # prevent duplicate slots if the user re-runs inference.
+        # Disconnect previous worker signals
         if self._current_worker is not None:
             try:
                 self._current_worker.signals.completed.disconnect()
@@ -782,7 +868,6 @@ class BayesianPage(QWidget):
                 self._current_worker.signals.progress.disconnect()
             except (TypeError, RuntimeError):
                 pass
-            # R8-NEW-002: also disconnect stage_changed and divergence_detected
             try:
                 self._current_worker.signals.stage_changed.disconnect()
             except (TypeError, RuntimeError, AttributeError):
@@ -792,7 +877,9 @@ class BayesianPage(QWidget):
             except (TypeError, RuntimeError, AttributeError):
                 pass
 
-        self._current_worker = BayesianWorker(
+        from rheojax.gui.jobs.process_adapter import make_bayesian_worker
+
+        self._current_worker = make_bayesian_worker(
             model_name=model_name,
             data=self._submitted_dataset_snapshot,
             num_warmup=config.get("num_warmup", 1000),
@@ -807,13 +894,6 @@ class BayesianPage(QWidget):
             dataset_id=self._submitted_dataset_id,
         )
 
-        # Connect BayesianWorker-specific signals with QueuedConnection.
-        # WorkerPool.submit() separately connects completed/failed for job
-        # lifecycle tracking; the connections below are for page-level UI
-        # updates and are NOT duplicates.
-        # NOTE: BayesianWorker signals are connected both here (page-level UI)
-        # and in WorkerPool.submit() (pool-level cleanup). Both handlers fire
-        # on completion. Order is non-deterministic but both are idempotent.
         self._current_worker.signals.progress.connect(
             self._on_worker_progress, Qt.ConnectionType.QueuedConnection
         )
@@ -843,7 +923,6 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
 
-        # Use submit() method, not start()
         self._worker_pool.submit(self._current_worker)
 
         self._is_running = True
@@ -970,6 +1049,12 @@ class BayesianPage(QWidget):
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
+
+        # Subprocess workers return a plain dict -- reconstruct BayesianResult
+        if isinstance(result, dict) and not isinstance(result, BayesianResult):
+            from rheojax.gui.jobs.process_adapter import bayesian_result_from_dict
+
+            result = bayesian_result_from_dict(result)
 
         # Use captured values from submission time (TOCTOU-safe)
         dataset_id = getattr(self, "_submitted_dataset_id", None)
@@ -1377,9 +1462,9 @@ class BayesianPage(QWidget):
         )
 
         posterior_samples = getattr(result, "posterior_samples", None) or {}
-        # Posterior predictive band is computed by sampling predictions.
-        # Use a small cap for responsiveness in the GUI.
-        draw_indices = self._posterior_draw_indices(posterior_samples, max_draws=200)
+        # R13-GUI-004: Reduced from 200 to 50 draws for UI responsiveness.
+        # Each draw calls model.predict() on the main thread.
+        draw_indices = self._posterior_draw_indices(posterior_samples, max_draws=50)
         if draw_indices.size == 0:
             logger.debug("plot_update skipped: no posterior draw indices")
             return
@@ -1407,7 +1492,7 @@ class BayesianPage(QWidget):
                 model_kwargs = dict(model_kwargs or {})
                 model_kwargs["fitted_model_state"] = _fms
 
-        for idx in draw_indices:
+        for draw_num, idx in enumerate(draw_indices):
             params = self._posterior_params_at_index(posterior_samples, int(idx))
             if not params:
                 continue
@@ -1433,6 +1518,11 @@ class BayesianPage(QWidget):
                     y_draws.append(y_pred_arr)
             except Exception:
                 continue
+            # R13-GUI-004: Process events every 10 iterations to keep UI responsive
+            if draw_num % 10 == 9:
+                from rheojax.gui.compat import QApplication as _QApp
+
+                _QApp.processEvents()
 
         if not y_draws:
             return

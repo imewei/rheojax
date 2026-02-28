@@ -478,3 +478,254 @@ class TestRunBayesianIsolated:
         assert isinstance(result["diagnostics_valid"], bool)
         assert "credible_intervals" in result
         assert isinstance(result["credible_intervals"], dict)
+
+
+# ===========================================================================
+# Tests for worker isolation config
+# ===========================================================================
+
+
+class TestWorkerIsolationConfig:
+    """get_worker_isolation_mode reads RHEOJAX_WORKER_ISOLATION env var."""
+
+    def test_default_is_subprocess(self):
+        from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+        os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+        assert get_worker_isolation_mode() == "subprocess"
+
+    def test_thread_fallback(self):
+        from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = "thread"
+        try:
+            assert get_worker_isolation_mode() == "thread"
+        finally:
+            os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+
+    def test_subprocess_explicit(self):
+        from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = "subprocess"
+        try:
+            assert get_worker_isolation_mode() == "subprocess"
+        finally:
+            os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+
+
+# ===========================================================================
+# Tests for result reconstruction
+# ===========================================================================
+
+
+class TestResultReconstruction:
+    """fit_result_from_dict / bayesian_result_from_dict reconstruct dataclasses."""
+
+    def test_fit_result_from_dict(self):
+        from rheojax.gui.jobs.process_adapter import fit_result_from_dict
+        from rheojax.gui.state.store import FitResult
+
+        d = {
+            "model_name": "maxwell",
+            "parameters": {"G0": 1000.0, "eta": 1000.0},
+            "chi_squared": 0.01,
+            "success": True,
+            "message": "Converged",
+            "timestamp": "2026-02-28T12:00:00",
+            "r_squared": 0.999,
+            "mpe": 0.1,
+            "fit_time": 2.5,
+            "num_iterations": 42,
+            "dataset_id": "test",
+        }
+        result = fit_result_from_dict(d)
+        assert isinstance(result, FitResult)
+        assert result.model_name == "maxwell"
+        assert result.success
+        assert result.parameters == {"G0": 1000.0, "eta": 1000.0}
+        assert result.chi_squared == 0.01
+        assert result.r_squared == 0.999
+        assert result.dataset_id == "test"
+
+    def test_fit_result_from_dict_missing_fields(self):
+        from rheojax.gui.jobs.process_adapter import fit_result_from_dict
+        from rheojax.gui.state.store import FitResult
+
+        d = {
+            "model_name": "maxwell",
+            "parameters": {},
+            "success": False,
+            "message": "Failed",
+        }
+        result = fit_result_from_dict(d)
+        assert isinstance(result, FitResult)
+        assert not result.success
+        assert result.chi_squared == 0.0
+
+    def test_bayesian_result_from_dict(self):
+        import numpy as np
+
+        from rheojax.gui.jobs.process_adapter import bayesian_result_from_dict
+        from rheojax.gui.state.store import BayesianResult
+
+        d = {
+            "model_name": "maxwell",
+            "dataset_id": "test",
+            "posterior_samples": {"G0": np.array([900, 1000, 1100])},
+            "summary": {"G0": {"mean": 1000.0}},
+            "r_hat": {"G0": 1.001},
+            "ess": {"G0": 500.0},
+            "divergences": 0,
+            "credible_intervals": {"G0": (900.0, 1100.0)},
+            "mcmc_time": 30.0,
+            "timestamp": "2026-02-28T12:00:00",
+            "num_warmup": 100,
+            "num_samples": 200,
+            "num_chains": 2,
+            "inference_data": None,
+            "diagnostics_valid": True,
+        }
+        result = bayesian_result_from_dict(d)
+        assert isinstance(result, BayesianResult)
+        assert result.model_name == "maxwell"
+        assert result.dataset_id == "test"
+        assert result.inference_data is None
+        assert result.num_warmup == 100
+        assert result.num_samples == 200
+        assert result.num_chains == 2
+        assert result.divergences == 0
+        assert result.diagnostics_valid is True
+
+    def test_bayesian_result_from_dict_missing_fields(self):
+        from rheojax.gui.jobs.process_adapter import bayesian_result_from_dict
+        from rheojax.gui.state.store import BayesianResult
+
+        d = {
+            "model_name": "maxwell",
+            "dataset_id": "test",
+            "posterior_samples": {},
+        }
+        result = bayesian_result_from_dict(d)
+        assert isinstance(result, BayesianResult)
+        assert result.mcmc_time == 0.0
+        assert result.divergences == 0
+
+
+# ===========================================================================
+# Tests for make_fit_worker / make_bayesian_worker factories
+# ===========================================================================
+
+
+class TestMakeFitWorker:
+    """make_fit_worker returns FitWorker in thread mode, ProcessWorkerAdapter otherwise."""
+
+    def test_thread_mode_returns_fit_worker(self):
+        import numpy as np
+
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = "thread"
+        try:
+            from rheojax.gui.jobs.fit_worker import FitWorker
+            from rheojax.gui.jobs.process_adapter import make_fit_worker
+
+            # Use a minimal mock for data
+            class FakeData:
+                x = np.linspace(0, 1, 10)
+                y = np.ones(10)
+                metadata = {"test_mode": "relaxation"}
+                _explicit_test_mode = "relaxation"
+
+            worker = make_fit_worker(
+                model_name="maxwell",
+                data=FakeData(),
+                initial_params={"G0": 1000.0},
+                options={},
+                dataset_id="test",
+            )
+            assert isinstance(worker, FitWorker)
+        finally:
+            os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+
+    @pytest.mark.skipif(_SKIP_QT, reason="PySide6 not available or no display")
+    def test_subprocess_mode_returns_adapter(self, qapp):
+        import numpy as np
+
+        os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+        from rheojax.gui.jobs.process_adapter import (
+            ProcessWorkerAdapter,
+            make_fit_worker,
+        )
+
+        class FakeData:
+            x = np.linspace(0, 1, 10)
+            y = np.ones(10)
+            metadata = {"test_mode": "relaxation"}
+            _explicit_test_mode = "relaxation"
+
+        worker = make_fit_worker(
+            model_name="maxwell",
+            data=FakeData(),
+            initial_params={"G0": 1000.0},
+            options={},
+            dataset_id="test",
+        )
+        assert isinstance(worker, ProcessWorkerAdapter)
+
+
+class TestMakeBayesianWorker:
+    """make_bayesian_worker returns BayesianWorker or ProcessWorkerAdapter."""
+
+    def test_thread_mode_returns_bayesian_worker(self):
+        import numpy as np
+
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = "thread"
+        try:
+            from rheojax.gui.jobs.bayesian_worker import BayesianWorker
+            from rheojax.gui.jobs.process_adapter import make_bayesian_worker
+
+            class FakeData:
+                x_data = np.linspace(0, 1, 10)
+                y_data = np.ones(10)
+                y2_data = None
+                test_mode = "relaxation"
+                metadata = {}
+
+            worker = make_bayesian_worker(
+                model_name="maxwell",
+                data=FakeData(),
+                num_warmup=50,
+                num_samples=100,
+                num_chains=1,
+                seed=42,
+                dataset_id="test",
+            )
+            assert isinstance(worker, BayesianWorker)
+        finally:
+            os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+
+    @pytest.mark.skipif(_SKIP_QT, reason="PySide6 not available or no display")
+    def test_subprocess_mode_returns_adapter(self, qapp):
+        import numpy as np
+
+        os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+        from rheojax.gui.jobs.process_adapter import (
+            ProcessWorkerAdapter,
+            make_bayesian_worker,
+        )
+
+        class FakeData:
+            x_data = np.linspace(0, 1, 10)
+            y_data = np.ones(10)
+            y2_data = None
+            test_mode = "relaxation"
+            metadata = {}
+
+        worker = make_bayesian_worker(
+            model_name="maxwell",
+            data=FakeData(),
+            num_warmup=50,
+            num_samples=100,
+            num_chains=1,
+            seed=42,
+            dataset_id="test",
+        )
+        assert isinstance(worker, ProcessWorkerAdapter)

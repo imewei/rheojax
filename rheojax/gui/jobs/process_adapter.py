@@ -365,3 +365,419 @@ class ProcessWorkerAdapter(QRunnable):
             proc.close()
         except (ValueError, OSError):
             pass  # Already closed or not started
+
+
+# ---------------------------------------------------------------------------
+# Worker isolation mode
+# ---------------------------------------------------------------------------
+
+
+def get_worker_isolation_mode() -> str:
+    """Return the configured worker isolation mode.
+
+    Reads the ``RHEOJAX_WORKER_ISOLATION`` environment variable.
+
+    Returns
+    -------
+    str
+        ``"subprocess"`` (default) or ``"thread"``.
+    """
+    return os.environ.get("RHEOJAX_WORKER_ISOLATION", "subprocess").lower()
+
+
+# ---------------------------------------------------------------------------
+# Data extraction helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_data(data: Any) -> tuple[Any, Any, Any, str, dict[str, Any]]:
+    """Extract x, y, y2, test_mode, metadata from RheoData or DatasetState.
+
+    Parameters
+    ----------
+    data : RheoData or DatasetState
+        The data source.
+
+    Returns
+    -------
+    tuple
+        (x_data, y_data, y2_data, test_mode, metadata)
+    """
+    import numpy as np
+
+    # DatasetState has .x_data / .y_data / .y2_data / .test_mode / .metadata
+    if hasattr(data, "x_data"):
+        x = data.x_data
+        y = data.y_data
+        y2 = getattr(data, "y2_data", None)
+        test_mode = getattr(data, "test_mode", "relaxation")
+        metadata = getattr(data, "metadata", {})
+    # RheoData has .x / .y (and possibly .y2)
+    elif hasattr(data, "x"):
+        x = data.x
+        y = data.y
+        y2 = getattr(data, "y2", None)
+        # RheoData stores test_mode in metadata or _explicit_test_mode
+        test_mode = getattr(data, "_explicit_test_mode", None)
+        if test_mode is None:
+            md = getattr(data, "metadata", {})
+            test_mode = md.get("test_mode", "relaxation")
+        metadata = getattr(data, "metadata", {})
+    else:
+        raise TypeError(
+            f"Unsupported data type: {type(data).__name__}. "
+            "Expected RheoData or DatasetState."
+        )
+
+    # Ensure NumPy arrays for cross-process pickling
+    if x is not None and not isinstance(x, np.ndarray):
+        x = np.asarray(x)
+    if y is not None and not isinstance(y, np.ndarray):
+        y = np.asarray(y)
+    if y2 is not None and not isinstance(y2, np.ndarray):
+        y2 = np.asarray(y2)
+
+    return x, y, y2, str(test_mode or "relaxation"), dict(metadata) if metadata else {}
+
+
+# ---------------------------------------------------------------------------
+# FitWorker factory
+# ---------------------------------------------------------------------------
+
+
+def make_fit_worker(
+    model_name: str,
+    data: Any,
+    initial_params: dict[str, float] | None = None,
+    options: dict[str, Any] | None = None,
+    cancel_token: Any | None = None,
+    dataset_id: str = "",
+) -> Any:
+    """Create a fit worker (subprocess or thread mode).
+
+    Parameters
+    ----------
+    model_name : str
+        Registered model name (e.g. ``"maxwell"``).
+    data : RheoData or DatasetState
+        Input data for fitting.
+    initial_params : dict, optional
+        Initial parameter values.
+    options : dict, optional
+        Fitting options (max_iter, ftol, etc.).
+    cancel_token : CancellationToken, optional
+        Only used in thread mode.
+    dataset_id : str, optional
+        Dataset identifier.
+
+    Returns
+    -------
+    QRunnable
+        Either a ``FitWorker`` (thread) or ``ProcessWorkerAdapter`` (subprocess).
+    """
+    mode = get_worker_isolation_mode()
+
+    if mode == "thread":
+        from rheojax.gui.jobs.fit_worker import FitWorker
+
+        return FitWorker(
+            model_name=model_name,
+            data=data,
+            initial_params=initial_params,
+            options=options,
+            cancel_token=cancel_token,
+            dataset_id=dataset_id,
+        )
+
+    # Subprocess mode
+    from functools import partial
+
+    from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
+
+    x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
+
+    # Get deformation_mode and poisson_ratio from metadata or options
+    deformation_mode = metadata.get("deformation_mode")
+    poisson_ratio = metadata.get("poisson_ratio")
+
+    def _work_fn(
+        progress_queue: Any,
+        cancel_event: Any,
+        *,
+        _model_name: str = model_name,
+        _x: Any = x_data,
+        _y: Any = y_data,
+        _test_mode: str = test_mode,
+        _init: dict = initial_params or {},
+        _opts: dict = options or {},
+        _y2: Any = y2_data,
+        _meta: dict = metadata,
+        _deform: str | None = deformation_mode,
+        _poisson: float | None = poisson_ratio,
+        _dsid: str = dataset_id,
+    ) -> dict[str, Any]:
+        return run_fit_isolated(
+            model_name=_model_name,
+            x_data=_x,
+            y_data=_y,
+            test_mode=_test_mode,
+            initial_params=_init,
+            options=_opts,
+            progress_queue=progress_queue,
+            cancel_event=cancel_event,
+            y2_data=_y2,
+            metadata=_meta,
+            deformation_mode=_deform,
+            poisson_ratio=_poisson,
+            dataset_id=_dsid,
+        )
+
+    return ProcessWorkerAdapter(_work_fn)
+
+
+# ---------------------------------------------------------------------------
+# FitResult reconstruction
+# ---------------------------------------------------------------------------
+
+
+def fit_result_from_dict(d: dict[str, Any]) -> Any:
+    """Reconstruct a ``FitResult`` dataclass from a subprocess result dict.
+
+    Parameters
+    ----------
+    d : dict
+        Dictionary returned by ``run_fit_isolated``.
+
+    Returns
+    -------
+    FitResult
+        The reconstructed dataclass.
+    """
+    from datetime import datetime
+
+    from rheojax.gui.state.store import FitResult
+
+    timestamp = d.get("timestamp")
+    if isinstance(timestamp, str):
+        try:
+            timestamp = datetime.fromisoformat(timestamp)
+        except (ValueError, TypeError):
+            timestamp = datetime.now()
+    elif timestamp is None:
+        timestamp = datetime.now()
+
+    return FitResult(
+        model_name=d.get("model_name", ""),
+        parameters=d.get("parameters", {}),
+        chi_squared=float(d.get("chi_squared", 0.0) or 0.0),
+        success=bool(d.get("success", False)),
+        message=d.get("message", ""),
+        timestamp=timestamp,
+        dataset_id=d.get("dataset_id", ""),
+        r_squared=float(d.get("r_squared", 0.0) or 0.0),
+        mpe=float(d.get("mpe", 0.0) or 0.0),
+        fit_time=float(d.get("fit_time", 0.0) or 0.0),
+        num_iterations=int(d.get("num_iterations", 0) or 0),
+        convergence_message=d.get("convergence_message", ""),
+        x_fit=d.get("x_fit"),
+        y_fit=d.get("y_fit"),
+        residuals=d.get("residuals"),
+        pcov=d.get("pcov"),
+        rmse=d.get("rmse"),
+        mae=d.get("mae"),
+        aic=d.get("aic"),
+        bic=d.get("bic"),
+        metadata=d.get("metadata"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# BayesianWorker factory
+# ---------------------------------------------------------------------------
+
+
+def make_bayesian_worker(
+    model_name: str,
+    data: Any,
+    num_warmup: int = 1000,
+    num_samples: int = 2000,
+    num_chains: int = 4,
+    warm_start: dict[str, float] | None = None,
+    priors: dict[str, Any] | None = None,
+    seed: int = 42,
+    cancel_token: Any | None = None,
+    deformation_mode: str | None = None,
+    poisson_ratio: float | None = None,
+    fitted_model_state: dict[str, Any] | None = None,
+    dataset_id: str = "",
+) -> Any:
+    """Create a Bayesian worker (subprocess or thread mode).
+
+    Parameters
+    ----------
+    model_name : str
+        Registered model name.
+    data : RheoData or DatasetState
+        Input data for inference.
+    num_warmup : int
+        Number of MCMC warmup iterations.
+    num_samples : int
+        Number of MCMC sampling iterations.
+    num_chains : int
+        Number of MCMC chains.
+    warm_start : dict, optional
+        Warm-start parameter values from NLSQ.
+    priors : dict, optional
+        Custom prior distributions.
+    seed : int
+        Random seed for reproducibility.
+    cancel_token : CancellationToken, optional
+        Only used in thread mode.
+    deformation_mode : str, optional
+        Deformation mode for DMTA.
+    poisson_ratio : float, optional
+        Poisson ratio for E-to-G conversion.
+    fitted_model_state : dict, optional
+        Full model state for warm-start.
+    dataset_id : str
+        Dataset identifier.
+
+    Returns
+    -------
+    QRunnable
+        Either a ``BayesianWorker`` (thread) or ``ProcessWorkerAdapter`` (subprocess).
+    """
+    mode = get_worker_isolation_mode()
+
+    if mode == "thread":
+        from rheojax.gui.jobs.bayesian_worker import BayesianWorker
+
+        return BayesianWorker(
+            model_name=model_name,
+            data=data,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            num_chains=num_chains,
+            warm_start=warm_start,
+            priors=priors,
+            seed=seed,
+            cancel_token=cancel_token,
+            deformation_mode=deformation_mode,
+            poisson_ratio=poisson_ratio,
+            fitted_model_state=fitted_model_state,
+            dataset_id=dataset_id,
+        )
+
+    # Subprocess mode
+    import numpy as np
+
+    from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+
+    x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
+
+    # Convert fitted_model_state JAX arrays to NumPy for pickling
+    safe_model_state = None
+    if fitted_model_state is not None:
+        safe_model_state = {}
+        for k, v in fitted_model_state.items():
+            if hasattr(v, "numpy"):
+                # JAX DeviceArray
+                safe_model_state[k] = np.asarray(v)
+            elif hasattr(v, "__jax_array__"):
+                safe_model_state[k] = np.asarray(v)
+            else:
+                safe_model_state[k] = v
+
+    def _work_fn(
+        progress_queue: Any,
+        cancel_event: Any,
+        *,
+        _model_name: str = model_name,
+        _x: Any = x_data,
+        _y: Any = y_data,
+        _test_mode: str = test_mode,
+        _warmup: int = num_warmup,
+        _samples: int = num_samples,
+        _chains: int = num_chains,
+        _warm_start: dict | None = warm_start,
+        _priors: dict | None = priors,
+        _seed: int = seed,
+        _y2: Any = y2_data,
+        _meta: dict = metadata,
+        _deform: str | None = deformation_mode,
+        _poisson: float | None = poisson_ratio,
+        _model_state: dict | None = safe_model_state,
+        _dsid: str = dataset_id,
+    ) -> dict[str, Any]:
+        return run_bayesian_isolated(
+            model_name=_model_name,
+            x_data=_x,
+            y_data=_y,
+            test_mode=_test_mode,
+            num_warmup=_warmup,
+            num_samples=_samples,
+            num_chains=_chains,
+            warm_start=_warm_start,
+            priors=_priors or {},
+            seed=_seed,
+            progress_queue=progress_queue,
+            cancel_event=cancel_event,
+            y2_data=_y2,
+            metadata=_meta,
+            deformation_mode=_deform,
+            poisson_ratio=_poisson,
+            fitted_model_state=_model_state,
+            dataset_id=_dsid,
+        )
+
+    return ProcessWorkerAdapter(_work_fn)
+
+
+# ---------------------------------------------------------------------------
+# BayesianResult reconstruction
+# ---------------------------------------------------------------------------
+
+
+def bayesian_result_from_dict(d: dict[str, Any]) -> Any:
+    """Reconstruct a ``BayesianResult`` dataclass from a subprocess result dict.
+
+    Parameters
+    ----------
+    d : dict
+        Dictionary returned by ``run_bayesian_isolated``.
+
+    Returns
+    -------
+    BayesianResult
+        The reconstructed dataclass.
+    """
+    from datetime import datetime
+
+    from rheojax.gui.state.store import BayesianResult
+
+    timestamp = d.get("timestamp")
+    if isinstance(timestamp, str):
+        try:
+            timestamp = datetime.fromisoformat(timestamp)
+        except (ValueError, TypeError):
+            timestamp = datetime.now()
+    elif timestamp is None:
+        timestamp = datetime.now()
+
+    return BayesianResult(
+        model_name=d.get("model_name", ""),
+        dataset_id=d.get("dataset_id", ""),
+        posterior_samples=d.get("posterior_samples"),
+        summary=d.get("summary"),
+        r_hat=d.get("r_hat", {}),
+        ess=d.get("ess", {}),
+        divergences=int(d.get("divergences", 0) or 0),
+        credible_intervals=d.get("credible_intervals", {}),
+        mcmc_time=float(d.get("mcmc_time", 0.0) or 0.0),
+        timestamp=timestamp,
+        num_warmup=int(d.get("num_warmup", 0) or 0),
+        num_samples=int(d.get("num_samples", 0) or 0),
+        num_chains=int(d.get("num_chains", 4) or 4),
+        inference_data=d.get("inference_data"),
+        diagnostics_valid=bool(d.get("diagnostics_valid", True)),
+    )

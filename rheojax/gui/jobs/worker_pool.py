@@ -368,6 +368,11 @@ class WorkerPool(QObject):
         If wait=True, this will block until all jobs complete
         or the timeout expires. Active jobs will be cancelled
         before waiting.
+
+        JIT-compiled workers (NUTS, NLSQ) cannot respond to Python-level
+        cancellation tokens during execution. If the timeout expires,
+        callers should use ``os._exit()`` to prevent the QThreadPool
+        destructor from blocking indefinitely.
         """
         with self._job_lock:
             active_count = len(self._active_jobs)
@@ -382,12 +387,26 @@ class WorkerPool(QObject):
         # Cancel all active jobs
         self.cancel_all()
 
+        # For subprocess workers with ProcessCancellationToken, explicitly
+        # trigger the escalation chain (event -> SIGTERM -> SIGKILL).
+        with self._job_lock:
+            active_tokens = list(self._active_jobs.values())
+        for token in active_tokens:
+            if hasattr(token, "event"):
+                # ProcessCancellationToken -- signal the child process
+                token.cancel()
+
+        # Also clear any queued-but-not-yet-started runnables so they
+        # never begin execution.
+        self._pool.clear()
+
         # Wait for completion if requested
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
                 logger.warning(
-                    "Worker pool shutdown timed out",
+                    "Worker pool shutdown timed out — "
+                    "workers may be stuck in JIT-compiled code",
                     timeout_ms=timeout_ms,
                 )
 
