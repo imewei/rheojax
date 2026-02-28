@@ -193,11 +193,15 @@ class TestSGRConventionalPredictions:
         log_omega_low = np.log10(omega_low[5:-5])
         slope_gp = np.polyfit(log_omega_low, np.log10(G_star_low[5:-5, 0]), 1)[0]
         # G' slope should be in (0, 2) in this low-frequency regime
-        assert 0 < slope_gp < 2, f"G' low-freq slope {slope_gp} out of expected range (0, 2)"
+        assert (
+            0 < slope_gp < 2
+        ), f"G' low-freq slope {slope_gp} out of expected range (0, 2)"
 
         # G'/G'' ratio should be physically plausible at the G'' peak frequency
         ratio_at_peak = G_star[gpp_max_idx, 0] / G_star[gpp_max_idx, 1]
-        assert 0.1 < ratio_at_peak < 50.0, f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
+        assert (
+            0.1 < ratio_at_peak < 50.0
+        ), f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
 
     def test_relaxation_mode_power_law_decay(self):
         """Test G(t) shows power-law decay t^(x-2) at long times."""

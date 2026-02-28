@@ -65,7 +65,9 @@ class TestHDF5Writer:
         # Verify data round-trips with correct values
         loaded = load_hdf5(str(output_file))
         np.testing.assert_allclose(loaded.x, sample_data.x, rtol=1e-12)
-        np.testing.assert_allclose(np.real(loaded.y), np.real(sample_data.y), rtol=1e-12)
+        np.testing.assert_allclose(
+            np.real(loaded.y), np.real(sample_data.y), rtol=1e-12
+        )
         assert loaded.metadata.get("sample_name") == "Test Sample"
         assert loaded.metadata.get("temperature") == 25.0
 
@@ -312,14 +314,15 @@ class TestHDF5RoundTrip:
 
         output_file = tmp_path / "original.h5"
         # Write original
-        original_data = RheoData(
-            x=np.array([1.0]), y=np.array([10.0]), domain="time"
-        )
+        original_data = RheoData(x=np.array([1.0]), y=np.array([10.0]), domain="time")
         save_hdf5(original_data, str(output_file))
 
         # Attempt write that fails during os.replace
         try:
-            with patch("rheojax.io.writers.hdf5_writer.os.replace", side_effect=OSError("disk full")):
+            with patch(
+                "rheojax.io.writers.hdf5_writer.os.replace",
+                side_effect=OSError("disk full"),
+            ):
                 new_data = RheoData(
                     x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]), domain="time"
                 )
@@ -459,6 +462,7 @@ class TestCSVReaderEdgeCases:
 # ---------------------------------------------------------------------------
 # Coverage Gap-4: HDF5 test_mode / deformation_mode round-trip
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
 class TestHDF5ModeRoundTrip:

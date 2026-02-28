@@ -267,7 +267,9 @@ class TestPhysicsFormulaReferences:
         for kf in kernel_files:
             content = kf.read_text()
             # Check for equation references (Eq., equation, Eqn.)
-            if not any(ref in content for ref in ["Eq.", "equation", "Eqn.", "eq.", "eqn."]):
+            if not any(
+                ref in content for ref in ["Eq.", "equation", "Eqn.", "eq.", "eqn."]
+            ):
                 missing_refs.append(str(kf))
 
         assert not missing_refs, (
@@ -283,19 +285,20 @@ class TestPredictPurity:
     @pytest.mark.smoke
     def test_predict_does_not_reset_fitted_to_false(self):
         """predict() on an already-fitted model must NOT reset fitted_=False."""
-        from rheojax.models import Maxwell
         import numpy as np
+
+        from rheojax.models import Maxwell
 
         model = Maxwell()
         t = np.logspace(-2, 2, 50)
         G_t = np.exp(-t / 1.0) * 1e4  # synthetic relaxation data
 
         # Fit the model to establish fitted_ = True
-        model.fit(t, G_t, test_mode='relaxation')
+        model.fit(t, G_t, test_mode="relaxation")
         assert model.fitted_, "Model should be fitted after fit()"
 
         # Now call predict — it must not reset fitted_ to False
-        model.predict(t, test_mode='relaxation')
+        model.predict(t, test_mode="relaxation")
 
         assert model.fitted_, (
             "predict() reset fitted_=False on an already-fitted model. "
@@ -305,22 +308,22 @@ class TestPredictPurity:
     @pytest.mark.smoke
     def test_predict_does_not_change_parameter_values(self):
         """predict() must not mutate parameter values."""
-        from rheojax.models import Maxwell
         import numpy as np
+
+        from rheojax.models import Maxwell
 
         model = Maxwell()
         t = np.logspace(-2, 2, 50)
         G_t = np.exp(-t / 1.0) * 1e4  # synthetic relaxation data
-        model.fit(t, G_t, test_mode='relaxation')
+        model.fit(t, G_t, test_mode="relaxation")
 
         # Capture fitted parameter values
         fitted_values = {
-            name: model.parameters.get_value(name)
-            for name in model.parameters
+            name: model.parameters.get_value(name) for name in model.parameters
         }
 
         # Call predict — parameters should not change
-        model.predict(t, test_mode='relaxation')
+        model.predict(t, test_mode="relaxation")
 
         for name, original_val in fitted_values.items():
             current_val = model.parameters.get_value(name)
@@ -333,21 +336,22 @@ class TestPredictPurity:
     @pytest.mark.smoke
     def test_predict_does_not_change_test_mode(self):
         """predict(test_mode=X) should not permanently change self._test_mode."""
-        from rheojax.models import Maxwell
         import numpy as np
+
+        from rheojax.models import Maxwell
 
         model = Maxwell()
         t = np.logspace(-2, 2, 50)
         G_t = np.exp(-t / 1.0) * 1e4
-        model.fit(t, G_t, test_mode='relaxation')
+        model.fit(t, G_t, test_mode="relaxation")
 
-        original_mode = getattr(model, '_test_mode', None)
+        original_mode = getattr(model, "_test_mode", None)
 
         # Predict with a different mode
-        model.predict(t, test_mode='creep')
+        model.predict(t, test_mode="creep")
 
         # _test_mode should be restored to the fitted mode
-        current_mode = getattr(model, '_test_mode', None)
+        current_mode = getattr(model, "_test_mode", None)
         assert current_mode == original_mode, (
             f"predict() changed _test_mode from {original_mode!r} to {current_mode!r}. "
             "predict() should restore _test_mode after execution."
@@ -378,11 +382,11 @@ class TestJnpRollBan:
                 continue
             content = path.read_text()
             # Find jnp.roll usage (excluding comments)
-            for i, line in enumerate(content.split('\n'), 1):
+            for i, line in enumerate(content.split("\n"), 1):
                 stripped = line.strip()
-                if stripped.startswith('#'):
+                if stripped.startswith("#"):
                     continue
-                if 'jnp.roll' in stripped:
+                if "jnp.roll" in stripped:
                     violations.append(f"  {filepath}:{i}: {stripped}")
 
         assert not violations, (
@@ -407,21 +411,22 @@ class TestDatasetIdPropagation:
         import dataclasses
 
         field_names = [f.name for f in dataclasses.fields(FitResult)]
-        assert "dataset_id" in field_names, (
-            "FitResult must have a dataset_id field for multi-dataset warm-start support"
-        )
+        assert (
+            "dataset_id" in field_names
+        ), "FitResult must have a dataset_id field for multi-dataset warm-start support"
 
     @pytest.mark.smoke
     def test_fit_worker_accepts_dataset_id(self):
         """FitWorker should accept and propagate dataset_id."""
         try:
-            from rheojax.gui.jobs.fit_worker import FitWorker
             import inspect
 
+            from rheojax.gui.jobs.fit_worker import FitWorker
+
             sig = inspect.signature(FitWorker.__init__)
-            assert "dataset_id" in sig.parameters, (
-                "FitWorker.__init__ must accept dataset_id parameter"
-            )
+            assert (
+                "dataset_id" in sig.parameters
+            ), "FitWorker.__init__ must accept dataset_id parameter"
         except ImportError:
             pytest.skip("GUI module not available")
 

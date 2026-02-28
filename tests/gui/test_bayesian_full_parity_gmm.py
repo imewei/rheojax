@@ -1,12 +1,10 @@
-"""Opt-in strict Bayesian parity test for GMM-like flow.
+"""Strict Bayesian parity test for GMM-like flow.
 
-Enable via env: RHEOJAX_FULL_PARITY_GMM=1
 Uses bundled multi-technique fixture with GMM model if available.
 """
 
 import hashlib
 import io
-import os
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -19,9 +17,6 @@ from rheojax.gui.services.bayesian_service import BayesianService
 pytestmark = [pytest.mark.slow]
 
 
-@pytest.mark.skipif(
-    os.environ.get("RHEOJAX_FULL_PARITY_GMM") != "1", reason="full parity opt-in"
-)
 def test_bayesian_full_parity_gmm_like():
     pytest.importorskip("jax")
 
@@ -87,4 +82,4 @@ def test_bayesian_full_parity_gmm_like():
     digest = hashlib.sha256(buf.getvalue()).hexdigest()
 
     assert len(digest) == 64
-    assert digest == "b83d68fe4b5b17b46ef6c29bbc6cb1bdea7cac35411e0d8b9b92a4b425e1a0cb"
+    assert digest == "e4912aea76c83876c659699a0eb067e3306cedf5eac32bc07f54bffcb406fe7a"

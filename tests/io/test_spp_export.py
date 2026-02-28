@@ -107,7 +107,7 @@ class TestExportSppTxt:
                     x in ln
                     for x in [
                         "Data calculated",
-                        "Frequency",
+                        "Angular Frequency",
                         "Number",
                         "Step",
                         "Time",
@@ -158,7 +158,7 @@ class TestExportSppTxt:
             main_file = Path(tmpdir) / "test_sample_SPP_NUMERICAL.txt"
             content = main_file.read_text()
 
-            assert "Frequency:" in content
+            assert "Angular Frequency (rad/s):" in content
             assert "Step size" in content
             assert "Standard differentiation" in content
 

@@ -188,7 +188,9 @@ class TestModelFitTemplate:
         frequency = np.logspace(-2, 2, 50)
         # Use proper Maxwell G* so both G' and G'' are positive
         G0 = 1e5
-        G_data = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (1 + frequency**2)
+        G_data = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (
+            1 + frequency**2
+        )
         G_fit = G_data * 1.02
 
         data = RheoData(
@@ -208,7 +210,9 @@ class TestModelFitTemplate:
         G0 = 1e5
         G_data = G0 * freq**2 / (1 + freq**2) + 1j * G0 * freq / (1 + freq**2)
         G_fit = G_data * 1.05
-        data = RheoData(x=freq, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency")
+        data = RheoData(
+            x=freq, y=G_data, x_units="rad/s", y_units="Pa", domain="frequency"
+        )
         fig, axes = plot_model_fit(data, G_fit, show_residuals=True)
         assert axes.shape == (2, 2)
         plt.close(fig)

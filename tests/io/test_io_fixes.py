@@ -876,7 +876,9 @@ class TestLoadFileMultiSegment:
         fpath = tmp_path / "multi.csv"
         fpath.write_text("time,stress\n1,10\n2,20\n3,30\n")
 
-        with patch("rheojax.gui.services.data_service.auto_load", return_value=[seg1, seg2]):
+        with patch(
+            "rheojax.gui.services.data_service.auto_load", return_value=[seg1, seg2]
+        ):
             result = service.load_file(fpath, x_col="time", y_col="stress")
 
         # Should return first segment
@@ -916,9 +918,9 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=gamma_dot, y=eta)
         mode = service.detect_test_mode(data)
 
-        assert mode == "flow", (
-            f"Shear-thinning power-law detected as '{mode}' instead of 'flow'"
-        )
+        assert (
+            mode == "flow"
+        ), f"Shear-thinning power-law detected as '{mode}' instead of 'flow'"
 
     @pytest.mark.smoke
     def test_exponential_relaxation_not_flow(self):
@@ -935,9 +937,9 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=t, y=G_t)
         mode = service.detect_test_mode(data)
 
-        assert mode == "relaxation", (
-            f"Exponential relaxation detected as '{mode}' instead of 'relaxation'"
-        )
+        assert (
+            mode == "relaxation"
+        ), f"Exponential relaxation detected as '{mode}' instead of 'relaxation'"
 
     @pytest.mark.smoke
     def test_narrow_range_not_flow(self):
@@ -954,9 +956,7 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=x, y=y)
         mode = service.detect_test_mode(data)
 
-        assert mode != "flow", (
-            "Sub-decade data should not be classified as flow"
-        )
+        assert mode != "flow", "Sub-decade data should not be classified as flow"
 
 
 class TestImportWizardCacheCleanup:
@@ -1014,9 +1014,7 @@ class TestDataPageTestModeCombo:
         source = data_page_path.read_text()
         # Find the addItems call with our modes
         for mode in ["flow_curve", "startup", "laos"]:
-            assert mode in source, (
-                f"'{mode}' not found in data_page.py test_mode combo"
-            )
+            assert mode in source, f"'{mode}' not found in data_page.py test_mode combo"
         # Ensure "rotation" is gone (replaced by "flow_curve")
         assert '"rotation"' not in source or "flow_curve" in source
 
@@ -1103,10 +1101,12 @@ class TestTryExcelNrows:
         # Create a large-ish Excel file
         n_rows = 10000
         fpath = tmp_path / "large.xlsx"
-        df = pd.DataFrame({
-            "time": np.arange(n_rows, dtype=float),
-            "stress": np.random.randn(n_rows),
-        })
+        df = pd.DataFrame(
+            {
+                "time": np.arange(n_rows, dtype=float),
+                "stress": np.random.randn(n_rows),
+            }
+        )
         df.to_excel(fpath, index=False)
 
         from rheojax.io.readers.auto import auto_load
@@ -1184,12 +1184,12 @@ class TestImportDispatchSplitsComplex:
         # The dispatch must use np.real for y_data when complex.
         # After GUI-009 fix, data is first converted via np.asarray then
         # split with np.real(y_np) / np.imag(y_np).
-        assert "np.real(" in code and "y_data" in code, (
-            "Import dispatch must store np.real(y) as y_data for complex data"
-        )
-        assert "np.imag(" in code and "y2_data" in code, (
-            "Import dispatch must store np.imag(y) as y2_data for complex data"
-        )
+        assert (
+            "np.real(" in code and "y_data" in code
+        ), "Import dispatch must store np.real(y) as y_data for complex data"
+        assert (
+            "np.imag(" in code and "y2_data" in code
+        ), "Import dispatch must store np.imag(y) as y2_data for complex data"
 
 
 class TestDetectTestModeFlow:
@@ -1203,7 +1203,7 @@ class TestDetectTestModeFlow:
 
         gamma_dot = np.logspace(-2, 2, 50)
         # Shear-thinning: η ~ γ̇^(-0.7)
-        eta = 1000 * gamma_dot**(-0.7)
+        eta = 1000 * gamma_dot ** (-0.7)
 
         data = RheoData(x=gamma_dot, y=eta)
         svc = DataService()
@@ -1294,7 +1294,11 @@ class TestY2ColExcelLoss:
     @pytest.mark.smoke
     def test_y2_col_translated_at_auto_load_entry(self):
         """auto_load must translate y2_col → y_cols before format dispatch."""
-        from rheojax.io.readers.auto import _EXCEL_KWARGS, _filter_kwargs, _translate_y2_col
+        from rheojax.io.readers.auto import (
+            _EXCEL_KWARGS,
+            _filter_kwargs,
+            _translate_y2_col,
+        )
 
         # Simulate the FIXED flow: translate first, then filter
         kwargs = {"x_col": "omega", "y_col": "G'", "y2_col": "G''"}
@@ -1318,11 +1322,13 @@ class TestY2ColExcelLoss:
         from rheojax.io import auto_load
 
         fpath = tmp_path / "modulus.xlsx"
-        df = pd.DataFrame({
-            "omega": [1.0, 10.0, 100.0],
-            "G'": [1e5, 2e5, 3e5],
-            "G''": [1e4, 2e4, 3e4],
-        })
+        df = pd.DataFrame(
+            {
+                "omega": [1.0, 10.0, 100.0],
+                "G'": [1e5, 2e5, 3e5],
+                "G''": [1e4, 2e4, 3e4],
+            }
+        )
         df.to_excel(fpath, index=False)
 
         data = auto_load(str(fpath), x_col="omega", y_col="G'", y2_col="G''")
@@ -1429,8 +1435,12 @@ class TestTestModeForwarding:
                 y=np.array([100.0, 80.0, 60.0]),
             )
 
-        with patch("rheojax.gui.services.data_service.auto_load", side_effect=mock_auto_load):
-            service.load_file(fpath, x_col="time", y_col="stress", test_mode="relaxation")
+        with patch(
+            "rheojax.gui.services.data_service.auto_load", side_effect=mock_auto_load
+        ):
+            service.load_file(
+                fpath, x_col="time", y_col="stress", test_mode="relaxation"
+            )
 
         assert "test_mode" in captured_kwargs
         assert captured_kwargs["test_mode"] == "relaxation"
@@ -1456,8 +1466,12 @@ class TestTestModeForwarding:
                 y=np.array([100.0, 80.0, 60.0]),
             )
 
-        with patch("rheojax.gui.services.data_service.auto_load", side_effect=mock_auto_load):
-            service.load_file_multi(fpath, x_col="time", y_col="stress", test_mode="oscillation")
+        with patch(
+            "rheojax.gui.services.data_service.auto_load", side_effect=mock_auto_load
+        ):
+            service.load_file_multi(
+                fpath, x_col="time", y_col="stress", test_mode="oscillation"
+            )
 
         assert "test_mode" in captured_kwargs
         assert captured_kwargs["test_mode"] == "oscillation"
@@ -1481,7 +1495,9 @@ class TestPreviewFileListHandling:
         seg1 = RheoData(x=np.array([1.0, 2.0]), y=np.array([10.0, 20.0]))
         seg2 = RheoData(x=np.array([3.0, 4.0]), y=np.array([30.0, 40.0]))
 
-        with patch("rheojax.gui.services.data_service.auto_load", return_value=[seg1, seg2]):
+        with patch(
+            "rheojax.gui.services.data_service.auto_load", return_value=[seg1, seg2]
+        ):
             result = service.preview_file(fpath, max_rows=10)
 
         assert result["headers"] == ["x", "y"]
@@ -1529,9 +1545,9 @@ class TestDetectTestModeSubMillihertz:
 
         data = RheoData(x=omega, y=E_prime)
         mode = service.detect_test_mode(data)
-        assert mode == "oscillation", (
-            f"Sub-mHz DMA data detected as '{mode}' instead of 'oscillation'"
-        )
+        assert (
+            mode == "oscillation"
+        ), f"Sub-mHz DMA data detected as '{mode}' instead of 'oscillation'"
 
 
 class TestJsonFallbackError:

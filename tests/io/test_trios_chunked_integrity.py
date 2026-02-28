@@ -175,12 +175,16 @@ class TestChunkingDataIntegrity:
         )
 
         np.testing.assert_allclose(
-            np.asarray(full_data.x), np.asarray(chunked_data.x),
-            rtol=1e-10, atol=1e-15,
+            np.asarray(full_data.x),
+            np.asarray(chunked_data.x),
+            rtol=1e-10,
+            atol=1e-15,
         )
         np.testing.assert_allclose(
-            np.asarray(full_data.y), np.asarray(chunked_data.y),
-            rtol=1e-10, atol=1e-15,
+            np.asarray(full_data.y),
+            np.asarray(chunked_data.y),
+            rtol=1e-10,
+            atol=1e-15,
         )
 
     def test_metadata_preservation_chunked(self, synthetic_trios_small):
@@ -216,10 +220,16 @@ class TestChunkingDataIntegrity:
         assert len(full_y) == len(chunked_data.y), "y length mismatch"
 
         np.testing.assert_allclose(
-            full_x, np.asarray(chunked_data.x), rtol=1e-10, atol=1e-15,
+            full_x,
+            np.asarray(chunked_data.x),
+            rtol=1e-10,
+            atol=1e-15,
         )
         np.testing.assert_allclose(
-            full_y, np.asarray(chunked_data.y), rtol=1e-10, atol=1e-15,
+            full_y,
+            np.asarray(chunked_data.y),
+            rtol=1e-10,
+            atol=1e-15,
         )
 
     def test_array_dtypes_match(self, synthetic_trios_small):

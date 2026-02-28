@@ -155,17 +155,25 @@ class TestFrequencyDependentModulus:
 
         # Full sweep: G'' must always be positive (physical constraint)
         omega_tau0_full = jnp.logspace(-2, 2, 50)
-        G_prime_full, G_double_prime_full = jax.vmap(lambda w: Gp(x, w))(omega_tau0_full)
+        G_prime_full, G_double_prime_full = jax.vmap(lambda w: Gp(x, w))(
+            omega_tau0_full
+        )
         assert jnp.all(G_prime_full > 0), "G' must be positive at all frequencies"
-        assert jnp.all(G_double_prime_full > 0), "G'' must be positive at all frequencies"
+        assert jnp.all(
+            G_double_prime_full > 0
+        ), "G'' must be positive at all frequencies"
 
         # G' approaches plateau at high frequency (elastic limit)
-        assert float(G_prime_full[-1]) > float(G_prime_full[0]), "G' should increase with omega"
+        assert float(G_prime_full[-1]) > float(
+            G_prime_full[0]
+        ), "G' should increase with omega"
 
         # G'' has a peak at intermediate frequency (not monotone over full range)
         # This is the physically correct SGR behavior (Sollich 1998)
         gpp_peak = jnp.max(G_double_prime_full)
-        assert float(gpp_peak) > float(G_double_prime_full[0]), "G'' should peak above low-freq value"
+        assert float(gpp_peak) > float(
+            G_double_prime_full[0]
+        ), "G'' should peak above low-freq value"
 
     def test_Gp_multiple_x_values(self):
         """Test power-law scaling for different x values."""

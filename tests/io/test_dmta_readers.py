@@ -56,7 +56,9 @@ def test_detect_deformation_mode_bending_columns():
 
 def test_detect_deformation_mode_compression_columns():
     """Test deformation mode detection for compression column names."""
-    result = detect_deformation_mode_from_columns(["E_compression", "stress_compression"])
+    result = detect_deformation_mode_from_columns(
+        ["E_compression", "stress_compression"]
+    )
     assert result == "compression"
 
 

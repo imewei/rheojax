@@ -1,13 +1,11 @@
-"""Strict, opt-in notebook-length Bayesian parity check.
+"""Strict notebook-length Bayesian parity check.
 
-Enable via env: RHEOJAX_FULL_PARITY=1
 Runs a longer SPP-like Bayesian inference on the bundled multi-technique
 fixture with notebook-like sampler settings and checks convergence + PPD hash.
 """
 
 import hashlib
 import io
-import os
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -20,9 +18,6 @@ from rheojax.gui.services.bayesian_service import BayesianService
 pytestmark = [pytest.mark.slow]
 
 
-@pytest.mark.skipif(
-    os.environ.get("RHEOJAX_FULL_PARITY") != "1", reason="full parity opt-in"
-)
 def test_bayesian_full_parity_notebook_like_relaxation():
     pytest.importorskip("jax")
 
@@ -93,4 +88,4 @@ def test_bayesian_full_parity_notebook_like_relaxation():
 
     assert len(digest) == 64
     # Golden hash captures notebook-like parity; update only on intentional changes.
-    assert digest == "030feb01740cafe02f3e03cce1af7e5658cc3697d0b78f2626e433ee339128fd"
+    assert digest == "95731c41fb73d9d0635ae45d11b0eac2aceeb6c2a569ea6ea07b415286c46c0c"

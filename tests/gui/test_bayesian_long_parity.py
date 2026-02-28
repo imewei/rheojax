@@ -1,13 +1,11 @@
-"""Opt-in longer Bayesian parity test using bundled fixtures.
+"""Longer Bayesian parity test using bundled fixtures.
 
-Enable via env: RHEOJAX_LONG_BAYES=1
 Runs a modest SPP-like Bayesian inference and checks diagnostics + PPD hash.
 """
 
 import csv
 import hashlib
 import io
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,9 +17,6 @@ from rheojax.gui.services.bayesian_service import BayesianResult, BayesianServic
 pytestmark = [pytest.mark.slow]
 
 
-@pytest.mark.skipif(
-    os.environ.get("RHEOJAX_LONG_BAYES") != "1", reason="long bayes opt-in"
-)
 def test_bayesian_long_parity_relaxation_fixture():
     pytest.importorskip("jax")
 

@@ -25,10 +25,10 @@ from rheojax.visualization.spp_plots import (
     plot_pipkin_diagram,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def laos_signals():
@@ -75,6 +75,7 @@ def spp_results(laos_signals):
 # ---------------------------------------------------------------------------
 # plot_lissajous
 # ---------------------------------------------------------------------------
+
 
 class TestPlotLissajous:
     """Tests for plot_lissajous."""
@@ -145,6 +146,7 @@ class TestPlotLissajous:
 # plot_cole_cole
 # ---------------------------------------------------------------------------
 
+
 class TestPlotColeCole:
     """Tests for plot_cole_cole."""
 
@@ -206,6 +208,7 @@ class TestPlotColeCole:
 # plot_moduli_evolution
 # ---------------------------------------------------------------------------
 
+
 class TestPlotModuliEvolution:
     """Tests for plot_moduli_evolution."""
 
@@ -265,6 +268,7 @@ class TestPlotModuliEvolution:
 # ---------------------------------------------------------------------------
 # plot_harmonic_spectrum
 # ---------------------------------------------------------------------------
+
 
 class TestPlotHarmonicSpectrum:
     """Tests for plot_harmonic_spectrum."""
@@ -337,6 +341,7 @@ class TestPlotHarmonicSpectrum:
 # plot_3d_trajectory
 # ---------------------------------------------------------------------------
 
+
 class TestPlot3DTrajectory:
     """Tests for plot_3d_trajectory."""
 
@@ -394,6 +399,7 @@ class TestPlot3DTrajectory:
 # plot_pipkin_diagram
 # ---------------------------------------------------------------------------
 
+
 class TestPlotPipkinDiagram:
     """Tests for plot_pipkin_diagram."""
 
@@ -438,6 +444,7 @@ class TestPlotPipkinDiagram:
 # ---------------------------------------------------------------------------
 # create_spp_report
 # ---------------------------------------------------------------------------
+
 
 class TestCreateSPPReport:
     """Tests for create_spp_report."""
@@ -533,6 +540,7 @@ class TestCreateSPPReport:
 # Cross-cutting concerns
 # ---------------------------------------------------------------------------
 
+
 class TestSPPPlotEdgeCases:
     """Cross-cutting edge case tests."""
 
@@ -595,6 +603,7 @@ class TestSPPPlotEdgeCases:
 # Coverage Gap-5: strain_rate_normalized path in create_spp_report
 # ---------------------------------------------------------------------------
 
+
 class TestSPPReportStrainRateNormalized:
     """Gap-5: create_spp_report uses strain_rate_normalized when present."""
 
@@ -620,6 +629,7 @@ class TestSPPReportStrainRateNormalized:
 # ---------------------------------------------------------------------------
 # Coverage Gap-7: plot_moduli_evolution single-Axes ValueError
 # ---------------------------------------------------------------------------
+
 
 class TestModuliEvolutionSingleAxes:
     """Gap-7: plot_moduli_evolution raises ValueError for single Axes with multi-panel."""

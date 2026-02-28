@@ -487,8 +487,8 @@ class TestZenerRotation:
         assert eta_app.shape == gamma_dot.shape
         assert isinstance(eta_app, jnp.ndarray)
 
-    def test_rotation_constant_viscosity(self):
-        """Test steady shear viscosity is constant (Newtonian)."""
+    def test_rotation_stress(self):
+        """Test steady shear stress sigma = eta * gamma_dot (Newtonian)."""
         model = Zener()
         eta = 1e3
         model.parameters.set_value("eta", eta)
@@ -501,10 +501,10 @@ class TestZenerRotation:
             metadata={"test_mode": "rotation"},
         )
 
-        eta_app = model.predict(data)
+        sigma = model.predict(data)
 
-        # Should be constant and equal to eta
-        assert_allclose(eta_app, eta * np.ones_like(gamma_dot), rtol=1e-6)
+        # sigma = eta * gamma_dot for Newtonian flow
+        assert_allclose(sigma, eta * np.array(gamma_dot), rtol=1e-6)
 
 
 class TestZenerOptimization:

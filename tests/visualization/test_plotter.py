@@ -55,7 +55,9 @@ class TestPlotRheoData:
         # Use proper Maxwell G* = G0*w^2/(1+w^2) + i*G0*w/(1+w^2) so both
         # G' (real) and G'' (imag) are positive — verifies both subplots render.
         G0 = 1e5
-        modulus = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (1 + frequency**2)
+        modulus = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (
+            1 + frequency**2
+        )
 
         data = RheoData(
             x=frequency,
@@ -74,7 +76,9 @@ class TestPlotRheoData:
         # Verify the plot was actually created (check lines or collections exist)
         axes = ax if isinstance(ax, (list, np.ndarray)) else [ax]
         for a in axes:
-            assert len(a.get_lines()) > 0 or len(a.collections) > 0, "Plot should have data"
+            assert (
+                len(a.get_lines()) > 0 or len(a.collections) > 0
+            ), "Plot should have data"
         plt.close(fig)
 
     @pytest.mark.smoke
@@ -152,7 +156,9 @@ class TestPlotFrequencyDomain:
         frequency = np.logspace(-2, 2, 50)
         # Use proper Maxwell G* so both G' and G'' are positive
         G0 = 1e5
-        G_complex = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (1 + frequency**2)
+        G_complex = G0 * frequency**2 / (1 + frequency**2) + 1j * G0 * frequency / (
+            1 + frequency**2
+        )
 
         fig, axes = plot_frequency_domain(frequency, G_complex)
 
@@ -225,7 +231,8 @@ class TestPlotResiduals:
         assert "Residuals" in ax.get_ylabel()
         # Check horizontal zero-line exists
         hlines = [
-            l for l in ax.get_lines()
+            l
+            for l in ax.get_lines()
             if len(l.get_ydata()) > 0 and np.allclose(l.get_ydata(), 0.0)
         ]
         assert len(hlines) >= 1, "Residual plot should have a horizontal zero-line"
@@ -437,6 +444,7 @@ def test_plot_fit_with_uncertainty_existing_ax():
 # Coverage Gap-6: _modulus_labels for bending/compression/metadata
 # ---------------------------------------------------------------------------
 
+
 class TestModulusLabels:
     """Gap-6: _modulus_labels returns E'/E'' for tension/bending/compression."""
 
@@ -454,7 +462,8 @@ class TestModulusLabels:
         from rheojax.visualization.plotter import _modulus_labels
 
         data = RheoData(
-            x=np.array([1.0]), y=np.array([1.0]),
+            x=np.array([1.0]),
+            y=np.array([1.0]),
             metadata={"deformation_mode": "tension"},
         )
         s, l, g = _modulus_labels(data=data)
@@ -466,7 +475,8 @@ class TestModulusLabels:
         from rheojax.visualization.plotter import _modulus_labels
 
         data = RheoData(
-            x=np.array([1.0]), y=np.array([1.0]),
+            x=np.array([1.0]),
+            y=np.array([1.0]),
             metadata={"deformation_mode": "bending"},
         )
         s, l, g = _modulus_labels(data=data)
@@ -478,7 +488,8 @@ class TestModulusLabels:
         from rheojax.visualization.plotter import _modulus_labels
 
         data = RheoData(
-            x=np.array([1.0]), y=np.array([1.0]),
+            x=np.array([1.0]),
+            y=np.array([1.0]),
             metadata={"deformation_mode": "compression"},
         )
         s, l, g = _modulus_labels(data=data)
@@ -498,7 +509,8 @@ class TestModulusLabels:
         from rheojax.visualization.plotter import _modulus_labels
 
         data = RheoData(
-            x=np.array([1.0]), y=np.array([1.0]),
+            x=np.array([1.0]),
+            y=np.array([1.0]),
             metadata={"deformation_mode": "compression"},
         )
         s, _, _ = _modulus_labels(data=data)

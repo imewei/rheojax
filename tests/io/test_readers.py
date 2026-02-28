@@ -452,6 +452,7 @@ data point 1	1.0	100
 # Coverage Gap Tests (Round 7)
 # ---------------------------------------------------------------------------
 
+
 class TestHasTriosMetadataNegative:
     """Gap-1: _has_trios_metadata returns False for non-TRIOS data."""
 

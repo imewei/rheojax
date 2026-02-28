@@ -147,7 +147,7 @@ class TestDesignTokenUsage:
         from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 
         source = inspect.getsource(PyQtGraphCanvas)
-        
+
         # Verify no hardcoded hex strings remain for colors
         assert (
             'background="w"' not in source
