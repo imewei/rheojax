@@ -368,3 +368,113 @@ class TestRunFitIsolated:
             assert isinstance(result["y_fit"], np.ndarray)
         if result.get("residuals") is not None:
             assert isinstance(result["residuals"], np.ndarray)
+
+
+# ===========================================================================
+# Tests for run_bayesian_isolated
+# ===========================================================================
+
+
+@pytest.mark.slow
+class TestRunBayesianIsolated:
+    """run_bayesian_isolated is a pure function for subprocess NUTS sampling."""
+
+    def test_basic_bayesian_returns_result(self):
+        import multiprocessing as mp
+
+        import numpy as np
+
+        from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+
+        t = np.linspace(0.01, 5, 50)
+        rng = np.random.default_rng(42)
+        # Maxwell: G(t) = G0 * exp(-t * G0/eta) -- use G0=1000, eta=1000 (tau=1)
+        G_t = 1000.0 * np.exp(-t / 1.0) + rng.normal(0, 10, len(t))
+
+        result = run_bayesian_isolated(
+            model_name="maxwell",
+            x_data=t,
+            y_data=G_t,
+            test_mode="relaxation",
+            num_warmup=50,
+            num_samples=100,
+            num_chains=1,
+            warm_start={"G0": 1000.0, "eta": 1000.0},
+            priors={},
+            seed=42,
+            progress_queue=mp.Queue(),
+            cancel_event=mp.Event(),
+        )
+
+        assert result["model_name"] == "maxwell"
+        assert "posterior_samples" in result
+        assert isinstance(result["posterior_samples"], dict)
+        assert len(result["posterior_samples"]) > 0
+        for name, samples in result["posterior_samples"].items():
+            assert isinstance(samples, np.ndarray), f"{name} is not NumPy"
+        assert result["mcmc_time"] > 0
+        assert result["timestamp"]  # non-empty ISO string
+        assert result["num_warmup"] == 50
+        assert result["num_samples"] == 100
+        assert result["num_chains"] == 1
+
+    def test_inference_data_is_none(self):
+        import multiprocessing as mp
+
+        import numpy as np
+
+        from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+
+        t = np.linspace(0.01, 5, 50)
+        G_t = 1000.0 * np.exp(-t / 1.0)
+
+        result = run_bayesian_isolated(
+            model_name="maxwell",
+            x_data=t,
+            y_data=G_t,
+            test_mode="relaxation",
+            num_warmup=25,
+            num_samples=50,
+            num_chains=1,
+            warm_start={"G0": 1000.0, "eta": 1000.0},
+            priors={},
+            seed=0,
+            progress_queue=mp.Queue(),
+            cancel_event=mp.Event(),
+        )
+
+        assert result.get("inference_data") is None
+
+    def test_result_has_diagnostics(self):
+        import multiprocessing as mp
+
+        import numpy as np
+
+        from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+
+        t = np.linspace(0.01, 5, 50)
+        G_t = 1000.0 * np.exp(-t / 1.0)
+
+        result = run_bayesian_isolated(
+            model_name="maxwell",
+            x_data=t,
+            y_data=G_t,
+            test_mode="relaxation",
+            num_warmup=25,
+            num_samples=50,
+            num_chains=1,
+            warm_start={"G0": 1000.0, "eta": 1000.0},
+            priors={},
+            seed=0,
+            progress_queue=mp.Queue(),
+            cancel_event=mp.Event(),
+        )
+
+        assert "r_hat" in result
+        assert "ess" in result
+        assert "divergences" in result
+        assert isinstance(result["divergences"], int)
+        assert "diagnostics_valid" in result
+        assert isinstance(result["diagnostics_valid"], bool)
+        assert "credible_intervals" in result
+        assert isinstance(result["credible_intervals"], dict)
