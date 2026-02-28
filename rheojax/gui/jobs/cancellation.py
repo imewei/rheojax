@@ -3,8 +3,12 @@ Cancellation Token
 =================
 
 Thread-safe cancellation mechanism for background jobs.
+Includes a multiprocessing variant for cross-process signaling.
 """
 
+from __future__ import annotations
+
+import multiprocessing as mp
 import time
 from threading import Event
 
@@ -158,6 +162,114 @@ class CancellationToken:
         -----
         Be careful when reusing tokens - ensure the previous
         operation has fully completed before resetting.
+        """
+        self._cancelled.clear()
+        self._error = None
+        self._cancel_start_time = None
+
+
+class ProcessCancellationToken:
+    """Cancellation token using multiprocessing.Event for cross-process signaling.
+
+    Same API as CancellationToken but works across process boundaries.
+    Used by ProcessWorkerAdapter for subprocess-based workers.
+    """
+
+    def __init__(
+        self,
+        job_id: str | None = None,
+        event: mp.synchronize.Event | None = None,
+    ) -> None:
+        self._cancelled = event if event is not None else mp.Event()
+        self._error: Exception | None = None
+        self._job_id = job_id
+        self._cancel_start_time: float | None = None
+
+    @property
+    def event(self) -> mp.synchronize.Event:
+        """The underlying mp.Event -- pass this to child processes."""
+        return self._cancelled
+
+    def cancel(self) -> None:
+        """Request cancellation across process boundaries."""
+        self._cancel_start_time = time.perf_counter()
+        logger.debug("Process cancellation requested", job_id=self._job_id)
+        self._cancelled.set()
+
+    def is_cancelled(self) -> bool:
+        """Check if cancellation was requested.
+
+        Returns
+        -------
+        bool
+            True if cancelled, False otherwise
+        """
+        return self._cancelled.is_set()
+
+    def check(self) -> None:
+        """Check and raise if cancelled.
+
+        Raises
+        ------
+        CancellationError
+            If cancellation was requested
+        """
+        if self.is_cancelled():
+            elapsed = None
+            if self._cancel_start_time is not None:
+                elapsed = time.perf_counter() - self._cancel_start_time
+            logger.debug(
+                "Process cancellation complete",
+                job_id=self._job_id,
+                elapsed=elapsed,
+            )
+            raise CancellationError("Operation cancelled by user")
+
+    def set_error(self, error: Exception) -> None:
+        """Store an error that occurred during execution.
+
+        Parameters
+        ----------
+        error : Exception
+            The error to store
+        """
+        logger.error(
+            "Error stored in process cancellation token",
+            job_id=self._job_id,
+            error_type=type(error).__name__,
+            exc_info=True,
+        )
+        self._error = error
+
+    def get_error(self) -> Exception | None:
+        """Get any error that occurred.
+
+        Returns
+        -------
+        Exception or None
+            The stored error, or None if no error occurred
+        """
+        return self._error
+
+    def wait(self, timeout: float | None = None) -> bool:
+        """Wait for cancellation.
+
+        Parameters
+        ----------
+        timeout : float, optional
+            Wait timeout in seconds. If None, wait indefinitely.
+
+        Returns
+        -------
+        bool
+            True if cancelled within timeout, False if timeout expired
+        """
+        return self._cancelled.wait(timeout)
+
+    def reset(self) -> None:
+        """Reset cancellation state.
+
+        Clears both the cancellation flag and any stored error.
         """
         self._cancelled.clear()
         self._error = None
