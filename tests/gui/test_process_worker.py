@@ -304,3 +304,67 @@ class TestProcessWorkerAdapter:
         adapter.run()
 
         assert len(cancelled_count) == 1
+
+
+# ===========================================================================
+# Tests for run_fit_isolated
+# ===========================================================================
+
+
+class TestRunFitIsolated:
+    """run_fit_isolated is a pure function for subprocess NLSQ fitting."""
+
+    def test_basic_fit_returns_result(self):
+        import multiprocessing as mp
+        import numpy as np
+        from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
+
+        # Maxwell relaxation: G(t) = G0 * exp(-t/tau), where tau = eta/G0
+        t = np.linspace(0.01, 5, 100)
+        G0, eta = 1000.0, 1000.0  # tau = eta/G0 = 1.0
+        G_t = G0 * np.exp(-t * G0 / eta)
+
+        result = run_fit_isolated(
+            model_name="maxwell",
+            x_data=t, y_data=G_t,
+            test_mode="relaxation",
+            initial_params={"G0": 500.0, "eta": 500.0},
+            options={"max_iter": 500},
+            progress_queue=mp.Queue(),
+            cancel_event=mp.Event(),
+        )
+
+        assert result["success"]
+        assert result["model_name"] == "maxwell"
+        assert isinstance(result["parameters"], dict)
+        assert "G0" in result["parameters"]
+        assert "eta" in result["parameters"]
+        assert result["parameters"]["G0"] > 0
+        assert result["parameters"]["eta"] > 0
+        assert result["fit_time"] > 0
+        assert result["timestamp"]  # non-empty ISO string
+
+    def test_all_arrays_are_numpy(self):
+        import multiprocessing as mp
+        import numpy as np
+        from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
+
+        t = np.linspace(0.01, 5, 100)
+        G_t = 1000.0 * np.exp(-t / 1.0)
+
+        result = run_fit_isolated(
+            model_name="maxwell",
+            x_data=t, y_data=G_t,
+            test_mode="relaxation",
+            initial_params={},
+            options={},
+            progress_queue=mp.Queue(),
+            cancel_event=mp.Event(),
+        )
+
+        if result.get("x_fit") is not None:
+            assert isinstance(result["x_fit"], np.ndarray)
+        if result.get("y_fit") is not None:
+            assert isinstance(result["y_fit"], np.ndarray)
+        if result.get("residuals") is not None:
+            assert isinstance(result["residuals"], np.ndarray)
