@@ -39,15 +39,16 @@ def run_fit_isolated(
     jax, jnp = safe_import_jax()
 
     from rheojax.core.data import RheoData
-    from rheojax.core.registry import Registry
     from rheojax.gui.services.model_service import ModelService
 
     # Ensure models are registered in this (sub)process.
     # In a subprocess the @ModelRegistry.register decorators haven't fired yet
-    # because the model modules use lazy imports.
-    registry = Registry.get_instance()
-    if not registry.get_all_models():
-        registry.discover("rheojax.models")
+    # because the model modules use lazy __getattr__ imports.
+    # Registry.discover() cannot trigger __getattr__ (inspect.getmembers uses
+    # dir() which doesn't list lazy names), so we must eagerly import all
+    # submodules to fire the decorators.
+    from rheojax.models import _ensure_all_registered
+    _ensure_all_registered()
 
     # RheoData stores complex modulus as y = G' + i*G'' (no separate y2 field)
     if y2_data is not None:

@@ -450,6 +450,42 @@ def _extract_data(data: Any) -> tuple[Any, Any, Any, str, dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Module-level entry points for subprocess work functions.
+# These MUST be at module level for pickling with macOS spawn context.
+# ---------------------------------------------------------------------------
+
+
+def _fit_work_entry(
+    progress_queue: Any,
+    cancel_event: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Module-level entry point for fit subprocess (picklable)."""
+    from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
+
+    return run_fit_isolated(
+        progress_queue=progress_queue,
+        cancel_event=cancel_event,
+        **kwargs,
+    )
+
+
+def _bayesian_work_entry(
+    progress_queue: Any,
+    cancel_event: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Module-level entry point for Bayesian subprocess (picklable)."""
+    from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+
+    return run_bayesian_isolated(
+        progress_queue=progress_queue,
+        cancel_event=cancel_event,
+        **kwargs,
+    )
+
+
+# ---------------------------------------------------------------------------
 # FitWorker factory
 # ---------------------------------------------------------------------------
 
@@ -498,10 +534,9 @@ def make_fit_worker(
             dataset_id=dataset_id,
         )
 
-    # Subprocess mode
+    # Subprocess mode — use functools.partial with module-level entry
+    # point for macOS spawn-context pickling compatibility.
     from functools import partial
-
-    from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
 
     x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
 
@@ -509,39 +544,22 @@ def make_fit_worker(
     deformation_mode = metadata.get("deformation_mode")
     poisson_ratio = metadata.get("poisson_ratio")
 
-    def _work_fn(
-        progress_queue: Any,
-        cancel_event: Any,
-        *,
-        _model_name: str = model_name,
-        _x: Any = x_data,
-        _y: Any = y_data,
-        _test_mode: str = test_mode,
-        _init: dict = initial_params or {},
-        _opts: dict = options or {},
-        _y2: Any = y2_data,
-        _meta: dict = metadata,
-        _deform: str | None = deformation_mode,
-        _poisson: float | None = poisson_ratio,
-        _dsid: str = dataset_id,
-    ) -> dict[str, Any]:
-        return run_fit_isolated(
-            model_name=_model_name,
-            x_data=_x,
-            y_data=_y,
-            test_mode=_test_mode,
-            initial_params=_init,
-            options=_opts,
-            progress_queue=progress_queue,
-            cancel_event=cancel_event,
-            y2_data=_y2,
-            metadata=_meta,
-            deformation_mode=_deform,
-            poisson_ratio=_poisson,
-            dataset_id=_dsid,
-        )
+    work_fn = partial(
+        _fit_work_entry,
+        model_name=model_name,
+        x_data=x_data,
+        y_data=y_data,
+        test_mode=test_mode,
+        initial_params=initial_params or {},
+        options=options or {},
+        y2_data=y2_data,
+        metadata=metadata,
+        deformation_mode=deformation_mode,
+        poisson_ratio=poisson_ratio,
+        dataset_id=dataset_id,
+    )
 
-    return ProcessWorkerAdapter(_work_fn)
+    return ProcessWorkerAdapter(work_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -677,10 +695,10 @@ def make_bayesian_worker(
             dataset_id=dataset_id,
         )
 
-    # Subprocess mode
+    # Subprocess mode — use functools.partial with module-level entry
+    # point for macOS spawn-context pickling compatibility.
     import numpy as np
-
-    from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+    from functools import partial
 
     x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
 
@@ -690,56 +708,33 @@ def make_bayesian_worker(
         safe_model_state = {}
         for k, v in fitted_model_state.items():
             if hasattr(v, "numpy"):
-                # JAX DeviceArray
                 safe_model_state[k] = np.asarray(v)
             elif hasattr(v, "__jax_array__"):
                 safe_model_state[k] = np.asarray(v)
             else:
                 safe_model_state[k] = v
 
-    def _work_fn(
-        progress_queue: Any,
-        cancel_event: Any,
-        *,
-        _model_name: str = model_name,
-        _x: Any = x_data,
-        _y: Any = y_data,
-        _test_mode: str = test_mode,
-        _warmup: int = num_warmup,
-        _samples: int = num_samples,
-        _chains: int = num_chains,
-        _warm_start: dict | None = warm_start,
-        _priors: dict | None = priors,
-        _seed: int = seed,
-        _y2: Any = y2_data,
-        _meta: dict = metadata,
-        _deform: str | None = deformation_mode,
-        _poisson: float | None = poisson_ratio,
-        _model_state: dict | None = safe_model_state,
-        _dsid: str = dataset_id,
-    ) -> dict[str, Any]:
-        return run_bayesian_isolated(
-            model_name=_model_name,
-            x_data=_x,
-            y_data=_y,
-            test_mode=_test_mode,
-            num_warmup=_warmup,
-            num_samples=_samples,
-            num_chains=_chains,
-            warm_start=_warm_start,
-            priors=_priors or {},
-            seed=_seed,
-            progress_queue=progress_queue,
-            cancel_event=cancel_event,
-            y2_data=_y2,
-            metadata=_meta,
-            deformation_mode=_deform,
-            poisson_ratio=_poisson,
-            fitted_model_state=_model_state,
-            dataset_id=_dsid,
-        )
+    work_fn = partial(
+        _bayesian_work_entry,
+        model_name=model_name,
+        x_data=x_data,
+        y_data=y_data,
+        test_mode=test_mode,
+        num_warmup=num_warmup,
+        num_samples=num_samples,
+        num_chains=num_chains,
+        warm_start=warm_start,
+        priors=priors or {},
+        seed=seed,
+        y2_data=y2_data,
+        metadata=metadata,
+        deformation_mode=deformation_mode,
+        poisson_ratio=poisson_ratio,
+        fitted_model_state=safe_model_state,
+        dataset_id=dataset_id,
+    )
 
-    return ProcessWorkerAdapter(_work_fn)
+    return ProcessWorkerAdapter(work_fn)
 
 
 # ---------------------------------------------------------------------------

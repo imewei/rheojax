@@ -832,3 +832,56 @@ class TestProcessExitVerification:
             assert get_worker_isolation_mode() == "thread"
         finally:
             os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
+
+
+class TestEndToEndFactory:
+    """End-to-end test: factory -> subprocess -> mp.Queue -> result dict.
+
+    These tests exercise the full pickling boundary by calling
+    ``make_fit_worker()`` in subprocess mode and invoking ``.run()``,
+    which spawns an actual ``mp.Process`` with the ``spawn`` start method.
+    """
+
+    def test_make_fit_worker_subprocess_runs_to_completion(self):
+        """Factory-created fit worker runs in subprocess and returns result."""
+        import numpy as np
+
+        os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)  # default = subprocess
+        from rheojax.gui.jobs.process_adapter import make_fit_worker
+
+        # Exponential relaxation data (Maxwell: G(t) = G0 * exp(-t/tau))
+        t = np.logspace(-2, 2, 100)
+        G_t = 1e3 * np.exp(-t / 1.0) + 10.0
+
+        class SimpleData:
+            x_data = t
+            y_data = G_t
+            y2_data = None
+            test_mode = "relaxation"
+            metadata = {}
+
+        worker = make_fit_worker(
+            model_name="maxwell",
+            data=SimpleData(),
+            initial_params=None,
+            options={"max_iter": 200},
+            dataset_id="e2e_test",
+        )
+
+        # Verify it's a ProcessWorkerAdapter (subprocess mode)
+        from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+        assert isinstance(worker, ProcessWorkerAdapter)
+
+        # Run it — this spawns a real mp.Process and blocks until done
+        results = []
+        errors = []
+        worker.signals.completed.connect(lambda r: results.append(r))
+        worker.signals.failed.connect(lambda e: errors.append(e))
+        worker.run()
+
+        assert not errors, f"Subprocess fit failed: {errors}"
+        assert len(results) == 1
+        result = results[0]
+        assert isinstance(result, dict)
+        assert result.get("success", False)
+        assert "parameters" in result

@@ -176,6 +176,7 @@ class WorkerPool(QObject):
         self._pool = QThreadPool()
         self._pool.setMaxThreadCount(max_threads)
         self._active_jobs: dict[str, CancellationToken] = {}
+        self._active_workers: dict[str, QRunnable] = {}
         self._job_signals: dict[str, QObject] = {}
         self._job_start_times: dict[str, float] = {}
         self._job_lock = Lock()
@@ -218,6 +219,7 @@ class WorkerPool(QObject):
         # Register job
         with self._job_lock:
             self._active_jobs[job_id] = worker.cancel_token  # type: ignore[attr-defined]
+            self._active_workers[job_id] = worker
             self._job_start_times[job_id] = time.monotonic()
             active_count = len(self._active_jobs)
 
@@ -384,23 +386,49 @@ class WorkerPool(QObject):
             timeout_ms=timeout_ms,
         )
 
-        # Cancel all active jobs
+        # Cancel all active jobs (sets cancel event / token.cancel())
         self.cancel_all()
-
-        # For subprocess workers with ProcessCancellationToken, explicitly
-        # trigger the escalation chain (event -> SIGTERM -> SIGKILL).
-        with self._job_lock:
-            active_tokens = list(self._active_jobs.values())
-        for token in active_tokens:
-            if hasattr(token, "event"):
-                # ProcessCancellationToken -- signal the child process
-                token.cancel()
 
         # Also clear any queued-but-not-yet-started runnables so they
         # never begin execution.
         self._pool.clear()
 
-        # Wait for completion if requested
+        # For subprocess workers, directly terminate child processes.
+        # JIT-compiled code cannot respond to Python-level cancellation,
+        # so we must SIGTERM → SIGKILL the child process.
+        with self._job_lock:
+            subprocess_workers = [
+                w for w in self._active_workers.values()
+                if hasattr(w, "_process") and w._process is not None
+            ]
+
+        for worker in subprocess_workers:
+            proc = worker._process
+            try:
+                if proc.is_alive():
+                    logger.debug("Terminating subprocess worker during shutdown")
+                    proc.terminate()
+            except (ValueError, OSError):
+                pass  # Already closed or dead
+
+        # Brief wait for SIGTERM to take effect
+        if subprocess_workers:
+            import time as _time
+            _time.sleep(min(2.0, timeout_ms / 1000.0))
+
+        # SIGKILL any survivors
+        for worker in subprocess_workers:
+            proc = worker._process
+            try:
+                if proc.is_alive():
+                    logger.debug("Killing unresponsive subprocess worker")
+                    proc.kill()
+                    proc.join(timeout=1.0)
+            except (ValueError, OSError):
+                pass  # Already closed or dead
+
+        # Wait for QThreadPool threads (adapter threads exit quickly
+        # once the child process is dead).
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
@@ -413,6 +441,7 @@ class WorkerPool(QObject):
         # Clear active jobs
         with self._job_lock:
             self._active_jobs.clear()
+            self._active_workers.clear()
             self._job_signals.clear()
             self._job_start_times.clear()
 
@@ -468,6 +497,7 @@ class WorkerPool(QObject):
         with self._job_lock:
             if job_id in self._active_jobs:
                 del self._active_jobs[job_id]
+            self._active_workers.pop(job_id, None)
             self._job_signals.pop(job_id, None)
             self._job_start_times.pop(job_id, None)
             remaining_jobs = len(self._active_jobs)
