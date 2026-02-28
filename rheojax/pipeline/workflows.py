@@ -308,6 +308,81 @@ class MastercurvePipeline(Pipeline):
         return self.shift_factors.copy()
 
 
+def _fit_model_in_subprocess(
+    model_name: str,
+    x_data,
+    y_data,
+    fit_kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    """Fit a single model in an isolated subprocess.
+
+    Module-level function required for pickling on spawn context.
+    Returns a serializable dict of results (no JAX arrays).
+    """
+    import numpy as np
+
+    from rheojax.core.jax_config import safe_import_jax
+
+    safe_import_jax()
+    from rheojax.models import _ensure_all_registered
+
+    _ensure_all_registered()
+    from rheojax.core.registry import ModelRegistry
+
+    try:
+        model = ModelRegistry.create(model_name)
+        model.fit(x_data, y_data, **fit_kwargs)
+        y_pred = model.predict(x_data)
+
+        # Handle complex/2D predictions
+        if np.iscomplexobj(y_pred):
+            y_pred_mag = np.abs(y_pred)
+        elif y_pred.ndim == 2 and y_pred.shape[1] == 2:
+            y_pred_mag = np.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
+        else:
+            y_pred_mag = y_pred
+
+        y_for_res = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
+        residuals = y_for_res - y_pred_mag
+        rmse = float(np.sqrt(np.mean(residuals**2)))
+
+        ss_res = float(np.sum(residuals**2))
+        y_for_ss = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
+        ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+        r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+        n = len(y_data)
+        k = len(model.parameters) if hasattr(model, "parameters") else 0
+        rss = np.sum(residuals**2)
+        if n > 0 and rss > 0:
+            aic = float(2 * k + n * np.log(rss / n))
+            bic = float(k * np.log(n) + n * np.log(rss / n))
+        elif n > 0:
+            aic = float("-inf")
+            bic = float("-inf")
+        else:
+            aic = float("inf")
+            bic = float("inf")
+
+        mean_abs_y = np.mean(np.abs(y_data))
+        rel_rmse = float(rmse / mean_abs_y) if mean_abs_y > 1e-15 else float("inf")
+
+        return {
+            "success": True,
+            "parameters": model.get_params(),
+            "predictions": np.asarray(y_pred_mag).tolist(),
+            "residuals": np.asarray(residuals).tolist(),
+            "rmse": rmse,
+            "rel_rmse": rel_rmse,
+            "r_squared": r_squared,
+            "n_params": k,
+            "aic": aic,
+            "bic": bic,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 class ModelComparisonPipeline(Pipeline):
     """Pipeline for comparing multiple models on the same data.
 
@@ -335,11 +410,20 @@ class ModelComparisonPipeline(Pipeline):
         self.models = models
         self.results: dict[str, dict[str, Any]] = {}
 
-    def run(self, data: RheoData, **fit_kwargs) -> ModelComparisonPipeline:
+    def run(
+        self,
+        data: RheoData,
+        parallel: bool = False,
+        n_workers: int | None = None,
+        **fit_kwargs,
+    ) -> ModelComparisonPipeline:
         """Fit multiple models and compare.
 
         Args:
             data: RheoData to fit
+            parallel: Whether to fit models in parallel subprocesses.
+                Each model gets its own process with independent JIT cache.
+            n_workers: Number of parallel workers (default: auto)
             **fit_kwargs: Additional arguments passed to fit
 
         Returns:
@@ -355,6 +439,17 @@ class ModelComparisonPipeline(Pipeline):
             data_shape=X.shape,
         )
         start_time = time.perf_counter()
+
+        if parallel and len(self.models) > 1:
+            self._run_parallel(X, y, n_workers=n_workers, **fit_kwargs)
+            total_time = time.perf_counter() - start_time
+            logger.info(
+                "Model comparison complete (parallel)",
+                n_models=len(self.models),
+                n_successful=len(self.results),
+                total_time=total_time,
+            )
+            return self
 
         for model_name in self.models:
             model_start = time.perf_counter()
@@ -475,6 +570,58 @@ class ModelComparisonPipeline(Pipeline):
             total_time=total_time,
         )
         return self
+
+    def _run_parallel(self, X, y, n_workers=None, **fit_kwargs) -> None:
+        """Run model fits in parallel subprocesses."""
+        from rheojax.parallel.config import get_default_workers
+        from rheojax.parallel.pool import PersistentProcessPool
+
+        n = n_workers or get_default_workers()
+        x_np = np.asarray(X, dtype=np.float64)
+        y_np = np.asarray(y)
+
+        with PersistentProcessPool(n_workers=n) as pool:
+            futures = {}
+            for model_name in self.models:
+                future = pool.submit(
+                    _fit_model_in_subprocess,
+                    model_name,
+                    x_np,
+                    y_np,
+                    fit_kwargs,
+                )
+                futures[model_name] = future
+
+            for model_name, future in futures.items():
+                try:
+                    result = future.result(timeout=300)
+                    if result.get("success"):
+                        self.results[model_name] = {
+                            "parameters": result["parameters"],
+                            "predictions": np.array(result["predictions"]),
+                            "residuals": np.array(result["residuals"]),
+                            "rmse": result["rmse"],
+                            "rel_rmse": result["rel_rmse"],
+                            "r_squared": result["r_squared"],
+                            "n_params": result["n_params"],
+                            "aic": result["aic"],
+                            "bic": result["bic"],
+                        }
+                        self.history.append(
+                            ("fit_compare", model_name, str(result["r_squared"]))
+                        )
+                    else:
+                        logger.error(
+                            "Parallel fit failed",
+                            model=model_name,
+                            error=result.get("error", "unknown"),
+                        )
+                except Exception as e:
+                    logger.error(
+                        "Parallel fit exception",
+                        model=model_name,
+                        error=str(e),
+                    )
 
     def get_best_model(self, metric: str = "rmse", minimize: bool = True) -> str:
         """Return name of best-fitting model.
