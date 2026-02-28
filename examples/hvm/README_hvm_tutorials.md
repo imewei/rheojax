@@ -35,7 +35,7 @@ cd examples/hvm
 jupyter notebook hvm_00_overview.ipynb
 
 # All notebooks (batch)
-uv run python scripts/run_notebooks.py --suite hvm
+uv run python scripts/run_single_notebook_96h.py examples/hvm
 ```
 
 ### Production quality (FAST_MODE=False, ~10-30 min per notebook)
