@@ -243,7 +243,7 @@ class ProcessWorkerAdapter(QRunnable):
                 msg = result_queue.get(timeout=0.25)
             except Empty:
                 # No message yet -- check if child is still running
-                if self._process is not None and not self._process.is_alive():
+                if self._process is not None and not self._proc_is_alive(self._process):
                     # Child died without sending a terminal message
                     self._drain_queue(result_queue)
                     exitcode = self._process.exitcode
@@ -316,16 +316,25 @@ class ProcessWorkerAdapter(QRunnable):
                 return
             # Ignore non-terminal messages during drain
 
+    @staticmethod
+    def _proc_is_alive(proc: mp.Process) -> bool:
+        """Check if *proc* is alive, returning False if already closed."""
+        try:
+            return proc.is_alive()
+        except ValueError:
+            # Process was already .close()'d — it's dead.
+            return False
+
     def _escalate_kill(self) -> None:
         """Escalation chain: cancel event -> SIGTERM -> SIGKILL."""
         proc = self._process
-        if proc is None or not proc.is_alive():
+        if proc is None or not self._proc_is_alive(proc):
             return
 
         # Step 1: cooperative cancellation already set via _cancel_token.cancel()
         # Wait for the process to exit on its own.
         proc.join(timeout=self._process_timeout)
-        if not proc.is_alive():
+        if not self._proc_is_alive(proc):
             return
 
         # Step 2: SIGTERM
@@ -337,7 +346,7 @@ class ProcessWorkerAdapter(QRunnable):
             except OSError:
                 return  # Process already gone
         proc.join(timeout=self._kill_timeout)
-        if not proc.is_alive():
+        if not self._proc_is_alive(proc):
             return
 
         # Step 3: SIGKILL
@@ -353,7 +362,7 @@ class ProcessWorkerAdapter(QRunnable):
         proc = self._process
         if proc is None:
             return
-        if proc.is_alive():
+        if self._proc_is_alive(proc):
             logger.warning("Process still alive in cleanup; killing")
             try:
                 proc.kill()

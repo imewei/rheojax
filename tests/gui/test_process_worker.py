@@ -65,6 +65,31 @@ def _work_fn_sleeps_long(progress_queue, cancel_event):
     time.sleep(60)
 
 
+def _work_fn_quick_result(progress_queue, cancel_event):
+    """Work function that completes immediately with a dict result."""
+    return {"done": True}
+
+
+def _work_fn_wait_for_cancel(progress_queue, cancel_event):
+    """Work function that loops until cancel event is set."""
+    import time
+
+    while not cancel_event.is_set():
+        time.sleep(0.1)
+    from rheojax.gui.jobs.cancellation import CancellationError
+
+    raise CancellationError("cancelled")
+
+
+def _work_fn_ignore_sigterm(progress_queue, cancel_event):
+    """Work function that ignores SIGTERM (tests SIGKILL escalation)."""
+    import signal
+    import time
+
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    time.sleep(300)
+
+
 class TestProcessCancellationToken:
     """ProcessCancellationToken uses mp.Event for cross-process signaling."""
 
@@ -729,3 +754,81 @@ class TestMakeBayesianWorker:
             dataset_id="test",
         )
         assert isinstance(worker, ProcessWorkerAdapter)
+
+
+def _assert_process_dead(proc):
+    """Assert a multiprocessing.Process is dead or already closed.
+
+    After ``_ensure_process_dead()`` the process object may be ``.close()``'d,
+    in which case ``.is_alive()`` raises ``ValueError: process object is closed``.
+    A closed process is dead by definition — that's the correct end state.
+    """
+    if proc is None:
+        return
+    try:
+        assert not proc.is_alive()
+    except ValueError:
+        # Process was already .close()'d — that means it's dead.
+        pass
+
+
+class TestProcessExitVerification:
+    """Verify no orphaned processes remain after worker lifecycle."""
+
+    def test_subprocess_worker_no_orphan_after_completion(self):
+        """Start worker -> let it complete -> verify no child process remains."""
+        from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+
+        adapter = ProcessWorkerAdapter(_work_fn_quick_result)
+        adapter.run()
+
+        # After run() returns, the subprocess should be gone
+        _assert_process_dead(adapter._process)
+
+    def test_subprocess_worker_no_orphan_after_cancel(self):
+        """Start long worker -> cancel -> verify child process is terminated."""
+        import threading
+
+        from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+
+        adapter = ProcessWorkerAdapter(
+            _work_fn_wait_for_cancel, process_timeout=2.0, kill_timeout=1.0
+        )
+        t = threading.Thread(target=adapter.run, daemon=True)
+        t.start()
+        time.sleep(0.5)
+
+        adapter.cancel()
+        t.join(timeout=15)
+
+        assert not t.is_alive()
+        _assert_process_dead(adapter._process)
+
+    def test_subprocess_worker_killed_after_unresponsive(self):
+        """Start unresponsive worker -> cancel -> verify SIGKILL after timeout."""
+        import threading
+
+        from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+
+        adapter = ProcessWorkerAdapter(
+            _work_fn_ignore_sigterm, process_timeout=1.0, kill_timeout=1.0
+        )
+        t = threading.Thread(target=adapter.run, daemon=True)
+        t.start()
+        time.sleep(0.5)
+
+        adapter.cancel()
+        t.join(timeout=15)
+
+        assert not t.is_alive()
+        _assert_process_dead(adapter._process)
+
+    def test_thread_fallback_mode(self):
+        """RHEOJAX_WORKER_ISOLATION=thread uses FitWorker directly."""
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = "thread"
+        try:
+            from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+            assert get_worker_isolation_mode() == "thread"
+        finally:
+            os.environ.pop("RHEOJAX_WORKER_ISOLATION", None)
