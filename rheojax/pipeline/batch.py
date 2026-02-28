@@ -78,6 +78,7 @@ class BatchPipeline:
         file_paths: Iterable[str | Path],
         format: str = "auto",
         parallel: bool = False,
+        parallel_io: bool = True,
         n_workers: int | None = None,
         **load_kwargs,
     ) -> BatchPipeline:
@@ -86,10 +87,14 @@ class BatchPipeline:
         Args:
             file_paths: List of file paths to process
             format: File format for loading
-            parallel: Whether to use parallel processing.
+            parallel: Whether to use parallel processing for the full pipeline.
                 Default False: JAX JIT cache is not thread-safe with concurrent
                 ThreadPoolExecutor. Set True only for I/O-bound pipelines without
                 JAX JIT calls (e.g., loading + simple numpy transforms).
+            parallel_io: Whether to load files in parallel using threads.
+                Default True: file I/O is thread-safe and benefits from
+                parallelism. Loading phase runs in threads, pipeline replay
+                runs sequentially.
             n_workers: Number of parallel workers (default: min(4, cpu_count))
             **load_kwargs: Additional arguments for data loading
 
@@ -182,12 +187,26 @@ class BatchPipeline:
                             f"Failed to process {file_path}: {error}", stacklevel=2
                         )
         else:
-            # Sequential processing
+            # Phase 1: Optionally pre-load files in parallel (I/O only, thread-safe)
+            preloaded: dict[Path, RheoData] = {}
+            if parallel_io and len(normalized_paths) > 1:
+                io_workers = n_workers or min(len(normalized_paths), 8)
+                preloaded = self._parallel_preload(
+                    normalized_paths,
+                    format=format,
+                    n_workers=io_workers,
+                    **load_kwargs,
+                )
+
+            # Phase 2: Sequential pipeline replay (JAX-safe)
             for file_path in normalized_paths:
                 try:
                     logger.debug("Processing file", filepath=str(file_path))
                     result, metrics = self._process_file(
-                        file_path, format=format, **load_kwargs
+                        file_path,
+                        format=format,
+                        preloaded_data=preloaded.get(file_path),
+                        **load_kwargs,
                     )
                     self.results.append((file_path, result, metrics))
                     logger.debug(
@@ -270,14 +289,63 @@ class BatchPipeline:
 
         return self.process_files(file_paths, **kwargs)
 
+    def _parallel_preload(
+        self,
+        file_paths: list[Path],
+        format: str = "auto",
+        n_workers: int = 8,
+        **load_kwargs,
+    ) -> dict[Path, RheoData]:
+        """Pre-load files in parallel using threads (I/O only, thread-safe).
+
+        Returns a dict mapping file_path -> RheoData for successfully loaded files.
+        Failures are logged but do not raise (handled later in _process_file).
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from rheojax.io import auto_load
+
+        loaded: dict[Path, RheoData] = {}
+
+        def _load_one(fp: Path) -> tuple[Path, RheoData | None, Exception | None]:
+            try:
+                data = auto_load(fp, format=format, **load_kwargs)
+                return (fp, data, None)
+            except Exception as e:
+                return (fp, None, e)
+
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_load_one, fp): fp for fp in file_paths}
+            for future in as_completed(futures):
+                fp, data, err = future.result()
+                if err is None and data is not None:
+                    loaded[fp] = data
+                elif err is not None:
+                    logger.debug(
+                        "Parallel preload failed for file",
+                        filepath=str(fp),
+                        error=str(err),
+                    )
+
+        logger.debug(
+            "Parallel preload completed",
+            n_loaded=len(loaded),
+            n_total=len(file_paths),
+        )
+        return loaded
+
     def _process_file(
-        self, file_path: Path, format: str = "auto", **load_kwargs
+        self,
+        file_path: Path,
+        format: str = "auto",
+        preloaded_data: RheoData | None = None,
+        **load_kwargs,
     ) -> tuple[RheoData, dict[str, Any]]:
         """Process single file with pipeline.
 
         Args:
             file_path: Path to file
             format: File format
+            preloaded_data: Pre-loaded RheoData (skips I/O if provided)
             **load_kwargs: Additional load arguments
 
         Returns:
@@ -293,9 +361,12 @@ class BatchPipeline:
         pipeline.steps = []
         pipeline._last_model = None
 
-        # Load data
-        with log_pipeline_stage(logger, "load", filepath=str(path)):
-            pipeline.load(path, format=format, **load_kwargs)
+        # Load data — use preloaded_data if available (from parallel I/O phase)
+        if preloaded_data is not None:
+            pipeline.data = preloaded_data
+        else:
+            with log_pipeline_stage(logger, "load", filepath=str(path)):
+                pipeline.load(path, format=format, **load_kwargs)
 
         # R12-E-006: pre-initialize metrics so transform replay errors can be
         # recorded inside the loop below before fit metrics are appended.
