@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 _SHUTDOWN = None
 
 
+def _warmup_jax(_unused=None):
+    """Pre-import JAX and register models in a worker process.
+
+    This triggers JIT compilation of common kernels so subsequent
+    tasks start faster.
+    """
+    from rheojax.core.jax_config import safe_import_jax
+
+    safe_import_jax()
+    from rheojax.models import _ensure_all_registered
+
+    _ensure_all_registered()
+    return True
+
+
 def _worker_loop(
     task_queue: mp.Queue,
     result_queue: mp.Queue,
@@ -125,6 +140,18 @@ class PersistentProcessPool:
         self._result_thread.start()
 
         logger.debug("PersistentProcessPool started with %d workers", self._n_workers)
+
+        # Optionally warm up workers with JAX + model registry imports
+        if warm_pool:
+            warmup_futures = []
+            for _ in range(self._n_workers):
+                warmup_futures.append(self.submit(_warmup_jax))
+            for f in warmup_futures:
+                try:
+                    f.result(timeout=120)
+                except Exception as e:
+                    logger.warning("Worker warmup failed: %s", e)
+            logger.debug("Worker warmup completed")
 
     @property
     def n_workers(self) -> int:
