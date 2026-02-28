@@ -65,6 +65,7 @@ class MastercurvePipeline(Pipeline):
         file_paths: list[str],
         temperatures: list[float],
         format: str = "auto",
+        parallel_io: bool = True,
         **load_kwargs,
     ) -> MastercurvePipeline:
         """Execute mastercurve workflow.
@@ -73,6 +74,7 @@ class MastercurvePipeline(Pipeline):
             file_paths: List of data file paths (one per temperature)
             temperatures: List of temperatures (in Kelvin)
             format: File format for loading
+            parallel_io: Whether to load files in parallel (default True)
             **load_kwargs: Additional arguments passed to load (e.g., x_col, y_col)
 
         Returns:
@@ -94,7 +96,45 @@ class MastercurvePipeline(Pipeline):
         )
         start_time = time.perf_counter()
 
-        # Load all datasets
+        # Load all datasets (optionally in parallel)
+        if parallel_io and len(file_paths) > 1:
+            datasets = self._load_datasets_parallel(
+                file_paths, format=format, **load_kwargs
+            )
+        else:
+            datasets = self._load_datasets_sequential(
+                file_paths, temperatures, format=format, **load_kwargs
+            )
+
+        # Merge datasets with temperature metadata
+        merged_data = self._merge_datasets(datasets, temperatures)
+
+        # Apply mastercurve transform if available
+        # For now, we'll implement a simple version
+        self.data = merged_data
+        self._apply_mastercurve_shift()
+
+        self.history.append(
+            ("mastercurve", str(len(file_paths)), str(self.reference_temp))
+        )
+
+        total_time = time.perf_counter() - start_time
+        logger.info(
+            "Mastercurve construction complete",
+            n_datasets=len(file_paths),
+            n_shift_factors=len(self.shift_factors),
+            total_time=total_time,
+        )
+        return self
+
+    def _load_datasets_sequential(
+        self,
+        file_paths: list[str],
+        temperatures: list[float],
+        format: str = "auto",
+        **load_kwargs,
+    ) -> list[RheoData]:
+        """Load datasets sequentially."""
         datasets = []
         for i, file_path in enumerate(file_paths):
             dataset_start = time.perf_counter()
@@ -119,27 +159,45 @@ class MastercurvePipeline(Pipeline):
                     exc_info=True,
                 )
                 raise
+        return datasets
 
-        # Merge datasets with temperature metadata
-        merged_data = self._merge_datasets(datasets, temperatures)
+    def _load_datasets_parallel(
+        self,
+        file_paths: list[str],
+        format: str = "auto",
+        **load_kwargs,
+    ) -> list[RheoData]:
+        """Load datasets in parallel using threads (I/O-safe)."""
+        from concurrent.futures import ThreadPoolExecutor
 
-        # Apply mastercurve transform if available
-        # For now, we'll implement a simple version
-        self.data = merged_data
-        self._apply_mastercurve_shift()
+        def _load_one(file_path: str) -> RheoData:
+            temp_pipeline = Pipeline()
+            temp_pipeline.load(file_path, format=format, **load_kwargs)
+            return temp_pipeline.get_result()
 
-        self.history.append(
-            ("mastercurve", str(len(file_paths)), str(self.reference_temp))
-        )
-
-        total_time = time.perf_counter() - start_time
-        logger.info(
-            "Mastercurve construction complete",
-            n_datasets=len(file_paths),
-            n_shift_factors=len(self.shift_factors),
-            total_time=total_time,
-        )
-        return self
+        n_workers = min(len(file_paths), 8)
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
+            futures = [executor.submit(_load_one, fp) for fp in file_paths]
+            datasets = []
+            for i, future in enumerate(futures):
+                try:
+                    data = future.result()
+                    datasets.append(data)
+                    logger.debug(
+                        "Dataset loaded (parallel)",
+                        dataset=i,
+                        file_path=file_paths[i],
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to load dataset",
+                        dataset=i,
+                        file_path=file_paths[i],
+                        error=str(e),
+                        exc_info=True,
+                    )
+                    raise
+        return datasets
 
     def _merge_datasets(
         self, datasets: list[RheoData], temperatures: list[float]
