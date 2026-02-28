@@ -667,7 +667,7 @@ clean-test:
 		-not -path "./.specify/*" \
 		-not -path "./agent-os/*" \
 		-exec rm -rf {} + 2>/dev/null || true
-	rm -rf .coverage
+	rm -f .coverage*
 	rm -rf coverage.xml
 
 clean: clean-build clean-pyc clean-test
