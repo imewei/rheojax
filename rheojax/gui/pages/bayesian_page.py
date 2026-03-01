@@ -1105,7 +1105,20 @@ class BayesianPage(QWidget):
                 inference_data=getattr(result, "inference_data", None),
                 diagnostics_valid=bool(getattr(result, "diagnostics_valid", True)),
             )
-        # R11-BP-001: Store dispatch handled by main_window._on_job_completed
+        # R13-BP-001: Dispatch STORE_BAYESIAN_RESULT directly so the result
+        # is persisted to the StateStore.  BayesianPage owns the Bayesian job
+        # lifecycle (submitted via _worker_pool.submit without registering the
+        # job type), so main_window._on_job_completed never reaches the
+        # "bayesian" branch.  Without this dispatch, DiagnosticsPage,
+        # ExportPage, and project save all miss the Bayesian result.
+        self._store.dispatch(
+            "STORE_BAYESIAN_RESULT",
+            {
+                "result": result,
+                "dataset_id": str(getattr(result, "dataset_id", "")),
+                "model_name": str(getattr(result, "model_name", "")),
+            },
+        )
 
         # Update diagnostics display
         self._update_diagnostics(result)

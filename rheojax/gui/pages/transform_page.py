@@ -894,13 +894,16 @@ class TransformPage(QWidget):
             return
 
         # Update "Before" canvas with original data
+        # R13-TP-001: DatasetState uses x_data/y_data (not .x/.y which are
+        # RheoData attributes).  Extract x_units/y_units from metadata.
         try:
+            meta = getattr(dataset, "metadata", {}) or {}
             self._before_canvas.plot(
-                dataset.x,
-                dataset.y,
+                dataset.x_data,
+                dataset.y_data,
                 label="Original",
-                xlabel=dataset.x_units or "x",
-                ylabel=dataset.y_units or "y",
+                xlabel=meta.get("x_units", "x"),
+                ylabel=meta.get("y_units", "y"),
                 title="Before Transform",
             )
             logger.debug(

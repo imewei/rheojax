@@ -972,7 +972,11 @@ class DataPage(QWidget):
                     "x_data": x_np,
                     "y_data": (np.real(y_np) if is_complex else y_np),
                     "y2_data": (np.imag(y_np) if is_complex else None),
-                    "metadata": getattr(rheo_data, "metadata", {}),
+                    "metadata": {
+                        **(getattr(rheo_data, "metadata", None) or {}),
+                        "x_units": getattr(rheo_data, "x_units", None),
+                        "y_units": getattr(rheo_data, "y_units", None),
+                    },
                 },
             )
 
@@ -986,7 +990,8 @@ class DataPage(QWidget):
             filepath=str(self._current_file_path),
             dataset_count=len(datasets),
             record_count=sum(
-                len(ds.x_data) if ds.x_data is not None else 0 for ds in datasets
+                getattr(ds.x, "shape", (0,))[0] if ds.x is not None else 0
+                for ds in datasets
             ),
             page="DataPage",
         )
