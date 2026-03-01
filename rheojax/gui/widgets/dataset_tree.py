@@ -397,10 +397,15 @@ class DatasetTree(QTreeWidget):
         # Show menu and emit signal
         action = menu.exec(self.viewport().mapToGlobal(position))
         if action:
+            action_text = action.text()
             logger.debug(
                 "User interaction",
                 widget=self.__class__.__name__,
                 action="context_menu_action",
-                menu_action=action.text(),
+                menu_action=action_text,
             )
+            # F-GUI-009 fix: emit the action name so subscribers can route to
+            # the correct handler (e.g. "Remove", "Rename...", "Export Data...").
+            self.context_action_triggered.emit(action_text)
+            # Legacy positional signal preserved for backward compatibility.
             self.context_menu_requested.emit(position)

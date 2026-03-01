@@ -737,8 +737,31 @@ class RheoJAXMainWindow(QMainWindow):
             )
 
             if reply == QMessageBox.StandardButton.Save:
-                self._on_save_file()
-                event.accept()
+                # GUI-P1-003 fix: only accept if save succeeds.  _on_save_file
+                # returns True when the save completes (or no changes needed)
+                # and False when the save is not implemented / failed.
+                saved = self._on_save_file()
+                if saved:
+                    event.accept()
+                else:
+                    # Save failed or not implemented — give the user a second
+                    # chance to explicitly discard or cancel, so data is never
+                    # silently lost.
+                    discard_reply = QMessageBox.question(
+                        self,
+                        "Save Failed",
+                        "Save could not be completed.\n\n"
+                        "Discard unsaved changes and close anyway?",
+                        QMessageBox.StandardButton.Discard
+                        | QMessageBox.StandardButton.Cancel,
+                        QMessageBox.StandardButton.Cancel,
+                    )
+                    if discard_reply == QMessageBox.StandardButton.Discard:
+                        event.accept()
+                    else:
+                        logger.debug("Shutdown cancelled after failed save")
+                        event.ignore()
+                        return
             elif reply == QMessageBox.StandardButton.Discard:
                 event.accept()
             else:
@@ -902,16 +925,27 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message(f"Opened: {file_path}", 3000)
 
     @Slot()
-    def _on_save_file(self) -> None:
-        """Handle save file action."""
+    def _on_save_file(self) -> bool:
+        """Handle save file action.
+
+        Returns
+        -------
+        bool
+            True if the save succeeded (or there was nothing to save),
+            False if the save could not be completed.  Callers should check
+            this return value before accepting a close event to prevent
+            silent data loss (GUI-P1-003).
+        """
         logger.debug("Save file action triggered")
 
         if not self._has_unsaved_changes:
             self.status_bar.show_message("No unsaved changes", 2000)
-            return
+            return True  # Nothing to save — treat as success
 
         # TODO: Implement project serialization (state → JSON/HDF5).
-        # For now, warn the user that save is not yet implemented.
+        # For now, inform the user that save is not yet implemented and
+        # return False so that closeEvent can offer an explicit Discard option
+        # rather than silently accepting the close (GUI-P1-003 fix).
         from rheojax.gui.compat import QMessageBox
 
         QMessageBox.information(
@@ -921,6 +955,7 @@ class RheoJAXMainWindow(QMainWindow):
             "Use 'Export Results' from the Bayesian or Fit tabs to save individual results.",
         )
         logger.warning("Save file action: not yet implemented")
+        return False
 
     @Slot()
     def _on_save_as(self) -> None:

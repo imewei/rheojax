@@ -634,21 +634,28 @@ class ExportPage(QWidget):
         self.export_requested.emit(config)
 
     def _perform_export(self, config: dict[str, Any]) -> None:
-        """Perform the actual export operation.
+        """Perform the actual export operation in a background thread.
+
+        GUI-P1-004 fix: all file I/O and figure generation now runs in an
+        ExportWorker so the Qt main thread stays responsive during long exports
+        (e.g., >10 figures or multi-GB HDF5 files).  A QProgressDialog with
+        indeterminate range is shown on the main thread; the worker emits
+        progress signals that update it via QueuedConnection.
 
         Parameters
         ----------
         config : dict
             Export configuration
         """
-        # TODO(perf): Move figure generation and file I/O into ExportWorker.
-        # Currently blocks main thread — processEvents() mitigates but doesn't
-        # prevent ANR on large exports (>10 figures).
+        from rheojax.gui.compat import QThreadPool
+        from rheojax.gui.jobs.export_worker import ExportWorker
+        from PySide6.QtCore import Qt as _Qt
+
         state = self._store.get_state()
         output_dir = config["output_dir"]
         data_format = config["data_format"]
         logger.debug(
-            "Export operation started",
+            "Export operation started (background)",
             output_dir=str(output_dir),
             data_format=data_format,
             num_datasets=len(getattr(state, "datasets", {}) or {}),
@@ -657,65 +664,64 @@ class ExportPage(QWidget):
             page="ExportPage",
         )
 
-        # Create progress dialog
-        progress = QProgressDialog("Exporting...", "Cancel", 0, 100, self)
+        # Disable export button to prevent double-submit.
+        export_btn = getattr(self, "_export_button", None)
+        if export_btn is not None:
+            export_btn.setEnabled(False)
+
+        # Indeterminate progress dialog (range 0, 0 = busy spinner).
+        progress = QProgressDialog("Exporting...", "Cancel", 0, 0, self)
         progress.setWindowTitle("Export Progress")
         progress.setMinimumDuration(500)
-        progress.setValue(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
 
-        try:
-            exported_files = []
-            total_steps = sum(
-                [
-                    config["include_parameters"],
-                    config["include_intervals"],
-                    config["include_posteriors"],
-                    config["include_figures"],
-                    config["include_diagnostics"],
-                    config["include_raw_data"],
-                    config["include_metadata"],
-                    config["template"] != "None",
-                ]
-            )
-            total_steps = max(total_steps, 1)
-            # NOTE: Progress granularity is per-category (not per-file).
-            # Single-category exports show 100% immediately after completion.
-            current_step = 0
-            active_id = (
-                state.active_dataset_id
-            )  # Moved here — used by all export branches
+        # Capture service references for the closure (avoids self-reference
+        # threading issues — services are thread-safe for read operations).
+        export_service = self._export_service
+        plot_service = self._plot_service
+        dataset_to_rheodata = self._dataset_to_rheodata
 
-            # Export parameters (filtered to active dataset)
+        def _run_export(progress_emit: Any) -> list[str]:
+            """All blocking work runs here — called from ExportWorker thread."""
+            import json
+            import threading
+
+            exported_files: list[str] = []
+            # Simple cancellation flag checked between stages.
+            _cancelled = threading.Event()
+            active_id = state.active_dataset_id
+
+            def _maybe_cancel() -> bool:
+                return _cancelled.is_set()
+
+            # -- Parameters ---------------------------------------------------
             if config["include_parameters"] and state.fit_results:
-                progress.setLabelText("Exporting parameters...")
+                progress_emit(10, "Exporting parameters...")
                 for result_id, result in state.fit_results.items():
+                    if _maybe_cancel():
+                        return exported_files
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
                     if active_id and dataset_id_of_result != active_id:
                         continue
                     filepath = output_dir / f"parameters_{result_id}.{data_format}"
-                    self._export_service.export_parameters(
-                        result, filepath, data_format
-                    )
+                    export_service.export_parameters(result, filepath, data_format)
                     exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Export credible intervals (filtered to active dataset)
+            # -- Credible intervals -------------------------------------------
             if config["include_intervals"] and state.bayesian_results:
-                progress.setLabelText("Exporting credible intervals...")
+                progress_emit(20, "Exporting credible intervals...")
                 for result_id, result in state.bayesian_results.items():
+                    if _maybe_cancel():
+                        return exported_files
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
                     if active_id and dataset_id_of_result != active_id:
                         continue
-                    # Export intervals as parameters-like structure
                     intervals = getattr(result, "credible_intervals", None)
                     if intervals:
-                        import json
-
                         json_filepath = (
                             output_dir / f"credible_intervals_{result_id}.json"
                         )
@@ -726,18 +732,16 @@ class ExportPage(QWidget):
                         with open(json_filepath, "w") as f:
                             json.dump(intervals_dict, f, indent=2)
                         exported_files.append(str(json_filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Export posterior samples (filtered to active dataset)
+            # -- Posterior samples --------------------------------------------
             if config["include_posteriors"] and state.bayesian_results:
-                progress.setLabelText("Exporting posterior samples...")
+                progress_emit(30, "Exporting posterior samples...")
                 for result_id, result in state.bayesian_results.items():
-                    # R11-EXP-003: Skip results without posterior samples
+                    if _maybe_cancel():
+                        return exported_files
                     if not getattr(result, "posterior_samples", None):
                         continue
                     dataset_id_of_result = getattr(result, "dataset_id", result_id)
@@ -746,18 +750,15 @@ class ExportPage(QWidget):
                     filepath = (
                         output_dir / f"posterior_samples_{result_id}.{data_format}"
                     )
-                    self._export_service.export_posterior(result, filepath, data_format)
+                    export_service.export_posterior(result, filepath, data_format)
                     exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Export figures
+            # -- Figures ------------------------------------------------------
             if config["include_figures"]:
-                progress.setLabelText("Exporting figures...")
+                progress_emit(40, "Exporting figures...")
                 figures_dir = output_dir / "figures"
                 figures_dir.mkdir(exist_ok=True)
 
@@ -765,15 +766,14 @@ class ExportPage(QWidget):
                 fig_dpi = config.get("dpi", 300)
                 fig_style = config.get("style", "default")
 
-                # Export fit plots for each dataset/result pair
                 for result_id, fit_result in state.fit_results.items():
-                    # Find associated dataset
+                    if _maybe_cancel():
+                        return exported_files
                     dataset = None
                     dataset_id = getattr(fit_result, "dataset_id", None)
                     if dataset_id and dataset_id in state.datasets:
                         dataset = state.datasets[dataset_id]
                     elif state.datasets:
-                        # Fall back to first dataset if no specific association
                         dataset = next(iter(state.datasets.values()))
 
                     if (
@@ -782,131 +782,79 @@ class ExportPage(QWidget):
                         and dataset.y_data is not None
                     ):
                         try:
-                            rheo_data = self._dataset_to_rheodata(dataset)
-
-                            # Create and export fit plot
-                            fit_fig = self._plot_service.create_fit_plot(
+                            rheo_data = dataset_to_rheodata(dataset)
+                            fit_fig = plot_service.create_fit_plot(
                                 rheo_data,
                                 fit_result,
                                 style=fig_style,
                                 test_mode=dataset.test_mode,
                             )
-                            fit_path = (
-                                figures_dir / f"fit_plot_{result_id}.{fig_format}"
-                            )
-                            self._export_service.export_figure(
-                                fit_fig, fit_path, dpi=fig_dpi
-                            )
+                            fit_path = figures_dir / f"fit_plot_{result_id}.{fig_format}"
+                            export_service.export_figure(fit_fig, fit_path, dpi=fig_dpi)
                             exported_files.append(str(fit_path))
-                            # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                             fit_fig.clf()
                             del fit_fig
-                            QApplication.processEvents()
-                            if progress.wasCanceled():
-                                return
 
-                            # Create and export residuals plot
-                            residuals_fig = self._plot_service.create_residual_plot(
+                            if _maybe_cancel():
+                                return exported_files
+
+                            residuals_fig = plot_service.create_residual_plot(
                                 rheo_data, fit_result, style=fig_style
                             )
                             residuals_path = (
                                 figures_dir / f"residuals_{result_id}.{fig_format}"
                             )
-                            self._export_service.export_figure(
+                            export_service.export_figure(
                                 residuals_fig, residuals_path, dpi=fig_dpi
                             )
                             exported_files.append(str(residuals_path))
-                            # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
                             residuals_fig.clf()
                             del residuals_fig
-                            QApplication.processEvents()
-                            if progress.wasCanceled():
-                                return
-
-                        except Exception as e:
+                        except Exception as exc:
                             logger.warning(
-                                f"Failed to export fit plots for {result_id}: {e}"
+                                f"Failed to export fit plots for {result_id}: {exc}"
                             )
 
-                # Export Bayesian diagnostic plots
                 for result_id, bayes_result in state.bayesian_results.items():
-                    # R11-EXP-003: Skip results without posterior samples
+                    if _maybe_cancel():
+                        return exported_files
                     if not getattr(bayes_result, "posterior_samples", None):
                         continue
                     try:
-                        # Trace plot
-                        trace_fig = self._plot_service.create_arviz_plot(
-                            bayes_result, plot_type="trace", style=fig_style
-                        )
-                        trace_path = figures_dir / f"trace_{result_id}.{fig_format}"
-                        self._export_service.export_figure(
-                            trace_fig, trace_path, dpi=fig_dpi
-                        )
-                        exported_files.append(str(trace_path))
-                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
-                        trace_fig.clf()
-                        del trace_fig
-                        QApplication.processEvents()
-                        if progress.wasCanceled():
-                            return
-
-                        # Forest plot
-                        forest_fig = self._plot_service.create_arviz_plot(
-                            bayes_result, plot_type="forest", style=fig_style
-                        )
-                        forest_path = figures_dir / f"forest_{result_id}.{fig_format}"
-                        self._export_service.export_figure(
-                            forest_fig, forest_path, dpi=fig_dpi
-                        )
-                        exported_files.append(str(forest_path))
-                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
-                        forest_fig.clf()
-                        del forest_fig
-                        QApplication.processEvents()
-                        if progress.wasCanceled():
-                            return
-
-                        # Pair plot
-                        pair_fig = self._plot_service.create_arviz_plot(
-                            bayes_result, plot_type="pair", style=fig_style
-                        )
-                        pair_path = figures_dir / f"pair_{result_id}.{fig_format}"
-                        self._export_service.export_figure(
-                            pair_fig, pair_path, dpi=fig_dpi
-                        )
-                        exported_files.append(str(pair_path))
-                        # R11-EXP-001: non-pyplot Figure — plt.close() is a no-op
-                        pair_fig.clf()
-                        del pair_fig
-                        QApplication.processEvents()
-                        if progress.wasCanceled():
-                            return
-
-                    except Exception as e:
+                        for plot_type in ("trace", "forest", "pair"):
+                            if _maybe_cancel():
+                                return exported_files
+                            fig = plot_service.create_arviz_plot(
+                                bayes_result, plot_type=plot_type, style=fig_style
+                            )
+                            fig_path = (
+                                figures_dir / f"{plot_type}_{result_id}.{fig_format}"
+                            )
+                            export_service.export_figure(fig, fig_path, dpi=fig_dpi)
+                            exported_files.append(str(fig_path))
+                            fig.clf()
+                            del fig
+                    except Exception as exc:
                         logger.warning(
-                            f"Failed to export Bayesian plots for {result_id}: {e}"
+                            f"Failed to export Bayesian plots for {result_id}: {exc}"
                         )
 
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
+            if _maybe_cancel():
+                return exported_files
 
-            if progress.wasCanceled():
-                return
-
-            # Export diagnostics
+            # -- Diagnostics --------------------------------------------------
             if config["include_diagnostics"] and state.bayesian_results:
-                progress.setLabelText("Exporting diagnostics...")
-                import json
+                progress_emit(70, "Exporting diagnostics...")
 
-                def _json_safe_dict(d):
-                    """Convert numpy scalars to Python floats for JSON serialization."""
+                def _json_safe_dict(d: Any) -> Any:
                     if not isinstance(d, dict):
                         return float(d) if hasattr(d, "item") else d
                     return {k: _json_safe_dict(v) for k, v in d.items()}
 
                 for result_id, result in state.bayesian_results.items():
+                    if _maybe_cancel():
+                        return exported_files
                     filepath = output_dir / f"diagnostics_{result_id}.json"
-                    # GUI-R6-006: Convert numpy.float64 to float for JSON
                     diagnostics = {
                         "r_hat": _json_safe_dict(result.r_hat),
                         "ess": _json_safe_dict(result.ess),
@@ -921,35 +869,30 @@ class ExportPage(QWidget):
                     with open(filepath, "w") as f:
                         json.dump(diagnostics, f, indent=2)
                     exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Export raw data
+            # -- Raw data -----------------------------------------------------
             if config["include_raw_data"] and state.datasets:
-                progress.setLabelText("Exporting raw data...")
+                progress_emit(80, "Exporting raw data...")
                 for dataset_id, dataset in state.datasets.items():
+                    if _maybe_cancel():
+                        return exported_files
                     if dataset.x_data is not None and dataset.y_data is not None:
                         filepath = output_dir / f"data_{dataset_id}.{data_format}"
-                        rheojax = self._dataset_to_rheodata(dataset)
-                        self._export_service.export_data(rheojax, filepath, data_format)
+                        rheojax = dataset_to_rheodata(dataset)
+                        export_service.export_data(rheojax, filepath, data_format)
                         exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Export metadata
+            # -- Metadata -----------------------------------------------------
             if config["include_metadata"]:
-                progress.setLabelText("Exporting metadata...")
                 import datetime
-                import json
 
+                progress_emit(90, "Exporting metadata...")
                 metadata = {
                     "export_timestamp": datetime.datetime.now().isoformat(),
                     "project_name": state.project_name,
@@ -962,25 +905,19 @@ class ExportPage(QWidget):
                 with open(filepath, "w") as f:
                     json.dump(metadata, f, indent=2)
                 exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(int(current_step / total_steps * 100))
-                QApplication.processEvents()
 
-            if progress.wasCanceled():
-                return
+            if _maybe_cancel():
+                return exported_files
 
-            # Generate report
+            # -- Report -------------------------------------------------------
             if config["template"] != "None":
-                progress.setLabelText("Generating report...")
+                progress_emit(95, "Generating report...")
                 template_type = "summary"
                 if "bayesian" in config["template"].lower():
                     template_type = "bayesian"
-
                 report_ext = "md" if "markdown" in config["template"].lower() else "pdf"
                 filepath = output_dir / f"report.{report_ext}"
-
-                # Build state dict for report
-                report_state = {
+                report_state: dict[str, Any] = {
                     "model_name": state.active_model_name,
                     "test_mode": (
                         state.datasets[list(state.datasets.keys())[0]].metadata.get(
@@ -990,49 +927,36 @@ class ExportPage(QWidget):
                         else None
                     ),
                 }
-
-                # Add parameters from latest fit
                 if state.fit_results:
-                    # NOTE: Using last-inserted dict entry as "latest" result.
-                    # This works because Python 3.7+ dicts preserve insertion order,
-                    # and results are always appended (never re-inserted).
                     latest_fit = list(state.fit_results.values())[-1]
                     report_state["parameters"] = latest_fit.parameters
-
-                # Add diagnostics from latest Bayesian result
                 if state.bayesian_results:
-                    # NOTE: Using last-inserted dict entry as "latest" result.
-                    # This works because Python 3.7+ dicts preserve insertion order,
-                    # and results are always appended (never re-inserted).
                     latest_bayes = list(state.bayesian_results.values())[-1]
                     report_state["diagnostics"] = {
                         "r_hat": latest_bayes.r_hat,
                         "ess": latest_bayes.ess,
                     }
-
-                self._export_service.generate_report(
-                    report_state, template_type, filepath
-                )
+                export_service.generate_report(report_state, template_type, filepath)
                 exported_files.append(str(filepath))
-                current_step += 1
-                progress.setValue(100)
 
+            progress_emit(100, "Export complete")
+            return exported_files
+
+        # ---- Wire up completion/failure callbacks (run on GUI thread) -------
+        def _on_completed(exported_files: list[str]) -> None:
             progress.close()
-
-            # Calculate total file size
-            total_size = 0
-            for file_str in exported_files:
-                file_path = Path(file_str)
-                if file_path.exists():
-                    total_size += file_path.stat().st_size
-
-            # Show success message
+            if export_btn is not None:
+                export_btn.setEnabled(True)
+            total_size = sum(
+                Path(f).stat().st_size
+                for f in exported_files
+                if Path(f).exists()
+            )
             QMessageBox.information(
                 self,
                 "Export Complete",
                 f"Successfully exported {len(exported_files)} files to:\n{output_dir}",
             )
-
             self.export_completed.emit(str(output_dir))
             logger.info(
                 "Export completed",
@@ -1041,12 +965,25 @@ class ExportPage(QWidget):
                 output_dir=str(output_dir),
             )
 
-        except Exception as e:
+        def _on_failed(error_msg: str) -> None:
             progress.close()
-            error_msg = f"Export failed: {e}"
-            QMessageBox.critical(self, "Export Error", error_msg)
-            self.export_failed.emit(error_msg)
-            logger.error(error_msg, exc_info=True)
+            if export_btn is not None:
+                export_btn.setEnabled(True)
+            full_msg = f"Export failed: {error_msg}"
+            QMessageBox.critical(self, "Export Error", full_msg)
+            self.export_failed.emit(full_msg)
+            logger.error(full_msg)
+
+        # ---- Launch worker --------------------------------------------------
+        worker = ExportWorker(export_fn=_run_export)
+        worker.signals.progress.connect(
+            lambda pct, label: progress.setLabelText(label),
+            _Qt.ConnectionType.QueuedConnection,
+        )
+        worker.signals.completed.connect(_on_completed, _Qt.ConnectionType.QueuedConnection)
+        worker.signals.failed.connect(_on_failed, _Qt.ConnectionType.QueuedConnection)
+        progress.canceled.connect(lambda: progress.close())
+        QThreadPool.globalInstance().start(worker)
 
     def export_results(
         self,

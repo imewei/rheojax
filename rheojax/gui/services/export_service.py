@@ -355,23 +355,53 @@ class ExportService:
             elif format in ["xlsx", "xls"]:
                 import pandas as pd
 
-                # Flatten samples to 2D
-                data = {
-                    k: v.flatten() if v.ndim > 1 else v
-                    for k, v in posterior_samples.items()
-                }
-                df = pd.DataFrame(data)
+                # F-GUI-012 fix: preserve multi-chain structure by adding
+                # "chain" and "draw" index columns when arrays are 2D
+                # (num_chains, num_samples) instead of flattening them,
+                # which loses chain identity and breaks per-chain diagnostics.
+                first_v = next(iter(posterior_samples.values()), None)
+                if first_v is not None and first_v.ndim == 2:
+                    num_chains, num_draws = first_v.shape
+                    rows = []
+                    for chain_idx in range(num_chains):
+                        for draw_idx in range(num_draws):
+                            row: dict[str, Any] = {"chain": chain_idx, "draw": draw_idx}
+                            row.update(
+                                {
+                                    k: float(v[chain_idx, draw_idx])
+                                    for k, v in posterior_samples.items()
+                                }
+                            )
+                            rows.append(row)
+                    df = pd.DataFrame(rows)
+                else:
+                    data = {k: v.ravel() for k, v in posterior_samples.items()}
+                    df = pd.DataFrame(data)
                 df.to_excel(path, index=False)
                 logger.debug("Wrote posterior samples to Excel")
 
             elif format == "csv":
                 import pandas as pd
 
-                data = {
-                    k: v.flatten() if v.ndim > 1 else v
-                    for k, v in posterior_samples.items()
-                }
-                df = pd.DataFrame(data)
+                # F-GUI-012 fix: same chain-preservation logic as Excel path.
+                first_v = next(iter(posterior_samples.values()), None)
+                if first_v is not None and first_v.ndim == 2:
+                    num_chains, num_draws = first_v.shape
+                    rows = []
+                    for chain_idx in range(num_chains):
+                        for draw_idx in range(num_draws):
+                            row = {"chain": chain_idx, "draw": draw_idx}
+                            row.update(
+                                {
+                                    k: float(v[chain_idx, draw_idx])
+                                    for k, v in posterior_samples.items()
+                                }
+                            )
+                            rows.append(row)
+                    df = pd.DataFrame(rows)
+                else:
+                    data = {k: v.ravel() for k, v in posterior_samples.items()}
+                    df = pd.DataFrame(data)
                 df.to_csv(path, index=False)
                 logger.debug("Wrote posterior samples to CSV")
 

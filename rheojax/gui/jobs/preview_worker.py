@@ -87,6 +87,75 @@ class PreviewWorker(QRunnable):
         self._file_path = file_path
         self._max_rows = max_rows
 
+    def _detect_file_format_background(self) -> str:
+        """F-GUI-011 fix: detect file format in the background thread.
+
+        Reads the first 2 KB of the file to identify the format.  Running
+        this here avoids blocking the Qt main thread with file I/O.
+
+        Returns
+        -------
+        str
+            Human-readable format name (e.g. 'TA Instruments TRIOS', 'CSV').
+        """
+        if not self._file_path or not self._file_path.exists():
+            return "Unknown"
+
+        suffix = self._file_path.suffix.lower()
+        name_lower = self._file_path.name.lower()
+
+        def _read_header() -> str:
+            for enc in ("utf-8", "utf-16", "latin-1"):
+                try:
+                    with open(self._file_path, encoding=enc, errors="strict") as fh:
+                        return fh.read(2000)
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+            # Fallback: replace undecodable bytes
+            with open(self._file_path, encoding="utf-8", errors="replace") as fh:
+                return fh.read(2000)
+
+        if suffix == ".txt":
+            try:
+                first_lines = _read_header()
+                if "trios" in first_lines.lower() or "[file" in first_lines.lower():
+                    return "TA Instruments TRIOS"
+                if (
+                    "rheometer" in first_lines.lower()
+                    or "rheocompass" in first_lines.lower()
+                ):
+                    return "Anton Paar RheoCompass"
+            except Exception:
+                pass
+            return "Text/CSV"
+
+        if suffix == ".csv":
+            try:
+                first_lines = _read_header()
+                if (
+                    "rheometer" in first_lines.lower()
+                    or "rheocompass" in first_lines.lower()
+                ):
+                    return "Anton Paar RheoCompass"
+                if "trios" in first_lines.lower():
+                    return "TA Instruments TRIOS CSV"
+            except Exception:
+                pass
+            return "CSV"
+
+        if suffix in {".xlsx", ".xls"}:
+            if "trios" in name_lower:
+                return "TA Instruments TRIOS Excel"
+            return "Excel"
+
+        if suffix == ".tri":
+            return "TA Instruments TRIOS Binary"
+
+        if suffix in {".rdf", ".dat"}:
+            return "Rheological Data"
+
+        return suffix.upper().lstrip(".")
+
     def run(self) -> None:
         """Execute file preview in background thread."""
         try:
@@ -105,6 +174,14 @@ class PreviewWorker(QRunnable):
                 self._file_path, max_rows=self._max_rows
             )
 
+            # F-GUI-011 fix: detect format here (in the worker thread) so that
+            # DataPage._on_preview_loaded() does not have to block the main thread
+            # on file I/O.  The result is embedded in the preview metadata dict.
+            detected_format = self._detect_file_format_background()
+            preview_result.setdefault("metadata", {})
+            if isinstance(preview_result["metadata"], dict):
+                preview_result["metadata"].setdefault("format", detected_format)
+
             n_rows = len(preview_result.get("data", []))
             headers = preview_result.get("headers", [])
             metadata = preview_result.get("metadata", {})
@@ -116,6 +193,7 @@ class PreviewWorker(QRunnable):
                 filepath=str(self._file_path),
                 n_rows_parsed=n_rows,
                 n_columns=len(headers),
+                detected_format=detected_format,
             )
             logger.debug(
                 "Preview column auto-detection result",

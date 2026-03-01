@@ -695,10 +695,10 @@ class StateStore:
         # self._state.  Subscribers that need the latest state must call
         # self.get_state() rather than relying on the snapshot argument.
         #
-        # WARNING (R12-C-001): Subscriber callbacks execute synchronously on
-        # the calling thread.  Callers from worker threads must use
-        # QueuedConnection signal relay rather than calling dispatch() or
-        # update_state() directly to ensure UI updates run on the main thread.
+        # GUI-P1-002 fix: if update_state() is called from a worker thread,
+        # defer subscriber notifications to the main Qt thread via
+        # QMetaObject.invokeMethod(QueuedConnection).  Subscriber callbacks
+        # update Qt widgets and MUST run on the main thread.
         #
         # R12-C-003: The subscriber list is captured once (above, inside the
         # lock); subscribe/unsubscribe calls during iteration take effect on
@@ -710,40 +710,73 @@ class StateStore:
         # instead of silently dropping it.  Using threading.local ensures that
         # a worker-thread dispatch does not interfere with a concurrent
         # main-thread dispatch.
-        tls = self._dispatch_tls
-        if getattr(tls, "dispatching", False):
-            # Queue nested state change for delivery after outer loop
-            if not hasattr(tls, "pending"):
-                tls.pending = []
-            tls.pending.append((subscribers, state_snapshot))
-            return
-        tls.dispatching = True
+        _on_main_thread = True
         try:
-            for subscriber in subscribers:
-                try:
-                    subscriber(state_snapshot)
-                except Exception:
-                    logger.error(
-                        "Subscriber callback failed",
-                        subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                        exc_info=True,
-                    )
-            # Drain any nested dispatches that were queued during this loop
-            while hasattr(tls, "pending") and tls.pending:
-                pending_subs, pending_snap = tls.pending.pop(0)
-                for subscriber in pending_subs:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+            _app = QApplication.instance()
+            if _app is not None and QThread.currentThread() != _app.thread():
+                _on_main_thread = False
+        except (ImportError, RuntimeError):
+            pass
+
+        if not _on_main_thread:
+            # Worker thread: defer subscriber calls to GUI thread.
+            try:
+                from PySide6.QtCore import QMetaObject, Qt
+                # M2 fix: append to deque instead of overwriting single-slot buffer
+                self._signals._pending_notifications.append(
+                    (subscribers, state_snapshot)
+                )
+                QMetaObject.invokeMethod(
+                    self._signals,
+                    "_run_subscriber_notifications",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+                # Fall through to emit_signal block below.
+            except (ImportError, RuntimeError, AttributeError) as exc:
+                logger.warning(
+                    "Failed to defer subscriber notifications to GUI thread; "
+                    "falling back to synchronous dispatch",
+                    error=str(exc),
+                )
+                _on_main_thread = True  # Fall back to synchronous path
+
+        if _on_main_thread:
+            tls = self._dispatch_tls
+            if getattr(tls, "dispatching", False):
+                # Queue nested state change for delivery after outer loop
+                if not hasattr(tls, "pending"):
+                    tls.pending = []
+                tls.pending.append((subscribers, state_snapshot))
+                return
+            tls.dispatching = True
+            try:
+                for subscriber in subscribers:
                     try:
-                        subscriber(pending_snap)
+                        subscriber(state_snapshot)
                     except Exception:
                         logger.error(
-                            "Subscriber callback failed (queued)",
+                            "Subscriber callback failed",
                             subscriber=getattr(subscriber, "__name__", str(subscriber)),
                             exc_info=True,
                         )
-        finally:
-            tls.dispatching = False
-            if hasattr(tls, "pending"):
-                tls.pending.clear()
+                # Drain any nested dispatches that were queued during this loop
+                while hasattr(tls, "pending") and tls.pending:
+                    pending_subs, pending_snap = tls.pending.pop(0)
+                    for subscriber in pending_subs:
+                        try:
+                            subscriber(pending_snap)
+                        except Exception:
+                            logger.error(
+                                "Subscriber callback failed (queued)",
+                                subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                                exc_info=True,
+                            )
+            finally:
+                tls.dispatching = False
+                if hasattr(tls, "pending"):
+                    tls.pending.clear()
 
         # Emit Qt signal via QueuedConnection to ensure delivery on the main
         # thread regardless of which thread calls update_state() (GUI-005).
@@ -1639,46 +1672,74 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # Notify subscribers outside the lock using the same TLS reentrancy guard
-        # as update_state() to prevent recursive subscriber notification when a
-        # subscriber triggers a nested dispatch on the same thread.
-        # R12-C-004: batch_update() now has the same TLS guard as update_state().
-        tls = self._dispatch_tls
-        if getattr(tls, "dispatching", False):
-            # Queue for delivery after the outer dispatch loop finishes
-            if not hasattr(tls, "pending"):
-                tls.pending = []
-            tls.pending.append((subscribers, state_snapshot))
-        else:
-            tls.dispatching = True
+        # M4 fix: mirror update_state() worker-thread deferral for batch_update().
+        # Subscriber callbacks update Qt widgets and MUST run on the main thread.
+        _on_main_thread = True
+        try:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+            _app = QApplication.instance()
+            if _app is not None and QThread.currentThread() != _app.thread():
+                _on_main_thread = False
+        except (ImportError, RuntimeError):
+            pass
+
+        if not _on_main_thread:
             try:
-                for subscriber in subscribers:
-                    try:
-                        subscriber(state_snapshot)
-                    except Exception:
-                        logger.error(
-                            "Subscriber callback failed during batch update",
-                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                            exc_info=True,
-                        )
-                # Drain any nested dispatches queued during this loop
-                while hasattr(tls, "pending") and tls.pending:
-                    pending_subs, pending_snap = tls.pending.pop(0)
-                    for subscriber in pending_subs:
+                from PySide6.QtCore import QMetaObject, Qt
+                self._signals._pending_notifications.append(
+                    (subscribers, state_snapshot)
+                )
+                QMetaObject.invokeMethod(
+                    self._signals,
+                    "_run_subscriber_notifications",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+            except (ImportError, RuntimeError, AttributeError) as exc:
+                logger.warning(
+                    "Failed to defer batch subscriber notifications; "
+                    "falling back to synchronous dispatch",
+                    error=str(exc),
+                )
+                _on_main_thread = True
+
+        if _on_main_thread:
+            # Notify subscribers using the TLS reentrancy guard to prevent
+            # recursive subscriber notification (R12-C-004).
+            tls = self._dispatch_tls
+            if getattr(tls, "dispatching", False):
+                if not hasattr(tls, "pending"):
+                    tls.pending = []
+                tls.pending.append((subscribers, state_snapshot))
+            else:
+                tls.dispatching = True
+                try:
+                    for subscriber in subscribers:
                         try:
-                            subscriber(pending_snap)
+                            subscriber(state_snapshot)
                         except Exception:
                             logger.error(
-                                "Subscriber callback failed in batch_update (pending)",
-                                subscriber=getattr(
-                                    subscriber, "__name__", str(subscriber)
-                                ),
+                                "Subscriber callback failed during batch update",
+                                subscriber=getattr(subscriber, "__name__", str(subscriber)),
                                 exc_info=True,
                             )
-            finally:
-                tls.dispatching = False
-                if hasattr(tls, "pending"):
-                    tls.pending.clear()
+                    while hasattr(tls, "pending") and tls.pending:
+                        pending_subs, pending_snap = tls.pending.pop(0)
+                        for subscriber in pending_subs:
+                            try:
+                                subscriber(pending_snap)
+                            except Exception:
+                                logger.error(
+                                    "Subscriber callback failed in batch_update (pending)",
+                                    subscriber=getattr(
+                                        subscriber, "__name__", str(subscriber)
+                                    ),
+                                    exc_info=True,
+                                )
+                finally:
+                    tls.dispatching = False
+                    if hasattr(tls, "pending"):
+                        tls.pending.clear()
 
         # R8-NEW-004: use QueuedConnection for thread safety (matches update_state pattern)
         try:

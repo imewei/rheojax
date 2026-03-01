@@ -20,6 +20,16 @@ try:
 except ImportError:
     HAS_PYSIDE6 = False
 
+try:
+    from PySide6.QtCore import Slot
+except ImportError:
+
+    def Slot(*args, **kwargs):  # type: ignore[misc]
+        def decorator(fn):
+            return fn
+
+        return decorator
+
     class QObject:  # type: ignore
         pass
 
@@ -61,6 +71,26 @@ class FitWorkerSignals(QObject):
     completed = Signal(object)  # FitResult
     failed = Signal(str)  # error message
     cancelled = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        # GUI-P1-001: staging buffer for elapsed-timer messages posted via
+        # QMetaObject.invokeMethod from a raw threading.Thread.  The buffer is
+        # written by the timer thread before invokeMethod is called so the slot
+        # sees the latest message when it runs on the GUI thread.
+        self._pending_elapsed_msg: str = ""
+
+    @Slot()
+    def _emit_progress_elapsed(self) -> None:
+        """Slot: relay staged elapsed-time message on the GUI thread.
+
+        Called exclusively via QMetaObject.invokeMethod(QueuedConnection)
+        from _elapsed_timer so that the progress signal is always emitted
+        from the main Qt thread, regardless of which OS thread triggered it.
+        """
+        msg = self._pending_elapsed_msg
+        if msg:
+            self.progress.emit(0, 0, msg)
 
 
 class FitWorker(QRunnable):
@@ -200,10 +230,16 @@ class FitWorker(QRunnable):
             _fit_start = time.perf_counter()
 
             def _elapsed_timer():
-                # NOTE: PySide6 handles signal emission from non-Qt threads correctly
-                # via internal thread detection. This timer emits progress signals from
-                # a raw threading.Thread, which relies on PySide6's AutoConnection
-                # resolving to QueuedConnection for cross-thread delivery.
+                # GUI-P1-001 fix: use QMetaObject.invokeMethod(QueuedConnection) so
+                # the slot runs on the main Qt thread even though this function runs
+                # in a raw threading.Thread (not a Qt-managed thread).  AutoConnection
+                # cannot reliably detect raw OS threads as Qt threads.
+                try:
+                    from PySide6.QtCore import QMetaObject, Qt as _Qt
+                    _use_invoke = True
+                except ImportError:
+                    _use_invoke = False
+
                 while not _fit_done.wait(timeout=5.0):
                     # GUI-008 fix: Only emit elapsed time if the NLSQ callback
                     # hasn't reported progress in the last 4 seconds, to avoid
@@ -212,11 +248,18 @@ class FitWorker(QRunnable):
                         stale = time.perf_counter() - _last_nlsq_progress > 4.0
                     if stale:
                         elapsed = time.perf_counter() - _fit_start
-                        self.signals.progress.emit(
-                            0,
-                            0,
-                            f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)",
-                        )
+                        msg = f"Fitting {self._model_name}... ({elapsed:.0f}s elapsed)"
+                        if _use_invoke:
+                            # Write buffer BEFORE invokeMethod to avoid race where
+                            # the slot runs before the buffer is populated.
+                            self.signals._pending_elapsed_msg = msg
+                            QMetaObject.invokeMethod(
+                                self.signals,
+                                "_emit_progress_elapsed",
+                                _Qt.ConnectionType.QueuedConnection,
+                            )
+                        else:
+                            self.signals.progress.emit(0, 0, msg)
 
             timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
             timer_thread.start()

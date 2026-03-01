@@ -19,6 +19,16 @@ try:
 except ImportError:
     HAS_PYSIDE6 = False
 
+try:
+    from PySide6.QtCore import Slot
+except ImportError:
+
+    def Slot(*args, **kwargs):  # type: ignore[misc]
+        def decorator(fn):
+            return fn
+
+        return decorator
+
     class QObject:  # type: ignore
         pass
 
@@ -66,6 +76,24 @@ class BayesianWorkerSignals(QObject):
     failed = Signal(str)  # error message
     cancelled = Signal()
     divergence_detected = Signal(int)  # count
+
+    def __init__(self) -> None:
+        super().__init__()
+        # GUI-P1-001: staging buffer for elapsed-timer messages posted via
+        # QMetaObject.invokeMethod from a raw threading.Thread.
+        self._pending_elapsed_msg: str = ""
+
+    @Slot()
+    def _emit_progress_elapsed(self) -> None:
+        """Slot: relay staged elapsed-time message on the GUI thread.
+
+        Called exclusively via QMetaObject.invokeMethod(QueuedConnection)
+        from _elapsed_timer so the progress signal is always emitted from
+        the main Qt thread regardless of which OS thread triggered it.
+        """
+        msg = self._pending_elapsed_msg
+        if msg:
+            self.progress.emit(0, 0, msg)
 
 
 class BayesianWorker(QRunnable):
@@ -360,15 +388,29 @@ class BayesianWorker(QRunnable):
             _nuts_start = time.perf_counter()
 
             def _elapsed_timer():
-                # NOTE: PySide6 handles signal emission from non-Qt threads correctly
-                # via internal thread detection. This timer emits progress signals from
-                # a raw threading.Thread, which relies on PySide6's AutoConnection
-                # resolving to QueuedConnection for cross-thread delivery.
+                # GUI-P1-001 fix: use QMetaObject.invokeMethod(QueuedConnection) so
+                # the slot runs on the main Qt thread even though this function runs
+                # in a raw threading.Thread (not a Qt-managed thread).
+                try:
+                    from PySide6.QtCore import QMetaObject, Qt as _Qt
+                    _use_invoke = True
+                except ImportError:
+                    _use_invoke = False
+
                 while not _nuts_done.wait(timeout=5.0):
                     elapsed = time.perf_counter() - _nuts_start
-                    self.signals.progress.emit(
-                        0, 0, f"NUTS sampling... ({elapsed:.0f}s elapsed)"
-                    )
+                    msg = f"NUTS sampling... ({elapsed:.0f}s elapsed)"
+                    if _use_invoke:
+                        # Write buffer BEFORE invokeMethod to avoid race where
+                        # the slot runs before the buffer is populated.
+                        self.signals._pending_elapsed_msg = msg
+                        QMetaObject.invokeMethod(
+                            self.signals,
+                            "_emit_progress_elapsed",
+                            _Qt.ConnectionType.QueuedConnection,
+                        )
+                    else:
+                        self.signals.progress.emit(0, 0, msg)
 
             timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
             timer_thread.start()

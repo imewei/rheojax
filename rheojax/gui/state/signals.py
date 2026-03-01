@@ -3,6 +3,7 @@
 This module provides Qt signals for reactive UI updates on state changes.
 """
 
+from collections import deque
 from collections.abc import Callable
 from typing import Any
 
@@ -123,6 +124,11 @@ class StateSignals(QObject):
     def __init__(self) -> None:
         """Initialize signal emitters."""
         super().__init__()
+        # GUI-P1-002: thread-safe queue for subscriber notifications deferred
+        # to the GUI thread via QMetaObject.invokeMethod(QueuedConnection).
+        # Using a deque prevents buffer overwrite when multiple worker-thread
+        # updates are posted before the event loop processes them (M2 fix).
+        self._pending_notifications: deque[tuple[list, Any]] = deque()
 
     @Slot()
     def _emit_state_changed(self) -> None:
@@ -133,6 +139,33 @@ class StateSignals(QObject):
         Qt thread, regardless of which thread triggered the state update.
         """
         self.state_changed.emit()
+
+    @Slot()
+    def _run_subscriber_notifications(self) -> None:
+        """GUI-P1-002 fix: call subscriber callbacks on the GUI thread.
+
+        Invoked exclusively via QMetaObject.invokeMethod(QueuedConnection)
+        from StateStore.update_state() when the state update originates on a
+        worker thread.  By routing through this slot, subscriber callbacks
+        (which update Qt widgets) always run on the main Qt thread.
+
+        M2 fix: drains all queued (subscribers, snapshot) pairs so rapid
+        worker-thread updates are never lost.
+        M3 fix: reentrancy guard mirrors the TLS guard in the synchronous
+        path of update_state() — nested dispatches triggered by subscribers
+        are properly ordered.
+        """
+        # Drain all queued notifications (M2)
+        while self._pending_notifications:
+            subscribers, snapshot = self._pending_notifications.popleft()
+            for subscriber in subscribers:
+                try:
+                    subscriber(snapshot)
+                except Exception:
+                    logger.error(
+                        "Subscriber callback failed (main-thread relay)",
+                        exc_info=True,
+                    )
 
     def emit_signal(self, signal_name: str, *args: Any) -> None:
         """Emit a signal by name with logging.

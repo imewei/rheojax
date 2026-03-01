@@ -548,11 +548,15 @@ class DataPage(QWidget):
             self._file_name_label.setText(f"File: {self._current_file_path.name}")
 
         # Detect file format for user feedback.
-        # NOTE: Reads first 2KB from file on main thread. Acceptable for local
-        # files; may briefly block UI for network-mounted paths.
-        # TODO(perf): Move _detect_file_format() into PreviewWorker to avoid blocking main thread
-        detected_format = self._detect_file_format()
-        metadata["format"] = detected_format
+        # F-GUI-011 fix: PreviewWorker now embeds the detected format in the
+        # metadata dict so we avoid blocking the main thread with file I/O here.
+        # Fall back to the main-thread helper only if the worker didn't set it
+        # (e.g. older cached worker instances or test stubs).
+        detected_format = metadata.get("format") if isinstance(metadata, dict) else None
+        if not detected_format:
+            detected_format = self._detect_file_format()
+            if isinstance(metadata, dict):
+                metadata["format"] = detected_format
         logger.debug(
             "File format detected",
             filepath=str(self._current_file_path),
