@@ -665,7 +665,8 @@ class ExportPage(QWidget):
         )
 
         # Disable export button to prevent double-submit.
-        export_btn = getattr(self, "_export_button", None)
+        # R13-GUI-EXP-001: button is stored as _btn_export, not _export_button.
+        export_btn = getattr(self, "_btn_export", None)
         if export_btn is not None:
             export_btn.setEnabled(False)
 
@@ -682,14 +683,17 @@ class ExportPage(QWidget):
         plot_service = self._plot_service
         dataset_to_rheodata = self._dataset_to_rheodata
 
+        # R13-GUI-EXP-002: move _cancelled outside _run_export so the progress
+        # dialog's canceled signal can set it, making the Cancel button actually
+        # stop the export stages instead of only closing the dialog.
+        import threading as _threading
+        _cancelled = _threading.Event()
+
         def _run_export(progress_emit: Any) -> list[str]:
             """All blocking work runs here — called from ExportWorker thread."""
             import json
-            import threading
 
             exported_files: list[str] = []
-            # Simple cancellation flag checked between stages.
-            _cancelled = threading.Event()
             active_id = state.active_dataset_id
 
             def _maybe_cancel() -> bool:
@@ -982,7 +986,9 @@ class ExportPage(QWidget):
         )
         worker.signals.completed.connect(_on_completed, _Qt.ConnectionType.QueuedConnection)
         worker.signals.failed.connect(_on_failed, _Qt.ConnectionType.QueuedConnection)
-        progress.canceled.connect(lambda: progress.close())
+        # R13-GUI-EXP-002: set the cancellation flag AND close the dialog so
+        # the ExportWorker actually stops between stages (not just visually).
+        progress.canceled.connect(lambda: (_cancelled.set(), progress.close()))
         QThreadPool.globalInstance().start(worker)
 
     def export_results(
@@ -1088,14 +1094,18 @@ class ExportPage(QWidget):
         list[str]
             Paths to exported files
         """
+        # R13-GUI-BATCH-001: _perform_export() is asynchronous — it launches an
+        # ExportWorker and returns immediately.  The return value of batch_export
+        # therefore contains output directories (not confirmed file paths).
+        # Do NOT treat the returned list as a confirmation that files exist.
         logger.debug("Export triggered", format="batch", page="ExportPage")
-        exported_files = []
+        submitted_dirs = []
 
         for export_config in exports:
             try:
                 self._perform_export(export_config)
-                exported_files.append(str(export_config.get("output_dir", "")))
+                submitted_dirs.append(str(export_config.get("output_dir", "")))
             except Exception as e:
-                logger.error(f"Batch export item failed: {e}", exc_info=True)
+                logger.error(f"Batch export item failed to submit: {e}", exc_info=True)
 
-        return exported_files
+        return submitted_dirs

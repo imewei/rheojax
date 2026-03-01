@@ -274,6 +274,9 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Dataset tree selection
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
+        # R13-GUI-CTX-001: connect context_action_triggered so tree context menu
+        # actions (Remove, Rename, Export Data, etc.) are actually handled.
+        self.data_tree.context_action_triggered.connect(self._on_context_action_triggered)
 
         # Transform page callbacks
         self.transform_page.transform_applied.connect(
@@ -1328,6 +1331,68 @@ class RheoJAXMainWindow(QMainWindow):
             )
             self.log(f"Could not update Data page preview: {exc}")
 
+    @Slot(str)
+    def _on_context_action_triggered(self, action_text: str) -> None:
+        """Route DatasetTree context menu actions to the appropriate handler.
+
+        R13-GUI-CTX-001: context_action_triggered was added in Round 2 but was
+        never connected.  All context menu items silently did nothing.
+
+        Parameters
+        ----------
+        action_text : str
+            Menu action label, e.g. 'Remove', 'Rename...', 'Export Data...'
+        """
+        logger.debug("Context action triggered", action=action_text)
+        if action_text == "Remove":
+            self._on_delete_dataset()
+        elif action_text == "Rename...":
+            # R13-GUI-CTX-M4: RENAME_DATASET reducer not yet implemented in
+            # the store — log and notify the user via status bar.
+            logger.info("Rename dataset not yet implemented in store reducer")
+            self.status_bar.show_message("Rename: not yet implemented", 3000)
+        elif action_text in ("Export Data...", "Export Parameters..."):
+            self.navigate_to("export")
+        elif action_text == "Duplicate":
+            # R13-GUI-CTX-M4: DUPLICATE_DATASET reducer not yet implemented.
+            logger.info("Duplicate dataset not yet implemented in store reducer")
+            self.status_bar.show_message("Duplicate: not yet implemented", 3000)
+        elif action_text == "Expand All":
+            self.data_tree.expandAll()
+        elif action_text == "Collapse All":
+            self.data_tree.collapseAll()
+        elif action_text == "Add Dataset...":
+            self._on_import()
+        elif action_text == "Import Folder...":
+            self._on_import()
+        elif action_text in ("Open in External Editor", "Show in Folder"):
+            file_path = self.data_tree.get_selected_file_path()
+            if file_path and file_path.exists():
+                try:
+                    from PySide6.QtCore import QUrl
+                    from PySide6.QtGui import QDesktopServices
+
+                    if action_text == "Show in Folder":
+                        # Open the containing directory
+                        QDesktopServices.openUrl(
+                            QUrl.fromLocalFile(str(file_path.parent))
+                        )
+                    else:
+                        QDesktopServices.openUrl(
+                            QUrl.fromLocalFile(str(file_path))
+                        )
+                except Exception as exc:
+                    logger.error(
+                        "Could not open file with system handler",
+                        file=str(file_path),
+                        error=str(exc),
+                    )
+        elif action_text == "Remove from Dataset":
+            logger.info("Remove file from dataset not yet implemented")
+            self.status_bar.show_message("Remove file: not yet implemented", 3000)
+        else:
+            logger.debug("Unhandled context action", action=action_text)
+
     # ------------------------------------------------------------------
     # Worker pool callbacks
     # ------------------------------------------------------------------
@@ -2058,8 +2123,13 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message(f"Fit failed: {exc}", 5000)
             return
 
-        # Ensure pipeline UI reacts even if job_started races
-        self._on_job_started(job_id)
+        # R13-GUI-DBL-001: Removed redundant direct call to _on_job_started().
+        # WorkerPool.submit() already emits job_started (connected via
+        # QueuedConnection in _init_worker_pool), which delivers _on_job_started
+        # on the next event loop tick.  The direct call caused double pipeline
+        # status updates and duplicate log entries for every fit job.
+        # The QueuedConnection is sufficient; QThreadPool queues the actual
+        # run() call so the job_started signal is always emitted first.
 
     # -------------------------------------------------------------------------
     # Analysis Menu Handlers
