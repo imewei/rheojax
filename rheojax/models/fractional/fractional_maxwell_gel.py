@@ -307,6 +307,10 @@ class FractionalMaxwellGel(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
+        # R13-FMG-001: Store test_mode so Bayesian inference picks up the correct
+        # protocol (otherwise _resolve_test_mode defaults to 'relaxation').
+        self._test_mode = test_mode
+
         with log_fit(logger, model="FractionalMaxwellGel", data_shape=X.shape) as ctx:
             try:
                 logger.info(
@@ -550,11 +554,16 @@ class FractionalMaxwellGel(BaseModel):
     def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
+        R13-FMG-002: Delegates to BaseModel.predict() for plain-array inputs so
+        that deformation_mode (E*->G* conversion) and test_mode restoration are
+        handled correctly.  Only RheoData inputs bypass super() because they
+        return a RheoData wrapper object.
+
         Args:
             X: RheoData object or array of x-values
             test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
                        Required when X is a raw array. If None, defaults to 'relaxation'.
-            **kwargs: Additional arguments (ignored for compatibility)
+            **kwargs: Additional arguments passed to BaseModel.predict()
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -562,27 +571,4 @@ class FractionalMaxwellGel(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
-            # Get parameters
-            c_alpha = self.parameters.get_value("c_alpha")
-            alpha = self.parameters.get_value("alpha")
-            eta = self.parameters.get_value("eta")
-            x = jnp.asarray(X)
-
-            # Normalize test_mode to string
-            mode = test_mode if test_mode is not None else "relaxation"
-            if hasattr(mode, "value"):
-                mode = mode.value
-
-            # Route to appropriate prediction method based on test_mode
-            if mode == "relaxation":
-                result = self._predict_relaxation_jax(x, c_alpha, alpha, eta)
-            elif mode == "creep":
-                result = self._predict_creep_jax(x, c_alpha, alpha, eta)
-            elif mode == "oscillation":
-                result = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
-            else:
-                raise ValueError(
-                    f"Unknown test mode: {mode}. "
-                    f"Must be 'relaxation', 'creep', or 'oscillation'"
-                )
-            return np.array(result)
+            return super().predict(X, test_mode=test_mode, **kwargs)

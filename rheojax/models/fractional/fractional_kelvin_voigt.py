@@ -40,7 +40,7 @@ from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
+from rheojax.core.test_modes import DeformationMode, TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
@@ -290,6 +290,10 @@ class FractionalKelvinVoigt(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
+        # R13-FKV-001: Store test_mode so Bayesian inference picks up the correct
+        # protocol (otherwise _resolve_test_mode defaults to 'relaxation').
+        self._test_mode = test_mode
+
         # Get test mode string for logging
         test_mode_str = (
             test_mode.value if hasattr(test_mode, "value") else str(test_mode)
@@ -447,10 +451,10 @@ class FractionalKelvinVoigt(BaseModel):
         alpha = self.parameters.get_value("alpha")
         assert Ge is not None and c_alpha is not None and alpha is not None
 
-        if test_mode in ("oscillation",):
+        if test_mode in ("oscillation", TestMode.OSCILLATION):
             result = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
             return np.array(result)
-        elif test_mode in ("creep",):
+        elif test_mode in ("creep", TestMode.CREEP):
             result = self._predict_creep_jax(x, Ge, c_alpha, alpha)
             return np.array(result)
         else:
@@ -551,13 +555,19 @@ class FractionalKelvinVoigt(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None):  # type: ignore[override]
+    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
+
+        R13-FKV-002: Delegates to BaseModel.predict() for plain-array inputs so
+        that deformation_mode (E*->G* conversion) and test_mode restoration are
+        handled correctly.  Only RheoData inputs bypass super() because they
+        return a RheoData wrapper object.
 
         Args:
             X: RheoData object or array of x-values
             test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
                        Required when X is a raw array. If None, defaults to 'relaxation'.
+            **kwargs: Additional arguments passed to BaseModel.predict()
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -565,24 +575,4 @@ class FractionalKelvinVoigt(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
-            # Get parameters
-            Ge = self.parameters.get_value("Ge")
-            c_alpha = self.parameters.get_value("c_alpha")
-            alpha = self.parameters.get_value("alpha")
-            assert Ge is not None and c_alpha is not None and alpha is not None
-            x = jnp.asarray(X)
-
-            # Route to appropriate prediction method based on test_mode
-            mode = test_mode if test_mode is not None else "relaxation"
-            if mode == "relaxation":
-                result = self._predict_relaxation_jax(x, Ge, c_alpha, alpha)
-            elif mode == "creep":
-                result = self._predict_creep_jax(x, Ge, c_alpha, alpha)
-            elif mode == "oscillation":
-                result = self._predict_oscillation_jax(x, Ge, c_alpha, alpha)
-            else:
-                raise ValueError(
-                    f"Unknown test mode: {mode}. "
-                    f"Must be 'relaxation', 'creep', or 'oscillation'"
-                )
-            return np.array(result)
+            return super().predict(X, test_mode=test_mode, **kwargs)

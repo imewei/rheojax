@@ -296,6 +296,10 @@ class FractionalMaxwellModel(BaseModel):
             y_data = jnp.array(y)
             test_mode = kwargs.get("test_mode", "relaxation")
 
+        # R13-FMM-001: Store test_mode so Bayesian inference picks up the correct
+        # protocol (otherwise _resolve_test_mode defaults to 'relaxation').
+        self._test_mode = test_mode
+
         # Determine data shape for logging
         data_shape = (len(X),) if hasattr(X, "__len__") else None
 
@@ -593,11 +597,16 @@ class FractionalMaxwellModel(BaseModel):
     def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
         """Predict response.
 
+        R13-FMM-002: Delegates to BaseModel.predict() for plain-array inputs so
+        that deformation_mode (E*->G* conversion) and test_mode restoration are
+        handled correctly.  Only RheoData inputs bypass super() because they
+        return a RheoData wrapper object.
+
         Args:
             X: RheoData object or array of x-values
             test_mode: Test mode for prediction ('relaxation', 'creep', 'oscillation')
                        Required when X is a raw array. If None, defaults to 'relaxation'.
-            **kwargs: Additional arguments (ignored for compatibility)
+            **kwargs: Additional arguments passed to BaseModel.predict()
 
         Returns:
             Predicted values (RheoData if input is RheoData, else array)
@@ -605,34 +614,7 @@ class FractionalMaxwellModel(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
-            # Get parameters
-            c1 = self.parameters.get_value("c1")
-            alpha = self.parameters.get_value("alpha")
-            beta = self.parameters.get_value("beta")
-            tau = self.parameters.get_value("tau")
-            assert (
-                c1 is not None
-                and alpha is not None
-                and beta is not None
-                and tau is not None
-            )
-            x = jnp.asarray(X)
-
-            # Normalize test_mode to string
-            mode = test_mode if test_mode is not None else getattr(self, "_test_mode", "relaxation")
-            if hasattr(mode, "value"):
-                mode = mode.value
-
-            # Route to appropriate prediction method based on test_mode
-            if mode == "relaxation":
-                result = self._predict_relaxation_jax(x, c1, alpha, beta, tau)
-            elif mode == "creep":
-                result = self._predict_creep_jax(x, c1, alpha, beta, tau)
-            elif mode == "oscillation":
-                result = self._predict_oscillation_jax(x, c1, alpha, beta, tau)
-            else:
-                raise ValueError(
-                    f"Unknown test mode: {mode}. "
-                    f"Must be 'relaxation', 'creep', or 'oscillation'"
-                )
-            return np.array(result)
+            # Delegate to BaseModel.predict() which handles deformation_mode
+            # conversion (DMTA E*->G*->E*) and test_mode restoration in its
+            # finally block.
+            return super().predict(X, test_mode=test_mode, **kwargs)

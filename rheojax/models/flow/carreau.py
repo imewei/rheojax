@@ -110,6 +110,8 @@ class Carreau(BaseModel):
         Returns:
             self for method chaining
         """
+        # P3-FLOW-001: Cache test_mode for Bayesian _resolve_test_mode() consistency
+        self._test_mode = kwargs.get("test_mode", "rotation")
         with log_fit(
             logger,
             self.__class__.__name__,

@@ -172,6 +172,8 @@ class DMTNonlocal(DMTBase):
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> DMTNonlocal:
         """Fit model to data."""
         test_mode = kwargs.get("test_mode", "flow_curve")
+        # P1-DMTNL-001: Cache test_mode for Bayesian _resolve_test_mode() fallback
+        self._test_mode = test_mode
 
         if test_mode in ("flow_curve", "rotation"):
             return self._fit_flow_curve(X, y, **kwargs)

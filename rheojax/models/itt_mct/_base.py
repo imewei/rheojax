@@ -218,6 +218,8 @@ class ITTMCTBase(BaseModel):
         if test_mode is None:
             test_mode = self._detect_protocol(X, y, **kwargs)
         self._last_protocol = test_mode  # type: ignore[assignment]
+        # P2-ITTMCT-001: Cache test_mode for Bayesian _resolve_test_mode() fallback
+        self._test_mode = test_mode
 
         # Dispatch to protocol-specific fitting
         protocol_dispatch = {
