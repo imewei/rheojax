@@ -1403,9 +1403,13 @@ class ParameterOptimizer:
 
         # Track history
         if self.track_history:
+            # Use `is not None` guard so iteration=0 (first step) is stored
+            # correctly.  The `or` sentinel coerces 0 → len(history), recording
+            # the wrong iteration number when history is already non-empty.
+            effective_iter = iteration if iteration is not None else len(self.history)
             self.history.append(
                 {
-                    "iteration": iteration or len(self.history),
+                    "iteration": effective_iter,
                     "values": coerced_values.copy(),
                     "objective": obj_value,
                 }
@@ -1413,7 +1417,10 @@ class ParameterOptimizer:
 
         # Call callback
         if self.callback:
-            self.callback(iteration or 0, coerced_values, obj_value)
+            # Same guard: iteration=0 must reach the callback as 0.
+            self.callback(
+                iteration if iteration is not None else 0, coerced_values, obj_value
+            )
 
     def get_history(self) -> list[dict[str, Any]]:
         """Get optimization history.
