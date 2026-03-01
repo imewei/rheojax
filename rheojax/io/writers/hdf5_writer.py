@@ -414,8 +414,22 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     # inside a loop is misleading and signals incomplete refactoring.
     import h5py
 
-    # Read subgroups
+    # Read subgroups and datasets.
+    # HDF5-READ-001: attrs are loaded first; skip any dataset/subgroup whose
+    # name collides with an already-loaded attribute.  Without this guard the
+    # dataset loop would silently overwrite the attribute value, corrupting
+    # metadata that was intentionally stored as a scalar attribute (e.g.
+    # test_mode, deformation_mode stored as belt-and-suspenders duplicates).
     for key in group.keys():
+        if key in metadata:
+            # Attribute with the same name already loaded — skip the
+            # dataset/subgroup to preserve the attribute's value.
+            logger.debug(
+                "Skipping HDF5 dataset/subgroup — name collides with "
+                "previously loaded attribute; attribute value is kept",
+                key=key,
+            )
+            continue
         if isinstance(group[key], h5py.Group):
             metadata[key] = _read_metadata_recursive(group[key])
         else:

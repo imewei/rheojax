@@ -350,9 +350,25 @@ def run_analyze(args: Namespace) -> int:
         try:
             from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 
+            # CLI-SPP-001: Guard sigma_sy before Bayesian — results["sigma_sy"]
+            # may be absent (KeyError) or None (no yield stress detected).
+            # Using a hard key access would crash with a confusing error;
+            # instead, skip Bayesian inference and inform the user.
+            _sigma_sy = results.get("sigma_sy")
+            if _sigma_sy is None:
+                print(
+                    "Warning: sigma_sy not detected in SPP results; "
+                    "skipping Bayesian inference.",
+                    file=sys.stderr,
+                )
+                logger.warning(
+                    "sigma_sy not available from SPP analysis; Bayesian step skipped"
+                )
+                return 0
+
             model = SPPYieldStress()
             gamma_0_array = np.array([args.gamma_0])
-            sigma_sy_array = np.array([results["sigma_sy"]])
+            sigma_sy_array = np.array([float(_sigma_sy)])
 
             model.fit(gamma_0_array, sigma_sy_array, test_mode="oscillation")
             bayes_result = model.fit_bayesian(

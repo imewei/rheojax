@@ -677,6 +677,21 @@ def parse_trios_csv(
                 if k.lower() != "variables" and not k.lower().startswith("data")
             }
 
+        # CSV-MULTI-001: Guard against empty header after label-column stripping.
+        # If the section header line contained only a label column (e.g. "Data")
+        # with no data columns, next_header is now [].  next_expected would be 0,
+        # matching nothing (non-blank rows have len(parts) >= 1 after stripping),
+        # and the section would produce 0 data rows followed by a silent skip.
+        # Emit a debug log and advance to the next section instead.
+        if not next_header:
+            logger.debug(
+                "Multi-table section has no data columns after label-column strip; "
+                "skipping section",
+                section_start=search_start,
+            )
+            search_start = next_section_start
+            continue
+
         # Parse data rows for this section
         next_data_rows: list[list[float]] = []
         next_expected = len(next_header) + next_col_offset

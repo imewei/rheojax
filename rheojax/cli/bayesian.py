@@ -195,7 +195,14 @@ def main(args: list[str] | None = None) -> int:
             if not data:
                 print("Error: No data segments found in file", file=sys.stderr)
                 return 1
-            print(f"Note: File contains {len(data)} segments, using first segment")
+            # CLI-BAY-NOTE-001: Print informational notes to stderr so that
+            # stdout contains only the result output (JSON or table).
+            # Printing to stdout would corrupt JSON output when parsed
+            # programmatically.
+            print(
+                f"Note: File contains {len(data)} segments, using first segment",
+                file=sys.stderr,
+            )
             data = data[0]
 
         logger.debug("Data loaded", shape=str(data.x.shape))
