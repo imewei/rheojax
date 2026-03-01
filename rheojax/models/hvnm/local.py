@@ -289,7 +289,7 @@ class HVNMLocal(HVNMBase):
         sigma = hvnm_steady_shear_stress_vec(gamma_dot_jax, G_D, k_d_D)
 
         if return_components:
-            eta_D = G_D / max(k_d_D, 1e-30)
+            eta_D = G_D / jnp.maximum(k_d_D, 1e-30)
             sigma_D = eta_D * gamma_dot_jax
             return {
                 "stress": np.asarray(sigma),
@@ -781,7 +781,7 @@ class HVNMLocal(HVNMBase):
         assert k_d_D is not None
 
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        Wi_D = gamma_dot_jax / max(k_d_D, 1e-30)
+        Wi_D = gamma_dot_jax / jnp.maximum(k_d_D, 1e-30)
         N1 = 2.0 * G_D * Wi_D**2
         N2 = jnp.zeros_like(N1)
         return np.asarray(N1), np.asarray(N2)
@@ -868,7 +868,7 @@ class HVNMLocal(HVNMBase):
         G_I_amp = d["G_I_eff"] * d["X_I"]
         G_0 = G_P * d["X_phi"] + G_E + G_D + G_I_amp
         G_inf = G_P * d["X_phi"]  # Only permanent plateau at large strain
-        gamma_c = 1.0 / max(d["X_I"], 1.0)  # Critical strain ~ 1/X_I
+        gamma_c = 1.0 / jnp.maximum(d["X_I"], 1.0)  # Critical strain ~ 1/X_I
         return {"G_0": float(G_0), "G_inf": float(G_inf), "gamma_c": float(gamma_c)}
 
     # =========================================================================
