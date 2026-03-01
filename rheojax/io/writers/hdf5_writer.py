@@ -319,8 +319,14 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             )
 
             # Load units
+            # R6-HDF5-001: h5py may return bytes instead of str on some
+            # platforms/backends. Decode to str for downstream compatibility.
             x_units = f["x"].attrs.get("units", None)
+            if isinstance(x_units, bytes):
+                x_units = x_units.decode("utf-8")
             y_units = f["y"].attrs.get("units", None)
+            if isinstance(y_units, bytes):
+                y_units = y_units.decode("utf-8")
             logger.debug(
                 "Units loaded",
                 x_units=x_units,
@@ -328,7 +334,10 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             )
 
             # Load domain
+            # R6-HDF5-002: Decode bytes for top-level string attrs.
             domain = f.attrs.get("domain", "time")
+            if isinstance(domain, bytes):
+                domain = domain.decode("utf-8")
             logger.debug("Domain loaded", domain=domain)
 
             # Load metadata
@@ -342,10 +351,15 @@ def load_hdf5(filepath: str | Path) -> RheoData:
 
             # Restore test_mode/deformation_mode from top-level attrs
             # into metadata (belt-and-suspenders with metadata dict)
+            # R6-HDF5-003: Decode bytes for top-level string attrs.
             test_mode = f.attrs.get("test_mode", None)
+            if isinstance(test_mode, bytes):
+                test_mode = test_mode.decode("utf-8")
             if test_mode and "test_mode" not in metadata:
                 metadata["test_mode"] = test_mode
             deformation_mode = f.attrs.get("deformation_mode", None)
+            if isinstance(deformation_mode, bytes):
+                deformation_mode = deformation_mode.decode("utf-8")
             if deformation_mode and "deformation_mode" not in metadata:
                 metadata["deformation_mode"] = deformation_mode
 

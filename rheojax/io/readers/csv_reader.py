@@ -516,7 +516,7 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
     nan_ratio = np.isnan(result).sum() / max(len(result), 1)
     if nan_ratio > 0.5:
         logger.warning(
-            "More than 50%% of values could not be converted to float — "
+            "More than 50% of values could not be converted to float — "
             "decimal separator detection may be incorrect. "
             "Consider specifying the decimal separator explicitly.",
             nan_ratio=f"{nan_ratio:.1%}",

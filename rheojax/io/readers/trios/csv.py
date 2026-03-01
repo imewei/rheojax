@@ -682,14 +682,22 @@ def parse_trios_csv(
         # with no data columns, next_header is now [].  next_expected would be 0,
         # matching nothing (non-blank rows have len(parts) >= 1 after stripping),
         # and the section would produce 0 data rows followed by a silent skip.
-        # Emit a debug log and advance to the next section instead.
+        # Emit a debug log and scan forward for the next section marker.
+        # R6-IO-001: Previously used stale next_section_start which caused an
+        # infinite loop when the marker equalled search_start.
         if not next_header:
             logger.debug(
                 "Multi-table section has no data columns after label-column strip; "
                 "skipping section",
                 section_start=search_start,
             )
-            search_start = next_section_start
+            # Scan forward from current position to find next '[' marker
+            _scan_start = next_data_start
+            search_start = None
+            for _si in range(_scan_start, len(lines)):
+                if lines[_si].strip().startswith("["):
+                    search_start = _si
+                    break
             continue
 
         # Parse data rows for this section

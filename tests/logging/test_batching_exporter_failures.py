@@ -29,8 +29,10 @@ class FailingExporter:
         return None
 
 
-def test_batching_exporter_recovers_from_inner_failure(caplog):
-    caplog.set_level(logging.ERROR)
+def test_batching_exporter_drops_on_inner_failure(caplog):
+    """When the inner exporter raises, entries are dropped (not requeued)
+    and a warning is logged with the count of dropped entries."""
+    caplog.set_level(logging.WARNING)
     inner = FailingExporter()
     exporter = BatchingExporter(
         inner_exporter=inner, batch_size=2, flush_interval=0.01, max_queue_size=10
@@ -39,17 +41,19 @@ def test_batching_exporter_recovers_from_inner_failure(caplog):
     entry1 = LogEntry("t1", "INFO", "l", "m1")
     entry2 = LogEntry("t2", "INFO", "l", "m2")
 
-    # First flush should fail, entries requeued
+    # Queue two entries, then flush — inner raises on first call
     exporter.export([entry1, entry2])
     exporter._flush()
 
-    # Second flush should succeed
+    # Second flush has nothing to deliver (entries were dropped, not requeued)
     exporter._flush()
 
     exporter.shutdown()
 
-    assert any("Batch export failed" in msg for msg in caplog.text.splitlines())
-    assert inner.seen, "entries should eventually be delivered"
+    assert any("Batch export failed" in line for line in caplog.text.splitlines())
+    assert "Dropped 2 log entries" in caplog.text
+    # Entries were NOT retried — inner never received them
+    assert inner.seen == [], "failed entries should be dropped, not retried"
 
 
 def test_batching_exporter_returns_false_on_inner_false(caplog):

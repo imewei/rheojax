@@ -375,12 +375,13 @@ class BatchingExporter(LogExporter):
                     success = self._inner.export(entries)
                 except Exception as exc:  # pragma: no cover - defensive
                     logging.getLogger(__name__).error(f"Batch export failed: {exc}")
-                    # best-effort requeue (no retry loop — entries already failed once)
-                    for entry in entries:
-                        try:
-                            self._queue.put_nowait(entry)
-                        except queue.Full:
-                            break
+                    # R6-LOG-001: Do NOT requeue failed entries — they would be
+                    # retried on every subsequent flush, causing an infinite retry
+                    # cycle that could exhaust CPU and fill logs with errors.
+                    # Drop the entries and log the count for observability.
+                    logging.getLogger(__name__).warning(
+                        "Dropped %d log entries after export failure", len(entries)
+                    )
                     return
 
                 if success is False:

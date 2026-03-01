@@ -51,6 +51,15 @@ _CSV_KWARGS = {
     "encoding",
     "validate",
     "deformation_mode",
+    # R6-AUTO-001: Include commonly-used load_csv kwargs so they are not
+    # silently dropped when users pass them through auto_load().
+    "x_units",
+    "y_units",
+    "domain",
+    "temperature",
+    "metadata",
+    "intended_transform",
+    "header",
 }
 _EXCEL_KWARGS = {
     "x_col",
@@ -60,6 +69,15 @@ _EXCEL_KWARGS = {
     "sheet",  # was "sheet_name" — must match load_excel() param name
     "validate",
     "deformation_mode",
+    # R6-AUTO-002: Include commonly-used load_excel kwargs so they are not
+    # silently dropped when users pass them through auto_load().
+    "x_units",
+    "y_units",
+    "domain",
+    "temperature",
+    "metadata",
+    "intended_transform",
+    "header",
 }
 _ANTON_PAAR_KWARGS = {
     "test_mode",
