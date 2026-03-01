@@ -312,7 +312,7 @@ class Pipeline:
                 # PB-001: auto-propagate test_mode from loaded data metadata
                 if hasattr(self, "data") and self.data is not None:
                     _meta = getattr(self.data, "metadata", None)
-                    if _meta:
+                    if _meta is not None:
                         if "test_mode" not in fit_kwargs:
                             _tm = _meta.get("test_mode")
                             if _tm is not None:

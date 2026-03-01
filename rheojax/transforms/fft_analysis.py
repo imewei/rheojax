@@ -342,14 +342,18 @@ class FFTAnalysis(BaseTransform):
         if "transform" not in _fft_meta or _fft_meta["transform"] != "fft":
             logger.error(
                 "Data was not created by FFT transform",
-                metadata_transform=data.metadata.get("transform"),
+                # FFT-INV-001: use _fft_meta (not data.metadata) — data.metadata
+                # may be None when the caller passes a plain RheoData without
+                # metadata, and None.get() raises AttributeError.
+                metadata_transform=_fft_meta.get("transform"),
             )
             raise ValueError("Data was not created by FFT transform")
 
         # Get original parameters
-        n_points = data.metadata.get("n_points")
-        dt = data.metadata.get("dt")
-        fft_complex = data.metadata.get("fft_complex")
+        # _fft_meta is guaranteed non-None here (passed the transform check above)
+        n_points = _fft_meta.get("n_points")
+        dt = _fft_meta.get("dt")
+        fft_complex = _fft_meta.get("fft_complex")
 
         if n_points is None or dt is None:
             logger.error(

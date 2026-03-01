@@ -133,22 +133,22 @@ class BayesianPipeline(Pipeline):
             data_shape=X.shape,  # type: ignore[union-attr]
             test_mode=(
                 self.data.metadata.get("test_mode", "unknown")
-                if hasattr(self.data, "metadata") and self.data.metadata
+                if hasattr(self.data, "metadata") and self.data.metadata is not None
                 else "unknown"
             ),
         ) as ctx:
             # BP-002: auto-propagate test_mode and deformation_mode from data metadata
             if hasattr(self, "data") and self.data is not None:
                 _meta = getattr(self.data, "metadata", None)
-                if _meta:
+                if _meta is not None:
                     if "test_mode" not in nlsq_kwargs:
                         _tm = _meta.get("test_mode")
-                        if _tm:
+                        if _tm is not None:
                             nlsq_kwargs["test_mode"] = _tm
                     # R9-PIPE-DMT: propagate deformation_mode for DMTA data
                     if "deformation_mode" not in nlsq_kwargs:
                         _dm = _meta.get("deformation_mode")
-                        if _dm:
+                        if _dm is not None:
                             nlsq_kwargs["deformation_mode"] = _dm
                     if "poisson_ratio" not in nlsq_kwargs:
                         _pr = _meta.get("poisson_ratio")
