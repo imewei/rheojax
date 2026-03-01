@@ -36,6 +36,7 @@ def run_fit_isolated(
     Returns a serializable dict with all arrays as NumPy.
     """
     from rheojax.core.jax_config import safe_import_jax
+
     jax, jnp = safe_import_jax()
 
     from rheojax.core.data import RheoData
@@ -48,6 +49,7 @@ def run_fit_isolated(
     # dir() which doesn't list lazy names), so we must eagerly import all
     # submodules to fire the decorators.
     from rheojax.models import _ensure_all_registered
+
     _ensure_all_registered()
 
     # RheoData stores complex modulus as y = G' + i*G'' (no separate y2 field)
@@ -57,8 +59,10 @@ def run_fit_isolated(
         y_combined = y_data
 
     rheo_data = RheoData(
-        x=x_data, y=y_combined,
-        initial_test_mode=test_mode, metadata=metadata or {},
+        x=x_data,
+        y=y_combined,
+        initial_test_mode=test_mode,
+        metadata=metadata or {},
     )
 
     start_time = time.perf_counter()
@@ -77,19 +81,25 @@ def run_fit_isolated(
         nonlocal last_iteration, last_loss
         if cancel_event.is_set():
             from rheojax.gui.jobs.cancellation import CancellationError
+
             raise CancellationError("Operation cancelled by user")
         last_iteration = iteration
         last_loss = loss
         percent = min(int(iteration / max_iter * 100), 100)
         message = f"Iteration {iteration}: loss = {loss:.6e}"
-        progress_queue.put({
-            "type": "progress", "percent": percent,
-            "total": 100, "message": message,
-        })
+        progress_queue.put(
+            {
+                "type": "progress",
+                "percent": percent,
+                "total": 100,
+                "message": message,
+            }
+        )
 
     service = ModelService()
     service_result = service.fit(
-        model_name, rheo_data,
+        model_name,
+        rheo_data,
         params=initial_params,
         progress_callback=progress_callback,
         **fit_kwargs,
@@ -126,10 +136,20 @@ def run_fit_isolated(
         "y_fit": _to_numpy(getattr(service_result, "y_fit", None)),
         "residuals": _to_numpy(getattr(service_result, "residuals", None)),
         "pcov": _to_numpy(getattr(service_result, "pcov", None)),
-        "rmse": float(svc_metadata["rmse"]) if svc_metadata.get("rmse") is not None else None,
-        "mae": float(svc_metadata["mae"]) if svc_metadata.get("mae") is not None else None,
-        "aic": float(svc_metadata["aic"]) if svc_metadata.get("aic") is not None else None,
-        "bic": float(svc_metadata["bic"]) if svc_metadata.get("bic") is not None else None,
+        "rmse": (
+            float(svc_metadata["rmse"])
+            if svc_metadata.get("rmse") is not None
+            else None
+        ),
+        "mae": (
+            float(svc_metadata["mae"]) if svc_metadata.get("mae") is not None else None
+        ),
+        "aic": (
+            float(svc_metadata["aic"]) if svc_metadata.get("aic") is not None else None
+        ),
+        "bic": (
+            float(svc_metadata["bic"]) if svc_metadata.get("bic") is not None else None
+        ),
         "metadata": {k: v for k, v in svc_metadata.items() if _is_serializable(v)},
     }
 

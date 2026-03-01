@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from rheojax.gui.compat import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -647,9 +646,10 @@ class ExportPage(QWidget):
         config : dict
             Export configuration
         """
+        from PySide6.QtCore import Qt as _Qt
+
         from rheojax.gui.compat import QThreadPool
         from rheojax.gui.jobs.export_worker import ExportWorker
-        from PySide6.QtCore import Qt as _Qt
 
         state = self._store.get_state()
         output_dir = config["output_dir"]
@@ -687,6 +687,7 @@ class ExportPage(QWidget):
         # dialog's canceled signal can set it, making the Cancel button actually
         # stop the export stages instead of only closing the dialog.
         import threading as _threading
+
         _cancelled = _threading.Event()
 
         def _run_export(progress_emit: Any) -> list[str]:
@@ -793,7 +794,9 @@ class ExportPage(QWidget):
                                 style=fig_style,
                                 test_mode=dataset.test_mode,
                             )
-                            fit_path = figures_dir / f"fit_plot_{result_id}.{fig_format}"
+                            fit_path = (
+                                figures_dir / f"fit_plot_{result_id}.{fig_format}"
+                            )
                             export_service.export_figure(fit_fig, fit_path, dpi=fig_dpi)
                             exported_files.append(str(fit_path))
                             fit_fig.clf()
@@ -927,14 +930,10 @@ class ExportPage(QWidget):
                 report_state: dict[str, Any] = {
                     "model_name": state.active_model_name,
                     "test_mode": (
-                        _active_ds.metadata.get("test_mode")
-                        if _active_ds
-                        else None
+                        _active_ds.metadata.get("test_mode") if _active_ds else None
                     ),
                 }
-                _report_key = (
-                    f"{state.active_model_name}_{state.active_dataset_id}"
-                )
+                _report_key = f"{state.active_model_name}_{state.active_dataset_id}"
                 _active_fit = state.fit_results.get(_report_key)
                 if _active_fit and hasattr(_active_fit, "parameters"):
                     report_state["parameters"] = _active_fit.parameters
@@ -956,9 +955,7 @@ class ExportPage(QWidget):
             if export_btn is not None:
                 export_btn.setEnabled(True)
             total_size = sum(
-                Path(f).stat().st_size
-                for f in exported_files
-                if Path(f).exists()
+                Path(f).stat().st_size for f in exported_files if Path(f).exists()
             )
             QMessageBox.information(
                 self,
@@ -988,7 +985,9 @@ class ExportPage(QWidget):
             lambda pct, label: progress.setLabelText(label),
             _Qt.ConnectionType.QueuedConnection,
         )
-        worker.signals.completed.connect(_on_completed, _Qt.ConnectionType.QueuedConnection)
+        worker.signals.completed.connect(
+            _on_completed, _Qt.ConnectionType.QueuedConnection
+        )
         worker.signals.failed.connect(_on_failed, _Qt.ConnectionType.QueuedConnection)
         # R13-GUI-EXP-002: set the cancellation flag AND close the dialog so
         # the ExportWorker actually stops between stages (not just visually).

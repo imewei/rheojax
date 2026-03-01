@@ -460,7 +460,11 @@ class FIKH(FIKHBase):
             Predicted values.
         """
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "startup")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "startup")
+        )
         mode = self._validate_test_mode(test_mode)
         params = self._get_params_dict()
 
@@ -720,9 +724,7 @@ class FIKH(FIKHBase):
 
         elif mode_enum in (TestMode.CREEP, TestMode.RELAXATION):
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get(
-                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-            )
+            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0))
             sigma_applied = kwargs.get(
                 "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
             )

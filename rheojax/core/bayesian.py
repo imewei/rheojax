@@ -1334,7 +1334,9 @@ class BayesianMixin:
         # revert the dict to its pre-Bayesian state; the overhead is acceptable
         # because it happens once per fit_bayesian() call, not per NUTS step.
         _raw_lfk = getattr(self, "_last_fit_kwargs", None)
-        _saved_last_fit_kwargs = copy.deepcopy(_raw_lfk) if _raw_lfk is not None else None
+        _saved_last_fit_kwargs = (
+            copy.deepcopy(_raw_lfk) if _raw_lfk is not None else None
+        )
 
         _fit_bayesian_succeeded = False
 
@@ -1379,7 +1381,7 @@ class BayesianMixin:
                         not hasattr(self, "_last_fit_kwargs")
                         or self._last_fit_kwargs is None
                     ):
-                        self._last_fit_kwargs = {}
+                        self._last_fit_kwargs: dict = {}
                     self._last_fit_kwargs.update(protocol_kwargs)
 
                 logger.info(
@@ -1558,7 +1560,7 @@ class BayesianMixin:
         # _closure_cache is eagerly initialized in BaseModel.__init__; the
         # guard below is a safety net for non-BaseModel users of BayesianMixin.
         if not hasattr(self, "_closure_cache"):
-            self._closure_cache = OrderedDict()
+            self._closure_cache: OrderedDict = OrderedDict()
 
         prior_factory = getattr(self, "bayesian_prior_factory", None)
         # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)
@@ -1666,7 +1668,7 @@ class BayesianMixin:
                 _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
                 _test_X = jnp.ones(_n_probe, dtype=jnp.float64)
                 _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
-                _test_pred = self.model_function(
+                _test_pred = self.model_function(  # type: ignore[attr-defined]
                     _test_X, _test_params, test_mode, **protocol_kwargs
                 )
                 _model_returns_2col = (

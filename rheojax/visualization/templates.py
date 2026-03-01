@@ -142,9 +142,9 @@ def plot_modulus_frequency(
         # Pop deformation_mode so it doesn't leak to matplotlib
         deformation_mode = kwargs.pop("deformation_mode", None)
         if deformation_mode is None:
-            deformation_mode = getattr(
-                data, "deformation_mode", None
-            ) or (data.metadata or {}).get("deformation_mode")
+            deformation_mode = getattr(data, "deformation_mode", None) or (
+                data.metadata or {}
+            ).get("deformation_mode")
 
         if separate_axes and np.iscomplexobj(y_data):
             # Two separate axes for storage/loss modulus

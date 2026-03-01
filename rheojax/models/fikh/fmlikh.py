@@ -374,7 +374,11 @@ class FMLIKH(FIKHBase):
         t = jnp.asarray(X)
         y_target = jnp.asarray(y)
         _kw_mode = kwargs.get("test_mode")
-        _resolved = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "relaxation")
+        _resolved = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "relaxation")
+        )
         mode = self._validate_test_mode(_resolved)
 
         # Extract kwargs relevant to transient simulation
@@ -581,7 +585,11 @@ class FMLIKH(FIKHBase):
     def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Predict based on test_mode."""
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "startup")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "startup")
+        )
         mode = self._validate_test_mode(test_mode)
         params = self._get_params_dict()
 

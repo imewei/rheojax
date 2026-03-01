@@ -566,7 +566,9 @@ class FractionalJeffreysModel(BaseModel):
             and tau1 is not None
         )
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        test_mode = (
+            _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        )
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
         elif test_mode in ("relaxation", TestMode.RELAXATION):

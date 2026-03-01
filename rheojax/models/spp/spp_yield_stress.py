@@ -444,7 +444,9 @@ class SPPYieldStress(BaseModel):
         # parameter for the likelihood sigma. Not used directly in model_function predictions.
 
         if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
-            yield_type = kwargs.get("yield_type", getattr(self, "_yield_type", "static"))
+            yield_type = kwargs.get(
+                "yield_type", getattr(self, "_yield_type", "static")
+            )
             if yield_type == "dynamic":
                 return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
             return self._predict_oscillation(

@@ -95,7 +95,9 @@ class ImportWorker(QRunnable):
     def run(self) -> None:
         """Execute file import in background thread."""
         try:
-            file_size = self._file_path.stat().st_size if self._file_path.exists() else -1
+            file_size = (
+                self._file_path.stat().st_size if self._file_path.exists() else -1
+            )
             file_suffix = self._file_path.suffix.lower()
             logger.info(
                 "Import worker started",
@@ -120,8 +122,7 @@ class ImportWorker(QRunnable):
             )
 
             total_rows = sum(
-                len(ds.x) for ds in datasets
-                if hasattr(ds, "x") and ds.x is not None
+                len(ds.x) for ds in datasets if hasattr(ds, "x") and ds.x is not None
             )
             detected_modes = []
             for ds in datasets:

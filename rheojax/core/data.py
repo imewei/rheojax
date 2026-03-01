@@ -14,6 +14,8 @@ import numpy as np
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper only
     import jax.numpy as jnp_typing
+
+    from rheojax.core.test_modes import TestModeEnum
 else:
     jnp_typing = np
 
@@ -328,7 +330,7 @@ class RheoData:
         # Otherwise get_test_mode() continues returning the stale detected value
         # even after the caller explicitly sets metadata["test_mode"].
         if "test_mode" in metadata:
-            self._detected_test_mode = None
+            self._detected_test_mode: TestModeEnum | None = None
             self._explicit_test_mode = metadata["test_mode"]  # R11-DATA-001: sync
             self.metadata.pop("detected_test_mode", None)  # R11-DATA-002: clear stale
         self.metadata.update(metadata)
@@ -893,9 +895,9 @@ class RheoData:
             # JAX has no cumulative_trapezoid; compute manually via
             # trapezoidal rule: I[0]=0, I[k] = I[k-1] + (y[k-1]+y[k])/2 * dx[k]
             dx = jnp.diff(self.x)
-            avg_y = (self.y[:-1] + self.y[1:]) / 2.0
+            avg_y = (self.y[:-1] + self.y[1:]) / 2.0  # type: ignore[operator]
             integrated = jnp.concatenate(
-                [jnp.zeros(1, dtype=self.y.dtype), jnp.cumsum(avg_y * dx)]
+                [jnp.zeros(1, dtype=self.y.dtype), jnp.cumsum(avg_y * dx)]  # type: ignore[union-attr]
             )
         else:
             # Use NumPy/SciPy cumulative trapezoid

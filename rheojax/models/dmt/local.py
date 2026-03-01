@@ -1664,7 +1664,11 @@ class DMTLocal(DMTBase):
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
         # P2-DMT-001: Use getattr with default so this is safe even if called
         # before _fit() (e.g. during model_function probe or unit tests).
-        mode = test_mode if test_mode is not None else getattr(self, "_test_mode", "flow_curve")
+        mode = (
+            test_mode
+            if test_mode is not None
+            else getattr(self, "_test_mode", "flow_curve")
+        )
         if mode is None:
             mode = "flow_curve"
 

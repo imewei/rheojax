@@ -195,7 +195,10 @@ def main(args: list[str] | None = None) -> int:
     # CLI-FIT-001: also guard complex y arrays — check magnitude for NaN/Inf
     if np.iscomplexobj(y_arr):
         if np.any(~np.isfinite(np.abs(y_arr))):
-            print("Error: Data contains NaN/Inf values in complex y column", file=sys.stderr)
+            print(
+                "Error: Data contains NaN/Inf values in complex y column",
+                file=sys.stderr,
+            )
             return 1
     elif np.any(~np.isfinite(y_arr)):
         print("Error: Data contains NaN/Inf values in y column", file=sys.stderr)

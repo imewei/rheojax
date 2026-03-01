@@ -225,7 +225,9 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             try:
                 with warnings.catch_warnings(record=True) as caught:
                     warnings.simplefilter("always")
-                    result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+                    result = load_trios(
+                        filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS)
+                    )
                 if not _has_trios_metadata(result):
                     raise ValueError("No TRIOS metadata found")
                 for w in caught:
@@ -311,7 +313,9 @@ def _try_trios_then_anton_then_csv(
         logger.debug("Trying Anton Paar reader", filepath=str(filepath))
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            result = load_anton_paar(filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS))
+            result = load_anton_paar(
+                filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS)
+            )
         for w in caught:
             warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
         logger.debug("Anton Paar reader succeeded", filepath=str(filepath))
@@ -645,9 +649,7 @@ def _try_all_readers(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
                 result = reader_func()
             # Reader succeeded — re-emit its warnings
             for w in caught:
-                warnings.warn_explicit(
-                    w.message, w.category, w.filename, w.lineno
-                )
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
             logger.debug("Reader succeeded", filepath=str(filepath), reader=reader_name)
             _inject_provenance(result, reader_name, attempted)
             return result

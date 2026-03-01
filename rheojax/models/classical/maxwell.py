@@ -142,7 +142,9 @@ class Maxwell(BaseModel):
             if supplied_mode is None and np.iscomplexobj(y_np):
                 test_mode = TestMode.OSCILLATION
             else:
-                test_mode = supplied_mode if supplied_mode is not None else TestMode.RELAXATION
+                test_mode = (
+                    supplied_mode if supplied_mode is not None else TestMode.RELAXATION
+                )
 
         if isinstance(test_mode, str):
             try:

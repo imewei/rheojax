@@ -392,7 +392,9 @@ class BayesianWorker(QRunnable):
                 # the slot runs on the main Qt thread even though this function runs
                 # in a raw threading.Thread (not a Qt-managed thread).
                 try:
-                    from PySide6.QtCore import QMetaObject, Qt as _Qt
+                    from PySide6.QtCore import QMetaObject
+                    from PySide6.QtCore import Qt as _Qt
+
                     _use_invoke = True
                 except ImportError:
                     _use_invoke = False

@@ -350,9 +350,7 @@ class SPPDecomposer(BaseTransform):
             strain_jax = self.gamma_0 * jnp.sin(omega_scalar * t_jax)
 
         if "strain_rate" in _spp_meta:
-            strain_rate_jax = jnp.asarray(
-                _spp_meta["strain_rate"], dtype=jnp.float64
-            )
+            strain_rate_jax = jnp.asarray(_spp_meta["strain_rate"], dtype=jnp.float64)
         else:
             # Compute strain rate via wrapped differentiation (Rogers parity)
             strain_rate_jax = differentiate_rate_from_strain(

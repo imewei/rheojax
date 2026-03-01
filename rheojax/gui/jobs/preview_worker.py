@@ -159,7 +159,9 @@ class PreviewWorker(QRunnable):
     def run(self) -> None:
         """Execute file preview in background thread."""
         try:
-            file_size = self._file_path.stat().st_size if self._file_path.exists() else -1
+            file_size = (
+                self._file_path.stat().st_size if self._file_path.exists() else -1
+            )
             logger.info(
                 "Preview worker started",
                 filepath=str(self._file_path),
@@ -186,7 +188,11 @@ class PreviewWorker(QRunnable):
             headers = preview_result.get("headers", [])
             metadata = preview_result.get("metadata", {})
             warnings_list = preview_result.get("warnings", [])
-            detected_cols = metadata.get("detected_columns", {}) if isinstance(metadata, dict) else {}
+            detected_cols = (
+                metadata.get("detected_columns", {})
+                if isinstance(metadata, dict)
+                else {}
+            )
 
             logger.info(
                 "Preview worker completed",

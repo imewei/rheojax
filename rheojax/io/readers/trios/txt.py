@@ -1041,7 +1041,10 @@ def _process_data_section(
 
     # Build segment metadata
     domain, test_mode = _infer_domain_and_mode(
-        columns[x_col], columns[y_col], x_units, y_units,
+        columns[x_col],
+        columns[y_col],
+        x_units,
+        y_units,
         all_columns=columns,
     )
     segment_metadata = _build_segment_metadata(
@@ -1469,7 +1472,10 @@ def _parse_segment(
 
     # Determine domain and test mode
     domain, test_mode = _infer_domain_and_mode(
-        columns[x_col], columns[y_col], x_units, y_units,
+        columns[x_col],
+        columns[y_col],
+        x_units,
+        y_units,
         all_columns=columns,
     )
 
@@ -1483,8 +1489,10 @@ def _parse_segment(
     col_names_lower = [c.lower() for c in columns]
     if any(
         "tensile" in c
-        or c.startswith("e' ") or c == "e'"
-        or c.startswith("e'' ") or c == "e''"
+        or c.startswith("e' ")
+        or c == "e'"
+        or c.startswith("e'' ")
+        or c == "e''"
         for c in col_names_lower
     ):
         segment_metadata["deformation_mode"] = "tension"
@@ -1568,9 +1576,17 @@ def _determine_xy_columns(
     storage_col = None
     loss_col = None
     for i, col in enumerate(columns_lower):
-        if ("storage modulus" in col or "tensile storage modulus" in col or col.startswith("e' ")) and i != x_col:
+        if (
+            "storage modulus" in col
+            or "tensile storage modulus" in col
+            or col.startswith("e' ")
+        ) and i != x_col:
             storage_col = i
-        elif ("loss modulus" in col or "tensile loss modulus" in col or col.startswith("e'' ")) and i != x_col:
+        elif (
+            "loss modulus" in col
+            or "tensile loss modulus" in col
+            or col.startswith("e'' ")
+        ) and i != x_col:
             loss_col = i
 
     # If we have both G' and G'' (or E' and E''), use them to construct complex modulus
@@ -1611,7 +1627,10 @@ def _determine_xy_columns(
 
 
 def _infer_domain_and_mode(
-    x_name: str, y_name: str, x_units: str, y_units: str,
+    x_name: str,
+    y_name: str,
+    x_units: str,
+    y_units: str,
     all_columns: list[str] | None = None,
 ) -> tuple:
     """Infer domain and test mode from column names and units.

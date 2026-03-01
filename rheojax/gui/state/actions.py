@@ -210,9 +210,7 @@ def update_dataset(dataset_id: str, **updates) -> None:
 
     def updater(state: AppState) -> AppState:
         if dataset_id not in state.datasets:
-            logger.warning(
-                "update_dataset: dataset not found", dataset_id=dataset_id
-            )
+            logger.warning("update_dataset: dataset not found", dataset_id=dataset_id)
             return state
 
         dataset = state.datasets[dataset_id]
@@ -245,9 +243,7 @@ def select_model(model_name: str, parameters: dict[str, ParameterState]) -> None
         Model parameters
     """
     store = StateStore()
-    logger.debug(
-        "select_model called", model_name=model_name, n_params=len(parameters)
-    )
+    logger.debug("select_model called", model_name=model_name, n_params=len(parameters))
     store.dispatch(
         "SET_ACTIVE_MODEL", {"model_name": model_name, "model_params": parameters}
     )
@@ -412,9 +408,7 @@ def start_fit(model_name: str, dataset_id: str) -> None:
         Dataset identifier
     """
     store = StateStore()
-    logger.info(
-        "Fit started", model_name=model_name, dataset_id=dataset_id
-    )
+    logger.info("Fit started", model_name=model_name, dataset_id=dataset_id)
 
     store.emit_signal("fit_started", model_name, dataset_id)
 
@@ -777,9 +771,7 @@ def set_pipeline_step(step: PipelineStep, status: StepStatus) -> None:
         New status
     """
     store = StateStore()
-    logger.debug(
-        "set_pipeline_step called", step=step.name, status=status.name
-    )
+    logger.debug("set_pipeline_step called", step=step.name, status=status.name)
     store.dispatch(
         "SET_PIPELINE_STEP",
         {"step": step.name, "status": status.name},

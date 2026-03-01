@@ -455,7 +455,9 @@ class FractionalMaxwellGel(BaseModel):
         eta = self.parameters.get_value("eta")
 
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        test_mode = (
+            _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        )
         if test_mode in ("oscillation", TestMode.OSCILLATION):
             result = self._predict_oscillation_jax(x, c_alpha, alpha, eta)
         elif test_mode in ("creep", TestMode.CREEP):

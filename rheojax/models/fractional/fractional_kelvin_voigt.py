@@ -443,7 +443,9 @@ class FractionalKelvinVoigt(BaseModel):
 
         # Handle raw array input with test_mode dispatch
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        test_mode = (
+            _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        )
 
         x = jnp.asarray(X)
         Ge = self.parameters.get_value("Ge")

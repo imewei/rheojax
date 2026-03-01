@@ -686,7 +686,6 @@ class BayesianPage(QWidget):
                 )
 
             from rheojax.gui.compat import QThreadPool
-
             from rheojax.gui.jobs.import_worker import ImportWorker
 
             preset_worker = ImportWorker(
@@ -707,7 +706,9 @@ class BayesianPage(QWidget):
                     except RuntimeError:
                         return
                     if not datasets_list:
-                        QMessageBox.warning(self, "No Data", "Preset dataset was empty.")
+                        QMessageBox.warning(
+                            self, "No Data", "Preset dataset was empty."
+                        )
                         return
                     rheo_data = datasets_list[0]
                     _dataset_id = str(uuid.uuid4())
@@ -1211,9 +1212,7 @@ class BayesianPage(QWidget):
         QMessageBox.critical(self, "Inference Error", error_msg)
 
     @Slot(str, str, str)
-    def _on_bayesian_failed(
-        self, model_name: str, dataset_id: str, error: str
-    ) -> None:
+    def _on_bayesian_failed(self, model_name: str, dataset_id: str, error: str) -> None:
         """Handle bayesian_failed signal from state store.
 
         This slot catches Bayesian failures that arrive via the WorkerPool /
@@ -1240,13 +1239,8 @@ class BayesianPage(QWidget):
         submitted_dataset = getattr(self, "_submitted_dataset_id", None) or ""
         if not model_name and not dataset_id:
             return  # Anonymous signal — cannot verify ownership
-        if (
-            (model_name and submitted_model and model_name != submitted_model)
-            or (
-                dataset_id
-                and submitted_dataset
-                and dataset_id != submitted_dataset
-            )
+        if (model_name and submitted_model and model_name != submitted_model) or (
+            dataset_id and submitted_dataset and dataset_id != submitted_dataset
         ):
             return
 

@@ -423,7 +423,10 @@ class BaseModel(BayesianMixin, ABC):
                     _X_score = X.x if isinstance(X, _RheoData) else X
                     _y_score = y
 
-                    if getattr(self, "_nlsq_result", None) is not None and self._nlsq_result.fun is not None:
+                    if (
+                        getattr(self, "_nlsq_result", None) is not None
+                        and self._nlsq_result.fun is not None
+                    ):
                         # R11-BASE-002: fun is a residual array, not a scalar cost.
                         # Compute ss_res = sum(residuals^2) instead of float(fun).
                         fun = np.asarray(self._nlsq_result.fun)

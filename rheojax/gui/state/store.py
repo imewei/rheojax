@@ -726,6 +726,7 @@ class StateStore:
         try:
             from PySide6.QtCore import QThread
             from PySide6.QtWidgets import QApplication
+
             _app = QApplication.instance()
             if _app is not None and QThread.currentThread() != _app.thread():
                 _on_main_thread = False
@@ -736,6 +737,7 @@ class StateStore:
             # Worker thread: defer subscriber calls to GUI thread.
             try:
                 from PySide6.QtCore import QMetaObject, Qt
+
                 # M2 fix: append to deque instead of overwriting single-slot buffer
                 self._signals._pending_notifications.append(
                     (subscribers, state_snapshot)
@@ -782,7 +784,9 @@ class StateStore:
                         except Exception:
                             logger.error(
                                 "Subscriber callback failed (queued)",
-                                subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                                subscriber=getattr(
+                                    subscriber, "__name__", str(subscriber)
+                                ),
                                 exc_info=True,
                             )
             finally:
@@ -1775,6 +1779,7 @@ class StateStore:
         try:
             from PySide6.QtCore import QThread
             from PySide6.QtWidgets import QApplication
+
             _app = QApplication.instance()
             if _app is not None and QThread.currentThread() != _app.thread():
                 _on_main_thread = False
@@ -1784,6 +1789,7 @@ class StateStore:
         if not _on_main_thread:
             try:
                 from PySide6.QtCore import QMetaObject, Qt
+
                 self._signals._pending_notifications.append(
                     (subscribers, state_snapshot)
                 )
@@ -1817,7 +1823,9 @@ class StateStore:
                         except Exception:
                             logger.error(
                                 "Subscriber callback failed during batch update",
-                                subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                                subscriber=getattr(
+                                    subscriber, "__name__", str(subscriber)
+                                ),
                                 exc_info=True,
                             )
                     while hasattr(tls, "pending") and tls.pending:

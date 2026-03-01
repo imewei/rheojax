@@ -622,9 +622,7 @@ class ParameterSet:
         # initial parameter creation are not bypassed.  The cost is negligible
         # (one dict comprehension) compared to the validation itself.
         context = {
-            p.name: p.value
-            for p in self._parameters.values()
-            if p.value is not None
+            p.name: p.value for p in self._parameters.values() if p.value is not None
         }
         if not param.validate(value, context):
             logger.error(

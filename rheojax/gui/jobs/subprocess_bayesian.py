@@ -94,6 +94,7 @@ def run_bayesian_isolated(
     # dir() which doesn't list lazy names), so we must eagerly import all
     # submodules to fire the decorators.
     from rheojax.models import _ensure_all_registered
+
     _ensure_all_registered()
 
     # RheoData stores complex modulus as y = G' + i*G'' (no separate y2 field)
@@ -103,15 +104,19 @@ def run_bayesian_isolated(
         y_combined = y_data
 
     rheo_data = RheoData(
-        x=x_data, y=y_combined,
-        initial_test_mode=test_mode, metadata=metadata or {},
+        x=x_data,
+        y=y_combined,
+        initial_test_mode=test_mode,
+        metadata=metadata or {},
     )
 
     start_time = time.perf_counter()
-    total_iterations = max(num_chains * (num_warmup + num_samples), 1)
 
     def progress_callback(
-        stage: str, chain: int, iteration: int, total: int,
+        stage: str,
+        chain: int,
+        iteration: int,
+        total: int,
     ):
         if cancel_event.is_set():
             from rheojax.gui.jobs.cancellation import CancellationError
@@ -119,12 +124,14 @@ def run_bayesian_isolated(
             raise CancellationError("Operation cancelled by user")
         percent = min(int(iteration / total * 100), 100) if total > 0 else 0
         message = f"{stage}: chain {chain}, iteration {iteration}/{total}"
-        progress_queue.put({
-            "type": "progress",
-            "percent": percent,
-            "total": 100,
-            "message": message,
-        })
+        progress_queue.put(
+            {
+                "type": "progress",
+                "percent": percent,
+                "total": 100,
+                "message": message,
+            }
+        )
 
     # Build kwargs for BayesianService.run_mcmc()
     mcmc_kwargs: dict[str, Any] = {

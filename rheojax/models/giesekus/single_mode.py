@@ -186,7 +186,11 @@ class GiesekusSingleMode(GiesekusBase):
         )
 
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -279,7 +283,11 @@ class GiesekusSingleMode(GiesekusBase):
             Predicted response
         """
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
@@ -324,7 +332,11 @@ class GiesekusSingleMode(GiesekusBase):
             Predicted response
         """
         eta_p, lambda_1, alpha, eta_s = params
-        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        mode = (
+            test_mode
+            if test_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:

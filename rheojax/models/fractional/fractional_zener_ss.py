@@ -539,7 +539,9 @@ class FractionalZenerSolidSolid(BaseModel):
 
         # Dispatch based on test_mode
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        test_mode = (
+            _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        )
         if test_mode in ("oscillation",):
             return self._predict_oscillation(X, Ge, Gm, alpha, tau_alpha)
         elif test_mode in ("creep",):

@@ -398,7 +398,8 @@ class WorkerPool(QObject):
         # so we must SIGTERM → SIGKILL the child process.
         with self._job_lock:
             subprocess_workers = [
-                w for w in self._active_workers.values()
+                w
+                for w in self._active_workers.values()
                 if hasattr(w, "_process") and w._process is not None
             ]
 
@@ -414,6 +415,7 @@ class WorkerPool(QObject):
         # Brief wait for SIGTERM to take effect
         if subprocess_workers:
             import time as _time
+
             _time.sleep(min(2.0, timeout_ms / 1000.0))
 
         # SIGKILL any survivors

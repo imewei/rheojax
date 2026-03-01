@@ -36,7 +36,6 @@ from rheojax.gui.compat import (
 from rheojax.gui.dialogs.about import AboutDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog
-from rheojax.gui.jobs.fit_worker import FitWorker
 from rheojax.gui.jobs.transform_worker import TransformWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.pages.bayesian_page import BayesianPage
@@ -276,7 +275,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
         # R13-GUI-CTX-001: connect context_action_triggered so tree context menu
         # actions (Remove, Rename, Export Data, etc.) are actually handled.
-        self.data_tree.context_action_triggered.connect(self._on_context_action_triggered)
+        self.data_tree.context_action_triggered.connect(
+            self._on_context_action_triggered
+        )
 
         # Transform page callbacks
         self.transform_page.transform_applied.connect(
@@ -809,6 +810,7 @@ class RheoJAXMainWindow(QMainWindow):
                 "Workers still running after shutdown timeout — "
                 "scheduling forced exit to prevent zombie process"
             )
+
             # Give Qt a brief moment to drain signals, then force-exit.
             # os._exit() bypasses QThreadPool destructor's infinite wait.
             def _force_exit():
@@ -1378,9 +1380,7 @@ class RheoJAXMainWindow(QMainWindow):
                             QUrl.fromLocalFile(str(file_path.parent))
                         )
                     else:
-                        QDesktopServices.openUrl(
-                            QUrl.fromLocalFile(str(file_path))
-                        )
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(str(file_path)))
                 except Exception as exc:
                     logger.error(
                         "Could not open file with system handler",
@@ -1481,7 +1481,11 @@ class RheoJAXMainWindow(QMainWindow):
                 # resolved from meta above in this same _on_job_completed call).
                 self.store.dispatch(
                     "FITTING_FAILED",
-                    {"error": error_msg, "model_name": model_name, "dataset_id": dataset_id},
+                    {
+                        "error": error_msg,
+                        "model_name": model_name,
+                        "dataset_id": dataset_id,
+                    },
                 )
                 # R11-MW-003: FITTING_FAILED reducer already sets pipeline
                 # step to ERROR; no separate SET_PIPELINE_STEP needed.
@@ -1562,12 +1566,20 @@ class RheoJAXMainWindow(QMainWindow):
         if job_type == "fit":
             self.store.dispatch(
                 "FITTING_FAILED",
-                {"error": str(error), "model_name": model_name, "dataset_id": dataset_id},
+                {
+                    "error": str(error),
+                    "model_name": model_name,
+                    "dataset_id": dataset_id,
+                },
             )
         elif job_type == "bayesian":
             self.store.dispatch(
                 "BAYESIAN_FAILED",
-                {"error": str(error), "model_name": model_name, "dataset_id": dataset_id},
+                {
+                    "error": str(error),
+                    "model_name": model_name,
+                    "dataset_id": dataset_id,
+                },
             )
         elif job_type == "transform":
             self.store.dispatch(
@@ -1596,12 +1608,20 @@ class RheoJAXMainWindow(QMainWindow):
         if job_type == "fit":
             self.store.dispatch(
                 "FITTING_FAILED",
-                {"error": "Cancelled", "model_name": model_name, "dataset_id": dataset_id},
+                {
+                    "error": "Cancelled",
+                    "model_name": model_name,
+                    "dataset_id": dataset_id,
+                },
             )
         elif job_type == "bayesian":
             self.store.dispatch(
                 "BAYESIAN_FAILED",
-                {"error": "Cancelled", "model_name": model_name, "dataset_id": dataset_id},
+                {
+                    "error": "Cancelled",
+                    "model_name": model_name,
+                    "dataset_id": dataset_id,
+                },
             )
         elif job_type == "transform":
             self.log("Transform cancelled")
@@ -2283,9 +2303,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message("Export in progress...", 0)
         # R6-EXP-003: Mark the pipeline EXPORT step as ACTIVE so the
         # pipeline chips reflect the in-progress state.
-        self.store.dispatch(
-            "SET_PIPELINE_STEP", {"step": "export", "status": "ACTIVE"}
-        )
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "export", "status": "ACTIVE"})
 
     @Slot(str)
     def _on_export_completed(self, output_path: str) -> None:
@@ -2301,9 +2319,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message(f"Export completed: {output_path}", 5000)
         # R6-EXP-001: Update pipeline step so the EXPORT chip reflects
         # completion instead of staying stuck on ACTIVE/PENDING.
-        self.store.dispatch(
-            "EXPORT_RESULTS", {"file_path": output_path}
-        )
+        self.store.dispatch("EXPORT_RESULTS", {"file_path": output_path})
         # R6-REV-001: Also dispatch SET_PIPELINE_STEP so pipeline_step_changed
         # signal fires (EXPORT_RESULTS reducer doesn't emit domain signals).
         self.store.dispatch(
@@ -2324,9 +2340,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message(f"Export failed: {error_msg}", 5000)
         # R6-EXP-002: Update pipeline step so the EXPORT chip reflects
         # the failure instead of staying stuck on ACTIVE/PENDING.
-        self.store.dispatch(
-            "SET_PIPELINE_STEP", {"step": "export", "status": "ERROR"}
-        )
+        self.store.dispatch("SET_PIPELINE_STEP", {"step": "export", "status": "ERROR"})
 
     @Slot()
     def _on_batch_fit(self) -> None:

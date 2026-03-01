@@ -50,11 +50,32 @@ AUTO_CHUNK_THRESHOLD_MB = 5.0
 
 # Unit substrings for identifying unit rows in TRIOS CSV files.
 # Shared between first-table parsing and multi-table continuation loop.
-_UNIT_SUBSTRINGS = frozenset({
-    "Pa", "Hz", "rad", "°C", "°F", "K", "/s", "%", "1/",
-    "mN", "mPa", "kPa", "MPa", "N·m", "N.m", "J/", "W/",
-    "m²", "m2", "mm", "μm", "nm",
-})
+_UNIT_SUBSTRINGS = frozenset(
+    {
+        "Pa",
+        "Hz",
+        "rad",
+        "°C",
+        "°F",
+        "K",
+        "/s",
+        "%",
+        "1/",
+        "mN",
+        "mPa",
+        "kPa",
+        "MPa",
+        "N·m",
+        "N.m",
+        "J/",
+        "W/",
+        "m²",
+        "m2",
+        "mm",
+        "μm",
+        "nm",
+    }
+)
 
 
 def detect_encoding(filepath: Path) -> str:
@@ -664,10 +685,10 @@ def parse_trios_csv(
         next_units = extract_units_from_header(next_header, next_unit_row)
 
         # Determine label-column offset for this section
-        next_first_col_is_label = (
-            next_header[0].lower() in {"variables", "data point"}
-            or next_header[0].lower().startswith("data")
-        )
+        next_first_col_is_label = next_header[0].lower() in {
+            "variables",
+            "data point",
+        } or next_header[0].lower().startswith("data")
         next_col_offset = 1 if next_first_col_is_label else 0
         if next_first_col_is_label:
             next_header = next_header[1:]

@@ -312,7 +312,9 @@ class BatchPipeline:
 
         loaded: dict[Path, RheoData] = {}
 
-        def _load_one(fp: Path) -> tuple[Path, RheoData | None, Exception | None]:
+        def _load_one(
+            fp: Path,
+        ) -> tuple[Path, RheoData | list[RheoData] | None, Exception | None]:
             try:
                 data = auto_load(fp, format=format, **load_kwargs)
                 return (fp, data, None)
@@ -324,7 +326,7 @@ class BatchPipeline:
             for future in as_completed(futures):
                 fp, data, err = future.result()
                 if err is None and data is not None:
-                    loaded[fp] = data
+                    loaded[fp] = data  # type: ignore[assignment]
                 elif err is not None:
                     logger.debug(
                         "Parallel preload failed for file",

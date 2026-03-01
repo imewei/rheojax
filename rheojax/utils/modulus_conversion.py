@@ -70,14 +70,14 @@ def _validate_poisson_ratio(nu: float) -> None:
     # bool is a subclass of int so isinstance(True, numbers.Number) is True —
     # reject it explicitly since passing a boolean is almost certainly a bug.
     if isinstance(nu, (str, bytes, bool)):
-        raise TypeError(
-            f"Poisson's ratio must be a number, got {type(nu).__name__!r}"
-        )
+        raise TypeError(f"Poisson's ratio must be a number, got {type(nu).__name__!r}")
     # UTILS-004: Handle JAX scalars and other numeric array-likes
     try:
         nu = float(nu)
-    except (TypeError, ValueError):
-        raise TypeError(f"Poisson's ratio must be a number, got {type(nu).__name__!r}")
+    except (TypeError, ValueError) as err:
+        raise TypeError(
+            f"Poisson's ratio must be a number, got {type(nu).__name__!r}"
+        ) from err
     if nu <= -1.0 or nu > 0.5:
         raise ValueError(
             f"Poisson's ratio must be in (-1, 0.5], got {nu}. "

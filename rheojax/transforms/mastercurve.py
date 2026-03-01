@@ -741,7 +741,7 @@ class Mastercurve(BaseTransform):
 
     def _transform(
         self, data: RheoData | list[RheoData]
-    ) -> RheoData | tuple[RheoData, dict[float, float]]:
+    ) -> RheoData | list[RheoData] | tuple[RheoData, dict[float, float]]:
         """Apply horizontal shift to single-temperature data or create mastercurve.
 
         Parameters
@@ -856,7 +856,7 @@ class Mastercurve(BaseTransform):
         # Compute shift factors
         if self._auto_shift:
             # Use automatic shift factor calculation
-            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)  # type: ignore[arg-type]
+            log_aT_array = self._compute_auto_shift_factors(datasets, ref_temp_idx)
             shift_factors = {
                 T: 10.0**log_aT
                 for T, log_aT in zip(temperatures, log_aT_array, strict=False)

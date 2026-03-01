@@ -1167,7 +1167,9 @@ class SGRConventional(BaseModel):
         """
         # Get test_mode from kwargs or instance attribute
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        test_mode = (
+            _kw_mode if _kw_mode is not None else getattr(self, "_test_mode", None)
+        )
         if test_mode is None:
             raise ValueError("test_mode must be specified for prediction")
 

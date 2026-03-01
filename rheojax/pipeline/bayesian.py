@@ -340,9 +340,7 @@ class BayesianPipeline(Pipeline):
                 # aggregate — a single failed parameter diagnostic should
                 # not make the summary metric NaN.
                 r_hat_values = [
-                    v
-                    for v in result.diagnostics["r_hat"].values()
-                    if np.isfinite(v)
+                    v for v in result.diagnostics["r_hat"].values() if np.isfinite(v)
                 ]
                 if r_hat_values:
                     ctx["r_hat_max"] = max(r_hat_values)
@@ -351,9 +349,7 @@ class BayesianPipeline(Pipeline):
                     logger.warning("All R-hat values are NaN — diagnostics invalid")
             if "ess" in result.diagnostics:
                 ess_values = [
-                    v
-                    for v in result.diagnostics["ess"].values()
-                    if np.isfinite(v)
+                    v for v in result.diagnostics["ess"].values() if np.isfinite(v)
                 ]
                 if ess_values:
                     ctx["ess_min"] = min(ess_values)

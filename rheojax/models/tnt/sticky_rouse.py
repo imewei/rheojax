@@ -114,7 +114,7 @@ from rheojax.models.tnt._kernels import (
     tnt_multimode_relaxation_vec,
     tnt_multimode_saos_moduli_vec,
 )
-from rheojax.utils.optimization import nlsq_curve_fit
+from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
 
 jax, jnp = safe_import_jax()
 
@@ -348,7 +348,11 @@ class TNTStickyRouse(TNTBase):
         tau_eff = jnp.maximum(tau_R_modes, tau_s)
 
         # Resolve test mode with fallback
-        mode = test_mode if test_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        mode = (
+            test_mode
+            if test_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
         gamma_dot = (
@@ -492,20 +496,27 @@ class TNTStickyRouse(TNTBase):
     # =========================================================================
 
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> TNTStickyRouse:
-        """Fit model to data using NLSQ optimization.
+        """Fit model to data using protocol-aware optimization.
 
         Parameters
         ----------
-        x : np.ndarray
+        X : np.ndarray
             Independent variable (time, frequency, or shear rate)
         y : np.ndarray
             Dependent variable (stress, modulus, or complex modulus)
         **kwargs : dict
-            Optional keyword arguments:
-            - test_mode: Protocol ('oscillation', 'relaxation', 'flow_curve')
+            Additional arguments including test_mode, method, gamma_dot, etc.
+
+        Returns
+        -------
+        self
         """
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
         self._test_mode = test_mode
 
         # Store protocol-specific inputs
@@ -513,6 +524,13 @@ class TNTStickyRouse(TNTBase):
         self._sigma_applied = kwargs.get("sigma_applied")
         self._gamma_0 = kwargs.get("gamma_0")
         self._omega_laos = kwargs.get("omega")
+
+        # Determine optimization method — ODE-based protocols require scipy
+        # because diffrax custom_vjp is incompatible with NLSQ forward-mode AD
+        method = kwargs.get("method", "auto")
+        _ode_protocols = {"startup", "creep", "laos"}
+        if test_mode in _ode_protocols:
+            method = "scipy"
 
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)
@@ -527,36 +545,34 @@ class TNTStickyRouse(TNTBase):
                 sigma_0 / jnp.sum(G_modes) * G_modes
             )
 
-        # Build objective function
-        def objective(params_array):
-            y_pred = self.model_function(x_jax, params_array, test_mode=test_mode)
-            if jnp.iscomplexobj(y_jax):
-                # Complex fitting (oscillation)
-                residuals = jnp.concatenate(
-                    [jnp.real(y_pred - y_jax), jnp.imag(y_pred - y_jax)]
-                )
-            else:
-                residuals = y_pred - y_jax
-            return residuals
+        # Define model function for fitting
+        def model_fn(x_fit, params):
+            return self.model_function(x_fit, params, test_mode=test_mode)
 
-        # Run NLSQ optimization
-        result = nlsq_curve_fit(
-            self.model_function,
+        # Create objective and optimize
+        objective = create_least_squares_objective(
+            model_fn,
             x_jax,
             y_jax,
-            self.parameters,
-            test_mode=test_mode,
+            use_log_residuals=kwargs.get(
+                "use_log_residuals", test_mode == "flow_curve"
+            ),
         )
 
-        # nlsq_curve_fit already updates ParameterSet in-place
+        result = nlsq_optimize(
+            objective,
+            self.parameters,
+            use_jax=kwargs.get("use_jax", True),
+            method=method,
+            max_iter=kwargs.get("max_iter", 2000),
+        )
 
-        # Store fit statistics
-        self._fit_result = result
-        self._r_squared = result.r_squared
+        self.fitted_ = True
+        self._nlsq_result = result
 
         logger.info(
-            f"Sticky Rouse fit complete: R²={self._r_squared:.4f}, "
-            f"n_modes={self._n_modes}"
+            f"Sticky Rouse fit complete: "
+            f"n_modes={self._n_modes}, method={method}"
         )
         return self
 
@@ -585,7 +601,11 @@ class TNTStickyRouse(TNTBase):
             Predicted response
         """
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "flow_curve")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "flow_curve")
+        )
 
         # Get mode parameters
         G_modes, tau_R, tau_eff = self._get_mode_arrays()

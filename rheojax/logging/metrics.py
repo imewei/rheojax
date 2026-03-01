@@ -206,9 +206,7 @@ class IterationLogger:
             operation: Operation name for log messages.
         """
         if log_every <= 0:
-            raise ValueError(
-                f"log_every must be a positive integer, got {log_every!r}"
-            )
+            raise ValueError(f"log_every must be a positive integer, got {log_every!r}")
         self.logger = logger or get_logger("rheojax.optimization")
         self.log_every = log_every
         self.level = level

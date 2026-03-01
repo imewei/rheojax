@@ -472,7 +472,11 @@ class MIKH(IKHBase):
             **kwargs: Additional parameters (test_mode, gamma_dot, etc.)
         """
         _kw_mode = kwargs.get("test_mode")
-        test_mode = _kw_mode if _kw_mode is not None else (self._test_mode if self._test_mode is not None else "startup")
+        test_mode = (
+            _kw_mode
+            if _kw_mode is not None
+            else (self._test_mode if self._test_mode is not None else "startup")
+        )
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 

@@ -181,7 +181,12 @@ class ParameterTable(QTableWidget):
             val_item = self.item(row, 1)
             min_item = self.item(row, 2)
             max_item = self.item(row, 3)
-            if name_item is None or val_item is None or min_item is None or max_item is None:
+            if (
+                name_item is None
+                or val_item is None
+                or min_item is None
+                or max_item is None
+            ):
                 logger.warning(
                     "Skipping incomplete table row",
                     widget=self.__class__.__name__,

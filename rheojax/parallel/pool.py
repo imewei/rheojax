@@ -87,7 +87,11 @@ def _worker_loop(
                 tb_truncated = tb[:4096] if len(tb) > 4096 else tb
                 try:
                     result_queue.put(
-                        (task_id, "error", f"Result serialization failed: {put_exc}\n{tb_truncated}")
+                        (
+                            task_id,
+                            "error",
+                            f"Result serialization failed: {put_exc}\n{tb_truncated}",
+                        )
                     )
                 except Exception:
                     # Queue itself is broken — log and continue the worker loop

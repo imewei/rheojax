@@ -398,7 +398,11 @@ class Pipeline:
             y_units=self.data.y_units if self.data else None,
             domain=self.data.domain if self.data else "time",
             metadata={
-                **(self.data.metadata if (self.data and self.data.metadata is not None) else {}),
+                **(
+                    self.data.metadata
+                    if (self.data and self.data.metadata is not None)
+                    else {}
+                ),
                 "type": "prediction",
                 "model": model.__class__.__name__,
             },

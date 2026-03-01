@@ -29,11 +29,10 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 import signal
-import sys
-import time
 import traceback
+from collections.abc import Callable
 from queue import Empty
-from typing import Any, Callable
+from typing import Any
 
 try:
     from rheojax.gui.compat import QObject, QRunnable, Signal
@@ -51,6 +50,7 @@ except ImportError:
     class Signal:  # type: ignore[no-redef]
         def __init__(self, *args: Any) -> None:
             pass
+
 
 from rheojax.gui.jobs.cancellation import CancellationError, ProcessCancellationToken
 from rheojax.logging import get_logger
@@ -697,8 +697,9 @@ def make_bayesian_worker(
 
     # Subprocess mode — use functools.partial with module-level entry
     # point for macOS spawn-context pickling compatibility.
-    import numpy as np
     from functools import partial
+
+    import numpy as np
 
     x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
 

@@ -220,14 +220,14 @@ def plot_rheo_data(
         kwargs = dict(kwargs)
         deformation_mode = kwargs.pop("deformation_mode", None)
         if deformation_mode is None:
-            deformation_mode = getattr(
-                data, "deformation_mode", None
-            ) or _meta.get("deformation_mode")
+            deformation_mode = getattr(data, "deformation_mode", None) or _meta.get(
+                "deformation_mode"
+            )
 
         # VIS-P2-003: Detect frequency-domain data even when y is real (e.g., only G' stored)
-        is_freq_domain = getattr(
-            data, "domain", None
-        ) == "frequency" or _meta.get("test_mode") in (
+        is_freq_domain = getattr(data, "domain", None) == "frequency" or _meta.get(
+            "test_mode"
+        ) in (
             "oscillation",
             "frequency_sweep",
         )
