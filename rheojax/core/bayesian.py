@@ -346,9 +346,11 @@ class BayesianMixin:
     def _validate_parameter_bounds(self) -> None:
         """Validate that all parameter bounds are valid.
 
-        Parameters with equal lower and upper bounds (``bounds[0] == bounds[1]``)
-        are treated as **fixed** and silently skipped — they won't be sampled by
-        NUTS.  Only bounds where lower > upper are invalid.
+        Parameters with near-equal lower and upper bounds are treated as
+        **fixed** and silently skipped — they won't be sampled by NUTS.
+        Near-equality uses relative tolerance ``1e-10 * max(|lo|, 1)`` to
+        handle floating-point roundtrip from factory methods that set
+        identical bounds.  Only bounds where lower > upper are invalid.
         """
         logger.debug("Validating parameter bounds")
         for name in self.parameters.keys():
@@ -359,7 +361,7 @@ class BayesianMixin:
             if bounds is None or bounds[0] is None or bounds[1] is None:
                 continue
             # Equal bounds → fixed parameter, skip (not sampled by NUTS)
-            if bounds[0] == bounds[1]:
+            if abs(bounds[1] - bounds[0]) < max(abs(bounds[0]), 1.0) * 1e-10:
                 logger.debug(
                     "Parameter has equal bounds (fixed), skipping",
                     parameter=name,
@@ -1786,12 +1788,12 @@ class BayesianMixin:
                 else:
                     # Data is |G*| (scalar) — compute magnitude from components
                     predictions_raw = jnp.sqrt(
-                        predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2
+                        predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2 + 1e-30
                     )
                     # Also convert y to magnitude if it's a 2D array (model returned 2 columns
                     # but data wasn't detected as complex)
                     if y.ndim == 2 and y.shape[1] == 2:
-                        y = jnp.sqrt(y[:, 0] ** 2 + y[:, 1] ** 2)
+                        y = jnp.sqrt(y[:, 0] ** 2 + y[:, 1] ** 2 + 1e-30)
 
             # Handle complex vs real predictions
             if is_complex_data:
