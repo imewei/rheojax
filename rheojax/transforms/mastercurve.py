@@ -313,9 +313,18 @@ class Mastercurve(BaseTransform):
         perr_clean : ndarray
             Uncertainties from cleaned fit
         """
-        # Try fit without first point
+        # Need at least 2 points remaining after removing the first to attempt a fit.
+        # With only 1 point we cannot improve the fit; return the full-data result.
         x_no_first = x[1:]
         y_no_first = y[1:]
+
+        if len(x_no_first) < 3:
+            # Too few points for 3-parameter power-law fit; keep full data
+            logger.debug(
+                "Too few points to attempt outlier removal (need >= 4 total)",
+                n_points=len(x),
+            )
+            return x, y, popt_full, perr_full
 
         popt_no_first, perr_no_first = self._fit_power_law(x_no_first, y_no_first)
 
@@ -816,6 +825,12 @@ class Mastercurve(BaseTransform):
             return_shifts=return_shifts,
         )
 
+        if not datasets:
+            raise ValueError(
+                "create_mastercurve requires at least one dataset. "
+                "Received an empty list."
+            )
+
         if return_shifts and not merge:
             logger.error(
                 "Invalid configuration: return_shifts=True requires merge=True"
@@ -869,8 +884,10 @@ class Mastercurve(BaseTransform):
                 b_T = T / self.T_ref
                 y_shifted = y_shifted * b_T
 
-            # Create metadata
-            new_metadata = _dmeta.copy()
+            # Create metadata — use THIS dataset's metadata (not the loop variable
+            # _dmeta which leaks from the temperature-extraction loop above and
+            # would give every shifted dataset the metadata of the last dataset).
+            new_metadata = (data.metadata or {}).copy()
             new_metadata.update(
                 {
                     "transform": "mastercurve",

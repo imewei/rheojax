@@ -212,7 +212,8 @@ def plot_rheo_data(
     logger.debug("Generating plot", plot_type="rheo_data", style=style)
 
     try:
-        test_mode = data.metadata.get("test_mode", "")
+        _meta = data.metadata or {}
+        test_mode = _meta.get("test_mode", "")
 
         # Select plot type based on domain and test mode
         # VIS-P1-004: Forward deformation mode for E'/G' label selection
@@ -221,12 +222,12 @@ def plot_rheo_data(
         if deformation_mode is None:
             deformation_mode = getattr(
                 data, "deformation_mode", None
-            ) or data.metadata.get("deformation_mode")
+            ) or _meta.get("deformation_mode")
 
         # VIS-P2-003: Detect frequency-domain data even when y is real (e.g., only G' stored)
         is_freq_domain = getattr(
             data, "domain", None
-        ) == "frequency" or data.metadata.get("test_mode") in (
+        ) == "frequency" or _meta.get("test_mode") in (
             "oscillation",
             "frequency_sweep",
         )

@@ -120,6 +120,12 @@ class SRFS(BaseTransform):
         auto_shift : bool
             Whether to automatically compute optimal shift factors
         """
+        if reference_gamma_dot <= 0.0:
+            raise ValueError(
+                f"reference_gamma_dot must be positive, got {reference_gamma_dot}. "
+                "The reference shear rate is used as a divisor in shift-factor "
+                "computation and cannot be zero or negative."
+            )
         super().__init__()
         self.reference_gamma_dot = reference_gamma_dot
         self._auto_shift = auto_shift

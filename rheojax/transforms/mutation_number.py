@@ -165,8 +165,11 @@ class MutationNumber(BaseTransform):
         float
             Extrapolated tail integral contribution
         """
-        # Use last few points to fit extrapolation model
-        n_fit = min(10, len(t) // 4)
+        # Use last few points to fit extrapolation model.
+        # Ensure n_fit >= 1 — when len(t) < 4, len(t)//4 == 0 and t[-0:] returns
+        # the FULL array (Python negative-index wrapping), which fits the entire
+        # signal instead of just the tail.
+        n_fit = max(1, min(10, len(t) // 4))
         t_fit = t[-n_fit:]
         G_fit = G_t[-n_fit:]
 

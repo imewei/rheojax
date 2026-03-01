@@ -182,6 +182,20 @@ class SmoothDerivative(BaseTransform):
         x_np = np.array(x) if isinstance(x, jnp.ndarray) else x
         y_np = np.array(y) if isinstance(y, jnp.ndarray) else y
 
+        # Guard: need at least 2 points to compute dx[0], and window_length points
+        # for Savitzky-Golay. Fall back to finite differences for small arrays.
+        if len(x_np) < 2:
+            raise ValueError(
+                f"SmoothDerivative requires at least 2 data points, got {len(x_np)}"
+            )
+        if len(x_np) < self.window_length:
+            logger.warning(
+                "Data length < window_length; falling back to finite differences",
+                data_length=len(x_np),
+                window_length=self.window_length,
+            )
+            return self._finite_diff_derivative(x, y)
+
         # Check if uniformly spaced
         dx = np.diff(x_np)
         is_uniform = np.allclose(dx, dx[0], rtol=1e-5)

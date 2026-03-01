@@ -57,7 +57,7 @@ def plot_stress_strain(
     logger.debug("Generating plot", plot_type="stress_strain", style=style)
 
     try:
-        test_mode = data.metadata.get("test_mode", "")
+        test_mode = (data.metadata or {}).get("test_mode", "")
 
         # Determine if log scale is appropriate
         log_x = False
@@ -144,7 +144,7 @@ def plot_modulus_frequency(
         if deformation_mode is None:
             deformation_mode = getattr(
                 data, "deformation_mode", None
-            ) or data.metadata.get("deformation_mode")
+            ) or (data.metadata or {}).get("deformation_mode")
 
         if separate_axes and np.iscomplexobj(y_data):
             # Two separate axes for storage/loss modulus
@@ -283,13 +283,13 @@ def plot_mastercurve(
 
         # Get reference temperature
         if reference_temp is None:
-            reference_temp = datasets[0].metadata.get("temperature", 25)
+            reference_temp = (datasets[0].metadata or {}).get("temperature", 25)
 
         # Plot each dataset
         colors = plt.cm.viridis(np.linspace(0, 1, len(datasets)))
 
         for i, data in enumerate(datasets):
-            temp = data.metadata.get("temperature", None)
+            temp = (data.metadata or {}).get("temperature", None)
             x_data = _ensure_numpy(data.x)
             y_data = _ensure_numpy(data.y)
 

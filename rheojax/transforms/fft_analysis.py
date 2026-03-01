@@ -137,22 +137,34 @@ class FFTAnalysis(BaseTransform):
         Parameters
         ----------
         y : jnp.ndarray
-            Input data
+            Input data (must have at least 2 points; single-point arrays are
+            returned unchanged since no trend can be estimated)
 
         Returns
         -------
         jnp.ndarray
             Detrended data
         """
-        # Fit linear trend: y = a*x + b
         n = len(y)
-        x = jnp.arange(n)
+        # Guard: need at least 2 points to fit a linear trend
+        if n < 2:
+            return y
+
+        # Fit linear trend: y = a*x + b
+        x = jnp.arange(n, dtype=jnp.float64)
 
         # Linear regression
         x_mean = jnp.mean(x)
         y_mean = jnp.mean(y)
 
-        slope = jnp.sum((x - x_mean) * (y - y_mean)) / jnp.sum((x - x_mean) ** 2)
+        denom = jnp.sum((x - x_mean) ** 2)
+        # Guard against degenerate case (all x identical, which cannot happen
+        # for arange but is defended against for robustness)
+        slope = jnp.where(
+            denom > 1e-30,
+            jnp.sum((x - x_mean) * (y - y_mean)) / denom,
+            0.0,
+        )
         intercept = y_mean - slope * x_mean
 
         # Remove trend
@@ -209,6 +221,11 @@ class FFTAnalysis(BaseTransform):
 
             logger.debug("Processing FFT input", n_points=len(t), dtype=str(y.dtype))
 
+            # Guard: minimum data size (must run BEFORE detrend to avoid zero-division)
+            n = len(t)
+            if n < 2:
+                raise ValueError("FFT requires at least 2 data points")
+
             # Handle complex data by taking real part
             if jnp.iscomplexobj(y):
                 logger.debug("Taking real part of complex signal")
@@ -220,9 +237,6 @@ class FFTAnalysis(BaseTransform):
                 y = self._detrend_data(y)
 
             # Compute frequencies and check spacing before windowing/FFT
-            n = len(t)
-            if n < 2:
-                raise ValueError("FFT requires at least 2 data points")
             # R8-FFT-001: use median diff for robust dt estimation (handles log-spaced time)
             dt_values = np.diff(np.asarray(t))
             dt = float(np.median(dt_values))
@@ -423,11 +437,19 @@ class FFTAnalysis(BaseTransform):
         freqs = np.asarray(freq_data.x)
         spectrum = np.asarray(freq_data.y)
 
+        if len(spectrum) == 0:
+            logger.debug("Empty spectrum — no peaks to detect")
+            return jnp.array([], dtype=jnp.float64), jnp.array([], dtype=jnp.float64)
+
         # Simple peak detection: find local maxima
         from scipy.signal import find_peaks as scipy_find_peaks
 
         # Normalize spectrum for prominence calculation
-        max_val = np.max(spectrum)
+        all_nan = np.all(np.isnan(spectrum))
+        if all_nan:
+            logger.debug("All-NaN spectrum — no peaks to detect")
+            return jnp.array([], dtype=jnp.float64), jnp.array([], dtype=jnp.float64)
+        max_val = np.nanmax(spectrum)
         spectrum_norm = spectrum / max_val if max_val > 1e-12 else spectrum
 
         # Find peaks
