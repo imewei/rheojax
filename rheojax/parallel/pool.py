@@ -11,14 +11,15 @@ import logging
 import multiprocessing as mp
 import threading
 import traceback
-from typing import Any, Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any
 
 from rheojax.parallel.config import get_default_workers
 
 logger = logging.getLogger(__name__)
 
-# Unique sentinel for shutdown — cannot collide with valid task payloads
-_SHUTDOWN = object()
+# Unique sentinel for shutdown — string constant survives pickling across spawn
+_SHUTDOWN_SENTINEL = "RHEOJAX_POOL_SHUTDOWN_v1"
 
 
 def _warmup_jax(_unused=None):
@@ -117,9 +118,8 @@ class PersistentProcessPool:
     ) -> None:
         self._n_workers = n_workers or get_default_workers()
         self._ctx = mp.get_context("spawn")
-        # Use a picklable sentinel for the spawn context: workers receive
-        # it as a constructor arg so identity comparison works across processes.
-        self._shutdown_sentinel = None  # None is picklable
+        # String sentinel survives pickling across spawn boundaries
+        self._shutdown_sentinel = _SHUTDOWN_SENTINEL
         self._task_queue: mp.Queue = self._ctx.Queue()
         self._result_queue: mp.Queue = self._ctx.Queue()
         self._workers: list[mp.Process] = []
@@ -203,9 +203,10 @@ class PersistentProcessPool:
 
     def shutdown(self, timeout: float = 10) -> None:
         """Shutdown all workers gracefully."""
-        if self._shutdown:
-            return
-        self._shutdown = True
+        with self._lock:
+            if self._shutdown:
+                return
+            self._shutdown = True
 
         # Send shutdown sentinels
         for _ in self._workers:
@@ -240,6 +241,7 @@ class PersistentProcessPool:
             for future in self._futures.values():
                 if not future.done():
                     future._set_error("Pool was shut down before task completed")
+            self._futures.clear()
 
         # Clean up queues
         for q in (self._task_queue, self._result_queue):

@@ -7,9 +7,10 @@ These are the primary entry points for users and internal pipeline code.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator
+from typing import Any
 
 from rheojax.parallel.config import get_default_workers, is_sequential_mode
 

@@ -77,14 +77,19 @@ def get_worker_isolation() -> str:
 
 
 def get_parallel_config() -> dict[str, Any]:
-    """Get full parallel configuration as dict."""
+    """Get full parallel configuration as dict.
+
+    Takes a snapshot of _overrides under the lock for a consistent view.
+    """
     with _config_lock:
-        warm = _overrides.get("warm_pool", False)
+        overrides_snapshot = dict(_overrides)
     return {
         "n_workers": get_default_workers(),
-        "isolation": get_worker_isolation(),
+        "isolation": overrides_snapshot.get("isolation")
+        or os.environ.get("RHEOJAX_WORKER_ISOLATION", "subprocess"),
         "sequential": is_sequential_mode(),
-        "warm_pool": warm or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
+        "warm_pool": overrides_snapshot.get("warm_pool", False)
+        or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
     }
 
 

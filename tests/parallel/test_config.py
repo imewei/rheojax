@@ -1,9 +1,9 @@
 """Tests for parallel configuration."""
 
 import os
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 
 class TestParallelConfig:
@@ -61,8 +61,9 @@ class TestParallelConfig:
             configure()
 
     def test_max_workers_capped_by_cpu(self):
-        from rheojax.parallel.config import get_default_workers
         import multiprocessing
+
+        from rheojax.parallel.config import get_default_workers
 
         n = get_default_workers()
         assert n <= multiprocessing.cpu_count()
@@ -86,12 +87,51 @@ class TestParallelConfig:
             assert isinstance(n, int)
             assert n >= 1
 
+    def test_configure_isolation_override(self):
+        """configure(isolation=...) overrides get_worker_isolation()."""
+        from rheojax.parallel.config import configure, get_worker_isolation
+
+        try:
+            configure(isolation="thread")
+            assert get_worker_isolation() == "thread"
+        finally:
+            configure()
+
+    def test_configure_n_workers_zero_clamped(self):
+        """n_workers=0 is clamped to 1."""
+        from rheojax.parallel.config import configure, get_default_workers
+
+        try:
+            configure(n_workers=0)
+            assert get_default_workers() == 1
+        finally:
+            configure()
+
+    def test_warm_pool_env_var(self):
+        """RHEOJAX_WARM_POOL=1 enables warm_pool in config."""
+        from rheojax.parallel.config import get_parallel_config
+
+        with patch.dict(os.environ, {"RHEOJAX_WARM_POOL": "1"}):
+            cfg = get_parallel_config()
+            assert cfg["warm_pool"] is True
+
+    def test_configure_isolation_in_parallel_config(self):
+        """configure(isolation=...) is reflected in get_parallel_config()."""
+        from rheojax.parallel.config import configure, get_parallel_config
+
+        try:
+            configure(isolation="thread")
+            cfg = get_parallel_config()
+            assert cfg["isolation"] == "thread"
+        finally:
+            configure()
+
     @pytest.mark.smoke
     def test_config_import(self):
         from rheojax.parallel.config import (  # noqa: F401
+            configure,
             get_default_workers,
             get_parallel_config,
             get_worker_isolation,
             is_sequential_mode,
-            configure,
         )

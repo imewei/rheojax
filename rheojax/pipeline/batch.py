@@ -307,6 +307,7 @@ class BatchPipeline:
         Failures are logged but do not raise (handled later in _process_file).
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         from rheojax.io import auto_load
 
         loaded: dict[Path, RheoData] = {}

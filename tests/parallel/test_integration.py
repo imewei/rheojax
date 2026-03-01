@@ -7,7 +7,6 @@ equivalent results to sequential execution.
 import numpy as np
 import pytest
 
-
 # ── Module-level functions (must be picklable on macOS spawn context) ──
 
 

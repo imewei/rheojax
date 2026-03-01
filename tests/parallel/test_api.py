@@ -1,7 +1,8 @@
 """Tests for parallel public API."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 # Module-level function for pickling
