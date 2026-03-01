@@ -154,6 +154,9 @@ class BayesianPipeline(Pipeline):
                         _pr = _meta.get("poisson_ratio")
                         if _pr is not None:
                             nlsq_kwargs["poisson_ratio"] = _pr
+            # Remove 'method' from nlsq_kwargs to prevent "multiple values"
+            # TypeError since we explicitly pass method="nlsq" below.
+            nlsq_kwargs.pop("method", None)
             model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
             r_squared = model_obj.score(X, y)
             ctx["r_squared"] = r_squared
@@ -390,7 +393,10 @@ class BayesianPipeline(Pipeline):
             raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
 
         logger.debug("Retrieving diagnostics", n_params=len(self._diagnostics))
-        return self._diagnostics
+        # Return a copy to prevent callers from mutating internal state
+        import copy as _copy
+
+        return _copy.deepcopy(self._diagnostics)
 
     def get_posterior_summary(self) -> pd.DataFrame:
         """Get formatted posterior summary statistics.

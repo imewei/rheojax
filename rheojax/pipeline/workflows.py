@@ -431,6 +431,24 @@ class ModelComparisonPipeline(Pipeline):
         X = np.array(data.x)
         y = np.array(data.y)
 
+        # Auto-propagate test_mode, deformation_mode, poisson_ratio from
+        # data.metadata into fit_kwargs (consistent with Pipeline.fit() and
+        # BayesianPipeline.fit_nlsq()).
+        _meta = getattr(data, "metadata", None)
+        if _meta is not None:
+            if "test_mode" not in fit_kwargs:
+                _tm = _meta.get("test_mode")
+                if _tm is not None:
+                    fit_kwargs["test_mode"] = _tm
+            if "deformation_mode" not in fit_kwargs:
+                _dm = _meta.get("deformation_mode")
+                if _dm is not None:
+                    fit_kwargs["deformation_mode"] = _dm
+            if "poisson_ratio" not in fit_kwargs:
+                _pr = _meta.get("poisson_ratio")
+                if _pr is not None:
+                    fit_kwargs["poisson_ratio"] = _pr
+
         logger.info(
             "Starting model comparison",
             n_models=len(self.models),

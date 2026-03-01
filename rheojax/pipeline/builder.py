@@ -194,22 +194,24 @@ class PipelineBuilder:
             return pipeline
 
         for step_type, step_kwargs in self.steps:
+            # Copy to avoid mutating stored dicts (allows repeated build() calls)
+            kwargs = step_kwargs.copy()
             if step_type == "load":
-                pipeline.load(**step_kwargs)
+                pipeline.load(**kwargs)
             elif step_type == "transform":
-                transform_name = step_kwargs.pop("name")
-                pipeline.transform(transform_name, **step_kwargs)
+                transform_name = kwargs.pop("name")
+                pipeline.transform(transform_name, **kwargs)
             elif step_type == "fit":
-                model_name = step_kwargs.pop("model")
-                pipeline.fit(model_name, **step_kwargs)
+                model_name = kwargs.pop("model")
+                pipeline.fit(model_name, **kwargs)
             elif step_type == "predict":
                 # Store prediction but don't break chain
-                step_kwargs.pop("store_as", None)  # Remove for now
+                kwargs.pop("store_as", None)  # Remove for now
                 # Predictions are implicit in pipeline
             elif step_type == "plot":
-                pipeline.plot(**step_kwargs)
+                pipeline.plot(**kwargs)
             elif step_type == "save":
-                pipeline.save(**step_kwargs)
+                pipeline.save(**kwargs)
 
         return pipeline
 

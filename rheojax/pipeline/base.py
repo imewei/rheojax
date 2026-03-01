@@ -716,7 +716,7 @@ class Pipeline:
         Example:
             >>> models = pipeline.get_all_models()
         """
-        return [step[1] for step in self.steps if step[0] == "fit"]
+        return [step[1] for step in self.steps if step[0] in ("fit", "fit_nlsq")]
 
     def get_fitted_parameters(self) -> dict[str, float]:
         """Get fitted parameters from the last model as a dictionary.

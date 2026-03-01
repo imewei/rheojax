@@ -434,7 +434,12 @@ class BatchPipeline:
                 try:
                     transform_cls = type(step_obj)
                     new_transform = copy.deepcopy(step_obj)
-                    pipeline.data = new_transform.transform(pipeline.data)
+                    transform_result = new_transform.transform(pipeline.data)
+                    # Handle transforms that return (data, extra) tuples
+                    if isinstance(transform_result, tuple):
+                        pipeline.data = transform_result[0]
+                    else:
+                        pipeline.data = transform_result
                     # Propagate test_mode from data metadata into replay kwargs
                     # so that a subsequent fit step picks it up correctly.
                     if pipeline.data is not None and hasattr(pipeline.data, "metadata"):
