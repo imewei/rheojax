@@ -492,7 +492,7 @@ def giesekus_saos_moduli(
     tuple[float, float]
         (G', G'') in Pa
     """
-    G = eta_p / lambda_1  # Elastic modulus
+    G = eta_p / jnp.maximum(lambda_1, 1e-12)  # Elastic modulus
     omega_lambda = omega * lambda_1
     omega_lambda_sq = omega_lambda * omega_lambda
     denom = 1.0 + omega_lambda_sq
@@ -622,7 +622,7 @@ def giesekus_ode_rhs(
     source_xy = eta_p * gamma_dot
 
     # Time derivatives: dτ/dt = (source - τ - α_coeff·τ·τ)/λ + convective
-    inv_lambda = 1.0 / lambda_1
+    inv_lambda = 1.0 / jnp.maximum(lambda_1, 1e-12)
 
     d_tau_xx = (-tau_xx - alpha_lambda_over_eta * tt_xx) * inv_lambda + conv_xx
     d_tau_yy = (-tau_yy - alpha_lambda_over_eta * tt_yy) * inv_lambda + conv_yy
@@ -814,7 +814,7 @@ def giesekus_multimode_saos_moduli(
         (G', G'') in Pa
     """
     # Compute per-mode contributions
-    G_modes = eta_p_modes / lambda_modes
+    G_modes = eta_p_modes / jnp.maximum(lambda_modes, 1e-12)
     omega_lambda = omega * lambda_modes
     omega_lambda_sq = omega_lambda * omega_lambda
     denom = 1.0 + omega_lambda_sq
