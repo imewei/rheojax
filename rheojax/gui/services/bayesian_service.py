@@ -157,7 +157,7 @@ class BayesianService:
             if isinstance(data, DatasetState):
                 data = rheodata_from_dataset_state(data)
                 metadata = dict(data.metadata or {})
-                test_mode = test_mode or metadata.get("test_mode")
+                test_mode = test_mode if test_mode is not None else metadata.get("test_mode")
 
             # Set initial values if provided
             if warm_start:

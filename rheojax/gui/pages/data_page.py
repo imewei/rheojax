@@ -855,7 +855,7 @@ class DataPage(QWidget):
             x_col=x_col,
             y_col=y_col,
             y2_col=y2_col,
-            test_mode=test_mode or "auto-detect",
+            test_mode=test_mode if test_mode is not None else "auto-detect",
             page="DataPage",
         )
 

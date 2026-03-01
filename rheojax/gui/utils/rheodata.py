@@ -40,7 +40,7 @@ def rheodata_from_dataset_state(dataset: DatasetState) -> RheoData:
         raise ValueError("DatasetState is missing x/y data")
 
     metadata = dict(getattr(dataset, "metadata", {}) or {})
-    test_mode = dataset.test_mode or metadata.get("test_mode")
+    test_mode = dataset.test_mode if dataset.test_mode is not None else metadata.get("test_mode")
     metadata.setdefault("test_mode", test_mode)
     logger.debug(
         "Extracted dataset info",
