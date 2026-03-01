@@ -61,7 +61,23 @@ def _worker_loop(
         task_id, fn, args, kwargs = task
         try:
             result = fn(*args, **kwargs)
-            result_queue.put((task_id, "ok", result))
+            try:
+                result_queue.put((task_id, "ok", result))
+            except Exception as put_exc:
+                # PARALLEL-001: Pickling the result can fail for non-picklable
+                # objects (e.g. open file handles, lambda functions, certain JAX
+                # arrays).  Without this guard the worker dies silently and the
+                # corresponding PoolFuture blocks until its timeout.
+                tb = traceback.format_exc()
+                tb_truncated = tb[:4096] if len(tb) > 4096 else tb
+                try:
+                    result_queue.put(
+                        (task_id, "error", f"Result serialization failed: {put_exc}\n{tb_truncated}")
+                    )
+                except Exception:
+                    # Queue itself is broken — log and continue the worker loop
+                    # so the process doesn't die silently.
+                    pass
         except Exception as exc:
             tb = traceback.format_exc()
             # Truncate traceback to prevent unbounded payload size
@@ -93,8 +109,11 @@ class PoolFuture:
     def result(self, timeout: float | None = None) -> Any:
         """Block until result is available, then return it."""
         if not self._event.wait(timeout=timeout):
+            # PARALLEL-003: timeout=None means indefinite wait, so this branch
+            # is only reachable when a finite timeout is supplied.
+            timeout_str = f"{timeout}s" if timeout is not None else "indefinite"
             raise TimeoutError(
-                f"Task {self._task_id} did not complete within {timeout}s"
+                f"Task {self._task_id} did not complete within {timeout_str}"
             )
         if self._error is not None:
             raise RuntimeError(self._error)
@@ -221,6 +240,15 @@ class PersistentProcessPool:
             if p.is_alive():
                 p.terminate()
                 p.join(timeout=2)
+
+        # PARALLEL-002: Wait for the result-collector thread to exit before
+        # draining the queue.  _collect_results checks self._shutdown (set
+        # above) and exits after at most one queue.get() timeout (0.1 s).
+        # Joining ensures we do not concurrently drain the queue from two
+        # threads, and that the thread is no longer accessing the queue when
+        # we call q.close() below.
+        if self._result_thread is not None and self._result_thread.is_alive():
+            self._result_thread.join(timeout=1.0)
 
         # Drain remaining results from queue before closing
         import queue as _queue

@@ -144,6 +144,12 @@ def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
         logger.debug("Power-law fit failed", error=str(e))
 
     # 3. Check for stretched exponential: log(-log(G/G0)) vs log(t)
+    # COMPAT-001: Initialize slope_stretch before the try block so the variable
+    # is always defined at the decision logic below.  Python's short-circuit
+    # evaluation means slope_stretch is never used when r_stretch_sq == 0.0,
+    # but initializing explicitly eliminates the UnboundLocalError risk if
+    # threshold values change in the future.
+    slope_stretch = 0.0
     try:
         G0 = G_t[0]
         G_norm = G_t / G0
@@ -382,6 +388,18 @@ def check_model_compatibility(
         material_type = detect_material_type(t=t, G_t=G_t)
     elif test_mode == "oscillation" and omega is not None and G_star is not None:
         material_type = detect_material_type(omega=omega, G_star=G_star)
+    elif test_mode is not None and test_mode not in ("relaxation", "oscillation"):
+        # COMPAT-002: Compatibility checking only supports relaxation and
+        # oscillation data.  For other test_modes (flow_curve, startup, creep,
+        # laos), we return an uninformative result.  Log a warning so callers
+        # are not silently misled into thinking a full compatibility check ran.
+        logger.warning(
+            "check_model_compatibility: test_mode=%r is not supported for "
+            "compatibility analysis (only 'relaxation' and 'oscillation' are "
+            "implemented). Returning default compatible=True with low confidence.",
+            test_mode,
+        )
+        confidence = 0.3  # Low confidence — no analysis was performed
 
     # Get model name
     model_name = model.__class__.__name__

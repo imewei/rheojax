@@ -104,6 +104,10 @@ def extract_frequency_features(omega: np.ndarray, G_star: np.ndarray) -> dict:
             window_length=FEATURE_CONFIG.savgol_window,
             polyorder=FEATURE_CONFIG.savgol_poly,
         )
+        # INIT-001: Savitzky-Golay can overshoot and produce negative values on
+        # noisy or edge data.  Clamping to epsilon prevents log10(negative) →
+        # NaN propagation into omega_mid and alpha_estimate.
+        G_mag_smooth = np.maximum(G_mag_smooth, FEATURE_CONFIG.epsilon)
     else:
         G_mag_smooth = G_mag.copy()
 

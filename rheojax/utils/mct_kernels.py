@@ -360,7 +360,16 @@ def _prony_log_spacing(
     Uses fixed log-spaced τ values and linear least squares for g values.
     Fast and robust but may not capture optimal mode distribution.
     """
-    tau = np.logspace(np.log10(t_valid.min()), np.log10(t_valid.max()), n_modes)
+    t_min = t_valid.min()
+    t_max = t_valid.max()
+    # PRONY-001: When all valid time points are identical (or within floating-
+    # point tolerance), logspace collapses to a single τ and the NNLS system
+    # becomes underdetermined.  Expand ±3 decades around the single time point
+    # so the basis matrix A is well-conditioned.
+    if t_max <= t_min * (1.0 + 1e-10):
+        t_min = max(t_min / 1e3, 1e-10)
+        t_max = t_min * 1e6
+    tau = np.logspace(np.log10(t_min), np.log10(t_max), n_modes)
 
     # Solve for non-negative amplitudes: m(t) ≈ A @ g
     # Use nnls instead of lstsq + clip: nnls directly constrains g >= 0,
@@ -751,6 +760,17 @@ def setup_microscopic_stress_weights(
     """
     from rheojax.utils.structure_factor import percus_yevick_sk, sk_derivatives
 
+    # MCT-001: Validate phi_volume range.  The Percus-Yevick approximation is
+    # only physical for 0 < φ < φ_rcp where φ_rcp ≈ 0.64 (random close packing
+    # for hard spheres).  Outside this range S(k) can become negative or
+    # singular, leading to bogus stress weights.
+    _PHI_MAX = 0.64  # random close packing limit for hard spheres
+    if not (0.0 < phi_volume < _PHI_MAX):
+        raise ValueError(
+            f"phi_volume must be in (0, {_PHI_MAX}) for the Percus-Yevick "
+            f"hard-sphere structure factor. Got phi_volume={phi_volume:.4f}."
+        )
+
     if phi_volume > 0.45 and n_k < 200:
         logger.warning(
             "setup_microscopic_stress_weights: phi=%.3f > 0.45 requires n_k >= 200 "
@@ -773,8 +793,14 @@ def setup_microscopic_stress_weights(
     prefactor = k_BT / (60.0 * np.pi**2)
 
     # Compute weights: prefactor × k⁴ × (S'/S²)² × dk
-    # Handle potential division issues near S(k) = 0
-    S_k_safe = np.maximum(S_k, 1e-10)
+    # Handle potential division issues near S(k) = 0.
+    # MCT-002: The guard value must be large enough that (dS_dk / S_k_safe^2)^2
+    # does not overflow double precision (~1e308).  S(k) near zero occurs only
+    # at k→0 or for unphysical phi values (caught above).  A guard of 1e-6
+    # keeps the denominator well within float64 range ((dS_dk)^2 * 1e24 for
+    # typical dS_dk ~ O(1)) while preserving physical accuracy for dilute
+    # suspensions (phi=0.01-0.02) where S(k→0) legitimately reaches 1e-3.
+    S_k_safe = np.maximum(S_k, 1e-6)
     vertex_factor = (dS_dk / S_k_safe**2) ** 2
 
     weights = prefactor * k_array**4 * vertex_factor * dk
