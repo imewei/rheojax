@@ -653,16 +653,22 @@ class BayesianMixin:
                 candidate = self.parameters.get_value(name)
             warm_start[name] = sanitize_value(name, candidate)
 
-        # Add noise scale initial values
+        # Add noise scale initial values.
+        # Use explicit None-check (not or-sentinel) so that a legitimately zero
+        # std dev (constant-data edge case) is preserved rather than silently
+        # replaced by 0.0 — both cases ultimately floor to 1e-6 via max().
         if is_complex:
-            y_real_scale = scale_info.get("y_real_scale") or 0.0
-            y_imag_scale = scale_info.get("y_imag_scale") or 0.0
+            _yr = scale_info.get("y_real_scale")
+            y_real_scale = _yr if _yr is not None else 0.0
+            _yi = scale_info.get("y_imag_scale")
+            y_imag_scale = _yi if _yi is not None else 0.0
             if "sigma_real" not in warm_start:
                 warm_start["sigma_real"] = max(y_real_scale * 0.1, 1e-6)
             if "sigma_imag" not in warm_start:
                 warm_start["sigma_imag"] = max(y_imag_scale * 0.1, 1e-6)
         else:
-            data_scale = scale_info.get("data_scale", 0.0) or 0.0
+            _ds = scale_info.get("data_scale")
+            data_scale = _ds if _ds is not None else 0.0
             if "sigma" not in warm_start:
                 warm_start["sigma"] = max(data_scale * 0.1, 1e-6)
 

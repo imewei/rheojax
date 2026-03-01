@@ -247,14 +247,16 @@ class FractionalBurgersModel(BaseModel):
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         tau_k_safe = tau_k + epsilon
+        # P2-FRAC-004: Guard t=0 — power(0/tau, -alpha_safe) = +inf when alpha>0.
+        t_safe = jnp.maximum(t, 1e-30)
         # Approximate using inverse relationship
         # G(0) ≈ 1/J_g (instantaneous modulus)
         G_inst = 1.0 / (Jg + epsilon)
         # Long-time decay (fractional Maxwell-like)
         # G(t) ~ t^(-α) at intermediate times
-        G_decay = G_inst * jnp.power(t / tau_k_safe, -alpha_safe)
+        G_decay = G_inst * jnp.power(t_safe / tau_k_safe, -alpha_safe)
         # Smooth transition
-        z = -jnp.power(t / tau_k_safe, alpha_safe)
+        z = -jnp.power(t_safe / tau_k_safe, alpha_safe)
         ml_term = mittag_leffler_e(z, alpha=alpha_safe)
         # Combine terms
         G_t = G_inst * ml_term + G_decay * (1.0 - ml_term)

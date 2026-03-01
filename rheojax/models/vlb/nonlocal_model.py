@@ -204,7 +204,10 @@ class VLBNonlocal(VLBBase):
         float
             Cooperativity length (m)
         """
-        D_mu = float(self.parameters.get_value("D_mu") or 1e-8)
+        # P3-VLB-001: Use explicit None-check instead of or-sentinel so that a
+        # legitimately small D_mu=0.0 (no diffusion) is not silently replaced.
+        _d_mu = self.parameters.get_value("D_mu")
+        D_mu = float(_d_mu if _d_mu is not None else 1e-8)
         return np.sqrt(D_mu / self.k_d_0)
 
     # =========================================================================
@@ -347,7 +350,8 @@ class VLBNonlocal(VLBBase):
         mu_xy = state_fields["mu_xy"]
 
         if self._stress_type == "fene":
-            L_max = float(self.parameters.get_value("L_max") or 10.0)
+            _l_max = self.parameters.get_value("L_max")
+            L_max = float(_l_max if _l_max is not None else 10.0)
             sigma_elastic = jax.vmap(
                 lambda xx, yy, zz, xy: vlb_stress_fene_xy(xx, yy, zz, xy, G0, L_max)
             )(
@@ -455,7 +459,8 @@ class VLBNonlocal(VLBBase):
         eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
 
         if self._stress_type == "fene":
-            L_max = float(self.parameters.get_value("L_max") or 10.0)
+            _l_max = self.parameters.get_value("L_max")
+            L_max = float(_l_max if _l_max is not None else 10.0)
 
             def _gamma_dot_single(state_i):
                 Sigma_i = state_i[0]

@@ -183,13 +183,15 @@ class FractionalZenerSolidLiquid(BaseModel):
         ml_beta = 1.0
 
         tau_safe = tau + epsilon
+        # P2-FRAC-002: Guard t=0 — power(0, -alpha_safe) = +inf when alpha>0.
+        t_safe = jnp.maximum(t, 1e-30)
         # Compute fractional relaxation term
         # E_{1-α,1}(-(t/τ)^(1-α))
-        z = -jnp.power(t / tau_safe, ml_alpha)
+        z = -jnp.power(t_safe / tau_safe, ml_alpha)
         # Mittag-Leffler function with concrete alpha/beta
         ml_term = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
         # G(t) = G_e + c_α * t^(-α) * E_{1-α,1}(...)
-        fractional_term = c_alpha * jnp.power(t, -alpha_safe) * ml_term
+        fractional_term = c_alpha * jnp.power(t_safe, -alpha_safe) * ml_term
 
         G_t = Ge + fractional_term
         return G_t

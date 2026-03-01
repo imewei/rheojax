@@ -1601,7 +1601,7 @@ class SGRGeneric(BaseModel):
             # This prevents stale closure capture in JIT/NUTS contexts.
             gamma_dot = kwargs.get("gamma_dot")
             if gamma_dot is None:
-                last_kwargs = getattr(self, "_last_fit_kwargs", {}) or {}
+                last_kwargs = getattr(self, "_last_fit_kwargs", None) or {}
                 gamma_dot = last_kwargs.get("gamma_dot")
             if gamma_dot is None:
                 gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)

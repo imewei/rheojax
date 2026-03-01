@@ -185,14 +185,16 @@ class FractionalJeffreysModel(BaseModel):
 
         tau1_safe = tau1 + epsilon
         eta1_safe = eta1 + epsilon
+        # P2-FRAC-003: Guard t=0 — power(0, -alpha_safe) = +inf when alpha>0.
+        t_safe = jnp.maximum(t, 1e-30)
         # Compute fractional relaxation term
         # E_{1-α,1-α}(-(t/τ_1)^(1-α))
-        z = -jnp.power(t / tau1_safe, ml_alpha)
+        z = -jnp.power(t_safe / tau1_safe, ml_alpha)
         # Two-parameter Mittag-Leffler function with concrete α and β
         ml_term = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
         # G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
         prefactor = eta1_safe / tau1_safe
-        G_t = prefactor * jnp.power(t, -alpha_safe) * ml_term
+        G_t = prefactor * jnp.power(t_safe, -alpha_safe) * ml_term
 
         return G_t
 

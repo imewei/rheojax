@@ -148,6 +148,9 @@ class DMTLocal(DMTBase):
             Fitted model instance
         """
         test_mode = kwargs.get("test_mode", "flow_curve")
+        # P2-DMT-001: Cache test_mode so model_function has a safe fallback
+        # when called outside the NUTS closure (e.g. direct model_function call).
+        self._test_mode = test_mode
 
         if test_mode in ("flow_curve", "rotation"):
             return self._fit_flow_curve(X, y, **kwargs)
@@ -1659,7 +1662,9 @@ class DMTLocal(DMTBase):
             Predicted response (stress, strain, or complex modulus)
         """
         p_values = dict(zip(self.parameters.keys(), params, strict=True))
-        mode = test_mode if test_mode is not None else self._test_mode
+        # P2-DMT-001: Use getattr with default so this is safe even if called
+        # before _fit() (e.g. during model_function probe or unit tests).
+        mode = test_mode if test_mode is not None else getattr(self, "_test_mode", "flow_curve")
         if mode is None:
             mode = "flow_curve"
 

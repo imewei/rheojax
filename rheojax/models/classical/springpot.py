@@ -351,8 +351,13 @@ class SpringPot(BaseModel):
         # alpha -> 1: pure elastic (G -> c_alpha)
 
         # General formula: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
+        # P2-FRAC-001: Guard t=0 — power(0, -alpha) = +inf when alpha>0, which
+        # propagates NaN through the NLSQ Jacobian.  Use 1e-30 floor so that
+        # t=0 maps to a very large (but finite) modulus, consistent with the
+        # singular G(0) = +∞ predicted by the SpringPot model.
+        t_safe = jnp.maximum(t, 1e-30)
         gamma_factor = jax_gamma(1.0 - alpha)
-        return c_alpha * jnp.power(t, -alpha) / gamma_factor
+        return c_alpha * jnp.power(t_safe, -alpha) / gamma_factor
 
     @staticmethod
     @jax.jit
