@@ -705,9 +705,69 @@ def pytest_configure(config):
 
 @pytest.fixture(autouse=True)
 def reset_jax_config():
-    """Reset JAX configuration after each test to avoid state leakage."""
+    """Reset JAX configuration and free memory after each test.
+
+    Without periodic cache clearing, JIT compilation artifacts accumulate
+    throughout the pytest-xdist worker's lifetime, causing each worker to
+    grow from ~1 GB to 3-4 GB. Combined with 8 workers on a 16 GB machine
+    this causes OOM and 35+ GB swap.
+    """
     yield
     # Reset JAX config validation state to avoid module import caching issues
     from rheojax.core.jax_config import reset_validation
 
     reset_validation()
+
+    # Free accumulated JIT caches to prevent unbounded memory growth
+    import gc
+
+    gc.collect()
+    try:
+        jax.clear_caches()
+    except Exception:
+        pass
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Clean up child processes and JAX resources when test session ends.
+
+    Each pytest-xdist worker runs as a separate process. Without explicit
+    cleanup, daemon child processes (from PersistentProcessPool) and JAX
+    XLA backends can persist after the worker exits, leading to zombie
+    processes and memory exhaustion.
+    """
+    import gc
+    import os
+
+    # Shut down any leaked PersistentProcessPool instances
+    try:
+        from rheojax.parallel.pool import _live_pools
+
+        for pool in list(_live_pools):
+            try:
+                pool.shutdown(timeout=2)
+            except Exception:
+                pool._force_kill_workers()
+    except ImportError:
+        pass
+
+    # Free JAX caches before exit
+    gc.collect()
+    try:
+        jax.clear_caches()
+    except Exception:
+        pass
+
+    # Kill any remaining child processes spawned by this worker
+    try:
+        import psutil
+
+        current = psutil.Process(os.getpid())
+        for child in current.children(recursive=True):
+            try:
+                child.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except ImportError:
+        # psutil not available — use os-level cleanup as fallback
+        pass

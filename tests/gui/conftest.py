@@ -400,20 +400,13 @@ def emoji_checker():
 
 @pytest.fixture(autouse=True)
 def reset_state_store():
-    """Reset StateStore singleton between tests.
+    """Reset StateStore and WorkerPool singletons between tests.
 
-    This fixture ensures each test starts with a clean StateStore instance,
-    preventing state leakage between tests that could cause flaky failures.
+    This fixture ensures each test starts with clean singleton instances,
+    preventing state leakage and process accumulation between tests.
 
-    The fixture:
-    1. Resets the singleton before each test
-    2. Yields control to the test
-    3. Resets again after the test completes
-
-    Notes
-    -----
-    This is an autouse fixture, meaning it runs automatically for every test
-    in the gui test suite without needing to be explicitly requested.
+    Without WorkerPool reset, subprocess workers spawned by one test
+    persist into subsequent tests, compounding memory usage.
     """
     # Reset before test
     try:
@@ -421,7 +414,14 @@ def reset_state_store():
 
         StateStore._instance = None
     except ImportError:
-        pass  # StateStore not available, skip reset
+        pass
+
+    try:
+        from rheojax.gui.jobs.worker_pool import WorkerPool
+
+        WorkerPool.reset()
+    except ImportError:
+        pass
 
     yield
 
@@ -430,6 +430,13 @@ def reset_state_store():
         from rheojax.gui.state.store import StateStore
 
         StateStore._instance = None
+    except ImportError:
+        pass
+
+    try:
+        from rheojax.gui.jobs.worker_pool import WorkerPool
+
+        WorkerPool.reset()
     except ImportError:
         pass
 
