@@ -996,10 +996,9 @@ class VLBVariant(VLBBase):
         """
         omega_jax = jnp.asarray(omega, dtype=jnp.float64)
         G_prime, G_double_prime = vlb_saos_moduli_vec(omega_jax, self.G0, self.k_d_0)
-        G_double_prime = (
-            G_double_prime
-            + float(self.parameters.get_value("eta_s") or 0.0) * omega_jax
-        )
+        _eta_s = self.parameters.get_value("eta_s")
+        eta_s = float(_eta_s if _eta_s is not None else 0.0)
+        G_double_prime = G_double_prime + eta_s * omega_jax
         return np.asarray(G_prime), np.asarray(G_double_prime)
 
     def predict_normal_stresses(self, gamma_dot: np.ndarray) -> np.ndarray:
@@ -1315,7 +1314,7 @@ class VLBVariant(VLBBase):
         t = result["t"]
 
         # Use last cycle for steady-state harmonics
-        omega = self._omega_laos or 1.0
+        omega = self._omega_laos if self._omega_laos is not None else 1.0
         period = 2 * np.pi / omega
         t_last_cycle = t[-1] - period
         mask = t >= t_last_cycle

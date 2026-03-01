@@ -341,7 +341,8 @@ class VLBNonlocal(VLBBase):
         """Compute local shear rate profile from state."""
         G0 = self.G0
         k_d_0 = self.k_d_0
-        eta_s = float(self.parameters.get_value("eta_s") or 0.0)
+        _eta_s = self.parameters.get_value("eta_s")
+        eta_s = float(_eta_s if _eta_s is not None else 0.0)
         Sigma = state_fields["Sigma"]
         mu_xy = state_fields["mu_xy"]
 
@@ -449,7 +450,8 @@ class VLBNonlocal(VLBBase):
         n = self.n_points
         G0 = self.G0
         k_d_0 = self.k_d_0
-        eta_s = float(self.parameters.get_value("eta_s") or 0.0)
+        _eta_s = self.parameters.get_value("eta_s")
+        eta_s = float(_eta_s if _eta_s is not None else 0.0)
         eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
 
         if self._stress_type == "fene":

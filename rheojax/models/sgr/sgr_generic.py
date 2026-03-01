@@ -1295,7 +1295,7 @@ class SGRGeneric(BaseModel):
             eta_ss = jnp.where(
                 exp > 0,
                 G0_scale * G0_dim * tau0 / exp_safe,
-                jnp.inf,
+                1e30,
             )
             return jnp.minimum(result, eta_ss)
 

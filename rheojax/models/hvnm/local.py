@@ -809,7 +809,7 @@ class HVNMLocal(HVNMBase):
         """
         t = laos_result["time"]
         stress = laos_result["stress"]
-        omega = self._omega_laos or 1.0
+        omega = self._omega_laos if self._omega_laos is not None else 1.0
 
         period = 2.0 * np.pi / omega
         n_periods = int((t[-1] - t[0]) / period)
