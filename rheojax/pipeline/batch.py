@@ -127,6 +127,11 @@ class BatchPipeline:
         )
 
         if parallel:
+            if parallel_io:
+                logger.debug(
+                    "parallel_io is ignored when parallel=True "
+                    "(full pipeline runs in threads, including I/O)"
+                )
             import warnings as _batch_warnings
 
             has_fit_steps = any(

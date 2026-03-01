@@ -6,38 +6,51 @@ All settings overridable via environment variables or configure() API.
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import os
+import threading
 from typing import Any
 
-# Module-level overrides (set via configure())
+logger = logging.getLogger(__name__)
+
+# Module-level overrides (set via configure()), guarded by _config_lock
 _overrides: dict[str, Any] = {}
+_config_lock = threading.Lock()
 
 
 def get_default_workers() -> int:
     """Optimal worker count for the current system.
 
-    Priority: configure() override > env var > auto-detection.
-    Auto-detection: GPU-aware (min(gpu_count, cpu_count, 4)) or
-    CPU-only (half of cores, capped at 8).
+    Priority: sequential mode (returns 1) > configure() override >
+    env var > auto-detection.
     """
-    override = _overrides.get("n_workers")
+    # Sequential mode takes absolute priority
+    if is_sequential_mode():
+        return 1
+
+    with _config_lock:
+        override = _overrides.get("n_workers")
     if override is not None:
         return int(override)
 
-    env_val = os.environ.get("RHEOJAX_PARALLEL_WORKERS")
+    env_val = os.environ.get("RHEOJAX_PARALLEL_WORKERS", "").strip()
     if env_val:
-        return max(1, int(env_val))
-
-    if is_sequential_mode():
-        return 1
+        try:
+            return max(1, int(env_val))
+        except ValueError:
+            logger.warning(
+                "Invalid RHEOJAX_PARALLEL_WORKERS=%r, falling back to auto-detection",
+                env_val,
+            )
 
     cpu_count = multiprocessing.cpu_count() or 1
 
     # GPU-aware: each worker needs ~2GB GPU RAM
     try:
-        import jax
+        from rheojax.core.jax_config import safe_import_jax
 
+        jax, _ = safe_import_jax()
         devices = jax.devices()
         gpu_count = sum(1 for d in devices if d.platform != "cpu")
         if gpu_count > 0:
@@ -56,7 +69,8 @@ def is_sequential_mode() -> bool:
 
 def get_worker_isolation() -> str:
     """Get worker isolation mode: 'subprocess' or 'thread'."""
-    override = _overrides.get("isolation")
+    with _config_lock:
+        override = _overrides.get("isolation")
     if override is not None:
         return str(override)
     return os.environ.get("RHEOJAX_WORKER_ISOLATION", "subprocess")
@@ -64,12 +78,13 @@ def get_worker_isolation() -> str:
 
 def get_parallel_config() -> dict[str, Any]:
     """Get full parallel configuration as dict."""
+    with _config_lock:
+        warm = _overrides.get("warm_pool", False)
     return {
         "n_workers": get_default_workers(),
         "isolation": get_worker_isolation(),
         "sequential": is_sequential_mode(),
-        "warm_pool": _overrides.get("warm_pool", False)
-        or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
+        "warm_pool": warm or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
     }
 
 
@@ -81,15 +96,18 @@ def configure(
 ) -> None:
     """Override default parallel configuration.
 
-    Call once at application startup. Pass None to reset to auto-detection.
+    Call once at application startup. Thread-safe.
+    Pass no arguments to reset to auto-detection.
     """
     global _overrides
-    _overrides = {}
+    new_overrides: dict[str, Any] = {}
     if n_workers is not None:
-        _overrides["n_workers"] = max(1, n_workers)
+        new_overrides["n_workers"] = max(1, n_workers)
     if warm_pool:
-        _overrides["warm_pool"] = True
+        new_overrides["warm_pool"] = True
     if isolation is not None:
-        _overrides["isolation"] = isolation
+        new_overrides["isolation"] = isolation
     if warmup_models:
-        _overrides["warmup_models"] = warmup_models
+        new_overrides["warmup_models"] = warmup_models
+    with _config_lock:
+        _overrides = new_overrides

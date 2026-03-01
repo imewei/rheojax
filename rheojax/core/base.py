@@ -1309,10 +1309,10 @@ class BaseTransform(ABC):
             raise TypeError(f"Cannot compose with {type(other)}")
 
     def batch_transform(self, datasets: list) -> list:
-        """Transform multiple datasets efficiently.
+        """Transform multiple datasets sequentially.
 
-        For same-shape datasets, uses ThreadPoolExecutor for parallelism.
-        Falls back to sequential for variable-length datasets.
+        Applies the transform to each dataset in order. Sequential execution
+        is required because JAX JIT compilation is not thread-safe.
 
         Parameters
         ----------
@@ -1326,20 +1326,6 @@ class BaseTransform(ABC):
         """
         if not datasets:
             return []
-
-        # Check if all datasets have same x-grid shape for potential optimization
-        shapes = {len(d.x) for d in datasets}
-        if len(shapes) == 1 and len(datasets) > 2:
-            # Same-shape: use thread parallelism (transforms are CPU-bound
-            # within a single call, no cross-thread JIT contention)
-            from concurrent.futures import ThreadPoolExecutor
-
-            n_workers = min(len(datasets), 4)
-            with ThreadPoolExecutor(max_workers=n_workers) as executor:
-                futures = [executor.submit(self.transform, d) for d in datasets]
-                return [f.result() for f in futures]
-
-        # Variable-length or small batch: sequential
         return [self.transform(d) for d in datasets]
 
     def __repr__(self) -> str:

@@ -45,8 +45,8 @@ class TestJITWarmup:
 
             assert r1 > 0  # G0 should be positive
             assert r2 > 0
-            # Second fit should be at least somewhat faster (JIT already cached)
-            # Be lenient - timing is noisy, especially on CI
-            assert t2 < t1 * 1.5 or t1 < 3.0, (
-                f"Expected warmup speedup: t1={t1:.2f}s, t2={t2:.2f}s"
+            # Second fit should not be dramatically slower than first
+            # (JIT cache is warm). Allow 2x tolerance for CI noise.
+            assert t2 < t1 * 2.0, (
+                f"Expected warmup benefit: t1={t1:.2f}s, t2={t2:.2f}s"
             )

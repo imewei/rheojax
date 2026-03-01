@@ -17,8 +17,8 @@ from rheojax.parallel.config import get_default_workers
 
 logger = logging.getLogger(__name__)
 
-# Sentinel for shutdown
-_SHUTDOWN = None
+# Unique sentinel for shutdown — cannot collide with valid task payloads
+_SHUTDOWN = object()
 
 
 def _warmup_jax(_unused=None):
@@ -40,12 +40,13 @@ def _worker_loop(
     task_queue: mp.Queue,
     result_queue: mp.Queue,
     worker_id: int,
+    shutdown_sentinel: object,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
     Receives (task_id, fn, args, kwargs) from task_queue.
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
-    Exits when it receives None sentinel.
+    Exits when it receives the shutdown sentinel.
     """
     while True:
         try:
@@ -53,7 +54,7 @@ def _worker_loop(
         except (EOFError, OSError):
             break
 
-        if task is _SHUTDOWN:
+        if task is shutdown_sentinel:
             break
 
         task_id, fn, args, kwargs = task
@@ -62,7 +63,9 @@ def _worker_loop(
             result_queue.put((task_id, "ok", result))
         except Exception as exc:
             tb = traceback.format_exc()
-            result_queue.put((task_id, "error", f"{exc}\n{tb}"))
+            # Truncate traceback to prevent unbounded payload size
+            tb_truncated = tb[:4096] if len(tb) > 4096 else tb
+            result_queue.put((task_id, "error", f"{exc}\n{tb_truncated}"))
 
 
 class PoolFuture:
@@ -114,6 +117,9 @@ class PersistentProcessPool:
     ) -> None:
         self._n_workers = n_workers or get_default_workers()
         self._ctx = mp.get_context("spawn")
+        # Use a picklable sentinel for the spawn context: workers receive
+        # it as a constructor arg so identity comparison works across processes.
+        self._shutdown_sentinel = None  # None is picklable
         self._task_queue: mp.Queue = self._ctx.Queue()
         self._result_queue: mp.Queue = self._ctx.Queue()
         self._workers: list[mp.Process] = []
@@ -127,7 +133,7 @@ class PersistentProcessPool:
         for i in range(self._n_workers):
             p = self._ctx.Process(
                 target=_worker_loop,
-                args=(self._task_queue, self._result_queue, i),
+                args=(self._task_queue, self._result_queue, i, self._shutdown_sentinel),
                 daemon=True,
             )
             p.start()
@@ -172,10 +178,10 @@ class PersistentProcessPool:
         The function must be module-level (picklable on spawn context).
         Returns a PoolFuture that can be awaited for the result.
         """
-        if self._shutdown:
-            raise RuntimeError("Cannot submit to a pool that has been shut down")
-
         with self._lock:
+            if self._shutdown:
+                raise RuntimeError("Cannot submit to a pool that has been shut down")
+
             task_id = self._task_counter
             self._task_counter += 1
             future = PoolFuture(task_id)
@@ -204,7 +210,7 @@ class PersistentProcessPool:
         # Send shutdown sentinels
         for _ in self._workers:
             try:
-                self._task_queue.put(_SHUTDOWN)
+                self._task_queue.put(self._shutdown_sentinel)
             except (OSError, ValueError):
                 pass
 
@@ -214,6 +220,26 @@ class PersistentProcessPool:
             if p.is_alive():
                 p.terminate()
                 p.join(timeout=2)
+
+        # Drain remaining results from queue before closing
+        while True:
+            try:
+                msg = self._result_queue.get_nowait()
+                task_id, status, payload = msg
+                future = self._futures.get(task_id)
+                if future is not None:
+                    if status == "ok":
+                        future._set_result(payload)
+                    else:
+                        future._set_error(payload)
+            except Exception:
+                break
+
+        # Poison any remaining pending futures so callers don't deadlock
+        with self._lock:
+            for future in self._futures.values():
+                if not future.done():
+                    future._set_error("Pool was shut down before task completed")
 
         # Clean up queues
         for q in (self._task_queue, self._result_queue):
@@ -234,7 +260,8 @@ class PersistentProcessPool:
                 continue
 
             task_id, status, payload = msg
-            future = self._futures.get(task_id)
+            with self._lock:
+                future = self._futures.pop(task_id, None)
             if future is None:
                 logger.warning("Result for unknown task_id=%d", task_id)
                 continue

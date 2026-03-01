@@ -52,12 +52,13 @@ class TestParallelConfig:
     def test_configure_overrides(self):
         from rheojax.parallel.config import configure, get_parallel_config
 
-        configure(n_workers=6, warm_pool=True)
-        cfg = get_parallel_config()
-        assert cfg["n_workers"] == 6
-        assert cfg["warm_pool"] is True
-        # Reset
-        configure(n_workers=None, warm_pool=False)
+        try:
+            configure(n_workers=6, warm_pool=True)
+            cfg = get_parallel_config()
+            assert cfg["n_workers"] == 6
+            assert cfg["warm_pool"] is True
+        finally:
+            configure()
 
     def test_max_workers_capped_by_cpu(self):
         from rheojax.parallel.config import get_default_workers
@@ -65,6 +66,25 @@ class TestParallelConfig:
 
         n = get_default_workers()
         assert n <= multiprocessing.cpu_count()
+
+    def test_sequential_mode_overrides_workers_env(self):
+        """RHEOJAX_SEQUENTIAL=1 takes priority over RHEOJAX_PARALLEL_WORKERS."""
+        from rheojax.parallel.config import get_default_workers
+
+        with patch.dict(
+            os.environ,
+            {"RHEOJAX_SEQUENTIAL": "1", "RHEOJAX_PARALLEL_WORKERS": "8"},
+        ):
+            assert get_default_workers() == 1
+
+    def test_invalid_workers_env_falls_back(self):
+        """Non-integer RHEOJAX_PARALLEL_WORKERS falls back to auto-detection."""
+        from rheojax.parallel.config import get_default_workers
+
+        with patch.dict(os.environ, {"RHEOJAX_PARALLEL_WORKERS": "not_a_number"}):
+            n = get_default_workers()
+            assert isinstance(n, int)
+            assert n >= 1
 
     @pytest.mark.smoke
     def test_config_import(self):
