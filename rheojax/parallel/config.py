@@ -66,8 +66,17 @@ def get_default_workers() -> int:
 
 
 def is_sequential_mode() -> bool:
-    """Check if all parallelism is disabled."""
-    return os.environ.get("RHEOJAX_SEQUENTIAL", "0") == "1"
+    """Check if all parallelism is disabled.
+
+    Automatically enabled when running under pytest-xdist to prevent
+    subprocess multiplication (xdist workers x pool workers -> OOM).
+    """
+    if os.environ.get("RHEOJAX_SEQUENTIAL", "0") == "1":
+        return True
+    # pytest-xdist sets PYTEST_XDIST_WORKER in each worker subprocess
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return True
+    return False
 
 
 def get_worker_isolation() -> str:

@@ -7,10 +7,12 @@ Uses 'spawn' context for macOS/Linux safety.
 
 from __future__ import annotations
 
+import atexit
 import logging
 import multiprocessing as mp
 import threading
 import traceback
+import weakref
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
@@ -20,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 # Unique sentinel for shutdown — string constant survives pickling across spawn
 _SHUTDOWN_SENTINEL = "RHEOJAX_POOL_SHUTDOWN_v1"
+
+# Track all live pool instances for atexit cleanup
+_live_pools: weakref.WeakSet = weakref.WeakSet()
+_atexit_registered = False
+
+
+def _atexit_kill_pools() -> None:
+    """Kill all remaining pool worker processes at interpreter exit."""
+    for pool in list(_live_pools):
+        try:
+            pool._force_kill_workers()
+        except Exception:
+            pass
 
 
 def _warmup_jax(_unused=None):
@@ -163,6 +178,13 @@ class PersistentProcessPool:
             target=self._collect_results, daemon=True
         )
         self._result_thread.start()
+
+        # Register for atexit cleanup so orphaned workers get killed
+        global _atexit_registered
+        _live_pools.add(self)
+        if not _atexit_registered:
+            atexit.register(_atexit_kill_pools)
+            _atexit_registered = True
 
         logger.debug("PersistentProcessPool started with %d workers", self._n_workers)
 
@@ -308,6 +330,20 @@ class PersistentProcessPool:
                 future._set_result(payload)
             else:
                 future._set_error(payload)
+
+    def __del__(self) -> None:
+        """Safety net: kill worker processes if pool is garbage-collected without shutdown."""
+        if not self._shutdown:
+            self._force_kill_workers()
+
+    def _force_kill_workers(self) -> None:
+        """Force-kill all worker processes without waiting."""
+        for p in self._workers:
+            try:
+                if p.is_alive():
+                    p.kill()
+            except (OSError, ValueError):
+                pass
 
     def __enter__(self) -> PersistentProcessPool:
         return self
