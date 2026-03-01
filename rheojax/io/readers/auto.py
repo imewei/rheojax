@@ -49,7 +49,9 @@ _CSV_KWARGS = {
     "test_mode",
     "delimiter",
     "encoding",
-    "validate",
+    # R13-AUTO-001: "validate" removed — load_csv does not accept it as a
+    # named parameter, so it would leak through **kwargs to pd.read_csv()
+    # and cause a TypeError.
     "deformation_mode",
     # R6-AUTO-001: Include commonly-used load_csv kwargs so they are not
     # silently dropped when users pass them through auto_load().
@@ -67,7 +69,9 @@ _EXCEL_KWARGS = {
     "y_cols",
     "test_mode",
     "sheet",  # was "sheet_name" — must match load_excel() param name
-    "validate",
+    # R13-AUTO-001: "validate" removed — load_excel does not accept it as a
+    # named parameter, so it would leak through **kwargs to pd.read_excel()
+    # and cause a TypeError.
     "deformation_mode",
     # R6-AUTO-002: Include commonly-used load_excel kwargs so they are not
     # silently dropped when users pass them through auto_load().

@@ -528,6 +528,10 @@ class BayesianMixin:
             scale_info["data_mean"] = float(np.mean(np.abs(y_np))) if y_np.size else 0.0
             y_jax = jnp.asarray(y_np, dtype=jnp.float64)
 
+        # R13-BAY-001: Populate n_points so _build_numpyro_model's probe uses
+        # the actual data size instead of a hardcoded 10.
+        scale_info["n_points"] = int(X_jax.shape[0])
+
         return {
             "X_jax": X_jax,
             "y_jax": y_jax,

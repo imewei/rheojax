@@ -523,27 +523,72 @@ class Pipeline:
                 elif format == "excel":
                     from rheojax.io import save_excel
 
+                    # R13-PIPE-XLS-001: The "parameters" key should contain
+                    # actual model parameters (name → value), not metadata
+                    # labels. Data metadata (units, domain) goes into a
+                    # separate "fit_quality" dict for the Fit Quality sheet.
                     parameters: dict[str, Any] = {}
-                    if self.data.x_units:
-                        parameters["x_units"] = self.data.x_units
-                    if self.data.y_units:
-                        parameters["y_units"] = self.data.y_units
-                    parameters["domain"] = self.data.domain
-                    if self.data.metadata:
-                        parameters["metadata"] = self.data.metadata
+                    _last_fit_steps = [
+                        s for s in self.steps if s[0] in ("fit", "fit_nlsq")
+                    ]
+                    if _last_fit_steps:
+                        _fit_model = _last_fit_steps[-1][1]
+                        if hasattr(_fit_model, "parameters"):
+                            for _pname in _fit_model.parameters.keys():
+                                try:
+                                    parameters[_pname] = float(
+                                        _fit_model.parameters.get_value(_pname)
+                                    )
+                                except (TypeError, ValueError):
+                                    pass
+                            parameters["model"] = type(_fit_model).__name__
 
-                    excel_payload = {
-                        "parameters": parameters,
+                    fit_quality: dict[str, Any] = {}
+                    if self.data.x_units:
+                        fit_quality["x_units"] = self.data.x_units
+                    if self.data.y_units:
+                        fit_quality["y_units"] = self.data.y_units
+                    if self.data.domain:
+                        fit_quality["domain"] = self.data.domain
+
+                    excel_payload: dict[str, Any] = {
+                        "x": np.array(self.data.x),
                         "predictions": np.array(self.data.y),
                     }
+                    if parameters:
+                        excel_payload["parameters"] = parameters
+                    if fit_quality:
+                        excel_payload["fit_quality"] = fit_quality
+                    # R13-PIPE-XLS-002: propagate deformation_mode for
+                    # correct E'/G' column labels in the Predictions sheet.
+                    if self.data.metadata:
+                        _dm = self.data.metadata.get("deformation_mode")
+                        if _dm is not None:
+                            excel_payload["deformation_mode"] = _dm
                     save_excel(excel_payload, path, **kwargs)
                 elif format == "csv":
-                    # Simple CSV export
+                    # R13-PIPE-CSV-001: Handle complex and 2D y arrays
+                    # in CSV export. Complex y is split into real/imag
+                    # columns; 2D y is split into numbered columns.
                     import pandas as pd
 
-                    df = pd.DataFrame(
-                        {"x": np.array(self.data.x), "y": np.array(self.data.y)}
-                    )
+                    x_arr = np.array(self.data.x)
+                    y_arr = np.array(self.data.y)
+                    if np.iscomplexobj(y_arr):
+                        df = pd.DataFrame(
+                            {
+                                "x": x_arr,
+                                "y_real": np.real(y_arr),
+                                "y_imag": np.imag(y_arr),
+                            }
+                        )
+                    elif y_arr.ndim == 2:
+                        cols: dict[str, Any] = {"x": x_arr}
+                        for ci in range(y_arr.shape[1]):
+                            cols[f"y_{ci}"] = y_arr[:, ci]
+                        df = pd.DataFrame(cols)
+                    else:
+                        df = pd.DataFrame({"x": x_arr, "y": y_arr})
                     df.to_csv(path, index=False, **kwargs)
                 else:
                     raise ValueError(f"Unknown format: {format}")

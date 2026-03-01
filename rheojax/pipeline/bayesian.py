@@ -336,11 +336,30 @@ class BayesianPipeline(Pipeline):
             _div = result.diagnostics.get("divergences")
             ctx["divergences"] = _div if _div is not None else 0
             if "r_hat" in result.diagnostics:
-                r_hat_values = list(result.diagnostics["r_hat"].values())
-                ctx["r_hat_max"] = max(r_hat_values) if r_hat_values else None
+                # R13-BAY-PIPE-001: Filter NaN values before computing
+                # aggregate — a single failed parameter diagnostic should
+                # not make the summary metric NaN.
+                r_hat_values = [
+                    v
+                    for v in result.diagnostics["r_hat"].values()
+                    if np.isfinite(v)
+                ]
+                if r_hat_values:
+                    ctx["r_hat_max"] = max(r_hat_values)
+                else:
+                    ctx["r_hat_max"] = None
+                    logger.warning("All R-hat values are NaN — diagnostics invalid")
             if "ess" in result.diagnostics:
-                ess_values = list(result.diagnostics["ess"].values())
-                ctx["ess_min"] = min(ess_values) if ess_values else None
+                ess_values = [
+                    v
+                    for v in result.diagnostics["ess"].values()
+                    if np.isfinite(v)
+                ]
+                if ess_values:
+                    ctx["ess_min"] = min(ess_values)
+                else:
+                    ctx["ess_min"] = None
+                    logger.warning("All ESS values are NaN — diagnostics invalid")
 
         # Store results
         self._bayesian_result = result
