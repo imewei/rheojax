@@ -363,19 +363,26 @@ class ITTMCTBase(BaseModel):
         bounds = (lower, upper)
 
         # Closure captures gamma_dot, sigma, param_names, and bounds
+        # Use scipy.optimize directly to avoid JAX tracing issues with NLSQ
+        from scipy.optimize import least_squares
+
         def residual_func(params):
-            # Clip params to bounds to handle numerical precision issues
-            params_clipped = jnp.clip(params, lower, upper)
+            # Handle both JAX arrays and numpy arrays
+            try:
+                params_np = np.array(params.block_until_ready())
+            except (AttributeError, TypeError):
+                params_np = np.array(params)
+            params_clipped = np.clip(params_np, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
             y_pred = self._predict_flow_curve(gamma_dot)
             return sigma - y_pred
 
-        result = fit_with_nlsq(
+        result = least_squares(
             residual_func,
             initial_values,
-            bounds=bounds,
-            **kwargs,
+            bounds=(lower, upper),
+            method="trf",
         )
 
         self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
