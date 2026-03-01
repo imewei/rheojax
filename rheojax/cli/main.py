@@ -295,10 +295,20 @@ def main(args: list[str] | None = None) -> int:
         return spp_main(args[1:])
 
     elif command == "info":
-        return show_info()
+        try:
+            return show_info()
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            logger.error("info command failed", error=str(e), exc_info=True)
+            return 1
 
     elif command == "inventory":
-        return show_inventory(args[1:])
+        try:
+            return show_inventory(args[1:])
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            logger.error("inventory command failed", error=str(e), exc_info=True)
+            return 1
 
     elif command in ("--help", "-h"):
         logger.debug("Help requested")
@@ -313,5 +323,10 @@ def main(args: list[str] | None = None) -> int:
         return 1
 
 
-if __name__ == "__main__":
+def cli_entry():
+    """Entry point for console_scripts -- wraps main() with sys.exit."""
     sys.exit(main())
+
+
+if __name__ == "__main__":
+    cli_entry()

@@ -92,8 +92,8 @@ Examples:
     parser.add_argument(
         "--max-iter",
         type=int,
-        default=100,
-        help="Maximum optimization iterations (default: 100)",
+        default=1000,
+        help="Maximum optimization iterations (default: 1000)",
     )
     parser.add_argument(
         "--deformation-mode",
@@ -181,8 +181,8 @@ def main(args: list[str] | None = None) -> int:
         model = ModelRegistry.create(parsed.model)
         logger.debug("Model created", model=parsed.model)
 
-    except KeyError:
-        print(f"Error: Unknown model '{parsed.model}'", file=sys.stderr)
+    except (KeyError, ValueError, TypeError, RuntimeError) as e:
+        print(f"Error: Could not create model '{parsed.model}': {e}", file=sys.stderr)
         print("Use 'rheojax inventory' to see available models", file=sys.stderr)
         return 1
 
@@ -233,6 +233,12 @@ def main(args: list[str] | None = None) -> int:
         if parsed.poisson_ratio is not None:
             fit_kwargs["poisson_ratio"] = parsed.poisson_ratio
 
+        # Auto-propagate deformation_mode from loaded data metadata
+        if fit_kwargs.get("deformation_mode") is None and hasattr(data, "metadata"):
+            auto_dm = data.metadata.get("deformation_mode")
+            if auto_dm is not None:
+                fit_kwargs["deformation_mode"] = auto_dm
+
         model.fit(data.x, data.y, **fit_kwargs)
         fit_time = time.perf_counter() - start_time
 
@@ -274,7 +280,11 @@ def main(args: list[str] | None = None) -> int:
 
     # Write output
     if parsed.output:
-        parsed.output.write_text(output_text)
+        try:
+            parsed.output.write_text(output_text)
+        except OSError as e:
+            print(f"Error writing to {parsed.output}: {e}", file=sys.stderr)
+            return 1
         print(f"Results written to {parsed.output}")
     else:
         print(output_text)

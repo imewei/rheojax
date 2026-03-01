@@ -137,14 +137,14 @@ def _add_analyze_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--x-col",
         type=str,
-        default="time",
-        help="Column name for time/x data (default: time)",
+        default=None,
+        help="Column name for time/x data (auto-detected if not specified)",
     )
     parser.add_argument(
         "--y-col",
         type=str,
-        default="stress",
-        help="Column name for stress/y data (default: stress)",
+        default=None,
+        help="Column name for stress/y data (auto-detected if not specified)",
     )
     parser.add_argument(
         "--strain-col",
@@ -236,11 +236,12 @@ def run_analyze(args: Namespace) -> int:
     # Load data
     try:
         logger.debug("Loading data file", file=str(args.input_file))
-        loaded = load_data(
-            str(args.input_file),
-            x_col=args.x_col,
-            y_col=args.y_col,
-        )
+        load_kwargs: dict = {}
+        if args.x_col is not None:
+            load_kwargs["x_col"] = args.x_col
+        if args.y_col is not None:
+            load_kwargs["y_col"] = args.y_col
+        loaded = load_data(str(args.input_file), **load_kwargs)
         # Handle potential list return (take first dataset if list)
         if isinstance(loaded, list):
             if not loaded:

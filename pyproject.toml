@@ -134,7 +134,7 @@ dev = [
 # Use: make install-jax-gpu (from repository) or manual pip commands.
 
 [project.scripts]
-rheojax = "rheojax.cli.main:main"
+rheojax = "rheojax.cli.main:cli_entry"
 rheojax-gui = "rheojax.gui.main:main"
 
 [project.urls]

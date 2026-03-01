@@ -15,6 +15,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 
@@ -163,6 +165,17 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error: File not found: {parsed.input_file}", file=sys.stderr)
         return 1
 
+    # Validate sampling parameters
+    if parsed.warmup < 1:
+        print(f"Error: --warmup must be >= 1, got {parsed.warmup}", file=sys.stderr)
+        return 1
+    if parsed.samples < 1:
+        print(f"Error: --samples must be >= 1, got {parsed.samples}", file=sys.stderr)
+        return 1
+    if parsed.chains < 1:
+        print(f"Error: --chains must be >= 1, got {parsed.chains}", file=sys.stderr)
+        return 1
+
     # Load data
     try:
         from rheojax.io import auto_load
@@ -191,6 +204,16 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error loading data: {e}", file=sys.stderr)
         return 1
 
+    # Validate loaded data
+    x_arr = np.asarray(data.x)
+    y_arr = np.asarray(data.y)
+    if np.any(~np.isfinite(x_arr)):
+        print("Error: Data contains NaN/Inf values in x column", file=sys.stderr)
+        return 1
+    if not np.iscomplexobj(y_arr) and np.any(~np.isfinite(y_arr)):
+        print("Error: Data contains NaN/Inf values in y column", file=sys.stderr)
+        return 1
+
     # Create model
     try:
         import rheojax.models  # noqa: F401 — trigger registration
@@ -199,8 +222,8 @@ def main(args: list[str] | None = None) -> int:
         model = ModelRegistry.create(parsed.model)
         logger.debug("Model created", model=parsed.model)
 
-    except KeyError:
-        print(f"Error: Unknown model '{parsed.model}'", file=sys.stderr)
+    except (KeyError, ValueError, TypeError, RuntimeError) as e:
+        print(f"Error: Could not create model '{parsed.model}': {e}", file=sys.stderr)
         print("Use 'rheojax inventory' to see available models", file=sys.stderr)
         return 1
 
@@ -220,6 +243,12 @@ def main(args: list[str] | None = None) -> int:
         mode_kwargs["deformation_mode"] = parsed.deformation_mode
     if parsed.poisson_ratio is not None:
         mode_kwargs["poisson_ratio"] = parsed.poisson_ratio
+
+    # Auto-propagate deformation_mode from loaded data metadata
+    if mode_kwargs.get("deformation_mode") is None and hasattr(data, "metadata"):
+        auto_dm = data.metadata.get("deformation_mode")
+        if auto_dm is not None:
+            mode_kwargs["deformation_mode"] = auto_dm
 
     # Optional NLSQ warm-start
     if parsed.warm_start:
@@ -295,7 +324,11 @@ def main(args: list[str] | None = None) -> int:
         "summary": {},
     }
 
-    rhat_dict = diagnostics.get("r_hat") or diagnostics.get("rhat") or {}
+    rhat_dict = diagnostics.get("r_hat")
+    if rhat_dict is None:
+        rhat_dict = diagnostics.get("rhat")
+    if rhat_dict is None:
+        rhat_dict = {}
     ess_dict = diagnostics.get("ess", {})
 
     for param_name in result.posterior_samples:
@@ -344,7 +377,11 @@ def main(args: list[str] | None = None) -> int:
 
     # Write output
     if parsed.output:
-        parsed.output.write_text(output_text)
+        try:
+            parsed.output.write_text(output_text)
+        except OSError as e:
+            print(f"Error writing to {parsed.output}: {e}", file=sys.stderr)
+            return 1
         print(f"Results written to {parsed.output}")
     else:
         print(output_text)
