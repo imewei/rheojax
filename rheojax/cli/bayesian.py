@@ -247,7 +247,7 @@ def main(args: list[str] | None = None) -> int:
             test_mode = data.metadata.get("test_mode")
     if test_mode is None:
         test_mode = "oscillation"
-        print(f"Note: No test mode detected, defaulting to '{test_mode}'")
+        print(f"Note: No test mode detected, defaulting to '{test_mode}'", file=sys.stderr)
 
     # Build shared kwargs for deformation mode
     mode_kwargs: dict = {}
@@ -264,10 +264,10 @@ def main(args: list[str] | None = None) -> int:
 
     # Optional NLSQ warm-start
     if parsed.warm_start:
-        print("Running NLSQ warm-start...")
+        print("Running NLSQ warm-start...", file=sys.stderr)
         try:
             model.fit(data.x, data.y, test_mode=test_mode, **mode_kwargs)
-            print("  NLSQ warm-start complete")
+            print("  NLSQ warm-start complete", file=sys.stderr)
             logger.info("NLSQ warm-start complete", model=parsed.model)
         except Exception as e:
             # Reset partially-mutated state from failed fit to avoid
@@ -275,7 +275,7 @@ def main(args: list[str] | None = None) -> int:
             model._last_fit_kwargs = {}
             model._test_mode = None
             model.fitted_ = False
-            print(f"  Warning: NLSQ warm-start failed ({e}), continuing with defaults")
+            print(f"  Warning: NLSQ warm-start failed ({e}), continuing with defaults", file=sys.stderr)
             logger.warning("NLSQ warm-start failed", error=str(e))
 
     # Run Bayesian inference
