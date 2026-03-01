@@ -140,7 +140,7 @@ def _loop_bridge_ode_rhs(
     stretch = jnp.sqrt(jnp.maximum(tr_S / 3.0, 0.0) + 1e-30)
 
     # Bell force-dependent breakage rate
-    beta = (1.0 / tau_b) * jnp.exp(nu * (stretch - 1.0))
+    beta = (1.0 / tau_b) * jnp.exp(jnp.minimum(nu * (stretch - 1.0), 500.0))
 
     # Bridge fraction kinetics: attachment - force-activated dissociation
     df_B = (1.0 - f_B) / tau_a - f_B * beta
