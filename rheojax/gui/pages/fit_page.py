@@ -82,6 +82,7 @@ class FitPage(QWidget):
         }
         self._current_model: str | None = None
         self._is_compatible: bool = False
+        self._fitting_supported: bool = True
         self._params_model_name: str | None = None
         self._empty_params_default_text = (
             "No model loaded. Select a model to edit parameters."
