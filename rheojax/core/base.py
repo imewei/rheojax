@@ -6,8 +6,10 @@ for all models and transforms in the rheojax package, with full JAX support.
 
 from __future__ import annotations
 
+import copy
 import logging
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from typing import Any
 
 import numpy as np
@@ -56,6 +58,7 @@ class BaseModel(BayesianMixin, ABC):
         self.y_data = None
         self._deformation_mode: DeformationMode | None = None
         self._poisson_ratio: float = 0.5
+        self._closure_cache: OrderedDict = OrderedDict()
 
     @abstractmethod
     def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> BaseModel:
@@ -301,22 +304,23 @@ class BaseModel(BayesianMixin, ABC):
             method=method,
         )
 
-        # Handle deformation mode: auto-detect from RheoData or explicit parameter
-        if deformation_mode is None:
-            from rheojax.core.data import RheoData
+        # Handle deformation mode: auto-detect from RheoData or explicit parameter.
+        # Always unpack RheoData regardless of whether deformation_mode was passed,
+        # so that test_mode propagation and x/y extraction happen unconditionally.
+        from rheojax.core.data import RheoData
 
-            if isinstance(X, RheoData):
-                # BASE-001: always extract arrays from RheoData for consistent _fit() input
-                _metadata = X.metadata
+        if isinstance(X, RheoData):
+            _metadata = X.metadata
+            if deformation_mode is None:
                 deformation_mode = _metadata.get("deformation_mode", None)
-                # R10-BASE-001: propagate test_mode from RheoData metadata into kwargs
-                # so that _fit() and model_function see the correct protocol.
-                if "test_mode" in _metadata and "test_mode" not in kwargs:
-                    kwargs["test_mode"] = _metadata["test_mode"]
-                # Extract x/y so _fit() always receives raw arrays, not RheoData
-                if y is None:
-                    y = X.y
-                X = X.x
+            # R10-BASE-001: propagate test_mode from RheoData metadata into kwargs
+            # so that _fit() and model_function see the correct protocol.
+            if "test_mode" in _metadata and "test_mode" not in kwargs:
+                kwargs["test_mode"] = _metadata["test_mode"]
+            # Extract x/y so _fit() always receives raw arrays, not RheoData
+            if y is None:
+                y = X.y
+            X = X.x
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):
@@ -516,7 +520,7 @@ class BaseModel(BayesianMixin, ABC):
         _had_test_mode = hasattr(self, "_test_mode")  # BASE-003: track if attr existed
         saved_test_mode = getattr(self, "_test_mode", None)
         _raw = getattr(self, "_last_fit_kwargs", None)
-        saved_last_fit_kwargs = dict(_raw) if _raw is not None else {}
+        saved_last_fit_kwargs = copy.deepcopy(_raw) if _raw is not None else None
 
         # Generate dummy data if not provided
         if X is None:
@@ -549,8 +553,8 @@ class BaseModel(BayesianMixin, ABC):
             self._test_mode = saved_test_mode
         elif hasattr(self, "_test_mode"):
             del self._test_mode
-        # Restore None if _last_fit_kwargs was originally absent/None
-        self._last_fit_kwargs = saved_last_fit_kwargs if saved_last_fit_kwargs else None
+        # Restore original _last_fit_kwargs (may be None or empty dict {})
+        self._last_fit_kwargs = saved_last_fit_kwargs
 
         logger.info(
             "NLSQ precompilation completed",
@@ -669,23 +673,17 @@ class BaseModel(BayesianMixin, ABC):
             X = jnp.array(X.x)
 
         if deformation_mode is None:
-            if isinstance(X, RheoData):
-                # This branch is now only reachable if X was not a RheoData above
-                # (i.e., the caller passed a plain array, not a RheoData object).
-                deformation_mode = X.metadata.get("deformation_mode", None)
-                if deformation_mode is not None:
-                    X = X.x
-
-            if deformation_mode is None:
-                deformation_mode = getattr(self, "_deformation_mode", None)
-                if deformation_mode is not None:
-                    poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
-                    logger.warning(
-                        "fit_bayesian() using deformation_mode='%s' from prior "
-                        "fit(). Pass deformation_mode explicitly if this is not "
-                        "intended.",
-                        str(deformation_mode),
-                    )
+            # RheoData extraction already happened above; X is always a plain
+            # array at this point.  Fall back to deformation_mode from prior fit().
+            deformation_mode = getattr(self, "_deformation_mode", None)
+            if deformation_mode is not None:
+                poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
+                logger.warning(
+                    "fit_bayesian() using deformation_mode='%s' from prior "
+                    "fit(). Pass deformation_mode explicitly if this is not "
+                    "intended.",
+                    str(deformation_mode),
+                )
 
         if deformation_mode is not None:
             if isinstance(deformation_mode, str):

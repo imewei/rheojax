@@ -618,14 +618,14 @@ class ParameterSet:
 
         param = self._parameters[name]
 
-        # Build context dict only when relative constraints exist (>99% of models skip this)
-        context: dict[str, float] | None = None
-        if self._has_relative_constraints:
-            context = {
-                p.name: p.value
-                for p in self._parameters.values()
-                if p.value is not None
-            }
+        # Always build context dict so that relative constraints added after
+        # initial parameter creation are not bypassed.  The cost is negligible
+        # (one dict comprehension) compared to the validation itself.
+        context = {
+            p.name: p.value
+            for p in self._parameters.values()
+            if p.value is not None
+        }
         if not param.validate(value, context):
             logger.error(
                 "Value violates constraints",

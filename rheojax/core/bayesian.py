@@ -795,7 +795,9 @@ class BayesianMixin:
             rng_key = jax.random.PRNGKey(rng_seed)
             # R12-B-009: include "diverging" so _process_mcmc_results can report
             # per-transition divergence counts without a second MCMC.get_extra_fields() call.
-            sampler.run(rng_key, X_jax, y_jax, extra_fields=("potential_energy", "diverging"))
+            sampler.run(
+                rng_key, X_jax, y_jax, extra_fields=("potential_energy", "diverging")
+            )
             return sampler
 
         try:
@@ -1319,9 +1321,8 @@ class BayesianMixin:
         # The copy is only used on the failure path (in the finally block) to
         # revert the dict to its pre-Bayesian state; the overhead is acceptable
         # because it happens once per fit_bayesian() call, not per NUTS step.
-        _saved_last_fit_kwargs = copy.deepcopy(
-            getattr(self, "_last_fit_kwargs", None) or {}
-        )
+        _raw_lfk = getattr(self, "_last_fit_kwargs", None)
+        _saved_last_fit_kwargs = copy.deepcopy(_raw_lfk) if _raw_lfk is not None else None
 
         _fit_bayesian_succeeded = False
 
@@ -1542,10 +1543,10 @@ class BayesianMixin:
             isinstance(v, np.ndarray) or hasattr(v, "devices")
             for v in protocol_kwargs.values()
         )
-        # R8-BAY-008: initialize eagerly; avoid lazy hasattr pattern which can
-        # create per-instance shadowing of a class-level dict in edge cases
+        # _closure_cache is eagerly initialized in BaseModel.__init__; the
+        # guard below is a safety net for non-BaseModel users of BayesianMixin.
         if not hasattr(self, "_closure_cache"):
-            self._closure_cache: OrderedDict = OrderedDict()
+            self._closure_cache = OrderedDict()
 
         prior_factory = getattr(self, "bayesian_prior_factory", None)
         # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)
@@ -1602,16 +1603,20 @@ class BayesianMixin:
 
         numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
 
-        # Extract scale values for likelihood (use 0.0 default for missing keys;
-        # avoid `or` which would swallow legitimate 0.0 values).
-        # Guaranteed non-None by _prepare_jax_data; defensive guards kept for
-        # robustness against incomplete scale_info from custom subclasses.
-        y_real_scale = scale_info.get("y_real_scale", 0.0) or 0.0
-        y_imag_scale = scale_info.get("y_imag_scale", 0.0) or 0.0
-        data_scale = scale_info.get("data_scale", 0.0) or 0.0
-        y_real_mean = scale_info.get("y_real_mean", 0.0) or 0.0
-        y_imag_mean = scale_info.get("y_imag_mean", 0.0) or 0.0
-        data_mean = scale_info.get("data_mean", 0.0) or 0.0
+        # Extract scale values for likelihood.  The `.get(key, 0.0)` call already
+        # provides the default; the previous `or 0.0` would swallow legitimate
+        # 0.0 values from scale_info, so it has been removed.
+        # M-1 guard: if a subclass stores explicit None, fall back to 0.0.
+        def _scale_val(key: str) -> float:
+            v = scale_info.get(key, 0.0)
+            return 0.0 if v is None else v
+
+        y_real_scale = _scale_val("y_real_scale")
+        y_imag_scale = _scale_val("y_imag_scale")
+        data_scale = _scale_val("data_scale")
+        y_real_mean = _scale_val("y_real_mean")
+        y_imag_mean = _scale_val("y_imag_mean")
+        data_mean = _scale_val("data_mean")
 
         # Capture priors at closure-build time (not re-read at trace time)
         _captured_priors = {}
@@ -1773,6 +1778,10 @@ class BayesianMixin:
                     predictions_raw = jnp.sqrt(
                         predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2
                     )
+                    # Also convert y to magnitude if it's a 2D array (model returned 2 columns
+                    # but data wasn't detected as complex)
+                    if y.ndim == 2 and y.shape[1] == 2:
+                        y = jnp.sqrt(y[:, 0] ** 2 + y[:, 1] ** 2)
 
             # Handle complex vs real predictions
             if is_complex_data:

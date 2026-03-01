@@ -561,7 +561,13 @@ class RheoData:
 
         # Check if already set in metadata (explicit or previously detected)
         if "test_mode" in self.metadata:
-            return self.metadata["test_mode"]
+            _raw = self.metadata["test_mode"]
+            try:
+                from rheojax.core.test_modes import TestMode
+
+                return TestMode(_raw.lower()).value if isinstance(_raw, str) else _raw
+            except (ValueError, AttributeError):
+                return _raw
 
         # Lazy import to avoid circular dependency
         from rheojax.core.test_modes import detect_test_mode
