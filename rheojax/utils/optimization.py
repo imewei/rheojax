@@ -431,6 +431,26 @@ class OptimizationResult:
     _curve_fit_result: Any | None = field(default=None, repr=False)
     _model_fn: Callable | None = field(default=None, repr=False)
     _x_data: np.ndarray | None = field(default=None, repr=False)
+    # OPT-AIC-BIC-001: True when residuals are concatenated [real, imag] from
+    # complex data.  Used by _resolve_n_data() to halve the residual vector
+    # length to recover the true observation count N.
+    _is_complex_split: bool = field(default=False, repr=False)
+
+    def _resolve_n_data(self) -> int:
+        """Resolve the true observation count N.
+
+        Priority: n_data > len(y_data) > residual-length (halved when
+        ``_is_complex_split`` is True, since the residual vector is
+        ``[real, imag]`` with length 2N).
+        """
+        if self.n_data is not None:
+            return self.n_data
+        if self.y_data is not None:
+            return len(self.y_data)
+        if self.residuals is not None:
+            raw_len = len(self.residuals)
+            return raw_len // 2 if self._is_complex_split else raw_len
+        return 0
 
     # =========================================================================
     # Statistical Properties (NLSQ 0.6.0 CurveFitResult compatible)
@@ -564,18 +584,15 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = (
-            self.n_data
-            if self.n_data is not None
-            else (len(self.residuals) if self.residuals is not None else None)
-        )
-        if n is None or n == 0:
-            return None
-
-        k = self.x.size
         residuals = np.asarray(self.residuals)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
+
+        n = self._resolve_n_data()
+        if n == 0:
+            return None
+
+        k = self.x.size
         rss = np.sum(residuals**2)
 
         if rss <= 0:
@@ -601,18 +618,15 @@ class OptimizationResult:
         if self.residuals is None:
             return None
 
-        n = (
-            self.n_data
-            if self.n_data is not None
-            else (len(self.residuals) if self.residuals is not None else None)
-        )
-        if n is None or n == 0:
-            return None
-
-        k = self.x.size
         residuals = np.asarray(self.residuals)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
+
+        n = self._resolve_n_data()
+        if n == 0:
+            return None
+
+        k = self.x.size
         rss = np.sum(residuals**2)
 
         if rss <= 0:
@@ -652,11 +666,7 @@ class OptimizationResult:
 
         from scipy import stats
 
-        n = (
-            self.n_data
-            if self.n_data is not None
-            else (len(self.residuals) if self.residuals is not None else 0)
-        )
+        n = self._resolve_n_data()
         p = self.x.size
 
         # Degrees of freedom
@@ -760,11 +770,7 @@ class OptimizationResult:
         from scipy import stats
 
         x_eval = np.asarray(x_eval, dtype=np.float64)
-        n = (
-            self.n_data
-            if self.n_data is not None
-            else (len(self.residuals) if self.residuals is not None else 0)
-        )
+        n = self._resolve_n_data()
         p = self.x.size
         dof = max(n - p, 1)
 
@@ -873,8 +879,23 @@ class OptimizationResult:
         y_data_np = np.asarray(y_data) if y_data is not None else None
         n_data = len(y_data_np) if y_data_np is not None else None
 
+        # OPT-AIC-BIC-001: detect complex-split residuals (length 2N from
+        # concatenated [real, imag]).  Only flag when y_data is absent and
+        # residuals are real-typed with even length — callers who pass y_data
+        # get the authoritative n_data from len(y_data) instead.
+        _complex_split = False
         if n_data is None and residuals is not None:
-            n_data = len(residuals)
+            _complex_split = (
+                not np.iscomplexobj(residuals)
+                and len(residuals) % 2 == 0
+                and len(residuals) > 2
+                and y_data_np is not None
+                and np.iscomplexobj(y_data_np)
+            )
+            # If y_data is complex but residuals are real, residuals were split
+            if y_data_np is not None and np.iscomplexobj(y_data_np):
+                n_data = len(y_data_np)
+            # Otherwise use residual length as-is (no unsafe halving)
 
         result = cls(
             x=popt,
@@ -898,6 +919,7 @@ class OptimizationResult:
             _curve_fit_result=curve_fit_result,
             _model_fn=model_fn,
             _x_data=np.asarray(x_data) if x_data is not None else None,
+            _is_complex_split=_complex_split,
         )
 
         return result
@@ -963,11 +985,17 @@ class OptimizationResult:
         # Store y_data for R² computation
         y_data_np = None
         n_data = None
+        _complex_split = False
         if y_data is not None:
             y_data_np = np.asarray(y_data)
             n_data = len(y_data_np)
-        elif residuals_np is not None:
-            n_data = residuals_np.size
+            # Detect complex-split residuals: y_data is complex but residuals are real
+            if (
+                np.iscomplexobj(y_data_np)
+                and residuals_np is not None
+                and not np.iscomplexobj(residuals_np)
+            ):
+                _complex_split = True
 
         return cls(
             x=x,
@@ -987,6 +1015,7 @@ class OptimizationResult:
             residuals=residuals_np,
             y_data=y_data_np,
             n_data=n_data,
+            _is_complex_split=_complex_split,
         )
 
 

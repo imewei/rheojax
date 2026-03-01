@@ -210,7 +210,12 @@ def main(args: list[str] | None = None) -> int:
     if np.any(~np.isfinite(x_arr)):
         print("Error: Data contains NaN/Inf values in x column", file=sys.stderr)
         return 1
-    if not np.iscomplexobj(y_arr) and np.any(~np.isfinite(y_arr)):
+    # CLI-BAY-001: also guard complex y arrays — check magnitude for NaN/Inf
+    if np.iscomplexobj(y_arr):
+        if np.any(~np.isfinite(np.abs(y_arr))):
+            print("Error: Data contains NaN/Inf values in complex y column", file=sys.stderr)
+            return 1
+    elif np.any(~np.isfinite(y_arr)):
         print("Error: Data contains NaN/Inf values in y column", file=sys.stderr)
         return 1
 
