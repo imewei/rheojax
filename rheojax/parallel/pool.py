@@ -122,7 +122,7 @@ class PersistentProcessPool:
         self._shutdown_sentinel = _SHUTDOWN_SENTINEL
         self._task_queue: mp.Queue = self._ctx.Queue()
         self._result_queue: mp.Queue = self._ctx.Queue()
-        self._workers: list[mp.Process] = []
+        self._workers: list[mp.process.BaseProcess] = []
         self._futures: dict[int, PoolFuture] = {}
         self._task_counter = 0
         self._lock = threading.Lock()
@@ -223,6 +223,8 @@ class PersistentProcessPool:
                 p.join(timeout=2)
 
         # Drain remaining results from queue before closing
+        import queue as _queue
+
         while True:
             try:
                 msg = self._result_queue.get_nowait()
@@ -233,7 +235,7 @@ class PersistentProcessPool:
                         future._set_result(payload)
                     else:
                         future._set_error(payload)
-            except Exception:
+            except (_queue.Empty, EOFError, OSError):
                 break
 
         # Poison any remaining pending futures so callers don't deadlock
@@ -248,17 +250,23 @@ class PersistentProcessPool:
             try:
                 q.close()
                 q.join_thread()
-            except Exception:
+            except (OSError, ValueError):
+                # OSError: queue pipe already closed
+                # ValueError: queue already closed
                 pass
 
         logger.debug("PersistentProcessPool shut down")
 
     def _collect_results(self) -> None:
         """Background thread that routes results to futures."""
+        import queue as _queue
+
         while not self._shutdown:
             try:
                 msg = self._result_queue.get(timeout=0.1)
-            except Exception:
+            except (_queue.Empty, EOFError, OSError):
+                # Empty: normal timeout, no results pending
+                # EOFError/OSError: queue closed during shutdown
                 continue
 
             task_id, status, payload = msg

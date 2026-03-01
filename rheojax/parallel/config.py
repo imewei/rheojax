@@ -55,7 +55,10 @@ def get_default_workers() -> int:
         gpu_count = sum(1 for d in devices if d.platform != "cpu")
         if gpu_count > 0:
             return min(gpu_count, cpu_count, 4)
-    except Exception:
+    except (ImportError, RuntimeError, AttributeError):
+        # ImportError: JAX not installed
+        # RuntimeError: JAX initialization failed
+        # AttributeError: API mismatch
         pass
 
     # CPU: half of cores, min 1, max 8 for practical memory limits
@@ -97,7 +100,6 @@ def configure(
     n_workers: int | None = None,
     warm_pool: bool = False,
     isolation: str | None = None,
-    warmup_models: list[str] | None = None,
 ) -> None:
     """Override default parallel configuration.
 
@@ -112,7 +114,5 @@ def configure(
         new_overrides["warm_pool"] = True
     if isolation is not None:
         new_overrides["isolation"] = isolation
-    if warmup_models:
-        new_overrides["warmup_models"] = warmup_models
     with _config_lock:
         _overrides = new_overrides
