@@ -116,6 +116,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.3.1",
     "pytest-qt>=4.5.0",
     "pytest-image-diff>=0.0.14",
     "hypothesis>=6.151.5",
@@ -167,6 +168,7 @@ addopts = [
     "--cov-report=xml",
     "--dist=loadscope",  # Distribute tests by scope for better load balancing
     "--maxfail=10",      # Stop after 10 failures to save time
+    "--timeout=120",     # Kill hung tests after 120s to prevent OOM
 ]
 # Performance optimizations
 cache_dir = ".pytest_cache"  # Explicit cache directory
