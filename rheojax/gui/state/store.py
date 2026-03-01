@@ -1471,6 +1471,19 @@ class StateStore:
             # no state clone, no state_changed signal).
             return None
 
+        # R6-STORE-001: Signal-only actions — dispatch() emits domain signals
+        # for these action types but they do not need to mutate state.  Return
+        # None so no update_state() call is made (no undo entry, no state
+        # clone, no state_changed signal).  Without these cases,
+        # BAYESIAN_PROGRESS would log a spurious "Unhandled action type"
+        # warning on every NUTS progress callback (hundreds per run).
+        if action_type in (
+            "BAYESIAN_PROGRESS",
+            "FIT_PROGRESS",
+            "TRANSFORM_APPLIED",
+        ):
+            return None
+
         logger.warning(
             "Unhandled action type — no reducer registered",
             action_type=action_type,

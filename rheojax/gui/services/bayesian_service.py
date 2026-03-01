@@ -353,6 +353,10 @@ class BayesianService:
                 num_samples=num_samples,
                 num_chains=num_chains,
                 inference_data=inference_data,
+                # R6-BSVC-001: Propagate diagnostics_valid from get_diagnostics()
+                # so the STORE_BAYESIAN_RESULT reducer can detect NaN-fallback
+                # diagnostics instead of always defaulting to True.
+                diagnostics_valid=bool(diagnostics.get("diagnostics_valid", True)),
             )
 
         except Exception as e:

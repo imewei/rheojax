@@ -1400,12 +1400,16 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_job_started(self, job_id: str) -> None:
         logger.debug("Job started", job_id=job_id)
         job_type = self._job_types.get(job_id, "")
-        if job_type:
-            step = "fit" if job_type == "fit" else "bayesian"
+        # R6-MW-001: Map job_type directly to pipeline step name.
+        # The old ternary "fit" if … else "bayesian" incorrectly mapped
+        # transform jobs to the "bayesian" pipeline step.
+        _type_to_step = {"fit": "fit", "bayesian": "bayesian", "transform": "transform"}
+        step = _type_to_step.get(job_type, "")
+        if step:
             self.store.dispatch("SET_PIPELINE_STEP", {"step": step, "status": "ACTIVE"})
-            self.pipeline_chips.set_step_status(
-                getattr(PipelineStep, step.upper()), StepStatus.ACTIVE
-            )
+            pipeline_step = getattr(PipelineStep, step.upper(), None)
+            if pipeline_step is not None:
+                self.pipeline_chips.set_step_status(pipeline_step, StepStatus.ACTIVE)
         self.status_bar.show_message(f"Job started: {job_id}", 1000)
 
     def _on_job_progress(
@@ -2277,6 +2281,11 @@ class RheoJAXMainWindow(QMainWindow):
         logger.debug("Export requested", output_dir=output_dir)
         self.log(f"Export: starting export to {output_dir}")
         self.status_bar.show_message("Export in progress...", 0)
+        # R6-EXP-003: Mark the pipeline EXPORT step as ACTIVE so the
+        # pipeline chips reflect the in-progress state.
+        self.store.dispatch(
+            "SET_PIPELINE_STEP", {"step": "export", "status": "ACTIVE"}
+        )
 
     @Slot(str)
     def _on_export_completed(self, output_path: str) -> None:
@@ -2290,6 +2299,16 @@ class RheoJAXMainWindow(QMainWindow):
         logger.info("Export completed", output_path=output_path)
         self.log(f"Export: completed to {output_path}")
         self.status_bar.show_message(f"Export completed: {output_path}", 5000)
+        # R6-EXP-001: Update pipeline step so the EXPORT chip reflects
+        # completion instead of staying stuck on ACTIVE/PENDING.
+        self.store.dispatch(
+            "EXPORT_RESULTS", {"file_path": output_path}
+        )
+        # R6-REV-001: Also dispatch SET_PIPELINE_STEP so pipeline_step_changed
+        # signal fires (EXPORT_RESULTS reducer doesn't emit domain signals).
+        self.store.dispatch(
+            "SET_PIPELINE_STEP", {"step": "export", "status": "COMPLETE"}
+        )
 
     @Slot(str)
     def _on_export_failed(self, error_msg: str) -> None:
@@ -2303,6 +2322,11 @@ class RheoJAXMainWindow(QMainWindow):
         logger.error("Export failed", error=error_msg)
         self.log(f"Export: failed - {error_msg}")
         self.status_bar.show_message(f"Export failed: {error_msg}", 5000)
+        # R6-EXP-002: Update pipeline step so the EXPORT chip reflects
+        # the failure instead of staying stuck on ACTIVE/PENDING.
+        self.store.dispatch(
+            "SET_PIPELINE_STEP", {"step": "export", "status": "ERROR"}
+        )
 
     @Slot()
     def _on_batch_fit(self) -> None:
