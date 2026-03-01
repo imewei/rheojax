@@ -921,24 +921,28 @@ class ExportPage(QWidget):
                     template_type = "bayesian"
                 report_ext = "md" if "markdown" in config["template"].lower() else "pdf"
                 filepath = output_dir / f"report.{report_ext}"
+                # R14-EXP-001: Use active dataset/model for report,
+                # not the first dict entry.
+                _active_ds = state.datasets.get(state.active_dataset_id)
                 report_state: dict[str, Any] = {
                     "model_name": state.active_model_name,
                     "test_mode": (
-                        state.datasets[list(state.datasets.keys())[0]].metadata.get(
-                            "test_mode"
-                        )
-                        if state.datasets
+                        _active_ds.metadata.get("test_mode")
+                        if _active_ds
                         else None
                     ),
                 }
-                if state.fit_results:
-                    latest_fit = list(state.fit_results.values())[-1]
-                    report_state["parameters"] = latest_fit.parameters
-                if state.bayesian_results:
-                    latest_bayes = list(state.bayesian_results.values())[-1]
+                _report_key = (
+                    f"{state.active_model_name}_{state.active_dataset_id}"
+                )
+                _active_fit = state.fit_results.get(_report_key)
+                if _active_fit and hasattr(_active_fit, "parameters"):
+                    report_state["parameters"] = _active_fit.parameters
+                _active_bayes = state.bayesian_results.get(_report_key)
+                if _active_bayes:
                     report_state["diagnostics"] = {
-                        "r_hat": latest_bayes.r_hat,
-                        "ess": latest_bayes.ess,
+                        "r_hat": _active_bayes.r_hat,
+                        "ess": _active_bayes.ess,
                     }
                 export_service.generate_report(report_state, template_type, filepath)
                 exported_files.append(str(filepath))
