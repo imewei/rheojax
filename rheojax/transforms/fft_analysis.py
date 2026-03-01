@@ -280,7 +280,7 @@ class FFTAnalysis(BaseTransform):
                 spectrum = jnp.where(max_val > 1e-12, spectrum / max_val, spectrum)
 
             # Create metadata
-            new_metadata = data.metadata.copy()
+            new_metadata = (data.metadata or {}).copy()
             new_metadata.update(
                 {
                     "transform": "fft",
@@ -338,7 +338,8 @@ class FFTAnalysis(BaseTransform):
             )
             raise ValueError("Inverse FFT requires frequency-domain data")
 
-        if "transform" not in data.metadata or data.metadata["transform"] != "fft":
+        _fft_meta = data.metadata or {}
+        if "transform" not in _fft_meta or _fft_meta["transform"] != "fft":
             logger.error(
                 "Data was not created by FFT transform",
                 metadata_transform=data.metadata.get("transform"),
@@ -373,7 +374,7 @@ class FFTAnalysis(BaseTransform):
         t = jnp.arange(n_points) * dt
 
         # Create metadata
-        new_metadata = data.metadata.copy()
+        new_metadata = (data.metadata or {}).copy()
         new_metadata.update({"transform": "ifft", "original_domain": "frequency"})
 
         logger.debug("Inverse FFT completed", output_points=len(y_reconstructed))

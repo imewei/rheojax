@@ -315,12 +315,12 @@ class Pipeline:
                     if _meta:
                         if "test_mode" not in fit_kwargs:
                             _tm = _meta.get("test_mode")
-                            if _tm:
+                            if _tm is not None:
                                 fit_kwargs["test_mode"] = _tm
                         # R9-PIPE-DMT: propagate deformation_mode for DMTA data
                         if "deformation_mode" not in fit_kwargs:
                             _dm = _meta.get("deformation_mode")
-                            if _dm:
+                            if _dm is not None:
                                 fit_kwargs["deformation_mode"] = _dm
                         if "poisson_ratio" not in fit_kwargs:
                             _pr = _meta.get("poisson_ratio")

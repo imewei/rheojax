@@ -172,6 +172,10 @@ class OWChirp(BaseTransform):
         # Initialize coefficient array
         coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex128)
 
+        # TRANS-001: Compute dt once outside loops (invariant to i, j)
+        # R11-OWC-003: Use median dt for robustness to non-uniform sampling
+        dt = float(jnp.median(jnp.diff(t))) if len(t) > 1 else 1.0
+
         # Compute wavelet transform at each frequency
         for i, freq in enumerate(frequencies):
             # For each time point, compute wavelet convolution
@@ -179,8 +183,6 @@ class OWChirp(BaseTransform):
             for j, t_center in enumerate(t):
                 wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
                 # Inner product
-                # R11-OWC-003: Use median dt for robustness to non-uniform sampling
-                dt = float(jnp.median(jnp.diff(t))) if len(t) > 1 else 1.0
                 coeff = jnp.sum(signal * jnp.conj(wavelet)) * dt
                 coefficients = coefficients.at[i, j].set(coeff)
 
@@ -338,7 +340,7 @@ class OWChirp(BaseTransform):
         spectrum = jnp.mean(jnp.abs(coefficients), axis=1)
 
         # Create metadata
-        new_metadata = data.metadata.copy()
+        new_metadata = (data.metadata or {}).copy()
         new_metadata.update(
             {
                 "transform": "owchirp",

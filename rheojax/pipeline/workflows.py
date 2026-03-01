@@ -287,15 +287,13 @@ class MastercurvePipeline(Pipeline):
             self.shift_factors[float(temp)] = shift
 
         # Apply shifts to x data (vectorized per temperature group)
-        shifted_x = self.data.x.copy()
+        # PIPE-004: Convert to numpy for in-place assignment (JAX arrays are immutable)
+        shifted_x = np.array(self.data.x)
         for unique_temp in np.unique(temps):
             mask = temps == unique_temp
             shift = self.shift_factors[float(unique_temp)]
             # R8-PIPE-001: multiply (not divide) by shift factor for TTS
-            if isinstance(shifted_x, jnp.ndarray):
-                shifted_x = shifted_x.at[mask].set(shifted_x[mask] * shift)
-            else:
-                shifted_x[mask] = shifted_x[mask] * shift
+            shifted_x[mask] = shifted_x[mask] * shift
 
         self.data.x = shifted_x
 

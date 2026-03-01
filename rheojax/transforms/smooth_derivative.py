@@ -388,7 +388,7 @@ class SmoothDerivative(BaseTransform):
                 new_y_units = f"derivative_order_{self.deriv}"
 
             # Create metadata
-            new_metadata = data.metadata.copy()
+            new_metadata = (data.metadata or {}).copy()
             new_metadata.update(
                 {
                     "transform": "derivative",
@@ -447,7 +447,7 @@ class SmoothDerivative(BaseTransform):
         )
 
         # Create metadata
-        new_metadata = data.metadata.copy()
+        new_metadata = (data.metadata or {}).copy()
         new_metadata.update(
             {"transform": "integral", "original_transform": "derivative"}
         )
