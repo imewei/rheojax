@@ -64,7 +64,7 @@ class _FailingBayesianModel(BayesianMixin):
 class TestITTMCTOscillationShape:
     """Guard: `if return_components:` must NOT be always-true."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_schematic_default_returns_1d(self):
         """Schematic predict(oscillation) without return_components → (N,)."""
         from rheojax.models.itt_mct import ITTMCTSchematic
@@ -77,7 +77,7 @@ class TestITTMCTOscillationShape:
         ), f"Default oscillation predict must return 1-D |G*|, got shape {result.shape}"
         assert result.shape == (5,)
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_schematic_components_returns_2d(self):
         """Schematic predict(oscillation, return_components=True) → (N, 2)."""
         from rheojax.models.itt_mct import ITTMCTSchematic

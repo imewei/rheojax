@@ -382,7 +382,7 @@ def discover_notebooks(targets: list[str]) -> list[Path]:
         else:
             print(f"Warning: Target {target} is neither a file nor a directory.")
 
-    return sorted(list(notebooks))
+    return sorted(notebooks)
 
 
 def main():

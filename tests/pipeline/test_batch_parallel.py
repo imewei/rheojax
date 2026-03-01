@@ -1,8 +1,9 @@
 """Tests for parallel batch processing."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
-from pathlib import Path
 
 
 @pytest.fixture
@@ -27,9 +28,7 @@ class TestBatchParallelIO:
 
         template = Pipeline()
         batch = BatchPipeline(template)
-        batch.process_files(
-            csv_files, parallel_io=True, x_col="time", y_col="G_relax"
-        )
+        batch.process_files(csv_files, parallel_io=True, x_col="time", y_col="G_relax")
         assert len(batch.results) == 5
 
     def test_parallel_io_matches_sequential(self, csv_files):

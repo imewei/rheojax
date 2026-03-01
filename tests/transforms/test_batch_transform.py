@@ -12,9 +12,7 @@ class TestBatchFFT:
 
         fft = FFTAnalysis()
         t = np.linspace(0, 10, 256)
-        datasets = [
-            RheoData(x=t, y=np.sin(2 * np.pi * f * t)) for f in [1.0, 2.0, 3.0]
-        ]
+        datasets = [RheoData(x=t, y=np.sin(2 * np.pi * f * t)) for f in [1.0, 2.0, 3.0]]
         results = fft.batch_transform(datasets)
         assert len(results) == 3
         for r in results:
@@ -27,17 +25,13 @@ class TestBatchFFT:
 
         fft = FFTAnalysis()
         t = np.linspace(0, 10, 256)
-        datasets = [
-            RheoData(x=t, y=np.sin(2 * np.pi * f * t)) for f in [1.0, 2.0]
-        ]
+        datasets = [RheoData(x=t, y=np.sin(2 * np.pi * f * t)) for f in [1.0, 2.0]]
 
         sequential = [fft.transform(d) for d in datasets]
         batched = fft.batch_transform(datasets)
 
         for s, b in zip(sequential, batched):
-            np.testing.assert_allclose(
-                np.asarray(s.y), np.asarray(b.y), rtol=1e-10
-            )
+            np.testing.assert_allclose(np.asarray(s.y), np.asarray(b.y), rtol=1e-10)
 
     def test_batch_fft_variable_length_fallback(self):
         from rheojax.core.data import RheoData
@@ -45,12 +39,8 @@ class TestBatchFFT:
 
         fft = FFTAnalysis()
         datasets = [
-            RheoData(
-                x=np.linspace(0, 10, 128), y=np.sin(np.linspace(0, 10, 128))
-            ),
-            RheoData(
-                x=np.linspace(0, 10, 256), y=np.sin(np.linspace(0, 10, 256))
-            ),
+            RheoData(x=np.linspace(0, 10, 128), y=np.sin(np.linspace(0, 10, 128))),
+            RheoData(x=np.linspace(0, 10, 256), y=np.sin(np.linspace(0, 10, 256))),
         ]
         # Should still work (falls back to sequential)
         results = fft.batch_transform(datasets)
@@ -88,6 +78,4 @@ class TestBatchSmoothDerivative:
         batched = sd.batch_transform(datasets)
 
         for s, b in zip(sequential, batched):
-            np.testing.assert_allclose(
-                np.asarray(s.y), np.asarray(b.y), rtol=1e-10
-            )
+            np.testing.assert_allclose(np.asarray(s.y), np.asarray(b.y), rtol=1e-10)

@@ -54,6 +54,7 @@ def timed(name: str, details: dict | None = None):
 # BENCHMARK 1: JIT Caching Across Instantiations
 # =============================================================================
 
+
 def bench_jit_caching():
     """Verify that JIT compilation caching correctly persists across model classes."""
     print("\n" + "=" * 70)
@@ -62,18 +63,18 @@ def bench_jit_caching():
 
     from rheojax.core.jax_config import safe_import_jax
     from rheojax.models import GeneralizedMaxwell
-    
+
     jax, jnp = safe_import_jax()
     jax.clear_caches()
-    
+
     t = np.logspace(-2, 2, 200)
-    G = 100 * np.exp(-t) + 10.0
+    _G = 100 * np.exp(-t) + 10.0  # noqa: F841 — needed to warm numpy
     t_jax = jnp.asarray(t)
-    
+
     E_inf = 50.0
     E_i = jnp.array([100.0])
     tau_i = jnp.array([1.0])
-    
+
     results = []
 
     # 1. First run (Cold compilation)
@@ -82,7 +83,7 @@ def bench_jit_caching():
         _ = m1._predict_relaxation_jit(t_jax, E_inf, E_i, tau_i)
         _.block_until_ready()
     results.append(r1)
-    
+
     # 2. Same model instance
     with timed("B) Same Model Instance (Warm)", {"repeats": 10}) as r2:
         for _ in range(10):
@@ -90,7 +91,7 @@ def bench_jit_caching():
             _.block_until_ready()
         r2.wall_ms /= 10.0
     results.append(r2)
-    
+
     # 3. New model instance
     with timed("C) New Model Instance (Should be Warm)", {"repeats": 10}) as r3:
         for _ in range(10):
@@ -107,12 +108,14 @@ def bench_jit_caching():
     print(f"\n  JIT Speedup factor: {ratio:.0f}x")
     if ratio < 50:
         print("  WARNING: JIT cache may not be applying correctly across instances.")
-    
+
     return results
+
 
 # =============================================================================
 # BENCHMARK 2: Host-to-Device Memory Transfer Overhead
 # =============================================================================
+
 
 def bench_transfer_overhead():
     """Measure the cost of passing native Numpy arrays to JAX endpoints."""
@@ -121,39 +124,42 @@ def bench_transfer_overhead():
     print("=" * 70)
 
     from rheojax.core.jax_config import safe_import_jax
+
     jax, jnp = safe_import_jax()
-    
+
     sizes = [1000, 10000, 100000]
     results = []
-    
+
     for n in sizes:
         arr_np = np.random.normal(0, 1, n)
-        
+
         # JAX conversion
         with timed(f"A) np -> jnp conversion (N={n})", {"N": n, "repeats": 100}) as r1:
             for _ in range(100):
                 arr_j = jnp.asarray(arr_np)
             r1.wall_ms /= 100.0
         results.append(r1)
-        
+
         # JAX backwards conversion
         with timed(f"B) jnp -> np conversion (N={n})", {"N": n, "repeats": 100}) as r2:
             for _ in range(100):
-                arr_n2 = np.asarray(arr_j)
+                _ = np.asarray(arr_j)
             r2.wall_ms /= 100.0
         results.append(r2)
 
     for r in results:
         print(r)
-        
+
     avg_to_jax = np.mean([r.wall_ms for r in results[0::2]])
     print(f"\n  Average to_jax transfer overhead: {avg_to_jax*1000:.1f} microseconds")
-    
+
     return results
+
 
 # =============================================================================
 # BENCHMARK 3: Model Instantiation Cost
 # =============================================================================
+
 
 def bench_instantiation_overhead():
     """Measure the fixed cost of creating ParameterSets and Model objects."""
@@ -169,26 +175,30 @@ def bench_instantiation_overhead():
     # Simple model creation
     with timed("A) Maxwell Instantiation", {"repeats": 1000}) as r1:
         for _ in range(1000):
-            m = Maxwell()
+            _ = Maxwell()
         r1.wall_ms /= 1000.0
     results.append(r1)
-    
+
     # Complex model creation
     with timed("B) SGRGeneric Instantiation", {"repeats": 1000}) as r2:
         for _ in range(1000):
-            m = SGRGeneric()
+            _ = SGRGeneric()
         r2.wall_ms /= 1000.0
     results.append(r2)
 
     for r in results:
         print(r)
 
-    print(f"\n  Base class initialization adds ~{r1.wall_ms * 1000:.0f} microseconds of latency.")
+    print(
+        f"\n  Base class initialization adds ~{r1.wall_ms * 1000:.0f} microseconds of latency."
+    )
     return results
+
 
 # =============================================================================
 # MAIN
 # =============================================================================
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -221,6 +231,7 @@ def main():
     print("  SUMMARY")
     print("=" * 70)
     print("  All core overheads are running dynamically.")
+
 
 if __name__ == "__main__":
     main()

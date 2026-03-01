@@ -103,7 +103,7 @@ class TestGlassTransition:
 class TestFlowCurveProtocol:
     """Tests for flow curve (steady shear) predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_flow_curve_fluid(self):
         """Test flow curve in fluid state."""
         model = ITTMCTSchematic(epsilon=-0.1)
@@ -116,7 +116,7 @@ class TestFlowCurveProtocol:
         # Fluid should show no yield stress
         assert sigma[0] < sigma[-1]  # Increasing with shear rate
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_flow_curve_glass(self):
         """Test flow curve in glass state (yield stress)."""
         model = ITTMCTSchematic(epsilon=0.1)
@@ -146,7 +146,7 @@ class TestFlowCurveProtocol:
 class TestOscillationProtocol:
     """Tests for SAOS (G', G'') predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_oscillation_returns_moduli(self):
         """Test that oscillation returns valid moduli."""
         model = ITTMCTSchematic(epsilon=-0.05)
@@ -186,7 +186,7 @@ class TestOscillationProtocol:
 class TestStartupProtocol:
     """Tests for startup flow predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_startup_stress_growth(self):
         """Test stress growth in startup flow."""
         model = ITTMCTSchematic(epsilon=0.05)
@@ -219,7 +219,7 @@ class TestStartupProtocol:
 class TestCreepProtocol:
     """Tests for creep compliance predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_creep_compliance_positive(self):
         """Test creep compliance is positive and increasing."""
         model = ITTMCTSchematic(epsilon=-0.05)
@@ -249,7 +249,7 @@ class TestCreepProtocol:
 class TestRelaxationProtocol:
     """Tests for stress relaxation predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_relaxation_stress_decay(self):
         """Test stress decay in relaxation."""
         model = ITTMCTSchematic(epsilon=-0.05)
@@ -277,7 +277,7 @@ class TestRelaxationProtocol:
 class TestLAOSProtocol:
     """Tests for LAOS predictions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_laos_oscillatory_response(self):
         """Test LAOS gives oscillatory stress response."""
         model = ITTMCTSchematic(epsilon=0.05)

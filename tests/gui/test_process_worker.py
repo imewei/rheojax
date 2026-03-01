@@ -6,7 +6,6 @@ import time
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Module-level helper functions for subprocess tests.
 # These MUST be at module level so they are picklable with the "spawn"
@@ -341,7 +340,9 @@ class TestRunFitIsolated:
 
     def test_basic_fit_returns_result(self):
         import multiprocessing as mp
+
         import numpy as np
+
         from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
 
         # Maxwell relaxation: G(t) = G0 * exp(-t/tau), where tau = eta/G0
@@ -351,7 +352,8 @@ class TestRunFitIsolated:
 
         result = run_fit_isolated(
             model_name="maxwell",
-            x_data=t, y_data=G_t,
+            x_data=t,
+            y_data=G_t,
             test_mode="relaxation",
             initial_params={"G0": 500.0, "eta": 500.0},
             options={"max_iter": 500},
@@ -371,7 +373,9 @@ class TestRunFitIsolated:
 
     def test_all_arrays_are_numpy(self):
         import multiprocessing as mp
+
         import numpy as np
+
         from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
 
         t = np.linspace(0.01, 5, 100)
@@ -379,7 +383,8 @@ class TestRunFitIsolated:
 
         result = run_fit_isolated(
             model_name="maxwell",
-            x_data=t, y_data=G_t,
+            x_data=t,
+            y_data=G_t,
             test_mode="relaxation",
             initial_params={},
             options={},
@@ -870,6 +875,7 @@ class TestEndToEndFactory:
 
         # Verify it's a ProcessWorkerAdapter (subprocess mode)
         from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+
         assert isinstance(worker, ProcessWorkerAdapter)
 
         # Run it — this spawns a real mp.Process and blocks until done

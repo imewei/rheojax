@@ -38,7 +38,7 @@ class TestMemoryFormParameter:
         with pytest.raises(ValueError, match="memory_form must be"):
             ITTMCTSchematic(memory_form="")
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_backward_compatibility_flow_curve(self):
         """Test that simplified form matches previous behavior exactly."""
         # Create two models with explicit simplified vs default
@@ -139,7 +139,7 @@ class TestStressFormParameter:
         with pytest.raises(ValueError, match="stress_form must be"):
             ITTMCTSchematic(stress_form="invalid")
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_microscopic_stress_flow_curve(self):
         """Test that microscopic stress form produces valid results."""
         model = ITTMCTSchematic(
@@ -181,7 +181,7 @@ class TestStressFormParameter:
             np.diff(sigma_micro), 0, atol=1e-10
         )
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_microscopic_with_custom_k_BT(self):
         """Test microscopic stress with custom thermal energy."""
         model = ITTMCTSchematic(
@@ -215,7 +215,7 @@ class TestStressFormParameter:
 class TestCombinedFeatures:
     """Tests for combining memory_form and stress_form."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_full_memory_with_microscopic_stress(self):
         """Test combining full memory with microscopic stress."""
         model = ITTMCTSchematic(

@@ -392,8 +392,8 @@ def profile_io():
     print("  SUITE: I/O PATH ANALYSIS")
     print("=" * 70)
 
-    from rheojax.core.jax_config import safe_import_jax
     from rheojax.core.data import RheoData
+    from rheojax.core.jax_config import safe_import_jax
 
     jax, jnp = safe_import_jax()
     np.random.seed(42)
@@ -407,9 +407,11 @@ def profile_io():
         def __init__(self):
             self.start = 0.0
             self.elapsed = 0.0
+
         def __enter__(self):
             self.start = time.perf_counter()
             return self
+
         def __exit__(self, *_):
             self.elapsed = time.perf_counter() - self.start
 
@@ -432,6 +434,7 @@ def profile_io():
     try:
         import csv
         import tempfile
+
         from rheojax.io import load_csv
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
@@ -445,7 +448,9 @@ def profile_io():
             for _ in range(10):
                 _data = load_csv(fname, x_col="time", y_col="stress")
 
-        print(f"\n  CSV reader (1000 rows, 10 iterations): {t_csv.elapsed*100:.1f} ms/read")
+        print(
+            f"\n  CSV reader (1000 rows, 10 iterations): {t_csv.elapsed*100:.1f} ms/read"
+        )
         os.unlink(fname)
     except Exception as e:
         print(f"\n  CSV reader test skipped: {e}")
@@ -557,7 +562,9 @@ def print_report(all_timings: dict[str, list[TimingResult]]) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Profile RheoJAX performance bottlenecks")
+    parser = argparse.ArgumentParser(
+        description="Profile RheoJAX performance bottlenecks"
+    )
     parser.add_argument(
         "--suite",
         choices=["pipeline", "memory", "imports", "io", "all"],
@@ -571,16 +578,26 @@ def main():
         help="Model to profile (pipeline suite only; default: all)",
     )
     parser.add_argument(
-        "--skip-bayesian", action="store_true", help="Skip Bayesian inference (pipeline suite only)"
+        "--skip-bayesian",
+        action="store_true",
+        help="Skip Bayesian inference (pipeline suite only)",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Include cProfile output (pipeline suite only)"
+        "--verbose",
+        action="store_true",
+        help="Include cProfile output (pipeline suite only)",
     )
     parser.add_argument(
-        "--warmup", type=int, default=100, help="NUTS warmup iterations (pipeline suite only)"
+        "--warmup",
+        type=int,
+        default=100,
+        help="NUTS warmup iterations (pipeline suite only)",
     )
     parser.add_argument(
-        "--samples", type=int, default=200, help="NUTS sample iterations (pipeline suite only)"
+        "--samples",
+        type=int,
+        default=200,
+        help="NUTS sample iterations (pipeline suite only)",
     )
     parser.add_argument("--chains", type=int, default=1, help="Number of MCMC chains")
     args = parser.parse_args()
@@ -596,7 +613,7 @@ def main():
 
     if args.suite in ("io", "all"):
         profile_io()
-        
+
     models_to_profile = []
     if args.suite in ("pipeline", "all"):
         models_to_profile = (

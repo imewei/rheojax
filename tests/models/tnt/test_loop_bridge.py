@@ -643,7 +643,7 @@ class TestRegistryIntegration:
 class TestFitting:
     """Tests for model fitting."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_fit_flow_curve(self):
         """Test fitting to flow curve data via scipy (NLSQ AD incompatible with diffrax)."""
         model_true = TNTLoopBridge()

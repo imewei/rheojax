@@ -58,7 +58,7 @@ class TestCrossProtocolConsistency:
 class TestAsymptoticBehavior:
     """Tests for asymptotic behavior."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_zero_shear_rate_limit(self):
         """Test behavior as γ̇ → 0."""
         model_fluid = ITTMCTSchematic(epsilon=-0.1)
@@ -74,7 +74,7 @@ class TestAsymptoticBehavior:
         sigma_glass = model_glass.predict(gamma_dot_low, test_mode="flow_curve")
         assert sigma_glass[0] > 0  # Yield stress
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_high_frequency_limit(self):
         """Test behavior as ω → ∞."""
         model = ITTMCTSchematic(epsilon=0.05)
@@ -92,7 +92,7 @@ class TestAsymptoticBehavior:
         # G' should be approaching a plateau (or still increasing)
         assert G_prime[1] >= G_prime[0] * 0.5  # Not dropping drastically
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_long_time_relaxation(self):
         """Test relaxation at long times."""
         model_fluid = ITTMCTSchematic(epsilon=-0.1)
@@ -117,7 +117,7 @@ class TestAsymptoticBehavior:
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
-    @pytest.mark.smoke
+    @pytest.mark.slow
     def test_zero_time(self):
         """Test behavior at t=0."""
         model = ITTMCTSchematic(epsilon=0.05)

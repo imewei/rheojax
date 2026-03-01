@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Simple notebook runner that executes cells sequentially."""
 
-import sys
 import os
+import sys
 
 # Set up environment
 os.environ["MPLBACKEND"] = "Agg"

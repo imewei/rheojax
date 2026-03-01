@@ -29,9 +29,7 @@ class TestModelComparisonParallel:
         mc_seq.run(relaxation_data, parallel=False, test_mode="relaxation")
 
         mc_par = ModelComparisonPipeline(models=["maxwell", "zener"])
-        mc_par.run(
-            relaxation_data, parallel=True, n_workers=2, test_mode="relaxation"
-        )
+        mc_par.run(relaxation_data, parallel=True, n_workers=2, test_mode="relaxation")
 
         # Both should find results for both models
         assert set(mc_seq.results.keys()) == set(mc_par.results.keys())
@@ -40,9 +38,9 @@ class TestModelComparisonParallel:
         for model in mc_seq.results:
             seq_r2 = mc_seq.results[model].get("r_squared", 0)
             par_r2 = mc_par.results[model].get("r_squared", 0)
-            assert abs(seq_r2 - par_r2) < 0.05, (
-                f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
-            )
+            assert (
+                abs(seq_r2 - par_r2) < 0.05
+            ), f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
 
     def test_parallel_single_model_fallback(self, relaxation_data):
         """With only 1 model, parallel=True should not use pool."""

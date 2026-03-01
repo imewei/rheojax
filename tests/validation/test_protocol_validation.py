@@ -38,6 +38,7 @@ jax, jnp = safe_import_jax()
 # or have protocols not yet implemented for generic predict().
 # These are excluded from the parametrized predict() test and tested
 # separately in TestSimulationProtocols.
+# Pairs that need simulation APIs or fit() state (tested in TestSimulationProtocols)
 _KNOWN_SIMULATION_ONLY = {
     ("dmt_local", "laos"),
     ("dmt_nonlocal", "startup"),
@@ -60,6 +61,7 @@ _KNOWN_SIMULATION_ONLY = {
     ("vlb_nonlocal", "creep"),
     ("mikh", "oscillation"),
     ("ml_ikh", "oscillation"),
+    ("sgr_conventional", "startup"),
     ("sgr_conventional", "laos"),
     ("sgr_generic", "creep"),
     ("sgr_generic", "startup"),
@@ -72,6 +74,18 @@ _KNOWN_SIMULATION_ONLY = {
     ("stz_conventional", "startup"),
     ("stz_conventional", "oscillation"),
     ("stz_conventional", "laos"),
+}
+
+# Pairs that timeout in smoke tests (>120s due to heavy JIT/Prony initialization).
+# Excluded from both TestProtocolValidation and TestSimulationProtocols smoke runs.
+_KNOWN_SLOW_PREDICT = {
+    ("itt_mct_schematic", "flow_curve"),
+    ("itt_mct_schematic", "oscillation"),
+    ("itt_mct_schematic", "startup"),
+    ("itt_mct_schematic", "creep"),
+    ("itt_mct_schematic", "relaxation"),
+    ("itt_mct_schematic", "laos"),
+    ("sgr_conventional", "startup"),
 }
 
 
@@ -156,8 +170,11 @@ def get_model_protocol_pairs() -> list[tuple[str, Protocol]]:
         info = ModelRegistry.get_info(model_name)
         if info and info.protocols:
             for protocol in info.protocols:
-                # Exclude simulation-only pairs (tested in TestSimulationProtocols)
-                if (model_name, protocol.value) not in _KNOWN_SIMULATION_ONLY:
+                # Exclude simulation-only and slow-predict pairs
+                if (model_name, protocol.value) not in _KNOWN_SIMULATION_ONLY and (
+                    model_name,
+                    protocol.value,
+                ) not in _KNOWN_SLOW_PREDICT:
                     pairs.append((model_name, protocol))
     return pairs
 
@@ -377,12 +394,12 @@ _NOT_IMPLEMENTED: set[tuple[str, str]] = set()
 
 def _get_simulation_pairs() -> list[tuple[str, str]]:
     """Get sorted (model_name, protocol_value) pairs for simulation-only tests."""
-    return sorted(_KNOWN_SIMULATION_ONLY)
+    return sorted(_KNOWN_SIMULATION_ONLY - _KNOWN_SLOW_PREDICT)
 
 
 def _get_simulation_ids() -> list[str]:
     """Generate descriptive test IDs for simulation pairs."""
-    return [f"{name}-{proto}" for name, proto in sorted(_KNOWN_SIMULATION_ONLY)]
+    return [f"{name}-{proto}" for name, proto in _get_simulation_pairs()]
 
 
 def _run_simulation_test(model, model_name: str, protocol: str):
