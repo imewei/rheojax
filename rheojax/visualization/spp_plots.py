@@ -93,6 +93,7 @@ def plot_lissajous(
     """
     logger.debug("Generating plot", plot_type="lissajous", style=style)
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -170,6 +171,10 @@ def plot_lissajous(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak (only if we
+        # created it — when ax was passed in, the caller owns the figure)
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate lissajous plot",
             plot_type="lissajous",
@@ -219,6 +224,7 @@ def plot_cole_cole(
     """
     logger.debug("Generating plot", plot_type="cole_cole", colormap=colormap)
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -291,6 +297,9 @@ def plot_cole_cole(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate cole_cole plot",
             plot_type="cole_cole",
@@ -336,6 +345,7 @@ def plot_moduli_evolution(
     """
     logger.debug("Generating plot", plot_type="moduli_evolution")
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -411,6 +421,9 @@ def plot_moduli_evolution(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate moduli_evolution plot",
             plot_type="moduli_evolution",
@@ -455,6 +468,7 @@ def plot_harmonic_spectrum(
         normalize=normalize,
     )
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -534,6 +548,9 @@ def plot_harmonic_spectrum(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate harmonic_spectrum plot",
             plot_type="harmonic_spectrum",
@@ -591,6 +608,7 @@ def plot_3d_trajectory(
     if omega == 0.0:
         raise ValueError("omega must be non-zero for 3D trajectory normalization")
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -667,6 +685,9 @@ def plot_3d_trajectory(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate 3d_trajectory plot",
             plot_type="3d_trajectory",
@@ -712,6 +733,7 @@ def plot_pipkin_diagram(
     """
     logger.debug("Generating plot", plot_type="pipkin_diagram", metric_name=metric_name)
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -740,6 +762,9 @@ def plot_pipkin_diagram(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak
+        if ax is None and fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate pipkin_diagram plot",
             plot_type="pipkin_diagram",
@@ -805,6 +830,7 @@ def create_spp_report(
     if gamma_0 == 0.0:
         raise ValueError("gamma_0 must be non-zero for SPP report normalization")
 
+    fig = None
     try:
         plt = _ensure_matplotlib()
 
@@ -910,6 +936,10 @@ def create_spp_report(
         return fig
 
     except Exception as e:
+        # VIZ-SPP-001: close figure on error to prevent memory leak (spp_report
+        # always creates its own figure — no external ax parameter)
+        if fig is not None:
+            _ensure_matplotlib().close(fig)
         logger.error(
             "Failed to generate spp_report plot",
             plot_type="spp_report",

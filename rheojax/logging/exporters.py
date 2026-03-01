@@ -551,6 +551,9 @@ class ExportingHandler(logging.Handler):
                     "processName",
                     "process",
                     "message",
+                    # Python 3.12+: asyncio task name — filter to avoid None
+                    # pollution in synchronous callers (LOG-EXP-001)
+                    "taskName",
                 }:
                     continue
                 attributes.setdefault(key, value)

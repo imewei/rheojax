@@ -601,6 +601,9 @@ def animate_tensorial_evolution(
         fig, ax = plt.subplots(figsize=(6, 5))
 
         max_val = np.max(np.abs(stress_history[:, idx]))
+        # VIZ-ANM-001: guard degenerate vmin=vmax=0 colormap (same fix as "all" branch)
+        if max_val == 0.0:
+            max_val = 1.0
         im = ax.imshow(
             stress_history[0, idx],
             cmap="coolwarm",
@@ -628,6 +631,9 @@ def animate_tensorial_evolution(
         # Compute N₁ for all frames
         N1_history = stress_history[:, 0] - stress_history[:, 1]
         max_N1 = np.max(np.abs(N1_history))
+        # VIZ-ANM-002: guard degenerate vmin=vmax=0 colormap
+        if max_N1 == 0.0:
+            max_N1 = 1.0
 
         im = ax.imshow(
             N1_history[0],
@@ -679,6 +685,9 @@ def animate_tensorial_evolution(
                 vm_history.append(np.array(sigma_eff))
             vm_history_arr = np.array(vm_history)
         max_vm = np.max(vm_history_arr)
+        # VIZ-ANM-003: guard degenerate vmin=vmax=0 colormap for zero-stress inputs
+        if max_vm == 0.0:
+            max_vm = 1.0
 
         im = ax.imshow(
             vm_history_arr[0],
