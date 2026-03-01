@@ -342,15 +342,16 @@ class SPPDecomposer(BaseTransform):
         omega_scalar = float(jnp.mean(omega_jax))
 
         # Get or compute strain and strain rate
-        if "strain" in data.metadata:
-            strain_jax = jnp.asarray(data.metadata["strain"], dtype=jnp.float64)
+        _spp_meta = data.metadata or {}
+        if "strain" in _spp_meta:
+            strain_jax = jnp.asarray(_spp_meta["strain"], dtype=jnp.float64)
         else:
             # Generate strain from sinusoidal assumption using mean omega
             strain_jax = self.gamma_0 * jnp.sin(omega_scalar * t_jax)
 
-        if "strain_rate" in data.metadata:
+        if "strain_rate" in _spp_meta:
             strain_rate_jax = jnp.asarray(
-                data.metadata["strain_rate"], dtype=jnp.float64
+                _spp_meta["strain_rate"], dtype=jnp.float64
             )
         else:
             # Compute strain rate via wrapped differentiation (Rogers parity)

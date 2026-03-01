@@ -258,7 +258,7 @@ class MastercurvePipeline(Pipeline):
         if self.data is None:
             return
 
-        temps = np.array(self.data.metadata.get("temperatures", []))
+        temps = np.array((self.data.metadata or {}).get("temperatures", []))
         if len(temps) == 0:
             return
 
@@ -1030,8 +1030,9 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         if gamma_0_values is None:
             gamma_0_values = []
             for data in stress_data:
-                if "gamma_0" in data.metadata:
-                    gamma_0_values.append(data.metadata["gamma_0"])
+                _g0_meta = data.metadata or {}
+                if "gamma_0" in _g0_meta:
+                    gamma_0_values.append(_g0_meta["gamma_0"])
                 else:
                     raise ValueError(
                         "gamma_0_values must be provided or present in metadata"

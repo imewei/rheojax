@@ -687,10 +687,11 @@ class Mastercurve(BaseTransform):
             If temperature metadata is missing
         """
         # Get temperature from metadata
-        if "temperature" not in data.metadata:
+        _meta_ts = data.metadata or {}
+        if "temperature" not in _meta_ts:
             raise ValueError("Temperature must be in metadata for mastercurve shifting")
 
-        T = data.metadata["temperature"]
+        T = _meta_ts["temperature"]
 
         # Get shift factor
         a_T = self.get_shift_factor(T)
@@ -708,7 +709,7 @@ class Mastercurve(BaseTransform):
             y_shifted = y_shifted * b_T
 
         # Create metadata
-        new_metadata = data.metadata.copy()
+        new_metadata = _meta_ts.copy()
         new_metadata.update(
             {
                 "transform": "mastercurve",
@@ -824,9 +825,10 @@ class Mastercurve(BaseTransform):
         # Extract temperatures and sort datasets
         temperatures = []
         for data in datasets:
-            if "temperature" not in data.metadata:
+            _dmeta = data.metadata or {}
+            if "temperature" not in _dmeta:
                 raise ValueError("All datasets must have 'temperature' in metadata")
-            temperatures.append(data.metadata["temperature"])
+            temperatures.append(_dmeta["temperature"])
 
         # Sort by temperature
         temp_indices = np.argsort(temperatures)
@@ -868,7 +870,7 @@ class Mastercurve(BaseTransform):
                 y_shifted = y_shifted * b_T
 
             # Create metadata
-            new_metadata = data.metadata.copy()
+            new_metadata = _dmeta.copy()
             new_metadata.update(
                 {
                     "transform": "mastercurve",

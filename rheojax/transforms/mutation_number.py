@@ -578,7 +578,7 @@ class MutationNumber(BaseTransform):
         delta = self.calculate(data)
 
         # Create metadata
-        new_metadata = data.metadata.copy()
+        new_metadata = (data.metadata or {}).copy()
         new_metadata.update(
             {
                 "transform": "mutation_number",

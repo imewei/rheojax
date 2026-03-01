@@ -216,16 +216,17 @@ class SRFS(BaseTransform):
             Shifted dataset
         """
         # Get reference shear rate from metadata
-        if "reference_gamma_dot" not in data.metadata:
+        _meta = data.metadata or {}
+        if "reference_gamma_dot" not in _meta:
             logger.error(
                 "Missing reference_gamma_dot in metadata",
-                available_keys=list(data.metadata.keys()),
+                available_keys=list(_meta.keys()),
             )
             raise ValueError(
                 "reference_gamma_dot must be in metadata for SRFS shifting"
             )
 
-        gamma_dot_ref = data.metadata["reference_gamma_dot"]
+        gamma_dot_ref = _meta["reference_gamma_dot"]
 
         logger.debug(
             "Applying SRFS shift to single dataset",
@@ -240,7 +241,7 @@ class SRFS(BaseTransform):
         x_shifted = jnp.asarray(data.x) * a_gamma_dot
 
         # Create shifted dataset
-        new_metadata = data.metadata.copy()
+        new_metadata = _meta.copy()
         new_metadata.update(
             {
                 "transform": "srfs",
@@ -385,15 +386,16 @@ class SRFS(BaseTransform):
         # Extract reference shear rates and sort
         ref_gamma_dots = []
         for data in datasets:
-            if "reference_gamma_dot" not in data.metadata:
+            _dmeta = data.metadata or {}
+            if "reference_gamma_dot" not in _dmeta:
                 logger.error(
                     "Missing reference_gamma_dot in dataset metadata",
-                    available_keys=list(data.metadata.keys()),
+                    available_keys=list(_dmeta.keys()),
                 )
                 raise ValueError(
                     "All datasets must have 'reference_gamma_dot' in metadata"
                 )
-            ref_gamma_dots.append(data.metadata["reference_gamma_dot"])
+            ref_gamma_dots.append(_dmeta["reference_gamma_dot"])
 
         logger.debug(
             "Reference shear rates extracted",

@@ -439,7 +439,7 @@ class BatchPipeline:
                     # so that a subsequent fit step picks it up correctly.
                     if pipeline.data is not None and hasattr(pipeline.data, "metadata"):
                         _tm = (pipeline.data.metadata or {}).get("test_mode")
-                        if _tm and "test_mode" not in fit_kwargs_replay:
+                        if _tm is not None and "test_mode" not in fit_kwargs_replay:
                             fit_kwargs_replay["test_mode"] = _tm
                     pipeline.steps.append((step_action, new_transform))
                     logger.debug(

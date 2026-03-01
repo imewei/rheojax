@@ -166,9 +166,9 @@ class BayesianPipeline(Pipeline):
         if self.data is not None and self.data.metadata is None:
             self.data.metadata = {}
         if self.data is not None and self.data.metadata is not None:
-            _dm_resolved = nlsq_kwargs.get("deformation_mode") or (
-                self.data.metadata.get("deformation_mode")
-            )
+            _dm_resolved = nlsq_kwargs.get("deformation_mode")
+            if _dm_resolved is None:
+                _dm_resolved = self.data.metadata.get("deformation_mode")
             if _dm_resolved is not None:
                 self.data.metadata["deformation_mode"] = _dm_resolved
             _pr_resolved = nlsq_kwargs.get("poisson_ratio")
