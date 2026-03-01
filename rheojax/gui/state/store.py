@@ -529,6 +529,12 @@ class StateStore:
                 payload_keys=payload_keys,
             )
             reducer = self._reduce_action(action_type, action)
+            # STORE-001: capture the active dataset id before state mutation
+            # so we can emit dataset_removed with the correct id after deletion.
+            _pre_delete_dataset_id: str = ""
+            if action_type == "DELETE_SELECTED_DATASET":
+                with self._lock:
+                    _pre_delete_dataset_id = self._state.active_dataset_id or ""
             if reducer is not None:
                 self.update_state(reducer, emit_signal=True)
 
@@ -635,6 +641,12 @@ class StateStore:
                 if dataset_id:
                     self.emit_signal("dataset_added", dataset_id)
                     self.emit_signal("dataset_selected", dataset_id)
+
+            elif action_type == "DELETE_SELECTED_DATASET":
+                # STORE-001: Emit dataset_removed with the id that was active
+                # *before* the reducer ran (captured above).  Subscribers such
+                # as the data tree use this to purge the deleted entry.
+                self.emit_signal("dataset_removed", _pre_delete_dataset_id)
 
             elif action_type == "IMPORT_DATA_FAILED":
                 error = action.get("error", "")
@@ -1283,6 +1295,13 @@ class StateStore:
                         x_fit=getattr(result, "x_fit", None),
                         y_fit=getattr(result, "y_fit", None),
                         residuals=getattr(result, "residuals", None),
+                        # STORE-005: Propagate uncertainty/info-criterion fields
+                        # so that export and diagnostics can access them.
+                        pcov=getattr(result, "pcov", None),
+                        rmse=getattr(result, "rmse", None),
+                        mae=getattr(result, "mae", None),
+                        aic=getattr(result, "aic", None),
+                        bic=getattr(result, "bic", None),
                         metadata=getattr(result, "metadata", None),
                     )
                 )
@@ -1348,6 +1367,15 @@ class StateStore:
                         num_samples=int(getattr(result, "num_samples", 0)),
                         num_chains=int(getattr(result, "num_chains", 4)),
                         inference_data=getattr(result, "inference_data", None),
+                        # STORE-004: Propagate diagnostics_valid so that the UI
+                        # can distinguish valid R-hat/ESS from NaN fallbacks.
+                        # M-6: When diag exists but lacks the key, fall through
+                        # to the result-level attribute to avoid defaulting True.
+                        diagnostics_valid=bool(
+                            diag["diagnostics_valid"]
+                            if diag and "diagnostics_valid" in diag
+                            else getattr(result, "diagnostics_valid", True)
+                        ),
                     )
 
                 bayes = state.bayesian_results.copy()
@@ -1386,6 +1414,62 @@ class StateStore:
                 return replace(state, **updates) if updates else state
 
             return updater
+
+        if action_type == "DELETE_SELECTED_DATASET":
+            # STORE-001: reducer for deleting the currently active dataset.
+            # Removes the dataset, its associated fit/Bayesian results, and
+            # selects the next available dataset as active (or None).
+
+            def updater(state: AppState) -> AppState:
+                dataset_id = state.active_dataset_id
+                if not dataset_id or dataset_id not in (state.datasets or {}):
+                    return state
+
+                new_datasets = state.datasets.copy()
+                del new_datasets[dataset_id]
+
+                # Select the next dataset (first remaining) as the new active one
+                new_active = next(iter(new_datasets.keys()), None)
+
+                # Purge all fit/Bayesian results associated with the deleted dataset
+                new_fit_results = {
+                    k: v
+                    for k, v in state.fit_results.items()
+                    if v.dataset_id != dataset_id
+                }
+                new_bayesian_results = {
+                    k: v
+                    for k, v in state.bayesian_results.items()
+                    if v.dataset_id != dataset_id
+                }
+
+                # M-3: Purge transform_history entries referencing the
+                # deleted dataset to avoid dangling references.
+                new_transform_history = [
+                    tr
+                    for tr in state.transform_history
+                    if tr.source_dataset_id != dataset_id
+                    and tr.target_dataset_id != dataset_id
+                ]
+
+                return replace(
+                    state,
+                    datasets=new_datasets,
+                    active_dataset_id=new_active,
+                    fit_results=new_fit_results,
+                    bayesian_results=new_bayesian_results,
+                    transform_history=new_transform_history,
+                    is_modified=True,
+                )
+
+            return updater
+
+        if action_type == "CHECK_COMPATIBILITY":
+            # STORE-002: CHECK_COMPATIBILITY is a UI-only trigger (opens the
+            # diagnostics tab) and does not need to mutate state.  Return
+            # None so dispatch() skips update_state entirely (no undo entry,
+            # no state clone, no state_changed signal).
+            return None
 
         logger.warning(
             "Unhandled action type — no reducer registered",

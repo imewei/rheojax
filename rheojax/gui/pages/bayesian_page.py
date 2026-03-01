@@ -379,6 +379,10 @@ class BayesianPage(QWidget):
             self._store.signals.model_selected.connect(self._on_model_changed)
             self._store.signals.bayesian_started.connect(self._on_bayesian_started)
             self._store.signals.bayesian_completed.connect(self._on_bayesian_completed)
+            # STORE-003: Connect bayesian_failed so that errors arriving via the
+            # WorkerPool path (main_window._on_job_failed → BAYESIAN_FAILED
+            # dispatch) are surfaced to the user in the BayesianPage UI.
+            self._store.signals.bayesian_failed.connect(self._on_bayesian_failed)
             self._store.signals.state_changed.connect(self._sync_deformation_from_store)
 
     @Slot()
@@ -1192,6 +1196,67 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
         QMessageBox.critical(self, "Inference Error", error_msg)
+
+    @Slot(str, str, str)
+    def _on_bayesian_failed(
+        self, model_name: str, dataset_id: str, error: str
+    ) -> None:
+        """Handle bayesian_failed signal from state store.
+
+        This slot catches Bayesian failures that arrive via the WorkerPool /
+        main_window._on_job_failed path (as opposed to the direct worker
+        signal path handled by _on_error).  Without this connection, those
+        errors are silently swallowed — the progress bar stays at 0 and the
+        Run button remains disabled, leaving the UI in a broken state.
+
+        Parameters
+        ----------
+        model_name : str
+            Model name (may be empty for anonymous jobs)
+        dataset_id : str
+            Dataset identifier (may be empty)
+        error : str
+            Human-readable error description
+        """
+        # Only react if this BayesianPage was the one running inference.
+        # If a different page/component submitted the job, we leave the UI
+        # untouched.  M-8: When both identifiers are empty, the signal is
+        # anonymous and could come from any source — reject it to avoid
+        # spurious UI resets.
+        submitted_model = getattr(self, "_submitted_model_name", None) or ""
+        submitted_dataset = getattr(self, "_submitted_dataset_id", None) or ""
+        if not model_name and not dataset_id:
+            return  # Anonymous signal — cannot verify ownership
+        if (
+            (model_name and submitted_model and model_name != submitted_model)
+            or (
+                dataset_id
+                and submitted_dataset
+                and dataset_id != submitted_dataset
+            )
+        ):
+            return
+
+        # Only update UI state if we believe inference was running.
+        if not self._is_running:
+            return
+
+        self._current_worker = None
+        self._is_running = False
+        self._btn_run.setEnabled(True)
+        self._btn_cancel.setEnabled(False)
+        # M-7: Reset progress bar so it doesn't stay at a partial value.
+        self._overall_progress.setValue(0)
+
+        self._status_text.append(f"Error: {error}")
+        logger.error(
+            "Bayesian inference failed (store signal)",
+            model_name=model_name,
+            dataset_id=dataset_id,
+            error=error,
+            page="BayesianPage",
+        )
+        QMessageBox.critical(self, "Inference Error", error)
 
     @Slot(str, str)
     def _on_bayesian_started(self, model_name: str = "", dataset_id: str = "") -> None:
