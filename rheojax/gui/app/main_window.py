@@ -1472,7 +1472,13 @@ class RheoJAXMainWindow(QMainWindow):
             else:
                 error_msg = getattr(result, "message", "Fit failed")
                 logger.warning("Fit unsuccessful", error=error_msg)
-                self.store.dispatch("FITTING_FAILED", {"error": error_msg})
+                # MW-FAIL-003: Include identifiers so fit_failed signal carries
+                # model_name/dataset_id (model_name and dataset_id already
+                # resolved from meta above in this same _on_job_completed call).
+                self.store.dispatch(
+                    "FITTING_FAILED",
+                    {"error": error_msg, "model_name": model_name, "dataset_id": dataset_id},
+                )
                 # R11-MW-003: FITTING_FAILED reducer already sets pipeline
                 # step to ERROR; no separate SET_PIPELINE_STEP needed.
                 self.status_bar.show_message(f"Fit failed: {error_msg}", 5000)
@@ -1536,15 +1542,29 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
         job_type = self._job_types.pop(job_id, "")
+        # MW-FAIL-001: Pop metadata so identifiers accompany FITTING_FAILED /
+        # BAYESIAN_FAILED.  Without model_name/dataset_id the store emits
+        # fit_failed("","",error) — BayesianPage._on_bayesian_failed() rejects
+        # anonymous signals leaving the UI stuck in a "running" state.
+        meta = self._job_metadata.pop(job_id, {})
         logger.error("Job failed", job_id=job_id, job_type=job_type, error=error)
         self.status_bar.hide_progress()
+        state = self.store.get_state()
+        model_name = meta.get("model_name") or state.active_model_name or ""
+        dataset_id = meta.get("dataset_id") or state.active_dataset_id or ""
         # R11-MW-002: FITTING_FAILED/BAYESIAN_FAILED reducers already handle
         # the pipeline step transition to ERROR, so no standalone
         # SET_PIPELINE_STEP dispatch is needed for fit/bayesian.
         if job_type == "fit":
-            self.store.dispatch("FITTING_FAILED", {"error": str(error)})
+            self.store.dispatch(
+                "FITTING_FAILED",
+                {"error": str(error), "model_name": model_name, "dataset_id": dataset_id},
+            )
         elif job_type == "bayesian":
-            self.store.dispatch("BAYESIAN_FAILED", {"error": str(error)})
+            self.store.dispatch(
+                "BAYESIAN_FAILED",
+                {"error": str(error), "model_name": model_name, "dataset_id": dataset_id},
+            )
         elif job_type == "transform":
             self.store.dispatch(
                 "SET_PIPELINE_STEP", {"step": job_type, "status": "ERROR"}
@@ -1555,16 +1575,30 @@ class RheoJAXMainWindow(QMainWindow):
 
     def _on_job_cancelled(self, job_id: str) -> None:
         job_type = self._job_types.pop(job_id, "")
+        # MW-FAIL-002: Pop metadata so identifiers accompany FITTING_FAILED /
+        # BAYESIAN_FAILED on cancellation (mirrors the fix in _on_job_failed).
+        meta = self._job_metadata.pop(job_id, {})
         logger.info("Job cancelled", job_id=job_id, job_type=job_type)
         self.status_bar.hide_progress()
-        if job_type:
+        state = self.store.get_state()
+        model_name = meta.get("model_name") or state.active_model_name or ""
+        dataset_id = meta.get("dataset_id") or state.active_dataset_id or ""
+        if job_type and job_type not in ("fit", "bayesian"):
+            # fit/bayesian have their own FAILED reducers that set ERROR status;
+            # dispatching WARNING first would cause double state churn.
             self.store.dispatch(
                 "SET_PIPELINE_STEP", {"step": job_type, "status": "WARNING"}
             )
         if job_type == "fit":
-            self.store.dispatch("FITTING_FAILED", {"error": "Cancelled"})
+            self.store.dispatch(
+                "FITTING_FAILED",
+                {"error": "Cancelled", "model_name": model_name, "dataset_id": dataset_id},
+            )
         elif job_type == "bayesian":
-            self.store.dispatch("BAYESIAN_FAILED", {"error": "Cancelled"})
+            self.store.dispatch(
+                "BAYESIAN_FAILED",
+                {"error": "Cancelled", "model_name": model_name, "dataset_id": dataset_id},
+            )
         elif job_type == "transform":
             self.log("Transform cancelled")
         self.log(f"Job {job_id} cancelled")
@@ -2024,7 +2058,16 @@ class RheoJAXMainWindow(QMainWindow):
 
         if not self.worker_pool:
             self.status_bar.show_message("Worker pool unavailable", 3000)
-            self.store.dispatch("FITTING_FAILED", {"error": "Worker pool unavailable"})
+            # MW-FAIL-003: Include identifiers in pre-submission failure so
+            # fit_failed signal is not anonymous.
+            self.store.dispatch(
+                "FITTING_FAILED",
+                {
+                    "error": "Worker pool unavailable",
+                    "model_name": model_name or "",
+                    "dataset_id": dataset_id or "",
+                },
+            )
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"})
             return
 
@@ -2118,7 +2161,16 @@ class RheoJAXMainWindow(QMainWindow):
         except Exception as exc:
             logger.error("Fit job submission failed", error=str(exc), exc_info=True)
             self.status_bar.hide_progress()
-            self.store.dispatch("FITTING_FAILED", {"error": str(exc)})
+            # MW-FAIL-003: Include identifiers so fit_failed signal is not
+            # anonymous (model_name and dataset.id are in local scope here).
+            self.store.dispatch(
+                "FITTING_FAILED",
+                {
+                    "error": str(exc),
+                    "model_name": model_name or "",
+                    "dataset_id": dataset.id if dataset is not None else "",
+                },
+            )
             self.store.dispatch("SET_PIPELINE_STEP", {"step": "fit", "status": "ERROR"})
             self.status_bar.show_message(f"Fit failed: {exc}", 5000)
             return

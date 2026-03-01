@@ -409,6 +409,15 @@ class BayesianService:
                 logger.warning("Unable to extract posterior samples for diagnostics")
                 return {}
 
+            # BSVC-002: Guard against None/empty posterior_samples before
+            # iterating — mirrors the guard added to get_credible_intervals().
+            if not posterior_samples:
+                logger.warning(
+                    "get_diagnostics: posterior_samples is empty or None; "
+                    "cannot compute ArviZ diagnostics"
+                )
+                return {"diagnostics_valid": False}
+
             # Convert to ArviZ format
             # Reshape samples: (n_chains, n_draws)
             idata_dict = {}
@@ -523,11 +532,22 @@ class BayesianService:
         )
         intervals = {}
 
+        # BSVC-001: posterior_samples can be None when BayesianResult is
+        # constructed without samples (e.g. partial failure path).  Guard
+        # before iterating to avoid AttributeError on .items().
+        posterior_samples = result.posterior_samples
+        if not posterior_samples:
+            logger.warning(
+                "get_credible_intervals: posterior_samples is empty or None",
+                model=result.model_name,
+            )
+            return intervals
+
         alpha = 1 - prob
         lower_percentile = 100 * alpha / 2
         upper_percentile = 100 * (1 - alpha / 2)
 
-        for param_name, samples in result.posterior_samples.items():
+        for param_name, samples in posterior_samples.items():
             # Flatten samples across chains if needed
             samples_flat = samples.flatten() if samples.ndim > 1 else samples
 

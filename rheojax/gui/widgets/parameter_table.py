@@ -174,16 +174,42 @@ class ParameterTable(QTableWidget):
         parameters = {}
 
         for row in range(self.rowCount()):
-            param_name = self.item(row, 0).text()
+            # PTBL-001: item() returns None if the row was removed while we
+            # are iterating (e.g. a concurrent clear triggered by a state
+            # update).  Guard every cell access to avoid AttributeError.
+            name_item = self.item(row, 0)
+            val_item = self.item(row, 1)
+            min_item = self.item(row, 2)
+            max_item = self.item(row, 3)
+            if name_item is None or val_item is None or min_item is None or max_item is None:
+                logger.warning(
+                    "Skipping incomplete table row",
+                    widget=self.__class__.__name__,
+                    row=row,
+                )
+                continue
+            param_name = name_item.text()
+            if not param_name:
+                continue
 
             # Get values from cells
-            value = float(self.item(row, 1).text())
-            min_bound = float(self.item(row, 2).text())
-            max_bound = float(self.item(row, 3).text())
+            try:
+                value = float(val_item.text())
+                min_bound = float(min_item.text())
+                max_bound = float(max_item.text())
+            except ValueError:
+                logger.warning(
+                    "Skipping row with non-numeric cell — parameter will use "
+                    "model default; check the table for typos",
+                    widget=self.__class__.__name__,
+                    row=row,
+                    param_name=param_name,
+                )
+                continue
 
             # Get fixed state from checkbox
             checkbox_widget = self.cellWidget(row, 4)
-            checkbox = checkbox_widget.findChild(QCheckBox)
+            checkbox = checkbox_widget.findChild(QCheckBox) if checkbox_widget else None
             fixed = checkbox.isChecked() if checkbox else False
 
             # Get original parameter state
