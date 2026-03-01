@@ -327,7 +327,9 @@ class MutationNumber(BaseTransform):
         if not self.extrapolate:
             return False
 
-        n_check = min(10, len(G_relax) // 4)
+        # R7-MUT-002: Ensure n_check >= 1 to avoid G_relax[-0:] returning
+        # the full array instead of just the tail.
+        n_check = max(1, min(10, len(G_relax) // 4))
         tail_values = G_relax[-n_check:]
         tail_mean = float(jnp.mean(tail_values))
         tail_positive = float(jnp.min(tail_values)) > 0
@@ -353,7 +355,10 @@ class MutationNumber(BaseTransform):
         t_max = t[-1]
         G_relax_tail = G_relax[-1]
 
-        n_fit = min(10, len(t) // 4)
+        # R7-MUT-003: Ensure n_fit >= 1, consistent with _extrapolate_tail.
+        # min(10, len(t)//4) gives 0 for len(t) < 4, causing t[-0:] to return
+        # the full array instead of the tail.
+        n_fit = max(1, min(10, len(t) // 4))
         if len(t) < n_fit or G_relax_tail <= 0:
             return 0.0
 
@@ -636,6 +641,14 @@ class MutationNumber(BaseTransform):
 
         # Get initial modulus
         G_0 = G_t[0]
+
+        # R7-MUT-001: Guard division by zero when G(0) is zero or negative
+        if float(G_0) <= 0:
+            logger.warning(
+                "get_relaxation_time: G(0) is non-positive, returning NaN",
+                G_0=float(G_0),
+            )
+            return float("nan")
 
         # Calculate ∫G(t)dt
         integral_G = self._integrate(t, G_t)

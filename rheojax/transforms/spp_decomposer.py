@@ -390,6 +390,16 @@ class SPPDecomposer(BaseTransform):
                 actual_end=actual_end,
                 selected_points=int(jnp.sum(mask)),
             )
+
+            # R7-SPP-001: Validate sufficient data remains after cycle masking.
+            # SPP analysis requires at least one full period of data.
+            if len(t_jax) < 4:
+                raise ValueError(
+                    f"Cycle selection left only {len(t_jax)} data points "
+                    f"(cycles {actual_start}-{actual_end}). "
+                    f"SPP analysis requires at least 4 points. "
+                    f"Adjust start_cycle/end_cycle or provide more data."
+                )
         else:
             actual_start, actual_end = 0, None
 

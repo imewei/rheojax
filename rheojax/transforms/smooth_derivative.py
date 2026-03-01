@@ -203,6 +203,15 @@ class SmoothDerivative(BaseTransform):
         if is_uniform:
             # Use scipy's savgol_filter directly
             delta = dx[0]
+            # R7-DERIV-002: Guard against zero spacing (duplicate x values).
+            # Cannot fall back to finite differences either since jnp.gradient
+            # also divides by dx — raise ValueError instead.
+            if abs(delta) < 1e-30:
+                raise ValueError(
+                    "SmoothDerivative: uniform spacing is near-zero "
+                    f"(delta={delta:.2e}). Data likely contains duplicate x "
+                    "values. Remove duplicates before computing derivatives."
+                )
             dy_dx = savgol_filter(
                 y_np,
                 window_length=self.window_length,
@@ -501,6 +510,14 @@ class SmoothDerivative(BaseTransform):
             x = jnp.array(x)
         if not isinstance(y, jnp.ndarray):
             y = jnp.array(y)
+
+        # R7-DERIV-001: Need at least 3 points for second derivative estimation
+        if len(x) < 3:
+            logger.warning(
+                "estimate_noise_level: need at least 3 data points, got %d",
+                len(x),
+            )
+            return 0.0
 
         # Compute second derivative (amplifies noise)
         d2y = jnp.gradient(jnp.gradient(y, x), x)

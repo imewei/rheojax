@@ -399,7 +399,20 @@ def check_model_compatibility(
             "implemented). Returning default compatible=True with low confidence.",
             test_mode,
         )
-        confidence = 0.3  # Low confidence — no analysis was performed
+        # R7-COMPAT-001: Return early for unsupported test modes.
+        # Previously, confidence=0.3 set here was overwritten by the default
+        # confidence=0.5 below, silently discarding the low-confidence signal.
+        return {
+            "compatible": True,
+            "confidence": 0.3,
+            "decay_type": decay_type,
+            "material_type": material_type,
+            "warnings": [
+                f"Compatibility checking not implemented for test_mode={test_mode!r}. "
+                "Only 'relaxation' and 'oscillation' are supported."
+            ],
+            "recommendations": [],
+        }
 
     # Get model name
     model_name = model.__class__.__name__

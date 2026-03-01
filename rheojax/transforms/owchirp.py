@@ -137,8 +137,12 @@ class OWChirp(BaseTransform):
         Array
             Complex wavelet coefficients
         """
+        # R7-OWC-001: Guard against frequency=0 to prevent division by zero
+        # in sigma computation. Use a small epsilon floor.
+        freq_safe = jnp.maximum(frequency, 1e-30)
+
         # Gaussian envelope width
-        sigma = width / (2.0 * jnp.pi * frequency)
+        sigma = width / (2.0 * jnp.pi * freq_safe)
 
         # Gaussian envelope
         envelope = jnp.exp(-(((t - t_center) / sigma) ** 2))
@@ -242,7 +246,9 @@ class OWChirp(BaseTransform):
             conv_trimmed = conv[:n_orig]
 
             # Apply 1/√f scale normalization (standard L² CWT normalization)
-            conv_normalized = conv_trimmed / jnp.sqrt(float(freq))
+            # R7-OWC-002: Guard against freq=0 (logspace guarantees positive but
+            # defend against edge cases in direct calls)
+            conv_normalized = conv_trimmed / jnp.sqrt(max(float(freq), 1e-30))
 
             coefficients_list.append(conv_normalized)
 

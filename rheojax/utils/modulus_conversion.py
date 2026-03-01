@@ -211,15 +211,18 @@ def convert_rheodata(
     if isinstance(to_mode, str):
         to_mode = DeformationMode(to_mode)
 
+    # R7-MOD-001: Guard against None metadata (RheoData allows metadata=None)
+    _meta = data.metadata if data.metadata is not None else {}
+
     # Determine source mode from metadata
-    from_mode_str = data.metadata.get("deformation_mode", "shear")
+    from_mode_str = _meta.get("deformation_mode", "shear")
     from_mode = DeformationMode(from_mode_str)
 
     # Convert y-data
     y_converted = convert_modulus(data.y, from_mode, to_mode, poisson_ratio)
 
     # Build updated metadata
-    new_metadata = dict(data.metadata)
+    new_metadata = dict(_meta)
     new_metadata["deformation_mode"] = to_mode.value
     new_metadata["poisson_ratio"] = poisson_ratio
     if from_mode != to_mode:
