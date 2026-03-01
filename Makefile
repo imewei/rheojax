@@ -18,6 +18,11 @@ TEST_DIR := tests
 DOCS_DIR := docs
 VENV := .venv
 
+# Parallel test workers: each xdist worker imports JAX (~1-2 GB).
+# Cap at 4 workers to stay within 16 GB RAM (4 x 2 GB = 8 GB headroom).
+# Override: XDIST_WORKERS=8 make test-parallel
+XDIST_WORKERS ?= 4
+
 # Platform detection
 UNAME_S := $(shell uname -s 2>/dev/null || echo "Windows")
 ifeq ($(UNAME_S),Linux)
@@ -462,40 +467,40 @@ test:
 
 test-smoke:
 	@echo "$(BOLD)$(BLUE)Running smoke tests (105 critical tests, ~30s-2min)...$(RESET)"
-	$(RUN_CMD) $(PYTEST) -n auto -m "smoke"
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "smoke"
 	@echo "$(BOLD)$(GREEN)✓ Smoke tests passed!$(RESET)"
 
 test-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests (excluding slow Bayesian tests)...$(RESET)"
 	@echo "$(BOLD)Note:$(RESET) Excludes 34 slow Bayesian tests (60-90 min), ~15-25 min runtime"
-	$(RUN_CMD) $(PYTEST) -n auto -m "not slow"
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "not slow"
 
 test-parallel:
 	@echo "$(BOLD)$(BLUE)Running tests in parallel (2-4x speedup)...$(RESET)"
-	$(RUN_CMD) $(PYTEST) -n auto
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS)
 
 test-all-parallel:
 	@echo "$(BOLD)$(BLUE)Running full test suite in parallel (~1245 tests)...$(RESET)"
 	@echo "$(BOLD)Note:$(RESET) Includes all tests (slow Bayesian, integration, etc.)"
-	$(RUN_CMD) $(PYTEST) -n auto
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS)
 	@echo "$(BOLD)$(GREEN)✓ Full test suite passed!$(RESET)"
 
 test-parallel-fast:
 	@echo "$(BOLD)$(BLUE)Running fast tests in parallel...$(RESET)"
-	$(RUN_CMD) $(PYTEST) -n auto -m "not slow"
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "not slow"
 
 test-ci:
 	@echo "$(BOLD)$(BLUE)Running CI test suite (matches GitHub Actions)...$(RESET)"
 	@echo "$(BOLD)Tests:$(RESET) 105 smoke tests, ~30s-2min"
 	@echo "$(BOLD)Note:$(RESET) GitHub CI now runs smoke tests only for fast feedback"
-	$(RUN_CMD) $(PYTEST) -n auto -m "smoke"
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "smoke"
 	@echo "$(BOLD)$(GREEN)✓ CI test suite passed!$(RESET)"
 
 test-ci-full:
 	@echo "$(BOLD)$(BLUE)Running full CI test suite (pre-v0.2.1 behavior)...$(RESET)"
 	@echo "$(BOLD)Excludes:$(RESET) slow, validation, benchmark, notebook_comprehensive"
 	@echo "$(BOLD)Tests:$(RESET) ~1069/1154 tests, ~5-10 minutes"
-	$(RUN_CMD) $(PYTEST) -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "not slow and not validation and not benchmark and not notebook_comprehensive"
 	@echo "$(BOLD)$(GREEN)✓ Full CI test suite passed!$(RESET)"
 
 test-coverage:
@@ -506,7 +511,7 @@ test-coverage:
 
 test-coverage-parallel:
 	@echo "$(BOLD)$(BLUE)Running tests with coverage in parallel...$(RESET)"
-	$(RUN_CMD) $(PYTEST) -n auto --cov=$(PACKAGE_NAME) --cov-report=term-missing --cov-report=html --cov-report=xml
+	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) --cov=$(PACKAGE_NAME) --cov-report=term-missing --cov-report=html --cov-report=xml
 	@echo "$(BOLD)$(GREEN)✓ Coverage report generated!$(RESET)"
 	@echo "View HTML report: open htmlcov/index.html"
 
@@ -518,7 +523,7 @@ test-validation:
 	@echo "$(BOLD)$(BLUE)Running validation tests with production-quality MCMC...$(RESET)"
 	@echo "$(BOLD)Configuration:$(RESET) PYTEST_FULL_VALIDATION=1 (num_warmup=2000, num_samples=1000)"
 	@echo "$(BOLD)Runtime:$(RESET) ~90 minutes (for weekly validation and releases)"
-	PYTEST_FULL_VALIDATION=1 $(RUN_CMD) $(PYTEST) -n auto
+	PYTEST_FULL_VALIDATION=1 $(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS)
 
 # ===================
 # Code quality targets
@@ -740,7 +745,7 @@ verify:
 	@echo "$(YELLOW)Note: Type checking is advisory. See 'make type-check' for full report.$(RESET)"
 	@echo ""
 	@echo "$(BOLD)Step 3/3: Smoke tests$(RESET)"
-	@$(RUN_CMD) $(PYTEST) -n auto -m "smoke" || (echo "$(RED)Smoke tests failed!$(RESET)" && exit 1)
+	@$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "smoke" || (echo "$(RED)Smoke tests failed!$(RESET)" && exit 1)
 	@echo ""
 	@echo "$(BOLD)$(GREEN)======================================$(RESET)"
 	@echo "$(BOLD)$(GREEN)  ALL CHECKS PASSED - SAFE TO PUSH$(RESET)"
