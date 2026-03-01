@@ -362,27 +362,20 @@ class ITTMCTBase(BaseModel):
         upper = np.array([b[1] if b[1] is not None else np.inf for b in param_bounds])
         bounds = (lower, upper)
 
-        # Closure captures gamma_dot, sigma, param_names, and bounds
-        # Use scipy.optimize directly to avoid JAX tracing issues with NLSQ
-        from scipy.optimize import least_squares
-
         def residual_func(params):
-            # Handle both JAX arrays and numpy arrays
-            try:
-                params_np = np.array(params.block_until_ready())
-            except (AttributeError, TypeError):
-                params_np = np.array(params)
-            params_clipped = np.clip(params_np, lower, upper)
+            params_clipped = np.clip(np.asarray(params), lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
             y_pred = self._predict_flow_curve(gamma_dot)
             return sigma - y_pred
 
-        result = least_squares(
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_flow_curve
+        result = fit_with_nlsq(
             residual_func,
             initial_values,
-            bounds=(lower, upper),
-            method="trf",
+            bounds=bounds,
+            method="scipy",
         )
 
         self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
