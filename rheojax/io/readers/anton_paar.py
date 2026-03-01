@@ -507,7 +507,11 @@ def _parse_single_interval(
             else:
                 continue
             if decimal_sep == ",":
-                p = p.replace(".", "").replace(",", ".")
+                # IO-001: Only strip thousands-separator dots (before the comma),
+                # not decimal dots in scientific notation mantissa (e.g. "1.23E+04")
+                parts = p.split(",", 1)
+                parts[0] = parts[0].replace(".", "")
+                p = ".".join(parts)
             try:
                 row_values.append(float(p))
             except ValueError:

@@ -212,8 +212,8 @@ def _run_scipy_least_squares(
         # Guard against NaN/Inf from ODE solvers — replace with large finite
         # penalty so scipy can still attempt to optimize (gradient-guided away
         # from the bad region). Without this, scipy raises ValueError at init.
+        # UTILS-001: Apply nan_to_num first so NaN gets 1e10 (not 0.0 from sign(NaN))
         if not np.all(np.isfinite(res)):
-            res = np.where(np.isfinite(res), res, np.sign(res) * 1e10)
             res = np.nan_to_num(res, nan=1e10, posinf=1e10, neginf=-1e10)
         return res
 

@@ -55,7 +55,7 @@ def _worker_loop(
         except (EOFError, OSError):
             break
 
-        if task is shutdown_sentinel:
+        if task == shutdown_sentinel:
             break
 
         task_id, fn, args, kwargs = task

@@ -64,7 +64,10 @@ def _validate_poisson_ratio(nu: float) -> None:
     Raises:
         ValueError: If Poisson's ratio is outside physical bounds
     """
-    if not isinstance(nu, (int, float, np.floating)):
+    # UTILS-004: Handle JAX scalars and other numeric array-likes
+    try:
+        nu = float(nu)
+    except (TypeError, ValueError):
         raise TypeError(f"Poisson's ratio must be a number, got {type(nu).__name__}")
     if nu <= -1.0 or nu > 0.5:
         raise ValueError(
