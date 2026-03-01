@@ -292,8 +292,10 @@ def load_trios_json(
             logger.warning("Result has no data, skipping", result_index=res_idx)
             continue
 
-        # Detect or use provided test mode
-        detected_mode = test_mode or detect_test_type(df)
+        # Detect or use provided test mode.
+        # IO-FIX-002: explicit None check avoids or-sentinel swallowing
+        # falsy test_mode values (e.g. empty string).
+        detected_mode = detect_test_type(df) if test_mode is None else test_mode
         logger.debug("Test mode", detected_mode=detected_mode, provided=test_mode)
 
         # Check for step column and split if needed

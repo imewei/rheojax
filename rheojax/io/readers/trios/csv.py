@@ -48,6 +48,14 @@ ENCODING_CASCADE = ["utf-8", "latin-1", "cp1252"]
 # Auto-chunking threshold (5 MB)
 AUTO_CHUNK_THRESHOLD_MB = 5.0
 
+# Unit substrings for identifying unit rows in TRIOS CSV files.
+# Shared between first-table parsing and multi-table continuation loop.
+_UNIT_SUBSTRINGS = frozenset({
+    "Pa", "Hz", "rad", "°C", "°F", "K", "/s", "%", "1/",
+    "mN", "mPa", "kPa", "MPa", "N·m", "N.m", "J/", "W/",
+    "m²", "m2", "mm", "μm", "nm",
+})
+
 
 def detect_encoding(filepath: Path) -> str:
     """Detect file encoding using cascade approach.
@@ -470,30 +478,6 @@ def parse_trios_csv(
             # Require positive evidence: at least one cell contains a known
             # unit substring. This rules out annotation/label rows.
             if is_unit_row:
-                _UNIT_SUBSTRINGS = {
-                    "Pa",
-                    "Hz",
-                    "rad",
-                    "°C",
-                    "°F",
-                    "K",
-                    "/s",
-                    "%",
-                    "1/",
-                    "mN",
-                    "mPa",
-                    "kPa",
-                    "MPa",
-                    "N·m",
-                    "N.m",
-                    "J/",
-                    "W/",
-                    "m²",
-                    "m2",
-                    "mm",
-                    "μm",
-                    "nm",
-                }
                 non_empty_parts = [p.strip() for p in parts[:6] if p.strip()]
                 has_unit_evidence = any(
                     any(u in p for u in _UNIT_SUBSTRINGS) for p in non_empty_parts
@@ -524,17 +508,21 @@ def parse_trios_csv(
             if k.lower() != "variables" and not k.lower().startswith("data")
         }
 
-    # Parse data rows
-    # IO-R6-006: Previously, both empty lines AND `[`-prefixed lines terminated
-    # parsing. Fix: empty lines → continue (skip blank separators between step
-    # sections); `[`-prefixed lines still break (end of current table).
+    # IO-004: Parse data rows from the current section and record where any
+    # `[`-prefixed section header occurs so we can continue into the next table.
+    # Previously `break` on `[` silently dropped all data after the first table
+    # boundary in multi-step TRIOS CSV exports.
     data_rows = []
     expected_cols = len(header) + col_offset
     skipped_rows = 0
+    next_section_start: int | None = None  # IO-004: track for multi-table loop
     for i in range(data_start, len(lines)):
         line = lines[i].strip()
         if line.startswith("["):
-            # Section header — end of this table's data
+            # Section header — end of this table's data.
+            # IO-004: record the position so the outer loop can find the
+            # next table's header rather than discarding everything after here.
+            next_section_start = i
             break
         if not line:
             # IO-R6-007: Skip blank separator lines within multi-step data
@@ -615,27 +603,177 @@ def parse_trios_csv(
             "Step column detected", step_col=step_col, num_steps=len(step_values)
         )
 
-    # Create TRIOSTable
-    table = TRIOSTable(
-        table_index=0,
-        header=list(df.columns),
-        units=units,
-        df=df,
-        step_values=step_values,
-    )
+    # Create first TRIOSTable
+    tables: list[TRIOSTable] = [
+        TRIOSTable(
+            table_index=0,
+            header=list(df.columns),
+            units=units,
+            df=df,
+            step_values=step_values,
+        )
+    ]
+
+    # IO-004: Parse additional tables that follow `[`-prefixed section headers.
+    # TRIOS multi-step CSV exports repeat the full `Variables`/header + data block
+    # for each step, separated by `[Step N]` section-header lines.
+    # Previously only the first block was parsed; everything after the first `[`
+    # was silently discarded.
+    search_start = next_section_start
+    while search_start is not None:
+        # Skip the `[...]` line itself, then find the next header row.
+        next_header_row = detect_header_row(lines, delimiter, search_start + 1)
+        if next_header_row >= len(lines):
+            break
+        # M-3: Validate that detect_header_row actually found a header and
+        # didn't just return the start_index fallback.  If the returned index
+        # equals search_start + 1 and the line looks numeric, it's a data row
+        # masquerading as a header — skip this section.
+        if next_header_row == search_start + 1:
+            _probe = lines[next_header_row].strip().split(delimiter)
+            if _probe and _is_numeric(_probe[0].strip()):
+                search_start = None
+                for _si in range(next_header_row, len(lines)):
+                    if lines[_si].strip().startswith("["):
+                        search_start = _si
+                        break
+                continue
+
+        # Parse the repeated header
+        next_header_line = lines[next_header_row]
+        next_header = [h.strip() for h in next_header_line.split(delimiter)]
+
+        # Determine unit row for this section
+        next_unit_row = None
+        next_data_start = next_header_row + 1
+        if next_data_start < len(lines):
+            nxt_line = lines[next_data_start]
+            nxt_parts = nxt_line.split(delimiter)
+            if nxt_parts and not nxt_parts[0].strip().lower().startswith("data"):
+                _is_u = True
+                for _p in nxt_parts[1:5]:
+                    if _p.strip() and _is_numeric(_p.strip()):
+                        _is_u = False
+                        break
+                if _is_u:
+                    _nep = [_p.strip() for _p in nxt_parts[:6] if _p.strip()]
+                    if any(any(u in _p for u in _UNIT_SUBSTRINGS) for _p in _nep):
+                        next_unit_row = nxt_parts
+                        next_data_start += 1
+
+        next_units = extract_units_from_header(next_header, next_unit_row)
+
+        # Determine label-column offset for this section
+        next_first_col_is_label = (
+            next_header[0].lower() in {"variables", "data point"}
+            or next_header[0].lower().startswith("data")
+        )
+        next_col_offset = 1 if next_first_col_is_label else 0
+        if next_first_col_is_label:
+            next_header = next_header[1:]
+            next_units = {
+                k: v
+                for k, v in next_units.items()
+                if k.lower() != "variables" and not k.lower().startswith("data")
+            }
+
+        # Parse data rows for this section
+        next_data_rows: list[list[float]] = []
+        next_expected = len(next_header) + next_col_offset
+        next_skipped = 0
+        next_section_start = None
+        for i in range(next_data_start, len(lines)):
+            line = lines[i].strip()
+            if line.startswith("["):
+                next_section_start = i
+                break
+            if not line:
+                continue
+            parts2 = line.split(delimiter)
+            if len(parts2) == next_expected:
+                row2: list[float] = []
+                for j2, val2 in enumerate(parts2):
+                    if j2 < next_col_offset:
+                        continue
+                    v2 = val2.strip()
+                    if not v2:
+                        row2.append(np.nan)
+                    else:
+                        try:
+                            if decimal_separator == ",":
+                                eu2 = v2.replace(".", "").replace(",", ".")
+                                try:
+                                    row2.append(float(eu2))
+                                except ValueError:
+                                    row2.append(float(v2))
+                            else:
+                                row2.append(float(v2))
+                        except ValueError:
+                            row2.append(np.nan)
+                if row2:
+                    next_data_rows.append(row2)
+            else:
+                next_skipped += 1
+
+        if next_skipped > 0:
+            warnings.warn(
+                f"Skipped {next_skipped} malformed rows in additional table "
+                f"(expected {next_expected} columns) in {filepath}",
+                stacklevel=3,
+            )
+
+        if not next_data_rows:
+            # Empty section — skip but continue searching for more
+            search_start = next_section_start
+            continue
+
+        # Build DataFrame for this section
+        nd_cols = len(next_data_rows[0])
+        nh_cols = len(next_header)
+        if nd_cols < nh_cols:
+            for nr in next_data_rows:
+                nr.extend([np.nan] * (nh_cols - len(nr)))
+        elif nd_cols > nh_cols:
+            next_header = next_header + [f"col_{i}" for i in range(nh_cols, nd_cols)]
+        next_df = pd.DataFrame(
+            next_data_rows,
+            columns=next_header[: max(nd_cols, nh_cols)],
+        )
+
+        next_step_col = detect_step_column(next_df)
+        next_step_vals = None
+        if next_step_col:
+            next_step_vals = next_df[next_step_col].unique().tolist()
+
+        tables.append(
+            TRIOSTable(
+                table_index=len(tables),
+                header=list(next_df.columns),
+                units=next_units,
+                df=next_df,
+                step_values=next_step_vals,
+            )
+        )
+        logger.debug(
+            "Additional table parsed",
+            table_index=len(tables) - 1,
+            num_rows=len(next_data_rows),
+        )
+        search_start = next_section_start
 
     logger.info(
         "TRIOS CSV parsing complete",
         filepath=str(filepath),
+        num_tables=len(tables),
         num_rows=len(data_rows),
-        num_columns=len(header),
+        num_columns=len(df.columns),
     )
 
     return TRIOSFile(
         filepath=str(filepath),
         format="csv",
         metadata=metadata,
-        tables=[table],
+        tables=tables,
         encoding=encoding,
         decimal_separator=decimal_separator,
     )
@@ -706,8 +844,11 @@ def load_trios_csv(
             columns=list(df.columns),
         )
 
-        # Detect or use provided test mode
-        detected_mode = test_mode or detect_test_type(df)
+        # Detect or use provided test mode.
+        # IO-FIX-002: use explicit None check (not `or`) — an empty-string
+        # test_mode="" is falsy and would fall through to auto-detection,
+        # ignoring the caller's intent.
+        detected_mode = detect_test_type(df) if test_mode is None else test_mode
         logger.debug("Test mode", detected_mode=detected_mode, provided=test_mode)
 
         # Check for step column and split if needed

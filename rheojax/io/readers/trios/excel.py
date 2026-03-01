@@ -722,8 +722,10 @@ def load_trios_excel(
         units = table.units
         sheet_name_str = table.sheet_name
 
-        # Detect or use provided test mode
-        detected_mode = test_mode or detect_test_type(df)
+        # Detect or use provided test mode.
+        # IO-FIX-002: explicit None check avoids or-sentinel swallowing
+        # falsy test_mode values (e.g. empty string).
+        detected_mode = detect_test_type(df) if test_mode is None else test_mode
 
         # Check for step column and split if needed
         step_col = detect_step_column(df)

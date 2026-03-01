@@ -256,13 +256,15 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             y_combined = np.concatenate(y_parts)
 
             # Create aggregated RheoData
+            # IO-FIX-001: copy metadata so downstream mutations do not corrupt
+            # the first_chunk.metadata reference (RheoData stores dict by ref).
             aggregated_data = RheoData(
                 x=x_combined,
                 y=y_combined,
                 x_units=first_chunk.x_units,
                 y_units=first_chunk.y_units,
                 domain=first_chunk.domain,
-                metadata=first_chunk.metadata,
+                metadata=first_chunk.metadata.copy(),
                 initial_test_mode=first_chunk.test_mode,
                 validate=kwargs.get("validate_data", True),
             )
