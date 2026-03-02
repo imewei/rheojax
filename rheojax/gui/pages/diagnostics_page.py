@@ -62,7 +62,7 @@ class DiagnosticsPage(QWidget):
         main_layout.addWidget(self._canvas, 1)
 
         # Bottom panel: Metrics and comparison (compact, fixed height)
-        bottom_splitter = QSplitter(Qt.Horizontal)
+        bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
         bottom_splitter.addWidget(self._create_metrics_panel())
         bottom_splitter.addWidget(self._create_comparison_panel())
         bottom_splitter.setSizes([500, 500])

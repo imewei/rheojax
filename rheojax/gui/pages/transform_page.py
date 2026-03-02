@@ -136,7 +136,7 @@ class TransformPage(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left sidebar
         sidebar_widget = QWidget()
@@ -192,25 +192,12 @@ class TransformPage(QWidget):
         self._scroll.setVisible(False)
         self._detail_layout.addWidget(self._scroll, 1)
 
-        # Preview canvas (created once, reused across selections to avoid
-        # OpenGL context segfaults from repeated create/destroy cycles)
-        self._preview_canvas = None
-        self._preview_label = None
-        if PYQTGRAPH_AVAILABLE:
-            self._preview_label = QLabel("Preview")
-            self._preview_label.setStyleSheet(
-                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
-                f" font-size: {Typography.SIZE_MD_SM}pt;"
-                f" margin-top: {Spacing.SM}px;"
-            )
-            self._preview_label.setVisible(False)
-            self._detail_layout.addWidget(self._preview_label)
-
-            self._preview_canvas = PyQtGraphCanvas()
-            self._preview_canvas.setMinimumHeight(250)
-            self._preview_canvas.set_labels(x_label="x", y_label="y")
-            self._preview_canvas.setVisible(False)
-            self._detail_layout.addWidget(self._preview_canvas, 1)
+        # Preview canvas — created lazily on first transform selection to avoid
+        # OpenGL context segfaults from QOpenGLWidget init before native window
+        # is shown (macOS Metal compatibility layer issue).
+        self._preview_canvas: PyQtGraphCanvas | None = None
+        self._preview_label: QLabel | None = None
+        self._preview_initialized = False
 
         # Apply button (always visible at bottom of detail panel)
         self._apply_btn = QPushButton("Apply Transform")
@@ -223,6 +210,52 @@ class TransformPage(QWidget):
         splitter.setSizes([200, 700])
 
         root.addWidget(splitter)
+
+    # ------------------------------------------------------------------
+    # Lazy preview canvas
+    # ------------------------------------------------------------------
+
+    def _ensure_preview_canvas(self) -> None:
+        """Lazily create the preview canvas on first use.
+
+        Deferred from ``_setup_ui`` to avoid OpenGL context init before the
+        native window is shown, which can segfault on macOS ARM64.
+        """
+        if self._preview_initialized:
+            return
+        self._preview_initialized = True
+
+        if not PYQTGRAPH_AVAILABLE:
+            return
+
+        try:
+            self._preview_label = QLabel("Preview")
+            self._preview_label.setStyleSheet(
+                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;"
+                f" margin-top: {Spacing.SM}px;"
+            )
+            self._preview_label.setVisible(False)
+            # Insert before the apply button (last widget in detail_layout)
+            idx = self._detail_layout.indexOf(self._apply_btn)
+            self._detail_layout.insertWidget(idx, self._preview_label)
+
+            self._preview_canvas = PyQtGraphCanvas()
+            self._preview_canvas.setMinimumHeight(250)
+            self._preview_canvas.set_labels(x_label="x", y_label="y")
+            self._preview_canvas.setVisible(False)
+            self._detail_layout.insertWidget(idx + 1, self._preview_canvas, 1)
+        except Exception:
+            logger.warning(
+                "Failed to create preview canvas; preview disabled",
+                page="TransformPage",
+                exc_info=True,
+            )
+            if self._preview_label is not None:
+                self._detail_layout.removeWidget(self._preview_label)
+                self._preview_label.deleteLater()
+            self._preview_canvas = None
+            self._preview_label = None
 
     # ------------------------------------------------------------------
     # Sidebar selection
@@ -310,7 +343,8 @@ class TransformPage(QWidget):
                 self._dataset_checklist.addItem(item)
             lay.addWidget(self._dataset_checklist)
 
-        # Show persistent preview canvas (created once in _setup_ui)
+        # Lazily create preview canvas on first transform selection
+        self._ensure_preview_canvas()
         if self._preview_canvas is not None:
             if self._preview_label is not None:
                 self._preview_label.setVisible(True)

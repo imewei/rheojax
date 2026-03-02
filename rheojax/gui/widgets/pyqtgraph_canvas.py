@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import sys
+
 import numpy as np
 
 try:
@@ -20,8 +22,17 @@ try:
     from pyqtgraph import PlotWidget, mkBrush, mkPen
 
     PYQTGRAPH_AVAILABLE = True
-    # Configure once at import time (not per-instance)
-    pg.setConfigOptions(antialias=True, useOpenGL=True, enableExperimental=True)
+    # macOS deprecated OpenGL; its Metal compatibility layer can segfault during
+    # QOpenGLWidget context init (especially inside QSplitter before the native
+    # window is shown).  Disable OpenGL there, keep it on Linux/Windows.
+    # enableExperimental is tied to useOpenGL because current experimental
+    # features (e.g. GPU-backed rendering paths) depend on an active GL context.
+    _use_opengl = sys.platform != "darwin"
+    pg.setConfigOptions(
+        antialias=True,
+        useOpenGL=_use_opengl,
+        enableExperimental=_use_opengl,
+    )
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
 
