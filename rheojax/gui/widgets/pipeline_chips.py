@@ -5,6 +5,8 @@ Pipeline Chips Widget
 Visual pipeline representation with status indicators.
 """
 
+from rheojax.gui.resources.styles.tokens import Spacing
+
 from rheojax.gui.compat import (
     QColor,
     QFont,
@@ -60,8 +62,10 @@ class PipelineChips(QWidget):
 
         # Main horizontal layout
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
-        layout.setSpacing(5)
+        layout.setContentsMargins(
+            Spacing.SM, Spacing.XS, Spacing.SM, Spacing.XS
+        )
+        layout.setSpacing(Spacing.XS)
 
         # Create chips for each pipeline step
         self._chips: dict[PipelineStep, QPushButton] = {}

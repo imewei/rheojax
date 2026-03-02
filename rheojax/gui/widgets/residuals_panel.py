@@ -20,6 +20,8 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -83,11 +85,11 @@ class ResidualsPanel(QWidget):
         """Set up the user interface."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(Spacing.XS)
 
         # Toolbar
         toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(4, 4, 4, 4)
+        set_toolbar_margins(toolbar_layout)
 
         # Plot type selector
         type_label = QLabel("Plot Type:")

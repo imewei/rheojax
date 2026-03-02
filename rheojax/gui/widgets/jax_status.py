@@ -5,6 +5,8 @@ JAX Status Widget
 GPU/device status indicator with memory monitoring.
 """
 
+from rheojax.gui.resources.styles.tokens import Spacing
+
 from rheojax.gui.compat import (
     QComboBox,
     QFrame,
@@ -59,8 +61,10 @@ class JAXStatusWidget(QWidget):
 
         # Main horizontal layout
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(
+            Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD
+        )
+        main_layout.setSpacing(Spacing.LG)
 
         # Device selector
         device_layout = QVBoxLayout()

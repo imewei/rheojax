@@ -22,6 +22,8 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.utils.layout_helpers import set_compact_margins, set_toolbar_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -71,8 +73,7 @@ class PlotPanel(QWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(2)
+        set_compact_margins(layout)
 
         # Title
         self._title_label = QLabel(f"Panel {self._index + 1}")
@@ -195,11 +196,11 @@ class MultiView(QWidget):
         """Set up the user interface."""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(4)
+        main_layout.setSpacing(Spacing.XS)
 
         # Toolbar
         toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(4, 4, 4, 4)
+        set_toolbar_margins(toolbar_layout)
 
         # Layout selector
         layout_label = QLabel("Layout:")

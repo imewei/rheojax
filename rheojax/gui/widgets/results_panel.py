@@ -8,6 +8,7 @@ Displays summary metrics for the latest fit and Bayesian runs.
 from __future__ import annotations
 
 from rheojax.gui.compat import QLabel, QTextEdit, QVBoxLayout, QWidget
+from rheojax.gui.resources.styles.tokens import Spacing
 from rheojax.gui.state.store import BayesianResult, FitResult
 from rheojax.logging import get_logger
 
@@ -21,8 +22,10 @@ class ResultsPanel(QWidget):
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
+        layout.setContentsMargins(
+            Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM
+        )
+        layout.setSpacing(Spacing.XS)
 
         self.fit_label = QLabel("Fit Results")
         self.fit_label.setStyleSheet("font-size: 11pt; font-weight: bold;")

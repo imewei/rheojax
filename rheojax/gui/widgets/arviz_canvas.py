@@ -15,11 +15,14 @@ from rheojax.gui.compat import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     Qt,
     QVBoxLayout,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
 from rheojax.logging import get_logger
 
@@ -97,17 +100,18 @@ class ArvizCanvas(BaseArviZWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface.
 
-        The canvas fills all available space and the figure is resized to
-        match the viewport on each plot swap, so plots always fit inside
-        the window without scrollbars.
+        The toolbar stays fixed at the top.  The matplotlib canvas is
+        wrapped in a QScrollArea so that tall ArviZ plots (e.g. trace
+        plots with many parameters) display at a readable size and the
+        user can scroll vertically instead of having everything squashed.
         """
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(Spacing.XS)
 
         # --- Fixed header: Plot Type selector + Refresh/Export buttons ---
         toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(4, 4, 4, 4)
+        set_toolbar_margins(toolbar_layout)
 
         type_label = QLabel("Plot Type:")
         toolbar_layout.addWidget(type_label)
@@ -132,7 +136,7 @@ class ArvizCanvas(BaseArviZWidget):
 
         layout.addLayout(toolbar_layout)
 
-        # --- Figure canvas fills all available space ---
+        # --- Figure canvas inside a scroll area ---
         self._figure = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._canvas.setSizePolicy(
@@ -141,7 +145,11 @@ class ArvizCanvas(BaseArviZWidget):
 
         self._nav_toolbar = NavigationToolbar2QT(self._canvas, self)
         layout.addWidget(self._nav_toolbar)
-        layout.addWidget(self._canvas, 1)
+
+        self._scroll_area = QScrollArea()
+        self._scroll_area.setWidgetResizable(False)
+        self._scroll_area.setWidget(self._canvas)
+        layout.addWidget(self._scroll_area, 1)
 
         # Status / empty label
         self._status_label = QLabel(
@@ -158,23 +166,37 @@ class ArvizCanvas(BaseArviZWidget):
         self._export_btn.clicked.connect(self.export_requested.emit)
 
     def _fit_figure_to_canvas(self) -> None:
-        """Resize the current figure to match the canvas viewport.
+        """Scale the figure to the viewport width, preserving aspect ratio.
 
-        After an ArviZ plot is swapped in, its native figsize may be much
-        larger than the available window area.  This method scales the
-        figure down (or up) so it renders entirely within the canvas
-        widget, then re-runs ``tight_layout`` to prevent axis overlap.
+        Instead of squashing tall ArviZ figures into the viewport, this
+        method sets the figure width to match the scroll-area viewport
+        and keeps the natural height (scaled proportionally).  The canvas
+        widget is then resized to match so that the QScrollArea provides
+        vertical scrolling for tall plots while short plots fill the
+        viewport without scrollbars.
         """
         if self._figure is None or self._canvas is None:
             return
 
-        w = self._canvas.width()
-        h = self._canvas.height()
-        if w <= 0 or h <= 0:
+        viewport_w = self._scroll_area.viewport().width()
+        viewport_h = self._scroll_area.viewport().height()
+        if viewport_w <= 0 or viewport_h <= 0:
             return
 
         dpi = self._figure.get_dpi()
-        self._figure.set_size_inches(w / dpi, h / dpi, forward=False)
+        fig_w, fig_h = self._figure.get_size_inches()
+
+        # Scale figure width to viewport; scale height proportionally
+        new_w = viewport_w / dpi
+        scale = new_w / fig_w if fig_w > 0 else 1.0
+        new_h = fig_h * scale
+
+        # Ensure the figure is at least as tall as the viewport so that
+        # short plots (e.g., forest, energy) fill the available space.
+        min_h = viewport_h / dpi
+        new_h = max(new_h, min_h)
+
+        self._figure.set_size_inches(new_w, new_h, forward=False)
 
         try:
             self._figure.tight_layout(pad=0.5)
@@ -182,6 +204,13 @@ class ArvizCanvas(BaseArviZWidget):
             # tight_layout can fail with some axis configurations
             # (e.g., colorbars, inset axes) — safe to skip
             pass
+
+        # Resize canvas widget to match figure so scroll area shows
+        # scrollbars only when needed.
+        canvas_w = int(new_w * dpi)
+        canvas_h = int(new_h * dpi)
+        self._canvas.setMinimumSize(canvas_w, canvas_h)
+        self._canvas.resize(canvas_w, canvas_h)
 
     def _on_type_changed(self, index: int) -> None:
         """Handle plot type change.

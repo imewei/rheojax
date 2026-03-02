@@ -30,6 +30,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -107,7 +108,7 @@ class PriorsEditor(QWidget):
         """Set up the user interface."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(Spacing.SM)
 
         # Splitter for table and editor
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -142,7 +143,7 @@ class PriorsEditor(QWidget):
         # Right: Editor panel
         editor_frame = QFrame()
         editor_layout = QVBoxLayout(editor_frame)
-        editor_layout.setContentsMargins(8, 0, 0, 0)
+        editor_layout.setContentsMargins(Spacing.SM, 0, 0, 0)
 
         # Distribution selector
         dist_group = QGroupBox("Distribution")
