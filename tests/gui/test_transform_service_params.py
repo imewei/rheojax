@@ -81,3 +81,39 @@ def test_multi_dataset_transforms_flagged():
     multi = {m["key"] for m in metadata if m["requires_multiple"]}
     assert "mastercurve" in multi
     assert "srfs" in multi
+
+
+import numpy as np
+from rheojax.core.data import RheoData
+
+
+def test_preview_returns_plot_data():
+    """preview_transform returns x/y arrays for Before and After."""
+    service = TransformService()
+    x = np.linspace(0, 10, 200)
+    y = np.sin(2 * np.pi * x) + 0.5 * np.sin(4 * np.pi * x)
+    data = RheoData(x=x, y=y)
+
+    result = service.preview_transform(
+        "derivative", data, {
+            "order": 1, "window_length": 11, "poly_order": 3,
+            "method": "savgol", "validate_window": True,
+            "smooth_before": False, "smooth_after": False, "mode": "mirror",
+        }
+    )
+    assert "x_before" in result
+    assert "y_before" in result
+    assert "x_after" in result
+    assert "y_after" in result
+    assert len(result["x_after"]) > 0
+    assert "error" not in result
+
+
+def test_preview_returns_error_on_failure():
+    """preview_transform returns error dict on failure, not exception."""
+    service = TransformService()
+    # Use a non-existent transform name to guarantee apply_transform raises
+    data = RheoData(x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]))
+    result = service.preview_transform("nonexistent_transform", data, {})
+    assert "error" in result
+    assert isinstance(result["error"], str)

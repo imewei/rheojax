@@ -731,7 +731,7 @@ class TransformService:
         data: RheoData | list[RheoData],
         params: dict[str, Any],
     ) -> dict[str, Any]:
-        """Preview transform result without applying.
+        """Compute transform and return plot data for preview.
 
         Parameters
         ----------
@@ -745,45 +745,40 @@ class TransformService:
         Returns
         -------
         dict
-            Preview information (statistics, expected output shape, etc.)
+            On success: x_before, y_before, x_after, y_after (numpy arrays)
+            On failure: error (str)
         """
-        logger.debug("Entering preview_transform", transform=name, params=params)
+        logger.debug("Computing preview", transform=name, params=params)
         try:
-            preview = {
-                "transform": name,
-                "input_type": "multiple" if isinstance(data, list) else "single",
-                "params": params,
-            }
-
+            # Capture before data
             if isinstance(data, list):
-                preview["n_datasets"] = len(data)
-                preview["total_points"] = sum(len(d.x) for d in data)
+                # Multi-dataset: use first dataset as "before" representative
+                x_before = np.asarray(data[0].x)
+                y_before = np.asarray(data[0].y)
             else:
-                preview["n_points"] = len(data.x)
-                preview["x_range"] = (float(np.min(data.x)), float(np.max(data.x)))
+                x_before = np.asarray(data.x)
+                y_before = np.asarray(data.y)
 
-            # Add transform-specific preview info
-            if name == "mastercurve":
-                if isinstance(data, list):
-                    temps = [d.metadata.get("temperature") for d in data]
-                    preview["temperatures"] = temps
+            # Compute actual transform
+            result = self.apply_transform(name, data, params)
 
-            elif name == "fft":
-                if not isinstance(data, list):
-                    preview["expected_output_domain"] = (
-                        "frequency" if data.domain == "time" else "time"
-                    )
+            # Unpack result (some transforms return (RheoData, metadata_dict))
+            if isinstance(result, tuple):
+                result_data = result[0]
+            else:
+                result_data = result
 
-            logger.debug("Exiting preview_transform", transform=name, preview=preview)
-            return preview
+            x_after = np.asarray(result_data.x)
+            y_after = np.asarray(result_data.y)
 
+            return {
+                "x_before": x_before,
+                "y_before": y_before,
+                "x_after": x_after,
+                "y_after": y_after,
+            }
         except Exception as e:
-            logger.error(
-                "Preview failed",
-                transform=name,
-                error=str(e),
-                exc_info=True,
-            )
+            logger.warning("Preview failed", transform=name, error=str(e))
             return {"error": str(e)}
 
     def validate_transform_input(
