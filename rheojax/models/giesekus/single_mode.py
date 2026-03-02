@@ -159,6 +159,7 @@ class GiesekusSingleMode(GiesekusBase):
         """Initialize single-mode Giesekus model."""
         super().__init__()
         self._test_mode = None
+        self._gamma_dot_warned: bool = False
 
     # =========================================================================
     # Core Interface Methods
@@ -374,7 +375,13 @@ class GiesekusSingleMode(GiesekusBase):
                 else self._gamma_dot_applied
             )
             if gamma_dot is None:
-                raise ValueError("relaxation mode requires gamma_dot (pre-shear rate)")
+                gamma_dot = 1.0
+                if not getattr(self, "_gamma_dot_warned", False):
+                    logger.warning(
+                        "relaxation mode: gamma_dot not provided, defaulting to 1.0 s⁻¹. "
+                        "Pass gamma_dot=<value> for accurate relaxation after cessation of flow."
+                    )
+                    self._gamma_dot_warned = True
             return self._simulate_relaxation_internal(
                 X_jax, eta_p, lambda_1, alpha, eta_s, gamma_dot
             )

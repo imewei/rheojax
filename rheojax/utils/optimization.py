@@ -1227,7 +1227,7 @@ def nlsq_optimize(
             nfev=nlsq_result.get("nfev", 0),
             cost=float(nlsq_result.get("cost", 0.0)),
         )
-    except (RuntimeError, ValueError, FloatingPointError, OverflowError) as e:
+    except (RuntimeError, TypeError, ValueError, FloatingPointError, OverflowError) as e:
         logger.warning(
             "NLSQ optimization raised exception, falling back to SciPy",
             error=str(e),
