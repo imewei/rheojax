@@ -58,3 +58,26 @@ def test_derivative_has_mode():
     params = service.get_transform_params("derivative")
     assert "mode" in params
     assert params["mode"]["type"] == "choice"
+
+
+def test_get_transform_metadata_returns_all_transforms():
+    """get_transform_metadata() returns metadata for all registered transforms."""
+    service = TransformService()
+    metadata = service.get_transform_metadata()
+    keys = service.get_available_transforms()
+    assert len(metadata) == len(keys)
+    for entry in metadata:
+        assert "key" in entry
+        assert "name" in entry
+        assert "description" in entry
+        assert "requires_multiple" in entry
+        assert isinstance(entry["requires_multiple"], bool)
+
+
+def test_multi_dataset_transforms_flagged():
+    """Mastercurve and SRFS must be flagged as requires_multiple."""
+    service = TransformService()
+    metadata = service.get_transform_metadata()
+    multi = {m["key"] for m in metadata if m["requires_multiple"]}
+    assert "mastercurve" in multi
+    assert "srfs" in multi

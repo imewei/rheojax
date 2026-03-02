@@ -331,6 +331,59 @@ class TransformService:
 
         return params_map.get(name, {})
 
+    def get_transform_metadata(self) -> list[dict[str, Any]]:
+        """Return display metadata for all transforms.
+
+        Returns
+        -------
+        list[dict]
+            Each dict has: key, name, description, requires_multiple
+        """
+        return [
+            {
+                "key": "fft",
+                "name": "FFT",
+                "description": "Fast Fourier Transform for frequency analysis",
+                "requires_multiple": False,
+            },
+            {
+                "key": "mastercurve",
+                "name": "Mastercurve",
+                "description": "Time-temperature superposition",
+                "requires_multiple": True,
+            },
+            {
+                "key": "srfs",
+                "name": "SRFS",
+                "description": "Strain-rate frequency superposition",
+                "requires_multiple": True,
+            },
+            {
+                "key": "mutation_number",
+                "name": "Mutation Number",
+                "description": "Calculate mutation number",
+                "requires_multiple": False,
+            },
+            {
+                "key": "owchirp",
+                "name": "OW Chirp",
+                "description": "Optimally-windowed chirp analysis",
+                "requires_multiple": False,
+            },
+            {
+                "key": "spp",
+                "name": "SPP Analysis",
+                "description": "LAOS yield stress and cage modulus extraction",
+                "requires_multiple": False,
+            },
+            {
+                "key": "derivative",
+                "name": "Derivatives",
+                "description": "Calculate numerical derivatives",
+                "requires_multiple": False,
+            },
+        ]
+
     def apply_transform(
         self,
         name: str,
