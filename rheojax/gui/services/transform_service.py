@@ -320,6 +320,13 @@ class TransformService:
                     "range": (0, 100),
                     "description": "First cycle to analyze (skip transients)",
                 },
+                "end_cycle": {
+                    "type": "int",
+                    "default": 0,
+                    "label": "End Cycle",
+                    "range": (0, 1000),
+                    "description": "Last cycle to analyze (0 = use all cycles)",
+                },
                 "use_numerical_method": {
                     "type": "bool",
                     "default": False,

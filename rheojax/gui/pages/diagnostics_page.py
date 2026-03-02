@@ -11,7 +11,6 @@ import numpy as np
 
 from rheojax.gui.compat import (
     QAbstractItemView,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -41,7 +40,6 @@ class DiagnosticsPage(QWidget):
     """Bayesian diagnostics page with ArviZ plots."""
 
     plot_requested = Signal(str, str)  # plot_type, model_id
-    export_requested = Signal(str)  # plot_type
     show_requested = Signal()  # kept for backward compat (main_window connection)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -187,42 +185,6 @@ class DiagnosticsPage(QWidget):
         apply_group_box_style(panel, "card")
         panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         return panel
-
-    def _export_plot(self, plot_type: str) -> None:
-        """Export current plot to file."""
-        filepath, _ = QFileDialog.getSaveFileName(
-            self,
-            f"Export {plot_type} Plot",
-            f"{plot_type.lower()}_plot.png",
-            "PNG Files (*.png);;PDF Files (*.pdf);;SVG Files (*.svg);;All Files (*)",
-        )
-
-        if filepath:
-            try:
-                self._canvas.export_figure(filepath)
-                logger.info(
-                    "Plot exported successfully",
-                    plot_type=plot_type,
-                    filepath=filepath,
-                    page="DiagnosticsPage",
-                )
-                QMessageBox.information(
-                    self, "Export Successful", f"Plot saved to {filepath}"
-                )
-            except Exception as e:
-                logger.error(
-                    "Failed to export plot",
-                    plot_type=plot_type,
-                    filepath=filepath,
-                    error=str(e),
-                    page="DiagnosticsPage",
-                    exc_info=True,
-                )
-                QMessageBox.warning(
-                    self, "Export Failed", f"Failed to export plot: {e}"
-                )
-
-        self.export_requested.emit(plot_type)
 
     def _refresh_comparison(self) -> None:
         """Refresh model comparison table with all bayesian results."""

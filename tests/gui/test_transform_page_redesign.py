@@ -107,3 +107,12 @@ def test_single_dataset_transform_no_checklist(page):
     """Selecting FFT does NOT show dataset checklist."""
     page._sidebar.setCurrentRow(0)  # FFT
     assert page._dataset_checklist is None
+
+
+def test_empty_state_when_no_selection(page):
+    """Empty state widget is visible before any transform is selected."""
+    # Use isHidden() since the parent widget is not shown in tests;
+    # isVisible() requires the full ancestor chain to be visible.
+    assert not page._empty_state.isHidden()
+    assert page._scroll.isHidden()
+    assert page._apply_btn.isHidden()

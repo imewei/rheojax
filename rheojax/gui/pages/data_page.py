@@ -229,6 +229,31 @@ class DataPage(QWidget):
                     ),
                 ],
             ),
+            (
+                "Transforms",
+                [
+                    (
+                        "FFT: Polypropylene Relaxation",
+                        "relaxation/polymers/polypropylene_relaxation.csv",
+                    ),
+                    (
+                        "Mastercurve: Foam DMA Temp Sweep",
+                        "temperature_sweep/foams/foam_dma_0C.csv",
+                    ),
+                    (
+                        "SRFS: Emulsion Flow Curves",
+                        "flow/emulsions/emulsions_v2.csv",
+                    ),
+                    (
+                        "OWChirp: LAOS TTS Signal",
+                        "laos/owchirp_tts.txt",
+                    ),
+                    (
+                        "SPP: LAOS Raw Signal (\u03b3\u2080=10)",
+                        "laos/raw_signal_0010.txt",
+                    ),
+                ],
+            ),
         ]
         for section_name, items in _sections:
             self._example_combo.addItem(f"── {section_name} ──")

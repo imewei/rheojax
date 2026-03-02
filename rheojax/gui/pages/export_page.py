@@ -954,6 +954,7 @@ class ExportPage(QWidget):
         # ---- Wire up completion/failure callbacks (run on GUI thread) -------
         def _on_completed(exported_files: list[str]) -> None:
             progress.close()
+            self._active_export_worker = None  # Release worker reference
             if export_btn is not None:
                 export_btn.setEnabled(True)
             total_size = sum(
@@ -974,6 +975,7 @@ class ExportPage(QWidget):
 
         def _on_failed(error_msg: str) -> None:
             progress.close()
+            self._active_export_worker = None  # Release worker reference
             if export_btn is not None:
                 export_btn.setEnabled(True)
             full_msg = f"Export failed: {error_msg}"
@@ -983,6 +985,11 @@ class ExportPage(QWidget):
 
         # ---- Launch worker --------------------------------------------------
         worker = ExportWorker(export_fn=_run_export)
+        # Prevent QThreadPool from auto-deleting the worker after run()
+        # returns — the C++ destructor would call removePostedEvents() on
+        # the QObject signals, discarding the queued completed/failed event
+        # before the main-thread event loop can deliver it.
+        worker.setAutoDelete(False)
         worker.signals.progress.connect(
             lambda pct, label: progress.setLabelText(label),
             _Qt.ConnectionType.QueuedConnection,
@@ -994,6 +1001,9 @@ class ExportPage(QWidget):
         # R13-GUI-EXP-002: set the cancellation flag AND close the dialog so
         # the ExportWorker actually stops between stages (not just visually).
         progress.canceled.connect(lambda: (_cancelled.set(), progress.close()))
+        # Store a reference so Python GC doesn't collect the worker (and its
+        # signals QObject) before the queued completed/failed event is delivered.
+        self._active_export_worker = worker
         QThreadPool.globalInstance().start(worker)
 
     def export_results(

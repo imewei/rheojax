@@ -15,10 +15,10 @@ from rheojax.gui.compat import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QObject,
     QPushButton,
     QRunnable,
     QScrollArea,
-    QSizePolicy,
     QSplitter,
     Qt,
     QThreadPool,
@@ -34,6 +34,7 @@ from rheojax.gui.resources.styles.tokens import (
     Typography,
     button_style,
     section_header_style,
+    themed,
 )
 from rheojax.gui.services.transform_service import TransformService
 from rheojax.gui.state.store import StateStore
@@ -51,6 +52,14 @@ except ImportError:
 
 logger = get_logger(__name__)
 
+_MAX_PREVIEW_POINTS = 2000
+
+
+class _WorkerSignals(QObject):
+    """Signals for cross-thread preview result delivery."""
+
+    result_ready = Signal(object)
+
 
 class _PreviewWorker(QRunnable):
     """QRunnable that computes a transform preview off the main thread."""
@@ -62,7 +71,7 @@ class _PreviewWorker(QRunnable):
         data: Any,
         params: dict[str, Any],
         generation: int,
-        callback: Any,
+        signals: _WorkerSignals,
     ) -> None:
         super().__init__()
         self.setAutoDelete(True)
@@ -71,13 +80,13 @@ class _PreviewWorker(QRunnable):
         self._data = data
         self._params = params
         self._generation = generation
-        self._callback = callback
+        self._signals = signals
 
     def run(self) -> None:
         result = self._service.preview_transform(self._key, self._data, self._params)
         # Attach generation so the page can discard stale results
         result["_generation"] = self._generation
-        self._callback(result)
+        self._signals.result_ready.emit(result)
 
 
 class TransformPage(QWidget):
@@ -100,6 +109,10 @@ class TransformPage(QWidget):
         self._param_form: ParameterFormBuilder | None = None
         self._dataset_checklist: QListWidget | None = None
         self._preview_generation = 0
+
+        # Thread-safe signal bridge for preview results
+        self._worker_signals = _WorkerSignals(self)
+        self._worker_signals.result_ready.connect(self._update_plot)
 
         # Debounce timer for live preview
         self._preview_timer = QTimer(self)
@@ -179,6 +192,26 @@ class TransformPage(QWidget):
         self._scroll.setVisible(False)
         self._detail_layout.addWidget(self._scroll, 1)
 
+        # Preview canvas (created once, reused across selections to avoid
+        # OpenGL context segfaults from repeated create/destroy cycles)
+        self._preview_canvas = None
+        self._preview_label = None
+        if PYQTGRAPH_AVAILABLE:
+            self._preview_label = QLabel("Preview")
+            self._preview_label.setStyleSheet(
+                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;"
+                f" margin-top: {Spacing.SM}px;"
+            )
+            self._preview_label.setVisible(False)
+            self._detail_layout.addWidget(self._preview_label)
+
+            self._preview_canvas = PyQtGraphCanvas()
+            self._preview_canvas.setMinimumHeight(250)
+            self._preview_canvas.set_labels(x_label="x", y_label="y")
+            self._preview_canvas.setVisible(False)
+            self._detail_layout.addWidget(self._preview_canvas, 1)
+
         # Apply button (always visible at bottom of detail panel)
         self._apply_btn = QPushButton("Apply Transform")
         self._apply_btn.setStyleSheet(button_style("success", "lg"))
@@ -210,6 +243,13 @@ class TransformPage(QWidget):
 
     def _rebuild_detail(self, meta: dict[str, Any]) -> None:
         """Tear down and rebuild the scrollable detail content."""
+        # Disconnect old param form signal before clearing to avoid stale callbacks
+        if self._param_form is not None:
+            try:
+                self._param_form.values_changed.disconnect(self._on_params_changed)
+            except RuntimeError:
+                pass  # Already disconnected
+
         # Clear previous content
         self._clear_layout(self._detail_scroll_layout)
         self._param_form = None
@@ -270,20 +310,12 @@ class TransformPage(QWidget):
                 self._dataset_checklist.addItem(item)
             lay.addWidget(self._dataset_checklist)
 
-        # Preview canvas
-        if PYQTGRAPH_AVAILABLE:
-            preview_label = QLabel("Preview")
-            preview_label.setStyleSheet(
-                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
-                f" font-size: {Typography.SIZE_MD_SM}pt;"
-                f" margin-top: {Spacing.SM}px;"
-            )
-            lay.addWidget(preview_label)
-
-            self._preview_canvas = PyQtGraphCanvas()
-            self._preview_canvas.setMinimumHeight(250)
-            self._preview_canvas.set_labels(x_label="x", y_label="y")
-            lay.addWidget(self._preview_canvas)
+        # Show persistent preview canvas (created once in _setup_ui)
+        if self._preview_canvas is not None:
+            if self._preview_label is not None:
+                self._preview_label.setVisible(True)
+            self._preview_canvas.setVisible(True)
+            self._preview_canvas.clear()
 
         lay.addStretch()
 
@@ -303,7 +335,7 @@ class TransformPage(QWidget):
 
     @Slot()
     def _request_preview(self) -> None:
-        if not self._selected_key or not PYQTGRAPH_AVAILABLE:
+        if not self._selected_key or self._preview_canvas is None:
             return
 
         dataset = self._store.get_active_dataset()
@@ -333,21 +365,15 @@ class TransformPage(QWidget):
             data,
             params,
             gen,
-            self._on_preview_ready,
+            self._worker_signals,
         )
         QThreadPool.globalInstance().start(worker)
 
-    def _on_preview_ready(self, result: dict[str, Any]) -> None:
-        """Called from worker thread; marshal to main thread via QTimer."""
-        QTimer.singleShot(0, lambda: self._update_plot(result))
-
     def _update_plot(self, result: dict[str, Any]) -> None:
-        if not PYQTGRAPH_AVAILABLE:
+        if self._preview_canvas is None:
             return
         # Discard stale results
         if result.get("_generation", 0) < self._preview_generation:
-            return
-        if not hasattr(self, "_preview_canvas"):
             return
 
         self._preview_canvas.clear()
@@ -360,18 +386,23 @@ class TransformPage(QWidget):
             )
             return
 
+        x_before = self._downsample(result["x_before"])
+        y_before = self._downsample(result["y_before"])
+        x_after = self._downsample(result["x_after"])
+        y_after = self._downsample(result["y_after"])
+
         self._preview_canvas.plot_data(
-            result["x_before"],
-            result["y_before"],
+            x_before,
+            y_before,
             name="Before",
-            color=ColorPalette.CHART_1,
+            color=themed("CHART_1"),
             line_width=2,
         )
         self._preview_canvas.plot_data(
-            result["x_after"],
-            result["y_after"],
+            x_after,
+            y_after,
             name="After",
-            color=ColorPalette.CHART_3,
+            color=themed("CHART_3"),
             line_width=2,
         )
 
@@ -420,6 +451,14 @@ class TransformPage(QWidget):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _downsample(arr: Any) -> Any:
+        """Take every Nth element if array exceeds preview limit."""
+        if hasattr(arr, "__len__") and len(arr) > _MAX_PREVIEW_POINTS:
+            step = len(arr) // _MAX_PREVIEW_POINTS
+            return arr[::step]
+        return arr
 
     @staticmethod
     def _clear_layout(layout: QVBoxLayout) -> None:
