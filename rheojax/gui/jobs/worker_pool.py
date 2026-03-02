@@ -440,6 +440,19 @@ class WorkerPool(QObject):
                     timeout_ms=timeout_ms,
                 )
 
+        # Explicitly close ProcessCancellationToken mp.Events so their
+        # POSIX semaphores are released before resource_tracker's atexit
+        # handler runs.  (Thread-based CancellationTokens have no .close()
+        # and are harmless — guarded by hasattr.)
+        with self._job_lock:
+            for worker in self._active_workers.values():
+                token = getattr(worker, "_cancel_token", None)
+                if token is not None and hasattr(token, "close"):
+                    try:
+                        token.close()
+                    except Exception:
+                        pass
+
         # Clear active jobs
         with self._job_lock:
             self._active_jobs.clear()

@@ -34,6 +34,19 @@ warnings.filterwarnings("ignore", message="Glyph.*missing from font")
 warnings.filterwarnings("ignore", message=".*layout not applied.*")
 warnings.filterwarnings("ignore", message=".*constrained_layout.*collapsed.*")
 
+# Suppress multiprocessing resource_tracker warnings at exit.
+# On macOS + Python 3.13, PySide6's Cocoa platform plugin can create a
+# C-level POSIX semaphore that Python's resource_tracker reports as leaked.
+# The tracker cleans it up automatically — the warning is cosmetic.
+# We use PYTHONWARNINGS env var because the resource_tracker runs in a child
+# process where warnings.filterwarnings() from the main process has no effect.
+warnings.filterwarnings("ignore", message="resource_tracker:.*leaked.*")
+warnings.filterwarnings("ignore", message="resource_tracker:.*semaphore.*")
+_pw = os.environ.get("PYTHONWARNINGS", "")
+_rt_filter = "ignore::UserWarning:multiprocessing.resource_tracker"
+if _rt_filter not in _pw:
+    os.environ["PYTHONWARNINGS"] = f"{_rt_filter},{_pw}" if _pw else _rt_filter
+
 # Imports after warnings configuration (intentional)
 from rheojax import __version__  # noqa: E402
 from rheojax.gui.utils.logging import install_gui_log_handler  # noqa: E402
@@ -490,6 +503,17 @@ def main(argv: list[str] | None = None) -> int:
     logger.debug("Entering Qt event loop")
     exit_code: int = app.exec()
     logger.info("Application exiting", exit_code=exit_code)
+
+    # Clean up multiprocessing resource tracker so it does not warn about
+    # semaphores leaked by third-party libraries (pyqtgraph, PySide6 Cocoa).
+    try:
+        from multiprocessing import resource_tracker
+
+        tracker = resource_tracker._resource_tracker
+        if tracker._pid is not None:
+            tracker._stop()
+    except Exception:
+        pass  # Best-effort; suppression via PYTHONWARNINGS is the fallback.
 
     return exit_code
 

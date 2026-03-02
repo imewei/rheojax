@@ -59,8 +59,6 @@ class ArvizCanvas(BaseArviZWidget):
     -------
     plot_changed : Signal(str)
         Emitted when plot type changes
-    export_requested : Signal()
-        Emitted when export is requested
 
     Example
     -------
@@ -70,7 +68,6 @@ class ArvizCanvas(BaseArviZWidget):
     """
 
     plot_changed = Signal(str)
-    export_requested = Signal()
 
     def __init__(self, parent: BaseArviZWidget | None = None) -> None:
         """Initialize ArviZ canvas.
@@ -130,10 +127,6 @@ class ArvizCanvas(BaseArviZWidget):
         self._refresh_btn.setToolTip("Regenerate current plot")
         toolbar_layout.addWidget(self._refresh_btn)
 
-        self._export_btn = QPushButton("Export")
-        self._export_btn.setToolTip("Export plot to file")
-        toolbar_layout.addWidget(self._export_btn)
-
         layout.addLayout(toolbar_layout)
 
         # --- Figure canvas inside a scroll area ---
@@ -163,7 +156,6 @@ class ArvizCanvas(BaseArviZWidget):
         """Connect internal signals."""
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
         self._refresh_btn.clicked.connect(self._refresh_plot)
-        self._export_btn.clicked.connect(self.export_requested.emit)
 
     def _fit_figure_to_canvas(self) -> None:
         """Scale the figure to the viewport width, preserving aspect ratio.

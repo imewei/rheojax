@@ -8,11 +8,14 @@ Includes a multiprocessing variant for cross-process signaling.
 
 from __future__ import annotations
 
-import multiprocessing as mp
 import time
 from threading import Event
+from typing import TYPE_CHECKING
 
 from rheojax.logging import get_logger
+
+if TYPE_CHECKING:
+    import multiprocessing as mp
 
 logger = get_logger(__name__)
 
@@ -180,7 +183,9 @@ class ProcessCancellationToken:
         job_id: str | None = None,
         event: mp.synchronize.Event | None = None,
     ) -> None:
-        self._cancelled = event if event is not None else mp.Event()
+        import multiprocessing as _mp
+
+        self._cancelled = event if event is not None else _mp.Event()
         self._error: Exception | None = None
         self._job_id = job_id
         self._cancel_start_time: float | None = None
@@ -189,6 +194,13 @@ class ProcessCancellationToken:
     def event(self) -> mp.synchronize.Event:
         """The underlying mp.Event -- pass this to child processes."""
         return self._cancelled
+
+    def close(self) -> None:
+        """Release the underlying mp.Event and its POSIX semaphores.
+
+        After calling close(), the token must not be used.
+        """
+        self._cancelled = None  # type: ignore[assignment]
 
     def cancel(self) -> None:
         """Request cancellation across process boundaries."""

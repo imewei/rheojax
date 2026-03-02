@@ -128,7 +128,7 @@ class HomePage(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
 
         content_widget = QWidget()
-        content_widget.setStyleSheet(f"background-color: {ColorPalette.BG_CANVAS};")
+        content_widget.setStyleSheet(f"background-color: {themed('BG_CANVAS')};")
         content_layout = QVBoxLayout(content_widget)
         content_layout.setSpacing(0)
         content_layout.setContentsMargins(0, 0, 0, 0)
@@ -138,7 +138,7 @@ class HomePage(QWidget):
 
         # Content area with padding
         body = QWidget()
-        body.setStyleSheet(f"background-color: {ColorPalette.BG_CANVAS};")
+        body.setStyleSheet(f"background-color: {themed('BG_CANVAS')};")
         body_layout = QVBoxLayout(body)
         body_layout.setSpacing(Spacing.XL)
         body_layout.setContentsMargins(
@@ -188,7 +188,7 @@ class HomePage(QWidget):
             QWidget {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {ColorPalette.PRIMARY_PRESSED}, stop:0.4 {ColorPalette.PRIMARY_PRESSED}, stop:1 {ColorPalette.ACCENT_PRESSED}
+                    stop:0 {themed('PRIMARY_PRESSED')}, stop:0.4 {themed('PRIMARY_PRESSED')}, stop:1 {themed('ACCENT_PRESSED')}
                 );
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }}
@@ -481,6 +481,19 @@ class HomePage(QWidget):
         b = int(b * (1 - factor))
         return f"#{r:02x}{g:02x}{b:02x}"
 
+    def _lighten_color(self, hex_color: str, factor: float = 0.25) -> str:
+        """Lighten a hex color toward white."""
+        hex_color = hex_color.lstrip("#")
+        r, g, b = (
+            int(hex_color[0:2], 16),
+            int(hex_color[2:4], 16),
+            int(hex_color[4:6], 16),
+        )
+        r = min(255, int(r + (255 - r) * factor))
+        g = min(255, int(g + (255 - g) * factor))
+        b = min(255, int(b + (255 - b) * factor))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
     def _create_recent_projects(self) -> QWidget:
         """Create recent projects section."""
         group = QGroupBox("Recent Projects")
@@ -588,16 +601,16 @@ class HomePage(QWidget):
             "Bayesian": "examples/data/pyRheo/fish_muscle/stressrelaxation_fishmuscle_data.csv",
         }
 
-        # Chart colors from design tokens
+        # Card colors — theme-aware so they stay vibrant in both light/dark
         chart_colors = [
-            ColorPalette.CHART_1,
-            ColorPalette.CHART_3,
-            ColorPalette.CHART_5,
-            ColorPalette.CHART_6,
-            ColorPalette.CHART_2,
-            ColorPalette.INFO,
-            ColorPalette.CHART_4,
-            ColorPalette.TEXT_SECONDARY,
+            themed("CHART_1"),
+            themed("CHART_3"),
+            themed("CHART_5"),
+            themed("CHART_6"),
+            themed("CHART_2"),
+            themed("INFO"),
+            themed("CHART_4"),
+            themed("ACCENT"),
         ]
 
         examples = [
@@ -650,12 +663,14 @@ class HomePage(QWidget):
         """Create an example dataset card."""
         card = ClickableWidget()
         darker = self._darken_color(color, 0.15)
+        lighter = self._lighten_color(color, 0.25)
         card.setStyleSheet(f"""
             QWidget {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
                     stop:0 {color}, stop:1 {darker}
                 );
+                border: 1px solid {lighter};
                 border-radius: {BorderRadius.XL}px;
             }}
         """)
@@ -669,7 +684,7 @@ class HomePage(QWidget):
         # Name
         name_label = QLabel(name)
         name_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_INVERSE}; font-size: {Typography.SIZE_BASE}pt;"
+            f"color: #FFFFFF; font-size: {Typography.SIZE_BASE}pt;"
             f" font-weight: {Typography.WEIGHT_BOLD}; background-color: transparent;"
         )
         layout.addWidget(name_label)

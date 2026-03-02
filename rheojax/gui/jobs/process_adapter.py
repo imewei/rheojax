@@ -389,6 +389,13 @@ class ProcessWorkerAdapter(QRunnable):
                 pass
             self._result_queue = None
 
+        # Release the cancel token's mp.Event — drops reference so CPython's
+        # refcount-based __del__ unregisters the POSIX semaphore from
+        # resource_tracker before interpreter shutdown.
+        if self._cancel_token is not None:
+            self._cancel_token.close()
+            self._cancel_token = None  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # Worker isolation mode

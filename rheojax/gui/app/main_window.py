@@ -299,9 +299,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.diagnostics_page.plot_requested.connect(
             self._on_diagnostics_plot_requested
         )
-        self.diagnostics_page.export_requested.connect(
-            self._on_diagnostics_export_requested
-        )
 
         # Export page signals
         self.export_page.export_requested.connect(self._on_export_requested)
@@ -1835,6 +1832,9 @@ class RheoJAXMainWindow(QMainWindow):
     # Transforms Menu Handlers
     # -------------------------------------------------------------------------
 
+    # Transforms that operate on multiple datasets (list[RheoData]).
+    _MULTI_DATASET_TRANSFORMS = frozenset({"mastercurve", "srfs"})
+
     def _on_apply_transform(
         self, transform_id: str, params: dict | None = None
     ) -> None:
@@ -1850,7 +1850,24 @@ class RheoJAXMainWindow(QMainWindow):
             from rheojax.gui.services.transform_service import TransformService
             from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            rheo_data = rheodata_from_dataset_state(dataset)
+            # Mastercurve / SRFS need all loaded datasets, not just the active one.
+            if transform_id in self._MULTI_DATASET_TRANSFORMS:
+                state = self.store.get_state()
+                all_datasets = state.datasets or {}
+                if len(all_datasets) < 2:
+                    self.status_bar.show_message(
+                        f"{transform_id} requires at least 2 datasets "
+                        f"(loaded {len(all_datasets)})",
+                        5000,
+                    )
+                    return
+                rheo_data = [
+                    rheodata_from_dataset_state(ds)
+                    for ds in all_datasets.values()
+                    if ds.x_data is not None and ds.y_data is not None
+                ]
+            else:
+                rheo_data = rheodata_from_dataset_state(dataset)
 
             # Resolve default params if none provided
             if params is None:
@@ -2274,19 +2291,6 @@ class RheoJAXMainWindow(QMainWindow):
         )
         self.log(f"Diagnostics: generating {plot_type} plot for {model_id}")
         self.status_bar.show_message(f"Generating {plot_type} plot...", 2000)
-
-    @Slot(str)
-    def _on_diagnostics_export_requested(self, plot_type: str) -> None:
-        """Handle diagnostics export request.
-
-        Parameters
-        ----------
-        plot_type : str
-            Type of plot being exported
-        """
-        logger.debug("Diagnostics export requested", plot_type=plot_type)
-        self.log(f"Diagnostics: exporting {plot_type} plot")
-        self.status_bar.show_message(f"Exporting {plot_type} plot...", 2000)
 
     @Slot(dict)
     def _on_export_requested(self, config: dict) -> None:

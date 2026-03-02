@@ -153,13 +153,13 @@ class DarkColorPalette:
     BORDER_FOCUS: ClassVar[str] = "#6366F1"
     BORDER_SUBTLE: ClassVar[str] = "#1E293B"
 
-    # Chart colors (same as light — already high-contrast)
-    CHART_1: ClassVar[str] = "#4338CA"
-    CHART_2: ClassVar[str] = "#7C3AED"
-    CHART_3: ClassVar[str] = "#059669"
-    CHART_4: ClassVar[str] = "#D97706"
-    CHART_5: ClassVar[str] = "#DC2626"
-    CHART_6: ClassVar[str] = "#DB2777"
+    # Chart colors (brighter for dark backgrounds)
+    CHART_1: ClassVar[str] = "#818CF8"  # indigo-400
+    CHART_2: ClassVar[str] = "#A78BFA"  # violet-400
+    CHART_3: ClassVar[str] = "#34D399"  # emerald-400
+    CHART_4: ClassVar[str] = "#FBBF24"  # amber-400
+    CHART_5: ClassVar[str] = "#F87171"  # red-400
+    CHART_6: ClassVar[str] = "#F472B6"  # pink-400
 
 
 class ThemeManager:
@@ -198,10 +198,19 @@ def themed(token_name: str) -> str:
     Returns
     -------
     str
-        The hex color string for the active theme.
+        The hex color string for the active theme.  Falls back to
+        ``ColorPalette.TEXT_PRIMARY`` if *token_name* is not found.
     """
     palette = ThemeManager.get_palette()
-    return getattr(palette, token_name)
+    value = getattr(palette, token_name, None)
+    if value is None:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Unknown design token '%s', falling back to TEXT_PRIMARY", token_name
+        )
+        return palette.TEXT_PRIMARY
+    return value
 
 
 @dataclass(frozen=True)
