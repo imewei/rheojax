@@ -39,6 +39,7 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
+from rheojax.gui.utils.style_helpers import set_density
 from rheojax.gui.resources.styles.tokens import (
     ColorPalette,
     Spacing,
@@ -269,6 +270,7 @@ class BayesianPage(QWidget):
         self._btn_cancel.clicked.connect(self._on_cancel_clicked)
         layout.addWidget(self._btn_cancel)
 
+        set_density(panel, "compact")
         return panel
 
     def _create_progress_panel(self) -> QWidget:

@@ -31,6 +31,7 @@ from rheojax.gui.resources.styles.tokens import (
     button_style,
 )
 from rheojax.gui.state.store import StateStore
+from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger
 
@@ -150,8 +151,7 @@ class TransformPage(QWidget):
 
         self._config_widget = QWidget()
         self._config_layout = QVBoxLayout(self._config_widget)
-        placeholder = QLabel("Select a transform to configure")
-        placeholder.setStyleSheet(f"color: {ColorPalette.TEXT_SECONDARY};")
+        placeholder = EmptyStateWidget("Select a transform to configure")
         self._config_layout.addWidget(placeholder)
         layout.addWidget(self._config_widget)
 

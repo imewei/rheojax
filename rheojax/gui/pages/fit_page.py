@@ -26,6 +26,7 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
+from rheojax.gui.utils.style_helpers import set_density
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,
@@ -36,6 +37,7 @@ from rheojax.gui.state.actions import (
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
+from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from rheojax.logging import get_logger
 
@@ -132,10 +134,9 @@ class FitPage(QWidget):
         # Plot canvas
         self._plot_canvas = PlotCanvas()
         layout.addWidget(self._plot_canvas, 3)
-        self._plot_placeholder = QLabel("No fit plot yet. Run a fit to see results.")
-        self._plot_placeholder.setAlignment(Qt.AlignCenter)
-        self._plot_placeholder.setStyleSheet(
-            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+        self._plot_placeholder = EmptyStateWidget(
+            "No fit plot yet.",
+            description="Run a fit to see results.",
         )
         layout.addWidget(self._plot_placeholder)
 
@@ -264,16 +265,13 @@ class FitPage(QWidget):
         self._status_text.setMaximumHeight(180)
         results_layout.addWidget(self._status_text)
 
-        self._empty_results = QLabel("No fit results yet.")
-        self._empty_results.setAlignment(Qt.AlignCenter)
-        self._empty_results.setStyleSheet(
-            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
-        )
+        self._empty_results = EmptyStateWidget("No fit results yet.")
         results_layout.addWidget(self._empty_results)
         layout.addWidget(results_group)
 
         layout.addStretch(1)
 
+        set_density(panel, "compact")
         return panel
 
     def _connect_signals(self) -> None:

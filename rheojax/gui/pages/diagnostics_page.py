@@ -28,6 +28,7 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
+from rheojax.gui.utils.layout_helpers import apply_group_box_style, set_compact_margins
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, FitResult, StateStore
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
@@ -67,7 +68,7 @@ class DiagnosticsPage(QWidget):
         bottom_splitter.addWidget(self._create_metrics_panel())
         bottom_splitter.addWidget(self._create_comparison_panel())
         bottom_splitter.setSizes([500, 500])
-        bottom_splitter.setMaximumHeight(160)
+        bottom_splitter.setMaximumHeight(200)
         main_layout.addWidget(bottom_splitter)
 
     def _connect_state_signals(self) -> None:
@@ -81,8 +82,7 @@ class DiagnosticsPage(QWidget):
     def _create_metrics_panel(self) -> QWidget:
         panel = QGroupBox("Goodness of Fit Metrics")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        set_compact_margins(layout)
 
         # GOF metrics in a compact 4-column layout:
         #   Metric | Value | Metric | Value
@@ -109,10 +109,11 @@ class DiagnosticsPage(QWidget):
         self._gof_table.setAlternatingRowColors(True)
         self._gof_table.setToolTip("Key diagnostics from the last Bayesian run")
 
-        # Compact sizing: hide row numbers, tight rows, no scrollbars
+        # Compact sizing: hide row numbers, no scrollbars.
+        # Do NOT force header height — the QSS QHeaderView::section has
+        # padding: 8px 12px which needs ~34px; forcing 22px clips the text.
         self._gof_table.verticalHeader().setVisible(False)
-        self._gof_table.verticalHeader().setDefaultSectionSize(22)
-        self._gof_table.horizontalHeader().setFixedHeight(22)
+        self._gof_table.verticalHeader().setDefaultSectionSize(24)
         self._gof_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self._gof_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._gof_table.setVerticalScrollBarPolicy(
@@ -135,19 +136,16 @@ class DiagnosticsPage(QWidget):
             self._metric_cell_map[metric] = (row, value_col)
 
         self._gof_table.horizontalHeader().setStretchLastSection(True)
-        # Fix height to exactly fit content: header + rows + frame
-        table_height = 22 + (n_rows * 22) + 2
-        self._gof_table.setFixedHeight(table_height)
         layout.addWidget(self._gof_table)
 
+        apply_group_box_style(panel, "card")
         panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         return panel
 
     def _create_comparison_panel(self) -> QWidget:
         panel = QGroupBox("Model Comparison")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        set_compact_margins(layout)
 
         # Model comparison table
         self._comparison_table = QTableWidget()
@@ -159,10 +157,9 @@ class DiagnosticsPage(QWidget):
         self._comparison_table.setToolTip(
             "Model comparison metrics; populate by running multiple models"
         )
-        # Compact sizing
+        # Compact sizing — do NOT force header height (same reason as GOF table)
         self._comparison_table.verticalHeader().setVisible(False)
-        self._comparison_table.verticalHeader().setDefaultSectionSize(22)
-        self._comparison_table.horizontalHeader().setFixedHeight(22)
+        self._comparison_table.verticalHeader().setDefaultSectionSize(24)
         self._comparison_table.horizontalHeader().setStretchLastSection(True)
         self._comparison_table.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection
@@ -187,6 +184,7 @@ class DiagnosticsPage(QWidget):
         bottom_row.addWidget(btn_refresh)
         layout.addLayout(bottom_row)
 
+        apply_group_box_style(panel, "card")
         panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         return panel
 
