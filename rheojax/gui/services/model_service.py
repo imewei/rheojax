@@ -214,6 +214,10 @@ class ModelService:
         """Initialize model service."""
         logger.debug("Initializing ModelService")
         self._registry = Registry.get_instance()
+        # Eagerly register all models so the registry is fully populated
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         logger.debug("ModelService initialized", registry_available=True)
 
     def _normalize_model_name(self, model_name: str) -> str:
@@ -1128,6 +1132,8 @@ class ModelService:
         try:
             # Create model instance with optional configuration
             model_kwargs = model_kwargs or {}
+            # Extract fitted_model_state before passing to constructor
+            fitted_model_state = model_kwargs.pop("fitted_model_state", None)
             model = self._registry.create_instance(
                 self._normalize_model_name(model_name),
                 plugin_type="model",
@@ -1149,9 +1155,7 @@ class ModelService:
                 model._test_mode = test_mode
 
             # Transfer fitted model state if provided (protocol kwargs, grid settings)
-            fitted_state = (
-                model_kwargs.get("fitted_model_state") if model_kwargs else None
-            )
+            fitted_state = fitted_model_state
             if fitted_state and isinstance(fitted_state, dict):
                 for attr in (
                     "_last_fit_kwargs",

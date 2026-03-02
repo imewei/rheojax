@@ -358,22 +358,36 @@ class ProcessWorkerAdapter(QRunnable):
         proc.join(timeout=2.0)
 
     def _ensure_process_dead(self) -> None:
-        """Best-effort cleanup called in the finally block of run()."""
+        """Best-effort cleanup called in the finally block of run().
+
+        Cleans up all IPC resources (process handle, queue, event) to
+        prevent leaked POSIX semaphores at interpreter shutdown.
+        """
         proc = self._process
-        if proc is None:
-            return
-        if self._proc_is_alive(proc):
-            logger.warning("Process still alive in cleanup; killing")
+        if proc is not None:
+            if self._proc_is_alive(proc):
+                logger.warning("Process still alive in cleanup; killing")
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+                proc.join(timeout=2.0)
+            # Close the process handle to free resources
             try:
-                proc.kill()
-            except OSError:
+                proc.close()
+            except (ValueError, OSError):
+                pass  # Already closed or not started
+            self._process = None
+
+        # Close the IPC queue — releases its internal semaphore.
+        queue = self._result_queue
+        if queue is not None:
+            try:
+                queue.close()
+                queue.join_thread()
+            except (OSError, ValueError, BrokenPipeError):
                 pass
-            proc.join(timeout=2.0)
-        # Close the process handle to free resources
-        try:
-            proc.close()
-        except (ValueError, OSError):
-            pass  # Already closed or not started
+            self._result_queue = None
 
 
 # ---------------------------------------------------------------------------
@@ -784,5 +798,6 @@ def bayesian_result_from_dict(d: dict[str, Any]) -> Any:
         num_samples=int(d.get("num_samples", 0) or 0),
         num_chains=int(d.get("num_chains", 4) or 4),
         inference_data=d.get("inference_data"),
+        sample_stats=d.get("sample_stats"),
         diagnostics_valid=bool(d.get("diagnostics_valid", True)),
     )

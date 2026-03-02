@@ -109,7 +109,13 @@ def run_fit_isolated(
 
     if not getattr(service_result, "success", True):
         error_msg = getattr(service_result, "message", "Fit failed")
-        return {"success": False, "error": error_msg, "model_name": model_name}
+        return {
+            "success": False,
+            "error": error_msg,
+            "message": error_msg,
+            "model_name": model_name,
+            "timestamp": datetime.now().isoformat(),
+        }
 
     def _to_numpy(arr):
         if arr is None:

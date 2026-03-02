@@ -176,6 +176,7 @@ class BayesianResult:
     num_samples: int = 2000
     num_chains: int = 4
     inference_data: Any | None = None  # Full ArviZ InferenceData with sample_stats
+    sample_stats: dict[str, Any] | None = None  # Raw energy/diverging arrays from MCMC
     diagnostics_valid: bool = True  # False when R-hat/ESS fell back to NaN/defaults
 
     @property

@@ -134,30 +134,111 @@ class DataPage(QWidget):
         example_layout = QHBoxLayout(example_group)
         self._example_combo = QComboBox()
         self._example_combo.setPlaceholderText("Select an example dataset")
-        _PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # rheojax/
-        self._example_paths = {
-            "Polypropylene Relaxation (basic)": str(
-                _PACKAGE_ROOT
-                / "examples/data/experimental/polypropylene_relaxation.csv"
+        _DATA_ROOT = Path(__file__).resolve().parents[3] / "examples" / "data"
+        self._example_paths: dict[str, str] = {}
+        _sections: list[tuple[str, list[tuple[str, str]]]] = [
+            (
+                "Relaxation",
+                [
+                    (
+                        "Polypropylene Relaxation (polymer)",
+                        "relaxation/polymers/polypropylene_relaxation.csv",
+                    ),
+                    (
+                        "HDPE Relaxation (polymer)",
+                        "relaxation/polymers/stressrelaxation_hdpe_data.csv",
+                    ),
+                    (
+                        "Liquid Foam Relaxation",
+                        "relaxation/foams/stressrelaxation_liquidfoam_data.csv",
+                    ),
+                    (
+                        "Fish Muscle Relaxation (biological)",
+                        "relaxation/biological/stressrelaxation_fishmuscle_data.csv",
+                    ),
+                    (
+                        "Laponite Clay Relaxation",
+                        "relaxation/clays/rel_lapo_1200.csv",
+                    ),
+                ],
             ),
-            "Polystyrene Creep (basic)": str(
-                _PACKAGE_ROOT / "examples/data/experimental/polystyrene_creep.csv"
+            (
+                "Creep",
+                [
+                    (
+                        "Polystyrene Creep (polymer)",
+                        "creep/polymers/polystyrene_creep.csv",
+                    ),
+                    (
+                        "Mucus Creep (biological)",
+                        "creep/biological/creep_mucus_data.csv",
+                    ),
+                ],
             ),
-            "Frequency Sweep TTS (mastercurve)": str(
-                _PACKAGE_ROOT / "examples/data/experimental/frequency_sweep_tts.txt"
+            (
+                "Oscillation",
+                [
+                    (
+                        "Polystyrene Oscillation 160\u00b0C",
+                        "oscillation/polystyrene/oscillation_ps160_data.csv",
+                    ),
+                    (
+                        "Chia Seed Gel Oscillation (food)",
+                        "oscillation/foods/oscillation_chia_data.csv",
+                    ),
+                    (
+                        "Metal Network Oscillation",
+                        "oscillation/metal_networks/epstein.csv",
+                    ),
+                ],
             ),
-            "Multi-technique (advanced)": str(
-                _PACKAGE_ROOT / "examples/data/experimental/multi_technique.txt"
+            (
+                "Flow",
+                [
+                    (
+                        "Cellulose Hydrogel Flow",
+                        "flow/hydrogels/cellulose_hydrogel_flow.csv",
+                    ),
+                    (
+                        "Ethyl Cellulose Solution Flow",
+                        "flow/solutions/rotation_ec07_data.csv",
+                    ),
+                ],
             ),
-            "OWChirp TTS": str(
-                _PACKAGE_ROOT / "examples/data/experimental/owchirp_tts.txt"
+            (
+                "Mastercurve / TTS",
+                [
+                    (
+                        "Frequency Sweep TTS (polymer)",
+                        "temperature_sweep/polymers/frequency_sweep_tts.txt",
+                    ),
+                    (
+                        "PS Oscillation Master Curve",
+                        "mastercurves/master_curve_ps_oscillation_data.csv",
+                    ),
+                ],
             ),
-            "OWChirp TCS": str(
-                _PACKAGE_ROOT / "examples/data/experimental/owchirp_tcs.txt"
+            (
+                "LAOS / Advanced",
+                [
+                    ("OWChirp TTS", "laos/owchirp_tts.txt"),
+                    ("OWChirp TCS", "laos/owchirp_tcs.txt"),
+                    (
+                        "Multi-technique (advanced)",
+                        "multi_technique/multi_technique.txt",
+                    ),
+                ],
             ),
-        }
-        for label in self._example_paths:
-            self._example_combo.addItem(label)
+        ]
+        for section_name, items in _sections:
+            self._example_combo.addItem(f"── {section_name} ──")
+            sep_idx = self._example_combo.count() - 1
+            model = self._example_combo.model()
+            model.item(sep_idx).setEnabled(False)
+            for label, rel_path in items:
+                full_path = str(_DATA_ROOT / rel_path)
+                self._example_paths[label] = full_path
+                self._example_combo.addItem(label)
         example_layout.addWidget(self._example_combo, 1)
 
         btn_example = QPushButton("Load")

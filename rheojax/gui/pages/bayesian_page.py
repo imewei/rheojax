@@ -1393,24 +1393,11 @@ class BayesianPage(QWidget):
     def _set_fit_plot_figure(self, fig) -> None:
         """Replace the Fit Plot canvas figure.
 
-        Swaps both the widget's .figure attribute and the underlying
-        FigureCanvasQTAgg.figure reference atomically to ensure they stay
-        in sync. The old figure is cleared after reassignment to release
-        resources without destroying the canvas C++ object.
-
-        R6-GUI-002: Don't plt.close() a figure embedded in FigureCanvasQTAgg
-        — it destroys the C++ object while the canvas may still reference it.
-        Clear instead.
+        Delegates to PlotCanvas.replace_figure() which properly manages
+        the Figure ↔ FigureCanvasQTAgg lifecycle (DPI sync, canvas
+        linkage, buffer clear) so that old plots are fully removed.
         """
-        # Capture old figure from the canvas (authoritative reference)
-        fig_old = self._fit_plot_canvas.canvas.figure
-        # Atomically swap figure — set canvas.figure first, then widget attribute
-        self._fit_plot_canvas.canvas.figure = fig
-        self._fit_plot_canvas.figure = fig
-        self._fit_plot_canvas.axes = fig.get_axes()[0] if fig.get_axes() else None
-        if fig_old is not None and fig_old is not fig:
-            fig_old.clear()  # Release old figure resources
-        self._fit_plot_canvas.canvas.draw_idle()
+        self._fit_plot_canvas.replace_figure(fig)
         self._fit_plot_placeholder.hide()
 
         logger.debug(

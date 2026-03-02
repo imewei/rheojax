@@ -174,6 +174,17 @@ def run_bayesian_isolated(
     except Exception:
         pass
 
+    # Extract sample_stats arrays for energy/divergence plots.
+    # Full InferenceData is not picklable, but raw NumPy arrays are.
+    sample_stats_np: dict[str, np.ndarray] = {}
+    idata = getattr(bayesian_result, "inference_data", None)
+    if idata is not None:
+        ss = getattr(idata, "sample_stats", None)
+        if ss is not None:
+            for var_name in ("energy", "diverging"):
+                if var_name in ss:
+                    sample_stats_np[var_name] = np.asarray(ss[var_name].values)
+
     return {
         "model_name": model_name,
         "dataset_id": dataset_id,
@@ -189,5 +200,6 @@ def run_bayesian_isolated(
         "num_samples": num_samples,
         "num_chains": num_chains,
         "inference_data": None,  # Not picklable, too large for mp.Queue
+        "sample_stats": sample_stats_np,  # Raw arrays for energy plot
         "diagnostics_valid": bayesian_result.diagnostics_valid,
     }

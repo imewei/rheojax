@@ -12,6 +12,7 @@ from rheojax.gui.compat import (
     QCheckBox,
     QColor,
     QHBoxLayout,
+    QHeaderView,
     QPalette,
     Qt,
     QTableWidget,
@@ -81,12 +82,13 @@ class ParameterTable(QTableWidget):
             "QHeaderView::section { font-size: 11pt; }"
         )
 
-        # Column widths
-        self.setColumnWidth(0, 120)
-        self.setColumnWidth(1, 100)
-        self.setColumnWidth(2, 80)
-        self.setColumnWidth(3, 80)
-        self.setColumnWidth(4, 60)
+        # Column sizing: stretch to fill available width
+        header = self.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         # Enable sorting
         self.setSortingEnabled(False)

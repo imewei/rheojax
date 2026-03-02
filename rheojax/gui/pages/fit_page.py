@@ -114,12 +114,15 @@ class FitPage(QWidget):
         left_scroll.setWidget(left_panel)
         left_scroll.setWidgetResizable(True)
         left_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        main_layout.addWidget(left_scroll, 1)
+        left_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        left_scroll.setMinimumWidth(380)
+        main_layout.addWidget(left_scroll, 2)
 
         # Center: Visualization (fit plot + residuals)
         center_panel = self._create_center_panel()
-        main_layout.addWidget(center_panel, 3)
+        main_layout.addWidget(center_panel, 5)
 
     def _create_center_panel(self) -> QWidget:
         """Create center panel with plot and residuals."""
@@ -1121,19 +1124,14 @@ class FitPage(QWidget):
 
     # External hooks from MainWindow
     def set_plot_figure(self, fig: Figure) -> None:
-        """Replace the plot canvas figure."""
-        # Close old figure to prevent memory leak
-        import matplotlib.pyplot as plt
+        """Replace the plot canvas figure.
 
-        old_fig = self._plot_canvas.figure
-        if old_fig is not None and old_fig is not fig:
-            plt.close(old_fig)
-
-        # Swap the FigureCanvas content
-        self._plot_canvas.figure = fig
-        self._plot_canvas.canvas.figure = fig
-        self._plot_canvas.axes = fig.gca()
-        self._plot_canvas.canvas.draw_idle()
+        Delegates to PlotCanvas.replace_figure() which properly manages
+        the Figure ↔ FigureCanvasQTAgg lifecycle (DPI sync, canvas
+        linkage, buffer clear) so that old plots are fully removed before
+        the new figure is rendered.
+        """
+        self._plot_canvas.replace_figure(fig)
         if hasattr(self, "_plot_placeholder"):
             self._plot_placeholder.hide()
 

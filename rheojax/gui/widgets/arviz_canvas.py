@@ -15,7 +15,6 @@ from rheojax.gui.compat import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSize,
     QSizePolicy,
     Qt,
     QVBoxLayout,
@@ -96,16 +95,20 @@ class ArvizCanvas(BaseArviZWidget):
         )
 
     def _setup_ui(self) -> None:
-        """Set up the user interface."""
+        """Set up the user interface.
+
+        The canvas fills all available space and the figure is resized to
+        match the viewport on each plot swap, so plots always fit inside
+        the window without scrollbars.
+        """
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # Toolbar
+        # --- Fixed header: Plot Type selector + Refresh/Export buttons ---
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setContentsMargins(4, 4, 4, 4)
 
-        # Plot type selector
         type_label = QLabel("Plot Type:")
         toolbar_layout.addWidget(type_label)
 
@@ -119,32 +122,24 @@ class ArvizCanvas(BaseArviZWidget):
 
         toolbar_layout.addStretch()
 
-        # Refresh button
         self._refresh_btn = QPushButton("Refresh")
         self._refresh_btn.setToolTip("Regenerate current plot")
         toolbar_layout.addWidget(self._refresh_btn)
 
-        # Export button
         self._export_btn = QPushButton("Export")
         self._export_btn.setToolTip("Export plot to file")
         toolbar_layout.addWidget(self._export_btn)
 
         layout.addLayout(toolbar_layout)
 
-        # Create matplotlib figure and canvas
-        # Note: We don't set a layout engine here because ArviZ creates its own
-        # figures which we swap in via _copy_arviz_figure(). The initial figure
-        # is just a placeholder.
+        # --- Figure canvas fills all available space ---
         self._figure = Figure(figsize=(8, 6), dpi=100)
         self._canvas = FigureCanvasQTAgg(self._figure)
-        # Use Expanding policy so widget can both grow and shrink with container
         self._canvas.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
-        # Navigation toolbar
         self._nav_toolbar = NavigationToolbar2QT(self._canvas, self)
-
         layout.addWidget(self._nav_toolbar)
         layout.addWidget(self._canvas, 1)
 
@@ -162,44 +157,31 @@ class ArvizCanvas(BaseArviZWidget):
         self._refresh_btn.clicked.connect(self._refresh_plot)
         self._export_btn.clicked.connect(self.export_requested.emit)
 
-    def _update_canvas_size(self) -> None:
-        """Update canvas size hints based on current figure dimensions.
+    def _fit_figure_to_canvas(self) -> None:
+        """Resize the current figure to match the canvas viewport.
 
-        Uses size hints instead of fixed minimum size to allow proper resizing.
+        After an ArviZ plot is swapped in, its native figsize may be much
+        larger than the available window area.  This method scales the
+        figure down (or up) so it renders entirely within the canvas
+        widget, then re-runs ``tight_layout`` to prevent axis overlap.
         """
-        if self._figure is None:
+        if self._figure is None or self._canvas is None:
             return
 
-        # Trigger layout update without forcing a fixed minimum size
-        self.updateGeometry()
-        self._canvas.updateGeometry()
+        w = self._canvas.width()
+        h = self._canvas.height()
+        if w <= 0 or h <= 0:
+            return
 
-    def sizeHint(self) -> QSize:
-        """Return recommended size based on figure dimensions.
+        dpi = self._figure.get_dpi()
+        self._figure.set_size_inches(w / dpi, h / dpi, forward=False)
 
-        Returns
-        -------
-        QSize
-            Recommended widget size
-        """
-        if self._figure is not None:
-            fig_width, fig_height = self._figure.get_size_inches()
-            dpi = self._figure.get_dpi()
-            # Add space for toolbar and status label
-            toolbar_height = 40
-            return QSize(int(fig_width * dpi), int(fig_height * dpi) + toolbar_height)
-        return QSize(800, 640)
-
-    def minimumSizeHint(self) -> QSize:
-        """Return minimum size for the widget.
-
-        Returns
-        -------
-        QSize
-            Minimum widget size (allows scrolling for larger plots)
-        """
-        # Allow widget to shrink to a reasonable minimum
-        return QSize(400, 300)
+        try:
+            self._figure.tight_layout(pad=0.5)
+        except Exception:
+            # tight_layout can fail with some axis configurations
+            # (e.g., colorbars, inset axes) — safe to skip
+            pass
 
     def _on_type_changed(self, index: int) -> None:
         """Handle plot type change.
@@ -247,10 +229,12 @@ class ArvizCanvas(BaseArviZWidget):
 
         self._status_label.hide()
 
-        # Clear figure
-        self._figure.clear()
-
-        # Generate plot based on type
+        # Generate plot based on type.
+        # Each plot function calls _arviz_plot → _copy_arviz_figure which:
+        #   1. Sanitizes text in the new ArviZ figure
+        #   2. swap_figure() — transfers figure to canvas
+        #   3. _fit_figure_to_canvas() — resizes figure to viewport
+        #   4. draw_idle() — single deferred draw
         plot_funcs = {
             "trace": self._plot_trace,
             "pair": self._plot_pair,
@@ -265,17 +249,8 @@ class ArvizCanvas(BaseArviZWidget):
         func = plot_funcs.get(self._current_plot_type)
         if func:
             try:
-                # Use timed_render for performance tracking
                 self.timed_render(self._current_plot_type, func)
-                self._status_label.setText(f"Showing: {self._current_plot_type}")
                 self._status_label.hide()
-
-                logger.debug(
-                    "Rendering",
-                    widget=self.__class__.__name__,
-                    plot_type=self._current_plot_type,
-                    has_inference_data=self._inference_data is not None,
-                )
             except Exception as e:
                 logger.error(
                     "Plot generation failed",
@@ -285,6 +260,7 @@ class ArvizCanvas(BaseArviZWidget):
                 )
                 self._status_label.setText(f"Error: {e}")
                 self._status_label.show()
+                self._figure.clear()
                 ax = self._figure.add_subplot(111)
                 ax.text(
                     0.5,
@@ -294,21 +270,10 @@ class ArvizCanvas(BaseArviZWidget):
                     va="center",
                     transform=ax.transAxes,
                 )
+                self._canvas.draw_idle()
         else:
             self._status_label.setText("Unsupported plot type")
             self._status_label.show()
-
-        # Sanitize any tab characters before drawing to avoid
-        # "Glyph 9 missing from font" warnings
-        self._sanitize_figure_text(self._figure)
-
-        # Suppress font glyph warnings during draw - ArviZ may generate
-        # text with tabs in tick labels that aren't accessible until draw time
-        import warnings
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="Glyph.*missing from font")
-            self._canvas.draw()
 
     def set_inference_data(self, idata: Any) -> None:
         """Set ArviZ InferenceData object.
@@ -421,7 +386,9 @@ class ArvizCanvas(BaseArviZWidget):
 
         ArviZ plotting functions create their own figures internally and don't
         accept a figure= parameter. This method uses the base class swap_figure
-        protocol for thread-safe figure swapping with proper cleanup.
+        protocol for thread-safe figure swapping with proper cleanup, then
+        resizes the figure to fit the canvas viewport so plots are never
+        larger than the window.
 
         Parameters
         ----------
@@ -435,8 +402,11 @@ class ArvizCanvas(BaseArviZWidget):
         # This handles canvas transfer and schedules cleanup on main thread
         self.swap_figure(arviz_fig)
 
-        # Update canvas size for scrolling based on new figure dimensions
-        self._update_canvas_size()
+        # Resize figure to fit the canvas viewport so the plot is never
+        # larger than the window.  tight_layout is re-run to prevent
+        # axis overlap at the new (potentially smaller) figsize.
+        self._fit_figure_to_canvas()
+        self._canvas.draw_idle()
 
         logger.debug(
             "Rendering",
@@ -712,6 +682,7 @@ class ArvizCanvas(BaseArviZWidget):
         message : str
             Message to display
         """
+        self._figure.clear()
         ax = self._figure.add_subplot(111)
         ax.text(
             0.5,
@@ -723,6 +694,8 @@ class ArvizCanvas(BaseArviZWidget):
             transform=ax.transAxes,
         )
         ax.set_axis_off()
+        self._sanitize_figure_text(self._figure)
+        self._canvas.draw_idle()
 
     def plot_trace(self, data: Any) -> None:
         """Generate trace plot (convenience method).

@@ -88,6 +88,43 @@ class PlotCanvas(QWidget):
         """Return the primary matplotlib Axes for compatibility."""
         return self.axes
 
+    def replace_figure(self, new_fig: Figure) -> None:
+        """Replace the displayed figure, properly managing the canvas lifecycle.
+
+        Unlike simply setting ``canvas.figure = fig``, this method ensures
+        the DPI matches, the figure↔canvas references are consistent, and
+        the Agg buffer is fully cleared before redrawing.
+        """
+        old_fig = self.figure
+
+        # Match DPI so the new figure renders at the correct size
+        new_fig.set_dpi(old_fig.get_dpi())
+
+        # Detach old figure from the canvas
+        old_fig.set_canvas(None)
+
+        # Link new figure → canvas (bidirectional)
+        new_fig.set_canvas(self.canvas)
+        self.canvas.figure = new_fig
+        self.figure = new_fig
+        self.axes = new_fig.gca()
+
+        # Update the toolbar so Home/Back/Forward work with the new figure
+        self.toolbar.update()
+
+        # Clear stale tooltip / interaction state
+        self._plot_data.clear()
+        self._annotation = None
+
+        # Force immediate full redraw (not deferred draw_idle)
+        self.canvas.draw()
+
+        logger.debug(
+            "Figure replaced",
+            widget=self.__class__.__name__,
+            num_axes=len(new_fig.axes),
+        )
+
     def refresh(self) -> None:
         """Redraw the canvas (compat helper)."""
         logger.debug("Rendering", widget=self.__class__.__name__)
