@@ -22,6 +22,7 @@ from rheojax.gui.widgets.pyqtgraph_canvas import (
     is_pyqtgraph_available,
 )
 from rheojax.gui.widgets.empty_state import EmptyStateWidget
+from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [
@@ -42,5 +43,6 @@ __all__ = [
     "ResidualsPanel",
     "PyQtGraphCanvas",
     "is_pyqtgraph_available",
+    "ParameterFormBuilder",
     "PYQTGRAPH_AVAILABLE",
 ]
