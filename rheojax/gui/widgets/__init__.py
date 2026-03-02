@@ -21,9 +21,11 @@ from rheojax.gui.widgets.pyqtgraph_canvas import (
     PyQtGraphCanvas,
     is_pyqtgraph_available,
 )
+from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [
+    "EmptyStateWidget",
     "BaseArviZWidget",
     "PlotCanvas",
     "PlotMetrics",
