@@ -1981,8 +1981,16 @@ class RheoJAXMainWindow(QMainWindow):
     ) -> None:
         """Process transform output into state store (shared by async and sync paths)."""
         # Validate transform output shape (T-008)
+        # Convert JAX arrays to NumPy at the GUI boundary (state store requires NumPy)
         x_data = getattr(transformed, "x", None)
         y_data = getattr(transformed, "y", None)
+        y2_data = getattr(transformed, "y2", None)
+        if x_data is not None and hasattr(x_data, "device"):
+            x_data = np.asarray(x_data)
+        if y_data is not None and hasattr(y_data, "device"):
+            y_data = np.asarray(y_data)
+        if y2_data is not None and hasattr(y2_data, "device"):
+            y2_data = np.asarray(y2_data)
         if x_data is not None and y_data is not None:
             if len(x_data) != len(y_data):
                 raise ValueError(
@@ -2008,7 +2016,7 @@ class RheoJAXMainWindow(QMainWindow):
                 "test_mode": new_test_mode,
                 "x_data": x_data,
                 "y_data": y_data,
-                "y2_data": getattr(transformed, "y2", None),
+                "y2_data": y2_data,
                 "metadata": metadata,
             },
         )
