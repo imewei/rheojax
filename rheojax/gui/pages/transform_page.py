@@ -2,987 +2,431 @@
 Transform Page
 =============
 
-Transform application interface (mastercurve, FFT, SRFS, etc.).
+Data-driven transform application interface with sidebar selection,
+auto-generated parameter forms, and live preview.
 """
+
+from __future__ import annotations
 
 from typing import Any
 
 from rheojax.gui.compat import (
-    QCheckBox,
-    QComboBox,
-    QDoubleSpinBox,
-    QFrame,
-    QGridLayout,
-    QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
+    QRunnable,
     QScrollArea,
     QSizePolicy,
     QSplitter,
     Qt,
+    QThreadPool,
+    QTimer,
     QVBoxLayout,
     QWidget,
     Signal,
+    Slot,
 )
 from rheojax.gui.resources.styles.tokens import (
     ColorPalette,
     Spacing,
     Typography,
     button_style,
+    section_header_style,
 )
+from rheojax.gui.services.transform_service import TransformService
 from rheojax.gui.state.store import StateStore
 from rheojax.gui.widgets.empty_state import EmptyStateWidget
-from rheojax.gui.widgets.plot_canvas import PlotCanvas
+from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.logging import get_logger
+
+try:
+    from rheojax.gui.widgets.pyqtgraph_canvas import (
+        PYQTGRAPH_AVAILABLE,
+        PyQtGraphCanvas,
+    )
+except ImportError:
+    PYQTGRAPH_AVAILABLE = False
 
 logger = get_logger(__name__)
 
 
+class _PreviewWorker(QRunnable):
+    """QRunnable that computes a transform preview off the main thread."""
+
+    def __init__(
+        self,
+        service: TransformService,
+        transform_key: str,
+        data: Any,
+        params: dict[str, Any],
+        generation: int,
+        callback: Any,
+    ) -> None:
+        super().__init__()
+        self.setAutoDelete(True)
+        self._service = service
+        self._key = transform_key
+        self._data = data
+        self._params = params
+        self._generation = generation
+        self._callback = callback
+
+    def run(self) -> None:
+        result = self._service.preview_transform(self._key, self._data, self._params)
+        # Attach generation so the page can discard stale results
+        result["_generation"] = self._generation
+        self._callback(result)
+
+
 class TransformPage(QWidget):
-    """Transform application page."""
+    """Transform application page with sidebar, parameter form, and live preview."""
 
     transform_selected = Signal(str)
-    transform_applied = Signal(str, str)  # transform_name, dataset_id
+    transform_applied = Signal(str, str)  # display_name, dataset_id
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
+
         self._store = StateStore()
-        self._selected_transform: str | None = None
-        self._param_controls: dict[str, list] = {}
-        self.setup_ui()
+        self._service = TransformService()
+        self._metadata = self._service.get_transform_metadata()
+
+        # Current state
+        self._selected_key: str | None = None
+        self._selected_display_name: str | None = None
+        self._param_form: ParameterFormBuilder | None = None
+        self._dataset_checklist: QListWidget | None = None
+        self._preview_generation = 0
+
+        # Debounce timer for live preview
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(500)
+        self._preview_timer.timeout.connect(self._request_preview)
+
+        self._setup_ui()
         logger.debug(
             "Initialization complete",
             class_name=self.__class__.__name__,
             page="TransformPage",
         )
 
-    def setup_ui(self) -> None:
-        layout = QVBoxLayout(self)
+    # ------------------------------------------------------------------
+    # UI setup
+    # ------------------------------------------------------------------
 
-        # Transform cards grid
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
+    def _setup_ui(self) -> None:
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        grid_widget = QWidget()
-        grid_layout = QGridLayout(grid_widget)
-        grid_layout.setSpacing(Spacing.LG)
-
-        # NOTE(T-015): Hardcoded — must be updated when new transforms are
-        # registered via @TransformRegistry.register(). A future enhancement
-        # could query TransformRegistry and provide display metadata there.
-        transforms = [
-            (
-                "FFT",
-                "Fast Fourier Transform for frequency analysis",
-                ColorPalette.CHART_5,
-            ),
-            ("Mastercurve", "Time-temperature superposition", ColorPalette.CHART_1),
-            ("SRFS", "Strain-rate frequency superposition", ColorPalette.CHART_3),
-            ("Mutation Number", "Calculate mutation number", ColorPalette.CHART_2),
-            ("OW Chirp", "Optimally-windowed chirp analysis", ColorPalette.CHART_4),
-            (
-                "SPP Analysis",
-                "LAOS yield stress and cage modulus extraction",
-                ColorPalette.CHART_6,
-            ),
-            (
-                "Derivatives",
-                "Calculate numerical derivatives",
-                ColorPalette.TEXT_SECONDARY,
-            ),
-        ]
-
-        for i, (name, desc, color) in enumerate(transforms):
-            card = self._create_transform_card(name, desc, color)
-            grid_layout.addWidget(card, i // 3, i % 3)
-
-        scroll.setWidget(grid_widget)
-        layout.addWidget(scroll, 1)
-
-        # Config and preview
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._create_config_panel())
-        splitter.addWidget(self._create_preview_panel())
-        splitter.setSizes([300, 700])
-        layout.addWidget(splitter, 2)
-
-    def _create_transform_card(self, name: str, desc: str, color: str) -> QWidget:
-        card = QFrame()
-        card.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
-        # Let height adapt to content but stay compact in the grid.
-        card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-        card.setMaximumHeight(200)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {color};
-                border-radius: 8px;
-                padding: 15px;
-            }}
-            QFrame:hover {{
-                background-color: {self._darken(color)};
-            }}
-        """)
-        card.setCursor(Qt.PointingHandCursor)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        layout.setSpacing(Spacing.SM)
-        name_label = QLabel(name)
-        name_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_INVERSE}; font-size: {Typography.SIZE_MD}pt;"
-            f" font-weight: {Typography.WEIGHT_BOLD};"
-        )
-
-        layout.addWidget(name_label)
-        layout.addStretch()
-
-        btn = QPushButton("Configure")
-        btn.setStyleSheet(button_style("secondary", "sm"))
-        btn.clicked.connect(lambda: self._select_transform(name))
-        layout.addWidget(btn)
-
-        return card
-
-    def _create_config_panel(self) -> QWidget:
-        panel = QGroupBox("Configuration")
-        layout = QVBoxLayout(panel)
-
-        self._config_widget = QWidget()
-        self._config_layout = QVBoxLayout(self._config_widget)
-        placeholder = EmptyStateWidget("Select a transform to configure")
-        self._config_layout.addWidget(placeholder)
-        layout.addWidget(self._config_widget)
-
-        layout.addStretch()
-
-        btn_apply = QPushButton("Apply Transform")
-        btn_apply.setStyleSheet(button_style("success", "lg"))
-        btn_apply.clicked.connect(self._apply_transform)
-        layout.addWidget(btn_apply)
-
-        return panel
-
-    def _create_preview_panel(self) -> QWidget:
-        panel = QGroupBox("Preview")
-        layout = QVBoxLayout(panel)
-
-        # Before/after split
         splitter = QSplitter(Qt.Horizontal)
 
-        before_widget = QWidget()
-        before_layout = QVBoxLayout(before_widget)
-        before_layout.addWidget(
-            QLabel(
-                "Before",
-                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
-                f" font-size: {Typography.SIZE_MD_SM}pt;",
-            )
+        # Left sidebar
+        sidebar_widget = QWidget()
+        sidebar_layout = QVBoxLayout(sidebar_widget)
+        sidebar_layout.setContentsMargins(
+            Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD
         )
-        self._before_canvas = PlotCanvas()
-        before_layout.addWidget(self._before_canvas)
 
-        after_widget = QWidget()
-        after_layout = QVBoxLayout(after_widget)
-        after_layout.addWidget(
-            QLabel(
-                "After",
-                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
-                f" font-size: {Typography.SIZE_MD_SM}pt;",
-            )
+        sidebar_header = QLabel("Transforms")
+        sidebar_header.setStyleSheet(section_header_style())
+        sidebar_layout.addWidget(sidebar_header)
+
+        self._sidebar = QListWidget()
+        self._sidebar.setFixedWidth(200)
+        for meta in self._metadata:
+            item = QListWidgetItem(meta["name"])
+            item.setData(Qt.UserRole, meta["key"])
+            self._sidebar.addItem(item)
+        self._sidebar.currentRowChanged.connect(self._on_sidebar_changed)
+        sidebar_layout.addWidget(self._sidebar)
+
+        hint = QLabel("Select a transform to configure and preview.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet(
+            f"color: {ColorPalette.TEXT_MUTED}; font-size: {Typography.SIZE_SM}pt;"
         )
-        self._after_canvas = PlotCanvas()
-        after_layout.addWidget(self._after_canvas)
+        sidebar_layout.addWidget(hint)
 
-        splitter.addWidget(before_widget)
-        splitter.addWidget(after_widget)
-        splitter.setSizes([500, 500])
+        splitter.addWidget(sidebar_widget)
 
-        layout.addWidget(splitter)
-
-        return panel
-
-    def _select_transform(self, name: str) -> None:
-        logger.debug("Transform selected", transform=name, page="TransformPage")
-        self._selected_transform = name
-        self.transform_selected.emit(name)
-
-        # Clear and rebuild config
-        while self._config_layout.count():
-            child = self._config_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
-        self._config_layout.addWidget(
-            QLabel(
-                f"{name} Parameters",
-                styleSheet=f"font-weight: {Typography.WEIGHT_BOLD};"
-                f" font-size: {Typography.SIZE_MD_SM}pt;",
-            )
+        # Right detail panel
+        self._detail_container = QWidget()
+        self._detail_layout = QVBoxLayout(self._detail_container)
+        self._detail_layout.setContentsMargins(
+            Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD
         )
-        self._param_controls.clear()
 
-        # Add transform-specific parameters
-        if name == "Mastercurve":
-            self._config_layout.addWidget(QLabel("Reference Temperature (°C):"))
-            spin = QDoubleSpinBox()
-            spin.setRange(-100, 300)
-            spin.setValue(25)
-            spin.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="reference_temp",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin)
-            self._param_controls.setdefault("mastercurve", []).append(
-                ("reference_temp", spin)
-            )
+        self._empty_state = EmptyStateWidget(
+            "No transform selected",
+            "Choose a transform from the list on the left.",
+        )
+        self._detail_layout.addWidget(self._empty_state)
 
-            check = QCheckBox("Auto-detect shift factors")
-            check.setChecked(True)
-            check.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="auto_shift",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check)
-            self._param_controls.setdefault("mastercurve", []).append(
-                ("auto_shift", check)
-            )
+        # Scroll area wrapping the detail content (will be populated on selection)
+        self._detail_scroll_content = QWidget()
+        self._detail_scroll_layout = QVBoxLayout(self._detail_scroll_content)
+        self._detail_scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self._detail_scroll_layout.setSpacing(Spacing.MD)
 
-            self._config_layout.addWidget(QLabel("Shift Method:"))
-            combo_shift = QComboBox()
-            combo_shift.addItems(["wlf", "arrhenius", "manual"])
-            combo_shift.setCurrentText("wlf")
-            combo_shift.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="shift_method",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_shift)
-            self._param_controls.setdefault("mastercurve", []).append(
-                ("shift_method", combo_shift)
-            )
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setWidget(self._detail_scroll_content)
+        self._scroll.setVisible(False)
+        self._detail_layout.addWidget(self._scroll, 1)
 
-        elif name == "SRFS":
-            self._config_layout.addWidget(QLabel("Reference Shear Rate (1/s):"))
-            spin = QDoubleSpinBox()
-            spin.setRange(0.001, 1000)
-            spin.setValue(1.0)
-            spin.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="reference_gamma_dot",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin)
-            self._param_controls.setdefault("srfs", []).append(
-                ("reference_gamma_dot", spin)
-            )
+        # Apply button (always visible at bottom of detail panel)
+        self._apply_btn = QPushButton("Apply Transform")
+        self._apply_btn.setStyleSheet(button_style("success", "lg"))
+        self._apply_btn.clicked.connect(self._apply_transform)
+        self._apply_btn.setVisible(False)
+        self._detail_layout.addWidget(self._apply_btn)
 
-            auto_shift = QCheckBox("Auto-detect shift factors")
-            auto_shift.setChecked(True)
-            auto_shift.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="auto_shift",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(auto_shift)
-            self._param_controls.setdefault("srfs", []).append(
-                ("auto_shift", auto_shift)
-            )
+        splitter.addWidget(self._detail_container)
+        splitter.setSizes([200, 700])
 
-        elif name == "FFT":
-            self._config_layout.addWidget(QLabel("Direction:"))
-            combo_dir = QComboBox()
-            combo_dir.addItems(["forward", "inverse"])
-            combo_dir.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="direction",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_dir)
-            self._param_controls.setdefault("fft", []).append(("direction", combo_dir))
+        root.addWidget(splitter)
 
-            self._config_layout.addWidget(QLabel("Window Function:"))
-            combo_window = QComboBox()
-            combo_window.addItems(["hann", "hamming", "blackman", "rectangular"])
-            combo_window.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="window",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_window)
-            self._param_controls.setdefault("fft", []).append(("window", combo_window))
+    # ------------------------------------------------------------------
+    # Sidebar selection
+    # ------------------------------------------------------------------
 
-            check_detrend = QCheckBox("Detrend (remove DC)")
-            check_detrend.setChecked(True)
-            check_detrend.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="detrend",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_detrend)
-            self._param_controls.setdefault("fft", []).append(
-                ("detrend", check_detrend)
-            )
+    @Slot(int)
+    def _on_sidebar_changed(self, row: int) -> None:
+        if row < 0 or row >= len(self._metadata):
+            return
 
-            check_norm = QCheckBox("Normalize amplitude")
-            check_norm.setChecked(True)
-            check_norm.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="normalize",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_norm)
-            self._param_controls.setdefault("fft", []).append(("normalize", check_norm))
+        meta = self._metadata[row]
+        self._selected_key = meta["key"]
+        self._selected_display_name = meta["name"]
+        self.transform_selected.emit(meta["name"])
+        logger.debug("Transform selected", transform=meta["name"], page="TransformPage")
 
-            check_psd = QCheckBox("Return PSD")
-            check_psd.setChecked(False)
-            check_psd.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="return_psd",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_psd)
-            self._param_controls.setdefault("fft", []).append(("return_psd", check_psd))
+        self._rebuild_detail(meta)
 
-        elif name == "Mutation Number":
-            self._config_layout.addWidget(QLabel("Integration Method:"))
-            combo_method = QComboBox()
-            combo_method.addItems(["trapz", "simpson", "romberg"])
-            combo_method.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="integration_method",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_method)
-            self._param_controls.setdefault("mutation_number", []).append(
-                ("integration_method", combo_method)
-            )
+    def _rebuild_detail(self, meta: dict[str, Any]) -> None:
+        """Tear down and rebuild the scrollable detail content."""
+        # Clear previous content
+        self._clear_layout(self._detail_scroll_layout)
+        self._param_form = None
+        self._dataset_checklist = None
 
-            check_extrap = QCheckBox("Extrapolate data")
-            check_extrap.setChecked(False)
-            check_extrap.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="extrapolate",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_extrap)
-            self._param_controls.setdefault("mutation_number", []).append(
-                ("extrapolate", check_extrap)
-            )
+        # Hide empty state, show scroll + apply button
+        self._empty_state.setVisible(False)
+        self._scroll.setVisible(True)
+        self._apply_btn.setVisible(True)
 
-            self._config_layout.addWidget(QLabel("Extrapolation Model:"))
-            combo_extrap = QComboBox()
-            combo_extrap.addItems(["exponential", "power_law", "linear"])
-            combo_extrap.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="extrapolation_model",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_extrap)
-            self._param_controls.setdefault("mutation_number", []).append(
-                ("extrapolation_model", combo_extrap)
-            )
+        lay = self._detail_scroll_layout
 
-        elif name == "OW Chirp":
-            self._config_layout.addWidget(QLabel("Min Frequency (rad/s):"))
-            spin_min = QDoubleSpinBox()
-            spin_min.setRange(0.0001, 1e6)
-            spin_min.setValue(0.01)
-            spin_min.setDecimals(4)
-            spin_min.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="min_frequency",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_min)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("min_frequency", spin_min)
-            )
+        # Header
+        header = QLabel(meta["name"])
+        header.setStyleSheet(section_header_style())
+        lay.addWidget(header)
 
-            self._config_layout.addWidget(QLabel("Max Frequency (rad/s):"))
-            spin_max = QDoubleSpinBox()
-            spin_max.setRange(0.0001, 1e6)
-            spin_max.setValue(100.0)
-            spin_max.setDecimals(4)
-            spin_max.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="max_frequency",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_max)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("max_frequency", spin_max)
-            )
+        desc = QLabel(meta["description"])
+        desc.setWordWrap(True)
+        desc.setStyleSheet(
+            f"color: {ColorPalette.TEXT_SECONDARY};"
+            f" font-size: {Typography.SIZE_MD_SM}pt;"
+        )
+        lay.addWidget(desc)
 
-            self._config_layout.addWidget(QLabel("# Frequencies:"))
-            spin_n = QDoubleSpinBox()
-            spin_n.setRange(4, 5000)
-            spin_n.setDecimals(0)
-            spin_n.setValue(100)
-            spin_n.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="n_frequencies",
-                    value=int(v),
-                    page="TransformPage",
-                )
+        # Parameter form
+        specs = self._service.get_transform_params(meta["key"])
+        if specs:
+            params_label = QLabel("Parameters")
+            params_label.setStyleSheet(
+                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;"
+                f" margin-top: {Spacing.SM}px;"
             )
-            self._config_layout.addWidget(spin_n)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("n_frequencies", spin_n)
-            )
+            lay.addWidget(params_label)
 
-            self._config_layout.addWidget(QLabel("Wavelet Width:"))
-            spin_w = QDoubleSpinBox()
-            spin_w.setRange(1.0, 20.0)
-            spin_w.setDecimals(2)
-            spin_w.setValue(5.0)
-            spin_w.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="wavelet_width",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_w)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("wavelet_width", spin_w)
-            )
+            self._param_form = ParameterFormBuilder(specs)
+            self._param_form.values_changed.connect(self._on_params_changed)
+            lay.addWidget(self._param_form)
 
-            check_harm = QCheckBox("Extract harmonics")
-            check_harm.setChecked(True)
-            check_harm.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="extract_harmonics",
-                    value=bool(s),
-                    page="TransformPage",
-                )
+        # Dataset checklist (only for multi-dataset transforms)
+        if meta.get("requires_multiple", False):
+            ds_label = QLabel("Datasets (select 2+)")
+            ds_label.setStyleSheet(
+                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;"
+                f" margin-top: {Spacing.SM}px;"
             )
-            self._config_layout.addWidget(check_harm)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("extract_harmonics", check_harm)
-            )
+            lay.addWidget(ds_label)
 
-            self._config_layout.addWidget(QLabel("Max Harmonic:"))
-            spin_h = QDoubleSpinBox()
-            spin_h.setRange(1, 99)
-            spin_h.setDecimals(0)
-            spin_h.setValue(7)
-            spin_h.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="max_harmonic",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_h)
-            self._param_controls.setdefault("owchirp", []).append(
-                ("max_harmonic", spin_h)
-            )
+            self._dataset_checklist = QListWidget()
+            self._dataset_checklist.setMaximumHeight(150)
+            state = self._store.get_state()
+            for ds_id, ds in state.datasets.items():
+                item = QListWidgetItem(ds.name)
+                item.setData(Qt.UserRole, ds_id)
+                item.setCheckState(Qt.CheckState.Unchecked)
+                self._dataset_checklist.addItem(item)
+            lay.addWidget(self._dataset_checklist)
 
-        elif name == "Derivatives":
-            self._config_layout.addWidget(QLabel("Order:"))
-            spin_order = QDoubleSpinBox()
-            spin_order.setRange(1, 4)
-            spin_order.setDecimals(0)
-            spin_order.setValue(1)
-            spin_order.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="order",
-                    value=int(v),
-                    page="TransformPage",
-                )
+        # Preview canvas
+        if PYQTGRAPH_AVAILABLE:
+            preview_label = QLabel("Preview")
+            preview_label.setStyleSheet(
+                f"font-weight: {Typography.WEIGHT_SEMIBOLD};"
+                f" font-size: {Typography.SIZE_MD_SM}pt;"
+                f" margin-top: {Spacing.SM}px;"
             )
-            self._config_layout.addWidget(spin_order)
-            self._param_controls.setdefault("derivative", []).append(
-                ("order", spin_order)
-            )
+            lay.addWidget(preview_label)
 
-            self._config_layout.addWidget(QLabel("Window Length:"))
-            spin_window = QDoubleSpinBox()
-            spin_window.setRange(3, 201)
-            spin_window.setDecimals(0)
-            spin_window.setValue(11)
-            spin_window.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="window_length",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_window)
-            self._param_controls.setdefault("derivative", []).append(
-                ("window_length", spin_window)
-            )
+            self._preview_canvas = PyQtGraphCanvas()
+            self._preview_canvas.setMinimumHeight(250)
+            self._preview_canvas.set_labels(x_label="x", y_label="y")
+            lay.addWidget(self._preview_canvas)
 
-            self._config_layout.addWidget(QLabel("Polynomial Order:"))
-            spin_poly = QDoubleSpinBox()
-            spin_poly.setRange(1, 10)
-            spin_poly.setDecimals(0)
-            spin_poly.setValue(3)
-            spin_poly.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="poly_order",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_poly)
-            self._param_controls.setdefault("derivative", []).append(
-                ("poly_order", spin_poly)
-            )
+        lay.addStretch()
 
-            self._config_layout.addWidget(QLabel("Mode (padding):"))
-            combo_mode = QComboBox()
-            combo_mode.addItems(["mirror", "nearest", "constant", "wrap"])
-            combo_mode.currentTextChanged.connect(
-                lambda t: logger.debug(
-                    "Parameter changed",
-                    parameter="mode",
-                    value=t,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(combo_mode)
-            self._param_controls.setdefault("derivative", []).append(
-                ("mode", combo_mode)
-            )
+        # Trigger initial preview
+        self._schedule_preview()
 
-            self._config_layout.addWidget(QLabel("Validate Window Length (odd):"))
-            check_validate = QCheckBox("Force odd window length")
-            check_validate.setChecked(True)
-            check_validate.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="validate_window",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_validate)
-            self._param_controls.setdefault("derivative", []).append(
-                ("validate_window", check_validate)
-            )
+    # ------------------------------------------------------------------
+    # Parameters changed -> debounced preview
+    # ------------------------------------------------------------------
 
-        elif name == "SPP Analysis":
-            self._config_layout.addWidget(QLabel("Angular Frequency (rad/s):"))
-            spin_omega = QDoubleSpinBox()
-            spin_omega.setRange(0.001, 1000)
-            spin_omega.setValue(1.0)
-            spin_omega.setDecimals(3)
-            spin_omega.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="omega",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_omega)
-            self._param_controls.setdefault("spp", []).append(("omega", spin_omega))
+    @Slot()
+    def _on_params_changed(self) -> None:
+        self._schedule_preview()
 
-            self._config_layout.addWidget(QLabel("Strain Amplitude (gamma_0):"))
-            spin_gamma0 = QDoubleSpinBox()
-            spin_gamma0.setRange(0.0001, 100.0)
-            spin_gamma0.setValue(1.0)
-            spin_gamma0.setDecimals(4)
-            spin_gamma0.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="gamma_0",
-                    value=v,
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_gamma0)
-            self._param_controls.setdefault("spp", []).append(("gamma_0", spin_gamma0))
+    def _schedule_preview(self) -> None:
+        self._preview_timer.start()
 
-            self._config_layout.addWidget(QLabel("Number of Harmonics:"))
-            spin_harmonics = QDoubleSpinBox()
-            spin_harmonics.setRange(1, 99)
-            spin_harmonics.setValue(39)
-            spin_harmonics.setDecimals(0)
-            spin_harmonics.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="n_harmonics",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_harmonics)
-            self._param_controls.setdefault("spp", []).append(
-                ("n_harmonics", spin_harmonics)
-            )
+    @Slot()
+    def _request_preview(self) -> None:
+        if not self._selected_key or not PYQTGRAPH_AVAILABLE:
+            return
 
-            self._config_layout.addWidget(QLabel("Start Cycle (skip transients):"))
-            spin_start = QDoubleSpinBox()
-            spin_start.setRange(0, 100)
-            spin_start.setValue(0)
-            spin_start.setDecimals(0)
-            spin_start.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="start_cycle",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_start)
-            self._param_controls.setdefault("spp", []).append(
-                ("start_cycle", spin_start)
-            )
+        dataset = self._store.get_active_dataset()
+        if dataset is None:
+            return
 
-            self._config_layout.addWidget(QLabel("End Cycle (optional):"))
-            spin_end = QDoubleSpinBox()
-            spin_end.setRange(0, 1000)
-            spin_end.setValue(0)
-            spin_end.setDecimals(0)
-            spin_end.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="end_cycle",
-                    value=int(v),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(spin_end)
-            self._param_controls.setdefault("spp", []).append(("end_cycle", spin_end))
+        # Build RheoData from active dataset (lazy import to avoid circular deps)
+        try:
+            from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            self._config_layout.addWidget(QLabel("Yield Tolerance:"))
-            spin_tol = QDoubleSpinBox()
-            spin_tol.setRange(0.0001, 1.0)
-            spin_tol.setDecimals(4)
-            spin_tol.setValue(0.02)
-            spin_tol.valueChanged.connect(
-                lambda v: logger.debug(
-                    "Parameter changed",
-                    parameter="yield_tolerance",
-                    value=v,
-                    page="TransformPage",
-                )
+            data = rheodata_from_dataset_state(dataset)
+        except Exception:
+            logger.debug(
+                "Could not convert dataset for preview",
+                page="TransformPage",
+                exc_info=True,
             )
-            self._config_layout.addWidget(spin_tol)
-            self._param_controls.setdefault("spp", []).append(
-                ("yield_tolerance", spin_tol)
-            )
+            return
 
-            check_numerical = QCheckBox("Use numerical method (MATLAB-compatible)")
-            check_numerical.setChecked(False)
-            check_numerical.stateChanged.connect(
-                lambda s: logger.debug(
-                    "Parameter changed",
-                    parameter="use_numerical_method",
-                    value=bool(s),
-                    page="TransformPage",
-                )
-            )
-            self._config_layout.addWidget(check_numerical)
-            self._param_controls.setdefault("spp", []).append(
-                ("use_numerical_method", check_numerical)
-            )
+        params = self.get_selected_params()
+        self._preview_generation += 1
+        gen = self._preview_generation
 
-        self._config_layout.addStretch()
+        worker = _PreviewWorker(
+            self._service,
+            self._selected_key,
+            data,
+            params,
+            gen,
+            self._on_preview_ready,
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_preview_ready(self, result: dict[str, Any]) -> None:
+        """Called from worker thread; marshal to main thread via QTimer."""
+        QTimer.singleShot(0, lambda: self._update_plot(result))
+
+    def _update_plot(self, result: dict[str, Any]) -> None:
+        if not PYQTGRAPH_AVAILABLE:
+            return
+        # Discard stale results
+        if result.get("_generation", 0) < self._preview_generation:
+            return
+        if not hasattr(self, "_preview_canvas"):
+            return
+
+        self._preview_canvas.clear()
+
+        if "error" in result:
+            logger.debug(
+                "Preview error",
+                error=result["error"],
+                page="TransformPage",
+            )
+            return
+
+        self._preview_canvas.plot_data(
+            result["x_before"],
+            result["y_before"],
+            name="Before",
+            color=ColorPalette.CHART_1,
+            line_width=2,
+        )
+        self._preview_canvas.plot_data(
+            result["x_after"],
+            result["y_after"],
+            name="After",
+            color=ColorPalette.CHART_3,
+            line_width=2,
+        )
+
+    # ------------------------------------------------------------------
+    # Apply transform
+    # ------------------------------------------------------------------
 
     def _apply_transform(self) -> None:
-        if not self._selected_transform:
+        if not self._selected_display_name:
             logger.debug(
                 "Apply transform called with no transform selected",
                 page="TransformPage",
             )
             return
 
-        logger.debug(
-            "Transform triggered",
-            transform=self._selected_transform,
-            page="TransformPage",
-        )
-
         dataset = self._store.get_active_dataset()
         if dataset:
-            self.transform_applied.emit(self._selected_transform, dataset.id)
+            self.transform_applied.emit(self._selected_display_name, dataset.id)
             logger.info(
                 "Transform applied",
-                transform=self._selected_transform,
+                transform=self._selected_display_name,
                 dataset_id=dataset.id,
                 page="TransformPage",
             )
         else:
             logger.debug(
                 "No active dataset for transform",
-                transform=self._selected_transform,
+                transform=self._selected_display_name,
                 page="TransformPage",
             )
 
-    # Map display names to internal control keys used in _select_transform()
-    _TRANSFORM_KEY_MAP: dict[str, str] = {
-        "SPP Analysis": "spp",
-        "OW Chirp": "owchirp",
-        "Derivatives": "derivative",
-        "Mutation Number": "mutation_number",
-        "Mastercurve": "mastercurve",
-        "SRFS": "srfs",
-        "FFT": "fft",
-    }
+    # ------------------------------------------------------------------
+    # Public API (MainWindow integration contract)
+    # ------------------------------------------------------------------
 
     def get_selected_params(self) -> dict[str, Any]:
         """Return current parameter values for the selected transform."""
-
-        if not self._selected_transform:
+        if self._param_form is None:
             return {}
-
-        key = self._TRANSFORM_KEY_MAP.get(
-            self._selected_transform,
-            self._selected_transform.lower().replace(" ", "_"),
-        )
-        params: dict[str, Any] = {}
-        for name, widget in self._param_controls.get(key, []):
-            if isinstance(widget, QDoubleSpinBox):
-                params[name] = widget.value()
-            elif isinstance(widget, QCheckBox):
-                params[name] = widget.isChecked()
-            elif isinstance(widget, QComboBox):
-                params[name] = widget.currentText().lower()
-        # Enforce Savitzky-Golay odd window if requested
-        if key == "derivative" and params.get("validate_window", False):
-            window_val = int(params.get("window_length", 11))
-            if window_val % 2 == 0:
-                params["window_length"] = window_val + 1
-        return params
-
-    def _darken(self, hex_color: str) -> str:
-        hex_color = hex_color.lstrip("#")
-        r, g, b = (
-            int(hex_color[0:2], 16),
-            int(hex_color[2:4], 16),
-            int(hex_color[4:6], 16),
-        )
-        return f"#{int(r * 0.9):02x}{int(g * 0.9):02x}{int(b * 0.9):02x}"
-
-    def apply_transform(
-        self,
-        transform_name: str,
-        dataset_ids: list[str],
-        params: dict[str, Any] | None = None,
-    ) -> None:
-        """Apply transform to datasets via signal emission.
-
-        This method triggers the transform_applied signal which is handled
-        by MainWindow to delegate to TransformService.
-
-        Parameters
-        ----------
-        transform_name : str
-            Name of the transform to apply
-        dataset_ids : list[str]
-            IDs of datasets to transform
-        params : dict, optional
-            Transform parameters (uses current UI values if not provided)
-        """
-        if not dataset_ids:
-            logger.debug(
-                "apply_transform called with empty dataset_ids",
-                transform=transform_name,
-                page="TransformPage",
-            )
-            return
-
-        logger.debug(
-            "Transform triggered",
-            transform=transform_name,
-            dataset_count=len(dataset_ids),
-            page="TransformPage",
-        )
-
-        # Use provided params or get from current UI
-        if params is None:
-            params = self.get_selected_params()
-
-        # Set the selected transform for signal emission
-        self._selected_transform = transform_name
-
-        # Emit signal for first dataset (MainWindow handles the rest)
-        self.transform_applied.emit(transform_name, dataset_ids[0])
-        logger.info(
-            "Transform applied",
-            transform=transform_name,
-            dataset_id=dataset_ids[0],
-            page="TransformPage",
-        )
-
-    def show_transform_preview(
-        self, transform_name: str, params: dict[str, Any]
-    ) -> None:
-        """Update preview canvases with before/after visualization.
-
-        Parameters
-        ----------
-        transform_name : str
-            Name of the transform to preview
-        params : dict
-            Transform parameters
-        """
-        logger.debug(
-            "Showing transform preview",
-            transform=transform_name,
-            params=params,
-            page="TransformPage",
-        )
-
-        # Get active dataset for preview
-        dataset = self._store.get_active_dataset()
-        if dataset is None:
-            logger.debug(
-                "No active dataset for preview",
-                transform=transform_name,
-                page="TransformPage",
-            )
-            return
-
-        # Update "Before" canvas with original data
-        # R13-TP-001: DatasetState uses x_data/y_data (not .x/.y which are
-        # RheoData attributes).  Extract x_units/y_units from metadata.
-        try:
-            meta = getattr(dataset, "metadata", {}) or {}
-            self._before_canvas.plot(
-                dataset.x_data,
-                dataset.y_data,
-                label="Original",
-                xlabel=meta.get("x_units", "x"),
-                ylabel=meta.get("y_units", "y"),
-                title="Before Transform",
-            )
-            logger.debug(
-                "Preview before canvas updated",
-                transform=transform_name,
-                page="TransformPage",
-            )
-        except Exception as e:
-            # If plot fails, clear the canvas
-            logger.error(
-                "Failed to update before canvas",
-                transform=transform_name,
-                error=str(e),
-                page="TransformPage",
-                exc_info=True,
-            )
-            self._before_canvas.clear()
-
-        # For "After" canvas, we'd need to actually compute the transform
-        # which requires the TransformService. For now, show placeholder.
-        # The actual preview is computed when MainWindow calls TransformService.preview_transform()
-        self._after_canvas.clear()
+        return self._param_form.get_values()
 
     def get_available_transforms(self) -> list[dict[str, Any]]:
-        """Return list of available transforms with metadata.
+        """Return list of available transforms with metadata."""
+        return self._service.get_transform_metadata()
 
-        Returns
-        -------
-        list[dict]
-            Transform definitions with name, description, color, and key
-        """
-        return [
-            {
-                "name": "FFT",
-                "key": "fft",
-                "description": "Fast Fourier Transform for frequency analysis",
-                "color": ColorPalette.CHART_5,
-                "requires_multiple": False,
-            },
-            {
-                "name": "Mastercurve",
-                "key": "mastercurve",
-                "description": "Time-Temperature Superposition",
-                "color": ColorPalette.CHART_1,
-                "requires_multiple": True,
-            },
-            {
-                "name": "SRFS",
-                "key": "srfs",
-                "description": "Strain-Rate Frequency Superposition",
-                "color": ColorPalette.CHART_3,
-                "requires_multiple": True,
-            },
-            {
-                "name": "Mutation Number",
-                "key": "mutation_number",
-                "description": "Calculate mutation number",
-                "color": ColorPalette.CHART_2,
-                "requires_multiple": False,
-            },
-            {
-                "name": "OW Chirp",
-                "key": "owchirp",
-                "description": "Optimally-windowed chirp analysis",
-                "color": ColorPalette.CHART_4,
-                "requires_multiple": False,
-            },
-            {
-                "name": "SPP Analysis",
-                "key": "spp",
-                "description": "LAOS yield stress and cage modulus extraction",
-                "color": ColorPalette.CHART_6,
-                "requires_multiple": False,
-            },
-            {
-                "name": "Derivatives",
-                "key": "derivative",
-                "description": "Calculate numerical derivatives",
-                "color": ColorPalette.TEXT_SECONDARY,
-                "requires_multiple": False,
-            },
-        ]
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _clear_layout(layout: QVBoxLayout) -> None:
+        """Remove all children from a layout."""
+        while layout.count():
+            child = layout.takeAt(0)
+            widget = child.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
