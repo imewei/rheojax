@@ -62,7 +62,9 @@ class ImportWorker(QRunnable):
     data_service : DataService
         Service instance used to load data.
     file_path : Path
-        Path to the data file.
+        Path to the primary data file (used for preview/column mapping).
+    file_paths : list[Path] or None
+        All file paths to import. If ``None``, only ``file_path`` is imported.
     x_col, y_col, y2_col : str or None
         Column name overrides.
     test_mode : str or None
@@ -78,6 +80,7 @@ class ImportWorker(QRunnable):
         y2_col: str | None = None,
         test_mode: str | None = None,
         temp_col: str | None = None,
+        file_paths: list[Path] | None = None,
     ) -> None:
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -88,6 +91,7 @@ class ImportWorker(QRunnable):
         self.signals = ImportWorkerSignals()
         self._data_service = data_service
         self._file_path = file_path
+        self._file_paths = file_paths or [file_path]
         self._x_col = x_col
         self._y_col = y_col
         self._y2_col = y2_col
@@ -97,15 +101,16 @@ class ImportWorker(QRunnable):
     def run(self) -> None:
         """Execute file import in background thread."""
         try:
-            file_size = (
-                self._file_path.stat().st_size if self._file_path.exists() else -1
-            )
-            file_suffix = self._file_path.suffix.lower()
             logger.info(
                 "Import worker started",
                 filepath=str(self._file_path),
-                file_size_bytes=file_size,
-                file_format=file_suffix,
+                file_count=len(self._file_paths),
+                file_size_bytes=(
+                    self._file_path.stat().st_size
+                    if self._file_path.exists()
+                    else -1
+                ),
+                file_format=self._file_path.suffix.lower(),
                 x_col=self._x_col,
                 y_col=self._y_col,
                 y2_col=self._y2_col,
@@ -115,20 +120,30 @@ class ImportWorker(QRunnable):
             # NOTE: Cancellation is not implemented for ImportWorker — the file
             # I/O call below is synchronous and non-interruptible.
 
-            datasets = self._data_service.load_file_multi(
-                self._file_path,
-                x_col=self._x_col,
-                y_col=self._y_col,
-                y2_col=self._y2_col,
-                test_mode=self._test_mode,
-                temp_col=self._temp_col,
-            )
+            all_datasets: list = []
+            for fp in self._file_paths:
+                datasets = self._data_service.load_file_multi(
+                    fp,
+                    x_col=self._x_col,
+                    y_col=self._y_col,
+                    y2_col=self._y2_col,
+                    test_mode=self._test_mode,
+                    temp_col=self._temp_col,
+                )
+                # Tag each dataset with its source file for naming
+                for ds in datasets:
+                    if not hasattr(ds, "metadata") or ds.metadata is None:
+                        ds.metadata = {}
+                    ds.metadata["_source_file"] = str(fp)
+                all_datasets.extend(datasets)
 
             total_rows = sum(
-                len(ds.x) for ds in datasets if hasattr(ds, "x") and ds.x is not None
+                len(ds.x)
+                for ds in all_datasets
+                if hasattr(ds, "x") and ds.x is not None
             )
             detected_modes = []
-            for ds in datasets:
+            for ds in all_datasets:
                 mode = getattr(ds, "test_mode", None)
                 if not mode and hasattr(ds, "metadata") and ds.metadata:
                     mode = ds.metadata.get("detected_test_mode")
@@ -136,7 +151,7 @@ class ImportWorker(QRunnable):
             logger.info(
                 "Import worker completed",
                 filepath=str(self._file_path),
-                num_segments=len(datasets),
+                num_segments=len(all_datasets),
                 total_rows=total_rows,
                 detected_test_modes=detected_modes,
             )
@@ -147,7 +162,7 @@ class ImportWorker(QRunnable):
                 y2_col_used=self._y2_col,
             )
 
-            self.signals.completed.emit(datasets)
+            self.signals.completed.emit(all_datasets)
 
         except Exception as e:
             error_msg = str(e)

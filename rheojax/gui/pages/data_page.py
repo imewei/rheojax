@@ -80,6 +80,7 @@ class DataPage(QWidget):
         self._store = StateStore()
         self._data_service = DataService()
         self._current_file_path: Path | None = None
+        self._all_file_paths: list[Path] = []
         self._preview_data: list[list] | None = None
         self._active_preview_worker: PreviewWorker | None = None
         self._active_import_worker: ImportWorker | None = None
@@ -495,13 +496,21 @@ class DataPage(QWidget):
             "All Files (*)"
         )
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Data File", "", file_filter
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select Data File(s)", "", file_filter
         )
 
-        if file_path:
-            logger.debug("File selected", filepath=file_path, page="DataPage")
-            self._on_file_dropped(file_path)
+        if file_paths:
+            # Store all selected paths for batch import
+            self._all_file_paths = [Path(p) for p in file_paths]
+            logger.info(
+                "Files selected",
+                count=len(file_paths),
+                filepaths=file_paths,
+                page="DataPage",
+            )
+            # Preview/validate with the first file
+            self._on_file_dropped(file_paths[0])
 
     def _on_file_dropped(self, file_path: str) -> None:
         """Handle file drop or selection."""
@@ -546,9 +555,18 @@ class DataPage(QWidget):
                 return
 
         self._current_file_path = path_obj
+        # If called from drag-drop (not from _browse_files), reset the list
+        if not self._all_file_paths or self._all_file_paths[0] != path_obj:
+            self._all_file_paths = [path_obj]
 
         # Update file info
-        self._file_name_label.setText(f"File: {self._current_file_path.name}")
+        n_files = len(self._all_file_paths)
+        if n_files > 1:
+            self._file_name_label.setText(
+                f"Files: {self._current_file_path.name} (+{n_files - 1} more)"
+            )
+        else:
+            self._file_name_label.setText(f"File: {self._current_file_path.name}")
         self._file_size_label.setText(f"Size: {size_bytes / 1024:.1f} KB")
 
         # Load and preview data
@@ -985,12 +1003,21 @@ class DataPage(QWidget):
             return
 
         # Show loading state
-        self._file_name_label.setText(f"Importing: {self._current_file_path.name}...")
+        n_files = len(self._all_file_paths)
+        if n_files > 1:
+            self._file_name_label.setText(
+                f"Importing {n_files} files..."
+            )
+        else:
+            self._file_name_label.setText(
+                f"Importing: {self._current_file_path.name}..."
+            )
 
         # Launch background worker
         worker = ImportWorker(
             data_service=self._data_service,
             file_path=self._current_file_path,
+            file_paths=self._all_file_paths,
             x_col=x_col or None,
             y_col=y_col or None,
             y2_col=y2_col,
@@ -1031,6 +1058,20 @@ class DataPage(QWidget):
         store = StateStore()
         first_dataset_id: str | None = None
 
+        # Pre-extract source file info before iterating (pop removes tags)
+        source_files: list[str | None] = []
+        for ds in datasets:
+            meta = getattr(ds, "metadata", None) or {}
+            source_files.append(meta.pop("_source_file", None))
+
+        # Count datasets per source file for segment numbering
+        from collections import Counter
+
+        source_counts = Counter(source_files)
+
+        # Track segment index per source file
+        source_seg_idx: dict[str | None, int] = {}
+
         for idx, rheo_data in enumerate(datasets):
             # Auto-detect test mode if not specified
             detected_mode = test_mode
@@ -1059,11 +1100,21 @@ class DataPage(QWidget):
             if first_dataset_id is None:
                 first_dataset_id = dataset_id
 
-            # Segment name for multi-segment files
-            if len(datasets) > 1:
-                name = f"{self._current_file_path.stem}_segment_{idx + 1}"
+            # Dataset name: use source file stem
+            source_file = source_files[idx]
+            source_stem = (
+                Path(source_file).stem
+                if source_file
+                else self._current_file_path.stem
+            )
+
+            # For multi-segment files from the same source, add segment suffix
+            if source_counts[source_file] > 1:
+                seg_idx = source_seg_idx.get(source_file, 0)
+                source_seg_idx[source_file] = seg_idx + 1
+                name = f"{source_stem}_segment_{seg_idx + 1}"
             else:
-                name = self._current_file_path.stem
+                name = source_stem
 
             # Register dataset in state store.
             # For complex oscillation data, split into real G' (y_data) and
@@ -1074,25 +1125,27 @@ class DataPage(QWidget):
             # to avoid per-element device sync in show_dataset() / str(x[i]).
             x_np = np.asarray(rheo_data.x)
             y_np = np.asarray(rheo_data.y)
+            file_path_str = source_file or str(self._current_file_path)
+            ds_meta = getattr(rheo_data, "metadata", None) or {}
             store.dispatch(
                 "IMPORT_DATA_SUCCESS",
                 {
                     "dataset_id": dataset_id,
-                    "file_path": str(self._current_file_path),
+                    "file_path": file_path_str,
                     "name": name,
                     "test_mode": detected_mode or "unknown",
                     "x_data": x_np,
                     "y_data": (np.real(y_np) if is_complex else y_np),
                     "y2_data": (np.imag(y_np) if is_complex else None),
                     "metadata": {
-                        **(getattr(rheo_data, "metadata", None) or {}),
+                        **ds_meta,
                         "x_units": getattr(rheo_data, "x_units", None),
                         "y_units": getattr(rheo_data, "y_units", None),
                     },
                 },
             )
 
-        # For multi-segment files, ensure the first segment is active
+        # For multi-file/multi-segment imports, ensure the first dataset is active
         if len(datasets) > 1 and first_dataset_id:
             store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": first_dataset_id})
 
@@ -1108,16 +1161,15 @@ class DataPage(QWidget):
             page="DataPage",
         )
 
-        # Notify user if multiple segments were imported
-        if len(datasets) > 1:
+        # Notify user about import results
+        n_files = len(self._all_file_paths)
+        if n_files > 1:
+            self._file_name_label.setText(
+                f"Imported {len(datasets)} datasets from {n_files} files"
+            )
+        elif len(datasets) > 1:
             self._file_name_label.setText(
                 f"Imported {len(datasets)} segments from {self._current_file_path.name}"
-            )
-            QMessageBox.information(
-                self,
-                "Multi-Segment File",
-                f"Imported {len(datasets)} segments from the file.\n"
-                f"The first segment is now active.",
             )
         else:
             self._file_name_label.setText(f"File: {self._current_file_path.name}")
