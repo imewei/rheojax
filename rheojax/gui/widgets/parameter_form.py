@@ -70,6 +70,7 @@ class ParameterFormBuilder(QWidget):
 
             if ptype == "float":
                 widget = QDoubleSpinBox()
+                widget.blockSignals(True)
                 lo, hi = spec.get("range", (0.0, 1e6))
                 widget.setRange(lo, hi)
                 # Adaptive decimals: 4 for small ranges, 2 for large
@@ -79,21 +80,28 @@ class ParameterFormBuilder(QWidget):
                 step = 10 ** (math.floor(math.log10(max(abs(hi - lo), 1e-10))) - 2)
                 widget.setSingleStep(step)
                 widget.setValue(spec["default"])
+                widget.blockSignals(False)
                 widget.valueChanged.connect(self._on_change)
             elif ptype == "int":
                 widget = QSpinBox()
+                widget.blockSignals(True)
                 lo, hi = spec.get("range", (0, 1000))
                 widget.setRange(int(lo), int(hi))
                 widget.setValue(int(spec["default"]))
+                widget.blockSignals(False)
                 widget.valueChanged.connect(self._on_change)
             elif ptype == "bool":
                 widget = QCheckBox()
+                widget.blockSignals(True)
                 widget.setChecked(bool(spec["default"]))
+                widget.blockSignals(False)
                 widget.stateChanged.connect(self._on_change)
             elif ptype == "choice":
                 widget = QComboBox()
+                widget.blockSignals(True)
                 widget.addItems(spec.get("choices", []))
                 widget.setCurrentText(str(spec["default"]))
+                widget.blockSignals(False)
                 widget.currentTextChanged.connect(self._on_change)
             else:
                 logger.warning("Unknown param type", param=name, type=ptype)

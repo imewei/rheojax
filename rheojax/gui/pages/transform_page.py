@@ -343,7 +343,9 @@ class TransformPage(QWidget):
                 self._dataset_checklist.addItem(item)
             lay.addWidget(self._dataset_checklist)
 
-        # Lazily create preview canvas on first transform selection
+        # Lazily create preview canvas on first transform selection to avoid
+        # OpenGL context segfaults from QOpenGLWidget init before native window
+        # is shown (macOS Metal compatibility layer issue).
         self._ensure_preview_canvas()
         if self._preview_canvas is not None:
             if self._preview_label is not None:
@@ -353,8 +355,10 @@ class TransformPage(QWidget):
 
         lay.addStretch()
 
-        # Trigger initial preview
-        self._schedule_preview()
+        # Do NOT auto-trigger preview here: preview fires only when the user
+        # explicitly changes a parameter (_on_params_changed).  Auto-triggering
+        # on sidebar selection causes full apply_transform calls (expensive and
+        # error-prone) every time the user browses available transforms.
 
     # ------------------------------------------------------------------
     # Parameters changed -> debounced preview
@@ -370,6 +374,17 @@ class TransformPage(QWidget):
     @Slot()
     def _request_preview(self) -> None:
         if not self._selected_key or self._preview_canvas is None:
+            return
+
+        # Multi-dataset transforms (mastercurve, srfs) can only run once the
+        # user clicks Apply with all datasets present.  Running a preview with
+        # only the single active dataset would always fail and produce
+        # misleading ERROR-level log output.
+        meta = next(
+            (m for m in self._metadata if m["key"] == self._selected_key), None
+        )
+        if meta and meta.get("requires_multiple", False):
+            self._preview_canvas.clear()
             return
 
         dataset = self._store.get_active_dataset()
@@ -451,6 +466,24 @@ class TransformPage(QWidget):
                 page="TransformPage",
             )
             return
+
+        # Pre-validate dataset requirements so the user gets a helpful message
+        # before the background worker is even submitted.
+        meta = next(
+            (m for m in self._metadata if m["key"] == self._selected_key), None
+        )
+        if meta and meta.get("requires_multiple", False):
+            state = self._store.get_state()
+            n_datasets = len(state.datasets) if state.datasets else 0
+            if n_datasets < 2:
+                logger.warning(
+                    "Insufficient datasets for transform",
+                    transform=self._selected_display_name,
+                    n_datasets=n_datasets,
+                    required=2,
+                    page="TransformPage",
+                )
+                return
 
         dataset = self._store.get_active_dataset()
         if dataset:

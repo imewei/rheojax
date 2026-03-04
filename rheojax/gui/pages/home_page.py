@@ -661,11 +661,13 @@ class HomePage(QWidget):
 
     def _create_example_card(self, name: str, description: str, color: str) -> QWidget:
         """Create an example dataset card."""
-        card = ClickableWidget()
+        card = ClickableFrame()
+        card.setFrameShape(QFrame.NoFrame)
+        card.setObjectName("exampleCard")
         darker = self._darken_color(color, 0.15)
         lighter = self._lighten_color(color, 0.25)
         card.setStyleSheet(f"""
-            QWidget {{
+            #exampleCard {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
                     stop:0 {color}, stop:1 {darker}

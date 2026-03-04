@@ -756,6 +756,19 @@ class TransformService:
             On failure: error (str)
         """
         logger.debug("Computing preview", transform=name, params=params)
+
+        # Guard: multi-dataset transforms (mastercurve, srfs) cannot be
+        # previewed with a single dataset.  Return a silent no-data result
+        # instead of calling apply_transform which logs ERROR-level messages
+        # for this expected condition and confuses the user.
+        _MULTI_DATASET = {"mastercurve", "srfs"}
+        if name in _MULTI_DATASET and not isinstance(data, list):
+            logger.debug(
+                "Preview skipped: multi-dataset transform requires list input",
+                transform=name,
+            )
+            return {"error": f"{name} preview requires multiple datasets"}
+
         try:
             # Capture before data
             if isinstance(data, list):
