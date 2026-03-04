@@ -341,6 +341,17 @@ class DataService:
                     file_path=str(file_path),
                 )
 
+        # Fallback: extract temperature from filename when no temp_col was
+        # specified and metadata still lacks temperature (e.g. foam_dma_-5C.csv).
+        if temp_col is None:
+            for ds in result:
+                if "temperature" not in (ds.metadata or {}):
+                    temp_from_name = self._extract_temperature_from_filename(
+                        file_path
+                    )
+                    if temp_from_name is not None:
+                        ds.metadata["temperature"] = temp_from_name
+
         logger.info(
             "Data loaded (multi)",
             filepath=str(file_path),
@@ -1221,3 +1232,28 @@ class DataService:
                 exc_info=True,
             )
             return None
+
+    @staticmethod
+    def _extract_temperature_from_filename(file_path: "Path") -> "float | None":
+        """Extract temperature from a filename like ``foam_dma_-5C.csv``.
+
+        Recognises patterns such as ``_-5C``, ``_60C``, ``_25.5C``,
+        ``_-10°C``, or a bare trailing number like ``ttw_70``.
+
+        Returns
+        -------
+        float or None
+            Extracted temperature in °C, or ``None`` if no match.
+        """
+        import re
+
+        stem = file_path.stem
+        # Pattern 1: number followed by C or °C (e.g., _-5C, _25.5°C)
+        m = re.search(r"[-_](-?\d+(?:\.\d+)?)\s*°?[Cc](?:\b|$)", stem)
+        if m:
+            return float(m.group(1))
+        # Pattern 2: trailing number after separator (e.g., ttw_70)
+        m = re.search(r"[-_](-?\d+(?:\.\d+)?)$", stem)
+        if m:
+            return float(m.group(1))
+        return None
