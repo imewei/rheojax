@@ -955,12 +955,17 @@ class DataPage(QWidget):
         if test_mode == "Auto-detect":
             test_mode = None  # Let service auto-detect
 
+        temp_col = self._temp_combo.currentText()
+        if temp_col == "None":
+            temp_col = None
+
         logger.info(
             "Import initiated",
             filepath=str(self._current_file_path),
             x_col=x_col,
             y_col=y_col,
             y2_col=y2_col,
+            temp_col=temp_col,
             test_mode=test_mode if test_mode is not None else "auto-detect",
             page="DataPage",
         )
@@ -990,6 +995,7 @@ class DataPage(QWidget):
             y_col=y_col or None,
             y2_col=y2_col,
             test_mode=test_mode,
+            temp_col=temp_col,
         )
         # R10-STO-002: Use QueuedConnection to guarantee the callback runs on
         # the main thread — ImportWorker emits signals from a worker thread.

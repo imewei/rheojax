@@ -77,6 +77,7 @@ class ImportWorker(QRunnable):
         y_col: str | None = None,
         y2_col: str | None = None,
         test_mode: str | None = None,
+        temp_col: str | None = None,
     ) -> None:
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -91,6 +92,7 @@ class ImportWorker(QRunnable):
         self._y_col = y_col
         self._y2_col = y2_col
         self._test_mode = test_mode
+        self._temp_col = temp_col
 
     def run(self) -> None:
         """Execute file import in background thread."""
@@ -119,6 +121,7 @@ class ImportWorker(QRunnable):
                 y_col=self._y_col,
                 y2_col=self._y2_col,
                 test_mode=self._test_mode,
+                temp_col=self._temp_col,
             )
 
             total_rows = sum(

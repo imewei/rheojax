@@ -256,6 +256,7 @@ class DataService:
         y_col: str | None = None,
         y2_col: str | None = None,
         test_mode: str | None = None,
+        temp_col: str | None = None,
         **kwargs: Any,
     ) -> list[RheoData]:
         """Load data from file, returning all segments.
@@ -271,6 +272,12 @@ class DataService:
             Column names for CSV/Excel files
         test_mode : str, optional
             Test mode override
+        temp_col : str, optional
+            Column name containing the temperature for this dataset.
+            The median value of that column is stored as
+            ``metadata["temperature"]`` (in whatever units the column
+            uses, typically °C or K).  Datasets that already carry a
+            ``"temperature"`` key in their metadata are left unchanged.
         **kwargs
             Additional loader arguments
 
@@ -311,6 +318,28 @@ class DataService:
 
         if not result:
             raise ValueError(f"No valid data segments loaded from {file_path}")
+
+        # Inject temperature from the user-selected column when the readers
+        # did not already populate metadata["temperature"] (e.g. plain CSV
+        # files that lack a TRIOS step-name header).
+        if temp_col is not None:
+            temp_value = self._extract_scalar_temperature(file_path, temp_col)
+            if temp_value is not None:
+                for ds in result:
+                    if "temperature" not in (ds.metadata or {}):
+                        ds.metadata["temperature"] = temp_value
+                logger.debug(
+                    "Temperature injected from column",
+                    temp_col=temp_col,
+                    temp_value=temp_value,
+                    num_datasets=len(result),
+                )
+            else:
+                logger.warning(
+                    "temp_col specified but no valid temperature found in file",
+                    temp_col=temp_col,
+                    file_path=str(file_path),
+                )
 
         logger.info(
             "Data loaded (multi)",
@@ -1138,3 +1167,57 @@ class DataService:
             metadata=data.metadata.copy(),
             initial_test_mode=data.metadata.get("test_mode"),
         )
+
+    @staticmethod
+    def _extract_scalar_temperature(
+        file_path: "Path", temp_col: str
+    ) -> "float | None":
+        """Extract a scalar temperature from a column in *file_path*.
+
+        Reads up to 200 rows with pandas (fast, no full parse) and returns the
+        median of the non-NaN numeric values in *temp_col*.  Returns ``None``
+        when the column is absent or all values are non-numeric.
+
+        Parameters
+        ----------
+        file_path : Path
+            Data file (CSV / TSV / TXT / XLSX / XLS).
+        temp_col : str
+            Column name (matched case-insensitively).
+
+        Returns
+        -------
+        float or None
+        """
+        import numpy as np
+        import pandas as pd
+
+        suffix = file_path.suffix.lower()
+        try:
+            if suffix in {".csv", ".txt", ".dat", ".tsv"}:
+                df = pd.read_csv(str(file_path), nrows=200, comment="#")
+            elif suffix in {".xlsx", ".xls"}:
+                df = pd.read_excel(str(file_path), nrows=200)
+            else:
+                return None
+
+            col_lower = temp_col.lower()
+            matched = next(
+                (c for c in df.columns if str(c).lower() == col_lower or str(c) == temp_col),
+                None,
+            )
+            if matched is None:
+                return None
+
+            vals = pd.to_numeric(df[matched], errors="coerce").dropna().values
+            if len(vals) == 0:
+                return None
+            return float(np.median(vals))
+        except Exception:
+            logger.debug(
+                "Temperature extraction failed",
+                temp_col=temp_col,
+                file_path=str(file_path),
+                exc_info=True,
+            )
+            return None
