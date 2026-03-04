@@ -170,39 +170,25 @@ This:
 
 #### Option 2: Manual Installation
 
-**For System CUDA 13.x (Turing and newer GPUs):**
-
 ```bash
-# Verify you have CUDA 13.x
-nvcc --version  # Should show release 13.x
+# 1. Check your CUDA version
+nvcc --version    # Note: release 12.x or 13.x
 
-# Verify GPU supports CUDA 13 (SM >= 7.5)
-nvidia-smi --query-gpu=compute_cap --format=csv,noheader  # Should be >= 7.5
+# 2. Remove ALL existing JAX/CUDA packages (prevents plugin conflicts)
+pip uninstall -y jax jaxlib \
+    jax-cuda13-plugin jax-cuda13-pjrt \
+    jax-cuda12-plugin jax-cuda12-pjrt
 
-# Install
-pip uninstall -y jax jaxlib
-pip install "jax[cuda13-local]"
+# 3. Install matching package
+pip install "jax[cuda13-local]"   # For CUDA 13.x (SM >= 7.5)
+pip install "jax[cuda12-local]"   # For CUDA 12.x (SM >= 5.2)
 
-# Verify
-python -c "import jax; print('Backend:', jax.default_backend())"
-# Should show: Backend: gpu
+# 4. Verify
+python -c "import jax; print(jax.default_backend(), jax.devices())"
+# Expected: gpu [CudaDevice(id=0)]
 ```
 
-**For System CUDA 12.x (Maxwell and newer GPUs):**
-
-```bash
-# Verify you have CUDA 12.x
-nvcc --version  # Should show release 12.x
-
-# Install
-pip uninstall -y jax jaxlib
-pip install "jax[cuda12-local]"
-
-# Verify
-python -c "import jax; print('Backend:', jax.default_backend())"
-```
-
-**Why separate installation?** JAX with CUDA support is Linux-specific and requires system CUDA pre-installed. Separating the installation avoids dependency conflicts on macOS/Windows.
+**Important:** Never install both cuda12 and cuda13 plugins simultaneously — only ONE CUDA plugin set can be active.
 
 #### GPU Compatibility Guide
 
@@ -222,54 +208,14 @@ python -c "import jax; print('Backend:', jax.default_backend())"
 
 #### GPU Troubleshooting
 
-**Issue: "nvcc not found"**
-
-CUDA toolkit not installed or not in PATH:
-```bash
-# Option 1: Install CUDA toolkit
-# Ubuntu/Debian:
-sudo apt install nvidia-cuda-toolkit
-
-# Option 2: Add existing CUDA to PATH
-export PATH=/usr/local/cuda/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-# Add to ~/.bashrc for permanent fix
-```
-
-**Issue: "CUDA version mismatch"**
-
-JAX package must match your system CUDA version:
-```bash
-# Check your system CUDA version
-nvcc --version
-# Shows: release 12.6 -> use cuda12-local
-# Shows: release 13.x -> use cuda13-local
-
-# Reinstall with correct package
-pip uninstall -y jax jaxlib
-pip install "jax[cuda12-local]"  # or cuda13-local
-```
-
-**Issue: "GPU SM version doesn't support CUDA 13"**
-
-Your GPU is older than Turing architecture:
-```bash
-# Check SM version
-nvidia-smi --query-gpu=compute_cap --format=csv,noheader
-# If < 7.5, you need CUDA 12
-
-# Install CUDA 12.x toolkit, then:
-pip install "jax[cuda12-local]"
-```
-
-**Issue: "libcuda.so not found" or similar library errors**
-
-CUDA libraries not in LD_LIBRARY_PATH:
-```bash
-# Add to ~/.bashrc
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-source ~/.bashrc
-```
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `plugin version X is not compatible with jaxlib Y` | Plugin/jaxlib version mismatch | Uninstall all, reinstall: `make install-jax-gpu` |
+| `PJRT_Api already exists for device type cuda` | Both cuda12 and cuda13 plugins installed | Uninstall all, reinstall only ONE |
+| `nvcc not found` | CUDA toolkit missing or not in PATH | `sudo apt install nvidia-cuda-toolkit` or `export PATH=/usr/local/cuda/bin:$PATH` |
+| `Backend: cpu` (GPU exists) | GPU JAX packages not installed | `make install-jax-gpu` |
+| `libcuda.so not found` | CUDA libs not in LD_LIBRARY_PATH | `export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH` |
+| `JaxRuntimeError: NOT_FOUND: cusolver_*` | Plugin/jaxlib version mismatch | Same as first row |
 
 #### Platform Support
 

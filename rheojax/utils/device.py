@@ -130,6 +130,51 @@ def get_recommended_package() -> str | None:
         return None
 
 
+def check_plugin_conflicts() -> list[str]:
+    """Check for known JAX CUDA plugin conflicts.
+
+    Returns
+    -------
+    list[str]
+        List of issue descriptions (empty = no issues).
+    """
+    issues = []
+    try:
+        import importlib.metadata as md
+
+        jaxlib_v = md.version("jaxlib")
+
+        cuda12 = cuda13 = None
+        try:
+            cuda12 = md.version("jax-cuda12-plugin")
+        except md.PackageNotFoundError:
+            pass
+        try:
+            cuda13 = md.version("jax-cuda13-plugin")
+        except md.PackageNotFoundError:
+            pass
+
+        # Check for dual plugin conflict
+        if cuda12 and cuda13:
+            issues.append(
+                f"Both cuda12 ({cuda12}) and cuda13 ({cuda13}) plugins installed. "
+                "Only ONE can be active — this causes PJRT registration conflicts."
+            )
+
+        # Check for version mismatch
+        for name, version in [("cuda12", cuda12), ("cuda13", cuda13)]:
+            if version and version != jaxlib_v:
+                issues.append(
+                    f"jax-{name}-plugin {version} != jaxlib {jaxlib_v}. "
+                    "Plugin version must exactly match jaxlib."
+                )
+
+    except Exception as e:
+        logger.debug(f"Plugin conflict check failed: {e}")
+
+    return issues
+
+
 def check_gpu_availability(warn: bool = True) -> bool:
     """Check if GPU is available but not being used by JAX.
 
@@ -172,7 +217,10 @@ def check_gpu_availability(warn: bool = True) -> bool:
         using_gpu = any("cuda" in str(d).lower() for d in devices)
 
         if using_gpu:
-            logger.debug(f"JAX is using GPU: {devices}")
+            # Check for plugin issues even when GPU works
+            issues = check_plugin_conflicts()
+            for issue in issues:
+                logger.warning(f"Plugin issue: {issue}")
             return True
 
         # GPU available but not being used
@@ -196,28 +244,34 @@ def _print_gpu_warning(
     cuda_major: int | None,
 ) -> None:
     """Print warning about GPU acceleration availability."""
-    print("\nGPU ACCELERATION AVAILABLE")
-    print("===========================")
-    print(f"GPU: {gpu_name} (SM {sm_version})")
-    print(f"System CUDA: {cuda_version or 'Not found'}")
-    print("JAX backend: CPU-only")
+    print("\nGPU AVAILABLE BUT NOT USED")
+    print(f"  GPU: {gpu_name} (SM {sm_version})")
+    print(f"  System CUDA: {cuda_version or 'Not found'}")
+
+    try:
+        from rheojax.core.jax_config import safe_import_jax
+
+        jax_mod, _ = safe_import_jax()
+        print(f"  JAX backend: {jax_mod.default_backend()}")
+    except ImportError:
+        print("  JAX backend: unknown")
+
+    issues = check_plugin_conflicts()
+    if issues:
+        print("\n  Issues detected:")
+        for issue in issues:
+            print(f"    - {issue}")
+
+    print("\n  Fix: make install-jax-gpu")
+    pkg = get_recommended_package()
+    if pkg:
+        print(
+            "  Or:  pip uninstall -y jax jaxlib "
+            "jax-cuda13-plugin jax-cuda13-pjrt "
+            "jax-cuda12-plugin jax-cuda12-pjrt"
+        )
+        print(f'       pip install "{pkg}"')
     print()
-
-    if cuda_major is None:
-        print("To enable GPU acceleration:")
-        print("  1. Install CUDA toolkit (12.x or 13.x)")
-        print("  2. Ensure nvcc is in PATH")
-        print("  3. Run: make install-jax-gpu")
-    else:
-        pkg = f"jax[cuda{cuda_major}-local]"
-        print("Enable 20-100x speedup:")
-        print("  make install-jax-gpu")
-        print()
-        print("Or manually:")
-        print("  pip uninstall -y jax jaxlib")
-        print(f'  pip install "{pkg}"')
-
-    print("\nSee README.md for details.\n")
 
 
 def get_device_info() -> dict:
@@ -249,6 +303,7 @@ def get_device_info() -> dict:
         "system_cuda_version": None,
         "system_cuda_major": None,
         "recommended_package": None,
+        "plugin_issues": [],
     }
 
     # JAX info — use safe_import_jax() per project convention
@@ -275,8 +330,9 @@ def get_device_info() -> dict:
     info["system_cuda_version"] = cuda_version
     info["system_cuda_major"] = cuda_major
 
-    # Recommended package
+    # Recommended package and plugin health
     info["recommended_package"] = get_recommended_package()
+    info["plugin_issues"] = check_plugin_conflicts()
 
     return info
 

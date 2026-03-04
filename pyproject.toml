@@ -42,10 +42,18 @@ requires-python = ">=3.12"
 #     make install-jax-gpu-cuda13   # Force CUDA 13 (requires system CUDA 13.x)
 #     make install-jax-gpu-cuda12   # Force CUDA 12 (requires system CUDA 12.x)
 #
-#   Manual install (uses system CUDA):
-#     pip uninstall -y jax jaxlib
+#   Manual install (uninstall ALL existing JAX/CUDA packages first):
+#     pip uninstall -y jax jaxlib jax-cuda13-plugin jax-cuda13-pjrt \
+#                      jax-cuda12-plugin jax-cuda12-pjrt
 #     pip install "jax[cuda13-local]"  # If system has CUDA 13.x
 #     pip install "jax[cuda12-local]"  # If system has CUDA 12.x
+#
+#   Or with project extras (ensures matching versions):
+#     pip install "rheojax[gpu_cuda13]"   # CUDA 13
+#     pip install "rheojax[gpu_cuda12]"   # CUDA 12
+#
+#   IMPORTANT: Never install both cuda12 and cuda13 plugins simultaneously.
+#   Only ONE CUDA plugin set can be active — having both causes PJRT conflicts.
 #
 #   GPU Compatibility:
 #     CUDA 13 (SM 7.5+): RTX 20xx/30xx/40xx, T4, A100, H100, L40
@@ -134,9 +142,17 @@ dependencies = [
     "furo>=2025.12.19",
     "sphinx-autodoc-typehints>=3.6.2",
 ]
-# NOTE: No gpu extra - GPU installation must be done manually to avoid conflicts.
-# See GPU ACCELERATION section above for installation instructions.
-# Use: make install-jax-gpu (from repository) or manual pip commands.
+[project.optional-dependencies]
+gpu_cuda13 = [
+    # CUDA 13 GPU support — versions must match jaxlib
+    "jax-cuda13-plugin>=0.8.0",
+    "jax-cuda13-pjrt>=0.8.0",
+]
+gpu_cuda12 = [
+    # CUDA 12 GPU support — versions must match jaxlib
+    "jax-cuda12-plugin>=0.8.0",
+    "jax-cuda12-pjrt>=0.8.0",
+]
 
 [project.scripts]
 rheojax = "rheojax.cli.main:cli_entry"

@@ -2,7 +2,7 @@
 # ========================
 # GPU Acceleration Support and Development Tools
 
-.PHONY: help install install-dev install-jax-gpu install-jax-gpu-cuda12 install-jax-gpu-cuda13 gpu-check env-info \
+.PHONY: help install install-dev install-jax-gpu install-jax-gpu-cuda12 install-jax-gpu-cuda13 gpu-check gpu-diagnose env-info \
         test test-smoke test-fast test-ci test-ci-full test-coverage test-integration test-validation \
         test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
@@ -73,6 +73,51 @@ else
     JAX_GPU_CUDA12_PKG :=
 endif
 
+# All JAX/CUDA packages that must be removed before a clean install
+JAX_ALL_PKGS := jax jaxlib jax-cuda12-plugin jax-cuda12-pjrt jax-cuda13-plugin jax-cuda13-pjrt
+
+# ─── Shared validation helpers ──────────────────────────────────────────────
+define VALIDATE_CUDA
+	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
+	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
+	if [ -z "$$CUDA_VERSION" ]; then \
+		echo "$(RED)Error: nvcc not found — CUDA toolkit not installed or not in PATH$(RESET)"; \
+		echo "  Ubuntu/Debian: sudo apt install nvidia-cuda-toolkit"; \
+		echo "  Or download from: https://developer.nvidia.com/cuda-downloads"; \
+		echo "  Then: export PATH=/usr/local/cuda/bin:\$$PATH"; \
+		exit 1; \
+	elif [ "$$CUDA_VERSION" != "$(1)" ]; then \
+		echo "$(RED)Error: System CUDA $$CUDA_FULL detected, but CUDA $(1).x required$(RESET)"; \
+		echo "  Use: make install-jax-gpu-cuda$(2) (if you have CUDA $(2).x)"; \
+		exit 1; \
+	fi; \
+	echo "System CUDA: $$CUDA_FULL"
+endef
+
+define VALIDATE_GPU_SM
+	@SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
+	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
+	if [ -z "$$SM_VERSION" ]; then \
+		echo "$(RED)Error: Could not detect GPU (nvidia-smi failed)$(RESET)"; \
+		exit 1; \
+	elif [ "$$SM_VERSION" -lt $(1) ]; then \
+		echo "$(RED)Error: GPU SM $$SM_DISPLAY too old (requires SM >= $(2))$(RESET)"; \
+		exit 1; \
+	fi; \
+	echo "GPU SM version: $$SM_DISPLAY (compatible)"
+endef
+
+define CLEAN_AND_INSTALL
+	@echo ""
+	@echo "Step 1/2: Removing all existing JAX/CUDA packages..."
+	@$(UNINSTALL_CMD) $(JAX_ALL_PKGS) 2>/dev/null || true
+	@echo ""
+	@echo "Step 2/2: Installing $(1)..."
+	@$(INSTALL_CMD) $(1)
+	@echo ""
+	@$(MAKE) gpu-check
+endef
+
 # Colors for output
 BOLD := \033[1m
 RESET := \033[0m
@@ -106,8 +151,9 @@ help:
 	@echo "  $(CYAN)install-jax-gpu$(RESET)       Auto-detect system CUDA and install JAX (Linux only)"
 	@echo "  $(CYAN)install-jax-gpu-cuda13$(RESET) Install JAX with system CUDA 13 (requires CUDA 13.x)"
 	@echo "  $(CYAN)install-jax-gpu-cuda12$(RESET) Install JAX with system CUDA 12 (requires CUDA 12.x)"
-	@echo "  $(CYAN)gpu-check$(RESET)             Check GPU availability and CUDA setup"
-	@echo "  $(CYAN)env-info$(RESET)              Show detailed environment information"
+	@echo "  $(CYAN)gpu-check$(RESET)             Verify GPU backend, devices, SVD"
+	@echo "  $(CYAN)gpu-diagnose$(RESET)          Check for common GPU issues"
+	@echo "  $(CYAN)env-info$(RESET)              Show full environment information"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
 	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite with fast MCMC, ~50-60min)"
@@ -252,211 +298,95 @@ endif
 # CUDA 13 installation (requires system CUDA 13.x)
 install-jax-gpu-cuda13:
 	@echo "$(BOLD)$(BLUE)Installing JAX with system CUDA 13...$(RESET)"
-	@echo "======================================"
-	@echo "$(BOLD)Platform:$(RESET) $(PLATFORM)"
-	@echo "$(BOLD)Package manager:$(RESET) $(PKG_MANAGER)"
-	@echo ""
 ifeq ($(PLATFORM),linux)
-	@# Validate system CUDA 13.x is installed
-	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
-	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
-	if [ -z "$$CUDA_VERSION" ]; then \
-		echo "$(RED)Error: nvcc not found - CUDA toolkit not installed$(RESET)"; \
-		exit 1; \
-	elif [ "$$CUDA_VERSION" != "13" ]; then \
-		echo "$(RED)Error: System CUDA $$CUDA_FULL detected, but CUDA 13.x required$(RESET)"; \
-		echo "Either:"; \
-		echo "  1. Install CUDA 13.x toolkit"; \
-		echo "  2. Use: make install-jax-gpu-cuda12 (if you have CUDA 12.x)"; \
-		exit 1; \
-	fi; \
-	echo "System CUDA: $$CUDA_FULL"
-	@# Validate GPU supports CUDA 13 (SM >= 7.5)
-	@SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
-	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
-	if [ -z "$$SM_VERSION" ]; then \
-		echo "$(RED)Error: Could not detect GPU$(RESET)"; \
-		exit 1; \
-	elif [ "$$SM_VERSION" -lt 75 ]; then \
-		echo "$(RED)Error: GPU SM $$SM_DISPLAY does not support CUDA 13$(RESET)"; \
-		echo "CUDA 13 requires SM >= 7.5 (Turing or newer)"; \
-		echo "Your GPU requires: make install-jax-gpu-cuda12"; \
-		exit 1; \
-	fi; \
-	echo "GPU SM version: $$SM_DISPLAY (compatible with CUDA 13)"
-	@echo ""
-	@echo "Step 1/2: Uninstalling CPU-only JAX..."
-	@$(UNINSTALL_CMD) jax jaxlib 2>/dev/null || true
-	@echo ""
-	@echo "Step 2/2: Installing JAX with system CUDA 13..."
-	@echo "Command: $(INSTALL_CMD) $(JAX_GPU_CUDA13_PKG)"
-	@$(INSTALL_CMD) $(JAX_GPU_CUDA13_PKG)
-	@echo ""
-	@$(MAKE) gpu-check
-	@echo ""
-	@echo "$(BOLD)$(GREEN)JAX GPU support installed successfully$(RESET)"
-	@echo "  Package: $(JAX_GPU_CUDA13_PKG)"
-	@echo "  Uses: System CUDA 13.x installation"
+	$(call VALIDATE_CUDA,13,12)
+	$(call VALIDATE_GPU_SM,75,7.5)
+	$(call CLEAN_AND_INSTALL,$(JAX_GPU_CUDA13_PKG))
+	@echo "Done — using system CUDA 13.x"
 else
-	@echo "$(RED)Error: CUDA 13 GPU acceleration only available on Linux$(RESET)"
+	@echo "$(RED)Error: CUDA 13 GPU acceleration requires Linux$(RESET)"
 endif
 
 # CUDA 12 installation (requires system CUDA 12.x)
 install-jax-gpu-cuda12:
 	@echo "$(BOLD)$(BLUE)Installing JAX with system CUDA 12...$(RESET)"
-	@echo "======================================"
-	@echo "$(BOLD)Platform:$(RESET) $(PLATFORM)"
-	@echo "$(BOLD)Package manager:$(RESET) $(PKG_MANAGER)"
-	@echo ""
 ifeq ($(PLATFORM),linux)
-	@# Validate system CUDA 12.x is installed
-	@CUDA_VERSION=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+' | head -1); \
-	CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
-	if [ -z "$$CUDA_VERSION" ]; then \
-		echo "$(RED)Error: nvcc not found - CUDA toolkit not installed$(RESET)"; \
-		exit 1; \
-	elif [ "$$CUDA_VERSION" != "12" ]; then \
-		echo "$(RED)Error: System CUDA $$CUDA_FULL detected, but CUDA 12.x required$(RESET)"; \
-		echo "Either:"; \
-		echo "  1. Install CUDA 12.x toolkit"; \
-		echo "  2. Use: make install-jax-gpu-cuda13 (if you have CUDA 13.x and SM >= 7.5)"; \
-		exit 1; \
-	fi; \
-	echo "System CUDA: $$CUDA_FULL"
-	@# Validate GPU supports CUDA 12 (SM >= 5.2)
-	@SM_VERSION=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.'); \
-	SM_DISPLAY=$$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1); \
-	if [ -z "$$SM_VERSION" ]; then \
-		echo "$(RED)Error: Could not detect GPU$(RESET)"; \
-		exit 1; \
-	elif [ "$$SM_VERSION" -lt 52 ]; then \
-		echo "$(RED)Error: GPU SM $$SM_DISPLAY too old$(RESET)"; \
-		echo "CUDA 12 requires SM >= 5.2 (Maxwell or newer)"; \
-		echo "Kepler and older GPUs are not supported."; \
-		exit 1; \
-	fi; \
-	echo "GPU SM version: $$SM_DISPLAY (compatible with CUDA 12)"
-	@echo ""
-	@echo "Step 1/2: Uninstalling CPU-only JAX..."
-	@$(UNINSTALL_CMD) jax jaxlib 2>/dev/null || true
-	@echo ""
-	@echo "Step 2/2: Installing JAX with system CUDA 12..."
-	@echo "Command: $(INSTALL_CMD) $(JAX_GPU_CUDA12_PKG)"
-	@$(INSTALL_CMD) $(JAX_GPU_CUDA12_PKG)
-	@echo ""
-	@$(MAKE) gpu-check
-	@echo ""
-	@echo "$(BOLD)$(GREEN)JAX GPU support installed successfully$(RESET)"
-	@echo "  Package: $(JAX_GPU_CUDA12_PKG)"
-	@echo "  Uses: System CUDA 12.x installation"
+	$(call VALIDATE_CUDA,12,13)
+	$(call VALIDATE_GPU_SM,52,5.2)
+	$(call CLEAN_AND_INSTALL,$(JAX_GPU_CUDA12_PKG))
+	@echo "Done — using system CUDA 12.x"
 else
-	@echo "$(RED)Error: CUDA 12 GPU acceleration only available on Linux$(RESET)"
+	@echo "$(RED)Error: CUDA 12 GPU acceleration requires Linux$(RESET)"
 endif
 
 # ===================
 # GPU verification
 # ===================
 gpu-check:
-	@echo "$(BOLD)$(BLUE)Checking GPU Configuration...$(RESET)"
-	@echo "============================"
-	@$(PYTHON) -c "import jax; print(f'JAX version: {jax.__version__}'); devices = jax.devices(); print(f'Available devices: {devices}'); gpu_devices = [d for d in devices if 'cuda' in str(d).lower() or 'gpu' in str(d).lower()]; print(f'✓ GPU detected: {len(gpu_devices)} device(s)') if gpu_devices else print('✗ No GPU detected - using CPU')"
+	@echo "$(BOLD)$(BLUE)GPU Verification$(RESET)"
+	@echo "================"
+	@$(PYTHON) -c "\
+import sys; \
+import jax; \
+v = jax.__version__; \
+b = jax.default_backend(); \
+d = jax.devices(); \
+gpu = sum(1 for x in d if 'cuda' in str(x).lower()); \
+print(f'JAX {v}  backend={b}  devices={gpu} GPU'); \
+if b != 'gpu': \
+    print('WARNING: Not using GPU'); sys.exit(1); \
+import jax.numpy as jnp; \
+s = jnp.linalg.svd(jnp.eye(3))[1]; \
+print(f'SVD check: {s}'); \
+print('All checks passed')"
+
+gpu-diagnose:
+	@echo "$(BOLD)$(BLUE)GPU Diagnostics$(RESET)"
+	@echo "==============="
+	@echo ""
+	@echo "1. Installed JAX/CUDA packages:"
+	@$(PYTHON) -m pip list 2>/dev/null | grep -iE "^(jax|cuda)" || echo "  (none found)"
+	@echo ""
+	@echo "2. Plugin conflict check:"
+	@HAS12=$$($(PYTHON) -m pip list 2>/dev/null | grep -c "jax-cuda12-plugin"); \
+	HAS13=$$($(PYTHON) -m pip list 2>/dev/null | grep -c "jax-cuda13-plugin"); \
+	if [ "$$HAS12" -gt 0 ] && [ "$$HAS13" -gt 0 ]; then \
+		echo "  $(RED)CONFLICT: Both cuda12 and cuda13 plugins installed!$(RESET)"; \
+		echo "  Fix: make install-jax-gpu (will clean and reinstall)"; \
+	elif [ "$$HAS12" -gt 0 ] || [ "$$HAS13" -gt 0 ]; then \
+		echo "  OK: Single plugin set installed"; \
+	else \
+		echo "  No CUDA plugins installed (CPU-only mode)"; \
+	fi
+	@echo ""
+	@echo "3. Version match check:"
+	@$(PYTHON) -c "\
+import importlib.metadata as md; \
+jaxlib_v = md.version('jaxlib'); \
+print(f'  jaxlib: {jaxlib_v}'); \
+for pkg in ['jax-cuda12-plugin','jax-cuda13-plugin','jax-cuda12-pjrt','jax-cuda13-pjrt']: \
+    try: \
+        v = md.version(pkg); \
+        match = 'OK' if v == jaxlib_v else 'MISMATCH'; \
+        print(f'  {pkg}: {v} [{match}]'); \
+    except md.PackageNotFoundError: pass" 2>/dev/null || echo "  (could not check)"
+	@echo ""
+	@echo "4. System CUDA:"
+	@nvcc --version 2>/dev/null | grep "release" || echo "  nvcc not found"
+	@echo ""
+	@echo "5. GPU hardware:"
+	@nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader 2>/dev/null \
+		|| echo "  nvidia-smi not found"
 
 # Environment info target
 env-info:
 	@echo "$(BOLD)$(BLUE)Environment Information$(RESET)"
 	@echo "======================"
+	@echo "  Platform: $(PLATFORM) ($(UNAME_S))"
+	@echo "  Package manager: $(PKG_MANAGER)"
+	@echo "  Python: $(shell $(PYTHON) --version 2>&1)"
 	@echo ""
-	@echo "$(BOLD)Platform Detection:$(RESET)"
-	@echo "  OS: $(UNAME_S)"
-	@echo "  Platform: $(PLATFORM)"
-	@echo ""
-	@echo "$(BOLD)Python Environment:$(RESET)"
-	@echo "  Python: $(shell $(PYTHON) --version 2>&1 || echo 'not found')"
-	@echo "  Python path: $(shell which $(PYTHON) 2>/dev/null || echo 'not found')"
-	@echo ""
-	@echo "$(BOLD)Package Manager Detection:$(RESET)"
-	@echo "  Active manager: $(PKG_MANAGER)"
-ifdef UV_AVAILABLE
-	@echo "  ✓ uv detected: $(UV_AVAILABLE)"
-	@echo "    Install command: $(INSTALL_CMD)"
-	@echo "    Uninstall command: $(UNINSTALL_CMD)"
-else
-	@echo "  ✗ uv not found"
-endif
-ifdef CONDA_PREFIX
-	@echo "  ✓ Conda environment detected"
-	@echo "    CONDA_PREFIX: $(CONDA_PREFIX)"
-ifdef MAMBA_AVAILABLE
-	@echo "    Mamba available: $(MAMBA_AVAILABLE)"
-else
-	@echo "    Mamba: not found"
-endif
-	@echo "    Note: Using pip within conda for JAX installation"
-else
-	@echo "  ✗ Not in conda environment"
-endif
-	@echo "  pip: $(shell which pip 2>/dev/null || echo 'not found')"
-	@echo ""
-	@echo "$(BOLD)GPU Support:$(RESET)"
-ifeq ($(PLATFORM),linux)
-	@echo "  Platform: ✅ Linux (GPU support available)"
-	@echo ""
-	@echo "  System CUDA:"
-	@CUDA_FULL=$$(nvcc --version 2>/dev/null | grep -oP 'release \K[0-9]+\.[0-9]+'); \
-	CUDA_MAJOR=$$(echo $$CUDA_FULL | cut -d'.' -f1); \
-	if [ -n "$$CUDA_FULL" ]; then \
-		echo "    Version: $$CUDA_FULL"; \
-		echo "    nvcc path: $$(which nvcc)"; \
-		if [ "$$CUDA_MAJOR" = "13" ]; then \
-			echo "    JAX package: $(JAX_GPU_CUDA13_PKG)"; \
-		elif [ "$$CUDA_MAJOR" = "12" ]; then \
-			echo "    JAX package: $(JAX_GPU_CUDA12_PKG)"; \
-		else \
-			echo "    JAX package: Not supported (need CUDA 12 or 13)"; \
-		fi; \
-	else \
-		echo "    Not found (nvcc not in PATH)"; \
-		echo "    Install CUDA toolkit or add to PATH"; \
-	fi
-	@echo ""
-	@echo "  GPU Hardware:"
-	@$(PYTHON) -c "\
-import subprocess; \
-r = subprocess.run(['nvidia-smi', '--query-gpu=name,compute_cap,driver_version', '--format=csv,noheader'], \
-    capture_output=True, text=True, timeout=5); \
-if r.returncode == 0: \
-    for line in r.stdout.strip().split('\n'): \
-        parts = line.split(', '); \
-        name, sm, driver = parts[0], parts[1], parts[2]; \
-        sm_int = int(sm.replace('.', '')); \
-        cuda_support = 'CUDA 12 and 13' if sm_int >= 75 else 'CUDA 12 only' if sm_int >= 52 else 'Not supported'; \
-        print(f'    Name: {name}'); \
-        print(f'    SM version: {sm} ({cuda_support})'); \
-        print(f'    Driver: {driver}'); \
-else: \
-    print('    Not detected (nvidia-smi failed)')" 2>/dev/null || echo "    nvidia-smi not found"
-	@echo ""
-	@echo "  JAX Status:"
-	@$(PYTHON) -c "\
-import jax; \
-print(f'    Version: {jax.__version__}'); \
-print(f'    Backend: {jax.default_backend()}'); \
-devices = jax.devices(); \
-gpu_count = sum(1 for d in devices if 'cuda' in str(d).lower()); \
-print(f'    GPU devices: {gpu_count}')" 2>/dev/null || echo "    JAX not installed"
-else
-	@echo "  Platform: ❌ $(PLATFORM) (GPU not supported)"
-endif
-	@echo ""
-	@echo "$(BOLD)GPU Compatibility Reference:$(RESET)"
-	@echo "  CUDA 13 (SM 7.5+): RTX 20xx/30xx/40xx, T4, A100, H100"
-	@echo "  CUDA 12 (SM 5.2+): GTX 9xx/10xx, P100, V100, + all above"
-	@echo ""
-	@echo "$(BOLD)Installation Commands:$(RESET)"
-	@echo "  Auto-detect:   make install-jax-gpu"
-	@echo "  Force CUDA 13: make install-jax-gpu-cuda13"
-	@echo "  Force CUDA 12: make install-jax-gpu-cuda12"
-	@echo ""
+	@$(MAKE) gpu-diagnose
 
 # ===================
 # Testing targets

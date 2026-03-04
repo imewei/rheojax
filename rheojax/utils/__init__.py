@@ -9,6 +9,7 @@ This module provides:
 
 from rheojax.utils.device import (
     check_gpu_availability,
+    check_plugin_conflicts,
     get_device_info,
     get_gpu_memory_info,
     print_device_summary,
@@ -43,6 +44,7 @@ __all__ = [
     "fit_parameters",
     # Device utilities
     "check_gpu_availability",
+    "check_plugin_conflicts",
     "get_device_info",
     "get_gpu_memory_info",
     "print_device_summary",
