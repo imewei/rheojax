@@ -14,75 +14,72 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: 'requirements-dev.txt'
+        enable-cache: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install black==25.11.0 ruff==0.14.5 mypy==1.18.2
+      run: uv sync
 
     - name: Run Black
-      run: black --check rheojax tests
+      run: uv run black --check rheojax tests
 
     - name: Run Ruff
-      run: ruff check rheojax tests
+      run: uv run ruff check rheojax tests
 
     - name: Run MyPy
-      run: mypy rheojax --ignore-missing-imports --no-strict-optional
+      run: uv run mypy rheojax --ignore-missing-imports --no-strict-optional
 
   quality:
     if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.12']
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: 'requirements-dev.txt'
+        enable-cache: true
+
+    - name: Set up Python 3.12
+      run: uv python install 3.12
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install radon>=6.0.0
+        uv sync
+        uv pip install "radon>=6.0.0"
 
     - name: Check cyclomatic complexity (max D-rating allowed)
       run: |
         echo "Checking for high complexity functions (D or worse)..."
         # Count D-rated or worse functions (lines starting with M/F/C for methods/functions/classes)
-        HIGH_COMPLEXITY=$(radon cc rheojax -nb --min D 2>/dev/null | grep -E "^    [MFC]" | wc -l || echo "0")
+        HIGH_COMPLEXITY=$(uv run radon cc rheojax -nb --min D 2>/dev/null | grep -E "^    [MFC]" | wc -l || echo "0")
         echo "Found $HIGH_COMPLEXITY high-complexity functions"
         # Allow up to 10 D-rated functions during transition period
         if [ "$HIGH_COMPLEXITY" -gt 10 ]; then
           echo "::error::Too many high-complexity functions ($HIGH_COMPLEXITY > 10)"
-          radon cc rheojax -nb --min D
+          uv run radon cc rheojax -nb --min D
           exit 1
         fi
-        echo "✅ Complexity check passed"
+        echo "Complexity check passed"
 
     - name: Check maintainability index (min B-rating)
       run: |
         echo "Checking maintainability index..."
         # Count files with C or worse maintainability
-        LOW_MI=$(radon mi rheojax -s 2>/dev/null | grep -E '\- [CD]' | grep -c "^" || echo "0")
+        LOW_MI=$(uv run radon mi rheojax -s 2>/dev/null | grep -E '\- [CD]' | grep -c "^" || echo "0")
         echo "Found $LOW_MI files with low maintainability"
         if [ "$LOW_MI" -gt 2 ]; then
           echo "::error::Too many low-maintainability files ($LOW_MI > 2)"
-          radon mi rheojax -s | grep -E '\- [CD]'
+          uv run radon mi rheojax -s | grep -E '\- [CD]'
           exit 1
         fi
-        echo "✅ Maintainability check passed"
+        echo "Maintainability check passed"
 
   test:
     if: ${{ false }}  # CI temporarily disabled
@@ -96,27 +93,25 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: |
-          requirements.txt
-          requirements-dev.txt
+        enable-cache: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-        pip install -e .
+      run: uv sync
 
-    - name: Run smoke tests (117 critical tests, ~2-5 min per job)
+    - name: Run smoke tests (~1366 critical tests, ~2-5 min per job)
       run: |
-        pytest -n auto -v --cov=rheojax --cov-report=xml --cov-report=term-missing -m "smoke"
-        # Note: Only smoke tests (117/1475 tests) run on every commit
-        # Fast tier (~1200 tests): pytest -n auto -m "not slow and not validation and not benchmark and not notebook_comprehensive"
-        # Full validation suite: pytest -n auto (run locally before releases)
+        uv run pytest -n 4 -v --timeout=120 --dist=loadscope \
+          --cov=rheojax --cov-report=xml --cov-report=term-missing \
+          -m "smoke"
+        # Note: Only smoke tests (~1366/4122 tests) run on every commit
+        # Fast tier (~3500 tests): pytest -n 4 -m "not slow and not validation and not benchmark and not notebook_comprehensive"
+        # Full validation suite: pytest -n 4 (run locally before releases)
 
     - name: Check minimum coverage threshold
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -130,16 +125,16 @@ jobs:
         print(int(line_rate * 100))
         ")
         echo "Current smoke test coverage: ${COVERAGE}%"
-        # Minimum threshold: 30% for smoke tests (target: 50% by end of sprint)
+        # Minimum threshold: 30% for smoke tests
         if [ "$COVERAGE" -lt 30 ]; then
           echo "::error::Coverage ${COVERAGE}% is below minimum threshold of 30%"
           exit 1
         fi
-        echo "✅ Coverage check passed (${COVERAGE}% >= 30%)"
+        echo "Coverage check passed (${COVERAGE}% >= 30%)"
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         flags: unittests
@@ -149,31 +144,26 @@ jobs:
   docs:
     if: ${{ false }}  # CI temporarily disabled
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.12']
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-        cache-dependency-path: |
-          requirements.txt
-          requirements-dev.txt
+        enable-cache: true
+
+    - name: Set up Python 3.12
+      run: uv python install 3.12
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-        pip install -e .
+        uv sync
+        uv pip install -r docs/requirements-docs.txt
 
     - name: Build documentation
       run: |
-        sphinx-build -b html docs/source docs/build
+        uv run sphinx-build -b html docs/source docs/build
 
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@v4
@@ -191,21 +181,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        enable-cache: true
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build>=1.2.0 twine>=6.0.0
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
 
     - name: Build package
-      run: python -m build
+      run: uv build
 
     - name: Check package with twine
-      run: twine check dist/*
+      run: |
+        uv pip install "twine>=6.0.0"
+        uv run twine check dist/*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
