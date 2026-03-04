@@ -1223,12 +1223,21 @@ Functions
 
    Checks if GPU hardware and CUDA are available but JAX is running CPU-only.
    Prints a helpful message with installation instructions if GPU is not being used.
+   Also checks for plugin conflicts even when GPU is working.
+
+.. autofunction:: rheojax.utils.device.check_plugin_conflicts
+   :noindex:
+
+   Detects known JAX CUDA plugin issues: dual cuda12/cuda13 plugins installed
+   simultaneously (causes PJRT registration conflicts) or plugin/jaxlib version
+   mismatches (causes silent CPU fallback). Returns a list of issue descriptions.
 
 .. autofunction:: rheojax.utils.device.get_device_info
    :noindex:
 
    Returns comprehensive device information including JAX version, backend,
-   device list, GPU hardware name, SM version, and system CUDA version.
+   device list, GPU hardware name, SM version, system CUDA version,
+   recommended package, and any plugin issues.
 
 .. autofunction:: rheojax.utils.device.get_gpu_memory_info
    :noindex:
@@ -1277,16 +1286,41 @@ Detailed Device Info
     print(f"GPU hardware: {info['gpu_hardware'] or 'None'}")
     print(f"System CUDA: {info['system_cuda_version'] or 'Not found'}")
 
+    # Check for plugin issues
+    if info['plugin_issues']:
+        for issue in info['plugin_issues']:
+            print(f"WARNING: {issue}")
+
     # GPU memory (if available)
     mem = get_gpu_memory_info()
     if mem:
         print(f"GPU Memory: {mem['used_mb']}/{mem['total_mb']} MB")
+
+Plugin Conflict Detection
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    from rheojax.utils import check_plugin_conflicts
+
+    issues = check_plugin_conflicts()
+    if issues:
+        for issue in issues:
+            print(f"Issue: {issue}")
+        print("Fix: pip uninstall -y jax jaxlib "
+              "jax-cuda12-plugin jax-cuda12-pjrt "
+              "jax-cuda13-plugin jax-cuda13-pjrt")
+        print("Then: make install-jax-gpu")
+    else:
+        print("No plugin conflicts detected")
 
 See Also
 ~~~~~~~~
 
 - :doc:`../development_status` - Technology stack and GPU requirements
 - ``make install-jax-gpu`` - Automated GPU JAX installation
+- ``make gpu-diagnose`` - Diagnose common GPU issues (plugin conflicts, version mismatches)
+- ``make gpu-check`` - Verify GPU backend, devices, and SVD computation
 
 
 Fit Quality Metrics

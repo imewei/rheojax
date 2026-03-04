@@ -5,13 +5,13 @@ Requirements
 ------------
 
 * Python 3.12 or higher (3.8-3.11 NOT supported)
-* JAX 0.8.0 (exact version required)
-* jaxlib 0.8.0 (must match JAX version exactly)
-* NumPy 2.0.0 or higher
-* SciPy 1.16.0 or higher
-* NLSQ 0.2.1 or higher (GPU-accelerated optimization)
-* NumPyro 0.19.0 or higher (Bayesian inference)
-* ArviZ 0.22.0 or higher (Bayesian visualization)
+* JAX >= 0.8.3
+* jaxlib >= 0.8.3 (must be compatible with JAX version)
+* NumPy >= 2.2.0
+* SciPy >= 1.14.0
+* NLSQ >= 0.6.8 (GPU-accelerated optimization)
+* NumPyro >= 0.20.0 (Bayesian inference)
+* ArviZ >= 0.23.4 (Bayesian visualization)
 
 Basic Installation
 ------------------
@@ -58,13 +58,28 @@ GPU acceleration provides 20-100x speedup for large datasets.
 
 .. code-block:: bash
 
-   pip uninstall -y jax jaxlib
+   # Remove ALL existing JAX/CUDA packages first (prevents plugin conflicts)
+   pip uninstall -y jax jaxlib \
+       jax-cuda13-plugin jax-cuda13-pjrt \
+       jax-cuda12-plugin jax-cuda12-pjrt
 
-   # For CUDA 12.x:
-   pip install jax[cuda12-local]==0.8.0 jaxlib==0.8.0
+   # For CUDA 13.x (SM >= 7.5):
+   pip install "jax[cuda13-local]"
 
-   # For CUDA 13.x:
-   pip install jax[cuda13-local]==0.8.0 jaxlib==0.8.0
+   # For CUDA 12.x (SM >= 5.2):
+   pip install "jax[cuda12-local]"
+
+**Or with project extras:**
+
+.. code-block:: bash
+
+   pip install "rheojax[gpu_cuda13]"   # CUDA 13
+   pip install "rheojax[gpu_cuda12]"   # CUDA 12
+
+.. important::
+
+   Never install both cuda12 and cuda13 plugins simultaneously.
+   Only ONE CUDA plugin set can be active — having both causes PJRT registration conflicts.
 
 **Requirements:**
 
@@ -79,7 +94,12 @@ GPU acceleration provides 20-100x speedup for large datasets.
    import jax
    print(jax.devices())  # Should show [cuda(id=0)] if GPU detected
 
-**Note:** There is no ``[gpu]`` pip extra. GPU installation must be done manually to avoid platform conflicts.
+**Diagnostics:**
+
+.. code-block:: bash
+
+   make gpu-check      # Verify GPU backend, devices, SVD computation
+   make gpu-diagnose   # Check for plugin conflicts, version mismatches
 
 I/O Support
 ~~~~~~~~~~~
@@ -127,17 +147,45 @@ This should display the version numbers and available devices (CPU or GPU) witho
 Troubleshooting
 ---------------
 
+GPU Issues
+~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 40
+
+   * - Symptom
+     - Cause
+     - Fix
+   * - ``plugin version X is not compatible with jaxlib Y``
+     - Plugin/jaxlib version mismatch
+     - Uninstall all, reinstall: ``make install-jax-gpu``
+   * - ``PJRT_Api already exists for device type cuda``
+     - Both cuda12 and cuda13 plugins installed
+     - Uninstall all, reinstall only ONE
+   * - ``nvcc not found``
+     - CUDA toolkit missing or not in PATH
+     - ``sudo apt install nvidia-cuda-toolkit`` or ``export PATH=/usr/local/cuda/bin:$PATH``
+   * - ``Backend: cpu`` (GPU exists)
+     - GPU JAX packages not installed
+     - ``make install-jax-gpu``
+   * - ``libcuda.so not found``
+     - CUDA libs not in LD_LIBRARY_PATH
+     - ``export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH``
+   * - ``JaxRuntimeError: NOT_FOUND: cusolver_*``
+     - Plugin/jaxlib version mismatch
+     - Same as first row
+
+Use ``make gpu-diagnose`` to automatically detect plugin conflicts and version mismatches.
+
 JAX Installation Issues
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 If you encounter issues with JAX installation, refer to the
 `JAX installation guide <https://jax.readthedocs.io/en/latest/installation.html>`_.
 
-**GPU Support:**
-
 * GPU acceleration requires Linux + CUDA 12.1+ or 13.x + NVIDIA driver >= 525 (CUDA 12) or >= 560 (CUDA 13)
 * macOS and Windows only support CPU mode
-* JAX and jaxlib versions must match exactly (both 0.8.0)
 
 Import Errors
 ~~~~~~~~~~~~~
@@ -146,4 +194,4 @@ If you encounter import errors, ensure all dependencies are installed:
 
 .. code-block:: bash
 
-   pip install -r requirements.txt
+   pip install -e ".[dev]"
