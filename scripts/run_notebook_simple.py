@@ -13,7 +13,7 @@ import nbformat
 from nbclient import NotebookClient
 
 
-def run_notebook(nb_path, timeout=300):
+def run_notebook(nb_path, timeout=600):
     """Execute notebook cells sequentially."""
     from pathlib import Path
 

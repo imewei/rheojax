@@ -659,25 +659,33 @@ def glass_transition_criterion(
     epsilon = (v2 - v2_critical) / v2_critical
     is_glass = epsilon > 0
 
-    # Non-ergodicity parameter
-    # Non-ergodicity parameter: solve MCT self-consistency equation numerically
+    # Non-ergodicity parameter: solve MCT self-consistency equation
     # Ref: Götze & Sjögren 1992, Eq. (2.6): f/(1-f) = v1*f + v2*f^2
+    # The physical solution is the LARGEST root f > f_c (≈ 0.5 for v1=0).
     if is_glass and v2 > 0:
-        from scipy.optimize import brentq
+        import numpy as _np
 
-        def _f_neq_eq(f: float) -> float:
-            if f >= 1.0:
-                return -1.0
-            return f / (1.0 - f) - (v1 * f + v2 * f * f)
+        if abs(v1) < 1e-10:
+            # Exact quadratic solution for v1=0:
+            # f/(1-f) = v2*f^2 → 1 = v2*f*(1-f) → f = (1+√(1-4/v2))/2
+            disc = 1.0 - 4.0 / v2
+            f_neq = (1.0 + _np.sqrt(max(disc, 0.0))) / 2.0 if disc >= 0 else 0.0
+        else:
+            # General case: numerical root-finding on (f_c, 1)
+            from scipy.optimize import brentq
 
-        try:
-            f_neq = brentq(_f_neq_eq, 1e-8, 1.0 - 1e-8)
-        except ValueError:
-            # Algebraic fallback if brentq fails to bracket a root
-            if v2 > 0 and v2_critical > 0:
-                f_neq = max(0.0, 1.0 - (v2_critical / v2) ** 0.5)
-            else:
-                f_neq = 0.0
+            def _f_neq_eq(f: float) -> float:
+                if f >= 1.0:
+                    return -1.0
+                return f / (1.0 - f) - (v1 * f + v2 * f * f)
+
+            try:
+                f_neq = brentq(_f_neq_eq, 0.5, 1.0 - 1e-8)
+            except ValueError:
+                try:
+                    f_neq = brentq(_f_neq_eq, 0.01, 1.0 - 1e-8)
+                except ValueError:
+                    f_neq = 0.0
     else:
         f_neq = 0.0
 
