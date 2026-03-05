@@ -60,7 +60,7 @@ class SpringPot(BaseModel):
 
     Parameters:
         c_alpha (float): Material constant in Pa·s^alpha, range [1e-3, 1e9], default 1e5
-        alpha (float): Power-law exponent (0=fluid, 1=solid), range [0.0, 1.0], default 0.5
+        alpha (float): Power-law exponent (0=elastic/solid, 1=viscous/fluid), range [0.0, 1.0], default 0.5
 
     Supported test modes:
         - Relaxation: Stress relaxation under constant strain
@@ -102,7 +102,7 @@ class SpringPot(BaseModel):
             value=0.5,
             bounds=FRACTIONAL_ORDER_BOUNDS,
             units="dimensionless",
-            description="Power-law exponent (0=fluid, 1=solid)",
+            description="Power-law exponent (0=elastic/solid, 1=viscous/fluid)",
         )
 
         self.fitted_ = False
@@ -335,20 +335,20 @@ class SpringPot(BaseModel):
 
         Theory: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
 
-        For alpha=0 (pure viscous): G(t) = c_alpha / t
-        For alpha=1 (pure elastic): G(t) = c_alpha (constant)
+        For alpha=0 (pure elastic): G(t) = c_alpha (constant)
+        For alpha=1 (pure viscous): G(t) → 0 for t > 0 (Gamma(0) = ∞)
 
         Args:
             t: Time array (s)
             c_alpha: Material constant (Pa·s^alpha)
-            alpha: Power-law exponent (0=fluid, 1=solid)
+            alpha: Power-law exponent (0=elastic/solid, 1=viscous/fluid)
 
         Returns:
             Relaxation modulus G(t) in Pa
         """
         # Handle special cases
-        # alpha -> 0: pure viscous (G -> c_alpha/t)
-        # alpha -> 1: pure elastic (G -> c_alpha)
+        # alpha -> 0: pure elastic (G -> c_alpha, constant)
+        # alpha -> 1: pure viscous (G -> 0 for t > 0)
 
         # General formula: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
         # P2-FRAC-001: Guard t=0 — power(0, -alpha) = +inf when alpha>0, which
@@ -366,13 +366,13 @@ class SpringPot(BaseModel):
 
         Theory: J(t) = (1/c_alpha) * t^alpha / Gamma(1+alpha)
 
-        For alpha=0 (pure viscous): J(t) = t/c_alpha
-        For alpha=1 (pure elastic): J(t) = 1/c_alpha
+        For alpha=0 (pure elastic): J(t) = 1/c_alpha (constant)
+        For alpha=1 (pure viscous): J(t) = t/c_alpha (linear in t)
 
         Args:
             t: Time array (s)
             c_alpha: Material constant (Pa·s^alpha)
-            alpha: Power-law exponent (0=fluid, 1=solid)
+            alpha: Power-law exponent (0=elastic/solid, 1=viscous/fluid)
 
         Returns:
             Creep compliance J(t) in 1/Pa
@@ -400,7 +400,7 @@ class SpringPot(BaseModel):
         Args:
             omega: Angular frequency array (rad/s)
             c_alpha: Material constant (Pa·s^alpha)
-            alpha: Power-law exponent (0=fluid, 1=solid)
+            alpha: Power-law exponent (0=elastic/solid, 1=viscous/fluid)
 
         Returns:
             Complex modulus G*(omega) in Pa
