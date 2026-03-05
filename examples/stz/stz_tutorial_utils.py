@@ -28,6 +28,15 @@ def compute_fit_quality(
     ss_res = np.sum((y_data - y_pred) ** 2)
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
     r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+    if r_squared < 0:
+        import warnings
+        warnings.warn(
+            f"R² = {r_squared:.4f} < 0: model fits worse than the mean. "
+            "Check initial parameters, data quality, or model suitability.",
+            stacklevel=2,
+        )
+
     rmse = float(np.sqrt(np.mean((y_data - y_pred) ** 2)))
     return {"r_squared": r_squared, "rmse": rmse}
 

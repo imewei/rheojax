@@ -442,17 +442,24 @@ def compute_non_ergodicity_parameter(
 ) -> float:
     """Compute non-ergodicity parameter f from F12 vertices.
 
-    The non-ergodicity parameter f is the long-time limit of the correlator
-    in the glass state. For the F12 model with v1=0:
-        f = 1 - 1/sqrt(v2) for v2 > 4 (glass)
-        f = 0 for v2 <= 4 (fluid)
+    Solves the MCT self-consistency equation:
+        f / (1 - f) = v1*f + v2*f^2
+    The physical solution is the *largest* root f > f_c (≈ 0.5 for v1=0).
+
+    For v1=0, the equation reduces to a quadratic with exact solution:
+        f = (1 + sqrt(1 - 4/v2)) / 2
+
+    For v1 != 0, uses Brent's method on (f_c, 1) where f_c is the critical
+    non-ergodicity parameter at the glass transition.
+
+    Reference: Götze & Sjögren 1992, Eq. (2.6).
 
     Args:
         v1: Linear vertex coefficient.
         v2: Quadratic vertex coefficient.
 
     Returns:
-        Non-ergodicity parameter f in [0, 1].
+        Non-ergodicity parameter f in [0, 1). Returns 0 for fluid state.
     """
     # Critical v2 for glass transition
     if abs(v1) < 1e-10:
@@ -460,18 +467,44 @@ def compute_non_ergodicity_parameter(
     else:
         v2_c = (4.0 - 2.0 * v1) / (1.0 - v1 / 4.0) if v1 < 4.0 else 4.0
 
-    if v2 <= v2_c:
-        return 0.0
-
-    # For v1 = 0: f = 1 - 1/sqrt(v2)
-    # General case is more complex, use approximation
     epsilon = (v2 - v2_c) / v2_c
     if epsilon <= 0:
         return 0.0
 
-    # Square-root singularity: f ~ sqrt(epsilon)
-    f = 0.5 * np.sqrt(epsilon)
-    return min(f, 0.9)  # Cap at physical maximum
+    # For v1=0: exact quadratic solution
+    # f/(1-f) = v2*f^2  =>  1 = v2*f*(1-f)  =>  f = (1 + sqrt(1 - 4/v2))/2
+    if abs(v1) < 1e-10:
+        disc = 1.0 - 4.0 / v2
+        if disc < 0:
+            return 0.0
+        return (1.0 + np.sqrt(disc)) / 2.0
+
+    # General case (v1 != 0): numerical root-finding
+    # The physical root is f > f_c where f_c ≈ 0.5 at the transition.
+    # Use f_c as the lower bracket (residual is ~0 there, slightly positive
+    # just above transition) and 1-eps as upper bracket (residual is negative
+    # because f/(1-f) -> inf while v1*f+v2*f^2 stays bounded).
+    from scipy.optimize import brentq
+
+    # Estimate f_c at the critical point (v2=v2_c)
+    # At transition: f_c/(1-f_c) = v1*f_c + v2_c*f_c^2, solved by bisection
+    f_c = 0.5  # Good starting estimate
+
+    def _f_neq_eq(f: float) -> float:
+        if f >= 1.0:
+            return -1.0
+        return f / (1.0 - f) - (v1 * f + v2 * f * f)
+
+    try:
+        f_neq = brentq(_f_neq_eq, f_c, 1.0 - 1e-8)
+    except ValueError:
+        # Fallback: try wider bracket
+        try:
+            f_neq = brentq(_f_neq_eq, 0.01, 1.0 - 1e-8)
+        except ValueError:
+            f_neq = 0.0
+
+    return f_neq
 
 
 def compute_separation_parameter(
@@ -878,6 +911,14 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
     ss_res = np.sum((y_data - y_pred) ** 2)
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
     r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+    if r2 < 0:
+        import warnings
+        warnings.warn(
+            f"R² = {r2:.4f} < 0: model fits worse than the mean. "
+            "Check initial parameters, data quality, or model suitability.",
+            stacklevel=2,
+        )
 
     # RMSE
     rmse = np.sqrt(np.mean((y_data - y_pred) ** 2))

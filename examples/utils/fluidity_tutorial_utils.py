@@ -587,6 +587,14 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
     r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
+    if r2 < 0:
+        import warnings
+        warnings.warn(
+            f"R² = {r2:.4f} < 0: model fits worse than the mean. "
+            "Check initial parameters, data quality, or model suitability.",
+            stacklevel=2,
+        )
+
     # RMSE
     rmse = np.sqrt(np.mean((y_data - y_pred) ** 2))
 
