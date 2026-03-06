@@ -858,7 +858,7 @@ class HebraudLequeux(BaseModel):
                 )
             )
         elif self._test_mode in ("oscillation", "saos"):
-            return np.array(
+            result = np.array(
                 run_saos(
                     X_jax,
                     float(0.5 if alpha is None else alpha),
@@ -868,6 +868,8 @@ class HebraudLequeux(BaseModel):
                     n_bins=int(n_bins),
                 )
             )
+            # Convert (N,2) [G', G''] to complex G* for consistent API
+            return result[:, 0] + 1j * result[:, 1]
         else:
             raise ValueError(f"Unknown test mode: {self._test_mode}")
 

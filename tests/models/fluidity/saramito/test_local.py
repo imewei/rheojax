@@ -296,8 +296,9 @@ class TestOscillationFitting:
         omega = np.logspace(-3, 3, 100)
         G_star = FluiditySaramitoLocal._predict_saos_jit(jnp.array(omega), G, f_eq)
 
-        G_prime = np.array(G_star[:, 0])
-        G_double_prime = np.array(G_star[:, 1])
+        G_star_arr = np.array(G_star)
+        G_prime = G_star_arr[:, 0]
+        G_double_prime = G_star_arr[:, 1]
 
         # At crossover (ω*τ = 1), G' ≈ G''
         crossover_omega = 1.0 / tau_eff

@@ -341,7 +341,8 @@ class TestSGRGenericModelInterface:
         omega = np.logspace(0, 3, 10)
         G_star = model.predict(omega)
 
-        assert G_star.shape == (10, 2), f"Prediction shape incorrect: {G_star.shape}"
+        assert G_star.shape == (10,), f"Prediction shape incorrect: {G_star.shape}"
+        assert np.iscomplexobj(G_star), "Predictions should be complex G*"
         assert not np.any(np.isnan(G_star)), "Predictions contain NaN"
         assert not np.any(np.isinf(G_star)), "Predictions contain Inf"
 

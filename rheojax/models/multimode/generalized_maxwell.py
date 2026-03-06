@@ -1198,7 +1198,7 @@ class GeneralizedMaxwell(BaseModel):
             omega: Angular frequency array
 
         Returns:
-            Complex modulus [E', E"] (M, 2)
+            Complex modulus G* = G' + iG'' (or E* for tensile)
         """
         symbol = "E" if self._modulus_type == "tensile" else "G"
 
@@ -1217,8 +1217,10 @@ class GeneralizedMaxwell(BaseModel):
         # Call JIT-compiled prediction (returns (2, M))
         E_star = self._predict_oscillation_jit(omega_jax, E_inf, E_i, tau_i)
 
-        # Transpose to (M, 2) for user-facing API
-        return np.asarray(E_star).T
+        # Return as complex G* = G' + iG'' (consistent with all other models)
+        E_prime = np.asarray(E_star[0])
+        E_double_prime = np.asarray(E_star[1])
+        return E_prime + 1j * E_double_prime
 
     @staticmethod
     @jax.jit

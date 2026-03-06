@@ -726,20 +726,34 @@ class MLIKH(IKHBase):
     ) -> "MLIKH":
         """Fit to frequency-domain SAOS data using Maxwell analytical expressions.
 
+        Fits G' and G'' independently when complex or (N, 2) input is provided.
+        Falls back to magnitude-only fitting for real 1D input.
+
         Args:
             X: Angular frequency array (omega)
-            y: Complex modulus G* = G' + i*G'' or magnitude |G*|
+            y: Complex G* = G' + iG'', (N, 2) array [G', G''], or real |G*|
         """
         from rheojax.utils.optimization import nlsq_optimize
 
         omega = jnp.asarray(X)
 
-        # Handle different y formats
+        # Handle different y formats — always extract G' and G'' for
+        # component-wise fitting (magnitude-only discards phase angle δ)
         y_arr = jnp.asarray(y)
         if jnp.iscomplexobj(y_arr):
-            target_magnitude = jnp.abs(y_arr)
+            # Complex G* = G' + iG'' provided
+            target_G_prime = jnp.real(y_arr)
+            target_G_double_prime = jnp.imag(y_arr)
+            fit_components = True
+        elif y_arr.ndim == 2 and y_arr.shape[1] == 2:
+            # (N, 2) array provided - [G', G''] format
+            target_G_prime = y_arr[:, 0]
+            target_G_double_prime = y_arr[:, 1]
+            fit_components = True
         else:
+            # Real 1D array — assume magnitude |G*| (no phase info available)
             target_magnitude = y_arr
+            fit_components = False
 
         def objective(param_values):
             """Compute residual using Maxwell analytical SAOS expressions."""
@@ -774,11 +788,20 @@ class MLIKH(IKHBase):
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
 
-            G_star_magnitude = jnp.sqrt(
-                G_prime_total**2 + G_double_prime_total**2 + 1e-30
-            )
-
-            return G_star_magnitude - target_magnitude
+            if fit_components:
+                # Fit G' and G'' independently (preserves phase information)
+                return jnp.concatenate(
+                    [
+                        G_prime_total - target_G_prime,
+                        G_double_prime_total - target_G_double_prime,
+                    ]
+                )
+            else:
+                # Magnitude-only fallback (no phase info available)
+                G_star_magnitude = jnp.sqrt(
+                    G_prime_total**2 + G_double_prime_total**2 + 1e-30
+                )
+                return G_star_magnitude - target_magnitude
 
         filtered = {k: v for k, v in kwargs.items() if k not in _MLIKH_RESERVED}
         nlsq_optimize(objective, self.parameters, **filtered)

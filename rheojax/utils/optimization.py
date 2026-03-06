@@ -2233,41 +2233,65 @@ def create_least_squares_objective(
             # Case 1: 2D [G', G"] format (e.g., FractionalZenerSolidSolid)
             if y_data_is_complex:
                 # Fit to real and imaginary parts separately
-                resid_real = y_pred[:, 0] - jnp.real(y_data_jax)
-                resid_imag = y_pred[:, 1] - jnp.imag(y_data_jax)
+                if use_log_residuals:
+                    resid_real = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-20))
+                    resid_imag = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred[:, 1]), 1e-20)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-20))
+                else:
+                    resid_real = y_pred[:, 0] - jnp.real(y_data_jax)
+                    resid_imag = y_pred[:, 1] - jnp.imag(y_data_jax)
 
-                if normalize:
-                    resid_real = resid_real / jnp.maximum(
-                        jnp.abs(jnp.real(y_data_jax)), 1e-10
-                    )
-                    resid_imag = resid_imag / jnp.maximum(
-                        jnp.abs(jnp.imag(y_data_jax)), 1e-10
-                    )
+                    if normalize:
+                        resid_real = resid_real / jnp.maximum(
+                            jnp.abs(jnp.real(y_data_jax)), 1e-10
+                        )
+                        resid_imag = resid_imag / jnp.maximum(
+                            jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                        )
 
                 return jnp.concatenate([resid_real, resid_imag])
             else:
-                # Fit to magnitude: |G*| = sqrt(G'^2 + G"^2)
-                y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
-
                 # Check if data is also 2D [G', G"]
                 y_data_is_2d = y_data_jax.ndim == 2 and y_data_jax.shape[-1] == 2
                 if y_data_is_2d:
-                    # Data is also 2D: compute magnitude
-                    y_data_magnitude = jnp.sqrt(
-                        y_data_jax[:, 0] ** 2 + y_data_jax[:, 1] ** 2
-                    )
+                    # Both (N, 2): fit both columns independently (stacked residuals)
+                    if use_log_residuals:
+                        resid_col0 = jnp.log10(
+                            jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
+                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 0]), 1e-20))
+                        resid_col1 = jnp.log10(
+                            jnp.maximum(jnp.abs(y_pred[:, 1]), 1e-20)
+                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 1]), 1e-20))
+                    else:
+                        resid_col0 = y_pred[:, 0] - y_data_jax[:, 0]
+                        resid_col1 = y_pred[:, 1] - y_data_jax[:, 1]
+
+                        if normalize:
+                            resid_col0 = resid_col0 / jnp.maximum(
+                                jnp.abs(y_data_jax[:, 0]), 1e-10
+                            )
+                            resid_col1 = resid_col1 / jnp.maximum(
+                                jnp.abs(y_data_jax[:, 1]), 1e-10
+                            )
+
+                    return jnp.concatenate([resid_col0, resid_col1])
                 else:
-                    # Data is already magnitude (1D)
-                    y_data_magnitude = y_data_jax
-
-                residuals = y_pred_magnitude - y_data_magnitude
-
-                if normalize:
-                    residuals = residuals / jnp.maximum(
-                        jnp.abs(y_data_magnitude), 1e-10
+                    # (N, 2) pred, (N,) data: fit to magnitude |G*|
+                    y_pred_magnitude = jnp.sqrt(
+                        y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2
                     )
 
-                return residuals
+                    residuals = y_pred_magnitude - y_data_jax
+
+                    if normalize:
+                        residuals = residuals / jnp.maximum(
+                            jnp.abs(y_data_jax), 1e-10
+                        )
+
+                    return residuals
 
         elif y_pred_is_complex:
             # Case 2: Complex predictions (G' + iG")

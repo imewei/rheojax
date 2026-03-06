@@ -397,8 +397,8 @@ class ITTMCTBase(BaseModel):
         omega : np.ndarray
             Angular frequency (rad/s)
         G_star : np.ndarray
-            Complex modulus. If 1D, interpreted as |G*|.
-            If 2D with shape (n, 2), interpreted as (G', G'').
+            Complex modulus. Accepts complex G* = G' + iG'',
+            (n, 2) array [G', G''], or 1D real |G*| magnitude.
 
         Returns
         -------
@@ -407,14 +407,22 @@ class ITTMCTBase(BaseModel):
         """
         from rheojax.utils.optimization import fit_with_nlsq
 
-        # Parse G_star format
-        if G_star.ndim == 2:
+        # Parse G_star format — always fit both components when available
+        if np.iscomplexobj(G_star):
+            # Complex G* = G' + iG'' provided
+            G_prime = np.real(G_star)
+            G_double_prime = np.imag(G_star)
+            y_combined = np.concatenate([G_prime, G_double_prime])
+            fit_components = True
+        elif G_star.ndim == 2 and G_star.shape[1] == 2:
             G_prime = G_star[:, 0]
             G_double_prime = G_star[:, 1]
             y_combined = np.concatenate([G_prime, G_double_prime])
+            fit_components = True
         else:
-            # Assume |G*|
+            # Real 1D array — assume magnitude |G*| (no phase info available)
             y_combined = G_star
+            fit_components = False
 
         param_names = list(self.parameters.keys())
         initial_values = np.array([self.parameters.get_value(p) for p in param_names])
@@ -431,7 +439,7 @@ class ITTMCTBase(BaseModel):
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
             G_pred = self._predict_oscillation(omega, return_components=True)
-            if G_star.ndim == 2:
+            if fit_components:
                 y_pred = np.concatenate([G_pred[:, 0], G_pred[:, 1]])
             else:
                 y_pred = np.sqrt(G_pred[:, 0] ** 2 + G_pred[:, 1] ** 2)

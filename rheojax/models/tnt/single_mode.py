@@ -461,7 +461,9 @@ class TNTSingleMode(TNTBase):
         x : array-like
             Independent variable (shear rate, frequency, or time)
         y : array-like
-            Dependent variable (stress, modulus, or strain)
+            Dependent variable (stress, modulus, or strain).
+            For oscillation, accepts complex G* = G' + iG'',
+            (N, 2) array [G', G''], or real |G*|.
         **kwargs
             Additional arguments including test_mode
 
@@ -483,7 +485,13 @@ class TNTSingleMode(TNTBase):
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+
+        # Preserve complex dtype for oscillation data (G* = G' + iG'')
+        y_arr = np.asarray(y)
+        if np.iscomplexobj(y_arr):
+            y_jax = jnp.asarray(y_arr, dtype=jnp.complex128)
+        else:
+            y_jax = jnp.asarray(y_arr, dtype=jnp.float64)
 
         # Store protocol-specific inputs
         self._gamma_dot_applied = kwargs.get("gamma_dot")
@@ -570,7 +578,17 @@ class TNTSingleMode(TNTBase):
             float(self.parameters.get_value(name)) for name in self.parameters.keys()
         ]
         params = jnp.array(param_values)
-        return self.model_function(x_jax, params, test_mode=test_mode)
+        result = self.model_function(x_jax, params, test_mode=test_mode)
+        # model_function returns (N,2) [G', G''] for oscillation;
+        # convert to complex G* for consistent API
+        if (
+            test_mode == "oscillation"
+            and hasattr(result, "ndim")
+            and result.ndim == 2
+            and result.shape[1] == 2
+        ):
+            result = result[:, 0] + 1j * result[:, 1]
+        return result
 
     def model_function(self, X, params, test_mode=None, **kwargs):
         """NumPyro/BayesianMixin model function.

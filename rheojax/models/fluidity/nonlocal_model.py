@@ -336,7 +336,12 @@ class FluidityNonlocal(FluidityBase):
         )
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+                # Preserve complex dtype for oscillation data (G* = G' + iG'')
+        y_arr = np.asarray(y)
+        if np.iscomplexobj(y_arr):
+            y_jax = jnp.asarray(y_arr, dtype=jnp.complex128)
+        else:
+            y_jax = jnp.asarray(y_arr, dtype=jnp.float64)
 
         # Extract protocol-specific inputs
         gamma_dot = kwargs.pop("gamma_dot", None)
@@ -918,7 +923,9 @@ class FluidityNonlocal(FluidityBase):
                 p["G"],
                 p["f_eq"],
             )
-            return np.array(result)
+            # Convert (N,2) [G', G''] to complex G* for consistent API
+            result = np.array(result)
+            return result[:, 0] + 1j * result[:, 1]
 
         elif test_mode in ["startup", "relaxation", "creep"]:
             return self._predict_transient(X, mode=test_mode)

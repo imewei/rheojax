@@ -325,11 +325,12 @@ class VLBMultiNetwork(VLBBase):
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
-        # For oscillation mode with complex G* data, convert to |G*|
-        # since model_function returns |G*| for oscillation
+        # Preserve complex dtype for oscillation data (G* = G' + iG'').
+        # create_least_squares_objective handles complex y_data + (N,2) y_pred
+        # by fitting G' and G'' independently (stacked residuals).
         y_np = np.asarray(y)
-        if test_mode == "oscillation" and np.iscomplexobj(y_np):
-            y_jax = jnp.asarray(np.abs(y_np), dtype=jnp.float64)
+        if np.iscomplexobj(y_np):
+            y_jax = jnp.asarray(y_np, dtype=jnp.complex128)
         else:
             y_jax = jnp.asarray(y_np, dtype=jnp.float64)
 
@@ -439,7 +440,17 @@ class VLBMultiNetwork(VLBBase):
             for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
-        return self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
+        result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
+        # model_function returns (N,2) [G', G''] for oscillation;
+        # convert to complex G* for consistent API
+        if (
+            test_mode == "oscillation"
+            and hasattr(result, "ndim")
+            and result.ndim == 2
+            and result.shape[1] == 2
+        ):
+            result = result[:, 0] + 1j * result[:, 1]
+        return result
 
     # =========================================================================
     # Model Function (NLSQ / NumPyro)

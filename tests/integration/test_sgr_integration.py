@@ -64,10 +64,11 @@ class TestSGRPipelineIntegration:
         omega = np.logspace(-1, 1, 20)
         predictions = model.predict(omega)
 
-        # Verify shape (M, 2) for [G', G'']
-        assert predictions.shape == (20, 2)
-        assert np.all(predictions[:, 0] > 0)  # G' positive
-        assert np.all(predictions[:, 1] > 0)  # G'' positive
+        # Verify complex G* output (G' + iG'')
+        assert predictions.shape == (20,)
+        assert np.iscomplexobj(predictions)
+        assert np.all(np.real(predictions) > 0)  # G' positive
+        assert np.all(np.imag(predictions) > 0)  # G'' positive
 
 
 class TestSGRBayesianWorkflow:
@@ -155,8 +156,9 @@ class TestSGRModelComparison:
         pred_gen = model_gen.predict(omega)
 
         # In linear regime, predictions should be close (<15% difference)
-        G_prime_conv = pred_conv[:, 0]
-        G_prime_gen = pred_gen[:, 0]
+        # Predictions are complex G* = G' + iG''
+        G_prime_conv = np.real(pred_conv)
+        G_prime_gen = np.real(pred_gen)
 
         rel_diff = np.abs(G_prime_conv - G_prime_gen) / (G_prime_conv + 1e-10)
 
@@ -199,8 +201,9 @@ class TestSGRPublishedValidation:
         omega = np.logspace(-2, 2, 50)
         predictions = model.predict(omega)
 
-        G_prime = predictions[:, 0]
-        G_double_prime = predictions[:, 1]
+        # Predictions are complex G* = G' + iG''
+        G_prime = np.real(predictions)
+        G_double_prime = np.imag(predictions)
 
         # Verify basic power-law trends (increasing with omega)
         # For x=1.5, exponent should be 0.5, so G' and G'' increase with omega

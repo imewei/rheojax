@@ -791,7 +791,8 @@ class ITTMCTSchematic(ITTMCTBase):
         Returns
         -------
         np.ndarray
-            Complex modulus or components
+            Complex modulus G* = G' + iG'' by default.
+            If return_components=True, returns (n, 2) array [G', G''].
         """
         omega = np.asarray(omega)
         G_inf = self.parameters.get_value("G_inf")
@@ -825,7 +826,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         if return_components:
             return np.column_stack([G_prime, G_double_prime])
-        return np.sqrt(G_prime**2 + G_double_prime**2)
+        return G_prime + 1j * G_double_prime
 
     def _predict_startup(
         self,

@@ -460,7 +460,8 @@ class TestFluidityEndToEnd:
         harmonics = model.extract_harmonics(stress, n_points_per_cycle=64)
 
         # Verify workflow completes
-        assert G_star.shape == (20, 2)
+        assert G_star.shape == (20,)
+        assert np.iscomplexobj(G_star)
         assert len(strain) == 128
         assert harmonics["I_1"] > 0
 

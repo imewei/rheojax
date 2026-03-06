@@ -300,9 +300,9 @@ class TestVLBLocalSAOS:
     def test_complex_modulus(self, vlb_local):
         """Test |G*| via predict with test_mode=oscillation."""
         omega = np.array([1.0])
-        G_components = vlb_local.predict(omega, test_mode="oscillation")
-        # model_function returns (N, 2) = [G', G'']
-        G_star_mag = float(np.sqrt(G_components[0, 0] ** 2 + G_components[0, 1] ** 2))
+        G_star = vlb_local.predict(omega, test_mode="oscillation")
+        # predict() returns complex G* = G' + iG''
+        G_star_mag = float(np.abs(G_star[0]))
         expected = np.sqrt(500.0**2 + 500.0**2)
         assert G_star_mag == pytest.approx(expected, rel=1e-10)
 

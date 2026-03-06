@@ -707,7 +707,12 @@ class HVMLocal(HVMBase):
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
-        y_jax = jnp.asarray(y, dtype=jnp.float64)
+                # Preserve complex dtype for oscillation data (G* = G' + iG'')
+        y_arr = np.asarray(y)
+        if np.iscomplexobj(y_arr):
+            y_jax = jnp.asarray(y_arr, dtype=jnp.complex128)
+        else:
+            y_jax = jnp.asarray(y_arr, dtype=jnp.float64)
 
         # Store protocol-specific inputs
         self._gamma_dot_applied = kwargs.get("gamma_dot")
@@ -794,9 +799,18 @@ class HVMLocal(HVMBase):
             for k, v in kwargs.items()
             if k not in ("test_mode", "deformation_mode", "poisson_ratio")
         }
-        return np.asarray(
+        result = np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)
         )
+        # model_function returns (N,2) [G', G''] for oscillation;
+        # convert to complex G* for consistent API
+        if (
+            test_mode == "oscillation"
+            and result.ndim == 2
+            and result.shape[1] == 2
+        ):
+            result = result[:, 0] + 1j * result[:, 1]
+        return result
 
     # =========================================================================
     # Model Function (NLSQ / NumPyro)

@@ -1496,7 +1496,7 @@ class SGRGeneric(BaseModel):
             omega: Angular frequency array (rad/s)
 
         Returns:
-            Complex modulus [G', G''] with shape (M, 2)
+            Complex modulus G* = G' + iG'' with shape (M,)
         """
         x = self.parameters.get_value("x")
         G0_scale = self.parameters.get_value("G0")
@@ -1505,7 +1505,9 @@ class SGRGeneric(BaseModel):
         omega_jax = jnp.asarray(omega)
         G_star_jax = self._predict_oscillation_jit(omega_jax, x, G0_scale, tau0)
 
-        return np.array(G_star_jax)
+        # Convert (N,2) [G', G''] to complex G* for consistent API
+        result = np.array(G_star_jax)
+        return result[:, 0] + 1j * result[:, 1]
 
     def _predict_relaxation(self, t: np.ndarray) -> np.ndarray:
         """Predict relaxation modulus in relaxation mode.

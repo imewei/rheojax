@@ -174,17 +174,18 @@ class TestSGRConventionalPredictions:
         omega_full = np.logspace(-1, 5, 100)
         G_star = model.predict(omega_full)
 
-        assert G_star.shape == (100, 2)
+        assert G_star.shape == (100,)
+        assert np.iscomplexobj(G_star)
         assert not np.any(np.isnan(G_star))
         assert not np.any(np.isinf(G_star))
-        assert np.all(G_star[:, 0] > 0), "G' must be positive at all frequencies"
-        assert np.all(G_star[:, 1] > 0), "G'' must be positive at all frequencies"
+        assert np.all(np.real(G_star) > 0), "G' must be positive at all frequencies"
+        assert np.all(np.imag(G_star) > 0), "G'' must be positive at all frequencies"
 
         # G' increases monotonically toward plateau
-        assert np.all(np.diff(G_star[:, 0]) > -1e-6), "G' should be non-decreasing"
+        assert np.all(np.diff(np.real(G_star)) > -1e-6), "G' should be non-decreasing"
 
         # G'' peaks at an intermediate frequency (physically correct SGR behavior)
-        gpp_max_idx = np.argmax(G_star[:, 1])
+        gpp_max_idx = np.argmax(np.imag(G_star))
         assert 0 < gpp_max_idx < 99, "G'' peak should be at an intermediate frequency"
 
         # Low-frequency power-law check (omega*tau0 << 1: G' ~ omega^(x-1))

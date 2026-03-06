@@ -439,6 +439,7 @@ class FMLIKH(FIKHBase):
         self._fit_n_cycles = n_cycles
 
         is_complex = jnp.iscomplexobj(y_arr)
+        is_stacked = y_arr.ndim == 2 and y_arr.shape[1] == 2
 
         def objective(param_values):
             p_names = list(self.parameters.keys())
@@ -452,6 +453,14 @@ class FMLIKH(FIKHBase):
                     [
                         jnp.real(G_star_pred) - jnp.real(y_arr),
                         jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                    ]
+                )
+            elif is_stacked:
+                # (N, 2) array - [G', G''] format
+                residuals = jnp.concatenate(
+                    [
+                        jnp.real(G_star_pred) - y_arr[:, 0],
+                        jnp.imag(G_star_pred) - y_arr[:, 1],
                     ]
                 )
             else:

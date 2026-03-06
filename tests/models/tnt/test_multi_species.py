@@ -312,10 +312,11 @@ class TestSAOS:
 
         G_prime, G_double_prime = model.predict_saos(omega)
 
-        # predict() returns (N, 2) column-stacked [G', G'']
-        assert G_star.shape == (20, 2)
-        assert np.allclose(G_star[:, 0], G_prime)
-        assert np.allclose(G_star[:, 1], G_double_prime)
+        # predict() returns complex G* = G' + iG''
+        assert G_star.shape == (20,)
+        assert np.iscomplexobj(G_star)
+        assert np.allclose(np.real(G_star), G_prime)
+        assert np.allclose(np.imag(G_star), G_double_prime)
 
     @pytest.mark.smoke
     def test_saos_terminal_scaling(self):
