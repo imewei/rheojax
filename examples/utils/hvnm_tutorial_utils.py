@@ -722,6 +722,10 @@ def plot_fit_comparison(
     # Model prediction
     y_pred = model.predict(x, test_mode=data.protocol, **data.protocol_kwargs)
 
+    # Handle (N, 2) predictions - convert to complex if needed
+    if hasattr(y_pred, "ndim") and y_pred.ndim == 2:
+        y_pred = y_pred[:, 0] + 1j * y_pred[:, 1]
+
     # Left: data vs fit
     logscale = data.protocol in ("flow_curve", "oscillation", "relaxation")
     if logscale:
@@ -805,6 +809,15 @@ def plot_ppc(
 
     if ppc_curves:
         ppc_arr = np.array(ppc_curves)
+
+        # Handle (N, 2) predictions - convert to complex if needed
+        if ppc_arr.ndim == 3:
+            ppc_arr = ppc_arr[:, :, 0] + 1j * ppc_arr[:, :, 1]
+
+        # For complex arrays, compute magnitude for percentile calculations
+        if np.iscomplexobj(ppc_arr):
+            ppc_arr = np.abs(ppc_arr)
+
         lo = np.percentile(ppc_arr, 2.5, axis=0)
         hi = np.percentile(ppc_arr, 97.5, axis=0)
         med = np.median(ppc_arr, axis=0)
