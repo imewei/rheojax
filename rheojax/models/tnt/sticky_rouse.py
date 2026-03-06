@@ -534,7 +534,7 @@ class TNTStickyRouse(TNTBase):
 
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)
-                # Preserve complex dtype for oscillation data (G* = G' + iG'')
+        # Preserve complex dtype for oscillation data (G* = G' + iG'')
         y_arr = np.asarray(y)
         if np.iscomplexobj(y_arr):
             y_jax = jnp.asarray(y_arr, dtype=jnp.complex128)

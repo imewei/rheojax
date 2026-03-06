@@ -421,6 +421,77 @@ class TestComplexDataHandling:
         np.testing.assert_allclose(rss_complex, rss_manual, rtol=1e-12)
 
 
+class TestStackedInputFormat:
+    """Test (N, 2) [G', G''] input format for create_least_squares_objective."""
+
+    def test_stacked_input_matches_complex(self):
+        """(N, 2) real input should produce same residuals as complex G*."""
+        from rheojax.utils.optimization import create_least_squares_objective
+
+        omega = jnp.logspace(-1, 1, 20)
+        G0, eta = 1e5, 1e3
+        tau = eta / G0
+        G_star = G0 * (1j * omega * tau) / (1 + 1j * omega * tau)
+        G_stacked = jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
+
+        def model_2d(x, params):
+            G0_, eta_ = params
+            tau_ = eta_ / G0_
+            Gs = G0_ * (1j * x * tau_) / (1 + 1j * x * tau_)
+            return jnp.column_stack([jnp.real(Gs), jnp.imag(Gs)])
+
+        obj_complex = create_least_squares_objective(model_2d, omega, G_star)
+        obj_stacked = create_least_squares_objective(model_2d, omega, G_stacked)
+
+        params = jnp.array([1.1e5, 1.1e3])
+        resid_complex = obj_complex(params)
+        resid_stacked = obj_stacked(params)
+
+        np.testing.assert_allclose(resid_complex, resid_stacked, rtol=1e-12)
+
+    def test_stacked_input_log_residuals(self):
+        """(N, 2) input with use_log_residuals=True should work correctly."""
+        from rheojax.utils.optimization import create_least_squares_objective
+
+        omega = jnp.logspace(-1, 1, 10)
+        G_prime = 1e5 * omega**2 / (1 + omega**2)
+        G_double_prime = 1e5 * omega / (1 + omega**2)
+        G_stacked = jnp.column_stack([G_prime, G_double_prime])
+
+        def model_2d(x, params):
+            G0_ = params[0]
+            Gp = G0_ * x**2 / (1 + x**2)
+            Gpp = G0_ * x / (1 + x**2)
+            return jnp.column_stack([Gp, Gpp])
+
+        obj = create_least_squares_objective(
+            model_2d, omega, G_stacked, use_log_residuals=True
+        )
+        resid = obj(jnp.array([1.1e5]))
+
+        # Should return 2N residuals (stacked G' and G'')
+        assert resid.shape == (20,)
+        assert not jnp.any(jnp.isnan(resid))
+        assert not jnp.any(jnp.isinf(resid))
+
+    def test_fikh_stacked_input_branch(self):
+        """FIKH/FMLIKH is_stacked branch should handle (N, 2) input."""
+        from rheojax.models.fikh.fikh import FIKH
+
+        model = FIKH()
+        omega = np.logspace(-1, 1, 10)
+        # Generate synthetic (N, 2) data
+        G_prime = 1000 * omega**2 / (1 + omega**2)
+        G_double_prime = 1000 * omega / (1 + omega**2)
+        G_stacked = np.column_stack([G_prime, G_double_prime])
+
+        # Should not raise — exercises the is_stacked branch
+        model.fit(omega, G_stacked, test_mode="oscillation", max_iter=5)
+        pred = model.predict(omega)
+        assert np.iscomplexobj(pred)
+        assert pred.shape == (10,)
+
+
 class TestOptimizationResultStatistics:
     """Test OptimizationResult statistical properties (NLSQ 0.6.0 compatibility)."""
 

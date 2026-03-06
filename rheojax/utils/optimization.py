@@ -2234,6 +2234,8 @@ def create_least_squares_objective(
             if y_data_is_complex:
                 # Fit to real and imaginary parts separately
                 if use_log_residuals:
+                    # Log-space residuals: abs() intentionally strips sign because
+                    # G' and G'' are physically positive; normalize is implicit
                     resid_real = jnp.log10(
                         jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
                     ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-20))
@@ -2259,6 +2261,8 @@ def create_least_squares_objective(
                 if y_data_is_2d:
                     # Both (N, 2): fit both columns independently (stacked residuals)
                     if use_log_residuals:
+                        # Log-space residuals: abs() intentionally strips sign because
+                        # G' and G'' are physically positive; normalize is implicit
                         resid_col0 = jnp.log10(
                             jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
                         ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 0]), 1e-20))

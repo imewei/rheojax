@@ -288,7 +288,7 @@ class TNTCates(TNTBase):
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
-                # Preserve complex dtype for oscillation data (G* = G' + iG'')
+        # Preserve complex dtype for oscillation data (G* = G' + iG'')
         y_arr = np.asarray(y)
         if np.iscomplexobj(y_arr):
             y_jax = jnp.asarray(y_arr, dtype=jnp.complex128)
@@ -386,7 +386,6 @@ class TNTCates(TNTBase):
         # convert to complex G* for consistent API
         if (
             test_mode == "oscillation"
-            and hasattr(result, "ndim")
             and result.ndim == 2
             and result.shape[1] == 2
         ):

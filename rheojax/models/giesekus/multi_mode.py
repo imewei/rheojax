@@ -438,7 +438,6 @@ class GiesekusMultiMode(BaseModel):
         # convert to complex G* to match the established convention
         if (
             test_mode == "oscillation"
-            and hasattr(result, "ndim")
             and result.ndim == 2
             and result.shape[1] == 2
         ):
