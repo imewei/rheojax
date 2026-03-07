@@ -83,6 +83,7 @@ suppress_warnings = [
     "ref.footnote",  # Suppress warnings for bibliography-style references (not inline-cited)
     "ref.citation",  # Suppress warnings for bibliography-style citations (not inline-cited)
     "docutils",  # Suppress minor docutils warnings from autodoc-processed docstrings
+    "sphinx_autodoc_typehints.forward_reference",  # Suppress unresolvable forward refs in matplotlib internals
 ]
 
 # MyST parser settings (if available)
