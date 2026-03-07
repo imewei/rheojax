@@ -267,11 +267,13 @@ References
 
 4. Fuereder, I. & Ilg, P. (2013). "Nonequilibrium thermodynamics of the soft glassy
    rheology model." *Phys. Rev. E*, 88, 042134.
-   https://doi.org/10.1103/PhysRevE.88.042134
+   DOI: `10.1103/PhysRevE.88.042134 <https://doi.org/10.1103/PhysRevE.88.042134>`_
+   :download:`PDF <../../../reference/fuereder_ilg_2013_sgr_thermodynamics.pdf>`
 
 5. Sollich, P. & Cates, M.E. (2012). "Thermodynamic interpretation of soft glassy
    rheology models." *Phys. Rev. E*, 85, 031127.
-   https://doi.org/10.1103/PhysRevE.85.031127
+   DOI: `10.1103/PhysRevE.85.031127 <https://doi.org/10.1103/PhysRevE.85.031127>`_
+   :download:`PDF <../../../reference/sollich_cates_2012_sgr_thermo.pdf>`
 
 6. Cates, M.E. & Sollich, P. (2004). "Tensorial constitutive models for disordered
    foams, dense emulsions, and other soft nonergodic materials."

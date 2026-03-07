@@ -239,31 +239,40 @@ See Also
 References
 ----------
 
-1. Falk, M.L. & Langer, J.S. (1998). "Dynamics of viscoplastic deformation in
+1. Falk, M. L. & Langer, J. S. (1998). "Dynamics of viscoplastic deformation in
    amorphous solids." *Phys. Rev. E*, 57, 7192–7205.
-   https://doi.org/10.1103/PhysRevE.57.7192
+   DOI: `10.1103/PhysRevE.57.7192 <https://doi.org/10.1103/PhysRevE.57.7192>`_
+   :download:`PDF <../../../reference/falk_langer_1998_stz.pdf>`
 
-2. Langer, J.S. (2008). "Shear-transformation-zone theory of plastic deformation
+2. Langer, J. S. & Pechenik, L. (2003). "Dynamics of shear-transformation zones
+   in amorphous plasticity: Energetic constraints in a minimal theory."
+   *Phys. Rev. E*, 68, 061507.
+   DOI: `10.1103/PhysRevE.68.061507 <https://doi.org/10.1103/PhysRevE.68.061507>`_
+   :download:`PDF <../../../reference/langer_pechenik_2003_stz_minimal.pdf>`
+
+3. Langer, J. S. (2008). "Shear-transformation-zone theory of plastic deformation
    near the glass transition." *Phys. Rev. E*, 77, 021502.
-   https://doi.org/10.1103/PhysRevE.77.021502
+   DOI: `10.1103/PhysRevE.77.021502 <https://doi.org/10.1103/PhysRevE.77.021502>`_
+   :download:`PDF <../../../reference/langer_2008_stz_dynamics.pdf>`
 
-3. Falk, M.L. & Langer, J.S. (2011). "Deformation and failure of amorphous,
+4. Falk, M. L. & Langer, J. S. (2011). "Deformation and failure of amorphous,
    solidlike materials." *Annu. Rev. Condens. Matter Phys.*, 2, 353–373.
-   https://doi.org/10.1146/annurev-conmatphys-062910-140452
+   DOI: `10.1146/annurev-conmatphys-062910-140452 <https://doi.org/10.1146/annurev-conmatphys-062910-140452>`_
 
-4. Manning, M.L., Langer, J.S., & Carlson, J.M. (2007). "Strain localization in
+5. Manning, M. L., Langer, J. S., & Carlson, J. M. (2007). "Strain localization in
    a shear transformation zone model for amorphous solids." *Phys. Rev. E*, 76,
-   056106. https://doi.org/10.1103/PhysRevE.76.056106
+   056106.
+   DOI: `10.1103/PhysRevE.76.056106 <https://doi.org/10.1103/PhysRevE.76.056106>`_
 
-5. Shi, Y. & Falk, M.L. (2005). "Strain localization and percolation of stable
+6. Shi, Y. & Falk, M. L. (2005). "Strain localization and percolation of stable
    structure in amorphous solids." *Phys. Rev. Lett.*, 95, 095502.
-   https://doi.org/10.1103/PhysRevLett.95.095502
+   DOI: `10.1103/PhysRevLett.95.095502 <https://doi.org/10.1103/PhysRevLett.95.095502>`_
 
-6. Johnson, W.L. & Samwer, K. (2005). "A universal criterion for plastic yielding
+7. Johnson, W. L. & Samwer, K. (2005). "A universal criterion for plastic yielding
    of metallic glasses with a (T/Tg)^(2/3) temperature dependence."
    *Phys. Rev. Lett.*, 95, 195501.
-   https://doi.org/10.1103/PhysRevLett.95.195501
+   DOI: `10.1103/PhysRevLett.95.195501 <https://doi.org/10.1103/PhysRevLett.95.195501>`_
 
-7. Schuh, C.A., Hufnagel, T.C., & Ramamurty, U. (2007). "Mechanical behavior of
+8. Schuh, C. A., Hufnagel, T. C., & Ramamurty, U. (2007). "Mechanical behavior of
    amorphous alloys." *Acta Mater.*, 55, 4067–4109.
-   https://doi.org/10.1016/j.actamat.2007.01.052
+   DOI: `10.1016/j.actamat.2007.01.052 <https://doi.org/10.1016/j.actamat.2007.01.052>`_

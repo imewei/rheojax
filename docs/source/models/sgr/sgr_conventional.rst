@@ -1704,7 +1704,8 @@ References
 
 .. [15] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
    *Physical Review E*, **85**, 031127 (2012).
-   https://doi.org/10.1103/PhysRevE.85.031127
+   DOI: `10.1103/PhysRevE.85.031127 <https://doi.org/10.1103/PhysRevE.85.031127>`_
+   :download:`PDF <../../../reference/sollich_cates_2012_sgr_thermo.pdf>`
 
 .. [16] Viasnoff, V. & Lequeux, F. "Rejuvenation and overaging in a colloidal glass under shear."
    *Physical Review Letters*, **89**, 065701 (2002).
@@ -1770,7 +1771,8 @@ Further Reading
 
 - Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
   *Physical Review E*, **85**, 031127 (2012).
-  https://doi.org/10.1103/PhysRevE.85.031127
+  DOI: `10.1103/PhysRevE.85.031127 <https://doi.org/10.1103/PhysRevE.85.031127>`_
+  :download:`PDF <../../../reference/sollich_cates_2012_sgr_thermo.pdf>`
 
 - Mason, T. G., Bibette, J., & Weitz, D. A. "Elasticity of compressed emulsions."
   *Physical Review Letters*, **75**\ (10), 2051-2054 (1995).
@@ -1795,7 +1797,7 @@ Further Reading
 - Sollich, P. "Soft Glassy Rheology." In *Molecular Gels: Materials with
   Self-Assembled Fibrillar Networks* (eds. R. G. Weiss & P. Terech),
   pp. 161--192. Springer, Dordrecht (2006).
-  https://doi.org/10.1007/1-4020-3689-2_6
+  DOI: `10.1007/1-4020-3689-2_6 <https://doi.org/10.1007/1-4020-3689-2_6>`_
   :download:`PDF <../../../reference/sollich_2005_soft_glass_rheology.pdf>`
 
 - Struik, L. C. E. *Physical Aging in Amorphous Polymers and Other Materials*.

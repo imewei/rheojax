@@ -1091,7 +1091,7 @@ See :doc:`fikh` references [1-10] for fractional calculus and IKH background.
 .. [11] Wei, Y., Solomon, M. J., and Larson, R. G. (2018). "A multimode structural
    kinetics constitutive equation for the transient rheology of thixotropic
    elasto-viscoplastic fluids." *J. Rheol.*, 62(1), 321-342.
-   https://doi.org/10.1122/1.4996752
+   DOI: `10.1122/1.4996752 <https://doi.org/10.1122/1.4996752>`_
    :download:`PDF <../../../reference/wei_solomon_larson_2018_multimode_ikh.pdf>`
 
 .. [12] Fielding, S. M., Sollich, P., and Cates, M. E. (2000). "Aging and rheology

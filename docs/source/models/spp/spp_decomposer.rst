@@ -1241,55 +1241,58 @@ References
 
 .. [1] Rogers, S. A., Erwin, B. M., Vlassopoulos, D., & Cloitre, M. "A sequence of
    physical processes determined and quantified in LAOS: Application to a yield stress
-   fluid." *J. Rheol.* **55**, 435-458 (2011). https://doi.org/10.1122/1.3544591
+   fluid." *J. Rheol.* **55**, 435-458 (2011).
+   DOI: `10.1122/1.3544591 <https://doi.org/10.1122/1.3544591>`_
    :download:`PDF <../../../reference/rogers_2011_spp_laos.pdf>`
 
 .. [2] Rogers, S. A. "In search of physical meaning: defining transient parameters for
    nonlinear viscoelasticity." *Rheol. Acta* **56**, 501-525 (2017).
-   https://doi.org/10.1007/s00397-017-1008-1
+   DOI: `10.1007/s00397-017-1008-1 <https://doi.org/10.1007/s00397-017-1008-1>`_
    :download:`PDF <../../../reference/rogers_2017_spp_transient.pdf>`
 
 .. [3] Rogers, S. A. "A sequence of physical processes determined and quantified in
    LAOS: An instantaneous local 2D/3D approach." *J. Rheol.* **56**, 1129-1151 (2012).
-   https://doi.org/10.1122/1.4726083
+   DOI: `10.1122/1.4726083 <https://doi.org/10.1122/1.4726083>`_
    :download:`PDF <../../../reference/rogers_2012_spp_instantaneous.pdf>`
 
 .. [4] Rogers, S. A. & Lettinga, M. P. "A sequence of physical processes determined
    and quantified in large-amplitude oscillatory shear (LAOS): Application to theoretical
-   nonlinear models." *J. Rheol.* **56**, 1-25 (2012). https://doi.org/10.1122/1.3662962
+   nonlinear models." *J. Rheol.* **56**, 1-25 (2012).
+   DOI: `10.1122/1.3662962 <https://doi.org/10.1122/1.3662962>`_
    :download:`PDF <../../../reference/rogers_lettinga_2012_spp_nonlinear.pdf>`
 
 .. [5] Ewoldt, R., Hosoi, A., & McKinley, G. "New measures for characterizing nonlinear
    viscoelasticity in large amplitude oscillatory shear." *J. Rheol.* **52**, 1427-1458 (2008).
-   https://doi.org/10.1122/1.2970095
+   DOI: `10.1122/1.2970095 <https://doi.org/10.1122/1.2970095>`_
 
 .. [6] Hyun, K., et al. "A review of nonlinear oscillatory shear tests: Analysis and
    application of large amplitude oscillatory shear (LAOS)." *Prog. Polym. Sci.* **36**,
    1697-1753 (2011).
-   https://doi.org/10.1016/j.progpolymsci.2011.02.002
+   DOI: `10.1016/j.progpolymsci.2011.02.002 <https://doi.org/10.1016/j.progpolymsci.2011.02.002>`_
 
 .. [7] Ewoldt, R. H. and McKinley, G. H. "Mapping thixo-elasto-visco-plastic behavior."
-   *Rheol. Acta* **56**, 195-210 (2017). https://doi.org/10.1007/s00397-017-1001-8
+   *Rheol. Acta* **56**, 195-210 (2017).
+   DOI: `10.1007/s00397-017-1001-8 <https://doi.org/10.1007/s00397-017-1001-8>`_
 
 .. [8] Cole, K. S. and Cole, R. H. "Dispersion and absorption in dielectrics I.
    Alternating current characteristics." *J. Chem. Phys.* **9**, 341-351 (1941).
-   https://doi.org/10.1063/1.1750906
+   DOI: `10.1063/1.1750906 <https://doi.org/10.1063/1.1750906>`_
 
 .. [9] Bonn, D., Denn, M. M., Berthier, L., Divoux, T., and Manneville, S. "Yield stress
    materials in soft condensed matter." *Rev. Mod. Phys.* **89**, 035005 (2017).
-   https://doi.org/10.1103/RevModPhys.89.035005
+   DOI: `10.1103/RevModPhys.89.035005 <https://doi.org/10.1103/RevModPhys.89.035005>`_
 
 .. [10] Kamal, M. R., Utracki, L. A., and Mirzadeh, A. "Rheology of Polymer Alloys
    and Blends." In *Polymer Blends Handbook*, Springer, 725-873 (2014).
-   https://doi.org/10.1007/978-94-007-6064-6_9
+   DOI: `10.1007/978-94-007-6064-6_9 <https://doi.org/10.1007/978-94-007-6064-6_9>`_
 
 .. [11] Le, A. N. M., et al. "Large amplitude oscillatory shear (LAOS) rheological
    characterization of green tea-fortified gels: Comparison of Fourier-transform and
    SPP analysis methods." *Food Research International* **174**, 113587 (2023).
-   https://doi.org/10.1016/j.foodres.2023.113587
+   DOI: `10.1016/j.foodres.2023.113587 <https://doi.org/10.1016/j.foodres.2023.113587>`_
 
 .. [12] Erturk, M. Y., Rogers, S. A., and Kokini, J. L. "Comparison of sequence of
    physical processes (SPP) and Fourier transform coupled with Chebyshev polynomials
    methods to interpret large amplitude oscillatory shear (LAOS) response of viscoelastic
    doughs and dough ingredients." *Food Hydrocolloids* **128**, 107558 (2022).
-   https://doi.org/10.1016/j.foodhyd.2022.107558
+   DOI: `10.1016/j.foodhyd.2022.107558 <https://doi.org/10.1016/j.foodhyd.2022.107558>`_

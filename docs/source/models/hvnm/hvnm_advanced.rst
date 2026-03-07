@@ -667,7 +667,7 @@ References
 13. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
     Vitrimers and Their Nanocomposites Based on Transient Network Theory."
     *Macromolecules*, 58(10), 4899--4912.
-    https://doi.org/10.1021/acs.macromol.4c02872
+    DOI: `10.1021/acs.macromol.4c02872 <https://doi.org/10.1021/acs.macromol.4c02872>`_
     :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
 14. Li, Z., Zhao, H., Zhang, L., Liu, J. et al. (2025). "Designing
@@ -687,7 +687,7 @@ References
 17. Hayashi, M. & Ricarte, R.G. (2025). "Towards the next development of
     vitrimers: Recent key topics for the practical application and understanding
     of the fundamental physics." *Prog. Polym. Sci.*, 170, 102026.
-    https://doi.org/10.1016/j.progpolymsci.2025.102026
+    DOI: `10.1016/j.progpolymsci.2025.102026 <https://doi.org/10.1016/j.progpolymsci.2025.102026>`_
     :download:`PDF <../../../reference/hayashi_ricarte_2025_vitrimers_review.pdf>`
 
 18. Zhao, H., Wei, X., Fang, Y. et al. (2022). "Molecular dynamics simulation

@@ -1623,17 +1623,20 @@ References
 .. [1] Wei, Y., Solomon, M. J., and Larson, R. G. "A multimode structural kinetics
    constitutive equation for the transient rheology of thixotropic elasto-viscoplastic
    fluids." *Journal of Rheology*, 62(1), 321-342 (2018).
-   https://doi.org/10.1122/1.4996752
+   DOI: `10.1122/1.4996752 <https://doi.org/10.1122/1.4996752>`_
    :download:`PDF <../../../reference/wei_solomon_larson_2018_multimode_ikh.pdf>`
 
 .. [2] Dimitriou, C. J. and McKinley, G. H. "A comprehensive constitutive law for
    waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*, 10(35),
-   6619-6644 (2014). https://doi.org/10.1039/c4sm00578c
+   6619-6644 (2014).
+   DOI: `10.1039/C4SM00578C <https://doi.org/10.1039/C4SM00578C>`_
    :download:`PDF <../../../reference/dimitriou_mckinley_2014_waxy_crude.pdf>`
 
 .. [3] Geri, M., Venkatesan, R., Sambath, K., and McKinley, G. H. "Thermokinematic
    memory and the thixotropic elasto-viscoplasticity of waxy crude oils."
-   *Journal of Rheology*, 61(3), 427-454 (2017). https://doi.org/10.1122/1.4978259
+   *Journal of Rheology*, 61(3), 427-454 (2017).
+   DOI: `10.1122/1.4978259 <https://doi.org/10.1122/1.4978259>`_
+   :download:`PDF <../../../reference/geri_2017_thermokinematic_memory.pdf>`
 
 .. [4] Fielding, S. M., et al. "Aging and rheology in soft materials."
    *Journal of Rheology*, 53(1), 39-64 (2009). https://doi.org/10.1122/1.3018902

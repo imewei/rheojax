@@ -358,7 +358,7 @@ References
 11. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
     Vitrimers and Their Nanocomposites Based on Transient Network Theory."
     *Macromolecules*, 58(10), 4899--4912.
-    https://doi.org/10.1021/acs.macromol.4c02872
+    DOI: `10.1021/acs.macromol.4c02872 <https://doi.org/10.1021/acs.macromol.4c02872>`_
     :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
 12. Alkhoury, K. & Chester, S.A. (2025). "A chemo-thermo-mechanically coupled
@@ -369,5 +369,5 @@ References
 13. White, Z.T., Smith, A.M. & Vernerey, F.J. (2025). "Mechanical cooperation
     between time-dependent and covalent bonds in molecular damage of polymer
     networks." *Communications Physics*, 8, 265.
-    https://doi.org/10.1038/s42005-025-02192-0
+    DOI: `10.1038/s42005-025-02192-0 <https://doi.org/10.1038/s42005-025-02192-0>`_
     :download:`PDF <../../../reference/white_2025_molecular_damage.pdf>`

@@ -1679,7 +1679,8 @@ References
    to obtain constitutive equation model parameters: Giesekus model of banding and
    nonbanding wormlike micelles. *J. Rheol.* 56:333-351. https://doi.org/10.1122/1.3684751
 
-.. [13] Assadi S, Lamont SC, Hansoge N, Liu Z, Crespo-Cuevas V, Salmon F & Vernerey FJ
-   (2025) Nonaffine motion and network reorganization in entangled polymer networks.
-   *Soft Matter* 21:2096-2113. https://doi.org/10.1039/d4sm01278j
+.. [13] Assadi, S., Lamont, S.C., Hansoge, N., Liu, Z., Crespo-Cuevas, V., Salmon, F. & Vernerey, F.J.
+   (2025). "Nonaffine motion and network reorganization in entangled polymer networks."
+   *Soft Matter*, 21, 2096--2113.
+   DOI: `10.1039/d4sm01278j <https://doi.org/10.1039/d4sm01278j>`_
    :download:`PDF <../../../reference/assadi_2025_nonaffine_entangled.pdf>`

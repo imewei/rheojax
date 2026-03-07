@@ -1985,10 +1985,13 @@ References
    recovery of the relaxation spectrum." *Journal of Rheology*, 45(1), 1-27 (2001).
    https://doi.org/10.1122/1.1332787
 
-.. [14] Springer, M. "pyvisco." ReadTheDocs (2026).
+.. [14] Springer, M. "pyvisco: A Python library for identifying Prony series parameters
+   of linear viscoelastic materials." NREL/ReadTheDocs (2026).
+   DOI: `10.5281/zenodo.7672127 <https://doi.org/10.5281/zenodo.7672127>`_
    :download:`PDF <../../../reference/springer_2026_pyvisco.pdf>`
 
 .. [15] Miranda-Valdez, I. Y., Niinistö, A., Mäkinen, T., Lejon, J., Koivisto, J.
    and Alava, M. J. "pyRheo: an open-source Python package for complex rheology."
-   *Digital Discovery*, 4, 1075-1082 (2025). https://doi.org/10.1039/d5dd00021a
+   *Digital Discovery*, 4, 1075-1082 (2025).
+   DOI: `10.1039/d5dd00021a <https://doi.org/10.1039/d5dd00021a>`_
    :download:`PDF <../../../reference/miranda-valdez_2025_pyrheo.pdf>`

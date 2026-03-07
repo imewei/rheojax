@@ -944,49 +944,51 @@ References
 .. [1] Rogers, S. A., Erwin, B. M., Vlassopoulos, D., and Cloitre, M. "A sequence
    of physical processes determined and quantified in LAOS: Application to a
    yield stress fluid." *Journal of Rheology*, 55, 435-458 (2011).
-   https://doi.org/10.1122/1.3544591
+   DOI: `10.1122/1.3544591 <https://doi.org/10.1122/1.3544591>`_
    :download:`PDF <../../../reference/rogers_2011_spp_laos.pdf>`
 
-.. [2] Rogers, S. A. "A sequence of physical processes determined and quantified
-   in large-amplitude oscillatory shear (LAOS): Application to theoretical
+.. [2] Rogers, S. A. and Lettinga, M. P. "A sequence of physical processes determined
+   and quantified in large-amplitude oscillatory shear (LAOS): Application to theoretical
    nonlinear models." *Journal of Rheology*, 56(1), 1-25 (2012).
-   https://doi.org/10.1122/1.3662962
+   DOI: `10.1122/1.3662962 <https://doi.org/10.1122/1.3662962>`_
    :download:`PDF <../../../reference/rogers_lettinga_2012_spp_nonlinear.pdf>`
 
-.. [3] Rogers, S. A. "In search of physical meaning: Defining transient parameters
+.. [3] Rogers, S. A. "In search of physical meaning: defining transient parameters
    for nonlinear viscoelasticity." *Rheologica Acta*, 56, 501-525 (2017).
-   https://doi.org/10.1007/s00397-017-1008-1
+   DOI: `10.1007/s00397-017-1008-1 <https://doi.org/10.1007/s00397-017-1008-1>`_
    :download:`PDF <../../../reference/rogers_2017_spp_transient.pdf>`
 
 .. [4] Ewoldt, R. H., Hosoi, A. E., and McKinley, G. H. "New measures for
    characterizing nonlinear viscoelasticity in large amplitude oscillatory shear."
    *Journal of Rheology*, 52, 1427-1458 (2008).
-   https://doi.org/10.1122/1.2970095
+   DOI: `10.1122/1.2970095 <https://doi.org/10.1122/1.2970095>`_
 
 .. [5] Hyun, K., et al. "A review of nonlinear oscillatory shear tests: Analysis
    and application of large amplitude oscillatory shear (LAOS)."
    *Progress in Polymer Science*, 36, 1697-1753 (2011).
-   https://doi.org/10.1016/j.progpolymsci.2011.02.002
+   DOI: `10.1016/j.progpolymsci.2011.02.002 <https://doi.org/10.1016/j.progpolymsci.2011.02.002>`_
 
 .. [6] Bonn, D., Denn, M. M., Berthier, L., Divoux, T., and Manneville, S.
    "Yield stress materials in soft condensed matter." *Reviews of Modern Physics*,
-   89, 035005 (2017). https://doi.org/10.1103/RevModPhys.89.035005
+   89, 035005 (2017).
+   DOI: `10.1103/RevModPhys.89.035005 <https://doi.org/10.1103/RevModPhys.89.035005>`_
 
 .. [7] Donley, G. J., et al. "Elucidating the G'' overshoot in soft materials with
    a yield transition via a time-resolved experimental strain decomposition."
    *Proceedings of the National Academy of Sciences*, 117, 21945-21952 (2020).
-   https://doi.org/10.1073/pnas.2003869117
+   DOI: `10.1073/pnas.2003869117 <https://doi.org/10.1073/pnas.2003869117>`_
 
 .. [8] Liu, A. J. and Nagel, S. R. "The jamming transition and the marginally jammed
    solid." *Annual Review of Condensed Matter Physics*, 1, 347-369 (2010).
-   https://doi.org/10.1146/annurev-conmatphys-070909-104045
+   DOI: `10.1146/annurev-conmatphys-070909-104045 <https://doi.org/10.1146/annurev-conmatphys-070909-104045>`_
 
 .. [9] Kim, J., et al. "Visualization of time-dependent intracycle molecular orientation
    dynamics in LAOS from anisotropic SANS." *Journal of Rheology*, 64, 291-303 (2020).
 
 .. [10] Saengow, C., Giacomin, A. J., and Kolitawong, C. "Exact analytical solution
    for large-amplitude oscillatory shear flow." *Macromolecular Theory and Simulations*,
-   24, 352-392 (2015). https://doi.org/10.1002/mats.201400104
+   24, 352-392 (2015).
+   DOI: `10.1002/mats.201400104 <https://doi.org/10.1002/mats.201400104>`_
 
 See Also
 --------

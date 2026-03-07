@@ -224,7 +224,7 @@ References
 2. Karim, M.R., Vernerey, F. & Sain, T. (2025). "Constitutive Modeling of
    Vitrimers and Their Nanocomposites Based on Transient Network Theory."
    *Macromolecules*, 58(10), 4899-4912.
-   https://doi.org/10.1021/acs.macromol.4c02872
+   DOI: `10.1021/acs.macromol.4c02872 <https://doi.org/10.1021/acs.macromol.4c02872>`_
    :download:`PDF <../../../reference/karim_2025_vitrimer_nanocomposites.pdf>`
 
 3. Li, Z., Zhao, H., Duan, P., Zhang, L. & Liu, J. (2024). "Manipulating

@@ -1395,12 +1395,24 @@ Mechanophore and Adaptive Networks
 
    - Modern continuum framework for adaptive networks
 
-5. **Wang, Q., Gossweiler, G. R., Craig, S. L., & Zhao, X.** (2014). Cephalopod-inspired design of electro-mechano-chemically responsive elastomers for on-demand fluorescent patterning. *Nature Communications*, 5, 4899.
+5. **Vernerey, F.J.** (2018). Transient response of nonlinear polymer networks: A kinetic theory. *Journal of the Mechanics and Physics of Solids*, 115, 230–247.
+   DOI: `10.1016/j.jmps.2018.02.018 <https://doi.org/10.1016/j.jmps.2018.02.018>`_
+   :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
+
+   - Kinetic theory for transient networks with nonlinear chain response
+
+6. **Wagner, R.J., Hobbs, E., & Vernerey, F.J.** (2021). A network model of transient polymers: exploring the micromechanics of nonlinear viscoelasticity. *Soft Matter*, 17, 8742–8757.
+   DOI: `10.1039/d1sm00753j <https://doi.org/10.1039/d1sm00753j>`_
+   :download:`PDF <../../../reference/wagner_2021_tnt_network_model.pdf>`
+
+   - Discrete network model validating continuum TNT predictions
+
+7. **Wang, Q., Gossweiler, G. R., Craig, S. L., & Zhao, X.** (2014). Cephalopod-inspired design of electro-mechano-chemically responsive elastomers for on-demand fluorescent patterning. *Nature Communications*, 5, 4899.
    https://doi.org/10.1038/ncomms5899
 
    - Mechanophore-crosslinked elastomers (experimental)
 
-6. **Creton, C.** (2017). 50th Anniversary Perspective: Networks and Gels: Soft but Dynamic and Tough. *Macromolecules*, 50(21), 8297-8316.
+8. **Creton, C.** (2017). 50th Anniversary Perspective: Networks and Gels: Soft but Dynamic and Tough. *Macromolecules*, 50(21), 8297-8316.
    https://doi.org/10.1021/acs.macromol.7b01698
 
    - Review of dynamic networks and toughening mechanisms
@@ -1408,25 +1420,25 @@ Mechanophore and Adaptive Networks
 Strain Crystallization
 ----------------------
 
-7. **Candau, N., Laghmach, R., Chazeau, L., Chenal, J.-M., Gauthier, C., Biben, T., & Munch, E.** (2014). Strain-induced crystallization of natural rubber and cross-link densities heterogeneities. *Macromolecules*, 47(16), 5815-5824.
+9. **Candau, N., Laghmach, R., Chazeau, L., Chenal, J.-M., Gauthier, C., Biben, T., & Munch, E.** (2014). Strain-induced crystallization of natural rubber and cross-link densities heterogeneities. *Macromolecules*, 47(16), 5815-5824.
    https://doi.org/10.1021/ma5006843
 
    - Modern experimental study of strain crystallization
 
-8. **Tosaka, M.** (2007). Strain-induced crystallization of crosslinked natural rubber as revealed by X-ray diffraction using synchrotron radiation. *Polymer Journal*, 39(12), 1207-1220.
-   https://doi.org/10.1295/polymj.PJ2007059
+10. **Tosaka, M.** (2007). Strain-induced crystallization of crosslinked natural rubber as revealed by X-ray diffraction using synchrotron radiation. *Polymer Journal*, 39(12), 1207-1220.
+    https://doi.org/10.1295/polymj.PJ2007059
 
-   - In-situ X-ray studies of crystallization kinetics
+    - In-situ X-ray studies of crystallization kinetics
 
 Numerical Methods
 -----------------
 
-9. **Hulsen, M. A., Fattal, R., & Kupferman, R.** (2005). Flow of viscoelastic fluids past a cylinder at high Weissenberg number: Stabilized simulations using matrix logarithms. *Journal of Non-Newtonian Fluid Mechanics*, 127(1), 27-39.
-   https://doi.org/10.1016/j.jnnfm.2005.01.002
+11. **Hulsen, M. A., Fattal, R., & Kupferman, R.** (2005). Flow of viscoelastic fluids past a cylinder at high Weissenberg number: Stabilized simulations using matrix logarithms. *Journal of Non-Newtonian Fluid Mechanics*, 127(1), 27-39.
+    https://doi.org/10.1016/j.jnnfm.2005.01.002
 
-   - Numerical techniques for viscoelastic constitutive equations
+    - Numerical techniques for viscoelastic constitutive equations
 
-10. **Owens, R. G., & Phillips, T. N.** (2002). *Computational Rheology*. Imperial College Press.
+12. **Owens, R. G., & Phillips, T. N.** (2002). *Computational Rheology*. Imperial College Press.
     ISBN: 978-1860941863
 
     - Comprehensive reference for solving rheological ODEs/PDEs
@@ -1434,12 +1446,12 @@ Numerical Methods
 Related Experimental Techniques
 --------------------------------
 
-11. **Hyun, K., Wilhelm, M., Klein, C. O., Cho, K. S., Nam, J. G., Ahn, K. H., Lee, S. J., Ewoldt, R. H., & McKinley, G. H.** (2011). A review of nonlinear oscillatory shear tests: Analysis and application of large amplitude oscillatory shear (LAOS). *Progress in Polymer Science*, 36(12), 1697-1753.
+13. **Hyun, K., Wilhelm, M., Klein, C. O., Cho, K. S., Nam, J. G., Ahn, K. H., Lee, S. J., Ewoldt, R. H., & McKinley, G. H.** (2011). A review of nonlinear oscillatory shear tests: Analysis and application of large amplitude oscillatory shear (LAOS). *Progress in Polymer Science*, 36(12), 1697-1753.
     https://doi.org/10.1016/j.progpolymsci.2011.02.002
 
     - LAOS methodology for probing nonlinear response
 
-12. **Negi, A. S., & Osuji, C. O.** (2009). New insights on fumed colloidal rheology--shear thickening and vorticity-aligned structures in flocculating dispersions. *Rheologica Acta*, 48(8), 871-881.
+14. **Negi, A. S., & Osuji, C. O.** (2009). New insights on fumed colloidal rheology--shear thickening and vorticity-aligned structures in flocculating dispersions. *Rheologica Acta*, 48(8), 871-881.
     https://doi.org/10.1007/s00397-008-0341-9
 
     - Flow-induced structure formation (related phenomenology)

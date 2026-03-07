@@ -1168,12 +1168,12 @@ References
 
 .. [1] Fuereder, I. & Ilg, P. "Nonequilibrium thermodynamics of the soft glassy
    rheology model." *Physical Review E*, **88**, 042134 (2013).
-   https://doi.org/10.1103/PhysRevE.88.042134
+   DOI: `10.1103/PhysRevE.88.042134 <https://doi.org/10.1103/PhysRevE.88.042134>`_
    :download:`PDF <../../../reference/fuereder_ilg_2013_sgr_thermodynamics.pdf>`
 
 .. [2] Grmela, M. & Öttinger, H. C. "Dynamics and thermodynamics of complex fluids. I.
-   Development of a general formalism." *Physical Review E*, **56**, 6620 (1997).
-   https://doi.org/10.1103/PhysRevE.56.6620
+   Development of a general formalism." *Physical Review E*, **56**, 6620-6632 (1997).
+   DOI: `10.1103/PhysRevE.56.6620 <https://doi.org/10.1103/PhysRevE.56.6620>`_
    :download:`PDF <../../../reference/grmela_ottinger_1997_generic.pdf>`
 
 .. [3] Öttinger, H. C. *Beyond Equilibrium Thermodynamics*. Wiley (2005).
@@ -1181,7 +1181,7 @@ References
 
 .. [4] Sollich, P. & Cates, M. E. "Thermodynamic interpretation of soft glassy rheology models."
    *Physical Review E*, **85**, 031127 (2012).
-   https://doi.org/10.1103/PhysRevE.85.031127
+   DOI: `10.1103/PhysRevE.85.031127 <https://doi.org/10.1103/PhysRevE.85.031127>`_
    :download:`PDF <../../../reference/sollich_cates_2012_sgr_thermo.pdf>`
 
 .. [5] Sollich, P. "Rheological constitutive equation for a model of soft glassy materials."
@@ -1208,5 +1208,5 @@ References
 
 .. [11] Öttinger, H. C. "Nonequilibrium thermodynamics for open systems."
    *Physical Review E*, **73**, 036126 (2006).
-   https://doi.org/10.1103/PhysRevE.73.036126
+   DOI: `10.1103/PhysRevE.73.036126 <https://doi.org/10.1103/PhysRevE.73.036126>`_
    :download:`PDF <../../../reference/ottinger_2006_generic_open_systems.pdf>`

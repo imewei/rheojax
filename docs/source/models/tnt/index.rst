@@ -772,14 +772,25 @@ References
     physically crosslinked networks." *Macromolecules*, 25, 7003–7010.
     https://doi.org/10.1021/ma00051a043
 
-11. Vernerey, F.J. (2022). "Mechanics of transient semi-flexible networks:
+11. Vernerey, F.J. (2018). "Transient response of nonlinear polymer networks:
+    A kinetic theory." *J. Mech. Phys. Solids*, 115, 230–247.
+    DOI: `10.1016/j.jmps.2018.02.018 <https://doi.org/10.1016/j.jmps.2018.02.018>`_
+    :download:`PDF <../../../reference/vernerey_2018_tnt_kinetic_theory.pdf>`
+
+12. Wagner, R.J., Hobbs, E., & Vernerey, F.J. (2021). "A network model of transient
+    polymers: exploring the micromechanics of nonlinear viscoelasticity."
+    *Soft Matter*, 17, 8742–8757.
+    DOI: `10.1039/d1sm00753j <https://doi.org/10.1039/d1sm00753j>`_
+    :download:`PDF <../../../reference/wagner_2021_tnt_network_model.pdf>`
+
+13. Vernerey, F.J. (2022). "Mechanics of transient semi-flexible networks:
     Soft-elasticity, stress relaxation and remodeling." *J. Mech. Phys. Solids*,
     160, 104776.
-    https://doi.org/10.1016/j.jmps.2022.104776
+    DOI: `10.1016/j.jmps.2022.104776 <https://doi.org/10.1016/j.jmps.2022.104776>`_
     :download:`PDF <../../../reference/vernerey_2022_semiflexible_networks.pdf>`
 
-12. Lamont, S. & Vernerey, F.J. (2022). "A Transient Microsphere Model for
-    Nonlinear Viscoelasticity in Dynamic Polymer Networks." *J. Appl. Mech.*
-    (ASME), 89, 011009.
-    https://doi.org/10.1115/1.4052375
+14. Lamont, S. & Vernerey, F.J. (2022). "A Transient Microsphere Model for
+    Nonlinear Viscoelasticity in Dynamic Polymer Networks." *J. Appl. Mech.*,
+    89, 011009.
+    DOI: `10.1115/1.4052375 <https://doi.org/10.1115/1.4052375>`_
     :download:`PDF <../../../reference/lamont_vernerey_2022_transient_microsphere.pdf>`

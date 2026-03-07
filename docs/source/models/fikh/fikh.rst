@@ -1369,14 +1369,14 @@ References
 
 .. [7] Dimitriou, C. J. and McKinley, G. H. (2014). "A comprehensive constitutive
    law for waxy crude oil: a thixotropic yield stress fluid." *Soft Matter*,
-   10, 6619-6644.
-   https://doi.org/10.1039/C4SM00578C
+   10(35), 6619-6644.
+   DOI: `10.1039/C4SM00578C <https://doi.org/10.1039/C4SM00578C>`_
    :download:`PDF <../../../reference/dimitriou_mckinley_2014_waxy_crude.pdf>`
 
 .. [8] Geri, M., Venkatesan, R., Sambath, K., and McKinley, G. H. (2017).
    "Thermokinematic memory and the thixotropic elasto-viscoplasticity of
    waxy crude oils." *J. Rheol.*, 61(3), 427-454.
-   https://doi.org/10.1122/1.4978259
+   DOI: `10.1122/1.4978259 <https://doi.org/10.1122/1.4978259>`_
    :download:`PDF <../../../reference/geri_2017_thermokinematic_memory.pdf>`
 
 **Thixotropic Modeling:**

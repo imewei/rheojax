@@ -317,24 +317,26 @@ References
 
 1. Rogers, S.A. (2012). "A sequence of physical processes determined and quantified
    in LAOS: An instantaneous local 2D/3D approach." *J. Rheol.*, 56, 1129–1151.
-   https://doi.org/10.1122/1.4726083
+   DOI: `10.1122/1.4726083 <https://doi.org/10.1122/1.4726083>`_
+   :download:`PDF <../../reference/rogers_2012_spp_instantaneous.pdf>`
 
 2. Rogers, S.A. & Lettinga, M.P. (2012). "A sequence of physical processes determined
    and quantified in large-amplitude oscillatory shear (LAOS): Application to
    theoretical nonlinear models." *J. Rheol.*, 56, 1–25.
-   https://doi.org/10.1122/1.3662962
+   DOI: `10.1122/1.3662962 <https://doi.org/10.1122/1.3662962>`_
+   :download:`PDF <../../reference/rogers_lettinga_2012_spp_nonlinear.pdf>`
 
 3. Donley, G.J., de Bruyn, J.R., McKinley, G.H., & Rogers, S.A. (2019).
    "Time-resolved dynamics of the yielding transition in soft materials."
    *J. Non-Newtonian Fluid Mech.*, 264, 117–134.
-   https://doi.org/10.1016/j.jnnfm.2018.10.003
+   DOI: `10.1016/j.jnnfm.2018.10.003 <https://doi.org/10.1016/j.jnnfm.2018.10.003>`_
 
 4. Hyun, K. et al. (2011). "A review of nonlinear oscillatory shear tests:
    Analysis and application of large amplitude oscillatory shear (LAOS)."
    *Prog. Polym. Sci.*, 36, 1697–1753.
-   https://doi.org/10.1016/j.progpolymsci.2011.02.002
+   DOI: `10.1016/j.progpolymsci.2011.02.002 <https://doi.org/10.1016/j.progpolymsci.2011.02.002>`_
 
 5. Ewoldt, R.H., Hosoi, A.E., & McKinley, G.H. (2008). "New measures for
    characterizing nonlinear viscoelasticity in large amplitude oscillatory shear."
    *J. Rheol.*, 52, 1427–1458.
-   https://doi.org/10.1122/1.2970095
+   DOI: `10.1122/1.2970095 <https://doi.org/10.1122/1.2970095>`_

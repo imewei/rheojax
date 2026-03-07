@@ -523,5 +523,5 @@ References
 6. Hui, C.-Y., Cui, F., Zehnder, A. & Vernerey, F.J. (2021). "Physically
    motivated models of polymer networks with dynamic cross-links: comparative
    study and future outlook." *Proc. R. Soc. A*, 477, 20210608.
-   https://doi.org/10.1098/rspa.2021.0608
+   DOI: `10.1098/rspa.2021.0608 <https://doi.org/10.1098/rspa.2021.0608>`_
    :download:`PDF <../../../reference/hui_2021_dynamic_crosslinks_review.pdf>`
