@@ -229,11 +229,50 @@ API References
 References
 ----------
 
-1. Wyss, H. M., et al. "Strain-Rate Frequency Superposition: A Rheological Probe of
-   Structural Relaxation in Soft Materials." *Physical Review Letters*, **98**, 238303 (2007).
+**Original SRFS Method:**
 
-2. Sollich, P. "Rheological constitutive equation for a model of soft glassy materials."
-   *Physical Review E*, **58**, 738 (1998).
+- Wyss, H. M., Miyazaki, K., Mattsson, J., Hu, Z., Reichman, D. R., & Weitz, D. A.
+  "Strain-Rate Frequency Superposition: A Rheological Probe of Structural Relaxation
+  in Soft Materials." *Phys. Rev. Lett.* 98, 238303 (2007).
+  DOI: `10.1103/PhysRevLett.98.238303 <https://doi.org/10.1103/PhysRevLett.98.238303>`_
 
-3. Fielding, S. M., et al. "Aging and rheology in soft materials."
-   *Journal of Rheology*, **44**, 323 (2000).
+**Extensions and Validation:**
+
+- Kalelkar, C., Lele, A., & Kamble, S. "Strain-rate frequency superposition in
+  large-amplitude oscillatory shear." *Phys. Rev. E* 81, 031401 (2010).
+  DOI: `10.1103/PhysRevE.81.031401 <https://doi.org/10.1103/PhysRevE.81.031401>`_
+  :download:`PDF <../../reference/kalelkar_lele_kamble_2010_srfs_laos.pdf>`
+
+- Erwin, B. M., Rogers, S. A., Cloitre, M., & Vlassopoulos, D. "Examining the validity
+  of strain-rate frequency superposition when measuring the linear viscoelastic properties
+  of soft materials." *J. Rheol.* 54, 187–195 (2010).
+  DOI: `10.1122/1.3301247 <https://doi.org/10.1122/1.3301247>`_
+  :download:`PDF <../../reference/erwin_rogers_2010_srfs_validity.pdf>`
+
+- Kowalczyk, A., Hochstein, B., Stähle, P., & Willenbacher, N. "Characterization of
+  complex fluids at very low frequency: Experimental verification of the strain rate-frequency
+  superposition (SRFS) method." *Appl. Rheol.* 20, 52340 (2010).
+  DOI: `10.3933/ApplRheol-20-52340 <https://doi.org/10.3933/ApplRheol-20-52340>`_
+  :download:`PDF <../../reference/kowalczyk_willenbacher_2010_srfs_verification.pdf>`
+
+- Hess, A. & Aksel, N. "Yielding and structural relaxation in soft materials: Evaluation
+  of strain-rate frequency superposition data by the stress decomposition method."
+  *Phys. Rev. E* 84, 051502 (2011).
+  DOI: `10.1103/PhysRevE.84.051502 <https://doi.org/10.1103/PhysRevE.84.051502>`_
+  :download:`PDF <../../reference/hess_aksel_2011_srfs_stress_decomposition.pdf>`
+
+- Li, J., Cheng, X., Zhang, Y., & Sun, W. "A revisit of strain-rate frequency superposition
+  of dense colloidal suspensions under oscillatory shears." *J. Cent. South Univ.* 23,
+  1873–1882 (2016).
+  DOI: `10.1007/s11771-016-3242-6 <https://doi.org/10.1007/s11771-016-3242-6>`_
+  :download:`PDF <../../reference/li_cheng_zhang_2016_srfs_colloidal.pdf>`
+
+**Underlying Theory (SGR Model):**
+
+- Sollich, P. "Rheological constitutive equation for a model of soft glassy materials."
+  *Phys. Rev. E* 58, 738 (1998).
+  DOI: `10.1103/PhysRevE.58.738 <https://doi.org/10.1103/PhysRevE.58.738>`_
+
+- Fielding, S. M., Sollich, P., & Cates, M. E. "Aging and rheology in soft materials."
+  *J. Rheol.* 44, 323 (2000).
+  DOI: `10.1122/1.551088 <https://doi.org/10.1122/1.551088>`_
