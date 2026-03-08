@@ -186,6 +186,30 @@ class BaseModel(BayesianMixin, ABC):
             )
             return None
 
+    def _make_error_result(self, test_mode: str | None, error: Exception):
+        """Build a :class:`FitResult` that records a failed fit attempt."""
+        from rheojax.core.fit_result import FitResult
+
+        return FitResult(
+            model_name=getattr(self, "_registry_name", self.__class__.__name__),
+            model_class_name=self.__class__.__name__,
+            protocol=test_mode,
+            params={
+                name: self.parameters.get_value(name)
+                for name in self.parameters.keys()
+            },
+            params_units={
+                name: getattr(self.parameters[name], "units", "") or ""
+                for name in self.parameters.keys()
+            },
+            n_params=len(list(self.parameters.keys())),
+            optimization_result=None,
+            metadata={
+                "error": str(error),
+                "error_type": type(error).__name__,
+            },
+        )
+
     def _enhance_error_with_compatibility(
         self,
         error: RuntimeError,
@@ -436,6 +460,14 @@ class BaseModel(BayesianMixin, ABC):
                         error=str(exc),
                     )
 
+        # Translate method="auto_global" into workflow kwarg for nlsq_optimize.
+        # Individual model _fit() methods forward kwargs["method"] to nlsq_optimize,
+        # but "auto_global" is a workflow selector, not an NLSQ method string.
+        # We remap it here so that _fit() sees method="auto" and workflow="auto_global".
+        if method == "auto_global":
+            kwargs.setdefault("workflow", "auto_global")
+            method = "auto"
+
         # Call subclass implementation (which uses NLSQ via optimization module)
         try:
             self._fit(X, y, method=method, **kwargs)
@@ -468,10 +500,14 @@ class BaseModel(BayesianMixin, ABC):
                         getattr(self, "_nlsq_result", None) is not None
                         and self._nlsq_result.fun is not None
                     ):
-                        # R11-BASE-002: fun is a residual array, not a scalar cost.
-                        # Compute ss_res = sum(residuals^2) instead of float(fun).
+                        # R11-BASE-002: fun may be a residual array or a scalar RSS.
                         fun = np.asarray(self._nlsq_result.fun)
-                        ss_res = float(np.sum(np.abs(fun) ** 2))
+                        if fun.ndim == 0:
+                            # P2-Fit-6: fun is already scalar RSS — use directly.
+                            ss_res = float(np.abs(fun))
+                        else:
+                            # fun is a residual vector — compute sum(residuals^2).
+                            ss_res = float(np.sum(np.abs(fun) ** 2))
                         y_arr = np.asarray(_y_score)
                         ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
                         if ss_tot > 0:
@@ -507,6 +543,8 @@ class BaseModel(BayesianMixin, ABC):
                 error=str(e),
                 exc_info=True,
             )
+            if return_result:
+                return self._make_error_result(test_mode, e)
             enhanced = self._enhance_error_with_compatibility(e, X, y, test_mode)
             if enhanced is not e:
                 raise enhanced from e
@@ -518,6 +556,8 @@ class BaseModel(BayesianMixin, ABC):
                 error=str(e),
                 exc_info=True,
             )
+            if return_result:
+                return self._make_error_result(test_mode, e)
             raise
 
         # Post-fit physics check

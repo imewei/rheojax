@@ -38,6 +38,11 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
+def _is_jax_array(x: Any) -> bool:
+    """Robust check for JAX arrays across JAX versions."""
+    return hasattr(x, "devices") and not isinstance(x, np.ndarray)
+
+
 class Pipeline:
     """Fluent API for rheological analysis workflows.
 
@@ -300,9 +305,9 @@ class Pipeline:
         y = self.data.y
 
         # Convert to numpy for fitting
-        if isinstance(X, jnp.ndarray):
+        if _is_jax_array(X):
             X = np.array(X)
-        if isinstance(y, jnp.ndarray):
+        if _is_jax_array(y):
             y = np.array(y)
 
         with log_pipeline_stage(
@@ -383,7 +388,7 @@ class Pipeline:
             X = self.data.x
 
         # Convert to numpy for prediction
-        if isinstance(X, jnp.ndarray):
+        if _is_jax_array(X):
             X = np.array(X)
 
         logger.debug(
@@ -832,9 +837,9 @@ class Pipeline:
         X = self.data.x
         y = self.data.y
 
-        if isinstance(X, jnp.ndarray):
+        if _is_jax_array(X):
             X = np.array(X)
-        if isinstance(y, jnp.ndarray):
+        if _is_jax_array(y):
             y = np.array(y)
 
         # Auto-propagate metadata
@@ -860,8 +865,11 @@ class Pipeline:
         # Set the best model as _last_model if available — reuse the
         # already-fitted instance from compare_models() instead of re-fitting.
         if comparison.results:
-            best_fr = comparison.results[comparison.rankings[0]]
-            fitted_model = getattr(best_fr, "_fitted_model", None)
+            best_fr = next(
+                (r for r in comparison.results if r.model_name == comparison.best_model),
+                None,
+            )
+            fitted_model = getattr(best_fr, "_fitted_model", None) if best_fr else None
             if fitted_model is not None:
                 self._last_model = fitted_model
                 self.steps.append(("compare_models", fitted_model))

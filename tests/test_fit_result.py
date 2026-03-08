@@ -19,7 +19,6 @@ import pytest
 from rheojax.core.fit_result import FitResult, ModelComparison, ModelInfo
 from rheojax.utils.optimization import OptimizationResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -278,7 +277,7 @@ class TestModelComparison:
         comp = self._make_comparison()
         assert len(comp.rankings) == 3
         assert comp.best_model in comp.rankings
-        assert comp.best_model == comp.rankings[0]
+        assert comp.rankings[comp.best_model] == 1
 
     def test_delta_criterion(self):
         comp = self._make_comparison()
@@ -317,7 +316,7 @@ class TestModelComparison:
 
     def test_empty_results(self):
         comp = ModelComparison(results=[], criterion="aic")
-        assert comp.rankings == []
+        assert comp.rankings == {}
         assert comp.best_model == ""
 
     def test_single_result(self):

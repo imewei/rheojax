@@ -141,6 +141,60 @@ class FitResult:
             return len(self.y)
         return 0
 
+    @property
+    def converged(self) -> bool:
+        """Alias for :attr:`success` (spec compatibility)."""
+        return self.success
+
+    @property
+    def n_points(self) -> int:
+        """Alias for :attr:`n_data` (spec compatibility)."""
+        return self.n_data
+
+    @property
+    def residuals(self) -> np.ndarray | None:
+        """Residual vector from the fit."""
+        if self.optimization_result is None:
+            return None
+        return getattr(self.optimization_result, "residuals", None)
+
+    @property
+    def loss_value(self) -> float | None:
+        """Final loss (sum of squared residuals)."""
+        if self.optimization_result is None:
+            return None
+        return getattr(self.optimization_result, "fun", None)
+
+    @property
+    def n_iterations(self) -> int | None:
+        """Number of optimizer iterations."""
+        if self.optimization_result is None:
+            return None
+        return getattr(self.optimization_result, "nit", None)
+
+    @property
+    def optimizer_used(self) -> str | None:
+        """Name of the optimizer that produced this result."""
+        if self.optimization_result is None:
+            return self.metadata.get("optimizer_used")
+        return getattr(self.optimization_result, "method", None)
+
+    @property
+    def covariance(self) -> np.ndarray | None:
+        """Parameter covariance matrix from the Jacobian."""
+        if self.optimization_result is None:
+            return None
+        return getattr(self.optimization_result, "pcov", None)
+
+    @property
+    def params_ci(self) -> dict[str, tuple[float, float]] | None:
+        """Parameter confidence intervals (95%) as {name: (lower, upper)}."""
+        ci_arr = self.confidence_intervals(alpha=0.95)
+        if ci_arr is None:
+            return None
+        names = list(self.params.keys())
+        return {names[i]: (float(ci_arr[i, 0]), float(ci_arr[i, 1])) for i in range(min(len(names), len(ci_arr)))}
+
     # ------------------------------------------------------------------
     # Delegated methods
     # ------------------------------------------------------------------
@@ -270,15 +324,27 @@ class FitResult:
         if self.X is not None:
             result["X"] = np.asarray(self.X).tolist()
         if self.y is not None:
-            result["y"] = np.asarray(self.y).tolist()
+            y_arr = np.asarray(self.y)
+            if np.iscomplexobj(y_arr):
+                result["y_real"] = y_arr.real.tolist()
+                result["y_imag"] = y_arr.imag.tolist()
+                result["y_is_complex"] = True
+            else:
+                result["y"] = y_arr.tolist()
         if self.fitted_curve is not None:
-            result["fitted_curve"] = np.asarray(self.fitted_curve).tolist()
+            fc_arr = np.asarray(self.fitted_curve)
+            if np.iscomplexobj(fc_arr):
+                result["fitted_curve_real"] = fc_arr.real.tolist()
+                result["fitted_curve_imag"] = fc_arr.imag.tolist()
+                result["fitted_curve_is_complex"] = True
+            else:
+                result["fitted_curve"] = fc_arr.tolist()
         return result
 
     def save(self, path: str) -> None:
         """Save fit result to file. Format is dispatched by extension.
 
-        Supported extensions: ``.npz``, ``.json``.
+        Supported extensions: ``.npz``, ``.json``, ``.h5`` / ``.hdf5``.
 
         Args:
             path: Output file path.
@@ -290,8 +356,14 @@ class FitResult:
             self._save_json(path)
         elif ext == ".npz":
             self._save_npz(path)
+        elif ext in (".h5", ".hdf5"):
+            from rheojax.io.writers.hdf5_writer import save_fit_result_hdf5
+
+            save_fit_result_hdf5(self, path)
         else:
-            raise ValueError(f"Unsupported extension '{ext}'. Use .json or .npz.")
+            raise ValueError(
+                f"Unsupported extension '{ext}'. Use .json, .npz, .h5, or .hdf5."
+            )
 
     def _save_json(self, path: str) -> None:
         import json
@@ -313,7 +385,15 @@ class FitResult:
             "timestamp": _str_to_bytes(self.timestamp),
             "param_names": _str_to_bytes(_json.dumps(list(self.params.keys()))),
             "param_values": np.array(list(self.params.values()), dtype=np.float64),
+            # P2-Fit-8: Persist success, n_data, and _is_complex_split for
+            # correct round-trip of statistics.
+            "success": np.array(self.success),
+            "n_data": np.array(self.n_data),
         }
+        if self.optimization_result is not None:
+            save_dict["_is_complex_split"] = np.array(
+                self.optimization_result._is_complex_split
+            )
         if self.X is not None:
             save_dict["X"] = np.asarray(self.X)
         if self.y is not None:
@@ -349,25 +429,42 @@ class FitResult:
         with open(path) as f:
             d = json.load(f)
 
+        # Reconstruct arrays, handling complex data serialized as
+        # separate real/imag keys (see to_dict).
+        def _load_array(
+            d: dict, key: str,
+        ) -> np.ndarray | None:
+            if d.get(f"{key}_is_complex"):
+                return np.array(d[f"{key}_real"]) + 1j * np.array(d[f"{key}_imag"])
+            if key in d:
+                return np.array(d[key])
+            return None
+
+        y_arr = _load_array(d, "y")
+        fitted = _load_array(d, "fitted_curve")
+
         # Reconstruct a minimal OptimizationResult from serialized stats.
-        # Stats (r_squared, aic, bic, etc.) are computed properties on
-        # OptimizationResult derived from residuals and y_data, so we
-        # reconstruct residuals from fitted_curve and y when available.
         opt_result = None
-        if "y" in d and "fitted_curve" in d:
+        if y_arr is not None and fitted is not None:
             from rheojax.utils.optimization import OptimizationResult
 
-            y_arr = np.array(d["y"])
-            fitted = np.array(d["fitted_curve"])
-            residuals = (y_arr - fitted).ravel()
+            _is_complex = np.iscomplexobj(y_arr)
+            if _is_complex:
+                residuals = np.concatenate([
+                    y_arr.real - fitted.real,
+                    y_arr.imag - fitted.imag,
+                ])
+            else:
+                residuals = (y_arr - fitted).ravel()
             rss = float(np.sum(residuals**2))
             opt_result = OptimizationResult(
                 x=np.array(list(d["params"].values())),
                 fun=rss,
-                success=d.get("success", True),
+                success=d.get("success", False),
                 y_data=y_arr,
                 residuals=residuals,
                 n_data=len(y_arr),
+                _is_complex_split=_is_complex,
             )
 
         return cls(
@@ -378,9 +475,9 @@ class FitResult:
             params_units=d.get("params_units", {}),
             n_params=d["n_params"],
             optimization_result=opt_result,
-            fitted_curve=np.array(d["fitted_curve"]) if "fitted_curve" in d else None,
+            fitted_curve=fitted,
             X=np.array(d["X"]) if "X" in d else None,
-            y=np.array(d["y"]) if "y" in d else None,
+            y=y_arr,
             timestamp=d.get("timestamp", ""),
             metadata=d.get("metadata", {}),
         )
@@ -399,6 +496,12 @@ class FitResult:
         y_arr = data["y"] if "y" in data else None
         fitted = data["fitted_curve"] if "fitted_curve" in data else None
 
+        # P2-Fit-8: Read back persisted success, n_data, _is_complex_split
+        # with backward-compatible defaults.
+        _success = bool(data["success"]) if "success" in data else True
+        _n_data = int(data["n_data"]) if "n_data" in data else (len(y_arr) if y_arr is not None else 0)
+        _is_complex_split = bool(data["_is_complex_split"]) if "_is_complex_split" in data else False
+
         # Reconstruct OptimizationResult from y + fitted_curve
         opt_result = None
         if y_arr is not None and fitted is not None:
@@ -408,10 +511,11 @@ class FitResult:
             opt_result = OptimizationResult(
                 x=np.array(param_values),
                 fun=float(np.sum(residuals**2)),
-                success=True,
+                success=_success,
                 y_data=np.asarray(y_arr),
                 residuals=residuals,
-                n_data=len(y_arr),
+                n_data=_n_data,
+                _is_complex_split=_is_complex_split,
             )
 
         return cls(
@@ -513,6 +617,7 @@ class ModelInfo:
 
     name: str
     class_name: str
+    model_class: type | None
     param_names: list[str]
     param_bounds: dict[str, tuple[float, float]]
     param_units: dict[str, str]
@@ -556,6 +661,11 @@ class ModelInfo:
             n_params = len(param_names)
             supports_bayesian = hasattr(instance, "fit_bayesian")
         except Exception:
+            logger.warning(
+                "ModelInfo.from_registry: instantiation failed for model '%s'",
+                name,
+                exc_info=True,
+            )
             param_names = []
             param_bounds = {}
             param_units = {}
@@ -565,6 +675,7 @@ class ModelInfo:
         return cls(
             name=name,
             class_name=info.plugin_class.__name__,
+            model_class=info.plugin_class,
             param_names=param_names,
             param_bounds=param_bounds,
             param_units=param_units,
@@ -599,12 +710,19 @@ class ModelComparison:
 
     results: list[FitResult]
     criterion: str = "aic"
-    rankings: list[str] = field(default_factory=list)
+    rankings: dict[str, int] = field(default_factory=dict)
     delta_criterion: dict[str, float] = field(default_factory=dict)
     weights: dict[str, float] = field(default_factory=dict)
     best_model: str = ""
 
+    _VALID_CRITERIA = {"aic", "bic", "aicc"}
+
     def __post_init__(self):
+        if self.criterion not in self._VALID_CRITERIA:
+            raise ValueError(
+                f"criterion must be one of {self._VALID_CRITERIA!r}, "
+                f"got {self.criterion!r}"
+            )
         if self.results and not self.rankings:
             self._compute_rankings()
 
@@ -624,8 +742,8 @@ class ModelComparison:
         entries.sort(key=lambda e: e[1])
         best_val = entries[0][1]
 
-        self.rankings = [name for name, _ in entries]
-        self.best_model = self.rankings[0]
+        self.rankings = {name: rank for rank, (name, _) in enumerate(entries, 1)}
+        self.best_model = entries[0][0]
 
         # Delta and Akaike weights
         deltas = {name: val - best_val for name, val in entries}
@@ -638,6 +756,10 @@ class ModelComparison:
         else:
             self.weights = dict.fromkeys(deltas, 0.0)
 
+    def ranked_names(self) -> list[str]:
+        """Return model names sorted by rank (best first)."""
+        return sorted(self.rankings, key=lambda n: self.rankings[n])
+
     def summary(self) -> str:
         """Human-readable summary table.
 
@@ -649,8 +771,8 @@ class ModelComparison:
             f"{'Rank':<6}{'Model':<25}{'Criterion':<14}{'Delta':<12}{'Weight':<10}",
             "-" * 67,
         ]
-        for rank, name in enumerate(self.rankings, 1):
-            # Find the result for this model
+        for name in self.ranked_names():
+            rank = self.rankings[name]
             r = next((x for x in self.results if x.model_name == name), None)
             crit_val = getattr(r, self.criterion, None) if r else None
             delta = self.delta_criterion.get(name, float("nan"))
@@ -678,7 +800,7 @@ class ModelComparison:
         else:
             fig = ax.figure
 
-        names = self.rankings
+        names = self.ranked_names()
         w = [self.weights.get(n, 0.0) for n in names]
         ax.bar(range(len(names)), w, tick_label=names, **kwargs)
         ax.set_ylabel("Akaike Weight")
