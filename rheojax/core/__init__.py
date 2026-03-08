@@ -9,6 +9,7 @@ This module provides:
 
 from .base import BaseModel, BaseTransform, TransformPipeline
 from .data import RheoData
+from .fit_result import FitResult, ModelComparison, ModelInfo
 from .parameters import (
     Parameter,
     ParameterConstraint,
@@ -31,6 +32,10 @@ __all__ = [
     "TransformPipeline",
     # Data wrapper
     "RheoData",
+    # Fit results
+    "FitResult",
+    "ModelInfo",
+    "ModelComparison",
     # Parameters
     "Parameter",
     "ParameterSet",

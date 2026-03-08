@@ -248,8 +248,12 @@ class BaseModel(BayesianMixin, ABC):
         perturb_factor: float = 0.3,
         deformation_mode: str | DeformationMode | None = None,
         poisson_ratio: float = 0.5,
+        auto_init: bool = False,
+        return_result: bool = False,
+        check_physics: bool = False,
+        uncertainty: str | None = None,
         **kwargs,
-    ) -> BaseModel:
+    ) -> BaseModel | Any:
         """Fit the model to data using NLSQ optimization.
 
         This method uses NLSQ (GPU-accelerated nonlinear least squares) by default
@@ -277,10 +281,21 @@ class BaseModel(BayesianMixin, ABC):
             perturb_factor: Perturbation magnitude for multi-start random starts (default: 0.3).
                 Parameters are perturbed by ± perturb_factor * (value or range).
                 Larger values (0.7-0.9) explore wider parameter space.
+            auto_init: If True, calls ``auto_p0()`` to estimate initial parameters
+                from data before running the optimizer (default: False).
+            return_result: If True, returns a ``FitResult`` instead of ``self``.
+                This intentionally breaks method chaining for workflows that need
+                structured result objects (default: False).
+            check_physics: If True, runs post-fit physics validation and emits
+                ``RheoJaxPhysicsWarning`` for any violations (default: False).
+            uncertainty: Post-fit uncertainty method. ``"hessian"`` for fast
+                Cramér-Rao bounds, ``"bootstrap"`` for residual bootstrap CIs,
+                or ``None`` to skip (default: None).
             **kwargs: Additional fitting options passed to _fit()
 
         Returns:
-            self for method chaining (scikit-learn style)
+            ``self`` for method chaining (default), or ``FitResult`` if
+            ``return_result=True``.
 
         Example:
             >>> model = Maxwell()
@@ -289,6 +304,9 @@ class BaseModel(BayesianMixin, ABC):
             >>> model.fit(t, G_data, check_compatibility=True)  # Check compatibility
             >>> model.fit(omega, G_star, use_log_residuals=True)  # Force log-residuals
             >>> model.fit(mastercurve, None, use_multi_start=True, n_starts=10)  # Multi-start
+            >>> result = model.fit(t, G_data, return_result=True)  # Structured result
+            >>> result = model.fit(t, G_data, auto_init=True, check_physics=True,
+            ...                    return_result=True)  # Full pipeline
         """
         # Get data shape for logging
         _shape = getattr(X, "shape", None)
@@ -375,8 +393,31 @@ class BaseModel(BayesianMixin, ABC):
         kwargs["n_starts"] = n_starts
         kwargs["perturb_factor"] = perturb_factor
 
-        # Optional compatibility check before fitting
+        # Auto-initialization: estimate initial parameters from data
         test_mode = kwargs.get("test_mode", None)
+        if auto_init:
+            try:
+                from rheojax.utils.initialization.auto_p0 import auto_p0 as _auto_p0
+
+                p0 = _auto_p0(X, y, self, test_mode=test_mode)
+                for name, value in p0.items():
+                    try:
+                        self.parameters.set_value(name, value)
+                    except (KeyError, ValueError):
+                        pass
+                logger.info(
+                    "auto_p0 initialized parameters",
+                    model=self.__class__.__name__,
+                    n_params_set=len(p0),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "auto_p0 failed, using default initial values",
+                    model=self.__class__.__name__,
+                    error=str(exc),
+                )
+
+        # Optional compatibility check before fitting
         if check_compatibility:
             compatibility = self._check_compatibility(X, y, test_mode)
             if compatibility and not compatibility.get("compatible", True):
@@ -478,6 +519,74 @@ class BaseModel(BayesianMixin, ABC):
                 exc_info=True,
             )
             raise
+
+        # Post-fit physics check
+        if check_physics:
+            try:
+                import warnings as _warnings
+
+                from rheojax.io._exceptions import RheoJaxPhysicsWarning
+                from rheojax.utils.physics_checks import check_fit_physics
+
+                violations = check_fit_physics(self)
+                for v in violations:
+                    _warnings.warn(
+                        f"{v.check}: {v.message} ({v.parameter}={v.value})",
+                        RheoJaxPhysicsWarning,
+                        stacklevel=2,
+                    )
+            except Exception as exc:
+                logger.debug(
+                    "Physics check failed",
+                    model=self.__class__.__name__,
+                    error=str(exc),
+                )
+
+        # Post-fit uncertainty quantification
+        _uncertainty_result = None
+        if uncertainty is not None:
+            try:
+                from rheojax.utils.uncertainty import bootstrap_ci, hessian_ci
+
+                if uncertainty == "hessian":
+                    _uncertainty_result = hessian_ci(
+                        self, X, y, test_mode=test_mode
+                    )
+                elif uncertainty == "bootstrap":
+                    _uncertainty_result = bootstrap_ci(
+                        self, X, y, test_mode=test_mode
+                    )
+                else:
+                    logger.warning(
+                        "Unknown uncertainty method",
+                        method=uncertainty,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Uncertainty computation failed",
+                    model=self.__class__.__name__,
+                    method=uncertainty,
+                    error=str(exc),
+                )
+
+        # Build FitResult if requested
+        if return_result:
+            try:
+                from rheojax.utils.model_selection import build_fit_result
+
+                fit_result = build_fit_result(
+                    self, X, y, test_mode=test_mode
+                )
+                if _uncertainty_result is not None:
+                    fit_result.metadata["uncertainty"] = _uncertainty_result
+                    fit_result.metadata["uncertainty_method"] = uncertainty
+                return fit_result
+            except Exception as exc:
+                logger.warning(
+                    "FitResult construction failed, returning self",
+                    model=self.__class__.__name__,
+                    error=str(exc),
+                )
 
         return self
 

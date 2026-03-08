@@ -854,6 +854,75 @@ class ModelRegistry:
         return info
 
     @classmethod
+    def for_protocol(cls, protocol: Protocol | str) -> list[PluginInfo]:
+        """Get all models supporting a given protocol.
+
+        Args:
+            protocol: Protocol to filter by (e.g. ``"relaxation"``).
+
+        Returns:
+            List of PluginInfo objects for matching models.
+        """
+        registry = cls._get_registry()
+        names = registry.find_compatible(protocol=protocol)
+        return [registry.get_info(n, PluginType.MODEL) for n in names
+                if registry.get_info(n, PluginType.MODEL) is not None]
+
+    @classmethod
+    def compatible_models(cls, data: Any) -> list[PluginInfo]:
+        """Find models compatible with a RheoData instance.
+
+        Reads ``data.test_mode`` (maps to protocol) and
+        ``data.metadata.get("deformation_mode")`` to filter models.
+
+        Args:
+            data: RheoData instance with test_mode metadata.
+
+        Returns:
+            List of PluginInfo objects for compatible models.
+        """
+        registry = cls._get_registry()
+        # Extract protocol from test_mode
+        test_mode = getattr(data, "test_mode", None)
+        if test_mode is None:
+            metadata = getattr(data, "metadata", {})
+            test_mode = metadata.get("test_mode") or metadata.get("detected_test_mode")
+
+        protocol = test_mode if test_mode else None
+
+        deformation_mode = None
+        metadata = getattr(data, "metadata", {})
+        if isinstance(metadata, dict):
+            deformation_mode = metadata.get("deformation_mode")
+
+        names = registry.find_compatible(
+            protocol=protocol,
+            deformation_mode=deformation_mode,
+        )
+        return [registry.get_info(n, PluginType.MODEL) for n in names
+                if registry.get_info(n, PluginType.MODEL) is not None]
+
+    @classmethod
+    def model_info(cls, name: str) -> Any:
+        """Get aggregated model information including parameter metadata.
+
+        Temporarily instantiates the model to read parameter names, bounds,
+        and units. Returns a ``ModelInfo`` dataclass.
+
+        Args:
+            name: Registry name of the model.
+
+        Returns:
+            ModelInfo instance with full model metadata.
+
+        Raises:
+            KeyError: If model is not registered.
+        """
+        from rheojax.core.fit_result import ModelInfo
+
+        return ModelInfo.from_registry(name)
+
+    @classmethod
     def unregister(cls, name: str):
         """Unregister a model.
 
