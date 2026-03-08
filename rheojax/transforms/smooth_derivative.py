@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import warnings
+
 import numpy as np
 from scipy.signal import savgol_filter
 
@@ -305,6 +307,10 @@ class SmoothDerivative(BaseTransform):
             ||y - integral(u)||² + α * TV(u)
         where u = dy/dx is the derivative.
 
+        .. warning::
+            Currently uses finite differences with smoothing as an
+            approximation, not true TV-regularised differentiation.
+
         Parameters
         ----------
         x : jnp.ndarray
@@ -319,8 +325,13 @@ class SmoothDerivative(BaseTransform):
         jnp.ndarray
             Derivative dy/dx
         """
-        # This is a complex optimization problem
-        # For now, use finite differences with smoothing as approximation
+        # TODO: Implement proper TV-regularised differentiation (Chambolle's algorithm)
+        warnings.warn(
+            "The 'total_variation' method currently uses finite differences with "
+            "smoothing as an approximation. For true TV-regularised differentiation, "
+            "use an external solver.",
+            stacklevel=2,
+        )
         dy_dx = self._finite_diff_derivative(x, y)
 
         # Apply TV denoising to the derivative

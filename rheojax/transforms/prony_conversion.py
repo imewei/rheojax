@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import warnings
+
 import numpy as np
 
 from rheojax.core.base import BaseTransform
@@ -181,31 +183,52 @@ class PronyConversion(BaseTransform):
 # ---------------------------------------------------------------------------
 
 
+@jax.jit
+def _prony_to_frequency_jax(
+    G_i: jnp.ndarray, tau_i: jnp.ndarray, G_e: float, omega: jnp.ndarray
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """JIT-compiled Prony to frequency conversion."""
+    wt2 = (omega[:, None] * tau_i[None, :]) ** 2
+    G_prime = G_e + jnp.sum(G_i[None, :] * wt2 / (1.0 + wt2), axis=1)
+    G_double_prime = jnp.sum(
+        G_i[None, :] * omega[:, None] * tau_i[None, :] / (1.0 + wt2), axis=1
+    )
+    return G_prime, G_double_prime
+
+
 def _prony_to_frequency(
     G_i: np.ndarray, tau_i: np.ndarray, G_e: float, omega: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Compute G'(ω) and G''(ω) from Prony parameters."""
-    omega = np.asarray(omega)
-    G_prime = np.full_like(omega, G_e, dtype=np.float64)
-    G_double_prime = np.zeros_like(omega, dtype=np.float64)
+    """Compute G'(ω) and G''(ω) from Prony parameters (JIT-accelerated)."""
+    G_p, G_dp = _prony_to_frequency_jax(
+        jnp.asarray(G_i, dtype=jnp.float64),
+        jnp.asarray(tau_i, dtype=jnp.float64),
+        G_e,
+        jnp.asarray(omega, dtype=jnp.float64),
+    )
+    return np.asarray(G_p), np.asarray(G_dp)
 
-    for g, tau in zip(G_i, tau_i, strict=False):
-        wt2 = (omega * tau) ** 2
-        G_prime += g * wt2 / (1.0 + wt2)
-        G_double_prime += g * omega * tau / (1.0 + wt2)
 
-    return G_prime, G_double_prime
+@jax.jit
+def _prony_to_time_jax(
+    G_i: jnp.ndarray, tau_i: jnp.ndarray, G_e: float, t: jnp.ndarray
+) -> jnp.ndarray:
+    """JIT-compiled Prony to time conversion."""
+    return G_e + jnp.sum(G_i[None, :] * jnp.exp(-t[:, None] / tau_i[None, :]), axis=1)
 
 
 def _prony_to_time(
     G_i: np.ndarray, tau_i: np.ndarray, G_e: float, t: np.ndarray
 ) -> np.ndarray:
-    """Compute G(t) from Prony parameters."""
-    t = np.asarray(t)
-    G_t = np.full_like(t, G_e, dtype=np.float64)
-    for g, tau in zip(G_i, tau_i, strict=False):
-        G_t += g * np.exp(-t / tau)
-    return G_t
+    """Compute G(t) from Prony parameters (JIT-accelerated)."""
+    return np.asarray(
+        _prony_to_time_jax(
+            jnp.asarray(G_i, dtype=jnp.float64),
+            jnp.asarray(tau_i, dtype=jnp.float64),
+            G_e,
+            jnp.asarray(t, dtype=jnp.float64),
+        )
+    )
 
 
 def _fit_prony_relaxation(
@@ -217,7 +240,10 @@ def _fit_prony_relaxation(
     # Log-spaced relaxation times (use t[0] if positive, else t[1])
     if len(t) < 2:
         raise ValueError("Prony fitting requires at least 2 time points.")
-    t_min = t[0] if t[0] > 0 else t[1]
+    t_positive = t[t > 0]
+    if len(t_positive) == 0:
+        raise ValueError("Prony fitting requires at least one positive time value.")
+    t_min = float(np.min(t_positive))
     tau_i = np.logspace(np.log10(t_min), np.log10(t[-1]), n_modes)
 
     # Equilibrium modulus estimate
@@ -242,6 +268,9 @@ def _fit_prony_oscillation(
     """Fit Prony series to dynamic moduli G'(ω), G''(ω)."""
     from scipy.optimize import nnls
 
+    # T-04: Ensure omega is sorted ascending for correct tau range computation
+    omega = np.sort(omega)
+
     tau_i = np.logspace(
         np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes
     )
@@ -251,12 +280,19 @@ def _fit_prony_oscillation(
     # Build kernel matrices
     n = len(omega)
     A = np.zeros((2 * n, n_modes))
-    for j, tau in enumerate(tau_i):
-        wt2 = (omega * tau) ** 2
-        A[:n, j] = wt2 / (1.0 + wt2)  # G' kernel
-        A[n:, j] = omega * tau / (1.0 + wt2)  # G'' kernel
+    wt2 = (omega[:, None] * tau_i[None, :]) ** 2
+    A[:n, :] = wt2 / (1.0 + wt2)  # G' kernel
+    A[n:, :] = omega[:, None] * tau_i[None, :] / (1.0 + wt2)  # G'' kernel
 
     b = np.concatenate([G_prime - G_e, G_double_prime])
+    neg_mask = b < 0
+    if np.any(neg_mask):
+        n_neg = int(np.sum(neg_mask))
+        warnings.warn(
+            f"Prony fit: {n_neg} negative target values clipped to zero "
+            "(noisy data or overestimated G_e).",
+            stacklevel=2,
+        )
     b = np.maximum(b, 0.0)
     G_i, _ = nnls(A, b)
 

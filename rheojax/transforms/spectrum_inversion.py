@@ -89,6 +89,13 @@ class SpectrumInversion(BaseTransform):
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
+        # Validate inputs — x must be strictly positive for log-space operations
+        if np.any(x <= 0):
+            raise ValueError(
+                f"SpectrumInversion: x (frequency/time) must be strictly positive; "
+                f"got min(x) = {np.min(x):.4g}"
+            )
+
         # Build τ grid
         if self.tau_range is not None:
             tau_min, tau_max = self.tau_range
@@ -141,13 +148,19 @@ class SpectrumInversion(BaseTransform):
 
 def _build_kernel(
     x: np.ndarray, tau: np.ndarray, source: str, G_e: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """Build the kernel matrix A and target vector b.
+) -> np.ndarray:
+    """Build the kernel matrix A for the linear inverse problem A @ H ≈ b.
 
-    Returns (A, b) where A @ H ≈ b.
+    The target vector b is assembled separately by :func:`_assemble_target`
+    because it depends on data preprocessing (G_e subtraction, complex
+    splitting) that is independent of the kernel structure.
+
+    Returns:
+        A: Kernel matrix with shape ``(M, n_tau)`` where M = N for relaxation
+           and M = 2N for oscillation (stacked G'/G'' rows).
     """
     d_ln_tau = np.diff(np.log(tau))
-    d_ln_tau = np.append(d_ln_tau, d_ln_tau[-1])  # extend last bin
+    d_ln_tau = np.append(d_ln_tau, d_ln_tau[-1] / 2.0)  # half-width boundary bin
 
     if source == "oscillation":
         omega = x
@@ -155,20 +168,17 @@ def _build_kernel(
         # Handle complex/real input
         n = len(omega)
         A = np.zeros((2 * n, len(tau)))
-        for j, (t, dlnt) in enumerate(zip(tau, d_ln_tau, strict=False)):
-            wt2 = (omega * t) ** 2
-            A[:n, j] = wt2 / (1.0 + wt2) * dlnt       # G' kernel
-            A[n:, j] = omega * t / (1.0 + wt2) * dlnt  # G'' kernel
+        wt2 = (omega[:, None] * tau[None, :]) ** 2
+        A[:n, :] = wt2 / (1.0 + wt2) * d_ln_tau[None, :]       # G' kernel
+        A[n:, :] = omega[:, None] * tau[None, :] / (1.0 + wt2) * d_ln_tau[None, :]  # G'' kernel
 
-        return A, None  # b assembled externally
+        return A
 
     elif source == "relaxation":
         t_data = x
-        A = np.zeros((len(t_data), len(tau)))
-        for j, (tau_j, dlnt) in enumerate(zip(tau, d_ln_tau, strict=False)):
-            A[:, j] = np.exp(-t_data / tau_j) * dlnt
+        A = np.exp(-t_data[:, None] / tau[None, :]) * d_ln_tau[None, :]
 
-        return A, None
+        return A
 
     else:
         raise ValueError(f"Unknown source: {source}")
@@ -212,7 +222,7 @@ def _tikhonov_inversion(
 
     where L is the identity (zeroth order) for stability.
     """
-    A, _ = _build_kernel(x, tau, source, G_e)
+    A = _build_kernel(x, tau, source, G_e)
     b = _assemble_target(y, source, G_e)
 
     n_tau = len(tau)
@@ -269,7 +279,7 @@ def _select_lambda_gcv(
             # ||residual||² = Σ (1-f_j)² (UTb_j)² + ||b - UU^Tb||²
             res_filtered = (1.0 - f) * UTb
             # Component orthogonal to range(A) is constant across lambdas
-            b_perp_sq = np.sum(b ** 2) - np.sum(UTb ** 2)
+            b_perp_sq = max(0.0, float(np.sum(b ** 2) - np.sum(UTb ** 2)))
             res_norm_sq = float(np.sum(res_filtered ** 2) + b_perp_sq)
 
             # trace(I - M) = n - Σ f_j
@@ -322,7 +332,7 @@ def _max_entropy_inversion(
 
     Uses iterative multiplicative update (Bryan's algorithm).
     """
-    A, _ = _build_kernel(x, tau, source, G_e)
+    A = _build_kernel(x, tau, source, G_e)
     b = _assemble_target(y, source, G_e)
 
     n_tau = len(tau)

@@ -306,7 +306,8 @@ class MutationNumber(BaseTransform):
         float
             Estimated equilibrium modulus G_eq
         """
-        n_tail = max(10, len(G_t) // 10)
+        # T-15: Clamp n_tail to valid range for short arrays
+        n_tail = min(max(1, len(G_t) // 10), len(G_t))
         return float(jnp.mean(G_t[-n_tail:]))
 
     def _should_extrapolate(self, G_relax: Array, G_0_relax: float) -> bool:
@@ -682,7 +683,8 @@ class MutationNumber(BaseTransform):
             G_t = jnp.real(G_t)
 
         # Estimate as average of last 10% of data
-        n_tail = max(10, len(G_t) // 10)
+        # T-15: Clamp n_tail to valid range for short arrays
+        n_tail = min(max(1, len(G_t) // 10), len(G_t))
         G_eq = float(jnp.mean(G_t[-n_tail:]))
 
         return G_eq

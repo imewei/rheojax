@@ -91,7 +91,8 @@ class CoxMerz(BaseTransform):
         else:
             G_star_mag = np.abs(y_osc)
 
-        eta_star = G_star_mag / omega
+        omega_safe = np.maximum(np.abs(omega), 1e-30)
+        eta_star = G_star_mag / omega_safe
 
         # Extract steady-shear viscosity η(γ̇)
         gamma_dot = np.asarray(flow_data.x)
@@ -103,7 +104,8 @@ class CoxMerz(BaseTransform):
             eta_steady_raw = y_flow
         else:
             # Assume stress → η = σ/γ̇
-            eta_steady_raw = y_flow / gamma_dot
+            gamma_dot_safe = np.maximum(np.abs(gamma_dot), 1e-30)
+            eta_steady_raw = y_flow / gamma_dot_safe
 
         # Build common log-spaced rate grid
         rate_min = max(np.min(omega), np.min(gamma_dot))

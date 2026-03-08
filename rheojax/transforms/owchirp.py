@@ -145,7 +145,7 @@ class OWChirp(BaseTransform):
         sigma = width / (2.0 * jnp.pi * freq_safe)
 
         # Gaussian envelope
-        envelope = jnp.exp(-(((t - t_center) / sigma) ** 2))
+        envelope = jnp.exp(-0.5 * (((t - t_center) / sigma) ** 2))
 
         # Complex exponential (chirp)
         omega = 2.0 * jnp.pi * frequency
@@ -155,6 +155,9 @@ class OWChirp(BaseTransform):
 
     def _wavelet_transform(self, t: Array, signal: Array, frequencies: Array) -> Array:
         """Compute wavelet transform of signal.
+
+        Uses vectorized JAX operations (vmap) instead of nested Python loops
+        for O(n_freqs * n_times) computation without Python-level overhead.
 
         Parameters
         ----------
@@ -170,26 +173,20 @@ class OWChirp(BaseTransform):
         Array
             Wavelet coefficients (n_frequencies, n_times)
         """
-        n_times = len(t)
-        n_freqs = len(frequencies)
-
-        # Initialize coefficient array
-        coefficients = jnp.zeros((n_freqs, n_times), dtype=jnp.complex128)
-
-        # TRANS-001: Compute dt once outside loops (invariant to i, j)
+        # TRANS-001: Compute dt once (invariant to freq, t_center)
         # R11-OWC-003: Use median dt for robustness to non-uniform sampling
-        dt = float(jnp.median(jnp.diff(t))) if len(t) > 1 else 1.0
+        dt = jnp.where(len(t) > 1, jnp.median(jnp.diff(t)), 1.0)
 
-        # Compute wavelet transform at each frequency
-        for i, freq in enumerate(frequencies):
-            # For each time point, compute wavelet convolution
-            # Use sliding window approach
-            for j, t_center in enumerate(t):
-                wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
-                # Inner product
-                coeff = jnp.sum(signal * jnp.conj(wavelet)) * dt
-                coefficients = coefficients.at[i, j].set(coeff)
+        # Vectorize over (freq, t_center) pairs using vmap
+        def compute_coeff(freq, t_center):
+            wavelet = self._chirp_wavelet(t, t_center, freq, self.wavelet_width)
+            return jnp.sum(signal * jnp.conj(wavelet)) * dt
 
+        # vmap over t_center (inner), then over freq (outer)
+        compute_row = jax.vmap(compute_coeff, in_axes=(None, 0))  # over t_centers
+        compute_all = jax.vmap(compute_row, in_axes=(0, None))    # over freqs
+
+        coefficients = compute_all(jnp.asarray(frequencies), t)
         return coefficients
 
     def _optimized_wavelet_transform(

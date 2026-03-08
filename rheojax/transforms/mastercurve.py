@@ -1017,19 +1017,43 @@ class Mastercurve(BaseTransform):
 
                 sort_i = np.argsort(x_i)
                 sort_j = np.argsort(x_j)
-                y_i_interp = np.interp(
-                    x_common,
-                    x_i[sort_i],
-                    np.asarray(data_i.y)[sort_i],
-                )
-                y_j_interp = np.interp(
-                    x_common,
-                    x_j[sort_j],
-                    np.asarray(data_j.y)[sort_j],
-                )
 
-                # Compute RMSE
-                error = np.sqrt(np.mean((y_i_interp - y_j_interp) ** 2))
+                y_i_raw = np.asarray(data_i.y)
+                y_j_raw = np.asarray(data_j.y)
+
+                # T-22: Handle complex G* data — compute overlap error
+                # on both G' and G'' independently, then combine RMSE.
+                if np.iscomplexobj(y_i_raw) or np.iscomplexobj(y_j_raw):
+                    y_i_raw = np.asarray(y_i_raw, dtype=np.complex128)
+                    y_j_raw = np.asarray(y_j_raw, dtype=np.complex128)
+                    # Interpolate real and imag parts separately
+                    y_i_real = np.interp(
+                        x_common, x_i[sort_i], np.real(y_i_raw)[sort_i]
+                    )
+                    y_i_imag = np.interp(
+                        x_common, x_i[sort_i], np.imag(y_i_raw)[sort_i]
+                    )
+                    y_j_real = np.interp(
+                        x_common, x_j[sort_j], np.real(y_j_raw)[sort_j]
+                    )
+                    y_j_imag = np.interp(
+                        x_common, x_j[sort_j], np.imag(y_j_raw)[sort_j]
+                    )
+                    error_real = np.mean((y_i_real - y_j_real) ** 2)
+                    error_imag = np.mean((y_i_imag - y_j_imag) ** 2)
+                    error = np.sqrt((error_real + error_imag) / 2.0)
+                else:
+                    y_i_interp = np.interp(
+                        x_common,
+                        x_i[sort_i],
+                        y_i_raw[sort_i],
+                    )
+                    y_j_interp = np.interp(
+                        x_common,
+                        x_j[sort_j],
+                        y_j_raw[sort_j],
+                    )
+                    error = np.sqrt(np.mean((y_i_interp - y_j_interp) ** 2))
                 total_error += error
                 n_overlaps += 1
 

@@ -951,6 +951,21 @@ def evolve_thixotropy_lambda(
         k_break=k_break,
     )
 
+    # T-24: Forward Euler stability check for thixotropy ODE.
+    # dt must be < 2 / max_eigenvalue to avoid oscillatory blow-up.
+    if len(t) > 1:
+        dt_arr = np.diff(t)
+        max_eigenvalue = k_build + k_break * np.max(np.abs(gamma_dot))
+        max_stable_dt = 2.0 / max(max_eigenvalue, 1e-30)
+        max_dt = float(np.max(dt_arr))
+        if max_dt > max_stable_dt:
+            warnings.warn(
+                f"Forward Euler may be unstable for thixotropy ODE: "
+                f"max(dt)={max_dt:.3g} > stability limit={max_stable_dt:.3g}. "
+                f"Consider using finer time steps or an implicit integrator.",
+                stacklevel=2,
+            )
+
     if t.shape != gamma_dot.shape:
         logger.error(
             "Shape mismatch between time and shear rate arrays",

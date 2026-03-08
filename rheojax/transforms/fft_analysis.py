@@ -279,6 +279,8 @@ class FFTAnalysis(BaseTransform):
                 # Power spectral density
                 logger.debug("Computing power spectral density")
                 spectrum = jnp.abs(fft_result) ** 2 / (n * dt)
+                # One-sided PSD: double non-DC, non-Nyquist bins
+                spectrum = spectrum.at[1:-1].set(spectrum[1:-1] * 2.0)
             else:
                 # Magnitude spectrum
                 logger.debug("Computing magnitude spectrum")
@@ -306,6 +308,9 @@ class FFTAnalysis(BaseTransform):
                     "dt": float(dt),
                     # Store complex coefficients as serializable list (T-010)
                     "fft_complex": fft_result.tolist(),
+                    # T-011: inverse FFT reconstructs the windowed signal, not
+                    # the original.  For lossless round-trip, use window='none'.
+                    "_windowed": self.window != "none",
                 }
             )
 

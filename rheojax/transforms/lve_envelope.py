@@ -92,7 +92,7 @@ class LVEEnvelope(BaseTransform):
                 G_i = np.asarray(meta["G_i"])
             if tau_i is None and "tau_i" in meta:
                 tau_i = np.asarray(meta["tau_i"])
-            if "G_e" in meta:
+            if abs(self.G_e) < 1e-30 and "G_e" in meta:
                 G_e = float(meta["G_e"])
 
         if G_i is None or tau_i is None:
@@ -107,6 +107,13 @@ class LVEEnvelope(BaseTransform):
         if len(G_i) != len(tau_i):
             raise ValueError(
                 f"G_i ({len(G_i)}) and tau_i ({len(tau_i)}) must have same length"
+            )
+
+        # T-12: Guard against non-positive relaxation times
+        if np.any(tau_i <= 0):
+            raise ValueError(
+                f"All relaxation times tau_i must be positive, "
+                f"got min={np.min(tau_i)}"
             )
 
         # Time array
@@ -146,6 +153,23 @@ class LVEEnvelope(BaseTransform):
 # ---------------------------------------------------------------------------
 
 
+@jax.jit
+def _lve_envelope_jax(
+    t: jnp.ndarray,
+    G_i: jnp.ndarray,
+    tau_i: jnp.ndarray,
+    G_e: float,
+    shear_rate: float,
+) -> jnp.ndarray:
+    """JIT-compiled LVE envelope computation."""
+    # modulus_integral = G_e * t + Σ Gᵢτᵢ (1 − exp(−t/τᵢ))
+    modulus_integral = G_e * t + jnp.sum(
+        G_i[None, :] * tau_i[None, :] * (1.0 - jnp.exp(-t[:, None] / tau_i[None, :])),
+        axis=1,
+    )
+    return shear_rate * modulus_integral
+
+
 def lve_envelope(
     t: np.ndarray,
     G_i: np.ndarray,
@@ -157,6 +181,8 @@ def lve_envelope(
 
     σ_LVE⁺(t) = γ̇₀ [G_e * t + Σ Gᵢτᵢ (1 − exp(−t/τᵢ))]
 
+    Uses JAX JIT compilation for vectorized evaluation.
+
     Args:
         t: Time array (s).
         G_i: Prony mode strengths (Pa).
@@ -167,12 +193,8 @@ def lve_envelope(
     Returns:
         Stress envelope σ_LVE⁺(t) in Pa.
     """
-    t = np.asarray(t, dtype=np.float64)
-    G_i = np.asarray(G_i, dtype=np.float64)
-    tau_i = np.asarray(tau_i, dtype=np.float64)
+    t_j = jnp.asarray(t, dtype=jnp.float64)
+    G_i_j = jnp.asarray(G_i, dtype=jnp.float64)
+    tau_i_j = jnp.asarray(tau_i, dtype=jnp.float64)
 
-    sigma = G_e * t
-    for g, tau in zip(G_i, tau_i, strict=False):
-        sigma = sigma + g * tau * (1.0 - np.exp(-t / tau))
-
-    return shear_rate * sigma
+    return np.asarray(_lve_envelope_jax(t_j, G_i_j, tau_i_j, G_e, shear_rate))

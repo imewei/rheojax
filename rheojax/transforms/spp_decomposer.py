@@ -353,9 +353,10 @@ class SPPDecomposer(BaseTransform):
             strain_rate_jax = jnp.asarray(_spp_meta["strain_rate"], dtype=jnp.float64)
         else:
             # Compute strain rate via wrapped differentiation (Rogers parity)
+            # T-26: Use median dt for robustness to non-uniform time steps
             strain_rate_jax = differentiate_rate_from_strain(
                 strain_jax,
-                float(t_jax[1] - t_jax[0]) if len(t_jax) > 1 else 0.001,
+                float(jnp.median(jnp.diff(t_jax))) if len(t_jax) > 1 else 0.001,
                 step_size=self.step_size,
                 looped=self.wrap_strain_rate,
             )
@@ -405,8 +406,8 @@ class SPPDecomposer(BaseTransform):
         # SPP Analysis
         # =====================================================================
 
-        # Compute dt for analyses
-        dt = float(t_jax[1] - t_jax[0]) if len(t_jax) > 1 else 0.001
+        # T-27: Use median dt for robustness to non-uniform time steps
+        dt = float(jnp.median(jnp.diff(t_jax))) if len(t_jax) > 1 else 0.001
 
         # Initialize method results (may be populated below)
         core_results = None
