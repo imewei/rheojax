@@ -32,6 +32,7 @@ References
 """
 
 # Import base class and utility functions
+from rheojax.utils.initialization.auto_p0 import auto_p0
 from rheojax.utils.initialization.base import (
     BaseInitializer,
     extract_frequency_features,
@@ -143,6 +144,8 @@ def initialize_fractional_burgers(omega, G_star, param_set):
 
 
 __all__ = [
+    # Auto-initialization engine
+    "auto_p0",
     # Public API functions (backward compatible)
     "extract_frequency_features",
     "initialize_fractional_burgers",

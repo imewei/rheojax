@@ -799,6 +799,112 @@ class Pipeline:
             for name in self._last_model.parameters.keys()
         }
 
+    def compare_models(
+        self,
+        models: list[str | BaseModel],
+        criterion: str = "aic",
+        **fit_kwargs,
+    ) -> Pipeline:
+        """Compare multiple models on the current data.
+
+        Fits each model and ranks by information criterion.  The best model
+        becomes ``_last_model`` and is appended to ``steps``.
+
+        Args:
+            models: List of model names (strings) or BaseModel instances.
+            criterion: Ranking criterion ('aic', 'aicc', 'bic').
+            **fit_kwargs: Extra kwargs forwarded to each ``model.fit()`` call.
+
+        Returns:
+            self for method chaining
+
+        Raises:
+            ValueError: If no data is loaded.
+
+        Example:
+            >>> pipeline.load('data.csv').compare_models(['maxwell', 'zener'])
+        """
+        if self.data is None:
+            raise ValueError("No data loaded. Call load() first.")
+
+        from rheojax.utils.model_selection import compare_models as _compare
+
+        X = self.data.x
+        y = self.data.y
+
+        if isinstance(X, jnp.ndarray):
+            X = np.array(X)
+        if isinstance(y, jnp.ndarray):
+            y = np.array(y)
+
+        # Auto-propagate metadata
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "test_mode" not in fit_kwargs and _meta.get("test_mode"):
+            fit_kwargs["test_mode"] = _meta["test_mode"]
+        if "deformation_mode" not in fit_kwargs and _meta.get("deformation_mode"):
+            fit_kwargs["deformation_mode"] = _meta["deformation_mode"]
+
+        test_mode = fit_kwargs.pop("test_mode", None)
+
+        comparison = _compare(
+            X, y,
+            models=models,
+            test_mode=test_mode,
+            criterion=criterion,
+            **fit_kwargs,
+        )
+
+        self._last_comparison = comparison
+        self.history.append(("compare_models", comparison.best_model, criterion))
+
+        # Set the best model as _last_model if available — reuse the
+        # already-fitted instance from compare_models() instead of re-fitting.
+        if comparison.results:
+            best_fr = comparison.results[comparison.rankings[0]]
+            fitted_model = getattr(best_fr, "_fitted_model", None)
+            if fitted_model is not None:
+                self._last_model = fitted_model
+                self.steps.append(("compare_models", fitted_model))
+            else:
+                logger.warning(
+                    "Best model FitResult has no attached fitted model",
+                    model=comparison.best_model,
+                )
+
+        return self
+
+    def get_fit_result(self) -> Any:
+        """Construct a FitResult from the last fitted model.
+
+        Returns:
+            FitResult with model metadata, fitted parameters, and statistics.
+
+        Raises:
+            ValueError: If no model has been fitted.
+
+        Example:
+            >>> result = pipeline.load('data.csv').fit('maxwell').get_fit_result()
+            >>> print(result.summary())
+        """
+        if self._last_model is None:
+            raise ValueError("No model fitted. Call fit() first.")
+
+        from rheojax.utils.model_selection import build_fit_result
+
+        X = self.data.x if self.data is not None else None
+        y = self.data.y if self.data is not None else None
+        test_mode = None
+        if self.data is not None:
+            _meta = getattr(self.data, "metadata", None) or {}
+            test_mode = _meta.get("test_mode")
+
+        return build_fit_result(
+            self._last_model,
+            X,
+            y,
+            test_mode=test_mode,
+        )
+
     def clone(self) -> Pipeline:
         """Create a copy of the pipeline.
 
