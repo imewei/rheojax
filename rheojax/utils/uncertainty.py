@@ -71,7 +71,10 @@ def _param_names(model: BaseModel) -> list[str]:
 
 def _param_values(model: BaseModel) -> np.ndarray:
     """Return current optimal parameter values as a float64 numpy array."""
-    return np.asarray(model.parameters.get_values(), dtype=np.float64)
+    names = list(model.parameters.keys())
+    return np.array(
+        [float(model.parameters.get_value(n)) for n in names], dtype=np.float64
+    )
 
 
 def _n_obs(y: np.ndarray) -> int:
@@ -351,37 +354,34 @@ def _jacobian_fallback_pcov(
         Covariance matrix (k×k) or None if computation fails.
     """
     try:
-        from scipy.optimize import approx_fprime
-
         from rheojax.utils.optimization import compute_covariance_from_jacobian
 
         y_arr = np.asarray(y)
 
+        import copy
+
+        # Use a deep copy to avoid mutating the original model (thread-safe)
+        model_copy = copy.deepcopy(model)
+
         def residual_vec(params: np.ndarray) -> np.ndarray:
             """Real residual vector for Jacobian estimation."""
-            # Temporarily store params in model parameters and predict
-            orig_vals = _param_values(model)
-            for i, name in enumerate(_param_names(model)):
-                model.parameters.set_value(name, float(params[i]))
-            try:
-                y_pred = _predict_safe(model, X)
-                residuals = y_pred - y_arr
-                return _residuals_to_real(residuals)
-            finally:
-                # Always restore original values
-                for i, name in enumerate(_param_names(model)):
-                    model.parameters.set_value(name, float(orig_vals[i]))
+            for i, name in enumerate(_param_names(model_copy)):
+                model_copy.parameters.set_value(name, float(params[i]))
+            y_pred = _predict_safe(model_copy, X)
+            residuals = y_pred - y_arr
+            return _residuals_to_real(residuals)
 
         eps = np.sqrt(np.finfo(np.float64).eps)
-        # approx_fprime returns shape (k,) for a scalar — use Jacobian row by row
         k = len(param_vals)
         base_res = residual_vec(param_vals)
         m = len(base_res)
         jac = np.zeros((m, k), dtype=np.float64)
         for j in range(k):
-            eps_vec = np.zeros(k)
-            eps_vec[j] = eps * max(abs(param_vals[j]), 1.0)
-            jac[:, j] = approx_fprime(param_vals, residual_vec, eps_vec)
+            # Forward-difference one column at a time
+            eps_j = eps * max(abs(param_vals[j]), 1.0)
+            params_plus = param_vals.copy()
+            params_plus[j] += eps_j
+            jac[:, j] = (residual_vec(params_plus) - base_res) / eps_j
 
         pcov = compute_covariance_from_jacobian(jac, base_res, n_data=n)
         if pcov is not None:

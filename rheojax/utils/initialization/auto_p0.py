@@ -376,7 +376,9 @@ def _infer_test_mode(
 ) -> str:
     """Infer protocol from data characteristics when not specified explicitly."""
     if explicit is not None:
-        return explicit
+        # Normalize canonical aliases so downstream branches match
+        _aliases = {"flow_curve": "flow", "flow curve": "flow"}
+        return _aliases.get(explicit.lower(), explicit)
 
     # Complex y almost certainly means oscillation (G* = G' + iG'')
     if np.iscomplexobj(y):
@@ -389,15 +391,20 @@ def _infer_test_mode(
     # X spanning many orders of magnitude (> 2 decades) with positive small values
     # is characteristic of frequency or shear-rate sweeps
     x_pos = X[X > 0]
+    y_real = np.real(y).astype(float)
+    y_positive = np.abs(y_real)
     if len(x_pos) > 1:
         decades = np.log10(x_pos.max() / x_pos.min())
+        # P2-Fit-4: Check for monotonically decreasing data first — this is
+        # characteristic of flow curves (viscosity vs shear rate) even when
+        # x_pos.min() < 1.0.  Without this, low-shear-rate flow curves are
+        # misidentified as oscillation.
+        if decades > 2.0 and len(y_positive) > 1 and np.all(np.diff(y_positive) <= 0):
+            return "flow"
         if decades > 2.0 and x_pos.min() < 1.0:
             return "oscillation"
         if decades > 2.0:
             return "flow"
-
-    # Monotonically decreasing y with time-like X → relaxation
-    y_real = np.real(y).astype(float)
     if len(y_real) > 1 and np.all(np.diff(y_real) <= 0):
         return "relaxation"
 
@@ -643,6 +650,18 @@ def _estimate_single_parameter(
         return 1.0  # rate coefficient — dimensionless default
 
     # ------------------------------------------------------------------
+    # Spring extensibility (FENE / finitely extensible models)
+    # ------------------------------------------------------------------
+    if nm in ("l2", "l_max", "l_sq", "l_squared", "b_fene"):
+        return 100.0  # dimensionless — typical FENE extensibility
+
+    # ------------------------------------------------------------------
+    # Gel strength (Winter-Chambon gel point parameter)
+    # ------------------------------------------------------------------
+    if nm in ("s", "s_gel", "gel_strength", "s_g"):
+        return _est_modulus(features, test_mode) * 0.1
+
+    # ------------------------------------------------------------------
     # Activation volume (HVM models)
     # ------------------------------------------------------------------
     if nm in ("v_act", "v_activation"):
@@ -827,7 +846,9 @@ def _clamp_to_bounds(value: float, name: str, model: BaseModel) -> float:
         bounds = model.parameters[name].bounds
         lo, hi = float(bounds[0]), float(bounds[1])
         if lo >= hi:
-            return value
+            # P2-Fit-5: When bounds are degenerate (lo == hi), the parameter
+            # is fixed — always return the bound value, not the estimate.
+            return lo
         return float(np.clip(value, lo, hi))
     except Exception:  # noqa: BLE001
         return value
@@ -871,7 +892,4 @@ def _generic_fallback(
 
 __all__ = [
     "auto_p0",
-    "_estimate_crossover_frequency",
-    "_estimate_decay_time",
-    "_estimate_yield_stress",
 ]

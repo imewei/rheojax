@@ -146,9 +146,16 @@ def _check_positive_moduli(
             or (lower.startswith("e") and lower[1:2].isdigit())
         )
         # Exclude non-modulus parameters that happen to start with "g" or "e":
-        # eta, epsilon, n, gamma-like names.
+        # eta, epsilon, n, gamma-like names, and common non-modulus g-prefixed
+        # parameters (gel point, trap stiffness, reference, scale, LAOS).
         excluded_prefixes = ("eta", "eps", "gamma", "g_dot", "gdot")
+        excluded_names = {
+            "gel", "gel_strength", "g_trap", "g_ref", "g_scale", "g_laos",
+            "g_dot", "gdot",
+        }
         if any(lower.startswith(ex) for ex in excluded_prefixes):
+            is_modulus = False
+        if lower in excluded_names:
             is_modulus = False
 
         if not is_modulus:
@@ -308,11 +315,11 @@ def _check_prony_positive(
 def _check_power_law_range(
     param_map: dict[str, tuple[float, tuple[float, float] | None]],
 ) -> list[PhysicsViolation]:
-    """Power-law index n should lie in (0, 2).
+    """Power-law index n should lie in (0, 1) for shear-thinning models.
 
-    Values outside this range are physically implausible for shear-thinning or
-    mildly shear-thickening fluids, though they are not thermodynamically
-    forbidden.  Emitted as a warning.
+    Values outside (0, 1) are unexpected for conventional shear-thinning
+    fluids.  Values in (1, 2) may indicate shear-thickening and are flagged
+    as warnings.  Values outside (0, 2) are flagged as errors.
     """
     violations: list[PhysicsViolation] = []
     for name, (value, _bounds) in param_map.items():
@@ -329,8 +336,21 @@ def _check_power_law_range(
                     check="power_law_range",
                     message=(
                         f"Power-law index '{name}' = {value:.4g} is outside (0, 2). "
-                        "Flow indices outside this range are physically implausible "
-                        "for most polymer melts and solutions."
+                        "Flow indices outside this range are physically implausible."
+                    ),
+                    severity="error",
+                )
+            )
+        elif value > 1.0:
+            violations.append(
+                PhysicsViolation(
+                    parameter=name,
+                    value=value,
+                    check="power_law_range",
+                    message=(
+                        f"Power-law index '{name}' = {value:.4g} is > 1. "
+                        "This indicates shear-thickening rather than the expected "
+                        "shear-thinning behavior."
                     ),
                     severity="warning",
                 )
@@ -385,6 +405,36 @@ def _check_plausibility(
 # Strategy registry — checkers applied in order
 # ---------------------------------------------------------------------------
 
+def _check_chebyshev_e1(
+    param_map: dict[str, tuple[float, tuple[float, float] | None]],
+) -> list[PhysicsViolation]:
+    """First Chebyshev elastic coefficient e₁ must be positive.
+
+    In LAOS, e₁ > 0 ensures elastic-dominated response at small strain
+    amplitudes, which is a thermodynamic requirement for passive materials
+    (Ewoldt, Hosoi & McKinley, J. Rheol. 2008).
+    """
+    violations: list[PhysicsViolation] = []
+    for name, (value, _bounds) in param_map.items():
+        lower = name.lower()
+        if lower in {"e1", "e_1", "chebyshev_e1"}:
+            if value <= 0.0:
+                violations.append(
+                    PhysicsViolation(
+                        parameter=name,
+                        value=value,
+                        check="chebyshev_e1",
+                        message=(
+                            f"Chebyshev elastic coefficient '{name}' = {value:.4g} is "
+                            "non-positive. The first elastic Chebyshev coefficient e₁ "
+                            "must be > 0 for thermodynamic consistency."
+                        ),
+                        severity="error",
+                    )
+                )
+    return violations
+
+
 _CHECKERS = [
     _check_positive_moduli,
     _check_positive_times,
@@ -392,6 +442,7 @@ _CHECKERS = [
     _check_fractional_orders,
     _check_prony_positive,
     _check_power_law_range,
+    _check_chebyshev_e1,
     _check_plausibility,
 ]
 

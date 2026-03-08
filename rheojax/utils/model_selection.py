@@ -22,7 +22,9 @@ produces a structured :class:`~rheojax.core.fit_result.FitResult`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import signal
+import time
+from typing import Any
 
 import numpy as np
 
@@ -30,9 +32,6 @@ from rheojax.core.fit_result import FitResult, ModelComparison
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger
-
-if TYPE_CHECKING:
-    pass
 
 jax, jnp = safe_import_jax()
 
@@ -133,19 +132,34 @@ def build_fit_result(
     n_params: int = len(param_names)
 
     # ------------------------------------------------------------------
-    # Attached OptimizationResult
+    # Attached OptimizationResult + Fitted curve
+    # (single predict() call to avoid redundant ODE solves)
     # ------------------------------------------------------------------
     opt_result = getattr(model, "_nlsq_result", None)
+    fitted_curve: np.ndarray | None = None
+    _cached_pred: np.ndarray | None = None
+
+    # Get prediction once — reused for both opt_result and fitted_curve
+    if getattr(model, "fitted_", False):
+        try:
+            pred = model.predict(X)
+            _cached_pred = np.asarray(pred)
+            fitted_curve = _cached_pred
+        except Exception as exc:
+            logger.warning(
+                "build_fit_result: predict() failed — fitted_curve omitted",
+                model=model_class_name,
+                error=str(exc),
+            )
 
     # Many models (e.g. classical family) don't store _nlsq_result.
-    # Build a minimal OptimizationResult from model.predict() residuals
+    # Build a minimal OptimizationResult from cached prediction residuals
     # so that AIC/BIC/R² are always available in the FitResult.
-    if opt_result is None and getattr(model, "fitted_", False) and y is not None:
+    if opt_result is None and _cached_pred is not None and y is not None:
         try:
             from rheojax.utils.optimization import OptimizationResult
 
-            pred = model.predict(X)
-            pred_arr = np.asarray(pred)
+            pred_arr = _cached_pred
             y_arr = np.asarray(y)
 
             if np.iscomplexobj(y_arr):
@@ -176,21 +190,6 @@ def build_fit_result(
             )
 
     # ------------------------------------------------------------------
-    # Fitted curve
-    # ------------------------------------------------------------------
-    fitted_curve: np.ndarray | None = None
-    if getattr(model, "fitted_", False):
-        try:
-            pred = model.predict(X)
-            fitted_curve = np.asarray(pred)
-        except Exception as exc:
-            logger.warning(
-                "build_fit_result: predict() failed — fitted_curve omitted",
-                model=model_class_name,
-                error=str(exc),
-            )
-
-    # ------------------------------------------------------------------
     # Assemble FitResult
     # ------------------------------------------------------------------
     return FitResult(
@@ -215,10 +214,11 @@ def build_fit_result(
 def compare_models(
     X: Any,
     y: Any,
-    models: list[str | Any],
+    models: list[str | Any] | None = None,
     test_mode: str | None = None,
     criterion: str = "aic",
     return_results: bool = False,
+    per_model_timeout: float | None = 300.0,
     **fit_kwargs: Any,
 ) -> ModelComparison:
     """Fit multiple models to the same data and rank them by an information criterion.
@@ -234,6 +234,8 @@ def compare_models(
             name string (e.g. ``"maxwell"``) or an already-instantiated
             ``BaseModel`` instance.  String entries are created via
             :meth:`~rheojax.core.registry.ModelRegistry.create`.
+            When ``None``, auto-discovers all models registered for
+            *test_mode* via :meth:`ModelRegistry.find`.
         test_mode: Protocol string forwarded to ``model.fit()``.  Pass ``None``
             to let each model auto-detect the protocol from the data shape.
         criterion: Information criterion used for ranking.  One of ``"aic"``,
@@ -242,6 +244,8 @@ def compare_models(
             API where the function returns ``(ModelComparison, list[FitResult])``.
             Currently the full list of :class:`~rheojax.core.fit_result.FitResult`
             objects is always accessible as ``ModelComparison.results``.
+        per_model_timeout: Maximum wall-clock seconds per model fit. ``None``
+            disables the timeout.  Defaults to 300 s (5 min).
         **fit_kwargs: Additional keyword arguments forwarded to every
             ``model.fit()`` call (e.g. ``max_iter``, ``workflow``).
 
@@ -250,7 +254,8 @@ def compare_models(
         Δ-criterion values, and Akaike weights.
 
     Raises:
-        ValueError: If ``criterion`` is not one of the supported values.
+        ValueError: If ``criterion`` is not one of the supported values, or
+            if ``models`` is ``None`` and ``test_mode`` is also ``None``.
 
     Example::
 
@@ -263,11 +268,29 @@ def compare_models(
         )
         print(comparison.summary())
         fig = comparison.plot()
+
+        # Auto-discover all models for a protocol:
+        comparison = compare_models(t, G_data, test_mode="relaxation")
     """
     _valid_criteria = {"aic", "bic", "aicc"}
     if criterion not in _valid_criteria:
         raise ValueError(
             f"criterion must be one of {sorted(_valid_criteria)!r}, got {criterion!r}"
+        )
+
+    # Auto-discover models from registry when not explicitly provided
+    if models is None:
+        if test_mode is None:
+            raise ValueError(
+                "test_mode is required when models is None "
+                "(needed for auto-discovery via ModelRegistry.find)"
+            )
+        models = ModelRegistry.find(protocol=test_mode)
+        logger.info(
+            "compare_models: auto-discovered models from registry",
+            protocol=test_mode,
+            n_models=len(models),
+            models=models,
         )
 
     fit_results: list[FitResult] = []
@@ -303,22 +326,44 @@ def compare_models(
         # ------------------------------------------------------------------
         # Fit
         # ------------------------------------------------------------------
-        logger.debug(
+        logger.info(
             "compare_models: fitting model",
             model=model_label,
-            index=idx,
+            progress=f"{idx + 1}/{len(models)}",
         )
 
         fit_kwargs_with_mode: dict[str, Any] = dict(fit_kwargs)
         if test_mode is not None:
             fit_kwargs_with_mode["test_mode"] = test_mode
 
+        t0 = time.monotonic()
         try:
-            model.fit(X, y, **fit_kwargs_with_mode)
+            # Use SIGALRM-based timeout on Unix; wall-clock fallback elsewhere
+            if per_model_timeout is not None and hasattr(signal, "SIGALRM"):
+                def _timeout_handler(
+                    signum: int,
+                    frame: Any,
+                    _label: str = model_label,
+                    _t: float = per_model_timeout,
+                ) -> None:
+                    raise TimeoutError(
+                        f"Model '{_label}' exceeded {_t}s timeout"
+                    )
+                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(max(1, int(per_model_timeout)))
+                try:
+                    model.fit(X, y, **fit_kwargs_with_mode)
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+            else:
+                model.fit(X, y, **fit_kwargs_with_mode)
         except Exception as exc:
+            elapsed = time.monotonic() - t0
             logger.warning(
                 "compare_models: fit failed — skipping model",
                 model=model_label,
+                elapsed_s=round(elapsed, 1),
                 error=str(exc),
             )
             continue

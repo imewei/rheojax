@@ -142,6 +142,13 @@ def _extract_bounds(
 ) -> tuple[np.ndarray, tuple[np.ndarray, np.ndarray]]:
     """Extract initial values and bounds arrays from a ParameterSet.
 
+    # TODO: Planned enhancement — log-transform bounded parameters before
+    # passing to the optimizer and inverse-transform on the way out. This
+    # would improve conditioning for parameters that span many orders of
+    # magnitude (e.g. moduli 1e0–1e9, time constants 1e-6–1e3). Requires
+    # careful integration with the NLSQ library's bound handling and the
+    # complex-residual split path in create_least_squares_objective.
+
     Converts ParameterSet bounds (which may contain None) into the
     (lower_array, upper_array) format expected by SciPy and NLSQ.
 
@@ -236,12 +243,17 @@ def _run_scipy_least_squares(
         residuals = residual_fn(scipy_result.x)
         pcov = compute_covariance_from_jacobian(jac, residuals)
 
+    # P1-5: Include residuals, y_data, n_data, and _is_complex_split so that
+    # downstream statistics (R², AIC, adj-R²) can be computed correctly.
+    final_residuals = residual_fn(scipy_result.x)
+    rss = float(np.sum(final_residuals**2))
+
     return OptimizationResult(
         x=np.asarray(scipy_result.x, dtype=np.float64),
         fun=(
             float(2.0 * scipy_result.cost)
             if hasattr(scipy_result, "cost")
-            else float(np.sum(residual_fn(scipy_result.x) ** 2))
+            else rss
         ),
         jac=jac,
         pcov=pcov,
@@ -261,6 +273,94 @@ def _run_scipy_least_squares(
             else None
         ),
         cost=float(cost_value) if cost_value is not None else None,
+        residuals=final_residuals,
+    )
+
+
+def _run_differential_evolution(
+    objective: Callable[[np.ndarray], float | np.ndarray],
+    x0: np.ndarray,
+    bounds: tuple[np.ndarray, np.ndarray],
+    max_iter: int,
+) -> OptimizationResult:
+    """Run SciPy's differential_evolution as a last-resort global optimizer.
+
+    Used as the final fallback in the ``workflow="auto_global"`` chain after
+    both NLSQ and SciPy TRF least-squares have failed to converge. Differential
+    evolution performs a population-based global search that is robust to
+    non-convex and multimodal objective landscapes.
+
+    The objective is wrapped to return a scalar RSS so that
+    ``differential_evolution`` (which minimises a scalar) can consume the same
+    residual functions used elsewhere.
+
+    Args:
+        objective: Residual function (params -> residual vector or scalar).
+        x0: Initial parameter values — seeded into the initial population
+            so that the global search starts from (or near) the best local
+            solution found so far.
+        bounds: (lower_bounds, upper_bounds) arrays.  Any infinite bound is
+            clamped to ±1e10 so that ``differential_evolution`` can draw
+            a finite initial population.
+        max_iter: Maximum number of generations (``maxiter`` in SciPy).
+
+    Returns:
+        OptimizationResult compatible with the rest of the optimisation chain.
+    """
+    from scipy.optimize import differential_evolution
+
+    lower, upper = bounds
+
+    # differential_evolution requires finite bounds; clamp ±inf to ±1e10.
+    finite_lower = np.where(np.isfinite(lower), lower, -1e10)
+    finite_upper = np.where(np.isfinite(upper), upper, 1e10)
+    de_bounds = list(zip(finite_lower.tolist(), finite_upper.tolist(), strict=True))
+
+    # Seed x0 into the initial population so DE starts near the best local
+    # solution.  We reshape x0 into a (1, n_params) array that
+    # differential_evolution accepts via ``init``.
+    x0_pop = x0.reshape(1, -1)
+
+    def scalar_objective(values: np.ndarray) -> float:
+        res = np.asarray(objective(values))
+        if np.iscomplexobj(res):
+            res = np.concatenate([np.real(res), np.imag(res)])
+        res = res.astype(np.float64)
+        if not np.all(np.isfinite(res)):
+            res = np.nan_to_num(res, nan=1e10, posinf=1e10, neginf=-1e10)
+        return float(np.sum(res**2))
+
+    logger.info(
+        "Running differential_evolution global optimizer",
+        n_params=len(x0),
+        maxiter=max_iter,
+    )
+    de_result = differential_evolution(
+        scalar_objective,
+        de_bounds,
+        maxiter=max_iter,
+        tol=1e-6,
+        seed=0,
+        polish=True,  # final local refinement with L-BFGS-B
+        x0=x0_pop,  # seed best local solution into initial population
+    )
+
+    x_opt = np.asarray(de_result.x, dtype=np.float64)
+    rss = float(de_result.fun)
+
+    return OptimizationResult(
+        x=x_opt,
+        fun=rss,
+        jac=None,
+        pcov=None,
+        success=bool(de_result.success),
+        message=str(de_result.message),
+        nit=int(getattr(de_result, "nit", 0)),
+        nfev=int(getattr(de_result, "nfev", 0)),
+        njev=0,
+        optimality=None,
+        active_mask=None,
+        cost=rss,
     )
 
 
@@ -435,6 +535,10 @@ class OptimizationResult:
     # complex data.  Used by _resolve_n_data() to halve the residual vector
     # length to recover the true observation count N.
     _is_complex_split: bool = field(default=False, repr=False)
+    # P1-6: When residuals are normalized (divided by weights), store the
+    # normalization weights so that R²/AIC/BIC can un-normalize for correct
+    # statistics.  Shape matches residuals.  None when residuals are raw.
+    _normalization_weights: np.ndarray | None = field(default=None, repr=False)
 
     def _resolve_n_data(self) -> int:
         """Resolve the true observation count N.
@@ -478,6 +582,11 @@ class OptimizationResult:
 
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
+
+        # P1-6: Un-normalize residuals when normalization weights are stored,
+        # so that ss_res is in the same units as ss_tot (raw data units).
+        if self._normalization_weights is not None:
+            residuals = residuals * np.asarray(self._normalization_weights)
 
         if len(residuals) == 2 * len(y_data):
             half = len(y_data)
@@ -588,6 +697,10 @@ class OptimizationResult:
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
 
+        # P1-6/P1-7: Un-normalize residuals for correct AIC computation.
+        if self._normalization_weights is not None:
+            residuals = residuals * np.asarray(self._normalization_weights)
+
         n = self._resolve_n_data()
         if n == 0:
             return None
@@ -621,6 +734,10 @@ class OptimizationResult:
         residuals = np.asarray(self.residuals)
         if np.iscomplexobj(residuals):
             residuals = np.abs(residuals)
+
+        # P1-6/P1-7: Un-normalize residuals for correct BIC computation.
+        if self._normalization_weights is not None:
+            residuals = residuals * np.asarray(self._normalization_weights)
 
         n = self._resolve_n_data()
         if n == 0:
@@ -790,8 +907,28 @@ class OptimizationResult:
             else:
                 mse = (self.fun / n) if n > 0 else 0.0
 
-            # Simple prediction interval using MSE (conservative estimate)
-            pred_std = np.sqrt(mse) * np.ones_like(y_pred)
+            # P2-Fit-3: Use leverage-weighted prediction intervals when the
+            # Jacobian is available: h_i = diag(J @ inv(J^T J) @ J^T), then
+            # pred_std_i = sqrt(mse * (1 + h_i)).  Falls back to constant MSE
+            # when Jacobian is unavailable (approximate but conservative).
+            if self.jac is not None:
+                try:
+                    J = np.asarray(self.jac, dtype=np.float64)
+                    # Compute J at x_new if different from training data
+                    # For now, only use training-point leverages when x_new matches
+                    JtJ = J.T @ J
+                    JtJ_inv = np.linalg.inv(JtJ + 1e-12 * np.eye(JtJ.shape[0]))
+                    hat_matrix_diag = np.sum((J @ JtJ_inv) * J, axis=1)
+                    # hat_matrix_diag has shape (n_residuals,); map to x_eval length
+                    if len(hat_matrix_diag) == len(x_eval):
+                        pred_std = np.sqrt(mse * (1.0 + hat_matrix_diag))
+                    else:
+                        # Residual length != x_eval length (e.g. complex-split)
+                        pred_std = np.sqrt(mse) * np.ones_like(y_pred)
+                except Exception:
+                    pred_std = np.sqrt(mse) * np.ones_like(y_pred)
+            else:
+                pred_std = np.sqrt(mse) * np.ones_like(y_pred)
 
             intervals = np.zeros((len(x_eval), 2))
             intervals[:, 0] = y_pred - t_val * pred_std
@@ -1210,11 +1347,28 @@ def nlsq_optimize(
     nlsq_kwargs.update(clean_kwargs)
 
     def _scipy_fallback(initial_guess: np.ndarray) -> OptimizationResult:
-        """Fallback to SciPy's least_squares when NLSQ fails."""
+        """Fallback chain when NLSQ fails.
+
+        For workflow="auto_global": SciPy TRF first, then differential_evolution
+        as the final global-search fallback.  For all other workflows: SciPy TRF only.
+        """
         logger.info("Using SciPy least_squares fallback")
-        return _run_scipy_least_squares(
+        scipy_result = _run_scipy_least_squares(
             objective, initial_guess, nlsq_bounds, ftol, xtol, gtol, max_iter
         )
+        if workflow == "auto_global" and not scipy_result.success:
+            logger.info(
+                "SciPy TRF fallback did not converge; trying differential_evolution"
+            )
+            de_result = _run_differential_evolution(
+                objective, scipy_result.x, nlsq_bounds, max_iter
+            )
+            de_result.message = (
+                f"[DE fallback] {de_result.message} "
+                f"(SciPy TRF: {scipy_result.message})"
+            )
+            return de_result
+        return scipy_result
 
     # Create NLSQ optimizer instance and run optimization
     try:
@@ -1244,14 +1398,24 @@ def nlsq_optimize(
         else:
             residuals_fb = _residuals_fb_raw.astype(np.float64)
         result.fun = float(np.sum(residuals_fb**2))
+        # P1-6: Propagate normalization weights for correct R²/AIC/BIC
+        _nw = getattr(objective, "_normalization_weights", None)
+        if _nw is not None:
+            result._normalization_weights = _nw
         _validate_optimization_result(result, residuals_fb)
         # Write back optimal params so model state reflects the fit
         parameters.set_values(result.x)
         return result
 
-    # Compute residuals at optimal point for covariance scaling
+    # Compute residuals at optimal point for covariance scaling.
+    # P2-Fit-2: Reuse residuals from NLSQ result when available (avoids an
+    # extra objective evaluation that can be expensive for ODE models).
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
-    residuals_raw = np.asarray(objective(x_opt))
+    _cached_fun = nlsq_result.get("fun_vector", nlsq_result.get("residuals"))
+    if _cached_fun is not None:
+        residuals_raw = np.asarray(_cached_fun)
+    else:
+        residuals_raw = np.asarray(objective(x_opt))
     if np.iscomplexobj(residuals_raw):
         residuals_np = np.concatenate(
             [np.real(residuals_raw), np.imag(residuals_raw)]
@@ -1262,18 +1426,24 @@ def nlsq_optimize(
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
     result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
 
+    # P1-6: Propagate normalization weights from the objective closure so that
+    # R²/AIC/BIC can un-normalize residuals for correct statistics.
+    _nw = getattr(objective, "_normalization_weights", None)
+    if _nw is not None:
+        result._normalization_weights = _nw
+
     # Store diagnostics if available (NLSQ 0.6.6+)
     if hasattr(nlsq_result, "diagnostics") or "diagnostics" in nlsq_result:
         result.diagnostics = nlsq_result.get(
             "diagnostics", getattr(nlsq_result, "diagnostics", None)
         )
 
-    if (
-        not result.success
-        and "inner optimization loop exceeded" in result.message.lower()
-    ):
+    # P2-Fit-9: Trigger SciPy fallback on ANY NLSQ failure when fallback is
+    # enabled, not just the "inner optimization loop exceeded" message.
+    if not result.success and fallback:
         logger.warning(
-            "NLSQ hit inner iteration limit; retrying with SciPy least_squares for stability."
+            "NLSQ did not converge; retrying with SciPy least_squares for stability.",
+            nlsq_message=result.message,
         )
         # OPT-003: warm-start from NLSQ's best result, not stale x0
         fallback_result = _scipy_fallback(x_opt)
@@ -2158,13 +2328,36 @@ def residual_sum_of_squares(
         return rss
 
 
+class ResidualFunction:
+    """Callable wrapper for residual functions that carries normalization metadata.
+
+    This replaces the fragile pattern of attaching ``_normalization_weights`` as
+    a function attribute (which breaks if the function is wrapped by decorators,
+    ``functools.wraps``, ``jax.jit``, etc.).  The class is fully transparent to
+    callers — it behaves like a plain function but safely exposes the weights.
+    """
+
+    __slots__ = ("_fn", "_normalization_weights")
+
+    def __init__(
+        self,
+        fn: Callable[[np.ndarray], np.ndarray],
+        normalization_weights: np.ndarray | None = None,
+    ) -> None:
+        self._fn = fn
+        self._normalization_weights = normalization_weights
+
+    def __call__(self, params: np.ndarray) -> np.ndarray:
+        return self._fn(params)
+
+
 def create_least_squares_objective(
     model_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
     x_data: np.ndarray,
     y_data: np.ndarray,
     normalize: bool = True,
     use_log_residuals: bool = False,
-) -> Callable[[np.ndarray], np.ndarray]:
+) -> ResidualFunction:
     """Create residual function for NLSQ least-squares fitting.
 
     IMPORTANT: This now returns a RESIDUAL FUNCTION (vector output), not a scalar
@@ -2217,6 +2410,15 @@ def create_least_squares_objective(
     else:
         y_data_jax = jnp.asarray(y_data, dtype=jnp.float64)
 
+    # P2-Fit-1: Compute a relative normalization floor from the overall data
+    # magnitude.  At the elastic plateau G'' can be orders of magnitude below
+    # G', so an absolute floor of 1e-10 Pa biases the optimizer.  Using a
+    # relative floor (1e-10 * max|y|) keeps the weighting proportional.
+    _norm_floor = jnp.float64(1e-10)
+    if normalize and not use_log_residuals:
+        _max_modulus = jnp.max(jnp.abs(y_data_jax))
+        _norm_floor = jnp.maximum(jnp.float64(1e-10), jnp.float64(1e-10) * _max_modulus)
+
     def residuals(params: np.ndarray) -> np.ndarray:
         """Compute residual vector for all data points."""
         # Ensure params are JAX arrays
@@ -2248,10 +2450,10 @@ def create_least_squares_objective(
 
                     if normalize:
                         resid_real = resid_real / jnp.maximum(
-                            jnp.abs(jnp.real(y_data_jax)), 1e-10
+                            jnp.abs(jnp.real(y_data_jax)), _norm_floor
                         )
                         resid_imag = resid_imag / jnp.maximum(
-                            jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                            jnp.abs(jnp.imag(y_data_jax)), _norm_floor
                         )
 
                 return jnp.concatenate([resid_real, resid_imag])
@@ -2275,10 +2477,10 @@ def create_least_squares_objective(
 
                         if normalize:
                             resid_col0 = resid_col0 / jnp.maximum(
-                                jnp.abs(y_data_jax[:, 0]), 1e-10
+                                jnp.abs(y_data_jax[:, 0]), _norm_floor
                             )
                             resid_col1 = resid_col1 / jnp.maximum(
-                                jnp.abs(y_data_jax[:, 1]), 1e-10
+                                jnp.abs(y_data_jax[:, 1]), _norm_floor
                             )
 
                     return jnp.concatenate([resid_col0, resid_col1])
@@ -2292,7 +2494,7 @@ def create_least_squares_objective(
 
                     if normalize:
                         residuals = residuals / jnp.maximum(
-                            jnp.abs(y_data_jax), 1e-10
+                            jnp.abs(y_data_jax), _norm_floor
                         )
 
                     return residuals
@@ -2318,10 +2520,10 @@ def create_least_squares_objective(
 
                     if normalize:
                         resid_real = resid_real / jnp.maximum(
-                            jnp.abs(jnp.real(y_data_jax)), 1e-10
+                            jnp.abs(jnp.real(y_data_jax)), _norm_floor
                         )
                         resid_imag = resid_imag / jnp.maximum(
-                            jnp.abs(jnp.imag(y_data_jax)), 1e-10
+                            jnp.abs(jnp.imag(y_data_jax)), _norm_floor
                         )
 
                 return jnp.concatenate([resid_real, resid_imag])
@@ -2332,7 +2534,7 @@ def create_least_squares_objective(
                 residuals = y_pred_magnitude - y_data_jax
 
                 if normalize:
-                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
 
                 return residuals
         else:
@@ -2350,7 +2552,7 @@ def create_least_squares_objective(
                 else:
                     residuals = y_pred - y_data_magnitude
                     if normalize:
-                        residuals = residuals / jnp.maximum(y_data_magnitude, 1e-10)
+                        residuals = residuals / jnp.maximum(y_data_magnitude, _norm_floor)
 
                 return residuals
             else:
@@ -2364,11 +2566,26 @@ def create_least_squares_objective(
                 else:
                     residuals = y_pred - y_data_jax
                     if normalize:
-                        residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), 1e-10)
+                        residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
 
                 return residuals
 
-    return residuals
+    # P1-6: Compute normalization weights so that downstream
+    # OptimizationResult can un-normalize for correct R²/AIC/BIC.
+    weights: np.ndarray | None = None
+    if normalize and not use_log_residuals:
+        if y_data_is_complex:
+            w_real = np.asarray(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _norm_floor))
+            w_imag = np.asarray(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _norm_floor))
+            weights = np.concatenate([w_real, w_imag])
+        elif y_data_jax.ndim == 2 and y_data_jax.shape[-1] == 2:
+            w0 = np.asarray(jnp.maximum(jnp.abs(y_data_jax[:, 0]), _norm_floor))
+            w1 = np.asarray(jnp.maximum(jnp.abs(y_data_jax[:, 1]), _norm_floor))
+            weights = np.concatenate([w0, w1])
+        else:
+            weights = np.asarray(jnp.maximum(jnp.abs(y_data_jax), _norm_floor))
+
+    return ResidualFunction(residuals, normalization_weights=weights)
 
 
 # Convenience aliases for compatibility with different naming conventions
@@ -2378,6 +2595,7 @@ fit_parameters = nlsq_optimize  # More descriptive for model fitting
 
 __all__ = [
     "OptimizationResult",
+    "ResidualFunction",
     "nlsq_optimize",
     "nlsq_multistart_optimize",
     "nlsq_curve_fit",
