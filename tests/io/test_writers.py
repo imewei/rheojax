@@ -507,3 +507,88 @@ class TestHDF5ModeRoundTrip:
         # RheoData auto-detects test_mode, so it may be present;
         # the key assertion is that round-trip doesn't error
         assert len(loaded.x) == 2
+
+    @pytest.mark.smoke
+    def test_hdf5_roundtrip_temperature_celsius(self, tmp_path):
+        """temperature_celsius metadata key survives HDF5 round-trip."""
+        data = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([10.0, 20.0, 30.0]),
+            domain="time",
+            metadata={"temperature": 25.0, "temperature_celsius": 25.0},
+        )
+        path = tmp_path / "temp_c.h5"
+        save_hdf5(data, str(path))
+        loaded = load_hdf5(str(path))
+        assert loaded.metadata["temperature"] == pytest.approx(25.0)
+        assert loaded.metadata["temperature_celsius"] == pytest.approx(25.0)
+
+    @pytest.mark.smoke
+    def test_hdf5_roundtrip_reference_gamma_dot(self, tmp_path):
+        """reference_gamma_dot metadata key survives HDF5 round-trip."""
+        data = RheoData(
+            x=np.array([0.1, 1.0, 10.0]),
+            y=np.array([100.0, 90.0, 80.0]),
+            domain="time",
+            metadata={"reference_gamma_dot": 0.01},
+        )
+        path = tmp_path / "ref_gdot.h5"
+        save_hdf5(data, str(path))
+        loaded = load_hdf5(str(path))
+        assert loaded.metadata["reference_gamma_dot"] == pytest.approx(0.01)
+
+    @pytest.mark.smoke
+    def test_hdf5_roundtrip_gamma_0(self, tmp_path):
+        """gamma_0 (strain amplitude) metadata key survives HDF5 round-trip."""
+        data = RheoData(
+            x=np.linspace(0.1, 10.0, 5),
+            y=np.linspace(1000.0, 800.0, 5),
+            domain="frequency",
+            metadata={"gamma_0": 0.01, "omega": 6.28},
+        )
+        path = tmp_path / "gamma0.h5"
+        save_hdf5(data, str(path))
+        loaded = load_hdf5(str(path))
+        assert loaded.metadata["gamma_0"] == pytest.approx(0.01)
+        assert loaded.metadata["omega"] == pytest.approx(6.28)
+
+    @pytest.mark.smoke
+    def test_hdf5_roundtrip_laos_harmonics(self, tmp_path):
+        """Nested dict with array values (LAOS harmonics) survives HDF5 round-trip."""
+        harmonics = {
+            "G1_prime": [1000.0, 950.0, 900.0],
+            "G3_prime": [50.0, 48.0, 46.0],
+            "I3_I1": [0.05, 0.05, 0.051],
+        }
+        data = RheoData(
+            x=np.array([0.01, 0.05, 0.1]),
+            y=np.array([1000.0, 950.0, 900.0]),
+            domain="time",
+            metadata={"laos_harmonics": harmonics, "gamma_0": 0.1},
+        )
+        path = tmp_path / "laos.h5"
+        save_hdf5(data, str(path))
+        loaded = load_hdf5(str(path))
+        assert loaded.metadata["gamma_0"] == pytest.approx(0.1)
+        rt_harmonics = loaded.metadata["laos_harmonics"]
+        assert rt_harmonics["G1_prime"] == pytest.approx([1000.0, 950.0, 900.0])
+        assert rt_harmonics["I3_I1"] == pytest.approx([0.05, 0.05, 0.051])
+
+    @pytest.mark.smoke
+    def test_hdf5_roundtrip_geometry(self, tmp_path):
+        """Geometry dict (gap, cone_angle, diameter) survives HDF5 round-trip."""
+        geometry = {"gap": 1.0, "cone_angle": 2.0, "diameter": 25.0}
+        data = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([100.0, 200.0, 300.0]),
+            domain="time",
+            metadata={"geometry": geometry, "instrument": "DHR-3"},
+        )
+        path = tmp_path / "geometry.h5"
+        save_hdf5(data, str(path))
+        loaded = load_hdf5(str(path))
+        rt_geom = loaded.metadata["geometry"]
+        assert rt_geom["gap"] == pytest.approx(1.0)
+        assert rt_geom["cone_angle"] == pytest.approx(2.0)
+        assert rt_geom["diameter"] == pytest.approx(25.0)
+        assert loaded.metadata["instrument"] == "DHR-3"
