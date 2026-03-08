@@ -271,6 +271,94 @@ def _write_metadata_recursive(
     return dropped_keys
 
 
+def save_fit_result_hdf5(
+    result: Any,
+    filepath: str | Path,
+    compression: bool = True,
+    compression_level: int = 4,
+) -> None:
+    """Save a FitResult to HDF5 file.
+
+    Stores model parameters, statistics, fitted curve, and metadata
+    in a structured HDF5 layout.
+
+    Args:
+        result: A FitResult instance (from rheojax.core.fit_result).
+        filepath: Output file path.
+        compression: Enable gzip compression (default: True).
+        compression_level: Compression level 0-9 (default: 4).
+
+    Raises:
+        ImportError: If h5py not installed.
+    """
+    try:
+        import h5py
+    except ImportError as exc:
+        raise ImportError(
+            "h5py is required for HDF5 writing. Install with: pip install h5py"
+        ) from exc
+
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    comp_algo: str | None = "gzip" if compression else None
+    comp_opts = compression_level if compression else None
+
+    with h5py.File(filepath, "w") as f:
+        f.attrs["rheojax_type"] = "FitResult"
+        f.attrs["model_name"] = result.model_name or ""
+        f.attrs["model_class_name"] = result.model_class_name or ""
+        f.attrs["protocol"] = result.protocol or ""
+        f.attrs["n_params"] = result.n_params
+
+        # Store scalar statistics
+        for attr_name in ("r_squared", "aic", "bic", "aicc", "rmse", "mae"):
+            val = getattr(result, attr_name, None)
+            if val is not None and np.isfinite(val):
+                f.attrs[attr_name] = float(val)
+
+        # Parameters
+        params_grp = f.create_group("params")
+        for name, value in result.params.items():
+            params_grp.attrs[name] = float(value)
+
+        # Parameter units
+        if result.params_units:
+            units_grp = f.create_group("params_units")
+            for name, unit in result.params_units.items():
+                units_grp.attrs[name] = str(unit)
+
+        # Fitted curve
+        if result.fitted_curve is not None:
+            arr = np.asarray(result.fitted_curve)
+            f.create_dataset(
+                "fitted_curve", data=arr,
+                compression=comp_algo, compression_opts=comp_opts,
+            )
+
+        # Input data
+        if result.X is not None:
+            f.create_dataset(
+                "input_x", data=np.asarray(result.X),
+                compression=comp_algo, compression_opts=comp_opts,
+            )
+        if result.y is not None:
+            f.create_dataset(
+                "input_y", data=np.asarray(result.y),
+                compression=comp_algo, compression_opts=comp_opts,
+            )
+
+        # Timestamp
+        if result.timestamp:
+            f.attrs["timestamp"] = result.timestamp
+
+    logger.info(
+        "Saved FitResult to HDF5",
+        filepath=str(filepath),
+        model_name=result.model_name,
+    )
+
+
 def load_hdf5(filepath: str | Path) -> RheoData:
     """Load RheoData from HDF5 file.
 

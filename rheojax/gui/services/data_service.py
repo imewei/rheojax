@@ -619,7 +619,11 @@ class DataService:
                 if np.sum(mask) > 5:
                     log_x = np.log10(x[mask])
                     log_y = np.log10(y[mask])
-                    correlation = np.corrcoef(log_x, log_y)[0, 1]
+                    # Suppress RuntimeWarning when y is constant (zero
+                    # variance → division by zero in corrcoef).  The
+                    # resulting NaN correctly skips the flow branch.
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        correlation = np.corrcoef(log_x, log_y)[0, 1]
                     x_decades = log_x.max() - log_x.min()
 
                     # Guard: distinguish flow (shear-thinning power law)

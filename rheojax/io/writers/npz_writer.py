@@ -12,7 +12,7 @@ from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = ["save_npz", "load_npz"]
+__all__ = ["save_npz", "load_npz", "save_fit_result_npz"]
 
 
 class _NumpyEncoder(json.JSONEncoder):
@@ -89,6 +89,71 @@ def save_npz(
         filepath=str(filepath),
         compressed=compressed,
         n_points=len(data.x),
+    )
+
+
+def save_fit_result_npz(
+    result: Any,
+    filepath: str | Path,
+    compressed: bool = True,
+) -> None:
+    """Save a FitResult to a NumPy .npz archive (no pickle, safe serialization).
+
+    Stores all fields as numpy arrays and UTF-8 encoded strings.
+
+    Args:
+        result: A FitResult instance (from rheojax.core.fit_result).
+        filepath: Destination path.
+        compressed: Use compressed npz (default: True).
+    """
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    # Build arrays dict — all values are numpy arrays (no pickle used)
+    arrays: dict[str, np.ndarray] = {
+        "_model_name": _encode_str(result.model_name or ""),
+        "_model_class_name": _encode_str(result.model_class_name or ""),
+        "_protocol": _encode_str(result.protocol or ""),
+        "_n_params": np.array([result.n_params]),
+        "_timestamp": _encode_str(result.timestamp or ""),
+    }
+
+    # Parameters as JSON-encoded string (safe serialization)
+    param_names = list(result.params.keys())
+    param_values = np.array([result.params[n] for n in param_names], dtype=np.float64)
+    arrays["_param_names"] = _encode_str(json.dumps(param_names))
+    arrays["_param_values"] = param_values
+
+    # Units as JSON-encoded string
+    if result.params_units:
+        arrays["_params_units"] = _encode_str(json.dumps(result.params_units))
+
+    # Fitted curve
+    if result.fitted_curve is not None:
+        arrays["fitted_curve"] = np.asarray(result.fitted_curve)
+
+    # Input data
+    if result.X is not None:
+        arrays["input_x"] = np.asarray(result.X)
+    if result.y is not None:
+        arrays["input_y"] = np.asarray(result.y)
+
+    # Statistics as JSON-encoded string
+    stats = {}
+    for attr_name in ("r_squared", "aic", "bic", "rmse", "mae"):
+        val = getattr(result, attr_name, None)
+        if val is not None:
+            stats[attr_name] = float(val)
+    if stats:
+        arrays["_stats"] = _encode_str(json.dumps(stats))
+
+    save_fn = np.savez_compressed if compressed else np.savez
+    save_fn(filepath, **arrays)
+
+    logger.info(
+        "Saved FitResult to npz",
+        filepath=str(filepath),
+        model_name=result.model_name,
     )
 
 
