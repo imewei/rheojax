@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.io.readers._utils import normalize_temperature
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -772,6 +773,31 @@ def segment_to_rheodata(
     metadata["x_column"] = segment.x_column
     metadata["y_column"] = segment.y_column
     metadata["is_complex"] = segment.is_complex
+
+    # Normalize temperature metadata to Kelvin (preserve original as temperature_celsius)
+    if "temperature" in metadata:
+        raw_temp = metadata["temperature"]
+        # May be a string like "25.0 °C", "25.0", or already a float in K
+        if isinstance(raw_temp, str):
+            # Try to extract numeric value and unit
+            temp_match = re.match(r"^\s*(-?\d+\.?\d*)\s*(°C|°F|C|F|K)?\s*$", raw_temp)
+            if temp_match:
+                numeric_val = float(temp_match.group(1))
+                unit_str = (temp_match.group(2) or "C").strip()
+                try:
+                    converted = normalize_temperature(numeric_val, unit_str)
+                    if unit_str.upper() in ("C", "°C"):
+                        metadata["temperature_celsius"] = numeric_val
+                    metadata["temperature"] = converted
+                except ValueError:
+                    pass  # Leave as-is if unit not recognized
+        elif isinstance(raw_temp, (int, float)):
+            # Numeric value without unit — assume Celsius for TRIOS files
+            try:
+                metadata["temperature_celsius"] = float(raw_temp)
+                metadata["temperature"] = normalize_temperature(float(raw_temp), "C")
+            except (TypeError, ValueError):
+                pass
 
     # Propagate deformation_mode from segment metadata (set by column detection)
     # If not explicitly set, infer from y_column name

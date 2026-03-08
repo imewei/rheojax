@@ -62,6 +62,13 @@ _CSV_KWARGS = {
     "metadata",
     "intended_transform",
     "header",
+    # Phase 2: protocol metadata kwargs
+    "column_mapping",
+    "strain_amplitude",
+    "angular_frequency",
+    "applied_stress",
+    "shear_rate",
+    "reference_gamma_dot",
 }
 _EXCEL_KWARGS = {
     "x_col",
@@ -82,6 +89,13 @@ _EXCEL_KWARGS = {
     "metadata",
     "intended_transform",
     "header",
+    # Phase 2: protocol metadata kwargs
+    "column_mapping",
+    "strain_amplitude",
+    "angular_frequency",
+    "applied_stress",
+    "shear_rate",
+    "reference_gamma_dot",
 }
 _ANTON_PAAR_KWARGS = {
     "test_mode",
@@ -155,26 +169,36 @@ def _inject_provenance(
                 )  # store a copy
 
 
-def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
+def auto_load(
+    filepath: str | Path, *, format: str | None = None, **kwargs
+) -> RheoData | list[RheoData]:
     """Automatically detect file format and load data.
 
     This function attempts to determine the file format based on:
-    1. File extension
-    2. File content inspection
-    3. Sequential reader attempts
+    1. The ``format`` argument (if provided — skips auto-detection cascade)
+    2. File extension
+    3. File content inspection
+    4. Sequential reader attempts
 
     Args:
         filepath: Path to data file
+        format: Optional format hint. Valid values: ``'trios'``,
+            ``'anton_paar'``, ``'csv'``, ``'excel'``. When supplied the
+            auto-detection cascade is skipped and the chosen reader is called
+            directly.  Case-insensitive.
         **kwargs: Additional arguments passed to specific readers
             - x_col, y_col: Required for CSV/Excel if auto-detection fails
             - return_all_segments: For TRIOS files with multiple segments
+            - column_mapping: dict mapping canonical names to column names
+            - strain_amplitude, angular_frequency: oscillation metadata
+            - applied_stress, shear_rate, reference_gamma_dot: flow metadata
 
     Returns:
         RheoData object or list of RheoData objects
 
     Raises:
         FileNotFoundError: If file doesn't exist
-        ValueError: If no reader can parse the file
+        ValueError: If no reader can parse the file or ``format`` is unknown
     """
     filepath = Path(filepath)
 
@@ -210,6 +234,38 @@ def auto_load(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
 
     with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
         io_ctx["extension"] = extension
+
+        # Direct format dispatch (skips auto-detection cascade)
+        if format is not None:
+            format_lower = format.lower()
+            logger.debug("Format hint provided", format=format_lower)
+            if format_lower == "trios":
+                result = load_trios(filepath, **_filter_kwargs(kwargs, _TRIOS_KWARGS))
+                _inject_provenance(result, "trios", ["trios"])
+            elif format_lower == "anton_paar":
+                result = load_anton_paar(
+                    filepath, **_filter_kwargs(kwargs, _ANTON_PAAR_KWARGS)
+                )
+                _inject_provenance(result, "anton_paar", ["anton_paar"])
+            elif format_lower == "csv":
+                result = _try_csv(filepath, **kwargs)
+            elif format_lower == "excel":
+                result = _try_excel(filepath, **_filter_kwargs(kwargs, _EXCEL_KWARGS))
+            else:
+                from rheojax.io._exceptions import RheoJaxFormatError
+
+                raise RheoJaxFormatError(
+                    f"Unknown format '{format}'. "
+                    f"Valid options: 'trios', 'anton_paar', 'csv', 'excel'"
+                )
+            # Add record count to context
+            if isinstance(result, list):
+                io_ctx["records"] = sum(len(r.x) for r in result)
+                io_ctx["segments"] = len(result)
+            else:
+                io_ctx["records"] = len(result.x)
+            return result
+
         logger.debug("Detecting format from extension", extension=extension)
 
         # Try based on file extension first

@@ -44,6 +44,12 @@ def load_csv(
     intended_transform: str | None = None,
     delimiter: str | None = None,
     encoding: str | None = None,
+    column_mapping: dict[str, str] | None = None,
+    strain_amplitude: float | None = None,
+    angular_frequency: float | None = None,
+    applied_stress: float | None = None,
+    shear_rate: float | None = None,
+    reference_gamma_dot: float | None = None,
     header: int | None = 0,
     **kwargs,
 ) -> RheoData:
@@ -74,6 +80,19 @@ def load_csv(
         encoding: File encoding (e.g. 'utf-8', 'latin-1', 'cp1252').
             Auto-detected if None. Use this to override detection for files
             with known encoding.
+        column_mapping: Optional dict mapping original column names to new names.
+            Applied immediately after reading, before any column lookup.
+            Example: {"t": "time", "sigma": "stress"}.
+        strain_amplitude: Strain amplitude (gamma_0) stored in metadata as
+            ``gamma_0``. Used for LAOS/oscillation protocols.
+        angular_frequency: Angular frequency (omega) stored in metadata as
+            ``omega``. Used for oscillation protocols.
+        applied_stress: Applied stress stored in metadata as ``sigma_applied``.
+            Used for creep protocols.
+        shear_rate: Shear rate stored in metadata as ``gamma_dot``.
+            Used for flow/startup protocols.
+        reference_gamma_dot: Reference shear rate stored in metadata as
+            ``reference_gamma_dot``. Used for dimensionless flow analysis.
         header: Row number for column headers (None if no header).
         **kwargs: Additional arguments passed to pandas.read_csv.
 
@@ -161,8 +180,11 @@ def load_csv(
 
     # Build list of columns to load (memory optimization for wide files)
     # Only use usecols when all column specifiers are strings (not indices)
+    # Skip when column_mapping is provided — file columns differ from target names
     usecols = None
-    if isinstance(x_col, str):
+    if column_mapping is not None:
+        pass  # Cannot use usecols with column_mapping (file has pre-rename names)
+    elif isinstance(x_col, str):
         cols_needed = [x_col]
         if y_col is not None and isinstance(y_col, str):
             cols_needed.append(y_col)
@@ -295,6 +317,11 @@ def load_csv(
             encoding=used_encoding,
         )
 
+    # Apply column renaming if provided
+    if column_mapping is not None:
+        df = df.rename(columns=column_mapping)
+        logger.debug("Applied column_mapping", mapping=column_mapping)
+
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
 
@@ -402,6 +429,18 @@ def load_csv(
     # Add temperature if provided
     if temperature is not None:
         final_metadata["temperature"] = temperature  # type: ignore[assignment]
+
+    # Store protocol metadata
+    if strain_amplitude is not None:
+        final_metadata["gamma_0"] = strain_amplitude
+    if angular_frequency is not None:
+        final_metadata["omega"] = angular_frequency
+    if applied_stress is not None:
+        final_metadata["sigma_applied"] = applied_stress
+    if shear_rate is not None:
+        final_metadata["gamma_dot"] = shear_rate
+    if reference_gamma_dot is not None:
+        final_metadata["reference_gamma_dot"] = reference_gamma_dot
 
     # Add intended_transform if provided
     if intended_transform is not None:
@@ -530,7 +569,7 @@ def _detect_delimiter(filepath: Path) -> str:
     sample = ""
     try:
         with open(filepath, encoding="utf-8-sig", errors="replace") as f:
-            sample = f.read(4096)
+            sample = f.read(8192)
             try:
                 dialect = csv.Sniffer().sniff(
                     sample, delimiters=[",", "\t", ";", "|", " "]  # type: ignore[arg-type]

@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.io.readers._utils import normalize_temperature
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -977,26 +978,62 @@ def _extract_geometry_metadata(global_meta: dict[str, Any]) -> dict[str, Any]:
 def _extract_temperature_metadata(
     global_meta: dict[str, Any], df: pd.DataFrame
 ) -> dict[str, Any]:
-    """Extract temperature from header and per-point data.
+    """Extract temperature from header and per-point data, normalizing to Kelvin.
+
+    Preserves the original Celsius value as ``temperature_celsius`` when a
+    Celsius reading is detected.  The ``temperature`` key always holds Kelvin.
 
     Args:
         global_meta: Global metadata dictionary
         df: DataFrame with data columns
 
     Returns:
-        Dictionary with temperature info
+        Dictionary with temperature info (temperature in Kelvin)
     """
     temp_meta: dict[str, Any] = {}
 
-    # Header temperature
+    # Header temperature — detect unit and convert to Kelvin when Celsius
     for key in ["Temperature", "temperature", "Temp"]:
         if key in global_meta:
-            temp_meta["temperature"] = global_meta[key]
+            raw_value = global_meta[key]
+            # Check for an explicit unit key (e.g. "temperature_unit": "°C")
+            unit_key = f"{key}_unit" if f"{key}_unit" in global_meta else "temperature_unit"
+            raw_unit = global_meta.get(unit_key, "")
+            # Determine whether the value is in Celsius
+            is_celsius = (
+                "°C" in str(raw_unit)
+                or raw_unit.strip().lower() in ("c", "°c", "celsius")
+            )
+            if not is_celsius:
+                # Fall back: if the raw value looks like it could be Celsius
+                # (e.g. stored as a plain float without an explicit unit key)
+                # and no unit says Kelvin/Fahrenheit, assume Celsius.
+                unit_lower = str(raw_unit).strip().lower()
+                is_kelvin = unit_lower in ("k", "kelvin")
+                is_fahrenheit = unit_lower in ("f", "°f", "fahrenheit")
+                if not is_kelvin and not is_fahrenheit:
+                    # No unit information — treat as Celsius (most common for
+                    # RheoCompass exports which always record in °C)
+                    is_celsius = True
+
+            try:
+                numeric_value = float(raw_value)
+                if is_celsius:
+                    temp_meta["temperature_celsius"] = numeric_value
+                    temp_meta["temperature"] = normalize_temperature(numeric_value, "C")
+                else:
+                    temp_meta["temperature"] = numeric_value
+            except (TypeError, ValueError):
+                # Non-numeric value (e.g. a string label) — store as-is
+                temp_meta["temperature"] = raw_value
             break
 
-    # Per-point temperature
+    # Per-point temperature — convert column data to Kelvin if in Celsius
     if "temperature" in df.columns:
-        temp_meta["temperature_data"] = df["temperature"].values
+        temp_values = df["temperature"].values.astype(float)
+        # Per-point data from RheoCompass is always in °C; convert to K
+        temp_meta["temperature_celsius_data"] = temp_values
+        temp_meta["temperature_data"] = temp_values + 273.15
 
     return temp_meta
 

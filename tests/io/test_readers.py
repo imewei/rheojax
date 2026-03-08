@@ -588,3 +588,94 @@ class TestDetectModulusPair:
         assert result is not None
         assert result[0] == "E_stor"
         assert result[1] == "E_loss"
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: format= kwarg tests
+# ---------------------------------------------------------------------------
+
+
+class TestAutoLoadFormatKwarg:
+    """Tests for the format= keyword argument added in Phase 2."""
+
+    def _make_csv(self, tmp_path, filename="test.csv"):
+        import pandas as pd
+
+        df = pd.DataFrame({"time": [0.1, 0.2, 0.3], "stress": [100.0, 90.0, 80.0]})
+        p = tmp_path / filename
+        df.to_csv(p, index=False)
+        return p
+
+    @pytest.mark.smoke
+    def test_auto_load_format_csv(self, tmp_path):
+        """format='csv' loads a CSV file directly without auto-detection."""
+        csv_file = self._make_csv(tmp_path)
+        data = auto_load(csv_file, format="csv", x_col="time", y_col="stress")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 3
+        np.testing.assert_allclose(data.x, [0.1, 0.2, 0.3], rtol=1e-10)
+
+    @pytest.mark.smoke
+    def test_auto_load_format_none_default(self, tmp_path):
+        """format=None (default) preserves existing auto-detection behavior."""
+        csv_file = self._make_csv(tmp_path)
+        data = auto_load(csv_file, format=None, x_col="time", y_col="stress")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 3
+
+    @pytest.mark.smoke
+    def test_auto_load_format_invalid(self, tmp_path):
+        """format='unknown' raises RheoJaxFormatError (subclass of ValueError)."""
+        from rheojax.io._exceptions import RheoJaxFormatError
+
+        csv_file = self._make_csv(tmp_path)
+        with pytest.raises(RheoJaxFormatError, match="Unknown format"):
+            auto_load(csv_file, format="unknown")
+
+    @pytest.mark.smoke
+    def test_auto_load_format_case_insensitive(self, tmp_path):
+        """format='CSV' (uppercase) is accepted."""
+        csv_file = self._make_csv(tmp_path)
+        data = auto_load(csv_file, format="CSV", x_col="time", y_col="stress")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 3
+
+    def test_auto_load_backward_compat(self, tmp_path):
+        """Calling without format= still works (backward compatible)."""
+        csv_file = self._make_csv(tmp_path)
+        # Standard call — no format kwarg at all
+        data = auto_load(csv_file, x_col="time", y_col="stress")
+        assert isinstance(data, RheoData)
+
+    def test_auto_load_format_excel(self, tmp_path):
+        """format='excel' loads an Excel file directly."""
+        pytest.importorskip("openpyxl")
+        import pandas as pd
+
+        excel_file = tmp_path / "test.xlsx"
+        df = pd.DataFrame({"time": [0.1, 0.2, 0.3], "stress": [100.0, 90.0, 80.0]})
+        df.to_excel(excel_file, index=False)
+
+        data = auto_load(excel_file, format="excel", x_col="time", y_col="stress")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 3
+
+    def test_auto_load_format_invalid_is_value_error(self, tmp_path):
+        """RheoJaxFormatError is a subclass of ValueError."""
+        from rheojax.io._exceptions import RheoJaxFormatError
+
+        csv_file = self._make_csv(tmp_path)
+        with pytest.raises(ValueError):
+            auto_load(csv_file, format="badformat")
+
+    def test_auto_load_format_csv_auto_columns(self, tmp_path):
+        """format='csv' with auto-detectable column names works without x_col/y_col."""
+        import pandas as pd
+
+        df = pd.DataFrame({"time": [0.1, 0.2], "stress": [100.0, 90.0]})
+        csv_file = tmp_path / "auto_cols.csv"
+        df.to_csv(csv_file, index=False)
+
+        data = auto_load(csv_file, format="csv")
+        assert isinstance(data, RheoData)
+        assert len(data.x) == 2

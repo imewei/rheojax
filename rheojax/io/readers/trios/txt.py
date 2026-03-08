@@ -53,6 +53,7 @@ Reference: Ported from hermes-rheo TriosRheoReader
 
 from __future__ import annotations
 
+import math
 import os
 import re
 import warnings
@@ -1125,6 +1126,8 @@ def _build_segment_metadata(
 
     if step_temperature is not None:
         segment_metadata["temperature"] = step_temperature
+        # Preserve Celsius value for user convenience (step_temperature is in Kelvin)
+        segment_metadata["temperature_celsius"] = step_temperature - 273.15
 
     return segment_metadata
 
@@ -1324,8 +1327,10 @@ def _parse_segment(
     # Find header and data lines
     segment_lines = lines[start:end]
 
-    # Extract temperature from step name (e.g., "Frequency sweep (150.0 °C)")
+    # Extract temperature and protocol metadata from step name
+    # e.g., "Frequency sweep (150.0 °C)" or "Amplitude sweep (1.0 Hz, 25.0 °C)"
     step_temperature = None
+    step_protocol_meta: dict = {}
     for line in segment_lines[:5]:  # Check first few lines
         if "Step name" in line or line.startswith("Step name"):
             # Extract temperature from format: "Step name\tFrequency sweep (150.0 °C)"
@@ -1334,7 +1339,18 @@ def _parse_segment(
             if temp_match:
                 temp_c = float(temp_match.group(1))
                 step_temperature = temp_c + 273.15  # Convert to Kelvin
-                break
+            # Extract angular frequency or frequency from step name
+            omega_match = re.search(r"(\d+\.?\d*)\s*(?:rad/s|rad s)", line)
+            if omega_match:
+                step_protocol_meta["omega"] = float(omega_match.group(1))
+            freq_match = re.search(r"(\d+\.?\d*)\s*Hz", line, re.IGNORECASE)
+            if freq_match and "omega" not in step_protocol_meta:
+                step_protocol_meta["omega"] = float(freq_match.group(1)) * 2 * math.pi
+            # Extract strain amplitude from step name (e.g. "1.0 %")
+            strain_match = re.search(r"(\d+\.?\d*)\s*%", line)
+            if strain_match:
+                step_protocol_meta["gamma_0"] = float(strain_match.group(1)) * 0.01
+            break
 
     # Look for "Number of points" line
     num_points_line = None
@@ -1497,9 +1513,40 @@ def _parse_segment(
     ):
         segment_metadata["deformation_mode"] = "tension"
 
-    # Add temperature if found
+    # Add temperature if found (step_temperature is already in Kelvin)
     if step_temperature is not None:
         segment_metadata["temperature"] = step_temperature
+        # Preserve Celsius value for user convenience
+        segment_metadata["temperature_celsius"] = step_temperature - 273.15
+
+    # Add protocol metadata extracted from step name
+    segment_metadata.update(step_protocol_meta)
+
+    # Check for LAOS harmonic columns
+    col_names_lower_full = [c.lower() for c in columns]
+    harmonic_col = next(
+        (i for i, c in enumerate(col_names_lower_full) if ("harmonic" in c and "number" in c) or c == "harmonic"),
+        None,
+    )
+    in_phase_col = next(
+        (i for i, c in enumerate(col_names_lower_full) if "in-phase" in c or "in_phase" in c or "in phase" in c),
+        None,
+    )
+    out_of_phase_col = next(
+        (i for i, c in enumerate(col_names_lower_full) if "out-of-phase" in c or "out_of_phase" in c or "out of phase" in c),
+        None,
+    )
+    if harmonic_col is not None or (in_phase_col is not None and out_of_phase_col is not None):
+        laos_harmonics: dict = {}
+        if harmonic_col is not None and harmonic_col < data_array.shape[1]:
+            laos_harmonics["harmonic_numbers"] = data_array[:, harmonic_col]
+        if in_phase_col is not None and in_phase_col < data_array.shape[1]:
+            laos_harmonics["in_phase"] = data_array[:, in_phase_col]
+        if out_of_phase_col is not None and out_of_phase_col < data_array.shape[1]:
+            laos_harmonics["out_of_phase"] = data_array[:, out_of_phase_col]
+        if laos_harmonics:
+            segment_metadata["laos_harmonics"] = laos_harmonics
+            logger.debug("LAOS harmonic columns detected", keys=list(laos_harmonics.keys()))
 
     return RheoData(
         x=x_data,
