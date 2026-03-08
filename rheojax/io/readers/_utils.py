@@ -32,6 +32,9 @@ __all__ = [
     "detect_deformation_mode_from_columns",
     "validate_transform",
     "construct_complex_modulus",
+    "UNIFIED_UNIT_CONVERSIONS",
+    "normalize_units",
+    "normalize_temperature",
 ]
 
 # =============================================================================
@@ -44,6 +47,8 @@ VALID_TEST_MODES: frozenset[str] = frozenset(
         "creep",
         "oscillation",
         "rotation",
+        "startup",
+        "flow_curve",
     }
 )
 
@@ -615,3 +620,100 @@ def construct_complex_modulus(
         result_dtype="complex128",
     )
     return g_prime + 1j * g_double_prime
+
+
+# =============================================================================
+# Unified Unit Conversions
+# =============================================================================
+
+# Merge of Anton Paar UNIT_CONVERSIONS + TRIOS TRIOS_UNIT_CONVERSIONS + extensions.
+# Each entry maps source_unit (lowercase) -> (target_si_unit, factor_or_None).
+# factor=None signals an additive conversion (temperature) handled in normalize_units().
+UNIFIED_UNIT_CONVERSIONS: dict[str, tuple[str, float | None]] = {
+    # Frequency
+    "hz": ("rad/s", 2 * np.pi),
+    "1/hz": ("rad/s", 2 * np.pi),
+    # Time
+    "ms": ("s", 0.001),
+    "min": ("s", 60.0),
+    "mins": ("s", 60.0),
+    "minutes": ("s", 60.0),
+    # Pressure / Modulus
+    "kpa": ("Pa", 1000.0),
+    "mpa": ("Pa", 1e6),  # megapascal
+    "gpa": ("Pa", 1e9),  # gigapascal (NEW)
+    # Viscosity — note mPa here means millipascal (0.001 Pa)
+    "mpa·s": ("Pa.s", 0.001),
+    "mpa.s": ("Pa.s", 0.001),
+    # Rotation
+    "rpm": ("1/s", 1.0 / 60.0),
+    "rev/min": ("1/s", 1.0 / 60.0),
+    "rev/s": ("1/s", 1.0),
+    # Dimensionless
+    "%": ("dimensionless", 0.01),
+    # Temperature (additive — factor is None, handled specially)
+    "°c": ("K", None),
+    "°f": ("K", None),
+    "c": ("K", None),
+    "f": ("K", None),
+}
+
+
+def normalize_temperature(value: float, unit: str = "C") -> float:
+    """Convert a temperature value to Kelvin.
+
+    Args:
+        value: Temperature value.
+        unit: Source unit — "C", "°C", "F", "°F", or "K".
+
+    Returns:
+        Temperature in Kelvin.
+
+    Raises:
+        ValueError: If unit is not recognized.
+    """
+    unit_lower = unit.strip().lower()
+    if unit_lower in ("c", "°c", "celsius"):
+        return value + 273.15
+    if unit_lower in ("f", "°f", "fahrenheit"):
+        return (value - 32) * 5 / 9 + 273.15
+    if unit_lower in ("k", "kelvin"):
+        return float(value)
+    raise ValueError(
+        f"Unrecognized temperature unit '{unit}'. Expected 'C', '°C', 'F', '°F', or 'K'."
+    )
+
+
+def normalize_units(
+    values: NDArray[np.floating], source_unit: str
+) -> tuple[NDArray[np.floating], str]:
+    """Convert values to SI units.
+
+    Handles both multiplicative conversions (kPa -> Pa) and additive
+    conversions (°C -> K).
+
+    Args:
+        values: Array of values to convert.
+        source_unit: Source unit string (case-insensitive lookup).
+
+    Returns:
+        Tuple of (converted_values, target_unit_string).
+        If no conversion found, returns (values, source_unit) unchanged.
+    """
+    key = source_unit.lower()
+    if key not in UNIFIED_UNIT_CONVERSIONS:
+        return values, source_unit
+
+    target_unit, factor = UNIFIED_UNIT_CONVERSIONS[key]
+    values = np.asarray(values, dtype=np.float64)
+
+    if factor is not None:
+        return values * factor, target_unit
+
+    # Additive temperature conversion
+    if key in ("°c", "c"):
+        return values + 273.15, target_unit
+    if key in ("°f", "f"):
+        return (values - 32) * 5 / 9 + 273.15, target_unit
+
+    return values, source_unit
