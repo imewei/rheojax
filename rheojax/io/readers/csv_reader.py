@@ -204,8 +204,8 @@ def load_csv(
             if first_line.startswith("#"):
                 comment_char = "#"
                 logger.debug("Auto-detected '#' comment preamble")
-        except Exception:
-            pass  # If we can't peek, proceed without comment detection
+        except (OSError, UnicodeDecodeError):
+            logger.debug("Could not peek at file for comment detection")
 
     # Read CSV file with tolerant encoding/dialect handling.
     # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
@@ -292,7 +292,7 @@ def load_csv(
                 # Reuse col_str — no second astype(str) needed
                 sample = col_str.str.replace("\ufffd", "", regex=False)
                 if sample.str.match(
-                    r"^[\d.eE+\-,\s]*\d[\d.eE+\-,\s]*$", na=False
+                    r"^[\d.eE+\-,]*\d[\d.eE+\-,]*$", na=False
                 ).any():
                     raise ValueError(
                         f"Encoding corruption detected in numeric column '{col}'. "
@@ -412,7 +412,7 @@ def load_csv(
 
     # Build source metadata (includes encoding provenance for debugging)
     source_metadata = {
-        "source_file": str(filepath.absolute()),
+        "source_file": filepath.name,
         "file_type": "csv" if filepath.suffix.lower() in {".csv", ""} else "txt",
         "x_column": x_col,
         "y_column": y_cols if is_complex else y_col,
@@ -530,6 +530,11 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
         has_both = any("," in s and "." in s for s in samples)
         has_comma_only = any("," in s and "." not in s for s in samples)
 
+        # Regex to detect scientific notation (e.g. "1.23E+04", "2.5e-3")
+        import re as _re
+
+        _SCI_RE = _re.compile(r"[eE][+\-]?\d")
+
         if has_both:
             # Pick format from first sample with both separators
             sample = next(s for s in samples if "," in s and "." in s)
@@ -537,6 +542,25 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
             last_dot = sample.rfind(".")
             if last_comma > last_dot:
                 # EU: 1.234,56 — dot=thousands, comma=decimal
+                # But skip dot-removal for scientific notation values
+                if any(_SCI_RE.search(s) for s in samples):
+                    # Mixed: some values have sci notation, some EU format.
+                    # Process element-wise: try float as-is first, then EU convert.
+                    result = np.empty(str_arr.shape, dtype=float)
+                    for idx in np.ndindex(str_arr.shape):
+                        val = str_arr[idx].strip()
+                        if _SCI_RE.search(val):
+                            try:
+                                result[idx] = float(val.replace(",", "."))
+                                continue
+                            except ValueError:
+                                pass
+                        eu_val = val.replace(".", "").replace(",", ".")
+                        try:
+                            result[idx] = float(eu_val)
+                        except ValueError:
+                            result[idx] = np.nan
+                    return result
                 str_arr = np.char.replace(str_arr, ".", "")
                 str_arr = np.char.replace(str_arr, ",", ".")
             else:

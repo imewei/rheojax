@@ -38,6 +38,7 @@ from rheojax.io.readers.trios.common import (
     select_xy_columns,
     split_by_step,
 )
+from rheojax.io._exceptions import RheoJaxValidationWarning
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -499,7 +500,7 @@ def parse_trios_csv(
             # Require positive evidence: at least one cell contains a known
             # unit substring. This rules out annotation/label rows.
             if is_unit_row:
-                non_empty_parts = [p.strip() for p in parts[:6] if p.strip()]
+                non_empty_parts = [p.strip() for p in parts[:20] if p.strip()]
                 has_unit_evidence = any(
                     any(u in p for u in _UNIT_SUBSTRINGS) for p in non_empty_parts
                 )
@@ -564,17 +565,17 @@ def parse_trios_csv(
                 else:
                     try:
                         if decimal_separator == ",":
-                            # R8-IO-001 + R10-CSV-001: EU decimal handling.
-                            # Strategy: try comma→dot conversion; if the result
-                            # is not a valid float, fall back to the original
-                            # value (handles sci notation like "1.0E-03" where
-                            # dot is the decimal and no comma is present).
-                            eu_val = val_clean.replace(".", "").replace(",", ".")
+                            # EU decimal handling: try comma→dot first (preserves
+                            # dots in sci notation like "1.23E+04"); only do full
+                            # EU conversion (remove dots, swap comma) if that fails.
                             try:
-                                row.append(float(eu_val))
+                                row.append(float(val_clean.replace(",", ".")))
                             except ValueError:
-                                # Fallback: try original (e.g. "1.0E-03")
-                                row.append(float(val_clean))
+                                eu_val = val_clean.replace(".", "").replace(",", ".")
+                                try:
+                                    row.append(float(eu_val))
+                                except ValueError:
+                                    row.append(float(val_clean))
                         else:
                             row.append(float(val_clean))
                     except ValueError:
@@ -745,11 +746,14 @@ def parse_trios_csv(
                     else:
                         try:
                             if decimal_separator == ",":
-                                eu2 = v2.replace(".", "").replace(",", ".")
                                 try:
-                                    row2.append(float(eu2))
+                                    row2.append(float(v2.replace(",", ".")))
                                 except ValueError:
-                                    row2.append(float(v2))
+                                    eu2 = v2.replace(".", "").replace(",", ".")
+                                    try:
+                                        row2.append(float(eu2))
+                                    except ValueError:
+                                        row2.append(float(v2))
                             else:
                                 row2.append(float(v2))
                         except ValueError:
@@ -1001,6 +1005,11 @@ def load_trios_csv(
             y_data = y_data[valid_mask]
 
             if len(x_data) == 0:
+                warnings.warn(
+                    f"Segment {seg_idx} has no valid data after NaN filtering and was skipped.",
+                    RheoJaxValidationWarning,
+                    stacklevel=2,
+                )
                 continue
 
             # Build metadata

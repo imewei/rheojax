@@ -18,14 +18,31 @@ logger = get_logger(__name__)
 __all__ = ["load_tts", "load_srfs", "load_series"]
 
 
+def _validate_glob_pattern(pattern: str) -> bool:
+    """Reject glob patterns that attempt path traversal via '..'.
+
+    Returns True if the pattern is safe, False otherwise.
+    """
+    if ".." in pattern:
+        logger.warning(
+            "Glob pattern rejected: '..' path traversal is not allowed",
+            pattern=pattern,
+        )
+        return False
+    return True
+
+
 def _expand_glob(files: list[str | Path] | str) -> list[Path]:
     """Expand a glob pattern or normalise a list of paths to sorted Path objects.
 
-    Note: Glob patterns are resolved relative to their parent directory and are
-    **not** sandboxed — patterns like ``"../../other/*.csv"`` will traverse
-    parent directories as expected by :meth:`pathlib.Path.glob`.
+    Patterns containing ``..`` are rejected to prevent path traversal.
     """
     if isinstance(files, str) and ("*" in files or "?" in files):
+        if not _validate_glob_pattern(files):
+            raise ValueError(
+                f"Glob pattern '{files}' rejected: '..' path traversal "
+                f"is not allowed."
+            )
         p = Path(files)
         expanded = sorted(p.parent.glob(p.name))
         if not expanded:

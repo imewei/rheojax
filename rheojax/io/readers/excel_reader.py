@@ -259,8 +259,11 @@ def load_excel(
             n_dropped=n_dropped,
             n_total=len(x_data),
         )
-    x_data = np.take(x_data, valid_idx)
-    y_data = np.take(y_data, valid_idx)
+    x_data = x_data[valid_idx]
+    if y_data.ndim > 1:
+        y_data = y_data[valid_idx, :]
+    else:
+        y_data = y_data[valid_idx]
 
     if len(x_data) == 0:
         logger.error(
@@ -297,7 +300,7 @@ def load_excel(
 
     # Build source metadata
     source_metadata = {
-        "source_file": str(filepath.absolute()),
+        "source_file": filepath.name,
         "file_type": "excel",
         "sheet": sheet,
         "x_column": x_col,

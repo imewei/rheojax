@@ -789,8 +789,14 @@ def segment_to_rheodata(
                     if unit_str.upper() in ("C", "°C"):
                         metadata["temperature_celsius"] = numeric_val
                     metadata["temperature"] = converted
-                except ValueError:
-                    pass  # Leave as-is if unit not recognized
+                except ValueError as e:
+                    logger.warning(
+                        "Could not convert temperature unit '%s': %s",
+                        unit_str,
+                        e,
+                    )
+                    # Store raw numeric value so downstream code doesn't fail on a string
+                    metadata["temperature"] = numeric_val
         elif isinstance(raw_temp, (int, float)):
             # Numeric value without unit — assume Celsius for TRIOS files
             try:

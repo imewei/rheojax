@@ -68,7 +68,7 @@ def save_npz(
 
     # Serialise metadata to JSON bytes (handles numpy types via custom encoder)
     metadata_bytes = json.dumps(
-        data.metadata or {}, cls=_NumpyEncoder, allow_nan=False
+        data.metadata or {}, cls=_NumpyEncoder, allow_nan=True
     ).encode("utf-8")
 
     arrays: dict[str, np.ndarray] = {

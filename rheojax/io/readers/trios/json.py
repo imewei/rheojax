@@ -191,7 +191,7 @@ def parse_trios_json(
 
     # Extract metadata
     metadata = experiment.get_metadata()
-    metadata["source_file"] = str(filepath)
+    metadata["source_file"] = Path(filepath).name
     metadata["source_format"] = "json"
 
     logger.info(

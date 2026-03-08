@@ -5,12 +5,14 @@ from __future__ import annotations
 import enum
 import os
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.io._exceptions import RheoJaxValidationWarning
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
@@ -233,9 +235,15 @@ def _write_metadata_recursive(
             except (TypeError, ValueError):
                 # Lists of mixed types — fall back to string
                 group.attrs[key] = str(value)
-                logger.debug(
-                    "Metadata stored as string (mixed-type list)",
-                    key=full_key,
+                logger.warning(
+                    "Metadata key '%s' contains mixed-type list, stored as string representation",
+                    full_key,
+                )
+                warnings.warn(
+                    f"Metadata key '{full_key}' contains mixed-type list, "
+                    f"stored as string representation",
+                    RheoJaxValidationWarning,
+                    stacklevel=4,
                 )
             continue
 
@@ -304,53 +312,72 @@ def save_fit_result_hdf5(
     comp_algo: str | None = "gzip" if compression else None
     comp_opts = compression_level if compression else None
 
-    with h5py.File(filepath, "w") as f:
-        f.attrs["rheojax_type"] = "FitResult"
-        f.attrs["model_name"] = result.model_name or ""
-        f.attrs["model_class_name"] = result.model_class_name or ""
-        f.attrs["protocol"] = result.protocol or ""
-        f.attrs["n_params"] = result.n_params
+    # Atomic write: write to a temp file in the same directory, then rename.
+    tmp_fd = None
+    tmp_path = None
+    try:
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=filepath.parent, suffix=".h5.tmp")
+        os.close(tmp_fd)
+        tmp_fd = None
 
-        # Store scalar statistics
-        for attr_name in ("r_squared", "aic", "bic", "aicc", "rmse", "mae"):
-            val = getattr(result, attr_name, None)
-            if val is not None and np.isfinite(val):
-                f.attrs[attr_name] = float(val)
+        with h5py.File(tmp_path, "w") as f:
+            f.attrs["rheojax_type"] = "FitResult"
+            f.attrs["model_name"] = result.model_name or ""
+            f.attrs["model_class_name"] = result.model_class_name or ""
+            f.attrs["protocol"] = result.protocol or ""
+            f.attrs["n_params"] = result.n_params
 
-        # Parameters
-        params_grp = f.create_group("params")
-        for name, value in result.params.items():
-            params_grp.attrs[name] = float(value)
+            # Store scalar statistics
+            for attr_name in ("r_squared", "aic", "bic", "aicc", "rmse", "mae"):
+                val = getattr(result, attr_name, None)
+                if val is not None and np.isfinite(val):
+                    f.attrs[attr_name] = float(val)
 
-        # Parameter units
-        if result.params_units:
-            units_grp = f.create_group("params_units")
-            for name, unit in result.params_units.items():
-                units_grp.attrs[name] = str(unit)
+            # Parameters
+            params_grp = f.create_group("params")
+            for name, value in result.params.items():
+                params_grp.attrs[name] = float(value)
 
-        # Fitted curve
-        if result.fitted_curve is not None:
-            arr = np.asarray(result.fitted_curve)
-            f.create_dataset(
-                "fitted_curve", data=arr,
-                compression=comp_algo, compression_opts=comp_opts,
-            )
+            # Parameter units
+            if result.params_units:
+                units_grp = f.create_group("params_units")
+                for name, unit in result.params_units.items():
+                    units_grp.attrs[name] = str(unit)
 
-        # Input data
-        if result.X is not None:
-            f.create_dataset(
-                "input_x", data=np.asarray(result.X),
-                compression=comp_algo, compression_opts=comp_opts,
-            )
-        if result.y is not None:
-            f.create_dataset(
-                "input_y", data=np.asarray(result.y),
-                compression=comp_algo, compression_opts=comp_opts,
-            )
+            # Fitted curve
+            if result.fitted_curve is not None:
+                arr = np.asarray(result.fitted_curve)
+                f.create_dataset(
+                    "fitted_curve", data=arr,
+                    compression=comp_algo, compression_opts=comp_opts,
+                )
 
-        # Timestamp
-        if result.timestamp:
-            f.attrs["timestamp"] = result.timestamp
+            # Input data
+            if result.X is not None:
+                f.create_dataset(
+                    "input_x", data=np.asarray(result.X),
+                    compression=comp_algo, compression_opts=comp_opts,
+                )
+            if result.y is not None:
+                f.create_dataset(
+                    "input_y", data=np.asarray(result.y),
+                    compression=comp_algo, compression_opts=comp_opts,
+                )
+
+            # Timestamp
+            if result.timestamp:
+                f.attrs["timestamp"] = result.timestamp
+
+        # Atomic rename
+        os.replace(tmp_path, filepath)
+        tmp_path = None
+
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     logger.info(
         "Saved FitResult to HDF5",
