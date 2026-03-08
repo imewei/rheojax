@@ -10,6 +10,7 @@ This module provides readers and writers for various data formats:
 """
 
 from rheojax.io import readers, writers
+from rheojax.io._exceptions import RheoJaxFormatError, RheoJaxValidationWarning
 
 # Import commonly used functions for convenience
 from rheojax.io.readers import (
@@ -17,8 +18,12 @@ from rheojax.io.readers import (
     load_anton_paar,
     load_csv,
     load_excel,
+    load_series,
+    load_srfs,
     load_trios,
+    load_tts,
 )
+from rheojax.io.readers._validation import validate_protocol
 
 # SPP export functions
 from rheojax.io.spp_export import (
@@ -29,8 +34,10 @@ from rheojax.io.spp_export import (
 )
 from rheojax.io.writers import (
     load_hdf5,
+    load_npz,
     save_excel,
     save_hdf5,
+    save_npz,
 )
 
 __all__ = [
@@ -42,13 +49,24 @@ __all__ = [
     "load_excel",
     "load_anton_paar",
     "auto_load",
+    # Multi-file loaders
+    "load_tts",
+    "load_srfs",
+    "load_series",
     # Writers
     "save_hdf5",
     "load_hdf5",
     "save_excel",
+    "save_npz",
+    "load_npz",
     # SPP Export
     "export_spp_txt",
     "export_spp_hdf5",
     "export_spp_csv",
     "to_matlab_dict",
+    # Exceptions and warnings
+    "RheoJaxFormatError",
+    "RheoJaxValidationWarning",
+    # Validation
+    "validate_protocol",
 ]

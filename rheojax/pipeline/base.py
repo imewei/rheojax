@@ -132,6 +132,10 @@ class Pipeline:
                         from rheojax.io import load_hdf5
 
                         result = load_hdf5(path, **kwargs)
+                    elif format == "npz":
+                        from rheojax.io.writers.npz_writer import load_npz
+
+                        result = load_npz(path)
                     else:
                         raise ValueError(f"Unknown format: {format}")
 

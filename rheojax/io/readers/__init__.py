@@ -8,6 +8,13 @@ This module provides readers for various instrument data formats:
 - Auto-detection wrapper
 """
 
+from rheojax.io.readers._column_mapping import (
+    CANONICAL_FIELDS,
+    CanonicalField,
+    match_column,
+    match_columns,
+)
+from rheojax.io.readers._validation import validate_protocol
 from rheojax.io.readers.anton_paar import (
     IntervalBlock,
     load_anton_paar,
@@ -17,6 +24,7 @@ from rheojax.io.readers.anton_paar import (
 from rheojax.io.readers.auto import auto_load
 from rheojax.io.readers.csv_reader import load_csv
 from rheojax.io.readers.excel_reader import load_excel
+from rheojax.io.readers.multi_file import load_series, load_srfs, load_tts
 
 # TRIOS multi-format support
 from rheojax.io.readers.trios import (
@@ -50,4 +58,15 @@ __all__ = [
     "IntervalBlock",
     # Auto-detection
     "auto_load",
+    # Column mapping registry
+    "CanonicalField",
+    "CANONICAL_FIELDS",
+    "match_column",
+    "match_columns",
+    # Validation
+    "validate_protocol",
+    # Multi-file loaders
+    "load_tts",
+    "load_srfs",
+    "load_series",
 ]
