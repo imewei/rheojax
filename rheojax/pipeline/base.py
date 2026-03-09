@@ -71,6 +71,13 @@ class Pipeline:
         self.steps: list[tuple[str, Any]] = []
         self.history: list[tuple[Any, ...]] = []
         self._last_model: BaseModel | None = None
+        self._last_fit_result: Any = None
+        self._last_bayesian_result: Any = None
+        self._transform_results: dict[str, tuple[Any, RheoData | None]] = {}
+        self._last_transform_name: str | None = None
+        self._current_figure: Any = None
+        self._diagnostic_results: Any = None
+        self._last_comparison: Any = None
         self._id = str(uuid.uuid4())[:8]
         logger.debug(
             "Pipeline initialized",
@@ -219,7 +226,13 @@ class Pipeline:
                 # Apply transform to full RheoData (not raw y array)
                 # Transforms expect RheoData with x, y, metadata, domain
                 ctx["input_shape"] = len(self.data.x)
+                pre_transform_data = self.data
                 result = transform_obj.transform(self.data)
+
+                # Cache full result + pre-transform data for plot_transform()
+                self._transform_results[transform_name] = (result, pre_transform_data)
+                self._last_transform_name = transform_name
+
                 if isinstance(result, tuple):
                     self.data = result[0]
                 else:
@@ -339,6 +352,7 @@ class Pipeline:
                 fit_kwargs["method"] = method
                 model_obj.fit(X, y, **fit_kwargs)
                 self._last_model = model_obj
+                self._last_fit_result = None  # Lazily built by get_fit_result()
                 self.steps.append(("fit", model_obj))
                 try:
                     score = model_obj.score(X, y)
@@ -691,7 +705,7 @@ class Pipeline:
 
         The figure is stored internally by plot() and retrieved by save_figure().
         """
-        if not hasattr(self, "_current_figure") or self._current_figure is None:
+        if self._current_figure is None:
             raise ValueError(
                 "No figure to save. Call plot() before save_figure(). "
                 "Example: pipeline.load('data.csv').fit('maxwell').plot().save_figure('output.pdf')"
@@ -725,6 +739,353 @@ class Pipeline:
                 raise
 
         self.history.append(("save_figure", str(path)))
+        return self
+
+    def fit_bayesian(
+        self,
+        model: str | BaseModel | None = None,
+        seed: int | None = None,
+        **bayesian_kwargs,
+    ) -> Pipeline:
+        """Run Bayesian (NUTS) inference on current data.
+
+        Uses the last fitted model (or a new one) with NLSQ warm-start.
+
+        Args:
+            model: Model name, instance, or None to reuse last fitted model.
+            seed: Random seed for reproducibility (default: 0).
+            **bayesian_kwargs: Arguments forwarded to model.fit_bayesian()
+                (num_warmup, num_samples, num_chains, target_accept_prob, etc.)
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit('maxwell').fit_bayesian(seed=42, num_warmup=1000)
+        """
+        if self.data is None:
+            raise ValueError("No data loaded. Call load() first.")
+
+        # Resolve model
+        if model is not None:
+            if isinstance(model, str):
+                model_obj = ModelRegistry.create(model)
+            else:
+                model_obj = model
+        elif self._last_model is not None:
+            model_obj = self._last_model
+        else:
+            raise ValueError("No model available. Call fit() first or provide a model.")
+
+        X = self.data.x
+        y = self.data.y
+        if _is_jax_array(X):
+            X = np.array(X)
+        if _is_jax_array(y):
+            y = np.array(y)
+
+        # Auto-propagate metadata
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "test_mode" not in bayesian_kwargs and _meta.get("test_mode"):
+            bayesian_kwargs["test_mode"] = _meta["test_mode"]
+        if "deformation_mode" not in bayesian_kwargs and _meta.get("deformation_mode"):
+            bayesian_kwargs["deformation_mode"] = _meta["deformation_mode"]
+        if "poisson_ratio" not in bayesian_kwargs and _meta.get("poisson_ratio"):
+            bayesian_kwargs["poisson_ratio"] = _meta["poisson_ratio"]
+
+        if seed is not None:
+            bayesian_kwargs["seed"] = seed
+
+        with log_pipeline_stage(
+            logger,
+            "fit_bayesian",
+            pipeline_id=self._id,
+            model=model_obj.__class__.__name__,
+        ) as ctx:
+            try:
+                result = model_obj.fit_bayesian(X, y, **bayesian_kwargs)
+                self._last_bayesian_result = result
+                self._last_model = model_obj
+                self.steps.append(("fit_bayesian", model_obj))
+                self.history.append(("fit_bayesian", model_obj.__class__.__name__))
+                ctx["num_samples"] = getattr(result, "num_samples", None)
+                ctx["num_chains"] = getattr(result, "num_chains", None)
+            except Exception as e:
+                logger.error(
+                    "Bayesian fitting failed",
+                    pipeline_id=self._id,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        return self
+
+    def plot_fit(
+        self,
+        confidence: float = 0.95,
+        show_residuals: bool = True,
+        show_uncertainty: bool = True,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Pipeline:
+        """Plot NLSQ fit with uncertainty band and residuals.
+
+        Requires a prior call to fit(). Uses FitPlotter internally.
+
+        Args:
+            confidence: Confidence level for uncertainty band (default: 0.95).
+            show_residuals: If True, add residuals subplot.
+            show_uncertainty: If True and covariance available, show band.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style ('default', 'publication', 'presentation').
+            **kwargs: Additional arguments forwarded to FitPlotter.plot_nlsq().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit('maxwell').plot_fit(confidence=0.95)
+        """
+        if self._last_model is None:
+            raise ValueError("No model fitted. Call fit() first.")
+        if self.data is None:
+            raise ValueError("No data loaded. Call load() first.")
+
+        from rheojax.visualization.fit_plotter import FitPlotter
+
+        fit_result = self.get_fit_result()
+        plotter = FitPlotter()
+
+        X = np.array(self.data.x) if _is_jax_array(self.data.x) else np.asarray(self.data.x)
+        y = np.array(self.data.y) if _is_jax_array(self.data.y) else np.asarray(self.data.y)
+
+        # Forward deformation_mode from metadata
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "deformation_mode" not in kwargs:
+            dm = _meta.get("deformation_mode")
+            if dm is not None:
+                kwargs["deformation_mode"] = dm
+        if "test_mode" not in kwargs:
+            tm = _meta.get("test_mode")
+            if tm is not None:
+                kwargs["test_mode"] = tm
+
+        fig, axes = plotter.plot_nlsq(
+            X, y, fit_result, self._last_model,
+            confidence=confidence,
+            show_residuals=show_residuals,
+            show_uncertainty=show_uncertainty,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_fit", style))
+        return self
+
+    def plot_bayesian(
+        self,
+        credible_level: float = 0.95,
+        max_draws: int = 500,
+        show_nlsq_overlay: bool = False,
+        show_residuals: bool = False,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Pipeline:
+        """Plot Bayesian posterior predictive with credible interval.
+
+        Requires a prior call to fit_bayesian().
+
+        Args:
+            credible_level: Credible interval level (default: 0.95).
+            max_draws: Maximum posterior draws for band computation.
+            show_nlsq_overlay: If True, overlay NLSQ fit for comparison.
+            show_residuals: If True, add residuals subplot.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style.
+            **kwargs: Additional arguments forwarded to FitPlotter.plot_bayesian().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit('maxwell').fit_bayesian(seed=42).plot_bayesian()
+        """
+        if self._last_bayesian_result is None:
+            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
+        if self._last_model is None:
+            raise ValueError("No model available.")
+        if self.data is None:
+            raise ValueError("No data loaded.")
+
+        from rheojax.visualization.fit_plotter import FitPlotter
+
+        plotter = FitPlotter()
+        X = np.array(self.data.x) if _is_jax_array(self.data.x) else np.asarray(self.data.x)
+        y = np.array(self.data.y) if _is_jax_array(self.data.y) else np.asarray(self.data.y)
+
+        # Forward metadata
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "deformation_mode" not in kwargs:
+            dm = _meta.get("deformation_mode")
+            if dm is not None:
+                kwargs["deformation_mode"] = dm
+        if "test_mode" not in kwargs:
+            tm = _meta.get("test_mode")
+            if tm is not None:
+                kwargs["test_mode"] = tm
+
+        fit_result = None
+        if show_nlsq_overlay:
+            try:
+                fit_result = self.get_fit_result()
+            except ValueError:
+                pass
+
+        fig, axes = plotter.plot_bayesian(
+            X, y, self._last_bayesian_result, self._last_model,
+            credible_level=credible_level,
+            max_draws=max_draws,
+            show_nlsq_overlay=show_nlsq_overlay,
+            fit_result=fit_result,
+            show_residuals=show_residuals,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_bayesian", style))
+        return self
+
+    def plot_diagnostics(
+        self,
+        output_dir: str | Path | None = None,
+        style: str = "default",
+        prefix: str = "mcmc",
+        formats: tuple[str, ...] = ("pdf", "png"),
+        dpi: int = 300,
+        **kwargs,
+    ) -> Pipeline:
+        """Generate ArviZ MCMC diagnostic suite (6 plots).
+
+        Requires a prior call to fit_bayesian().
+
+        Args:
+            output_dir: Directory for saving plots. If None, displays only.
+            style: Plot style.
+            prefix: Filename prefix for saved plots.
+            formats: Output formats (default: ('pdf', 'png')).
+            dpi: Resolution for raster formats.
+            **kwargs: Additional arguments forwarded to generate_diagnostic_suite().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit_bayesian(seed=42).plot_diagnostics(output_dir='./diag')
+        """
+        if self._last_bayesian_result is None:
+            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
+
+        from rheojax.visualization.fit_plotter import generate_diagnostic_suite
+
+        result = generate_diagnostic_suite(
+            self._last_bayesian_result,
+            style=style,
+            output_dir=output_dir,
+            prefix=prefix,
+            formats=formats,
+            dpi=dpi,
+            **kwargs,
+        )
+
+        self._diagnostic_results = result
+
+        # Expose the first diagnostic figure for save_figure() chaining.
+        # generate_diagnostic_suite returns dict[str, Figure | Path].
+        if isinstance(result, dict):
+            for fig_or_path in result.values():
+                if hasattr(fig_or_path, "savefig"):
+                    self._current_figure = fig_or_path
+                    break
+
+        self.history.append(("plot_diagnostics", str(output_dir)))
+        return self
+
+    def plot_transform(
+        self,
+        transform_name: str | None = None,
+        show_intermediate: bool = True,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Pipeline:
+        """Plot the result of a previously applied transform.
+
+        Uses TransformPlotter for per-transform layout dispatch.
+
+        Args:
+            transform_name: Name of the transform to plot. If None, uses the
+                most recently applied transform.
+            show_intermediate: Whether to show before/after comparison.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style.
+            **kwargs: Additional arguments forwarded to TransformPlotter.
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.transform('mastercurve', reference_temp=25.0).plot_transform()
+        """
+        from rheojax.visualization.transform_plotter import TransformPlotter
+
+        if transform_name is None:
+            transform_name = self._last_transform_name
+
+        if transform_name is None or transform_name not in self._transform_results:
+            available = list(self._transform_results.keys())
+            raise ValueError(
+                f"No cached result for transform '{transform_name}'. "
+                f"Available transforms: {available}. "
+                "Call transform() before plot_transform()."
+            )
+
+        cached_result, pre_data = self._transform_results[transform_name]
+        plotter = TransformPlotter()
+
+        fig, axes = plotter.plot(
+            transform_name,
+            cached_result,
+            input_data=pre_data if show_intermediate else None,
+            show_intermediate=show_intermediate,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_transform", transform_name, style))
         return self
 
     def get_result(self) -> RheoData:
@@ -949,6 +1310,106 @@ class Pipeline:
         self.steps = []
         self.history = []
         self._last_model = None
+        self._last_fit_result = None
+        self._last_bayesian_result = None
+        self._transform_results = {}
+        self._last_transform_name = None
+        self._current_figure = None
+        self._diagnostic_results = None
+        self._last_comparison = None
+        return self
+
+    def export(
+        self,
+        output: str | Path,
+        format: str = "auto",
+        *,
+        include_data: bool = True,
+        include_figures: bool = True,
+        include_diagnostics: bool = True,
+        figure_formats: tuple[str, ...] = ("pdf", "png"),
+        figure_dpi: int = 300,
+        **kwargs,
+    ) -> Pipeline:
+        """Export the full analysis to a directory or file.
+
+        This bundles data, parameters, statistics, figures, transform results,
+        and Bayesian diagnostics into a single export.
+
+        Args:
+            output: Output path. If a directory (no extension or trailing /),
+                exports as structured directory. If .xlsx, exports Excel.
+            format: Export format ('auto', 'directory', 'excel').
+                'auto' infers from the output path extension.
+            include_data: Save raw and transformed data files.
+            include_figures: Save generated matplotlib figures.
+            include_diagnostics: Save MCMC diagnostic plots.
+            figure_formats: Formats for figure files (default: ('pdf', 'png')).
+            figure_dpi: Resolution for raster figures (default: 300).
+            **kwargs: Additional arguments forwarded to the exporter.
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.load('data.csv').fit('maxwell').plot_fit().export('./results')
+            >>> pipeline.export('report.xlsx')
+        """
+        from rheojax.io.analysis_exporter import AnalysisExporter
+
+        output_path = Path(output)
+        exporter = AnalysisExporter(
+            figure_formats=figure_formats,
+            figure_dpi=figure_dpi,
+        )
+
+        # Determine format
+        if format == "auto":
+            if output_path.suffix.lower() == ".xlsx":
+                format = "excel"
+            else:
+                format = "directory"
+
+        with log_pipeline_stage(
+            logger,
+            "export",
+            pipeline_id=self._id,
+            output=str(output_path),
+            format=format,
+        ) as ctx:
+            try:
+                if format == "directory":
+                    exporter.export_directory(
+                        self,
+                        output_path,
+                        include_data=include_data,
+                        include_figures=include_figures,
+                        include_diagnostics=include_diagnostics,
+                        **kwargs,
+                    )
+                elif format == "excel":
+                    exporter.export_excel(
+                        self,
+                        output_path,
+                        include_plots=include_figures,
+                        **kwargs,
+                    )
+                else:
+                    raise ValueError(
+                        f"Unknown export format: {format}. Use 'directory' or 'excel'."
+                    )
+                ctx["format"] = format
+            except Exception as e:
+                logger.error(
+                    "Export failed",
+                    pipeline_id=self._id,
+                    output=str(output_path),
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        self.history.append(("export", str(output_path), format))
         return self
 
     def __repr__(self) -> str:
