@@ -15,21 +15,7 @@ logger = get_logger(__name__)
 __all__ = ["save_npz", "load_npz", "save_fit_result_npz"]
 
 
-class _NumpyEncoder(json.JSONEncoder):
-    """JSON encoder that handles NumPy scalar and array types."""
-
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.bool_):
-            return bool(obj)
-        if isinstance(obj, np.complexfloating):
-            return {"real": float(obj.real), "imag": float(obj.imag)}
-        return super().default(obj)
+from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyEncoder
 
 
 def _encode_str(s: str | None) -> np.ndarray:

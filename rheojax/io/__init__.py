@@ -32,6 +32,8 @@ from rheojax.io.spp_export import (
     export_spp_txt,
     to_matlab_dict,
 )
+from rheojax.io.analysis_exporter import AnalysisExporter
+from rheojax.io.json_encoder import NumpyJSONEncoder
 from rheojax.io.writers import (
     load_hdf5,
     load_npz,
@@ -64,6 +66,9 @@ __all__ = [
     "export_spp_hdf5",
     "export_spp_csv",
     "to_matlab_dict",
+    # Analysis exporter
+    "AnalysisExporter",
+    "NumpyJSONEncoder",
     # Exceptions and warnings
     "RheoJaxFormatError",
     "RheoJaxValidationWarning",
