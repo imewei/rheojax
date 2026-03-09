@@ -281,7 +281,9 @@ class TestFluidityFitPredictRoundtrip:
         G_star_np = np.array(G_star)
         model.fit(omega, G_star_np, test_mode="oscillation", max_iter=20)
         pred = model.predict(omega)
-        assert pred.shape == G_star_np.shape
+        # predict() returns complex G* (N,) from the (N, 2) input
+        assert pred.shape == (len(omega),)
+        assert np.iscomplexobj(pred)
         assert np.all(np.isfinite(pred))
 
     def test_local_startup_roundtrip(self):
@@ -438,15 +440,10 @@ class TestFluidityEndToEnd:
         """Test oscillation workflow from SAOS to LAOS."""
         model = FluidityLocal()
 
-        # SAOS - linear regime
+        # SAOS - linear regime (use public predict API for complex G* output)
         omega = np.logspace(-2, 2, 20)
-        G_star = model._predict_saos_jit(
-            jnp.asarray(omega),
-            model.parameters.get_value("G"),
-            model.parameters.get_value("f_eq"),
-            model.parameters.get_value("theta"),
-        )
-        G_star = np.array(G_star)
+        model._test_mode = "oscillation"
+        G_star = model.predict(omega)
 
         # LAOS - nonlinear regime
         strain, stress = model.simulate_laos(

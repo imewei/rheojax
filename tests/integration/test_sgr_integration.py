@@ -240,7 +240,7 @@ class TestSGRPublishedValidation:
             model._test_mode = "oscillation"
 
             pred = model.predict(omega)
-            predictions[regime] = pred[:, 0]  # G' values
+            predictions[regime] = np.real(pred)  # G' values
 
         # Power-law regime should have intermediate frequency dependence
         # (between glass and Newtonian)

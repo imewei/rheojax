@@ -443,7 +443,9 @@ class TestFluidityLocalFitting:
         G_star_np = np.array(G_star)
         model.fit(omega, G_star_np, test_mode="oscillation", max_iter=20)
         pred = model.predict(omega)
-        assert pred.shape == G_star_np.shape
+        # predict() returns complex G* (N,) from the (N, 2) input
+        assert pred.shape == (len(omega),)
+        assert np.iscomplexobj(pred)
         assert np.all(np.isfinite(pred))
 
     def test_fit_saos_alias(self):

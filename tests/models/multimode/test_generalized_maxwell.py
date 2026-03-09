@@ -177,8 +177,8 @@ class TestGMMOscillationMode:
         G_star = model.predict(omega)  # test_mode set via _test_mode
 
         # Extract G' and G"
-        G_prime = G_star[:, 0]
-        G_double_prime = G_star[:, 1]
+        G_prime = np.real(G_star)
+        G_double_prime = np.imag(G_star)
 
         # Check G' bounds (should be between G_inf and G_inf + sum(G_i))
         G_inf = 1e3
@@ -205,8 +205,8 @@ class TestGMMOscillationMode:
         omega = np.logspace(-2, 2, 50)
         model._test_mode = "oscillation"
         G_star = model.predict(omega)  # test_mode set via _test_mode
-        G_prime = G_star[:, 0]
-        G_double_prime = G_star[:, 1]
+        G_prime = np.real(G_star)
+        G_double_prime = np.imag(G_star)
 
         # Analytical Maxwell oscillation:
         # G' = G0 * (ω*τ)^2 / (1 + (ω*τ)^2)
@@ -260,8 +260,8 @@ class TestGMMOscillationMode:
 
         # Check fit quality (R² > 0.95)
         G_star_pred = model.predict(omega)  # test_mode set via _test_mode
-        residual_prime = G_star_data[:, 0] - G_star_pred[:, 0]
-        residual_double_prime = G_star_data[:, 1] - G_star_pred[:, 1]
+        residual_prime = G_star_data[:, 0] - np.real(G_star_pred)
+        residual_double_prime = G_star_data[:, 1] - np.imag(G_star_pred)
         ss_res = np.sum(residual_prime**2 + residual_double_prime**2)
         ss_tot = np.sum(
             (G_star_data[:, 0] - np.mean(G_star_data[:, 0])) ** 2
@@ -285,8 +285,8 @@ class TestGMMOscillationMode:
         omega = np.logspace(-2, 2, 50)
         model._test_mode = "oscillation"
         G_star = model.predict(omega)  # test_mode set via _test_mode
-        G_prime = G_star[:, 0]
-        G_double_prime = G_star[:, 1]
+        G_prime = np.real(G_star)
+        G_double_prime = np.imag(G_star)
 
         # Compute tan delta
         tan_delta = G_double_prime / G_prime
@@ -331,7 +331,7 @@ class TestGMMOscillationMode:
         ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
 
     def test_oscillation_output_shape(self):
-        """Oscillation output should have correct shape [N, 2] for [G', G'']."""
+        """Oscillation output should be a 1D complex array (N,) for G* = G' + iG''."""
         model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
         model.parameters.set_value("G_inf", 1e3)
         model.parameters.set_value("G_1", 1e5)
@@ -343,7 +343,8 @@ class TestGMMOscillationMode:
         model._test_mode = "oscillation"  # Set test mode explicitly
         G_star = model.predict(omega)
 
-        assert G_star.shape == (50, 2), f"Expected shape (50, 2), got {G_star.shape}"
+        assert G_star.shape == (50,), f"Expected shape (50,), got {G_star.shape}"
+        assert np.iscomplexobj(G_star), "Expected complex output for oscillation"
 
 
 class TestGMMCreepMode:

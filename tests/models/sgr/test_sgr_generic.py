@@ -228,12 +228,12 @@ class TestSGRGenericModelComparison:
         # Check predictions match within tolerance
         # GENERIC formulation should give same linear response as conventional
         relative_error_G_prime = np.max(
-            np.abs(G_star_generic[:, 0] - G_star_conventional[:, 0])
-            / (np.abs(G_star_conventional[:, 0]) + 1e-10)
+            np.abs(np.real(G_star_generic) - np.real(G_star_conventional))
+            / (np.abs(np.real(G_star_conventional)) + 1e-10)
         )
         relative_error_G_double_prime = np.max(
-            np.abs(G_star_generic[:, 1] - G_star_conventional[:, 1])
-            / (np.abs(G_star_conventional[:, 1]) + 1e-10)
+            np.abs(np.imag(G_star_generic) - np.imag(G_star_conventional))
+            / (np.abs(np.imag(G_star_conventional)) + 1e-10)
         )
 
         # Allow 10% tolerance for different numerical implementations

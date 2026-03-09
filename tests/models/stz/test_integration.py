@@ -200,9 +200,10 @@ class TestSTZIntegration:
         omega = np.logspace(6, 14, 10)
         result = model._predict(omega)
 
-        # Should return [G', G''] as 2 columns
-        assert result.ndim == 2
-        assert result.shape == (len(omega), 2)
+        # Should return complex G* = G' + iG''
+        assert result.ndim == 1
+        assert result.shape == (len(omega),)
+        assert np.iscomplexobj(result)
 
     def test_parameter_bounds_enforced(self):
         """Test that parameter bounds are enforced."""

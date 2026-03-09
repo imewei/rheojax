@@ -192,14 +192,14 @@ class TestSGRConventionalPredictions:
         omega_low = np.logspace(-1, 1, 40)  # omega*tau0 from 1e-4 to 1e-2
         G_star_low = model.predict(omega_low)
         log_omega_low = np.log10(omega_low[5:-5])
-        slope_gp = np.polyfit(log_omega_low, np.log10(G_star_low[5:-5, 0]), 1)[0]
+        slope_gp = np.polyfit(log_omega_low, np.log10(np.real(G_star_low[5:-5])), 1)[0]
         # G' slope should be in (0, 2) in this low-frequency regime
         assert (
             0 < slope_gp < 2
         ), f"G' low-freq slope {slope_gp} out of expected range (0, 2)"
 
         # G'/G'' ratio should be physically plausible at the G'' peak frequency
-        ratio_at_peak = G_star[gpp_max_idx, 0] / G_star[gpp_max_idx, 1]
+        ratio_at_peak = np.real(G_star[gpp_max_idx]) / np.imag(G_star[gpp_max_idx])
         assert (
             0.1 < ratio_at_peak < 50.0
         ), f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
@@ -344,7 +344,7 @@ class TestSGRConventionalPredictions:
         # while G'' decreases. Check high-frequency end.
         high_freq_idx = -5  # Near end of range
         assert (
-            G_star[high_freq_idx, 0] > G_star[high_freq_idx, 1]
+            np.real(G_star[high_freq_idx]) > np.imag(G_star[high_freq_idx])
         ), "Glass phase should show G' > G'' at high frequencies"
 
         # Also check that phase regime detection works
@@ -369,7 +369,7 @@ class TestSGRConventionalPredictions:
         # and G' ~ omega^2, G'' ~ omega (different from power-law regime)
         low_freq_idx = slice(0, 10)
         assert np.all(
-            G_star[low_freq_idx, 1] > G_star[low_freq_idx, 0]
+            np.imag(G_star[low_freq_idx]) > np.real(G_star[low_freq_idx])
         ), "Newtonian phase should show G'' > G' at low frequencies"
 
         # Check phase regime detection
@@ -391,17 +391,17 @@ class TestSGRConventionalPredictions:
         G_star = model.predict(omega)
 
         # Check both components positive
-        assert np.all(G_star[:, 0] > 0), "G' should be positive"
-        assert np.all(G_star[:, 1] > 0), "G'' should be positive"
+        assert np.all(np.real(G_star) > 0), "G' should be positive"
+        assert np.all(np.imag(G_star) > 0), "G'' should be positive"
 
         # Check complex modulus magnitude |G*| = sqrt(G'^2 + G''^2)
-        G_magnitude = np.sqrt(G_star[:, 0] ** 2 + G_star[:, 1] ** 2)
+        G_magnitude = np.abs(G_star)
         assert np.all(G_magnitude > 0)
-        assert np.all(G_magnitude > G_star[:, 0]), "|G*| should be >= G'"
-        assert np.all(G_magnitude > G_star[:, 1]), "|G*| should be >= G''"
+        assert np.all(G_magnitude > np.real(G_star)), "|G*| should be >= G'"
+        assert np.all(G_magnitude > np.imag(G_star)), "|G*| should be >= G''"
 
         # Check loss tangent tan(delta) = G''/G' is reasonable
-        tan_delta = G_star[:, 1] / G_star[:, 0]
+        tan_delta = np.imag(G_star) / np.real(G_star)
         assert np.all(tan_delta > 0), "Loss tangent should be positive"
 
         # Check that tan(delta) values are reasonable (not too extreme)
@@ -425,8 +425,7 @@ class TestSGRConventionalPredictions:
         G_star_array = model.predict(omega_array)
         assert G_star_array.shape == (
             20,
-            2,
-        ), "Oscillation array output should be (M, 2)"
+        ), "Oscillation array output should be complex (M,)"
 
         # Test relaxation mode with array
         model._test_mode = "relaxation"
@@ -1075,10 +1074,7 @@ class TestSGRConventionalFitting:
         model_true._test_mode = "oscillation"
 
         omega = np.logspace(-2, 2, 30)
-        G_star_2d = model_true.predict(omega)  # Shape (30, 2)
-
-        # Convert to complex
-        G_star_complex = G_star_2d[:, 0] + 1j * G_star_2d[:, 1]
+        G_star_complex = model_true.predict(omega)  # Shape (30,) complex
 
         # Fit with complex input
         model_fit = SGRConventional()
