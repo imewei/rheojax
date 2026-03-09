@@ -30,9 +30,12 @@ logger = get_logger(__name__)
 
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for fit subcommand."""
+    from rheojax.cli._globals import create_global_parser
+
     parser = argparse.ArgumentParser(
         prog="rheojax fit",
         description="NLSQ model fitting for rheological data",
+        parents=[create_global_parser()],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -129,6 +132,10 @@ def main(args: list[str] | None = None) -> int:
     parser = create_parser()
     parsed = parser.parse_args(args)
 
+    from rheojax.cli._globals import apply_globals
+
+    apply_globals(parsed)
+
     logger.info(
         "CLI fit command",
         model=parsed.model,
@@ -219,10 +226,11 @@ def main(args: list[str] | None = None) -> int:
         )
         return 1
 
-    # Validate complex data for oscillation mode
-    if test_mode == "oscillation" and not np.iscomplexobj(y_arr):
+    # Validate data shape for oscillation mode: accept complex G*, real (N,2), or real (N,)
+    if test_mode == "oscillation" and not np.iscomplexobj(y_arr) and y_arr.ndim != 2:
         print(
-            "Error: Oscillation test mode requires complex y data (G' + iG''). "
+            "Error: Oscillation test mode requires complex y data (G' + iG'') or "
+            "two-column real data [G', G'']. "
             "Use --y-cols to specify storage and loss modulus columns.",
             file=sys.stderr,
         )
@@ -254,7 +262,8 @@ def main(args: list[str] | None = None) -> int:
 
     except Exception as e:
         print(f"Error during fitting: {e}", file=sys.stderr)
-        logger.error("Fit failed", model=parsed.model, error=str(e), exc_info=True)
+        logger.error("Fit failed", model=parsed.model, error=str(e))
+        logger.debug("Fit traceback", exc_info=True)
         return 1
 
     # Extract results

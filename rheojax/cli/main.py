@@ -9,6 +9,12 @@ Commands:
     fit       - NLSQ model fitting
     bayesian  - Bayesian inference (NUTS sampling)
     spp       - SPP (Sequence of Physical Processes) analysis
+    load      - Load data and output summary or JSON envelope
+    transform - Apply a registered transform to data
+    export    - Export pipeline results to directory/Excel/HDF5
+    run       - Execute a YAML pipeline configuration
+    pipeline  - Pipeline management (init, validate, show)
+    batch     - Batch fit a model across multiple files
     info      - Display package information
     inventory - List available models and transforms
 """
@@ -35,17 +41,29 @@ def create_main_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Commands:
-  fit       NLSQ model fitting
-  bayesian  Bayesian inference (NUTS sampling)
-  spp       SPP (Sequence of Physical Processes) analysis for LAOS data
-  info      Display package version and configuration info
-  inventory List available models and transforms with protocol support
+  fit        NLSQ model fitting
+  bayesian   Bayesian inference (NUTS sampling)
+  spp        SPP (Sequence of Physical Processes) analysis for LAOS data
+  load       Load data and output summary or JSON envelope
+  transform  Apply a registered transform to data
+  export     Export pipeline results to directory/Excel/HDF5
+  run        Execute a YAML pipeline configuration
+  pipeline   Pipeline management (init, validate, show)
+  batch      Batch fit a model across multiple files
+  info       Display package version and configuration info
+  inventory  List available models and transforms with protocol support
 
 Examples:
   rheojax fit data.csv --model maxwell --x-col time --y-col G_t
   rheojax bayesian data.csv --model maxwell --x-col time --y-col G_t --warm-start
   rheojax spp analyze data.csv --omega 1.0 --gamma-0 0.5
   rheojax spp batch data_dir/ --omega 1.0
+  rheojax load data.csv --json | rheojax fit --model maxwell
+  rheojax transform fft_analysis --input data.csv
+  rheojax export results/ --output bundle.h5 --format hdf5
+  rheojax pipeline init --template basic --output pipeline.yaml
+  rheojax run pipeline.yaml
+  rheojax batch "data/*.csv" --model maxwell --test-mode relaxation
   rheojax info
   rheojax inventory
   rheojax inventory --protocol laos
@@ -82,6 +100,48 @@ For command-specific help:
         "spp",
         help="SPP (Sequence of Physical Processes) analysis",
         add_help=False,  # Let the spp module handle help
+    )
+
+    # Load subcommand
+    subparsers.add_parser(
+        "load",
+        help="Load data and output summary or JSON envelope",
+        add_help=False,
+    )
+
+    # Transform subcommand
+    subparsers.add_parser(
+        "transform",
+        help="Apply a registered transform to data",
+        add_help=False,
+    )
+
+    # Export subcommand
+    subparsers.add_parser(
+        "export",
+        help="Export pipeline results to directory/Excel/HDF5",
+        add_help=False,
+    )
+
+    # Run subcommand
+    subparsers.add_parser(
+        "run",
+        help="Execute a YAML pipeline configuration",
+        add_help=False,
+    )
+
+    # Pipeline subcommand
+    subparsers.add_parser(
+        "pipeline",
+        help="Pipeline management (init, validate, show)",
+        add_help=False,
+    )
+
+    # Batch subcommand
+    subparsers.add_parser(
+        "batch",
+        help="Batch fit a model across multiple files",
+        add_help=False,
     )
 
     # Info subcommand
@@ -293,6 +353,42 @@ def main(args: list[str] | None = None) -> int:
         from rheojax.cli.spp import main as spp_main
 
         return spp_main(args[1:])
+
+    elif command == "load":
+        logger.info("Running CLI command", command="load")
+        from rheojax.cli.cmd_load import main as load_main
+
+        return load_main(args[1:])
+
+    elif command == "transform":
+        logger.info("Running CLI command", command="transform")
+        from rheojax.cli.cmd_transform import main as transform_main
+
+        return transform_main(args[1:])
+
+    elif command == "export":
+        logger.info("Running CLI command", command="export")
+        from rheojax.cli.cmd_export import main as export_main
+
+        return export_main(args[1:])
+
+    elif command == "run":
+        logger.info("Running CLI command", command="run")
+        from rheojax.cli.cmd_run import main as run_main
+
+        return run_main(args[1:])
+
+    elif command == "pipeline":
+        logger.info("Running CLI command", command="pipeline")
+        from rheojax.cli.cmd_pipeline import main as pipeline_main
+
+        return pipeline_main(args[1:])
+
+    elif command == "batch":
+        logger.info("Running CLI command", command="batch")
+        from rheojax.cli.cmd_batch import main as batch_main
+
+        return batch_main(args[1:])
 
     elif command == "info":
         try:

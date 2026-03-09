@@ -30,9 +30,12 @@ logger = get_logger(__name__)
 
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for bayesian subcommand."""
+    from rheojax.cli._globals import create_global_parser
+
     parser = argparse.ArgumentParser(
         prog="rheojax bayesian",
         description="Bayesian inference (NUTS) for rheological models",
+        parents=[create_global_parser()],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -153,6 +156,10 @@ def main(args: list[str] | None = None) -> int:
     """Run Bayesian inference from CLI."""
     parser = create_parser()
     parsed = parser.parse_args(args)
+
+    from rheojax.cli._globals import apply_globals
+
+    apply_globals(parsed)
 
     logger.info(
         "CLI bayesian command",
@@ -292,7 +299,8 @@ def main(args: list[str] | None = None) -> int:
 
         print(
             f"Running NUTS ({parsed.warmup} warmup, "
-            f"{parsed.samples} samples, {parsed.chains} chains)..."
+            f"{parsed.samples} samples, {parsed.chains} chains)...",
+            file=sys.stderr,
         )
 
         result = model.fit_bayesian(
@@ -316,12 +324,8 @@ def main(args: list[str] | None = None) -> int:
 
     except Exception as e:
         print(f"Error during Bayesian inference: {e}", file=sys.stderr)
-        logger.error(
-            "Bayesian inference failed",
-            model=parsed.model,
-            error=str(e),
-            exc_info=True,
-        )
+        logger.error("Bayesian inference failed", model=parsed.model, error=str(e))
+        logger.debug("Bayesian inference traceback", exc_info=True)
         return 1
 
     # Extract diagnostics

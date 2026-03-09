@@ -31,9 +31,12 @@ logger = get_logger(__name__)
 
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for SPP CLI commands."""
+    from rheojax.cli._globals import create_global_parser
+
     parser = argparse.ArgumentParser(
         prog="rheojax spp",
         description="SPP (Sequence of Physical Processes) analysis for LAOS data",
+        parents=[create_global_parser()],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -515,6 +518,10 @@ def main(args: list[str] | None = None) -> int:
     """Main entry point for SPP CLI."""
     parser = create_parser()
     parsed_args = parser.parse_args(args)
+
+    from rheojax.cli._globals import apply_globals
+
+    apply_globals(parsed_args)
 
     if parsed_args.command is None:
         parser.print_help()
