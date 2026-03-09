@@ -1,6 +1,7 @@
 """Tests for ParameterFormBuilder widget."""
 
 import os
+
 import pytest
 
 # Skip entirely if no display and no offscreen platform

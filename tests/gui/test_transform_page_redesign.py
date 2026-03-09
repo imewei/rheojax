@@ -1,6 +1,7 @@
 """Tests for the redesigned TransformPage."""
 
 import os
+
 import pytest
 
 if not os.environ.get("QT_QPA_PLATFORM"):
@@ -8,9 +9,10 @@ if not os.environ.get("QT_QPA_PLATFORM"):
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
 from unittest.mock import MagicMock, patch
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 
 @pytest.fixture(scope="module")
