@@ -133,10 +133,10 @@ class TestAutoP0Fractional:
 
     def test_fractional_zener_oscillation(self):
         try:
-            from rheojax.models.fractional.fractional_zener_ss import FractionalZenerSS
+            from rheojax.models.fractional.fractional_zener_ss import FractionalZenerSolidSolid
         except ImportError:
-            pytest.skip("FractionalZenerSS not available")
-        model = FractionalZenerSS()
+            pytest.skip("FractionalZenerSolidSolid not available")
+        model = FractionalZenerSolidSolid()
         omega = np.logspace(-2, 2, 100)
         G_star = 500.0 + 500.0 * (1j * omega) ** 0.3
         p0 = auto_p0(omega, G_star, model, test_mode="oscillation")

@@ -327,8 +327,17 @@ class TestProtocolValidation:
 
     def test_all_models_have_protocols(self):
         """Verify that every registered model declares at least one protocol."""
-        # Exclude test fixture models registered in test files
-        test_models = {"simple_test_model"}
+        # Exclude test fixture models that may leak from other test modules
+        test_models = {
+            "simple_test_model",
+            "export_test_model",
+            "viz_test_model",
+            "batch_test_model",
+            "builder_test_model",
+            "mock_model",
+            "mock_maxwell",
+            "mock_zener",
+        }
         models_without_protocols = []
 
         for model_name in ModelRegistry.list_models():
