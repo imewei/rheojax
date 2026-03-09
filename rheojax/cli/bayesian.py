@@ -15,17 +15,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.logging import get_logger
-
 if TYPE_CHECKING:
     pass
-
-jax, jnp = safe_import_jax()
-
-logger = get_logger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -157,9 +148,15 @@ def main(args: list[str] | None = None) -> int:
     parser = create_parser()
     parsed = parser.parse_args(args)
 
+    import numpy as np
+
     from rheojax.cli._globals import apply_globals
+    from rheojax.core.jax_config import safe_import_jax
+    from rheojax.logging import get_logger
 
     apply_globals(parsed)
+    jax, jnp = safe_import_jax()
+    logger = get_logger(__name__)
 
     logger.info(
         "CLI bayesian command",
@@ -406,8 +403,9 @@ def main(args: list[str] | None = None) -> int:
         except OSError as e:
             print(f"Error writing to {parsed.output}: {e}", file=sys.stderr)
             return 1
-        print(f"Results written to {parsed.output}")
+        print(f"Results written to {parsed.output}", file=sys.stderr)
     else:
         print(output_text)
+        sys.stdout.flush()
 
     return 0

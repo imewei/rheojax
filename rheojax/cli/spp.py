@@ -14,19 +14,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.io import auto_load as load_data
-from rheojax.logging import get_logger
-from rheojax.transforms.spp_decomposer import SPPDecomposer
-
 if TYPE_CHECKING:
     from argparse import Namespace
-
-jax, jnp = safe_import_jax()
-
-logger = get_logger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -209,6 +198,14 @@ def _add_batch_args(parser: argparse.ArgumentParser) -> None:
 
 def run_analyze(args: Namespace) -> int:
     """Run SPP analysis on a single file."""
+    import numpy as np
+
+    from rheojax.io import auto_load as load_data
+    from rheojax.logging import get_logger
+    from rheojax.transforms.spp_decomposer import SPPDecomposer
+
+    logger = get_logger(__name__)
+
     if args.omega <= 0:
         print("Error: --omega must be positive", file=sys.stderr)
         return 1
@@ -399,6 +396,12 @@ def run_analyze(args: Namespace) -> int:
 
 def run_batch(args: Namespace) -> int:
     """Run SPP analysis on multiple files."""
+    from rheojax.io import auto_load as load_data
+    from rheojax.logging import get_logger
+    from rheojax.transforms.spp_decomposer import SPPDecomposer
+
+    logger = get_logger(__name__)
+
     if args.omega <= 0:
         print("Error: --omega must be positive", file=sys.stderr)
         return 1
@@ -484,6 +487,7 @@ def _save_results(
     omega: float = 1.0,
 ) -> None:
     """Save SPP results to file."""
+    import numpy as np
     import pandas as pd
 
     if matlab_format:

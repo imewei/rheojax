@@ -15,17 +15,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
-
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.logging import get_logger
-
 if TYPE_CHECKING:
     pass
-
-jax, jnp = safe_import_jax()
-
-logger = get_logger(__name__)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -132,9 +123,13 @@ def main(args: list[str] | None = None) -> int:
     parser = create_parser()
     parsed = parser.parse_args(args)
 
+    import numpy as np
+
     from rheojax.cli._globals import apply_globals
+    from rheojax.logging import get_logger
 
     apply_globals(parsed)
+    logger = get_logger(__name__)
 
     logger.info(
         "CLI fit command",
@@ -171,7 +166,10 @@ def main(args: list[str] | None = None) -> int:
             if not data:
                 print("Error: No data segments found in file", file=sys.stderr)
                 return 1
-            logger.warning("File contains %d segments, using first segment", len(data))
+            print(
+                f"Note: File contains {len(data)} segments, using first segment",
+                file=sys.stderr,
+            )
             data = data[0]
 
         logger.debug("Data loaded", shape=str(data.x.shape))
@@ -258,6 +256,7 @@ def main(args: list[str] | None = None) -> int:
         model.fit(data.x, data.y, **fit_kwargs)
         fit_time = time.perf_counter() - start_time
 
+        print(f"Fit complete ({fit_time:.2f}s)", file=sys.stderr)
         logger.info("Fit complete", model=parsed.model, time=f"{fit_time:.2f}s")
 
     except Exception as e:
@@ -302,8 +301,9 @@ def main(args: list[str] | None = None) -> int:
         except OSError as e:
             print(f"Error writing to {parsed.output}: {e}", file=sys.stderr)
             return 1
-        print(f"Results written to {parsed.output}")
+        print(f"Results written to {parsed.output}", file=sys.stderr)
     else:
         print(output_text)
+        sys.stdout.flush()
 
     return 0

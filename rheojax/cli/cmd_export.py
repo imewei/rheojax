@@ -220,9 +220,23 @@ def main(args: list[str] | None = None) -> int:
             )
             return 1
 
+    # Validate output path safety — reject '..' traversal and absolute paths
+    output_path = parsed.output
+    if ".." in output_path.parts:
+        print(
+            f"Error: Output path must not contain '..' segments, got '{output_path}'",
+            file=sys.stderr,
+        )
+        return 1
+    if output_path.is_absolute():
+        print(
+            f"Error: Output path must be relative, got absolute '{output_path}'",
+            file=sys.stderr,
+        )
+        return 1
+
     # Run the export
     try:
-        output_path = parsed.output
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if parsed.export_format == "directory":
