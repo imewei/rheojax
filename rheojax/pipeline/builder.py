@@ -145,6 +145,70 @@ class PipelineBuilder:
         self.steps.append(("plot", {"show": show, "style": style, **kwargs}))
         return self
 
+    def add_bayesian_step(
+        self,
+        num_warmup: int = 1000,
+        num_samples: int = 2000,
+        num_chains: int = 4,
+        seed: int = 0,
+        warm_start: bool = True,
+        **kwargs,
+    ) -> PipelineBuilder:
+        """Add Bayesian inference step (NUTS sampling).
+
+        Args:
+            num_warmup: Number of warmup iterations per chain
+            num_samples: Number of posterior samples per chain
+            num_chains: Number of MCMC chains
+            seed: Random seed for reproducibility
+            warm_start: Whether to use NLSQ results as initial values
+            **kwargs: Additional arguments for fit_bayesian()
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> builder.add_bayesian_step(num_warmup=500, num_samples=1000)
+        """
+        self.steps.append(
+            (
+                "bayesian",
+                {
+                    "num_warmup": num_warmup,
+                    "num_samples": num_samples,
+                    "num_chains": num_chains,
+                    "seed": seed,
+                    "warm_start": warm_start,
+                    **kwargs,
+                },
+            )
+        )
+        return self
+
+    def add_export_step(
+        self,
+        output_path: str | Path,
+        format: str = "directory",
+        **kwargs,
+    ) -> PipelineBuilder:
+        """Add analysis export step.
+
+        Args:
+            output_path: Output directory or file path
+            format: Export format ('directory', 'excel', 'hdf5', 'auto')
+            **kwargs: Additional arguments for Pipeline.export()
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> builder.add_export_step('./results', format='directory')
+        """
+        self.steps.append(
+            ("export", {"output_path": str(output_path), "format": format, **kwargs})
+        )
+        return self
+
     def add_save_step(
         self, file_path: str | Path, format: str = "hdf5", **kwargs
     ) -> PipelineBuilder:
@@ -208,6 +272,13 @@ class PipelineBuilder:
                 # Store prediction but don't break chain
                 kwargs.pop("store_as", None)  # Remove for now
                 # Predictions are implicit in pipeline
+            elif step_type == "bayesian":
+                # Delegate to Pipeline.fit_bayesian which handles
+                # warm_start, test_mode propagation, and result caching
+                pipeline.fit_bayesian(**kwargs)
+            elif step_type == "export":
+                output_path = kwargs.pop("output_path")
+                pipeline.export(output_path, **kwargs)
             elif step_type == "plot":
                 pipeline.plot(**kwargs)
             elif step_type == "save":
@@ -236,18 +307,25 @@ class PipelineBuilder:
         for step_type, _ in self.steps:
             if step_type == "load":
                 has_loaded = True
-            elif step_type in ["transform", "fit", "plot", "save"]:
+            elif step_type in [
+                "transform", "fit", "plot", "save", "bayesian", "export",
+            ]:
                 if not has_loaded:
                     raise ValueError(
                         f"Step '{step_type}' requires data to be loaded first"
                     )
 
-        # Check that fit comes before predict
+        # Check that fit comes before predict and bayesian
         fit_indices = [
             i for i, (step_type, _) in enumerate(self.steps) if step_type == "fit"
         ]
         predict_indices = [
             i for i, (step_type, _) in enumerate(self.steps) if step_type == "predict"
+        ]
+        bayesian_indices = [
+            i
+            for i, (step_type, _) in enumerate(self.steps)
+            if step_type == "bayesian"
         ]
 
         for pred_idx in predict_indices:
@@ -255,6 +333,12 @@ class PipelineBuilder:
                 warnings.warn(
                     f"Predict step at index {pred_idx} has no prior fit step",
                     stacklevel=2,
+                )
+
+        for bayes_idx in bayesian_indices:
+            if not any(fit_idx < bayes_idx for fit_idx in fit_indices):
+                raise ValueError(
+                    f"Bayesian step at index {bayes_idx} requires a prior fit step"
                 )
 
         # Validate that referenced models/transforms exist
