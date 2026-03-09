@@ -5,8 +5,6 @@ JAX Status Widget
 GPU/device status indicator with memory monitoring.
 """
 
-from rheojax.gui.resources.styles.tokens import Spacing
-
 from rheojax.gui.compat import (
     QComboBox,
     QFrame,
@@ -18,6 +16,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

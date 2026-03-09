@@ -39,7 +39,6 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
-from rheojax.gui.utils.style_helpers import set_density
 from rheojax.gui.resources.styles.tokens import (
     ColorPalette,
     Spacing,
@@ -56,6 +55,7 @@ from rheojax.gui.state.actions import (
 )
 from rheojax.gui.state.store import BayesianResult, StateStore
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
+from rheojax.gui.utils.style_helpers import set_density
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
 from rheojax.logging import get_logger
 

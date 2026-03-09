@@ -27,9 +27,9 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
-from rheojax.gui.utils.layout_helpers import apply_group_box_style, set_compact_margins
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, FitResult, StateStore
+from rheojax.gui.utils.layout_helpers import apply_group_box_style, set_compact_margins
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas
 from rheojax.logging import get_logger
 

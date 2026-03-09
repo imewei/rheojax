@@ -12,14 +12,17 @@ store and may lead to stale UI.  Use ``store.dispatch()`` or
 """
 
 from pathlib import Path
+from typing import Any
 
 from rheojax.gui.state.store import (
     BayesianResult,
     DatasetState,
     FitResult,
     PipelineStep,
+    PipelineStepConfig,
     StateStore,
     StepStatus,
+    VisualPipelineState,
 )
 from rheojax.logging import get_logger
 
@@ -566,3 +569,130 @@ def can_redo() -> bool:
     logger.debug("Selector called", selector="can_redo")
     store = StateStore()
     return store.can_redo()
+
+
+# --- Visual Pipeline Selectors ---
+
+
+def get_visual_pipeline() -> VisualPipelineState:
+    """Get the visual pipeline state.
+
+    Returns
+    -------
+    VisualPipelineState
+        Current visual pipeline state (cloned snapshot)
+    """
+    logger.debug("Selector called", selector="get_visual_pipeline")
+    state = StateStore().get_state()
+    return state.visual_pipeline
+
+
+def get_visual_pipeline_steps() -> list[PipelineStepConfig]:
+    """Get the ordered list of visual pipeline steps.
+
+    Returns
+    -------
+    list[PipelineStepConfig]
+        Shallow copy of the steps list
+    """
+    logger.debug("Selector called", selector="get_visual_pipeline_steps")
+    state = StateStore().get_state()
+    return list(state.visual_pipeline.steps)
+
+
+def get_selected_pipeline_step() -> PipelineStepConfig | None:
+    """Get the currently selected pipeline step.
+
+    Returns
+    -------
+    PipelineStepConfig | None
+        Selected step, or None if no step is selected
+    """
+    logger.debug("Selector called", selector="get_selected_pipeline_step")
+    state = StateStore().get_state()
+    vp = state.visual_pipeline
+    if vp.selected_step_id is None:
+        return None
+    return next((s for s in vp.steps if s.id == vp.selected_step_id), None)
+
+
+def get_pipeline_step_by_id(step_id: str) -> PipelineStepConfig | None:
+    """Get a pipeline step by its UUID.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the target step
+
+    Returns
+    -------
+    PipelineStepConfig | None
+        Matching step, or None if not found
+    """
+    logger.debug("Selector called", selector="get_pipeline_step_by_id", step_id=step_id)
+    state = StateStore().get_state()
+    return next((s for s in state.visual_pipeline.steps if s.id == step_id), None)
+
+
+def get_pipeline_step_result(step_id: str) -> Any:
+    """Get the cached result for a completed pipeline step.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the step
+
+    Returns
+    -------
+    Any
+        Cached result, or None if not available
+    """
+    logger.debug(
+        "Selector called", selector="get_pipeline_step_result", step_id=step_id
+    )
+    state = StateStore().get_state()
+    return state.visual_pipeline.step_results.get(step_id)
+
+
+def is_pipeline_running() -> bool:
+    """Check if the visual pipeline is currently executing.
+
+    Returns
+    -------
+    bool
+        True if the pipeline is actively running
+    """
+    logger.debug("Selector called", selector="is_pipeline_running")
+    state = StateStore().get_state()
+    return state.visual_pipeline.is_running
+
+
+def get_pipeline_name() -> str:
+    """Get the current visual pipeline name.
+
+    Returns
+    -------
+    str
+        Pipeline name
+    """
+    logger.debug("Selector called", selector="get_pipeline_name")
+    state = StateStore().get_state()
+    return state.visual_pipeline.pipeline_name
+
+
+def get_visual_pipeline_progress() -> float:
+    """Get visual pipeline progress as a fraction of completed steps.
+
+    Returns
+    -------
+    float
+        Progress from 0.0 (no steps complete) to 1.0 (all steps complete).
+        Returns 0.0 when the pipeline has no steps.
+    """
+    logger.debug("Selector called", selector="get_visual_pipeline_progress")
+    state = StateStore().get_state()
+    vp = state.visual_pipeline
+    if not vp.steps:
+        return 0.0
+    completed = sum(1 for s in vp.steps if s.status == StepStatus.COMPLETE)
+    return completed / len(vp.steps)

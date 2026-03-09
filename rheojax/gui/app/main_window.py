@@ -5,11 +5,14 @@ Main Application Window
 Central window coordinating pages, state, and services with dock-based layout.
 """
 
+from __future__ import annotations
+
 import os
 import threading
 import uuid
 import webbrowser
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -25,8 +28,8 @@ from rheojax.gui.compat import (
     QMainWindow,
     QMessageBox,
     QShortcut,
+    QSplitter,
     Qt,
-    QTabWidget,
     QTextEdit,
     QToolBar,
     QWidget,
@@ -38,13 +41,15 @@ from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.jobs.transform_worker import TransformWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
-from rheojax.gui.pages.bayesian_page import BayesianPage
-from rheojax.gui.pages.data_page import DataPage
-from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
-from rheojax.gui.pages.export_page import ExportPage
-from rheojax.gui.pages.fit_page import FitPage
-from rheojax.gui.pages.home_page import HomePage
-from rheojax.gui.pages.transform_page import TransformPage
+
+if TYPE_CHECKING:
+    from rheojax.gui.pages.bayesian_page import BayesianPage  # noqa: F401
+    from rheojax.gui.pages.data_page import DataPage  # noqa: F401
+    from rheojax.gui.pages.diagnostics_page import DiagnosticsPage  # noqa: F401
+    from rheojax.gui.pages.export_page import ExportPage  # noqa: F401
+    from rheojax.gui.pages.fit_page import FitPage  # noqa: F401
+    from rheojax.gui.pages.home_page import HomePage  # noqa: F401
+    from rheojax.gui.pages.transform_page import TransformPage  # noqa: F401
 from rheojax.gui.resources import load_stylesheet
 from rheojax.gui.resources.styles import ThemeManager
 from rheojax.gui.state.signals import StateSignals
@@ -59,6 +64,8 @@ from rheojax.gui.state.store import (
 )
 from rheojax.gui.widgets.dataset_tree import DatasetTree
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
+from rheojax.gui.widgets.pipeline_sidebar import PipelineSidebar
+from rheojax.gui.widgets.workspace_container import WorkspaceContainer
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -68,8 +75,8 @@ class RheoJAXMainWindow(QMainWindow):
     """Main application window for RheoJAX GUI.
 
     Architecture:
-        - Dock-based layout (data panel, log panel)
-        - Tab widget with 7 pages (home, data, transform, fit, bayesian, diagnostics, export)
+        - QSplitter central layout (PipelineSidebar left, WorkspaceContainer right)
+        - Bottom dock: log panel
         - Central state store with Redux-like actions/reducers
         - Service layer for RheoJAX API integration
         - Background worker pool for long-running tasks
@@ -82,8 +89,10 @@ class RheoJAXMainWindow(QMainWindow):
         Application menu bar
     status_bar : StatusBar
         Status bar with progress and system indicators
-    tabs : QTabWidget
-        Central tab widget with pages
+    sidebar : PipelineSidebar
+        Left pipeline step navigation sidebar
+    workspace : WorkspaceContainer
+        Right stacked page container
 
     Example
     -------
@@ -129,7 +138,7 @@ class RheoJAXMainWindow(QMainWindow):
         logger.debug("Setting up UI components")
         self.setup_ui()
         self.setup_docks()
-        self.setup_tabs()
+        self.setup_workspace()
 
         # Connect signals
         logger.debug("Connecting signals")
@@ -171,14 +180,19 @@ class RheoJAXMainWindow(QMainWindow):
         logger.debug("UI setup complete")
 
     def setup_docks(self) -> None:
-        """Create dock widgets for data panel and log panel."""
+        """Create dock widgets for log panel.
+
+        The left DatasetTree dock has been replaced by PipelineSidebar inside
+        the central QSplitter.  The DatasetTree widget is still constructed here
+        as ``self.data_tree`` so that existing signal connections remain valid;
+        it is not added to a dock widget.
+        """
         logger.debug("Setting up dock widgets")
-        # Left dock: Data panel (project tree)
-        self.data_dock = QDockWidget("Data", self)
-        self.data_dock.setObjectName("DataDock")
+
+        # Keep DatasetTree widget for signal compatibility (not shown in a dock).
         self.data_tree = DatasetTree(self)
-        self.data_dock.setWidget(self.data_tree)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.data_dock)
+        # Expose a None sentinel so any code that checks self.data_dock doesn't crash.
+        self.data_dock = None
 
         # Bottom dock: Log panel (collapsible)
         self.log_dock = QDockWidget("Log", self)
@@ -193,57 +207,56 @@ class RheoJAXMainWindow(QMainWindow):
         # Start with log panel hidden
         self.log_dock.setVisible(False)
 
-    def setup_tabs(self) -> None:
-        """Create tab pages for main content area."""
-        logger.debug("Setting up tab pages")
-        self.tabs = QTabWidget(self)
-        # Use QSS for styling, remove inline overrides that conflict with theme
-        self.tabs.setDocumentMode(True)  # Enable document mode for cleaner look
-        self.setCentralWidget(self.tabs)
+    def setup_workspace(self) -> None:
+        """Create sidebar + workspace splitter as central widget.
 
-        # Create pages
-        self.home_page = HomePage(self)
-        self.data_page = DataPage(self)
-        self.transform_page = TransformPage(self)
-        self.fit_page = FitPage(self)
-        self.bayesian_page = BayesianPage(self)
-        self.diagnostics_page = DiagnosticsPage(self)
-        self.export_page = ExportPage(self)
+        The WorkspaceContainer owns the page instances.  Convenience references
+        (self.home_page, self.data_page, …) are exposed here so that existing
+        signal connection code in connect_signals() continues to work without
+        modification.
+        """
+        logger.debug("Setting up workspace layout")
 
-        # Add pages to tabs
-        self.tabs.addTab(self.home_page, "Home")
-        self.tabs.addTab(self.data_page, "Data")
-        self.tabs.addTab(self.transform_page, "Transform")
-        self.tabs.addTab(self.fit_page, "Fit")
-        self.tabs.addTab(self.bayesian_page, "Bayesian")
-        self.tabs.addTab(self.diagnostics_page, "Diagnostics")
-        self.tabs.addTab(self.export_page, "Export")
+        # Left sidebar and right workspace container
+        self.sidebar = PipelineSidebar(self)
+        self.workspace = WorkspaceContainer(self)
 
-        # Set initial visibility based on default mode
-        self._update_tabs_visibility(self._current_workflow_mode)
+        # Expose page references for backward-compatibility with connect_signals()
+        self.home_page = self.workspace._home_page
+        self.data_page = self.workspace._data_page
+        self.transform_page = self.workspace._transform_page
+        self.fit_page = self.workspace._fit_page
+        self.bayesian_page = self.workspace._bayesian_page
+        self.diagnostics_page = self.workspace._diagnostics_page
+        self.export_page = self.workspace._export_page
 
-        logger.debug("Tab pages setup complete", tab_count=self.tabs.count())
+        # Horizontal splitter: sidebar (fixed left) | workspace (expanding right)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.splitter.addWidget(self.sidebar)
+        self.splitter.addWidget(self.workspace)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setSizes([260, 1140])
+        self.sidebar.setMinimumWidth(260)
+
+        self.setCentralWidget(self.splitter)
+
+        logger.debug("Workspace layout setup complete")
 
     def _update_tabs_visibility(self, mode: WorkflowMode) -> None:
-        """Update tab visibility based on workflow mode.
+        """Update visible page on mode change.
+
+        In the new splitter layout the sidebar always shows all pipeline steps;
+        workflow-mode filtering is informational only and logged for diagnostics.
 
         Parameters
         ----------
         mode : WorkflowMode
             Active workflow mode
         """
-        # Define visible tabs for each mode by page index
-        # 0: Home, 1: Data, 2: Transform, 3: Fit, 4: Bayesian, 5: Diagnostics, 6: Export
-        visible_indices = {
-            WorkflowMode.FITTING: {0, 1, 3, 4, 5, 6},
-            WorkflowMode.TRANSFORM: {0, 1, 2, 6},
-        }
+        logger.debug("Workflow mode updated", mode=mode.name)
 
-        indices = visible_indices.get(mode, set())
-        for i in range(self.tabs.count()):
-            self.tabs.setTabVisible(i, i in indices)
-
-    def _wrap_widget_in_toolbar(self, widget: QWidget) -> "QToolBar":
+    def _wrap_widget_in_toolbar(self, widget: QWidget) -> QToolBar:
         """Place an arbitrary widget inside a non-movable toolbar."""
         toolbar = QToolBar(self)
         toolbar.setMovable(False)
@@ -263,6 +276,7 @@ class RheoJAXMainWindow(QMainWindow):
         self._connect_models_menu()
         self._connect_transforms_menu()
         self._connect_analysis_menu()
+        self._connect_pipeline_menu()
         self._connect_tools_menu()
         self._connect_help_menu()
 
@@ -270,6 +284,11 @@ class RheoJAXMainWindow(QMainWindow):
         self.pipeline_chips.step_clicked.connect(
             lambda step: self.navigate_to(step.name.lower())
         )
+
+        # Sidebar navigation signals
+        self.sidebar.step_selected.connect(self._on_sidebar_step_selected)
+        self.sidebar.run_all_requested.connect(self._on_run_all)
+        self.sidebar.run_step_requested.connect(self._on_run_step)
 
         # Dataset tree selection
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
@@ -379,7 +398,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.zoom_out_action.triggered.connect(self._on_zoom_out)
         self.menu_bar.reset_zoom_action.triggered.connect(self._on_reset_zoom)
         self.menu_bar.view_data_dock_action.triggered.connect(
-            lambda: self.data_dock.setVisible(
+            lambda: self.sidebar.setVisible(
                 self.menu_bar.view_data_dock_action.isChecked()
             )
         )
@@ -666,6 +685,12 @@ class RheoJAXMainWindow(QMainWindow):
             self._on_check_compatibility
         )
 
+    def _connect_pipeline_menu(self) -> None:
+        """Connect Pipeline menu actions."""
+        self.menu_bar.pipeline_new_action.triggered.connect(self._on_new_pipeline)
+        self.menu_bar.pipeline_open_action.triggered.connect(self._on_open_pipeline)
+        self.menu_bar.pipeline_save_action.triggered.connect(self._on_save_pipeline)
+
     def _connect_tools_menu(self) -> None:
         """Connect Tools menu actions."""
         self.menu_bar.tools_console.triggered.connect(self._on_python_console)
@@ -688,23 +713,29 @@ class RheoJAXMainWindow(QMainWindow):
         page_name : str
             Target page identifier (home, data, transform, fit, bayesian, diagnostics, export)
         """
-        page_map = {
-            "home": 0,
-            "data": 1,
-            "transform": 2,
-            "fit": 3,
-            "bayesian": 4,
-            "diagnostics": 5,
-            "export": 6,
+        # Map public page names to WorkspaceContainer step_type keys.
+        # WorkspaceContainer uses "load" for DataPage and None for HomePage.
+        _page_to_step: dict[str, str | None] = {
+            "home": None,
+            "data": "load",
+            "transform": "transform",
+            "fit": "fit",
+            "bayesian": "bayesian",
+            "diagnostics": "diagnostics",
+            "export": "export",
         }
-
-        if page_name.lower() in page_map:
-            from_page = self.tabs.tabText(self.tabs.currentIndex())
-            to_page = page_name.capitalize()
-            self.tabs.setCurrentIndex(page_map[page_name.lower()])
-            self.store.dispatch("SET_TAB", {"tab": page_name.lower()})
-            logger.info("Page navigated", from_page=from_page, to_page=to_page)
-            self.log(f"Navigated to {page_name.capitalize()} page")
+        name = page_name.lower()
+        if name in _page_to_step:
+            step_type = _page_to_step[name]
+            to_page = name.capitalize()
+            self.workspace.show_step(step_type)
+            # Highlight matching step in sidebar (best-effort — sidebar uses
+            # step_type keys, so we pass the public name for now and let the
+            # sidebar's own selection logic handle the match).
+            self.sidebar.select_step(step_type or "")
+            self.store.dispatch("SET_TAB", {"tab": name})
+            logger.info("Page navigated", to_page=to_page)
+            self.log(f"Navigated to {to_page} page")
 
     def log(self, message: str) -> None:
         """Append message to log panel.
@@ -1220,7 +1251,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_zoom_in(self) -> None:
         """Handle zoom in action."""
-        current_page = self.tabs.currentWidget()
+        current_page = self.workspace.get_current_page()
         if hasattr(current_page, "zoom_in"):
             current_page.zoom_in()
         self.log("Zoom in")
@@ -1229,7 +1260,7 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_zoom_out(self) -> None:
         """Handle zoom out action."""
-        current_page = self.tabs.currentWidget()
+        current_page = self.workspace.get_current_page()
         if hasattr(current_page, "zoom_out"):
             current_page.zoom_out()
         self.log("Zoom out")
@@ -1238,11 +1269,150 @@ class RheoJAXMainWindow(QMainWindow):
     @Slot()
     def _on_reset_zoom(self) -> None:
         """Handle reset zoom action."""
-        current_page = self.tabs.currentWidget()
+        current_page = self.workspace.get_current_page()
         if hasattr(current_page, "reset_zoom"):
             current_page.reset_zoom()
         self.log("Zoom reset")
         self.status_bar.show_message("Zoom reset", 1000)
+
+    # -------------------------------------------------------------------------
+    # Sidebar and Pipeline Handlers
+    # -------------------------------------------------------------------------
+
+    @Slot(str)
+    def _on_sidebar_step_selected(self, step_id: str) -> None:
+        """Navigate to the workspace page matching the sidebar step selection.
+
+        The sidebar emits a step_id corresponding to a VisualPipelineStep UUID.
+        We retrieve the step's step_type from state and map it to a page name.
+
+        Parameters
+        ----------
+        step_id : str
+            Step identifier from PipelineSidebar (UUID or step_type key).
+        """
+        logger.debug("Sidebar step selected", step_id=step_id)
+        # step_id may be a UUID for a VisualPipelineStep or a raw step_type.
+        # Try to look up by UUID first, then fall back to treating it as step_type.
+        _step_type_to_page = {
+            "load": "data",
+            "transform": "transform",
+            "fit": "fit",
+            "bayesian": "bayesian",
+            "export": "export",
+        }
+        try:
+            from rheojax.gui.state import selectors
+
+            step = selectors.get_pipeline_step_by_id(step_id)
+            step_type = step.step_type if step else step_id
+        except Exception:
+            step_type = step_id
+
+        page_name = _step_type_to_page.get(step_type, step_type)
+        self.navigate_to(page_name)
+
+    @Slot()
+    def _on_new_pipeline(self) -> None:
+        """Clear the current visual pipeline state."""
+        logger.debug("New pipeline action triggered")
+        from rheojax.gui.state.actions import clear_pipeline
+
+        clear_pipeline()
+        self.log("Pipeline cleared")
+        self.status_bar.show_message("New pipeline created", 2000)
+
+    @Slot()
+    def _on_open_pipeline(self) -> None:
+        """Open a pipeline from a YAML file."""
+        logger.debug("Open pipeline action triggered")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Pipeline", "", "YAML Files (*.yaml *.yml)"
+        )
+        if path:
+            try:
+                from rheojax.gui.state.actions import load_pipeline
+                from rheojax.gui.state.store import VisualPipelineState
+                from rheojax.gui.utils.pipeline_serializer import from_yaml
+
+                with open(path) as f:
+                    steps, name = from_yaml(f.read())
+                vp = VisualPipelineState(steps=steps, pipeline_name=name)
+                load_pipeline(vp)
+                self.log(f"Pipeline loaded from: {path}")
+                logger.info("Pipeline loaded", path=path)
+                self.status_bar.show_message(f"Pipeline loaded: {Path(path).name}", 3000)
+            except Exception as exc:
+                logger.error("Failed to open pipeline", error=str(exc), exc_info=True)
+                self.log(f"Failed to open pipeline: {exc}")
+                self.status_bar.show_message(f"Open pipeline failed: {exc}", 5000)
+
+    @Slot()
+    def _on_save_pipeline(self) -> None:
+        """Save the current pipeline to a YAML file."""
+        logger.debug("Save pipeline action triggered")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Pipeline", "pipeline.yaml", "YAML Files (*.yaml *.yml)"
+        )
+        if path:
+            try:
+                from rheojax.gui.state.selectors import (
+                    get_pipeline_name,
+                    get_visual_pipeline_steps,
+                )
+                from rheojax.gui.utils.pipeline_serializer import to_yaml
+
+                yaml_str = to_yaml(get_visual_pipeline_steps(), get_pipeline_name())
+                with open(path, "w") as f:
+                    f.write(yaml_str)
+                self.log(f"Pipeline saved to: {path}")
+                logger.info("Pipeline saved", path=path)
+                self.status_bar.show_message(f"Pipeline saved: {Path(path).name}", 3000)
+            except Exception as exc:
+                logger.error("Failed to save pipeline", error=str(exc), exc_info=True)
+                self.log(f"Failed to save pipeline: {exc}")
+                self.status_bar.show_message(f"Save pipeline failed: {exc}", 5000)
+
+    @Slot()
+    def _on_run_all(self) -> None:
+        """Execute all pipeline steps in sequence."""
+        logger.debug("Run all pipeline steps requested")
+        try:
+            from rheojax.gui.state.selectors import get_visual_pipeline_steps
+
+            steps = get_visual_pipeline_steps()
+        except Exception as exc:
+            logger.error("Could not retrieve pipeline steps", error=str(exc), exc_info=True)
+            steps = []
+
+        if not steps:
+            self.status_bar.show_message("No pipeline steps to run", 2000)
+            return
+
+        try:
+            from rheojax.gui.services.pipeline_execution_service import (
+                PipelineExecutionService,
+            )
+
+            service = PipelineExecutionService(self)
+            service.execute_all(steps)
+        except Exception as exc:
+            logger.error("Pipeline execution failed", error=str(exc), exc_info=True)
+            self.log(f"Pipeline execution failed: {exc}")
+            self.status_bar.show_message(f"Pipeline run failed: {exc}", 5000)
+
+    @Slot(str)
+    def _on_run_step(self, step_id: str) -> None:
+        """Execute a single pipeline step.
+
+        Parameters
+        ----------
+        step_id : str
+            Identifier of the step to execute.
+        """
+        logger.debug("Run single step requested", step_id=step_id)
+        # TODO: implement single-step execution via PipelineExecutionService
+        self.status_bar.show_message(f"Run step '{step_id}': coming soon", 2000)
 
     def _on_theme_changed(self, theme: str) -> None:
         """Handle theme change."""

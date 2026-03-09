@@ -30,10 +30,10 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, Typography, button_style
-from rheojax.gui.utils.layout_helpers import set_page_margins
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.store import StateStore
+from rheojax.gui.utils.layout_helpers import set_page_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

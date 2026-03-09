@@ -65,6 +65,18 @@ class StateSignals(QObject):
         Emitted when Bayesian inference fails (model_name, dataset_id, error)
     pipeline_step_changed : Signal(str, str)
         Emitted when pipeline step changes (step_name, status)
+    pipeline_structure_changed : Signal()
+        Emitted on any structural change to the visual pipeline (add/remove/reorder)
+    pipeline_step_selected : Signal(str)
+        Emitted when a visual pipeline step is selected (step_id, empty for deselect)
+    pipeline_step_status_changed : Signal(str, str)
+        Emitted when a visual pipeline step status changes (step_id, status_name)
+    pipeline_execution_started : Signal()
+        Emitted when visual pipeline execution begins
+    pipeline_execution_completed : Signal()
+        Emitted when visual pipeline execution finishes
+    pipeline_name_changed : Signal(str)
+        Emitted when the visual pipeline name changes (new_name)
     transform_applied : Signal(str, str)
         Emitted when transform applied (transform_name, dataset_id)
     jax_device_changed : Signal(str)
@@ -106,6 +118,17 @@ class StateSignals(QObject):
 
     # Pipeline
     pipeline_step_changed = Signal(str, str)  # step_name, status
+
+    # Visual Pipeline signals
+    pipeline_step_added = Signal(str)  # step_id
+    pipeline_step_removed = Signal(str)  # step_id
+    pipeline_step_selected = Signal(str)  # step_id (empty string for deselection)
+    pipeline_step_config_changed = Signal(str)  # step_id
+    pipeline_step_status_changed = Signal(str, str)  # step_id, status_name
+    pipeline_structure_changed = Signal()  # any structural change (add/remove/reorder)
+    pipeline_execution_started = Signal()
+    pipeline_execution_completed = Signal()
+    pipeline_name_changed = Signal(str)  # new_name
 
     # Transforms
     transform_applied = Signal(str, str)  # transform_name, dataset_id

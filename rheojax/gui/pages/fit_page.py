@@ -26,7 +26,6 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
-from rheojax.gui.utils.style_helpers import set_density
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,
@@ -35,9 +34,10 @@ from rheojax.gui.state.actions import (
     update_parameter_bounds,
 )
 from rheojax.gui.state.store import StateStore
+from rheojax.gui.utils.style_helpers import set_density
+from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
-from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from rheojax.logging import get_logger
 

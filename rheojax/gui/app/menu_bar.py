@@ -50,6 +50,7 @@ class MenuBar(QMenuBar):
         self._create_models_menu()
         self._create_transforms_menu()
         self._create_analysis_menu()
+        self._create_pipeline_menu()
         self._create_tools_menu()
         self._create_help_menu()
 
@@ -1179,6 +1180,62 @@ class MenuBar(QMenuBar):
             "Menu created",
             menu="Analysis",
             action_count=analysis_menu.actions().__len__(),
+        )
+
+    def _create_pipeline_menu(self) -> None:
+        """Create Pipeline menu for visual pipeline management."""
+        logger.debug("Creating menu", menu="Pipeline")
+        pipeline_menu = self.addMenu("&Pipeline")
+
+        # New Pipeline
+        self.pipeline_new_action = QAction("&New Pipeline", self)
+        self.pipeline_new_action.setShortcut("Ctrl+Shift+N")
+        self.pipeline_new_action.setStatusTip("Create a new empty pipeline")
+        self.pipeline_new_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="new_pipeline", menu="Pipeline")
+        )
+        pipeline_menu.addAction(self.pipeline_new_action)
+
+        # Open Pipeline
+        self.pipeline_open_action = QAction("&Open Pipeline...", self)
+        self.pipeline_open_action.setStatusTip("Open a pipeline from a YAML file")
+        self.pipeline_open_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="open_pipeline", menu="Pipeline")
+        )
+        pipeline_menu.addAction(self.pipeline_open_action)
+
+        # Save Pipeline
+        self.pipeline_save_action = QAction("&Save Pipeline...", self)
+        self.pipeline_save_action.setShortcut("Ctrl+Shift+S")
+        self.pipeline_save_action.setStatusTip("Save current pipeline to a YAML file")
+        self.pipeline_save_action.triggered.connect(
+            lambda: logger.debug("Action triggered", action="save_pipeline", menu="Pipeline")
+        )
+        pipeline_menu.addAction(self.pipeline_save_action)
+
+        pipeline_menu.addSeparator()
+
+        # From Template submenu
+        self.pipeline_template_menu = pipeline_menu.addMenu("From &Template")
+        _templates = [
+            ("NLSQ Fitting", "nlsq_fitting"),
+            ("Bayesian Inference", "bayesian_inference"),
+            ("Transform + Fit", "transform_fit"),
+        ]
+        self.pipeline_template_actions: dict[str, QAction] = {}
+        for label, key in _templates:
+            action = QAction(label, self)
+            action.setStatusTip(f"Load the '{label}' pipeline template")
+            action.triggered.connect(
+                lambda _checked=False, k=key: logger.debug(
+                    "Template selected", template=k, menu="Pipeline"
+                )
+            )
+            self.pipeline_template_menu.addAction(action)
+            self.pipeline_template_actions[key] = action
+
+        logger.debug(
+            "Menu created", menu="Pipeline", action_count=pipeline_menu.actions().__len__()
         )
 
     def _create_tools_menu(self) -> None:

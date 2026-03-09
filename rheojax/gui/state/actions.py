@@ -17,9 +17,11 @@ from rheojax.gui.state.store import (
     FitResult,
     ParameterState,
     PipelineStep,
+    PipelineStepConfig,
     StateStore,
     StepStatus,
     TransformRecord,
+    VisualPipelineState,
 )
 from rheojax.logging import get_logger
 
@@ -1008,3 +1010,220 @@ def add_transform_record(
         target_id=target_id,
     )
     store.emit_signal("transform_applied", transform_name, target_id)
+
+
+# --- Visual Pipeline Actions ---
+
+
+def add_pipeline_step(
+    step_type: str,
+    name: str,
+    config: dict[str, Any] | None = None,
+    position: int | None = None,
+) -> str:
+    """Add a step to the visual pipeline.
+
+    Parameters
+    ----------
+    step_type : str
+        Step type: "load", "transform", "fit", "bayesian", "export"
+    name : str
+        Display name for the step
+    config : dict, optional
+        Step configuration
+    position : int, optional
+        Desired insertion position (ignored — steps are appended and
+        reindexed by the reducer)
+
+    Returns
+    -------
+    str
+        New step UUID
+    """
+    step_id = str(uuid.uuid4())
+    step_config = PipelineStepConfig(
+        id=step_id,
+        step_type=step_type,
+        name=name,
+        config=config or {},
+        status=StepStatus.PENDING,
+        position=position or 0,
+    )
+    store = StateStore()
+    logger.debug(
+        "add_pipeline_step called",
+        step_id=step_id,
+        step_type=step_type,
+        name=name,
+    )
+    store.dispatch("ADD_PIPELINE_STEP", {"step_config": step_config})
+    return step_id
+
+
+def remove_pipeline_step(step_id: str) -> None:
+    """Remove a step from the visual pipeline.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the step to remove
+    """
+    store = StateStore()
+    logger.debug("remove_pipeline_step called", step_id=step_id)
+    store.dispatch("REMOVE_PIPELINE_STEP", {"step_id": step_id})
+
+
+def reorder_pipeline_step(step_id: str, new_position: int) -> None:
+    """Move a pipeline step to a new position.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the step to move
+    new_position : int
+        Target zero-based index
+    """
+    store = StateStore()
+    logger.debug(
+        "reorder_pipeline_step called",
+        step_id=step_id,
+        new_position=new_position,
+    )
+    store.dispatch(
+        "REORDER_PIPELINE_STEP",
+        {"step_id": step_id, "new_position": new_position},
+    )
+
+
+def select_pipeline_step(step_id: str | None) -> None:
+    """Select a pipeline step (or deselect with None).
+
+    Parameters
+    ----------
+    step_id : str | None
+        UUID to select, or None to clear selection
+    """
+    store = StateStore()
+    logger.debug("select_pipeline_step called", step_id=step_id)
+    store.dispatch("SELECT_PIPELINE_STEP", {"step_id": step_id})
+
+
+def update_step_config(step_id: str, config: dict[str, Any]) -> None:
+    """Update the configuration of a pipeline step.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the target step
+    config : dict
+        Key/value pairs to merge into the step's config
+    """
+    store = StateStore()
+    logger.debug(
+        "update_step_config called",
+        step_id=step_id,
+        config_keys=list(config.keys()),
+    )
+    store.dispatch("UPDATE_STEP_CONFIG", {"step_id": step_id, "config": config})
+
+
+def update_step_status(
+    step_id: str,
+    status: StepStatus,
+    error_message: str | None = None,
+) -> None:
+    """Update the execution status of a pipeline step.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the target step
+    status : StepStatus
+        New status value
+    error_message : str, optional
+        Error description (used when status is ERROR)
+    """
+    store = StateStore()
+    logger.debug(
+        "update_step_status called",
+        step_id=step_id,
+        status=status.name,
+    )
+    store.dispatch(
+        "UPDATE_STEP_STATUS",
+        {"step_id": step_id, "status": status, "error_message": error_message},
+    )
+
+
+def cache_step_result(step_id: str, result: Any) -> None:
+    """Cache the result of a completed pipeline step.
+
+    Parameters
+    ----------
+    step_id : str
+        UUID of the completed step
+    result : Any
+        Result object to cache
+    """
+    store = StateStore()
+    logger.debug("cache_step_result called", step_id=step_id)
+    store.dispatch("CACHE_STEP_RESULT", {"step_id": step_id, "result": result})
+
+
+def set_pipeline_running(is_running: bool, current_step_id: str | None = None) -> None:
+    """Set pipeline execution state.
+
+    Parameters
+    ----------
+    is_running : bool
+        True when the pipeline is actively executing
+    current_step_id : str, optional
+        UUID of the step currently executing
+    """
+    store = StateStore()
+    logger.debug(
+        "set_pipeline_running called",
+        is_running=is_running,
+        current_step_id=current_step_id,
+    )
+    store.dispatch(
+        "SET_PIPELINE_RUNNING",
+        {"is_running": is_running, "current_step_id": current_step_id},
+    )
+
+
+def set_pipeline_name(name: str) -> None:
+    """Set the visual pipeline name.
+
+    Parameters
+    ----------
+    name : str
+        New pipeline name
+    """
+    store = StateStore()
+    logger.debug("set_pipeline_name called", name=name)
+    store.dispatch("SET_PIPELINE_NAME", {"name": name})
+
+
+def clear_pipeline() -> None:
+    """Clear the entire visual pipeline (steps, results, selection)."""
+    store = StateStore()
+    logger.debug("clear_pipeline called")
+    store.dispatch("CLEAR_PIPELINE", {})
+
+
+def load_pipeline(visual_pipeline: VisualPipelineState) -> None:
+    """Load a visual pipeline state (e.g., restored from YAML/project file).
+
+    Parameters
+    ----------
+    visual_pipeline : VisualPipelineState
+        Pipeline state to load
+    """
+    store = StateStore()
+    logger.debug(
+        "load_pipeline called",
+        pipeline_name=visual_pipeline.pipeline_name,
+        n_steps=len(visual_pipeline.steps),
+    )
+    store.dispatch("LOAD_PIPELINE", {"visual_pipeline": visual_pipeline})

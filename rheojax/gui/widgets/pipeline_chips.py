@@ -5,8 +5,6 @@ Pipeline Chips Widget
 Visual pipeline representation with status indicators.
 """
 
-from rheojax.gui.resources.styles.tokens import Spacing
-
 from rheojax.gui.compat import (
     QColor,
     QFont,
@@ -19,6 +17,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.logging import get_logger
 

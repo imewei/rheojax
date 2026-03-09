@@ -9,9 +9,12 @@ Reusable UI components for the RheoJAX GUI.
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas, ArvizCanvas
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
+from rheojax.gui.widgets.batch_panel import BatchPanel
 from rheojax.gui.widgets.dataset_tree import DatasetTree
+from rheojax.gui.widgets.empty_state import EmptyStateWidget
 from rheojax.gui.widgets.jax_status import JAXStatusWidget
 from rheojax.gui.widgets.multi_view import MultiView
+from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
@@ -21,11 +24,10 @@ from rheojax.gui.widgets.pyqtgraph_canvas import (
     PyQtGraphCanvas,
     is_pyqtgraph_available,
 )
-from rheojax.gui.widgets.empty_state import EmptyStateWidget
-from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
 __all__ = [
+    "BatchPanel",
     "EmptyStateWidget",
     "BaseArviZWidget",
     "PlotCanvas",

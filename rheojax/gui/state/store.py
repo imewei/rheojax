@@ -258,6 +258,56 @@ class TransformRecord:
 
 
 @dataclass
+class PipelineStepConfig:
+    """Configuration for a single visual pipeline step."""
+
+    id: str  # UUID
+    step_type: str  # "load", "transform", "fit", "bayesian", "export"
+    name: str  # Display name
+    config: dict[str, Any] = field(default_factory=dict)
+    status: "StepStatus" = field(default_factory=lambda: StepStatus.PENDING)
+    result_cache_key: str | None = None
+    error_message: str | None = None
+    position: int = 0
+
+    def clone(self) -> "PipelineStepConfig":
+        """Create a deep copy of this pipeline step config."""
+        return PipelineStepConfig(
+            id=self.id,
+            step_type=self.step_type,
+            name=self.name,
+            config=copy.deepcopy(self.config),
+            status=self.status,
+            result_cache_key=self.result_cache_key,
+            error_message=self.error_message,
+            position=self.position,
+        )
+
+
+@dataclass
+class VisualPipelineState:
+    """State for the visual pipeline builder in the GUI."""
+
+    steps: list["PipelineStepConfig"] = field(default_factory=list)
+    selected_step_id: str | None = None
+    is_running: bool = False
+    current_running_step_id: str | None = None
+    pipeline_name: str = "Untitled Pipeline"
+    step_results: dict[str, Any] = field(default_factory=dict)
+
+    def clone(self) -> "VisualPipelineState":
+        """Create a deep copy of this visual pipeline state."""
+        return VisualPipelineState(
+            steps=[s.clone() for s in self.steps],
+            selected_step_id=self.selected_step_id,
+            is_running=self.is_running,
+            current_running_step_id=self.current_running_step_id,
+            pipeline_name=self.pipeline_name,
+            step_results=copy.deepcopy(self.step_results),
+        )
+
+
+@dataclass
 class AppState:
     """Root application state."""
 
@@ -281,6 +331,7 @@ class AppState:
     # UI State
     current_tab: str = "home"
     pipeline_state: PipelineState = field(default_factory=PipelineState)
+    visual_pipeline: VisualPipelineState = field(default_factory=VisualPipelineState)
 
     # JAX
     jax_device: str = "cpu"
@@ -311,6 +362,7 @@ class AppState:
             fit_results={k: v.clone() for k, v in self.fit_results.items()},
             bayesian_results={k: v.clone() for k, v in self.bayesian_results.items()},
             pipeline_state=self.pipeline_state.clone(),
+            visual_pipeline=self.visual_pipeline.clone(),
             transform_history=[t.clone() for t in self.transform_history],
             recent_projects=copy.copy(self.recent_projects),
         )
@@ -658,6 +710,34 @@ class StateStore:
                     error=error,
                 )
 
+            elif action_type in (
+                "ADD_PIPELINE_STEP",
+                "REMOVE_PIPELINE_STEP",
+                "REORDER_PIPELINE_STEP",
+            ):
+                self.emit_signal("pipeline_structure_changed")
+
+            elif action_type == "SELECT_PIPELINE_STEP":
+                step_id = action.get("step_id") or ""
+                self.emit_signal("pipeline_step_selected", step_id)
+
+            elif action_type == "UPDATE_STEP_STATUS":
+                step_id = action.get("step_id", "")
+                status = action.get("status")
+                status_name = status.name if hasattr(status, "name") else str(status)
+                self.emit_signal("pipeline_step_status_changed", step_id, status_name)
+
+            elif action_type == "SET_PIPELINE_RUNNING":
+                is_running = action.get("is_running", False)
+                if is_running:
+                    self.emit_signal("pipeline_execution_started")
+                else:
+                    self.emit_signal("pipeline_execution_completed")
+
+            elif action_type == "SET_PIPELINE_NAME":
+                name = action.get("name", "")
+                self.emit_signal("pipeline_name_changed", name)
+
     def update_state(
         self,
         updater: Callable[[AppState], AppState],
@@ -839,6 +919,7 @@ class StateStore:
             "recent_projects",
             "deformation_mode",
             "poisson_ratio",
+            "visual_pipeline",
         ]:
             old_val = getattr(old_state, attr, None)
             new_val = getattr(new_state, attr, None)
@@ -1468,6 +1549,156 @@ class StateStore:
                 )
 
             return updater
+
+        if action_type == "ADD_PIPELINE_STEP":
+            step_config = action.get("step_config")
+
+            def _add_step(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.steps.append(step_config.clone())
+                for i, s in enumerate(vp.steps):
+                    s.position = i
+                return replace(state, visual_pipeline=vp, is_modified=True)
+
+            return _add_step
+
+        if action_type == "REMOVE_PIPELINE_STEP":
+            step_id = action.get("step_id")
+
+            def _remove_step(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.steps = [s for s in vp.steps if s.id != step_id]
+                for i, s in enumerate(vp.steps):
+                    s.position = i
+                if vp.selected_step_id == step_id:
+                    vp.selected_step_id = None
+                if step_id in vp.step_results:
+                    del vp.step_results[step_id]
+                return replace(state, visual_pipeline=vp, is_modified=True)
+
+            return _remove_step
+
+        if action_type == "REORDER_PIPELINE_STEP":
+            step_id = action.get("step_id")
+            new_position = action.get("new_position")
+
+            def _reorder_step(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                step = next((s for s in vp.steps if s.id == step_id), None)
+                if step is None:
+                    return state
+                vp.steps.remove(step)
+                vp.steps.insert(new_position, step)
+                for i, s in enumerate(vp.steps):
+                    s.position = i
+                # When reordering, clear ALL cached results — pipeline semantics
+                # change fundamentally and any cached output may be invalid.
+                vp.step_results.clear()
+                return replace(state, visual_pipeline=vp, is_modified=True)
+
+            return _reorder_step
+
+        if action_type == "SELECT_PIPELINE_STEP":
+            step_id = action.get("step_id")
+
+            def _select_step(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.selected_step_id = step_id
+                return replace(state, visual_pipeline=vp)
+
+            return _select_step
+
+        if action_type == "UPDATE_STEP_CONFIG":
+            step_id = action.get("step_id")
+            config_updates = action.get("config", {})
+
+            def _update_config(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                for step in vp.steps:
+                    if step.id == step_id:
+                        step.config.update(config_updates)
+                        break
+                idx = next((i for i, s in enumerate(vp.steps) if s.id == step_id), None)
+                if idx is not None:
+                    for s in vp.steps[idx:]:
+                        vp.step_results.pop(s.id, None)
+                        if s.status == StepStatus.COMPLETE:
+                            s.status = StepStatus.PENDING
+                return replace(state, visual_pipeline=vp, is_modified=True)
+
+            return _update_config
+
+        if action_type == "UPDATE_STEP_STATUS":
+            step_id = action.get("step_id")
+            status = action.get("status")
+            error_message = action.get("error_message")
+
+            def _update_status(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                for step in vp.steps:
+                    if step.id == step_id:
+                        step.status = status
+                        step.error_message = error_message
+                        break
+                return replace(state, visual_pipeline=vp)
+
+            return _update_status
+
+        if action_type == "CACHE_STEP_RESULT":
+            step_id = action.get("step_id")
+            result = action.get("result")
+
+            def _cache_result(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.step_results[step_id] = result
+                return replace(state, visual_pipeline=vp)
+
+            return _cache_result
+
+        if action_type == "SET_PIPELINE_RUNNING":
+            is_running = action.get("is_running")
+            current_step_id = action.get("current_step_id")
+
+            def _set_running(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.is_running = is_running
+                vp.current_running_step_id = current_step_id
+                return replace(state, visual_pipeline=vp)
+
+            return _set_running
+
+        if action_type == "SET_PIPELINE_NAME":
+            name = action.get("name", "Untitled Pipeline")
+
+            def _set_name(state: AppState) -> AppState:
+                vp = state.visual_pipeline.clone()
+                vp.pipeline_name = name
+                return replace(state, visual_pipeline=vp, is_modified=True)
+
+            return _set_name
+
+        if action_type == "CLEAR_PIPELINE":
+
+            def _clear_pipeline(state: AppState) -> AppState:
+                return replace(
+                    state,
+                    visual_pipeline=VisualPipelineState(),
+                    is_modified=True,
+                )
+
+            return _clear_pipeline
+
+        if action_type == "LOAD_PIPELINE":
+            visual_pipeline = action.get("visual_pipeline")
+
+            def _load_pipeline(state: AppState) -> AppState:
+                return replace(
+                    state,
+                    visual_pipeline=visual_pipeline.clone(),
+                    is_modified=False,
+                )
+
+            return _load_pipeline
 
         if action_type == "CHECK_COMPATIBILITY":
             # STORE-002: CHECK_COMPATIBILITY is a UI-only trigger (opens the
