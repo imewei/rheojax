@@ -463,6 +463,92 @@ class BatchPipeline:
                     )
                     metrics["transform_replay_failed"] = True
 
+            elif step_action == "fit_bayesian":
+                # Replay Bayesian inference on the newly fitted model.
+                if pipeline._last_model is None:
+                    logger.warning(
+                        "Skipping fit_bayesian step — no prior fit available",
+                        filepath=str(path),
+                    )
+                    continue
+                try:
+                    X = np.array(pipeline.data.x)
+                    y = np.array(pipeline.data.y)
+                    _bayes_kwargs: dict[str, Any] = {}
+                    # Forward test_mode from fit replay
+                    if "test_mode" in fit_kwargs_replay:
+                        _bayes_kwargs["test_mode"] = fit_kwargs_replay["test_mode"]
+                    # Forward deformation_mode/poisson_ratio
+                    _dm = fit_kwargs_replay.get("deformation_mode")
+                    if _dm is not None:
+                        _bayes_kwargs["deformation_mode"] = _dm
+                    _pr = fit_kwargs_replay.get("poisson_ratio")
+                    if _pr is not None:
+                        _bayes_kwargs["poisson_ratio"] = _pr
+                    # Carry Bayesian sampling kwargs from the template model.
+                    # These are stored by Pipeline.fit_bayesian() on the model
+                    # as _last_bayesian_kwargs (separate from _last_fit_kwargs
+                    # which only holds protocol kwargs from NLSQ).
+                    _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
+                    if _template_bayes is not None:
+                        for _bk in (
+                            "num_warmup", "num_samples", "num_chains", "seed",
+                            "target_accept_prob",
+                        ):
+                            if _bk in _template_bayes:
+                                _bayes_kwargs.setdefault(_bk, _template_bayes[_bk])
+                    result = pipeline._last_model.fit_bayesian(X, y, **_bayes_kwargs)
+                    pipeline._last_bayesian_result = result
+                    pipeline.steps.append((step_action, pipeline._last_model))
+                    metrics["bayesian_completed"] = True
+                    logger.debug(
+                        "Replayed fit_bayesian step",
+                        model=type(pipeline._last_model).__name__,
+                        filepath=str(path),
+                    )
+                except Exception as _be:
+                    logger.error(
+                        "Bayesian replay failed; skipping",
+                        model=type(pipeline._last_model).__name__,
+                        error=str(_be),
+                    )
+                    metrics["bayesian_replay_failed"] = True
+
+            elif step_action == "export":
+                # Replay export step for each processed file.
+                try:
+                    export_config = step_obj if isinstance(step_obj, dict) else {}
+                    _out_path = export_config.get("output_path", "")
+                    _fmt = export_config.get("format", "directory")
+                    per_file_out = None
+                    if _out_path:
+                        # Create per-file output subdirectory to avoid collisions
+                        per_file_out = Path(_out_path) / path.stem
+                        pipeline.export(
+                            str(per_file_out),
+                            format=_fmt,
+                        )
+                        metrics["export_path"] = str(per_file_out)
+                    logger.debug(
+                        "Replayed export step",
+                        filepath=str(path),
+                        output=str(per_file_out) if _out_path else "(no output path)",
+                    )
+                except Exception as _ee:
+                    logger.error(
+                        "Export replay failed; skipping",
+                        error=str(_ee),
+                    )
+                    metrics["export_replay_failed"] = True
+
+            else:
+                logger.warning(
+                    "Unknown step action in batch replay; skipping",
+                    step_action=step_action,
+                    filepath=str(path),
+                )
+                metrics.setdefault("unknown_steps_skipped", []).append(step_action)
+
         result = pipeline.get_result()
 
         # Compute metrics if model was fitted

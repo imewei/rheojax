@@ -806,6 +806,19 @@ class Pipeline:
                 result = model_obj.fit_bayesian(X, y, **bayesian_kwargs)
                 self._last_bayesian_result = result
                 self._last_model = model_obj
+                # Store sampling kwargs on the model so BatchPipeline can
+                # replay with the same configuration.  _last_fit_kwargs only
+                # contains protocol kwargs from NLSQ — Bayesian sampling
+                # params (num_warmup, num_samples, num_chains, seed) are
+                # consumed by NumPyro and never stored there.
+                _sampling_keys = {
+                    "num_warmup", "num_samples", "num_chains", "seed",
+                    "target_accept_prob",
+                }
+                model_obj._last_bayesian_kwargs = {
+                    k: v for k, v in bayesian_kwargs.items()
+                    if k in _sampling_keys
+                }
                 self.steps.append(("fit_bayesian", model_obj))
                 self.history.append(("fit_bayesian", model_obj.__class__.__name__))
                 ctx["num_samples"] = getattr(result, "num_samples", None)
@@ -1409,6 +1422,7 @@ class Pipeline:
                 )
                 raise
 
+        self.steps.append(("export", {"output_path": str(output_path), "format": format}))
         self.history.append(("export", str(output_path), format))
         return self
 
