@@ -28,6 +28,12 @@ from rheojax.visualization.plotter import (
     plot_time_domain,
     save_figure,
 )
+from rheojax.visualization.fit_plotter import (
+    FitPlotter,
+    compute_credible_band,
+    generate_diagnostic_suite,
+)
+from rheojax.visualization.transform_plotter import TransformPlotter
 from rheojax.visualization.templates import (
     apply_template_style,
     plot_mastercurve,
@@ -115,6 +121,12 @@ __all__ = [
     "plot_mastercurve",
     "plot_model_fit",
     "apply_template_style",
+    # Fit visualization
+    "FitPlotter",
+    "compute_credible_band",
+    "generate_diagnostic_suite",
+    # Transform visualization
+    "TransformPlotter",
     # EPM plots - scalar
     "plot_lattice_fields",
     "animate_stress_evolution",
