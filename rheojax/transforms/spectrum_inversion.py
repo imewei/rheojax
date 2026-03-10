@@ -89,6 +89,13 @@ class SpectrumInversion(BaseTransform):
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
+        # Validate n_tau — must be >=2 so that d_ln_tau has at least one element
+        if self.n_tau < 2:
+            raise ValueError(
+                f"SpectrumInversion: n_tau must be >= 2 (got {self.n_tau}). "
+                "The kernel matrix requires at least 2 τ points to compute d(ln τ) bin widths."
+            )
+
         # Validate inputs — x must be strictly positive for log-space operations
         if np.any(x <= 0):
             raise ValueError(
