@@ -11,6 +11,8 @@ pytestmark = pytest.mark.gui
 
 def test_install_gui_log_handler_forwards_records() -> None:
     """Log records should reach the GUI append callback."""
+    from PySide6.QtWidgets import QApplication
+
     captured: list[str] = []
     handler = install_gui_log_handler(captured.append, level=logging.DEBUG)
 
@@ -23,6 +25,10 @@ def test_install_gui_log_handler_forwards_records() -> None:
 
     try:
         logger.info("hello gui logger")
+        # Qt signal delivery may be queued — flush the event loop.
+        app = QApplication.instance()
+        if app is not None:
+            app.processEvents()
     finally:
         logging.getLogger().removeHandler(handler)
         root_logger.setLevel(original_level)

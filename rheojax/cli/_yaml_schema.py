@@ -38,7 +38,15 @@ VALID_STEP_TYPES: frozenset[str] = frozenset(
 STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
     "load": {
         "required": ["file"],
-        "optional": ["format", "x_col", "y_col", "y_cols", "test_mode"],
+        "optional": [
+            "format",
+            "x_col",
+            "y_col",
+            "y_cols",
+            "test_mode",
+            "deformation_mode",
+            "poisson_ratio",
+        ],
     },
     "transform": {
         "required": ["name"],
@@ -248,6 +256,26 @@ def validate_config(config: PipelineConfig) -> list[str]:
                     f"{step_label} ({step_type}): Unknown keys {sorted(unknown)}. "
                     f"Allowed: {sorted(allowed)}."
                 )
+
+        # P3-3: Log a warning if the transform name isn't in the registry.
+        # This is best-effort — custom transforms or aliases may not be
+        # registered at validation time, so we warn rather than error.
+        if step_type == "transform":
+            transform_name = step.get("name")
+            if transform_name:
+                try:
+                    from rheojax.core.registry import TransformRegistry
+
+                    registered = TransformRegistry.list_transforms()
+                    if registered and transform_name not in registered:
+                        logger.warning(
+                            "Transform name not found in registry",
+                            step=step_label,
+                            transform=transform_name,
+                            available=registered,
+                        )
+                except Exception:
+                    pass  # Registry not available at validation time
 
         if step_type == "fit":
             has_fit = True

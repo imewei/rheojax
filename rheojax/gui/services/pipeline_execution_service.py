@@ -23,6 +23,46 @@ logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# DMTA parameter resolution helper (P1-1, P2-1, P2-4)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_dmta_kwargs(kwargs: dict[str, Any], data: Any) -> None:
+    """Resolve deformation_mode and poisson_ratio into *kwargs* in-place.
+
+    Fallback chain (first non-None wins):
+      1. Already present in *kwargs* (from step config).
+      2. data.metadata (set by data loader / prior pipeline steps).
+      3. AppState global settings (user's UI selection).
+    """
+    _meta: dict = {}
+    if hasattr(data, "metadata") and data.metadata:
+        _meta = data.metadata
+
+    if "deformation_mode" not in kwargs:
+        dm = _meta.get("deformation_mode")
+        if dm is None:
+            try:
+                store = StateStore()
+                dm = getattr(store.get_state(), "deformation_mode", None)
+            except Exception:
+                pass
+        if dm is not None:
+            kwargs["deformation_mode"] = dm
+
+    if "poisson_ratio" not in kwargs:
+        pr = _meta.get("poisson_ratio")
+        if pr is None:
+            try:
+                store = StateStore()
+                pr = getattr(store.get_state(), "poisson_ratio", None)
+            except Exception:
+                pass
+        if pr is not None:
+            kwargs["poisson_ratio"] = pr
+
+
+# ---------------------------------------------------------------------------
 # Internal state-mutation helpers
 # (update_step_status, cache_step_result, set_pipeline_running do not exist
 # in actions.py, so we implement them here via direct StateStore updaters.)
@@ -389,6 +429,11 @@ class PipelineExecutionService(QObject):
             k: v for k, v in config.items() if k not in _RESERVED
         }
 
+        # P1-1 / P2-4: Resolve deformation_mode and poisson_ratio from
+        # (a) step config (already in fit_kwargs), (b) data metadata,
+        # (c) AppState global settings — in that priority order.
+        _resolve_dmta_kwargs(fit_kwargs, data)
+
         logger.info(
             "Pipeline fit step",
             model=model_name,
@@ -472,6 +517,16 @@ class PipelineExecutionService(QObject):
         }
         if fitted_model_state is not None:
             extra_kwargs["fitted_model_state"] = fitted_model_state
+
+        # P2-1: Resolve deformation_mode, poisson_ratio, and test_mode for
+        # Bayesian inference — same fallback chain as _execute_fit.
+        _resolve_dmta_kwargs(extra_kwargs, data)
+        if "test_mode" not in extra_kwargs:
+            _tm: str | None = None
+            if hasattr(data, "metadata") and data.metadata:
+                _tm = data.metadata.get("test_mode")
+            if _tm is not None:
+                extra_kwargs["test_mode"] = _tm
 
         logger.info(
             "Pipeline Bayesian step",

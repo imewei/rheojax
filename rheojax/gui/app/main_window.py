@@ -1403,7 +1403,10 @@ class RheoJAXMainWindow(QMainWindow):
 
     @Slot(str)
     def _on_run_step(self, step_id: str) -> None:
-        """Execute a single pipeline step.
+        """Execute a single pipeline step with accumulated context.
+
+        Builds context from all preceding steps' cached results, then
+        executes only the target step via PipelineExecutionService.
 
         Parameters
         ----------
@@ -1411,8 +1414,68 @@ class RheoJAXMainWindow(QMainWindow):
             Identifier of the step to execute.
         """
         logger.debug("Run single step requested", step_id=step_id)
-        # TODO: implement single-step execution via PipelineExecutionService
-        self.status_bar.show_message(f"Run step '{step_id}': coming soon", 2000)
+
+        try:
+            from rheojax.gui.services.pipeline_execution_service import (
+                PipelineExecutionService,
+            )
+            from rheojax.gui.state.selectors import get_visual_pipeline_steps
+
+            steps = get_visual_pipeline_steps()
+        except Exception as exc:
+            logger.error("Could not retrieve pipeline steps", error=str(exc), exc_info=True)
+            self.status_bar.show_message(f"Run step failed: {exc}", 5000)
+            return
+
+        # Find the target step and build context from prior completed steps.
+        target_step = None
+        prior_steps = []
+        for s in steps:
+            if s.id == step_id:
+                target_step = s
+                break
+            prior_steps.append(s)
+
+        if target_step is None:
+            self.status_bar.show_message(f"Step '{step_id}' not found", 3000)
+            return
+
+        # Reconstruct context by replaying prior steps' cached results.
+        context: dict = {}
+        store = self.store
+        vp = store.get_state().visual_pipeline
+        for prior in prior_steps:
+            cached = vp.step_results.get(prior.id)
+            if cached is None:
+                continue
+            # Mirror PipelineExecutionService context accumulation.
+            if prior.step_type == "load":
+                context["data"] = cached
+            elif prior.step_type == "transform":
+                context["data"] = cached
+            elif prior.step_type == "fit":
+                context["fit_result"] = cached
+                context["model_name"] = prior.config.get("model", "")
+            elif prior.step_type == "bayesian":
+                context["bayesian_result"] = cached
+            elif prior.step_type == "export":
+                context["export_path"] = cached
+
+        try:
+            service = PipelineExecutionService(self)
+            service.execute_single_step(target_step, context)
+            self.status_bar.show_message(
+                f"Step '{target_step.name}' completed", 3000,
+            )
+        except Exception as exc:
+            logger.error(
+                "Single step execution failed",
+                step_id=step_id,
+                error=str(exc),
+                exc_info=True,
+            )
+            self.log(f"Step '{target_step.name}' failed: {exc}")
+            self.status_bar.show_message(f"Step failed: {exc}", 5000)
 
     def _on_theme_changed(self, theme: str) -> None:
         """Handle theme change."""
@@ -2526,11 +2589,104 @@ class RheoJAXMainWindow(QMainWindow):
 
     @Slot()
     def _on_batch_fit(self) -> None:
-        """Handle batch fit action."""
+        """Handle batch fit action — opens the BatchPanel dialog."""
         logger.debug("Batch fit action triggered")
-        self.log("Opening batch fit dialog...")
-        self.navigate_to("fit")
-        self.status_bar.show_message("Batch fit: select datasets", 2000)
+        self.log("Opening batch processing panel...")
+
+        from rheojax.gui.compat import QDialog, QVBoxLayout
+        from rheojax.gui.widgets.batch_panel import BatchPanel
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Batch Processing")
+        dialog.resize(700, 500)
+        layout = QVBoxLayout(dialog)
+        batch_panel = BatchPanel(dialog)
+        layout.addWidget(batch_panel)
+
+        # P2-2: Connect batch_requested → _on_batch_requested handler.
+        batch_panel.batch_requested.connect(
+            lambda d, p, files: self._on_batch_requested(d, p, files, batch_panel)
+        )
+        dialog.exec()
+
+    def _on_batch_requested(
+        self,
+        directory: str,
+        pattern: str,
+        file_paths: list,
+        batch_panel: Any,
+    ) -> None:
+        """Execute the current pipeline for each file in the batch.
+
+        For each file, modifies the load step's config to point at the file,
+        executes the full pipeline, and updates the BatchPanel status.
+        """
+        import time
+
+        logger.info(
+            "Batch execution started",
+            directory=directory,
+            pattern=pattern,
+            file_count=len(file_paths),
+        )
+        self.status_bar.show_message(f"Batch: processing {len(file_paths)} files...", 0)
+
+        try:
+            from rheojax.gui.services.pipeline_execution_service import (
+                PipelineExecutionService,
+            )
+            from rheojax.gui.state.selectors import get_visual_pipeline_steps
+
+            template_steps = get_visual_pipeline_steps()
+        except Exception as exc:
+            logger.error("Could not retrieve pipeline steps", error=str(exc))
+            batch_panel.finish_batch(0, len(file_paths))
+            return
+
+        if not template_steps:
+            self.log("Batch: no pipeline steps configured")
+            batch_panel.finish_batch(0, len(file_paths))
+            return
+
+        success_count = 0
+        total = len(file_paths)
+
+        for i, fpath in enumerate(file_paths):
+            batch_panel.set_file_status(fpath, "RUNNING")
+            batch_panel.set_progress(i, total, f"Processing {Path(fpath).name}...")
+            start = time.perf_counter()
+
+            try:
+                # Clone steps and patch the load step's file path.
+                from dataclasses import replace as dc_replace
+
+                run_steps = []
+                for step in template_steps:
+                    if step.step_type == "load":
+                        patched_config = {**step.config, "file": fpath}
+                        run_steps.append(dc_replace(step, config=patched_config))
+                    else:
+                        run_steps.append(step)
+
+                service = PipelineExecutionService(self)
+                service.execute_all(run_steps)
+                elapsed = time.perf_counter() - start
+                batch_panel.set_file_status(fpath, "DONE", elapsed)
+                success_count += 1
+            except Exception as exc:
+                elapsed = time.perf_counter() - start
+                batch_panel.set_file_status(fpath, "FAILED", elapsed)
+                logger.warning(
+                    "Batch file failed",
+                    file=fpath,
+                    error=str(exc),
+                )
+
+        batch_panel.finish_batch(success_count, total)
+        self.status_bar.show_message(
+            f"Batch complete: {success_count}/{total} succeeded", 5000,
+        )
+        self.log(f"Batch complete: {success_count}/{total} files succeeded")
 
     @Slot()
     def _on_compare_models(self) -> None:

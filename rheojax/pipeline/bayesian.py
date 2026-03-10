@@ -93,6 +93,12 @@ class BayesianPipeline(Pipeline):
         Raises:
             ValueError: If data not loaded
 
+        Note:
+            This method writes resolved ``deformation_mode``, ``poisson_ratio``,
+            and ``test_mode`` back to ``self.data.metadata`` so that a subsequent
+            ``fit_bayesian()`` call inherits these settings without the caller
+            having to repeat them.
+
         Example:
             >>> pipeline.fit_nlsq('maxwell')
             >>> # or with instance

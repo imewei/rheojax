@@ -92,6 +92,18 @@ Examples:
         help="Comma-separated Y column names (for oscillation data)",
     )
     parser.add_argument(
+        "--deformation-mode",
+        type=str,
+        default=None,
+        help="Deformation mode for DMTA data (tension, compression, bending, shear)",
+    )
+    parser.add_argument(
+        "--poisson-ratio",
+        type=float,
+        default=None,
+        help="Poisson ratio for DMTA modulus conversion (default: 0.5)",
+    )
+    parser.add_argument(
         "--max-iter",
         type=int,
         default=1000,
@@ -287,6 +299,10 @@ def main(args: list[str] | None = None) -> int:
         load_kwargs["y_cols"] = [c.strip() for c in parsed.y_cols.split(",")]
 
     fit_kwargs: dict = {"max_iter": parsed.max_iter}
+    if parsed.deformation_mode is not None:
+        fit_kwargs["deformation_mode"] = parsed.deformation_mode
+    if parsed.poisson_ratio is not None:
+        fit_kwargs["poisson_ratio"] = parsed.poisson_ratio
 
     # Create output directory if requested
     if parsed.output_dir is not None:

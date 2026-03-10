@@ -101,6 +101,14 @@ class BatchPipeline:
         Returns:
             self for method chaining
 
+        Note:
+            During replay, protocol-specific kwargs (gamma_dot, sigma_init,
+            lam_init, sigma_0, lam_0, gamma_0, omega_laos, n_cycles,
+            points_per_cycle) are stripped from the template's fit kwargs
+            because they are data-dependent and should not be reused
+            across datasets.  DMTA kwargs (deformation_mode, poisson_ratio)
+            and solver settings (method) are preserved.
+
         Example:
             >>> batch.process_files(['data1.csv', 'data2.csv'])
             >>> # Parallel mode (use with caution — JAX JIT not thread-safe):

@@ -1222,6 +1222,8 @@ class Pipeline:
             fit_kwargs["test_mode"] = _meta["test_mode"]
         if "deformation_mode" not in fit_kwargs and _meta.get("deformation_mode"):
             fit_kwargs["deformation_mode"] = _meta["deformation_mode"]
+        if "poisson_ratio" not in fit_kwargs and _meta.get("poisson_ratio"):
+            fit_kwargs["poisson_ratio"] = _meta["poisson_ratio"]
 
         test_mode = fit_kwargs.pop("test_mode", None)
 
