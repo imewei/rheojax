@@ -1375,7 +1375,13 @@ class RheoJAXMainWindow(QMainWindow):
 
     @Slot()
     def _on_run_all(self) -> None:
-        """Execute all pipeline steps in sequence."""
+        """Execute all pipeline steps in sequence on a background thread.
+
+        PipelineExecutionService runs fit and Bayesian steps synchronously —
+        calling it on the main thread would freeze the Qt event loop.  We
+        submit a QRunnable to the global thread pool and route the result
+        back to the main thread via typed Qt signals on a QObject relay.
+        """
         logger.debug("Run all pipeline steps requested")
         try:
             from rheojax.gui.state.selectors import get_visual_pipeline_steps
@@ -1389,24 +1395,57 @@ class RheoJAXMainWindow(QMainWindow):
             self.status_bar.show_message("No pipeline steps to run", 2000)
             return
 
-        try:
-            from rheojax.gui.services.pipeline_execution_service import (
-                PipelineExecutionService,
-            )
+        from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
 
-            service = PipelineExecutionService(self)
-            service.execute_all(steps)
-        except Exception as exc:
-            logger.error("Pipeline execution failed", error=str(exc), exc_info=True)
-            self.log(f"Pipeline execution failed: {exc}")
-            self.status_bar.show_message(f"Pipeline run failed: {exc}", 5000)
+        class _Relay(QObject):
+            finished = Signal()
+            error = Signal(str)
+
+        relay = _Relay()
+        relay.finished.connect(
+            lambda: self.status_bar.show_message("Pipeline completed", 3000),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        relay.error.connect(self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection)
+
+        # Keep relay alive until signals are delivered — prevent premature GC
+        # when the QRunnable completes and releases its closure references.
+        self._active_relay = relay
+
+        _steps = steps
+        _relay = relay
+
+        class _RunAllWorker(QRunnable):
+            def run(self) -> None:  # type: ignore[override]
+                try:
+                    from rheojax.gui.services.pipeline_execution_service import (
+                        PipelineExecutionService,
+                    )
+
+                    # parent=None: QObject parent must live in the same thread.
+                    # The window lives on the main thread; this runs on a pool
+                    # thread, so cross-thread parenting is forbidden by Qt.
+                    service = PipelineExecutionService(None)
+                    service.execute_all(_steps)
+                    _relay.finished.emit()
+                except Exception as exc:
+                    logger.error(
+                        "Pipeline execution failed", error=str(exc), exc_info=True
+                    )
+                    _relay.error.emit(str(exc))
+
+        worker = _RunAllWorker()
+        worker.setAutoDelete(True)
+        QThreadPool.globalInstance().start(worker)
+        self.status_bar.show_message("Running pipeline…", 0)
 
     @Slot(str)
     def _on_run_step(self, step_id: str) -> None:
         """Execute a single pipeline step with accumulated context.
 
         Builds context from all preceding steps' cached results, then
-        executes only the target step via PipelineExecutionService.
+        executes only the target step via PipelineExecutionService on a
+        background thread.
 
         Parameters
         ----------
@@ -1461,21 +1500,60 @@ class RheoJAXMainWindow(QMainWindow):
             elif prior.step_type == "export":
                 context["export_path"] = cached
 
-        try:
-            service = PipelineExecutionService(self)
-            service.execute_single_step(target_step, context)
-            self.status_bar.show_message(
-                f"Step '{target_step.name}' completed", 3000,
-            )
-        except Exception as exc:
-            logger.error(
-                "Single step execution failed",
-                step_id=step_id,
-                error=str(exc),
-                exc_info=True,
-            )
-            self.log(f"Step '{target_step.name}' failed: {exc}")
-            self.status_bar.show_message(f"Step failed: {exc}", 5000)
+        # Offload to a background thread — same reason as _on_run_all.
+        from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
+
+        class _Relay(QObject):
+            finished = Signal(str)
+            error = Signal(str)
+
+        relay = _Relay()
+        relay.finished.connect(
+            self._on_pipeline_step_done, Qt.ConnectionType.QueuedConnection
+        )
+        relay.error.connect(self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection)
+
+        # Keep relay alive until signals are delivered — prevent premature GC.
+        self._active_relay = relay
+
+        _target = target_step
+        _context = context
+        _step_id = step_id
+        _relay = relay
+
+        class _RunStepWorker(QRunnable):
+            def run(self) -> None:  # type: ignore[override]
+                try:
+                    # parent=None: QObject parent must live in the same thread.
+                    service = PipelineExecutionService(None)
+                    service.execute_single_step(_target, _context)
+                    _relay.finished.emit(_target.name)
+                except Exception as exc:
+                    logger.error(
+                        "Single step execution failed",
+                        step_id=_step_id,
+                        error=str(exc),
+                        exc_info=True,
+                    )
+                    _relay.error.emit(str(exc))
+
+        worker = _RunStepWorker()
+        worker.setAutoDelete(True)
+        QThreadPool.globalInstance().start(worker)
+        self.status_bar.show_message(f"Running step '{target_step.name}'…", 0)
+
+    @Slot(str)
+    def _on_pipeline_step_done(self, step_name: str) -> None:
+        """Called on the main thread when a single pipeline step completes."""
+        self.status_bar.show_message(f"Step '{step_name}' completed", 3000)
+        self.log(f"Step '{step_name}' completed")
+
+    @Slot(str)
+    def _on_pipeline_run_error(self, error_msg: str) -> None:
+        """Called on the main thread when a pipeline run or step fails."""
+        logger.error("Pipeline worker error", error=error_msg)
+        self.log(f"Pipeline execution failed: {error_msg}")
+        self.status_bar.show_message(f"Pipeline run failed: {error_msg}", 5000)
 
     def _on_theme_changed(self, theme: str) -> None:
         """Handle theme change."""
