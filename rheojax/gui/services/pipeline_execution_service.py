@@ -261,6 +261,17 @@ class PipelineExecutionService(QObject):
         if not file_path:
             raise ValueError("Load step requires a 'file' key in its config.")
 
+        # Defense-in-depth: reject unsafe paths even if they bypassed schema validation.
+        _path = Path(file_path)
+        if _path.is_absolute():
+            raise ValueError(
+                f"Load step file path must be relative, got absolute: {file_path}"
+            )
+        if ".." in _path.parts:
+            raise ValueError(
+                f"Load step file path must not contain '..' segments: {file_path}"
+            )
+
         # Extract the known DataService.load_file keyword arguments.
         _KNOWN = {"x_col", "y_col", "y2_col", "test_mode"}
         load_kwargs: dict[str, Any] = {
@@ -513,6 +524,16 @@ class PipelineExecutionService(QObject):
 
         output_path = Path(config.get("output", "results/"))
         export_format: str = config.get("format", "directory")
+
+        # Defense-in-depth: reject unsafe output paths.
+        if output_path.is_absolute():
+            raise ValueError(
+                f"Export output path must be relative, got absolute: {output_path}"
+            )
+        if ".." in output_path.parts:
+            raise ValueError(
+                f"Export output path must not contain '..' segments: {output_path}"
+            )
 
         output_path.mkdir(parents=True, exist_ok=True)
 

@@ -222,6 +222,26 @@ def from_yaml(yaml_str: str) -> tuple[list[PipelineStepConfig], str]:
     if missing:
         raise ValueError(f"Pipeline YAML is missing required top-level keys: {missing}")
 
+    # Validate against the CLI schema for defense-in-depth (path traversal,
+    # step ordering, required keys, unknown step types).
+    from rheojax.cli._yaml_schema import (  # noqa: PLC0415
+        PipelineConfig,
+        validate_config,
+    )
+
+    schema_config = PipelineConfig(
+        version=str(raw.get("version", "1")),
+        name=str(raw.get("name", "")),
+        defaults=raw.get("defaults") or {},
+        steps=raw.get("steps", []),
+    )
+    schema_errors = validate_config(schema_config)
+    if schema_errors:
+        raise ValueError(
+            "Pipeline YAML failed schema validation:\n"
+            + "\n".join(f"  - {e}" for e in schema_errors)
+        )
+
     pipeline_name: str = str(raw["name"])
     raw_steps = raw.get("steps", [])
     if not isinstance(raw_steps, list):

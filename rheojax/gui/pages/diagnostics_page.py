@@ -26,7 +26,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
-from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
+from rheojax.gui.resources.styles.tokens import ColorPalette
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, FitResult, StateStore
 from rheojax.gui.utils.layout_helpers import apply_group_box_style, set_compact_margins
@@ -485,7 +485,7 @@ class DiagnosticsPage(QWidget):
             NLSQ fit result for R-squared, Chi-squared, MPE
         """
         # Map metric names to values
-        values: dict[str, str] = {m: "--" for m in self._metric_names}
+        values: dict[str, str] = dict.fromkeys(self._metric_names, "--")
 
         # --- GOF metrics from NLSQ FitResult ---
         if fit_result is not None:

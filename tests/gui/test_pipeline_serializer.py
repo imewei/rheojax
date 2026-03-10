@@ -43,7 +43,7 @@ def _make_step(
 
 
 def _make_load_step(**kwargs) -> PipelineStepConfig:
-    return _make_step("load", {"file": "/data/sample.csv", "format": "csv"}, **kwargs)
+    return _make_step("load", {"file": "data/sample.csv", "format": "csv"}, **kwargs)
 
 
 def _make_fit_step(**kwargs) -> PipelineStepConfig:
@@ -63,7 +63,7 @@ def _make_bayesian_step(**kwargs) -> PipelineStepConfig:
 
 
 def _make_export_step(**kwargs) -> PipelineStepConfig:
-    return _make_step("export", {"output": "/results/", "format": "csv"}, **kwargs)
+    return _make_step("export", {"output": "results/", "format": "csv"}, **kwargs)
 
 
 def _basic_steps() -> list[PipelineStepConfig]:
@@ -159,7 +159,7 @@ class TestToYaml:
         step = _make_export_step()
         yaml_str = to_yaml([step])
         doc = yaml.safe_load(yaml_str)
-        assert doc["steps"][0]["output"] == "/results/"
+        assert doc["steps"][0]["output"] == "results/"
 
     def test_yaml_bayesian_step_serialized(self):
         """to_yaml must correctly serialize a bayesian step with all sampling kwargs."""
@@ -189,7 +189,7 @@ class TestFromYaml:
             "name: Test\n"
             "steps:\n"
             "  - type: load\n"
-            "    file: /data/test.csv\n"
+            "    file: data/test.csv\n"
         )
         steps, name = from_yaml(yaml_str)
         assert len(steps) == 1
@@ -202,11 +202,11 @@ class TestFromYaml:
             "name: Pipeline\n"
             "steps:\n"
             "  - type: load\n"
-            "    file: /data/x.csv\n"
+            "    file: data/x.csv\n"
             "  - type: fit\n"
             "    model: Maxwell\n"
             "  - type: export\n"
-            "    output: /out/\n"
+            "    output: out/\n"
         )
         steps, _ = from_yaml(yaml_str)
         assert [s.step_type for s in steps] == ["load", "fit", "export"]
@@ -217,12 +217,14 @@ class TestFromYaml:
             "version: '1'\n"
             "name: Cfg\n"
             "steps:\n"
+            "  - type: load\n"
+            "    file: data/input.csv\n"
             "  - type: fit\n"
             "    model: Giesekus\n"
             "    max_iter: 5000\n"
         )
         steps, _ = from_yaml(yaml_str)
-        cfg = steps[0].config
+        cfg = steps[1].config
         assert cfg["model"] == "Giesekus"
         assert cfg["max_iter"] == 5000
 
@@ -232,11 +234,13 @@ class TestFromYaml:
             "version: '1'\n"
             "name: N\n"
             "steps:\n"
+            "  - type: load\n"
+            "    file: data/input.csv\n"
             "  - type: fit\n"
             "    model: Maxwell\n"
         )
         steps, _ = from_yaml(yaml_str)
-        assert "Maxwell" in steps[0].name
+        assert "Maxwell" in steps[1].name
 
     def test_positions_assigned_in_order(self):
         """from_yaml must assign zero-based positions matching list order."""
@@ -245,7 +249,7 @@ class TestFromYaml:
             "name: P\n"
             "steps:\n"
             "  - type: load\n"
-            "    file: /x.csv\n"
+            "    file: data/x.csv\n"
             "  - type: fit\n"
             "    model: Maxwell\n"
         )
@@ -260,14 +264,14 @@ class TestFromYaml:
             "name: S\n"
             "steps:\n"
             "  - type: load\n"
-            "    file: /f.csv\n"
+            "    file: data/f.csv\n"
         )
         steps, _ = from_yaml(yaml_str)
         assert steps[0].status == StepStatus.PENDING
 
     def test_missing_version_raises(self):
         """from_yaml must raise ValueError when 'version' is missing."""
-        yaml_str = "name: Bad\nsteps:\n  - type: load\n    file: /x.csv\n"
+        yaml_str = "name: Bad\nsteps:\n  - type: load\n    file: data/x.csv\n"
         with pytest.raises(ValueError, match="version"):
             from_yaml(yaml_str)
 
@@ -277,9 +281,33 @@ class TestFromYaml:
             "version: '1'\n"
             "name: Bad\n"
             "steps:\n"
-            "  - file: /x.csv\n"
+            "  - file: data/x.csv\n"
         )
         with pytest.raises(ValueError, match="type"):
+            from_yaml(yaml_str)
+
+    def test_absolute_path_rejected(self):
+        """from_yaml must reject absolute file paths via schema validation."""
+        yaml_str = (
+            "version: '1'\n"
+            "name: Bad\n"
+            "steps:\n"
+            "  - type: load\n"
+            "    file: /etc/passwd\n"
+        )
+        with pytest.raises(ValueError, match="absolute"):
+            from_yaml(yaml_str)
+
+    def test_path_traversal_rejected(self):
+        """from_yaml must reject path traversal via schema validation."""
+        yaml_str = (
+            "version: '1'\n"
+            "name: Bad\n"
+            "steps:\n"
+            "  - type: load\n"
+            "    file: ../../etc/passwd\n"
+        )
+        with pytest.raises(ValueError, match="\\.\\."):
             from_yaml(yaml_str)
 
 
@@ -310,12 +338,13 @@ class TestYamlRoundtrip:
     def test_roundtrip_preserves_config(self):
         """Config values must survive the to_yaml -> from_yaml round-trip intact."""
         original = [
-            _make_fit_step(position=0),
+            _make_load_step(position=0),
+            _make_fit_step(position=1),
         ]
         yaml_str = to_yaml(original)
         recovered, _ = from_yaml(yaml_str)
-        assert recovered[0].config["model"] == "Maxwell"
-        assert recovered[0].config["max_iter"] == 1000
+        assert recovered[1].config["model"] == "Maxwell"
+        assert recovered[1].config["max_iter"] == 1000
 
     def test_roundtrip_assigns_fresh_uuids(self):
         """from_yaml must generate new UUIDs (not reuse the original step IDs)."""
@@ -381,7 +410,7 @@ class TestToPipelineBuilder:
         builder = to_pipeline_builder(steps)
         load_kwargs = next(kw for t, kw in builder.steps if t == "load")
         assert "file_path" in load_kwargs
-        assert load_kwargs["file_path"] == "/data/sample.csv"
+        assert load_kwargs["file_path"] == "data/sample.csv"
 
     def test_export_step_output_path_key(self):
         """to_pipeline_builder must remap GUI 'output' key to builder 'output_path'."""
@@ -389,7 +418,7 @@ class TestToPipelineBuilder:
         builder = to_pipeline_builder(steps)
         export_kwargs = next(kw for t, kw in builder.steps if t == "export")
         assert "output_path" in export_kwargs
-        assert export_kwargs["output_path"] == "/results/"
+        assert export_kwargs["output_path"] == "results/"
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +433,7 @@ class TestFromPipelineBuilder:
         from rheojax.pipeline.builder import PipelineBuilder
 
         builder = PipelineBuilder()
-        builder.add_load_step(file_path="/data/t.csv", format="csv")
+        builder.add_load_step(file_path="data/t.csv", format="csv")
         builder.add_fit_step("Maxwell")
         state = from_pipeline_builder(builder, pipeline_name="From Builder")
         assert isinstance(state, VisualPipelineState)
@@ -417,7 +446,7 @@ class TestFromPipelineBuilder:
         from rheojax.pipeline.builder import PipelineBuilder
 
         builder = PipelineBuilder()
-        builder.add_load_step(file_path="/data/t.csv")
+        builder.add_load_step(file_path="data/t.csv")
         builder.add_fit_step("Giesekus")
         state = from_pipeline_builder(builder)
         fit_step = next(s for s in state.steps if s.step_type == "fit")
@@ -428,33 +457,33 @@ class TestFromPipelineBuilder:
         from rheojax.pipeline.builder import PipelineBuilder
 
         builder = PipelineBuilder()
-        builder.add_load_step(file_path="/data/input.csv")
+        builder.add_load_step(file_path="data/input.csv")
         state = from_pipeline_builder(builder)
         load_step = state.steps[0]
         assert "file" in load_step.config
-        assert load_step.config["file"] == "/data/input.csv"
+        assert load_step.config["file"] == "data/input.csv"
 
     def test_export_step_output_key_remapped(self):
         """from_pipeline_builder must translate 'output_path' -> 'output' for export."""
         from rheojax.pipeline.builder import PipelineBuilder
 
         builder = PipelineBuilder()
-        builder.add_load_step(file_path="/data/input.csv")
+        builder.add_load_step(file_path="data/input.csv")
         builder.add_fit_step("Maxwell")
-        builder.add_export_step("/out/", format="csv")
+        builder.add_export_step("out/", format="csv")
         state = from_pipeline_builder(builder)
         export_step = next(s for s in state.steps if s.step_type == "export")
         assert "output" in export_step.config
-        assert export_step.config["output"] == "/out/"
+        assert export_step.config["output"] == "out/"
 
     def test_step_positions_assigned_sequentially(self):
         """from_pipeline_builder must assign zero-based positions."""
         from rheojax.pipeline.builder import PipelineBuilder
 
         builder = PipelineBuilder()
-        builder.add_load_step(file_path="/data/t.csv")
+        builder.add_load_step(file_path="data/t.csv")
         builder.add_fit_step("Maxwell")
-        builder.add_export_step("/out/")
+        builder.add_export_step("out/")
         state = from_pipeline_builder(builder)
         for idx, step in enumerate(state.steps):
             assert step.position == idx

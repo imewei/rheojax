@@ -1185,8 +1185,8 @@ class DataService:
 
     @staticmethod
     def _extract_scalar_temperature(
-        file_path: "Path", temp_col: str
-    ) -> "float | None":
+        file_path: Path, temp_col: str
+    ) -> float | None:
         """Extract a scalar temperature from a column in *file_path*.
 
         Reads up to 200 rows with pandas (fast, no full parse) and returns the
@@ -1238,7 +1238,7 @@ class DataService:
             return None
 
     @staticmethod
-    def _extract_temperature_from_filename(file_path: "Path") -> "float | None":
+    def _extract_temperature_from_filename(file_path: Path) -> float | None:
         """Extract temperature from a filename like ``foam_dma_-5C.csv``.
 
         Recognises patterns such as ``_-5C``, ``_60C``, ``_25.5C``,

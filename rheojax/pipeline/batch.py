@@ -473,6 +473,10 @@ class BatchPipeline:
                     continue
                 try:
                     X = np.array(pipeline.data.x)
+                    if pipeline.data.y is None:
+                        raise ValueError(
+                            f"Cannot replay fit_bayesian: data.y is None for {path}"
+                        )
                     y = np.array(pipeline.data.y)
                     _bayes_kwargs: dict[str, Any] = {}
                     # Forward test_mode from fit replay
@@ -634,7 +638,7 @@ class BatchPipeline:
             row = {
                 "file_path": str(path_obj),
                 "file_name": path_obj.name,
-                "n_points": len(result.x),
+                "n_points": len(result.x) if result.x is not None else 0,
             }
             row.update(metrics)
             summary_data.append(row)
