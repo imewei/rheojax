@@ -1080,7 +1080,16 @@ class OptimizationResult:
         """
         # Extract common fields
         x = np.asarray(nlsq_result.get("x", []), dtype=np.float64)
-        fun = float(nlsq_result.get("cost", nlsq_result.get("fun", 0.0)))
+        # NLSQ v0.6.10: 'fun' is now the residual vector (array), not a scalar.
+        # Always prefer 'cost' (scalar); fall back to sum-of-squares of 'fun'.
+        _cost_raw = nlsq_result.get("cost")
+        if _cost_raw is not None:
+            fun = float(_cost_raw)
+        else:
+            _fun_raw = nlsq_result.get("fun", 0.0)
+            _fun_arr = np.asarray(_fun_raw)
+            fun = float(_fun_arr) if _fun_arr.ndim == 0 else float(np.sum(_fun_arr**2))
+
         success = bool(nlsq_result.get("success", False))
         message = str(nlsq_result.get("message", ""))
         nfev = int(nlsq_result.get("nfev", 0))
