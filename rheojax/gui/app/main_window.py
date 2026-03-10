@@ -131,6 +131,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.worker_pool: WorkerPool | None = None
         self._job_types: dict[str, str] = {}
         self._job_metadata: dict[str, dict] = {}  # Capture context at submission time
+        self._active_relays: set = set()  # Keep QObject relays alive until signals delivered
         self._plot_style: str = "default"
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
 
@@ -1410,10 +1411,12 @@ class RheoJAXMainWindow(QMainWindow):
 
         # Keep relay alive until signals are delivered — prevent premature GC
         # when the QRunnable completes and releases its closure references.
-        self._active_relay = relay
+        # Use a set so concurrent runs don't clobber each other's relay.
+        self._active_relays.add(relay)
 
         _steps = steps
         _relay = relay
+        _self = self
 
         class _RunAllWorker(QRunnable):
             def run(self) -> None:  # type: ignore[override]
@@ -1433,6 +1436,8 @@ class RheoJAXMainWindow(QMainWindow):
                         "Pipeline execution failed", error=str(exc), exc_info=True
                     )
                     _relay.error.emit(str(exc))
+                finally:
+                    _self._active_relays.discard(_relay)
 
         worker = _RunAllWorker()
         worker.setAutoDelete(True)
@@ -1514,12 +1519,14 @@ class RheoJAXMainWindow(QMainWindow):
         relay.error.connect(self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection)
 
         # Keep relay alive until signals are delivered — prevent premature GC.
-        self._active_relay = relay
+        # Use a set so concurrent step runs don't clobber each other's relay.
+        self._active_relays.add(relay)
 
         _target = target_step
         _context = context
         _step_id = step_id
         _relay = relay
+        _self = self
 
         class _RunStepWorker(QRunnable):
             def run(self) -> None:  # type: ignore[override]
@@ -1536,6 +1543,8 @@ class RheoJAXMainWindow(QMainWindow):
                         exc_info=True,
                     )
                     _relay.error.emit(str(exc))
+                finally:
+                    _self._active_relays.discard(_relay)
 
         worker = _RunStepWorker()
         worker.setAutoDelete(True)
@@ -2729,9 +2738,13 @@ class RheoJAXMainWindow(QMainWindow):
         success_count = 0
         total = len(file_paths)
 
+        from rheojax.gui.compat import QApplication
+
         for i, fpath in enumerate(file_paths):
             batch_panel.set_file_status(fpath, "RUNNING")
             batch_panel.set_progress(i, total, f"Processing {Path(fpath).name}...")
+            # Allow the Qt event loop to repaint the progress UI before blocking.
+            QApplication.processEvents()
             start = time.perf_counter()
 
             try:
