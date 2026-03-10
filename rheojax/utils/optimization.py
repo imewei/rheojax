@@ -1411,7 +1411,15 @@ def nlsq_optimize(
     # P2-Fit-2: Reuse residuals from NLSQ result when available (avoids an
     # extra objective evaluation that can be expensive for ODE models).
     x_opt = np.asarray(nlsq_result.get("x", x0), dtype=np.float64)
+    # NLSQ v0.6.10: 'fun' is the residual vector (array); 'fun_vector' and
+    # 'residuals' keys were removed.  Prefer the cached residual from the result
+    # dict to avoid an expensive extra objective evaluation (especially costly
+    # for ODE-based models).
     _cached_fun = nlsq_result.get("fun_vector", nlsq_result.get("residuals"))
+    if _cached_fun is None:
+        _fun_field = nlsq_result.get("fun")
+        if _fun_field is not None and np.asarray(_fun_field).ndim >= 1:
+            _cached_fun = _fun_field
     if _cached_fun is not None:
         residuals_raw = np.asarray(_cached_fun)
     else:
