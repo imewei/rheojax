@@ -784,6 +784,12 @@ class Pipeline:
         if _is_jax_array(y):
             y = np.array(y)
 
+        # PIPE-WARM-001: strip pipeline-level `warm_start` kwarg — it is consumed
+        # at the builder level and must not be forwarded to model.fit_bayesian(),
+        # which passes **nuts_kwargs straight to NUTS(). Passing warm_start=True
+        # to NUTS causes a TypeError.
+        bayesian_kwargs.pop("warm_start", None)
+
         # Auto-propagate metadata
         # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
         # values such as test_mode="" or deformation_mode="shear" (empty string).
