@@ -174,7 +174,21 @@ class OWChirp(BaseTransform):
             Wavelet coefficients (n_frequencies, n_times)
         """
         # TRANS-001: Compute dt once (invariant to freq, t_center)
-        # R11-OWC-003: Use median dt for robustness to non-uniform sampling
+        # R11-OWC-003: Use median dt for robustness to non-uniform sampling.
+        # Warn if spacing is non-uniform (>5% variation) — reduces CWT accuracy.
+        if len(t) > 1:
+            dt_arr = jnp.diff(t)
+            _dt_med = float(jnp.median(dt_arr))
+            _dt_std = float(jnp.std(dt_arr))
+            if _dt_med > 0 and (_dt_std / _dt_med) > 0.05:
+                import warnings as _warnings
+                _warnings.warn(
+                    f"OWChirp (vmap path): non-uniform time spacing detected "
+                    f"(std/median = {_dt_std / _dt_med:.2f}). "
+                    "Results may be inaccurate.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         dt = jnp.where(len(t) > 1, jnp.median(jnp.diff(t)), 1.0)
 
         # Vectorize over (freq, t_center) pairs using vmap
@@ -214,7 +228,19 @@ class OWChirp(BaseTransform):
             raise ValueError("Wavelet transform requires at least 2 time points")
         dt_arr = jnp.diff(t)
         dt = float(jnp.median(dt_arr))
-        # R11-OWC-001: Use median dt for robustness to non-uniform sampling
+        # R11-OWC-001: Use median dt for robustness to non-uniform sampling.
+        # Warn when spacing varies more than 5% — non-uniform dt reduces CWT accuracy.
+        dt_std = float(jnp.std(dt_arr))
+        if dt > 0 and (dt_std / dt) > 0.05:
+            import warnings as _warnings
+            _warnings.warn(
+                f"OWChirp: non-uniform time spacing detected "
+                f"(std/median = {dt_std / dt:.2f}). "
+                "FFT-based CWT assumes uniform dt — results may be inaccurate. "
+                "Interpolate to a uniform grid before transforming.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         coefficients_list = []
 
