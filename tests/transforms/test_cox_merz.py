@@ -100,3 +100,21 @@ class TestCoxMerz:
         transform = CoxMerz(tolerance=0.1)
         result, meta = transform.transform([osc, flow_stress])
         assert meta["cox_merz_result"].mean_deviation < 0.15
+
+    def test_zero_viscosity_no_nan(self):
+        """Zero viscosity values should not produce NaN/inf in log interpolation."""
+        omega = np.logspace(-1, 1, 20)
+        G_star = np.zeros(20, dtype=complex)  # G*=0 → η*=0
+        osc = RheoData(x=omega, y=G_star, metadata={"test_mode": "oscillation"})
+
+        gamma_dot = np.logspace(-1, 1, 20)
+        eta_steady = np.zeros(20)  # Zero viscosity
+        flow = RheoData(
+            x=gamma_dot,
+            y=eta_steady,
+            metadata={"test_mode": "flow_curve", "is_viscosity": True},
+        )
+        transform = CoxMerz(tolerance=0.5)
+        result, meta = transform.transform([osc, flow])
+        # Must not crash or produce NaN — deviation is finite
+        assert np.isfinite(meta["cox_merz_result"].mean_deviation)

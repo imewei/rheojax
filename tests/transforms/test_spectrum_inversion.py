@@ -131,3 +131,13 @@ class TestSpectrumInversionMaxEnt:
         transform = SpectrumInversion(method="unknown")
         with pytest.raises(ValueError, match="Unknown method"):
             transform.transform(data)
+
+    @pytest.mark.smoke
+    def test_n_tau_one_raises(self):
+        """n_tau=1 should raise ValueError (need >=2 for d(ln tau) bins)."""
+        omega = np.logspace(-2, 2, 50)
+        G_star = 1000.0 * (1j * omega) / (1.0 + 1j * omega)
+        data = RheoData(x=omega, y=G_star)
+        transform = SpectrumInversion(n_tau=1)
+        with pytest.raises(ValueError, match="n_tau must be >= 2"):
+            transform.transform(data)

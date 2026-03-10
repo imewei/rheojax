@@ -317,27 +317,36 @@ class BatchPanel(QWidget):
         elapsed:
             Elapsed time in seconds, displayed in the Time column.
         """
+        # Two-pass lookup: prefer exact full-path match (UserRole), fall back
+        # to basename only when no full-path match is found.  This prevents
+        # duplicate basenames (e.g. sub1/data.csv and sub2/data.csv) from
+        # updating the wrong row.
+        target_row = None
+        basename = os.path.basename(file_path)
         for row in range(self.file_table.rowCount()):
             item = self.file_table.item(row, _COL_FILENAME)
             if item is None:
                 continue
-            # Prefer exact full-path match (stored in UserRole) so that
-            # recursive globs with duplicate basenames update the correct row.
             stored_path = item.data(Qt.ItemDataRole.UserRole)
-            if stored_path == file_path or item.text() == os.path.basename(file_path):
-                status_item = QTableWidgetItem(status)
-                if status == _STATUS_DONE:
-                    status_item.setForeground(Qt.GlobalColor.darkGreen)
-                elif status == _STATUS_FAILED:
-                    status_item.setForeground(Qt.GlobalColor.red)
-                elif status == _STATUS_RUNNING:
-                    status_item.setForeground(Qt.GlobalColor.darkBlue)
-                self.file_table.setItem(row, _COL_STATUS, status_item)
-                if elapsed is not None:
-                    self.file_table.setItem(
-                        row, _COL_TIME, QTableWidgetItem(f"{elapsed:.2f}")
-                    )
+            if stored_path == file_path:
+                target_row = row
                 break
+            if target_row is None and item.text() == basename:
+                target_row = row  # tentative basename match; keep scanning
+
+        if target_row is not None:
+            status_item = QTableWidgetItem(status)
+            if status == _STATUS_DONE:
+                status_item.setForeground(Qt.GlobalColor.darkGreen)
+            elif status == _STATUS_FAILED:
+                status_item.setForeground(Qt.GlobalColor.red)
+            elif status == _STATUS_RUNNING:
+                status_item.setForeground(Qt.GlobalColor.darkBlue)
+            self.file_table.setItem(target_row, _COL_STATUS, status_item)
+            if elapsed is not None:
+                self.file_table.setItem(
+                    target_row, _COL_TIME, QTableWidgetItem(f"{elapsed:.2f}")
+                )
 
     def set_progress(self, current: int, total: int, message: str = "") -> None:
         """Update the progress bar and status label.

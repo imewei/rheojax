@@ -412,3 +412,23 @@ class TestPipelineSaving:
         pipeline = Pipeline()
         with pytest.raises(ValueError, match="No data to save"):
             pipeline.save("output.hdf5")
+
+
+class TestPipelineFitBayesian:
+    """Tests for Pipeline.fit_bayesian kwargs handling."""
+
+    @pytest.mark.smoke
+    def test_warm_start_stripped_before_model(self, sample_data):
+        """warm_start must not reach model.fit_bayesian (NUTS rejects it)."""
+        from unittest.mock import MagicMock, patch
+
+        pipeline = Pipeline(data=sample_data)
+        mock_model = MockModel()
+        mock_model.fit_bayesian = MagicMock(return_value=MagicMock())
+        pipeline._last_model = mock_model
+
+        pipeline.fit_bayesian(warm_start=True, seed=42)
+
+        mock_model.fit_bayesian.assert_called_once()
+        _, kwargs = mock_model.fit_bayesian.call_args
+        assert "warm_start" not in kwargs
