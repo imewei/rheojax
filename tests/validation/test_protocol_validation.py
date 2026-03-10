@@ -86,6 +86,10 @@ _KNOWN_SLOW_PREDICT = {
     ("itt_mct_schematic", "relaxation"),
     ("itt_mct_schematic", "laos"),
     ("sgr_conventional", "startup"),
+    # ML-IKH relaxation requires heavy Prony/Volterra ODE initialization (>120s)
+    ("ml_ikh", "relaxation"),
+    # HL flow_curve uses population-balance PDE solver that exceeds 120s in smoke
+    ("hebraud_lequeux", "flow_curve"),
 }
 
 
