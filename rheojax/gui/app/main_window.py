@@ -2707,9 +2707,12 @@ class RheoJAXMainWindow(QMainWindow):
 
         For each file, modifies the load step's config to point at the file,
         executes the full pipeline, and updates the BatchPanel status.
-        """
-        import time
 
+        The heavy JAX fitting work runs on a thread-pool thread so the Qt
+        event loop stays responsive.  A relay QObject with typed signals
+        routes per-file progress updates back to the main thread where the
+        BatchPanel widgets live.
+        """
         logger.info(
             "Batch execution started",
             directory=directory,
@@ -2719,9 +2722,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message(f"Batch: processing {len(file_paths)} files...", 0)
 
         try:
-            from rheojax.gui.services.pipeline_execution_service import (
-                PipelineExecutionService,
-            )
             from rheojax.gui.state.selectors import get_visual_pipeline_steps
 
             template_steps = get_visual_pipeline_steps()
@@ -2735,49 +2735,98 @@ class RheoJAXMainWindow(QMainWindow):
             batch_panel.finish_batch(0, len(file_paths))
             return
 
-        success_count = 0
-        total = len(file_paths)
+        # --- Relay for cross-thread progress updates --------------------------
+        from rheojax.gui.compat import QObject, QRunnable, QThreadPool
 
-        from rheojax.gui.compat import QApplication
+        class _BatchRelay(QObject):
+            # file_path, status, elapsed (negative means no elapsed)
+            file_status = Signal(str, str, float)
+            # current, total, message
+            progress = Signal(int, int, str)
+            # success_count, total_count
+            finished = Signal(int, int)
 
-        for i, fpath in enumerate(file_paths):
-            batch_panel.set_file_status(fpath, "RUNNING")
-            batch_panel.set_progress(i, total, f"Processing {Path(fpath).name}...")
-            # Allow the Qt event loop to repaint the progress UI before blocking.
-            QApplication.processEvents()
-            start = time.perf_counter()
+        relay = _BatchRelay()
+        relay.file_status.connect(
+            lambda fp, st, el: batch_panel.set_file_status(
+                fp, st, el if el >= 0 else None
+            ),
+            Qt.ConnectionType.QueuedConnection,
+        )
+        relay.progress.connect(
+            batch_panel.set_progress, Qt.ConnectionType.QueuedConnection,
+        )
 
-            try:
-                # Clone steps and patch the load step's file path.
+        def _on_batch_finished(success: int, total: int) -> None:
+            batch_panel.finish_batch(success, total)
+            self.status_bar.show_message(
+                f"Batch complete: {success}/{total} succeeded", 5000,
+            )
+            self.log(f"Batch complete: {success}/{total} files succeeded")
+            self._active_relays.discard(relay)
+
+        relay.finished.connect(
+            _on_batch_finished, Qt.ConnectionType.QueuedConnection,
+        )
+
+        # Prevent premature GC — same pattern as _on_run_all.
+        self._active_relays.add(relay)
+
+        # Capture closures for the worker thread.
+        _steps = template_steps
+        _files = file_paths
+        _relay = relay
+
+        class _BatchWorker(QRunnable):
+            def run(self) -> None:  # type: ignore[override]
+                import time
                 from dataclasses import replace as dc_replace
 
-                run_steps = []
-                for step in template_steps:
-                    if step.step_type == "load":
-                        patched_config = {**step.config, "file": fpath}
-                        run_steps.append(dc_replace(step, config=patched_config))
-                    else:
-                        run_steps.append(step)
-
-                service = PipelineExecutionService(self)
-                service.execute_all(run_steps)
-                elapsed = time.perf_counter() - start
-                batch_panel.set_file_status(fpath, "DONE", elapsed)
-                success_count += 1
-            except Exception as exc:
-                elapsed = time.perf_counter() - start
-                batch_panel.set_file_status(fpath, "FAILED", elapsed)
-                logger.warning(
-                    "Batch file failed",
-                    file=fpath,
-                    error=str(exc),
+                from rheojax.gui.services.pipeline_execution_service import (
+                    PipelineExecutionService,
                 )
 
-        batch_panel.finish_batch(success_count, total)
-        self.status_bar.show_message(
-            f"Batch complete: {success_count}/{total} succeeded", 5000,
-        )
-        self.log(f"Batch complete: {success_count}/{total} files succeeded")
+                success_count = 0
+                total = len(_files)
+
+                for i, fpath in enumerate(_files):
+                    _relay.file_status.emit(fpath, "RUNNING", -1.0)
+                    _relay.progress.emit(
+                        i, total, f"Processing {Path(fpath).name}..."
+                    )
+                    start = time.perf_counter()
+
+                    try:
+                        run_steps = []
+                        for step in _steps:
+                            if step.step_type == "load":
+                                patched = {**step.config, "file": fpath}
+                                run_steps.append(
+                                    dc_replace(step, config=patched)
+                                )
+                            else:
+                                run_steps.append(step)
+
+                        # parent=None: worker thread cannot parent to main-thread widget.
+                        service = PipelineExecutionService(None)
+                        service.execute_all(run_steps)
+                        elapsed = time.perf_counter() - start
+                        _relay.file_status.emit(fpath, "DONE", elapsed)
+                        success_count += 1
+                    except Exception as exc:
+                        elapsed = time.perf_counter() - start
+                        _relay.file_status.emit(fpath, "FAILED", elapsed)
+                        logger.warning(
+                            "Batch file failed",
+                            file=fpath,
+                            error=str(exc),
+                        )
+
+                _relay.finished.emit(success_count, total)
+
+        worker = _BatchWorker()
+        worker.setAutoDelete(True)
+        QThreadPool.globalInstance().start(worker)
 
     @Slot()
     def _on_compare_models(self) -> None:
