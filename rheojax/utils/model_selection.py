@@ -106,7 +106,8 @@ def build_fit_result(
     # ------------------------------------------------------------------
     if test_mode is None:
         # Try the attribute stored by BaseModel.fit()
-        test_mode = str(getattr(model, "_test_mode", None) or "") or None
+        _raw_tm = getattr(model, "_test_mode", None)
+        test_mode = str(_raw_tm) if _raw_tm is not None else None
 
     # ------------------------------------------------------------------
     # Extract parameter values and units

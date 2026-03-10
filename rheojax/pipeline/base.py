@@ -785,13 +785,21 @@ class Pipeline:
             y = np.array(y)
 
         # Auto-propagate metadata
+        # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
+        # values such as test_mode="" or deformation_mode="shear" (empty string).
         _meta = getattr(self.data, "metadata", None) or {}
-        if "test_mode" not in bayesian_kwargs and _meta.get("test_mode"):
-            bayesian_kwargs["test_mode"] = _meta["test_mode"]
-        if "deformation_mode" not in bayesian_kwargs and _meta.get("deformation_mode"):
-            bayesian_kwargs["deformation_mode"] = _meta["deformation_mode"]
-        if "poisson_ratio" not in bayesian_kwargs and _meta.get("poisson_ratio"):
-            bayesian_kwargs["poisson_ratio"] = _meta["poisson_ratio"]
+        if "test_mode" not in bayesian_kwargs:
+            _tm = _meta.get("test_mode")
+            if _tm is not None:
+                bayesian_kwargs["test_mode"] = _tm
+        if "deformation_mode" not in bayesian_kwargs:
+            _dm = _meta.get("deformation_mode")
+            if _dm is not None:
+                bayesian_kwargs["deformation_mode"] = _dm
+        if "poisson_ratio" not in bayesian_kwargs:
+            _pr = _meta.get("poisson_ratio")
+            if _pr is not None:
+                bayesian_kwargs["poisson_ratio"] = _pr
 
         if seed is not None:
             bayesian_kwargs["seed"] = seed
@@ -1217,13 +1225,21 @@ class Pipeline:
             y = np.array(y)
 
         # Auto-propagate metadata
+        # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
+        # values such as test_mode="" or deformation_mode="shear".
         _meta = getattr(self.data, "metadata", None) or {}
-        if "test_mode" not in fit_kwargs and _meta.get("test_mode"):
-            fit_kwargs["test_mode"] = _meta["test_mode"]
-        if "deformation_mode" not in fit_kwargs and _meta.get("deformation_mode"):
-            fit_kwargs["deformation_mode"] = _meta["deformation_mode"]
-        if "poisson_ratio" not in fit_kwargs and _meta.get("poisson_ratio"):
-            fit_kwargs["poisson_ratio"] = _meta["poisson_ratio"]
+        if "test_mode" not in fit_kwargs:
+            _tm = _meta.get("test_mode")
+            if _tm is not None:
+                fit_kwargs["test_mode"] = _tm
+        if "deformation_mode" not in fit_kwargs:
+            _dm = _meta.get("deformation_mode")
+            if _dm is not None:
+                fit_kwargs["deformation_mode"] = _dm
+        if "poisson_ratio" not in fit_kwargs:
+            _pr = _meta.get("poisson_ratio")
+            if _pr is not None:
+                fit_kwargs["poisson_ratio"] = _pr
 
         test_mode = fit_kwargs.pop("test_mode", None)
 

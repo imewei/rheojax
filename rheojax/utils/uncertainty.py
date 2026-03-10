@@ -224,7 +224,7 @@ def hessian_ci(
     # ------------------------------------------------------------------
     if pcov is None:
         logger.debug("NLSQ pcov not available — computing JAX Hessian")
-        resolved_test_mode = test_mode or getattr(model, "_test_mode", None)
+        resolved_test_mode = test_mode if test_mode is not None else getattr(model, "_test_mode", None)
 
         y_arr = np.asarray(y)
         is_complex = np.iscomplexobj(y_arr)
@@ -476,7 +476,7 @@ def bootstrap_ci(
     n_params = len(param_names)
     n_obs = _n_obs(np.asarray(y))
 
-    resolved_test_mode: str | None = test_mode or getattr(model, "_test_mode", None)
+    resolved_test_mode: str | None = test_mode if test_mode is not None else getattr(model, "_test_mode", None)
 
     logger.info(
         "bootstrap_ci started",
