@@ -317,10 +317,14 @@ class BatchPanel(QWidget):
         elapsed:
             Elapsed time in seconds, displayed in the Time column.
         """
-        filename = os.path.basename(file_path)
         for row in range(self.file_table.rowCount()):
             item = self.file_table.item(row, _COL_FILENAME)
-            if item and item.text() == filename:
+            if item is None:
+                continue
+            # Prefer exact full-path match (stored in UserRole) so that
+            # recursive globs with duplicate basenames update the correct row.
+            stored_path = item.data(Qt.ItemDataRole.UserRole)
+            if stored_path == file_path or item.text() == os.path.basename(file_path):
                 status_item = QTableWidgetItem(status)
                 if status == _STATUS_DONE:
                     status_item.setForeground(Qt.GlobalColor.darkGreen)
@@ -386,9 +390,14 @@ class BatchPanel(QWidget):
         for path in file_paths:
             row = self.file_table.rowCount()
             self.file_table.insertRow(row)
-            self.file_table.setItem(
-                row, _COL_FILENAME, QTableWidgetItem(os.path.basename(path))
-            )
+            name_item = QTableWidgetItem(os.path.basename(path))
+            # Store the full path as tooltip so set_file_status can match
+            # unambiguously when two files share the same basename (e.g.
+            # sub-dir scans with a recursive glob pattern).
+            name_item.setToolTip(path)
+            # UserRole stores the full absolute path for O(n) exact matching.
+            name_item.setData(Qt.ItemDataRole.UserRole, path)
+            self.file_table.setItem(row, _COL_FILENAME, name_item)
             self.file_table.setItem(
                 row, _COL_STATUS, QTableWidgetItem(_STATUS_PENDING)
             )
