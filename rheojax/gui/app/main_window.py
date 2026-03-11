@@ -295,6 +295,9 @@ class RheoJAXMainWindow(QMainWindow):
         # GUI-009: auto-navigate when a new step is added so the workspace
         # immediately shows the correct page for the newly created step.
         self.sidebar.step_added.connect(self._on_sidebar_step_selected)
+        # GUI-016: auto-populate step config from current page selections
+        # when a new step is added (model name, transform name, etc.)
+        self.sidebar.step_added.connect(self._auto_populate_step_config)
 
         # Dataset tree selection
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
@@ -307,6 +310,10 @@ class RheoJAXMainWindow(QMainWindow):
         # Transform page callbacks
         self.transform_page.transform_applied.connect(
             self._on_transform_applied_from_page
+        )
+        # GUI-016: sync pipeline step config when user browses transforms
+        self.transform_page.transform_selected.connect(
+            lambda _name: self._sync_transform_step_config()
         )
 
         # Fit page requests (run through centralized job pipeline)
@@ -344,6 +351,10 @@ class RheoJAXMainWindow(QMainWindow):
         )
         signals.dataset_added.connect(self._on_dataset_added)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
+
+        # GUI-016: keep selected pipeline step config in sync with page changes
+        signals.model_selected.connect(self._sync_fit_step_config)
+        signals.model_params_changed.connect(self._sync_fit_step_config)
 
     def _init_worker_pool(self) -> None:
         """Create and connect WorkerPool if PySide6 is available."""
@@ -1289,6 +1300,97 @@ class RheoJAXMainWindow(QMainWindow):
         page_name = _step_type_to_page.get(step_type, step_type)
         self.navigate_to(page_name)
 
+    @Slot(str)
+    def _auto_populate_step_config(self, step_id: str) -> None:
+        """Auto-populate a newly-added pipeline step's config from current UI state.
+
+        Called when a step is added via the sidebar.  Reads the current model
+        selection (FitPage), transform selection (TransformPage), active dataset
+        file path (DataPage), and Bayesian settings (BayesianPage) to fill the
+        step's config dict so that pipeline execution has the required keys.
+
+        Parameters
+        ----------
+        step_id : str
+            UUID of the newly-added step.
+        """
+        try:
+            from rheojax.gui.state import selectors
+            from rheojax.gui.state.actions import update_step_config
+
+            step = selectors.get_pipeline_step_by_id(step_id)
+            if step is None:
+                return
+
+            config: dict[str, Any] = {}
+
+            if step.step_type == "load":
+                dataset = self.store.get_active_dataset()
+                if dataset and dataset.file_path:
+                    config["file"] = str(dataset.file_path)
+                    if dataset.test_mode:
+                        config["test_mode"] = dataset.test_mode
+
+            elif step.step_type == "transform":
+                tp = self.transform_page
+                if tp._selected_key:
+                    config["name"] = tp._selected_key
+                    params = tp.get_selected_params()
+                    config.update(params)
+
+            elif step.step_type == "fit":
+                state = self.store.get_state()
+                if state.active_model_name:
+                    config["model"] = state.active_model_name
+                if state.model_params:
+                    config["params"] = {
+                        name: p.value for name, p in state.model_params.items()
+                    }
+                # Include test mode and deformation mode
+                test_mode = getattr(state, "test_mode", None)
+                if test_mode:
+                    config["test_mode"] = test_mode
+                dm = getattr(state, "deformation_mode", None)
+                if dm:
+                    config["deformation_mode"] = dm
+                pr = getattr(state, "poisson_ratio", None)
+                if pr is not None:
+                    config["poisson_ratio"] = pr
+
+            elif step.step_type == "bayesian":
+                state = self.store.get_state()
+                if state.active_model_name:
+                    config["model"] = state.active_model_name
+                # Pull Bayesian settings from the BayesianPage if available
+                try:
+                    bp = self.bayesian_page
+                    if hasattr(bp, "_sampler_combo"):
+                        config.setdefault("num_warmup", 1000)
+                        config.setdefault("num_samples", 2000)
+                        config.setdefault("num_chains", 4)
+                except Exception:
+                    pass
+
+            elif step.step_type == "export":
+                config["format"] = "directory"
+                config["output"] = "results/"
+
+            if config:
+                update_step_config(step_id, config)
+                logger.debug(
+                    "Auto-populated step config",
+                    step_id=step_id,
+                    step_type=step.step_type,
+                    config_keys=list(config.keys()),
+                )
+
+        except Exception:
+            logger.debug(
+                "Could not auto-populate step config",
+                step_id=step_id,
+                exc_info=True,
+            )
+
     @Slot()
     def _on_new_pipeline(self) -> None:
         """Clear the current visual pipeline state."""
@@ -1298,6 +1400,60 @@ class RheoJAXMainWindow(QMainWindow):
         clear_pipeline()
         self.log("Pipeline cleared")
         self.status_bar.show_message("New pipeline created", 2000)
+
+    @Slot(str)
+    def _sync_fit_step_config(self, _model_name: str = "") -> None:
+        """Update the selected pipeline step's config when model selection changes.
+
+        Called when model_selected or model_params_changed signals fire.
+        Only acts if the currently-selected pipeline step is a 'fit' or
+        'bayesian' step.
+        """
+        try:
+            from rheojax.gui.state import selectors
+            from rheojax.gui.state.actions import update_step_config
+
+            step = selectors.get_selected_pipeline_step()
+            if step is None or step.step_type not in ("fit", "bayesian"):
+                return
+
+            state = self.store.get_state()
+            config: dict[str, Any] = {}
+            if state.active_model_name:
+                config["model"] = state.active_model_name
+            if state.model_params:
+                config["params"] = {
+                    name: p.value for name, p in state.model_params.items()
+                }
+
+            if config:
+                update_step_config(step.id, config)
+        except Exception:
+            logger.debug("Could not sync fit step config", exc_info=True)
+
+    def _sync_transform_step_config(self) -> None:
+        """Update the selected pipeline step's config when transform selection changes.
+
+        Called from TransformPage transform_selected signal.
+        Only acts if the currently-selected pipeline step is a 'transform' step.
+        """
+        try:
+            from rheojax.gui.state import selectors
+            from rheojax.gui.state.actions import update_step_config
+
+            step = selectors.get_selected_pipeline_step()
+            if step is None or step.step_type != "transform":
+                return
+
+            tp = self.transform_page
+            if not tp._selected_key:
+                return
+
+            config: dict[str, Any] = {"name": tp._selected_key}
+            config.update(tp.get_selected_params())
+            update_step_config(step.id, config)
+        except Exception:
+            logger.debug("Could not sync transform step config", exc_info=True)
 
     @Slot()
     def _on_open_pipeline(self) -> None:
@@ -2351,17 +2507,29 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_transform_applied_from_page(
         self, transform_name: str, dataset_id: str
     ) -> None:
-        """Handle transform requests originating from TransformPage."""
-        name_map = {
-            "fft": "fft",
-            "mastercurve": "mastercurve",
-            "srfs": "srfs",
-            "mutation number": "mutation_number",
-            "ow chirp": "owchirp",
-            "derivatives": "derivative",
-            "spp analysis": "spp",
-        }
-        transform_id = name_map.get(transform_name.lower(), transform_name.lower())
+        """Handle transform requests originating from TransformPage.
+
+        Uses TransformPage._selected_key (internal key like "owchirp") when
+        available, falling back to a display-name → key map for robustness.
+        """
+        # Prefer the internal key stored on the TransformPage — it is set
+        # when the user clicks a sidebar item and is always a valid
+        # TransformService key (e.g. "owchirp", "spp", "derivative").
+        transform_id: str = getattr(self.transform_page, "_selected_key", "") or ""
+        if not transform_id:
+            # Fallback: build map from TransformService metadata so it stays
+            # in sync with TransformService.get_transform_metadata() rather
+            # than a hardcoded dict that drifts when transforms are added.
+            _display_to_key: dict[str, str] = {}
+            try:
+                for meta in self.transform_page.get_available_transforms():
+                    _display_to_key[meta["name"].lower()] = meta["key"]
+            except Exception:
+                pass
+            transform_id = _display_to_key.get(
+                transform_name.lower(), transform_name.lower()
+            )
+
         params = self.transform_page.get_selected_params()
         # Activate selected dataset
         self.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": dataset_id})

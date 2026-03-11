@@ -299,13 +299,59 @@ class FitPage(QWidget):
         )
 
     def _populate_quick_model_selector(self, models: dict[str, list[str]]) -> None:
-        """Populate quick model selector with available models."""
+        """Populate quick model selector with models grouped by family.
+
+        Categories are shown as disabled separator items so the user can
+        visually scan by family without the flat-list problem.
+        """
         self._quick_model_combo.blockSignals(True)
         self._quick_model_combo.clear()
         self._quick_model_combo.addItem("Select model...", None)
-        for category in models.values():
-            for model_name in category:
-                self._quick_model_combo.addItem(model_name, model_name)
+
+        # Human-readable family labels
+        _family_labels = {
+            "classical": "Classical",
+            "flow": "Flow",
+            "fractional_maxwell": "Fractional Maxwell",
+            "fractional_zener": "Fractional Zener",
+            "fractional_advanced": "Fractional Advanced",
+            "multi_mode": "Multi-Mode",
+            "sgr": "SGR",
+            "stz": "STZ",
+            "epm": "EPM",
+            "fluidity": "Fluidity",
+            "fluidity_saramito": "Fluidity-Saramito",
+            "ikh": "IKH",
+            "fikh": "FIKH",
+            "hl": "Hebraud-Lequeux",
+            "spp_laos": "SPP/LAOS",
+            "giesekus": "Giesekus",
+            "dmt": "DMT",
+            "itt_mct": "ITT-MCT",
+            "tnt": "TNT",
+            "vlb": "VLB",
+            "hvm": "HVM",
+            "hvnm": "HVNM",
+        }
+
+        for family_key, model_names in models.items():
+            if not model_names:
+                continue
+            # Add a non-selectable category header
+            label = _family_labels.get(family_key, family_key.replace("_", " ").title())
+            header_text = f"── {label} ──"
+            self._quick_model_combo.addItem(header_text, None)
+            idx = self._quick_model_combo.count() - 1
+            # Make the header item non-selectable
+            model = self._quick_model_combo.model()
+            if model is not None:
+                item = model.item(idx)
+                if item is not None:
+                    item.setEnabled(False)
+
+            for model_name in model_names:
+                self._quick_model_combo.addItem(f"  {model_name}", model_name)
+
         self._quick_model_combo.blockSignals(False)
 
     def _apply_model_selection(self, model_name: str, dispatch: bool) -> None:
