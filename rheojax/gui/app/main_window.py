@@ -1365,9 +1365,9 @@ class RheoJAXMainWindow(QMainWindow):
                 try:
                     bp = self.bayesian_page
                     if hasattr(bp, "_sampler_combo"):
-                        config.setdefault("num_warmup", 1000)
-                        config.setdefault("num_samples", 2000)
-                        config.setdefault("num_chains", 4)
+                        config["num_warmup"] = 1000
+                        config["num_samples"] = 2000
+                        config["num_chains"] = 4
                 except Exception:
                     pass
 
