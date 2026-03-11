@@ -521,8 +521,15 @@ class PipelineExecutionService(QObject):
         _resolve_dmta_kwargs(extra_kwargs, data)
         if "test_mode" not in extra_kwargs:
             _tm: str | None = None
+            # Fallback 1: data metadata (set by loader or prior fit).
             if hasattr(data, "metadata") and data.metadata:
                 _tm = data.metadata.get("test_mode")
+            # Fallback 2: prior fit result's cached kwargs (covers cases
+            # where fit set test_mode but metadata was not updated).
+            if _tm is None and fit_result is not None:
+                _last_kw = getattr(fit_result, "_last_fit_kwargs", None)
+                if isinstance(_last_kw, dict):
+                    _tm = _last_kw.get("test_mode")
             if _tm is not None:
                 extra_kwargs["test_mode"] = _tm
 
@@ -546,6 +553,7 @@ class PipelineExecutionService(QObject):
         )
 
         context["bayesian_result"] = result
+        context.setdefault("model_name", model_name)
         return result
 
     def _execute_export(self, config: dict, context: dict) -> Any:

@@ -287,7 +287,7 @@ class TestFromYaml:
             from_yaml(yaml_str)
 
     def test_absolute_path_rejected(self):
-        """from_yaml must reject absolute file paths via schema validation."""
+        """from_yaml must reject absolute file paths in strict mode."""
         yaml_str = (
             "version: '1'\n"
             "name: Bad\n"
@@ -296,7 +296,21 @@ class TestFromYaml:
             "    file: /etc/passwd\n"
         )
         with pytest.raises(ValueError, match="absolute"):
-            from_yaml(yaml_str)
+            from_yaml(yaml_str, strict=True)
+
+    def test_absolute_path_warned_in_non_strict_mode(self):
+        """from_yaml warns but accepts absolute paths in non-strict (GUI) mode."""
+        yaml_str = (
+            "version: '1'\n"
+            "name: GUI draft\n"
+            "steps:\n"
+            "  - type: load\n"
+            "    file: /Users/data/sample.csv\n"
+        )
+        # Should not raise — GUI file picker returns absolute paths.
+        steps, name = from_yaml(yaml_str, strict=False)
+        assert len(steps) == 1
+        assert steps[0].config["file"] == "/Users/data/sample.csv"
 
     def test_path_traversal_rejected(self):
         """from_yaml must reject path traversal via schema validation."""

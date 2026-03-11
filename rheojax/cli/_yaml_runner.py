@@ -235,10 +235,26 @@ def _coerce_value(raw: str) -> Any:
 _STEP_ALLOWED_KEYS: dict[str, set[str]] = {
     "load": {"file", "format", "x_col", "y_col", "y_cols", "test_mode", "deformation_mode", "poisson_ratio"},
     "fit": {"model", "method", "max_iter", "test_mode", "deformation_mode", "poisson_ratio", "use_jax", "params"},
-    "bayesian": {"num_warmup", "num_samples", "num_chains", "seed", "warm_start", "target_accept_prob", "test_mode"},
+    "bayesian": {"num_warmup", "num_samples", "num_chains", "seed", "warm_start", "target_accept_prob", "test_mode", "deformation_mode", "poisson_ratio"},
     "export": {"output", "format"},
     # "transform" is intentionally absent — open kwargs by design.
 }
+
+# Structural invariant: every key that can be populated via config.defaults
+# (_STEP_ALLOWED_DEFAULTS) must also be accepted as a CLI override
+# (_STEP_ALLOWED_KEYS).  Violation means an override silently drops a key
+# that defaults-merging would accept.
+for _step_type, _default_keys in _STEP_ALLOWED_DEFAULTS.items():
+    _override_keys = _STEP_ALLOWED_KEYS.get(_step_type)
+    if _override_keys is None:
+        continue  # "transform" — open kwargs, no allowlist
+    _missing = _default_keys - _override_keys
+    if _missing:
+        raise AssertionError(
+            f"_STEP_ALLOWED_DEFAULTS['{_step_type}'] has keys {_missing} "
+            f"not present in _STEP_ALLOWED_KEYS['{_step_type}']. "
+            f"Add them to _STEP_ALLOWED_KEYS to prevent silent override drops."
+        )
 
 
 def _nested_set(target: dict[str, Any], keys: list[str], value: Any) -> None:

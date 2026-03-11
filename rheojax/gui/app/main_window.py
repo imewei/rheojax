@@ -1478,6 +1478,9 @@ class RheoJAXMainWindow(QMainWindow):
                 context["model_name"] = prior.config.get("model", "")
             elif prior.step_type == "bayesian":
                 context["bayesian_result"] = cached
+                # Recover model_name from prior Bayesian step config.
+                if not context.get("model_name"):
+                    context["model_name"] = prior.config.get("model", "")
             elif prior.step_type == "export":
                 context["export_path"] = cached
 

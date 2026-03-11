@@ -284,9 +284,13 @@ def from_yaml(
                     continue
                 p = _Path(value)
                 # Absolute paths are legitimate in GUI context (file-picker
-                # returns them).  Warn for observability but do not reject —
-                # matches PipelineExecutionService behaviour.
+                # returns them) but rejected in strict mode (CLI-compatible).
                 if p.is_absolute():
+                    if strict:
+                        raise ValueError(
+                            f"Step {i + 1}: '{key}' must not be an absolute "
+                            f"path, got '{value}'."
+                        )
                     logger.warning(
                         "Step %d: '%s' is an absolute path (CLI validator "
                         "would reject this)",
