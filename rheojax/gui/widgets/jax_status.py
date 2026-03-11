@@ -3,11 +3,11 @@ JAX Status Widget
 ================
 
 GPU/device status indicator with memory monitoring.
+Uses the RheoJAX design token system for consistent theming.
 """
 
 from rheojax.gui.compat import (
     QComboBox,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -16,7 +16,12 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import (
+    BorderRadius,
+    Spacing,
+    Typography,
+    themed,
+)
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +35,7 @@ class JAXStatusWidget(QWidget):
         - Memory bar (used/total)
         - Float64 indicator
         - JIT cache count
-        - Compact horizontal layout
+        - Compact horizontal layout with themed status badges
 
     Signals
     -------
@@ -58,93 +63,104 @@ class JAXStatusWidget(QWidget):
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
 
-        # Main horizontal layout
+        # Main horizontal layout — no separators, just spacing
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(
-            Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD
+            Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM
         )
-        main_layout.setSpacing(Spacing.LG)
+        main_layout.setSpacing(Spacing.XL)
 
-        # Device selector
+        # Shared label style
+        label_style = f"""
+            font-family: {Typography.FONT_FAMILY};
+            font-weight: {Typography.WEIGHT_SEMIBOLD};
+            font-size: {Typography.SIZE_XS}pt;
+            color: {themed('TEXT_MUTED')};
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        """
+
+        # --- Device selector ---
         device_layout = QVBoxLayout()
-        device_layout.setSpacing(2)
-        device_label = QLabel("Device:")
-        device_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        device_layout.setSpacing(Spacing.XXS)
+        device_label = QLabel("Device")
+        device_label.setStyleSheet(label_style)
         self._device_combo = QComboBox()
-        self._device_combo.setMinimumWidth(100)
+        self._device_combo.setMinimumWidth(110)
+        self._device_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: {themed('BG_SURFACE')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
+                border-radius: {BorderRadius.MD}px;
+                padding: {Spacing.XXS}px {Spacing.SM}px;
+                font-family: {Typography.FONT_FAMILY_MONO};
+                font-size: {Typography.SIZE_SM}pt;
+                color: {themed('TEXT_PRIMARY')};
+            }}
+            QComboBox:hover {{
+                border-color: {themed('BORDER_DEFAULT')};
+            }}
+            QComboBox:focus {{
+                border-color: {themed('BORDER_FOCUS')};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 20px;
+            }}
+        """)
         self._device_combo.currentTextChanged.connect(self._on_device_changed)
         device_layout.addWidget(device_label)
         device_layout.addWidget(self._device_combo)
         main_layout.addLayout(device_layout)
 
-        # Separator
-        sep1 = QFrame()
-        sep1.setFrameShape(QFrame.VLine)
-        sep1.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(sep1)
-
-        # Memory usage
+        # --- Memory usage ---
         memory_layout = QVBoxLayout()
-        memory_layout.setSpacing(2)
-        memory_label = QLabel("Memory:")
-        memory_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        memory_layout.setSpacing(Spacing.XXS)
+        memory_label = QLabel("Memory")
+        memory_label.setStyleSheet(label_style)
         self._memory_bar = QProgressBar()
-        self._memory_bar.setMinimumWidth(120)
-        self._memory_bar.setMaximumHeight(18)
+        self._memory_bar.setMinimumWidth(130)
+        self._memory_bar.setMaximumHeight(20)
         self._memory_bar.setTextVisible(True)
         self._memory_bar.setFormat("%v MB / %m MB")
+        self._set_memory_bar_style("normal")
         memory_layout.addWidget(memory_label)
         memory_layout.addWidget(self._memory_bar)
         main_layout.addLayout(memory_layout)
 
-        # Separator
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.VLine)
-        sep2.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(sep2)
-
-        # Float64 indicator
+        # --- Float64 indicator ---
         float64_layout = QVBoxLayout()
-        float64_layout.setSpacing(2)
-        float64_label = QLabel("Float64:")
-        float64_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        float64_layout.setSpacing(Spacing.XXS)
+        float64_label = QLabel("Float64")
+        float64_label.setStyleSheet(label_style)
         self._float64_indicator = QLabel("Unknown")
         self._float64_indicator.setAlignment(Qt.AlignCenter)
-        self._float64_indicator.setStyleSheet(
-            "padding: 3px 10px; border-radius: 3px; background-color: #e0e0e0;"
-        )
+        self._float64_indicator.setMinimumWidth(72)
+        self._set_badge_style(self._float64_indicator, "pending")
         float64_layout.addWidget(float64_label)
         float64_layout.addWidget(self._float64_indicator)
         main_layout.addLayout(float64_layout)
 
-        # Separator
-        sep3 = QFrame()
-        sep3.setFrameShape(QFrame.VLine)
-        sep3.setFrameShadow(QFrame.Sunken)
-        main_layout.addWidget(sep3)
-
-        # JIT cache count
+        # --- JIT cache count ---
         jit_layout = QVBoxLayout()
-        jit_layout.setSpacing(2)
-        jit_label = QLabel("JIT Cache:")
-        jit_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        jit_layout.setSpacing(Spacing.XXS)
+        jit_label = QLabel("JIT Cache")
+        jit_label.setStyleSheet(label_style)
         self._jit_count_label = QLabel("0")
         self._jit_count_label.setAlignment(Qt.AlignCenter)
-        self._jit_count_label.setStyleSheet("font-size: 10pt;")
+        self._jit_count_label.setMinimumWidth(48)
         jit_layout.addWidget(jit_label)
         jit_layout.addWidget(self._jit_count_label)
         main_layout.addLayout(jit_layout)
 
-        # Compiling indicator
+        # --- Compiling indicator ---
         compile_layout = QVBoxLayout()
-        compile_layout.setSpacing(2)
-        compile_label = QLabel("Compiling:")
-        compile_label.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        compile_layout.setSpacing(Spacing.XXS)
+        compile_label = QLabel("Status")
+        compile_label.setStyleSheet(label_style)
         self._compile_indicator = QLabel("Idle")
         self._compile_indicator.setAlignment(Qt.AlignCenter)
-        self._compile_indicator.setStyleSheet(
-            "padding: 3px 10px; border-radius: 3px; background-color: #e0e0e0;"
-        )
+        self._compile_indicator.setMinimumWidth(80)
         compile_layout.addWidget(compile_label)
         compile_layout.addWidget(self._compile_indicator)
         main_layout.addLayout(compile_layout)
@@ -156,6 +172,75 @@ class JAXStatusWidget(QWidget):
         self.update_jit_cache(0)
         self.set_compiling(False)
         logger.debug("Initialization complete", class_name=self.__class__.__name__)
+
+    # ------------------------------------------------------------------
+    # Styling helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _set_badge_style(label: QLabel, status: str) -> None:
+        """Apply themed badge styling to a QLabel.
+
+        Parameters
+        ----------
+        label : QLabel
+            Target label widget
+        status : str
+            One of: success, warning, error, pending
+        """
+        status_map = {
+            "success": (themed("SUCCESS"), themed("SUCCESS_LIGHT")),
+            "warning": (themed("WARNING"), themed("WARNING_LIGHT")),
+            "error": (themed("ERROR"), themed("ERROR_LIGHT")),
+            "pending": (themed("TEXT_MUTED"), themed("BG_HOVER")),
+        }
+        fg, bg = status_map.get(status, status_map["pending"])
+        label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg};
+                color: {fg};
+                border-radius: {BorderRadius.SM}px;
+                padding: {Spacing.XXS}px {Spacing.SM}px;
+                font-family: {Typography.FONT_FAMILY};
+                font-size: {Typography.SIZE_SM}pt;
+                font-weight: {Typography.WEIGHT_SEMIBOLD};
+            }}
+        """)
+
+    def _set_memory_bar_style(self, level: str) -> None:
+        """Apply themed styling to the memory progress bar.
+
+        Parameters
+        ----------
+        level : str
+            One of: normal, warning, critical
+        """
+        chunk_colors = {
+            "normal": themed("SUCCESS"),
+            "warning": themed("WARNING"),
+            "critical": themed("ERROR"),
+        }
+        chunk_color = chunk_colors.get(level, themed("SUCCESS"))
+
+        self._memory_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {themed('BG_HOVER')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
+                border-radius: {BorderRadius.SM}px;
+                text-align: center;
+                font-family: {Typography.FONT_FAMILY_MONO};
+                font-size: {Typography.SIZE_XS}pt;
+                color: {themed('TEXT_SECONDARY')};
+            }}
+            QProgressBar::chunk {{
+                background-color: {chunk_color};
+                border-radius: {BorderRadius.SM - 1}px;
+            }}
+        """)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def update_device_list(self, devices: list[str]) -> None:
         """Update the list of available devices.
@@ -233,43 +318,13 @@ class JAXStatusWidget(QWidget):
         self._memory_bar.setMaximum(total)
         self._memory_bar.setValue(used)
 
-        # Color based on usage
-        if used / total > 0.9:
-            # Red for >90% usage
-            self._memory_bar.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #ccc;
-                    border-radius: 3px;
-                    text-align: center;
-                }
-                QProgressBar::chunk {
-                    background-color: #F44336;
-                }
-            """)
-        elif used / total > 0.7:
-            # Orange for >70% usage
-            self._memory_bar.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #ccc;
-                    border-radius: 3px;
-                    text-align: center;
-                }
-                QProgressBar::chunk {
-                    background-color: #FF9800;
-                }
-            """)
+        # Color based on usage level
+        if total > 0 and used / total > 0.9:
+            self._set_memory_bar_style("critical")
+        elif total > 0 and used / total > 0.7:
+            self._set_memory_bar_style("warning")
         else:
-            # Green for normal usage
-            self._memory_bar.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #ccc;
-                    border-radius: 3px;
-                    text-align: center;
-                }
-                QProgressBar::chunk {
-                    background-color: #4CAF50;
-                }
-            """)
+            self._set_memory_bar_style("normal")
 
     def set_float64_enabled(self, enabled: bool) -> None:
         """Set float64 enabled indicator.
@@ -287,16 +342,10 @@ class JAXStatusWidget(QWidget):
         )
         if enabled:
             self._float64_indicator.setText("Enabled")
-            self._float64_indicator.setStyleSheet(
-                "padding: 3px 10px; border-radius: 3px; "
-                "background-color: #4CAF50; color: white; font-weight: bold;"
-            )
+            self._set_badge_style(self._float64_indicator, "success")
         else:
             self._float64_indicator.setText("Disabled")
-            self._float64_indicator.setStyleSheet(
-                "padding: 3px 10px; border-radius: 3px; "
-                "background-color: #F44336; color: white; font-weight: bold;"
-            )
+            self._set_badge_style(self._float64_indicator, "error")
 
     def update_jit_cache(self, count: int) -> None:
         """Update JIT cache count.
@@ -314,17 +363,28 @@ class JAXStatusWidget(QWidget):
         )
         self._jit_count_label.setText(str(count))
 
-        # Color based on count
+        # Style based on count
         if count > 100:
-            color = "#FF9800"  # Orange for many cached functions
+            fg = themed("WARNING")
+            bg = themed("WARNING_LIGHT")
         elif count > 0:
-            color = "#4CAF50"  # Green for normal
+            fg = themed("PRIMARY")
+            bg = themed("PRIMARY_SUBTLE")
         else:
-            color = "#666666"  # Gray for zero
+            fg = themed("TEXT_MUTED")
+            bg = themed("BG_HOVER")
 
-        self._jit_count_label.setStyleSheet(
-            f"font-size: 10pt; color: {color}; font-weight: bold;"
-        )
+        self._jit_count_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {bg};
+                color: {fg};
+                border-radius: {BorderRadius.SM}px;
+                padding: {Spacing.XXS}px {Spacing.SM}px;
+                font-family: {Typography.FONT_FAMILY_MONO};
+                font-size: {Typography.SIZE_SM}pt;
+                font-weight: {Typography.WEIGHT_BOLD};
+            }}
+        """)
 
     def set_compiling(self, compiling: bool) -> None:
         """Show compiling indicator."""
@@ -336,14 +396,10 @@ class JAXStatusWidget(QWidget):
         )
         if compiling:
             self._compile_indicator.setText("Compiling...")
-            self._compile_indicator.setStyleSheet(
-                "padding:3px 10px; border-radius:3px; background-color:#FFB74D; color:#000;"
-            )
+            self._set_badge_style(self._compile_indicator, "warning")
         else:
             self._compile_indicator.setText("Idle")
-            self._compile_indicator.setStyleSheet(
-                "padding:3px 10px; border-radius:3px; background-color:#C8E6C9; color:#1B5E20;"
-            )
+            self._set_badge_style(self._compile_indicator, "success")
 
     def _on_device_changed(self, device: str) -> None:
         """Handle device selection change.

@@ -142,7 +142,7 @@ class PipelineSidebar(QWidget):
 
         delegate = PipelineStepDelegate(self._list)
         self._list.setItemDelegate(delegate)
-        root.addWidget(self._list, stretch=1)
+        root.addWidget(self._list, stretch=2)
 
         # --- Run buttons ---
         run_row = QHBoxLayout()
@@ -183,7 +183,7 @@ class PipelineSidebar(QWidget):
             "border: 1px dashed #D1D5DB; border-radius: 4px;"
         )
         datasets_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root.addWidget(datasets_placeholder)
+        root.addWidget(datasets_placeholder, stretch=3)
 
         # --- Connect state signals ---
         signals = StateStore().signals

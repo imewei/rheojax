@@ -3,8 +3,9 @@ Home Page
 =========
 
 Landing page with quick start actions, recent projects, and system status.
-Redesigned with a compact hero, card-based quick-start grid, and a
-two-column body layout for better information hierarchy.
+Features a compact hero, card-based quick-start grid, full-width primary
+sections (Quick Start, Recent Projects), and a compact secondary row
+(System Status, Resources).
 """
 
 from pathlib import Path
@@ -28,8 +29,6 @@ from rheojax.gui.resources.styles import (
     ColorPalette,
     Spacing,
     Typography,
-    button_style,
-    card_style,
     section_header_style,
     themed,
 )
@@ -121,35 +120,31 @@ class HomePage(QWidget):
         # Compact hero header
         content_layout.addWidget(self._create_header())
 
-        # Body: two-column layout
+        # Body: stacked layout — primary sections full-width, secondary side-by-side
         body = QWidget()
         body.setStyleSheet(f"background-color: {themed('BG_CANVAS')};")
-        body_layout = QHBoxLayout(body)
-        body_layout.setSpacing(Spacing.XL)
+        body_layout = QVBoxLayout(body)
+        body_layout.setSpacing(Spacing.MD)
         body_layout.setContentsMargins(
             Spacing.PAGE_MARGIN + 4,
-            Spacing.XL,
+            Spacing.MD,
             Spacing.PAGE_MARGIN + 4,
             Spacing.PAGE_MARGIN,
         )
 
-        # Left column (primary): Quick Start + Recent Projects
-        left_col = QVBoxLayout()
-        left_col.setSpacing(Spacing.XL)
-        left_col.addWidget(self._create_quick_start())
-        left_col.addWidget(self._create_recent_projects())
-        left_col.addStretch()
+        # Primary sections — full-width rows
+        body_layout.addWidget(self._create_quick_start())
+        body_layout.addWidget(self._create_recent_projects(), stretch=1)
 
-        # Right column (supporting): System Status + Resources
-        right_col = QVBoxLayout()
-        right_col.setSpacing(Spacing.XL)
-        right_col.addWidget(self._create_system_status())
-        right_col.addWidget(self._create_resources())
-        right_col.addStretch()
+        # Secondary sections — two-column row (System Status | Resources)
+        secondary_row = QHBoxLayout()
+        secondary_row.setSpacing(Spacing.XL)
+        secondary_row.setAlignment(Qt.AlignTop)
+        secondary_row.addWidget(self._create_system_status(), stretch=1, alignment=Qt.AlignTop)
+        secondary_row.addWidget(self._create_resources(), stretch=1, alignment=Qt.AlignTop)
+        body_layout.addLayout(secondary_row)
 
-        # 3:2 ratio — primary content gets more space
-        body_layout.addLayout(left_col, stretch=3)
-        body_layout.addLayout(right_col, stretch=2)
+        # No bottom stretch — Recent Projects expands to fill available space
 
         content_layout.addWidget(body)
 
@@ -376,10 +371,11 @@ class HomePage(QWidget):
         card.setFocusPolicy(Qt.StrongFocus)
         card.setCursor(Qt.PointingHandCursor)
         card.setAccessibleName(f"Quick start: {title}")
-        card.setMinimumHeight(96)
+        card.setMinimumHeight(64)
+        card.setMaximumHeight(80)
         card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # Accent color bar at the top of the card
+        # Accent color for the left-side indicator bar
         accent_colors = {
             "primary": themed("PRIMARY"),
             "success": themed("SUCCESS"),
@@ -387,26 +383,53 @@ class HomePage(QWidget):
             "error": themed("ERROR"),
             "accent": themed("ACCENT"),
         }
+        # Light tint backgrounds keyed to variant
+        accent_bg_colors = {
+            "primary": themed("PRIMARY_SUBTLE"),
+            "success": themed("SUCCESS_LIGHT"),
+            "warning": themed("WARNING_LIGHT"),
+            "error": themed("ERROR_LIGHT"),
+            "accent": themed("ACCENT_LIGHT"),
+        }
         accent = accent_colors.get(variant, themed("PRIMARY"))
+        accent_bg = accent_bg_colors.get(variant, themed("PRIMARY_SUBTLE"))
 
         card.setStyleSheet(f"""
             QWidget {{
                 background-color: {themed('BG_ELEVATED')};
                 border: 1px solid {themed('BORDER_SUBTLE')};
-                border-top: 3px solid {accent};
-                border-radius: {BorderRadius.LG}px;
+                border-left: 4px solid {accent};
+                border-radius: {BorderRadius.XL}px;
             }}
             QWidget:hover {{
-                background-color: {themed('BG_HOVER')};
-                border-color: {themed('BORDER_DEFAULT')};
-                border-top: 3px solid {accent};
+                background-color: {accent_bg};
+                border-color: {accent};
+                border-left: 4px solid {accent};
+            }}
+            QWidget:focus {{
+                border-color: {themed('BORDER_FOCUS')};
+                border-left: 4px solid {themed('BORDER_FOCUS')};
             }}
             QLabel {{ background-color: transparent; border: none; }}
         """)
 
-        layout = QVBoxLayout(card)
+        layout = QHBoxLayout(card)
         layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        layout.setSpacing(Spacing.XS)
+        layout.setSpacing(Spacing.MD)
+
+        # Accent dot indicator
+        dot = QLabel()
+        dot.setFixedSize(10, 10)
+        dot.setStyleSheet(f"""
+            background-color: {accent};
+            border: none;
+            border-radius: 5px;
+        """)
+        layout.addWidget(dot, alignment=Qt.AlignTop)
+
+        # Text column
+        text_col = QVBoxLayout()
+        text_col.setSpacing(Spacing.XXS)
 
         title_label = QLabel(title)
         title_label.setStyleSheet(f"""
@@ -415,7 +438,7 @@ class HomePage(QWidget):
             font-weight: {Typography.WEIGHT_SEMIBOLD};
             color: {themed('TEXT_PRIMARY')};
         """)
-        layout.addWidget(title_label)
+        text_col.addWidget(title_label)
 
         desc_label = QLabel(description)
         desc_label.setStyleSheet(f"""
@@ -425,9 +448,10 @@ class HomePage(QWidget):
             color: {themed('TEXT_MUTED')};
         """)
         desc_label.setWordWrap(True)
-        layout.addWidget(desc_label)
+        text_col.addWidget(desc_label)
 
-        layout.addStretch()
+        text_col.addStretch()
+        layout.addLayout(text_col, stretch=1)
 
         return card
 
@@ -438,6 +462,7 @@ class HomePage(QWidget):
     def _create_recent_projects(self) -> QWidget:
         """Create recent projects section."""
         container = QWidget()
+        container.setMinimumHeight(360)
         outer = QVBoxLayout(container)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(Spacing.SM)
@@ -452,13 +477,15 @@ class HomePage(QWidget):
         if not recent_projects:
             empty = QLabel("No recent projects. Import data or open a project to get started.")
             empty.setAlignment(Qt.AlignCenter)
+            empty.setMinimumHeight(120)
             empty.setStyleSheet(f"""
                 color: {themed('TEXT_MUTED')};
+                font-family: {Typography.FONT_FAMILY};
                 font-size: {Typography.SIZE_MD_SM}pt;
                 padding: {Spacing.XL}px {Spacing.LG}px;
                 background-color: {themed('BG_SURFACE')};
-                border: 1px dashed {themed('BORDER_SUBTLE')};
-                border-radius: {BorderRadius.LG}px;
+                border: 2px dashed {themed('BORDER_DEFAULT')};
+                border-radius: {BorderRadius.XL}px;
             """)
             empty.setWordWrap(True)
             outer.addWidget(empty)
@@ -475,11 +502,11 @@ class HomePage(QWidget):
             QWidget {{
                 background-color: {themed('BG_ELEVATED')};
                 border: 1px solid {themed('BORDER_SUBTLE')};
-                border-radius: {BorderRadius.LG}px;
+                border-radius: {BorderRadius.XL}px;
             }}
             QWidget:hover {{
-                background-color: {themed('BG_HOVER')};
-                border-color: {themed('BORDER_DEFAULT')};
+                background-color: {themed('PRIMARY_SUBTLE')};
+                border-color: {themed('PRIMARY')};
             }}
             QLabel {{ background-color: transparent; border: none; }}
         """)
@@ -549,12 +576,15 @@ class HomePage(QWidget):
         card = QWidget()
         card.setStyleSheet(f"""
             QWidget {{
-                {card_style()}
+                background-color: {themed('BG_ELEVATED')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
+                border-radius: {BorderRadius.XL}px;
+                padding: {Spacing.MD}px;
             }}
         """)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(
-            Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG
+            Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS
         )
 
         self._jax_status = JAXStatusWidget()
@@ -612,16 +642,33 @@ class HomePage(QWidget):
         outer.addWidget(label)
 
         resources = [
-            ("Documentation", "https://rheojax.readthedocs.io"),
-            ("Tutorials", "https://github.com/imewei/rheojax/tree/main/examples"),
-            ("Report Issues", "https://github.com/imewei/rheojax/issues"),
+            ("Documentation", "API reference and guides", "https://rheojax.readthedocs.io"),
+            ("Tutorials", "Example notebooks", "https://github.com/imewei/rheojax/tree/main/examples"),
         ]
 
-        for title, url in resources:
+        link_style = f"""
+            QPushButton {{
+                background-color: {themed('BG_ELEVATED')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
+                border-radius: {BorderRadius.LG}px;
+                padding: {Spacing.SM}px {Spacing.LG}px;
+                text-align: left;
+                font-family: {Typography.FONT_FAMILY};
+                font-size: {Typography.SIZE_MD_SM}pt;
+                font-weight: {Typography.WEIGHT_MEDIUM};
+                color: {themed('PRIMARY')};
+            }}
+            QPushButton:hover {{
+                background-color: {themed('PRIMARY_SUBTLE')};
+                border-color: {themed('PRIMARY')};
+                color: {themed('PRIMARY_HOVER')};
+            }}
+        """
+
+        for title, _desc, url in resources:
             btn = QPushButton(title)
-            btn.setProperty("variant", "secondary")
             btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet(button_style("secondary", "md"))
+            btn.setStyleSheet(link_style)
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
             outer.addWidget(btn)
 
