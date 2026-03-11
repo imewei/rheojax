@@ -371,13 +371,29 @@ def run_pipeline(
         logger.error("Pipeline construction failed", error=str(exc))
         return 1
 
-    logger.info("Executing pipeline", name=config.name, num_steps=len(config.steps))
+    from rheojax.pipeline.base import Pipeline  # noqa: PLC0415
+
+    num_steps = len(builder.steps)
+    logger.info("Executing pipeline", name=config.name, num_steps=num_steps)
 
     with create_progress() as progress:
-        task = progress.add_task(f"Running pipeline '{config.name}'…", total=None)
+        task = progress.add_task(
+            f"Pipeline '{config.name}'",
+            total=num_steps,
+        )
+
+        def _on_step(index: int, step_type: str) -> None:
+            progress.update(
+                task,
+                description=f"[{index + 1}/{num_steps}] {step_type}",
+                completed=index,
+            )
+
         try:
-            builder.build(validate=True)
-            progress.update(task, description="Done")
+            builder._validate_pipeline()
+            pipeline = Pipeline()
+            builder._execute_steps(pipeline, on_step=_on_step)
+            progress.update(task, description="Done", completed=num_steps)
         except Exception as exc:
             print_error(f"Pipeline execution failed: {exc}")
             logger.error("Pipeline execution failed", error=str(exc))

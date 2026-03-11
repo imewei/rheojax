@@ -232,12 +232,13 @@ def show_inventory(args: list[str] | None = None) -> int:
 
     registry = Registry.get_instance()
 
-    # Force discovery of all models if not already loaded
-    # In a real package this might happen automatically via imports
-    # For now, let's assume models are imported. If not, we might need explicit discovery.
-    # We can try to import the main package to trigger registration.
+    # Force discovery of all models/transforms — lazy imports mean
+    # `import rheojax.models` alone does NOT trigger registration.
     import rheojax.models  # noqa
     import rheojax.transforms  # noqa
+
+    rheojax.models._ensure_all_registered()
+    rheojax.transforms._ensure_all_registered()
 
     inv = registry.inventory()
 

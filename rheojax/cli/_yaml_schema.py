@@ -78,7 +78,11 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "num_samples",
             "num_chains",
             "seed",
-            "warm_start",  # warm_start is a valid bayesian step key
+            "warm_start",
+            "target_accept_prob",
+            "test_mode",
+            "deformation_mode",
+            "poisson_ratio",
         ],
     },
     "export": {
@@ -207,6 +211,8 @@ def validate_config(config: PipelineConfig) -> list[str]:
         ...     for e in errors:
         ...         print(e)
     """
+    from rheojax.cli._yaml_runner import _STEP_ALLOWED_DEFAULTS  # noqa: PLC0415
+
     errors: list[str] = []
 
     if config.version not in ("1", 1):
@@ -247,8 +253,14 @@ def validate_config(config: PipelineConfig) -> list[str]:
             continue
 
         schema = STEP_SCHEMAS[step_type]
-        # Merge defaults so that required keys satisfied via defaults are not flagged.
-        effective = {**config.defaults, **step}
+        # Merge only the defaults that are relevant to this step type,
+        # so that e.g. test_mode from defaults is not flagged as unknown
+        # on export steps.
+        _allowed_defaults = _STEP_ALLOWED_DEFAULTS.get(step_type, set())
+        _filtered_defaults = {
+            k: v for k, v in config.defaults.items() if k in _allowed_defaults
+        }
+        effective = {**_filtered_defaults, **step}
         step_keys = set(effective.keys()) - {"type"}
 
         # Check required keys against the effective (defaults-merged) view
