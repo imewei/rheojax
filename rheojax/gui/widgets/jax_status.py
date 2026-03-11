@@ -324,6 +324,7 @@ class JAXStatusWidget(QWidget):
         elif total > 0 and used / total > 0.7:
             self._set_memory_bar_style("warning")
         else:
+            # Covers both normal usage (<70%) and total == 0 (unknown)
             self._set_memory_bar_style("normal")
 
     def set_float64_enabled(self, enabled: bool) -> None:
