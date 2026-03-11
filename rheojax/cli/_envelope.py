@@ -148,6 +148,7 @@ class Envelope:
             )
             return envelope
         except ValueError as exc:
+            print(f"Warning: Invalid pipe input — {exc}", file=sys.stderr)
             logger.warning("Failed to parse stdin envelope", error=str(exc))
             return None
 

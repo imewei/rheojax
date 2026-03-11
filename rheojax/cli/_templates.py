@@ -144,12 +144,16 @@ steps:
 version: "1"
 name: "Batch NLSQ Processing"
 
+# Note: this template processes a single file.
+# To process multiple files with glob patterns (e.g. data/*.csv),
+# use the 'rheojax batch' command instead of 'rheojax run'.
+
 defaults:
   test_mode: relaxation
 
 steps:
   - type: load
-    file: data/*.csv
+    file: data/sample.csv
     x_col: time
     y_col: G_t
     format: auto

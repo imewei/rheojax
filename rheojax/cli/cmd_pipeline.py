@@ -23,7 +23,14 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_TEMPLATE_CHOICES = ("basic", "bayesian", "batch", "mastercurve")
+try:
+    from rheojax.cli._templates import TEMPLATES as _TEMPLATES
+
+    _TEMPLATE_CHOICES = tuple(sorted(_TEMPLATES.keys()))
+except Exception:
+    # Fallback if _templates is unavailable at import time.
+    # Keep in sync with TEMPLATES dict in rheojax/cli/_templates.py.
+    _TEMPLATE_CHOICES = ("basic", "bayesian", "batch", "creep", "mastercurve", "oscillation")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -120,12 +127,16 @@ def run_init(args: argparse.Namespace) -> int:
         try:
             from rheojax.cli._templates import list_templates
 
-            names = list_templates()
+            templates = list_templates()
         except ImportError:
-            names = list(_TEMPLATE_CHOICES)
+            templates = [{"name": n, "description": ""} for n in _TEMPLATE_CHOICES]
         print("Available pipeline templates:")
-        for name in names:
-            print(f"  {name}")
+        for t in templates:
+            desc = t.get("description", "")
+            if desc:
+                print(f"  {t['name']} — {desc}")
+            else:
+                print(f"  {t['name']}")
         return 0
 
     # Check for existing output file
@@ -173,10 +184,11 @@ def run_validate(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        from rheojax.cli._yaml_schema import load_config, validate_config
+        from rheojax.cli._yaml_schema import load_config
 
-        config = load_config(args.config)
-        errors = validate_config(config)
+        load_config(args.config)
+        # load_config raises ValueError with all error messages if validation
+        # fails, so reaching this line means the config is valid.
     except ImportError:
         print(
             "Error: YAML schema validator not available. "
@@ -188,12 +200,6 @@ def run_validate(args: argparse.Namespace) -> int:
         print(f"Error loading config '{args.config}': {e}", file=sys.stderr)
         logger.error("Config load failed", config=str(args.config))
         logger.debug("Config load traceback", exc_info=True)
-        return 1
-
-    if errors:
-        print(f"Validation failed for '{args.config}':")
-        for err in errors:
-            print(f"  - {err}")
         return 1
 
     print(f"Config is valid: {args.config}")
@@ -222,29 +228,49 @@ def run_show(args: argparse.Namespace) -> int:
         print(f"Error: Config must be a YAML mapping, got {type(config).__name__}", file=sys.stderr)
         return 1
 
-    # Plain summary from raw YAML dict
+    # Plain summary from raw YAML dict (current schema only)
     print(f"Pipeline config: {args.config}")
     print("-" * 50)
 
-    name = config.get("name") or config.get("pipeline", {}).get("name", "(unnamed)")
+    name = config.get("name", "(unnamed)")
+    version = config.get("version", "?")
     print(f"Name:    {name}")
+    print(f"Version: {version}")
 
-    steps = config.get("steps") or config.get("pipeline", {}).get("steps", [])
+    defaults = config.get("defaults") or {}
+    if defaults:
+        print(f"Defaults: {defaults}")
+
+    steps = config.get("steps") or []
     if steps:
         print(f"Steps:   {len(steps)}")
         for i, step in enumerate(steps, 1):
             if isinstance(step, dict):
-                step_type = step.get("type") or step.get("action") or "(unknown)"
-                step_name = step.get("name") or step_type
-                print(f"  {i}. {step_name}")
+                step_type = step.get("type", "(unknown)")
+                print(f"  {i}. {step_type}")
             else:
                 print(f"  {i}. {step}")
     else:
         print("Steps:   (none defined)")
 
-    output_cfg = config.get("output") or config.get("export", {})
-    if output_cfg:
-        print(f"Output:  {output_cfg}")
+    # Non-blocking validation: show warnings but don't fail the command.
+    try:
+        from rheojax.cli._yaml_schema import PipelineConfig, validate_config
+
+        pc = PipelineConfig(
+            version=str(config.get("version", "")),
+            name=str(config.get("name", "")),
+            defaults=dict(config.get("defaults") or {}),
+            steps=list(config.get("steps") or []),
+        )
+        errors = validate_config(pc)
+        if errors:
+            print()
+            print("Validation warnings:")
+            for err in errors:
+                print(f"  - {err}")
+    except Exception:
+        pass  # Validation is best-effort in show mode
 
     return 0
 

@@ -107,4 +107,10 @@ def apply_globals(args: argparse.Namespace) -> None:
             level = "WARNING"
 
     configure_logging(level=level)
+
+    if getattr(args, "no_color", False):
+        from rheojax.cli._output import reset_console
+
+        reset_console(no_color=True)
+
     logger.debug("Global flags applied", log_level=level)

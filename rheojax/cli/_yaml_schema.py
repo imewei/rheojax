@@ -34,6 +34,14 @@ VALID_STEP_TYPES: frozenset[str] = frozenset(
     {"load", "transform", "fit", "bayesian", "export"}
 )
 
+# Bayesian sampling parameter limits — shared by validate_config() and the
+# GUI's PipelineExecutionService._coerce_bayesian_int() to prevent OOM.
+BAYESIAN_PARAM_LIMITS: dict[str, tuple[int, int]] = {
+    "num_warmup": (1, 50_000),
+    "num_samples": (1, 50_000),
+    "num_chains": (1, 16),
+}
+
 # Per-step required and optional keys (excluding the universal "type" key).
 STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
     "load": {
@@ -60,6 +68,7 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "test_mode",
             "deformation_mode",
             "poisson_ratio",
+            "use_jax",  # SER-003: PipelineBuilder passes use_jax to fit steps
         ],
     },
     "bayesian": {
@@ -69,7 +78,7 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "num_samples",
             "num_chains",
             "seed",
-            "warm_start",
+            "warm_start",  # warm_start is a valid bayesian step key
         ],
     },
     "export": {
@@ -238,11 +247,13 @@ def validate_config(config: PipelineConfig) -> list[str]:
             continue
 
         schema = STEP_SCHEMAS[step_type]
-        step_keys = set(step.keys()) - {"type"}
+        # Merge defaults so that required keys satisfied via defaults are not flagged.
+        effective = {**config.defaults, **step}
+        step_keys = set(effective.keys()) - {"type"}
 
-        # Check required keys
+        # Check required keys against the effective (defaults-merged) view
         for req in schema["required"]:
-            if req not in step:
+            if req not in effective:
                 errors.append(
                     f"{step_label} ({step_type}): Missing required key '{req}'."
                 )
@@ -284,6 +295,25 @@ def validate_config(config: PipelineConfig) -> list[str]:
 
         if step_type == "fit":
             has_fit = True
+
+        # Validate Bayesian sampling parameter ranges to prevent OOM.
+        if step_type == "bayesian":
+            for key, (lo, hi) in BAYESIAN_PARAM_LIMITS.items():
+                val = step.get(key)
+                if val is not None:
+                    try:
+                        ival = int(val)
+                    except (TypeError, ValueError):
+                        errors.append(
+                            f"{step_label} (bayesian): '{key}' must be an integer, "
+                            f"got {val!r}."
+                        )
+                        continue
+                    if not (lo <= ival <= hi):
+                        errors.append(
+                            f"{step_label} (bayesian): '{key}' must be between "
+                            f"{lo} and {hi}, got {val}."
+                        )
 
         if step_type == "bayesian" and not has_fit:
             errors.append(

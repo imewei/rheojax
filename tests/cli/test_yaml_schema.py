@@ -85,6 +85,48 @@ class TestValidateConfig:
         assert any("bayesian" in e.lower() or "fit" in e.lower() for e in errors)
 
     @pytest.mark.unit
+    def test_bayesian_num_samples_out_of_range_is_error(self):
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell"},
+                {"type": "bayesian", "num_samples": 999_999},
+            ],
+        )
+        errors = validate_config(config)
+        assert any("num_samples" in e and "between" in e for e in errors)
+
+    @pytest.mark.unit
+    def test_bayesian_num_chains_out_of_range_is_error(self):
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell"},
+                {"type": "bayesian", "num_chains": 100},
+            ],
+        )
+        errors = validate_config(config)
+        assert any("num_chains" in e and "between" in e for e in errors)
+
+    @pytest.mark.unit
+    def test_bayesian_valid_params_pass(self):
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell"},
+                {"type": "bayesian", "num_warmup": 500, "num_samples": 1000, "num_chains": 4},
+            ],
+        )
+        errors = validate_config(config)
+        assert not any("num_" in e for e in errors)
+
+    @pytest.mark.unit
     def test_unknown_step_type_is_error(self):
         config = PipelineConfig(
             version="1",

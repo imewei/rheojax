@@ -27,8 +27,24 @@ logger = get_logger(__name__)
 # Config -> Builder translation
 # ------------------------------------------------------------------
 
-# Keys that should never be forwarded to PipelineBuilder step methods
-_STEP_META_KEYS: frozenset[str] = frozenset({"type"})
+# Per-step-type keys that may be populated from config.defaults.
+# Keys not listed here are silently dropped when merging defaults into a step.
+_STEP_ALLOWED_DEFAULTS: dict[str, set[str]] = {
+    "load": {"test_mode", "deformation_mode", "poisson_ratio", "format", "x_col", "y_col", "y_cols"},
+    "transform": set(),  # transforms take their own kwargs, not protocol defaults
+    "fit": {"test_mode", "deformation_mode", "poisson_ratio", "method", "max_iter"},
+    "bayesian": {
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+        "num_warmup",
+        "num_samples",
+        "num_chains",
+        "seed",
+        "warm_start",
+    },
+    "export": set(),  # export has no rheological defaults
+}
 
 
 def config_to_builder(config: PipelineConfig) -> PipelineBuilder:
@@ -55,13 +71,14 @@ def config_to_builder(config: PipelineConfig) -> PipelineBuilder:
     builder = PipelineBuilder()
 
     for step in config.steps:
-        # Merge defaults under step, step keys win
-        merged: dict[str, Any] = {**config.defaults, **step}
-        step_type: str = merged.pop("type")
+        step_type: str = step.get("type", "")
 
-        # Strip remaining meta keys
-        for meta in _STEP_META_KEYS:
-            merged.pop(meta, None)
+        # Filter defaults to only keys allowed for this step type, then merge.
+        # Explicit step values always win over defaults.
+        allowed_defaults = _STEP_ALLOWED_DEFAULTS.get(step_type, set())
+        filtered_defaults = {k: v for k, v in config.defaults.items() if k in allowed_defaults}
+        merged: dict[str, Any] = {**filtered_defaults, **step}
+        merged.pop("type")  # Remove the "type" sentinel; already captured above
 
         logger.debug("Translating step", step_type=step_type, kwargs=list(merged.keys()))
 
@@ -160,6 +177,10 @@ def apply_overrides(config: PipelineConfig, overrides: list[str]) -> PipelineCon
                 raise ValueError(
                     f"Step index in override '{path_str}' must be an integer."
                 ) from exc
+            if step_idx < 0:
+                raise ValueError(
+                    f"Step index must be non-negative, got {step_idx} in override '{path_str}'."
+                )
             if step_idx >= len(steps_copy):
                 raise ValueError(
                     f"Override path '{path_str}': step index {step_idx} is out of "
@@ -211,8 +232,35 @@ def _coerce_value(raw: str) -> Any:
     return raw
 
 
+_STEP_ALLOWED_KEYS: dict[str, set[str]] = {
+    "load": {"file", "format", "x_col", "y_col", "y_cols", "test_mode", "deformation_mode", "poisson_ratio"},
+    "fit": {"model", "method", "max_iter", "test_mode", "deformation_mode", "poisson_ratio", "use_jax", "params"},
+    "bayesian": {"num_warmup", "num_samples", "num_chains", "seed", "warm_start", "target_accept_prob", "test_mode"},
+    "export": {"output", "format"},
+    # "transform" is intentionally absent — open kwargs by design.
+}
+
+
 def _nested_set(target: dict[str, Any], keys: list[str], value: Any) -> None:
-    """Set a value in a nested dict via a list of key segments."""
+    """Set a value in a nested dict via a list of key segments.
+
+    When the first key targets a step dict (has a ``"type"`` key), the
+    override key is validated against the step-type allowlist to catch
+    typos and accidental injections early.
+    """
+    # Validate override key against step-type allowlist.
+    if "type" in target and len(keys) == 1:
+        step_type = target.get("type", "")
+        allowed = _STEP_ALLOWED_KEYS.get(step_type)
+        if allowed is not None and keys[0] not in allowed:
+            logger.warning(
+                "Override injects unrecognised key into %s step: '%s'. "
+                "Allowed: %s",
+                step_type,
+                keys[0],
+                sorted(allowed),
+            )
+
     for key in keys[:-1]:
         if key not in target or not isinstance(target[key], dict):
             target[key] = {}
