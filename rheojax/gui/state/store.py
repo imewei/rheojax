@@ -645,9 +645,15 @@ class StateStore:
                 self.emit_signal("bayesian_progress", "", int(progress))
 
             elif action_type == "BAYESIAN_COMPLETED":
-                # Signal emission handled by STORE_BAYESIAN_RESULT to avoid
-                # duplicate bayesian_completed signals when both actions fire.
-                pass
+                # Symmetric with FITTING_COMPLETED: emit the signal so callers
+                # using only bayesian_completed() action creator get notified.
+                # STORE_BAYESIAN_RESULT also emits this signal, but duplicate
+                # emissions are harmless (UI idempotent).
+                self.emit_signal(
+                    "bayesian_completed",
+                    str(action.get("model_name", "")),
+                    str(action.get("dataset_id", "")),
+                )
 
             elif action_type == "BAYESIAN_FAILED":
                 error = action.get("error", "")
@@ -710,16 +716,32 @@ class StateStore:
                     error=error,
                 )
 
-            elif action_type in (
-                "ADD_PIPELINE_STEP",
-                "REMOVE_PIPELINE_STEP",
-                "REORDER_PIPELINE_STEP",
-            ):
+            elif action_type == "ADD_PIPELINE_STEP":
+                # STATE-003: Emit specific signal before the general structural one
+                # so subscribers that track individual steps can react correctly.
+                sc = action.get("step_config")
+                if sc is not None:
+                    self.emit_signal("pipeline_step_added", sc.id)
+                self.emit_signal("pipeline_structure_changed")
+
+            elif action_type == "REMOVE_PIPELINE_STEP":
+                # STATE-003: Emit specific removal signal before the general one.
+                step_id = action.get("step_id", "")
+                self.emit_signal("pipeline_step_removed", step_id)
+                self.emit_signal("pipeline_structure_changed")
+
+            elif action_type == "REORDER_PIPELINE_STEP":
                 self.emit_signal("pipeline_structure_changed")
 
             elif action_type == "SELECT_PIPELINE_STEP":
                 step_id = action.get("step_id") or ""
                 self.emit_signal("pipeline_step_selected", step_id)
+
+            elif action_type == "UPDATE_STEP_CONFIG":
+                # STATE-002: Emit pipeline_step_config_changed so subscribers
+                # (e.g. step config panels) can refresh when config is updated.
+                step_id = action.get("step_id", "")
+                self.emit_signal("pipeline_step_config_changed", step_id)
 
             elif action_type == "UPDATE_STEP_STATUS":
                 step_id = action.get("step_id", "")
@@ -1309,24 +1331,25 @@ class StateStore:
             return updater
 
         if action_type == "FITTING_COMPLETED":
-
-            def updater(state: AppState) -> AppState:
-                pipeline = state.pipeline_state.clone()
-                pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
-                pipeline.current_step = PipelineStep.FIT
-                return replace(state, pipeline_state=pipeline)
-
-            return updater
+            # STATE-004: Do not mutate pipeline step status here.
+            # STORE_FIT_RESULT is the single source of truth for FIT=COMPLETE,
+            # which prevents duplicate undo entries from both actions writing the
+            # same state transition.  This action exists solely to trigger the
+            # fit_completed signal in the dispatch() signal chain.
+            #
+            # INVARIANT: Every caller that dispatches FITTING_COMPLETED must
+            # dispatch STORE_FIT_RESULT first (see main_window.py
+            # _on_job_completed).  If STORE_FIT_RESULT is omitted, the step
+            # will silently remain non-COMPLETE.
+            return lambda state: state
 
         if action_type == "BAYESIAN_COMPLETED":
-
-            def updater(state: AppState) -> AppState:
-                pipeline = state.pipeline_state.clone()
-                pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.COMPLETE
-                pipeline.current_step = PipelineStep.BAYESIAN
-                return replace(state, pipeline_state=pipeline)
-
-            return updater
+            # STATE-004: Same pattern — STORE_BAYESIAN_RESULT owns BAYESIAN=COMPLETE.
+            # BAYESIAN_COMPLETED exists only to drive the bayesian_completed signal.
+            #
+            # INVARIANT: same as FITTING_COMPLETED above — callers must dispatch
+            # STORE_BAYESIAN_RESULT before (or instead of) this action.
+            return lambda state: state
 
         if action_type == "FITTING_FAILED":
 
@@ -1552,6 +1575,10 @@ class StateStore:
 
         if action_type == "ADD_PIPELINE_STEP":
             step_config = action.get("step_config")
+            # STATE-001: Guard against missing step_config to prevent AttributeError
+            # on None.clone() when the action is dispatched without a step_config key.
+            if step_config is None:
+                return lambda state: state
 
             def _add_step(state: AppState) -> AppState:
                 vp = state.visual_pipeline.clone()
@@ -1581,6 +1608,11 @@ class StateStore:
         if action_type == "REORDER_PIPELINE_STEP":
             step_id = action.get("step_id")
             new_position = action.get("new_position")
+            # STATE-006: Guard against None/non-int new_position. The step would
+            # have already been removed from the list before list.insert() raises
+            # TypeError, causing permanent data loss without this guard.
+            if new_position is None or not isinstance(new_position, int):
+                return lambda state: state
 
             def _reorder_step(state: AppState) -> AppState:
                 vp = state.visual_pipeline.clone()
@@ -1620,7 +1652,13 @@ class StateStore:
                         break
                 idx = next((i for i, s in enumerate(vp.steps) if s.id == step_id), None)
                 if idx is not None:
-                    for s in vp.steps[idx:]:
+                    # Clear the edited step's cached result (config changed
+                    # → old result is stale), but preserve its status so an
+                    # in-progress execution is not disrupted.
+                    vp.step_results.pop(step_id, None)
+                    # STATE-007: Use idx+1 so only *downstream* steps are
+                    # invalidated. The edited step keeps its status.
+                    for s in vp.steps[idx + 1 :]:
                         vp.step_results.pop(s.id, None)
                         if s.status == StepStatus.COMPLETE:
                             s.status = StepStatus.PENDING
@@ -1647,6 +1685,13 @@ class StateStore:
         if action_type == "CACHE_STEP_RESULT":
             step_id = action.get("step_id")
             result = action.get("result")
+            # STATE-009: Large JAX arrays stored in step_results are deep-copied
+            # into the undo stack on every cache update, which can exhaust memory
+            # for long pipelines. Callers should dispatch this action with
+            # track_undo=False:
+            #   store.dispatch({"type": "CACHE_STEP_RESULT", ...}, track_undo=False)
+            # The dispatch() method's track_undo parameter propagates to
+            # update_state(), so no store-level change is required here.
 
             def _cache_result(state: AppState) -> AppState:
                 vp = state.visual_pipeline.clone()
@@ -1656,7 +1701,7 @@ class StateStore:
             return _cache_result
 
         if action_type == "SET_PIPELINE_RUNNING":
-            is_running = action.get("is_running")
+            is_running = action.get("is_running", False)
             current_step_id = action.get("current_step_id")
 
             def _set_running(state: AppState) -> AppState:

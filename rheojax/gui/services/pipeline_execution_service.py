@@ -6,16 +6,28 @@ service (DataService, TransformService, ModelService, etc.).
 
 This service runs SYNCHRONOUSLY — the caller is responsible for
 invoking it from a worker thread, not the GUI thread.
+
+Thread Safety
+-------------
+All state mutations are routed through ``rheojax.gui.state.actions``
+(GUI-001 through GUI-005).  Each action function calls
+``StateStore.dispatch()``, which internally uses
+``QMetaObject.invokeMethod(QueuedConnection)`` for both subscriber
+notifications and ``state_changed`` emission, making them safe to call
+from worker threads (GUI-006).  The per-action signals (e.g.
+``pipeline_step_status_changed``) are emitted via
+``StateStore.emit_signal()``, which defers cross-thread delivery using
+``QTimer.singleShot(0, ...)``.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
+from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.store import StateStore, StepStatus
 from rheojax.logging import get_logger
 
@@ -62,64 +74,32 @@ def _resolve_dmta_kwargs(kwargs: dict[str, Any], data: Any) -> None:
             kwargs["poisson_ratio"] = pr
 
 
-# ---------------------------------------------------------------------------
-# Internal state-mutation helpers
-# (update_step_status, cache_step_result, set_pipeline_running do not exist
-# in actions.py, so we implement them here via direct StateStore updaters.)
-# ---------------------------------------------------------------------------
+def _coerce_bayesian_int(
+    config: dict[str, Any], key: str, default: int, *, max_val: int = 50_000
+) -> int:
+    """Coerce a Bayesian config value to int with range validation.
 
+    The per-key limits are defined in
+    :data:`rheojax.cli._yaml_schema.BAYESIAN_PARAM_LIMITS` (single source of
+    truth shared with the CLI validator).
 
-def _update_step_status(
-    step_id: str,
-    status: StepStatus,
-    error_message: str | None = None,
-) -> None:
-    """Update the status of a PipelineStepConfig in VisualPipelineState."""
-    store = StateStore()
-
-    def updater(state):
-        vp = state.visual_pipeline.clone()
-        new_steps = []
-        for step in vp.steps:
-            if step.id == step_id:
-                updated = replace(step, status=status, error_message=error_message)
-                new_steps.append(updated)
-            else:
-                new_steps.append(step)
-        vp.steps = new_steps
-        return replace(state, visual_pipeline=vp)
-
-    store.update_state(updater)
-    store.emit_signal("visual_pipeline_changed")
-
-
-def _cache_step_result(step_id: str, result: Any) -> None:
-    """Cache the result of a completed step in VisualPipelineState.step_results."""
-    store = StateStore()
-
-    def updater(state):
-        vp = state.visual_pipeline.clone()
-        vp.step_results[step_id] = result
-        return replace(state, visual_pipeline=vp)
-
-    store.update_state(updater)
-
-
-def _set_pipeline_running(
-    is_running: bool,
-    current_step_id: str | None = None,
-) -> None:
-    """Set the running flag and active step on VisualPipelineState."""
-    store = StateStore()
-
-    def updater(state):
-        vp = state.visual_pipeline.clone()
-        vp.is_running = is_running
-        vp.current_running_step_id = current_step_id
-        return replace(state, visual_pipeline=vp)
-
-    store.update_state(updater)
-    store.emit_signal("visual_pipeline_changed")
+    Raises
+    ------
+    ValueError
+        If the value is not an integer or is outside [1, max_val].
+    """
+    val = config.get(key, default)
+    try:
+        ival = int(val)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"Bayesian step: '{key}' must be an integer, got {val!r}."
+        ) from None
+    if not (1 <= ival <= max_val):
+        raise ValueError(
+            f"Bayesian step: '{key}' must be between 1 and {max_val}, got {ival}."
+        )
+    return ival
 
 
 class PipelineExecutionService(QObject):
@@ -172,13 +152,17 @@ class PipelineExecutionService(QObject):
         steps : list[PipelineStepConfig]
             Ordered list of steps to execute.
         """
+        # GUI-014 (P3): emit pipeline_started before the early-return so
+        # observers always see the started signal before completed.
         if not steps:
-            _set_pipeline_running(False)
             self.pipeline_started.emit()
+            pipeline_actions.set_pipeline_running(False)
             self.pipeline_completed.emit()
             return
 
-        _set_pipeline_running(True, steps[0].id)
+        # GUI-001 / GUI-002: use public action function — goes through
+        # dispatch() → reducer → pipeline_execution_started signal.
+        pipeline_actions.set_pipeline_running(True, steps[0].id)
         self.pipeline_started.emit()
 
         # Accumulates results shared across steps (data, fit_result, etc.)
@@ -186,26 +170,31 @@ class PipelineExecutionService(QObject):
 
         try:
             for step in steps:
-                _set_pipeline_running(True, step.id)
-                _update_step_status(step.id, StepStatus.ACTIVE)
+                # GUI-002: dispatch via actions, not direct store mutation.
+                pipeline_actions.set_pipeline_running(True, step.id)
+                # GUI-001: dispatch via actions — emits pipeline_step_status_changed.
+                pipeline_actions.update_step_status(step.id, StepStatus.ACTIVE)
                 self.step_started.emit(step.id)
 
                 try:
                     result = self._execute_step(step, context)
-                    _cache_step_result(step.id, result)
-                    _update_step_status(step.id, StepStatus.COMPLETE)
+                    # GUI-004: dispatch via actions — immutable reducer path.
+                    pipeline_actions.cache_step_result(step.id, result)
+                    pipeline_actions.update_step_status(step.id, StepStatus.COMPLETE)
                     self.step_completed.emit(step.id)
                 except Exception as exc:
                     error_msg = str(exc)
-                    _update_step_status(step.id, StepStatus.ERROR, error_msg)
+                    pipeline_actions.update_step_status(
+                        step.id, StepStatus.ERROR, error_msg
+                    )
                     self.step_failed.emit(step.id, error_msg)
                     raise
 
-            _set_pipeline_running(False)
+            pipeline_actions.set_pipeline_running(False)
             self.pipeline_completed.emit()
 
         except Exception as exc:
-            _set_pipeline_running(False)
+            pipeline_actions.set_pipeline_running(False)
             self.pipeline_failed.emit(str(exc))
 
     def execute_single_step(self, step, context: dict) -> Any:
@@ -233,18 +222,18 @@ class PipelineExecutionService(QObject):
             Re-raises any exception from the underlying service after
             dispatching ERROR status.
         """
-        _update_step_status(step.id, StepStatus.ACTIVE)
+        pipeline_actions.update_step_status(step.id, StepStatus.ACTIVE)
         self.step_started.emit(step.id)
 
         try:
             result = self._execute_step(step, context)
-            _cache_step_result(step.id, result)
-            _update_step_status(step.id, StepStatus.COMPLETE)
+            pipeline_actions.cache_step_result(step.id, result)
+            pipeline_actions.update_step_status(step.id, StepStatus.COMPLETE)
             self.step_completed.emit(step.id)
             return result
         except Exception as exc:
             error_msg = str(exc)
-            _update_step_status(step.id, StepStatus.ERROR, error_msg)
+            pipeline_actions.update_step_status(step.id, StepStatus.ERROR, error_msg)
             self.step_failed.emit(step.id, error_msg)
             raise
 
@@ -302,11 +291,18 @@ class PipelineExecutionService(QObject):
             raise ValueError("Load step requires a 'file' key in its config.")
 
         # Defense-in-depth: reject path-traversal attempts.  Absolute paths are
-        # legitimate (GUI file-picker, CLI --output flag), so only '..' is blocked.
+        # legitimate when originating from the GUI file-picker, so only '..'
+        # is blocked.  Log a warning for absolute paths so the divergence with
+        # the CLI validator (which rejects them) is observable.
         _path = Path(file_path)
         if ".." in _path.parts:
             raise ValueError(
                 f"Load step file path must not contain '..' segments: {file_path}"
+            )
+        if _path.is_absolute():
+            logger.warning(
+                "Load step uses absolute path (CLI validator would reject this)",
+                file_path=str(file_path),
             )
 
         # Extract the known DataService.load_file keyword arguments.
@@ -487,9 +483,14 @@ class PipelineExecutionService(QObject):
                 "No 'model_name' found in execution context."
             )
 
-        num_warmup: int = int(config.get("num_warmup", 1000))
-        num_samples: int = int(config.get("num_samples", 2000))
-        num_chains: int = int(config.get("num_chains", 4))
+        from rheojax.cli._yaml_schema import BAYESIAN_PARAM_LIMITS  # noqa: PLC0415
+
+        _wlo, _whi = BAYESIAN_PARAM_LIMITS["num_warmup"]
+        _slo, _shi = BAYESIAN_PARAM_LIMITS["num_samples"]
+        _clo, _chi = BAYESIAN_PARAM_LIMITS["num_chains"]
+        num_warmup = _coerce_bayesian_int(config, "num_warmup", 1000, max_val=_whi)
+        num_samples = _coerce_bayesian_int(config, "num_samples", 2000, max_val=_shi)
+        num_chains = _coerce_bayesian_int(config, "num_chains", 4, max_val=_chi)
         use_warm_start: bool = bool(config.get("warm_start", True))
 
         # Build warm-start param dict from the prior NLSQ fit result.
@@ -578,10 +579,16 @@ class PipelineExecutionService(QObject):
         export_format: str = config.get("format", "directory")
 
         # Defense-in-depth: reject path-traversal attempts only.  Absolute paths
-        # are valid for GUI file-picker and CLI --output invocations.
+        # are valid for GUI file-picker invocations.  Log a warning so the
+        # divergence with the CLI validator (which rejects them) is observable.
         if ".." in output_path.parts:
             raise ValueError(
                 f"Export output path must not contain '..' segments: {output_path}"
+            )
+        if output_path.is_absolute():
+            logger.warning(
+                "Export step uses absolute path (CLI validator would reject this)",
+                output_path=str(output_path),
             )
 
         output_path.mkdir(parents=True, exist_ok=True)

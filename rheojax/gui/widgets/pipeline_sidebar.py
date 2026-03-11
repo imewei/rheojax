@@ -192,6 +192,7 @@ class PipelineSidebar(QWidget):
         signals.pipeline_name_changed.connect(self._on_pipeline_name_changed)
         signals.pipeline_execution_started.connect(self._update_run_buttons)
         signals.pipeline_execution_completed.connect(self._update_run_buttons)
+        signals.pipeline_step_status_changed.connect(lambda *_: self._update_run_buttons())
 
         # Initial populate
         self._refresh_list()
@@ -216,6 +217,28 @@ class PipelineSidebar(QWidget):
         for i in range(self._list.count()):
             item = self._list.item(i)
             if item and item.data(ROLE_STEP_ID) == step_id:
+                self._list.setCurrentItem(item)
+                return
+
+    def select_step_by_type(self, step_type: str | None) -> None:
+        """Programmatically select the first step matching a step_type.
+
+        List items are UUID-keyed (ROLE_STEP_ID), so ``select_step`` cannot
+        match on a step_type string. This method iterates ROLE_STEP_TYPE data
+        and selects the first item whose type equals *step_type*.
+
+        Parameters
+        ----------
+        step_type : str | None
+            Step type to match (e.g. ``"load"``, ``"fit"``), or None to
+            deselect all items.
+        """
+        if not step_type:
+            self._list.clearSelection()
+            return
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            if item and item.data(ROLE_STEP_TYPE) == step_type:
                 self._list.setCurrentItem(item)
                 return
 
@@ -402,6 +425,9 @@ class PipelineSidebar(QWidget):
 
         if selected_id:
             self.select_step(selected_id)
+            if self._list.currentItem() is None:
+                pipeline_actions.select_pipeline_step(None)
+                self.step_selected.emit("")
 
         self._update_run_buttons()
 
@@ -422,7 +448,7 @@ class PipelineSidebar(QWidget):
                 matching = next((s for s in steps if s.id == step_id), None)
                 if matching:
                     item.setData(ROLE_STATUS, matching.status)
-                    self._list.update()
+                    self._list.viewport().update()
                 break
 
     def _on_pipeline_name_changed(self, new_name: str) -> None:

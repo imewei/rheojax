@@ -24,6 +24,9 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
+_SPINNER_CHARS: list[str] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
 class PipelineChips(QWidget):
     """Horizontal pipeline progress widget with status indicators.
 
@@ -293,30 +296,28 @@ class PipelineChips(QWidget):
 
     def _update_spinner(self) -> None:
         """Update spinner animation for active chips."""
-        self._spinner_state = (self._spinner_state + 1) % 4
-
-        spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self._spinner_state = (self._spinner_state + 1) % len(_SPINNER_CHARS)
 
         for _step, chip in self._chips.items():
             status = chip.property("status")
             if status == StepStatus.ACTIVE:
                 # Get base text (remove previous spinner if present)
                 base_text = chip.text()
-                for char in spinner_chars:
+                for char in _SPINNER_CHARS:
                     base_text = base_text.replace(f" {char}", "")
 
                 # Add spinner
-                spinner_char = spinner_chars[self._spinner_state % len(spinner_chars)]
+                spinner_char = _SPINNER_CHARS[self._spinner_state]
                 chip.setText(f"{base_text} {spinner_char}")
             elif status == StepStatus.COMPLETE:
                 # Show a checkmark
                 base_text = chip.text()
-                for char in spinner_chars:
+                for char in _SPINNER_CHARS:
                     base_text = base_text.replace(f" {char}", "")
                 chip.setText(base_text.replace(" ✔", "") + " ✔")
             else:
                 # Ensure spinner not shown for other states
                 base_text = chip.text()
-                for char in spinner_chars:
+                for char in _SPINNER_CHARS:
                     base_text = base_text.replace(f" {char}", "")
                 chip.setText(base_text)

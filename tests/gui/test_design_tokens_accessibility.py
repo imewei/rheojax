@@ -177,66 +177,6 @@ class TestKeyboardAccessibility:
         """Ensure QApplication exists for widget tests."""
 
     @pytest.mark.smoke
-    def test_workflow_cards_are_focusable(self) -> None:
-        """Workflow cards should accept keyboard focus."""
-        from rheojax.gui.compat import Qt
-        from rheojax.gui.pages.home_page import HomePage
-
-        page = HomePage()
-        # Find QFrame children with "card-clickable" property
-        from rheojax.gui.compat import QFrame
-
-        cards = [
-            w
-            for w in page.findChildren(QFrame)
-            if w.property("class") == "card-clickable"
-        ]
-        assert len(cards) >= 2, "Should have at least 2 workflow cards"
-        for card in cards:
-            assert (
-                card.focusPolicy() == Qt.StrongFocus
-            ), f"Workflow card should have StrongFocus policy, got {card.focusPolicy()}"
-
-    @pytest.mark.smoke
-    def test_workflow_cards_have_accessible_names(self) -> None:
-        """Workflow cards should have accessible names for screen readers."""
-        from rheojax.gui.compat import QFrame
-        from rheojax.gui.pages.home_page import HomePage
-
-        page = HomePage()
-        cards = [
-            w
-            for w in page.findChildren(QFrame)
-            if w.property("class") == "card-clickable"
-        ]
-        for card in cards:
-            name = card.accessibleName()
-            assert name, "Workflow card should have an accessible name"
-            assert (
-                "workflow" in name.lower()
-            ), f"Accessible name '{name}' should mention 'workflow'"
-
-    @pytest.mark.smoke
-    def test_example_cards_are_focusable(self) -> None:
-        """Example dataset cards should accept keyboard focus."""
-        from rheojax.gui.compat import Qt, QWidget
-        from rheojax.gui.pages.home_page import HomePage
-
-        page = HomePage()
-        # Example cards have accessible names starting with "Example dataset:"
-        focusable_examples = [
-            w
-            for w in page.findChildren(QWidget)
-            if w.accessibleName().startswith("Example dataset:")
-        ]
-        # There should be 8 example cards
-        assert (
-            len(focusable_examples) == 8
-        ), f"Expected 8 focusable example cards, found {len(focusable_examples)}"
-        for card in focusable_examples:
-            assert card.focusPolicy() == Qt.StrongFocus
-
-    @pytest.mark.smoke
     def test_drop_zone_is_focusable(self) -> None:
         """DropZone should accept keyboard focus."""
         from rheojax.gui.compat import Qt
@@ -245,56 +185,6 @@ class TestKeyboardAccessibility:
         drop_zone = DropZone()
         assert drop_zone.focusPolicy() == Qt.StrongFocus
         assert drop_zone.accessibleName() == "File drop zone"
-
-
-# =============================================================================
-# QSS / Card Component Tests
-# =============================================================================
-
-
-@pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
-class TestCardQSSCompatibility:
-    """Verify card widgets match QSS selector requirements."""
-
-    @pytest.fixture(autouse=True)
-    def _ensure_qapp(self, qapp):
-        """Ensure QApplication exists for widget tests."""
-
-    @pytest.mark.smoke
-    def test_workflow_cards_have_styled_panel_frame_shape(self) -> None:
-        """Workflow cards must have frameShape=StyledPanel for QSS matching."""
-        from rheojax.gui.compat import QFrame
-        from rheojax.gui.pages.home_page import HomePage
-
-        page = HomePage()
-        cards = [
-            w
-            for w in page.findChildren(QFrame)
-            if w.property("class") == "card-clickable"
-        ]
-        assert len(cards) >= 2, "Should have at least 2 workflow cards"
-        for card in cards:
-            assert card.frameShape() == QFrame.StyledPanel, (
-                "Card must have StyledPanel frameShape for QSS selector "
-                'QFrame[frameShape="StyledPanel"][class="card-clickable"] to match'
-            )
-
-    @pytest.mark.smoke
-    def test_workflow_cards_use_clickable_frame_subclass(self) -> None:
-        """Workflow cards should be ClickableFrame instances (not monkey-patched)."""
-        from rheojax.gui.compat import QFrame
-        from rheojax.gui.pages.home_page import ClickableFrame, HomePage
-
-        page = HomePage()
-        cards = [
-            w
-            for w in page.findChildren(QFrame)
-            if w.property("class") == "card-clickable"
-        ]
-        for card in cards:
-            assert isinstance(
-                card, ClickableFrame
-            ), f"Card should be ClickableFrame, got {type(card).__name__}"
 
 
 # =============================================================================

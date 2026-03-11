@@ -27,10 +27,10 @@ QPainter = QtGui.QPainter
 # QRect lives in QtCore (not QtGui) in Qt5 and Qt6
 QRect = QtCore.QRect
 
-# Data roles for QListWidgetItem
-ROLE_STEP_ID = Qt.UserRole
-ROLE_STEP_TYPE = Qt.UserRole + 1
-ROLE_STATUS = Qt.UserRole + 2
+# Data roles for QListWidgetItem (scoped enum for PySide6/Qt6 compatibility)
+ROLE_STEP_ID = Qt.ItemDataRole.UserRole
+ROLE_STEP_TYPE = Qt.ItemDataRole.UserRole + 1
+ROLE_STATUS = Qt.ItemDataRole.UserRole + 2
 
 # Status color map
 _STATUS_COLORS: dict[StepStatus, str] = {
@@ -112,7 +112,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         rect = option.rect
 
         # Highlight selected items
-        is_selected = bool(option.state & 0x0002)  # QStyle.State_Selected
+        is_selected = bool(option.state & QtWidgets.QStyle.StateFlag.State_Selected)
         if is_selected:
             painter.fillRect(rect, QColor("#EEF2FF"))
         else:
@@ -121,7 +121,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         # Retrieve data
         step_type = index.data(ROLE_STEP_TYPE) or ""
         raw_status = index.data(ROLE_STATUS)
-        step_name = index.data(Qt.DisplayRole) or ""
+        step_name = index.data(Qt.ItemDataRole.DisplayRole) or ""
 
         # Resolve status — stored as StepStatus enum or its integer value
         status: StepStatus = StepStatus.PENDING

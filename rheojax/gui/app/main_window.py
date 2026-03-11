@@ -12,7 +12,7 @@ import threading
 import uuid
 import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from rheojax.gui.pages.transform_page import TransformPage  # noqa: F401
 from rheojax.gui.resources import load_stylesheet
 from rheojax.gui.resources.styles import ThemeManager
+from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.signals import StateSignals
 from rheojax.gui.state.store import (
     AppState,
@@ -132,6 +133,7 @@ class RheoJAXMainWindow(QMainWindow):
         self._job_types: dict[str, str] = {}
         self._job_metadata: dict[str, dict] = {}  # Capture context at submission time
         self._active_relays: set = set()  # Keep QObject relays alive until signals delivered
+        self._navigating: bool = False  # GUI-013: re-entry guard for navigate_to
         self._plot_style: str = "default"
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
 
@@ -290,6 +292,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.sidebar.step_selected.connect(self._on_sidebar_step_selected)
         self.sidebar.run_all_requested.connect(self._on_run_all)
         self.sidebar.run_step_requested.connect(self._on_run_step)
+        # GUI-009: auto-navigate when a new step is added so the workspace
+        # immediately shows the correct page for the newly created step.
+        self.sidebar.step_added.connect(self._on_sidebar_step_selected)
 
         # Dataset tree selection
         self.data_tree.dataset_selected.connect(self._on_dataset_selected)
@@ -311,7 +316,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.home_page.open_project_requested.connect(self._on_open_file)
         self.home_page.import_data_requested.connect(self._on_import)
         self.home_page.new_project_requested.connect(self._on_new_file)
-        self.home_page.example_selected.connect(self._on_open_example)
         self.home_page.recent_project_opened.connect(self._on_open_recent_project)
 
         # Diagnostics page signals
@@ -714,29 +718,39 @@ class RheoJAXMainWindow(QMainWindow):
         page_name : str
             Target page identifier (home, data, transform, fit, bayesian, diagnostics, export)
         """
-        # Map public page names to WorkspaceContainer step_type keys.
-        # WorkspaceContainer uses "load" for DataPage and None for HomePage.
-        _page_to_step: dict[str, str | None] = {
-            "home": None,
-            "data": "load",
-            "transform": "transform",
-            "fit": "fit",
-            "bayesian": "bayesian",
-            "diagnostics": "diagnostics",
-            "export": "export",
-        }
-        name = page_name.lower()
-        if name in _page_to_step:
-            step_type = _page_to_step[name]
-            to_page = name.capitalize()
-            self.workspace.show_step(step_type)
-            # Highlight matching step in sidebar (best-effort — sidebar uses
-            # step_type keys, so we pass the public name for now and let the
-            # sidebar's own selection logic handle the match).
-            self.sidebar.select_step(step_type or "")
-            self.store.dispatch("SET_TAB", {"tab": name})
-            logger.info("Page navigated", to_page=to_page)
-            self.log(f"Navigated to {to_page} page")
+        # GUI-013: prevent re-entrant calls (e.g. sidebar selection emitting
+        # step_selected which calls navigate_to again).
+        # NOTE: This guard assumes single-threaded (GUI main thread) access.
+        # navigate_to must never be called from a worker thread.
+        if self._navigating:
+            return
+        self._navigating = True
+        try:
+            # Map public page names to WorkspaceContainer step_type keys.
+            # WorkspaceContainer uses "load" for DataPage and None for HomePage.
+            _page_to_step: dict[str, str | None] = {
+                "home": None,
+                "data": "load",
+                "transform": "transform",
+                "fit": "fit",
+                "bayesian": "bayesian",
+                "diagnostics": "diagnostics",
+                "export": "export",
+            }
+            name = page_name.lower()
+            if name in _page_to_step:
+                step_type = _page_to_step[name]
+                to_page = name.capitalize()
+                self.workspace.show_step(step_type)
+                # GUI-008: sidebar items are UUID-keyed; select_step_by_type
+                # iterates ROLE_STEP_TYPE data to find the correct item.
+                self.sidebar.select_step_by_type(step_type or "")
+                # Navigation is handled by workspace.show_step() above;
+                # no dispatch needed (SET_TAB had no reducer).
+                logger.info("Page navigated", to_page=to_page)
+                self.log(f"Navigated to {to_page} page")
+        finally:
+            self._navigating = False
 
     def log(self, message: str) -> None:
         """Append message to log panel.
@@ -1027,56 +1041,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.navigate_to("data")
         self.status_bar.show_message(f"Opened: {path.name}", 3000)
 
-    @Slot(str)
-    def _on_open_example(self, example_name: str) -> None:
-        """Handle example selection from the home page.
-
-        Opens the corresponding notebook in Google Colab for interactive use.
-        """
-        logger.debug("Opening example", example_name=example_name)
-        # Map example names to their relative paths in the repository
-        example_paths = {
-            "oscillation": "examples/basic/02-zener-fitting.ipynb",
-            "relaxation": "examples/basic/01-maxwell-fitting.ipynb",
-            "creep": "examples/basic/03-springpot-fitting.ipynb",
-            "flow": "examples/basic/04-bingham-fitting.ipynb",
-            "sgr": "examples/advanced/09-sgr-soft-glassy-rheology.ipynb",
-            "spp": "examples/advanced/10-spp-laos-tutorial.ipynb",
-            "tts": "examples/transforms/02-mastercurve-tts.ipynb",
-            "bayesian": "examples/bayesian",
-        }
-
-        COLAB_BASE = "https://colab.research.google.com/github/imewei/rheojax/blob/main"
-        GITHUB_BASE = "https://github.com/imewei/rheojax/tree/main"
-
-        rel_path = example_paths.get(example_name.lower())
-        if rel_path is None:
-            # Unknown example, open examples directory
-            url = f"{GITHUB_BASE}/examples"
-        elif rel_path.endswith(".ipynb"):
-            # Notebook - open in Colab
-            url = f"{COLAB_BASE}/{rel_path}"
-        else:
-            # Directory - open on GitHub
-            url = f"{GITHUB_BASE}/{rel_path}"
-
-        try:
-            webbrowser.open(url)
-            self.log(f"Opening example: {rel_path or example_name}")
-            logger.info("Example opened", example_name=example_name, url=url)
-            self.status_bar.show_message(
-                f"Opening {example_name} example in Colab...", 2000
-            )
-        except Exception as exc:
-            logger.error(
-                "Failed to open example",
-                example_name=example_name,
-                error=str(exc),
-                exc_info=True,
-            )
-            webbrowser.open(f"{GITHUB_BASE}/examples")
-            self.log("Falling back to examples repository link")
-
     @Slot()
     def _on_import(self) -> None:
         """Handle import data action."""
@@ -1306,7 +1270,19 @@ class RheoJAXMainWindow(QMainWindow):
             from rheojax.gui.state import selectors
 
             step = selectors.get_pipeline_step_by_id(step_id)
-            step_type = step.step_type if step else step_id
+            if step is not None:
+                step_type = step.step_type
+            else:
+                # GUI-015: step not found — fall back to home rather than
+                # using the raw UUID as a page name (which would never match).
+                logger.warning(
+                    "Sidebar step_id not found in pipeline state, falling back to home",
+                    step_id=step_id,
+                )
+                self.status_bar.show_message(
+                    "Pipeline step not found — navigating to Home", 3000
+                )
+                step_type = "home"
         except Exception:
             step_type = step_id
 
@@ -1505,6 +1481,14 @@ class RheoJAXMainWindow(QMainWindow):
             elif prior.step_type == "export":
                 context["export_path"] = cached
 
+        # GUI-007: If running a standalone Bayesian step after a cached fit,
+        # model_name may be absent. Recover it from the fit result object.
+        if not context.get("model_name") and context.get("fit_result"):
+            context["model_name"] = (
+                getattr(context["fit_result"], "model_name", "")
+                or getattr(context["fit_result"], "_model_name", "")
+            )
+
         # Offload to a background thread — same reason as _on_run_all.
         from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
 
@@ -1563,6 +1547,9 @@ class RheoJAXMainWindow(QMainWindow):
         logger.error("Pipeline worker error", error=error_msg)
         self.log(f"Pipeline execution failed: {error_msg}")
         self.status_bar.show_message(f"Pipeline run failed: {error_msg}", 5000)
+        # GUI-010: belt-and-suspenders — re-enable run buttons even when the
+        # execution service failed before dispatching pipeline_execution_completed.
+        pipeline_actions.set_pipeline_running(False)
 
     def _on_theme_changed(self, theme: str) -> None:
         """Handle theme change."""

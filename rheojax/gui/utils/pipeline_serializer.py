@@ -189,12 +189,21 @@ def to_yaml(
     return result
 
 
-def from_yaml(yaml_str: str) -> tuple[list[PipelineStepConfig], str]:
+def from_yaml(
+    yaml_str: str,
+    strict: bool = False,
+) -> tuple[list[PipelineStepConfig], str]:
     """Parse a YAML string into GUI pipeline steps.
 
     Args:
         yaml_str: YAML pipeline configuration string (as produced by
             :func:`to_yaml` or the ``rheojax run`` CLI).
+        strict: When ``True``, run the full CLI :func:`validate_config` check
+            (requires a ``load`` first step, non-empty steps list, etc.).
+            When ``False`` (the default), only lightweight structural checks
+            are performed — each step must be a dict with a ``"type"`` key.
+            GUI draft pipelines are loaded with ``strict=False`` so that
+            in-progress pipelines in any order are accepted without error.
 
     Returns:
         A ``(steps, pipeline_name)`` tuple where *steps* is an ordered list
@@ -222,25 +231,73 @@ def from_yaml(yaml_str: str) -> tuple[list[PipelineStepConfig], str]:
     if missing:
         raise ValueError(f"Pipeline YAML is missing required top-level keys: {missing}")
 
-    # Validate against the CLI schema for defense-in-depth (path traversal,
-    # step ordering, required keys, unknown step types).
-    from rheojax.cli._yaml_schema import (  # noqa: PLC0415
-        PipelineConfig,
-        validate_config,
-    )
-
-    schema_config = PipelineConfig(
-        version=str(raw.get("version", "1")),
-        name=str(raw.get("name", "")),
-        defaults=raw.get("defaults") or {},
-        steps=raw.get("steps", []),
-    )
-    schema_errors = validate_config(schema_config)
-    if schema_errors:
-        raise ValueError(
-            "Pipeline YAML failed schema validation:\n"
-            + "\n".join(f"  - {e}" for e in schema_errors)
+    # SER-001: empty-step pipelines are valid GUI drafts — return early before
+    # any validation that requires at least one step.
+    if not raw.get("steps"):
+        logger.debug(
+            "Deserialized empty pipeline from YAML",
+            pipeline_name=raw.get("name", "Untitled Pipeline"),
         )
+        return [], raw.get("name", "Untitled Pipeline")
+
+    if strict:
+        # Full CLI validation: enforces load-first ordering, non-empty steps,
+        # path safety, etc.  The CLI calls validate_config separately before
+        # execution, so the GUI should only reach this branch via explicit opt-in.
+        from rheojax.cli._yaml_schema import (  # noqa: PLC0415
+            PipelineConfig,
+            validate_config,
+        )
+
+        schema_config = PipelineConfig(
+            version=str(raw.get("version", "1")),
+            name=str(raw.get("name", "")),
+            defaults=raw.get("defaults") or {},
+            steps=raw.get("steps", []),
+        )
+        schema_errors = validate_config(schema_config)
+        if schema_errors:
+            raise ValueError(
+                "Pipeline YAML failed schema validation:\n"
+                + "\n".join(f"  - {e}" for e in schema_errors)
+            )
+    else:
+        # SER-002: lightweight structural check — each step must be a dict with
+        # a "type" key.  Execution-order constraints (load-first, fit-before-
+        # bayesian) are intentionally skipped so that GUI draft pipelines in any
+        # order round-trip without error.
+        #
+        # Path-safety checks (absolute paths, ".." traversal) are always applied
+        # regardless of strict mode — these are security invariants, not ordering
+        # constraints.
+        from pathlib import Path as _Path  # noqa: PLC0415
+
+        _PATH_KEYS = {"file", "output"}
+        for i, step in enumerate(raw.get("steps", [])):
+            if not isinstance(step, dict):
+                raise ValueError(f"Step {i + 1} must be a dict")
+            if "type" not in step:
+                raise ValueError(f"Step {i + 1} missing 'type' key")
+            for key in _PATH_KEYS:
+                value = step.get(key)
+                if value is None or not isinstance(value, str):
+                    continue
+                p = _Path(value)
+                # Absolute paths are legitimate in GUI context (file-picker
+                # returns them).  Warn for observability but do not reject —
+                # matches PipelineExecutionService behaviour.
+                if p.is_absolute():
+                    logger.warning(
+                        "Step %d: '%s' is an absolute path (CLI validator "
+                        "would reject this)",
+                        i + 1,
+                        key,
+                    )
+                if ".." in p.parts:
+                    raise ValueError(
+                        f"Step {i + 1}: '{key}' must not contain '..' segments, "
+                        f"got '{value}'."
+                    )
 
     pipeline_name: str = str(raw["name"])
     raw_steps = raw.get("steps", [])

@@ -336,3 +336,52 @@ class TestPipelineExecutionService:
         assert "data" in received_context_keys[1]
         # Fit receives data from transform
         assert "data" in received_context_keys[2]
+
+
+# ---------------------------------------------------------------------------
+# TestCoerceBayesianInt
+# ---------------------------------------------------------------------------
+
+
+class TestCoerceBayesianInt:
+    """Unit tests for _coerce_bayesian_int helper."""
+
+    @pytest.fixture(autouse=True)
+    def _import_helper(self):
+        from rheojax.gui.services.pipeline_execution_service import (
+            _coerce_bayesian_int,
+        )
+
+        self._coerce = _coerce_bayesian_int
+
+    @pytest.mark.smoke
+    def test_default_value_used_when_key_absent(self):
+        assert self._coerce({}, "num_warmup", 1000) == 1000
+
+    @pytest.mark.unit
+    def test_string_coerced_to_int(self):
+        assert self._coerce({"num_warmup": "500"}, "num_warmup", 1000) == 500
+
+    @pytest.mark.unit
+    def test_float_coerced_to_int(self):
+        assert self._coerce({"num_samples": 2000.0}, "num_samples", 1000) == 2000
+
+    @pytest.mark.unit
+    def test_non_numeric_raises_value_error(self):
+        with pytest.raises(ValueError, match="must be an integer"):
+            self._coerce({"num_warmup": "abc"}, "num_warmup", 1000)
+
+    @pytest.mark.unit
+    def test_zero_raises_value_error(self):
+        with pytest.raises(ValueError, match="must be between"):
+            self._coerce({"num_warmup": 0}, "num_warmup", 1000)
+
+    @pytest.mark.unit
+    def test_exceeds_max_raises_value_error(self):
+        with pytest.raises(ValueError, match="must be between"):
+            self._coerce({"num_chains": 100}, "num_chains", 4, max_val=16)
+
+    @pytest.mark.unit
+    def test_boundary_value_accepted(self):
+        assert self._coerce({"num_chains": 16}, "num_chains", 4, max_val=16) == 16
+        assert self._coerce({"num_chains": 1}, "num_chains", 4, max_val=16) == 1

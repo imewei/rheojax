@@ -269,7 +269,7 @@ class TestUpdateStepConfig:
         assert step.config["ftol"] == 1e-8
 
     def test_update_config_invalidates_downstream(self):
-        """Updating a step config must reset the step and downstream results."""
+        """Updating a step config must clear its cached result and reset downstream steps."""
         id0 = _add_load_step("Load")
         id1 = _add_fit_step("Fit")
         # Mark both as COMPLETE with cached results.
@@ -277,14 +277,15 @@ class TestUpdateStepConfig:
         update_step_status(id1, StepStatus.COMPLETE)
         cache_step_result(id0, "data")
         cache_step_result(id1, "fit")
-        # Update config of the first step — this must invalidate id0 onwards.
+        # Update config of the first step — this must invalidate downstream.
         update_step_config(id0, {"new_option": True})
-        # The updated step and all downstream steps must be reset.
         step0 = get_pipeline_step_by_id(id0)
         step1 = get_pipeline_step_by_id(id1)
-        assert step0.status == StepStatus.PENDING
-        assert step1.status == StepStatus.PENDING
+        # The edited step keeps its status but loses its cached result.
+        assert step0.status == StepStatus.COMPLETE
         assert get_pipeline_step_result(id0) is None
+        # Downstream steps are fully reset.
+        assert step1.status == StepStatus.PENDING
         assert get_pipeline_step_result(id1) is None
 
     def test_update_config_overwrite_existing_key(self):

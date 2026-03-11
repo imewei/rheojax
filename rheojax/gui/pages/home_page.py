@@ -9,7 +9,6 @@ from pathlib import Path
 
 from rheojax.gui.compat import (
     QFrame,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -35,22 +34,6 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
-class ClickableFrame(QFrame):
-    """A QFrame subclass that emits a signal on click and handles keyboard activation."""
-
-    clicked = Signal()
-
-    def mousePressEvent(self, event) -> None:
-        self.clicked.emit()
-        super().mousePressEvent(event)
-
-    def keyPressEvent(self, event) -> None:
-        if event.key() in (Qt.Key_Return, Qt.Key_Space):
-            self.clicked.emit()
-        else:
-            super().keyPressEvent(event)
-
-
 class ClickableWidget(QWidget):
     """A QWidget subclass that emits a signal on click and handles keyboard activation."""
 
@@ -71,11 +54,10 @@ class HomePage(QWidget):
     """Home page with getting started content.
 
     Features:
-        - Quick start wizard
+        - Quick start buttons (Import Data, New Project, Open Project)
         - Recent projects list
-        - Example datasets
-        - Tutorial links
         - System status
+        - Resources links
 
     Signals
     -------
@@ -85,8 +67,6 @@ class HomePage(QWidget):
         Emitted when user clicks Import Data
     new_project_requested : Signal()
         Emitted when user clicks New Project
-    example_selected : Signal(str)
-        Emitted when user selects an example
     recent_project_opened : Signal(Path)
         Emitted when user opens a recent project
 
@@ -99,9 +79,7 @@ class HomePage(QWidget):
     open_project_requested = Signal()
     import_data_requested = Signal()
     new_project_requested = Signal()
-    example_selected = Signal(str)
     recent_project_opened = Signal(Path)
-    workflow_selected = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize home page.
@@ -151,20 +129,8 @@ class HomePage(QWidget):
         # Quick Start section
         body_layout.addWidget(self._create_quick_start())
 
-        # Workflow Selector
-        body_layout.addWidget(self._create_workflow_selector())
-
-        # Two-column layout for Recent Projects and Examples
-        two_col_layout = QHBoxLayout()
-        two_col_layout.setSpacing(Spacing.XL)
-
-        # Recent Projects (left)
-        two_col_layout.addWidget(self._create_recent_projects())
-
-        # Example Datasets (right)
-        two_col_layout.addWidget(self._create_examples())
-
-        body_layout.addLayout(two_col_layout)
+        # Recent Projects
+        body_layout.addWidget(self._create_recent_projects())
 
         # Bottom row: System Status and Resources side by side
         bottom_row = QHBoxLayout()
@@ -271,13 +237,6 @@ class HomePage(QWidget):
             Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
         )
 
-        # Open Project button
-        btn_open = self._create_action_button(
-            "Open Project", "Load an existing RheoJAX project", "primary"
-        )
-        btn_open.clicked.connect(self._on_open_project_clicked)
-        layout.addWidget(btn_open)
-
         # Import Data button
         btn_import = self._create_action_button(
             "Import Data", "Import TRIOS, Anton Paar, CSV, Excel", "success"
@@ -291,6 +250,13 @@ class HomePage(QWidget):
         )
         btn_new.clicked.connect(self._on_new_project_clicked)
         layout.addWidget(btn_new)
+
+        # Open Project button
+        btn_open = self._create_action_button(
+            "Open Project", "Load an existing RheoJAX project", "primary"
+        )
+        btn_open.clicked.connect(self._on_open_project_clicked)
+        layout.addWidget(btn_open)
 
         return group
 
@@ -362,137 +328,6 @@ class HomePage(QWidget):
             }}
         """)
         return btn
-
-    def _create_workflow_selector(self) -> QWidget:
-        """Create workflow selection section."""
-        group = QGroupBox("Select Workflow")
-
-        layout = QHBoxLayout(group)
-        layout.setSpacing(Spacing.LG)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
-        )
-
-        # Fitting Workflow Card
-        fit_card = self._create_workflow_card(
-            "Fitting Workflow",
-            "Data -> Fit -> Bayesian -> Diagnostics -> Export",
-            "primary",
-            "fitting",
-        )
-        layout.addWidget(fit_card)
-
-        # Transform Workflow Card
-        transform_card = self._create_workflow_card(
-            "Transform Workflow",
-            "Data -> Transforms (FFT, TTS, SPP) -> Export",
-            "success",
-            "transform",
-        )
-        layout.addWidget(transform_card)
-
-        return group
-
-    def _create_workflow_card(
-        self, title: str, description: str, variant: str, mode: str
-    ) -> QWidget:
-        """Create a workflow selection card using ClickableFrame."""
-        card = ClickableFrame()
-        card.setFrameShape(QFrame.StyledPanel)
-        card.setProperty("class", "card-clickable")
-        card.setCursor(Qt.PointingHandCursor)
-        card.setMinimumHeight(140)
-
-        layout = QVBoxLayout(card)
-        layout.setSpacing(Spacing.SM)
-        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-
-        # Title — use PRIMARY (readable on both light and dark surfaces)
-        title_label = QLabel(title)
-        title_label.setStyleSheet(f"""
-            font-size: {Typography.SIZE_XL}pt;
-            font-weight: {Typography.WEIGHT_BOLD};
-            color: {ColorPalette.PRIMARY};
-            background-color: transparent;
-            border: none;
-        """)
-        title_label.setObjectName("cardTitle")
-        layout.addWidget(title_label)
-
-        # Description
-        desc_label = QLabel(description)
-        desc_label.setWordWrap(True)
-        desc_label.setStyleSheet(f"""
-            font-size: {Typography.SIZE_MD}pt;
-            color: {ColorPalette.TEXT_SECONDARY};
-            background-color: transparent;
-            border: none;
-        """)
-        layout.addWidget(desc_label)
-
-        layout.addStretch()
-
-        # Action Label
-        action_label = QLabel("Start Workflow \u2192")
-        action_label.setAlignment(Qt.AlignRight)
-        action_label.setStyleSheet(f"""
-            font-weight: {Typography.WEIGHT_SEMIBOLD};
-            color: {ColorPalette.ACCENT};
-            font-size: {Typography.SIZE_BASE}pt;
-            background-color: transparent;
-            border: none;
-        """)
-        layout.addWidget(action_label)
-
-        # Keyboard accessibility
-        card.setFocusPolicy(Qt.StrongFocus)
-        card.setAccessibleName(f"{title} workflow card")
-        card.setAccessibleDescription(description)
-
-        # Connect click signal to workflow selection
-        card.clicked.connect(lambda m=mode: self._select_workflow(m))
-
-        return card
-
-    def _select_workflow(self, mode: str) -> None:
-        """Handle workflow selection."""
-        logger.debug(
-            "Quick action triggered",
-            action="select_workflow",
-            page="HomePage",
-            workflow_mode=mode,
-        )
-        self._store.dispatch("SET_WORKFLOW_MODE", {"mode": mode})
-        self.workflow_selected.emit(mode)
-        # Navigate to data tab to start work
-        logger.debug("Navigation action", target="data", page="HomePage")
-        self._store.dispatch("NAVIGATE_TAB", {"tab": "data"})
-
-    def _darken_color(self, hex_color: str, factor: float = 0.1) -> str:
-        """Darken a hex color."""
-        hex_color = hex_color.lstrip("#")
-        r, g, b = (
-            int(hex_color[0:2], 16),
-            int(hex_color[2:4], 16),
-            int(hex_color[4:6], 16),
-        )
-        r = int(r * (1 - factor))
-        g = int(g * (1 - factor))
-        b = int(b * (1 - factor))
-        return f"#{r:02x}{g:02x}{b:02x}"
-
-    def _lighten_color(self, hex_color: str, factor: float = 0.25) -> str:
-        """Lighten a hex color toward white."""
-        hex_color = hex_color.lstrip("#")
-        r, g, b = (
-            int(hex_color[0:2], 16),
-            int(hex_color[2:4], 16),
-            int(hex_color[4:6], 16),
-        )
-        r = min(255, int(r + (255 - r) * factor))
-        g = min(255, int(g + (255 - g) * factor))
-        b = min(255, int(b + (255 - b) * factor))
-        return f"#{r:02x}{g:02x}{b:02x}"
 
     def _create_recent_projects(self) -> QWidget:
         """Create recent projects section."""
@@ -575,149 +410,6 @@ class HomePage(QWidget):
         widget.clicked.connect(on_project_open)
 
         return widget
-
-    def _create_examples(self) -> QWidget:
-        """Create example datasets section."""
-        group = QGroupBox("Example Datasets")
-
-        layout = QGridLayout(group)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
-        )
-        layout.setHorizontalSpacing(Spacing.SM)
-        layout.setVerticalSpacing(Spacing.SM)
-        self._examples_layout = layout
-        self._example_cards: list[QWidget] = []
-
-        # Map example names to actual file paths (relative to project root)
-        self._example_paths = {
-            "Oscillation": "examples/data/pyRheo/chia_pudding/oscillation_chia_data.csv",
-            "Relaxation": "examples/data/experimental/polypropylene_relaxation.csv",
-            "Creep": "examples/data/pyRheo/mucus/creep_mucus_data.csv",
-            "Flow": "examples/data/experimental/cellulose_hydrogel_flow.csv",
-            "SGR": "examples/data/pyRheo/emulsion/emulsions_v2.csv",
-            "SPP": "examples/data/experimental/multi_technique.txt",
-            "TTS": "examples/data/experimental/frequency_sweep_tts.txt",
-            "Bayesian": "examples/data/pyRheo/fish_muscle/stressrelaxation_fishmuscle_data.csv",
-        }
-
-        # Card colors — theme-aware so they stay vibrant in both light/dark
-        chart_colors = [
-            themed("CHART_1"),
-            themed("CHART_3"),
-            themed("CHART_5"),
-            themed("CHART_6"),
-            themed("CHART_2"),
-            themed("INFO"),
-            themed("CHART_4"),
-            themed("ACCENT"),
-        ]
-
-        examples = [
-            ("Oscillation", "SAOS frequency sweep"),
-            ("Relaxation", "Stress relaxation G(t)"),
-            ("Creep", "Creep compliance J(t)"),
-            ("Flow", "Steady shear flow curve"),
-            ("SGR", "Soft glassy emulsion"),
-            ("SPP", "Multi-technique TRIOS"),
-            ("TTS", "Time-Temp Superposition"),
-            ("Bayesian", "Fish muscle relaxation"),
-        ]
-
-        for idx, (name, description) in enumerate(examples):
-            color = chart_colors[idx % len(chart_colors)]
-            card = self._create_example_card(name, description, color)
-            self._example_cards.append(card)
-
-        self._relayout_examples()
-
-        return group
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._relayout_examples()
-
-    def _relayout_examples(self) -> None:
-        if not hasattr(self, "_examples_layout"):
-            return
-        layout = self._examples_layout
-        # Clear layout
-        while layout.count():
-            item = layout.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
-
-        if not self._example_cards:
-            return
-
-        # Determine columns based on available width
-        width = self.width()
-        cols = 4 if width > 1200 else 3 if width > 900 else 2 if width > 600 else 1
-
-        for idx, card in enumerate(self._example_cards):
-            row = idx // cols
-            col = idx % cols
-            layout.addWidget(card, row, col)
-
-    def _create_example_card(self, name: str, description: str, color: str) -> QWidget:
-        """Create an example dataset card."""
-        card = ClickableFrame()
-        card.setFrameShape(QFrame.NoFrame)
-        card.setObjectName("exampleCard")
-        darker = self._darken_color(color, 0.15)
-        lighter = self._lighten_color(color, 0.25)
-        card.setStyleSheet(f"""
-            #exampleCard {{
-                background-color: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {color}, stop:1 {darker}
-                );
-                border: 1px solid {lighter};
-                border-radius: {BorderRadius.XL}px;
-            }}
-        """)
-        card.setCursor(Qt.PointingHandCursor)
-        card.setMinimumHeight(72)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
-        layout.setSpacing(Spacing.XXS)
-
-        # Name
-        name_label = QLabel(name)
-        name_label.setStyleSheet(
-            f"color: #FFFFFF; font-size: {Typography.SIZE_BASE}pt;"
-            f" font-weight: {Typography.WEIGHT_BOLD}; background-color: transparent;"
-        )
-        layout.addWidget(name_label)
-
-        # Description
-        desc_label = QLabel(description)
-        desc_label.setStyleSheet(
-            f"color: rgba(255, 255, 255, 0.80); font-size: {Typography.SIZE_XS}pt;"
-            f" font-weight: {Typography.WEIGHT_NORMAL}; background-color: transparent;"
-        )
-        desc_label.setWordWrap(True)
-        layout.addWidget(desc_label)
-
-        # Keyboard accessibility
-        card.setFocusPolicy(Qt.StrongFocus)
-        card.setAccessibleName(f"Example dataset: {name}")
-        card.setAccessibleDescription(description)
-
-        # Connect click signal
-        def on_example_open(example_name=name):
-            logger.debug(
-                "Quick action triggered",
-                action="select_example",
-                page="HomePage",
-                example_name=example_name,
-            )
-            self.example_selected.emit(example_name)
-
-        card.clicked.connect(on_example_open)
-
-        return card
 
     def _create_system_status(self) -> QWidget:
         """Create system status section."""
@@ -825,56 +517,3 @@ class HomePage(QWidget):
             for path in state.recent_projects
         ]
 
-    def open_example(self, example_name: str) -> None:
-        """Open example dataset.
-
-        Parameters
-        ----------
-        example_name : str
-            Example identifier
-        """
-        logger.debug(
-            "Quick action triggered",
-            action="open_example",
-            page="HomePage",
-            example_name=example_name,
-        )
-        self.example_selected.emit(example_name)
-
-    def get_example_path(self, example_name: str) -> Path | None:
-        """Get the file path for an example dataset.
-
-        Parameters
-        ----------
-        example_name : str
-            Example identifier (e.g., "Oscillation", "Relaxation")
-
-        Returns
-        -------
-        Path | None
-            Absolute path to the example file, or None if not found
-        """
-        if not hasattr(self, "_example_paths"):
-            return None
-
-        rel_path = self._example_paths.get(example_name)
-        if not rel_path:
-            return None
-
-        # Try resolving from project root (current working directory)
-        path = Path(rel_path)
-        if path.exists():
-            return path.resolve()
-
-        # Try from cwd
-        cwd_path = Path.cwd() / rel_path
-        if cwd_path.exists():
-            return cwd_path.resolve()
-
-        # Try from module location
-        module_dir = Path(__file__).parent.parent.parent.parent
-        module_path = module_dir / rel_path
-        if module_path.exists():
-            return module_path.resolve()
-
-        return None
