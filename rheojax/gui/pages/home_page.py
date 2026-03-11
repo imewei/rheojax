@@ -2,19 +2,23 @@
 Home Page
 =========
 
-Landing page with quick start actions and recent projects.
+Landing page with quick start actions, recent projects, and system status.
+Redesigned with a compact hero, card-based quick-start grid, and a
+two-column body layout for better information hierarchy.
 """
 
 from pathlib import Path
 
 from rheojax.gui.compat import (
     QFrame,
-    QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     Qt,
+    QTimer,
     QVBoxLayout,
     QWidget,
     Signal,
@@ -25,6 +29,8 @@ from rheojax.gui.resources.styles import (
     Spacing,
     Typography,
     button_style,
+    card_style,
+    section_header_style,
     themed,
 )
 from rheojax.gui.state.store import StateStore
@@ -54,9 +60,10 @@ class HomePage(QWidget):
     """Home page with getting started content.
 
     Features:
-        - Quick start buttons (Import Data, New Project, Open Project)
+        - Compact hero header with version + model count
+        - Card-based quick start actions (Import, New, Open)
         - Recent projects list
-        - System status
+        - System status (JAX device, float64, memory)
         - Resources links
 
     Signals
@@ -111,13 +118,13 @@ class HomePage(QWidget):
         content_layout.setSpacing(0)
         content_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Hero header section (gradient banner)
+        # Compact hero header
         content_layout.addWidget(self._create_header())
 
-        # Content area with padding
+        # Body: two-column layout
         body = QWidget()
         body.setStyleSheet(f"background-color: {themed('BG_CANVAS')};")
-        body_layout = QVBoxLayout(body)
+        body_layout = QHBoxLayout(body)
         body_layout.setSpacing(Spacing.XL)
         body_layout.setContentsMargins(
             Spacing.PAGE_MARGIN + 4,
@@ -126,35 +133,59 @@ class HomePage(QWidget):
             Spacing.PAGE_MARGIN,
         )
 
-        # Quick Start section
-        body_layout.addWidget(self._create_quick_start())
+        # Left column (primary): Quick Start + Recent Projects
+        left_col = QVBoxLayout()
+        left_col.setSpacing(Spacing.XL)
+        left_col.addWidget(self._create_quick_start())
+        left_col.addWidget(self._create_recent_projects())
+        left_col.addStretch()
 
-        # Recent Projects
-        body_layout.addWidget(self._create_recent_projects())
+        # Right column (supporting): System Status + Resources
+        right_col = QVBoxLayout()
+        right_col.setSpacing(Spacing.XL)
+        right_col.addWidget(self._create_system_status())
+        right_col.addWidget(self._create_resources())
+        right_col.addStretch()
 
-        # Bottom row: System Status and Resources side by side
-        bottom_row = QHBoxLayout()
-        bottom_row.setSpacing(Spacing.XL)
-        bottom_row.addWidget(self._create_system_status())
-        bottom_row.addWidget(self._create_resources())
-        body_layout.addLayout(bottom_row)
-
-        body_layout.addStretch()
+        # 3:2 ratio — primary content gets more space
+        body_layout.addLayout(left_col, stretch=3)
+        body_layout.addLayout(right_col, stretch=2)
 
         content_layout.addWidget(body)
 
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
 
+        # Defer model registry discovery to avoid blocking GUI startup
+        QTimer.singleShot(0, self._populate_stat_pills)
+
+    def _populate_stat_pills(self) -> None:
+        """Populate header stat pills after event loop starts."""
+        stats = self._get_inventory_stats()
+        # Insert pills before the stretch item (last item in the layout)
+        insert_pos = self._stat_pills_layout.count() - 1
+        for label_text in stats:
+            pill = QLabel(label_text)
+            pill.setStyleSheet(self._stat_pill_style)
+            self._stat_pills_layout.insertWidget(insert_pos, pill)
+            insert_pos += 1
+
+    # ------------------------------------------------------------------
+    # Header
+    # ------------------------------------------------------------------
+
     def _create_header(self) -> QWidget:
-        """Create hero header with gradient background."""
+        """Create compact hero header with gradient background."""
         header = QWidget()
-        header.setMinimumHeight(240)
+        header.setMinimumHeight(140)
+        header.setMaximumHeight(160)
         header.setStyleSheet(f"""
             QWidget {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {themed('PRIMARY_PRESSED')}, stop:0.4 {themed('PRIMARY_PRESSED')}, stop:1 {themed('ACCENT_PRESSED')}
+                    stop:0 {themed('PRIMARY_PRESSED')},
+                    stop:0.4 {themed('PRIMARY_PRESSED')},
+                    stop:1 {themed('ACCENT_PRESSED')}
                 );
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }}
@@ -162,17 +193,17 @@ class HomePage(QWidget):
         """)
 
         layout = QVBoxLayout(header)
-        layout.setSpacing(Spacing.MD)
+        layout.setSpacing(Spacing.SM)
         layout.setContentsMargins(
             Spacing.PAGE_MARGIN + 16,
-            Spacing.XXL,
-            Spacing.PAGE_MARGIN + 16,
             Spacing.XL,
+            Spacing.PAGE_MARGIN + 16,
+            Spacing.LG,
         )
 
-        # Top Row: Title + Version Badge
+        # Top row: Title + Version badge + Stats
         top_row = QHBoxLayout()
-        top_row.setSpacing(Spacing.LG)
+        top_row.setSpacing(Spacing.MD)
         top_row.setContentsMargins(0, 0, 0, 0)
 
         # Title
@@ -180,13 +211,13 @@ class HomePage(QWidget):
         title.setStyleSheet(f"""
             color: {ColorPalette.TEXT_INVERSE};
             font-family: {Typography.FONT_FAMILY};
-            font-size: {Typography.SIZE_HERO}pt;
+            font-size: {Typography.SIZE_HEADING + 4}pt;
             font-weight: {Typography.WEIGHT_BOLD};
             background-color: transparent;
         """)
         top_row.addWidget(title)
 
-        # Version Badge
+        # Version badge
         try:
             from rheojax import __version__
 
@@ -200,24 +231,40 @@ class HomePage(QWidget):
                 color: {ColorPalette.TEXT_INVERSE};
                 background-color: rgba(255, 255, 255, 0.15);
                 border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: {BorderRadius.MD}px;
-                padding: {Spacing.XS}px {Spacing.MD}px;
-                font-size: {Typography.SIZE_MD}pt;
+                border-radius: {BorderRadius.SM}px;
+                padding: {Spacing.XXS}px {Spacing.SM}px;
+                font-size: {Typography.SIZE_SM}pt;
                 font-weight: {Typography.WEIGHT_SEMIBOLD};
-                font-family: {Typography.FONT_FAMILY};
+                font-family: {Typography.FONT_FAMILY_MONO};
             }}
         """)
         top_row.addWidget(version_badge)
-        top_row.addStretch()  # Push everything to left
 
+        # Stat pills (model count + transforms) — populated asynchronously
+        # to avoid blocking the GUI with model registry discovery.
+        self._stat_pill_style = f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.85);
+                background-color: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: {BorderRadius.SM}px;
+                padding: {Spacing.XXS}px {Spacing.SM}px;
+                font-size: {Typography.SIZE_SM}pt;
+                font-weight: {Typography.WEIGHT_MEDIUM};
+                font-family: {Typography.FONT_FAMILY};
+            }}
+        """
+        self._stat_pills_layout = top_row
+
+        top_row.addStretch()
         layout.addLayout(top_row)
 
         # Subtitle
         subtitle = QLabel("JAX-Accelerated Rheological Analysis")
         subtitle.setStyleSheet(f"""
-            color: {ColorPalette.TEXT_DISABLED};
+            color: rgba(255, 255, 255, 0.7);
             font-family: {Typography.FONT_FAMILY};
-            font-size: {Typography.SIZE_XL + 2}pt;
+            font-size: {Typography.SIZE_LG}pt;
             font-weight: {Typography.WEIGHT_NORMAL};
             background-color: transparent;
         """)
@@ -227,38 +274,84 @@ class HomePage(QWidget):
 
         return header
 
+    @staticmethod
+    def _get_inventory_stats() -> list[str]:
+        """Return stat strings for the header pills."""
+        try:
+            import rheojax.models
+            import rheojax.transforms
+
+            rheojax.models._ensure_all_registered()
+            rheojax.transforms._ensure_all_registered()
+
+            from rheojax.core.registry import Registry
+
+            registry = Registry.get_instance()
+            inv = registry.inventory()
+            n_models = len(inv.get("all_models", []))
+            n_transforms = len(inv.get("all_transforms", []))
+            pills = []
+            if n_models:
+                pills.append(f"{n_models} Models")
+            if n_transforms:
+                pills.append(f"{n_transforms} Transforms")
+            return pills
+        except Exception:
+            return []
+
+    # ------------------------------------------------------------------
+    # Quick Start
+    # ------------------------------------------------------------------
+
     def _create_quick_start(self) -> QWidget:
-        """Create quick start section."""
-        group = QGroupBox("Quick Start")
+        """Create quick start section with card grid."""
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(Spacing.MD)
 
-        layout = QHBoxLayout(group)
-        layout.setSpacing(Spacing.MD)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
-        )
+        # Section label
+        label = QLabel("Quick Start")
+        label.setStyleSheet(section_header_style())
+        outer.addWidget(label)
 
-        # Import Data button
-        btn_import = self._create_action_button(
-            "Import Data", "Import TRIOS, Anton Paar, CSV, Excel", "success"
-        )
-        btn_import.clicked.connect(self._on_import_data_clicked)
-        layout.addWidget(btn_import)
+        # Card grid (3 columns)
+        grid = QGridLayout()
+        grid.setSpacing(Spacing.MD)
+        grid.setContentsMargins(0, 0, 0, 0)
 
-        # New Project button
-        btn_new = self._create_action_button(
-            "New Project", "Start a new analysis project", "warning"
-        )
-        btn_new.clicked.connect(self._on_new_project_clicked)
-        layout.addWidget(btn_new)
+        cards = [
+            {
+                "title": "Import Data",
+                "desc": "TRIOS, Anton Paar, CSV, Excel",
+                "variant": "success",
+                "slot": self._on_import_data_clicked,
+            },
+            {
+                "title": "New Project",
+                "desc": "Start a new analysis",
+                "variant": "warning",
+                "slot": self._on_new_project_clicked,
+            },
+            {
+                "title": "Open Project",
+                "desc": "Load existing project",
+                "variant": "primary",
+                "slot": self._on_open_project_clicked,
+            },
+        ]
 
-        # Open Project button
-        btn_open = self._create_action_button(
-            "Open Project", "Load an existing RheoJAX project", "primary"
-        )
-        btn_open.clicked.connect(self._on_open_project_clicked)
-        layout.addWidget(btn_open)
+        for col, card_info in enumerate(cards):
+            card = self._create_action_card(
+                card_info["title"],
+                card_info["desc"],
+                card_info["variant"],
+            )
+            card.clicked.connect(card_info["slot"])
+            grid.addWidget(card, 0, col)
 
-        return group
+        outer.addLayout(grid)
+        return container
 
     def _on_open_project_clicked(self) -> None:
         """Handle Open Project button click."""
@@ -275,122 +368,148 @@ class HomePage(QWidget):
         logger.debug("Quick action triggered", action="new_project", page="HomePage")
         self.new_project_requested.emit()
 
-    def _create_action_button(
+    def _create_action_card(
         self, title: str, description: str, variant: str
-    ) -> QPushButton:
-        """Create a styled action button."""
-        btn = QPushButton(f"{title}\n\n{description}")
-        btn.setMinimumHeight(100)
-        btn.setProperty("variant", variant)
-        btn.setCursor(Qt.PointingHandCursor)
+    ) -> ClickableWidget:
+        """Create a quick-start action card with title, description, and color accent."""
+        card = ClickableWidget()
+        card.setFocusPolicy(Qt.StrongFocus)
+        card.setCursor(Qt.PointingHandCursor)
+        card.setAccessibleName(f"Quick start: {title}")
+        card.setMinimumHeight(96)
+        card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # Gradient backgrounds for each variant (theme-aware tokens)
-        variant_gradients = {
-            "primary": (
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('PRIMARY_HOVER')}, stop:1 {themed('PRIMARY')})",
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('PRIMARY')}, stop:1 {themed('PRIMARY_PRESSED')})",
-            ),
-            "success": (
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('SUCCESS_BRIGHT')}, stop:1 {themed('SUCCESS')})",
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('SUCCESS')}, stop:1 {themed('SUCCESS_HOVER')})",
-            ),
-            "warning": (
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('WARNING_BRIGHT')}, stop:1 {themed('WARNING')})",
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('WARNING')}, stop:1 {themed('WARNING_HOVER')})",
-            ),
-            "error": (
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ERROR_BRIGHT')}, stop:1 {themed('ERROR')})",
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ERROR')}, stop:1 {themed('ERROR_HOVER')})",
-            ),
-            "accent": (
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ACCENT_BRIGHT')}, stop:1 {themed('ACCENT')})",
-                f"qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {themed('ACCENT')}, stop:1 {themed('ACCENT_HOVER')})",
-            ),
+        # Accent color bar at the top of the card
+        accent_colors = {
+            "primary": themed("PRIMARY"),
+            "success": themed("SUCCESS"),
+            "warning": themed("WARNING"),
+            "error": themed("ERROR"),
+            "accent": themed("ACCENT"),
         }
-        bg_grad, bg_hover_grad = variant_gradients.get(
-            variant, variant_gradients["primary"]
-        )
-        text_color = themed("TEXT_INVERSE")
+        accent = accent_colors.get(variant, themed("PRIMARY"))
 
-        btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {bg_grad};
-                color: {text_color};
-                border: none;
-                border-radius: {BorderRadius.XL}px;
-                text-align: left;
-                padding: {Spacing.LG}px {Spacing.XL}px;
-                font-size: 11pt;
-                font-weight: 600;
+        card.setStyleSheet(f"""
+            QWidget {{
+                background-color: {themed('BG_ELEVATED')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
+                border-top: 3px solid {accent};
+                border-radius: {BorderRadius.LG}px;
             }}
-            QPushButton:hover {{
-                background-color: {bg_hover_grad};
+            QWidget:hover {{
+                background-color: {themed('BG_HOVER')};
+                border-color: {themed('BORDER_DEFAULT')};
+                border-top: 3px solid {accent};
             }}
+            QLabel {{ background-color: transparent; border: none; }}
         """)
-        return btn
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        layout.setSpacing(Spacing.XS)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"""
+            font-family: {Typography.FONT_FAMILY};
+            font-size: {Typography.SIZE_MD}pt;
+            font-weight: {Typography.WEIGHT_SEMIBOLD};
+            color: {themed('TEXT_PRIMARY')};
+        """)
+        layout.addWidget(title_label)
+
+        desc_label = QLabel(description)
+        desc_label.setStyleSheet(f"""
+            font-family: {Typography.FONT_FAMILY};
+            font-size: {Typography.SIZE_SM}pt;
+            font-weight: {Typography.WEIGHT_NORMAL};
+            color: {themed('TEXT_MUTED')};
+        """)
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        layout.addStretch()
+
+        return card
+
+    # ------------------------------------------------------------------
+    # Recent Projects
+    # ------------------------------------------------------------------
 
     def _create_recent_projects(self) -> QWidget:
         """Create recent projects section."""
-        group = QGroupBox("Recent Projects")
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(Spacing.SM)
 
-        layout = QVBoxLayout(group)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
-        )
-        layout.setSpacing(Spacing.SM)
+        label = QLabel("Recent Projects")
+        label.setStyleSheet(section_header_style())
+        outer.addWidget(label)
 
         # Get recent projects from state
         recent_projects = self._store.get_state().recent_projects
 
         if not recent_projects:
-            no_projects = QLabel("No recent projects")
-            no_projects.setProperty("class", "placeholder")
-            no_projects.setAlignment(Qt.AlignCenter)
-            layout.addWidget(no_projects)
+            empty = QLabel("No recent projects. Import data or open a project to get started.")
+            empty.setAlignment(Qt.AlignCenter)
+            empty.setStyleSheet(f"""
+                color: {themed('TEXT_MUTED')};
+                font-size: {Typography.SIZE_MD_SM}pt;
+                padding: {Spacing.XL}px {Spacing.LG}px;
+                background-color: {themed('BG_SURFACE')};
+                border: 1px dashed {themed('BORDER_SUBTLE')};
+                border-radius: {BorderRadius.LG}px;
+            """)
+            empty.setWordWrap(True)
+            outer.addWidget(empty)
         else:
-            for project_path in recent_projects[:5]:  # Show last 5
-                project_widget = self._create_recent_project_item(project_path)
-                layout.addWidget(project_widget)
+            for project_path in recent_projects[:5]:
+                outer.addWidget(self._create_recent_project_item(project_path))
 
-        layout.addStretch()
-
-        return group
+        return container
 
     def _create_recent_project_item(self, project_path: Path) -> QWidget:
         """Create a recent project item."""
         widget = ClickableWidget()
         widget.setStyleSheet(f"""
             QWidget {{
-                background-color: {ColorPalette.BG_SURFACE};
-                border: 1px solid {ColorPalette.BORDER_SUBTLE};
+                background-color: {themed('BG_ELEVATED')};
+                border: 1px solid {themed('BORDER_SUBTLE')};
                 border-radius: {BorderRadius.LG}px;
             }}
             QWidget:hover {{
-                background-color: {ColorPalette.BG_HOVER};
-                border-color: {ColorPalette.BORDER_DEFAULT};
+                background-color: {themed('BG_HOVER')};
+                border-color: {themed('BORDER_DEFAULT')};
             }}
+            QLabel {{ background-color: transparent; border: none; }}
         """)
 
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        layout.setSpacing(Spacing.XS)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
+        layout.setSpacing(Spacing.SM)
 
-        # Project name
+        # Left: name + path stacked
+        text_col = QVBoxLayout()
+        text_col.setSpacing(Spacing.XXS)
+
         name = QLabel(project_path.stem)
-        name.setStyleSheet(
-            f"font-weight: 600; font-size: 11pt; color: {ColorPalette.TEXT_PRIMARY};"
-            " border: none; background-color: transparent;"
-        )
-        layout.addWidget(name)
+        name.setStyleSheet(f"""
+            font-weight: {Typography.WEIGHT_SEMIBOLD};
+            font-size: {Typography.SIZE_MD_SM}pt;
+            color: {themed('TEXT_PRIMARY')};
+        """)
+        text_col.addWidget(name)
 
-        # Project path
-        path_label = QLabel(str(project_path))
-        path_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_MUTED}; font-size: 9pt; font-weight: normal;"
-            " border: none; background-color: transparent;"
-        )
+        path_label = QLabel(str(project_path.parent))
+        path_label.setStyleSheet(f"""
+            color: {themed('TEXT_MUTED')};
+            font-size: {Typography.SIZE_XS}pt;
+            font-weight: {Typography.WEIGHT_NORMAL};
+        """)
         path_label.setWordWrap(True)
-        layout.addWidget(path_label)
+        text_col.addWidget(path_label)
+
+        layout.addLayout(text_col, stretch=1)
 
         # Keyboard accessibility
         widget.setFocusPolicy(Qt.StrongFocus)
@@ -411,23 +530,42 @@ class HomePage(QWidget):
 
         return widget
 
+    # ------------------------------------------------------------------
+    # System Status
+    # ------------------------------------------------------------------
+
     def _create_system_status(self) -> QWidget:
         """Create system status section."""
-        group = QGroupBox("System Status")
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(Spacing.SM)
 
-        layout = QVBoxLayout(group)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
+        label = QLabel("System Status")
+        label.setStyleSheet(section_header_style())
+        outer.addWidget(label)
+
+        # Card wrapper for the JAX status widget
+        card = QWidget()
+        card.setStyleSheet(f"""
+            QWidget {{
+                {card_style()}
+            }}
+        """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(
+            Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG
         )
 
-        # JAX status widget
         self._jax_status = JAXStatusWidget()
-        layout.addWidget(self._jax_status)
+        card_layout.addWidget(self._jax_status)
+
+        outer.addWidget(card)
 
         # Initialize JAX status
         self._update_jax_status()
 
-        return group
+        return container
 
     def _update_jax_status(self) -> None:
         """Update JAX status display."""
@@ -436,43 +574,42 @@ class HomePage(QWidget):
 
             jax_info = get_jax_info()
 
-            # Update device list
             devices = jax_info.get("devices", ["cpu"])
             self._jax_status.update_device_list(devices)
 
-            # Set current device
             current_device = jax_info.get("default_device", "cpu")
             self._jax_status.set_current_device(current_device)
 
-            # Update memory
             memory_used = jax_info.get("memory_used_mb", 0)
             memory_total = jax_info.get("memory_total_mb", 0)
             self._jax_status.update_memory(memory_used, memory_total)
 
-            # Float64 status
             float64_enabled = jax_info.get("float64_enabled", False)
             self._jax_status.set_float64_enabled(float64_enabled)
 
-            # JIT cache
             jit_cache_count = jax_info.get("jit_cache_count", 0)
             self._jax_status.update_jit_cache(jit_cache_count)
 
         except Exception:
             logger.error("Failed to update JAX status", exc_info=True, page="HomePage")
-            # Fallback if JAX info unavailable
             self._jax_status.update_device_list(["cpu"])
             self._jax_status.set_current_device("cpu")
             self._jax_status.set_float64_enabled(False)
 
+    # ------------------------------------------------------------------
+    # Resources
+    # ------------------------------------------------------------------
+
     def _create_resources(self) -> QWidget:
         """Create resources section."""
-        group = QGroupBox("Resources")
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(Spacing.SM)
 
-        layout = QVBoxLayout(group)
-        layout.setContentsMargins(
-            Spacing.LG, Spacing.XL + Spacing.SM, Spacing.LG, Spacing.LG
-        )
-        layout.setSpacing(Spacing.SM)
+        label = QLabel("Resources")
+        label.setStyleSheet(section_header_style())
+        outer.addWidget(label)
 
         resources = [
             ("Documentation", "https://rheojax.readthedocs.io"),
@@ -486,11 +623,9 @@ class HomePage(QWidget):
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(button_style("secondary", "md"))
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
-            layout.addWidget(btn)
+            outer.addWidget(btn)
 
-        layout.addStretch()
-
-        return group
+        return container
 
     def _open_url(self, url: str, title: str = "") -> None:
         """Open URL in default browser."""
@@ -516,4 +651,3 @@ class HomePage(QWidget):
             }
             for path in state.recent_projects
         ]
-

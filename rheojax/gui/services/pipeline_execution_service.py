@@ -222,6 +222,8 @@ class PipelineExecutionService(QObject):
             Re-raises any exception from the underlying service after
             dispatching ERROR status.
         """
+        pipeline_actions.set_pipeline_running(True, step.id)
+        self.pipeline_started.emit()
         pipeline_actions.update_step_status(step.id, StepStatus.ACTIVE)
         self.step_started.emit(step.id)
 
@@ -230,11 +232,15 @@ class PipelineExecutionService(QObject):
             pipeline_actions.cache_step_result(step.id, result)
             pipeline_actions.update_step_status(step.id, StepStatus.COMPLETE)
             self.step_completed.emit(step.id)
+            pipeline_actions.set_pipeline_running(False)
+            self.pipeline_completed.emit()
             return result
         except Exception as exc:
             error_msg = str(exc)
             pipeline_actions.update_step_status(step.id, StepStatus.ERROR, error_msg)
             self.step_failed.emit(step.id, error_msg)
+            pipeline_actions.set_pipeline_running(False)
+            self.pipeline_failed.emit(error_msg)
             raise
 
     # ------------------------------------------------------------------
@@ -506,7 +512,7 @@ class PipelineExecutionService(QObject):
             if hasattr(fit_result, "metadata") and isinstance(
                 fit_result.metadata, dict
             ):
-                fitted_model_state = fit_result.metadata.get("model_state")
+                fitted_model_state = fit_result.metadata.get("fitted_model_state")
 
         # Collect remaining kwargs (e.g. target_accept_prob, custom_priors).
         _RESERVED = {"num_warmup", "num_samples", "num_chains", "warm_start"}
@@ -524,12 +530,12 @@ class PipelineExecutionService(QObject):
             # Fallback 1: data metadata (set by loader or prior fit).
             if hasattr(data, "metadata") and data.metadata:
                 _tm = data.metadata.get("test_mode")
-            # Fallback 2: prior fit result's cached kwargs (covers cases
-            # where fit set test_mode but metadata was not updated).
+            # Fallback 2: prior fit result's metadata (covers cases
+            # where fit set test_mode but data metadata was not updated).
             if _tm is None and fit_result is not None:
-                _last_kw = getattr(fit_result, "_last_fit_kwargs", None)
-                if isinstance(_last_kw, dict):
-                    _tm = _last_kw.get("test_mode")
+                _fit_meta = getattr(fit_result, "metadata", None)
+                if isinstance(_fit_meta, dict):
+                    _tm = _fit_meta.get("test_mode")
             if _tm is not None:
                 extra_kwargs["test_mode"] = _tm
 
@@ -665,9 +671,9 @@ class PipelineExecutionService(QObject):
                     bayesian_result, post_path, format=export_format
                 )
             else:
-                logger.warning(
+                raise ValueError(
                     "Export step: no fit_result or bayesian_result in context; "
-                    "nothing to export."
+                    "nothing to export. Run a fit or bayesian step first."
                 )
 
         context["export_path"] = str(output_path)

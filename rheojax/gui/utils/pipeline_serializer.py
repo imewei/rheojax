@@ -286,11 +286,8 @@ def from_yaml(
                 # Absolute paths are legitimate in GUI context (file-picker
                 # returns them) but rejected in strict mode (CLI-compatible).
                 if p.is_absolute():
-                    if strict:
-                        raise ValueError(
-                            f"Step {i + 1}: '{key}' must not be an absolute "
-                            f"path, got '{value}'."
-                        )
+                    # Absolute paths are OK in GUI (file-picker) but would
+                    # be rejected by CLI's strict validator.
                     logger.warning(
                         "Step %d: '%s' is an absolute path (CLI validator "
                         "would reject this)",
@@ -308,6 +305,15 @@ def from_yaml(
     if not isinstance(raw_steps, list):
         raise ValueError("'steps' must be a YAML sequence.")
 
+    # SER-010: Merge top-level ``defaults`` into each step's config dict
+    # using the same per-step-type allowlists as the CLI runner, so that
+    # the GUI and CLI execute the same YAML identically.
+    from rheojax.cli._yaml_runner import (  # noqa: PLC0415
+        _STEP_ALLOWED_DEFAULTS,
+    )
+
+    raw_defaults: dict[str, Any] = raw.get("defaults") or {}
+
     steps: list[PipelineStepConfig] = []
     for idx, raw_step in enumerate(raw_steps):
         if not isinstance(raw_step, dict):
@@ -317,8 +323,13 @@ def from_yaml(
         if not step_type:
             raise ValueError(f"Step {idx + 1}: missing required 'type' key.")
 
-        # Build config dict: everything except the "type" key.
-        config: dict[str, Any] = {k: v for k, v in raw_step.items() if k != "type"}
+        # Merge defaults allowed for this step type, then overlay explicit keys.
+        allowed = _STEP_ALLOWED_DEFAULTS.get(step_type, set())
+        filtered_defaults = {k: v for k, v in raw_defaults.items() if k in allowed}
+        config: dict[str, Any] = {
+            **filtered_defaults,
+            **{k: v for k, v in raw_step.items() if k != "type"},
+        }
 
         steps.append(_make_step(step_type, config, position=idx))
 
@@ -415,6 +426,20 @@ def from_pipeline_builder(
         >>> state = from_pipeline_builder(builder, pipeline_name="My Analysis")
         >>> yaml_str = to_yaml(state.steps, pipeline_name=state.pipeline_name)
     """
+    # SER-011: Builder defaults that should be stripped during round-trip
+    # to avoid inflating the YAML with values the user never set.
+    _BUILDER_DEFAULTS: dict[str, dict[str, Any]] = {
+        "fit": {"method": "auto", "use_jax": True},
+        "bayesian": {
+            "num_warmup": 1000,
+            "num_samples": 2000,
+            "num_chains": 4,
+            "seed": 0,
+            "warm_start": True,
+        },
+        "export": {"format": "auto"},
+    }
+
     gui_steps: list[PipelineStepConfig] = []
 
     for position, (step_type, kwargs) in enumerate(builder.steps):
@@ -433,6 +458,12 @@ def from_pipeline_builder(
         # transform and fit: builder already uses "name" and "model" keys
         # (set by add_transform_step / add_fit_step), so no remapping needed.
         # bayesian: all kwargs are passed through as-is.
+
+        # Strip builder-injected defaults so the YAML stays minimal.
+        defaults_for_type = _BUILDER_DEFAULTS.get(step_type, {})
+        for key, default_val in defaults_for_type.items():
+            if key in cfg and cfg[key] == default_val:
+                del cfg[key]
 
         gui_steps.append(_make_step(step_type, cfg, position=position))
 
