@@ -20,7 +20,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.data import RheoData
 from rheojax.core.registry import ModelRegistry
 from rheojax.pipeline import Pipeline
-from rheojax.pipeline.builder import ConditionalPipelineBuilder, PipelineBuilder
+from rheojax.pipeline.builder import PipelineBuilder
 
 
 # Mock model for testing
@@ -282,39 +282,6 @@ class TestPipelineBuilderUtilities:
         assert "PipelineBuilder" in repr_str
         assert "load" in repr_str
         assert "fit" in repr_str
-
-
-class TestConditionalPipelineBuilder:
-    """Test conditional pipeline builder."""
-
-    def test_initialization(self):
-        """Test conditional builder initialization."""
-        builder = ConditionalPipelineBuilder()
-        assert len(builder.steps) == 0
-        assert len(builder.conditions) == 0
-
-    def test_add_conditional_step(self):
-        """Test adding conditional step."""
-        builder = ConditionalPipelineBuilder()
-
-        def condition(pipeline):
-            return len(pipeline.data.x) > 10
-
-        builder.add_conditional_step("fit", condition, model="builder_test_model")
-
-        assert len(builder) == 1
-        assert 0 in builder.conditions
-
-    def test_build_with_warning(self, temp_csv_file):
-        """Test that conditional build produces warning."""
-        builder = ConditionalPipelineBuilder()
-        builder.add_load_step(temp_csv_file, format="csv", x_col="x", y_col="y")
-        builder.add_conditional_step("fit", lambda p: True, model="builder_test_model")
-
-        with pytest.warns(UserWarning, match="not fully implemented"):
-            pipeline = builder.build()
-
-        assert isinstance(pipeline, Pipeline)
 
 
 class TestBuilderErrorHandling:

@@ -52,10 +52,7 @@ Example - Pipeline builder:
 from rheojax.pipeline.base import Pipeline
 from rheojax.pipeline.batch import BatchPipeline
 from rheojax.pipeline.bayesian import BayesianPipeline
-from rheojax.pipeline.builder import (
-    ConditionalPipelineBuilder,
-    PipelineBuilder,
-)
+from rheojax.pipeline.builder import PipelineBuilder
 from rheojax.pipeline.workflows import (
     CreepToRelaxationPipeline,
     FrequencyToTimePipeline,
@@ -76,7 +73,6 @@ __all__ = [
     "SPPAmplitudeSweepPipeline",
     # Builders
     "PipelineBuilder",
-    "ConditionalPipelineBuilder",
     # Batch processing
     "BatchPipeline",
 ]

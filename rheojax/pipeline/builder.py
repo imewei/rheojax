@@ -16,7 +16,6 @@ Example:
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -272,6 +271,10 @@ class PipelineBuilder:
                 # Store prediction but don't break chain
                 kwargs.pop("store_as", None)  # Remove for now
                 # Predictions are implicit in pipeline
+                logger.warning(
+                    "Predict step is a no-op — predictions are generated "
+                    "automatically during fit/bayesian steps"
+                )
             elif step_type == "bayesian":
                 # Delegate to Pipeline.fit_bayesian which handles
                 # warm_start, test_mode propagation, and result caching
@@ -350,6 +353,17 @@ class PipelineBuilder:
         Raises:
             ValueError: If component not found
         """
+        # Trigger lazy discovery so registries are populated before listing.
+        from rheojax.models import _ensure_all_registered as _ensure_models
+
+        _ensure_models()
+        try:
+            from rheojax.transforms import _ensure_all_registered as _ensure_transforms
+
+            _ensure_transforms()
+        except ImportError:
+            pass
+
         for step_type, step_kwargs in self.steps:
             if step_type == "fit":
                 model_name = step_kwargs.get("model")
@@ -404,67 +418,6 @@ class PipelineBuilder:
         return f"PipelineBuilder(steps={step_types})"
 
 
-class ConditionalPipelineBuilder(PipelineBuilder):
-    """Pipeline builder with conditional step execution.
-
-    This builder allows adding steps that only execute if certain
-    conditions are met.
-
-    Example:
-        >>> builder = ConditionalPipelineBuilder()
-        >>> builder.add_load_step('data.csv')
-        >>> builder.add_conditional_fit('maxwell', condition=lambda p: len(p.data.x) > 10)
-    """
-
-    def __init__(self):
-        """Initialize conditional builder."""
-        super().__init__()
-        self.conditions: dict[int, Any] = {}
-
-    def add_conditional_step(
-        self, step_type: str, condition: Callable[[Pipeline], bool], **kwargs
-    ) -> ConditionalPipelineBuilder:
-        """Add a conditional step.
-
-        Args:
-            step_type: Type of step ('fit', 'transform', etc.)
-            condition: Callable that takes Pipeline and returns bool
-            **kwargs: Step arguments
-
-        Returns:
-            self for method chaining
-        """
-        step_index = len(self.steps)
-        self.steps.append((step_type, kwargs))
-        self.conditions[step_index] = condition
-        return self
-
-    def build(self, validate: bool = True) -> Pipeline:
-        """Build pipeline with conditional execution.
-
-        Note: Conditional execution is tracked but not enforced in
-        current implementation. This would require a different
-        execution model.
-
-        Args:
-            validate: Whether to validate
-
-        Returns:
-            Pipeline instance
-        """
-        # For now, build normally
-        # Full implementation would create a ConditionalPipeline class
-        if self.conditions:
-            warnings.warn(
-                "Conditional steps are not fully implemented. "
-                "All steps will be executed unconditionally.",
-                stacklevel=2,
-            )
-
-        return super().build(validate=validate)
-
-
 __all__ = [
     "PipelineBuilder",
-    "ConditionalPipelineBuilder",
 ]

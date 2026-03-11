@@ -32,6 +32,17 @@ from rheojax.transforms.srfs import (
     detect_shear_banding,
 )
 
+
+def _ensure_all_registered() -> None:
+    """No-op — all transforms are eagerly imported above.
+
+    This function exists so that ``PipelineBuilder._validate_components()``
+    can call ``from rheojax.transforms import _ensure_all_registered``
+    symmetrically with the models package. Importing this module already
+    triggers all ``@TransformRegistry.register`` decorators.
+    """
+
+
 __all__ = [
     "CoxMerz",
     "FFTAnalysis",
