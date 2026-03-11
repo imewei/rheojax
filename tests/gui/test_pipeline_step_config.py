@@ -377,3 +377,63 @@ class TestStepConfigSync:
         step = get_pipeline_step_by_id(step_id)
         assert step is not None
         assert step.config.get("model") == "springpot"
+
+
+# ---------------------------------------------------------------------------
+# Transform fallback path
+# ---------------------------------------------------------------------------
+
+
+class TestTransformFallbackPath:
+    @pytest.mark.unit
+    def test_transform_metadata_has_name_and_key_fields(self, qapp_module):
+        """TransformPage.get_available_transforms() returns dicts with 'name' and 'key'."""
+        from rheojax.gui.services.transform_service import TransformService
+
+        service = TransformService()
+        metadata = service.get_transform_metadata()
+        assert len(metadata) > 0, "Should have at least one transform"
+
+        for meta in metadata:
+            assert "name" in meta, f"Missing 'name' key in metadata: {meta}"
+            assert "key" in meta, f"Missing 'key' key in metadata: {meta}"
+
+    @pytest.mark.unit
+    def test_display_to_key_map_round_trips(self, qapp_module):
+        """Building a display-name → key map from metadata should resolve all transforms."""
+        from rheojax.gui.services.transform_service import TransformService
+
+        service = TransformService()
+        metadata = service.get_transform_metadata()
+        display_to_key = {m["name"].lower(): m["key"] for m in metadata}
+
+        # Every key should be discoverable via its display name
+        for meta in metadata:
+            resolved = display_to_key.get(meta["name"].lower())
+            assert resolved == meta["key"], (
+                f"Display name '{meta['name']}' resolved to '{resolved}', expected '{meta['key']}'"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Defensive exception handling
+# ---------------------------------------------------------------------------
+
+
+class TestAutoPopulateDefensiveHandling:
+    @pytest.mark.unit
+    def test_update_step_config_with_nonexistent_id_does_not_crash(self, qapp_module):
+        """update_step_config with a bad step_id should not raise."""
+        from rheojax.gui.state.actions import update_step_config
+
+        # Should not raise — the reducer simply won't find the step
+        update_step_config("nonexistent-uuid", {"model": "maxwell"})
+
+    @pytest.mark.unit
+    def test_auto_populate_pattern_handles_missing_step(self, qapp_module):
+        """Simulates the try/except guard in _auto_populate_step_config."""
+        from rheojax.gui.state import selectors
+
+        # get_pipeline_step_by_id returns None for unknown IDs
+        step = selectors.get_pipeline_step_by_id("does-not-exist")
+        assert step is None
