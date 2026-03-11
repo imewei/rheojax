@@ -52,6 +52,20 @@ class PlotCanvas(QWidget):
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.axes = self.figure.add_subplot(111)
 
+        # Guard against use-after-free: wrap draw() so that deferred
+        # redraws scheduled by draw_idle() silently no-op when the C++
+        # widget has already been deleted (e.g. during pytest-qt teardown).
+        # The segfault occurs inside draw() → update() on a freed C++ object.
+        _original_draw = self.canvas.draw
+
+        def _safe_draw() -> None:
+            try:
+                _original_draw()
+            except RuntimeError:
+                pass  # C++ object already deleted
+
+        self.canvas.draw = _safe_draw
+
         # Create navigation toolbar
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
 
@@ -83,6 +97,29 @@ class PlotCanvas(QWidget):
             figure_size=(8, 6),
             dpi=100,
         )
+
+    def cleanup(self) -> None:
+        """Explicitly release matplotlib resources before Qt widget deletion.
+
+        Must be called before the widget is deleted to prevent segfaults from
+        deferred ``draw_idle()`` callbacks firing on a freed C++ object.
+        """
+        import matplotlib.pyplot as plt
+
+        try:
+            if hasattr(self, "canvas") and self.canvas is not None:
+                self.canvas.callbacks.callbacks.clear()
+                # Neuter the timer-based draw_idle so it becomes a no-op.
+                self.canvas.draw_idle = lambda: None
+            if hasattr(self, "figure") and self.figure is not None:
+                plt.close(self.figure)
+        except RuntimeError:
+            pass  # C++ object already deleted
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws before the widget is closed."""
+        self.cleanup()
+        super().closeEvent(event)
 
     def get_axes(self):
         """Return the primary matplotlib Axes for compatibility."""

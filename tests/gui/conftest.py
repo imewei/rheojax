@@ -32,7 +32,7 @@ HAS_DISPLAY = (
 )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def gui_config() -> dict:
     """Provide GUI configuration for tests.
 
@@ -443,10 +443,11 @@ def reset_state_store():
 
 @pytest.fixture(autouse=True)
 def reset_plot_metrics():
-    """Reset PlotMetrics between tests.
+    """Reset PlotMetrics and close matplotlib figures between tests.
 
-    This fixture ensures plot metrics don't accumulate across tests,
-    providing clean performance data for each test run.
+    This fixture ensures plot metrics don't accumulate across tests and
+    prevents FigureCanvasQTAgg use-after-free segfaults by closing all
+    matplotlib figures before pytest-qt teardown deletes Qt widgets.
     """
     try:
         from rheojax.gui.widgets.base_arviz_widget import PlotMetrics
@@ -456,6 +457,13 @@ def reset_plot_metrics():
         pass
 
     yield
+
+    # Close all matplotlib figures to cancel pending draw_idle() timers.
+    # This prevents segfaults when pytest-qt deletes widgets that still
+    # have deferred draw callbacks scheduled.
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
 
     try:
         from rheojax.gui.widgets.base_arviz_widget import PlotMetrics

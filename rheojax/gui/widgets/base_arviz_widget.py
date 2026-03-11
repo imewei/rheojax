@@ -143,6 +143,30 @@ class BaseArviZWidget(QWidget):
             widget=self.__class__.__name__,
         )
 
+    def cleanup(self) -> None:
+        """Release matplotlib resources before Qt widget deletion.
+
+        Prevents segfaults from deferred ``draw_idle()`` callbacks firing
+        on a freed C++ ``FigureCanvasQTAgg`` object.  Safe to call multiple
+        times.
+        """
+        try:
+            if self._canvas is not None:
+                self._canvas.callbacks.callbacks.clear()
+                self._canvas.draw_idle = lambda: None
+            for fig in self._pending_cleanup:
+                plt.close(fig)
+            self._pending_cleanup.clear()
+            if self._figure is not None:
+                plt.close(self._figure)
+        except RuntimeError:
+            pass  # C++ object already deleted
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws before the widget is closed."""
+        self.cleanup()
+        super().closeEvent(event)
+
     def swap_figure(self, new_fig: Figure) -> None:
         """Thread-safe figure replacement with proper cleanup.
 

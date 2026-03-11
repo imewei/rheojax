@@ -72,6 +72,8 @@ def test_bayesian_page_shows_fit_plot_only_and_no_arviz(qtbot) -> None:
     page._update_fit_plot_from_posterior(result)
     assert not page._fit_plot_placeholder.isVisible()
 
+    page._fit_plot_canvas.cleanup()
+
 
 def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
     store = StateStore()
@@ -133,6 +135,8 @@ def test_bayesian_fit_plot_includes_credible_band(qtbot, monkeypatch) -> None:
     ax = page._fit_plot_canvas.figure.gca()
     # fill_between creates a PolyCollection in axes.collections
     assert len(ax.collections) >= 1
+
+    page._fit_plot_canvas.cleanup()
 
 
 def test_bayesian_oscillation_complex_includes_component_bands(
@@ -206,6 +210,8 @@ def test_bayesian_oscillation_complex_includes_component_bands(
     assert any("G'" in text for text in labels)
     assert any('G"' in text or 'G"' in text for text in labels)
 
+    page._fit_plot_canvas.cleanup()
+
 
 def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) -> None:
     store = StateStore()
@@ -272,3 +278,6 @@ def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) 
 
     np.testing.assert_allclose(lines["G' (data)"].get_ydata(), g_prime)
     np.testing.assert_allclose(lines['G" (data)'].get_ydata(), g_double)
+
+    page._fit_plot_canvas.cleanup()
+
