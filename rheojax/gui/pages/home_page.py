@@ -644,7 +644,6 @@ class HomePage(QWidget):
         resources = [
             ("Documentation", "API reference and guides", "https://rheojax.readthedocs.io"),
             ("Tutorials", "Example notebooks", "https://github.com/imewei/rheojax/tree/main/examples"),
-            ("Report Issues", "Bug reports and feature requests", "https://github.com/imewei/rheojax/issues"),
         ]
 
         link_style = f"""
