@@ -784,11 +784,29 @@ class Pipeline:
         if _is_jax_array(y):
             y = np.array(y)
 
-        # PIPE-WARM-001: strip pipeline-level `warm_start` kwarg — it is consumed
-        # at the builder level and must not be forwarded to model.fit_bayesian(),
-        # which passes **nuts_kwargs straight to NUTS(). Passing warm_start=True
-        # to NUTS causes a TypeError.
-        bayesian_kwargs.pop("warm_start", None)
+        # PIPE-WARM-001: strip pipeline-level `warm_start` kwarg — it must not
+        # be forwarded to model.fit_bayesian(), which passes **nuts_kwargs
+        # straight to NUTS().  Passing warm_start=True to NUTS causes TypeError.
+        #
+        # When warm_start is False, build initial_values from bounds midpoints
+        # so the sampler starts from prior-like values rather than NLSQ estimates.
+        # We avoid model_obj.__class__() which crashes for models with required
+        # constructor args (GeneralizedMaxwell(n_modes), STZ(variant), etc.).
+        use_warm_start = bayesian_kwargs.pop("warm_start", True)
+        if not use_warm_start:
+            import math  # noqa: PLC0415
+
+            midpoint_values: dict[str, float] = {}
+            for name in model_obj.parameters.keys():
+                param = model_obj.parameters[name]
+                lo, hi = param.bounds
+                if lo is not None and hi is not None and lo > 0 and hi > 0:
+                    midpoint_values[name] = math.sqrt(lo * hi)
+                elif lo is not None and hi is not None:
+                    midpoint_values[name] = (lo + hi) / 2.0
+                else:
+                    midpoint_values[name] = 1.0
+            bayesian_kwargs.setdefault("initial_values", midpoint_values)
 
         # Auto-propagate metadata
         # Use explicit `is not None` guards — truthy check swallows falsy-but-valid

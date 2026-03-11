@@ -69,7 +69,7 @@ class TestAddExportStep:
         builder = PipelineBuilder()
         builder.add_export_step("results/")
         _, kwargs = next(s for s in builder.steps if s[0] == "export")
-        assert kwargs["format"] == "directory"
+        assert kwargs["format"] == "auto"
 
     @pytest.mark.unit
     def test_add_export_step_custom_format(self):

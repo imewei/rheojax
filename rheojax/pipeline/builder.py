@@ -187,7 +187,7 @@ class PipelineBuilder:
     def add_export_step(
         self,
         output_path: str | Path,
-        format: str = "directory",
+        format: str = "auto",
         **kwargs,
     ) -> PipelineBuilder:
         """Add analysis export step.
@@ -256,7 +256,27 @@ class PipelineBuilder:
             # data / model state.
             return pipeline
 
-        for step_type, step_kwargs in self.steps:
+        self._execute_steps(pipeline)
+        return pipeline
+
+    def _execute_steps(
+        self,
+        pipeline: Pipeline,
+        on_step: "Callable[[int, str], None] | None" = None,
+    ) -> None:
+        """Execute all builder steps on a Pipeline.
+
+        Parameters
+        ----------
+        pipeline : Pipeline
+            Target pipeline instance.
+        on_step : callable, optional
+            ``on_step(index, step_type)`` is called before each step executes.
+            Used by the CLI for per-step progress reporting.
+        """
+        for i, (step_type, step_kwargs) in enumerate(self.steps):
+            if on_step is not None:
+                on_step(i, step_type)
             # Copy to avoid mutating stored dicts (allows repeated build() calls)
             kwargs = step_kwargs.copy()
             if step_type == "load":
@@ -286,8 +306,6 @@ class PipelineBuilder:
                 pipeline.plot(**kwargs)
             elif step_type == "save":
                 pipeline.save(**kwargs)
-
-        return pipeline
 
     def _validate_pipeline(self):
         """Validate pipeline construction.
