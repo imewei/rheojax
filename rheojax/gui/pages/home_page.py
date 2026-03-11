@@ -644,6 +644,7 @@ class HomePage(QWidget):
         resources = [
             ("Documentation", "API reference and guides", "https://rheojax.readthedocs.io"),
             ("Tutorials", "Example notebooks", "https://github.com/imewei/rheojax/tree/main/examples"),
+            ("Report Issues", "Bug reports and feature requests", "https://github.com/imewei/rheojax/issues"),
         ]
 
         link_style = f"""
@@ -665,8 +666,9 @@ class HomePage(QWidget):
             }}
         """
 
-        for title, _desc, url in resources:
+        for title, desc, url in resources:
             btn = QPushButton(title)
+            btn.setToolTip(desc)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(link_style)
             btn.clicked.connect(lambda checked, u=url, t=title: self._open_url(u, t))
