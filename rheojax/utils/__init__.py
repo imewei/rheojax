@@ -18,14 +18,14 @@ from rheojax.utils.metrics import (
     compute_fit_quality,
     r2_complex,
 )
+from rheojax.utils.model_selection import (
+    build_fit_result,
+    compare_models,
+)
 from rheojax.utils.modulus_conversion import (
     POISSON_PRESETS,
     convert_modulus,
     convert_rheodata,
-)
-from rheojax.utils.model_selection import (
-    build_fit_result,
-    compare_models,
 )
 from rheojax.utils.optimization import (
     OptimizationResult,

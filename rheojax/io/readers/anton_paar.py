@@ -997,12 +997,15 @@ def _extract_temperature_metadata(
         if key in global_meta:
             raw_value = global_meta[key]
             # Check for an explicit unit key (e.g. "temperature_unit": "°C")
-            unit_key = f"{key}_unit" if f"{key}_unit" in global_meta else "temperature_unit"
+            unit_key = (
+                f"{key}_unit" if f"{key}_unit" in global_meta else "temperature_unit"
+            )
             raw_unit = global_meta.get(unit_key, "")
             # Determine whether the value is in Celsius
-            is_celsius = (
-                "°C" in str(raw_unit)
-                or raw_unit.strip().lower() in ("c", "°c", "celsius")
+            is_celsius = "°C" in str(raw_unit) or raw_unit.strip().lower() in (
+                "c",
+                "°c",
+                "celsius",
             )
             if not is_celsius:
                 # Fall back: if the raw value looks like it could be Celsius

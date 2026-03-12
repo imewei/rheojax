@@ -313,7 +313,9 @@ class TestUpdateStepStatus:
     def test_error_message_stored(self):
         """An error_message must be stored when status is ERROR."""
         step_id = _add_fit_step()
-        update_step_status(step_id, StepStatus.ERROR, error_message="Convergence failed")
+        update_step_status(
+            step_id, StepStatus.ERROR, error_message="Convergence failed"
+        )
         step = get_pipeline_step_by_id(step_id)
         assert step.status == StepStatus.ERROR
         assert step.error_message == "Convergence failed"

@@ -132,7 +132,9 @@ def test_relaxation_monotonic_passes():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) == 0
     assert report.quality_flags.get("monotonic_decay") is True
 
@@ -143,7 +145,9 @@ def test_relaxation_non_monotonic_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert any("monoton" in str(w.message).lower() for w in validation_warns)
     assert report.quality_flags.get("monotonic_decay") is False
@@ -156,9 +160,14 @@ def test_relaxation_late_start_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
-    assert any("transient" in str(w.message).lower() or "start" in str(w.message).lower() for w in validation_warns)
+    assert any(
+        "transient" in str(w.message).lower() or "start" in str(w.message).lower()
+        for w in validation_warns
+    )
     assert report.quality_flags.get("early_transient_present") is False
 
 
@@ -173,7 +182,9 @@ def test_oscillation_sufficient_range_passes():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) == 0
     assert report.quality_flags.get("frequency_range_sufficient") is True
 
@@ -184,7 +195,9 @@ def test_oscillation_insufficient_range_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert any("decade" in str(w.message).lower() for w in validation_warns)
     assert report.quality_flags.get("frequency_range_sufficient") is False
@@ -201,7 +214,9 @@ def test_creep_with_sigma_passes():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) == 0
     assert report.quality_flags.get("sigma_metadata_present") is True
 
@@ -212,9 +227,14 @@ def test_creep_missing_sigma_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
-    assert any("sigma" in str(w.message).lower() or "stress" in str(w.message).lower() for w in validation_warns)
+    assert any(
+        "sigma" in str(w.message).lower() or "stress" in str(w.message).lower()
+        for w in validation_warns
+    )
     assert report.quality_flags.get("sigma_metadata_present") is False
 
 
@@ -229,7 +249,9 @@ def test_rotation_with_rate_passes():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) == 0
     assert report.quality_flags.get("shear_rate_metadata_present") is True
 
@@ -240,7 +262,9 @@ def test_rotation_missing_rate_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert report.quality_flags.get("shear_rate_metadata_present") is False
 
@@ -267,7 +291,9 @@ def test_validate_with_compatible_transform():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data, intended_transform="mastercurve")
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     # Should pass all checks (freq range OK, temperature present, test_mode consistent)
     assert len(validation_warns) == 0
 
@@ -279,7 +305,9 @@ def test_validate_with_incompatible_transform():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data, intended_transform="mastercurve")
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert len(report.warnings) >= 1
 
@@ -304,7 +332,9 @@ def test_validate_unknown_test_mode_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert any("unknown" in str(w.message).lower() for w in validation_warns)
 
@@ -324,7 +354,9 @@ def test_validate_none_test_mode_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         report = validate_protocol(data)
-    validation_warns = [w for w in caught if issubclass(w.category, RheoJaxValidationWarning)]
+    validation_warns = [
+        w for w in caught if issubclass(w.category, RheoJaxValidationWarning)
+    ]
     assert len(validation_warns) >= 1
     assert report.protocol_inferred is True
 

@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
+from rheojax.io._exceptions import RheoJaxValidationWarning
 from rheojax.io.readers.trios.common import (
     DataSegment,
     TRIOSFile,
@@ -38,7 +39,6 @@ from rheojax.io.readers.trios.common import (
     select_xy_columns,
     split_by_step,
 )
-from rheojax.io._exceptions import RheoJaxValidationWarning
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

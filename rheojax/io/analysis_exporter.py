@@ -28,15 +28,13 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyJSONEncoder
 from rheojax.logging import get_logger
 
 # Ensure float64 is configured before any JAX array handling
 _jax, _jnp = safe_import_jax()
 
 logger = get_logger(__name__)
-
-
-from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyJSONEncoder
 
 
 class AnalysisExporter:
@@ -219,7 +217,10 @@ class AnalysisExporter:
                     self._write_excel_predictions(writer, state)
 
                 # Residuals sheet
-                if state["fit_result"] is not None and state["fit_result"].residuals is not None:
+                if (
+                    state["fit_result"] is not None
+                    and state["fit_result"].residuals is not None
+                ):
                     self._write_excel_residuals(writer, state)
 
                 # Transform summary sheet
@@ -339,7 +340,15 @@ class AnalysisExporter:
                 "params_units": dict(fr.params_units),
                 "statistics": {},
             }
-            for attr in ("r_squared", "adj_r_squared", "rmse", "mae", "aic", "bic", "aicc"):
+            for attr in (
+                "r_squared",
+                "adj_r_squared",
+                "rmse",
+                "mae",
+                "aic",
+                "bic",
+                "aicc",
+            ):
                 val = getattr(fr, attr, None)
                 if val is not None and np.isfinite(val):
                     summary["fit"]["statistics"][attr] = float(val)
@@ -360,7 +369,9 @@ class AnalysisExporter:
             for attr in ("num_samples", "num_warmup", "num_chains", "num_divergences"):
                 val = getattr(br, attr, None)
                 if val is not None:
-                    bayes_summary[attr] = int(val) if isinstance(val, (int, np.integer)) else val
+                    bayes_summary[attr] = (
+                        int(val) if isinstance(val, (int, np.integer)) else val
+                    )
             if hasattr(br, "diagnostics") and br.diagnostics:
                 diag = br.diagnostics
                 bayes_summary["diagnostics"] = {
@@ -414,7 +425,14 @@ class AnalysisExporter:
         meta = summary.get("metadata", {})
         if meta:
             lines.append("Data:")
-            for key in ("domain", "test_mode", "deformation_mode", "n_points", "x_units", "y_units"):
+            for key in (
+                "domain",
+                "test_mode",
+                "deformation_mode",
+                "n_points",
+                "x_units",
+                "y_units",
+            ):
                 val = meta.get(key)
                 if val is not None:
                     lines.append(f"  {key}: {val}")
@@ -503,9 +521,7 @@ class AnalysisExporter:
         # NPZ (binary, fast reload)
         fr.save(str(results_dir / "fit_result.npz"))
 
-    def _write_transform_results(
-        self, state: dict[str, Any], output_dir: Path
-    ) -> None:
+    def _write_transform_results(self, state: dict[str, Any], output_dir: Path) -> None:
         """Write cached transform results to results/transforms/."""
         transforms = state["transform_results"]
         if not transforms:
@@ -567,7 +583,9 @@ class AnalysisExporter:
         with open(index_path, "w") as f:
             json.dump(
                 {"transforms": entries},
-                f, indent=2, cls=_NumpyJSONEncoder,
+                f,
+                indent=2,
+                cls=_NumpyJSONEncoder,
             )
 
     def _write_figures(self, state: dict[str, Any], output_dir: Path) -> None:
@@ -634,10 +652,12 @@ class AnalysisExporter:
         # History
         for i, h in enumerate(state["history"]):
             details = ", ".join(str(d) for d in h[1:]) if len(h) > 1 else ""
-            rows.append({
-                "Field": f"Step {i + 1}",
-                "Value": f"{h[0]}" + (f" ({details})" if details else ""),
-            })
+            rows.append(
+                {
+                    "Field": f"Step {i + 1}",
+                    "Value": f"{h[0]}" + (f" ({details})" if details else ""),
+                }
+            )
 
         pd.DataFrame(rows).to_excel(writer, sheet_name="Summary", index=False)
 
@@ -697,17 +717,21 @@ class AnalysisExporter:
         prefix = "E" if dm in ("tension", "bending", "compression") else "G"
 
         if np.iscomplexobj(y_arr):
-            df = pd.DataFrame({
-                "x": x_arr,
-                f"{prefix}' (Storage)": np.real(y_arr),
-                f"{prefix}'' (Loss)": np.imag(y_arr),
-            })
+            df = pd.DataFrame(
+                {
+                    "x": x_arr,
+                    f"{prefix}' (Storage)": np.real(y_arr),
+                    f"{prefix}'' (Loss)": np.imag(y_arr),
+                }
+            )
         elif y_arr.ndim == 2 and y_arr.shape[1] == 2:
-            df = pd.DataFrame({
-                "x": x_arr,
-                f"{prefix}' (Storage)": y_arr[:, 0],
-                f"{prefix}'' (Loss)": y_arr[:, 1],
-            })
+            df = pd.DataFrame(
+                {
+                    "x": x_arr,
+                    f"{prefix}' (Storage)": y_arr[:, 0],
+                    f"{prefix}'' (Loss)": y_arr[:, 1],
+                }
+            )
         else:
             df = pd.DataFrame({"x": x_arr, "y": y_arr})
 
@@ -728,17 +752,21 @@ class AnalysisExporter:
         prefix = "E" if dm in ("tension", "bending", "compression") else "G"
 
         if np.iscomplexobj(fc):
-            df = pd.DataFrame({
-                "x": X,
-                f"{prefix}' (Fit)": np.real(fc),
-                f"{prefix}'' (Fit)": np.imag(fc),
-            })
+            df = pd.DataFrame(
+                {
+                    "x": X,
+                    f"{prefix}' (Fit)": np.real(fc),
+                    f"{prefix}'' (Fit)": np.imag(fc),
+                }
+            )
         elif fc.ndim == 2 and fc.shape[1] == 2:
-            df = pd.DataFrame({
-                "x": X,
-                f"{prefix}' (Fit)": fc[:, 0],
-                f"{prefix}'' (Fit)": fc[:, 1],
-            })
+            df = pd.DataFrame(
+                {
+                    "x": X,
+                    f"{prefix}' (Fit)": fc[:, 0],
+                    f"{prefix}'' (Fit)": fc[:, 1],
+                }
+            )
         else:
             df = pd.DataFrame({"x": X, "Prediction": fc})
 
@@ -752,16 +780,20 @@ class AnalysisExporter:
         residuals = np.asarray(fr.residuals)
 
         if np.iscomplexobj(residuals):
-            df = pd.DataFrame({
-                "Index": np.arange(len(residuals)),
-                "Residual (Real)": np.real(residuals),
-                "Residual (Imag)": np.imag(residuals),
-            })
+            df = pd.DataFrame(
+                {
+                    "Index": np.arange(len(residuals)),
+                    "Residual (Real)": np.real(residuals),
+                    "Residual (Imag)": np.imag(residuals),
+                }
+            )
         else:
-            df = pd.DataFrame({
-                "Index": np.arange(len(residuals)),
-                "Residual": residuals,
-            })
+            df = pd.DataFrame(
+                {
+                    "Index": np.arange(len(residuals)),
+                    "Residual": residuals,
+                }
+            )
 
         df.to_excel(writer, sheet_name="Residuals", index=False)
 
@@ -812,8 +844,15 @@ class AnalysisExporter:
                 arr = np.asarray(samples).ravel()
                 rows.append({"Field": f"{name} (mean)", "Value": float(np.mean(arr))})
                 rows.append({"Field": f"{name} (std)", "Value": float(np.std(arr))})
-                rows.append({"Field": f"{name} (2.5%)", "Value": float(np.percentile(arr, 2.5))})
-                rows.append({"Field": f"{name} (97.5%)", "Value": float(np.percentile(arr, 97.5))})
+                rows.append(
+                    {"Field": f"{name} (2.5%)", "Value": float(np.percentile(arr, 2.5))}
+                )
+                rows.append(
+                    {
+                        "Field": f"{name} (97.5%)",
+                        "Value": float(np.percentile(arr, 97.5)),
+                    }
+                )
 
         pd.DataFrame(rows).to_excel(writer, sheet_name="Bayesian", index=False)
 
@@ -824,7 +863,9 @@ class AnalysisExporter:
         try:
             from openpyxl.drawing.image import Image as XLImage
         except ImportError:
-            logger.debug("openpyxl.drawing.image not available — skipping plot embedding")
+            logger.debug(
+                "openpyxl.drawing.image not available — skipping plot embedding"
+            )
             return
 
         fig = state["current_figure"]

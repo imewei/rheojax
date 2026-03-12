@@ -251,7 +251,9 @@ def main(args: list[str] | None = None) -> int:
         from rheojax.core.registry import TransformRegistry
 
         transform = TransformRegistry.create(parsed.transform_name, **transform_params)
-        logger.debug("Transform created", name=parsed.transform_name, params=transform_params)
+        logger.debug(
+            "Transform created", name=parsed.transform_name, params=transform_params
+        )
     except (KeyError, ValueError, TypeError) as e:
         print(
             f"Error: Could not create transform '{parsed.transform_name}': {e}",
@@ -265,7 +267,9 @@ def main(args: list[str] | None = None) -> int:
         result = transform.transform(data)
         logger.info("Transform applied", name=parsed.transform_name)
     except Exception as e:
-        print(f"Error applying transform '{parsed.transform_name}': {e}", file=sys.stderr)
+        print(
+            f"Error applying transform '{parsed.transform_name}': {e}", file=sys.stderr
+        )
         logger.error("Transform failed", name=parsed.transform_name)
         logger.debug("Transform traceback", exc_info=True)
         return 1
@@ -312,7 +316,9 @@ def main(args: list[str] | None = None) -> int:
                 res_x = np.asarray(result.x)
                 res_y = np.asarray(result.y)
                 if np.iscomplexobj(res_y):
-                    df = pd.DataFrame({"x": res_x, "y_real": res_y.real, "y_imag": res_y.imag})
+                    df = pd.DataFrame(
+                        {"x": res_x, "y_real": res_y.real, "y_imag": res_y.imag}
+                    )
                 elif res_y.ndim == 2:
                     df = pd.DataFrame(np.column_stack([res_x, res_y]))
                 else:

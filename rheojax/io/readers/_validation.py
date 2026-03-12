@@ -155,7 +155,9 @@ def _check_creep(data: RheoData, report: LoaderReport) -> None:
         report.warnings.append(msg)
         report.quality_flags["sigma_metadata_present"] = False
         warnings.warn(msg, RheoJaxValidationWarning, stacklevel=4)
-        logger.debug("Creep sigma metadata check failed", metadata_keys=list(meta.keys()))
+        logger.debug(
+            "Creep sigma metadata check failed", metadata_keys=list(meta.keys())
+        )
     else:
         report.quality_flags["sigma_metadata_present"] = True
 
@@ -194,9 +196,7 @@ def _check_oscillation(data: RheoData, report: LoaderReport) -> None:
 def _check_rotation(data: RheoData, report: LoaderReport) -> None:
     """Quality checks for steady-state flow curve (rotation) data."""
     meta = data.metadata
-    has_rate = any(
-        k in meta for k in ("gamma_dot", "shear_rate", "applied_shear_rate")
-    )
+    has_rate = any(k in meta for k in ("gamma_dot", "shear_rate", "applied_shear_rate"))
     if not has_rate:
         msg = (
             "Flow curve (rotation) data is missing shear rate metadata. "

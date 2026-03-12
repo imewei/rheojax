@@ -348,20 +348,26 @@ def save_fit_result_hdf5(
             if result.fitted_curve is not None:
                 arr = np.asarray(result.fitted_curve)
                 f.create_dataset(
-                    "fitted_curve", data=arr,
-                    compression=comp_algo, compression_opts=comp_opts,
+                    "fitted_curve",
+                    data=arr,
+                    compression=comp_algo,
+                    compression_opts=comp_opts,
                 )
 
             # Input data
             if result.X is not None:
                 f.create_dataset(
-                    "input_x", data=np.asarray(result.X),
-                    compression=comp_algo, compression_opts=comp_opts,
+                    "input_x",
+                    data=np.asarray(result.X),
+                    compression=comp_algo,
+                    compression_opts=comp_opts,
                 )
             if result.y is not None:
                 f.create_dataset(
-                    "input_y", data=np.asarray(result.y),
-                    compression=comp_algo, compression_opts=comp_opts,
+                    "input_y",
+                    data=np.asarray(result.y),
+                    compression=comp_algo,
+                    compression_opts=comp_opts,
                 )
 
             # Timestamp

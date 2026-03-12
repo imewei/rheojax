@@ -74,9 +74,14 @@ def run_nlsq_saos(
     model.fit(omega, G_star, **defaults)
 
     # Check R² and warn if fit is poor
-    r2 = getattr(model._nlsq_result, "r_squared", None) if hasattr(model, "_nlsq_result") else None
+    r2 = (
+        getattr(model._nlsq_result, "r_squared", None)
+        if hasattr(model, "_nlsq_result")
+        else None
+    )
     if r2 is not None and r2 < 0:
         import warnings
+
         warnings.warn(
             f"NLSQ R² = {r2:.4f} < 0: model fits worse than the mean. "
             "Check initial parameters, data quality, or model suitability.",
@@ -113,9 +118,14 @@ def run_nlsq_protocol(
     model.fit(x, y, **defaults)
 
     # Check R² and warn if fit is poor
-    r2 = getattr(model._nlsq_result, "r_squared", None) if hasattr(model, "_nlsq_result") else None
+    r2 = (
+        getattr(model._nlsq_result, "r_squared", None)
+        if hasattr(model, "_nlsq_result")
+        else None
+    )
     if r2 is not None and r2 < 0:
         import warnings
+
         warnings.warn(
             f"NLSQ R² = {r2:.4f} < 0: model fits worse than the mean. "
             "Check initial parameters, data quality, or model suitability.",
@@ -138,17 +148,23 @@ def check_nlsq_quality(model: Any, min_r2: float = 0.0) -> dict[str, Any]:
     """
     result = getattr(model, "_nlsq_result", None)
     if result is None:
-        return {"r2": None, "iterations": None, "converged": False,
-                "message": "No NLSQ result found — model.fit() not called?"}
+        return {
+            "r2": None,
+            "iterations": None,
+            "converged": False,
+            "message": "No NLSQ result found — model.fit() not called?",
+        }
 
     r2 = getattr(result, "r_squared", None) or 0.0
     nit = getattr(result, "nfev", None) or getattr(result, "iterations", None)
     converged = r2 >= min_r2
 
     if not converged:
-        msg = (f"NLSQ FAILED: R² = {r2:.4f} (< {min_r2}). "
-               "Model-data mismatch likely. Bayesian inference will NOT produce "
-               "meaningful posteriors with this warm-start.")
+        msg = (
+            f"NLSQ FAILED: R² = {r2:.4f} (< {min_r2}). "
+            "Model-data mismatch likely. Bayesian inference will NOT produce "
+            "meaningful posteriors with this warm-start."
+        )
     else:
         msg = f"NLSQ OK: R² = {r2:.4f}"
 

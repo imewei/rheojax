@@ -3,8 +3,10 @@
 Merges patterns from Anton Paar COLUMN_MAPPINGS, TRIOS TRIOS_COLUMN_MAPPINGS,
 and _utils.py regex patterns into a single canonical source.
 """
+
 from __future__ import annotations
 
+import re as _re
 from dataclasses import dataclass
 
 from rheojax.io.readers._utils import extract_unit_from_header
@@ -267,8 +269,6 @@ CANONICAL_FIELDS: dict[str, CanonicalField] = {
 }
 
 # Pre-compiled patterns sorted by priority (lower number = higher priority)
-import re as _re  # deferred to avoid circular import at module level
-
 _compiled_patterns: dict[str, list[_re.Pattern]] = {
     name: [_re.compile(p, _re.IGNORECASE) for p in cf.patterns]
     for name, cf in CANONICAL_FIELDS.items()
@@ -279,9 +279,8 @@ _priority_order: list[str] = sorted(
     CANONICAL_FIELDS.keys(), key=lambda n: CANONICAL_FIELDS[n].priority
 )
 
-def match_column(
-    header: str, instrument: str | None = None
-) -> CanonicalField | None:
+
+def match_column(header: str, instrument: str | None = None) -> CanonicalField | None:
     """Match a column header string to a CanonicalField.
 
     Uses :func:`~rheojax.io.readers._utils.extract_unit_from_header` to strip
@@ -310,9 +309,7 @@ def match_column(
     for field_name in _priority_order:
         for pattern in _compiled_patterns[field_name]:
             if pattern.match(name_part):
-                logger.debug(
-                    "Column %r matched canonical field %r", header, field_name
-                )
+                logger.debug("Column %r matched canonical field %r", header, field_name)
                 return CANONICAL_FIELDS[field_name]
 
     logger.debug("Column %r had no canonical match", header)

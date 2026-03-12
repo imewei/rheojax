@@ -60,7 +60,17 @@ class TestMainUnknownCommand:
 class TestMainCommandHelp:
     @pytest.mark.parametrize(
         "cmd",
-        ["fit", "bayesian", "spp", "load", "transform", "export", "run", "pipeline", "batch"],
+        [
+            "fit",
+            "bayesian",
+            "spp",
+            "load",
+            "transform",
+            "export",
+            "run",
+            "pipeline",
+            "batch",
+        ],
     )
     @pytest.mark.smoke
     def test_command_help_does_not_crash(self, cmd, capsys):

@@ -1525,18 +1525,32 @@ def _parse_segment(
     # Check for LAOS harmonic columns
     col_names_lower_full = [c.lower() for c in columns]
     harmonic_col = next(
-        (i for i, c in enumerate(col_names_lower_full) if ("harmonic" in c and "number" in c) or c == "harmonic"),
+        (
+            i
+            for i, c in enumerate(col_names_lower_full)
+            if ("harmonic" in c and "number" in c) or c == "harmonic"
+        ),
         None,
     )
     in_phase_col = next(
-        (i for i, c in enumerate(col_names_lower_full) if "in-phase" in c or "in_phase" in c or "in phase" in c),
+        (
+            i
+            for i, c in enumerate(col_names_lower_full)
+            if "in-phase" in c or "in_phase" in c or "in phase" in c
+        ),
         None,
     )
     out_of_phase_col = next(
-        (i for i, c in enumerate(col_names_lower_full) if "out-of-phase" in c or "out_of_phase" in c or "out of phase" in c),
+        (
+            i
+            for i, c in enumerate(col_names_lower_full)
+            if "out-of-phase" in c or "out_of_phase" in c or "out of phase" in c
+        ),
         None,
     )
-    if harmonic_col is not None or (in_phase_col is not None and out_of_phase_col is not None):
+    if harmonic_col is not None or (
+        in_phase_col is not None and out_of_phase_col is not None
+    ):
         laos_harmonics: dict = {}
         if harmonic_col is not None and harmonic_col < data_array.shape[1]:
             laos_harmonics["harmonic_numbers"] = data_array[:, harmonic_col]
@@ -1546,7 +1560,9 @@ def _parse_segment(
             laos_harmonics["out_of_phase"] = data_array[:, out_of_phase_col]
         if laos_harmonics:
             segment_metadata["laos_harmonics"] = laos_harmonics
-            logger.debug("LAOS harmonic columns detected", keys=list(laos_harmonics.keys()))
+            logger.debug(
+                "LAOS harmonic columns detected", keys=list(laos_harmonics.keys())
+            )
 
     return RheoData(
         x=x_data,

@@ -360,7 +360,9 @@ class FluiditySaramitoBase(BaseModel):
         # 2. Fit HB parameters to high-rate region
         # σ - τ_y = K * γ̇^n → log(σ - τ_y) = log(K) + n*log(γ̇)
         sigma_excess = sigma - tau_y_est
-        valid_mask = (sigma_excess > 0.1 * tau_y_est) & (gamma_dot > 0)  # Above noise floor; guard log(0)
+        valid_mask = (sigma_excess > 0.1 * tau_y_est) & (
+            gamma_dot > 0
+        )  # Above noise floor; guard log(0)
 
         if valid_mask.sum() >= 3:
             log_gd = np.log(gamma_dot[valid_mask])

@@ -153,7 +153,9 @@ class TestFromStdin:
 
     @pytest.mark.unit
     def test_from_stdin_parses_valid_envelope(self, monkeypatch):
-        env = Envelope(rheojax_version="0.1.0", envelope_type="data", data={"x": [], "y": []})
+        env = Envelope(
+            rheojax_version="0.1.0", envelope_type="data", data={"x": [], "y": []}
+        )
         json_str = env.to_json()
 
         mock_stdin = MagicMock()

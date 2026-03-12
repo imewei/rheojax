@@ -106,9 +106,7 @@ class ImportWorker(QRunnable):
                 filepath=str(self._file_path),
                 file_count=len(self._file_paths),
                 file_size_bytes=(
-                    self._file_path.stat().st_size
-                    if self._file_path.exists()
-                    else -1
+                    self._file_path.stat().st_size if self._file_path.exists() else -1
                 ),
                 file_format=self._file_path.suffix.lower(),
                 x_col=self._x_col,

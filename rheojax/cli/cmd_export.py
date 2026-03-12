@@ -194,7 +194,9 @@ def main(args: list[str] | None = None) -> int:
                 from rheojax.pipeline import Pipeline
 
                 pipeline = Pipeline.load(str(input_path))  # type: ignore[attr-defined]
-                logger.debug("Pipeline loaded from results directory", path=str(input_path))
+                logger.debug(
+                    "Pipeline loaded from results directory", path=str(input_path)
+                )
             except (ImportError, AttributeError):
                 # Pipeline.load() may not exist; fall back to passing path to exporter
                 pipeline = None
@@ -241,7 +243,9 @@ def main(args: list[str] | None = None) -> int:
         elif parsed.export_format == "hdf5":
             exporter.export_hdf5(pipeline, output_path=str(output_path))
 
-        logger.info("Export complete", output=str(output_path), format=parsed.export_format)
+        logger.info(
+            "Export complete", output=str(output_path), format=parsed.export_format
+        )
 
     except Exception as e:
         print(f"Error during export: {e}", file=sys.stderr)

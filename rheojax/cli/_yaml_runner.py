@@ -30,7 +30,15 @@ logger = get_logger(__name__)
 # Per-step-type keys that may be populated from config.defaults.
 # Keys not listed here are silently dropped when merging defaults into a step.
 _STEP_ALLOWED_DEFAULTS: dict[str, set[str]] = {
-    "load": {"test_mode", "deformation_mode", "poisson_ratio", "format", "x_col", "y_col", "y_cols"},
+    "load": {
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+        "format",
+        "x_col",
+        "y_col",
+        "y_cols",
+    },
     "transform": set(),  # transforms take their own kwargs, not protocol defaults
     "fit": {"test_mode", "deformation_mode", "poisson_ratio", "method", "max_iter"},
     "bayesian": {
@@ -76,11 +84,15 @@ def config_to_builder(config: PipelineConfig) -> PipelineBuilder:
         # Filter defaults to only keys allowed for this step type, then merge.
         # Explicit step values always win over defaults.
         allowed_defaults = _STEP_ALLOWED_DEFAULTS.get(step_type, set())
-        filtered_defaults = {k: v for k, v in config.defaults.items() if k in allowed_defaults}
+        filtered_defaults = {
+            k: v for k, v in config.defaults.items() if k in allowed_defaults
+        }
         merged: dict[str, Any] = {**filtered_defaults, **step}
         merged.pop("type")  # Remove the "type" sentinel; already captured above
 
-        logger.debug("Translating step", step_type=step_type, kwargs=list(merged.keys()))
+        logger.debug(
+            "Translating step", step_type=step_type, kwargs=list(merged.keys())
+        )
 
         if step_type == "load":
             file_path = merged.pop("file")
@@ -233,9 +245,37 @@ def _coerce_value(raw: str) -> Any:
 
 
 _STEP_ALLOWED_KEYS: dict[str, set[str]] = {
-    "load": {"file", "format", "x_col", "y_col", "y_cols", "test_mode", "deformation_mode", "poisson_ratio"},
-    "fit": {"model", "method", "max_iter", "test_mode", "deformation_mode", "poisson_ratio", "use_jax", "params"},
-    "bayesian": {"num_warmup", "num_samples", "num_chains", "seed", "warm_start", "target_accept_prob", "test_mode", "deformation_mode", "poisson_ratio"},
+    "load": {
+        "file",
+        "format",
+        "x_col",
+        "y_col",
+        "y_cols",
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+    },
+    "fit": {
+        "model",
+        "method",
+        "max_iter",
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+        "use_jax",
+        "params",
+    },
+    "bayesian": {
+        "num_warmup",
+        "num_samples",
+        "num_chains",
+        "seed",
+        "warm_start",
+        "target_accept_prob",
+        "test_mode",
+        "deformation_mode",
+        "poisson_ratio",
+    },
     "export": {"output", "format"},
     # "transform" is intentionally absent — open kwargs by design.
 }
@@ -270,8 +310,7 @@ def _nested_set(target: dict[str, Any], keys: list[str], value: Any) -> None:
         allowed = _STEP_ALLOWED_KEYS.get(step_type)
         if allowed is not None and keys[0] not in allowed:
             logger.warning(
-                "Override injects unrecognised key into %s step: '%s'. "
-                "Allowed: %s",
+                "Override injects unrecognised key into %s step: '%s'. " "Allowed: %s",
                 step_type,
                 keys[0],
                 sorted(allowed),
@@ -299,7 +338,9 @@ def dry_run_pipeline(config: PipelineConfig) -> None:
         >>> dry_run_pipeline(config)
     """
     console = get_console()
-    console.print(f"\n[header]Pipeline:[/header] {config.name}  (version {config.version})")
+    console.print(
+        f"\n[header]Pipeline:[/header] {config.name}  (version {config.version})"
+    )
     if config.defaults:
         console.print(f"[muted]Defaults:[/muted] {config.defaults}")
 
@@ -307,7 +348,9 @@ def dry_run_pipeline(config: PipelineConfig) -> None:
     for idx, step in enumerate(config.steps):
         step_type = step.get("type", "?")
         extra = {k: v for k, v in step.items() if k != "type"}
-        console.print(f"  [info]{idx + 1}.[/info] [header]{step_type}[/header]  {extra}")
+        console.print(
+            f"  [info]{idx + 1}.[/info] [header]{step_type}[/header]  {extra}"
+        )
     console.print()
 
 

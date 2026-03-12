@@ -182,6 +182,7 @@ class OWChirp(BaseTransform):
             _dt_std = float(jnp.std(dt_arr))
             if _dt_med > 0 and (_dt_std / _dt_med) > 0.05:
                 import warnings as _warnings
+
                 _warnings.warn(
                     f"OWChirp (vmap path): non-uniform time spacing detected "
                     f"(std/median = {_dt_std / _dt_med:.2f}). "
@@ -198,7 +199,7 @@ class OWChirp(BaseTransform):
 
         # vmap over t_center (inner), then over freq (outer)
         compute_row = jax.vmap(compute_coeff, in_axes=(None, 0))  # over t_centers
-        compute_all = jax.vmap(compute_row, in_axes=(0, None))    # over freqs
+        compute_all = jax.vmap(compute_row, in_axes=(0, None))  # over freqs
 
         coefficients = compute_all(jnp.asarray(frequencies), t)
         return coefficients
@@ -233,6 +234,7 @@ class OWChirp(BaseTransform):
         dt_std = float(jnp.std(dt_arr))
         if dt > 0 and (dt_std / dt) > 0.05:
             import warnings as _warnings
+
             _warnings.warn(
                 f"OWChirp: non-uniform time spacing detected "
                 f"(std/median = {dt_std / dt:.2f}). "

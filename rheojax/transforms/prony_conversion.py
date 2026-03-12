@@ -16,10 +16,9 @@ The Prony series representation is:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any
-
-import warnings
 
 import numpy as np
 
@@ -185,8 +184,8 @@ class PronyConversion(BaseTransform):
 
 @jax.jit
 def _prony_to_frequency_jax(
-    G_i: jnp.ndarray, tau_i: jnp.ndarray, G_e: float, omega: jnp.ndarray
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+    G_i: Any, tau_i: Any, G_e: float, omega: Any
+) -> tuple[Any, Any]:
     """JIT-compiled Prony to frequency conversion."""
     wt2 = (omega[:, None] * tau_i[None, :]) ** 2
     G_prime = G_e + jnp.sum(G_i[None, :] * wt2 / (1.0 + wt2), axis=1)
@@ -210,9 +209,7 @@ def _prony_to_frequency(
 
 
 @jax.jit
-def _prony_to_time_jax(
-    G_i: jnp.ndarray, tau_i: jnp.ndarray, G_e: float, t: jnp.ndarray
-) -> jnp.ndarray:
+def _prony_to_time_jax(G_i: Any, tau_i: Any, G_e: float, t: Any) -> Any:
     """JIT-compiled Prony to time conversion."""
     return G_e + jnp.sum(G_i[None, :] * jnp.exp(-t[:, None] / tau_i[None, :]), axis=1)
 
@@ -271,9 +268,7 @@ def _fit_prony_oscillation(
     # T-04: Ensure omega is sorted ascending for correct tau range computation
     omega = np.sort(omega)
 
-    tau_i = np.logspace(
-        np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes
-    )
+    tau_i = np.logspace(np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes)
 
     G_e = max(float(np.min(G_prime)), 0.0)
 

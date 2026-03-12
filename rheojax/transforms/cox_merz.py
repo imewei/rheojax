@@ -59,9 +59,7 @@ class CoxMerz(BaseTransform):
         self.n_points = n_points
         self.result: CoxMerzResult | None = None
 
-    def _transform(
-        self, data: list[RheoData]
-    ) -> tuple[RheoData, dict[str, Any]]:
+    def _transform(self, data: list[RheoData]) -> tuple[RheoData, dict[str, Any]]:
         """Apply Cox-Merz comparison.
 
         Args:
@@ -131,11 +129,15 @@ class CoxMerz(BaseTransform):
         sort_o = np.argsort(omega)
         sort_g = np.argsort(gamma_dot)
         eta_c = np.exp(
-            np.interp(np.log(common_rates), np.log(omega[sort_o]), np.log(eta_star[sort_o]))
+            np.interp(
+                np.log(common_rates), np.log(omega[sort_o]), np.log(eta_star[sort_o])
+            )
         )
         eta_s = np.exp(
             np.interp(
-                np.log(common_rates), np.log(gamma_dot[sort_g]), np.log(eta_steady_raw[sort_g])
+                np.log(common_rates),
+                np.log(gamma_dot[sort_g]),
+                np.log(eta_steady_raw[sort_g]),
             )
         )
 

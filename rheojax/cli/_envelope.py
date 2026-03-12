@@ -233,7 +233,9 @@ def create_fit_envelope(
     fit_result: dict[str, Any] = {
         "model": model_name,
         "test_mode": test_mode,
-        "parameters": {k: float(v) if hasattr(v, "item") else v for k, v in params.items()},
+        "parameters": {
+            k: float(v) if hasattr(v, "item") else v for k, v in params.items()
+        },
     }
 
     return Envelope(

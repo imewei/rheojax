@@ -120,7 +120,12 @@ class TestValidateConfig:
             steps=[
                 {"type": "load", "file": "data.csv"},
                 {"type": "fit", "model": "maxwell"},
-                {"type": "bayesian", "num_warmup": 500, "num_samples": 1000, "num_chains": 4},
+                {
+                    "type": "bayesian",
+                    "num_warmup": 500,
+                    "num_samples": 1000,
+                    "num_chains": 4,
+                },
             ],
         )
         errors = validate_config(config)

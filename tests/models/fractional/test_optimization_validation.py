@@ -109,7 +109,9 @@ class TestOptimizationFailureDetection:
     """
 
     @pytest.mark.parametrize("model_name,ModelClass", SCALAR_DATA_MODELS)
-    def test_optimization_with_bad_data_handles_gracefully(self, model_name, ModelClass):
+    def test_optimization_with_bad_data_handles_gracefully(
+        self, model_name, ModelClass
+    ):
         """Test that optimization with bad data either raises or completes with warning."""
         model = ModelClass()
 

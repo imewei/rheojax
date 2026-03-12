@@ -30,13 +30,17 @@ class TestCreateParser:
     @pytest.mark.unit
     def test_has_test_mode_flag(self):
         parser = create_parser()
-        ns = parser.parse_args(["*.csv", "--model", "maxwell", "--test-mode", "relaxation"])
+        ns = parser.parse_args(
+            ["*.csv", "--model", "maxwell", "--test-mode", "relaxation"]
+        )
         assert ns.test_mode == "relaxation"
 
     @pytest.mark.unit
     def test_has_output_dir_flag(self):
         parser = create_parser()
-        ns = parser.parse_args(["*.csv", "--model", "maxwell", "--output-dir", "results"])
+        ns = parser.parse_args(
+            ["*.csv", "--model", "maxwell", "--output-dir", "results"]
+        )
         assert str(ns.output_dir) == "results"
 
     @pytest.mark.unit
@@ -64,22 +68,26 @@ class TestMainErrors:
     @pytest.mark.smoke
     def test_main_no_matching_files_returns_1(self, tmp_path):
         # Pattern that matches nothing in tmp_path
-        result = main([
-            str(tmp_path / "*.totally_nonexistent_extension_xyz"),
-            "--model",
-            "maxwell",
-            "--test-mode",
-            "relaxation",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.totally_nonexistent_extension_xyz"),
+                "--model",
+                "maxwell",
+                "--test-mode",
+                "relaxation",
+            ]
+        )
         assert result == 1
 
     @pytest.mark.unit
     def test_main_invalid_max_iter_returns_1(self, tmp_path):
-        result = main([
-            str(tmp_path / "*.csv"),
-            "--model",
-            "maxwell",
-            "--max-iter",
-            "0",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.csv"),
+                "--model",
+                "maxwell",
+                "--max-iter",
+                "0",
+            ]
+        )
         assert result == 1

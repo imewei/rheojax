@@ -54,7 +54,8 @@ def run_notebook(nb_path, timeout=600):
 
     # Remove all injected setup cells before saving (tagged + legacy untagged)
     nb.cells = [
-        c for c in nb.cells
+        c
+        for c in nb.cells
         if not (
             c.get("metadata", {}).get("_runner_setup")
             or (

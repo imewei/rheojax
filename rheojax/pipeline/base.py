@@ -844,12 +844,14 @@ class Pipeline:
                 # params (num_warmup, num_samples, num_chains, seed) are
                 # consumed by NumPyro and never stored there.
                 _sampling_keys = {
-                    "num_warmup", "num_samples", "num_chains", "seed",
+                    "num_warmup",
+                    "num_samples",
+                    "num_chains",
+                    "seed",
                     "target_accept_prob",
                 }
                 model_obj._last_bayesian_kwargs = {
-                    k: v for k, v in bayesian_kwargs.items()
-                    if k in _sampling_keys
+                    k: v for k, v in bayesian_kwargs.items() if k in _sampling_keys
                 }
                 self.steps.append(("fit_bayesian", model_obj))
                 self.history.append(("fit_bayesian", model_obj.__class__.__name__))
@@ -903,8 +905,16 @@ class Pipeline:
         fit_result = self.get_fit_result()
         plotter = FitPlotter()
 
-        X = np.array(self.data.x) if _is_jax_array(self.data.x) else np.asarray(self.data.x)
-        y = np.array(self.data.y) if _is_jax_array(self.data.y) else np.asarray(self.data.y)
+        X = (
+            np.array(self.data.x)
+            if _is_jax_array(self.data.x)
+            else np.asarray(self.data.x)
+        )
+        y = (
+            np.array(self.data.y)
+            if _is_jax_array(self.data.y)
+            else np.asarray(self.data.y)
+        )
 
         # Forward deformation_mode from metadata
         _meta = getattr(self.data, "metadata", None) or {}
@@ -918,7 +928,10 @@ class Pipeline:
                 kwargs["test_mode"] = tm
 
         fig, axes = plotter.plot_nlsq(
-            X, y, fit_result, self._last_model,
+            X,
+            y,
+            fit_result,
+            self._last_model,
             confidence=confidence,
             show_residuals=show_residuals,
             show_uncertainty=show_uncertainty,
@@ -975,8 +988,16 @@ class Pipeline:
         from rheojax.visualization.fit_plotter import FitPlotter
 
         plotter = FitPlotter()
-        X = np.array(self.data.x) if _is_jax_array(self.data.x) else np.asarray(self.data.x)
-        y = np.array(self.data.y) if _is_jax_array(self.data.y) else np.asarray(self.data.y)
+        X = (
+            np.array(self.data.x)
+            if _is_jax_array(self.data.x)
+            else np.asarray(self.data.x)
+        )
+        y = (
+            np.array(self.data.y)
+            if _is_jax_array(self.data.y)
+            else np.asarray(self.data.y)
+        )
 
         # Forward metadata
         _meta = getattr(self.data, "metadata", None) or {}
@@ -997,7 +1018,10 @@ class Pipeline:
                 pass
 
         fig, axes = plotter.plot_bayesian(
-            X, y, self._last_bayesian_result, self._last_model,
+            X,
+            y,
+            self._last_bayesian_result,
+            self._last_model,
             credible_level=credible_level,
             max_draws=max_draws,
             show_nlsq_overlay=show_nlsq_overlay,
@@ -1268,7 +1292,8 @@ class Pipeline:
         test_mode = fit_kwargs.pop("test_mode", None)
 
         comparison = _compare(
-            X, y,
+            X,
+            y,
             models=models,
             test_mode=test_mode,
             criterion=criterion,
@@ -1282,7 +1307,11 @@ class Pipeline:
         # already-fitted instance from compare_models() instead of re-fitting.
         if comparison.results:
             best_fr = next(
-                (r for r in comparison.results if r.model_name == comparison.best_model),
+                (
+                    r
+                    for r in comparison.results
+                    if r.model_name == comparison.best_model
+                ),
                 None,
             )
             fitted_model = getattr(best_fr, "_fitted_model", None) if best_fr else None
@@ -1464,7 +1493,9 @@ class Pipeline:
                 )
                 raise
 
-        self.steps.append(("export", {"output_path": str(output_path), "format": format}))
+        self.steps.append(
+            ("export", {"output_path": str(output_path), "format": format})
+        )
         self.history.append(("export", str(output_path), format))
         return self
 

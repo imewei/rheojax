@@ -101,9 +101,7 @@ class DiagnosticsPage(QWidget):
         self._gof_table = QTableWidget()
         self._gof_table.setRowCount(n_rows)
         self._gof_table.setColumnCount(n_cols_pair * 2)
-        self._gof_table.setHorizontalHeaderLabels(
-            ["Metric", "Value"] * n_cols_pair
-        )
+        self._gof_table.setHorizontalHeaderLabels(["Metric", "Value"] * n_cols_pair)
         self._gof_table.setAlternatingRowColors(True)
         self._gof_table.setToolTip("Key diagnostics from the last Bayesian run")
 
@@ -447,9 +445,7 @@ class DiagnosticsPage(QWidget):
                     arr = np.asarray(stat_arr)
                     if arr.ndim == 1:
                         if num_chains > 1 and arr.size % num_chains == 0:
-                            sample_stats_dict[stat_name] = arr.reshape(
-                                num_chains, -1
-                            )
+                            sample_stats_dict[stat_name] = arr.reshape(num_chains, -1)
                         else:
                             sample_stats_dict[stat_name] = arr.reshape(1, -1)
                     else:

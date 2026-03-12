@@ -346,9 +346,7 @@ class DataService:
         if temp_col is None:
             for ds in result:
                 if "temperature" not in (ds.metadata or {}):
-                    temp_from_name = self._extract_temperature_from_filename(
-                        file_path
-                    )
+                    temp_from_name = self._extract_temperature_from_filename(file_path)
                     if temp_from_name is not None:
                         ds.metadata["temperature"] = temp_from_name
 
@@ -1184,9 +1182,7 @@ class DataService:
         )
 
     @staticmethod
-    def _extract_scalar_temperature(
-        file_path: Path, temp_col: str
-    ) -> float | None:
+    def _extract_scalar_temperature(file_path: Path, temp_col: str) -> float | None:
         """Extract a scalar temperature from a column in *file_path*.
 
         Reads up to 200 rows with pandas (fast, no full parse) and returns the
@@ -1218,7 +1214,11 @@ class DataService:
 
             col_lower = temp_col.lower()
             matched = next(
-                (c for c in df.columns if str(c).lower() == col_lower or str(c) == temp_col),
+                (
+                    c
+                    for c in df.columns
+                    if str(c).lower() == col_lower or str(c) == temp_col
+                ),
                 None,
             )
             if matched is None:

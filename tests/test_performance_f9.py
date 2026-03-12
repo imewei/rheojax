@@ -45,9 +45,9 @@ class TestNLSQPerformance:
         model.fit(t, G_t, test_mode="relaxation")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < NLSQ_TIME_LIMIT, (
-            f"Maxwell relaxation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < NLSQ_TIME_LIMIT
+        ), f"Maxwell relaxation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
 
     def test_maxwell_relaxation_1000pts(self):
         from rheojax.models.classical import Maxwell
@@ -59,9 +59,9 @@ class TestNLSQPerformance:
         model.fit(t, G_t, test_mode="relaxation")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < NLSQ_TIME_LIMIT, (
-            f"Maxwell relaxation 1000pts took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < NLSQ_TIME_LIMIT
+        ), f"Maxwell relaxation 1000pts took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
 
     def test_maxwell_oscillation_500pts(self):
         from rheojax.models.classical import Maxwell
@@ -73,9 +73,9 @@ class TestNLSQPerformance:
         model.fit(omega, G_star, test_mode="oscillation")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < NLSQ_TIME_LIMIT, (
-            f"Maxwell oscillation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < NLSQ_TIME_LIMIT
+        ), f"Maxwell oscillation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
 
     def test_zener_relaxation_500pts(self):
         from rheojax.models.classical import Zener
@@ -88,9 +88,9 @@ class TestNLSQPerformance:
         model.fit(t, G_t, test_mode="relaxation")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < NLSQ_TIME_LIMIT, (
-            f"Zener relaxation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < NLSQ_TIME_LIMIT
+        ), f"Zener relaxation fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
 
     def test_cross_flow_curve_500pts(self):
         from rheojax.models.flow import Cross
@@ -105,9 +105,9 @@ class TestNLSQPerformance:
         model.fit(gd, sigma, test_mode="flow_curve")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < NLSQ_TIME_LIMIT, (
-            f"Cross flow_curve fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < NLSQ_TIME_LIMIT
+        ), f"Cross flow_curve fit took {elapsed:.2f}s (limit {NLSQ_TIME_LIMIT}s)"
 
 
 @pytest.mark.slow
@@ -125,6 +125,6 @@ class TestJITOverhead:
         model.fit(t, G_t, test_mode="relaxation")
         elapsed = time.perf_counter() - start
 
-        assert elapsed < JIT_TIME_LIMIT, (
-            f"First Maxwell fit (JIT) took {elapsed:.2f}s (limit {JIT_TIME_LIMIT}s)"
-        )
+        assert (
+            elapsed < JIT_TIME_LIMIT
+        ), f"First Maxwell fit (JIT) took {elapsed:.2f}s (limit {JIT_TIME_LIMIT}s)"

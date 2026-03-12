@@ -22,9 +22,7 @@ class ResultsPanel(QWidget):
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(
-            Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM
-        )
+        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         layout.setSpacing(Spacing.XS)
 
         self.fit_label = QLabel("Fit Results")

@@ -59,13 +59,13 @@ if TYPE_CHECKING:
 _EPS: float = 1e-12
 
 # Default fallback values when estimation completely fails and no bounds exist
-_DEFAULT_MODULUS: float = 1_000.0       # Pa
-_DEFAULT_VISCOSITY: float = 1.0         # Pa·s
-_DEFAULT_TAU: float = 1.0              # s
-_DEFAULT_POWER_LAW_N: float = 0.5      # dimensionless
+_DEFAULT_MODULUS: float = 1_000.0  # Pa
+_DEFAULT_VISCOSITY: float = 1.0  # Pa·s
+_DEFAULT_TAU: float = 1.0  # s
+_DEFAULT_POWER_LAW_N: float = 0.5  # dimensionless
 _DEFAULT_FRACTIONAL_ORDER: float = 0.5
-_DEFAULT_YIELD_STRESS: float = 10.0    # Pa
-_DEFAULT_V_ACT: float = 1e-5           # m³ (HVM activation volume)
+_DEFAULT_YIELD_STRESS: float = 10.0  # Pa
+_DEFAULT_V_ACT: float = 1e-5  # m³ (HVM activation volume)
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +473,9 @@ def _compute_data_features(
         try:
             freq_feats = extract_frequency_features(omega, y)
             features["freq_features"] = freq_feats
-            features["alpha_estimate"] = float(freq_feats.get("alpha_estimate", _DEFAULT_FRACTIONAL_ORDER))
+            features["alpha_estimate"] = float(
+                freq_feats.get("alpha_estimate", _DEFAULT_FRACTIONAL_ORDER)
+            )
         except Exception:  # noqa: BLE001
             features["freq_features"] = {}
             features["alpha_estimate"] = _DEFAULT_FRACTIONAL_ORDER
@@ -502,7 +504,9 @@ def _compute_data_features(
         t = X.astype(float)
         J_t = y_real
         features["J0"] = float(J_t[0]) if len(J_t) > 0 else 1.0 / _DEFAULT_MODULUS
-        features["G0_creep"] = float(1.0 / (J_t[0] + _EPS)) if len(J_t) > 0 else _DEFAULT_MODULUS
+        features["G0_creep"] = (
+            float(1.0 / (J_t[0] + _EPS)) if len(J_t) > 0 else _DEFAULT_MODULUS
+        )
         features["t"] = t
         features["J_t"] = J_t
 
@@ -522,14 +526,18 @@ def _compute_data_features(
         try:
             features["sigma_y_est"] = _estimate_yield_stress(gd, sg)
         except Exception:  # noqa: BLE001
-            features["sigma_y_est"] = float(sg[0]) if len(sg) > 0 else _DEFAULT_YIELD_STRESS
+            features["sigma_y_est"] = (
+                float(sg[0]) if len(sg) > 0 else _DEFAULT_YIELD_STRESS
+            )
 
         # Power-law exponent from log-log slope in medium shear-rate range
         if len(gd) >= 3:
             mask = gd > _EPS
             if mask.sum() >= 2:
                 try:
-                    coeffs = np.polyfit(np.log10(gd[mask]), np.log10(sg[mask] + _EPS), 1)
+                    coeffs = np.polyfit(
+                        np.log10(gd[mask]), np.log10(sg[mask] + _EPS), 1
+                    )
                     features["n_power_law"] = float(np.clip(coeffs[0], 0.0, 1.0))
                 except Exception:  # noqa: BLE001
                     features["n_power_law"] = _DEFAULT_POWER_LAW_N
@@ -540,7 +548,9 @@ def _compute_data_features(
 
         features["gamma_dot"] = gd
         features["sigma"] = sg
-        features["sigma_max"] = float(sg.max()) if len(sg) > 0 else _DEFAULT_YIELD_STRESS
+        features["sigma_max"] = (
+            float(sg.max()) if len(sg) > 0 else _DEFAULT_YIELD_STRESS
+        )
 
     return features
 
@@ -565,11 +575,11 @@ def _estimate_single_parameter(
 
     if nm == "eta_inf":
         eta0 = _est_eta_0(features, test_mode)
-        return eta0 * 0.01   # η_inf is typically 1-2 orders below η_0
+        return eta0 * 0.01  # η_inf is typically 1-2 orders below η_0
 
     if nm == "eta_s":
         eta0 = _est_eta_0(features, test_mode)
-        return eta0 * 0.01   # solvent viscosity ≈ 1% of zero-rate viscosity
+        return eta0 * 0.01  # solvent viscosity ≈ 1% of zero-rate viscosity
 
     if nm == "eta_p":
         # Polymer contribution: η_p = η_0 - η_s
@@ -579,8 +589,18 @@ def _estimate_single_parameter(
     # ------------------------------------------------------------------
     # Relaxation time / lambda parameters
     # ------------------------------------------------------------------
-    if nm in ("tau", "lambda", "tau_r", "tau_d", "tau_e", "tau_rep",
-              "tau_0", "tau_c", "tau_eq", "lam"):
+    if nm in (
+        "tau",
+        "lambda",
+        "tau_r",
+        "tau_d",
+        "tau_e",
+        "tau_rep",
+        "tau_0",
+        "tau_c",
+        "tau_eq",
+        "lam",
+    ):
         return _est_tau(features, test_mode)
 
     if nm == "lambda_0":
@@ -595,7 +615,9 @@ def _estimate_single_parameter(
     if nm in ("g_g", "gg", "g_glassy"):
         # Glassy modulus: use high-frequency plateau for oscillation
         if test_mode == "oscillation" and "freq_features" in features:
-            return float(features["freq_features"].get("high_plateau", _DEFAULT_MODULUS))
+            return float(
+                features["freq_features"].get("high_plateau", _DEFAULT_MODULUS)
+            )
         return _est_modulus(features, test_mode) * 10.0
 
     if nm in ("g_inf", "g_infinity"):
@@ -679,8 +701,15 @@ def _estimate_single_parameter(
     # ------------------------------------------------------------------
     # Dimensionless parameters (Giesekus mobility, PTT epsilon, etc.)
     # ------------------------------------------------------------------
-    if nm in ("alpha_giesekus", "alpha_mob", "xi", "eps", "epsilon_ptt",
-              "f_c", "f_neq"):
+    if nm in (
+        "alpha_giesekus",
+        "alpha_mob",
+        "xi",
+        "eps",
+        "epsilon_ptt",
+        "f_c",
+        "f_neq",
+    ):
         return 0.1
 
     if nm in ("beta_ratio", "beta_mob"):
@@ -696,10 +725,10 @@ def _estimate_single_parameter(
     # Temperature / activation energy parameters
     # ------------------------------------------------------------------
     if nm in ("e_a", "e_act", "delta_h"):
-        return 50_000.0   # J/mol — typical polymer activation energy
+        return 50_000.0  # J/mol — typical polymer activation energy
 
     if nm in ("t_ref", "t_0"):
-        return 298.15   # K — room temperature reference
+        return 298.15  # K — room temperature reference
 
     # ------------------------------------------------------------------
     # Catch-all: use the feature that best matches the physics
@@ -756,13 +785,14 @@ def _est_modulus(features: dict[str, Any], test_mode: str) -> float:
 # Prony / GMM mode helpers
 # ---------------------------------------------------------------------------
 
+
 def _is_prony_modulus(nm: str) -> bool:
     """Return True if the parameter name looks like a Prony modulus mode."""
     # Patterns: G_i, G_1, G_2, ..., E_i, E_1, ..., G_inf, E_inf
     # Exclude generic G0-type names already handled above
     for prefix in ("g_", "e_"):
         if nm.startswith(prefix):
-            suffix = nm[len(prefix):]
+            suffix = nm[len(prefix) :]
             if suffix.lstrip("-").isdigit() or suffix == "inf" or suffix == "infinity":
                 return True
     return False

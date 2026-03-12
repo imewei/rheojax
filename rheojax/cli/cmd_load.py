@@ -184,7 +184,9 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error: {err}", file=sys.stderr)
         return 1
 
-    logger.debug("Data loaded and validated", shape=str(x_arr.shape), test_mode=test_mode)
+    logger.debug(
+        "Data loaded and validated", shape=str(x_arr.shape), test_mode=test_mode
+    )
 
     if parsed.json_output:
         # Build JSON envelope for piping

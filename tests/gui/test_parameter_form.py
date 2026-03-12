@@ -102,6 +102,7 @@ def test_form_values_changed_signal(qapp, sample_specs):
 def test_form_with_real_transform_specs(qapp):
     """Form works with actual TransformService specs."""
     from rheojax.gui.services.transform_service import TransformService
+
     service = TransformService()
     for key in service.get_available_transforms():
         specs = service.get_transform_params(key)

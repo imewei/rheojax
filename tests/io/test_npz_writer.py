@@ -1,4 +1,5 @@
 """Tests for NumPy .npz writer/reader (Phase 3)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -24,7 +25,9 @@ def _make_data(
 ) -> RheoData:
     x = np.linspace(0.1, 1.0, n)
     if complex_y:
-        y = np.array([100.0 + 50.0j, 90.0 + 45.0j, 80.0 + 40.0j, 70.0 + 35.0j, 60.0 + 30.0j])
+        y = np.array(
+            [100.0 + 50.0j, 90.0 + 45.0j, 80.0 + 40.0j, 70.0 + 35.0j, 60.0 + 30.0j]
+        )
     else:
         y = np.linspace(100.0, 60.0, n)
     return RheoData(
@@ -62,8 +65,12 @@ def test_roundtrip_real(tmp_path):
 @pytest.mark.smoke
 def test_roundtrip_complex(tmp_path):
     """Save and load complex y data (G* = G' + iG'')."""
-    data = _make_data(complex_y=True, x_units="rad/s", domain="frequency",
-                      initial_test_mode="oscillation")
+    data = _make_data(
+        complex_y=True,
+        x_units="rad/s",
+        domain="frequency",
+        initial_test_mode="oscillation",
+    )
     path = tmp_path / "complex.npz"
     save_npz(data, path)
     loaded = load_npz(path)

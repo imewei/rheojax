@@ -504,13 +504,18 @@ class BatchPipeline:
                     _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
                     if _template_bayes is not None:
                         for _bk in (
-                            "num_warmup", "num_samples", "num_chains", "seed",
+                            "num_warmup",
+                            "num_samples",
+                            "num_chains",
+                            "seed",
                             "target_accept_prob",
                         ):
                             if _bk in _template_bayes:
                                 _bayes_kwargs.setdefault(_bk, _template_bayes[_bk])
-                    result = pipeline._last_model.fit_bayesian(X, y, **_bayes_kwargs)
-                    pipeline._last_bayesian_result = result
+                    bayes_result = pipeline._last_model.fit_bayesian(
+                        X, y, **_bayes_kwargs
+                    )
+                    pipeline._last_bayesian_result = bayes_result
                     pipeline.steps.append((step_action, pipeline._last_model))
                     metrics["bayesian_completed"] = True
                     logger.debug(

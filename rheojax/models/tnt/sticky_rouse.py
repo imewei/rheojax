@@ -576,8 +576,7 @@ class TNTStickyRouse(TNTBase):
         self._nlsq_result = result
 
         logger.info(
-            f"Sticky Rouse fit complete: "
-            f"n_modes={self._n_modes}, method={method}"
+            f"Sticky Rouse fit complete: " f"n_modes={self._n_modes}, method={method}"
         )
         return self
 

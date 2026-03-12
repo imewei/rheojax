@@ -35,7 +35,9 @@ class TestAddBayesianStep:
     @pytest.mark.unit
     def test_add_bayesian_step_custom_values(self):
         builder = PipelineBuilder()
-        builder.add_bayesian_step(num_warmup=500, num_samples=1000, num_chains=2, seed=42)
+        builder.add_bayesian_step(
+            num_warmup=500, num_samples=1000, num_chains=2, seed=42
+        )
         _, kwargs = next(s for s in builder.steps if s[0] == "bayesian")
         assert kwargs["num_warmup"] == 500
         assert kwargs["num_samples"] == 1000
@@ -125,9 +127,5 @@ class TestBuilderChaining:
     @pytest.mark.unit
     def test_step_count_after_chaining(self):
         builder = PipelineBuilder()
-        (
-            builder.add_load_step("data.csv")
-            .add_fit_step("maxwell")
-            .add_bayesian_step()
-        )
+        (builder.add_load_step("data.csv").add_fit_step("maxwell").add_bayesian_step())
         assert len(builder) == 3

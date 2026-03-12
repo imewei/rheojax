@@ -7,9 +7,8 @@ functions (e.g., creep compliance → relaxation modulus).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
-
 import warnings
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from scipy.signal import savgol_filter

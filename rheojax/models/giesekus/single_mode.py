@@ -302,11 +302,7 @@ class GiesekusSingleMode(GiesekusBase):
         # model_function returns (N,2) real [G', G''] for oscillation;
         # convert to complex G* to match the established convention
         # (Maxwell, Zener, fractional models all return complex G*)
-        if (
-            test_mode == "oscillation"
-            and result.ndim == 2
-            and result.shape[1] == 2
-        ):
+        if test_mode == "oscillation" and result.ndim == 2 and result.shape[1] == 2:
             result = result[:, 0] + 1j * result[:, 1]
         return result
 

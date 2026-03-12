@@ -65,9 +65,7 @@ class JAXStatusWidget(QWidget):
 
         # Main horizontal layout — no separators, just spacing
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(
-            Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM
-        )
+        main_layout.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
         main_layout.setSpacing(Spacing.XL)
 
         # Shared label style

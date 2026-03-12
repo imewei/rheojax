@@ -64,9 +64,7 @@ class PipelineChips(QWidget):
 
         # Main horizontal layout
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(
-            Spacing.SM, Spacing.XS, Spacing.SM, Spacing.XS
-        )
+        layout.setContentsMargins(Spacing.SM, Spacing.XS, Spacing.SM, Spacing.XS)
         layout.setSpacing(Spacing.XS)
 
         # Create chips for each pipeline step

@@ -75,7 +75,9 @@ class FitResult:
     input_data: RheoData | None = field(default=None, repr=False)
     X: np.ndarray | None = field(default=None, repr=False)
     y: np.ndarray | None = field(default=None, repr=False)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
+    timestamp: str = field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
+    )
     metadata: dict[str, Any] = field(default_factory=dict)
     _fitted_model: Any = field(default=None, repr=False, compare=False)
 
@@ -193,7 +195,10 @@ class FitResult:
         if ci_arr is None:
             return None
         names = list(self.params.keys())
-        return {names[i]: (float(ci_arr[i, 0]), float(ci_arr[i, 1])) for i in range(min(len(names), len(ci_arr)))}
+        return {
+            names[i]: (float(ci_arr[i, 0]), float(ci_arr[i, 1]))
+            for i in range(min(len(names), len(ci_arr)))
+        }
 
     # ------------------------------------------------------------------
     # Delegated methods
@@ -432,7 +437,8 @@ class FitResult:
         # Reconstruct arrays, handling complex data serialized as
         # separate real/imag keys (see to_dict).
         def _load_array(
-            d: dict, key: str,
+            d: dict,
+            key: str,
         ) -> np.ndarray | None:
             if d.get(f"{key}_is_complex"):
                 return np.array(d[f"{key}_real"]) + 1j * np.array(d[f"{key}_imag"])
@@ -450,10 +456,12 @@ class FitResult:
 
             _is_complex = np.iscomplexobj(y_arr)
             if _is_complex:
-                residuals = np.concatenate([
-                    y_arr.real - fitted.real,
-                    y_arr.imag - fitted.imag,
-                ])
+                residuals = np.concatenate(
+                    [
+                        y_arr.real - fitted.real,
+                        y_arr.imag - fitted.imag,
+                    ]
+                )
             else:
                 residuals = (y_arr - fitted).ravel()
             rss = float(np.sum(residuals**2))
@@ -499,8 +507,14 @@ class FitResult:
         # P2-Fit-8: Read back persisted success, n_data, _is_complex_split
         # with backward-compatible defaults.
         _success = bool(data["success"]) if "success" in data else True
-        _n_data = int(data["n_data"]) if "n_data" in data else (len(y_arr) if y_arr is not None else 0)
-        _is_complex_split = bool(data["_is_complex_split"]) if "_is_complex_split" in data else False
+        _n_data = (
+            int(data["n_data"])
+            if "n_data" in data
+            else (len(y_arr) if y_arr is not None else 0)
+        )
+        _is_complex_split = (
+            bool(data["_is_complex_split"]) if "_is_complex_split" in data else False
+        )
 
         # Reconstruct OptimizationResult from y + fitted_curve
         opt_result = None
@@ -552,7 +566,9 @@ class FitResult:
         y = np.asarray(self.y)
 
         if show_residuals and self.fitted_curve is not None:
-            fig, (ax_fit, ax_res) = plt.subplots(2, 1, figsize=(8, 6), height_ratios=[3, 1], sharex=True)
+            fig, (ax_fit, ax_res) = plt.subplots(
+                2, 1, figsize=(8, 6), height_ratios=[3, 1], sharex=True
+            )
         else:
             fig, ax_fit = plt.subplots(1, 1, figsize=(8, 4))
             ax_res = None
@@ -573,7 +589,11 @@ class FitResult:
 
         ax_fit.set_ylabel("Response")
         ax_fit.legend()
-        ax_fit.set_title(f"{self.model_class_name} — R² = {self.r_squared:.4f}" if self.r_squared is not None else self.model_class_name)
+        ax_fit.set_title(
+            f"{self.model_class_name} — R² = {self.r_squared:.4f}"
+            if self.r_squared is not None
+            else self.model_class_name
+        )
 
         if ax_res is not None and self.fitted_curve is not None:
             residuals = y - np.asarray(self.fitted_curve)

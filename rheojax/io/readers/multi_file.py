@@ -264,7 +264,7 @@ def load_series(
         rd = _flatten_result(raw)
         rd.metadata["protocol"] = protocol
         if metadata_key is not None:
-            rd.metadata[metadata_key] = metadata_values[i]  # type: ignore[index]
+            rd.metadata[metadata_key] = metadata_values[i]
         results.append(rd)
 
     if sort_by is not None:

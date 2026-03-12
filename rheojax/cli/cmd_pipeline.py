@@ -30,7 +30,14 @@ try:
 except Exception:
     # Fallback if _templates is unavailable at import time.
     # Keep in sync with TEMPLATES dict in rheojax/cli/_templates.py.
-    _TEMPLATE_CHOICES = ("basic", "bayesian", "batch", "creep", "mastercurve", "oscillation")
+    _TEMPLATE_CHOICES = (
+        "basic",
+        "bayesian",
+        "batch",
+        "creep",
+        "mastercurve",
+        "oscillation",
+    )
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -218,14 +225,20 @@ def run_show(args: argparse.Namespace) -> int:
         with open(args.config) as fh:
             config = yaml.safe_load(fh)
     except ImportError:
-        print("Error: PyYAML is required. Install with: pip install pyyaml", file=sys.stderr)
+        print(
+            "Error: PyYAML is required. Install with: pip install pyyaml",
+            file=sys.stderr,
+        )
         return 1
     except Exception as e:
         print(f"Error reading config '{args.config}': {e}", file=sys.stderr)
         return 1
 
     if not isinstance(config, dict):
-        print(f"Error: Config must be a YAML mapping, got {type(config).__name__}", file=sys.stderr)
+        print(
+            f"Error: Config must be a YAML mapping, got {type(config).__name__}",
+            file=sys.stderr,
+        )
         return 1
 
     # Plain summary from raw YAML dict (current schema only)

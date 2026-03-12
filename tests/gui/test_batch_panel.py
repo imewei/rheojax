@@ -13,9 +13,7 @@ try:
 except ImportError:
     HAS_PYSIDE6 = False
 
-pytestmark = pytest.mark.skipif(
-    not HAS_PYSIDE6, reason="PySide6 not installed"
-)
+pytestmark = pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
 
 
 @pytest.fixture(scope="module")

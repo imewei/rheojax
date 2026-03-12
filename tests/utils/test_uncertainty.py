@@ -103,9 +103,9 @@ class TestHessianCI:
         ci = hessian_ci(model, t, G, alpha=0.05)
         for name, (lo, hi) in ci.items():
             val = model.parameters.get_value(name)
-            assert lo <= val <= hi, (
-                f"Parameter {name!r}: optimal value {val:.4g} not in [{lo:.4g}, {hi:.4g}]"
-            )
+            assert (
+                lo <= val <= hi
+            ), f"Parameter {name!r}: optimal value {val:.4g} not in [{lo:.4g}, {hi:.4g}]"
 
     @pytest.mark.smoke
     def test_alpha_controls_width(self, fitted_maxwell):
@@ -116,9 +116,9 @@ class TestHessianCI:
         for name in ci_narrow:
             width_narrow = ci_narrow[name][1] - ci_narrow[name][0]
             width_wide = ci_wide[name][1] - ci_wide[name][0]
-            assert width_wide >= width_narrow, (
-                f"99% CI for {name!r} is narrower than 80% CI"
-            )
+            assert (
+                width_wide >= width_narrow
+            ), f"99% CI for {name!r} is narrower than 80% CI"
 
     @pytest.mark.smoke
     def test_complex_oscillation_data(self, fitted_maxwell_oscillation):
@@ -204,9 +204,9 @@ class TestBootstrapCI:
         ci_a = bootstrap_ci(model, t, G, n_bootstrap=20, seed=99)
         ci_b = bootstrap_ci(model, t, G, n_bootstrap=20, seed=99)
         for name in ci_a:
-            assert ci_a[name] == ci_b[name], (
-                f"Non-reproducible CI for {name!r}: {ci_a[name]} vs {ci_b[name]}"
-            )
+            assert (
+                ci_a[name] == ci_b[name]
+            ), f"Non-reproducible CI for {name!r}: {ci_a[name]} vs {ci_b[name]}"
 
     @pytest.mark.smoke
     def test_different_seeds_differ(self, fitted_maxwell):
@@ -259,9 +259,9 @@ class TestBootstrapCI:
         for name in ci_narrow:
             w_narrow = ci_narrow[name][1] - ci_narrow[name][0]
             w_wide = ci_wide[name][1] - ci_wide[name][0]
-            assert w_wide >= w_narrow * 0.8, (
-                f"99% bootstrap CI for {name!r} not wider than 80% CI"
-            )
+            assert (
+                w_wide >= w_narrow * 0.8
+            ), f"99% bootstrap CI for {name!r} not wider than 80% CI"
 
     @pytest.mark.slow
     def test_bootstrap_ci_covers_true_params(self, fitted_maxwell):
@@ -314,12 +314,12 @@ class TestHessianVsBootstrap:
             val = model.parameters.get_value(name)
             lo_h, hi_h = ci_h[name]
             lo_b, hi_b = ci_b[name]
-            assert lo_h <= val <= hi_h, (
-                f"Hessian CI for {name!r} does not cover optimum {val:.4g}"
-            )
-            assert lo_b <= val <= hi_b, (
-                f"Bootstrap CI for {name!r} does not cover optimum {val:.4g}"
-            )
+            assert (
+                lo_h <= val <= hi_h
+            ), f"Hessian CI for {name!r} does not cover optimum {val:.4g}"
+            assert (
+                lo_b <= val <= hi_b
+            ), f"Bootstrap CI for {name!r} does not cover optimum {val:.4g}"
 
     @pytest.mark.slow
     def test_both_methods_agree_on_noisy_data(self, fitted_maxwell):

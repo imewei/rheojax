@@ -1005,9 +1005,7 @@ class DataPage(QWidget):
         # Show loading state
         n_files = len(self._all_file_paths)
         if n_files > 1:
-            self._file_name_label.setText(
-                f"Importing {n_files} files..."
-            )
+            self._file_name_label.setText(f"Importing {n_files} files...")
         else:
             self._file_name_label.setText(
                 f"Importing: {self._current_file_path.name}..."
@@ -1103,9 +1101,7 @@ class DataPage(QWidget):
             # Dataset name: use source file stem
             source_file = source_files[idx]
             source_stem = (
-                Path(source_file).stem
-                if source_file
-                else self._current_file_path.stem
+                Path(source_file).stem if source_file else self._current_file_path.stem
             )
 
             # For multi-segment files from the same source, add segment suffix

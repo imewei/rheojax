@@ -988,11 +988,7 @@ class HVNMLocal(HVNMBase):
         )
         # model_function returns (N,2) [G', G''] for oscillation;
         # convert to complex G* for consistent API
-        if (
-            test_mode == "oscillation"
-            and result.ndim == 2
-            and result.shape[1] == 2
-        ):
+        if test_mode == "oscillation" and result.ndim == 2 and result.shape[1] == 2:
             result = result[:, 0] + 1j * result[:, 1]
         return result
 

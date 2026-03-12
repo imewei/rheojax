@@ -33,7 +33,11 @@ class NumpyJSONEncoder(json.JSONEncoder):
         if isinstance(obj, np.bool_):
             return bool(obj)
         if isinstance(obj, np.complexfloating):
-            return {"__complex__": True, "real": float(obj.real), "imag": float(obj.imag)}
+            return {
+                "__complex__": True,
+                "real": float(obj.real),
+                "imag": float(obj.imag),
+            }
         # JAX arrays
         if hasattr(obj, "item") and hasattr(obj, "shape"):
             try:

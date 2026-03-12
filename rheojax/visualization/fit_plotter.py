@@ -25,7 +25,6 @@ from rheojax.visualization.plotter import (
     _apply_style,
     _ensure_numpy,
     _filter_positive,
-    _modulus_labels,
     compute_uncertainty_band,
     save_figure,
 )
@@ -129,6 +128,7 @@ def compute_credible_band(
 
     # Vectorized model evaluation over posterior draws
     try:
+
         def _eval_single(params):
             return model_fn(x_jax, params, test_mode, **model_kwargs)
 
@@ -226,10 +226,10 @@ def generate_diagnostic_suite(
     """
     try:
         import arviz as az
-    except ImportError:
+    except ImportError as err:
         raise ImportError(
             "ArviZ is required for diagnostic plots. Install with: uv add arviz"
-        )
+        ) from err
 
     logger.debug("Generating diagnostic suite", prefix=prefix, style=style)
 
@@ -244,9 +244,7 @@ def generate_diagnostic_suite(
 
     # Filter variable names
     if var_names is None:
-        var_names = [
-            v for v in trace.posterior.data_vars if not v.startswith("sigma")
-        ]
+        var_names = [v for v in trace.posterior.data_vars if not v.startswith("sigma")]
 
     # Filter degenerate parameters (range < 1e-10) to prevent KDE crashes
     filtered_vars = []
@@ -266,7 +264,7 @@ def generate_diagnostic_suite(
         logger.warning("No non-degenerate parameters for diagnostic plots")
         return {}
 
-    style_params = _apply_style(style)
+    _apply_style(style)
     diagnostics: dict[str, Figure] = {}
 
     # 1. Pair plot (parameter correlations)
@@ -281,9 +279,7 @@ def generate_diagnostic_suite(
 
     # 2. Forest plot (parameter estimates with 95% HDI)
     try:
-        axes = az.plot_forest(
-            trace, var_names=var_names, combined=True, hdi_prob=0.95
-        )
+        axes = az.plot_forest(trace, var_names=var_names, combined=True, hdi_prob=0.95)
         fig_forest = (
             axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
         )
@@ -316,9 +312,7 @@ def generate_diagnostic_suite(
     # 5. Rank plot (convergence check)
     try:
         axes = az.plot_rank(trace, var_names=var_names)
-        fig_rank = (
-            axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
-        )
+        fig_rank = axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
         diagnostics["rank"] = fig_rank
     except Exception as e:
         logger.warning("Rank plot failed", error=str(e))
@@ -326,9 +320,7 @@ def generate_diagnostic_suite(
     # 6. ESS plot (effective sample size)
     try:
         axes = az.plot_ess(trace, var_names=var_names, kind="local")
-        fig_ess = (
-            axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
-        )
+        fig_ess = axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
         diagnostics["ess"] = fig_ess
     except Exception as e:
         logger.warning("ESS plot failed", error=str(e))
@@ -469,7 +461,9 @@ class FitPlotter:
         # Compute predictions on dense grid
         try:
             y_pred_dense = np.asarray(
-                model.model_function(jnp.asarray(x_pred), jnp.asarray(popt), test_mode, **kwargs)
+                model.model_function(
+                    jnp.asarray(x_pred), jnp.asarray(popt), test_mode, **kwargs
+                )
             )
         except Exception:
             # Fallback: use model.predict
@@ -482,14 +476,21 @@ class FitPlotter:
         elif show_residuals:
             try:
                 y_pred_data = np.asarray(
-                    model.model_function(jnp.asarray(x_data), jnp.asarray(popt), test_mode, **kwargs)
+                    model.model_function(
+                        jnp.asarray(x_data), jnp.asarray(popt), test_mode, **kwargs
+                    )
                 )
             except Exception:
                 y_pred_data = _ensure_numpy(model.predict(x_data))
 
         # Compute uncertainty band (NLSQ only works for real-valued output)
         y_lower, y_upper = None, None
-        if show_uncertainty and pcov is not None and popt is not None and not is_complex:
+        if (
+            show_uncertainty
+            and pcov is not None
+            and popt is not None
+            and not is_complex
+        ):
             try:
 
                 def _model_for_band(x, params):
@@ -515,19 +516,32 @@ class FitPlotter:
 
         if is_complex:
             return self._plot_complex_fit(
-                x_data, y_data, x_pred, y_pred_dense, y_pred_data,
-                y_lower=None, y_upper=None,  # NLSQ uncertainty not supported for complex
+                x_data,
+                y_data,
+                x_pred,
+                y_pred_dense,
+                y_pred_data,
+                y_lower=None,
+                y_upper=None,  # NLSQ uncertainty not supported for complex
                 show_residuals=show_residuals,
-                storage_label=storage_label, loss_label=loss_label,
-                model_name=model_name, band_label=band_label,
+                storage_label=storage_label,
+                loss_label=loss_label,
+                model_name=model_name,
+                band_label=band_label,
                 style_params=style_params,
             )
         else:
             return self._plot_scalar_fit(
-                x_data, y_data, x_pred, y_pred_dense, y_pred_data,
-                y_lower=y_lower, y_upper=y_upper,
+                x_data,
+                y_data,
+                x_pred,
+                y_pred_dense,
+                y_pred_data,
+                y_lower=y_lower,
+                y_upper=y_upper,
                 show_residuals=show_residuals,
-                model_name=model_name, band_label=band_label,
+                model_name=model_name,
+                band_label=band_label,
                 style_params=style_params,
                 log_x=self._infer_log_x(fit_result),
                 log_y=self._infer_log_y(fit_result),
@@ -633,10 +647,12 @@ class FitPlotter:
         if show_residuals:
             # Build median parameter vector
             model_param_names = [p for p in param_names if not p.startswith("sigma")]
-            median_params = jnp.asarray([
-                np.median(bayesian_result.posterior_samples[p])
-                for p in model_param_names
-            ])
+            median_params = jnp.asarray(
+                [
+                    np.median(bayesian_result.posterior_samples[p])
+                    for p in model_param_names
+                ]
+            )
             model_kwargs = dict(kwargs)  # snapshot to avoid mutation
             try:
                 y_pred_data = np.asarray(
@@ -657,20 +673,33 @@ class FitPlotter:
 
         if is_complex:
             fig, axes = self._plot_complex_fit(
-                x_data, y_data, x_pred, y_median, y_pred_data,
-                y_lower=y_lower, y_upper=y_upper,
+                x_data,
+                y_data,
+                x_pred,
+                y_median,
+                y_pred_data,
+                y_lower=y_lower,
+                y_upper=y_upper,
                 show_residuals=show_residuals,
-                storage_label=storage_label, loss_label=loss_label,
-                model_name=model_name, band_label=band_label,
+                storage_label=storage_label,
+                loss_label=loss_label,
+                model_name=model_name,
+                band_label=band_label,
                 style_params=style_params,
                 fit_label="Posterior median",
             )
         else:
             fig, axes = self._plot_scalar_fit(
-                x_data, y_data, x_pred, y_median, y_pred_data,
-                y_lower=y_lower, y_upper=y_upper,
+                x_data,
+                y_data,
+                x_pred,
+                y_median,
+                y_pred_data,
+                y_lower=y_lower,
+                y_upper=y_upper,
                 show_residuals=show_residuals,
-                model_name=model_name, band_label=band_label,
+                model_name=model_name,
+                band_label=band_label,
                 style_params=style_params,
                 fit_label="Posterior median",
                 band_color="C0",
@@ -690,7 +719,10 @@ class FitPlotter:
                 try:
                     y_nlsq = np.asarray(
                         model.model_function(
-                            jnp.asarray(x_pred), jnp.asarray(popt), test_mode, **model_kwargs
+                            jnp.asarray(x_pred),
+                            jnp.asarray(popt),
+                            test_mode,
+                            **model_kwargs,
                         )
                     )
                 except Exception:
@@ -698,9 +730,13 @@ class FitPlotter:
 
                 if y_nlsq is not None:
                     ax_main.plot(
-                        x_pred, y_nlsq, "--",
-                        color="C3", linewidth=style_params["lines.linewidth"] * 0.8,
-                        label="NLSQ fit", zorder=2,
+                        x_pred,
+                        y_nlsq,
+                        "--",
+                        color="C3",
+                        linewidth=style_params["lines.linewidth"] * 0.8,
+                        label="NLSQ fit",
+                        zorder=2,
                     )
 
                     # NLSQ uncertainty band
@@ -709,18 +745,27 @@ class FitPlotter:
                         def _nlsq_fn(x, params):
                             return np.asarray(
                                 model.model_function(
-                                    jnp.asarray(x), jnp.asarray(params),
-                                    test_mode, **model_kwargs,
+                                    jnp.asarray(x),
+                                    jnp.asarray(params),
+                                    test_mode,
+                                    **model_kwargs,
                                 )
                             )
 
                         _, nlsq_lower, nlsq_upper = compute_uncertainty_band(
-                            _nlsq_fn, x_pred, popt, pcov, confidence=nlsq_confidence,
+                            _nlsq_fn,
+                            x_pred,
+                            popt,
+                            pcov,
+                            confidence=nlsq_confidence,
                         )
                         if nlsq_lower is not None:
                             ax_main.fill_between(
-                                x_pred, nlsq_lower, nlsq_upper,
-                                alpha=0.15, color="C3",
+                                x_pred,
+                                nlsq_lower,
+                                nlsq_upper,
+                                alpha=0.15,
+                                color="C3",
                                 label=f"NLSQ {int(nlsq_confidence * 100)}% CI",
                                 zorder=0,
                             )
@@ -803,16 +848,22 @@ class FitPlotter:
             test_mode = getattr(model, "_test_mode", None)
 
         fig, axes = plt.subplots(
-            1, 2,
-            figsize=(style_params["figure.figsize"][0] * 1.6,
-                     style_params["figure.figsize"][1]),
+            1,
+            2,
+            figsize=(
+                style_params["figure.figsize"][0] * 1.6,
+                style_params["figure.figsize"][1],
+            ),
             sharey=True,
         )
 
-        marker_kw = dict(
-            s=style_params["lines.markersize"] ** 2,
-            facecolors="none", edgecolors="k", linewidths=1.0, zorder=5,
-        )
+        marker_kw = {
+            "s": style_params["lines.markersize"] ** 2,
+            "facecolors": "none",
+            "edgecolors": "k",
+            "linewidths": 1.0,
+            "zorder": 5,
+        }
 
         # --- Left: NLSQ ---
         axes[0].scatter(x_data, y_data, label="Data", **marker_kw)
@@ -835,8 +886,13 @@ class FitPlotter:
             y_nlsq = _ensure_numpy(model.predict(x_pred))
 
         axes[0].plot(
-            x_pred, y_nlsq, "-", color="C0",
-            linewidth=style_params["lines.linewidth"], label="NLSQ fit", zorder=3,
+            x_pred,
+            y_nlsq,
+            "-",
+            color="C0",
+            linewidth=style_params["lines.linewidth"],
+            label="NLSQ fit",
+            zorder=3,
         )
 
         if pcov is not None:
@@ -849,13 +905,21 @@ class FitPlotter:
                 )
 
             _, nlsq_lower, nlsq_upper = compute_uncertainty_band(
-                _nlsq_fn, x_pred, popt, pcov, confidence=confidence,
+                _nlsq_fn,
+                x_pred,
+                popt,
+                pcov,
+                confidence=confidence,
             )
             if nlsq_lower is not None:
                 axes[0].fill_between(
-                    x_pred, nlsq_lower, nlsq_upper,
-                    alpha=0.25, color="C0",
-                    label=f"{int(confidence * 100)}% CI", zorder=1,
+                    x_pred,
+                    nlsq_lower,
+                    nlsq_upper,
+                    alpha=0.25,
+                    color="C0",
+                    label=f"{int(confidence * 100)}% CI",
+                    zorder=1,
                 )
 
         axes[0].set_title("NLSQ (Frequentist)")
@@ -878,14 +942,22 @@ class FitPlotter:
         )
 
         axes[1].plot(
-            x_pred, y_median, "-", color="C1",
+            x_pred,
+            y_median,
+            "-",
+            color="C1",
             linewidth=style_params["lines.linewidth"],
-            label="Posterior median", zorder=3,
+            label="Posterior median",
+            zorder=3,
         )
         axes[1].fill_between(
-            x_pred, y_lower, y_upper,
-            alpha=0.25, color="C1",
-            label=f"{int(credible_level * 100)}% CI", zorder=1,
+            x_pred,
+            y_lower,
+            y_upper,
+            alpha=0.25,
+            color="C1",
+            label=f"{int(credible_level * 100)}% CI",
+            zorder=1,
         )
 
         axes[1].set_title("Bayesian (NUTS)")
@@ -957,7 +1029,9 @@ class FitPlotter:
         style_params = _apply_style(style)
 
         if fit_result is None and bayesian_result is None:
-            raise ValueError("At least one of fit_result or bayesian_result must be provided")
+            raise ValueError(
+                "At least one of fit_result or bayesian_result must be provided"
+            )
 
         fig = None
         if ax is None:
@@ -971,7 +1045,8 @@ class FitPlotter:
                 param_names = list(fit_result.params.keys())
             else:
                 param_names = [
-                    k for k in bayesian_result.posterior_samples
+                    k
+                    for k in bayesian_result.posterior_samples
                     if not k.startswith("sigma")
                 ]
 
@@ -1033,11 +1108,11 @@ class FitPlotter:
 
     # --- Private helpers ---
 
-    def _make_pred_grid(
-        self, x_data: np.ndarray, n_points: int
-    ) -> np.ndarray:
+    def _make_pred_grid(self, x_data: np.ndarray, n_points: int) -> np.ndarray:
         """Create a dense prediction grid matching the data range."""
-        x_min, x_max = np.min(x_data[x_data > 0]) if np.any(x_data > 0) else np.min(x_data), np.max(x_data)
+        x_min, x_max = (
+            np.min(x_data[x_data > 0]) if np.any(x_data > 0) else np.min(x_data)
+        ), np.max(x_data)
         # Use log spacing if data spans > 1.5 decades
         if x_min > 0 and x_max / x_min > 30:
             return np.logspace(np.log10(x_min), np.log10(x_max), n_points)
@@ -1051,7 +1126,13 @@ class FitPlotter:
     def _infer_log_y(self, fit_result: Any) -> bool:
         """Infer whether log y-axis is appropriate from fit result metadata."""
         protocol = getattr(fit_result, "protocol", None) or ""
-        return protocol in ("oscillation", "rotation", "flow_curve", "frequency_sweep", "relaxation")
+        return protocol in (
+            "oscillation",
+            "rotation",
+            "flow_curve",
+            "frequency_sweep",
+            "relaxation",
+        )
 
     def _plot_scalar_fit(
         self,
@@ -1076,9 +1157,12 @@ class FitPlotter:
 
         if n_rows == 2:
             fig, axes = plt.subplots(
-                2, 1,
-                figsize=(style_params["figure.figsize"][0],
-                         style_params["figure.figsize"][1] * 1.4),
+                2,
+                1,
+                figsize=(
+                    style_params["figure.figsize"][0],
+                    style_params["figure.figsize"][1] * 1.4,
+                ),
                 gridspec_kw={"height_ratios": [3, 1]},
                 sharex=True,
             )
@@ -1092,28 +1176,46 @@ class FitPlotter:
             if log_y:
                 mask = (y_lower > 0) & (y_upper > 0)
                 ax_fit.fill_between(
-                    x_pred[mask], y_lower[mask], y_upper[mask],
-                    alpha=0.25, color=band_color, label=band_label, zorder=1,
+                    x_pred[mask],
+                    y_lower[mask],
+                    y_upper[mask],
+                    alpha=0.25,
+                    color=band_color,
+                    label=band_label,
+                    zorder=1,
                 )
             else:
                 ax_fit.fill_between(
-                    x_pred, y_lower, y_upper,
-                    alpha=0.25, color=band_color, label=band_label, zorder=1,
+                    x_pred,
+                    y_lower,
+                    y_upper,
+                    alpha=0.25,
+                    color=band_color,
+                    label=band_label,
+                    zorder=1,
                 )
 
         # Fit curve
         ax_fit.plot(
-            x_pred, y_pred, "-",
-            color=band_color, linewidth=style_params["lines.linewidth"],
-            label=fit_label, zorder=2,
+            x_pred,
+            y_pred,
+            "-",
+            color=band_color,
+            linewidth=style_params["lines.linewidth"],
+            label=fit_label,
+            zorder=2,
         )
 
         # Data points
         ax_fit.scatter(
-            x_data, y_data,
+            x_data,
+            y_data,
             s=style_params["lines.markersize"] ** 2,
-            facecolors="none", edgecolors="C1", linewidths=1.2,
-            label="Data", zorder=3,
+            facecolors="none",
+            edgecolors="C1",
+            linewidths=1.2,
+            label="Data",
+            zorder=3,
         )
 
         if log_x:
@@ -1136,9 +1238,12 @@ class FitPlotter:
             pct_resid = residuals / denom * 100
 
             ax_resid.scatter(
-                x_data, pct_resid,
+                x_data,
+                pct_resid,
                 s=style_params["lines.markersize"] ** 2 * 0.7,
-                facecolors="none", edgecolors="C2", linewidths=1.0,
+                facecolors="none",
+                edgecolors="C2",
+                linewidths=1.0,
             )
             ax_resid.axhline(y=0, color="k", linestyle="--", linewidth=0.8)
             ax_resid.set_ylabel("Residuals (%)")
@@ -1169,7 +1274,8 @@ class FitPlotter:
         n_cols = 2  # Always G' and G''
 
         fig, axes = plt.subplots(
-            n_rows, n_cols,
+            n_rows,
+            n_cols,
             figsize=(
                 style_params["figure.figsize"][0] * 1.5,
                 style_params["figure.figsize"][1] * (1.4 if n_rows == 2 else 1.0),
@@ -1188,10 +1294,14 @@ class FitPlotter:
             # Data
             x_filt, y_filt = _filter_positive(x_data, extract_fn(y_data), warn=False)
             ax.scatter(
-                x_filt, y_filt,
+                x_filt,
+                y_filt,
                 s=style_params["lines.markersize"] ** 2,
-                facecolors="none", edgecolors=color, linewidths=1.2,
-                label="Data", zorder=3,
+                facecolors="none",
+                edgecolors=color,
+                linewidths=1.2,
+                label="Data",
+                zorder=3,
             )
 
             # Fit curve
@@ -1199,9 +1309,13 @@ class FitPlotter:
                 x_pred, extract_fn(y_pred), warn=False
             )
             ax.loglog(
-                x_pred_filt, y_pred_filt, "-",
-                color=color, linewidth=style_params["lines.linewidth"],
-                label=fit_label, zorder=2,
+                x_pred_filt,
+                y_pred_filt,
+                "-",
+                color=color,
+                linewidth=style_params["lines.linewidth"],
+                label=fit_label,
+                zorder=2,
             )
 
             # Uncertainty band
@@ -1211,8 +1325,13 @@ class FitPlotter:
                 mask = (lower_comp > 0) & (upper_comp > 0) & (x_pred > 0)
                 if np.any(mask):
                     ax.fill_between(
-                        x_pred[mask], lower_comp[mask], upper_comp[mask],
-                        alpha=0.25, color=color, label=band_label, zorder=1,
+                        x_pred[mask],
+                        lower_comp[mask],
+                        upper_comp[mask],
+                        alpha=0.25,
+                        color=color,
+                        label=band_label,
+                        zorder=1,
                     )
 
             ax.set_ylabel(label)
@@ -1225,17 +1344,18 @@ class FitPlotter:
                 comp_data = extract_fn(y_data)
                 comp_pred = extract_fn(y_pred_data)
                 residuals = comp_data - comp_pred
-                denom = np.maximum(
-                    np.abs(comp_data), np.max(np.abs(comp_data)) * 1e-10
-                )
+                denom = np.maximum(np.abs(comp_data), np.max(np.abs(comp_data)) * 1e-10)
                 pct = residuals / denom * 100
 
                 pos_mask = np.isfinite(comp_data) & (comp_data > 0)
                 ax_r.semilogx(
-                    x_data[pos_mask], pct[pos_mask], "o",
+                    x_data[pos_mask],
+                    pct[pos_mask],
+                    "o",
                     color=color,
                     markersize=style_params["lines.markersize"] * 0.8,
-                    markerfacecolor="none", markeredgewidth=1.0,
+                    markerfacecolor="none",
+                    markeredgewidth=1.0,
                 )
                 ax_r.axhline(y=0, color="k", linestyle="--", linewidth=0.8)
                 ax_r.set_ylabel(f"{label} Resid. (%)")

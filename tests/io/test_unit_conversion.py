@@ -1,4 +1,5 @@
 """Tests for unified unit normalization (Phase 1)."""
+
 import numpy as np
 import pytest
 
@@ -91,11 +92,24 @@ def test_normalize_units_passthrough():
 @pytest.mark.smoke
 def test_unified_dict_has_expected_keys():
     expected_keys = {
-        "hz", "1/hz", "ms", "min", "mins", "minutes",
-        "kpa", "mpa", "gpa",
-        "mpa·s", "mpa.s",
-        "rpm", "rev/min", "rev/s",
+        "hz",
+        "1/hz",
+        "ms",
+        "min",
+        "mins",
+        "minutes",
+        "kpa",
+        "mpa",
+        "gpa",
+        "mpa·s",
+        "mpa.s",
+        "rpm",
+        "rev/min",
+        "rev/s",
         "%",
-        "°c", "°f", "c", "f",
+        "°c",
+        "°f",
+        "c",
+        "f",
     }
     assert expected_keys.issubset(UNIFIED_UNIT_CONVERSIONS.keys())

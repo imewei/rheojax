@@ -92,19 +92,12 @@ def _t_critical(alpha: float, n: int, k: int) -> float:
     """Two-sided t-critical value at significance *alpha*.
 
     Uses scipy.stats.t.ppf(1 - alpha/2, dof) where dof = max(n - k, 1).
-    Falls back to the normal quantile (scipy-free environments) when scipy
-    is unavailable.
+    Uses the Student-t distribution via scipy (a hard dependency of rheojax).
     """
+    from scipy.stats import t as t_dist
+
     dof = max(n - k, 1)
-    try:
-        from scipy.stats import t as t_dist
-
-        return float(t_dist.ppf(1.0 - alpha / 2.0, dof))
-    except ImportError:  # pragma: no cover
-        # Normal approximation — valid as n → ∞
-        from math import erfinv, sqrt
-
-        return float(sqrt(2.0) * erfinv(1.0 - alpha))
+    return float(t_dist.ppf(1.0 - alpha / 2.0, dof))
 
 
 def _predict_safe(model: BaseModel, X: np.ndarray) -> np.ndarray:
@@ -224,7 +217,9 @@ def hessian_ci(
     # ------------------------------------------------------------------
     if pcov is None:
         logger.debug("NLSQ pcov not available — computing JAX Hessian")
-        resolved_test_mode = test_mode if test_mode is not None else getattr(model, "_test_mode", None)
+        resolved_test_mode = (
+            test_mode if test_mode is not None else getattr(model, "_test_mode", None)
+        )
 
         y_arr = np.asarray(y)
         is_complex = np.iscomplexobj(y_arr)
@@ -242,16 +237,14 @@ def hessian_ci(
         else:
             _resolved_tm = resolved_test_mode
 
-            def loss_fn(params_arr: jnp.ndarray) -> jnp.ndarray:
+            def loss_fn(params_arr: Any) -> Any:
                 y_pred_jnp = model_fn(X, params_arr, _resolved_tm)
                 y_true_jnp = jnp.asarray(y_arr)
                 if is_complex:
                     r_real = jnp.real(y_pred_jnp) - jnp.real(y_true_jnp)
                     r_imag = jnp.imag(y_pred_jnp) - jnp.imag(y_true_jnp)
                     return 0.5 * (jnp.sum(r_real**2) + jnp.sum(r_imag**2))
-                return 0.5 * jnp.sum(
-                    (jnp.asarray(y_pred_jnp) - y_true_jnp) ** 2
-                )
+                return 0.5 * jnp.sum((jnp.asarray(y_pred_jnp) - y_true_jnp) ** 2)
 
             try:
                 params_jax = jnp.asarray(param_vals)
@@ -476,7 +469,9 @@ def bootstrap_ci(
     n_params = len(param_names)
     n_obs = _n_obs(np.asarray(y))
 
-    resolved_test_mode: str | None = test_mode if test_mode is not None else getattr(model, "_test_mode", None)
+    resolved_test_mode: str | None = (
+        test_mode if test_mode is not None else getattr(model, "_test_mode", None)
+    )
 
     logger.info(
         "bootstrap_ci started",

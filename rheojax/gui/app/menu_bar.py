@@ -1240,7 +1240,9 @@ class MenuBar(QMenuBar):
         self.pipeline_new_action.setShortcut("Ctrl+Alt+N")
         self.pipeline_new_action.setStatusTip("Create a new empty pipeline")
         self.pipeline_new_action.triggered.connect(
-            lambda: logger.debug("Action triggered", action="new_pipeline", menu="Pipeline")
+            lambda: logger.debug(
+                "Action triggered", action="new_pipeline", menu="Pipeline"
+            )
         )
         pipeline_menu.addAction(self.pipeline_new_action)
 
@@ -1248,7 +1250,9 @@ class MenuBar(QMenuBar):
         self.pipeline_open_action = QAction("&Open Pipeline...", self)
         self.pipeline_open_action.setStatusTip("Open a pipeline from a YAML file")
         self.pipeline_open_action.triggered.connect(
-            lambda: logger.debug("Action triggered", action="open_pipeline", menu="Pipeline")
+            lambda: logger.debug(
+                "Action triggered", action="open_pipeline", menu="Pipeline"
+            )
         )
         pipeline_menu.addAction(self.pipeline_open_action)
 
@@ -1257,7 +1261,9 @@ class MenuBar(QMenuBar):
         self.pipeline_save_action.setShortcut("Ctrl+Shift+S")
         self.pipeline_save_action.setStatusTip("Save current pipeline to a YAML file")
         self.pipeline_save_action.triggered.connect(
-            lambda: logger.debug("Action triggered", action="save_pipeline", menu="Pipeline")
+            lambda: logger.debug(
+                "Action triggered", action="save_pipeline", menu="Pipeline"
+            )
         )
         pipeline_menu.addAction(self.pipeline_save_action)
 
@@ -1283,7 +1289,9 @@ class MenuBar(QMenuBar):
             self.pipeline_template_actions[key] = action
 
         logger.debug(
-            "Menu created", menu="Pipeline", action_count=pipeline_menu.actions().__len__()
+            "Menu created",
+            menu="Pipeline",
+            action_count=pipeline_menu.actions().__len__(),
         )
 
     def _create_tools_menu(self) -> None:

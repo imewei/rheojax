@@ -1,4 +1,5 @@
 """Tests for protocol metadata kwargs in CSV and Excel readers (Phase 2)."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -96,7 +97,13 @@ def test_csv_multiple_metadata(csv_file):
 @pytest.mark.smoke
 def test_csv_no_metadata_default(csv_file):
     data = load_csv(csv_file, x_col="time", y_col="stress")
-    for key in ("gamma_0", "omega", "sigma_applied", "gamma_dot", "reference_gamma_dot"):
+    for key in (
+        "gamma_0",
+        "omega",
+        "sigma_applied",
+        "gamma_dot",
+        "reference_gamma_dot",
+    ):
         assert key not in data.metadata
 
 
@@ -149,5 +156,11 @@ def test_excel_multiple_metadata(excel_file):
 @pytest.mark.smoke
 def test_excel_no_metadata_default(excel_file):
     data = load_excel(excel_file, x_col="time", y_col="stress")
-    for key in ("gamma_0", "omega", "sigma_applied", "gamma_dot", "reference_gamma_dot"):
+    for key in (
+        "gamma_0",
+        "omega",
+        "sigma_applied",
+        "gamma_dot",
+        "reference_gamma_dot",
+    ):
         assert key not in data.metadata

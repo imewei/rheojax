@@ -227,9 +227,7 @@ def get_template(name: str) -> str:
     """
     if name not in TEMPLATES:
         available = sorted(TEMPLATES.keys())
-        raise KeyError(
-            f"Template '{name}' not found.  Available: {available}"
-        )
+        raise KeyError(f"Template '{name}' not found.  Available: {available}")
     logger.debug("Retrieved template", name=name)
     return TEMPLATES[name]["yaml"]
 

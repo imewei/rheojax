@@ -37,6 +37,7 @@ def mock_store():
 @pytest.fixture
 def page(qapp, mock_store):
     from rheojax.gui.pages.transform_page import TransformPage
+
     p = TransformPage()
     p._store = mock_store
     return p
@@ -71,7 +72,9 @@ def test_apply_emits_signal(page, mock_store):
 
     page._sidebar.setCurrentRow(0)  # FFT
     signals_received = []
-    page.transform_applied.connect(lambda name, ds_id: signals_received.append((name, ds_id)))
+    page.transform_applied.connect(
+        lambda name, ds_id: signals_received.append((name, ds_id))
+    )
     page._apply_transform()
     assert len(signals_received) == 1
     assert signals_received[0][1] == "test-ds-1"

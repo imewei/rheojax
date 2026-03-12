@@ -250,11 +250,7 @@ def _run_scipy_least_squares(
 
     return OptimizationResult(
         x=np.asarray(scipy_result.x, dtype=np.float64),
-        fun=(
-            float(2.0 * scipy_result.cost)
-            if hasattr(scipy_result, "cost")
-            else rss
-        ),
+        fun=(float(2.0 * scipy_result.cost) if hasattr(scipy_result, "cost") else rss),
         jac=jac,
         pcov=pcov,
         success=bool(scipy_result.success),
@@ -1323,7 +1319,7 @@ def nlsq_optimize(
     # NLSQ will minimize sum(residuals²) internally
 
     # Set up NLSQ optimization parameters
-    nlsq_kwargs = {
+    nlsq_kwargs: dict[str, Any] = {
         "fun": objective,  # Now a residual function returning vector
         "x0": x0,
         "bounds": nlsq_bounds,
@@ -1390,7 +1386,13 @@ def nlsq_optimize(
             nfev=nlsq_result.get("nfev", 0),
             cost=float(nlsq_result.get("cost", 0.0)),
         )
-    except (RuntimeError, TypeError, ValueError, FloatingPointError, OverflowError) as e:
+    except (
+        RuntimeError,
+        TypeError,
+        ValueError,
+        FloatingPointError,
+        OverflowError,
+    ) as e:
         logger.warning(
             "NLSQ optimization raised exception, falling back to SciPy",
             error=str(e),
@@ -1952,7 +1954,7 @@ def nlsq_curve_fit(
         return model_fn(x, params_array)
 
     # Build kwargs for nlsq.curve_fit
-    curve_fit_kwargs = {
+    curve_fit_kwargs: dict[str, Any] = {
         "p0": p0,
         "bounds": (lower, upper),
         "auto_bounds": auto_bounds,
@@ -2503,9 +2505,7 @@ def create_least_squares_objective(
                     return jnp.concatenate([resid_col0, resid_col1])
                 else:
                     # (N, 2) pred, (N,) data: fit to magnitude |G*|
-                    y_pred_magnitude = jnp.sqrt(
-                        y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2
-                    )
+                    y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
 
                     residuals = y_pred_magnitude - y_data_jax
 
@@ -2551,7 +2551,9 @@ def create_least_squares_objective(
                 residuals = y_pred_magnitude - y_data_jax
 
                 if normalize:
-                    residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
+                    residuals = residuals / jnp.maximum(
+                        jnp.abs(y_data_jax), _norm_floor
+                    )
 
                 return residuals
         else:
@@ -2569,7 +2571,9 @@ def create_least_squares_objective(
                 else:
                     residuals = y_pred - y_data_magnitude
                     if normalize:
-                        residuals = residuals / jnp.maximum(y_data_magnitude, _norm_floor)
+                        residuals = residuals / jnp.maximum(
+                            y_data_magnitude, _norm_floor
+                        )
 
                 return residuals
             else:
@@ -2583,7 +2587,9 @@ def create_least_squares_objective(
                 else:
                     residuals = y_pred - y_data_jax
                     if normalize:
-                        residuals = residuals / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
+                        residuals = residuals / jnp.maximum(
+                            jnp.abs(y_data_jax), _norm_floor
+                        )
 
                 return residuals
 

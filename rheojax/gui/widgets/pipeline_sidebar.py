@@ -192,7 +192,9 @@ class PipelineSidebar(QWidget):
         signals.pipeline_name_changed.connect(self._on_pipeline_name_changed)
         signals.pipeline_execution_started.connect(self._update_run_buttons)
         signals.pipeline_execution_completed.connect(self._update_run_buttons)
-        signals.pipeline_step_status_changed.connect(lambda *_: self._update_run_buttons())
+        signals.pipeline_step_status_changed.connect(
+            lambda *_: self._update_run_buttons()
+        )
 
         # Initial populate
         self._refresh_list()

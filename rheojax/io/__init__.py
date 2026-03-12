@@ -11,6 +11,8 @@ This module provides readers and writers for various data formats:
 
 from rheojax.io import readers, writers
 from rheojax.io._exceptions import RheoJaxFormatError, RheoJaxValidationWarning
+from rheojax.io.analysis_exporter import AnalysisExporter
+from rheojax.io.json_encoder import NumpyJSONEncoder
 
 # Import commonly used functions for convenience
 from rheojax.io.readers import (
@@ -32,8 +34,6 @@ from rheojax.io.spp_export import (
     export_spp_txt,
     to_matlab_dict,
 )
-from rheojax.io.analysis_exporter import AnalysisExporter
-from rheojax.io.json_encoder import NumpyJSONEncoder
 from rheojax.io.writers import (
     load_hdf5,
     load_npz,

@@ -1,4 +1,5 @@
 """Tests for the consolidated canonical column field registry."""
+
 from __future__ import annotations
 
 import pytest

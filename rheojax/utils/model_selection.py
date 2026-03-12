@@ -164,10 +164,12 @@ def build_fit_result(
             y_arr = np.asarray(y)
 
             if np.iscomplexobj(y_arr):
-                residuals = np.concatenate([
-                    y_arr.real - pred_arr.real,
-                    y_arr.imag - pred_arr.imag,
-                ])
+                residuals = np.concatenate(
+                    [
+                        y_arr.real - pred_arr.real,
+                        y_arr.imag - pred_arr.imag,
+                    ]
+                )
                 _is_complex = True
             else:
                 residuals = y_arr - pred_arr
@@ -341,15 +343,15 @@ def compare_models(
         try:
             # Use SIGALRM-based timeout on Unix; wall-clock fallback elsewhere
             if per_model_timeout is not None and hasattr(signal, "SIGALRM"):
+
                 def _timeout_handler(
                     signum: int,
                     frame: Any,
                     _label: str = model_label,
                     _t: float = per_model_timeout,
                 ) -> None:
-                    raise TimeoutError(
-                        f"Model '{_label}' exceeded {_t}s timeout"
-                    )
+                    raise TimeoutError(f"Model '{_label}' exceeded {_t}s timeout")
+
                 old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
                 signal.alarm(max(1, int(per_model_timeout)))
                 try:

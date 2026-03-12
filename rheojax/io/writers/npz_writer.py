@@ -1,4 +1,5 @@
 """NumPy .npz writer/reader for RheoData objects."""
+
 from __future__ import annotations
 
 import json
@@ -8,14 +9,12 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyEncoder
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
 __all__ = ["save_npz", "load_npz", "save_fit_result_npz"]
-
-
-from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyEncoder
 
 
 def _encode_str(s: str | None) -> np.ndarray:

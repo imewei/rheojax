@@ -132,7 +132,9 @@ class RheoJAXMainWindow(QMainWindow):
         self.worker_pool: WorkerPool | None = None
         self._job_types: dict[str, str] = {}
         self._job_metadata: dict[str, dict] = {}  # Capture context at submission time
-        self._active_relays: set = set()  # Keep QObject relays alive until signals delivered
+        self._active_relays: set = (
+            set()
+        )  # Keep QObject relays alive until signals delivered
         self._navigating: bool = False  # GUI-013: re-entry guard for navigate_to
         self._plot_style: str = "default"
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
@@ -1523,7 +1525,9 @@ class RheoJAXMainWindow(QMainWindow):
                 load_pipeline(vp)
                 self.log(f"Pipeline loaded from: {path}")
                 logger.info("Pipeline loaded", path=path)
-                self.status_bar.show_message(f"Pipeline loaded: {Path(path).name}", 3000)
+                self.status_bar.show_message(
+                    f"Pipeline loaded: {Path(path).name}", 3000
+                )
             except Exception as exc:
                 logger.error("Failed to open pipeline", error=str(exc), exc_info=True)
                 self.log(f"Failed to open pipeline: {exc}")
@@ -1570,7 +1574,9 @@ class RheoJAXMainWindow(QMainWindow):
 
             steps = get_visual_pipeline_steps()
         except Exception as exc:
-            logger.error("Could not retrieve pipeline steps", error=str(exc), exc_info=True)
+            logger.error(
+                "Could not retrieve pipeline steps", error=str(exc), exc_info=True
+            )
             steps = []
 
         if not steps:
@@ -1588,7 +1594,9 @@ class RheoJAXMainWindow(QMainWindow):
             lambda: self.status_bar.show_message("Pipeline completed", 3000),
             Qt.ConnectionType.QueuedConnection,
         )
-        relay.error.connect(self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection)
+        relay.error.connect(
+            self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection
+        )
 
         # Keep relay alive until signals are delivered — prevent premature GC
         # when the QRunnable completes and releases its closure references.
@@ -1648,7 +1656,9 @@ class RheoJAXMainWindow(QMainWindow):
 
             steps = get_visual_pipeline_steps()
         except Exception as exc:
-            logger.error("Could not retrieve pipeline steps", error=str(exc), exc_info=True)
+            logger.error(
+                "Could not retrieve pipeline steps", error=str(exc), exc_info=True
+            )
             self.status_bar.show_message(f"Run step failed: {exc}", 5000)
             return
 
@@ -1692,10 +1702,9 @@ class RheoJAXMainWindow(QMainWindow):
         # GUI-007: If running a standalone Bayesian step after a cached fit,
         # model_name may be absent. Recover it from the fit result object.
         if not context.get("model_name") and context.get("fit_result"):
-            context["model_name"] = (
-                getattr(context["fit_result"], "model_name", "")
-                or getattr(context["fit_result"], "_model_name", "")
-            )
+            context["model_name"] = getattr(
+                context["fit_result"], "model_name", ""
+            ) or getattr(context["fit_result"], "_model_name", "")
 
         # Offload to a background thread — same reason as _on_run_all.
         from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
@@ -1708,7 +1717,9 @@ class RheoJAXMainWindow(QMainWindow):
         relay.finished.connect(
             self._on_pipeline_step_done, Qt.ConnectionType.QueuedConnection
         )
-        relay.error.connect(self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection)
+        relay.error.connect(
+            self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection
+        )
 
         # Keep relay alive until signals are delivered — prevent premature GC.
         # Use a set so concurrent step runs don't clobber each other's relay.
@@ -2961,19 +2972,22 @@ class RheoJAXMainWindow(QMainWindow):
             Qt.ConnectionType.QueuedConnection,
         )
         relay.progress.connect(
-            batch_panel.set_progress, Qt.ConnectionType.QueuedConnection,
+            batch_panel.set_progress,
+            Qt.ConnectionType.QueuedConnection,
         )
 
         def _on_batch_finished(success: int, total: int) -> None:
             batch_panel.finish_batch(success, total)
             self.status_bar.show_message(
-                f"Batch complete: {success}/{total} succeeded", 5000,
+                f"Batch complete: {success}/{total} succeeded",
+                5000,
             )
             self.log(f"Batch complete: {success}/{total} files succeeded")
             self._active_relays.discard(relay)
 
         relay.finished.connect(
-            _on_batch_finished, Qt.ConnectionType.QueuedConnection,
+            _on_batch_finished,
+            Qt.ConnectionType.QueuedConnection,
         )
 
         # Prevent premature GC — same pattern as _on_run_all.
@@ -2998,9 +3012,7 @@ class RheoJAXMainWindow(QMainWindow):
 
                 for i, fpath in enumerate(_files):
                     _relay.file_status.emit(fpath, "RUNNING", -1.0)
-                    _relay.progress.emit(
-                        i, total, f"Processing {Path(fpath).name}..."
-                    )
+                    _relay.progress.emit(i, total, f"Processing {Path(fpath).name}...")
                     start = time.perf_counter()
 
                     try:
@@ -3008,9 +3020,7 @@ class RheoJAXMainWindow(QMainWindow):
                         for step in _steps:
                             if step.step_type == "load":
                                 patched = {**step.config, "file": fpath}
-                                run_steps.append(
-                                    dc_replace(step, config=patched)
-                                )
+                                run_steps.append(dc_replace(step, config=patched))
                             else:
                                 run_steps.append(step)
 

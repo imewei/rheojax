@@ -25,6 +25,7 @@ jax, jnp = safe_import_jax()
 # Mock model & transform for testing
 # ---------------------------------------------------------------------------
 
+
 class _VizTestModel(BaseModel):
     """Simple model for visualization testing."""
 
@@ -91,7 +92,11 @@ def pipeline_with_data():
     t = np.linspace(0.1, 10, 50)
     y = 100 * np.exp(-0.5 * t) + np.random.normal(0, 2, 50)
     data = RheoData(
-        x=t, y=y, x_units="s", y_units="Pa", domain="time",
+        x=t,
+        y=y,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
         metadata={"test_mode": "relaxation"},
     )
     return Pipeline(data=data)
@@ -107,6 +112,7 @@ def fitted_pipeline(pipeline_with_data):
 # ---------------------------------------------------------------------------
 # plot_fit tests
 # ---------------------------------------------------------------------------
+
 
 class TestPipelinePlotFit:
     """Tests for Pipeline.plot_fit()."""
@@ -148,10 +154,7 @@ class TestPipelinePlotFit:
 
     def test_plot_fit_chaining(self, fitted_pipeline):
         """plot_fit() supports fluent chaining."""
-        result = (
-            fitted_pipeline
-            .plot_fit(show_residuals=False, show_uncertainty=False)
-        )
+        result = fitted_pipeline.plot_fit(show_residuals=False, show_uncertainty=False)
         assert result is fitted_pipeline
         plt.close(fitted_pipeline._current_figure)
 
@@ -159,6 +162,7 @@ class TestPipelinePlotFit:
 # ---------------------------------------------------------------------------
 # plot_transform tests
 # ---------------------------------------------------------------------------
+
 
 class TestPipelinePlotTransform:
     """Tests for Pipeline.plot_transform()."""
@@ -180,7 +184,9 @@ class TestPipelinePlotTransform:
         pipeline_with_data.transform(_VizTestTransform())
 
         assert "_VizTestTransform" in pipeline_with_data._transform_results
-        cached_result, cached_pre = pipeline_with_data._transform_results["_VizTestTransform"]
+        cached_result, cached_pre = pipeline_with_data._transform_results[
+            "_VizTestTransform"
+        ]
         assert cached_pre is pre_data
 
     def test_plot_transform_no_transform_raises(self, pipeline_with_data):
@@ -207,6 +213,7 @@ class TestPipelinePlotTransform:
 # fit_bayesian tests (lightweight — no real NUTS)
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineFitBayesian:
     """Tests for Pipeline.fit_bayesian()."""
 
@@ -226,6 +233,7 @@ class TestPipelineFitBayesian:
 # plot_bayesian tests
 # ---------------------------------------------------------------------------
 
+
 class TestPipelinePlotBayesian:
     """Tests for Pipeline.plot_bayesian()."""
 
@@ -239,6 +247,7 @@ class TestPipelinePlotBayesian:
 # plot_diagnostics tests
 # ---------------------------------------------------------------------------
 
+
 class TestPipelinePlotDiagnostics:
     """Tests for Pipeline.plot_diagnostics()."""
 
@@ -251,6 +260,7 @@ class TestPipelinePlotDiagnostics:
 # ---------------------------------------------------------------------------
 # Reset tests
 # ---------------------------------------------------------------------------
+
 
 class TestPipelineReset:
     """Tests for Pipeline.reset() clearing visualization state."""
@@ -270,23 +280,20 @@ class TestPipelineReset:
 # Full workflow test
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineFullWorkflow:
     """End-to-end workflow test: load → transform → fit → plot_*."""
 
     @pytest.mark.smoke
     def test_transform_then_fit_then_plot(self, pipeline_with_data):
         """Complete workflow: transform → plot_transform → fit → plot_fit."""
-        result = (
-            pipeline_with_data
-            .transform(_VizTestTransform())
-            .plot_transform(show_intermediate=True)
+        result = pipeline_with_data.transform(_VizTestTransform()).plot_transform(
+            show_intermediate=True
         )
         plt.close(result._current_figure)
 
-        result = (
-            result
-            .fit(_VizTestModel())
-            .plot_fit(show_residuals=True, show_uncertainty=False)
+        result = result.fit(_VizTestModel()).plot_fit(
+            show_residuals=True, show_uncertainty=False
         )
         plt.close(result._current_figure)
 

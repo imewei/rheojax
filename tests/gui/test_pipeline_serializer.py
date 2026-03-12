@@ -277,12 +277,7 @@ class TestFromYaml:
 
     def test_missing_type_raises(self):
         """from_yaml must raise ValueError when a step is missing 'type'."""
-        yaml_str = (
-            "version: '1'\n"
-            "name: Bad\n"
-            "steps:\n"
-            "  - file: data/x.csv\n"
-        )
+        yaml_str = "version: '1'\n" "name: Bad\n" "steps:\n" "  - file: data/x.csv\n"
         with pytest.raises(ValueError, match="type"):
             from_yaml(yaml_str)
 

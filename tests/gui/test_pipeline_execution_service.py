@@ -190,32 +190,24 @@ class TestPipelineExecutionService:
     def test_execute_transform_requires_data_in_context(self, service):
         """_execute_transform must raise ValueError when context has no 'data'."""
         with pytest.raises(ValueError, match="prior load step"):
-            service._execute_transform(
-                config={"name": "fft"}, context={}
-            )
+            service._execute_transform(config={"name": "fft"}, context={})
 
     def test_execute_transform_requires_name_key(self, service):
         """_execute_transform must raise ValueError when 'name' key is absent."""
         mock_data = MagicMock()
         with pytest.raises(ValueError, match="'name'"):
-            service._execute_transform(
-                config={}, context={"data": mock_data}
-            )
+            service._execute_transform(config={}, context={"data": mock_data})
 
     def test_execute_fit_requires_data_in_context(self, service):
         """_execute_fit must raise ValueError when context has no 'data'."""
         with pytest.raises(ValueError, match="prior load step"):
-            service._execute_fit(
-                config={"model": "Maxwell"}, context={}
-            )
+            service._execute_fit(config={"model": "Maxwell"}, context={})
 
     def test_execute_fit_requires_model_key(self, service):
         """_execute_fit must raise ValueError when 'model' key is absent."""
         mock_data = MagicMock()
         with pytest.raises(ValueError, match="'model'"):
-            service._execute_fit(
-                config={}, context={"data": mock_data}
-            )
+            service._execute_fit(config={}, context={"data": mock_data})
 
     def test_execute_bayesian_requires_data_in_context(self, service):
         """_execute_bayesian must raise ValueError when context has no 'data'."""
@@ -226,9 +218,7 @@ class TestPipelineExecutionService:
         """_execute_bayesian must raise ValueError when 'model_name' is missing."""
         mock_data = MagicMock()
         with pytest.raises(ValueError, match="prior fit step"):
-            service._execute_bayesian(
-                config={}, context={"data": mock_data}
-            )
+            service._execute_bayesian(config={}, context={"data": mock_data})
 
     # ------------------------------------------------------------------
     # execute_all integration (mocked services)
@@ -281,7 +271,9 @@ class TestPipelineExecutionService:
         ):
             service.execute_all([step])
 
-        assert any(running_states), "is_pipeline_running() was never True during execution"
+        assert any(
+            running_states
+        ), "is_pipeline_running() was never True during execution"
         # After completion the pipeline must be stopped.
         assert is_pipeline_running() is False
 

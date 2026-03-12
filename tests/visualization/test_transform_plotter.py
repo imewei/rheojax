@@ -50,6 +50,7 @@ def complex_data():
 # Dispatch tests
 # ---------------------------------------------------------------------------
 
+
 class TestTransformPlotterDispatch:
     """Tests for auto-dispatch based on transform name."""
 
@@ -79,6 +80,7 @@ class TestTransformPlotterDispatch:
 # FFT tests
 # ---------------------------------------------------------------------------
 
+
 class TestFFTPlot:
     """Tests for FFT analysis visualization."""
 
@@ -102,6 +104,7 @@ class TestFFTPlot:
 # Mastercurve tests
 # ---------------------------------------------------------------------------
 
+
 class TestMastercurvePlot:
     """Tests for mastercurve visualization."""
 
@@ -113,7 +116,9 @@ class TestMastercurvePlot:
 
         datasets = [complex_data] * 3
         fig, axes = plotter.plot(
-            "mastercurve", result, input_data=datasets,
+            "mastercurve",
+            result,
+            input_data=datasets,
         )
         assert fig is not None
         assert len(axes) == 2  # unshifted + shifted
@@ -134,14 +139,17 @@ class TestMastercurvePlot:
 # Mutation number tests
 # ---------------------------------------------------------------------------
 
+
 class TestMutationNumberPlot:
 
     @pytest.mark.smoke
     def test_mutation_number(self, plotter):
         """Mutation number plot shows bar with value."""
         data = RheoData(
-            x=np.array([0.0]), y=np.array([0.42]),
-            domain="scalar", y_units="dimensionless",
+            x=np.array([0.0]),
+            y=np.array([0.42]),
+            domain="scalar",
+            y_units="dimensionless",
             metadata={"mutation_number": 0.42},
         )
         fig, ax = plotter.plot("mutation_number", data)
@@ -154,14 +162,18 @@ class TestMutationNumberPlot:
 # Derivative tests
 # ---------------------------------------------------------------------------
 
+
 class TestDerivativePlot:
 
     @pytest.mark.smoke
     def test_derivative_with_input(self, plotter, time_data):
         """Derivative plot shows original + derivative."""
         deriv = RheoData(
-            x=time_data.x, y=np.cos(2 * np.pi * time_data.x),
-            x_units="s", y_units="Pa/s", domain="time",
+            x=time_data.x,
+            y=np.cos(2 * np.pi * time_data.x),
+            x_units="s",
+            y_units="Pa/s",
+            domain="time",
         )
         fig, axes = plotter.plot("derivative", deriv, input_data=time_data)
         assert len(axes) == 2
@@ -172,6 +184,7 @@ class TestDerivativePlot:
 # SPP tests
 # ---------------------------------------------------------------------------
 
+
 class TestSPPPlot:
 
     @pytest.mark.smoke
@@ -180,7 +193,9 @@ class TestSPPPlot:
         t = np.linspace(0, 2 * np.pi, 100)
         stress = np.sin(t)
         data = RheoData(
-            x=t, y=stress, domain="time",
+            x=t,
+            y=stress,
+            domain="time",
             metadata={
                 "spp_results": {
                     "strain": np.sin(t),
@@ -200,19 +215,23 @@ class TestSPPPlot:
 # Prony conversion tests
 # ---------------------------------------------------------------------------
 
+
 class TestPronyPlot:
 
     @pytest.mark.smoke
     def test_prony_with_input(self, plotter, time_data, complex_data):
         """Prony conversion shows input + converted domains."""
         from collections import namedtuple
+
         PronyResult = namedtuple("PronyResult", ["G_i", "tau_i", "G_e", "n_modes"])
-        meta = {"prony_result": PronyResult(
-            G_i=np.array([1e4, 5e3]),
-            tau_i=np.array([0.1, 1.0]),
-            G_e=100.0,
-            n_modes=2,
-        )}
+        meta = {
+            "prony_result": PronyResult(
+                G_i=np.array([1e4, 5e3]),
+                tau_i=np.array([0.1, 1.0]),
+                G_e=100.0,
+                n_modes=2,
+            )
+        }
         result = (complex_data, meta)
         fig, axes = plotter.plot("prony", result, input_data=time_data)
         assert len(axes) == 2
@@ -222,6 +241,7 @@ class TestPronyPlot:
 # ---------------------------------------------------------------------------
 # Spectrum inversion tests
 # ---------------------------------------------------------------------------
+
 
 class TestSpectrumPlot:
 
@@ -240,6 +260,7 @@ class TestSpectrumPlot:
 # ---------------------------------------------------------------------------
 # Cox-Merz tests
 # ---------------------------------------------------------------------------
+
 
 class TestCoxMerzPlot:
 
@@ -279,6 +300,7 @@ class TestCoxMerzPlot:
 # LVE envelope tests
 # ---------------------------------------------------------------------------
 
+
 class TestLVEEnvelopePlot:
 
     @pytest.mark.smoke
@@ -287,7 +309,9 @@ class TestLVEEnvelopePlot:
         t = np.linspace(0, 5, 100)
         sigma = 500 * (1 - np.exp(-t))
         env_data = RheoData(
-            x=t, y=sigma, domain="time",
+            x=t,
+            y=sigma,
+            domain="time",
             metadata={"shear_rate": 1.0},
         )
         result = (env_data, {"lve_result": None})
@@ -300,12 +324,15 @@ class TestLVEEnvelopePlot:
 # Generic fallback tests
 # ---------------------------------------------------------------------------
 
+
 class TestGenericPlot:
 
     def test_generic_with_input(self, plotter, time_data, freq_data):
         """Generic plot shows before/after."""
         fig, axes = plotter.plot(
-            "some_new_transform", freq_data, input_data=time_data,
+            "some_new_transform",
+            freq_data,
+            input_data=time_data,
         )
         assert len(axes) == 2
         plt.close(fig)
@@ -320,6 +347,7 @@ class TestGenericPlot:
 # ---------------------------------------------------------------------------
 # Unpack result tests
 # ---------------------------------------------------------------------------
+
 
 class TestUnpackResult:
 
@@ -345,6 +373,7 @@ class TestUnpackResult:
 # ---------------------------------------------------------------------------
 # Style tests
 # ---------------------------------------------------------------------------
+
 
 class TestTransformPlotterStyles:
 

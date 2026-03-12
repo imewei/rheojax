@@ -130,9 +130,9 @@ class TestTransformNameMapping:
         available = service.get_available_transforms()
 
         meta_keys = {m["key"] for m in metadata}
-        assert meta_keys == set(available), (
-            f"Metadata keys {meta_keys} != available {set(available)}"
-        )
+        assert meta_keys == set(
+            available
+        ), f"Metadata keys {meta_keys} != available {set(available)}"
 
     @pytest.mark.unit
     def test_all_display_names_are_unique(self, qapp_module):
@@ -194,7 +194,9 @@ class TestPipelineStepAutoPopulate:
         from rheojax.gui.state.selectors import get_pipeline_step_by_id
 
         step_id = add_pipeline_step("load", "Load Data")
-        update_step_config(step_id, {"file": "/tmp/test.csv", "test_mode": "oscillation"})
+        update_step_config(
+            step_id, {"file": "/tmp/test.csv", "test_mode": "oscillation"}
+        )
 
         step = get_pipeline_step_by_id(step_id)
         assert step is not None
@@ -410,9 +412,9 @@ class TestTransformFallbackPath:
         # Every key should be discoverable via its display name
         for meta in metadata:
             resolved = display_to_key.get(meta["name"].lower())
-            assert resolved == meta["key"], (
-                f"Display name '{meta['name']}' resolved to '{resolved}', expected '{meta['key']}'"
-            )
+            assert (
+                resolved == meta["key"]
+            ), f"Display name '{meta['name']}' resolved to '{resolved}', expected '{meta['key']}'"
 
 
 # ---------------------------------------------------------------------------

@@ -157,7 +157,9 @@ def load_config(path: str | Path) -> PipelineConfig:
         raw = yaml.safe_load(fh)
 
     if not isinstance(raw, dict):
-        raise ValueError(f"Config file must be a YAML mapping, got {type(raw).__name__}.")
+        raise ValueError(
+            f"Config file must be a YAML mapping, got {type(raw).__name__}."
+        )
 
     # Required top-level keys
     missing_top = [k for k in ("version", "name", "steps") if k not in raw]

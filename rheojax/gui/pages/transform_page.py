@@ -380,9 +380,7 @@ class TransformPage(QWidget):
         # user clicks Apply with all datasets present.  Running a preview with
         # only the single active dataset would always fail and produce
         # misleading ERROR-level log output.
-        meta = next(
-            (m for m in self._metadata if m["key"] == self._selected_key), None
-        )
+        meta = next((m for m in self._metadata if m["key"] == self._selected_key), None)
         if meta and meta.get("requires_multiple", False):
             self._preview_canvas.clear()
             return
@@ -469,9 +467,7 @@ class TransformPage(QWidget):
 
         # Pre-validate dataset requirements so the user gets a helpful message
         # before the background worker is even submitted.
-        meta = next(
-            (m for m in self._metadata if m["key"] == self._selected_key), None
-        )
+        meta = next((m for m in self._metadata if m["key"] == self._selected_key), None)
         if meta and meta.get("requires_multiple", False):
             state = self._store.get_state()
             n_datasets = len(state.datasets) if state.datasets else 0

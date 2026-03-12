@@ -71,9 +71,7 @@ def set_compact_margins(layout: QLayout) -> None:
     layout : QLayout
         The layout to configure.
     """
-    layout.setContentsMargins(
-        Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS
-    )
+    layout.setContentsMargins(Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS)
     layout.setSpacing(Spacing.XXS)
 
 
@@ -89,9 +87,7 @@ def set_toolbar_margins(layout: QLayout) -> None:
     layout : QLayout
         The layout to configure.
     """
-    layout.setContentsMargins(
-        Spacing.SM, Spacing.XS, Spacing.SM, Spacing.XS
-    )
+    layout.setContentsMargins(Spacing.SM, Spacing.XS, Spacing.SM, Spacing.XS)
     layout.setSpacing(Spacing.XS)
 
 
@@ -109,9 +105,7 @@ def set_zero_margins(layout: QLayout) -> None:
     layout.setContentsMargins(0, 0, 0, 0)
 
 
-def apply_group_box_style(
-    group_box: QGroupBox, variant: str = "panel"
-) -> None:
+def apply_group_box_style(group_box: QGroupBox, variant: str = "panel") -> None:
     """Apply a QGroupBox style variant via a QSS property selector.
 
     Sets the custom ``gbStyle`` property on *group_box* and triggers a

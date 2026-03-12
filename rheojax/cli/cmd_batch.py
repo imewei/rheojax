@@ -164,7 +164,9 @@ def _fit_single(
         if not data:
             raise ValueError("File contained no data segments")
         if len(data) > 1:
-            logger.warning("Multi-segment file, using first segment", file=str(file_path))
+            logger.warning(
+                "Multi-segment file, using first segment", file=str(file_path)
+            )
         data = data[0]
 
     # Resolve test_mode
@@ -174,9 +176,7 @@ def _fit_single(
         if test_mode is None and hasattr(data, "metadata"):
             test_mode = data.metadata.get("test_mode")
     if test_mode is None:
-        raise ValueError(
-            "Could not auto-detect test mode. Use --test-mode to specify."
-        )
+        raise ValueError("Could not auto-detect test mode. Use --test-mode to specify.")
 
     # Validate
     x_arr = np.asarray(data.x)
@@ -201,8 +201,7 @@ def _fit_single(
     fit_time = time.perf_counter() - start
 
     params = {
-        name: float(model.parameters[name].value)
-        for name in model.parameters.keys()
+        name: float(model.parameters[name].value) for name in model.parameters.keys()
     }
 
     result.update(
@@ -281,7 +280,10 @@ def main(args: list[str] | None = None) -> int:
 
     files = [Path(f) for f in matched if Path(f).is_file()]
     if not files:
-        print(f"Error: Pattern matched entries but none are files: '{parsed.pattern}'", file=sys.stderr)
+        print(
+            f"Error: Pattern matched entries but none are files: '{parsed.pattern}'",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Found {len(files)} file(s) matching '{parsed.pattern}'")
@@ -345,7 +347,9 @@ def main(args: list[str] | None = None) -> int:
 
                 out_file.write_text(json.dumps(result, indent=2, cls=NumpyJSONEncoder))
             except Exception as e:
-                logger.warning("Could not save result file", file=str(out_file), error=str(e))
+                logger.warning(
+                    "Could not save result file", file=str(out_file), error=str(e)
+                )
 
     print()
 

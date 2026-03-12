@@ -343,8 +343,8 @@ class TestSGRConventionalPredictions:
         # In glass phase at high frequencies, G' should dominate (approaches plateau)
         # while G'' decreases. Check high-frequency end.
         high_freq_idx = -5  # Near end of range
-        assert (
-            np.real(G_star[high_freq_idx]) > np.imag(G_star[high_freq_idx])
+        assert np.real(G_star[high_freq_idx]) > np.imag(
+            G_star[high_freq_idx]
         ), "Glass phase should show G' > G'' at high frequencies"
 
         # Also check that phase regime detection works

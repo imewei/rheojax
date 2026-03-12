@@ -62,9 +62,11 @@ class TestMainHelp:
         mock_stdin.isatty.return_value = True
         monkeypatch.setattr(sys, "stdin", mock_stdin)
 
-        result = main([
-            str(tmp_path / "nonexistent_results"),
-            "--output",
-            str(tmp_path / "out"),
-        ])
+        result = main(
+            [
+                str(tmp_path / "nonexistent_results"),
+                "--output",
+                str(tmp_path / "out"),
+            ]
+        )
         assert result == 1

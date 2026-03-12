@@ -146,8 +146,8 @@ Extend `ModelRegistry` (do NOT replace it) with query methods:
 ```python
 # Already exists:
 ModelRegistry.register("name", protocols=[Protocol.RELAXATION, ...])
-ModelRegistry.find(protocol=Protocol.RELAXATION) → list[PluginInfo]
-ModelRegistry.get("model_name") → PluginInfo
+ModelRegistry.find(protocol=Protocol.RELAXATION)  # -> list[PluginInfo]
+ModelRegistry.get("model_name")  # -> PluginInfo
 
 # NEW — add to registry.py:
 ModelRegistry.for_protocol(protocol: str | Protocol) -> list[PluginInfo]

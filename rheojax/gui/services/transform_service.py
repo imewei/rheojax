@@ -842,9 +842,11 @@ class TransformService:
                 logger.info(
                     "Transform complete",
                     transform=name,
-                    passes=extra.get("cox_merz_result", {}).passes
-                    if hasattr(extra.get("cox_merz_result"), "passes")
-                    else None,
+                    passes=(
+                        extra.get("cox_merz_result", {}).passes
+                        if hasattr(extra.get("cox_merz_result"), "passes")
+                        else None
+                    ),
                 )
                 logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result), extra
@@ -880,9 +882,7 @@ class TransformService:
                 prony = PronyConversion(n_modes=n_modes, direction=direction)
                 result, extra = prony.transform(data)
 
-                logger.info(
-                    "Transform complete", transform=name, direction=direction
-                )
+                logger.info("Transform complete", transform=name, direction=direction)
                 logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result), extra
 
@@ -893,7 +893,9 @@ class TransformService:
                 source = params.get("source", "oscillation")
                 G_e = float(params.get("G_e", 0.0))
                 regularization_raw = float(params.get("regularization", 0.0))
-                regularization = regularization_raw if regularization_raw > 0.0 else None
+                regularization = (
+                    regularization_raw if regularization_raw > 0.0 else None
+                )
 
                 logger.debug(
                     "Applying spectrum inversion transform",

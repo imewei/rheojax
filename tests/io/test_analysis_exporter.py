@@ -27,6 +27,7 @@ jax, jnp = safe_import_jax()
 # Mock model & transform
 # ---------------------------------------------------------------------------
 
+
 class _ExportTestModel(BaseModel):
     """Simple model for export testing."""
 
@@ -93,7 +94,11 @@ def sample_data():
     t = np.linspace(0.1, 10, 50)
     y = 100 * np.exp(-0.5 * t) + np.random.normal(0, 2, 50)
     return RheoData(
-        x=t, y=y, x_units="s", y_units="Pa", domain="time",
+        x=t,
+        y=y,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
         metadata={"test_mode": "relaxation"},
     )
 
@@ -119,6 +124,7 @@ def full_pipeline(sample_data):
 # ---------------------------------------------------------------------------
 # AnalysisExporter tests
 # ---------------------------------------------------------------------------
+
 
 class TestAnalysisExporter:
     """Tests for AnalysisExporter directly."""
@@ -280,6 +286,7 @@ class TestAnalysisExporterExcel:
 # Pipeline.export() integration tests
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineExport:
     """Tests for Pipeline.export() method."""
 
@@ -316,10 +323,7 @@ class TestPipelineExport:
 
     def test_export_chaining(self, full_pipeline, tmp_path):
         """Export supports fluent chaining."""
-        result = (
-            full_pipeline
-            .export(tmp_path / "analysis")
-        )
+        result = full_pipeline.export(tmp_path / "analysis")
         assert result is full_pipeline
         plt.close("all")
 
@@ -332,6 +336,7 @@ class TestPipelineExport:
 # ---------------------------------------------------------------------------
 # Full workflow test
 # ---------------------------------------------------------------------------
+
 
 class TestExportFullWorkflow:
     """End-to-end: load → transform → fit → plot → export."""

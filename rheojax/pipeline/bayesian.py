@@ -212,7 +212,7 @@ class BayesianPipeline(Pipeline):
 
         return self
 
-    def fit_bayesian(
+    def fit_bayesian(  # type: ignore[override]
         self,
         num_samples: int = 2000,
         num_warmup: int = 1000,

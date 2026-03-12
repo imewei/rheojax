@@ -4,7 +4,6 @@ This module defines the exception and warning hierarchy used across
 the I/O subsystem and the fitting/transform workflows.
 """
 
-
 # ---------------------------------------------------------------------------
 # I/O exceptions
 # ---------------------------------------------------------------------------

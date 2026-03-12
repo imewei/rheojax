@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import warnings
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -291,9 +292,7 @@ def load_csv(
                 affected_cols.append(col)
                 # Reuse col_str — no second astype(str) needed
                 sample = col_str.str.replace("\ufffd", "", regex=False)
-                if sample.str.match(
-                    r"^[\d.eE+\-,]*\d[\d.eE+\-,]*$", na=False
-                ).any():
+                if sample.str.match(r"^[\d.eE+\-,]*\d[\d.eE+\-,]*$", na=False).any():
                     raise ValueError(
                         f"Encoding corruption detected in numeric column '{col}'. "
                         f"The file may need to be re-exported with UTF-8 encoding. "
@@ -422,13 +421,13 @@ def load_csv(
         source_metadata["encoding_fallback"] = True
 
     # Merge with user metadata
-    final_metadata = {**source_metadata}
+    final_metadata: dict[str, Any] = {**source_metadata}
     if metadata:
         final_metadata.update(metadata)
 
     # Add temperature if provided
     if temperature is not None:
-        final_metadata["temperature"] = temperature  # type: ignore[assignment]
+        final_metadata["temperature"] = temperature
 
     # Store protocol metadata
     if strain_amplitude is not None:

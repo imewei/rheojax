@@ -115,9 +115,7 @@ class PipelineTemplateDialog(QDialog):
 
         self.preview_edit = QTextEdit()
         self.preview_edit.setReadOnly(True)
-        self.preview_edit.setStyleSheet(
-            "font-family: monospace; font-size: 10pt;"
-        )
+        self.preview_edit.setStyleSheet("font-family: monospace; font-size: 10pt;")
         self.preview_edit.setPlaceholderText("Select a template to preview its YAML...")
         right_layout.addWidget(self.preview_edit)
 
@@ -135,8 +133,7 @@ class PipelineTemplateDialog(QDialog):
 
         # Button box
         self.button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
             "Use Template"
@@ -193,9 +190,7 @@ class PipelineTemplateDialog(QDialog):
         if current is None:
             self.preview_edit.clear()
             self.description_label.setText("")
-            self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
-                False
-            )
+            self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
             return
 
         name = current.text()
@@ -238,9 +233,7 @@ class PipelineTemplateDialog(QDialog):
 
     def _on_reject(self) -> None:
         """Close with Rejected result; selected_template remains None."""
-        logger.debug(
-            "Dialog closed", dialog=self.__class__.__name__, result="rejected"
-        )
+        logger.debug("Dialog closed", dialog=self.__class__.__name__, result="rejected")
         self.reject()
 
     # ------------------------------------------------------------------

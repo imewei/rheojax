@@ -914,6 +914,7 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
 
     if r2 < 0:
         import warnings
+
         warnings.warn(
             f"R² = {r2:.4f} < 0: model fits worse than the mean. "
             "Check initial parameters, data quality, or model suitability.",

@@ -176,8 +176,10 @@ def _build_kernel(
         n = len(omega)
         A = np.zeros((2 * n, len(tau)))
         wt2 = (omega[:, None] * tau[None, :]) ** 2
-        A[:n, :] = wt2 / (1.0 + wt2) * d_ln_tau[None, :]       # G' kernel
-        A[n:, :] = omega[:, None] * tau[None, :] / (1.0 + wt2) * d_ln_tau[None, :]  # G'' kernel
+        A[:n, :] = wt2 / (1.0 + wt2) * d_ln_tau[None, :]  # G' kernel
+        A[n:, :] = (
+            omega[:, None] * tau[None, :] / (1.0 + wt2) * d_ln_tau[None, :]
+        )  # G'' kernel
 
         return A
 
@@ -191,9 +193,7 @@ def _build_kernel(
         raise ValueError(f"Unknown source: {source}")
 
 
-def _assemble_target(
-    y: np.ndarray, source: str, G_e: float
-) -> np.ndarray:
+def _assemble_target(y: np.ndarray, source: str, G_e: float) -> np.ndarray:
     """Assemble the target vector b from measurement data."""
     if source == "oscillation":
         if np.iscomplexobj(y):
@@ -250,9 +250,7 @@ def _tikhonov_inversion(
     return H_tau, float(lam), residual_norm
 
 
-def _select_lambda_gcv(
-    A: np.ndarray, b: np.ndarray, L: np.ndarray
-) -> float:
+def _select_lambda_gcv(A: np.ndarray, b: np.ndarray, L: np.ndarray) -> float:
     """Select regularization parameter via Generalized Cross-Validation.
 
     GCV(λ) = ||A H_λ - b||² / (trace(I - A(A^TA + λ²L^TL)^{-1}A^T))²
@@ -266,17 +264,17 @@ def _select_lambda_gcv(
     gcv_scores = np.full(len(lambdas), np.inf)
 
     # Check if L is identity — enables fast SVD path
-    is_identity_L = (L.shape[0] == L.shape[1] and np.allclose(L, np.eye(L.shape[0])))
+    is_identity_L = L.shape[0] == L.shape[1] and np.allclose(L, np.eye(L.shape[0]))
 
     if is_identity_L:
         # Fast SVD-based GCV: precompute once, O(min(n,m)) per lambda
         U, s, Vt = np.linalg.svd(A, full_matrices=False)
-        s2 = s ** 2
+        s2 = s**2
         # Coefficients for residual: UTb projected onto singular vectors
         UTb = U.T @ b
 
         for i, lam in enumerate(lambdas):
-            lam2 = lam ** 2
+            lam2 = lam**2
             # Filter factors: f_j = σ_j² / (σ_j² + λ²)
             f = s2 / (s2 + lam2)
 
@@ -286,14 +284,14 @@ def _select_lambda_gcv(
             # ||residual||² = Σ (1-f_j)² (UTb_j)² + ||b - UU^Tb||²
             res_filtered = (1.0 - f) * UTb
             # Component orthogonal to range(A) is constant across lambdas
-            b_perp_sq = max(0.0, float(np.sum(b ** 2) - np.sum(UTb ** 2)))
-            res_norm_sq = float(np.sum(res_filtered ** 2) + b_perp_sq)
+            b_perp_sq = max(0.0, float(np.sum(b**2) - np.sum(UTb**2)))
+            res_norm_sq = float(np.sum(res_filtered**2) + b_perp_sq)
 
             # trace(I - M) = n - Σ f_j
             trace_I_minus_M = n - np.sum(f)
 
             if trace_I_minus_M > 0:
-                gcv_scores[i] = res_norm_sq / trace_I_minus_M ** 2
+                gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
     else:
         # General case: L ≠ I — use direct solve (original algorithm)
         ATA = A.T @ A

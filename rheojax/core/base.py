@@ -195,8 +195,7 @@ class BaseModel(BayesianMixin, ABC):
             model_class_name=self.__class__.__name__,
             protocol=test_mode,
             params={
-                name: self.parameters.get_value(name)
-                for name in self.parameters.keys()
+                name: self.parameters.get_value(name) for name in self.parameters.keys()
             },
             params_units={
                 name: getattr(self.parameters[name], "units", "") or ""
@@ -589,13 +588,9 @@ class BaseModel(BayesianMixin, ABC):
                 from rheojax.utils.uncertainty import bootstrap_ci, hessian_ci
 
                 if uncertainty == "hessian":
-                    _uncertainty_result = hessian_ci(
-                        self, X, y, test_mode=test_mode
-                    )
+                    _uncertainty_result = hessian_ci(self, X, y, test_mode=test_mode)
                 elif uncertainty == "bootstrap":
-                    _uncertainty_result = bootstrap_ci(
-                        self, X, y, test_mode=test_mode
-                    )
+                    _uncertainty_result = bootstrap_ci(self, X, y, test_mode=test_mode)
                 else:
                     logger.warning(
                         "Unknown uncertainty method",
@@ -614,9 +609,7 @@ class BaseModel(BayesianMixin, ABC):
             try:
                 from rheojax.utils.model_selection import build_fit_result
 
-                fit_result = build_fit_result(
-                    self, X, y, test_mode=test_mode
-                )
+                fit_result = build_fit_result(self, X, y, test_mode=test_mode)
                 if _uncertainty_result is not None:
                     fit_result.metadata["uncertainty"] = _uncertainty_result
                     fit_result.metadata["uncertainty_method"] = uncertainty

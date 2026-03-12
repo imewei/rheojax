@@ -18,6 +18,11 @@ from rheojax.visualization.epm_plots import (
     plot_tensorial_fields,
     plot_von_mises_field,
 )
+from rheojax.visualization.fit_plotter import (
+    FitPlotter,
+    compute_credible_band,
+    generate_diagnostic_suite,
+)
 from rheojax.visualization.plotter import (
     compute_uncertainty_band,
     plot_fit_with_uncertainty,
@@ -28,12 +33,6 @@ from rheojax.visualization.plotter import (
     plot_time_domain,
     save_figure,
 )
-from rheojax.visualization.fit_plotter import (
-    FitPlotter,
-    compute_credible_band,
-    generate_diagnostic_suite,
-)
-from rheojax.visualization.transform_plotter import TransformPlotter
 from rheojax.visualization.templates import (
     apply_template_style,
     plot_mastercurve,
@@ -41,6 +40,7 @@ from rheojax.visualization.templates import (
     plot_modulus_frequency,
     plot_stress_strain,
 )
+from rheojax.visualization.transform_plotter import TransformPlotter
 
 
 def configure_matplotlib(

@@ -13,6 +13,7 @@ fit_gel_point        : Winter-Chambon gel-point exponent from G(t).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -224,7 +225,7 @@ def preprocess_for_protocol(
     X = np.asarray(X, dtype=np.float64)
     y_arr = np.asarray(y)
 
-    dispatchers = {
+    dispatchers: dict[str, Callable[..., PreprocessingResult]] = {
         "relaxation": _preprocess_relaxation,
         "creep": _preprocess_creep,
         "oscillation": _preprocess_oscillation,
@@ -308,14 +309,15 @@ def _preprocess_relaxation(
             )
 
     return PreprocessingResult(
-        X=t, y=G_t, diagnostics=diagnostics,
-        warnings=warnings_list, applied=applied,
+        X=t,
+        y=G_t,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=applied,
     )
 
 
-def _preprocess_creep(
-    t: np.ndarray, J_t: np.ndarray, **kwargs
-) -> PreprocessingResult:
+def _preprocess_creep(t: np.ndarray, J_t: np.ndarray, **kwargs) -> PreprocessingResult:
     """Creep: detect plateau vs viscous flow regime."""
     warnings_list: list[str] = []
     diagnostics: dict[str, Any] = {}
@@ -330,8 +332,9 @@ def _preprocess_creep(
         if len(t_late) > 2:
             slope = np.polyfit(t_late, J_late, 1)[0]
             diagnostics["late_slope"] = float(slope)
-            diagnostics["has_viscous_flow"] = bool(slope > 0 and
-                slope * t_late[-1] > 0.5 * J_late[-1])
+            diagnostics["has_viscous_flow"] = bool(
+                slope > 0 and slope * t_late[-1] > 0.5 * J_late[-1]
+            )
 
     # Check monotonicity
     dJ = np.diff(J_real)
@@ -344,7 +347,11 @@ def _preprocess_creep(
         )
 
     return PreprocessingResult(
-        X=t, y=J_t, diagnostics=diagnostics, warnings=warnings_list, applied=[],
+        X=t,
+        y=J_t,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=[],
     )
 
 
@@ -366,8 +373,13 @@ def _preprocess_oscillation(
         G_prime = G_star[:, 0]
         G_double_prime = G_star[:, 1]
     else:
-        return PreprocessingResult(X=omega, y=G_star, diagnostics=diagnostics,
-                                   warnings=warnings_list, applied=[])
+        return PreprocessingResult(
+            X=omega,
+            y=G_star,
+            diagnostics=diagnostics,
+            warnings=warnings_list,
+            applied=[],
+        )
 
     # KK check via the standalone public function
     if len(omega) > 5:
@@ -382,11 +394,17 @@ def _preprocess_oscillation(
 
     # Check tan(delta) range
     tan_delta = G_double_prime / np.maximum(G_prime, 1e-30)
-    diagnostics["tan_delta_range"] = (float(np.min(tan_delta)), float(np.max(tan_delta)))
+    diagnostics["tan_delta_range"] = (
+        float(np.min(tan_delta)),
+        float(np.max(tan_delta)),
+    )
 
     return PreprocessingResult(
-        X=omega, y=G_star, diagnostics=diagnostics,
-        warnings=warnings_list, applied=[],
+        X=omega,
+        y=G_star,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=[],
     )
 
 
@@ -438,8 +456,11 @@ def _preprocess_flow_curve(
         pass
 
     return PreprocessingResult(
-        X=gamma_dot, y=sigma, diagnostics=diagnostics,
-        warnings=warnings_list, applied=[],
+        X=gamma_dot,
+        y=sigma,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=[],
     )
 
 
@@ -463,13 +484,14 @@ def _preprocess_startup(
         sigma_ss = float(np.mean(sigma_real[late_start:]))
         diagnostics["sigma_steady_state"] = sigma_ss
         if sigma_ss > 0:
-            diagnostics["overshoot_ratio"] = float(
-                sigma_real[peak_idx] / sigma_ss
-            )
+            diagnostics["overshoot_ratio"] = float(sigma_real[peak_idx] / sigma_ss)
 
     return PreprocessingResult(
-        X=t, y=sigma, diagnostics=diagnostics,
-        warnings=warnings_list, applied=[],
+        X=t,
+        y=sigma,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=[],
     )
 
 
@@ -579,6 +601,9 @@ def _preprocess_laos(
             diagnostics["ewoldt_classification"] = ewoldt
 
     return PreprocessingResult(
-        X=t, y=response, diagnostics=diagnostics,
-        warnings=warnings_list, applied=[],
+        X=t,
+        y=response,
+        diagnostics=diagnostics,
+        warnings=warnings_list,
+        applied=[],
     )

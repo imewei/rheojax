@@ -140,8 +140,12 @@ class HomePage(QWidget):
         secondary_row = QHBoxLayout()
         secondary_row.setSpacing(Spacing.XL)
         secondary_row.setAlignment(Qt.AlignTop)
-        secondary_row.addWidget(self._create_system_status(), stretch=1, alignment=Qt.AlignTop)
-        secondary_row.addWidget(self._create_resources(), stretch=1, alignment=Qt.AlignTop)
+        secondary_row.addWidget(
+            self._create_system_status(), stretch=1, alignment=Qt.AlignTop
+        )
+        secondary_row.addWidget(
+            self._create_resources(), stretch=1, alignment=Qt.AlignTop
+        )
         body_layout.addLayout(secondary_row)
 
         # No bottom stretch — Recent Projects expands to fill available space
@@ -475,7 +479,9 @@ class HomePage(QWidget):
         recent_projects = self._store.get_state().recent_projects
 
         if not recent_projects:
-            empty = QLabel("No recent projects. Import data or open a project to get started.")
+            empty = QLabel(
+                "No recent projects. Import data or open a project to get started."
+            )
             empty.setAlignment(Qt.AlignCenter)
             empty.setMinimumHeight(120)
             empty.setStyleSheet(f"""
@@ -583,9 +589,7 @@ class HomePage(QWidget):
             }}
         """)
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(
-            Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS
-        )
+        card_layout.setContentsMargins(Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS)
 
         self._jax_status = JAXStatusWidget()
         card_layout.addWidget(self._jax_status)
@@ -642,8 +646,16 @@ class HomePage(QWidget):
         outer.addWidget(label)
 
         resources = [
-            ("Documentation", "API reference and guides", "https://rheojax.readthedocs.io"),
-            ("Tutorials", "Example notebooks", "https://github.com/imewei/rheojax/tree/main/examples"),
+            (
+                "Documentation",
+                "API reference and guides",
+                "https://rheojax.readthedocs.io",
+            ),
+            (
+                "Tutorials",
+                "Example notebooks",
+                "https://github.com/imewei/rheojax/tree/main/examples",
+            ),
         ]
 
         link_style = f"""

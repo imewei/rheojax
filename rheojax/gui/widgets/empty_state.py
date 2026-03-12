@@ -44,9 +44,7 @@ class EmptyStateWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(Spacing.SM)
-        layout.setContentsMargins(
-            Spacing.XL, Spacing.XL, Spacing.XL, Spacing.XL
-        )
+        layout.setContentsMargins(Spacing.XL, Spacing.XL, Spacing.XL, Spacing.XL)
 
         self._message_label = QLabel(message)
         self._message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -66,9 +64,7 @@ class EmptyStateWidget(QWidget):
             self._action_btn.setProperty("variant", "secondary")
             self._action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self._action_btn.clicked.connect(self.action_clicked)
-            layout.addWidget(
-                self._action_btn, alignment=Qt.AlignmentFlag.AlignCenter
-            )
+            layout.addWidget(self._action_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
     def set_message(self, text: str) -> None:
         """Update the primary message text."""

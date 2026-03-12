@@ -27,6 +27,7 @@ jax, jnp = safe_import_jax()
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def simple_data():
     """Simple exponential decay data for scalar fits."""
@@ -115,6 +116,7 @@ def plotter():
 # ---------------------------------------------------------------------------
 # compute_credible_band tests
 # ---------------------------------------------------------------------------
+
 
 class TestComputeCredibleBand:
     """Tests for compute_credible_band()."""
@@ -226,12 +228,20 @@ class TestComputeCredibleBand:
         }
 
         _, lo_90, hi_90 = compute_credible_band(
-            mock_model.model_function, x, posterior, ["G0", "tau"],
-            credible_level=0.90, test_mode="relaxation",
+            mock_model.model_function,
+            x,
+            posterior,
+            ["G0", "tau"],
+            credible_level=0.90,
+            test_mode="relaxation",
         )
         _, lo_99, hi_99 = compute_credible_band(
-            mock_model.model_function, x, posterior, ["G0", "tau"],
-            credible_level=0.99, test_mode="relaxation",
+            mock_model.model_function,
+            x,
+            posterior,
+            ["G0", "tau"],
+            credible_level=0.99,
+            test_mode="relaxation",
         )
 
         width_90 = np.mean(hi_90 - lo_90)
@@ -242,6 +252,7 @@ class TestComputeCredibleBand:
 # ---------------------------------------------------------------------------
 # FitPlotter tests
 # ---------------------------------------------------------------------------
+
 
 class TestFitPlotterNLSQ:
     """Tests for FitPlotter.plot_nlsq()."""
@@ -254,8 +265,12 @@ class TestFitPlotterNLSQ:
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_nlsq(
-            x, y, mock_fit_result, mock_model,
-            show_residuals=False, show_uncertainty=False,
+            x,
+            y,
+            mock_fit_result,
+            mock_model,
+            show_residuals=False,
+            show_uncertainty=False,
         )
 
         assert fig is not None
@@ -270,8 +285,12 @@ class TestFitPlotterNLSQ:
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_nlsq(
-            x, y, mock_fit_result, mock_model,
-            show_residuals=True, show_uncertainty=True,
+            x,
+            y,
+            mock_fit_result,
+            mock_model,
+            show_residuals=True,
+            show_uncertainty=True,
         )
 
         assert fig is not None
@@ -308,7 +327,10 @@ class TestFitPlotterNLSQ:
         mock_model.model_function = complex_model_fn
 
         fig, axes = plotter.plot_nlsq(
-            freq, G_star, fit_result, mock_model,
+            freq,
+            G_star,
+            fit_result,
+            mock_model,
             show_residuals=True,
         )
 
@@ -324,7 +346,10 @@ class TestFitPlotterNLSQ:
         x, y, _ = simple_data
 
         fig, _ = plotter.plot_nlsq(
-            x, y, mock_fit_result, mock_model,
+            x,
+            y,
+            mock_fit_result,
+            mock_model,
             show_residuals=False,
             deformation_mode="tension",
         )
@@ -345,23 +370,30 @@ class TestFitPlotterBayesian:
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_bayesian(
-            x, y, mock_bayesian_result, mock_model,
-            credible_level=0.95, max_draws=100,
+            x,
+            y,
+            mock_bayesian_result,
+            mock_model,
+            credible_level=0.95,
+            max_draws=100,
         )
 
         assert fig is not None
         plt.close(fig)
 
     def test_bayesian_with_nlsq_overlay(
-        self, plotter, simple_data, mock_bayesian_result,
-        mock_fit_result, mock_model
+        self, plotter, simple_data, mock_bayesian_result, mock_fit_result, mock_model
     ):
         """Bayesian fit with NLSQ overlay."""
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_bayesian(
-            x, y, mock_bayesian_result, mock_model,
-            show_nlsq_overlay=True, fit_result=mock_fit_result,
+            x,
+            y,
+            mock_bayesian_result,
+            mock_model,
+            show_nlsq_overlay=True,
+            fit_result=mock_fit_result,
             max_draws=50,
         )
 
@@ -375,8 +407,12 @@ class TestFitPlotterBayesian:
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_bayesian(
-            x, y, mock_bayesian_result, mock_model,
-            show_residuals=True, max_draws=50,
+            x,
+            y,
+            mock_bayesian_result,
+            mock_model,
+            show_residuals=True,
+            max_draws=50,
         )
 
         assert fig is not None
@@ -389,14 +425,17 @@ class TestFitPlotterComparison:
 
     @pytest.mark.smoke
     def test_comparison_plot(
-        self, plotter, simple_data, mock_fit_result,
-        mock_bayesian_result, mock_model
+        self, plotter, simple_data, mock_fit_result, mock_bayesian_result, mock_model
     ):
         """Side-by-side NLSQ vs Bayesian comparison."""
         x, y, _ = simple_data
 
         fig, axes = plotter.plot_comparison(
-            x, y, mock_fit_result, mock_bayesian_result, mock_model,
+            x,
+            y,
+            mock_fit_result,
+            mock_bayesian_result,
+            mock_model,
             max_draws=50,
         )
 
@@ -406,15 +445,18 @@ class TestFitPlotterComparison:
         plt.close(fig)
 
     def test_comparison_complex_raises(
-        self, plotter, complex_data, mock_fit_result,
-        mock_bayesian_result, mock_model
+        self, plotter, complex_data, mock_fit_result, mock_bayesian_result, mock_model
     ):
         """Comparison plot raises NotImplementedError for complex data."""
         freq, G_star = complex_data
 
         with pytest.raises(NotImplementedError, match="complex"):
             plotter.plot_comparison(
-                freq, G_star, mock_fit_result, mock_bayesian_result, mock_model,
+                freq,
+                G_star,
+                mock_fit_result,
+                mock_bayesian_result,
+                mock_model,
             )
 
 
@@ -456,6 +498,7 @@ class TestFitPlotterParameterTable:
 # generate_diagnostic_suite tests
 # ---------------------------------------------------------------------------
 
+
 class TestDiagnosticSuite:
     """Tests for generate_diagnostic_suite()."""
 
@@ -478,6 +521,7 @@ class TestDiagnosticSuite:
 # ---------------------------------------------------------------------------
 # Helper method tests
 # ---------------------------------------------------------------------------
+
 
 class TestFitPlotterHelpers:
     """Tests for FitPlotter private helpers."""
@@ -528,6 +572,7 @@ class TestFitPlotterHelpers:
 # Style tests
 # ---------------------------------------------------------------------------
 
+
 class TestFitPlotterStyles:
     """Verify style parameter propagation."""
 
@@ -539,8 +584,13 @@ class TestFitPlotterStyles:
         x, y, _ = simple_data
 
         fig, _ = plotter.plot_nlsq(
-            x, y, mock_fit_result, mock_model,
-            style=style, show_residuals=False, show_uncertainty=False,
+            x,
+            y,
+            mock_fit_result,
+            mock_model,
+            style=style,
+            show_residuals=False,
+            show_uncertainty=False,
         )
 
         assert fig is not None

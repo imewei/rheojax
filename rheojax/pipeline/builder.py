@@ -16,6 +16,7 @@ Example:
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -262,7 +263,7 @@ class PipelineBuilder:
     def _execute_steps(
         self,
         pipeline: Pipeline,
-        on_step: "Callable[[int, str], None] | None" = None,
+        on_step: Callable[[int, str], None] | None = None,
     ) -> None:
         """Execute all builder steps on a Pipeline.
 
@@ -329,7 +330,12 @@ class PipelineBuilder:
             if step_type == "load":
                 has_loaded = True
             elif step_type in [
-                "transform", "fit", "plot", "save", "bayesian", "export",
+                "transform",
+                "fit",
+                "plot",
+                "save",
+                "bayesian",
+                "export",
             ]:
                 if not has_loaded:
                     raise ValueError(
@@ -344,9 +350,7 @@ class PipelineBuilder:
             i for i, (step_type, _) in enumerate(self.steps) if step_type == "predict"
         ]
         bayesian_indices = [
-            i
-            for i, (step_type, _) in enumerate(self.steps)
-            if step_type == "bayesian"
+            i for i, (step_type, _) in enumerate(self.steps) if step_type == "bayesian"
         ]
 
         for pred_idx in predict_indices:

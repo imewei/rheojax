@@ -150,9 +150,7 @@ class BatchPanel(QWidget):
             _COL_TIME, QHeaderView.ResizeMode.ResizeToContents
         )
         self.file_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.file_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
+        self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.file_table.setAlternatingRowColors(True)
         self.file_table.setMinimumHeight(160)
         files_layout.addWidget(self.file_table)
@@ -407,9 +405,7 @@ class BatchPanel(QWidget):
             # UserRole stores the full absolute path for O(n) exact matching.
             name_item.setData(Qt.ItemDataRole.UserRole, path)
             self.file_table.setItem(row, _COL_FILENAME, name_item)
-            self.file_table.setItem(
-                row, _COL_STATUS, QTableWidgetItem(_STATUS_PENDING)
-            )
+            self.file_table.setItem(row, _COL_STATUS, QTableWidgetItem(_STATUS_PENDING))
             self.file_table.setItem(row, _COL_TIME, QTableWidgetItem(""))
 
     def _update_run_button_state(self) -> None:

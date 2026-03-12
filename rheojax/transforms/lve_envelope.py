@@ -70,7 +70,9 @@ class LVEEnvelope(BaseTransform):
         self.t_out = t_out
         self.result: LVEEnvelopeResult | None = None
 
-    def _transform(self, data: RheoData | None = None) -> tuple[RheoData, dict[str, Any]]:
+    def _transform(
+        self, data: RheoData | None = None
+    ) -> tuple[RheoData, dict[str, Any]]:
         """Compute LVE envelope.
 
         Args:
@@ -155,12 +157,12 @@ class LVEEnvelope(BaseTransform):
 
 @jax.jit
 def _lve_envelope_jax(
-    t: jnp.ndarray,
-    G_i: jnp.ndarray,
-    tau_i: jnp.ndarray,
+    t: Any,
+    G_i: Any,
+    tau_i: Any,
     G_e: float,
     shear_rate: float,
-) -> jnp.ndarray:
+) -> Any:
     """JIT-compiled LVE envelope computation."""
     # modulus_integral = G_e * t + Σ Gᵢτᵢ (1 − exp(−t/τᵢ))
     modulus_integral = G_e * t + jnp.sum(

@@ -31,6 +31,7 @@ def compute_fit_quality(
 
     if r_squared < 0:
         import warnings
+
         warnings.warn(
             f"R² = {r_squared:.4f} < 0: model fits worse than the mean. "
             "Check initial parameters, data quality, or model suitability.",

@@ -17,7 +17,8 @@ class TestCompareModels:
         G_t = 1000.0 * np.exp(-t / 1.0)
 
         comparison = compare_models(
-            t, G_t,
+            t,
+            G_t,
             models=["maxwell", "zener"],
             test_mode="relaxation",
             criterion="aic",
@@ -33,7 +34,8 @@ class TestCompareModels:
         G_t = 1000.0 * np.exp(-t / 1.0)
 
         comparison = compare_models(
-            t, G_t,
+            t,
+            G_t,
             models=["maxwell", "zener"],
             test_mode="relaxation",
         )
@@ -58,7 +60,8 @@ class TestCompareModels:
         G_t = 1000.0 * np.exp(-t)
 
         comparison = compare_models(
-            t, G_t,
+            t,
+            G_t,
             models=["maxwell", "definitely_not_a_real_model"],
             test_mode="relaxation",
         )

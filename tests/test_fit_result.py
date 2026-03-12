@@ -35,7 +35,9 @@ def _make_optimization_result(
     # Residuals that give approximately the target R²
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
     ss_res_target = (1 - r2_target) * ss_tot
-    residuals = np.random.default_rng(42).normal(0, np.sqrt(ss_res_target / n_data), n_data)
+    residuals = np.random.default_rng(42).normal(
+        0, np.sqrt(ss_res_target / n_data), n_data
+    )
     rss = float(np.sum(residuals**2))
     pcov = np.eye(n_params) * 0.01
 
@@ -236,11 +238,13 @@ class TestFitResultPlot:
     @pytest.mark.smoke
     def test_plot_creates_figure(self):
         import matplotlib
+
         matplotlib.use("Agg")
         result = _make_fit_result()
         fig = result.plot()
         assert fig is not None
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     @pytest.mark.smoke
@@ -266,11 +270,13 @@ class TestModelComparison:
             ("zener", "Zener", 3),
             ("springpot", "Springpot", 2),
         ]:
-            results.append(_make_fit_result(
-                model_name=name,
-                model_class_name=cls_name,
-                n_params=n_params,
-            ))
+            results.append(
+                _make_fit_result(
+                    model_name=name,
+                    model_class_name=cls_name,
+                    n_params=n_params,
+                )
+            )
         return ModelComparison(results=results, criterion="aic")
 
     def test_rankings_computed(self):
@@ -307,11 +313,13 @@ class TestModelComparison:
     @pytest.mark.smoke
     def test_plot_creates_figure(self):
         import matplotlib
+
         matplotlib.use("Agg")
         comp = self._make_comparison()
         fig = comp.plot()
         assert fig is not None
         import matplotlib.pyplot as plt
+
         plt.close("all")
 
     def test_empty_results(self):

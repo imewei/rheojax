@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -308,13 +309,13 @@ def load_excel(
     }
 
     # Merge with user metadata
-    final_metadata = {**source_metadata}
+    final_metadata: dict[str, Any] = {**source_metadata}
     if metadata:
         final_metadata.update(metadata)
 
     # Add temperature if provided
     if temperature is not None:
-        final_metadata["temperature"] = temperature  # type: ignore[assignment]
+        final_metadata["temperature"] = temperature
 
     # Store protocol metadata
     if strain_amplitude is not None:

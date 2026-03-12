@@ -280,4 +280,3 @@ def test_bayesian_oscillation_y_y2_combined_plots_correctly(qtbot, monkeypatch) 
     np.testing.assert_allclose(lines['G" (data)'].get_ydata(), g_double)
 
     page._fit_plot_canvas.cleanup()
-

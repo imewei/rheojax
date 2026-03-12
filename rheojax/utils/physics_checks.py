@@ -80,7 +80,9 @@ def _coerce_float(value: Any) -> float | None:
         return None
 
 
-def _build_param_map(model: Any, result: FitResult | None) -> dict[str, tuple[float, tuple[float, float] | None]]:
+def _build_param_map(
+    model: Any, result: FitResult | None
+) -> dict[str, tuple[float, tuple[float, float] | None]]:
     """Return ``{name: (value, bounds)}`` from the model and optional result.
 
     The result's ``params`` dict takes precedence for values so that the
@@ -91,7 +93,7 @@ def _build_param_map(model: Any, result: FitResult | None) -> dict[str, tuple[fl
 
     # Collect from the model's ParameterSet first.
     try:
-        ps: ParameterSet = model.parameters  # type: ignore[attr-defined]
+        ps: ParameterSet = model.parameters
         for name in ps.keys():
             p: Parameter = ps[name]
             value = _coerce_float(p.value)
@@ -150,8 +152,14 @@ def _check_positive_moduli(
         # parameters (gel point, trap stiffness, reference, scale, LAOS).
         excluded_prefixes = ("eta", "eps", "gamma", "g_dot", "gdot")
         excluded_names = {
-            "gel", "gel_strength", "g_trap", "g_ref", "g_scale", "g_laos",
-            "g_dot", "gdot",
+            "gel",
+            "gel_strength",
+            "g_trap",
+            "g_ref",
+            "g_scale",
+            "g_laos",
+            "g_dot",
+            "gdot",
         }
         if any(lower.startswith(ex) for ex in excluded_prefixes):
             is_modulus = False
@@ -325,7 +333,13 @@ def _check_power_law_range(
     for name, (value, _bounds) in param_map.items():
         lower = name.lower()
         # Match: n, n_pl, n_power, power_law_index — but not "nu", "n_modes", etc.
-        is_power_law_n = lower in {"n", "n_pl", "n_power", "power_law_index", "flow_index"}
+        is_power_law_n = lower in {
+            "n",
+            "n_pl",
+            "n_power",
+            "power_law_index",
+            "flow_index",
+        }
         if not is_power_law_n:
             continue
         if not (0.0 < value < 2.0):
@@ -404,6 +418,7 @@ def _check_plausibility(
 # ---------------------------------------------------------------------------
 # Strategy registry — checkers applied in order
 # ---------------------------------------------------------------------------
+
 
 def _check_chebyshev_e1(
     param_map: dict[str, tuple[float, tuple[float, float] | None]],
