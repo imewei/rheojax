@@ -32,7 +32,7 @@ At a Glance
    * - **Bayesian**
      - Full MCMC inference (NumPyro NUTS) with NLSQ warm-start for all models
    * - **Transforms**
-     - 7 transforms (FFT, mastercurve/TTS, SRFS, SPP, OWChirp, derivatives, mutation number)
+     - 11 transforms (FFT, mastercurve/TTS, SRFS, SPP, OWChirp, derivatives, mutation number, Prony conversion, spectrum inversion, LVE envelope, Cox-Merz)
    * - **Performance**
      - 10-100x speedups via JAX; 5-270x optimization via NLSQ
    * - **DMTA/DMA**

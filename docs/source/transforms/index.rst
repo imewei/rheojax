@@ -15,6 +15,10 @@ to quickly compare available transforms and jump to details.
    smooth_derivative
    spp
    srfs
+   prony_conversion
+   spectrum_inversion
+   lve_envelope
+   cox_merz
 
 See also
 --------

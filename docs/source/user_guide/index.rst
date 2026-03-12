@@ -298,7 +298,7 @@ Related Documentation
 
 - :doc:`/quickstart` — 5-minute installation and first fit
 - :doc:`/models/index` — Comprehensive Model Handbook (53 models, all equations and theory)
-- :doc:`/transforms/index` — Transform Reference (7 transforms, mathematical details)
+- :doc:`/transforms/index` — Transform Reference (11 transforms, mathematical details)
 - :doc:`/api_reference` — Complete API documentation
 - :doc:`/examples/index` — 240+ example notebooks across all model families
 

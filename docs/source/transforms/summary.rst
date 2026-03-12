@@ -1,7 +1,7 @@
 Transforms Summary & Workflow Guide
 ====================================
 
-This page provides a comprehensive quick-reference guide for all 7 data transforms in RheoJAX. Use the comparison matrices and workflow examples below to select and chain transforms for your rheological analysis pipelines.
+This page provides a comprehensive quick-reference guide for all 11 data transforms in RheoJAX. Use the comparison matrices and workflow examples below to select and chain transforms for your rheological analysis pipelines.
 
 
 Complete Transforms Comparison Matrix
@@ -70,6 +70,34 @@ The table below provides a comprehensive overview of all transforms across key c
      - Medium-High
      - No
      - LAOS yield stress extraction, static vs dynamic yield
+   * - :doc:`Prony Conversion </transforms/prony_conversion>`
+     - Time ↔ frequency domain conversion via Prony series (generalized Maxwell)
+     - Relaxation G(t) or oscillation G*(ω)
+     - Converted domain + Prony parameters (G_i, τ_i)
+     - Low
+     - Yes
+     - Domain interconversion, parametric representation, LVE envelope input
+   * - :doc:`Spectrum Inversion </transforms/spectrum_inversion>`
+     - Recover continuous relaxation spectrum H(τ) via regularized inversion
+     - Oscillation G*(ω) or relaxation G(t)
+     - Continuous spectrum (τ, H(τ))
+     - Medium
+     - No
+     - Material fingerprinting, relaxation mode identification, blend analysis
+   * - :doc:`LVE Envelope </transforms/lve_envelope>`
+     - Linear viscoelastic startup stress envelope from Prony series
+     - Prony parameters (G_i, τ_i) or RheoData with metadata
+     - Stress envelope σ_LVE⁺(t)
+     - Low
+     - Yes
+     - Nonlinearity detection, strain hardening/softening, damping function
+   * - :doc:`Cox-Merz </transforms/cox_merz>`
+     - Cox-Merz rule validation: |η*(ω)| vs η(γ̇) comparison
+     - Two RheoData: oscillation + flow curve
+     - Deviation metric + pass/fail
+     - Low
+     - Yes
+     - Rule validation, yielding detection, material classification
 
 **Legend:**
 
@@ -145,6 +173,36 @@ Follow this decision tree to identify the appropriate transform for your analysi
    │     • Cole-Cole trajectories for yielding identification
    │     • Static vs dynamic yield stress extraction
    │     • Use Cases: Yield stress fluids, LAOS characterization
+   │
+   ├─ PARAMETRIC DOMAIN CONVERSION (Prony series)?
+   │  └─ Prony Conversion ★★★☆☆
+   │     • G(t) → G'(ω), G''(ω) via analytical Prony relations
+   │     • G'(ω), G''(ω) → G(t) via inverse Prony fitting
+   │     • NNLS fitting ensures non-negative mode strengths
+   │     • Auto mode selection or manual n_modes control
+   │     • Use Cases: Domain interconversion, LVE envelope input, GMM analysis
+   │
+   ├─ RELAXATION SPECTRUM (continuous H(τ) recovery)?
+   │  └─ Spectrum Inversion ★★★★☆
+   │     • Recover H(τ) from G*(ω) or G(t) data
+   │     • Methods: Tikhonov (GCV auto-λ) or Maximum Entropy
+   │     • Non-negative spectrum enforcement
+   │     • Dual-source: oscillation or relaxation input
+   │     • Use Cases: Material fingerprinting, blend analysis, spectrum comparison
+   │
+   ├─ STARTUP STRESS PREDICTION (LVE envelope)?
+   │  └─ LVE Envelope ★★★☆☆
+   │     • σ_LVE⁺(t) = γ̇₀ [G_e·t + Σ Gᵢτᵢ(1 − exp(−t/τᵢ))]
+   │     • JIT-compiled for fast multi-rate sweeps
+   │     • Accepts Prony params directly or from metadata
+   │     • Use Cases: Nonlinearity detection, strain hardening/softening
+   │
+   ├─ EMPIRICAL RULE VALIDATION (Cox-Merz)?
+   │  └─ Cox-Merz ★★☆☆☆
+   │     • Compare |η*(ω)| with η(γ̇) at ω = γ̇
+   │     • Log-log interpolation onto common rate grid
+   │     • Quantitative pass/fail with configurable tolerance
+   │     • Use Cases: Rule validation, yielding detection, material screening
    │
    └─ MULTI-STEP ANALYSIS (combine transforms)?
       └─ See "Common Workflow Pipelines" section below
@@ -858,6 +916,150 @@ intracycle structure at large amplitudes.
 * Validating constitutive models against SPP trajectories
 
 
+Prony Conversion
+~~~~~~~~~~~~~~~~
+
+**Purpose:** Parametric domain conversion between time and frequency domains using the Prony (generalized Maxwell) series.
+
+**Key Capabilities:**
+
+* **Time → Frequency:** :math:`G(t) \to G'(\omega), G''(\omega)` via analytical Prony relations
+* **Frequency → Time:** :math:`G'(\omega), G''(\omega) \to G(t)` via inverse Prony fitting
+* **NNLS Fitting:** Non-negative least squares ensures thermodynamically consistent mode strengths
+* **Auto Mode Selection:** Automatic number of modes based on data density
+
+**Quick Example:**
+
+.. code-block:: python
+
+   from rheojax.transforms import PronyConversion
+
+   # G(t) → G'(ω), G''(ω)
+   prony = PronyConversion(n_modes=10, direction="time_to_freq")
+   freq_data, info = prony.transform(relaxation_data)
+
+   # Access Prony parameters
+   result = info["prony_result"]
+   print(f"Modes: {result.n_modes}, G_e: {result.G_e:.1f} Pa")
+
+   # Reverse: G*(ω) → G(t)
+   prony_inv = PronyConversion(direction="freq_to_time", n_modes=8)
+   relax_data, _ = prony_inv.transform(oscillation_data)
+
+**Best For:**
+
+* Domain interconversion with compact parametric representation
+* Obtaining Prony parameters for LVE envelope computation
+* Generalized Maxwell model parameter extraction
+* Round-trip validation of data consistency
+
+Spectrum Inversion
+~~~~~~~~~~~~~~~~~~
+
+**Purpose:** Recover the continuous relaxation spectrum :math:`H(\tau)` from dynamic moduli or relaxation data via regularized inversion.
+
+**Key Capabilities:**
+
+* **Tikhonov Regularization:** GCV-optimized regularization parameter selection
+* **Maximum Entropy:** Information-theoretic inversion preserving positivity
+* **Dual-Source Input:** Works from oscillation :math:`G^*(\omega)` or relaxation :math:`G(t)` data
+* **Non-Negative Enforcement:** Physical constraint :math:`H(\tau) \ge 0`
+
+**Quick Example:**
+
+.. code-block:: python
+
+   from rheojax.transforms import SpectrumInversion
+
+   # From oscillatory data
+   inv = SpectrumInversion(method="tikhonov", n_tau=100)
+   spectrum_data, info = inv.transform(osc_data)
+
+   tau = spectrum_data.x      # Relaxation times
+   H_tau = spectrum_data.y    # Spectrum H(τ)
+
+   # From relaxation data
+   inv_relax = SpectrumInversion(source="relaxation", method="max_entropy")
+   spectrum_data, _ = inv_relax.transform(relax_data)
+
+**Best For:**
+
+* Material fingerprinting via relaxation time distribution
+* Identifying discrete relaxation modes in blends and composites
+* Comparing spectra across compositions, temperatures, or processing conditions
+* Complementary to discrete Prony representation (continuous vs discrete)
+
+LVE Envelope
+~~~~~~~~~~~~~
+
+**Purpose:** Compute the linear viscoelastic startup stress envelope from Prony series parameters.
+
+**Key Capabilities:**
+
+* **Analytical Prediction:** :math:`\sigma_{\text{LVE}}^+(t) = \dot{\gamma}_0 [G_e t + \sum G_i \tau_i (1 - e^{-t/\tau_i})]`
+* **JIT-Compiled:** Fast evaluation for multi-rate sweeps
+* **Flexible Input:** Prony parameters via constructor or from data metadata
+
+**Quick Example:**
+
+.. code-block:: python
+
+   from rheojax.transforms import LVEEnvelope
+   import numpy as np
+
+   G_i = np.array([5e3, 2e3])
+   tau_i = np.array([0.1, 10.0])
+
+   lve = LVEEnvelope(shear_rate=1.0, G_i=G_i, tau_i=tau_i)
+   envelope_data, info = lve.transform()
+
+   # Compare with experimental startup data
+   import matplotlib.pyplot as plt
+   plt.loglog(envelope_data.x, envelope_data.y, '--', label='LVE envelope')
+   plt.loglog(startup_data.x, startup_data.y, 'o', label='Experiment')
+   plt.legend()
+   plt.close("all")
+
+**Best For:**
+
+* Detecting nonlinear behavior (strain hardening/softening) in startup experiments
+* Damping function extraction: :math:`h(\gamma) = \sigma_{\text{exp}} / \sigma_{\text{LVE}}`
+* Multi-rate LVE families for branched polymer characterization
+* Input for constitutive model validation
+
+Cox-Merz
+~~~~~~~~
+
+**Purpose:** Validate the Cox-Merz empirical rule: :math:`|\eta^*(\omega)| = \eta(\dot{\gamma})` at :math:`\omega = \dot{\gamma}`.
+
+**Key Capabilities:**
+
+* **Rule Validation:** Quantitative pass/fail assessment with configurable tolerance
+* **Deviation Mapping:** Point-by-point relative deviation across the overlap region
+* **Log-Log Interpolation:** Onto common rate grid preserving power-law structure
+* **Flexible Input:** Accepts complex :math:`G^*` or :math:`[G', G'']` and stress or viscosity
+
+**Quick Example:**
+
+.. code-block:: python
+
+   from rheojax.transforms import CoxMerz
+
+   cm = CoxMerz(tolerance=0.10)
+   result_data, info = cm.transform([osc_data, flow_data])
+
+   result = info["cox_merz_result"]
+   print(f"Mean deviation: {result.mean_deviation:.1%}")
+   print(f"Passes (≤10%): {result.passes}")
+
+**Best For:**
+
+* Validating oscillatory-to-steady-shear equivalence for flexible polymers
+* Detecting yield stress behavior (Cox-Merz failure = yielding indicator)
+* Material screening and classification
+* Quality control of rheological measurements
+
+
 Common Workflow Pipelines
 --------------------------
 
@@ -1034,6 +1236,94 @@ Workflow 5: Strain History → Smooth Derivative → Strain Rate → Flow Model 
 * Enables flow model fitting from non-standard tests
 
 
+Workflow 6: Relaxation → Prony Conversion → LVE Envelope → Nonlinearity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Goal:** Fit Prony series to relaxation data, compute LVE startup envelope, compare with experiment.
+
+.. code-block:: python
+
+   from rheojax.transforms import PronyConversion, LVEEnvelope
+   import numpy as np
+
+   # Step 1: Fit Prony series to G(t) data
+   prony = PronyConversion(n_modes=10, direction="time_to_freq")
+   _, info = prony.transform(relaxation_data)
+   result = info["prony_result"]
+
+   # Step 2: Compute LVE envelope at experimental rate
+   lve = LVEEnvelope(
+       shear_rate=1.0, G_i=result.G_i,
+       tau_i=result.tau_i, G_e=result.G_e
+   )
+   envelope_data, _ = lve.transform()
+
+   # Step 3: Compare with experimental startup data
+   import matplotlib.pyplot as plt
+   plt.loglog(envelope_data.x, envelope_data.y, '--', label='LVE')
+   plt.loglog(startup_data.x, startup_data.y, 'o', label='Experiment')
+   plt.legend()
+   plt.close("all")
+
+**Why this workflow:**
+
+* Prony series provides compact parametric representation for LVE envelope
+* LVE envelope + experimental data reveals strain hardening/softening onset
+* Multi-rate sweeps identify critical Weissenberg number
+
+Workflow 7: Oscillation → Spectrum Inversion → Material Fingerprint
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Goal:** Recover continuous relaxation spectrum from frequency sweep for material identification.
+
+.. code-block:: python
+
+   from rheojax.transforms import SpectrumInversion
+   import matplotlib.pyplot as plt
+
+   # Recover H(τ) from oscillatory data
+   inv = SpectrumInversion(method="tikhonov", n_tau=100)
+   spectrum_data, info = inv.transform(osc_data)
+
+   # Plot relaxation spectrum
+   plt.semilogx(spectrum_data.x, spectrum_data.y)
+   plt.xlabel(r'$\tau$ (s)')
+   plt.ylabel(r'$H(\tau)$ (Pa)')
+   plt.title(f"λ = {info['spectrum_result'].regularization_param:.2e}")
+   plt.close("all")
+
+**Why this workflow:**
+
+* Continuous spectrum reveals distribution of relaxation mechanisms
+* Peaks in :math:`H(\tau)` correspond to distinct molecular processes
+* Fingerprint comparison across formulations, temperatures, or aging conditions
+
+Workflow 8: Oscillation + Flow Curve → Cox-Merz Validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Goal:** Validate Cox-Merz rule to assess whether oscillatory and steady-shear data are consistent.
+
+.. code-block:: python
+
+   from rheojax.transforms import CoxMerz
+
+   cm = CoxMerz(tolerance=0.10, n_points=50)
+   result_data, info = cm.transform([osc_data, flow_data])
+
+   result = info["cox_merz_result"]
+   if result.passes:
+       print(f"Cox-Merz passes: mean deviation {result.mean_deviation:.1%}")
+   else:
+       print(f"Cox-Merz FAILS: deviation {result.mean_deviation:.1%}")
+       print("Material may exhibit yielding or associating behavior")
+
+**Why this workflow:**
+
+* Quick validation of data consistency between oscillatory and flow measurements
+* Cox-Merz failure flags yield stress behavior or structural breakdown under flow
+* Useful as a quality control step before model fitting
+
+
 Transform Chaining & Compatibility
 -----------------------------------
 
@@ -1071,13 +1361,36 @@ Which Transforms Can Be Chained?
    * - Smooth Derivative
      - Any
      - ✓ Pre-processing step for noisy data (chain first)
+   * - Prony Conversion
+     - LVE Envelope
+     - ✓ Prony parameters feed directly into LVE envelope computation
+   * - Prony Conversion
+     - Spectrum Inversion
+     - ✗ Both produce spectral representations (choose one)
+   * - FFT
+     - Prony Conversion
+     - ✗ Both do time→frequency (choose based on parametric vs non-parametric need)
+   * - Prony Conversion
+     - Cox-Merz
+     - ✓ Prony → G*(ω) → complex viscosity for Cox-Merz comparison
+   * - FFT
+     - Spectrum Inversion
+     - ✓ FFT → G*(ω) → H(τ) spectrum recovery
+   * - Spectrum Inversion
+     - Any model
+     - ✓ Terminal analysis (spectrum is the result); use peaks to initialize model fits
+   * - Cox-Merz
+     - Any
+     - ✗ Terminal validation step (pass/fail metric is the result)
 
 **General Rules:**
 
-1. **Smooth Derivative is a pre-processor** - Apply first to reduce noise
-2. **FFT and OWChirp are alternatives** - Both do time→frequency (pick based on use case)
-3. **Mastercurve is a merge operation** - Combine multiple datasets, not chainable after FFT/OWChirp
-4. **Mutation Number is standalone** - Terminal analysis step, no chaining after
+1. **Smooth Derivative is a pre-processor** — Apply first to reduce noise
+2. **FFT and OWChirp are alternatives** — Both do time→frequency (pick based on use case)
+3. **Prony Conversion and FFT are alternatives** — Parametric vs non-parametric domain conversion
+4. **Prony → LVE Envelope is a natural chain** — Prony parameters feed directly into startup prediction
+5. **Spectrum Inversion and Cox-Merz are terminal** — Their outputs are analysis results, not intermediate data
+6. **Mastercurve is a merge operation** — Combine multiple datasets, not chainable after FFT/OWChirp
 
 
 Sequential Processing Pipelines
