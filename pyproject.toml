@@ -115,14 +115,25 @@ dependencies = [
 
     # Machine learning utilities
     "scikit-learn>=1.8.0",
-
-    # GUI (interactive analysis)
+]
+[project.optional-dependencies]
+# GUI (interactive analysis) — requires system Qt libraries
+gui = [
     "PySide6>=6.10.2",
     "qtpy>=2.4.3",        # Qt binding abstraction (PyQt/PySide compatibility)
     "pyqtgraph>=0.14.0",  # Interactive GPU-accelerated plotting
     "qasync>=0.28.0",
-
-    # Testing
+]
+# Documentation build
+docs = [
+    "sphinx>=9.1.0",
+    "furo>=2025.12.19",
+    "sphinx-autodoc-typehints>=3.6.2",
+    "sphinx-copybutton>=0.5.2",
+    "myst-parser[linkify]>=5.0.0",
+]
+# Testing
+test = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
@@ -130,25 +141,20 @@ dependencies = [
     "pytest-qt>=4.5.0",
     "pytest-image-diff>=0.0.14",
     "hypothesis>=6.151.5",
-
-    # Code quality
+]
+# Code quality and development tools
+dev = [
     "black>=26.1.0",
     "ruff>=0.15.0",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
-
-    # Interactive / notebooks
     "ipython>=9.10.0",
     "jupyter>=1.1.1",
-
-    # Documentation
-    "sphinx>=9.1.0",
-    "furo>=2025.12.19",
-    "sphinx-autodoc-typehints>=3.6.2",
-    "sphinx-copybutton>=0.5.2",
-    "myst-parser[linkify]>=5.0.0",
 ]
-[project.optional-dependencies]
+# Full local development install: pip install -e ".[all]"
+all = [
+    "rheojax[gui,docs,test,dev]",
+]
 gpu_cuda13 = [
     # CUDA 13 GPU support — versions must match jaxlib
     "jax-cuda13-plugin>=0.8.0",

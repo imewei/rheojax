@@ -23,7 +23,8 @@ formats: []
 # Python configuration
 python:
   install:
-    # Install the project package — pulls all dependencies from pyproject.toml
-    # (includes sphinx, furo, sphinx-autodoc-typehints, jax, numpyro, arviz, etc.)
+    # Install the project with docs extras only (excludes GUI/test/dev deps)
     - method: pip
       path: .
+      extra_requirements:
+        - docs
