@@ -18,6 +18,7 @@ for interactive rheological analysis workflows.
    diagnostics
    transforms
    exporting
+   menu_reference
    keyboard_shortcuts
 
 Overview
