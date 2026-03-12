@@ -132,6 +132,9 @@ class TestMenuBarActionConnections:
             ("test_mode_relaxation", "Relaxation Mode"),
             ("test_mode_creep", "Creep Mode"),
             ("test_mode_rotation", "Rotation Mode"),
+            ("test_mode_flow_curve", "Flow Curve Mode"),
+            ("test_mode_startup", "Startup Mode"),
+            ("test_mode_laos", "LAOS Mode"),
             ("auto_detect_mode_action", "Auto-detect Mode"),
         ]
 
@@ -182,6 +185,51 @@ class TestMenuBarActionConnections:
             # SGR
             ("model_sgr_conventional", "SGR Conventional"),
             ("model_sgr_generic", "SGR GENERIC"),
+            # SPP LAOS
+            ("model_spp_yield_stress", "SPP Yield Stress"),
+            # STZ
+            ("model_stz_conventional", "STZ Conventional"),
+            # EPM
+            ("model_lattice_epm", "Lattice EPM"),
+            ("model_tensorial_epm", "Tensorial EPM"),
+            # Fluidity
+            ("model_fluidity_local", "Fluidity Local"),
+            ("model_fluidity_nonlocal", "Fluidity Nonlocal"),
+            # Saramito EVP
+            ("model_saramito_local", "Saramito Local"),
+            ("model_saramito_nonlocal", "Saramito Nonlocal"),
+            # IKH
+            ("model_mikh", "MIKH"),
+            ("model_mlikh", "MLIKH"),
+            # FIKH
+            ("model_fikh", "FIKH"),
+            ("model_fmlikh", "FMLIKH"),
+            # Hébraud-Lequeux
+            ("model_hebraud_lequeux", "Hébraud-Lequeux"),
+            # ITT-MCT
+            ("model_itt_mct_schematic", "ITT-MCT Schematic"),
+            ("model_itt_mct_isotropic", "ITT-MCT Isotropic"),
+            # DMT
+            ("model_dmt_local", "DMT Local"),
+            ("model_dmt_nonlocal", "DMT Nonlocal"),
+            # Giesekus
+            ("model_giesekus_single", "Giesekus Single"),
+            ("model_giesekus_multi", "Giesekus Multi"),
+            # TNT
+            ("model_tnt_single_mode", "TNT Single Mode"),
+            ("model_tnt_cates", "TNT Cates"),
+            ("model_tnt_loop_bridge", "TNT Loop-Bridge"),
+            ("model_tnt_multi_species", "TNT Multi-Species"),
+            ("model_tnt_sticky_rouse", "TNT Sticky Rouse"),
+            # VLB
+            ("model_vlb_local", "VLB Local"),
+            ("model_vlb_multi_network", "VLB Multi-Network"),
+            ("model_vlb_variant", "VLB Variant"),
+            ("model_vlb_nonlocal", "VLB Nonlocal"),
+            # HVM
+            ("model_hvm_local", "HVM Local"),
+            # HVNM
+            ("model_hvnm_local", "HVNM Local"),
         ]
 
         for action_name, description in model_actions:
@@ -207,6 +255,11 @@ class TestMenuBarActionConnections:
             ("transform_mutation", "Mutation Number"),
             ("transform_owchirp", "OWChirp"),
             ("transform_derivatives", "Derivatives"),
+            ("transform_spp", "SPP"),
+            ("transform_cox_merz", "Cox-Merz"),
+            ("transform_lve_envelope", "LVE Envelope"),
+            ("transform_prony", "Prony Conversion"),
+            ("transform_spectrum", "Spectrum Inversion"),
         ]
 
         for action_name, description in transform_actions:
@@ -239,6 +292,34 @@ class TestMenuBarActionConnections:
             assert action_has_receivers(
                 action
             ), f"Analysis > {description} ({action_name}) has no connected handler"
+
+    @pytest.mark.smoke
+    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
+    def test_pipeline_menu_actions_connected(self, qtbot, qapp) -> None:
+        """Verify all Pipeline menu actions have handlers."""
+        from rheojax.gui.app.main_window import RheoJAXMainWindow
+
+        window = RheoJAXMainWindow()
+        qtbot.addWidget(window)
+
+        pipeline_actions = [
+            ("pipeline_new_action", "New Pipeline"),
+            ("pipeline_open_action", "Open Pipeline"),
+            ("pipeline_save_action", "Save Pipeline"),
+        ]
+
+        for action_name, description in pipeline_actions:
+            action = getattr(window.menu_bar, action_name, None)
+            assert action is not None, f"Missing action: {action_name}"
+            assert action_has_receivers(
+                action
+            ), f"Pipeline > {description} ({action_name}) has no connected handler"
+
+        # Template actions (stored in dict)
+        for key, action in window.menu_bar.pipeline_template_actions.items():
+            assert action_has_receivers(
+                action
+            ), f"Pipeline > Template > {key} has no connected handler"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")

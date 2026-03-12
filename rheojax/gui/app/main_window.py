@@ -685,10 +685,22 @@ class RheoJAXMainWindow(QMainWindow):
             lambda: self._on_apply_transform("owchirp")
         )
         self.menu_bar.transform_derivatives.triggered.connect(
-            lambda: self._on_apply_transform("derivatives")
+            lambda: self._on_apply_transform("derivative")
         )
         self.menu_bar.transform_spp.triggered.connect(
             lambda: self._on_apply_transform("spp")
+        )
+        self.menu_bar.transform_cox_merz.triggered.connect(
+            lambda: self._on_apply_transform("cox_merz")
+        )
+        self.menu_bar.transform_lve_envelope.triggered.connect(
+            lambda: self._on_apply_transform("lve_envelope")
+        )
+        self.menu_bar.transform_prony.triggered.connect(
+            lambda: self._on_apply_transform("prony_conversion")
+        )
+        self.menu_bar.transform_spectrum.triggered.connect(
+            lambda: self._on_apply_transform("spectrum_inversion")
         )
 
     def _connect_analysis_menu(self) -> None:
@@ -706,6 +718,43 @@ class RheoJAXMainWindow(QMainWindow):
         self.menu_bar.pipeline_new_action.triggered.connect(self._on_new_pipeline)
         self.menu_bar.pipeline_open_action.triggered.connect(self._on_open_pipeline)
         self.menu_bar.pipeline_save_action.triggered.connect(self._on_save_pipeline)
+        for key, action in self.menu_bar.pipeline_template_actions.items():
+            action.triggered.connect(
+                lambda _checked=False, k=key: self._on_load_pipeline_template(k)
+            )
+
+    def _on_load_pipeline_template(self, template_key: str) -> None:
+        """Load a pipeline from a built-in template.
+
+        Parameters
+        ----------
+        template_key : str
+            Key identifying the template (e.g. ``"nlsq_fitting"``).
+        """
+        logger.debug("Pipeline template requested", template=template_key)
+        try:
+            from rheojax.cli._templates import get_template
+            from rheojax.gui.state.actions import load_pipeline
+            from rheojax.gui.state.store import VisualPipelineState
+            from rheojax.gui.utils.pipeline_serializer import from_yaml
+
+            yaml_str = get_template(template_key)
+            steps, name = from_yaml(yaml_str)
+            vp = VisualPipelineState(steps=steps, pipeline_name=name)
+            load_pipeline(vp)
+            self.log(f"Loaded pipeline template: {template_key}")
+            self.status_bar.show_message(f"Template loaded: {template_key}", 2000)
+        except KeyError:
+            logger.warning("Unknown pipeline template", template=template_key)
+            self.status_bar.show_message(f"Unknown template: {template_key}", 3000)
+        except Exception as exc:
+            logger.error(
+                "Failed to load template",
+                template=template_key,
+                error=str(exc),
+                exc_info=True,
+            )
+            self.status_bar.show_message(f"Template load failed: {exc}", 5000)
 
     def _connect_tools_menu(self) -> None:
         """Connect Tools menu actions."""

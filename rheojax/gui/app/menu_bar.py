@@ -416,7 +416,7 @@ class MenuBar(QMenuBar):
 
         # Auto-detect Test Mode
         self.auto_detect_mode_action = QAction("&Auto-detect Test Mode", self)
-        self.auto_detect_mode_action.setShortcut(QKeySequence("Ctrl+D"))
+        self.auto_detect_mode_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
         self.auto_detect_mode_action.setStatusTip(
             "Automatically detect test mode from data"
         )
@@ -1109,6 +1109,54 @@ class MenuBar(QMenuBar):
         )
         transforms_menu.addAction(self.transform_spp)
 
+        transforms_menu.addSeparator()
+
+        # Cox-Merz
+        self.transform_cox_merz = QAction("Cox-&Merz Rule", self)
+        self.transform_cox_merz.setStatusTip("Validate Cox-Merz rule (|η*| vs η)")
+        self.transform_cox_merz.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_cox_merz", menu="Transforms"
+            )
+        )
+        transforms_menu.addAction(self.transform_cox_merz)
+
+        # LVE Envelope
+        self.transform_lve_envelope = QAction("LVE &Envelope", self)
+        self.transform_lve_envelope.setStatusTip(
+            "Linear viscoelastic startup stress envelope"
+        )
+        self.transform_lve_envelope.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_lve_envelope", menu="Transforms"
+            )
+        )
+        transforms_menu.addAction(self.transform_lve_envelope)
+
+        # Prony Conversion
+        self.transform_prony = QAction("&Prony Conversion", self)
+        self.transform_prony.setStatusTip(
+            "Time \u2194 frequency domain via Prony series decomposition"
+        )
+        self.transform_prony.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_prony", menu="Transforms"
+            )
+        )
+        transforms_menu.addAction(self.transform_prony)
+
+        # Spectrum Inversion
+        self.transform_spectrum = QAction("&Spectrum Inversion", self)
+        self.transform_spectrum.setStatusTip(
+            "Recover relaxation spectrum H(\u03c4) from G(t) or G*(\u03c9)"
+        )
+        self.transform_spectrum.triggered.connect(
+            lambda: logger.debug(
+                "Action triggered", action="transform_spectrum", menu="Transforms"
+            )
+        )
+        transforms_menu.addAction(self.transform_spectrum)
+
         logger.debug(
             "Menu created",
             menu="Transforms",
@@ -1189,7 +1237,7 @@ class MenuBar(QMenuBar):
 
         # New Pipeline
         self.pipeline_new_action = QAction("&New Pipeline", self)
-        self.pipeline_new_action.setShortcut("Ctrl+Shift+N")
+        self.pipeline_new_action.setShortcut("Ctrl+Alt+N")
         self.pipeline_new_action.setStatusTip("Create a new empty pipeline")
         self.pipeline_new_action.triggered.connect(
             lambda: logger.debug("Action triggered", action="new_pipeline", menu="Pipeline")
