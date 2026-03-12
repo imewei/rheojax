@@ -9,6 +9,10 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.13"
+  apt_packages:
+    # System libraries required by PySide6 (Qt) on headless Ubuntu
+    - libegl1
+    - libopengl0
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
@@ -23,8 +27,6 @@ formats: []
 # Python configuration
 python:
   install:
-    # Install the project with docs extras only (excludes GUI/test/dev deps)
+    # Install the project package — pulls all dependencies from pyproject.toml
     - method: pip
       path: .
-      extra_requirements:
-        - docs
