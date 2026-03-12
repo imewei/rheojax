@@ -19,42 +19,193 @@ the complex shear modulus:
 
    G^*(\omega) = G'(\omega) + i\,G''(\omega)
 
-For isotropic, linear-viscoelastic materials these are connected by Poisson's ratio
-:math:`\nu`:
+For isotropic, linear-viscoelastic materials these are connected by the
+complex Poisson's ratio :math:`\nu^*`:
 
 .. math::
 
-   E^*(\omega) = 2(1 + \nu)\,G^*(\omega)
+   E^*(\omega) = 2\bigl(1 + \nu^*(\omega)\bigr)\,G^*(\omega)
 
-Common Poisson's ratios by material class:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 40 20 40
-
-   * - Material
-     - :math:`\nu`
-     - :math:`E/G` factor
-   * - Rubbers / Elastomers (:math:`T \gg T_g`)
-     - 0.50
-     - 3.0
-   * - Glassy polymers (:math:`T \ll T_g`)
-     - 0.35
-     - 2.7
-   * - Semi-crystalline polymers
-     - 0.40
-     - 2.8
-   * - Metals
-     - 0.30
-     - 2.6
+A direct interchange :math:`E^* \leftrightarrow G^*` is **only valid under
+specific conditions**.  Understanding when the conversion is safe — and when
+it fails — is essential for correct DMTA analysis.
 
 .. important::
 
    The relaxation spectrum :math:`H(\tau)` is a material property independent of
    deformation mode.  Shear, tension, and bending all share the same spectrum
    --- only the amplitude scale changes.  Every ``OSCILLATION``-capable model in
-   RheoJAX is mathematically applicable to DMTA data after a simple modulus
-   conversion.
+   RheoJAX is mathematically applicable to DMTA data after a modulus
+   conversion, **provided the conditions below are satisfied**.
+
+.. _conversion-validity:
+
+Validity Conditions for :math:`E^* \leftrightarrow G^*`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following four conditions must hold for the scalar conversion to be
+physically meaningful.
+
+**Condition 1 — Incompressibility** (:math:`\nu \to 1/2`)
+
+For a truly incompressible material the conversion simplifies to:
+
+.. math::
+
+   E^* = 3\,G^*
+
+This is the most commonly invoked condition in soft matter and polymer physics.
+It applies when:
+
+- **Rubbers and elastomers** above :math:`T_g` (bulk modulus
+  :math:`K \gg G`, so :math:`\nu \approx 0.5`)
+- **Hydrogels** and biological soft tissues
+- **Polymer melts** and concentrated solutions in the terminal regime
+- Any system where volumetric deformation is energetically costly compared
+  to shear (:math:`K/G \gg 1`)
+
+The factor-of-3 conversion is exact in the incompressible limit and is
+widely used in rubber elasticity and XPCS/rheology cross-comparisons.
+
+**Condition 2 — Real, frequency-independent Poisson's ratio**
+
+If :math:`\nu^* \approx \nu` (real, not complex), the conversion remains clean:
+
+.. math::
+
+   E^* = 2(1 + \nu)\,G^*
+
+This holds when volumetric relaxation is either absent or occurs on a very
+different timescale than the shear relaxation being probed.  In practice:
+
+- Glassy polymers near and below :math:`T_g`:
+  :math:`\nu \approx 0.33\text{--}0.40`, so :math:`E \approx 2.6\text{--}2.8\,G`
+- Semi-crystalline polymers: :math:`\nu \approx 0.35\text{--}0.45`
+
+Here :math:`E^*` and :math:`G^*` are proportional but **not equal** — the
+conversion factor must be applied explicitly.
+
+**Condition 3 — Isotropy**
+
+The relation :math:`E = 2G(1+\nu)` assumes **linear elastic isotropy**:
+
+- No fibre reinforcement, crystalline texture, or flow-induced anisotropy
+- Sample geometry must not induce multiaxial stress states that break the
+  uniaxial / simple-shear assumption
+
+For oriented polymer films, highly anisotropic nanocomposites, or liquid
+crystalline networks, this scalar conversion fails.  The moduli must instead
+be treated as full compliance/stiffness tensors.
+
+**Condition 4 — Linear viscoelastic (LVE) regime**
+
+Both moduli must be measured strictly within the linear viscoelastic limit.
+If either the DMA or the shear rheometer applies a strain amplitude large
+enough to induce non-linear structural breakdown (Payne effect in filled
+networks, chain disentanglement), the linear conversion is no longer
+mathematically valid.
+
+.. _conversion-failure:
+
+When the Conversion Fails
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The conversion **breaks down** — and using :math:`E^* \approx 3G^*` can be
+seriously wrong — in the following situations:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Situation
+     - Why it fails
+   * - Near glass transition (:math:`T_g \pm 20\,°C`)
+     - :math:`\nu^*` becomes strongly frequency-dependent and complex;
+       volumetric relaxation couples to shear
+   * - Semicrystalline polymers under tension
+     - Crystalline lamellae introduce anisotropy; :math:`\nu` varies with
+       orientation
+   * - Foams, cellular solids
+     - Compressibility is significant; :math:`K \sim G`
+   * - Filled systems (high :math:`\varphi` particles)
+     - Compressive and shear reinforcement differ; effective :math:`\nu` shifts
+   * - Highly crosslinked thermosets
+     - :math:`\nu` can drop to :math:`\sim 0.3`;
+       :math:`E \approx 2.6\,G`, not :math:`3\,G`
+
+The most physically rich failure case is **near** :math:`T_g`, where the bulk
+modulus :math:`K` relaxes on a different timescale than :math:`G`.  In this
+regime:
+
+.. math::
+
+   \nu^*(\omega) = \frac{3K^*(\omega) - 2G^*(\omega)}
+   {2\bigl(3K^*(\omega) + G^*(\omega)\bigr)}
+
+is itself a complex, frequency-dependent quantity.  The measured :math:`E^*`
+from a tensile DMA mode encodes a **mixture of** :math:`K^*` **and**
+:math:`G^*` responses that cannot be cleanly separated without independent
+volumetric measurements.
+
+**Geometric and boundary effects.**  In a DMA tensile test of a short, thick
+sample the clamps restrict lateral contraction.  This introduces shear stresses
+into the nominally pure-tension measurement, artificially inflating :math:`E^*`
+and breaking the mathematical conversion unless aspect-ratio corrections are
+applied.
+
+.. _conversion-practical:
+
+Practical Summary
+~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20 20
+
+   * - Material Class
+     - Safe?
+     - :math:`\nu`
+     - :math:`E/G` Factor
+   * - Rubbers, elastomers (:math:`T > T_g + 30\,\text{K}`)
+     - Yes
+     - 0.50
+     - 3.0
+   * - Hydrogels, biopolymer networks
+     - Yes
+     - 0.50
+     - 3.0
+   * - Polymer melts (terminal regime)
+     - Yes
+     - 0.50
+     - 3.0
+   * - Glassy polymers (:math:`T < T_g - 30\,\text{K}`)
+     - With caution
+     - 0.33--0.40
+     - 2.6--2.8
+   * - Semi-crystalline polymers
+     - With caution
+     - 0.35--0.45
+     - 2.7--2.9
+   * - Near :math:`T_g` (:math:`\pm 20\,°\text{C}`)
+     - **No**
+     - complex :math:`\nu^*(\omega)`
+     - —
+   * - Filled / composite systems
+     - Verify independently
+     - depends on :math:`\varphi`, morphology
+     - —
+   * - Foams, cellular solids
+     - **No**
+     - :math:`K \sim G`
+     - —
+
+.. warning::
+
+   Blindly applying :math:`E^* = 3G^*` across a full temperature or frequency
+   sweep through the glass transition will artificially skew the shape and
+   width of the :math:`\tan\delta` peak and the transition zone.  For broad
+   master curves spanning :math:`T_g`, see :ref:`viscoelastic-poisson` below
+   for mitigation strategies.
 
 Deformation Modes
 -----------------
@@ -153,11 +304,45 @@ relaxation function analogous to the modulus:
 where :math:`\nu_0 \approx 0.50` (rubbery), :math:`\nu_\infty \approx 0.35`
 (glassy), and :math:`\tau_\nu` is the Poisson relaxation time.
 
+The :math:`K^*`/:math:`G^*` Coupling Near :math:`T_g`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the glass transition region, the bulk modulus :math:`K^*` and shear modulus
+:math:`G^*` relax on **different timescales**.  :math:`K^*` typically has a
+weaker dispersion than :math:`G^*` (volumetric relaxation is faster and
+narrower).  This means the complex Poisson's ratio:
+
+.. math::
+
+   \nu^*(\omega) = \frac{3K^*(\omega) - 2G^*(\omega)}
+   {2\bigl(3K^*(\omega) + G^*(\omega)\bigr)}
+
+has both a real and imaginary part that vary with frequency.  Consequently,
+a tensile DMA measurement in this regime **encodes a mixture of** :math:`K^*`
+**and** :math:`G^*`, and cannot be cleanly decomposed into shear-only
+information without an independent volumetric (e.g.\ dilatometric or
+ultrasonic) measurement.
+
+**Practical impact**: The :math:`\tan\delta` peak from a tensile DMA test
+is shifted in both frequency and height relative to the :math:`\tan\delta`
+from a shear rheometer.  This is a real physical difference, not a calibration
+artefact.
+
+Application to Vitrimers and Exchangeable Networks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For vitrimer networks modelled with :doc:`/models/hvm/index` or
+:doc:`/models/hvnm/index`, the incompressible approximation
+:math:`E^* = 3G^*` is typically safe in the rubbery plateau and terminal
+regimes.  However, caution is required near the topology freezing temperature
+:math:`T_v`, where bond-exchange kinetics can contribute to volumetric
+relaxation and cause :math:`\nu` to drift from the incompressible limit.
+
 .. important::
 
    RheoJAX currently assumes **constant** :math:`\nu`.  For a master curve
    spanning the full glass transition, this introduces a systematic error of
-   up to ~11% in modulus (factor 3.0/2.7).  Recommended practice:
+   up to ~11% in modulus (factor 3.0 / 2.7).  Recommended practice:
 
    - **Rubbery plateau analysis** (:math:`T \gg T_g`): use :math:`\nu = 0.50`
    - **Glassy plateau analysis** (:math:`T \ll T_g`): use :math:`\nu = 0.35`
