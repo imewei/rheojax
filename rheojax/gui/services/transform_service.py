@@ -15,11 +15,15 @@ from rheojax.core.data import RheoData
 from rheojax.logging import get_logger
 from rheojax.transforms import (
     SRFS,
+    CoxMerz,
     FFTAnalysis,
+    LVEEnvelope,
     Mastercurve,
     MutationNumber,
     OWChirp,
+    PronyConversion,
     SmoothDerivative,
+    SpectrumInversion,
     SPPDecomposer,
 )
 
@@ -55,6 +59,10 @@ class TransformService:
             "derivative": SmoothDerivative,
             "mutation_number": MutationNumber,
             "spp": SPPDecomposer,
+            "cox_merz": CoxMerz,
+            "lve_envelope": LVEEnvelope,
+            "prony_conversion": PronyConversion,
+            "spectrum_inversion": SpectrumInversion,
         }
         logger.debug(
             "TransformService initialized",
@@ -334,6 +342,91 @@ class TransformService:
                     "description": "Use numerical differentiation (MATLAB-compatible)",
                 },
             },
+            "cox_merz": {
+                "tolerance": {
+                    "type": "float",
+                    "default": 0.10,
+                    "label": "Pass Tolerance",
+                    "range": (0.001, 1.0),
+                    "description": "Maximum mean relative deviation for the rule to pass",
+                },
+                "n_points": {
+                    "type": "int",
+                    "default": 50,
+                    "label": "Interpolation Points",
+                    "range": (10, 500),
+                    "description": "Number of points on the common rate grid",
+                },
+            },
+            "lve_envelope": {
+                "shear_rate": {
+                    "type": "float",
+                    "default": 1.0,
+                    "label": "Shear Rate",
+                    "range": (1e-6, 1e6),
+                    "description": "Applied shear rate gamma_dot_0 (1/s)",
+                },
+                "G_e": {
+                    "type": "float",
+                    "default": 0.0,
+                    "label": "Equilibrium Modulus",
+                    "range": (0.0, 1e12),
+                    "description": "Equilibrium modulus G_e (Pa, 0 = no equilibrium term)",
+                },
+            },
+            "prony_conversion": {
+                "n_modes": {
+                    "type": "int",
+                    "default": 0,
+                    "label": "Number of Modes",
+                    "range": (0, 100),
+                    "description": "Prony modes (0 = auto-select)",
+                },
+                "direction": {
+                    "type": "choice",
+                    "choices": ["time_to_freq", "freq_to_time"],
+                    "default": "time_to_freq",
+                    "label": "Direction",
+                    "description": "Conversion direction",
+                },
+            },
+            "spectrum_inversion": {
+                "method": {
+                    "type": "choice",
+                    "choices": ["tikhonov", "max_entropy"],
+                    "default": "tikhonov",
+                    "label": "Method",
+                    "description": "Regularization method",
+                },
+                "n_tau": {
+                    "type": "int",
+                    "default": 100,
+                    "label": "Tau Grid Points",
+                    "range": (2, 1000),
+                    "description": "Number of relaxation time points",
+                },
+                "source": {
+                    "type": "choice",
+                    "choices": ["oscillation", "relaxation"],
+                    "default": "oscillation",
+                    "label": "Data Source",
+                    "description": "Input data type",
+                },
+                "G_e": {
+                    "type": "float",
+                    "default": 0.0,
+                    "label": "Equilibrium Modulus",
+                    "range": (0.0, 1e12),
+                    "description": "Equilibrium modulus G_e (Pa)",
+                },
+                "regularization": {
+                    "type": "float",
+                    "default": 0.0,
+                    "label": "Regularization (lambda)",
+                    "range": (0.0, 1e4),
+                    "description": "Manual regularization parameter (0 = auto-select via GCV)",
+                },
+            },
         }
 
         return params_map.get(name, {})
@@ -387,6 +480,30 @@ class TransformService:
                 "key": "derivative",
                 "name": "Derivatives",
                 "description": "Calculate numerical derivatives",
+                "requires_multiple": False,
+            },
+            {
+                "key": "cox_merz",
+                "name": "Cox-Merz Rule",
+                "description": "Validate Cox-Merz rule (|eta*| vs eta)",
+                "requires_multiple": True,
+            },
+            {
+                "key": "lve_envelope",
+                "name": "LVE Envelope",
+                "description": "Linear viscoelastic startup stress envelope",
+                "requires_multiple": False,
+            },
+            {
+                "key": "prony_conversion",
+                "name": "Prony Conversion",
+                "description": "Time to/from frequency domain via Prony series",
+                "requires_multiple": False,
+            },
+            {
+                "key": "spectrum_inversion",
+                "name": "Spectrum Inversion",
+                "description": "Recover relaxation spectrum H(tau) from G(t) or G*(omega)",
                 "requires_multiple": False,
             },
         ]
@@ -699,6 +816,106 @@ class TransformService:
                 logger.debug("Exiting apply_transform", transform=name)
                 return _with_provenance(result), {"spp_results": spp_results}
 
+            elif name == "cox_merz":
+                # Cox-Merz rule validation — requires list of 2 datasets
+                if not isinstance(data, list) or len(data) != 2:
+                    logger.error(
+                        "CoxMerz requires exactly 2 datasets",
+                        transform=name,
+                        received_type=type(data).__name__,
+                    )
+                    raise ValueError(
+                        "Cox-Merz requires exactly 2 datasets: [oscillation, flow_curve]"
+                    )
+
+                tolerance = float(params.get("tolerance", 0.10))
+                n_points = int(params.get("n_points", 50))
+
+                logger.debug(
+                    "Applying Cox-Merz transform",
+                    tolerance=tolerance,
+                    n_points=n_points,
+                )
+                cox_merz = CoxMerz(tolerance=tolerance, n_points=n_points)
+                result, extra = cox_merz.transform(data)
+
+                logger.info(
+                    "Transform complete",
+                    transform=name,
+                    passes=extra.get("cox_merz_result", {}).passes
+                    if hasattr(extra.get("cox_merz_result"), "passes")
+                    else None,
+                )
+                logger.debug("Exiting apply_transform", transform=name)
+                return _with_provenance(result), extra
+
+            elif name == "lve_envelope":
+                # LVE startup stress envelope — uses Prony params from data.metadata
+                shear_rate = float(params.get("shear_rate", 1.0))
+                G_e = float(params.get("G_e", 0.0))
+
+                logger.debug(
+                    "Applying LVE envelope transform",
+                    shear_rate=shear_rate,
+                    G_e=G_e,
+                )
+                lve = LVEEnvelope(shear_rate=shear_rate, G_e=G_e)
+                result, extra = lve.transform(data)
+
+                logger.info("Transform complete", transform=name)
+                logger.debug("Exiting apply_transform", transform=name)
+                return _with_provenance(result), extra
+
+            elif name == "prony_conversion":
+                # Prony series time ↔ frequency conversion
+                n_modes_raw = int(params.get("n_modes", 0))
+                n_modes = n_modes_raw if n_modes_raw > 0 else None
+                direction = params.get("direction", "time_to_freq")
+
+                logger.debug(
+                    "Applying Prony conversion transform",
+                    n_modes=n_modes,
+                    direction=direction,
+                )
+                prony = PronyConversion(n_modes=n_modes, direction=direction)
+                result, extra = prony.transform(data)
+
+                logger.info(
+                    "Transform complete", transform=name, direction=direction
+                )
+                logger.debug("Exiting apply_transform", transform=name)
+                return _with_provenance(result), extra
+
+            elif name == "spectrum_inversion":
+                # Relaxation spectrum H(τ) recovery
+                method = params.get("method", "tikhonov")
+                n_tau = int(params.get("n_tau", 100))
+                source = params.get("source", "oscillation")
+                G_e = float(params.get("G_e", 0.0))
+                regularization_raw = float(params.get("regularization", 0.0))
+                regularization = regularization_raw if regularization_raw > 0.0 else None
+
+                logger.debug(
+                    "Applying spectrum inversion transform",
+                    method=method,
+                    n_tau=n_tau,
+                    source=source,
+                    G_e=G_e,
+                    regularization=regularization,
+                )
+                spectrum = SpectrumInversion(
+                    method=method,
+                    n_tau=n_tau,
+                    source=source,
+                    G_e=G_e,
+                    regularization=regularization,
+                )
+                result, extra = spectrum.transform(data)
+
+                logger.info("Transform complete", transform=name, method=method)
+                logger.debug("Exiting apply_transform", transform=name)
+                return _with_provenance(result), extra
+
             else:
                 logger.error("Transform not implemented", transform=name)
                 raise ValueError(f"Transform {name} not implemented")
@@ -761,7 +978,7 @@ class TransformService:
         # previewed with a single dataset.  Return a silent no-data result
         # instead of calling apply_transform which logs ERROR-level messages
         # for this expected condition and confuses the user.
-        _MULTI_DATASET = {"mastercurve", "srfs"}
+        _MULTI_DATASET = {"mastercurve", "srfs", "cox_merz"}
         if name in _MULTI_DATASET and not isinstance(data, list):
             logger.debug(
                 "Preview skipped: multi-dataset transform requires list input",
@@ -824,7 +1041,7 @@ class TransformService:
         warnings = []
 
         # Check if transform requires multiple datasets
-        multi_dataset_transforms = ["mastercurve", "srfs"]
+        multi_dataset_transforms = ["mastercurve", "srfs", "cox_merz"]
         if name in multi_dataset_transforms and not isinstance(data, list):
             warnings.append(f"{name} requires multiple datasets")
 
