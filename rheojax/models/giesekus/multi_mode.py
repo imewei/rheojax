@@ -339,6 +339,7 @@ class GiesekusMultiMode(BaseModel):
         """
         from rheojax.utils.optimization import (
             create_least_squares_objective,
+            make_fd_differentiable,
             nlsq_optimize,
         )
 
@@ -372,9 +373,21 @@ class GiesekusMultiMode(BaseModel):
             """Stateless model function for optimization."""
             return self.model_function(x_fit, params, test_mode=test_mode)
 
+        # ODE-based protocols use diffrax (custom_vjp), incompatible with
+        # NLSQ's jacfwd.  On GPU, wrap with FD-JVP (parallel perturbations).
+        # On CPU, vmap doesn't parallelize — scipy sequential FD is faster.
+        _ode_protocols = {"relaxation", "startup", "creep", "laos"}
+        _is_ode = test_mode in _ode_protocols
+        _on_gpu = jax.default_backend() != "cpu"
+        _fit_fn = (
+            make_fd_differentiable(model_fn)
+            if _is_ode and _on_gpu
+            else model_fn
+        )
+
         # Create objective and optimize using ParameterSet
         objective = create_least_squares_objective(
-            model_fn,
+            _fit_fn,
             x_jax,
             y_jax,
             use_log_residuals=kwargs.get(
@@ -382,11 +395,17 @@ class GiesekusMultiMode(BaseModel):
             ),
         )
 
+        # On CPU, ODE protocols use scipy (sequential FD is faster than vmap).
+        # On GPU, the FD-JVP wrapper makes NLSQ work → use 'auto'.
+        _method = kwargs.get("method", "auto")
+        if _is_ode and not _on_gpu and _method in ("auto", "nlsq", "trf", "lm"):
+            _method = "scipy"
+
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
+            method=_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 

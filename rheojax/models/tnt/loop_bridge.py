@@ -724,11 +724,17 @@ class TNTLoopBridge(TNTBase):
             ),
         )
 
+        # ODE-based protocols use diffrax with custom_vjp, incompatible with
+        # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
+        # oscillation is linearized analytical; all other protocols use ODE.
+        _ode_protocols = {"flow_curve", "startup", "relaxation", "creep", "laos"}
+        _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
+            method=kwargs.get("method", _default_method),
             max_iter=kwargs.get("max_iter", 2000),
         )
 

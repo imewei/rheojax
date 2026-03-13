@@ -525,12 +525,11 @@ class TNTStickyRouse(TNTBase):
         self._gamma_0 = kwargs.get("gamma_0")
         self._omega_laos = kwargs.get("omega")
 
-        # Determine optimization method — ODE-based protocols require scipy
-        # because diffrax custom_vjp is incompatible with NLSQ forward-mode AD
-        method = kwargs.get("method", "auto")
+        # ODE-based protocols use diffrax with custom_vjp, incompatible with
+        # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
-        if test_mode in _ode_protocols:
-            method = "scipy"
+        _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        method = kwargs.get("method", _default_method)
 
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)
