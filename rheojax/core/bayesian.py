@@ -189,67 +189,13 @@ class BayesianResult:
             log_likelihood=log_likelihood,
         )
 
-        def _ensure_energy(idata):
-            """Guarantee energy diagnostic exists for ArviZ energy plots."""
-            sample_stats = getattr(idata, "sample_stats", None)
-            if sample_stats is None:
-                logger.debug("sample_stats not present — energy injection skipped")
-                return idata
-            if hasattr(sample_stats, "energy"):
-                return idata
-
-            try:
-                extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
-            except TypeError:
-                extra_fields = self.mcmc.get_extra_fields()
-            except Exception as exc:
-                logger.debug(
-                    "Failed to extract energy diagnostic from MCMC extra fields",
-                    error=str(exc),
-                )
-                return idata
-            energy_field = None
-            if isinstance(extra_fields, dict):
-                energy_field = extra_fields.get("energy")
-                if energy_field is None:
-                    energy_field = extra_fields.get("potential_energy")
-
-            if energy_field is None:
-                return idata
-
-            import xarray as xr
-
-            energy_array = np.asarray(energy_field)
-            try:
-                energy_array = energy_array.reshape(self.num_chains, -1)
-            except ValueError:
-                energy_array = np.expand_dims(energy_array, axis=0)
-
-            idata.sample_stats = sample_stats.assign(
-                energy=xr.DataArray(energy_array, dims=("chain", "draw"))
-            )
-            return idata
-
         # Return cached version if available
         if log_likelihood and self._inference_data_ll is not None:
             logger.debug("Returning cached InferenceData (with log_likelihood)")
-            return _ensure_energy(self._inference_data_ll)
+            return self._inference_data_ll
         if not log_likelihood and self._inference_data is not None:
             logger.debug("Returning cached InferenceData (without log_likelihood)")
-            return _ensure_energy(self._inference_data)
-
-        # Import arviz (lazy import)
-        from rheojax.core.arviz_utils import import_arviz
-
-        try:
-            az = import_arviz(required=("from_numpyro",))
-            logger.debug("ArviZ imported successfully")
-        except ImportError as exc:
-            logger.error("ArviZ import failed", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for InferenceData conversion. "
-                "Install it with: pip install arviz"
-            ) from exc
+            return self._inference_data
 
         # Ensure MCMC object is available
         if self.mcmc is None:
@@ -260,26 +206,165 @@ class BayesianResult:
                 "Re-run fit_bayesian() to generate a compatible result."
             )
 
-        # Convert using ArviZ's from_numpyro utility
-        logger.debug(
-            "Creating InferenceData from MCMC object",
-            log_likelihood=log_likelihood,
+        # Import arviz (lazy import)
+        from rheojax.core.arviz_utils import import_arviz
+
+        try:
+            az = import_arviz(required=("InferenceData",))
+            logger.debug("ArviZ imported successfully")
+        except ImportError as exc:
+            logger.error("ArviZ import failed", exc_info=True)
+            raise ImportError(
+                "ArviZ is required for InferenceData conversion. "
+                "Install it with: pip install arviz"
+            ) from exc
+
+        if log_likelihood:
+            # log_likelihood=True requires model re-evaluation (slow path).
+            # Delegate to az.from_numpyro which traces the model to extract
+            # pointwise log-likelihoods for WAIC/LOO computation.
+            logger.debug(
+                "Creating InferenceData from MCMC object (with log_likelihood)",
+            )
+            try:
+                az_full = import_arviz(required=("from_numpyro",))
+                idata = az_full.from_numpyro(self.mcmc, log_likelihood=True)
+            except ImportError as exc:
+                raise ImportError(
+                    "ArviZ is required for log-likelihood computation. "
+                    "Install it with: pip install arviz"
+                ) from exc
+            logger.info(
+                "InferenceData created successfully (with log_likelihood)",
+                num_chains=self.num_chains,
+                num_samples=self.num_samples,
+            )
+            self._inference_data_ll = idata
+            return idata
+
+        # Fast path (log_likelihood=False): build InferenceData directly from
+        # numpy arrays already present in BayesianResult, bypassing the
+        # az.from_numpyro model-trace that triggers XLA recompilation
+        # (~500-1500ms on first call). This reduces conversion to <5ms.
+        #
+        # ArviZ's from_numpyro calls numpyro.handlers.trace().get_trace() in
+        # NumPyroConverter.__init__ to discover observed sites for the
+        # observed_data / log_likelihood groups. When log_likelihood=False we
+        # don't need those groups, so we can skip the trace entirely and
+        # assemble the two groups we do need (posterior, sample_stats) from
+        # data that is already on the host.
+        logger.debug("Building InferenceData directly (fast path, no model trace)")
+
+        import xarray as xr
+
+        # --- posterior group ---
+        # Use get_samples(group_by_chain=True) to include ALL sampled sites
+        # (model parameters + deterministic sites like num_nonfinite) so the
+        # result matches what az.from_numpyro would return.
+        # self.posterior_samples only contains param_names + sigma params;
+        # deterministic sites (numpyro.deterministic) are excluded from it.
+        num_chains = self.num_chains
+        posterior_dict: dict[str, xr.DataArray] = {}
+        try:
+            # Prefer group_by_chain samples — already (num_chains, num_draws)
+            _raw_samples = self.mcmc.get_samples(group_by_chain=True)
+            if hasattr(_raw_samples, "_asdict"):
+                _raw_samples = _raw_samples._asdict()
+            for name, arr in _raw_samples.items():
+                np_arr = np.asarray(arr)
+                if np_arr.ndim >= 2:
+                    # Shape is already (num_chains, num_draws[, ...])
+                    posterior_dict[name] = xr.DataArray(
+                        np_arr, dims=("chain", "draw") + tuple(
+                            f"dim_{i}" for i in range(np_arr.ndim - 2)
+                        )
+                    )
+                else:
+                    # Fallback: reshape flat array
+                    try:
+                        shaped = np_arr.reshape(num_chains, -1)
+                    except ValueError:
+                        shaped = np_arr[np.newaxis, :]
+                    posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
+        except Exception as exc:
+            # Fall back to posterior_samples (already numpy, already on host)
+            logger.debug(
+                "get_samples(group_by_chain=True) failed, using posterior_samples",
+                error=str(exc),
+            )
+            for name, flat_arr in self.posterior_samples.items():
+                try:
+                    shaped = flat_arr.reshape(num_chains, -1)
+                except ValueError:
+                    shaped = flat_arr[np.newaxis, :]
+                posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
+
+        posterior_ds = xr.Dataset(posterior_dict)
+
+        # --- sample_stats group ---
+        # Mirrors ArviZ's NumPyroConverter.sample_stats_to_xarray() rename map.
+        _stat_rename = {
+            "potential_energy": "lp",
+            "adapt_state.step_size": "step_size",
+            "num_steps": "n_steps",
+            "accept_prob": "acceptance_rate",
+        }
+        stats_dict: dict[str, xr.DataArray] = {}
+        try:
+            try:
+                extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
+            except TypeError:
+                extra_fields = self.mcmc.get_extra_fields()
+
+            if isinstance(extra_fields, dict):
+                for stat, value in extra_fields.items():
+                    if isinstance(value, (dict, tuple)):
+                        continue
+                    arr = np.asarray(value)
+                    # Ensure (chain, draw) shape
+                    if arr.ndim == 1:
+                        try:
+                            arr = arr.reshape(num_chains, -1)
+                        except ValueError:
+                            arr = arr[np.newaxis, :]
+                    elif arr.ndim != 2:
+                        continue  # Skip unexpected shapes
+
+                    # potential_energy → lp (negated, matching ArviZ convention)
+                    if stat == "potential_energy":
+                        stats_dict["lp"] = xr.DataArray(-arr, dims=("chain", "draw"))
+                        # Also expose as energy for az.plot_energy()
+                        stats_dict["energy"] = xr.DataArray(arr, dims=("chain", "draw"))
+                    else:
+                        dest_name = _stat_rename.get(stat, stat)
+                        stats_dict[dest_name] = xr.DataArray(arr, dims=("chain", "draw"))
+                        if stat == "num_steps":
+                            # tree_depth = floor(log2(num_steps)) + 1
+                            stats_dict["tree_depth"] = xr.DataArray(
+                                (np.log2(np.maximum(arr, 1)).astype(int) + 1),
+                                dims=("chain", "draw"),
+                            )
+        except Exception as exc:
+            logger.debug(
+                "Failed to extract sample_stats from MCMC extra fields",
+                error=str(exc),
+            )
+
+        sample_stats_ds = xr.Dataset(stats_dict)
+
+        idata = az.InferenceData(
+            posterior=posterior_ds,
+            sample_stats=sample_stats_ds,
         )
-        idata = az.from_numpyro(self.mcmc, log_likelihood=log_likelihood)
+
         logger.info(
-            "InferenceData created successfully",
+            "InferenceData created successfully (fast path)",
             num_chains=self.num_chains,
             num_samples=self.num_samples,
-            log_likelihood=log_likelihood,
         )
 
-        # Cache separately: with and without log_likelihood
-        if log_likelihood:
-            self._inference_data_ll = idata
-        else:
-            self._inference_data = idata
-
-        return _ensure_energy(idata)
+        self._inference_data = idata
+        return idata
 
 
 class BayesianMixin:

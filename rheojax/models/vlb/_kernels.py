@@ -1521,7 +1521,7 @@ def build_vlb_nonlocal_pde_rhs(breakage_type="constant", stress_type="linear"):
 
         return jnp.concatenate(
             [
-                jnp.array([dSigma]),
+                jnp.expand_dims(dSigma, 0),
                 dmu_xx,
                 dmu_yy,
                 dmu_zz,

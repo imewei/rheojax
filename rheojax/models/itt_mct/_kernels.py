@@ -683,23 +683,28 @@ def extract_laos_harmonics(
     """
     T_period = 2 * jnp.pi / omega
 
-    def extract_single_harmonic(n):
-        """Extract nth harmonic coefficient."""
-        sin_nwt = jnp.sin(n * omega * t)
-        cos_nwt = jnp.cos(n * omega * t)
+    # Build odd harmonic indices (1, 3, 5, ...) as a static array at trace time.
+    # n_harmonics is static (static_argnames), so this list is resolved at compile
+    # time and the resulting jnp.array has a fixed, known shape.
+    n_vec = jnp.array(list(range(1, 2 * n_harmonics, 2)), dtype=jnp.float64)
+    # n_vec: shape (n_harmonics,)
 
-        # Fourier coefficients via integration
-        sigma_prime = 2 * jnp.trapezoid(sigma * sin_nwt, t) / T_period
-        sigma_double_prime = 2 * jnp.trapezoid(sigma * cos_nwt, t) / T_period
+    # Compute all harmonic basis functions simultaneously.
+    # n_vec[:, None] * omega * t[None, :] → shape (n_harmonics, len_t)
+    phase = n_vec[:, None] * (omega * t[None, :])
+    sin_mat = jnp.sin(phase)  # (n_harmonics, len_t)
+    cos_mat = jnp.cos(phase)  # (n_harmonics, len_t)
 
-        return sigma_prime, sigma_double_prime
+    # sigma[None, :] broadcasts to (n_harmonics, len_t)
+    sigma_sin = sigma[None, :] * sin_mat  # (n_harmonics, len_t)
+    sigma_cos = sigma[None, :] * cos_mat  # (n_harmonics, len_t)
 
-    # Extract odd harmonics (1, 3, 5, ...) - even harmonics are zero for symmetric response
-    sigma_primes = []
-    sigma_double_primes = []
-    for n in range(1, 2 * n_harmonics, 2):
-        sp, sdp = extract_single_harmonic(n)
-        sigma_primes.append(sp)
-        sigma_double_primes.append(sdp)
+    # Vectorised trapezoid integration over time axis (axis=1).
+    # jnp.trapezoid accepts 2D y with axis= keyword: output shape (n_harmonics,).
+    integrals_sin = jnp.trapezoid(sigma_sin, t, axis=1)
+    integrals_cos = jnp.trapezoid(sigma_cos, t, axis=1)
 
-    return jnp.array(sigma_primes), jnp.array(sigma_double_primes)
+    sigma_primes = 2.0 * integrals_sin / T_period
+    sigma_double_primes = 2.0 * integrals_cos / T_period
+
+    return sigma_primes, sigma_double_primes
