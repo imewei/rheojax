@@ -731,7 +731,7 @@ class RheoJAXMainWindow(QMainWindow):
         Parameters
         ----------
         template_key : str
-            Key identifying the template (e.g. ``"nlsq_fitting"``).
+            Key identifying the template (e.g. ``"basic"``).
         """
         logger.debug("Pipeline template requested", template=template_key)
         try:
@@ -2359,7 +2359,8 @@ class RheoJAXMainWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     # Transforms that operate on multiple datasets (list[RheoData]).
-    _MULTI_DATASET_TRANSFORMS = frozenset({"mastercurve", "srfs"})
+    # cox_merz requires exactly 2 datasets (oscillation + flow curve).
+    _MULTI_DATASET_TRANSFORMS = frozenset({"mastercurve", "srfs", "cox_merz"})
 
     def _on_apply_transform(
         self, transform_id: str, params: dict | None = None
