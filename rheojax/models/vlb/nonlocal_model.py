@@ -426,8 +426,8 @@ class VLBNonlocal(VLBBase):
         n_steps = int(t_end / dt)
         t_save = jnp.linspace(0.0, t_end, n_steps + 1)
 
-        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
-        term = diffrax.ODETerm(jax.checkpoint(pde_rhs))
+        # pde_rhs is already wrapped with jax.checkpoint by _build_pde_rhs()
+        term = diffrax.ODETerm(pde_rhs)
         solver = diffrax.Tsit5()
         controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 

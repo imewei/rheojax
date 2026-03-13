@@ -365,7 +365,9 @@ class STZConventional(STZBase):
 
         # Set up Diffrax solver
         # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
-        _rhs = lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i)
+        def _rhs(ti, yi, args_i):
+            return ode_fn(cast(float, ti), yi, args_i)
+
         term = diffrax.ODETerm(jax.checkpoint(_rhs))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
