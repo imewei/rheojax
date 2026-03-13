@@ -160,6 +160,11 @@ def _check_positive_moduli(
             "g_laos",
             "g_dot",
             "gdot",
+            # Chebyshev LAOS coefficients — handled by _check_chebyshev_e1;
+            # must NOT be classified as elastic moduli (can be negative).
+            "e1",
+            "e_1",
+            "chebyshev_e1",
         }
         if any(lower.startswith(ex) for ex in excluded_prefixes):
             is_modulus = False
