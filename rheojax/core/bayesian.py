@@ -20,6 +20,7 @@ Example:
 from __future__ import annotations
 
 import copy
+import functools
 import warnings
 from collections import OrderedDict
 from collections.abc import Callable
@@ -1666,8 +1667,6 @@ class BayesianMixin:
                 #
                 # We capture non-JAX args (test_mode, protocol_kwargs) via partial
                 # since jax.eval_shape requires all positional args to be abstract.
-                import functools
-
                 _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
                 _test_X = jax.ShapeDtypeStruct((_n_probe,), jnp.float64)
                 _test_params = jax.ShapeDtypeStruct(
