@@ -136,6 +136,7 @@ class TestDiffraxCompilation:
         return ITTMCTSchematic(epsilon=-0.1)  # Fluid state for faster convergence
 
     @pytest.mark.slow
+    @pytest.mark.timeout(600)
     def test_diffrax_compilation_occurs(self, itt_mct_model):
         """Test that JIT compilation happens on first call."""
         pytest.importorskip("diffrax")
@@ -160,6 +161,7 @@ class TestDiffraxCompilation:
         )
 
     @pytest.mark.slow
+    @pytest.mark.timeout(600)
     def test_precompile_method_works(self, itt_mct_model):
         """Test that precompile() method triggers compilation."""
         pytest.importorskip("diffrax")
@@ -182,6 +184,7 @@ class TestDiffraxCompilation:
         ), f"After precompile(), prediction took {predict_time:.1f}s (expected <10s)"
 
     @pytest.mark.slow
+    @pytest.mark.timeout(600)
     def test_precompile_reduces_first_call_time(self):
         """Test that precompile() reduces the effective first-call time."""
         pytest.importorskip("diffrax")

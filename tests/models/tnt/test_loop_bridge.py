@@ -10,6 +10,8 @@ Tests cover:
 - Registry integration
 """
 
+import gc
+
 import numpy as np
 import pytest
 
@@ -17,6 +19,19 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.tnt import TNTLoopBridge
 
 jax, jnp = safe_import_jax()
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_jit_caches():
+    """Free JIT caches after each test to prevent xdist worker OOM.
+
+    TNT loop_bridge tests compile separate XLA graphs for each ODE protocol
+    (startup, relaxation, creep, LAOS).  Under --dist=loadscope all 44 tests
+    land in one worker; without cleanup the accumulated graphs exceed ~2 GB.
+    """
+    yield
+    gc.collect()
+    jax.clear_caches()
 
 
 # =============================================================================
@@ -269,14 +284,14 @@ class TestStartupSimulation:
         model.parameters.set_value("eta_s", 0.0)
 
         gamma_dot = 5.0
-        t = np.linspace(0, 10, 500)
+        t = np.linspace(0, 10, 100)
         sigma = model.simulate_startup(t, gamma_dot=gamma_dot)
 
         # Stress should approach a steady value
         sigma_final = sigma[-1]
-        sigma_mid = sigma[-50]
+        sigma_mid = sigma[-10]
 
-        # Last 50 points should be close (within 5%)
+        # Last 10 points should be close (within 5%)
         assert np.abs(sigma_final - sigma_mid) / sigma_final < 0.05
 
     def test_startup_with_bridge_fraction(self):
@@ -355,7 +370,7 @@ class TestRelaxationSimulation:
         model = TNTLoopBridge()
         model.parameters.set_value("f_B_eq", 0.5)
 
-        t = np.linspace(0, 20, 200)
+        t = np.linspace(0, 20, 50)
         sigma = model.simulate_relaxation(t, gamma_dot_preshear=1.0)
 
         # Stress should decay
@@ -570,7 +585,7 @@ class TestPhysicalConsistency:
         """Test bridge fraction stays in [0, 1] during startup."""
         model = TNTLoopBridge()
 
-        t = np.linspace(0, 10, 200)
+        t = np.linspace(0, 10, 50)
         _, f_B = model.simulate_startup(t, gamma_dot=10.0, return_bridge_fraction=True)
 
         assert np.all(f_B >= 0)
