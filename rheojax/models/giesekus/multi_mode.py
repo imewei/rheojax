@@ -347,7 +347,7 @@ class GiesekusMultiMode(BaseModel):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (self._test_mode if self._test_mode is not None else "oscillation")
+            else (getattr(self, "_test_mode", None) or "oscillation")
         )
         self._test_mode = test_mode
         self._gamma_dot_applied = kwargs.get("gamma_dot")
@@ -435,7 +435,7 @@ class GiesekusMultiMode(BaseModel):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (self._test_mode if self._test_mode is not None else "oscillation")
+            else (getattr(self, "_test_mode", None) or "oscillation")
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -481,7 +481,7 @@ class GiesekusMultiMode(BaseModel):
         mode = (
             test_mode
             if test_mode is not None
-            else (self._test_mode if self._test_mode is not None else "oscillation")
+            else (getattr(self, "_test_mode", None) or "oscillation")
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 

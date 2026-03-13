@@ -314,7 +314,21 @@ def _select_lambda_gcv(A: np.ndarray, b: np.ndarray, L: np.ndarray) -> float:
             except np.linalg.LinAlgError:
                 continue
 
-    best_idx = np.argmin(gcv_scores)
+    finite_mask = np.isfinite(gcv_scores)
+    if not np.any(finite_mask):
+        # All GCV scores are inf (e.g. degenerate kernel / zero trace denominators).
+        # Fall back to a moderate regularization parameter and warn.
+        import warnings as _warnings
+
+        _warnings.warn(
+            "GCV: all regularization candidates produced infinite scores. "
+            "Falling back to lambda=1e-3. Consider providing a manual "
+            "regularization parameter via the 'regularization' argument.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return 1e-3
+    best_idx = int(np.argmin(gcv_scores))
     return float(lambdas[best_idx])
 
 

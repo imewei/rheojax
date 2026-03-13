@@ -319,7 +319,7 @@ class VLBMultiNetwork(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (self._test_mode if self._test_mode is not None else "flow_curve")
+            else (getattr(self, "_test_mode", None) or "flow_curve")
         )
         self._test_mode = test_mode
 
@@ -421,7 +421,7 @@ class VLBMultiNetwork(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (self._test_mode if self._test_mode is not None else "flow_curve")
+            else (getattr(self, "_test_mode", None) or "flow_curve")
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -482,7 +482,7 @@ class VLBMultiNetwork(VLBBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (self._test_mode if self._test_mode is not None else "flow_curve")
+            else (getattr(self, "_test_mode", None) or "flow_curve")
         )
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)
