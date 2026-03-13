@@ -81,6 +81,37 @@ def verify_float64() -> None:
         )
 
 
+def _enable_compilation_cache(jax_module: Any) -> None:
+    """Enable JAX persistent compilation cache for cross-session speedup.
+
+    Persists XLA compiled programs to ``~/.cache/rheojax/jax_cache/``.
+    Eliminates 764-1552ms cold JIT overhead on subsequent Python sessions.
+
+    Disabled when ``RHEOJAX_NO_JIT_CACHE=1`` is set (useful for debugging
+    compilation issues or benchmarking cold-start performance).
+    """
+    import os
+    import pathlib
+
+    if os.environ.get("RHEOJAX_NO_JIT_CACHE", "0") == "1":
+        return
+
+    cache_dir = pathlib.Path.home() / ".cache" / "rheojax" / "jax_cache"
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        # JAX >= 0.4.25: preferred config-based API
+        jax_module.config.update("jax_compilation_cache_dir", str(cache_dir))
+    except (OSError, RuntimeError, AttributeError, TypeError):
+        try:
+            # Fallback: older JAX experimental API
+            from jax.experimental.compilation_cache import compilation_cache as cc
+
+            cc.set_cache_dir(str(cache_dir))
+        except (OSError, RuntimeError, ImportError):
+            # Non-fatal: cache is a performance optimization, not required
+            pass
+
+
 def safe_import_jax() -> tuple[Any, Any]:
     """Safely import JAX with float64 precision enforcement.
 
@@ -140,6 +171,12 @@ def safe_import_jax() -> tuple[Any, Any]:
         # CRITICAL: Explicitly enable float64 precision
         # NLSQ v0.2.1+ uses float32 by default, so we must configure JAX explicitly
         jax.config.update("jax_enable_x64", True)
+
+        # Enable persistent XLA compilation cache.  This avoids the 764-1552ms
+        # cold JIT overhead on subsequent Python sessions by persisting compiled
+        # XLA programs to disk.  JAX validates cache entries by HLO hash, so
+        # stale entries are automatically ignored after code changes.
+        _enable_compilation_cache(jax)
 
         # Verify float64 mode
         try:

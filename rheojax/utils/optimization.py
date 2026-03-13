@@ -83,6 +83,72 @@ _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
 )
 
 
+def make_fd_differentiable(
+    fn: Callable,
+    eps: float = 1e-7,
+) -> Callable:
+    """Wrap a function with a finite-difference custom JVP.
+
+    This enables ``jax.jacfwd`` (forward-mode AD) for functions that cannot be
+    traced by JAX's autodiff — e.g. diffrax ODE solvers which use ``custom_vjp``
+    and are therefore incompatible with ``jacfwd``.
+
+    The wrapper computes JVPs via central differences: ``(f(x+εv) - f(x-εv)) / 2ε``.
+    When combined with ``jax.jacfwd``, this effectively computes the full Jacobian
+    via ``vmap``'d perturbations in a **single batched XLA call** — much faster
+    than scipy's sequential finite differences.
+
+    Args:
+        fn: Function ``(x_data, params) -> predictions``.  Only the ``params``
+            argument (index 1) is differentiated; ``x_data`` passes through.
+        eps: Perturbation size for central differences.
+
+    Returns:
+        A function with identical signature but a custom JVP rule for ``params``.
+
+    Example::
+
+        # Before: NLSQ fails with TypeError on ODE models
+        objective = create_least_squares_objective(model_fn, x, y)
+
+        # After: finite-difference JVP makes it NLSQ-compatible
+        objective = create_least_squares_objective(
+            make_fd_differentiable(model_fn), x, y
+        )
+    """
+
+    @jax.custom_jvp
+    def wrapped(x_data, params):
+        return fn(x_data, params)
+
+    @wrapped.defjvp
+    def wrapped_jvp(primals, tangents):
+        x_data, params = primals
+        _, params_dot = tangents
+
+        # Primal output
+        y = wrapped(x_data, params)
+
+        # Relative perturbation: scale eps by each parameter's magnitude to
+        # avoid catastrophic cancellation for large-magnitude params (e.g.
+        # eta_p ~ 100 Pa·s).  Without this, abs perturbation 1e-7 on a value
+        # of 100 gives relative perturbation 1e-9, at float64 precision limit.
+        scale = jnp.maximum(jnp.abs(params), 1.0) * eps
+        # Central-difference JVP: J·v ≈ (f(x + h) - f(x - h)) / (2 * ||h||)
+        # where h = scale ⊙ v (element-wise product).
+        # When jacfwd sends v = e_i (unit basis), h = scale_i * e_i, so
+        # ||h|| = scale_i and this gives column i of J correctly.
+        h = scale * params_dot
+        y_plus = fn(x_data, params + h)
+        y_minus = fn(x_data, params - h)
+        h_norm = jnp.sqrt(jnp.sum(h ** 2) + 1e-300)
+        y_dot = (y_plus - y_minus) / (2.0 * h_norm)
+
+        return y, y_dot
+
+    return wrapped
+
+
 def _validate_optimization_result(
     result: OptimizationResult,
     residuals: np.ndarray,
@@ -208,10 +274,6 @@ def _run_scipy_least_squares(
 
     def residual_fn(values: np.ndarray) -> np.ndarray:
         res = objective(values)
-        # OPT-007: Use hasattr check instead of isinstance(res, jnp.ndarray)
-        # which is unreliable on JAX >= 0.4.7
-        if hasattr(res, "devices"):
-            res = np.asarray(res)
         res = np.asarray(res)
         if np.iscomplexobj(res):
             res = np.concatenate([np.real(res), np.imag(res)])
@@ -2619,6 +2681,7 @@ fit_parameters = nlsq_optimize  # More descriptive for model fitting
 __all__ = [
     "OptimizationResult",
     "ResidualFunction",
+    "make_fd_differentiable",
     "nlsq_optimize",
     "nlsq_multistart_optimize",
     "nlsq_curve_fit",
