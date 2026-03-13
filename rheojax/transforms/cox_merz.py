@@ -111,33 +111,50 @@ class CoxMerz(BaseTransform):
         eta_steady_raw = np.maximum(eta_steady_raw, 1e-30)
 
         # Build common log-spaced rate grid
-        rate_min = max(np.min(omega), np.min(gamma_dot))
-        rate_max = min(np.max(omega), np.max(gamma_dot))
+        # Use strictly positive omega/gamma_dot values so log10 is always valid.
+        omega_pos = omega[omega > 0]
+        gamma_dot_pos = gamma_dot[gamma_dot > 0]
+        if len(omega_pos) == 0:
+            raise ValueError("Oscillation data has no positive frequency values")
+        if len(gamma_dot_pos) == 0:
+            raise ValueError("Flow curve data has no positive shear-rate values")
+        rate_min = max(float(np.min(omega_pos)), float(np.min(gamma_dot_pos)))
+        rate_max = min(float(np.max(omega_pos)), float(np.max(gamma_dot_pos)))
 
         if rate_min >= rate_max:
             raise ValueError(
-                f"No overlapping rate range: oscillation [{np.min(omega):.2g}, "
-                f"{np.max(omega):.2g}], flow [{np.min(gamma_dot):.2g}, "
-                f"{np.max(gamma_dot):.2g}]"
+                f"No overlapping rate range: oscillation [{np.min(omega_pos):.2g}, "
+                f"{np.max(omega_pos):.2g}], flow [{np.min(gamma_dot_pos):.2g}, "
+                f"{np.max(gamma_dot_pos):.2g}]"
             )
 
         common_rates = np.logspace(
             np.log10(rate_min), np.log10(rate_max), self.n_points
         )
 
-        # Interpolate in log-log space (np.interp requires sorted x-array)
-        sort_o = np.argsort(omega)
-        sort_g = np.argsort(gamma_dot)
+        # Interpolate in log-log space (np.interp requires sorted x-array).
+        # Use only strictly positive x values so np.log() is always finite.
+        omega_mask = omega > 0
+        gamma_dot_mask = gamma_dot > 0
+        omega_valid = omega[omega_mask]
+        eta_star_valid = eta_star[omega_mask]
+        gamma_dot_valid = gamma_dot[gamma_dot_mask]
+        eta_steady_valid = eta_steady_raw[gamma_dot_mask]
+
+        sort_o = np.argsort(omega_valid)
+        sort_g = np.argsort(gamma_dot_valid)
         eta_c = np.exp(
             np.interp(
-                np.log(common_rates), np.log(omega[sort_o]), np.log(eta_star[sort_o])
+                np.log(common_rates),
+                np.log(omega_valid[sort_o]),
+                np.log(eta_star_valid[sort_o]),
             )
         )
         eta_s = np.exp(
             np.interp(
                 np.log(common_rates),
-                np.log(gamma_dot[sort_g]),
-                np.log(eta_steady_raw[sort_g]),
+                np.log(gamma_dot_valid[sort_g]),
+                np.log(eta_steady_valid[sort_g]),
             )
         )
 
