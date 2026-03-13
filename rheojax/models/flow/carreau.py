@@ -168,8 +168,8 @@ class Carreau(BaseModel):
                 mid_start = len(X_sorted) // 3
                 mid_end = 2 * len(X_sorted) // 3
                 if mid_end > mid_start + 1:
-                    log_gamma = np.log(X_sorted[mid_start:mid_end])
-                    log_eta = np.log(y_sorted[mid_start:mid_end])
+                    log_gamma = np.log(np.maximum(X_sorted[mid_start:mid_end], 1e-30))
+                    log_eta = np.log(np.maximum(y_sorted[mid_start:mid_end], 1e-30))
                     coeffs = np.polyfit(log_gamma, log_eta, 1)
                     n_est = coeffs[0] + 1.0  # Slope is n-1
                     logger.debug(

@@ -439,9 +439,10 @@ class GiesekusBase(BaseModel):
         # At high Wi: η/η₀ ≈ 1/(α·Wi) for α > 0
         if len(gamma_dot) > 3:
             # Use slope in log-log space at high rates
-            log_gd = np.log(gamma_dot[-3:])
-            log_eta = np.log(eta[-3:])
-            slope = (log_eta[-1] - log_eta[0]) / (log_gd[-1] - log_gd[0])
+            log_gd = np.log(np.maximum(gamma_dot[-3:], 1e-30))
+            log_eta = np.log(np.maximum(eta[-3:], 1e-30))
+            dlog_gd = log_gd[-1] - log_gd[0]
+            slope = (log_eta[-1] - log_eta[0]) / dlog_gd if abs(dlog_gd) > 1e-30 else 0.0
             # Power-law index n ≈ 1 + slope, and n relates to α
             # For Giesekus: n → 0.5 as Wi → ∞, so α ≈ (1-2n)/2
             n_est = max(0.1, min(1.0, 1.0 + slope))
