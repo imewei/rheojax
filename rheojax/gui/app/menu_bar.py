@@ -1272,9 +1272,9 @@ class MenuBar(QMenuBar):
         # From Template submenu
         self.pipeline_template_menu = pipeline_menu.addMenu("From &Template")
         _templates = [
-            ("NLSQ Fitting", "nlsq_fitting"),
-            ("Bayesian Inference", "bayesian_inference"),
-            ("Transform + Fit", "transform_fit"),
+            ("NLSQ Fitting", "basic"),
+            ("Bayesian Inference", "bayesian"),
+            ("SAOS Oscillation", "oscillation"),
         ]
         self.pipeline_template_actions: dict[str, QAction] = {}
         for label, key in _templates:
