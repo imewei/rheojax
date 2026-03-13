@@ -33,6 +33,8 @@ from jax.scipy.special import gamma as jax_gamma
 # ML-CONST: Module-level constant for Taylor iteration indices.
 # Hoisted out of _ml_taylor to avoid re-materializing the array on every call
 # (which happens once per vmapped element when using vmap over z).
+# NOTE: safe_import_jax() on line 30 ensures float64 is enabled before this
+# array is created.  Do not reorder imports above this line.
 _ML_TAYLOR_K = jnp.arange(300, dtype=jnp.float64)
 
 

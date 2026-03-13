@@ -2534,9 +2534,10 @@ def create_least_squares_objective(
     try:
         # Use a single-element x probe and a single-element params probe.
         # eval_shape traces abstractly — values are irrelevant, only dtypes
-        # and shapes propagate.  Most RheoJAX model_fns accept (x, params) with
-        # x broadcasted over arbitrary batch sizes and params as a 1-D array of
-        # any length, so a 1-element probe is sufficient to determine output dtype.
+        # and shapes propagate.  The 1-element params probe may not match the
+        # real parameter count, so only the output *dtype* and *ndim* are
+        # trusted from this probe (not the full output shape).  This is
+        # sufficient for the dispatch decision (complex vs real vs 2D).
         _x_probe = x_data_jax[:1] if x_data_jax.ndim >= 1 and x_data_jax.shape[0] > 0 else x_data_jax
         _p_probe = jnp.zeros(1, dtype=jnp.float64)
         _out_shape = jax.eval_shape(model_fn, _x_probe, _p_probe)

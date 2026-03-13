@@ -601,11 +601,11 @@ class BatchPipeline:
     def _clone_pipeline(self, pipeline: Pipeline) -> Pipeline:
         """Clone pipeline for independent execution.
 
-        SYS-07: Lightweight structural clone — avoids deep-copying JAX arrays,
-        compiled closures, and large data buffers that are not used by the
-        replay loop in _process_file.  _process_file immediately resets
+        SYS-07: Lightweight structural clone — calls Pipeline.__init__ (so new
+        fields added to __init__ are automatically included) then copies only
+        the history list from the template.  _process_file immediately resets
         pipeline.steps, pipeline._last_model, and pipeline.data, so only a
-        valid fresh Pipeline instance is required here.
+        valid fresh Pipeline instance with inherited history is needed.
 
         Args:
             pipeline: Pipeline to clone
@@ -613,25 +613,8 @@ class BatchPipeline:
         Returns:
             New Pipeline instance with a clean state (no data, no model)
         """
-        clone = Pipeline.__new__(Pipeline)
-        # Initialise all instance fields to match Pipeline.__init__ defaults.
-        # We intentionally exclude: data, _last_model, _last_fit_result,
-        # _last_bayesian_result, _transform_results, _current_figure,
-        # _diagnostic_results, _last_comparison (all reset by _process_file).
-        import uuid as _uuid
-
-        clone.data = None
-        clone.steps = []
+        clone = Pipeline()  # uses __init__ defaults — future-proof
         clone.history = list(pipeline.history)
-        clone._last_model = None
-        clone._last_fit_result = None
-        clone._last_bayesian_result = None
-        clone._transform_results = {}
-        clone._last_transform_name = None
-        clone._current_figure = None
-        clone._diagnostic_results = None
-        clone._last_comparison = None
-        clone._id = str(_uuid.uuid4())[:8]
         return clone
 
     def get_results(self) -> list[tuple[Path, RheoData, dict[str, Any]]]:
