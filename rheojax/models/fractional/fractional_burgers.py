@@ -583,7 +583,8 @@ class FractionalBurgersModel(BaseModel):
             return self._predict_creep(X, Jg, eta1, Jk, alpha, tau_k)
         elif test_mode == TestMode.OSCILLATION:
             logger.debug("Computing complex modulus for oscillation mode")
-            return self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+            stacked = self._predict_oscillation(X, Jg, eta1, Jk, alpha, tau_k)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         else:
             # Default to creep mode for Burgers model
             logger.debug("Default to creep mode prediction")

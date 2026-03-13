@@ -497,7 +497,8 @@ class FractionalMaxwellGel(BaseModel):
         elif test_mode == "creep":
             return self._predict_creep_jax(X, **params_dict)
         elif test_mode == "oscillation":
-            return self._predict_oscillation_jax(X, **params_dict)
+            stacked = self._predict_oscillation_jax(X, **params_dict)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         else:
             # Default to relaxation for unknown modes
             return self._predict_relaxation_jax(X, **params_dict)

@@ -546,7 +546,8 @@ class FractionalPoyntingThomson(BaseModel):
             return self._predict_creep(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.OSCILLATION:
             logger.debug("Computing complex modulus for oscillation mode")
-            return self._predict_oscillation(X, Ge, Gk, alpha, tau)
+            stacked = self._predict_oscillation(X, Ge, Gk, alpha, tau)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         else:
             # Default to creep mode for FPT model
             logger.debug("Default to creep mode prediction")

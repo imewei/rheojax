@@ -533,7 +533,8 @@ class FractionalZenerSolidLiquid(BaseModel):
         elif test_mode == "creep":
             return self._predict_creep(X, Ge, c_alpha, alpha, tau)
         elif test_mode == "oscillation":
-            return self._predict_oscillation(X, Ge, c_alpha, alpha, tau)
+            stacked = self._predict_oscillation(X, Ge, c_alpha, alpha, tau)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         else:
             # Default to relaxation mode for FZSL model
             return self._predict_relaxation(X, Ge, c_alpha, alpha, tau)

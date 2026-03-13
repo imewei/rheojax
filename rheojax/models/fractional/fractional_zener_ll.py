@@ -611,7 +611,8 @@ class FractionalZenerLiquidLiquid(BaseModel):
             return self._predict_creep(X, c1, c2, alpha, beta, gamma, tau)
         else:  # Default to oscillation
             logger.debug("Computing complex modulus for oscillation mode")
-            return self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+            stacked = self._predict_oscillation(X, c1, c2, alpha, beta, gamma, tau)
+            return stacked[..., 0] + 1j * stacked[..., 1]
 
 
 # Convenience alias

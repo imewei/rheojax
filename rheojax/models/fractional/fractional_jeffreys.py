@@ -632,7 +632,8 @@ class FractionalJeffreysModel(BaseModel):
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(X, eta1, eta2, alpha, tau1)
         elif test_mode == TestMode.OSCILLATION:
-            return self._predict_oscillation(X, eta1, eta2, alpha, tau1)
+            stacked = self._predict_oscillation(X, eta1, eta2, alpha, tau1)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         elif test_mode in (
             TestMode.ROTATION,
             TestMode.FLOW_CURVE,

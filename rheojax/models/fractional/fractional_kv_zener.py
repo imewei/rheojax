@@ -528,7 +528,8 @@ class FractionalKelvinVoigtZener(BaseModel):
         elif test_mode == TestMode.CREEP:
             return self._predict_creep(X, Ge, Gk, alpha, tau)
         elif test_mode == TestMode.OSCILLATION:
-            return self._predict_oscillation(X, Ge, Gk, alpha, tau)
+            stacked = self._predict_oscillation(X, Ge, Gk, alpha, tau)
+            return stacked[..., 0] + 1j * stacked[..., 1]
         else:
             # Default to creep mode for FKVZ model
             return self._predict_creep(X, Ge, Gk, alpha, tau)
