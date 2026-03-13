@@ -302,11 +302,16 @@ class VLBLocal(VLBBase):
             ),
         )
 
+        # ODE-based protocols use diffrax with custom_vjp, incompatible with
+        # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
+        _ode_protocols = {"laos"}
+        _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", "auto"),
+            method=kwargs.get("method", _default_method),
             max_iter=kwargs.get("max_iter", 2000),
         )
 
@@ -492,7 +497,8 @@ class VLBLocal(VLBBase):
         }
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
 
-        term = diffrax.ODETerm(ode_fn)
+        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
@@ -723,7 +729,8 @@ class VLBLocal(VLBBase):
 
         y0 = jnp.array([1.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
 
-        term = diffrax.ODETerm(ode_fn)
+        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
+        term = diffrax.ODETerm(jax.checkpoint(ode_fn))
         solver = diffrax.Tsit5()
         controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
         dt0 = (t_jax[-1] - t_jax[0]) / max(len(t_jax), 1000)

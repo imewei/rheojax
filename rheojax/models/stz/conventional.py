@@ -364,9 +364,9 @@ class STZConventional(STZBase):
                 y0 = jnp.array([sigma_init, chi_init, Lambda_init, 0.0])
 
         # Set up Diffrax solver
-        term = diffrax.ODETerm(
-            lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i)
-        )
+        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
+        _rhs = lambda ti, yi, args_i: ode_fn(cast(float, ti), yi, args_i)
+        term = diffrax.ODETerm(jax.checkpoint(_rhs))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 
@@ -655,7 +655,8 @@ class STZConventional(STZBase):
             args_with_rate = {**args_i, "gamma_dot": gamma_dot_t}
             return stz_ode_rhs(ti, yi, args_with_rate)
 
-        term = diffrax.ODETerm(laos_ode)
+        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
+        term = diffrax.ODETerm(jax.checkpoint(laos_ode))
         solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
 

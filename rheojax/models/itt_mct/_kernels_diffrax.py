@@ -160,7 +160,8 @@ def make_flow_curve_vector_field(
 
         return deriv
 
-    return vector_field
+    # Wrap with checkpoint to trade compute for memory during NUTS reverse-mode AD
+    return jax.checkpoint(vector_field)
 
 
 # =============================================================================
@@ -339,7 +340,8 @@ def make_flow_curve_with_stress_vector_field(
 
         return deriv
 
-    return vector_field
+    # Wrap with checkpoint to trade compute for memory during NUTS reverse-mode AD
+    return jax.checkpoint(vector_field)
 
 
 def solve_flow_curve_single(

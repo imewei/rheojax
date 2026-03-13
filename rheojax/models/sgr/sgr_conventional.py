@@ -1605,7 +1605,8 @@ class SGRConventional(BaseModel):
         # Solve ODE using Diffrax
         # Use Tsit5 (Runge-Kutta 5(4)) which is generally efficient for non-stiff problems
         # Use PIDController for adaptive step size (similar to odeint)
-        term = diffrax.ODETerm(vector_field)
+        # Wrap with checkpoint to reduce VJP memory during NUTS reverse-mode AD
+        term = diffrax.ODETerm(jax.checkpoint(vector_field))
         solver = diffrax.Tsit5()
         t0 = t_jax[0]
         t1 = t_jax[-1]
