@@ -694,6 +694,8 @@ class SGRConventional(BaseModel):
 
         if gamma_0 is None or omega is None:
             raise ValueError("LAOS fitting requires gamma_0 and omega in kwargs")
+        if gamma_0 <= 0:
+            raise ValueError(f"gamma_0 must be positive, got {gamma_0}")
 
         if gamma_0 is not None:
             self._gamma_0 = gamma_0

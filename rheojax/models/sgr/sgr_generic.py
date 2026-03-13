@@ -995,6 +995,8 @@ class SGRGeneric(BaseModel):
 
         if gamma_0 is None or omega is None:
             raise ValueError("LAOS fitting requires gamma_0 and omega in kwargs")
+        if gamma_0 <= 0:
+            raise ValueError(f"gamma_0 must be positive, got {gamma_0}")
 
         n_particles = kwargs.get("n_particles", 5000)
         use_pde = kwargs.get("use_pde", False)
@@ -1599,14 +1601,21 @@ class SGRGeneric(BaseModel):
         elif mode == "creep":
             return self._predict_creep_jit(X_jax, x, G0_scale, tau0)
         elif mode == "startup":
-            # Priority: explicit kwarg > _last_fit_kwargs > instance attr > default
-            # This prevents stale closure capture in JIT/NUTS contexts.
+            # Priority: explicit kwarg > _last_fit_kwargs > instance attr
+            # Use None sentinel (not `or`) to avoid swallowing gamma_dot=0.0.
             gamma_dot = kwargs.get("gamma_dot")
             if gamma_dot is None:
                 last_kwargs = getattr(self, "_last_fit_kwargs", None) or {}
                 gamma_dot = last_kwargs.get("gamma_dot")
             if gamma_dot is None:
-                gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+                gamma_dot = getattr(self, "_startup_gamma_dot", None)
+            if gamma_dot is None:
+                # R-SGR-GENERIC-001: Require explicit gamma_dot — silent 1.0 default
+                # masks bugs during NUTS startup inference.
+                raise RuntimeError(
+                    "SGRGeneric.model_function: gamma_dot not provided and "
+                    "_startup_gamma_dot not cached. Call fit() with startup data first."
+                )
             return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
         elif mode in ("laos", "oscillation_laos"):
             # R8-SGR-001: LAOS not supported in NUTS (OOM for Bayesian), raise informative error

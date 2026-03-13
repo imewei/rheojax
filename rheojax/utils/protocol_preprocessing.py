@@ -79,10 +79,15 @@ def check_kramers_kronig(
     max_slope : float
         Maximum absolute log-log slope of G' with respect to ω.
     """
-    ln_omega = np.log(omega)
+    ln_omega = np.log(np.maximum(omega, 1e-30))
     ln_G_prime = np.log(np.maximum(G_prime, 1e-30))
     # Use forward differences (consistent with the original inline implementation)
-    slope = np.abs(np.diff(ln_G_prime) / np.diff(ln_omega))
+    d_ln_omega = np.diff(ln_omega)
+    # Guard against duplicate frequencies (d_ln_omega=0 → division by zero)
+    valid = np.abs(d_ln_omega) > 1e-30
+    if not np.any(valid):
+        return True, 0.0
+    slope = np.abs(np.diff(ln_G_prime)[valid] / d_ln_omega[valid])
     max_slope = float(np.max(slope))
     return max_slope <= tolerance, max_slope
 
@@ -419,9 +424,15 @@ def _preprocess_flow_curve(
 
     # Yield stress detection via log-log slope
     if len(gamma_dot) > 5:
-        log_gd = np.log10(gamma_dot)
+        log_gd = np.log10(np.maximum(gamma_dot, 1e-30))
         log_s = np.log10(np.maximum(sigma_real, 1e-30))
-        slopes = np.diff(log_s) / np.diff(log_gd)
+        d_log_gd = np.diff(log_gd)
+        # Guard against duplicate shear rates (d_log_gd=0 → division by zero)
+        valid_gd = np.abs(d_log_gd) > 1e-30
+        if np.any(valid_gd):
+            slopes = np.diff(log_s)[valid_gd] / d_log_gd[valid_gd]
+        else:
+            slopes = np.array([0.0])
         min_slope = float(np.min(slopes))
         diagnostics["min_log_slope"] = min_slope
 
