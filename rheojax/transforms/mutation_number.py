@@ -203,7 +203,7 @@ class MutationNumber(BaseTransform):
         elif self.extrapolation_model == "powerlaw":
             # Fit G(t) = A * t^(-n)
             # ln(G) = ln(A) - n*ln(t)
-            log_t = jnp.log(t_fit)
+            log_t = jnp.log(jnp.maximum(t_fit, 1e-30))
             log_G = jnp.log(jnp.maximum(G_fit, 1e-10))
 
             # Linear regression
