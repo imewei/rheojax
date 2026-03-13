@@ -1131,32 +1131,27 @@ def ml_ikh_flow_curve_steady_state_per_mode(gamma_dot, n_modes, **params):
     gamma_dot_abs = jnp.abs(gamma_dot)
     eta_inf = params.get("eta_inf", 0.0)
 
-    # Sum yield stress contributions from all modes
-    sigma_total = jnp.zeros_like(gamma_dot)
+    # Build mode parameter arrays at trace time (Python loop runs once during JIT
+    # compilation, not per call). Stacking into arrays lets XLA emit a single
+    # fused broadcast+matmul kernel instead of n_modes separate scalar ops.
+    sigma_y0_arr = jnp.stack([params[f"sigma_y0_{i}"] for i in range(1, n_modes + 1)])
+    delta_sigma_y_arr = jnp.stack(
+        [params.get(f"delta_sigma_y_{i}", 0.0) for i in range(1, n_modes + 1)]
+    )
+    if f"k1_1" in params:
+        k1_arr = jnp.stack([params[f"k1_{i}"] for i in range(1, n_modes + 1)])
+        k2_arr = jnp.stack([params[f"k2_{i}"] for i in range(1, n_modes + 1)])
+    else:
+        tau_thix_arr = jnp.stack([params[f"tau_thix_{i}"] for i in range(1, n_modes + 1)])
+        k1_arr = 1.0 / jnp.maximum(tau_thix_arr, 1e-12)
+        k2_arr = jnp.stack([params[f"Gamma_{i}"] for i in range(1, n_modes + 1)])
 
-    for i in range(1, n_modes + 1):
-        sigma_y0_i = params[f"sigma_y0_{i}"]
-        delta_sigma_y_i = params.get(f"delta_sigma_y_{i}", 0.0)
-
-        # Structure kinetics for mode i
-        if f"k1_{i}" in params:
-            k1_i = params[f"k1_{i}"]
-            k2_i = params[f"k2_{i}"]
-        else:
-            tau_thix_i = params[f"tau_thix_{i}"]
-            Gamma_i = params[f"Gamma_{i}"]
-            k1_i = 1.0 / jnp.maximum(tau_thix_i, 1e-12)
-            k2_i = Gamma_i
-
-        # Steady-state lambda for mode i
-        lambda_ss_i = k1_i / (k1_i + k2_i * gamma_dot_abs + 1e-20)
-
-        # Mode yield stress contribution
-        sigma_y_i = sigma_y0_i + delta_sigma_y_i * lambda_ss_i
-        sigma_total = sigma_total + sigma_y_i
-
-    # Add viscous contribution
-    sigma_total = sigma_total + eta_inf * gamma_dot_abs
+    # Vectorized over modes: (n_modes, 1) broadcasts against (N,)
+    lambda_ss = k1_arr[:, None] / (
+        k1_arr[:, None] + k2_arr[:, None] * gamma_dot_abs[None, :] + 1e-20
+    )  # (n_modes, N)
+    sigma_y = sigma_y0_arr[:, None] + delta_sigma_y_arr[:, None] * lambda_ss  # (n_modes, N)
+    sigma_total = jnp.sum(sigma_y, axis=0) + eta_inf * gamma_dot_abs  # (N,)
 
     return sigma_total
 
@@ -1185,25 +1180,21 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     k3 = params.get("k3", 0.0)
     eta_inf = params.get("eta_inf", 0.0)
 
-    # Compute weighted sum of steady-state lambdas
-    weighted_lambda_sum = jnp.zeros_like(gamma_dot)
+    # Build mode parameter arrays at trace time, then vectorize over modes.
+    w_arr = jnp.stack([params.get(f"w_{i}", 1.0 / n_modes) for i in range(1, n_modes + 1)])
+    if f"k1_1" in params:
+        k1_arr = jnp.stack([params[f"k1_{i}"] for i in range(1, n_modes + 1)])
+        k2_arr = jnp.stack([params[f"k2_{i}"] for i in range(1, n_modes + 1)])
+    else:
+        tau_thix_arr = jnp.stack([params[f"tau_thix_{i}"] for i in range(1, n_modes + 1)])
+        k1_arr = 1.0 / jnp.maximum(tau_thix_arr, 1e-12)
+        k2_arr = jnp.stack([params[f"Gamma_{i}"] for i in range(1, n_modes + 1)])
 
-    for i in range(1, n_modes + 1):
-        w_i = params.get(f"w_{i}", 1.0 / n_modes)
-
-        # Structure kinetics for mode i
-        if f"k1_{i}" in params:
-            k1_i = params[f"k1_{i}"]
-            k2_i = params[f"k2_{i}"]
-        else:
-            tau_thix_i = params[f"tau_thix_{i}"]
-            Gamma_i = params[f"Gamma_{i}"]
-            k1_i = 1.0 / jnp.maximum(tau_thix_i, 1e-12)
-            k2_i = Gamma_i
-
-        # Steady-state lambda for mode i
-        lambda_ss_i = k1_i / (k1_i + k2_i * gamma_dot_abs + 1e-20)
-        weighted_lambda_sum = weighted_lambda_sum + w_i * lambda_ss_i
+    # Vectorized: (n_modes, 1) broadcasts against gamma_dot_abs (N,)
+    lambda_ss = k1_arr[:, None] / (
+        k1_arr[:, None] + k2_arr[:, None] * gamma_dot_abs[None, :] + 1e-20
+    )  # (n_modes, N)
+    weighted_lambda_sum = jnp.sum(w_arr[:, None] * lambda_ss, axis=0)  # (N,)
 
     # Global yield stress
     sigma_y = sigma_y0 + k3 * weighted_lambda_sum

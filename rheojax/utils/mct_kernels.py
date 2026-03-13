@@ -17,6 +17,7 @@ glass_transition_criterion
 
 from __future__ import annotations
 
+import functools
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -399,15 +400,13 @@ def _prony_smart_init(
         n_modes,
     )
 
-    # Estimate amplitudes using log-linear interpolation of m(t)
-    # For m(t) ~ g*exp(-t/τ), we have log(m) ~ log(g) - t/τ
-    # Estimate g from local values of m at times near τ
-    g_init = np.zeros(n_modes)
-    for i, tau_i in enumerate(tau_init):
-        # Find time point closest to tau_i
-        idx = np.argmin(np.abs(t_valid - tau_i))
-        # Estimate g from m(τ) ≈ g * exp(-1) = g * 0.368
-        g_init[i] = m_valid[idx] / 0.368 / max(n_modes, 1)
+    # Vectorized amplitude estimation: for m(t) ~ g*exp(-t/τ),
+    # find the nearest t_valid index for each tau_init in one batched step.
+    # Shape: (n_modes, n_t) diff matrix → argmin over n_t axis → (n_modes,) indices.
+    dist_matrix = np.abs(t_valid[np.newaxis, :] - tau_init[:, np.newaxis])  # (n_modes, n_t)
+    nearest_idx = np.argmin(dist_matrix, axis=1)  # (n_modes,)
+    # Estimate g from m(τ) ≈ g * exp(-1) = g * 0.368
+    g_init = m_valid[nearest_idx] / 0.368 / max(n_modes, 1)
 
     # Ensure positive and scale to match total kernel area
     g_init = np.maximum(g_init, m_valid[0] / max(n_modes, 1) / 10)
@@ -708,6 +707,7 @@ def glass_transition_criterion(
 # =============================================================================
 
 
+@functools.lru_cache(maxsize=64)
 def setup_microscopic_stress_weights(
     phi_volume: float,
     k_min: float = 1.0,
@@ -854,6 +854,7 @@ def compute_microscopic_stress(
     return jnp.sum(weights * phi_squared_integrated)
 
 
+@functools.lru_cache(maxsize=64)
 def get_microscopic_stress_prefactor(
     phi_volume: float,
     k_min: float = 1.0,
