@@ -241,10 +241,15 @@ def _fit_prony_relaxation(
     if len(t_positive) == 0:
         raise ValueError("Prony fitting requires at least one positive time value.")
     t_min = float(np.min(t_positive))
-    tau_i = np.logspace(np.log10(t_min), np.log10(t[-1]), n_modes)
+    # PC-001: use np.max(t) not t[-1] — t may be unsorted so the last element
+    # is not necessarily the largest time.  np.max guarantees t_max >= t_min,
+    # preventing a ValueError from log10 of a non-positive number.
+    t_max = float(np.max(t_positive))
+    tau_i = np.logspace(np.log10(t_min), np.log10(t_max), n_modes)
 
-    # Equilibrium modulus estimate
-    G_e = max(float(G_t[-1]), 0.0)
+    # Equilibrium modulus estimate: G(t→∞) ≈ G at maximum time.
+    # Use the G value at argmax(t) to handle unsorted time arrays correctly.
+    G_e = max(float(G_t[np.argmax(t)]), 0.0)
 
     # Build kernel matrix: A_ij = exp(-t_j / tau_i)
     A = np.exp(-t[:, None] / tau_i[None, :])
@@ -265,8 +270,12 @@ def _fit_prony_oscillation(
     """Fit Prony series to dynamic moduli G'(ω), G''(ω)."""
     from scipy.optimize import nnls
 
-    # T-04: Ensure omega is sorted ascending for correct tau range computation
-    omega = np.sort(omega)
+    # T-04: Ensure omega is sorted ascending for correct tau range computation.
+    # Must reorder G_prime and G_double_prime to stay aligned with sorted omega.
+    sort_idx = np.argsort(omega)
+    omega = omega[sort_idx]
+    G_prime = G_prime[sort_idx]
+    G_double_prime = G_double_prime[sort_idx]
 
     tau_i = np.logspace(np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes)
 
