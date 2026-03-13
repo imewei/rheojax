@@ -709,14 +709,15 @@ def _process_sample_array_complex(
     y_chunk_real = convert_units(sample_array[:, y_col], y_units_orig, "Pa")
     y_chunk_imag = convert_units(sample_array[:, y_col2], y_units2_orig, "Pa")
 
-    # Remove NaN values from either component
+    # Remove non-finite values (NaN and ±inf) — both violate RheoData's
+    # isfinite invariant and corrupt model fits.
     y_chunk_real_array = np.real_if_close(np.asarray(y_chunk_real))
     y_chunk_imag_array = np.real_if_close(np.asarray(y_chunk_imag))
 
-    valid_mask = ~(
-        np.isnan(x_chunk_array)
-        | np.isnan(y_chunk_real_array)
-        | np.isnan(y_chunk_imag_array)
+    valid_mask = (
+        np.isfinite(x_chunk_array)
+        & np.isfinite(y_chunk_real_array)
+        & np.isfinite(y_chunk_imag_array)
     )
 
     x_chunk = x_chunk_array[valid_mask]
@@ -736,12 +737,12 @@ def _process_sample_array_real(
         y_col: Y column index
 
     Returns:
-        Tuple of (x_chunk, y_chunk) arrays with NaN values removed
+        Tuple of (x_chunk, y_chunk) arrays with NaN and Inf values removed
     """
     x_chunk_array = np.real_if_close(np.asarray(sample_array[:, x_col]))
     y_chunk_array = np.real_if_close(np.asarray(sample_array[:, y_col]))
 
-    valid_mask = ~(np.isnan(x_chunk_array) | np.isnan(y_chunk_array))
+    valid_mask = np.isfinite(x_chunk_array) & np.isfinite(y_chunk_array)
 
     return x_chunk_array[valid_mask], y_chunk_array[valid_mask]
 

@@ -395,22 +395,23 @@ def load_trios_json(
             elif detected_mode == "rotation":
                 x_data, x_units = convert_unit(x_data, x_units, "1/s")
 
-            # Remove NaN values
+            # Remove non-finite values (NaN and ±inf) to satisfy RheoData's
+            # isfinite invariant and prevent corrupt values from poisoning fits.
             if is_complex:
-                valid_mask = ~(
-                    np.isnan(x_data)
-                    | np.isnan(np.real(y_data))
-                    | np.isnan(np.imag(y_data))
+                valid_mask = (
+                    np.isfinite(x_data)
+                    & np.isfinite(np.real(y_data))
+                    & np.isfinite(np.imag(y_data))
                 )
             else:
-                valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
+                valid_mask = np.isfinite(x_data) & np.isfinite(y_data)
 
             x_data = x_data[valid_mask]
             y_data = y_data[valid_mask]
 
             if len(x_data) == 0:
                 logger.warning(
-                    "Segment has 0 valid data points after NaN filtering; skipping",
+                    "Segment has 0 valid data points after non-finite filtering; skipping",
                     segment_index=seg_idx,
                     result_index=res_idx,
                 )

@@ -1129,6 +1129,7 @@ class OptimizationResult:
         nlsq_result: dict[str, Any],
         residuals: np.ndarray | None = None,
         y_data: np.ndarray | None = None,
+        compute_covariance: bool = True,
     ) -> OptimizationResult:
         """Create OptimizationResult from NLSQ result dictionary.
 
@@ -1136,6 +1137,8 @@ class OptimizationResult:
             nlsq_result: Result dictionary from nlsq.LeastSquares.least_squares
             residuals: Optional residual vector for covariance scaling and metrics
             y_data: Optional original y data for R² computation
+            compute_covariance: Whether to compute the covariance matrix via SVD
+                (default: True). Set False to skip SVD when CIs are not needed.
 
         Returns:
             OptimizationResult instance with fields extracted from NLSQ result
@@ -1177,9 +1180,11 @@ class OptimizationResult:
         # Note: NLSQ uses 'nfev' for iterations in some contexts
         nit = int(nlsq_result.get("nit", nlsq_result.get("nfev", 0)))
 
-        # Compute covariance from Jacobian
+        # OPT-06: Compute covariance from Jacobian only when requested.
+        # Skipping the SVD is a significant speedup for fast fits where
+        # confidence intervals are not needed.
         pcov = None
-        if jac is not None:
+        if jac is not None and compute_covariance:
             pcov = compute_covariance_from_jacobian(jac, residuals)
 
         # Store residuals as numpy array for statistical properties
@@ -1518,7 +1523,12 @@ def nlsq_optimize(
         residuals_np = residuals_raw.astype(np.float64)
 
     # Convert NLSQ result to OptimizationResult (with residuals for covariance)
-    result = OptimizationResult.from_nlsq(nlsq_result, residuals=residuals_np)
+    # OPT-06: forward compute_covariance so SVD is skipped when not requested.
+    result = OptimizationResult.from_nlsq(
+        nlsq_result,
+        residuals=residuals_np,
+        compute_covariance=compute_covariance,
+    )
 
     # P1-6: Propagate normalization weights from the objective closure so that
     # R²/AIC/BIC can un-normalize residuals for correct statistics.

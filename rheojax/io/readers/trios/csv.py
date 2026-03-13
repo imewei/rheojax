@@ -991,15 +991,17 @@ def load_trios_csv(
             if detected_mode == "oscillation":
                 x_data, x_units = convert_unit(x_data, x_units, "rad/s")
 
-            # Remove NaN values
+            # Remove non-finite values (NaN and ±inf) — both poison model
+            # fits and violate RheoData's isfinite invariant which raises
+            # ValueError on inf.  np.isfinite is False for both NaN and inf.
             if is_complex:
-                valid_mask = ~(
-                    np.isnan(x_data)
-                    | np.isnan(np.real(y_data))
-                    | np.isnan(np.imag(y_data))
+                valid_mask = (
+                    np.isfinite(x_data)
+                    & np.isfinite(np.real(y_data))
+                    & np.isfinite(np.imag(y_data))
                 )
             else:
-                valid_mask = ~(np.isnan(x_data) | np.isnan(y_data))
+                valid_mask = np.isfinite(x_data) & np.isfinite(y_data)
 
             x_data = x_data[valid_mask]
             y_data = y_data[valid_mask]

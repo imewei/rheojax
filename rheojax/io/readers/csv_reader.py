@@ -356,17 +356,21 @@ def load_csv(
     if not is_complex:
         y_data = _to_float(y_data)
 
-    # Remove NaN values in single pass (avoid intermediate copies)
+    # Remove non-finite values (NaN and ±inf) in single pass.
+    # np.isfinite covers both, preventing RheoData's isfinite check from
+    # raising a confusing ValueError on instrument artefacts.
     if is_complex:
         valid_idx = np.flatnonzero(
-            ~(np.isnan(x_data) | np.isnan(y_data.real) | np.isnan(y_data.imag))
+            np.isfinite(x_data)
+            & np.isfinite(y_data.real)
+            & np.isfinite(y_data.imag)
         )
     else:
-        valid_idx = np.flatnonzero(~(np.isnan(x_data) | np.isnan(y_data)))
+        valid_idx = np.flatnonzero(np.isfinite(x_data) & np.isfinite(y_data))
     n_dropped = len(x_data) - len(valid_idx)
     if n_dropped > 0:
         logger.warning(
-            "Dropped NaN rows during loading",
+            "Dropped non-finite (NaN/Inf) rows during loading",
             n_dropped=n_dropped,
             n_total=len(x_data),
         )
