@@ -330,20 +330,15 @@ class BayesianResult:
                     elif arr.ndim != 2:
                         continue  # Skip unexpected shapes
 
-                    # potential_energy → lp (negated, matching ArviZ convention)
+                    # Match ArviZ's NumPyroConverter exactly: potential_energy
+                    # becomes negated "lp". ArviZ does NOT synthesise "energy"
+                    # (which requires kinetic energy from the leapfrog integrator)
+                    # or "tree_depth" from these fields.
                     if stat == "potential_energy":
                         stats_dict["lp"] = xr.DataArray(-arr, dims=("chain", "draw"))
-                        # Also expose as energy for az.plot_energy()
-                        stats_dict["energy"] = xr.DataArray(arr, dims=("chain", "draw"))
                     else:
                         dest_name = _stat_rename.get(stat, stat)
                         stats_dict[dest_name] = xr.DataArray(arr, dims=("chain", "draw"))
-                        if stat == "num_steps":
-                            # tree_depth = floor(log2(num_steps)) + 1
-                            stats_dict["tree_depth"] = xr.DataArray(
-                                (np.log2(np.maximum(arr, 1)).astype(int) + 1),
-                                dims=("chain", "draw"),
-                            )
         except Exception as exc:
             logger.debug(
                 "Failed to extract sample_stats from MCMC extra fields",
