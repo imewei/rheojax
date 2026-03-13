@@ -1657,25 +1657,38 @@ class BayesianMixin:
             _model_returns_2col = bool(scale_info["model_returns_2col"])
         else:
             _model_returns_2col = False
-            # R12-B-018: track whether _test_mode existed before the probe so
-            # the finally block can restore the exact prior state instead of
-            # unconditionally setting _test_mode=None when the attribute was
-            # absent before the probe call.
-            _had_probe_test_mode = hasattr(self, "_test_mode")
-            _saved_probe_test_mode = getattr(self, "_test_mode", None)
             try:
-                # BAY-006: use actual data shape for probe, not hardcoded 2
+                # B004-FIX: Use jax.eval_shape to determine output shape without
+                # triggering XLA compilation or executing the function.  This
+                # eliminates the 1-5s JIT overhead of the previous approach (which
+                # called model_function with dummy data) and avoids the _test_mode
+                # mutation/restore dance entirely.
+                #
+                # We capture non-JAX args (test_mode, protocol_kwargs) via partial
+                # since jax.eval_shape requires all positional args to be abstract.
+                import functools
+
                 _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
-                _test_X = jnp.ones(_n_probe, dtype=jnp.float64)
-                _test_params = jnp.ones(len(param_names), dtype=jnp.float64)
-                _test_pred = self.model_function(  # type: ignore[attr-defined]
-                    _test_X, _test_params, test_mode, **protocol_kwargs
+                _test_X = jax.ShapeDtypeStruct((_n_probe,), jnp.float64)
+                _test_params = jax.ShapeDtypeStruct(
+                    (len(param_names),), jnp.float64
+                )
+                _probe_fn = functools.partial(
+                    self.model_function,  # type: ignore[attr-defined]
+                    test_mode=test_mode,
+                    **protocol_kwargs,
+                )
+                _out_shape = jax.eval_shape(
+                    _probe_fn,
+                    _test_X,
+                    _test_params,
                 )
                 _model_returns_2col = (
-                    hasattr(_test_pred, "ndim")
-                    and _test_pred.ndim == 2
-                    and _test_pred.shape[1] == 2
-                    and jnp.isrealobj(_test_pred)
+                    hasattr(_out_shape, "ndim")
+                    and _out_shape.ndim == 2
+                    and _out_shape.shape[1] == 2
+                    and _out_shape.dtype != jnp.complex128
+                    and _out_shape.dtype != jnp.complex64
                 )
             except Exception as exc:
                 # R10-BAY-001: Log the probe failure instead of silently swallowing it.
@@ -1686,14 +1699,6 @@ class BayesianMixin:
                     error=str(exc),
                     test_mode=str(test_mode),
                 )
-            finally:
-                # Restore _test_mode to its exact pre-probe state.
-                # R12-B-018: if the attribute did not exist before the probe, delete it
-                # rather than setting it to None (which would create a spurious attribute).
-                if _had_probe_test_mode:
-                    self._test_mode = _saved_probe_test_mode
-                elif hasattr(self, "_test_mode"):
-                    del self._test_mode
             # Cache in scale_info so the probe is only run once per fit_bayesian call
             scale_info["model_returns_2col"] = int(_model_returns_2col)
 
