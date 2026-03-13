@@ -251,6 +251,7 @@ def _run_scipy_least_squares(
     xtol: float,
     gtol: float,
     max_iter: int,
+    compute_covariance: bool = True,
 ) -> OptimizationResult:
     """Run SciPy's TRF least squares and return an OptimizationResult.
 
@@ -266,6 +267,9 @@ def _run_scipy_least_squares(
         xtol: Parameter tolerance.
         gtol: Gradient tolerance.
         max_iter: Maximum iterations (max_nfev = max_iter * 10).
+        compute_covariance: Whether to compute the covariance matrix from the
+            Jacobian (default: True). Set False to skip SVD and save time when
+            covariance is not required.
 
     Returns:
         OptimizationResult with optimal parameters and covariance.
@@ -300,15 +304,15 @@ def _run_scipy_least_squares(
     cost_value = getattr(scipy_result, "cost", None)
     jac = None
     pcov = None
-    if scipy_result.jac is not None:
-        jac = np.asarray(scipy_result.jac, dtype=np.float64)
-        residuals = residual_fn(scipy_result.x)
-        pcov = compute_covariance_from_jacobian(jac, residuals)
-
+    # OPT-05: Evaluate residuals once and reuse for both covariance and final
+    # stats — avoids a second (potentially expensive) objective call.
     # P1-5: Include residuals, y_data, n_data, and _is_complex_split so that
     # downstream statistics (R², AIC, adj-R²) can be computed correctly.
     final_residuals = residual_fn(scipy_result.x)
     rss = float(np.sum(final_residuals**2))
+    if scipy_result.jac is not None and compute_covariance:
+        jac = np.asarray(scipy_result.jac, dtype=np.float64)
+        pcov = compute_covariance_from_jacobian(jac, final_residuals)
 
     return OptimizationResult(
         x=np.asarray(scipy_result.x, dtype=np.float64),
@@ -1238,6 +1242,8 @@ def nlsq_optimize(
     stability: str | bool = False,
     fallback: bool = False,
     compute_diagnostics: bool = False,
+    # OPT-06: make covariance computation lazy to avoid SVD on every fit
+    compute_covariance: bool = True,
     **kwargs,
 ) -> OptimizationResult:
     """Optimize objective function using NLSQ (GPU-accelerated).
@@ -1293,6 +1299,11 @@ def nlsq_optimize(
         compute_diagnostics: Compute model health diagnostics (default: False).
             When True, result.diagnostics includes identifiability analysis,
             gradient health, and other diagnostic information.
+        compute_covariance: Whether to compute the parameter covariance matrix
+            (default: True). The covariance is derived from an SVD of the
+            Jacobian at the solution. Set False to skip this step when
+            confidence intervals and parameter uncertainties are not needed,
+            avoiding one full SVD per fit.
         **kwargs: Additional arguments passed to nlsq.LeastSquares.least_squares
 
     Returns:
@@ -1349,7 +1360,8 @@ def nlsq_optimize(
             n_params=len(x0),
         )
         result = _run_scipy_least_squares(
-            objective, x0, nlsq_bounds, ftol, xtol, gtol, max_iter
+            objective, x0, nlsq_bounds, ftol, xtol, gtol, max_iter,
+            compute_covariance=compute_covariance,
         )
         parameters.set_values(result.x)
         return result
@@ -1421,7 +1433,8 @@ def nlsq_optimize(
         """
         logger.info("Using SciPy least_squares fallback")
         scipy_result = _run_scipy_least_squares(
-            objective, initial_guess, nlsq_bounds, ftol, xtol, gtol, max_iter
+            objective, initial_guess, nlsq_bounds, ftol, xtol, gtol, max_iter,
+            compute_covariance=compute_covariance,
         )
         if workflow == "auto_global" and not scipy_result.success:
             logger.info(
@@ -2500,17 +2513,59 @@ def create_least_squares_objective(
         _max_modulus = jnp.max(jnp.abs(y_data_jax))
         _norm_floor = jnp.maximum(jnp.float64(1e-10), jnp.float64(1e-10) * _max_modulus)
 
+    # OPT-03: Determine the model's output format once at construction time
+    # using jax.eval_shape (zero-cost abstract evaluation, no actual compute).
+    # The three static flags below replace the per-call jnp.iscomplexobj /
+    # y_pred.ndim checks that were executed on every optimizer iteration.
+    # Fallback to dynamic dispatch if eval_shape fails (e.g. model has
+    # side-effects or requires concrete values).
+    _static_dispatch: str | None = None  # "2d", "complex", "real", or None (dynamic)
+    _static_y_data_is_2d: bool = y_data_jax.ndim == 2 and y_data_jax.shape[-1] == 2
+    try:
+        # Use a single-element x probe and a single-element params probe.
+        # eval_shape traces abstractly — values are irrelevant, only dtypes
+        # and shapes propagate.  Most RheoJAX model_fns accept (x, params) with
+        # x broadcasted over arbitrary batch sizes and params as a 1-D array of
+        # any length, so a 1-element probe is sufficient to determine output dtype.
+        _x_probe = x_data_jax[:1] if x_data_jax.ndim >= 1 and x_data_jax.shape[0] > 0 else x_data_jax
+        _p_probe = jnp.zeros(1, dtype=jnp.float64)
+        _out_shape = jax.eval_shape(model_fn, _x_probe, _p_probe)
+        _out_is_complex = jnp.issubdtype(_out_shape.dtype, jnp.complexfloating)
+        _out_is_2d = _out_shape.ndim == 2 and _out_shape.shape[-1] == 2
+        if _out_is_2d:
+            _static_dispatch = "2d"
+        elif _out_is_complex:
+            _static_dispatch = "complex"
+        else:
+            _static_dispatch = "real"
+    except Exception:
+        # Dynamic dispatch fallback: eval_shape failed (model has side-effects,
+        # requires concrete values, or uses Python control flow on shape).
+        _static_dispatch = None
+
     def residuals(params: np.ndarray) -> np.ndarray:
         """Compute residual vector for all data points."""
-        # Ensure params are JAX arrays
-        params_jax = jnp.asarray(params, dtype=jnp.float64)
+        # OPT-02: Avoid unconditional host→device transfer on every iteration.
+        # NLSQ passes NumPy arrays; JAX's own gradient passes jax.Array.
+        # isinstance check is a Python-level no-op for JAX arrays.
+        if not isinstance(params, jax.Array):
+            params_jax = jnp.asarray(params, dtype=jnp.float64)
+        else:
+            params_jax = params
 
         # Get model predictions
         y_pred = model_fn(x_data_jax, params_jax)
 
-        # Check prediction format: complex, 2D [G', G"], or real
-        y_pred_is_complex = jnp.iscomplexobj(y_pred)
-        y_pred_is_2d = y_pred.ndim == 2 and y_pred.shape[-1] == 2
+        # OPT-03: Use statically-determined dispatch path baked at closure
+        # construction time.  Falls back to the original dynamic check when
+        # eval_shape could not determine the output format.
+        if _static_dispatch is not None:
+            y_pred_is_2d = _static_dispatch == "2d"
+            y_pred_is_complex = _static_dispatch == "complex"
+        else:
+            # Dynamic fallback (only reached when eval_shape failed)
+            y_pred_is_complex = jnp.iscomplexobj(y_pred)
+            y_pred_is_2d = y_pred.ndim == 2 and y_pred.shape[-1] == 2
 
         if y_pred_is_2d:
             # Case 1: 2D [G', G"] format (e.g., FractionalZenerSolidSolid)
@@ -2539,9 +2594,7 @@ def create_least_squares_objective(
 
                 return jnp.concatenate([resid_real, resid_imag])
             else:
-                # Check if data is also 2D [G', G"]
-                y_data_is_2d = y_data_jax.ndim == 2 and y_data_jax.shape[-1] == 2
-                if y_data_is_2d:
+                if _static_y_data_is_2d:
                     # Both (N, 2): fit both columns independently (stacked residuals)
                     if use_log_residuals:
                         # Log-space residuals: abs() intentionally strips sign because
@@ -2569,14 +2622,14 @@ def create_least_squares_objective(
                     # (N, 2) pred, (N,) data: fit to magnitude |G*|
                     y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
 
-                    residuals = y_pred_magnitude - y_data_jax
+                    _resid = y_pred_magnitude - y_data_jax
 
                     if normalize:
-                        residuals = residuals / jnp.maximum(
+                        _resid = _resid / jnp.maximum(
                             jnp.abs(y_data_jax), _norm_floor
                         )
 
-                    return residuals
+                    return _resid
 
         elif y_pred_is_complex:
             # Case 2: Complex predictions (G' + iG")
@@ -2610,14 +2663,14 @@ def create_least_squares_objective(
                 # Complex predictions, real data: fit to magnitude |G*|
                 # This is the common case for oscillation mode fitting
                 y_pred_magnitude = jnp.abs(y_pred)
-                residuals = y_pred_magnitude - y_data_jax
+                _resid = y_pred_magnitude - y_data_jax
 
                 if normalize:
-                    residuals = residuals / jnp.maximum(
+                    _resid = _resid / jnp.maximum(
                         jnp.abs(y_data_jax), _norm_floor
                     )
 
-                return residuals
+                return _resid
         else:
             # Case 3: Real predictions
             if y_data_is_complex:
@@ -2627,33 +2680,33 @@ def create_least_squares_objective(
 
                 if use_log_residuals:
                     # Log-space residuals
-                    residuals = jnp.log10(
+                    _resid = jnp.log10(
                         jnp.maximum(jnp.abs(y_pred), 1e-20)
                     ) - jnp.log10(jnp.maximum(y_data_magnitude, 1e-20))
                 else:
-                    residuals = y_pred - y_data_magnitude
+                    _resid = y_pred - y_data_magnitude
                     if normalize:
-                        residuals = residuals / jnp.maximum(
+                        _resid = _resid / jnp.maximum(
                             y_data_magnitude, _norm_floor
                         )
 
-                return residuals
+                return _resid
             else:
                 # Both real: standard case
                 if use_log_residuals:
                     # Log-space residuals for rheological data
                     # Handle both positive and negative values by using absolute value
-                    residuals = jnp.log10(
+                    _resid = jnp.log10(
                         jnp.maximum(jnp.abs(y_pred), 1e-20)
                     ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax), 1e-20))
                 else:
-                    residuals = y_pred - y_data_jax
+                    _resid = y_pred - y_data_jax
                     if normalize:
-                        residuals = residuals / jnp.maximum(
+                        _resid = _resid / jnp.maximum(
                             jnp.abs(y_data_jax), _norm_floor
                         )
 
-                return residuals
+                return _resid
 
     # P1-6: Compute normalization weights so that downstream
     # OptimizationResult can un-normalize for correct R²/AIC/BIC.

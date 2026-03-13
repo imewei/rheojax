@@ -30,6 +30,11 @@ logger = get_logger(__name__)
 jax, jnp = safe_import_jax()
 from jax.scipy.special import gamma as jax_gamma
 
+# ML-CONST: Module-level constant for Taylor iteration indices.
+# Hoisted out of _ml_taylor to avoid re-materializing the array on every call
+# (which happens once per vmapped element when using vmap over z).
+_ML_TAYLOR_K = jnp.arange(300, dtype=jnp.float64)
+
 
 def mittag_leffler_e(z: float | jnp.ndarray, alpha: float) -> float | jnp.ndarray:
     """
@@ -140,33 +145,33 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
         return _ml_taylor_complex(z, alpha, beta, n_iter)
 
     # --- Real z: vectorized log-space computation ---
-    k = jnp.arange(n_iter, dtype=jnp.float64)
-    gamma_args = alpha * k + beta
+    # ML-CONST: reuse the module-level arange; slice to n_iter if caller passes
+    # a value smaller than 300 (rare, but preserves the original API contract).
+    k = _ML_TAYLOR_K if n_iter == 300 else jnp.arange(n_iter, dtype=jnp.float64)
 
-    # log|z^k| = k * log|z|;  k=0 term is always z^0 = 1 → log = 0
+    # ML-02: Fuse intermediate allocations.
+    # Compute log|z^k| directly without a separate safe_abs_z variable.
     abs_z = jnp.abs(z)
-    safe_abs_z = jnp.maximum(abs_z, 1e-300)
-    log_abs_z = jnp.log(safe_abs_z)
-    log_zpow = jnp.where(k == 0, 0.0, k * log_abs_z)
+    log_abs_z = jnp.log(jnp.maximum(abs_z, 1e-300))
 
-    # log Gamma via gammaln — never overflows (unlike jax_gamma for large args)
-    log_gamma = jax.scipy.special.gammaln(gamma_args)
+    # log|term_k| = k*log|z| - gammaln(a*k + b), k=0 → log_zpow=0
+    # Fused into a single expression: avoids separate log_zpow and log_gamma arrays.
+    log_abs_terms = jnp.where(k == 0, 0.0, k * log_abs_z) - jax.scipy.special.gammaln(
+        alpha * k + beta
+    )
 
-    # log|term_k| = log|z^k| - lgamma(a*k + b), clamped to avoid exp overflow
-    log_abs_terms = log_zpow - log_gamma
-    log_abs_terms = jnp.minimum(log_abs_terms, 700.0)
-    abs_terms = jnp.exp(log_abs_terms)
+    # Clamp to avoid exp overflow, then exponentiate once.
+    abs_terms = jnp.exp(jnp.minimum(log_abs_terms, 700.0))
 
     # Zero out when z ≈ 0 and k > 0 (z^k → 0, but log-space gives artefacts)
     abs_terms = jnp.where((k > 0) & (abs_z < 1e-300), 0.0, abs_terms)
 
     # R11-ML-001: Zero out negligible terms to avoid unnecessary computation
-    max_term = jnp.max(abs_terms)
-    abs_terms = jnp.where(abs_terms < 1e-30 * max_term, 0.0, abs_terms)
+    abs_terms = jnp.where(abs_terms < 1e-30 * jnp.max(abs_terms), 0.0, abs_terms)
 
-    # Sign: z^k = |z|^k for z >= 0,  (-1)^k |z|^k for z < 0
-    neg_sign = jnp.where(k % 2 == 0, 1.0, -1.0)
-    sign = jnp.where(z >= 0, 1.0, neg_sign)
+    # Sign: z^k = |z|^k for z >= 0,  (-1)^k |z|^k for z < 0.
+    # Fused sign computation — no separate neg_sign variable.
+    sign = jnp.where(z >= 0, 1.0, jnp.where(k % 2 == 0, 1.0, -1.0))
 
     return jnp.sum(sign * abs_terms)
 
@@ -252,19 +257,31 @@ def _ml_asymptotic_neg(z, alpha, beta, n_terms=20):
     """
     Asymptotic expansion for large negative z (Relaxation mode).
     E_{a,b}(z) ~ - sum_{k=1}^N z^(-k) / Gamma(beta - alpha*k)
+
+    ML-03: Precompute all gamma_args as a vector, then apply vmap(_safe_rgamma)
+    once and do a single vectorized dot product.  Eliminates the fori_loop and
+    reduces the number of sequential kernel dispatches from n_terms to 1.
     """
     inv_z = 1.0 / z
+    # k = 1 .. n_terms as a static vector (shape (n_terms,))
+    ks = jnp.arange(1, n_terms + 1, dtype=jnp.float64)
 
-    def body(k, val):
-        # k goes from 1 to n_terms
-        # Term = z^(-k) / Gamma(beta - alpha*k)
-        # Use safe reciprocal gamma to handle poles
-        rgamma_val = _safe_rgamma(beta - alpha * k)
-        term = (inv_z**k) * rgamma_val
-        # Series is - sum(...)
-        return val - term
+    # Precompute all gamma arguments in one shot
+    gamma_args = beta - alpha * ks  # shape (n_terms,)
 
-    return jax.lax.fori_loop(1, n_terms + 1, body, jnp.zeros_like(z))
+    # Vectorised reciprocal-gamma over all 20 arguments at once
+    rgamma_vals = jax.vmap(_safe_rgamma)(gamma_args)  # shape (n_terms,)
+
+    # inv_z^k = exp(k * log(inv_z)) — more numerically stable than pow iteration
+    # inv_z is a scalar (negative, so take absolute value first then restore sign)
+    # Note: z < 0 and k is integer → sign of inv_z^k follows (-1)^k
+    abs_inv_z = jnp.abs(inv_z)
+    pow_abs = jnp.exp(ks * jnp.log(jnp.maximum(abs_inv_z, 1e-300)))
+    inv_z_pow = jnp.where(ks % 2 == 0, pow_abs, -pow_abs)  # restores sign of inv_z^k
+
+    # Signed terms and sum; series is -sum(...)
+    terms = inv_z_pow * rgamma_vals
+    return -jnp.sum(terms)
 
 
 def _sigmoid_blend(x, transition, width=1.0):
@@ -341,6 +358,10 @@ def _mittag_leffler_hybrid(z, alpha, beta):
             # n_iter=300 ensures accuracy up to z=10.0
             # For negative z, the dynamic threshold ensures we don't evaluate
             # deep in the unstable region where Taylor explodes.
+            #
+            # ML-01: Compute val_taylor exactly once and reuse it for both the
+            # alpha>=1 fallback in val_neg and the blend targets below.
+            # Previously _ml_taylor was called twice per element in this branch.
             val_taylor = _ml_taylor(z_val, a_val, b_val, n_iter=300)
 
             # Positive Asymptotic (guarded)
@@ -356,7 +377,7 @@ def _mittag_leffler_hybrid(z, alpha, beta):
 
             # The negative asymptotic expansion diverges for alpha >= 1
             # (1/Gamma(b-ak) grows factorially while z^{-k} decays exponentially).
-            # Fall back to Taylor series which converges for all finite z.
+            # Reuse the already-computed val_taylor — no second call needed (ML-01).
             val_neg = jnp.where(a_val < 1.0, val_neg_raw, val_taylor)
 
             # Blend Neg <-> Taylor (Left transition)

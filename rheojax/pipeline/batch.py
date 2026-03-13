@@ -398,8 +398,8 @@ class BatchPipeline:
             if step_action in ("fit", "fit_nlsq"):
                 model_cls = type(step_obj)
                 new_model = model_cls()
-                X = np.array(pipeline.data.x)
-                y = np.array(pipeline.data.y)
+                X = np.asarray(pipeline.data.x)
+                y = np.asarray(pipeline.data.y)
                 _lfk = getattr(step_obj, "_last_fit_kwargs", None)
                 fit_kwargs_replay = dict(_lfk) if _lfk is not None else {}
                 # Strip internal tracking keys and protocol-specific kwargs
@@ -437,13 +437,17 @@ class BatchPipeline:
                 )
             elif step_action == "transform":
                 # Re-apply the transform to the pipeline's current data.
-                # NOTE: deepcopy carries fitted state from the template (e.g.
-                # shift_factors in Mastercurve).  This is intentional for
-                # transforms that should reuse the template's fitted params,
-                # but wrong for transforms that must re-fit per dataset.
+                # SYS-08: use shallow copy for stateless transforms to avoid
+                # cloning large internal buffers.  Stateless transforms expose a
+                # `stateless` class attribute (or instance attribute) set to True.
+                # Transforms with fitted state (e.g. Mastercurve shift_factors)
+                # keep deepcopy to preserve template params across datasets.
                 try:
                     transform_cls = type(step_obj)
-                    new_transform = copy.deepcopy(step_obj)
+                    if getattr(step_obj, "stateless", False):
+                        new_transform = copy.copy(step_obj)
+                    else:
+                        new_transform = copy.deepcopy(step_obj)
                     transform_result = new_transform.transform(pipeline.data)
                     # Handle transforms that return (data, extra) tuples
                     if isinstance(transform_result, tuple):
@@ -480,12 +484,12 @@ class BatchPipeline:
                     )
                     continue
                 try:
-                    X = np.array(pipeline.data.x)
+                    X = np.asarray(pipeline.data.x)
                     if pipeline.data.y is None:
                         raise ValueError(
                             f"Cannot replay fit_bayesian: data.y is None for {path}"
                         )
-                    y = np.array(pipeline.data.y)
+                    y = np.asarray(pipeline.data.y)
                     _bayes_kwargs: dict[str, Any] = {}
                     # Forward test_mode from fit replay
                     if "test_mode" in fit_kwargs_replay:
@@ -571,8 +575,8 @@ class BatchPipeline:
         # Compute metrics if model was fitted
         if pipeline._last_model is not None:
             model = pipeline._last_model
-            X = np.array(result.x)
-            y = np.array(result.y)
+            X = np.asarray(result.x)
+            y = np.asarray(result.y)
 
             with log_fit(
                 logger,
@@ -597,14 +601,38 @@ class BatchPipeline:
     def _clone_pipeline(self, pipeline: Pipeline) -> Pipeline:
         """Clone pipeline for independent execution.
 
+        SYS-07: Lightweight structural clone — avoids deep-copying JAX arrays,
+        compiled closures, and large data buffers that are not used by the
+        replay loop in _process_file.  _process_file immediately resets
+        pipeline.steps, pipeline._last_model, and pipeline.data, so only a
+        valid fresh Pipeline instance is required here.
+
         Args:
             pipeline: Pipeline to clone
 
         Returns:
-            New Pipeline instance
+            New Pipeline instance with a clean state (no data, no model)
         """
-        # R8-PIPE-002: implement clone instead of returning empty Pipeline
-        return copy.deepcopy(pipeline)
+        clone = Pipeline.__new__(Pipeline)
+        # Initialise all instance fields to match Pipeline.__init__ defaults.
+        # We intentionally exclude: data, _last_model, _last_fit_result,
+        # _last_bayesian_result, _transform_results, _current_figure,
+        # _diagnostic_results, _last_comparison (all reset by _process_file).
+        import uuid as _uuid
+
+        clone.data = None
+        clone.steps = []
+        clone.history = list(pipeline.history)
+        clone._last_model = None
+        clone._last_fit_result = None
+        clone._last_bayesian_result = None
+        clone._transform_results = {}
+        clone._last_transform_name = None
+        clone._current_figure = None
+        clone._diagnostic_results = None
+        clone._last_comparison = None
+        clone._id = str(_uuid.uuid4())[:8]
+        return clone
 
     def get_results(self) -> list[tuple[Path, RheoData, dict[str, Any]]]:
         """Get all processing results.

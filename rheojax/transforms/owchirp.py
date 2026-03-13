@@ -244,40 +244,53 @@ class OWChirp(BaseTransform):
                 stacklevel=2,
             )
 
-        coefficients_list = []
-
         # R10-OWC-002: Zero-pad to 2× length for linear (non-circular) correlation.
         # The FFT-based cross-correlation is circular by default; zero-padding to at
         # least 2N prevents wrap-around aliasing in the time domain.
         n_orig = len(t)
         n_pad = 2 * n_orig
 
-        for freq in frequencies:
-            # Center wavelet at t=0 for correct FFT cross-correlation (R10-OWC-002).
-            # Centering at the signal midpoint shifts the phase of the output by a
-            # frequency-dependent amount, causing systematic wavelet centering errors.
+        # TR-01: Vectorized batched FFT — replaces the Python for-loop over
+        # frequencies (which issued 200 sequential FFT calls) with 3 batched
+        # operations: one fft on the wavelet matrix, one pointwise multiply, one
+        # ifft.  Shape legend: F = n_frequencies, N = n_orig, P = n_pad.
+
+        # Build wavelet matrix (F, P) — all wavelets zero-padded in one shot.
+        # vmap over frequencies; each call produces a length-n_orig complex array
+        # that is then zero-padded to n_pad.
+        def _make_wavelet_row(freq: Array) -> Array:
+            """Return zero-padded wavelet for a single frequency (shape: (n_pad,))."""
+            # Center at t=0 per R10-OWC-002 convention.
             wavelet = self._chirp_wavelet(t, 0.0, freq, self.wavelet_width)
+            return jnp.pad(wavelet, (0, n_pad - n_orig))
 
-            # Zero-pad signal and wavelet to 2N
-            signal_padded = jnp.pad(signal, (0, n_pad - n_orig))
-            wavelet_padded = jnp.pad(wavelet, (0, n_pad - n_orig))
+        # wavelet_matrix: (F, P)
+        wavelet_matrix = jax.vmap(_make_wavelet_row)(jnp.asarray(frequencies))
 
-            # FFT-based cross-correlation (conj of wavelet in frequency domain)
-            signal_fft = jnp.fft.fft(signal_padded)
-            wavelet_fft = jnp.fft.fft(wavelet_padded)
-            conv = jnp.fft.ifft(signal_fft * jnp.conj(wavelet_fft))
+        # Single batched FFT of all wavelets: (F, P)
+        wavelet_fft_matrix = jnp.fft.fft(wavelet_matrix, axis=-1)
 
-            # Trim to original length
-            conv_trimmed = conv[:n_orig]
+        # Signal: pad once and FFT once → (P,)
+        signal_padded = jnp.pad(signal, (0, n_pad - n_orig))
+        signal_fft = jnp.fft.fft(signal_padded)  # (P,)
 
-            # Apply 1/√f scale normalization (standard L² CWT normalization)
-            # R7-OWC-002: Guard against freq=0 (logspace guarantees positive but
-            # defend against edge cases in direct calls)
-            conv_normalized = conv_trimmed / jnp.sqrt(max(float(freq), 1e-30))
+        # Cross-correlation in frequency domain; broadcast signal_fft over F axis.
+        # signal_fft[None, :] is (1, P); result is (F, P).
+        conv_fft = signal_fft[None, :] * jnp.conj(wavelet_fft_matrix)
 
-            coefficients_list.append(conv_normalized)
+        # Single batched IFFT: (F, P) → trim to (F, N)
+        conv_full = jnp.fft.ifft(conv_fft, axis=-1)
+        conv_trimmed = conv_full[:, :n_orig]  # (F, N)
 
-        coefficients = jnp.stack(coefficients_list, axis=0)
+        # Apply 1/√f scale normalization (standard L² CWT normalization).
+        # TR-02: Use jnp.maximum instead of Python max() — avoids device→host
+        # transfer when frequencies is a JAX array.
+        # R7-OWC-002: Guard against freq=0 (logspace guarantees positive values
+        # but defend against edge cases in direct calls).
+        freq_safe = jnp.maximum(jnp.asarray(frequencies), 1e-30)  # (F,)
+        scale = jnp.sqrt(freq_safe)[:, None]  # (F, 1) for broadcasting over N
+
+        coefficients = conv_trimmed / scale  # (F, N)
 
         return coefficients * dt
 

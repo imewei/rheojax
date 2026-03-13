@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 _overrides: dict[str, Any] = {}
 _config_lock = threading.Lock()
 
+# SYS-04: Cache the JAX GPU device count so jax.devices() is called at most
+# once per process.  Initialised to None (sentinel = "not yet queried").
+_cached_gpu_count: int | None = None
+_gpu_count_lock = threading.Lock()
+
 
 def get_default_workers() -> int:
     """Optimal worker count for the current system.
@@ -46,20 +51,27 @@ def get_default_workers() -> int:
 
     cpu_count = multiprocessing.cpu_count() or 1
 
-    # GPU-aware: each worker needs ~2GB GPU RAM
-    try:
-        from rheojax.core.jax_config import safe_import_jax
+    # GPU-aware: each worker needs ~2GB GPU RAM.
+    # SYS-04: Cache the device-count query — jax.devices() triggers JAX
+    # initialisation and is expensive when called on every invocation.
+    global _cached_gpu_count
+    with _gpu_count_lock:
+        if _cached_gpu_count is None:
+            try:
+                from rheojax.core.jax_config import safe_import_jax
 
-        jax, _ = safe_import_jax()
-        devices = jax.devices()
-        gpu_count = sum(1 for d in devices if d.platform != "cpu")
-        if gpu_count > 0:
-            return min(gpu_count, cpu_count, 4)
-    except (ImportError, RuntimeError, AttributeError):
-        # ImportError: JAX not installed
-        # RuntimeError: JAX initialization failed
-        # AttributeError: API mismatch
-        pass
+                jax, _ = safe_import_jax()
+                devices = jax.devices()
+                _cached_gpu_count = sum(1 for d in devices if d.platform != "cpu")
+            except (ImportError, RuntimeError, AttributeError):
+                # ImportError: JAX not installed
+                # RuntimeError: JAX initialization failed
+                # AttributeError: API mismatch
+                _cached_gpu_count = 0
+        gpu_count = _cached_gpu_count
+
+    if gpu_count > 0:
+        return min(gpu_count, cpu_count, 4)
 
     # CPU: half of cores, min 1, max 8 for practical memory limits
     return max(1, min(cpu_count // 2, 8))

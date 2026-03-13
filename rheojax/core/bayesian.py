@@ -130,8 +130,12 @@ class BayesianResult:
             num_chains=self.num_chains,
         )
         # Ensure posterior_samples are float64 numpy arrays
+        # BAY-05: skip copy when already float64 NumPy to avoid eager allocation
         for name, samples in self.posterior_samples.items():
-            self.posterior_samples[name] = np.asarray(samples, dtype=np.float64)
+            arr = np.asarray(samples)
+            if arr.dtype != np.float64:
+                arr = arr.astype(np.float64)
+            self.posterior_samples[name] = arr
         logger.debug(
             "BayesianResult initialized",
             parameter_names=list(self.posterior_samples.keys()),
@@ -511,16 +515,22 @@ class BayesianMixin:
             y_real = jnp.real(y_complex)
             y_imag = jnp.imag(y_complex)
 
-            # Compute scale from JAX arrays (std computation is fast)
-            scale_info["y_real_scale"] = float(jnp.std(y_real)) if y_real.size else 0.0
-            scale_info["y_imag_scale"] = float(jnp.std(y_imag)) if y_imag.size else 0.0
-            # Mean magnitude for sigma prior flooring (constant-data guard)
-            scale_info["y_real_mean"] = (
-                float(jnp.mean(jnp.abs(y_real))) if y_real.size else 0.0
-            )
-            scale_info["y_imag_mean"] = (
-                float(jnp.mean(jnp.abs(y_imag))) if y_imag.size else 0.0
-            )
+            # SYS-09: Batch all four reductions into one jnp.stack + single
+            # device→host transfer, avoiding 4 separate sync stalls.
+            if y_real.size:
+                _stats = jnp.stack(
+                    [jnp.std(y_real), jnp.std(y_imag),
+                     jnp.mean(jnp.abs(y_real)), jnp.mean(jnp.abs(y_imag))]
+                ).tolist()
+                scale_info["y_real_scale"] = _stats[0]
+                scale_info["y_imag_scale"] = _stats[1]
+                scale_info["y_real_mean"] = _stats[2]
+                scale_info["y_imag_mean"] = _stats[3]
+            else:
+                scale_info["y_real_scale"] = 0.0
+                scale_info["y_imag_scale"] = 0.0
+                scale_info["y_real_mean"] = 0.0
+                scale_info["y_imag_mean"] = 0.0
 
             scale_info["n_real"] = int(y_real.shape[0])
             y_jax = jnp.concatenate([y_real, y_imag])
@@ -857,18 +867,23 @@ class BayesianMixin:
             num_samples=num_samples,
             num_chains=num_chains,
         )
-        samples = mcmc.get_samples()
-
-        # Get chain-grouped samples for diagnostics (explicit shape, not
-        # relying on implicit concatenation ordering from get_samples())
+        # BAY-03: call get_samples only once (group_by_chain=True), then
+        # derive the flat form by reshaping — avoids a redundant device→host
+        # transfer that get_samples() without group_by_chain would trigger.
         try:
             samples_grouped = mcmc.get_samples(group_by_chain=True)
+            # Flat samples = concatenate along the chain axis (axis 0)
+            samples = {
+                k: v.reshape((-1,) + v.shape[2:])
+                for k, v in samples_grouped.items()
+            }
         except Exception as exc:
             logger.debug(
                 "group_by_chain failed, falling back to ungrouped samples",
                 error=str(exc),
             )
             samples_grouped = None
+            samples = mcmc.get_samples()
 
         # Convert to numpy arrays (model parameters only)
         posterior_samples = {}
@@ -900,17 +915,19 @@ class BayesianMixin:
                     samples_grouped[name], dtype=np.float64
                 )
 
-        # Compute summary statistics
+        # BAY-04: consolidate per-parameter percentile passes into one
+        # np.quantile call per parameter (7 passes → 1 pass + 2 scalars).
         summary = {}
         for name, sample_array in posterior_samples.items():
+            qs = np.quantile(sample_array, [0.05, 0.25, 0.50, 0.75, 0.95])
             summary[name] = {
                 "mean": float(np.mean(sample_array)),
                 "std": float(np.std(sample_array)),
-                "median": float(np.median(sample_array)),
-                "q05": float(np.percentile(sample_array, 5)),
-                "q25": float(np.percentile(sample_array, 25)),
-                "q75": float(np.percentile(sample_array, 75)),
-                "q95": float(np.percentile(sample_array, 95)),
+                "median": float(qs[2]),
+                "q05": float(qs[0]),
+                "q25": float(qs[1]),
+                "q75": float(qs[3]),
+                "q95": float(qs[4]),
             }
 
         diagnostics = self._compute_diagnostics(
@@ -1760,8 +1777,9 @@ class BayesianMixin:
                         name, dist.Uniform(low=lower, high=upper)
                     )
 
-            # Convert to array and compute predictions
-            params_array = jnp.array([params_dict[name] for name in param_names])
+            # BAY-01: use jnp.stack instead of jnp.array(list-comp) so this
+            # compiles to a single XLA concatenation op in the NUTS hot path.
+            params_array = jnp.stack([params_dict[name] for name in param_names])
 
             # Forward protocol kwargs to model_function
             # FIKH, FMLIKH models need strain= kwarg for startup/laos modes
@@ -1776,12 +1794,14 @@ class BayesianMixin:
             # 1) Per-element log-probability penalty to reject NaN regions
             # 2) Replace NaN with 0.0 to prevent downstream tracing errors
             is_finite = jnp.isfinite(predictions_raw)
-            # Per-element penalty: each NaN contributes -1e18 to log-prob,
-            # ensuring NUTS strongly rejects parameter regions producing NaN.
+            # SYS-12: compute penalty and count in one pass over is_finite.
+            # jnp.where emits an element-wise select; summing the boolean
+            # directly for the count re-uses the already-live is_finite buffer.
+            not_finite = ~is_finite
             finite_penalty = jnp.where(is_finite, 0.0, -1e18).sum()
             numpyro.factor("finite_check", finite_penalty)
             numpyro.deterministic(
-                "num_nonfinite", jnp.sum(~is_finite).astype(jnp.float64)
+                "num_nonfinite", not_finite.sum().astype(jnp.float64)
             )
             predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
 

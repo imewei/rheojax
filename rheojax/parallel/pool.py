@@ -269,12 +269,14 @@ class PersistentProcessPool:
 
         # PARALLEL-002: Wait for the result-collector thread to exit before
         # draining the queue.  _collect_results checks self._shutdown (set
-        # above) and exits after at most one queue.get() timeout (0.1 s).
+        # above) and exits after at most one queue.get() timeout (1.0 s,
+        # raised from 0.1 s by SYS-03).  Use 2.0 s join budget to give the
+        # thread a full polling cycle plus margin to exit cleanly.
         # Joining ensures we do not concurrently drain the queue from two
         # threads, and that the thread is no longer accessing the queue when
         # we call q.close() below.
         if self._result_thread is not None and self._result_thread.is_alive():
-            self._result_thread.join(timeout=1.0)
+            self._result_thread.join(timeout=2.0)
 
         # Drain remaining results from queue before closing
         import queue as _queue
@@ -312,12 +314,19 @@ class PersistentProcessPool:
         logger.debug("PersistentProcessPool shut down")
 
     def _collect_results(self) -> None:
-        """Background thread that routes results to futures."""
+        """Background thread that routes results to futures.
+
+        SYS-03: Poll interval raised to 1.0s (was 0.1s) to reduce CPU burn
+        from busy-waiting.  JAX tasks are long-running (seconds to minutes),
+        so 1 Hz polling adds negligible latency while cutting thread wake-ups
+        by 10x.  shutdown() joins this thread with a 1.0s budget, which is
+        already accounted for in the existing join timeout.
+        """
         import queue as _queue
 
         while not self._shutdown:
             try:
-                msg = self._result_queue.get(timeout=0.1)
+                msg = self._result_queue.get(timeout=1.0)
             except (_queue.Empty, EOFError, OSError):
                 # Empty: normal timeout, no results pending
                 # EOFError/OSError: queue closed during shutdown

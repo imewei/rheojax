@@ -317,11 +317,11 @@ class Pipeline:
         X = self.data.x
         y = self.data.y
 
-        # Convert to numpy for fitting
+        # Convert to numpy for fitting — np.asarray is zero-copy for CPU arrays
         if _is_jax_array(X):
-            X = np.array(X)
+            X = np.asarray(X)
         if _is_jax_array(y):
-            y = np.array(y)
+            y = np.asarray(y)
 
         with log_pipeline_stage(
             logger,
@@ -401,9 +401,9 @@ class Pipeline:
                 raise ValueError("No data available for prediction.")
             X = self.data.x
 
-        # Convert to numpy for prediction
+        # Convert to numpy for prediction — np.asarray is zero-copy for CPU arrays
         if _is_jax_array(X):
-            X = np.array(X)
+            X = np.asarray(X)
 
         logger.debug(
             "Generating predictions",
@@ -780,9 +780,9 @@ class Pipeline:
         X = self.data.x
         y = self.data.y
         if _is_jax_array(X):
-            X = np.array(X)
+            X = np.asarray(X)
         if _is_jax_array(y):
-            y = np.array(y)
+            y = np.asarray(y)
 
         # PIPE-WARM-001: strip pipeline-level `warm_start` kwarg — it must not
         # be forwarded to model.fit_bayesian(), which passes **nuts_kwargs
@@ -905,16 +905,9 @@ class Pipeline:
         fit_result = self.get_fit_result()
         plotter = FitPlotter()
 
-        X = (
-            np.array(self.data.x)
-            if _is_jax_array(self.data.x)
-            else np.asarray(self.data.x)
-        )
-        y = (
-            np.array(self.data.y)
-            if _is_jax_array(self.data.y)
-            else np.asarray(self.data.y)
-        )
+        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        X = np.asarray(self.data.x)
+        y = np.asarray(self.data.y)
 
         # Forward deformation_mode from metadata
         _meta = getattr(self.data, "metadata", None) or {}
@@ -988,16 +981,9 @@ class Pipeline:
         from rheojax.visualization.fit_plotter import FitPlotter
 
         plotter = FitPlotter()
-        X = (
-            np.array(self.data.x)
-            if _is_jax_array(self.data.x)
-            else np.asarray(self.data.x)
-        )
-        y = (
-            np.array(self.data.y)
-            if _is_jax_array(self.data.y)
-            else np.asarray(self.data.y)
-        )
+        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        X = np.asarray(self.data.x)
+        y = np.asarray(self.data.y)
 
         # Forward metadata
         _meta = getattr(self.data, "metadata", None) or {}
@@ -1268,9 +1254,9 @@ class Pipeline:
         y = self.data.y
 
         if _is_jax_array(X):
-            X = np.array(X)
+            X = np.asarray(X)
         if _is_jax_array(y):
-            y = np.array(y)
+            y = np.asarray(y)
 
         # Auto-propagate metadata
         # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
