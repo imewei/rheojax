@@ -25,7 +25,7 @@ from rheojax.core.jax_config import safe_import_jax
 
 # Safe import ensures float64
 jax, jnp = safe_import_jax()
-from jax import jit, lax  # noqa: E402
+jit, lax = jax.jit, jax.lax
 
 if TYPE_CHECKING:
     from jax import Array

@@ -52,7 +52,7 @@ from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
-from jax.scipy.special import gamma as jax_gamma
+jax_gamma = jax.scipy.special.gamma
 
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol

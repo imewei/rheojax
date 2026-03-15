@@ -34,7 +34,7 @@ jax, jnp = safe_import_jax()
 
 
 import numpy as np
-from jax.scipy.special import gamma as jax_gamma
+jax_gamma = jax.scipy.special.gamma
 
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData

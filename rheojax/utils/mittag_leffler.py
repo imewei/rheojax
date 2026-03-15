@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
-from jax.scipy.special import gamma as jax_gamma
+jax_gamma = jax.scipy.special.gamma
 
 # ML-CONST: Module-level constant for Taylor iteration indices.
 # Hoisted out of _ml_taylor to avoid re-materializing the array on every call

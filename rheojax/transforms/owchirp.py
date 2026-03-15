@@ -20,8 +20,8 @@ from rheojax.logging import get_logger
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-# Import Array for runtime isinstance checks
-from jax import Array
+# Array alias for runtime isinstance checks (via safe_import_jax handle)
+Array = jax.Array
 
 # Module logger
 logger = get_logger(__name__)
