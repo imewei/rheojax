@@ -750,9 +750,9 @@ class BayesianPipeline(Pipeline):
         idata = self._get_inference_data()
 
         # Filter degenerate parameters to prevent ArviZ KDE crashes
-        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
-            import numpy as np
+        import numpy as np
 
+        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
             all_vars = list(idata.posterior.data_vars)
             var_names = [
                 v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
@@ -856,9 +856,9 @@ class BayesianPipeline(Pipeline):
         idata = self._get_inference_data()
 
         # Filter degenerate parameters to prevent ArviZ KDE crashes
-        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
-            import numpy as np
+        import numpy as np
 
+        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
             all_vars = list(idata.posterior.data_vars)
             var_names = [
                 v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
