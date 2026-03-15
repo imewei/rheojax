@@ -1161,7 +1161,7 @@ class RheoJAXMainWindow(QMainWindow):
                     "dataset_id": config["dataset_id"],
                     "file_path": str(config["file_path"]),
                     "name": Path(config["file_path"]).stem,
-                    "test_mode": test_mode or "unknown",
+                    "test_mode": test_mode if test_mode is not None else "unknown",
                     "x_data": rheo_data.x,
                     "y_data": rheo_data.y,
                     "y2_data": getattr(rheo_data, "y2", None),

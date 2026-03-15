@@ -90,7 +90,7 @@ class DataService:
             y = y + 1j * y2
 
         # Determine domain from test_mode
-        test_mode = dataset.test_mode or "unknown"
+        test_mode = dataset.test_mode if dataset.test_mode is not None else "unknown"
         domain = "frequency" if test_mode == "oscillation" else "time"
 
         metadata = dict(dataset.metadata) if dataset.metadata else {}

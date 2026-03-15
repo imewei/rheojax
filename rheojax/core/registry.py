@@ -889,7 +889,9 @@ class ModelRegistry:
         test_mode = getattr(data, "test_mode", None)
         if test_mode is None:
             metadata = getattr(data, "metadata", {})
-            test_mode = metadata.get("test_mode") or metadata.get("detected_test_mode")
+            test_mode = metadata.get("test_mode")
+            if test_mode is None:
+                test_mode = metadata.get("detected_test_mode")
 
         protocol = test_mode if test_mode else None
 
