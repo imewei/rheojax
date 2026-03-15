@@ -44,8 +44,13 @@ def page(qapp, mock_store):
 
 
 def test_sidebar_populated_with_transforms(page):
-    """Sidebar list has items for all 7 transforms."""
-    assert page._sidebar.count() == 7
+    """Sidebar list has items for all registered transforms."""
+    from rheojax.core.registry import TransformRegistry
+    from rheojax.transforms import _ensure_all_registered
+
+    _ensure_all_registered()
+    expected = len(TransformRegistry.list_transforms())
+    assert page._sidebar.count() == expected
 
 
 def test_selecting_transform_shows_params(page):
@@ -82,8 +87,13 @@ def test_apply_emits_signal(page, mock_store):
 
 def test_get_available_transforms_returns_metadata(page):
     """get_available_transforms() delegates to service."""
+    from rheojax.core.registry import TransformRegistry
+    from rheojax.transforms import _ensure_all_registered
+
+    _ensure_all_registered()
+    expected = len(TransformRegistry.list_transforms())
     transforms = page.get_available_transforms()
-    assert len(transforms) == 7
+    assert len(transforms) == expected
     assert all("key" in t for t in transforms)
 
 
