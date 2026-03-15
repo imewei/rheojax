@@ -1563,7 +1563,12 @@ class SGRGeneric(BaseModel):
         x = self.parameters.get_value("x")
         G0_scale = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
-        gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
+        gamma_dot = getattr(self, "_startup_gamma_dot", None)
+        if gamma_dot is None:
+            raise RuntimeError(
+                "SGRGeneric._predict_startup requires _startup_gamma_dot. "
+                "Call fit() with test_mode='startup' first."
+            )
         t_jax = jnp.asarray(t)
         eta_plus_jax = self._predict_startup_jit(t_jax, x, G0_scale, tau0, gamma_dot)
         return np.array(eta_plus_jax)

@@ -534,6 +534,9 @@ def _setup_and_predict(model, model_name: str, protocol: str):
             "omega": 1.0,
         }
 
+    elif model_name in ("sgr_conventional", "sgr_generic") and protocol == "startup":
+        model._startup_gamma_dot = 1.0
+
     # Generate standard test data for this protocol
     X, kwargs = ProtocolDataFactory.generate(Protocol(protocol))
     return _try_predict_with_test_mode(model, X, kwargs)
