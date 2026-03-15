@@ -585,7 +585,7 @@ class MLIKH(IKHBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) or "startup")
+            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "startup")
         )
 
         # Get parameters as dict

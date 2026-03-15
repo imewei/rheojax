@@ -492,7 +492,7 @@ class MIKH(IKHBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) or "startup")
+            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "startup")
         )
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))

@@ -482,7 +482,8 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             ValueError: If test mode is not supported.
         """
         if test_mode is None:
-            test_mode = getattr(self, "_test_mode", None) or "startup"
+            _cached = getattr(self, "_test_mode", None)
+            test_mode = _cached if _cached is not None else "startup"
 
         # Handle string conversion
         if isinstance(test_mode, str):

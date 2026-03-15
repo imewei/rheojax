@@ -243,7 +243,7 @@ class VLBLocal(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) or "flow_curve")
+            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
         )
         self._test_mode = test_mode
 
@@ -345,7 +345,7 @@ class VLBLocal(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) or "flow_curve")
+            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -412,7 +412,7 @@ class VLBLocal(VLBBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) or "flow_curve")
+            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
