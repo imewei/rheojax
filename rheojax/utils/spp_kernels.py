@@ -746,10 +746,10 @@ def spp_fourier_analysis(
         axis=1,
     )
 
-    # Magnitudes
+    # Magnitudes (+ 1e-30 guards sqrt(0) infinite gradient)
     eps = 1e-20
-    mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1))
-    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
+    mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1) + 1e-30)
+    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1) + 1e-30)
 
     # R11-SPP-KRN-001: Avoid sign(0)=0 at Frenet degeneracy
     denom = rd_x_rdd[:, 2]
@@ -1721,10 +1721,10 @@ def spp_numerical_analysis(
         axis=1,
     )
 
-    # Magnitudes for Frenet-Serret frame
+    # Magnitudes for Frenet-Serret frame (+ 1e-30 guards sqrt(0) infinite gradient)
     eps = 1e-20  # Avoid division by zero
-    mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1))
-    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
+    mag_rd = jnp.sqrt(jnp.sum(rd**2, axis=1) + 1e-30)
+    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1) + 1e-30)
 
     # R11-SPP-KRN-001: Avoid sign(0)=0 at Frenet degeneracy
     # G'_t = -rd_x_rdd[:,0] / rd_x_rdd[:,2]
@@ -2136,9 +2136,9 @@ def frenet_serret_frame(
         axis=1,
     )
 
-    # Magnitudes
-    mag_rd = jnp.sqrt(jnp.sum(rd_arr**2, axis=1))
-    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1))
+    # Magnitudes (+ 1e-30 guards sqrt(0) infinite gradient)
+    mag_rd = jnp.sqrt(jnp.sum(rd_arr**2, axis=1) + 1e-30)
+    mag_rd_x_rdd = jnp.sqrt(jnp.sum(rd_x_rdd**2, axis=1) + 1e-30)
 
     # Tangent vector: T = rd / |rd|
     T_vec = rd_arr / jnp.maximum(mag_rd[:, None], eps)

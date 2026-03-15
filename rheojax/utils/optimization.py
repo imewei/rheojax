@@ -2634,7 +2634,7 @@ def create_least_squares_objective(
                     return jnp.concatenate([resid_col0, resid_col1])
                 else:
                     # (N, 2) pred, (N,) data: fit to magnitude |G*|
-                    y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2)
+                    y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2 + 1e-30)
 
                     _resid = y_pred_magnitude - y_data_jax
 
