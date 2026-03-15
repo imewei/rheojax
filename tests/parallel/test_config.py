@@ -1,9 +1,23 @@
 """Tests for parallel configuration."""
 
 import os
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
+
+
+@contextmanager
+def _no_xdist_env(**extra):
+    """Context manager that clears PYTEST_XDIST_WORKER to test non-sequential paths.
+
+    Under pytest-xdist, is_sequential_mode() auto-returns True, which masks
+    the behavior of worker count overrides. This helper creates a clean env.
+    """
+    clean_env = {k: v for k, v in os.environ.items() if k != "PYTEST_XDIST_WORKER"}
+    clean_env.update(extra)
+    with patch.dict(os.environ, clean_env, clear=True):
+        yield
 
 
 class TestParallelConfig:
@@ -19,13 +33,14 @@ class TestParallelConfig:
     def test_env_override_workers(self):
         from rheojax.parallel.config import get_default_workers
 
-        with patch.dict(os.environ, {"RHEOJAX_PARALLEL_WORKERS": "8"}):
+        with _no_xdist_env(RHEOJAX_PARALLEL_WORKERS="8"):
             assert get_default_workers() == 8
 
     def test_sequential_mode(self):
         from rheojax.parallel.config import is_sequential_mode
 
-        assert not is_sequential_mode()
+        with _no_xdist_env():
+            assert not is_sequential_mode()
         with patch.dict(os.environ, {"RHEOJAX_SEQUENTIAL": "1"}):
             assert is_sequential_mode()
 
@@ -54,9 +69,10 @@ class TestParallelConfig:
 
         try:
             configure(n_workers=6, warm_pool=True)
-            cfg = get_parallel_config()
-            assert cfg["n_workers"] == 6
-            assert cfg["warm_pool"] is True
+            with _no_xdist_env():
+                cfg = get_parallel_config()
+                assert cfg["n_workers"] == 6
+                assert cfg["warm_pool"] is True
         finally:
             configure()
 
@@ -65,8 +81,9 @@ class TestParallelConfig:
 
         from rheojax.parallel.config import get_default_workers
 
-        n = get_default_workers()
-        assert n <= multiprocessing.cpu_count()
+        with _no_xdist_env():
+            n = get_default_workers()
+            assert n <= multiprocessing.cpu_count()
 
     def test_sequential_mode_overrides_workers_env(self):
         """RHEOJAX_SEQUENTIAL=1 takes priority over RHEOJAX_PARALLEL_WORKERS."""
@@ -82,7 +99,7 @@ class TestParallelConfig:
         """Non-integer RHEOJAX_PARALLEL_WORKERS falls back to auto-detection."""
         from rheojax.parallel.config import get_default_workers
 
-        with patch.dict(os.environ, {"RHEOJAX_PARALLEL_WORKERS": "not_a_number"}):
+        with _no_xdist_env(RHEOJAX_PARALLEL_WORKERS="not_a_number"):
             n = get_default_workers()
             assert isinstance(n, int)
             assert n >= 1
@@ -103,7 +120,8 @@ class TestParallelConfig:
 
         try:
             configure(n_workers=0)
-            assert get_default_workers() == 1
+            with _no_xdist_env():
+                assert get_default_workers() == 1
         finally:
             configure()
 
