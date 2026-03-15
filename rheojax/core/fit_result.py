@@ -521,12 +521,19 @@ class FitResult:
         if y_arr is not None and fitted is not None:
             from rheojax.utils.optimization import OptimizationResult
 
-            residuals = (np.asarray(y_arr) - np.asarray(fitted)).ravel()
+            y_np = np.asarray(y_arr)
+            fitted_np = np.asarray(fitted)
+            if np.iscomplexobj(y_np):
+                residuals = np.concatenate(
+                    [y_np.real - fitted_np.real, y_np.imag - fitted_np.imag]
+                )
+            else:
+                residuals = (y_np - fitted_np).ravel()
             opt_result = OptimizationResult(
                 x=np.array(param_values),
                 fun=float(np.sum(residuals**2)),
                 success=_success,
-                y_data=np.asarray(y_arr),
+                y_data=y_np,
                 residuals=residuals,
                 n_data=_n_data,
                 _is_complex_split=_is_complex_split,
