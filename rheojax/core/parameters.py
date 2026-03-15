@@ -276,9 +276,10 @@ class Parameter:
         # The old guard (hasattr "aval") also rejected concrete jax.Array
         # scalars which have .aval but are NOT tracers.
         try:
-            import jax.core as _jax_core
+            from rheojax.core.jax_config import safe_import_jax
 
-            if isinstance(val, _jax_core.Tracer):
+            _jax, _ = safe_import_jax()
+            if isinstance(val, _jax.core.Tracer):
                 raise TypeError(
                     "Cannot set parameter value to a JAX traced value. "
                     "Call set_value() outside of @jax.jit."
