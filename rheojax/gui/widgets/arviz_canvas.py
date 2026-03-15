@@ -28,6 +28,27 @@ from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
+
+def _filter_degenerate_vars(idata: Any) -> list[str] | None:
+    """Filter out degenerate parameters (range < 1e-10) to prevent ArviZ KDE crashes.
+
+    Returns filtered var_names list, or None if no posterior data available.
+    """
+    import numpy as np
+
+    if not hasattr(idata, "posterior") or idata.posterior is None:
+        return None
+    var_names = list(idata.posterior.data_vars)
+    filtered = []
+    for v in var_names:
+        vals = idata.posterior[v].values.ravel()
+        if np.ptp(vals) > 1e-10:
+            filtered.append(v)
+        else:
+            logger.debug("Skipping degenerate parameter in ArviZ plot", param=v)
+    return filtered if filtered else None
+
+
 # Available ArviZ plot types
 PLOT_TYPES = [
     ("trace", "Trace Plot", "MCMC trace and posterior distributions"),
@@ -542,7 +563,13 @@ class ArvizCanvas(BaseArviZWidget):
         try:
             import arviz as az
 
-            self._arviz_plot(az.plot_trace, self._inference_data)
+            var_names = _filter_degenerate_vars(self._inference_data)
+            if var_names is None:
+                self._plot_fallback("No non-degenerate parameters to plot")
+                return
+            self._arviz_plot(
+                az.plot_trace, self._inference_data, var_names=var_names
+            )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -556,6 +583,10 @@ class ArvizCanvas(BaseArviZWidget):
         try:
             import arviz as az
 
+            var_names = _filter_degenerate_vars(self._inference_data)
+            if var_names is None:
+                self._plot_fallback("No non-degenerate parameters to plot")
+                return
             has_divergences = (
                 self._inference_data is not None
                 and hasattr(self._inference_data, "sample_stats")
@@ -564,7 +595,10 @@ class ArvizCanvas(BaseArviZWidget):
             )
 
             self._arviz_plot(
-                az.plot_pair, self._inference_data, divergences=has_divergences
+                az.plot_pair,
+                self._inference_data,
+                var_names=var_names,
+                divergences=has_divergences,
             )
         except ImportError:
             logger.error(
@@ -579,9 +613,14 @@ class ArvizCanvas(BaseArviZWidget):
         try:
             import arviz as az
 
+            var_names = _filter_degenerate_vars(self._inference_data)
+            if var_names is None:
+                self._plot_fallback("No non-degenerate parameters to plot")
+                return
             self._arviz_plot(
                 az.plot_forest,
                 self._inference_data,
+                var_names=var_names,
                 hdi_prob=self._hdi_prob,
                 combined=True,
             )
@@ -598,8 +637,15 @@ class ArvizCanvas(BaseArviZWidget):
         try:
             import arviz as az
 
+            var_names = _filter_degenerate_vars(self._inference_data)
+            if var_names is None:
+                self._plot_fallback("No non-degenerate parameters to plot")
+                return
             self._arviz_plot(
-                az.plot_posterior, self._inference_data, hdi_prob=self._hdi_prob
+                az.plot_posterior,
+                self._inference_data,
+                var_names=var_names,
+                hdi_prob=self._hdi_prob,
             )
         except ImportError:
             logger.error(

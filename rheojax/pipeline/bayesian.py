@@ -749,6 +749,18 @@ class BayesianPipeline(Pipeline):
         # Get InferenceData
         idata = self._get_inference_data()
 
+        # Filter degenerate parameters to prevent ArviZ KDE crashes
+        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
+            import numpy as np
+
+            all_vars = list(idata.posterior.data_vars)
+            var_names = [
+                v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
+            ]
+            if not var_names:
+                logger.warning("All posterior parameters are degenerate, skipping pair plot")
+                return self
+
         # Create pair plot
         axes = az.plot_pair(
             idata,
@@ -842,6 +854,18 @@ class BayesianPipeline(Pipeline):
 
         # Get InferenceData
         idata = self._get_inference_data()
+
+        # Filter degenerate parameters to prevent ArviZ KDE crashes
+        if var_names is None and hasattr(idata, "posterior") and idata.posterior is not None:
+            import numpy as np
+
+            all_vars = list(idata.posterior.data_vars)
+            var_names = [
+                v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
+            ]
+            if not var_names:
+                logger.warning("All posterior parameters are degenerate, skipping forest plot")
+                return self
 
         # Create forest plot
         axes = az.plot_forest(
