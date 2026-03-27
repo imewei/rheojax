@@ -882,6 +882,7 @@ class TestF002KwargsCache:
         assert dmt_exponential._laos_lam_init == 1.0
 
 
+@pytest.mark.slow
 class TestFitRelaxation:
     """Tests for _fit_relaxation implementation."""
 

@@ -572,7 +572,7 @@ class TestModelIntegration:
             # Some models may fail to fit with synthetic data, which is acceptable
             pass
 
-    @pytest.mark.flaky(reruns=2)
+    @pytest.mark.slow
     def test_smart_initialization_improves_fit(self):
         """Test that smart initialization improves fit quality vs defaults."""
         from rheojax.models import FractionalZenerSolidSolid

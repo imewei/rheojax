@@ -9,7 +9,6 @@ from rheojax.gui.utils.logging import install_gui_log_handler
 pytestmark = pytest.mark.gui
 
 
-@pytest.mark.flaky(reruns=2)
 def test_install_gui_log_handler_forwards_records() -> None:
     """Log records should reach the GUI append callback."""
     from PySide6.QtWidgets import QApplication
@@ -20,6 +19,14 @@ def test_install_gui_log_handler_forwards_records() -> None:
     root_logger = logging.getLogger()
     original_level = root_logger.level
     root_logger.setLevel(logging.DEBUG)
+
+    # Temporarily remove stream handlers to avoid "I/O operation on closed
+    # file" errors when xdist workers close stderr.
+    _removed: list[logging.Handler] = []
+    for h in list(root_logger.handlers):
+        if isinstance(h, logging.StreamHandler) and h is not handler:
+            root_logger.removeHandler(h)
+            _removed.append(h)
 
     logger = logging.getLogger("rheojax.gui.logging_test")
     logger.setLevel(logging.DEBUG)
@@ -33,5 +40,7 @@ def test_install_gui_log_handler_forwards_records() -> None:
     finally:
         logging.getLogger().removeHandler(handler)
         root_logger.setLevel(original_level)
+        for h in _removed:
+            root_logger.addHandler(h)
 
     assert any("hello gui logger" in line for line in captured)
