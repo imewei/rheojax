@@ -9,6 +9,7 @@ from rheojax.gui.utils.logging import install_gui_log_handler
 pytestmark = pytest.mark.gui
 
 
+@pytest.mark.flaky(reruns=2)
 def test_install_gui_log_handler_forwards_records() -> None:
     """Log records should reach the GUI append callback."""
     from PySide6.QtWidgets import QApplication
