@@ -69,6 +69,7 @@ class TestMemoryFormParameter:
         assert not info["is_glass"]
         assert model.memory_form == "full"
 
+    @pytest.mark.slow
     def test_full_memory_differs_from_simplified(self):
         """Test that full form gives quantitatively different results.
 
@@ -96,6 +97,7 @@ class TestMemoryFormParameter:
 
         assert "m=full" in repr_str
 
+    @pytest.mark.slow
     def test_memory_form_with_lorentzian(self):
         """Test full memory form with Lorentzian decorrelation."""
         model = ITTMCTSchematic(
@@ -154,6 +156,7 @@ class TestStressFormParameter:
         # Should produce positive stress values
         assert np.all(sigma >= 0)
 
+    @pytest.mark.slow
     def test_microscopic_differs_from_schematic(self):
         """Test that microscopic form gives different stress magnitudes."""
         gamma_dot = np.logspace(-1, 1, 5)
@@ -233,6 +236,7 @@ class TestCombinedFeatures:
         sigma = model.predict(gamma_dot, test_mode="flow_curve")
         assert np.all(sigma >= 0)
 
+    @pytest.mark.slow
     def test_all_options_combined(self):
         """Test combining all new options with existing options."""
         model = ITTMCTSchematic(

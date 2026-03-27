@@ -127,6 +127,7 @@ class TestEdgeCases:
         sigma_startup = model.predict(t, test_mode="startup", gamma_dot=1.0)
         assert sigma_startup[0] == pytest.approx(0.0, abs=1e-10)
 
+    @pytest.mark.slow
     def test_single_point_prediction(self):
         """Test prediction for single data point."""
         model = ITTMCTSchematic(epsilon=0.05)
@@ -137,6 +138,7 @@ class TestEdgeCases:
         assert len(sigma) == 1
         assert sigma[0] > 0
 
+    @pytest.mark.slow
     def test_numerical_stability_extreme_rates(self):
         """Test numerical stability at extreme shear rates."""
         model = ITTMCTSchematic(epsilon=0.05)

@@ -129,6 +129,7 @@ class TestFlowCurveProtocol:
         # Glass should show yield stress (non-zero at γ̇ → 0)
         assert sigma[0] > 0
 
+    @pytest.mark.slow
     def test_flow_curve_shear_thinning(self):
         """Test shear thinning behavior."""
         model = ITTMCTSchematic(epsilon=0.05)
@@ -168,6 +169,7 @@ class TestOscillationProtocol:
         # G' should increase with frequency for viscoelastic material
         assert G_prime[-1] >= G_prime[0]
 
+    @pytest.mark.slow
     def test_glass_plateau_modulus(self):
         """Test that glass shows plateau modulus."""
         model = ITTMCTSchematic(epsilon=0.1)
@@ -199,6 +201,7 @@ class TestStartupProtocol:
         assert sigma[0] == pytest.approx(0.0, abs=1e-6)  # σ(0) = 0
         assert np.all(sigma >= 0)
 
+    @pytest.mark.slow
     def test_startup_overshoot(self):
         """Test stress overshoot in startup (characteristic of MCT)."""
         model = ITTMCTSchematic(epsilon=0.1)
@@ -233,6 +236,7 @@ class TestCreepProtocol:
         # Compliance should increase with time for fluid
         assert J[-1] > J[0]
 
+    @pytest.mark.slow
     def test_creep_glass_bounded(self):
         """Test that glass state creep is bounded."""
         model = ITTMCTSchematic(epsilon=0.1)
@@ -262,6 +266,7 @@ class TestRelaxationProtocol:
         # Stress should decay for fluid
         assert sigma[0] >= sigma[-1]
 
+    @pytest.mark.slow
     def test_relaxation_glass_residual(self):
         """Test residual stress in glass relaxation."""
         model = ITTMCTSchematic(epsilon=0.1)
@@ -293,6 +298,7 @@ class TestLAOSProtocol:
         sigma_range = sigma.max() - sigma.min()
         assert sigma_range > 0
 
+    @pytest.mark.slow
     def test_laos_harmonics(self):
         """Test extraction of LAOS harmonics."""
         model = ITTMCTSchematic(epsilon=0.1)

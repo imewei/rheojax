@@ -574,6 +574,7 @@ class TestVLBVariantBayesian:
 class TestVLBVariantProtocols:
     """Test NLSQ fitting for various protocols."""
 
+    @pytest.mark.slow
     def test_fit_flow_curve_bell(self, vlb_bell):
         """NLSQ fits shear-thinning flow curve."""
         gdot = np.logspace(-1, 1, 20)

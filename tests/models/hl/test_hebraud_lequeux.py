@@ -31,6 +31,7 @@ class TestHebraudLequeux:
         model.parameters.set_value("alpha", 0.3)
         assert model.get_phase_state() == "glass"
 
+    @pytest.mark.slow
     def test_flow_curve_prediction(self, model):
         """Test steady shear flow curve prediction."""
         # Use higher shear rates for faster test (fewer time steps needed)
