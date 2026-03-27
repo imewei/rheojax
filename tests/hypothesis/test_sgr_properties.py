@@ -220,8 +220,11 @@ class TestPhysicalConstraints:
         omega = np.logspace(-1, 3, 20)
         G_star = model.predict(omega)
 
-        assert np.all(G_star[:, 0] > 0), f"G' contains non-positive values for x={x}"
-        assert np.all(G_star[:, 1] > 0), f"G'' contains non-positive values for x={x}"
+        # _predict_oscillation returns complex (N,), not (N,2)
+        G_prime = np.real(G_star)
+        G_double_prime = np.imag(G_star)
+        assert np.all(G_prime > 0), f"G' contains non-positive values for x={x}"
+        assert np.all(G_double_prime > 0), f"G'' contains non-positive values for x={x}"
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
     @settings(
@@ -343,7 +346,8 @@ class TestPhysicalConstraints:
         omega = np.logspace(-1, 2, 20)
         G_star = model.predict(omega)
 
-        tan_delta = G_star[:, 1] / G_star[:, 0]
+        # _predict_oscillation returns complex (N,), not (N,2)
+        tan_delta = np.imag(G_star) / np.real(G_star)
 
         assert np.all(
             tan_delta > 0
@@ -473,7 +477,8 @@ class TestPowerLawScaling:
 
         # Fit power-law exponent in log-log space
         log_omega = np.log10(omega[5:-5])
-        log_G_prime = np.log10(G_star[5:-5, 0])
+        # _predict_oscillation returns complex (N,), not (N,2)
+        log_G_prime = np.log10(np.real(G_star[5:-5]))
 
         slope = np.polyfit(log_omega, log_G_prime, 1)[0]
 
@@ -657,8 +662,9 @@ class TestCrossValidation:
         model._test_mode = "oscillation"
         G_star = model.predict(omega)
 
-        assert np.all(G_star[:, 0] > 0), f"G' should be positive for x={x}"
-        assert np.all(G_star[:, 1] > 0), f"G'' should be positive for x={x}"
+        # _predict_oscillation returns complex (N,), not (N,2)
+        assert np.all(np.real(G_star) > 0), f"G' should be positive for x={x}"
+        assert np.all(np.imag(G_star) > 0), f"G'' should be positive for x={x}"
 
         # Test relaxation mode
         t = np.array([0.01, 0.1, 1.0])
