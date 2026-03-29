@@ -501,9 +501,8 @@ class SGRGeneric(BaseModel):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        test_mode: str | None = None,
         **kwargs,
-    ) -> None:
+    ) -> SGRGeneric:
         """Fit SGR GENERIC model to data using NLSQ optimization.
 
         Routes to appropriate fitting method based on test_mode.
@@ -511,12 +510,13 @@ class SGRGeneric(BaseModel):
         Args:
             X: Independent variable (frequency for oscillation, time for relaxation)
             y: Dependent variable (complex modulus, relaxation modulus, etc.)
-            test_mode: Test mode ('oscillation', 'relaxation', 'creep', 'steady_shear', 'laos')
-            **kwargs: NLSQ optimizer arguments
+            **kwargs: NLSQ optimizer arguments.
+                Must include test_mode ('oscillation', 'relaxation', 'creep', 'steady_shear', 'laos').
 
         Raises:
             ValueError: If test_mode not provided or invalid
         """
+        test_mode = kwargs.pop("test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for SGR GENERIC fitting")
 
@@ -584,6 +584,8 @@ class SGRGeneric(BaseModel):
                     exc_info=True,
                 )
                 raise
+
+        return self
 
     def _fit_oscillation_mode(
         self,
@@ -2539,6 +2541,9 @@ class SGRGeneric(BaseModel):
                 raise ValueError(
                     f"Parameter '{_name}' is None — set it before calling evolve_x()."
                 )
+        # Narrow types for mypy after None-check loop above
+        assert x_eq is not None and alpha_aging is not None
+        assert beta_rejuv is not None and x_ss_A is not None and x_ss_n is not None
 
         if x0 is None:
             x0 = self.parameters.get_value("x")

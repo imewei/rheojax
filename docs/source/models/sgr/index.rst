@@ -21,7 +21,7 @@ Quick Reference
      - 3 (:math:`x`, :math:`G_0`, :math:`\tau_0`)
      - Soft glassy materials, aging, yield stress fluids
    * - :doc:`sgr_generic`
-     - 4-5
+     - 3 (:math:`x`, :math:`G_0`, :math:`\tau_0`)
      - Thermodynamically consistent extension (GENERIC framework)
 
 

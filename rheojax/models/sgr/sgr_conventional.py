@@ -253,9 +253,8 @@ class SGRConventional(BaseModel):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        test_mode: str | None = None,
         **kwargs,
-    ) -> None:
+    ) -> SGRConventional:
         """Fit SGR model to data using NLSQ optimization.
 
         Routes to appropriate fitting method based on test_mode. This is the
@@ -264,8 +263,8 @@ class SGRConventional(BaseModel):
         Args:
             X: Independent variable (frequency for oscillation, time for relaxation)
             y: Dependent variable (complex modulus, relaxation modulus, etc.)
-            test_mode: Test mode ('oscillation', 'relaxation', 'creep', 'steady_shear')
-            **kwargs: NLSQ optimizer arguments (max_iter, ftol, xtol, gtol)
+            **kwargs: NLSQ optimizer arguments (max_iter, ftol, xtol, gtol).
+                Must include test_mode ('oscillation', 'relaxation', 'creep', 'steady_shear').
 
         Raises:
             ValueError: If test_mode not provided or invalid
@@ -276,6 +275,7 @@ class SGRConventional(BaseModel):
             as warm-start for Bayesian inference via fit_bayesian().
         """
         # Detect test mode
+        test_mode = kwargs.pop("test_mode", None)
         if test_mode is None:
             raise ValueError("test_mode must be specified for SGR fitting")
 
@@ -344,6 +344,8 @@ class SGRConventional(BaseModel):
                     exc_info=True,
                 )
                 raise
+
+        return self
 
     def _fit_oscillation_mode(
         self,

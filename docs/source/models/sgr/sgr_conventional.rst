@@ -813,7 +813,7 @@ Under constant stress :math:`\sigma_0` applied at time :math:`t_w`, the strain e
 
 .. math::
 
-   J(t - t_w, t_w) \sim (t - t_w)^{x-1}
+   J(t - t_w, t_w) \sim (t - t_w)^{2-x}
 
 **For** :math:`x < 1` (glass phase), the material exhibits **logarithmic creep** for small stresses (:math:`\sigma_0 \ll \sigma_y`):
 
@@ -1172,7 +1172,7 @@ Parameters
    * - ``x``
      - :math:`x`
      - —
-     - :math:`0 < x < 3`
+     - :math:`0.5 \leq x \leq 3`
      - Effective noise temperature; controls rheological behavior
    * - ``G0``
      - :math:`G_0`
@@ -1470,7 +1470,7 @@ Scaling Predictions
      - :math:`G(t) \approx G_{\text{plateau}}` (aging plateau)
    * - **Creep**
      - Fluid (:math:`x > 1`)
-     - :math:`J(t) \sim t^{x-1}`
+     - :math:`J(t) \sim t^{2-x}`
    * -
      - Glass (:math:`\sigma < \sigma_y`)
      - :math:`J(t) \to \text{const}` (solid-like)
@@ -1537,7 +1537,7 @@ Optimization Algorithm Selection
    - Use informative priors: :math:`x \sim \text{Uniform}(0.5, 2.5)` or :math:`\text{Normal}(1.5, 0.5)`
 
 **Bounds**:
-   - :math:`x`: [0.3, 2.5] (typical soft glass range)
+   - :math:`x`: [0.5, 3.0] (code default bounds)
    - :math:`G_0`: [1e-1, 1e6] Pa (adjust to material)
    - :math:`\tau_0`: [1e-8, 1e0] s
 
@@ -1668,7 +1668,7 @@ Multiple Test Modes
 
    # Predict steady shear flow curve
    gamma_dot = np.logspace(-3, 2, 50)
-   sigma = model.predict(gamma_dot, test_mode='steady_shear')
+   eta = model.predict(gamma_dot, test_mode='steady_shear')  # returns viscosity η(γ̇)
 
 ----
 

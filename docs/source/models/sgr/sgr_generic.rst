@@ -61,6 +61,18 @@ The GENERIC formulation, developed by Grmela and Öttinger [2]_, guarantees:
 This implementation follows Fuereder and Ilg's thermodynamically consistent reformulation
 of the SGR model [1]_, enabling entropy production calculations and thermodynamic validation.
 
+.. note:: **Implementation: Reduced 2D State Model**
+
+   The full Fuereder & Ilg (2013) theory is formulated at the distribution level,
+   evolving :math:`P(E, l, t)` over all trap depths and local strains. This implementation
+   uses a **reduced 2D state representation** :math:`\mathbf{z} = [\sigma, \lambda]`
+   (macroscopic stress and a structural parameter) with a binary mixing entropy, which
+   captures the essential thermodynamic structure (energy conservation, non-negative entropy
+   production, Onsager symmetry) while remaining computationally tractable. The rheological
+   predictions (SAOS, relaxation, creep, flow curves) use the same SGR kernel functions as
+   the conventional model. The GENERIC operators (Poisson bracket :math:`L`, friction matrix
+   :math:`M`) act on the reduced state space rather than the full distribution.
+
 Physical Foundations
 --------------------
 
@@ -508,8 +520,8 @@ inconsistencies even in formally correct implementations:
 1. **Negative effective temperature** (:math:`x < 0`):
 
    - Physically meaningless; indicates fitting error or data issues
-   - Detection: Check :math:`x > 0` before any calculation
-   - Resolution: Constrain :math:`x \geq x_{\min} > 0` in optimization
+   - Detection: Check :math:`x \geq 0.5` before any calculation
+   - Resolution: Constrain :math:`x \geq 0.5` in optimization (code default lower bound)
 
 2. **Entropy decrease during equilibration**:
 
@@ -541,7 +553,7 @@ The following bounds ensure well-posed GENERIC dynamics:
      - Constraint
      - Physical Rationale
    * - :math:`x` (noise temp)
-     - :math:`0 < x \leq 3`
+     - :math:`0.5 \leq x \leq 3`
      - Positive temperature; :math:`x > 3` gives unphysical rapid relaxation
    * - :math:`G_0` (modulus)
      - :math:`G_0 > 0`
@@ -567,8 +579,10 @@ The following bounds ensure well-posed GENERIC dynamics:
    model.parameters.set_value('G0', 100.0)
    model.parameters.set_value('tau0', 0.01)
 
-   # Verify thermodynamic consistency of the model configuration
-   consistency_report = model.verify_thermodynamic_consistency()
+   # Verify thermodynamic consistency at a given state [sigma, lambda]
+   import numpy as np
+   state = np.array([0.0, 1.0])  # [stress, structural parameter]
+   consistency_report = model.verify_thermodynamic_consistency(state)
    print(consistency_report)
 
 .. note:: **Numerical Precision Considerations**
@@ -849,7 +863,7 @@ Parameters
    * - ``x``
      - :math:`x`
      - —
-     - :math:`0 < x < 3`
+     - :math:`0.5 \leq x \leq 3`
      - Effective noise temperature
    * - ``G0``
      - :math:`G_0`
