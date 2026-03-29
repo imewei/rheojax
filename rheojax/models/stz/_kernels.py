@@ -38,7 +38,8 @@ def rate_factor_C(stress: float, sigma_y: float) -> float:
     Returns:
         Rate factor C (dimensionless, >= 1)
     """
-    x = stress / sigma_y
+    sigma_y_safe = jnp.maximum(jnp.abs(sigma_y), 1e-30)
+    x = stress / sigma_y_safe
 
     # Safe computation of cosh(x)
     # log(cosh(x)) = |x| - log(2) + log(1 + exp(-2|x|))
@@ -63,7 +64,8 @@ def transition_T(stress: float, sigma_y: float) -> float:
     Returns:
         Transition bias T (dimensionless, [-1, 1])
     """
-    return jnp.tanh(stress / sigma_y)
+    sigma_y_safe = jnp.maximum(jnp.abs(sigma_y), 1e-30)
+    return jnp.tanh(stress / sigma_y_safe)
 
 
 @jax.jit
@@ -88,7 +90,7 @@ def stz_density(chi: float, ez: float = 1.0) -> float:
 def plastic_rate(
     stress: float,
     Lambda: float,
-    chi: float,  # Used if Lambda is not state var, but here we pass Lambda
+    chi: float,  # noqa: ARG001 — kept for call-site uniformity with ODE state vectors
     sigma_y: float,
     tau0: float,
     epsilon0: float,
@@ -97,13 +99,14 @@ def plastic_rate(
 
     gamma_dot_pl = (2 * epsilon0 / tau0) * Lambda * C(sigma) * T(sigma)
 
-    The exp(-1/chi) is typically inside Lambda (if Lambda is equilibrium).
-    Here Lambda is passed explicitly (either state var or computed).
+    Lambda is passed explicitly (either a state variable or computed from chi
+    via ``stz_density``).  The ``chi`` argument is unused here but retained so
+    that callers can forward the full ODE state without repackaging.
 
     Args:
         stress: Deviatoric stress (Pa)
-        Lambda: STZ density
-        chi: Effective temperature (unused if Lambda passed, kept for API)
+        Lambda: STZ density (pre-computed or state variable)
+        chi: Effective temperature (unused — kept for API uniformity)
         sigma_y: Yield stress scale (Pa)
         tau0: Molecular attempt time (s)
         epsilon0: Characteristic strain increment (dimensionless)
@@ -154,7 +157,7 @@ def chi_evolution_langer2008(
     # We use absolute work rate to ensure aging drives to chi_inf correctly
     # Rate factor kappa * W_pl / sigma_y
     # c0 handles the scaling
-    rate = jnp.abs(work_rate) / (c0 * sigma_y)
+    rate = jnp.abs(work_rate) / jnp.maximum(c0 * sigma_y, 1e-30)
 
     # Evolution
     dchi = rate * (chi_inf - chi)
@@ -186,7 +189,8 @@ def lambda_evolution(
         d(Lambda)/dt
     """
     Lambda_eq = stz_density(chi, ez)
-    return -(Lambda - Lambda_eq) / tau_relax
+    tau_safe = jnp.maximum(jnp.abs(tau_relax), 1e-30)
+    return -(Lambda - Lambda_eq) / tau_safe
 
 
 @jax.jit

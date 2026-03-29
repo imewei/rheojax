@@ -81,19 +81,21 @@ class STZBase(BaseModel):
 
         # chi_inf: Steady-state effective temperature (dimensionless)
         # Represents the structural disorder at high shear rates
+        # Metallic glasses: 0.5-2.0; colloids/soft matter: 0.05-0.5
         self.parameters.add(
             name="chi_inf",
             value=0.1,
-            bounds=(0.01, 0.5),
+            bounds=(0.01, 2.0),
             units="dimensionless",
             description="Steady-state effective temperature",
         )
 
         # tau0: Molecular attempt time (s)
+        # Metallic glasses: 1e-13-1e-9; colloids/soft matter: 1e-4-1e-1
         self.parameters.add(
             name="tau0",
             value=1e-12,
-            bounds=(1e-14, 1e-9),
+            bounds=(1e-14, 1e0),
             units="s",
             description="Molecular vibration timescale",
         )

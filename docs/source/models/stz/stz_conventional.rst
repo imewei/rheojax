@@ -8,9 +8,9 @@ Quick Reference
 
 - **Parameters:** 10 (:math:`G_0, \sigma_y, \chi_{\infty}, \tau_0, \varepsilon_0, c_0, e_Z, \tau_\beta, m_{\infty}, \Gamma_m`)
 
-- **Key equation:** :math:`\dot{\varepsilon}^{pl} = \frac{\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)`
+- **Key equation:** :math:`\dot{\varepsilon}^{pl} = \frac{2\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)`
 
-- **Test modes:** flow_curve (steady_shear), startup, relaxation, creep, oscillation (LAOS)
+- **Test modes:** flow_curve (steady_shear), startup, relaxation, creep, oscillation (SAOS), laos (LAOS via gamma_0 > 0.01)
 
 - **Material examples:** Metallic glasses, colloidal glasses, dense emulsions, granular matter
 
@@ -26,7 +26,7 @@ Notation Guide
    * - :math:`\chi`
      - Effective temperature (configurational disorder parameter)
    * - :math:`\Lambda(\chi)`
-     - STZ density, :math:`\Lambda = \exp(-1/\chi)`
+     - STZ density, :math:`\Lambda = \exp(-e_Z/\chi)`
    * - :math:`s`
      - Deviatoric stress (shear stress)
    * - :math:`\sigma_y`
@@ -38,7 +38,7 @@ Notation Guide
    * - :math:`\tau_0`
      - Molecular attempt time (vibration timescale)
    * - :math:`\mathcal{C}(s)`
-     - Rate factor (activation), :math:`\cosh(s/\sigma_y)^q`
+     - Rate factor (activation), :math:`\cosh(s/\sigma_y)`
    * - :math:`\mathcal{T}(s)`
      - Transition bias, :math:`\tanh(s/\sigma_y)`
    * - :math:`c_0`
@@ -336,12 +336,12 @@ The plastic strain rate :math:`\dot{\varepsilon}^{pl}` is governed by the densit
 
 .. math::
 
-   \dot{\varepsilon}^{pl} = \frac{\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)
+   \dot{\varepsilon}^{pl} = \frac{2\varepsilon_0}{\tau_0} \Lambda(\chi) \mathcal{C}(s) \mathcal{T}(s)
 
 where:
 
-*   :math:`\Lambda(\chi) = e^{-1/\chi}` is the **STZ Density**.
-*   :math:`\mathcal{C}(s) = \cosh(s/\sigma_y)^q` is the **Rate Factor** (activation).
+*   :math:`\Lambda(\chi) = e^{-e_Z/\chi}` is the **STZ Density**.
+*   :math:`\mathcal{C}(s) = \cosh(s/\sigma_y)` is the **Rate Factor** (activation).
 *   :math:`\mathcal{T}(s) = \tanh(s/\sigma_y)` is the **Transition Bias**.
 *   :math:`s` is the deviatoric stress.
 *   :math:`\sigma_y` is the yield stress scale.
@@ -359,18 +359,20 @@ State Evolution Equations
    The term :math:`s \dot{\varepsilon}^{pl}` represents the rate of energy dissipation. :math:`\chi_\infty` is the steady-state effective temperature at high drive.
 
 2. **STZ Density Dynamics** (:math:`\Lambda`)
-   (Standard/Full variants) Relaxes toward the equilibrium value :math:`e^{-1/\chi}`:
+   (Standard/Full variants) Relaxes toward the equilibrium value :math:`e^{-e_Z/\chi}`:
 
    .. math::
 
-      \dot{\Lambda} = -\frac{\Lambda - e^{-1/\chi}}{\tau_\beta}
+      \dot{\Lambda} = -\frac{\Lambda - e^{-e_Z/\chi}}{\tau_\beta}
 
 3. **Orientation Dynamics** (:math:`m`)
    (Full variant) Describes the kinematic hardening or back-stress due to STZ alignment:
 
    .. math::
 
-      \dot{m} = \frac{2 \mathcal{C}(s)}{\tau_0} (\mathcal{T}(s) - m) - \Gamma m
+      \dot{m} = \Gamma_m \, |\dot{\varepsilon}^{pl}| \, (m_\infty \, \text{sign}(s) - m)
+
+   where :math:`\Gamma_m` is a rate coefficient and :math:`m_\infty` is the saturation value.
 
 Quasilinear Approximations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -395,7 +397,7 @@ Near steady state, the rate factor can be approximated:
 
 .. math::
 
-   \mathcal{C}(s) = \cosh(s/\sigma_y)^q \approx 1
+   \mathcal{C}(s) = \cosh(s/\sigma_y) \approx 1
 
 This holds when the stress-dependent STZ creation rate varies slowly compared to
 the relaxation dynamics.
@@ -406,10 +408,10 @@ With both approximations, the plastic strain rate becomes:
 
 .. math::
 
-   \dot{\varepsilon}^{pl} \approx \frac{\varepsilon_0}{\tau_0 \sigma_y} \Lambda(\chi) \cdot s
+   \dot{\varepsilon}^{pl} \approx \frac{2\varepsilon_0}{\tau_0 \sigma_y} \Lambda(\chi) \cdot s
 
 This is a **viscoplastic** constitutive law with stress-dependent viscosity
-:math:`\eta_{\text{eff}} = \sigma_y \tau_0 / (\varepsilon_0 \Lambda(\chi))`.
+:math:`\eta_{\text{eff}} = \sigma_y \tau_0 / (2\varepsilon_0 \Lambda(\chi))`.
 
 **Validity Conditions**
 
@@ -620,7 +622,7 @@ Parameter Interpretation
 :math:`\sigma_y` **(Yield Stress Scale)**:
    The stress scale for STZ activation, not the macroscopic yield stress.
 
-   *For graduate students*: :math:`\sigma_y` appears in the activation factors :math:`\mathcal{C}(s) = \cosh(s/\sigma_y)^q` and :math:`\mathcal{T}(s) = \tanh(s/\sigma_y)`. It sets the stress scale at which STZs flip from one orientation to the other. The macroscopic yield stress :math:`\sigma_y^{\text{eff}} \sim \sigma_y \sqrt{\Lambda(\chi)}` depends on the STZ density. Near the glass transition, :math:`\sigma_y` is related to the shear modulus times the STZ size: :math:`\sigma_y \approx G_0\varepsilon_0`.
+   *For graduate students*: :math:`\sigma_y` appears in the activation factors :math:`\mathcal{C}(s) = \cosh(s/\sigma_y)` and :math:`\mathcal{T}(s) = \tanh(s/\sigma_y)`. It sets the stress scale at which STZs flip from one orientation to the other. The macroscopic yield stress :math:`\sigma_y^{\text{eff}} \sim \sigma_y \sqrt{\Lambda(\chi)}` depends on the STZ density. Near the glass transition, :math:`\sigma_y` is related to the shear modulus times the STZ size: :math:`\sigma_y \approx G_0\varepsilon_0`.
 
    *For practitioners*: :math:`\sigma_y` controls the curvature of the flow curve. Larger :math:`\sigma_y` means the material transitions more gradually from solid-like to fluid-like behavior. Fit :math:`\sigma_y` from the stress scale where the flow curve bends (not the low-rate plateau, which depends on :math:`\chi`).
 
@@ -926,9 +928,10 @@ Usage
    print(model.parameters.get_value("sigma_y"))
 
    # --- 2. Transient Startup Simulation ---
-   # Simulate stress overshoot at constant shear rate
+   # Fit startup data, then predict
    t = np.linspace(0, 10, 1000)
-   stress_overshoot = model.predict(t, test_mode='startup', gamma_dot=1.0)
+   model.fit(t, stress_data, test_mode='startup', gamma_dot=1.0)
+   stress_overshoot = model.predict(t)
 
    # --- 3. LAOS Simulation ---
    # Large Amplitude Oscillatory Shear

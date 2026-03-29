@@ -49,10 +49,12 @@ def generate_synthetic_flow_curve(
     noise_level: float = 0.03,
     seed: int = 42,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
-    """Generate synthetic steady-state flow curve from the STZ arctanh formula.
+    """Generate synthetic steady-state flow curve from the STZ arcsinh formula.
 
-    Uses the analytical formula sigma = sigma_y * arctanh(gamma_dot * tau0 / term)
-    and adds multiplicative Gaussian noise in log-space.
+    Uses the exact Langer 2008 steady-state formula:
+        sigma = sigma_y * arcsinh(gamma_dot * tau0 / (2 * epsilon0 * Lambda_ss))
+    where Lambda_ss = exp(-ez / chi_inf), and adds multiplicative Gaussian noise
+    in log-space.
 
     Args:
         params: Dictionary of STZ parameters. If None, uses physically motivated
@@ -75,6 +77,7 @@ def generate_synthetic_flow_curve(
             "sigma_y": 50.0,
             "chi_inf": 0.26,
             "tau0": 1e-4,
+            "epsilon0": 0.1,
             "ez": 0.8,
         }
 
@@ -84,16 +87,17 @@ def generate_synthetic_flow_curve(
         n_points,
     )
 
-    # Compute clean stress via the arctanh formula
+    # Compute clean stress via the exact arcsinh formula (Langer 2008)
     sigma_y = params["sigma_y"]
     chi_inf = params["chi_inf"]
     tau0 = params["tau0"]
+    epsilon0 = params.get("epsilon0", 0.1)
     ez = params["ez"]
 
-    term = np.exp(-(1.0 + ez) / chi_inf)
-    arg = gamma_dot * tau0 / (term + 1e-30)
-    arg_clamped = np.clip(arg, -0.999999, 0.999999)
-    stress_clean = sigma_y * np.arctanh(arg_clamped)
+    Lambda_ss = np.exp(-ez / chi_inf)
+    prefactor = 2.0 * epsilon0 * Lambda_ss + 1e-30
+    arg = gamma_dot * tau0 / prefactor
+    stress_clean = sigma_y * np.arcsinh(arg)
 
     # Add multiplicative noise in log-space
     rng = np.random.default_rng(seed)

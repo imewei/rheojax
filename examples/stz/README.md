@@ -6,7 +6,7 @@ Tutorial notebooks for the Shear Transformation Zone (STZ) model — a microscop
 
 | # | Notebook | Protocol | Data | Parameters Probed |
 |---|----------|----------|------|-------------------|
-| 01 | `01_stz_flow_curve.ipynb` | Steady-state flow curve | Synthetic (arctanh formula) | sigma_y, chi_inf, tau0, ez |
+| 01 | `01_stz_flow_curve.ipynb` | Steady-state flow curve | Synthetic (arcsinh formula) | sigma_y, chi_inf, tau0, epsilon0, ez |
 | 02 | `02_stz_startup_shear.ipynb` | Startup shear | Synthetic (from NB01) | All 8 (standard variant) |
 | 03 | `03_stz_stress_relaxation.ipynb` | Stress relaxation | Real laponite clay (5 ages) | All 8, chi_inf(t_wait) aging |
 | 04 | `04_stz_creep.ipynb` | Creep | Real mucus | sigma_y, chi_inf, tau0, epsilon0, c0, ez, tau_beta |
@@ -42,7 +42,7 @@ NB05 (SAOS, real polystyrene) -- independent
 ## Data Sources
 
 **Synthetic data (Notebooks 01, 02, 06):**
-- NB01: Flow curve generated from the STZ arctanh formula with known parameters and 3% log-normal noise
+- NB01: Flow curve generated from the STZ arcsinh formula (Langer 2008) with known parameters and 3% log-normal noise
 - NB02, NB06: Startup/LAOS data generated from NB01 calibrated parameters with 3% Gaussian noise
 
 **Real data (Notebooks 03, 04, 05):**

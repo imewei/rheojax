@@ -163,6 +163,7 @@ class STZConventional(STZBase):
             sigma_y = p_map["sigma_y"]
             chi_inf = p_map["chi_inf"]
             tau0 = p_map["tau0"]
+            epsilon0 = p_map["epsilon0"]
             ez = p_map["ez"]
 
             return self._predict_steady_shear_jit(
@@ -170,6 +171,7 @@ class STZConventional(STZBase):
                 sigma_y,
                 chi_inf,
                 tau0,
+                epsilon0,
                 ez,
             )
 
@@ -187,20 +189,20 @@ class STZConventional(STZBase):
 
     @staticmethod
     @jax.jit
-    def _predict_steady_shear_jit(gamma_dot, sigma_y, chi_inf, tau0, ez):
+    def _predict_steady_shear_jit(gamma_dot, sigma_y, chi_inf, tau0, epsilon0, ez):
         """Analytical steady-state flow curve prediction.
 
-        At steady state:
+        At steady state (Langer 2008):
         - chi -> chi_inf
-        - Lambda = exp(-ez / chi_inf)
-        - The plastic rate prefactor includes Lambda * C where C ~ exp(-1/chi)
-        - Combined: Lambda * exp(-1/chi) = exp(-(ez + 1) / chi_inf)
+        - Lambda_ss = exp(-ez / chi_inf)
+        - gamma_dot = (2*epsilon0/tau0) * Lambda_ss * cosh(s/sy) * tanh(s/sy)
+                    = (2*epsilon0/tau0) * Lambda_ss * sinh(s/sy)
+        - Inverting: sigma = sigma_y * arcsinh(gamma_dot * tau0 / (2*epsilon0*Lambda_ss))
         """
-        # Combined activation factor at steady state
-        term = jnp.exp(-(1.0 + ez) / chi_inf)
-        arg = (gamma_dot * tau0) / (term + 1e-30)
-        arg_clamped = jnp.clip(arg, -0.999999, 0.999999)
-        sigma = sigma_y * jnp.arctanh(arg_clamped)
+        Lambda_ss = jnp.exp(-ez / chi_inf)
+        prefactor = 2.0 * epsilon0 * Lambda_ss + 1e-30
+        arg = (gamma_dot * tau0) / prefactor
+        sigma = sigma_y * jnp.arcsinh(arg)
         return sigma
 
     # =========================================================================
@@ -234,10 +236,10 @@ class STZConventional(STZBase):
         else:
             y_jax = jnp.asarray(y_arr, dtype=jnp.float64)
 
-        # Extract protocol-specific inputs
-        gamma_dot = kwargs.pop("gamma_dot", None)
-        sigma_applied = kwargs.pop("sigma_applied", None)
-        sigma_0 = kwargs.pop("sigma_0", None)
+        # Extract protocol-specific inputs (use .get() to avoid mutating caller's dict)
+        gamma_dot = kwargs.get("gamma_dot", None)
+        sigma_applied = kwargs.get("sigma_applied", None)
+        sigma_0 = kwargs.get("sigma_0", None)
 
         if mode == "startup" and gamma_dot is None:
             raise ValueError("startup mode requires gamma_dot in kwargs")
@@ -445,8 +447,8 @@ class STZConventional(STZBase):
                 - use_log_residuals (bool): Log-space fitting (default varies).
         """
 
-        gamma_0 = kwargs.pop("gamma_0", None)
-        omega = kwargs.pop("omega", None)
+        gamma_0 = kwargs.get("gamma_0", None)
+        omega = kwargs.get("omega", None)
 
         # Store for prediction
         self._gamma_0 = gamma_0
@@ -527,15 +529,18 @@ class STZConventional(STZBase):
     def _predict_saos_jit(omega, G0, sigma_y, chi_inf, tau0, epsilon0, ez):
         """SAOS prediction using linear viscoelastic approximation.
 
-        In the linear limit (small strain), STZ behaves like a Maxwell model
-        with effective relaxation time tau_eff.
+        In the linear limit (small strain), the STZ plastic rate linearizes as:
+            gamma_dot_pl ≈ (2*epsilon0/tau0) * Lambda_ss * (sigma / sigma_y)
+
+        Combined with ds/dt = G0*(gamma_dot - gamma_dot_pl), this gives a
+        Maxwell model with effective relaxation time:
+            tau_M = tau0 * sigma_y / (2 * epsilon0 * Lambda_ss * G0)
         """
         # At steady state chi -> chi_inf
         Lambda_ss = jnp.exp(-ez / chi_inf)
 
-        # Effective Maxwell relaxation time
-        # tau_eff ~ tau0 / (epsilon0 * Lambda_ss)
-        tau_eff = tau0 / (2.0 * epsilon0 * Lambda_ss + 1e-30)
+        # Effective Maxwell relaxation time (Langer 2008, linearized)
+        tau_eff = (tau0 * sigma_y) / (2.0 * epsilon0 * Lambda_ss * G0 + 1e-30)
 
         # Maxwell model: G* = G0 * (i * omega * tau) / (1 + i * omega * tau)
         omega_tau = omega * tau_eff
@@ -809,6 +814,7 @@ class STZConventional(STZBase):
                 p_values["sigma_y"],
                 p_values["chi_inf"],
                 p_values["tau0"],
+                p_values["epsilon0"],
                 p_values["ez"],
             )
         elif mode == "oscillation":
@@ -891,6 +897,7 @@ class STZConventional(STZBase):
                 p_values["sigma_y"],
                 p_values["chi_inf"],
                 p_values["tau0"],
+                p_values["epsilon0"],
                 p_values["ez"],
             )
             return np.array(result)

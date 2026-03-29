@@ -214,7 +214,7 @@ class TestSTZIntegration:
             model.parameters.set_value("chi_inf", -0.1)  # Negative not allowed
 
         with pytest.raises(ValueError):
-            model.parameters.set_value("chi_inf", 1.0)  # > 0.5 not allowed
+            model.parameters.set_value("chi_inf", 3.0)  # > 2.0 not allowed
 
     def test_bayesian_mixin_integration(self):
         """Test that model inherits BayesianMixin correctly."""
