@@ -5,7 +5,7 @@ the behavior of materials with elastic response at short times and power-law
 relaxation at long times, typical of polymer melts and concentrated solutions.
 
 Mathematical Description:
-    Relaxation Modulus: G(t) = G_m t^(-α) E_{1-α,1-α}(-t^(1-α)/τ_α)
+    Relaxation Modulus: G(t) = G_m E_{α,1}(-(t/τ_α)^α) = G_m E_α(-(t/τ_α)^α)
     Complex Modulus: G*(ω) = G_m (iωτ_α)^α / (1 + (iωτ_α)^α)
     Creep Compliance: J(t) = (1/G_m) + (t^α)/(G_m τ_α^α) E_{α,1+α}(-(t/τ_α)^α)
 

@@ -219,7 +219,13 @@ class FractionalZenerLiquidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
+        Approximate form (no exact closed-form in Mittag-Leffler for FZLL):
+            G(t) ≈ c1 / (1 + (t/τ)^α) + c2 · exp(-t/τ)
+
+        The first term captures the power-law decay from the springpot branch,
+        and the second term captures the exponential decay from the dashpot
+        branch. This approximation preserves the correct limiting behaviors:
+        G(0+) = c1 + c2, and G(∞) = 0 (liquid).
         """
         epsilon = 1e-12
         # Clip fractional orders using JAX operations (tracer-safe)

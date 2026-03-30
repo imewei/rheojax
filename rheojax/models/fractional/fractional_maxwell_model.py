@@ -5,8 +5,9 @@ each with independent fractional orders. It provides maximum flexibility in
 describing viscoelastic materials with fractional dynamics.
 
 Mathematical Description:
-    Relaxation Modulus: G(t) = c_1 t^(-α) E_{1-α}(-(t/τ)^β)
+    Relaxation Modulus: G(t) = (c_1/τ^β) t^(β-α) E_{β, β-α+1}(-(t/τ)^β)
     Complex Modulus: G*(ω) = c_1 (iω)^α / (1 + (iωτ)^β)
+    Creep Compliance: J(t) = (1/c_1) [t^α/Γ(1+α) + τ^β t^(α-β)/Γ(1+α-β)]
 
 where α and β are independent fractional orders.
 
@@ -41,7 +42,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode
-from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
+from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 # Module logger
 logger = get_logger(__name__)
@@ -135,38 +136,39 @@ class FractionalMaxwellModel(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t) using JAX.
 
-        G(t) = c_1 t^(-α) E_{1-α}(-(t/τ)^β)
+        Derived from the inverse Laplace transform of G̃(s) = G*(s)/s:
+            G(t) = (c₁/τ^β) · t^(β-α) · E_{β, β-α+1}(-(t/τ)^β)
+
+        where E_{β, β-α+1} is the two-parameter Mittag-Leffler function.
 
         Args:
             t: Time array
-            c1: Material constant
+            c1: Material constant (Pa·s^α)
             alpha: First fractional order
             beta: Second fractional order
-            tau: Relaxation time
+            tau: Relaxation time (s)
 
         Returns:
             Relaxation modulus array
         """
-        # Add small epsilon to prevent issues
         epsilon = 1e-12
 
-        # Clip alpha and beta to safe range (now works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
 
-        # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
         tau_safe = jnp.maximum(tau, epsilon)
 
-        # Compute argument for Mittag-Leffler function
+        # Mittag-Leffler argument
         z = -((t_safe / tau_safe) ** beta_safe)
 
-        # Compute E_{1-α}(z) (requires concrete alpha)
-        ml_alpha = 1.0 - alpha_safe
-        ml_value = mittag_leffler_e(z, alpha=ml_alpha)
+        # E_{β, β-α+1}(z) — two-parameter Mittag-Leffler
+        ml_beta_param = beta_safe - alpha_safe + 1.0
+        ml_value = mittag_leffler_e2(z, alpha=beta_safe, beta=ml_beta_param)
 
-        # Compute G(t)
-        G_t = c1 * (t_safe ** (-alpha_safe)) * ml_value
+        # G(t) = (c1 / tau^beta) * t^{beta - alpha} * E_{beta, beta-alpha+1}(z)
+        prefactor = c1 / (tau_safe**beta_safe)
+        G_t = prefactor * (t_safe ** (beta_safe - alpha_safe)) * ml_value
 
         return G_t
 
@@ -177,52 +179,43 @@ class FractionalMaxwellModel(BaseModel):
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
-        For the general FMM, the creep compliance is obtained through
-        the relationship J(s) = 1/[s²G(s)] in Laplace domain.
+        Derived from J̃(s) = 1/(s·G*(s)) = (1 + (sτ)^β) / (c₁ s^{α+1}):
+            J(t) = (1/c₁) [t^α/Γ(1+α) + τ^β · t^{α-β}/Γ(1+α-β)]
+
+        Two power-law terms: the first is the springpot creep, the second
+        captures the contribution from the second element.
 
         Args:
             t: Time array
-            c1: Material constant
+            c1: Material constant (Pa·s^α)
             alpha: First fractional order
             beta: Second fractional order
-            tau: Relaxation time
+            tau: Relaxation time (s)
 
         Returns:
             Creep compliance array
         """
-        # Add small epsilon
         epsilon = 1e-12
 
-        # Clip alpha and beta to safe range (now works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
 
-        # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
         tau_safe = jnp.maximum(tau, epsilon)
         c1_safe = jnp.maximum(c1, epsilon)
 
-        # For general FMM, creep is more complex
-        # Approximate using J(t) ≈ (1/c1) t^α E_{α,1+α}((t/τ)^β)
-        # Limit the argument to prevent overflow
-        z_raw = (t_safe / tau_safe) ** beta_safe
-        z = jnp.minimum(z_raw, 50.0)  # Limit argument to prevent ML overflow
+        # J(t) = (1/c1) * [t^alpha / Gamma(1+alpha) + tau^beta * t^{alpha-beta} / Gamma(1+alpha-beta)]
+        inv_gamma_1 = jnp.exp(-jax.lax.lgamma(1.0 + alpha_safe))
+        inv_gamma_2 = jnp.exp(-jax.lax.lgamma(1.0 + alpha_safe - beta_safe))
 
-        # Compute E_{α,1+α}(z) (requires concrete alpha/beta)
-        ml_alpha = alpha_safe
-        ml_beta = 1.0 + alpha_safe
-        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
+        term1 = (t_safe**alpha_safe) * inv_gamma_1
+        term2 = (tau_safe**beta_safe) * (t_safe ** (alpha_safe - beta_safe)) * inv_gamma_2
 
-        # Limit ML value to prevent overflow
-        ml_value_safe = jnp.minimum(ml_value, 1e15)
+        J_t = (term1 + term2) / c1_safe
 
-        # Creep compliance
-        J_t = (1.0 / c1_safe) * (t_safe**alpha_safe) * ml_value_safe
-
-        # Clip to reasonable range for compliance values
+        # Clip to reasonable range
         J_t_clipped = jnp.clip(J_t, epsilon, 1e10)
 
-        # Monotonicity enforced by physical parameter bounds, not in NUTS path
         return J_t_clipped
 
     def _predict_oscillation_jax(
