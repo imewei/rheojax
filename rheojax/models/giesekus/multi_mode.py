@@ -230,13 +230,16 @@ class GiesekusMultiMode(BaseModel):
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        assert val is not None
+        return float(val)
 
     @property
     def eta_0(self) -> float:
         """Get zero-shear viscosity η₀ = η_s + Σ η_p,i (Pa·s)."""
         eta_p_total = sum(
-            self.parameters.get_value(f"eta_p_{i}") for i in range(self._n_modes)
+            float(self.parameters.get_value(f"eta_p_{i}") or 0.0)
+            for i in range(self._n_modes)
         )
         return self.eta_s + eta_p_total
 
@@ -257,9 +260,9 @@ class GiesekusMultiMode(BaseModel):
             raise IndexError(f"Mode index {mode_idx} out of range [0, {self._n_modes})")
 
         return {
-            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}")),
-            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}")),
-            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}")),
+            "eta_p": float(self.parameters.get_value(f"eta_p_{mode_idx}") or 0.0),
+            "lambda_1": float(self.parameters.get_value(f"lambda_{mode_idx}") or 0.0),
+            "alpha": float(self.parameters.get_value(f"alpha_{mode_idx}") or 0.0),
         }
 
     def set_mode_params(

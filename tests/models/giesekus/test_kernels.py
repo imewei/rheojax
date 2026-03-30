@@ -179,21 +179,37 @@ class TestNormalStresses:
     """Tests for normal stress differences."""
 
     @pytest.mark.smoke
-    def test_n2_n1_ratio(self):
-        """Test diagnostic ratio N₂/N₁ = -α/2."""
+    def test_n2_n1_ratio_low_wi(self):
+        """Test N₂/N₁ → -α/2 at low Wi (zero-shear limit)."""
         eta_p = 100.0
         lambda_1 = 1.0
-        gamma_dot = 10.0
+        gamma_dot = 0.01  # Wi = 0.01 (deep in linear regime)
 
         for alpha in [0.1, 0.2, 0.3, 0.4, 0.5]:
             N1, N2 = giesekus_steady_normal_stresses(gamma_dot, eta_p, lambda_1, alpha)
 
-            ratio = N2 / N1
+            ratio = float(N2 / N1)
             expected = -alpha / 2
 
             assert np.isclose(
                 ratio, expected, rtol=0.01
             ), f"α={alpha}: {ratio} != {expected}"
+
+    @pytest.mark.smoke
+    def test_n2_n1_ratio_deviates_at_high_wi(self):
+        """Test that exact N₂/N₁ deviates from -α/2 at high Wi."""
+        eta_p = 100.0
+        lambda_1 = 1.0
+        gamma_dot = 10.0  # Wi = 10
+        alpha = 0.3
+
+        N1, N2 = giesekus_steady_normal_stresses(gamma_dot, eta_p, lambda_1, alpha)
+        ratio = float(N2 / N1)
+        approx = -alpha / 2  # -0.15
+
+        # Exact ratio should be less negative than -α/2 at high Wi
+        assert ratio > approx, f"ratio={ratio} should be > {approx} at high Wi"
+        assert ratio < 0, "N₂/N₁ should still be negative"
 
     @pytest.mark.smoke
     def test_n1_positive(self):

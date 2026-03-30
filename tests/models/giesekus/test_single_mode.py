@@ -202,13 +202,14 @@ class TestNormalStresses:
 
     @pytest.mark.smoke
     def test_n2_n1_ratio_prediction(self):
-        """Test predicted N₂/N₁ equals -α/2."""
+        """Test predicted N₂/N₁ ≈ -α/2 at low Wi."""
         model = GiesekusSingleMode()
 
         for alpha in [0.1, 0.2, 0.3, 0.4, 0.5]:
             model.parameters.set_value("alpha", alpha)
 
-            gamma_dot = np.array([10.0])
+            # Use low Wi (γ̇=0.01, λ=1 → Wi=0.01) where -α/2 is exact
+            gamma_dot = np.array([0.01])
             N1, N2 = model.predict_normal_stresses(gamma_dot)
 
             ratio = N2[0] / N1[0]

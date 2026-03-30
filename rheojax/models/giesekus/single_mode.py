@@ -1216,14 +1216,14 @@ class GiesekusSingleMode(GiesekusBase):
             sigma_prime.append(sigma_n_prime)
             sigma_double_prime.append(sigma_n_double_prime)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
-        intensity = np.sqrt(sigma_prime**2 + sigma_double_prime**2)
+        sigma_prime_arr = np.array(sigma_prime)
+        sigma_double_prime_arr = np.array(sigma_double_prime)
+        intensity = np.sqrt(sigma_prime_arr**2 + sigma_double_prime_arr**2)
 
         return {
             "n": np.array(harmonics),
-            "sigma_prime": sigma_prime,
-            "sigma_double_prime": sigma_double_prime,
+            "sigma_prime": sigma_prime_arr,
+            "sigma_double_prime": sigma_double_prime_arr,
             "intensity": intensity,
             "I3_I1": (
                 intensity[1] / intensity[0] if intensity[0] > 0 else 0.0

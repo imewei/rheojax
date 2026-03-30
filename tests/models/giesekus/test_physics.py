@@ -21,19 +21,19 @@ class TestDiagnosticRatios:
     """Tests for physical diagnostic relationships."""
 
     @pytest.mark.smoke
-    def test_n2_n1_ratio_exact(self):
-        """Test N₂/N₁ = -α/2 holds exactly.
+    def test_n2_n1_ratio_low_wi(self):
+        """Test N₂/N₁ → -α/2 at low Wi (zero-shear limit).
 
-        This is a fundamental property of the Giesekus model that
-        provides a direct experimental route to determine α.
+        In the zero-shear limit, N₂/N₁ = -α/2 exactly. This provides
+        a direct experimental route to determine α from low-rate data.
 
-        Reference: Bird et al. (1987), Eq. 4.4-22
+        Reference: Bird et al. (1987), Table 8.5-1
         """
         model = GiesekusSingleMode()
 
-        # Test across range of α values
+        # Test across range of α values at low Wi
         alpha_values = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
-        gamma_dot = 10.0
+        gamma_dot = 0.01  # Wi = λ·γ̇ = 1·0.01 = 0.01 (linear regime)
 
         for alpha in alpha_values:
             model.parameters.set_value("alpha", alpha)
@@ -43,14 +43,15 @@ class TestDiagnosticRatios:
             expected = -alpha / 2
 
             assert np.isclose(
-                ratio, expected, rtol=0.001
+                ratio, expected, rtol=0.01
             ), f"α={alpha}: N₂/N₁={ratio:.6f} != expected {expected:.6f}"
 
     @pytest.mark.smoke
-    def test_n2_n1_ratio_all_rates(self):
-        """Test N₂/N₁ = -α/2 holds at all shear rates.
+    def test_n2_n1_ratio_varies_with_wi(self):
+        """Test that exact N₂/N₁ deviates from -α/2 at high Wi.
 
-        The ratio should be independent of shear rate.
+        The ratio N₂/N₁ = -α/2 is exact only in the zero-shear limit.
+        At finite Wi the exact ratio is less negative than -α/2.
         """
         model = GiesekusSingleMode()
         model.parameters.set_value("alpha", 0.3)
@@ -59,11 +60,17 @@ class TestDiagnosticRatios:
         N1, N2 = model.predict_normal_stresses(gamma_dots)
 
         ratios = N2 / N1
-        expected = -0.3 / 2
 
-        assert np.allclose(
-            ratios, expected, rtol=0.01
-        ), f"Ratio varies with rate: min={ratios.min():.4f}, max={ratios.max():.4f}"
+        # All ratios negative
+        assert np.all(ratios < 0), "N₂/N₁ should always be negative"
+        # At low Wi (first few points), close to -α/2
+        assert np.isclose(
+            ratios[0], -0.15, rtol=0.01
+        ), f"Low-Wi ratio should be ≈ -0.15, got {ratios[0]:.4f}"
+        # At high Wi (last points), ratio deviates toward zero
+        assert ratios[-1] > -0.15, (
+            f"High-Wi ratio should be less negative than -0.15, got {ratios[-1]:.4f}"
+        )
 
 
 class TestUCMLimit:

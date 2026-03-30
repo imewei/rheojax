@@ -241,7 +241,7 @@ def _solve_giesekus_f_quartic(
     # Initial guess interpolating between asymptotic limits
     # Low Wi: f ≈ 1 - α·Wi² (first-order perturbation)
     f_low = jnp.maximum(1.0 - alpha_safe * wi2, 0.3)
-    # High Wi: f approaches f_max = 1/(2α·Wi) from below
+    # High Wi: f bounded above by f_max = 1/(2α·Wi) from disc_yy ≥ 0
     f_high = 0.9 * f_max
     f_init = jnp.where(wi < 1.0, jnp.minimum(f_low, f_max), f_high)
 
@@ -256,6 +256,58 @@ def _solve_giesekus_f_quartic(
     f_final, _ = jax.lax.scan(newton_step, f_init, None, length=20)
 
     return jnp.where(is_trivial, 1.0, f_final)
+
+
+@jax.jit
+def _compute_steady_dimensionless_stresses(
+    wi: float,
+    alpha: float,
+    f: float,
+) -> tuple[float, float]:
+    """Compute exact dimensionless normal stress components from converged f.
+
+    Given the viscosity reduction factor f from ``_solve_giesekus_f_quartic``,
+    compute the dimensionless stress components s_xx and s_yy from the
+    quadratic steady-state balance equations::
+
+        (1) α·s_xx² + s_xx = 2Wi·s_xy − α·s_xy²   (xx-component)
+        (2) α·s_yy² + s_yy + α·s_xy² = 0           (yy-component)
+
+    where s_xy = Wi·f.
+
+    Parameters
+    ----------
+    wi : float
+        Weissenberg number Wi = λγ̇
+    alpha : float
+        Mobility factor (0 ≤ α ≤ 0.5)
+    f : float
+        Viscosity reduction factor from ``_solve_giesekus_f_quartic``
+
+    Returns
+    -------
+    tuple[float, float]
+        (s_xx, s_yy) dimensionless stress components
+    """
+    alpha_safe = jnp.maximum(alpha, 1e-30)
+    s_xy = wi * f
+    s_xy2 = s_xy * s_xy
+
+    # s_yy from Eq(2): quadratic α·s_yy² + s_yy + α·s_xy² = 0
+    disc_yy = jnp.maximum(1.0 - 4.0 * alpha_safe * alpha_safe * s_xy2, 0.0)
+    s_yy = (-1.0 + jnp.sqrt(disc_yy + 1e-30)) / (2.0 * alpha_safe)
+
+    # s_xx from Eq(1): quadratic α·s_xx² + s_xx - (2Wi·s_xy - α·s_xy²) = 0
+    q_xx = 2.0 * wi * s_xy - alpha_safe * s_xy2
+    disc_xx = jnp.maximum(1.0 + 4.0 * alpha_safe * q_xx, 0.0)
+    s_xx = (-1.0 + jnp.sqrt(disc_xx + 1e-30)) / (2.0 * alpha_safe)
+
+    # Handle α → 0 (UCM) limit: s_xx → 2Wi², s_yy → 0
+    is_ucm = alpha < 1e-12
+    s_yy = jnp.where(is_ucm, 0.0, s_yy)
+    s_xx = jnp.where(is_ucm, 2.0 * wi * wi, s_xx)
+
+    return s_xx, s_yy
 
 
 @jax.jit
@@ -347,14 +399,18 @@ def giesekus_steady_normal_stresses(
 ) -> tuple[float, float]:
     """Compute first and second normal stress differences.
 
-    For the Giesekus model::
+    Uses the exact steady-state solution from the quadratic algebraic
+    system for the dimensionless stress components (s_xx, s_yy)::
 
-        N₁ = τ_xx - τ_yy = Ψ₁·γ̇²
-        N₂ = τ_yy - τ_zz = Ψ₂·γ̇² = -(α/2)·N₁
+        N₁ = τ_xx - τ_yy = (s_xx - s_yy) · η_p/λ
+        N₂ = τ_yy - τ_zz = s_yy · η_p/λ
 
-    The first normal stress coefficient is::
+    In the zero-shear limit (Wi → 0), the ratio approaches::
 
-        Ψ₁ = 2η_p·λ·f² / [1 + (1-2α)·Wi²·f²]
+        N₂/N₁ → -α/2
+
+    At finite Wi, the exact ratio deviates from -α/2; use this function
+    for accurate normal stress predictions at all shear rates.
 
     Parameters
     ----------
@@ -375,15 +431,15 @@ def giesekus_steady_normal_stresses(
     wi = lambda_1 * jnp.abs(gamma_dot)
     f = _solve_giesekus_f_quartic(wi, alpha)
 
-    # First normal stress coefficient
-    f2 = f * f
-    wi2f2 = wi * wi * f2
-    psi1 = 2.0 * eta_p * lambda_1 * f2 / (1.0 + (1.0 - 2.0 * alpha) * wi2f2)
+    # Exact dimensionless stress components from the steady-state
+    # quadratic system (same equations used inside the Newton solver)
+    s_xx, s_yy = _compute_steady_dimensionless_stresses(wi, alpha, f)
 
-    # Normal stress differences
-    gd2 = gamma_dot * gamma_dot
-    N1 = psi1 * gd2
-    N2 = -alpha * N1 / 2.0  # Giesekus prediction: N2/N1 = -α/2
+    # Convert to dimensional: τ_ij = s_ij · η_p / λ
+    stress_scale = eta_p / jnp.maximum(lambda_1, 1e-12)
+
+    N1 = (s_xx - s_yy) * stress_scale  # τ_xx - τ_yy
+    N2 = s_yy * stress_scale  # τ_yy - τ_zz  (τ_zz = 0)
 
     return N1, N2
 

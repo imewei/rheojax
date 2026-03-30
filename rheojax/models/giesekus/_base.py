@@ -176,22 +176,30 @@ class GiesekusBase(BaseModel):
     @property
     def eta_p(self) -> float:
         """Get polymer viscosity η_p (Pa·s)."""
-        return float(self.parameters.get_value("eta_p"))
+        val = self.parameters.get_value("eta_p")
+        assert val is not None
+        return float(val)
 
     @property
     def lambda_1(self) -> float:
         """Get relaxation time λ (s)."""
-        return float(self.parameters.get_value("lambda_1"))
+        val = self.parameters.get_value("lambda_1")
+        assert val is not None
+        return float(val)
 
     @property
     def alpha(self) -> float:
         """Get mobility factor α (dimensionless)."""
-        return float(self.parameters.get_value("alpha"))
+        val = self.parameters.get_value("alpha")
+        assert val is not None
+        return float(val)
 
     @property
     def eta_s(self) -> float:
         """Get solvent viscosity η_s (Pa·s)."""
-        return float(self.parameters.get_value("eta_s"))
+        val = self.parameters.get_value("eta_s")
+        assert val is not None
+        return float(val)
 
     @property
     def eta_0(self) -> float:
