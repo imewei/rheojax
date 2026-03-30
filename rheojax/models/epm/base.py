@@ -566,11 +566,16 @@ class EPMBase(BaseModel):
         sigma_c_mean = self.parameters.get_value("sigma_c_mean")
         sigma_c_std = self.parameters.get_value("sigma_c_std")
         smoothing_width = self.parameters.get_value("smoothing_width")
-        assert mu is not None
-        assert tau_pl is not None
-        assert sigma_c_mean is not None
-        assert sigma_c_std is not None
-        assert smoothing_width is not None
+        if mu is None:
+            raise ValueError("Parameter 'mu' must be set before use")
+        if tau_pl is None:
+            raise ValueError("Parameter 'tau_pl' must be set before use")
+        if sigma_c_mean is None:
+            raise ValueError("Parameter 'sigma_c_mean' must be set before use")
+        if sigma_c_std is None:
+            raise ValueError("Parameter 'sigma_c_std' must be set before use")
+        if smoothing_width is None:
+            raise ValueError("Parameter 'smoothing_width' must be set before use")
         return {
             "mu": mu,
             "tau_pl": tau_pl,
@@ -714,7 +719,8 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data if possible
         dt = self.dt
@@ -766,7 +772,8 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=modulus.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt
@@ -827,7 +834,8 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=strain.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt
@@ -906,7 +914,8 @@ class EPMBase(BaseModel):
             RheoData with x=time, y=stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt

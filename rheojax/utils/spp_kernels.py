@@ -304,15 +304,11 @@ def harmonic_reconstruction(
         jnp.arange(n_harmonics),
     )
 
-    # Reconstruct signal
-    def reconstruct_point(t_point):
-        result = jnp.float64(0.0)
-        for i in range(n_harmonics):
-            n = 2 * i + 1
-            result = result + amplitudes[i] * jnp.sin(n * omega * t_point + phases[i])
-        return result
-
-    reconstructed = jax.vmap(reconstruct_point)(t)
+    # Reconstruct signal — vectorized over harmonics and time
+    harmonics = 2 * jnp.arange(n_harmonics) + 1  # [1, 3, 5, ...]
+    # phase matrix: (n_harmonics, len(t))
+    phase_matrix = harmonics[:, None] * omega * t[None, :] + phases[:, None]
+    reconstructed = jnp.sum(amplitudes[:, None] * jnp.sin(phase_matrix), axis=0)
 
     return amplitudes, phases, reconstructed
 
@@ -514,23 +510,23 @@ def harmonic_reconstruction_full(
     # Only use fundamental for strain/rate (n=1), odd harmonics up to n_harmonics for stress
 
     def reconstruct_signal(An, Bn, max_harmonic, fundamental_only=False):
-        """Reconstruct signal from Fourier coefficients."""
-        result = jnp.zeros(L, dtype=jnp.float64)
+        """Reconstruct signal from Fourier coefficients (vectorized)."""
         if fundamental_only:
-            # Only fundamental harmonic
-            n = 1
-            idx = p * n
-            if idx < len(An):
-                result = result + An[idx] * jnp.cos(n * omega * time_new)
-                result = result + Bn[idx] * jnp.sin(n * omega * time_new)
-        else:
-            # Odd harmonics up to max_harmonic
-            for n in range(1, max_harmonic + 1, 2):
-                idx = p * n
-                if idx < len(An):
-                    result = result + An[idx] * jnp.cos(n * omega * time_new)
-                    result = result + Bn[idx] * jnp.sin(n * omega * time_new)
-        return result
+            idx = p
+            cos_term = jnp.cos(omega * time_new)
+            sin_term = jnp.sin(omega * time_new)
+            an = jnp.where(idx < len(An), An[jnp.minimum(idx, len(An) - 1)], 0.0)
+            bn = jnp.where(idx < len(Bn), Bn[jnp.minimum(idx, len(Bn) - 1)], 0.0)
+            return an * cos_term + bn * sin_term
+        # Odd harmonics: vectorized over harmonic indices
+        harmonics = jnp.arange(1, max_harmonic + 1, 2)
+        indices = p * harmonics
+        an = jnp.where(indices < len(An), An[jnp.minimum(indices, len(An) - 1)], 0.0)
+        bn = jnp.where(indices < len(Bn), Bn[jnp.minimum(indices, len(Bn) - 1)], 0.0)
+        phase = harmonics[:, None] * omega * time_new[None, :]  # (H, L)
+        return jnp.sum(
+            an[:, None] * jnp.cos(phase) + bn[:, None] * jnp.sin(phase), axis=0
+        )
 
     strain_recon = reconstruct_signal(An_strain, Bn_strain, 1, fundamental_only=True)
     rate_recon = reconstruct_signal(An_rate, Bn_rate, 1, fundamental_only=True)
@@ -670,38 +666,47 @@ def spp_fourier_analysis(
     # For each waveform, compute f, f', f'', f'''
 
     def compute_derivatives_from_fourier(An, Bn, max_harmonic):
-        """Compute signal and its 1st, 2nd, 3rd derivatives from Fourier coefficients."""
-        f = jnp.zeros(L, dtype=jnp.float64)
-        fd = jnp.zeros(L, dtype=jnp.float64)
-        fdd = jnp.zeros(L, dtype=jnp.float64)
-        fddd = jnp.zeros(L, dtype=jnp.float64)
+        """Compute signal and its 1st, 2nd, 3rd derivatives from Fourier coefficients.
 
-        for n in range(1, max_harmonic + 1, 2):
-            idx = p * n
-            if idx < len(An):
-                n_omega = n * omega
-                cos_term = jnp.cos(n_omega * time_new)
-                sin_term = jnp.sin(n_omega * time_new)
+        Vectorized over harmonics using broadcasting: harmonic indices (H,)
+        broadcast against time points (L,) to produce (H, L) intermediates,
+        then summed along the harmonic axis.
+        """
+        # Build array of odd harmonic indices: [1, 3, 5, ..., max_harmonic]
+        harmonics = jnp.arange(1, max_harmonic + 1, 2)
+        indices = p * harmonics  # Coefficient indices
 
-                # f(t) = An*cos(nωt) + Bn*sin(nωt)
-                f = f + An[idx] * cos_term + Bn[idx] * sin_term
+        # Gather coefficients, zero-padding for out-of-range indices
+        an = jnp.where(indices < len(An), An[jnp.minimum(indices, len(An) - 1)], 0.0)
+        bn = jnp.where(indices < len(Bn), Bn[jnp.minimum(indices, len(Bn) - 1)], 0.0)
 
-                # f'(t) = -nω*An*sin(nωt) + nω*Bn*cos(nωt)
-                fd = fd - n_omega * An[idx] * sin_term + n_omega * Bn[idx] * cos_term
+        # n*omega for each harmonic: shape (H,)
+        n_omega = harmonics * omega
 
-                # f''(t) = -n²ω²*An*cos(nωt) - n²ω²*Bn*sin(nωt)
-                fdd = (
-                    fdd
-                    - n_omega**2 * An[idx] * cos_term
-                    - n_omega**2 * Bn[idx] * sin_term
-                )
+        # cos(n*omega*t) and sin(n*omega*t): shape (H, L)
+        # n_omega[:, None] * time_new[None, :] broadcasts to (H, L)
+        phase = n_omega[:, None] * time_new[None, :]
+        cos_terms = jnp.cos(phase)
+        sin_terms = jnp.sin(phase)
 
-                # f'''(t) = n³ω³*An*sin(nωt) - n³ω³*Bn*cos(nωt)
-                fddd = (
-                    fddd
-                    + n_omega**3 * An[idx] * sin_term
-                    - n_omega**3 * Bn[idx] * cos_term
-                )
+        # f(t) = sum_n [An*cos + Bn*sin]
+        f = jnp.sum(an[:, None] * cos_terms + bn[:, None] * sin_terms, axis=0)
+
+        # f'(t) = sum_n [-nω*An*sin + nω*Bn*cos]
+        fd = jnp.sum(
+            n_omega[:, None] * (-an[:, None] * sin_terms + bn[:, None] * cos_terms),
+            axis=0,
+        )
+
+        # f''(t) = sum_n [-n²ω²*An*cos - n²ω²*Bn*sin]
+        n_omega2 = (n_omega**2)[:, None]
+        fdd = jnp.sum(-n_omega2 * (an[:, None] * cos_terms + bn[:, None] * sin_terms), axis=0)
+
+        # f'''(t) = sum_n [n³ω³*An*sin - n³ω³*Bn*cos]
+        n_omega3 = (n_omega**3)[:, None]
+        fddd = jnp.sum(
+            n_omega3 * (an[:, None] * sin_terms - bn[:, None] * cos_terms), axis=0
+        )
 
         return f, fd, fdd, fddd
 
@@ -801,8 +806,11 @@ def spp_fourier_analysis(
     denom = jnp.maximum(sigma_prime**2 + sigma_dprime**2, eps)
     delta_t_dot = (sigma_prime * sigma_tprime - sigma_dprime**2) / denom
 
-    # Displacement stress
+    # Displacement stress: sigma_d = sigma - G'_t * gamma - G''_t/omega * gamma_dot
     disp_stress = stress_recon - (Gp_t * strain_recon + Gpp_t * rate_recon)
+    # Equilibrium strain: gamma_eq = gamma - sigma_d / G'_t (Rogers 2017).
+    # We use abs(G'_t) to prevent sign inversion near yielding where G'_t -> 0;
+    # the equilibrium strain estimate is physically ill-defined in that regime.
     eq_strain_est = strain_recon - disp_stress / jnp.maximum(jnp.abs(Gp_t), eps)
 
     # Frenet-Serret frame
@@ -1162,9 +1170,15 @@ def spp_stress_decomposition(
     rate_amplitude: float,
 ) -> tuple["Array", "Array"]:
     """
-    Decompose total stress into elastic and viscous contributions.
+    Decompose total stress into elastic and viscous contributions via linear projection.
 
-    Uses SPP framework to separate σ(t) = σ'(t) + σ''(t) where:
+    This is a Cho-style orthogonal projection (Cho et al. 2005), NOT the full SPP
+    Frenet-Serret decomposition. It projects stress onto normalized strain and
+    strain-rate directions and distributes the residual symmetrically. For the
+    full SPP decomposition (which includes the displacement stress sigma_d via
+    the osculating plane), use :func:`spp_fourier_analysis` instead.
+
+    Separates σ(t) = σ'(t) + σ''(t) where:
     - σ'(t): Elastic (in-phase with strain) component
     - σ''(t): Viscous (in-phase with strain rate) component
 
@@ -1209,7 +1223,11 @@ def spp_stress_decomposition(
 
     Notes
     -----
-    - Decomposition valid for any LAOS response (linear or nonlinear)
+    - This is a linear projection decomposition, exact for sinusoidal signals.
+      For nonlinear responses, the residual (displacement stress) is split
+      equally between elastic and viscous components.
+    - For the full SPP decomposition that separately tracks the displacement
+      stress, use :func:`spp_fourier_analysis`.
     - For linear viscoelastic: σ_e = G' * γ, σ_v = G'' * γ / ω
     - Decomposition satisfies σ = σ_e + σ_v at all times
     """
@@ -1323,21 +1341,30 @@ def numerical_derivative_4th_order(
         result = result_padded[pad_size : pad_size + L]
 
         # Fix boundaries with forward/backward differences (2nd order)
-        # Forward at start: (-f[p+2k] + 4*f[p+k] - 3*f[p]) / (2*k*dt)
+        # Vectorized scatter: compute corrections for all boundary points at once
         boundary_k = min(3 * k, L - 1)
-        for p in range(boundary_k):
-            if p + 2 * k < L and p + k < L:
-                result = result.at[p].set(
-                    (-signal_arr[p + 2 * k] + 4 * signal_arr[p + k] - 3 * signal_arr[p])
-                    / (2 * h)
-                )
+        # Forward at start: (-f[p+2k] + 4*f[p+k] - 3*f[p]) / (2*k*dt)
+        fwd_idx = jnp.arange(boundary_k)
+        fwd_valid = (fwd_idx + 2 * k < L) & (fwd_idx + k < L)
+        fwd_vals = (
+            -signal_arr[jnp.minimum(fwd_idx + 2 * k, L - 1)]
+            + 4 * signal_arr[jnp.minimum(fwd_idx + k, L - 1)]
+            - 3 * signal_arr[fwd_idx]
+        ) / (2 * h)
+        result = result.at[fwd_idx].set(
+            jnp.where(fwd_valid, fwd_vals, result[fwd_idx])
+        )
         # Backward at end: (f[p-2k] - 4*f[p-k] + 3*f[p]) / (2*k*dt)
-        for p in range(L - boundary_k, L):
-            if p - 2 * k >= 0 and p - k >= 0:
-                result = result.at[p].set(
-                    (signal_arr[p - 2 * k] - 4 * signal_arr[p - k] + 3 * signal_arr[p])
-                    / (2 * h)
-                )
+        bwd_idx = jnp.arange(L - boundary_k, L)
+        bwd_valid = (bwd_idx - 2 * k >= 0) & (bwd_idx - k >= 0)
+        bwd_vals = (
+            signal_arr[jnp.maximum(bwd_idx - 2 * k, 0)]
+            - 4 * signal_arr[jnp.maximum(bwd_idx - k, 0)]
+            + 3 * signal_arr[bwd_idx]
+        ) / (2 * h)
+        result = result.at[bwd_idx].set(
+            jnp.where(bwd_valid, bwd_vals, result[bwd_idx])
+        )
 
     elif order == 2:
         # 4th-order centered second derivative
@@ -1351,30 +1378,26 @@ def numerical_derivative_4th_order(
         ) / (12 * h**2)
         result = result_padded[pad_size : pad_size + L]
 
-        # Boundary correction with 2nd-order forward/backward formulas
+        # Boundary correction — vectorized scatter
         boundary_k = min(3 * k, L - 1)
-        for p in range(boundary_k):
-            if p + 3 * k < L:
-                result = result.at[p].set(
-                    (
-                        -signal_arr[p + 3 * k]
-                        + 4 * signal_arr[p + 2 * k]
-                        - 5 * signal_arr[p + k]
-                        + 2 * signal_arr[p]
-                    )
-                    / (h**2)
-                )
-        for p in range(L - boundary_k, L):
-            if p - 3 * k >= 0:
-                result = result.at[p].set(
-                    (
-                        -signal_arr[p - 3 * k]
-                        + 4 * signal_arr[p - 2 * k]
-                        - 5 * signal_arr[p - k]
-                        + 2 * signal_arr[p]
-                    )
-                    / (h**2)
-                )
+        fwd_idx = jnp.arange(boundary_k)
+        fwd_valid = fwd_idx + 3 * k < L
+        fwd_vals = (
+            -signal_arr[jnp.minimum(fwd_idx + 3 * k, L - 1)]
+            + 4 * signal_arr[jnp.minimum(fwd_idx + 2 * k, L - 1)]
+            - 5 * signal_arr[jnp.minimum(fwd_idx + k, L - 1)]
+            + 2 * signal_arr[fwd_idx]
+        ) / (h**2)
+        result = result.at[fwd_idx].set(jnp.where(fwd_valid, fwd_vals, result[fwd_idx]))
+        bwd_idx = jnp.arange(L - boundary_k, L)
+        bwd_valid = bwd_idx - 3 * k >= 0
+        bwd_vals = (
+            -signal_arr[jnp.maximum(bwd_idx - 3 * k, 0)]
+            + 4 * signal_arr[jnp.maximum(bwd_idx - 2 * k, 0)]
+            - 5 * signal_arr[jnp.maximum(bwd_idx - k, 0)]
+            + 2 * signal_arr[bwd_idx]
+        ) / (h**2)
+        result = result.at[bwd_idx].set(jnp.where(bwd_valid, bwd_vals, result[bwd_idx]))
 
     elif order == 3:
         # 4th-order centered third derivative
@@ -1389,93 +1412,37 @@ def numerical_derivative_4th_order(
         ) / (8 * h**3)
         result = result_padded[pad_size : pad_size + L]
 
-        # Boundary correction
+        # Boundary correction — vectorized scatter
         boundary_k = min(4 * k, L - 1)
-        for p in range(boundary_k):
-            if p + 4 * k < L:
-                result = result.at[p].set(
-                    (
-                        -3 * signal_arr[p + 4 * k]
-                        + 14 * signal_arr[p + 3 * k]
-                        - 24 * signal_arr[p + 2 * k]
-                        + 18 * signal_arr[p + k]
-                        - 5 * signal_arr[p]
-                    )
-                    / (2 * h**3)
-                )
-        for p in range(L - boundary_k, L):
-            if p - 4 * k >= 0:
-                result = result.at[p].set(
-                    (
-                        3 * signal_arr[p - 4 * k]
-                        - 14 * signal_arr[p - 3 * k]
-                        + 24 * signal_arr[p - 2 * k]
-                        - 18 * signal_arr[p - k]
-                        + 5 * signal_arr[p]
-                    )
-                    / (2 * h**3)
-                )
+        fwd_idx = jnp.arange(boundary_k)
+        fwd_valid = fwd_idx + 4 * k < L
+        fwd_vals = (
+            -3 * signal_arr[jnp.minimum(fwd_idx + 4 * k, L - 1)]
+            + 14 * signal_arr[jnp.minimum(fwd_idx + 3 * k, L - 1)]
+            - 24 * signal_arr[jnp.minimum(fwd_idx + 2 * k, L - 1)]
+            + 18 * signal_arr[jnp.minimum(fwd_idx + k, L - 1)]
+            - 5 * signal_arr[fwd_idx]
+        ) / (2 * h**3)
+        result = result.at[fwd_idx].set(jnp.where(fwd_valid, fwd_vals, result[fwd_idx]))
+        bwd_idx = jnp.arange(L - boundary_k, L)
+        bwd_valid = bwd_idx - 4 * k >= 0
+        bwd_vals = (
+            3 * signal_arr[jnp.maximum(bwd_idx - 4 * k, 0)]
+            - 14 * signal_arr[jnp.maximum(bwd_idx - 3 * k, 0)]
+            + 24 * signal_arr[jnp.maximum(bwd_idx - 2 * k, 0)]
+            - 18 * signal_arr[jnp.maximum(bwd_idx - k, 0)]
+            + 5 * signal_arr[bwd_idx]
+        ) / (2 * h**3)
+        result = result.at[bwd_idx].set(jnp.where(bwd_valid, bwd_vals, result[bwd_idx]))
     else:
         result = signal_arr
 
     return result
 
 
-@partial(jax.jit, static_argnums=(2, 3))
-def numerical_derivative(
-    signal: "Array",
-    dt: float,
-    order: int = 1,
-    step_size: int = 1,
-) -> "Array":
-    """
-    Compute numerical derivatives using finite differences (MATLAB SPPplus compatible).
-
-    Implements the same finite-difference schemes as SPPplus_numerical_v2.m:
-    - 4th-order centered differences in the interior
-    - Forward/backward differences at boundaries
-
-    Parameters
-    ----------
-    signal : Array
-        Input signal to differentiate (1D array)
-    dt : float
-        Time step between samples (s)
-    order : int, optional
-        Derivative order: 1, 2, or 3 (default: 1)
-    step_size : int, optional
-        Step size k for stencil (default: 1, larger = more smoothing)
-
-    Returns
-    -------
-    Array
-        Numerical derivative of same length as input
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>> from rheojax.utils.spp_kernels import numerical_derivative
-    >>>
-    >>> # Sinusoidal signal
-    >>> t = jnp.linspace(0, 2*jnp.pi, 1000)
-    >>> dt = t[1] - t[0]
-    >>> signal = jnp.sin(t)
-    >>>
-    >>> # First derivative (should be cos(t))
-    >>> d_signal = numerical_derivative(signal, dt, order=1)
-    >>>
-    >>> # Second derivative (should be -sin(t))
-    >>> d2_signal = numerical_derivative(signal, dt, order=2)
-
-    Notes
-    -----
-    - Matches MATLAB SPPplus_numerical_v2.m "standard" differentiation mode
-    - Uses higher-order stencils for accuracy
-    - Boundary handling uses forward/backward differences
-    - For periodic signals, consider using `numerical_derivative_periodic`
-    """
-    # Use the 4th-order implementation
-    return numerical_derivative_4th_order(signal, dt, order, step_size)
+#: Alias for :func:`numerical_derivative_4th_order`.
+#: Kept for backwards compatibility and MATLAB SPPplus naming parity.
+numerical_derivative = numerical_derivative_4th_order
 
 
 @partial(jax.jit, static_argnums=(2,))

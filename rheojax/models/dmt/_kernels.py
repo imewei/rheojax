@@ -28,7 +28,7 @@ def viscosity_exponential(
     eta_0: float,
     eta_inf: float,
 ) -> jnp.ndarray:
-    """Exponential viscosity closure (original DMT 2013).
+    """Exponential viscosity closure (de Souza Mendes 2009).
 
     η(λ) = η_∞ · (η_0/η_∞)^λ
 

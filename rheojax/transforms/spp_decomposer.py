@@ -37,7 +37,7 @@ from rheojax.core.registry import TransformRegistry
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)
-_, jnp = safe_import_jax()
+jax, jnp = safe_import_jax()
 
 # Module logger
 logger = get_logger(__name__)
@@ -189,6 +189,10 @@ class SPPDecomposer(BaseTransform):
             If True, infer strain rate with periodic wrapping when missing (default: True)
         """
         super().__init__()
+        if omega <= 0:
+            raise ValueError(f"omega must be positive, got {omega}")
+        if gamma_0 <= 0:
+            raise ValueError(f"gamma_0 must be positive, got {gamma_0}")
         self.omega = float(omega)
         self.gamma_0 = float(gamma_0)
         self.gamma_dot_0 = self.omega * self.gamma_0  # Rate amplitude
@@ -532,6 +536,14 @@ class SPPDecomposer(BaseTransform):
         # Store Results
         # =====================================================================
 
+        # Batch device-to-host transfer for array results
+        waveforms = jax.device_get({
+            "G_cage": G_cage,
+            "sigma_elastic": sigma_elastic,
+            "sigma_viscous": sigma_viscous,
+            "stress_reconstructed": stress_reconstructed,
+        })
+
         self.results_ = {
             # Yield stresses
             "sigma_sy": float(sigma_sy),
@@ -541,8 +553,8 @@ class SPPDecomposer(BaseTransform):
             "n_power_law": float(n_power),
             "r_squared_power_law": float(r_squared_power),
             # Harmonic analysis
-            "harmonic_amplitudes": np.array(amplitudes),
-            "harmonic_phases": np.array(phases),
+            "harmonic_amplitudes": np.asarray(amplitudes),
+            "harmonic_phases": np.asarray(phases),
             "fundamental_amplitude": (
                 float(amplitudes[0]) if len(amplitudes) > 0 else 0.0
             ),
@@ -558,44 +570,31 @@ class SPPDecomposer(BaseTransform):
             "eta_M": float(lissajous["eta_M"]),
             "S_factor": float(lissajous["S_factor"]),
             "T_factor": float(lissajous["T_factor"]),
-            # Waveforms
-            "G_cage": np.array(G_cage),
-            "sigma_elastic": np.array(sigma_elastic),
-            "sigma_viscous": np.array(sigma_viscous),
-            "stress_reconstructed": np.array(stress_reconstructed),
+            # Waveforms (batched D→H)
+            **{k: np.asarray(v) for k, v in waveforms.items()},
             # Cycle selection info
             "cycles_analyzed": (actual_start, actual_end),
         }
         if core_results is not None:
-            core_block = {
-                k: np.array(core_results[k])
-                for k in [
-                    "Gp_t",
-                    "Gpp_t",
-                    "G_star_t",
-                    "tan_delta_t",
-                    "delta_t",
-                    "disp_stress",
-                    "eq_strain_est",
-                    "Gp_t_dot",
-                    "Gpp_t_dot",
-                    "G_speed",
-                    "delta_t_dot",
-                    "strain_recon",
-                    "rate_recon",
-                    "stress_recon",
-                    "time_new",
-                ]
-                if k in core_results
-            }
+            _core_keys = [
+                "Gp_t", "Gpp_t", "G_star_t", "tan_delta_t", "delta_t",
+                "disp_stress", "eq_strain_est", "Gp_t_dot", "Gpp_t_dot",
+                "G_speed", "delta_t_dot", "strain_recon", "rate_recon",
+                "stress_recon", "time_new",
+            ]
+            core_jax = {k: core_results[k] for k in _core_keys if k in core_results}
+            core_host = jax.device_get(core_jax)
+            core_block = {k: np.asarray(v) for k, v in core_host.items()}
             if "Delta" in core_results:
                 self.results_["Delta"] = float(core_results["Delta"])
             self.results_["core"] = core_block
             self.results_["spp_params"] = spp_params
             if fsf_data_out is not None:
-                self.results_["fsf_data_out"] = np.array(fsf_data_out)
+                self.results_["fsf_data_out"] = np.asarray(
+                    jax.device_get(fsf_data_out)
+                )
             if ft_out is not None:
-                self.results_["ft_out"] = np.array(ft_out)
+                self.results_["ft_out"] = np.asarray(jax.device_get(ft_out))
 
             # Build MATLAB-compatible tables (15 cols + optional FSF)
             spp_export = build_spp_exports(

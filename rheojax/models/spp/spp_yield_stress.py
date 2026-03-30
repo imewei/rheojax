@@ -312,7 +312,8 @@ class SPPYieldStress(BaseModel):
         )
         if np.any(low_amp_mask):
             G_cage_est = np.mean(
-                sigma_array[low_amp_mask] / gamma_0_array[low_amp_mask]
+                sigma_array[low_amp_mask]
+                / np.maximum(gamma_0_array[low_amp_mask], 1e-10)
             )
             self.parameters.set_value("G_cage", np.clip(G_cage_est, 1e-3, 1e9))
 
@@ -432,8 +433,7 @@ class SPPYieldStress(BaseModel):
         if test_mode is None:
             test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
 
-        # Extract parameters
-        G_cage = params[0]
+        # Extract parameters (params[0]=G_cage, params[7]=noise — used by Bayesian)
         sigma_sy_scale = params[1]
         sigma_sy_exp = params[2]
         sigma_dy_scale = params[3]
@@ -447,11 +447,13 @@ class SPPYieldStress(BaseModel):
             yield_type = kwargs.get(
                 "yield_type", getattr(self, "_yield_type", "static")
             )
+            if yield_type not in ("static", "dynamic"):
+                raise ValueError(
+                    f"yield_type must be 'static' or 'dynamic', got '{yield_type}'"
+                )
             if yield_type == "dynamic":
                 return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
-            return self._predict_oscillation(
-                X, G_cage, sigma_sy_scale, sigma_sy_exp, eta_inf
-            )
+            return self._predict_oscillation(X, sigma_sy_scale, sigma_sy_exp)
         elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             return self._predict_rotation(X, sigma_dy_scale, eta_inf, n_power_law)
         else:
@@ -461,10 +463,8 @@ class SPPYieldStress(BaseModel):
     @jax.jit
     def _predict_oscillation(
         gamma_0: Array,
-        G_cage: jax.Array | float,
         sigma_sy_scale: jax.Array | float,
         sigma_sy_exp: jax.Array | float,
-        eta_inf: jax.Array | float,
     ) -> Array:
         """Predict static yield stress for amplitude sweep.
 
@@ -474,14 +474,10 @@ class SPPYieldStress(BaseModel):
         ----------
         gamma_0 : Array
             Strain amplitudes
-        G_cage : float
-            Cage modulus (not directly used, but available)
         sigma_sy_scale : float
             Yield stress scale
         sigma_sy_exp : float
             Yield stress exponent
-        eta_inf : float
-            Infinite-shear viscosity (not directly used)
 
         Returns
         -------

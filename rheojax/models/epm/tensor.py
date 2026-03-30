@@ -206,11 +206,16 @@ class TensorialEPM(EPMBase):
         tau_pl_normal = self.parameters.get_value("tau_pl_normal")
         hill_H = self.parameters.get_value("hill_H")
         hill_N = self.parameters.get_value("hill_N")
-        assert nu is not None
-        assert tau_pl_shear is not None
-        assert tau_pl_normal is not None
-        assert hill_H is not None
-        assert hill_N is not None
+        if nu is None:
+            raise ValueError("Parameter 'nu' must be set before use")
+        if tau_pl_shear is None:
+            raise ValueError("Parameter 'tau_pl_shear' must be set before use")
+        if tau_pl_normal is None:
+            raise ValueError("Parameter 'tau_pl_normal' must be set before use")
+        if hill_H is None:
+            raise ValueError("Parameter 'hill_H' must be set before use")
+        if hill_N is None:
+            raise ValueError("Parameter 'hill_N' must be set before use")
         tensorial_params = {
             "nu": nu,
             "tau_pl_shear": tau_pl_shear,
@@ -494,7 +499,8 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data if possible
         dt = self.dt
@@ -539,7 +545,8 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt
@@ -592,7 +599,8 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt
@@ -664,7 +672,8 @@ class TensorialEPM(EPMBase):
         Extracts shear component from tensorial stress.
         """
         time = data.x
-        assert time is not None
+        if time is None:
+            raise ValueError("data.x (time array) must not be None")
 
         # Calculate dt from data
         dt = self.dt
