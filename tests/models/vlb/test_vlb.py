@@ -536,6 +536,59 @@ class TestVLBMultiNetworkAnalytical:
         G_t = vlb_multi_perm.predict(t, test_mode="relaxation")
         assert float(G_t[0]) == pytest.approx(500.0, rel=1e-3)
 
+    def test_creep_with_permanent_network(self, vlb_multi_perm):
+        """Creep compliance for mode + permanent network reaches bounded plateau.
+
+        SLS: J(t) = 1/(G0+Ge) + G0/(Ge*(G0+Ge)) * (1 - exp(-t/tau_ret))
+        At long times: J -> 1/G_e
+        """
+        t = np.linspace(0.01, 50, 200)
+        sigma_0 = 100.0
+        gamma = vlb_multi_perm.predict(t, test_mode="creep", sigma_applied=sigma_0)
+        gamma = np.asarray(gamma)
+
+        G0, k_d, G_e = 1000.0, 1.0, 500.0
+        G_total = G0 + G_e
+
+        # Instantaneous compliance
+        J_inst = 1.0 / G_total
+        assert float(gamma[0]) == pytest.approx(sigma_0 * J_inst, rel=0.1)
+
+        # Long-time plateau
+        J_inf = 1.0 / G_e
+        assert float(gamma[-1]) == pytest.approx(sigma_0 * J_inf, rel=0.02)
+
+    @pytest.mark.smoke
+    def test_multi_total_modulus(self, vlb_multi_2):
+        """G_total = sum(G_i) should equal sum of mode moduli."""
+        assert float(vlb_multi_2.G_total) == pytest.approx(1000.0, rel=1e-10)
+
+    @pytest.mark.smoke
+    def test_multi_steady_viscosity(self, vlb_multi_2):
+        """Total zero-shear viscosity = sum(G_i/k_d_i)."""
+        eta = vlb_multi_2.eta_0
+        expected = 500.0 / 0.1 + 500.0 / 10.0
+        assert float(eta) == pytest.approx(expected, rel=1e-10)
+
+    def test_multi_fit_oscillation(self, vlb_multi_2):
+        """Multi-network should fit SAOS data and recover parameters."""
+        omega = np.logspace(-2, 2, 30)
+        G0, kd0 = 500.0, 0.1
+        G1, kd1 = 500.0, 10.0
+        t0, t1 = 1.0 / kd0, 1.0 / kd1
+        wt0, wt1 = omega * t0, omega * t1
+
+        Gp = G0 * wt0**2 / (1 + wt0**2) + G1 * wt1**2 / (1 + wt1**2)
+        Gpp = G0 * wt0 / (1 + wt0**2) + G1 * wt1 / (1 + wt1**2)
+        G_star = Gp + 1j * Gpp
+
+        model = VLBMultiNetwork(n_modes=2)
+        model.fit(omega, G_star, test_mode="oscillation")
+
+        Gp_pred, Gpp_pred = model.predict_saos(omega)
+        np.testing.assert_allclose(Gp_pred, Gp, rtol=0.05)
+        np.testing.assert_allclose(Gpp_pred, Gpp, rtol=0.05)
+
 
 # =============================================================================
 # Cross-Protocol Consistency Tests

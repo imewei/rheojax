@@ -277,7 +277,8 @@ class VLBVariant(VLBBase):
         Returns params in ParameterSet order: [G0, k_d_0, eta_s, (nu), (L_max), (E_a, T_ref)].
         """
         param_values = [
-            float(self.parameters.get_value(name)) for name in self.parameters.keys()
+            float(v) for name in self.parameters.keys()
+            if (v := self.parameters.get_value(name)) is not None
         ]
         return jnp.array(param_values, dtype=jnp.float64)
 
@@ -457,7 +458,8 @@ class VLBVariant(VLBBase):
 
         # Build parameter array from ParameterSet
         param_values = [
-            float(self.parameters.get_value(name)) for name in self.parameters.keys()
+            float(v) for name in self.parameters.keys()
+            if (v := self.parameters.get_value(name)) is not None
         ]
         params = jnp.array(param_values)
 
@@ -1188,7 +1190,7 @@ class VLBVariant(VLBBase):
 
     def simulate_laos(
         self,
-        t: np.ndarray,
+        t: np.ndarray | None,
         gamma_0: float,
         omega: float,
         n_cycles: int = 10,

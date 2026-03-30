@@ -14,11 +14,11 @@ Key Equation
 ------------
 The VLB constitutive equation for the distribution tensor mu::
 
-    dmu/dt = k_d * (I - mu) + D·mu + mu·D
+    dmu/dt = k_d * (I - mu) + L·mu + mu·L^T
 
 where:
 - mu is the distribution tensor (dimensionless, equilibrium mu = I)
-- D is the rate-of-deformation tensor (symmetric part of velocity gradient)
+- L is the velocity gradient tensor (L = nabla v)
 - k_d is the dissociation rate (1/s)
 
 Stress is computed from the distribution tensor::
@@ -39,8 +39,6 @@ Vernerey, Long, & Brighenti (2017). JMPS 107, 1-20.
 """
 
 from __future__ import annotations
-
-from functools import partial
 
 from rheojax.core.jax_config import safe_import_jax
 
@@ -214,6 +212,104 @@ def vlb_normal_stress_1(mu_xx: float, mu_yy: float, G0: float) -> float:
         First normal stress difference N1 (Pa)
     """
     return G0 * (mu_xx - mu_yy)
+
+
+# =============================================================================
+# Thermodynamic Quantities
+# =============================================================================
+
+
+@jax.jit
+def vlb_free_energy(
+    mu_xx: float, mu_yy: float, mu_zz: float, G0: float
+) -> float:
+    """Elastic free energy stored in the transient network.
+
+    For Gaussian chains (Vernerey et al. 2018, Polymers Eq. 5)::
+
+        Psi = (1/2) * G0 * [tr(mu) - 3 - ln(det(mu))]
+
+    At equilibrium (mu = I): Psi = 0.
+    Always non-negative by Jensen's inequality.
+
+    Parameters
+    ----------
+    mu_xx, mu_yy, mu_zz : float
+        Diagonal distribution tensor components
+    G0 : float
+        Network modulus (Pa)
+
+    Returns
+    -------
+    float
+        Free energy density (Pa)
+    """
+    tr_mu = mu_xx + mu_yy + mu_zz
+    # det(mu) for diagonal-dominant tensor (off-diagonal mu_xy contribution
+    # is second-order in strain and neglected for this thermodynamic measure;
+    # for the full tensor, det would include -mu_xy^2 terms, but the free
+    # energy is typically evaluated on the diagonal invariants).
+    ln_det = jnp.log(jnp.maximum(mu_xx * mu_yy * mu_zz, 1e-30))
+    return 0.5 * G0 * (tr_mu - 3.0 - ln_det)
+
+
+@jax.jit
+def vlb_free_energy_full(
+    mu_xx: float, mu_yy: float, mu_zz: float, mu_xy: float, G0: float
+) -> float:
+    """Elastic free energy with full determinant including off-diagonal terms.
+
+    Uses det(mu) = mu_xx * mu_yy * mu_zz - mu_zz * mu_xy^2 for the
+    incompressible simple-shear state vector [mu_xx, mu_yy, mu_zz, mu_xy].
+
+    Parameters
+    ----------
+    mu_xx, mu_yy, mu_zz, mu_xy : float
+        Distribution tensor components
+    G0 : float
+        Network modulus (Pa)
+
+    Returns
+    -------
+    float
+        Free energy density (Pa)
+    """
+    tr_mu = mu_xx + mu_yy + mu_zz
+    det_mu = mu_xx * mu_yy * mu_zz - mu_zz * mu_xy * mu_xy
+    ln_det = jnp.log(jnp.maximum(det_mu, 1e-30))
+    return 0.5 * G0 * (tr_mu - 3.0 - ln_det)
+
+
+@jax.jit
+def vlb_dissipation(
+    mu_xx: float, mu_yy: float, mu_zz: float, G0: float, k_d: float
+) -> float:
+    """Rate of energy dissipation by chain breakage and reformation.
+
+    For Gaussian chains (Vernerey et al. 2018, JMPS Eqs. 19-21)::
+
+        D = G0 * k_d * [tr(mu) - 3 - ln(det(mu))]
+
+    This equals 2 * k_d * Psi, confirming non-negative dissipation
+    (second law of thermodynamics).
+
+    Parameters
+    ----------
+    mu_xx, mu_yy, mu_zz : float
+        Diagonal distribution tensor components
+    G0 : float
+        Network modulus (Pa)
+    k_d : float
+        Dissociation rate (1/s)
+
+    Returns
+    -------
+    float
+        Dissipation rate (Pa/s)
+    """
+    tr_mu = mu_xx + mu_yy + mu_zz
+    ln_det = jnp.log(jnp.maximum(mu_xx * mu_yy * mu_zz, 1e-30))
+    return G0 * k_d * (tr_mu - 3.0 - ln_det)
 
 
 # =============================================================================
@@ -415,17 +511,6 @@ def vlb_saos_moduli(omega: float, G0: float, k_d: float) -> tuple[float, float]:
     return G_prime, G_double_prime
 
 
-def _vlb_saos_G_prime(omega: float, G0: float, k_d: float) -> float:
-    """Helper returning only G' for vmap."""
-    G_p, _ = vlb_saos_moduli(omega, G0, k_d)
-    return G_p
-
-
-def _vlb_saos_G_double_prime(omega: float, G0: float, k_d: float) -> float:
-    """Helper returning only G'' for vmap."""
-    _, G_pp = vlb_saos_moduli(omega, G0, k_d)
-    return G_pp
-
 
 def vlb_saos_moduli_vec(
     omega_arr: jnp.ndarray, G0: float, k_d: float
@@ -535,7 +620,7 @@ def vlb_multi_saos(
     return G_prime, G_double_prime
 
 
-@partial(jax.jit, static_argnums=())
+@jax.jit
 def vlb_multi_saos_vec(
     omega_arr: jnp.ndarray,
     G_modes: jnp.ndarray,
@@ -853,8 +938,7 @@ def vlb_creep_compliance_dual(t: float, G0: float, k_d: float, G_e: float) -> fl
     float
         Creep compliance J(t) (1/Pa)
     """
-    G_total = G0 + G_e
-    # Avoid division by zero if G_e = 0
+    G_total = jnp.maximum(G0 + G_e, 1e-30)
     G_e_safe = jnp.maximum(G_e, 1e-30)
     tau_ret = G_total / (k_d * G_e_safe)
 
@@ -916,134 +1000,6 @@ def vlb_solve_creep_gamma_dot(
 
     return gamma_dot
 
-
-# =============================================================================
-# LAOS ODE RHS (single network, for jax.lax.scan)
-# =============================================================================
-
-
-@jax.jit
-def vlb_laos_step(
-    carry: tuple,
-    t_val: float,
-    G0: float,
-    k_d: float,
-    gamma_0: float,
-    omega: float,
-    dt: float,
-) -> tuple:
-    """Single Euler step for LAOS simulation (single network).
-
-    Applies oscillatory shear gamma(t) = gamma_0 * sin(omega * t),
-    so gamma_dot(t) = gamma_0 * omega * cos(omega * t).
-
-    Uses explicit Euler for simplicity in jax.lax.scan.
-
-    Parameters
-    ----------
-    carry : tuple
-        (mu_xx, mu_yy, mu_zz, mu_xy) current state
-    t_val : float
-        Current time
-    G0 : float
-        Network modulus (Pa)
-    k_d : float
-        Dissociation rate (1/s)
-    gamma_0 : float
-        Strain amplitude
-    omega : float
-        Angular frequency (rad/s)
-    dt : float
-        Time step (s)
-
-    Returns
-    -------
-    tuple
-        (new_carry, output_tuple) where output_tuple = (sigma, N1)
-    """
-    mu_xx, mu_yy, mu_zz, mu_xy = carry
-
-    # Instantaneous shear rate
-    gamma_dot = gamma_0 * omega * jnp.cos(omega * t_val)
-
-    # ODE RHS
-    dmu_xx, dmu_yy, dmu_zz, dmu_xy = vlb_mu_rhs_shear(
-        mu_xx, mu_yy, mu_zz, mu_xy, gamma_dot, k_d
-    )
-
-    # Euler step
-    mu_xx_new = mu_xx + dt * dmu_xx
-    mu_yy_new = mu_yy + dt * dmu_yy
-    mu_zz_new = mu_zz + dt * dmu_zz
-    mu_xy_new = mu_xy + dt * dmu_xy
-
-    # Compute stress and N1 at current state
-    sigma = vlb_shear_stress(mu_xy, G0)
-    N1 = vlb_normal_stress_1(mu_xx, mu_yy, G0)
-
-    new_carry = (mu_xx_new, mu_yy_new, mu_zz_new, mu_xy_new)
-    return new_carry, (sigma, N1)
-
-
-@jax.jit
-def vlb_multi_laos_step(
-    carry: tuple,
-    t_val: float,
-    G_modes: jnp.ndarray,
-    kd_modes: jnp.ndarray,
-    eta_s: float,
-    gamma_0: float,
-    omega: float,
-    dt: float,
-) -> tuple:
-    """Single Euler step for multi-network LAOS.
-
-    State: (mu_xy_modes, mu_xx_modes, mu_yy_modes) where each is shape (M,).
-
-    Parameters
-    ----------
-    carry : tuple
-        (mu_xy_modes, mu_xx_modes, mu_yy_modes) current state arrays
-    t_val : float
-        Current time
-    G_modes : jnp.ndarray
-        Mode moduli (Pa), shape (M,)
-    kd_modes : jnp.ndarray
-        Mode dissociation rates (1/s), shape (M,)
-    eta_s : float
-        Solvent viscosity (Pa*s)
-    gamma_0 : float
-        Strain amplitude
-    omega : float
-        Angular frequency (rad/s)
-    dt : float
-        Time step (s)
-
-    Returns
-    -------
-    tuple
-        (new_carry, (sigma, N1))
-    """
-    mu_xy_modes, mu_xx_modes, mu_yy_modes = carry
-
-    gamma_dot = gamma_0 * omega * jnp.cos(omega * t_val)
-
-    # ODE RHS for each mode (vectorized)
-    dmu_xx = kd_modes * (1.0 - mu_xx_modes) + 2.0 * gamma_dot * mu_xy_modes
-    dmu_yy = kd_modes * (1.0 - mu_yy_modes)
-    dmu_xy = -kd_modes * mu_xy_modes + gamma_dot * mu_yy_modes
-
-    # Euler step
-    mu_xx_new = mu_xx_modes + dt * dmu_xx
-    mu_yy_new = mu_yy_modes + dt * dmu_yy
-    mu_xy_new = mu_xy_modes + dt * dmu_xy
-
-    # Stress = sum G_i * mu_xy_i + eta_s * gamma_dot
-    sigma = jnp.sum(G_modes * mu_xy_modes) + eta_s * gamma_dot
-    N1 = jnp.sum(G_modes * (mu_xx_modes - mu_yy_modes))
-
-    new_carry = (mu_xy_new, mu_xx_new, mu_yy_new)
-    return new_carry, (sigma, N1)
 
 
 # =============================================================================

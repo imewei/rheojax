@@ -260,10 +260,12 @@ class VLBMultiNetwork(VLBBase):
             (G_modes, kd_modes) each shape (N,)
         """
         G_arr = np.array(
-            [float(self.parameters.get_value(f"G_{i}")) for i in range(self._n_modes)]
+            [float(v) for i in range(self._n_modes)
+             if (v := self.parameters.get_value(f"G_{i}")) is not None]
         )
         kd_arr = np.array(
-            [float(self.parameters.get_value(f"k_d_{i}")) for i in range(self._n_modes)]
+            [float(v) for i in range(self._n_modes)
+             if (v := self.parameters.get_value(f"k_d_{i}")) is not None]
         )
         return G_arr, kd_arr
 
