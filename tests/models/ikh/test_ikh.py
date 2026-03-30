@@ -289,12 +289,15 @@ class TestMIKH:
         # Predicted
         sigma_pred = model.predict_flow_curve(gamma_dot)
 
-        # Analytical steady-state
+        # Analytical steady-state (Dimitriou & McKinley 2014, Eq. 28)
+        C = model.parameters.get_value("C")
+        gamma_dyn = model.parameters.get_value("gamma_dyn")
         k1 = 1.0 / tau_thix
         k2 = Gamma
         lambda_ss = k1 / (k1 + k2 * np.abs(gamma_dot))
         sigma_y_ss = sigma_y0 + delta_sigma_y * lambda_ss
-        sigma_analytical = sigma_y_ss + eta_inf * np.abs(gamma_dot)
+        alpha_sat = C / gamma_dyn  # Backstress saturation
+        sigma_analytical = alpha_sat + sigma_y_ss + eta_inf * np.abs(gamma_dot)
 
         np.testing.assert_allclose(sigma_pred, sigma_analytical, rtol=1e-5)
 
@@ -739,22 +742,25 @@ class TestIKHKernels:
         ), "Stress should be less than elastic prediction"
 
     def test_flow_curve_steady_state_kernel(self):
-        """Test steady-state flow curve kernel."""
+        """Test steady-state flow curve kernel including backstress saturation."""
         params = {
             "sigma_y0": 10.0,
             "delta_sigma_y": 40.0,
             "tau_thix": 1.0,
             "Gamma": 0.5,
             "eta_inf": 0.1,
+            "C": 50.0,
+            "gamma_dyn": 2.0,
         }
 
         gamma_dot = jnp.array([0.1, 1.0, 10.0, 100.0])
         sigma = ikh_flow_curve_steady_state(gamma_dot, **params)
 
-        # Analytical
+        # Analytical (Dimitriou & McKinley 2014, Eq. 28)
         k1 = 1.0
         k2 = 0.5
         lam_ss = k1 / (k1 + k2 * gamma_dot)
-        sigma_expected = 10.0 + 40.0 * lam_ss + 0.1 * gamma_dot
+        alpha_sat = 50.0 / 2.0  # C / gamma_dyn = 25.0
+        sigma_expected = alpha_sat + 10.0 + 40.0 * lam_ss + 0.1 * gamma_dot
 
         np.testing.assert_allclose(sigma, sigma_expected, rtol=1e-5)

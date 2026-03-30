@@ -187,7 +187,7 @@ class MIKH(IKHBase):
         self.parameters.add(
             "mu_p",
             value=1e-3,
-            bounds=(1e-9, 1e3),
+            bounds=(1e-6, 1e3),
             units="Pa s",
             description="Plastic viscosity (Perzyna regularization)",
         )
@@ -295,8 +295,19 @@ class MIKH(IKHBase):
         X_arr = jnp.asarray(X)
 
         # Detect if this is frequency-domain (omega array) or time-domain (time series)
-        # Heuristic: time-domain data typically has >100 points for oscillation
-        is_time_domain = len(X_arr) > 100
+        # Use explicit kwarg if provided; otherwise heuristic based on data shape
+        # and whether values look like frequencies (positive, no repeated values)
+        oscillation_mode = kwargs.get("oscillation_mode", None)
+        if oscillation_mode == "time_domain":
+            is_time_domain = True
+        elif oscillation_mode == "frequency_domain":
+            is_time_domain = False
+        else:
+            # Heuristic: frequency data is short, positive, and monotonic
+            is_short = len(X_arr) <= 200
+            is_positive = bool(jnp.all(X_arr > 0))
+            is_monotone = bool(jnp.all(jnp.diff(X_arr) > 0))
+            is_time_domain = not (is_short and is_positive and is_monotone)
 
         if is_time_domain:
             # Time-domain: use return mapping with sinusoidal strain
@@ -346,7 +357,7 @@ class MIKH(IKHBase):
 
             G = p_dict["G"]
             eta = p_dict["eta"]
-            tau = eta / G  # Maxwell relaxation time
+            tau = eta / jnp.maximum(G, 1e-30)  # Maxwell relaxation time
 
             # Maxwell moduli
             wt = omega * tau
@@ -447,7 +458,7 @@ class MIKH(IKHBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=1_000_000,
             throw=False,
         )
 
@@ -504,7 +515,7 @@ class MIKH(IKHBase):
         elif test_mode in ["creep", "relaxation"]:
             t = jnp.asarray(X)
             gamma_dot = kwargs.get(
-                "gamma_dot", getattr(self, "_fit_gamma_dot", float("nan"))
+                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
             )
             sigma_applied = kwargs.get(
                 "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
@@ -620,7 +631,7 @@ class MIKH(IKHBase):
         # Extract protocol-specific args from kwargs, falling back to
         # cached values from _fit_ode_formulation()
         gamma_dot = kwargs.get(
-            "gamma_dot", getattr(self, "_fit_gamma_dot", float("nan"))
+            "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
         )
         sigma_applied = kwargs.get(
             "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
@@ -642,7 +653,7 @@ class MIKH(IKHBase):
             omega = jnp.asarray(X)
             G = param_dict["G"]
             eta = param_dict["eta"]
-            tau = eta / G  # Maxwell relaxation time
+            tau = eta / jnp.maximum(G, 1e-30)  # Maxwell relaxation time
 
             # Maxwell moduli
             wt = omega * tau

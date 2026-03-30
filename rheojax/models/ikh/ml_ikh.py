@@ -536,7 +536,7 @@ class MLIKH(IKHBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=1_000_000,
             throw=False,
         )
 
