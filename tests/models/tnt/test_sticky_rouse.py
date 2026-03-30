@@ -127,34 +127,34 @@ class TestStickerFloorPhysics:
     """Tests for sticker floor constraint: tau_eff_k = max(tau_R_k, tau_s)."""
 
     @pytest.mark.smoke
-    def test_effective_times_sticker_floor(self):
-        """Test effective times are max(tau_R_k, tau_s)."""
+    def test_effective_times_sticker_additive(self):
+        """Test effective times are τ_R_k + τ_s (Leibler-Rubinstein-Colby 1991)."""
         model = TNTStickyRouse(n_modes=3)
 
         # Default tau_s = 0.1, tau_R = [10.0, 1.0, 0.1]
         tau_eff = model.get_effective_times()
 
-        # Mode 0: max(10.0, 0.1) = 10.0
-        # Mode 1: max(1.0, 0.1) = 1.0
-        # Mode 2: max(0.1, 0.1) = 0.1
-        assert np.isclose(tau_eff[0], 10.0)
-        assert np.isclose(tau_eff[1], 1.0)
-        assert np.isclose(tau_eff[2], 0.1)
+        # Mode 0: 10.0 + 0.1 = 10.1
+        # Mode 1: 1.0 + 0.1 = 1.1
+        # Mode 2: 0.1 + 0.1 = 0.2
+        assert np.isclose(tau_eff[0], 10.1)
+        assert np.isclose(tau_eff[1], 1.1)
+        assert np.isclose(tau_eff[2], 0.2)
 
     @pytest.mark.smoke
-    def test_sticker_floor_limits_fast_modes(self):
-        """When tau_s > tau_R_k, sticker limits relaxation."""
+    def test_sticker_dominates_fast_modes(self):
+        """When tau_s > tau_R_k, sticker contribution dominates."""
         model = TNTStickyRouse(n_modes=3)
         model.parameters.set_value("tau_s", 5.0)  # Longer than tau_R_1 and tau_R_2
 
         tau_eff = model.get_effective_times()
 
-        # Mode 0: max(10.0, 5.0) = 10.0
-        # Mode 1: max(1.0, 5.0) = 5.0 ← sticker-limited
-        # Mode 2: max(0.1, 5.0) = 5.0 ← sticker-limited
-        assert np.isclose(tau_eff[0], 10.0)
-        assert np.isclose(tau_eff[1], 5.0)
-        assert np.isclose(tau_eff[2], 5.0)
+        # Mode 0: 10.0 + 5.0 = 15.0
+        # Mode 1: 1.0 + 5.0 = 6.0 ← sticker-dominated
+        # Mode 2: 0.1 + 5.0 = 5.1 ← sticker-dominated
+        assert np.isclose(tau_eff[0], 15.0)
+        assert np.isclose(tau_eff[1], 6.0)
+        assert np.isclose(tau_eff[2], 5.1)
 
     def test_rouse_limit_when_tau_s_small(self):
         """When tau_s ≪ all tau_R_k, model reduces to multi-mode Maxwell."""

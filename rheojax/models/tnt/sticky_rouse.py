@@ -64,7 +64,7 @@ Global:
     - eta_s: Solvent viscosity (Pa·s)
 
 Derived quantities:
-    - tau_eff_k = max(tau_R_k, tau_s) for each mode
+    - tau_eff_k = tau_R_k + tau_s for each mode (Leibler-Rubinstein-Colby 1991)
 
 Default Mode Spacing
 --------------------
@@ -293,7 +293,8 @@ class TNTStickyRouse(TNTBase):
         tau_R = jnp.array(tau_vals)
         tau_s_val = self.parameters.get_value("tau_s")
         tau_s = float(tau_s_val) if tau_s_val is not None else 0.0
-        tau_eff = jnp.maximum(tau_R, tau_s)
+        # Additive per Leibler-Rubinstein-Colby (1991): τ_eff = τ_R + τ_s
+        tau_eff = tau_R + tau_s
         return G_modes, tau_R, tau_eff
 
     def get_effective_times(self) -> np.ndarray:
@@ -302,7 +303,7 @@ class TNTStickyRouse(TNTBase):
         Returns
         -------
         np.ndarray
-            Effective times τ_eff_k = max(τ_R_k, τ_s), shape (N,)
+            Effective times τ_eff_k = τ_R_k + τ_s, shape (N,)
         """
         _, _, tau_eff = self._get_mode_arrays()
         return np.asarray(tau_eff)
@@ -344,8 +345,8 @@ class TNTStickyRouse(TNTBase):
         tau_s = params[2 * N]
         eta_s = params[2 * N + 1]
 
-        # Effective times: floor at sticker lifetime
-        tau_eff = jnp.maximum(tau_R_modes, tau_s)
+        # Additive per Leibler-Rubinstein-Colby (1991): τ_eff = τ_R + τ_s
+        tau_eff = tau_R_modes + tau_s
 
         # Resolve test mode with fallback
         mode = (

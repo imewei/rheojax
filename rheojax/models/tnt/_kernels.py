@@ -126,7 +126,8 @@ def breakage_power_law(
     """
     tr_S = S_xx + S_yy + S_zz
     stretch = jnp.sqrt(jnp.maximum(tr_S / 3.0, 1e-30))
-    return (1.0 / tau_b) * jnp.power(stretch, m_break)
+    # Cap to prevent overflow for large m_break (matching Bell model's exp(500) guard)
+    return (1.0 / tau_b) * jnp.minimum(jnp.power(stretch, m_break), 1e30)
 
 
 # =============================================================================
@@ -716,6 +717,7 @@ def tnt_single_mode_creep_ode_rhs(
     S_xx, S_yy, S_zz, S_xy, gamma = state
 
     # Compute shear rate from stress constraint
+    # Floor prevents division by zero when eta_s = 0 (dry network limit)
     eta_s_reg = jnp.maximum(eta_s, 1e-10 * G * tau_b)
     gamma_dot = (sigma_applied - G * S_xy) / eta_s_reg
 
