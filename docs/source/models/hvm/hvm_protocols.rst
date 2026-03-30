@@ -592,6 +592,50 @@ Fourier decomposition :math:`\sigma_{12}(t) = \gamma_0 \sum_n [G_n' \sin(n\omega
 for odd :math:`n`, Chebyshev decomposition, and Lissajous figure analysis.
 
 
+.. _hvm-saos-validity:
+
+SAOS Validity Criterion
+-----------------------
+
+The analytical SAOS expressions assume :math:`k_{BER} = k_{BER,0}` (constant,
+zero-stress thermal rate).  Under oscillatory shear, the TST coupling modifies
+the exchange rate by a factor :math:`\cosh(V_{act} \sigma_{VM} / RT)`.  This
+factor is negligible when the **mechanochemical coupling number** is small:
+
+.. math::
+
+   \Lambda = \frac{V_{act} \, G_E}{RT}
+
+The peak cosh argument during one oscillation cycle scales as
+:math:`\Lambda \cdot \gamma_0` (where :math:`\gamma_0` is the strain amplitude),
+so the fractional rate enhancement is :math:`\cosh(\Lambda \gamma_0) - 1`.
+
+The **critical strain amplitude** below which the analytical SAOS is accurate
+to better than 1% is:
+
+.. math::
+
+   \gamma_c \approx \frac{0.14}{\Lambda} = \frac{0.14 \, RT}{V_{act} \, G_E}
+
+For typical vitrimers (:math:`V_{act} \sim 10^{-5}` m³/mol,
+:math:`G_E \sim 10^4` Pa, :math:`T = 300` K):
+:math:`\Lambda \approx 4 \times 10^{-5}`, giving
+:math:`\gamma_c \approx 3500` — the analytical SAOS is valid at any
+physically realizable strain amplitude.
+
+For stiff networks with strong mechanochemical coupling
+(:math:`V_{act} \sim 10^{-3}` m³/mol, :math:`G_E \sim 10^6` Pa):
+:math:`\Lambda \approx 400`, giving :math:`\gamma_c \approx 3.5 \times 10^{-4}`
+(0.035%) — use ``simulate_laos()`` instead of ``predict_saos()``.
+
+.. note::
+
+   Use ``model.check_saos_validity(gamma_0)`` to programmatically verify
+   whether the analytical SAOS is appropriate for your parameter regime.
+   The method returns the mechanochemical coupling :math:`\Lambda`,
+   the critical strain :math:`\gamma_c`, and a boolean validity flag.
+
+
 Protocol Comparison: HVM vs VLB
 ================================
 

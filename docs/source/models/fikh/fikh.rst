@@ -349,17 +349,25 @@ Plus a **history buffer** for the fractional derivative:
 The history buffer size N determines the memory truncation length and
 accuracy of the L1 scheme approximation.
 
-Dimensionless Groups
-~~~~~~~~~~~~~~~~~~~~
+Scaling Groups
+~~~~~~~~~~~~~~
 
-**Fractional Weissenberg Number (** :math:`Wi_{\alpha}` **):**
+**Fractional Structure Number (** :math:`\Lambda_{\alpha}` **):**
 
 .. math::
 
-   Wi_\alpha = \dot{\gamma} \cdot \tau_{thix}^{1/\alpha}
+   \Lambda_\alpha = \dot{\gamma} \cdot \tau_{thix}^{1/\alpha}
 
-Ratio of shear rate to the effective (fractional) structure buildup rate.
-Note the :math:`1/\alpha` exponent reflecting fractional time scaling.
+Scaling parameter relating shear rate to the effective (fractional) structure
+buildup rate. Note the :math:`1/\alpha` exponent reflecting fractional time scaling.
+
+.. note::
+
+   :math:`\Lambda_\alpha` is **not dimensionless** for :math:`\alpha \neq 1`
+   (it has dimensions :math:`\text{s}^{1/\alpha - 1}`). It is a useful heuristic
+   scaling parameter for comparing flow regimes within the FIKH model at fixed
+   :math:`\alpha`, but cannot be directly compared to the standard Weissenberg
+   number :math:`Wi = \dot{\gamma} \cdot \tau`.
 
 **Deborah Number (De):**
 
@@ -814,9 +822,9 @@ Base Parameters (Always Present)
      - Structural breakdown coefficient
    * - ``alpha_structure``
      - 0.5
-     - (0.05, 0.99)
+     - (0.0, 1.0)
      - —
-     - Fractional order for structure
+     - Fractional order for structure (practical range: 0.05–0.99; avoid degenerate limits α→0 and α→1)
    * - ``eta_inf``
      - 0.1
      - (0, :math:`10^9`)

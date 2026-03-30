@@ -395,7 +395,7 @@ Parameter Interpretation
 
 :math:`\sigma_{c,\text{std}}` **(Disorder Strength)**:
    Standard deviation of local yield thresholds across the material, quantifying microstructural heterogeneity.
-   *For graduate students*: Disorder drives avalanche criticality. Larger :math:`\sigma_{c,\text{std}}` → broader avalanche size distributions, power-law exponents closer to :math:`\tau` ≈ 2.0 (with disorder) vs. 1.5 (mean-field). Controls correlation length :math:`\xi_{\text{corr}}` of yielding events.
+   *For graduate students*: Disorder drives avalanche criticality. Larger :math:`\sigma_{c,\text{std}}` → broader avalanche size distributions. In 2D lattice EPM under quasistatic loading, the avalanche exponent :math:`\tau \approx 1.0\text{--}1.5` (Lin et al. PNAS 2014 measured :math:`\tau = 1.36 \pm 0.03`); the mean-field value :math:`\tau = 3/2` holds only under random triggering. Controls correlation length :math:`\xi_{\text{corr}}` of yielding events.
    *For practitioners*: High disorder correlates with pronounced shear banding. Monitor :math:`\sigma_{c,\text{std}}/\sigma_c` ratio to predict flow instabilities.
 
 :math:`\alpha` **(Disorder Parameter)**:
@@ -608,7 +608,7 @@ where :math:`\lambda` is the feedback gain (typically 0.1-1.0).
 
 - :math:`\Sigma_0 < \Sigma_y`: Strain rate decays to zero (**arrest**)
 - :math:`\Sigma_0 > \Sigma_y`: Strain rate stabilizes to finite value (**flow**)
-- Fluidization time :math:`t_f \sim (\Sigma_y - \Sigma_0)^{-\nu}` with :math:`\nu \approx 4-6`
+- Fluidization time :math:`t_f \sim (\Sigma_y - \Sigma_0)^{-\beta}` with :math:`\beta \approx 2\text{--}3` for athermal EPM (Ferrero et al. PRL 2022). Larger exponents :math:`\beta \approx 4\text{--}6` observed in thermal creep experiments (e.g., carbopol gels)
 
 .. _epm-oscillation:
 
@@ -1505,7 +1505,7 @@ In the critical regime near yielding, avalanche sizes follow a power-law distrib
 
 where:
 
-- :math:`\tau` **≈ 1.5-2.0**: Universal exponent (mean-field :math:`\tau` = 3/2, with disorder corrections)
+- :math:`\tau` **≈ 1.0-1.5** (2D quasistatic): Lin et al. PNAS 2014 measured :math:`\tau = 1.36 \pm 0.03` in 2D. Mean-field :math:`\tau = 3/2` applies under random triggering only
 - **S_c**: Finite-size cutoff scaling with lattice size L
 - **d_f ≈ 2**: Fractal dimension of avalanches in 2D
 

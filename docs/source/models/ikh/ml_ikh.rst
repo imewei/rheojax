@@ -538,11 +538,12 @@ Each mode reaches its own steady state:
 
    \lambda_{ss,i} = \frac{1/\tau_{thix,i}}{1/\tau_{thix,i} + \Gamma_i |\dot{\gamma}|}
 
-The total stress is:
+Including the backstress saturation :math:`\alpha_{sat,i} = C_i / \gamma_{dyn,i}` per mode
+(Dimitriou & McKinley 2014, Eq. 28), the total stress is:
 
 .. math::
 
-   \sigma_{ss} = \sum_{i=1}^{N} \left( \sigma_{y0,i} + \Delta\sigma_{y,i} \lambda_{ss,i} \right) + \eta_{\infty} |\dot{\gamma}|
+   \sigma_{ss} = \sum_{i=1}^{N} \left( \frac{C_i}{\gamma_{dyn,i}} + \sigma_{y0,i} + \Delta\sigma_{y,i} \lambda_{ss,i} \right) + \eta_{\infty} |\dot{\gamma}|
 
 **Weighted-sum steady state:**
 
@@ -552,11 +553,12 @@ All :math:`\lambda_i` reach steady state with the global plastic strain rate:
 
    \lambda_{ss,i} = \frac{1/\tau_{thix,i}}{1/\tau_{thix,i} + \Gamma_i |\dot{\gamma}^p|}
 
-The yield stress becomes:
+Including the global backstress saturation :math:`\alpha_{sat} = C / \gamma_{dyn}`,
+the total stress becomes:
 
 .. math::
 
-   \sigma_{y,ss} = \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_{ss,i}
+   \sigma_{ss} = \frac{C}{\gamma_{dyn}} + \sigma_{y,0} + k_3 \sum_{i=1}^{N} w_i \lambda_{ss,i} + \eta_{\infty} |\dot{\gamma}|
 
 
 Validity and Assumptions

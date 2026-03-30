@@ -405,6 +405,41 @@ quantifies nonlinearity.  The HVNM predicts :math:`I_{3/1}` onset at lower
 :math:`\gamma_0` than HVM due to strain amplification.
 
 
+.. _hvnm-saos-validity:
+
+SAOS Validity Criterion
+-----------------------
+
+The analytical SAOS uses constant :math:`k_{BER}` rates.  For HVNM, both
+matrix and interphase networks have TST coupling, so the validity depends
+on two mechanochemical coupling numbers:
+
+.. math::
+
+   \Lambda_{mat} = \frac{V_{act} \, G_E}{RT}, \qquad
+   \Lambda_{int} = \frac{V_{act}^{int} \, G_{I,eff} \, X_I}{RT}
+
+The critical strain amplitude is set by the **more restrictive** network:
+
+.. math::
+
+   \gamma_c = \min\!\left(
+     \frac{0.14}{\Lambda_{mat}},\;
+     \frac{0.14}{\Lambda_{int}}
+   \right)
+
+Nanocomposites typically have :math:`\Lambda_{int} > \Lambda_{mat}` (the
+interphase is stiffer and more strongly coupled), so the interphase network
+usually limits the SAOS validity.  Combined with strain amplification
+:math:`X_I`, the effective SAOS window narrows as :math:`\phi` increases.
+
+.. note::
+
+   Use ``model.check_saos_validity(gamma_0)`` to verify the analytical SAOS
+   is appropriate.  The method returns :math:`\Lambda_{mat}`,
+   :math:`\Lambda_{int}`, both critical strains, and a validity flag.
+
+
 .. _hvnm-cyclic:
 
 Cyclic Loading & Mullins Effect

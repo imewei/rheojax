@@ -9,7 +9,7 @@ Quick Reference
 
 - **Use when:** Elastoviscoplastic materials with thixotropy
 
-- **Parameters:** :math:`G`, :math:`\tau_y`, :math:`f`, :math:`\eta_p`, :math:`t_a`, :math:`b`
+- **Parameters:** 10 (minimal) or 12 (full coupling): :math:`G`, :math:`\eta_s`, :math:`\tau_{y0}`, :math:`K_{HB}`, :math:`n_{HB}`, :math:`f_{\text{age}}`, :math:`f_{\text{flow}}`, :math:`t_a`, :math:`b`, :math:`n_{\text{rej}}`; full adds :math:`\tau_{y,\text{coupling}}`, :math:`m_{\text{yield}}`
 
 - **Key equation:** :math:`\boldsymbol{\tau} + \lambda \stackrel{\nabla}{\boldsymbol{\tau}} = 2\eta_p \mathbf{D}`
 

@@ -90,7 +90,7 @@ Notation Guide
 Overview
 ========
 
-The de Souza Mendes-Thompson (DMT) model [deSouzaMendes2009]_ [Mendes2011]_ is a
+The de Souza Mendes-Thompson (DMT) model [deSouzaMendes2009]_ [Mendes2012]_ is a
 structural-kinetics based thixotropic model that captures time-dependent rheological
 behavior through a scalar structure parameter :math:`\lambda \in [0, 1]`.
 
@@ -2132,7 +2132,7 @@ Literature References
    of structured fluids." *Journal of Non-Newtonian Fluid Mechanics*, 164(1-3), 66-75.
    https://doi.org/10.1016/j.jnnfm.2009.08.005
 
-.. [Mendes2011] de Souza Mendes, P. R., & Thompson, R. L. (2012). "A critical overview
+.. [Mendes2012] de Souza Mendes, P. R., & Thompson, R. L. (2012). "A critical overview
    of elasto-viscoplastic thixotropic modeling." *Journal of Non-Newtonian Fluid
    Mechanics*, 187-188, 8-15.
    https://doi.org/10.1016/j.jnnfm.2012.08.006

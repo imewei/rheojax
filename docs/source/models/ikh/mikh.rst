@@ -319,6 +319,16 @@ As plastic deformation accumulates, :math:`\alpha` evolves according to the Arms
 
 The ratio :math:`C / \gamma_{\text{dyn}}` determines the maximum backstress magnitude.
 
+.. note::
+
+   **Reparameterization for** :math:`m \neq 1`: The original Dimitriou & McKinley (2014) paper
+   defines backstress recovery through a back-strain :math:`A` with :math:`\sigma_{back} = C \cdot A`
+   and recovery function :math:`f(A) = (q|A|)^m \operatorname{sign}(A)`. RheoJAX works directly
+   with the backstress :math:`\alpha` and uses :math:`\gamma_{dyn} \cdot |\alpha|^{m-1} \cdot \alpha`.
+   For :math:`m = 1`, :math:`\gamma_{dyn} = q` exactly. For :math:`m \neq 1`, the mapping is
+   :math:`\gamma_{dyn} = q^m \cdot C^{1-m}`. Both parameterizations are mathematically equivalent;
+   fitted parameter values should be interpreted accordingly.
+
 Isotropic Hardening (Thixotropy)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -470,22 +480,28 @@ At steady state (d/dt = 0), the flow curve follows from the equilibrium conditio
 
 where :math:`k_1 = 1/\tau_{\text{thix}}` and :math:`k_2 = \Gamma`.
 
-**Steady-state stress:**
+**Backstress saturation** (from :math:`d\alpha/dt = 0` at steady state, :math:`m = 1`):
 
 .. math::
 
-   \sigma_{ss} = \sigma_{y,0} + \Delta\sigma_y \cdot \lambda_{ss} + \eta_{\infty}|\dot{\gamma}|
+   \alpha_{sat} = \frac{C}{\gamma_{dyn}}
+
+**Steady-state stress** (Dimitriou & McKinley 2014, Eq. 28):
+
+.. math::
+
+   \sigma_{ss} = \frac{C}{\gamma_{dyn}} + \sigma_{y,0} + \Delta\sigma_y \cdot \lambda_{ss} + \eta_{\infty}|\dot{\gamma}|
 
 Substituting the structure balance:
 
 .. math::
 
-   \sigma_{ss}(\dot{\gamma}) = \sigma_{y,0} + \frac{\Delta\sigma_y}{1 + \Gamma\tau_{thix}|\dot{\gamma}|} + \eta_{\infty}|\dot{\gamma}|
+   \sigma_{ss}(\dot{\gamma}) = \frac{C}{\gamma_{dyn}} + \sigma_{y,0} + \frac{\Delta\sigma_y}{1 + \Gamma\tau_{thix}|\dot{\gamma}|} + \eta_{\infty}|\dot{\gamma}|
 
 This produces the characteristic shear-thinning flow curve:
 
-- **Low shear rate (** :math:`\dot{\gamma} \to 0` **):** :math:`\sigma \to \sigma_{y,0} + \Delta\sigma_y` (structured yield stress)
-- **High shear rate (** :math:`\dot{\gamma} \to \infty` **):** :math:`\sigma \to \sigma_{y,0} + \eta_\infty \dot{\gamma}` (linear viscous)
+- **Low shear rate (** :math:`\dot{\gamma} \to 0` **):** :math:`\sigma \to C/\gamma_{dyn} + \sigma_{y,0} + \Delta\sigma_y` (backstress + structured yield stress)
+- **High shear rate (** :math:`\dot{\gamma} \to \infty` **):** :math:`\sigma \to C/\gamma_{dyn} + \sigma_{y,0} + \eta_\infty \dot{\gamma}` (backstress + linear viscous)
 
 Governing Equations
 -------------------

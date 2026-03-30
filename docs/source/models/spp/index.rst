@@ -213,6 +213,42 @@ Model Documentation
    spp_yield_stress
 
 
+SPP vs. Ewoldt (FTC) Frameworks
+--------------------------------
+
+The RheoJAX SPP module implements **two complementary LAOS analysis frameworks**
+that serve different purposes:
+
+**SPP (Rogers)** — :func:`~rheojax.utils.spp_kernels.spp_fourier_analysis`:
+
+- Provides **continuous, time-resolved** moduli :math:`G'_t(t)`, :math:`G''_t(t)`
+  at every instant within the oscillation cycle via the Frenet-Serret frame.
+- Naturally captures the **displacement stress** :math:`\sigma_d(t)` — a third
+  function beyond elastic and viscous that tracks microstructural rearrangement.
+- More **sensitive to yielding** — detects the onset of plasticity at lower strain
+  amplitudes than intercycle measures.
+- Requires higher-order derivatives (up to third), making it **more noise-sensitive**.
+  Use Fourier-based analytical derivatives (default) for best results.
+
+**Ewoldt/Cho (FTC)** — :func:`~rheojax.utils.spp_kernels.lissajous_metrics`:
+
+- Provides **discrete intercycle** measures: :math:`G'_L` (large strain), :math:`G'_M`
+  (minimum strain), :math:`\eta'_L`, :math:`\eta'_M`, and the stiffening/thickening
+  ratios :math:`S` and :math:`T`.
+- Based on Chebyshev decomposition of the Lissajous-Bowditch curves.
+- More **robust to noise** — requires only first-order information.
+- Gives summary snapshots rather than the full intracycle time evolution.
+
+.. note::
+
+   In the **linear viscoelastic** regime (SAOS), both frameworks reduce to the
+   same result: SPP gives constant :math:`G'_t = G'` and :math:`G''_t = G''`
+   throughout the cycle, while the Ewoldt measures give :math:`G'_L = G'_M = G'`.
+   The frameworks diverge only in the nonlinear (LAOS) regime, where the intracycle
+   resolution of SPP reveals the **sequence** of physical processes — elasticity,
+   yielding, flow, and cage reformation — that intercycle averages cannot resolve.
+
+
 See Also
 --------
 

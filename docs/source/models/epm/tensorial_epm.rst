@@ -416,7 +416,7 @@ Parameters
      - Description
    * - ``mu``
      - Pa
-     - [0.1, 100.0]
+     - [0.1, 1e9]
      - Shear modulus (elastic stiffness)
    * - ``nu``
      - dimensionless

@@ -621,9 +621,9 @@ Shared Fractional Order (``shared_alpha=True``)
      - Description
    * - ``alpha_structure``
      - 0.5
-     - (0.05, 0.99)
+     - (0.0, 1.0)
      - —
-     - Shared fractional order for all modes
+     - Shared fractional order for all modes (practical range: 0.05–0.99)
 
 Per-Mode Parameters
 ~~~~~~~~~~~~~~~~~~~
@@ -661,9 +661,9 @@ For each mode i = 0, 1, ..., N-1:
      - Dynamic recovery parameter for mode i
    * - ``alpha_i``
      - 0.5
-     - (0.05, 0.99)
+     - (0.0, 1.0)
      - —
-     - Per-mode fractional order (only if ``shared_alpha=False``)
+     - Per-mode fractional order (only if ``shared_alpha=False``; practical range: 0.05–0.99)
 
 **Note**: The global parameters ``tau_thix``, ``Gamma``, and ``alpha_structure`` (when
 ``shared_alpha=True``) are shared across all modes and are NOT per-mode parameters.

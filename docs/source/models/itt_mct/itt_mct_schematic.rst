@@ -508,13 +508,15 @@ At steady state with constant :math:`\dot{\gamma}`, the stress is:
 
    \sigma_{ss} = \dot{\gamma} \int_0^\infty G(s) \cdot h(\dot{\gamma} s) ds
 
-where :math:`G(s) = G_\infty \Phi_{\text{eq}}(s)` is the equilibrium relaxation modulus.
+where :math:`G(s) = G_\infty \Phi_{\text{eq}}(s)^2` is the equilibrium relaxation modulus
+(Fuchs & Cates 2002).  The squared correlator arises because the stress
+autocorrelator couples two density fluctuations.
 
 **Yield stress** (glass state, :math:`\varepsilon > 0`):
 
 .. math::
 
-   \sigma_y = \lim_{\dot{\gamma} \to 0} \sigma_{ss} = G_\infty \gamma_c f
+   \sigma_y = \lim_{\dot{\gamma} \to 0} \sigma_{ss} = G_\infty \gamma_c f^2
 
 **Shear thinning**: As :math:`\dot{\gamma}` increases, the cage is broken faster, and the effective
 viscosity decreases:
@@ -578,7 +580,7 @@ After cessation of flow at :math:`t = 0`:
 
 .. math::
 
-   \sigma(t) = \sigma(0) \cdot \Phi_{\text{relax}}(t)
+   \sigma(t) = G_\infty \gamma_{\text{pre}} \, \Phi_{\text{relax}}(t)^2
 
 In the glass state, stress does not fully relax:
 

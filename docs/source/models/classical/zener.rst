@@ -7,8 +7,8 @@ Quick Reference
 ---------------
 
 - **Use when:** Viscoelastic solid with finite equilibrium modulus, creep-recovery tests
-- **Parameters:** 3 (:math:`G_e`, :math:`G_m`, :math:`\eta`)
-- **Key equation:** :math:`G(t) = G_s + G_p \exp(-t/\tau)` where :math:`\tau = \eta_p/G_p`
+- **Parameters:** 3 (``Ge``, ``Gm``, ``eta``)
+- **Key equation:** :math:`G(t) = G_e + G_m \exp(-t/\tau)` where :math:`\tau = \eta/G_m`
 - **Test modes:** Oscillation, relaxation, creep, flow curve
 - **Material examples:** Cross-linked PDMS, vulcanized rubber, hydrogels, biological tissues
 
@@ -16,19 +16,24 @@ Notation Guide
 --------------
 
 .. list-table::
-   :widths: 15 85
+   :widths: 20 12 68
    :header-rows: 1
 
    * - Symbol
+     - Code name
      - Meaning
-   * - :math:`G_s`
+   * - :math:`G_e` (or :math:`G_s`)
+     - ``Ge``
      - Equilibrium modulus (Pa). Permanent stiffness at infinite time.
-   * - :math:`G_p`
+   * - :math:`G_m` (or :math:`G_p`)
+     - ``Gm``
      - Maxwell arm modulus (Pa). Relaxation strength.
-   * - :math:`\eta_p`
+   * - :math:`\eta` (or :math:`\eta_p`)
+     - ``eta``
      - Maxwell arm viscosity (Pa·s). Controls relaxation timescale.
    * - :math:`\tau`
-     - Relaxation time (s), :math:`\tau = \eta_p/G_p`.
+     - (derived)
+     - Relaxation time (s), :math:`\tau = \eta/G_m`.
 
 Overview
 --------
@@ -331,7 +336,7 @@ Parameters
      - Maxwell spring modulus; > 0 controls relaxation magnitude.
    * - ``eta``
      - Pa·s
-     - Maxwell dashpot viscosity; > 0 sets relaxation time :math:`\tau = \eta_p/G_p`.
+     - Maxwell dashpot viscosity; > 0 sets relaxation time :math:`\tau = \eta/G_m`.
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~

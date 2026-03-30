@@ -170,7 +170,9 @@ The interphase distribution tensor evolves with amplified affine deformation:
 
 .. math::
 
-   \dot{\mu}^I_{xy} = X_I \dot{\gamma} (\mu^I_{xx} + 1)/2 - k_{BER}^{int}(\mu^I_{xy} - \mu^{I,nat}_{xy})
+   \dot{\mu}^I_{xx} &= 2 X_I \dot{\gamma} \, \mu^I_{xy} + k_{BER}^{int}(\mu^{I,nat}_{xx} - \mu^I_{xx}) \\
+   \dot{\mu}^I_{yy} &= k_{BER}^{int}(\mu^{I,nat}_{yy} - \mu^I_{yy}) \\
+   \dot{\mu}^I_{xy} &= X_I \dot{\gamma} \, \mu^I_{yy} + k_{BER}^{int}(\mu^{I,nat}_{xy} - \mu^I_{xy})
 
 The I-network natural-state tensor evolves symmetrically with the E-network:
 
