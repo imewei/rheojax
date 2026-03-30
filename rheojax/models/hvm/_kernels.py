@@ -87,7 +87,8 @@ def hvm_ber_rate_constant(nu_0: float, E_a: float, T: float) -> float:
     float
         Zero-stress BER rate (1/s)
     """
-    return nu_0 * jnp.exp(-E_a / (_R_GAS * T))
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    return nu_0 * jnp.exp(-E_a / (_R_GAS * T_safe))
 
 
 @jax.jit
@@ -125,20 +126,20 @@ def hvm_ber_rate_stress(
     float
         Stress-enhanced BER rate (1/s)
     """
-    # 2D von Mises stress
-    sigma_vm = jnp.sqrt(
-        jnp.maximum(
-            sigma_E_xx**2
-            + sigma_E_yy**2
-            - sigma_E_xx * sigma_E_yy
-            + 3.0 * sigma_E_xy**2,
-            1e-30,
-        )
+    # 2D von Mises stress (use eps=1e-12 to tame sqrt gradient for NUTS AD)
+    sigma_vm_sq = (
+        sigma_E_xx**2
+        + sigma_E_yy**2
+        - sigma_E_xx * sigma_E_yy
+        + 3.0 * sigma_E_xy**2
     )
-    RT = _R_GAS * T
+    sigma_vm = jnp.sqrt(jnp.maximum(sigma_vm_sq, 0.0) + 1e-12)
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    RT = _R_GAS * T_safe
     k0 = nu_0 * jnp.exp(-E_a / RT)
-    # cosh coupling: symmetric acceleration under tension/compression
-    return k0 * jnp.cosh(V_act * sigma_vm / RT)
+    # Clamp cosh arg to prevent overflow (cosh(710) ≈ inf in float64)
+    cosh_arg = jnp.clip(V_act * sigma_vm / RT, -500.0, 500.0)
+    return k0 * jnp.cosh(cosh_arg)
 
 
 @jax.jit
@@ -185,11 +186,15 @@ def hvm_ber_rate_stretch(
     # mu_zz = mu_nat_zz for simple shear (both equal to their respective values)
     # In simple shear, mu_E_zz ≈ mu_E_nat_zz, so we use the 2D trace difference
     delta_trace = (mu_E_xx - mu_E_nat_xx) + (mu_E_yy - mu_E_nat_yy)
-    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 1e-30))
+    # Use eps=1e-12 instead of max(x, 1e-30) to tame sqrt gradient for NUTS AD
+    delta_stretch = jnp.sqrt(jnp.abs(delta_trace) / 2.0 + 1e-12)
 
-    RT = _R_GAS * T
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    RT = _R_GAS * T_safe
     k0 = nu_0 * jnp.exp(-E_a / RT)
-    return k0 * jnp.cosh(V_act * G_E * delta_stretch / RT)
+    # Clamp cosh arg to prevent overflow (cosh(710) ≈ inf in float64)
+    cosh_arg = jnp.clip(V_act * G_E * delta_stretch / RT, -500.0, 500.0)
+    return k0 * jnp.cosh(cosh_arg)
 
 
 # =============================================================================
@@ -296,7 +301,6 @@ def hvm_normal_stress_1(
     mu_E_nat_yy: float,
     mu_D_xx: float,
     mu_D_yy: float,
-    G_P: float,
     G_E: float,
     G_D: float,
 ) -> float:
@@ -316,8 +320,6 @@ def hvm_normal_stress_1(
         E-network diagonal natural state components
     mu_D_xx, mu_D_yy : float
         D-network diagonal distribution components
-    G_P : float
-        Permanent network modulus (unused, kept for interface consistency)
     G_E, G_D : float
         Exchangeable and dissociative network moduli (Pa)
 
@@ -546,49 +548,9 @@ def _hvm_saos_G_double_prime(
     return G_pp
 
 
-def hvm_saos_moduli_vec(
-    omega_arr: jnp.ndarray,
-    G_P: float,
-    G_E: float,
-    G_D: float,
-    k_BER_0: float,
-    k_d_D: float,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    """Vectorized SAOS moduli over frequency array.
-
-    Parameters
-    ----------
-    omega_arr : jnp.ndarray
-        Angular frequency array (rad/s)
-    G_P, G_E, G_D : float
-        Subnetwork moduli (Pa)
-    k_BER_0 : float
-        Zero-stress BER rate (1/s)
-    k_d_D : float
-        Dissociative rate (1/s)
-
-    Returns
-    -------
-    tuple of (jnp.ndarray, jnp.ndarray)
-        (G', G'') arrays (Pa)
-    """
-    tau_E_eff = 1.0 / (2.0 * jnp.maximum(k_BER_0, 1e-30))
-    wt_E = omega_arr * tau_E_eff
-    wt_E2 = wt_E * wt_E
-    denom_E = 1.0 + wt_E2
-
-    tau_D = 1.0 / jnp.maximum(k_d_D, 1e-30)
-    wt_D = omega_arr * tau_D
-    wt_D2 = wt_D * wt_D
-    denom_D = 1.0 + wt_D2
-
-    G_prime = G_P + G_E * wt_E2 / denom_E + G_D * wt_D2 / denom_D
-    G_double_prime = G_E * wt_E / denom_E + G_D * wt_D / denom_D
-
-    return G_prime, G_double_prime
-
-
-hvm_saos_moduli_vec = jax.jit(hvm_saos_moduli_vec)
+hvm_saos_moduli_vec = jax.jit(
+    jax.vmap(hvm_saos_moduli, in_axes=(0, None, None, None, None, None))
+)
 
 
 @jax.jit
@@ -783,7 +745,7 @@ def hvm_creep_compliance_linear(
     float
         Creep compliance J(t) (1/Pa)
     """
-    G_tot = G_P + G_E + G_D
+    G_tot = jnp.maximum(G_P + G_E + G_D, 1e-30)
     G_P_safe = jnp.maximum(G_P, 1e-30)
 
     # Instantaneous elastic compliance

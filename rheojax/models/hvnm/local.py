@@ -282,8 +282,10 @@ class HVNMLocal(HVNMBase):
         """
         G_D = self.G_D
         k_d_D = self.k_d_D
-        assert G_D is not None
-        assert k_d_D is not None
+        if G_D is None:
+            raise ValueError("G_D must not be None")
+        if k_d_D is None:
+            raise ValueError("k_d_D must not be None")
 
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         sigma = hvnm_steady_shear_stress_vec(gamma_dot_jax, G_D, k_d_D)
@@ -328,10 +330,12 @@ class HVNMLocal(HVNMBase):
         G_E = self.G_E
         G_D = self.G_D
         k_d_D = self.k_d_D
-        assert G_P is not None
-        assert G_E is not None
-        assert G_D is not None
-        assert k_d_D is not None
+        if G_P is None or G_E is None:
+            raise ValueError("G_P, G_E must not be None")
+        if G_D is None:
+            raise ValueError("G_D must not be None")
+        if k_d_D is None:
+            raise ValueError("k_d_D must not be None")
 
         omega_jax = jnp.asarray(omega, dtype=jnp.float64)
         p = self._get_params_dict()
@@ -385,9 +389,8 @@ class HVNMLocal(HVNMBase):
         G_P = self.G_P
         G_E = self.G_E
         G_D = self.G_D
-        assert G_P is not None
-        assert G_E is not None
-        assert G_D is not None
+        if G_P is None or G_E is None or G_D is None:
+            raise ValueError("G_P, G_E, G_D must not be None")
 
         self._gamma_dot_applied = gamma_dot
         t_jax = jnp.asarray(t, dtype=jnp.float64)
@@ -404,7 +407,8 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         D_int_col = ys[
             :, 17
         ]  # Always 18-component state; zero when damage not included
@@ -494,9 +498,8 @@ class HVNMLocal(HVNMBase):
         G_P = self.G_P
         G_E = self.G_E
         G_D = self.G_D
-        assert G_P is not None
-        assert G_E is not None
-        assert G_D is not None
+        if G_P is None or G_E is None or G_D is None:
+            raise ValueError("G_P, G_E, G_D must not be None")
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
@@ -512,7 +515,8 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         D_int_col = ys[
             :, 17
         ]  # Always 18-component state; zero when damage not included
@@ -590,7 +594,8 @@ class HVNMLocal(HVNMBase):
         self._sigma_applied = sigma_0
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
-        assert args is not None
+        if args is None:
+            raise ValueError("ODE args dict must not be None")
 
         sol = hvnm_solve_creep(
             t_jax,
@@ -603,7 +608,8 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
@@ -661,9 +667,8 @@ class HVNMLocal(HVNMBase):
         G_P = self.G_P
         G_E = self.G_E
         G_D = self.G_D
-        assert G_P is not None
-        assert G_E is not None
-        assert G_D is not None
+        if G_P is None or G_E is None or G_D is None:
+            raise ValueError("G_P, G_E, G_D must not be None")
 
         self._gamma_0 = gamma_0
         self._omega_laos = omega
@@ -682,7 +687,8 @@ class HVNMLocal(HVNMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         D_int_col = ys[
             :, 17
         ]  # Always 18-component state; zero when damage not included
@@ -777,8 +783,10 @@ class HVNMLocal(HVNMBase):
         """
         G_D = self.G_D
         k_d_D = self.k_d_D
-        assert G_D is not None
-        assert k_d_D is not None
+        if G_D is None:
+            raise ValueError("G_D must not be None")
+        if k_d_D is None:
+            raise ValueError("k_d_D must not be None")
 
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         Wi_D = gamma_dot_jax / jnp.maximum(k_d_D, 1e-30)
@@ -860,9 +868,8 @@ class HVNMLocal(HVNMBase):
         G_P = self.G_P
         G_E = self.G_E
         G_D = self.G_D
-        assert G_P is not None
-        assert G_E is not None
-        assert G_D is not None
+        if G_P is None or G_E is None or G_D is None:
+            raise ValueError("G_P, G_E, G_D must not be None")
 
         d = self._get_derived_params(self._get_params_dict())
         G_I_amp = d["G_I_eff"] * d["X_I"]

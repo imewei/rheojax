@@ -52,7 +52,7 @@ jax, jnp = safe_import_jax()
 # =============================================================================
 
 
-def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
+def _hvnm_initial_state() -> jnp.ndarray:
     """Create equilibrium initial state vector for HVNM.
 
     At equilibrium:
@@ -63,49 +63,23 @@ def _hvnm_initial_state(include_interfacial_damage: bool) -> jnp.ndarray:
     - mu^I = mu^I_nat = I  (interphase at natural state)
     - D_int = 0             (no interfacial damage)
 
-    Parameters
-    ----------
-    include_interfacial_damage : bool
-        Whether interfacial damage is active (D_int slot always present)
-
     Returns
     -------
     jnp.ndarray
         Initial state vector (always 18 components)
     """
-    # E-network: [mu_E_xx=1, mu_E_yy=1, mu_E_xy=0]
-    # E-network natural state: [mu_E_nat_xx=1, mu_E_nat_yy=1, mu_E_nat_xy=0]
-    # D-network: [mu_D_xx=1, mu_D_yy=1, mu_D_xy=0]
-    # gamma=0, D=0
-    # I-network: [mu_I_xx=1, mu_I_yy=1, mu_I_xy=0]
-    # I-network natural state: [mu_I_nat_xx=1, mu_I_nat_yy=1, mu_I_nat_xy=0]
-    # D_int=0 (interfacial damage, zero when not included)
-    components = [
-        1.0,
-        1.0,
-        0.0,  # E-network
-        1.0,
-        1.0,
-        0.0,  # E-network natural state
-        1.0,
-        1.0,
-        0.0,  # D-network
-        0.0,  # gamma
-        0.0,  # D (matrix damage)
-        1.0,
-        1.0,
-        0.0,  # I-network
-        1.0,
-        1.0,
-        0.0,  # I-network natural state
-        0.0,  # D_int (interfacial damage, zero when not included)
-    ]
-
-    return jnp.array(components, dtype=jnp.float64)
+    # [mu_E_xx, mu_E_yy, mu_E_xy, mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
+    #  mu_D_xx, mu_D_yy, mu_D_xy, gamma, D,
+    #  mu_I_xx, mu_I_yy, mu_I_xy, mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy, D_int]
+    return jnp.array(
+        [1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0,
+         1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0],
+        dtype=jnp.float64,
+    )
 
 
 def _hvnm_relaxation_initial_state(
-    gamma_step: float, include_interfacial_damage: bool
+    gamma_step: float,
 ) -> jnp.ndarray:
     """Create initial state after instantaneous step strain.
 
@@ -116,8 +90,6 @@ def _hvnm_relaxation_initial_state(
     ----------
     gamma_step : float
         Applied step strain
-    include_interfacial_damage : bool
-        Whether interfacial damage is active (D_int slot always present)
 
     Returns
     -------
@@ -729,11 +701,11 @@ def _make_hvnm_creep_vector_field(
         eta_E = G_E / (2.0 * k_BER_mat_safe)
         eta_D = jnp.where(include_dissociative, G_D / k_d_D_safe, 0.0)
         eta_I = G_I_eff * X_I / (2.0 * k_BER_int_safe)
-        # Small regularization from P-network elastic stiffness
-        eta_eff = eta_E + eta_D + eta_I + G_P * X_phi * 1e-6
+        # Regularization: use a fixed small viscosity floor (1 Pa·s)
+        # independent of G_P to avoid decade-spanning corruption
+        eta_eff = eta_E + eta_D + eta_I + 1.0  # 1 Pa·s floor
 
         gamma_dot = sigma_residual / jnp.maximum(eta_eff, 1e-30)
-        gamma_dot = jnp.clip(gamma_dot, -1e10, 1e10)
 
         # E-network evolution
         dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
@@ -975,7 +947,7 @@ def hvnm_solve_startup(
     vf = _make_hvnm_startup_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_initial_state(include_interfacial_damage)
+    y0 = _hvnm_initial_state()
     args = _default_hvnm_args(params)
     args["gamma_dot"] = gamma_dot
     return _solve_hvnm_ode(t, vf, y0, args)
@@ -1010,7 +982,7 @@ def hvnm_solve_relaxation(
     vf = _make_hvnm_relaxation_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_relaxation_initial_state(gamma_step, include_interfacial_damage)
+    y0 = _hvnm_relaxation_initial_state(gamma_step)
     args = _default_hvnm_args(params)
     return _solve_hvnm_ode(t, vf, y0, args)
 
@@ -1044,7 +1016,7 @@ def hvnm_solve_creep(
     vf = _make_hvnm_creep_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_initial_state(include_interfacial_damage)
+    y0 = _hvnm_initial_state()
     args = _default_hvnm_args(params)
     args["sigma_0"] = sigma_0
     return _solve_hvnm_ode(t, vf, y0, args)
@@ -1082,7 +1054,7 @@ def hvnm_solve_laos(
     vf = _make_hvnm_laos_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_initial_state(include_interfacial_damage)
+    y0 = _hvnm_initial_state()
     args = _default_hvnm_args(params)
     args["gamma_0"] = gamma_0
     args["omega"] = omega

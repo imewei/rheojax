@@ -42,7 +42,7 @@ jax, jnp = safe_import_jax()
 # =============================================================================
 
 
-def _hvm_initial_state(include_dissociative: bool, include_damage: bool) -> jnp.ndarray:
+def _hvm_initial_state() -> jnp.ndarray:
     """Create equilibrium initial state vector.
 
     At equilibrium:
@@ -51,20 +51,12 @@ def _hvm_initial_state(include_dissociative: bool, include_damage: bool) -> jnp.
     - gamma = 0             (no strain)
     - D = 0                 (no damage)
     """
-    # E-network: mu_E_xx=1, mu_E_yy=1, mu_E_xy=0
-    # E-network natural state: mu_E_nat_xx=1, mu_E_nat_yy=1, mu_E_nat_xy=0
-    y0 = jnp.array([1.0, 1.0, 0.0, 1.0, 1.0, 0.0], dtype=jnp.float64)
-
-    # D-network: mu_D_xx=1, mu_D_yy=1, mu_D_xy=0 (always included in state, zeroed if not active)
-    y0 = jnp.concatenate([y0, jnp.array([1.0, 1.0, 0.0], dtype=jnp.float64)])
-
-    # gamma = 0
-    y0 = jnp.concatenate([y0, jnp.array([0.0], dtype=jnp.float64)])
-
-    # D = 0 (damage)
-    y0 = jnp.concatenate([y0, jnp.array([0.0], dtype=jnp.float64)])
-
-    return y0
+    # [mu_E_xx, mu_E_yy, mu_E_xy, mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy,
+    #  mu_D_xx, mu_D_yy, mu_D_xy, gamma, D]
+    return jnp.array(
+        [1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+        dtype=jnp.float64,
+    )
 
 
 # =============================================================================
@@ -419,8 +411,6 @@ def _make_creep_vector_field(
         E_a = args["E_a"]
         V_act = args["V_act"]
         T = args["T"]
-        Gamma_0 = args["Gamma_0"]
-        lambda_crit = args["lambda_crit"]
 
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
@@ -462,13 +452,11 @@ def _make_creep_vector_field(
             eta_D = G_D / k_d_D_safe
         else:
             eta_D = 0.0
-        # Add P-network elastic stiffness as a regularization
-        # (prevents unbounded gamma_dot at t=0)
-        eta_eff = eta_E + eta_D + G_P * 1e-6  # Small regularization
+        # Regularization: use a fixed small viscosity floor (1 Pa·s)
+        # independent of G_P to avoid decade-spanning corruption
+        eta_eff = eta_E + eta_D + 1.0  # 1 Pa·s floor prevents unbounded gamma_dot at t=0
 
         gamma_dot = sigma_residual / jnp.maximum(eta_eff, 1e-30)
-        # Clamp to prevent numerical blowup
-        gamma_dot = jnp.clip(gamma_dot, -1e10, 1e10)
 
         dmu_E_xx, dmu_E_yy, dmu_E_xy, dmu_E_nat_xx, dmu_E_nat_yy, dmu_E_nat_xy = (
             hvm_exchangeable_rhs_shear(
@@ -498,6 +486,8 @@ def _make_creep_vector_field(
         dgamma = gamma_dot
 
         if include_damage:
+            Gamma_0 = args["Gamma_0"]
+            lambda_crit = args["lambda_crit"]
             dD = hvm_damage_rhs(
                 mu_E_xx,
                 mu_E_yy,
@@ -570,14 +560,14 @@ def _solve_hvm_ode(
         ODE solution
     """
     term = diffrax.ODETerm(vector_field)
+    solver = diffrax.Tsit5()
 
+    # Tsit5 used for all cases (Kvaerno5 causes lineax LU transpose
+    # TracerBoolConversionError during JAX tracing). Tighter tolerances
+    # when TST kinetics are active (use_stiff_solver=True).
     if use_stiff_solver:
-        # Use Tsit5 instead of Kvaerno5 to avoid lineax LU transpose
-        # TracerBoolConversionError during JAX tracing (NUTS/JIT)
-        solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-8, atol=1e-10)
     else:
-        solver = diffrax.Tsit5()
         stepsize_controller = diffrax.PIDController(rtol=1e-6, atol=1e-8)
 
     t0 = t[0]
@@ -651,7 +641,7 @@ def hvm_solve_startup(
         ODE solution with y shape (n_times, 11)
     """
     vf = _make_startup_vector_field(kinetics, include_damage, include_dissociative)
-    y0 = _hvm_initial_state(include_dissociative, include_damage)
+    y0 = _hvm_initial_state()
 
     args = {**params, "gamma_dot": gamma_dot}
     # Set defaults for optional params
@@ -765,7 +755,7 @@ def hvm_solve_creep(
         ODE solution
     """
     vf = _make_creep_vector_field(kinetics, include_damage, include_dissociative)
-    y0 = _hvm_initial_state(include_dissociative, include_damage)
+    y0 = _hvm_initial_state()
 
     args = {**params, "sigma_0": sigma_0}
     args.setdefault("G_D", 0.0)
@@ -811,7 +801,7 @@ def hvm_solve_laos(
         ODE solution
     """
     vf = _make_laos_vector_field(kinetics, include_damage, include_dissociative)
-    y0 = _hvm_initial_state(include_dissociative, include_damage)
+    y0 = _hvm_initial_state()
 
     args = {**params, "gamma_0": gamma_0, "omega": omega}
     args.setdefault("G_D", 0.0)

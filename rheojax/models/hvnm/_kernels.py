@@ -233,18 +233,20 @@ def hvnm_ber_rate_interphase_stress(
     float
         Stress-enhanced interfacial BER rate (1/s)
     """
-    sigma_vm = jnp.sqrt(
-        jnp.maximum(
-            sigma_I_xx**2
-            + sigma_I_yy**2
-            - sigma_I_xx * sigma_I_yy
-            + 3.0 * sigma_I_xy**2,
-            1e-30,
-        )
+    # 2D von Mises stress (use eps=1e-12 to tame sqrt gradient for NUTS AD)
+    sigma_vm_sq = (
+        sigma_I_xx**2
+        + sigma_I_yy**2
+        - sigma_I_xx * sigma_I_yy
+        + 3.0 * sigma_I_xy**2
     )
-    RT = _R_GAS * T
+    sigma_vm = jnp.sqrt(jnp.maximum(sigma_vm_sq, 0.0) + 1e-12)
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    RT = _R_GAS * T_safe
     k0 = nu_0_int * jnp.exp(-E_a_int / RT)
-    return k0 * jnp.cosh(V_act_int * sigma_vm / RT)
+    # Clamp cosh arg to prevent overflow (cosh(710) ≈ inf in float64)
+    cosh_arg = jnp.clip(V_act_int * sigma_vm / RT, -500.0, 500.0)
+    return k0 * jnp.cosh(cosh_arg)
 
 
 @jax.jit
@@ -311,11 +313,15 @@ def hvnm_ber_rate_interphase_stretch(
         Stretch-enhanced interfacial BER rate (1/s)
     """
     delta_trace = (mu_I_xx - mu_I_nat_xx) + (mu_I_yy - mu_I_nat_yy)
-    delta_stretch = jnp.sqrt(jnp.maximum(jnp.abs(delta_trace) / 2.0, 1e-30))
+    # Use eps=1e-12 instead of max(x, 1e-30) to tame sqrt gradient for NUTS AD
+    delta_stretch = jnp.sqrt(jnp.abs(delta_trace) / 2.0 + 1e-12)
 
-    RT = _R_GAS * T
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    RT = _R_GAS * T_safe
     k0 = nu_0_int * jnp.exp(-E_a_int / RT)
-    return k0 * jnp.cosh(V_act_int * G_I_eff * delta_stretch / RT)
+    # Clamp cosh arg to prevent overflow (cosh(710) ≈ inf in float64)
+    cosh_arg = jnp.clip(V_act_int * G_I_eff * delta_stretch / RT, -500.0, 500.0)
+    return k0 * jnp.cosh(cosh_arg)
 
 
 @jax.jit
@@ -338,7 +344,8 @@ def hvnm_ber_rate_constant_matrix(nu_0: float, E_a: float, T: float) -> float:
     float
         Zero-stress matrix BER rate (1/s)
     """
-    return nu_0 * jnp.exp(-E_a / (_R_GAS * T))
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    return nu_0 * jnp.exp(-E_a / (_R_GAS * T_safe))
 
 
 @jax.jit
@@ -363,7 +370,8 @@ def hvnm_ber_rate_constant_interphase(
     float
         Zero-stress interfacial BER rate (1/s)
     """
-    return nu_0_int * jnp.exp(-E_a_int / (_R_GAS * T))
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    return nu_0_int * jnp.exp(-E_a_int / (_R_GAS * T_safe))
 
 
 # =============================================================================
@@ -652,7 +660,8 @@ def hvnm_interfacial_damage_rhs(
     creation = Gamma_0_int * (1.0 - D_int) * driving
 
     # Self-healing (TST, active above T_v^int)
-    h_int = h_0 * jnp.exp(-E_a_heal / (_R_GAS * T))
+    T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
+    h_int = h_0 * jnp.exp(-E_a_heal / (_R_GAS * T_safe))
     healing = h_int * jnp.power(jnp.maximum(D_int, 0.0), n_h)
 
     return creation - healing

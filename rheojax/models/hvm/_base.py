@@ -72,6 +72,10 @@ class HVMBase(VLBBase):
         include_damage: bool = False,
         include_dissociative: bool = True,
     ):
+        if kinetics not in ("stress", "stretch"):
+            raise ValueError(
+                f"kinetics must be 'stress' or 'stretch', got '{kinetics}'"
+            )
         self._kinetics = kinetics
         self._include_damage = include_damage
         self._include_dissociative = include_dissociative
@@ -96,6 +100,20 @@ class HVMBase(VLBBase):
     def include_dissociative(self) -> bool:
         """Whether D-network is present."""
         return self._include_dissociative
+
+    @include_damage.setter
+    def include_damage(self, value):
+        raise AttributeError(
+            "include_damage is immutable after construction. "
+            "Create a new HVMLocal instance instead."
+        )
+
+    @include_dissociative.setter
+    def include_dissociative(self, value):
+        raise AttributeError(
+            "include_dissociative is immutable after construction. "
+            "Create a new HVMLocal instance instead."
+        )
 
     @property
     def G_P(self) -> float:
@@ -273,6 +291,64 @@ class HVMBase(VLBBase):
         k0 = self.compute_ber_rate_at_equilibrium()
         return 1.0 / (2.0 * float(jnp.maximum(k0, 1e-30)))
 
+    def check_saos_validity(self, gamma_0: float = 0.01) -> dict[str, float | bool]:
+        """Check whether analytical SAOS is valid at a given strain amplitude.
+
+        The analytical SAOS expressions assume k_BER = k_BER_0 (constant,
+        zero-stress). Under oscillatory shear, TST couples stress to the
+        exchange rate via cosh(V_act·σ_VM/RT). This coupling is negligible
+        when the dimensionless mechanochemical number Λ·γ₀ << 1:
+
+            Λ = V_act · G_E / RT
+
+        The critical strain amplitude where cosh deviates by ~1% is:
+
+            γ_c ≈ 0.14 / Λ = 0.14 · RT / (V_act · G_E)
+
+        Below γ_c, analytical SAOS is exact to O(Λ²γ₀²). Above γ_c,
+        use the LAOS ODE solver (simulate_laos) for accurate results.
+
+        Parameters
+        ----------
+        gamma_0 : float, default 0.01
+            Strain amplitude to check (dimensionless)
+
+        Returns
+        -------
+        dict
+            'Lambda': mechanochemical coupling number V_act·G_E/RT
+            'Lambda_gamma_0': Λ·γ₀ (should be << 1 for SAOS validity)
+            'gamma_c': critical strain amplitude (1% cosh deviation)
+            'cosh_correction': cosh(Λ·γ₀) - 1 (fractional rate enhancement)
+            'is_valid': True if analytical SAOS is accurate to < 1%
+        """
+        R_gas = 8.314462618
+        RT = R_gas * max(self.T, 1.0)
+        Lambda = self.V_act * self.G_E / RT
+        Lambda_g0 = Lambda * gamma_0
+        gamma_c = 0.14 / max(Lambda, 1e-30)
+
+        import math
+
+        cosh_corr = math.cosh(Lambda_g0) - 1.0
+        is_valid = cosh_corr < 0.01  # < 1% rate enhancement
+
+        if not is_valid:
+            logger.warning(
+                f"Analytical SAOS may be inaccurate at gamma_0={gamma_0:.4g}: "
+                f"Lambda={Lambda:.4g}, cosh correction={cosh_corr:.4g} (>{0.01}). "
+                f"Critical strain gamma_c={gamma_c:.4g}. "
+                f"Consider using simulate_laos() for nonlinear analysis."
+            )
+
+        return {
+            "Lambda": Lambda,
+            "Lambda_gamma_0": Lambda_g0,
+            "gamma_c": gamma_c,
+            "cosh_correction": cosh_corr,
+            "is_valid": is_valid,
+        }
+
     def get_network_fractions(self) -> dict[str, float]:
         """Compute modulus fractions for each subnetwork.
 
@@ -328,15 +404,14 @@ class HVMBase(VLBBase):
         """
         if T_range is None:
             T_range = np.linspace(250.0, 450.0, 50)
-        T_range = np.asarray(T_range)
+        T_range = np.asarray(T_range, dtype=np.float64)
 
         inv_T = 1000.0 / T_range
-        log_k = np.array(
-            [
-                np.log10(float(hvm_ber_rate_constant(self.nu_0, self.E_a, T_i)))
-                for T_i in T_range
-            ]
-        )
+        # Vectorized: single JIT call instead of Python loop with host-device transfers
+        T_jax = jnp.asarray(T_range, dtype=jnp.float64)
+        _ber_vec = jax.vmap(hvm_ber_rate_constant, in_axes=(None, None, 0))
+        k_arr = _ber_vec(self.nu_0, self.E_a, T_jax)
+        log_k = np.asarray(jnp.log10(jnp.maximum(k_arr, 1e-30)))
 
         return inv_T, log_k
 

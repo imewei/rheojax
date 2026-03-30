@@ -97,6 +97,20 @@ class HVNMBase(HVMBase):
         """Whether diffusion mode is active."""
         return self._include_diffusion
 
+    @include_interfacial_damage.setter
+    def include_interfacial_damage(self, value):
+        raise AttributeError(
+            "include_interfacial_damage is immutable after construction. "
+            "Create a new HVNMLocal instance instead."
+        )
+
+    @include_diffusion.setter
+    def include_diffusion(self, value):
+        raise AttributeError(
+            "include_diffusion is immutable after construction. "
+            "Create a new HVNMLocal instance instead."
+        )
+
     @property
     def beta_I(self) -> float:
         """Interphase reinforcement ratio G_I/G_E."""
@@ -425,6 +439,65 @@ class HVNMBase(HVMBase):
         k0_int = self.compute_ber_rate_interphase_equilibrium()
         return 1.0 / (2.0 * max(k0_int, 1e-30))
 
+    def check_saos_validity(self, gamma_0: float = 0.01) -> dict[str, object]:
+        """Check whether analytical SAOS is valid at a given strain amplitude.
+
+        For HVNM, both matrix (E) and interphase (I) networks have TST
+        coupling. The more restrictive network determines the SAOS validity.
+
+        Matrix:    Λ_mat = V_act · G_E / RT
+        Interphase: Λ_int = V_act_int · G_I_eff · X_I / RT
+
+        Parameters
+        ----------
+        gamma_0 : float, default 0.01
+            Strain amplitude to check (dimensionless)
+
+        Returns
+        -------
+        dict
+            'Lambda_mat', 'Lambda_int': mechanochemical coupling numbers
+            'gamma_c_mat', 'gamma_c_int': critical strains per network
+            'gamma_c': min(gamma_c_mat, gamma_c_int) — overall limit
+            'is_valid': True if analytical SAOS is accurate to < 1%
+        """
+        R_gas = 8.314462618
+        RT = R_gas * max(self.T, 1.0)
+
+        Lambda_mat = self.V_act * self.G_E / RT
+        G_I_amp = self.G_I_eff * self.X_I
+        Lambda_int = self.V_act_int * G_I_amp / RT
+
+        gamma_c_mat = 0.14 / max(Lambda_mat, 1e-30)
+        gamma_c_int = 0.14 / max(Lambda_int, 1e-30)
+        gamma_c = min(gamma_c_mat, gamma_c_int)
+
+        import math
+
+        cosh_mat = math.cosh(Lambda_mat * gamma_0) - 1.0
+        cosh_int = math.cosh(Lambda_int * gamma_0) - 1.0
+        max_corr = max(cosh_mat, cosh_int)
+        is_valid = max_corr < 0.01
+
+        if not is_valid:
+            limiting = "interphase" if cosh_int > cosh_mat else "matrix"
+            logger.warning(
+                f"Analytical SAOS may be inaccurate at gamma_0={gamma_0:.4g}: "
+                f"{limiting} network cosh correction={max_corr:.4g} (>{0.01}). "
+                f"gamma_c={gamma_c:.4g}. Use simulate_laos() instead."
+            )
+
+        return {
+            "Lambda_mat": Lambda_mat,
+            "Lambda_int": Lambda_int,
+            "gamma_c_mat": gamma_c_mat,
+            "gamma_c_int": gamma_c_int,
+            "gamma_c": gamma_c,
+            "cosh_correction_mat": cosh_mat,
+            "cosh_correction_int": cosh_int,
+            "is_valid": is_valid,
+        }
+
     def get_network_fractions_nc(self) -> dict[str, float]:
         """Compute modulus fractions for all four subnetworks.
 
@@ -544,27 +617,17 @@ class HVNMBase(HVMBase):
         """
         if T_range is None:
             T_range = np.linspace(250.0, 450.0, 50)
-        T_range = np.asarray(T_range)
+        T_range = np.asarray(T_range, dtype=np.float64)
 
         inv_T = 1000.0 / T_range
-        log_k_mat = np.array(
-            [
-                np.log10(float(hvnm_ber_rate_constant_matrix(self.nu_0, self.E_a, Ti)))
-                for Ti in T_range
-            ]
-        )
-        log_k_int = np.array(
-            [
-                np.log10(
-                    float(
-                        hvnm_ber_rate_constant_interphase(
-                            self.nu_0_int, self.E_a_int, Ti
-                        )
-                    )
-                )
-                for Ti in T_range
-            ]
-        )
+        # Vectorized: single JIT call instead of Python loop with host-device transfers
+        T_jax = jnp.asarray(T_range, dtype=jnp.float64)
+        _mat_vec = jax.vmap(hvnm_ber_rate_constant_matrix, in_axes=(None, None, 0))
+        _int_vec = jax.vmap(hvnm_ber_rate_constant_interphase, in_axes=(None, None, 0))
+        k_mat = _mat_vec(self.nu_0, self.E_a, T_jax)
+        k_int = _int_vec(self.nu_0_int, self.E_a_int, T_jax)
+        log_k_mat = np.asarray(jnp.log10(jnp.maximum(k_mat, 1e-30)))
+        log_k_int = np.asarray(jnp.log10(jnp.maximum(k_int, 1e-30)))
 
         return inv_T, log_k_mat, log_k_int
 

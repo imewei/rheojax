@@ -163,6 +163,19 @@ class HVMLocal(HVMBase):
         )
 
     # =========================================================================
+    # Internal Helpers
+    # =========================================================================
+
+    def _resolve_test_mode(self, kwarg_value) -> str:
+        """Resolve test_mode from kwarg, cached value, or default."""
+        if kwarg_value is not None:
+            return kwarg_value
+        cached = getattr(self, "_test_mode", None)
+        if cached is not None:
+            return cached
+        return "flow_curve"
+
+    # =========================================================================
     # Parameter Helpers
     # =========================================================================
 
@@ -288,7 +301,8 @@ class HVMLocal(HVMBase):
 
         # Use ODE solver for TST feedback
         params = self._get_params_dict()
-        assert params is not None
+        if params is None:
+            raise ValueError("params dict must not be None")
         sol = hvm_solve_startup(
             t_jax,
             gamma_dot,
@@ -299,7 +313,8 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys  # (n_times, 11)
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
 
         # Compute stress from state
         stress = jax.vmap(
@@ -346,7 +361,6 @@ class HVMLocal(HVMBase):
                             y[4],
                             y[6],
                             y[7],
-                            params["G_P"],
                             params["G_E"],
                             params.get("G_D", 0.0),
                         )
@@ -383,7 +397,8 @@ class HVMLocal(HVMBase):
         """
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
-        assert params is not None
+        if params is None:
+            raise ValueError("params dict must not be None")
 
         sol = hvm_solve_relaxation(
             t_jax,
@@ -395,7 +410,8 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
 
         # G(t) = sigma(t) / gamma_step
         stress = jax.vmap(
@@ -459,7 +475,8 @@ class HVMLocal(HVMBase):
         self._sigma_applied = sigma_0
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
-        assert params is not None
+        if params is None:
+            raise ValueError("params dict must not be None")
 
         sol = hvm_solve_creep(
             t_jax,
@@ -471,7 +488,8 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         gamma = ys[:, 9]
         gamma = jnp.where(
             sol.result == diffrax.RESULTS.successful,
@@ -523,7 +541,8 @@ class HVMLocal(HVMBase):
         self._omega_laos = omega
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._get_params_dict()
-        assert params is not None
+        if params is None:
+            raise ValueError("params dict must not be None")
 
         sol = hvm_solve_laos(
             t_jax,
@@ -536,7 +555,8 @@ class HVMLocal(HVMBase):
         )
 
         ys = sol.ys
-        assert ys is not None
+        if ys is None:
+            raise ValueError("ODE solver returned None for ys")
         strain = gamma_0 * jnp.sin(omega * t_jax)
         gamma_dot_arr = gamma_0 * omega * jnp.cos(omega * t_jax)
 
@@ -561,7 +581,6 @@ class HVMLocal(HVMBase):
                 y[4],
                 y[6],
                 y[7],
-                params["G_P"],
                 params["G_E"],
                 params.get("G_D", 0.0),
             )
@@ -639,7 +658,12 @@ class HVMLocal(HVMBase):
         """
         t = laos_result["time"]
         stress = laos_result["stress"]
-        omega = self._omega_laos if self._omega_laos is not None else 1.0
+        if self._omega_laos is None:
+            raise ValueError(
+                "omega not set — call simulate_laos() first or pass omega "
+                "via simulate_laos(t, gamma_0, omega)"
+            )
+        omega = self._omega_laos
 
         # Use last complete cycle(s) for FFT
         period = 2.0 * np.pi / omega
@@ -698,12 +722,7 @@ class HVMLocal(HVMBase):
             nlsq_optimize,
         )
 
-        _kw_mode = kwargs.get("test_mode")
-        test_mode = (
-            _kw_mode
-            if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
-        )
+        test_mode = self._resolve_test_mode(kwargs.get("test_mode"))
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -789,12 +808,7 @@ class HVMLocal(HVMBase):
         np.ndarray
             Predicted response
         """
-        _kw_mode = kwargs.get("test_mode")
-        test_mode = (
-            _kw_mode
-            if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
-        )
+        test_mode = self._resolve_test_mode(kwargs.get("test_mode"))
         param_values = jnp.array(
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
@@ -839,9 +853,10 @@ class HVMLocal(HVMBase):
         jnp.ndarray
             Predicted response
         """
-        # Unpack parameters by position
-        p_names = list(self.parameters.keys())
-        p_dict = dict(zip(p_names, params, strict=True))
+        # Unpack parameters by position (cache key list to avoid repeated iteration)
+        if not hasattr(self, "_param_names"):
+            self._param_names = list(self.parameters.keys())
+        p_dict = dict(zip(self._param_names, params, strict=True))
 
         G_P = p_dict["G_P"]
         G_E = p_dict["G_E"]
@@ -852,11 +867,7 @@ class HVMLocal(HVMBase):
         G_D = p_dict.get("G_D", 0.0)
         k_d_D = p_dict.get("k_d_D", 1.0)
 
-        mode = (
-            test_mode
-            if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
-        )
+        mode = self._resolve_test_mode(test_mode)
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
