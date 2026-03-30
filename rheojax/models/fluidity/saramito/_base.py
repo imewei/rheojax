@@ -266,14 +266,14 @@ class FluiditySaramitoBase(BaseModel):
             tau_y_coupling = self.parameters.get_value("tau_y_coupling")
             m_yield = self.parameters.get_value("m_yield")
 
-            if tau_y_coupling is None or m_yield is None:
-                return float(tau_y0)
+            if tau_y_coupling is None or m_yield is None or tau_y0 is None:
+                return float(tau_y0 or 0.0)
 
             f_safe = max(f, 1e-20)
             tau_y = tau_y0 + tau_y_coupling / (f_safe**m_yield)
             return float(tau_y)
         else:
-            return float(tau_y0)
+            return float(tau_y0 or 0.0)
 
     def _get_saramito_ode_args(self, params: dict | None = None) -> dict:
         """Build args dictionary for ODE integration.

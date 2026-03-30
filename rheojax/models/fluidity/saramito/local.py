@@ -1239,4 +1239,4 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         float
             Critical stress σ_c ≈ τ_y (Pa)
         """
-        return self.parameters.get_value("tau_y0")
+        return self.parameters.get_value("tau_y0") or 0.0

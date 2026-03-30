@@ -37,15 +37,12 @@ jax, jnp = safe_import_jax()
 
 @jax.jit
 def von_mises_stress_2d(tau_xx: float, tau_yy: float, tau_xy: float) -> float:
-    """Compute Von Mises equivalent stress for 2D stress tensor.
+    """Compute Von Mises equivalent stress for traceless deviatoric tensor.
 
-    For plane stress (σ_zz = 0):
-    |τ| = √(τ_xx² + τ_yy² - τ_xx*τ_yy + 3*τ_xy²)
+    For a traceless deviatoric tensor (tr(τ) = 0), the third diagonal
+    component is τ_zz = -(τ_xx + τ_yy). The Von Mises equivalent stress
+    is defined via the second invariant:
 
-    For traceless deviatoric tensor (τ_xx + τ_yy = 0 in simple shear):
-    |τ| = √(τ_xx² + τ_yy² + 2*τ_xy²)
-
-    We use the second invariant formulation:
     |τ| = √(0.5 * τ:τ) where τ:τ = τ_ij * τ_ij
 
     Args:

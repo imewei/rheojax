@@ -39,7 +39,7 @@ def f_loc_herschel_bulkley(
 ) -> float:
     """Compute local equilibrium fluidity from Herschel-Bulkley flow curve.
 
-    f_loc = max(0, |σ| - τ_y)^n / K
+    f_loc = ((max(0, |σ| - τ_y)) / K)^(1/n)
 
     This is the inverse of the HB flow curve σ = τ_y + K*γ̇^n.
 
@@ -59,7 +59,9 @@ def f_loc_herschel_bulkley(
     # Smooth max(0, x) using softplus for differentiability
     # softplus(x) = log(1 + exp(x)), approaches x for x >> 0, approaches 0 for x << 0
     # Scale factor to control transition sharpness
-    scale = tau_y * 0.01 + eps  # 1% of yield stress for smooth transition
+    # Clamp scale to [0.1, 10] Pa to avoid stiffness at very small τ_y
+    # and loss of accuracy at very large τ_y
+    scale = jnp.clip(tau_y * 0.01, 0.1, 10.0) + eps
 
     delta_sigma = jnp.abs(sigma) - tau_y
 
@@ -201,8 +203,10 @@ def fluidity_local_ode_rhs(
     aging_rate = (f_eq - f_safe) / theta
 
     # Rejuvenation term: flow-induced increase toward f_inf
+    # Floor at 1e-6 (not 1e-20) to prevent gradient explosion for n_rejuv < 1:
+    # d/dx(x^n) = n*x^(n-1) diverges as x→0 when n<1; 1e-6 keeps gradients O(1e6)
     gamma_dot_abs = jnp.abs(gamma_dot)
-    rejuv_rate = a * jnp.power(gamma_dot_abs + 1e-20, n_rejuv) * (f_inf - f_safe)
+    rejuv_rate = a * jnp.power(gamma_dot_abs + 1e-6, n_rejuv) * (f_inf - f_safe)
 
     d_f = aging_rate + rejuv_rate
 
@@ -260,7 +264,8 @@ def fluidity_local_creep_ode_rhs(
 
     # 2. Fluidity evolution
     aging_rate = (f_eq - f_safe) / theta
-    rejuv_rate = a * jnp.power(jnp.abs(gamma_dot) + 1e-20, n_rejuv) * (f_inf - f_safe)
+    # Floor at 1e-6 to prevent gradient explosion for n_rejuv < 1
+    rejuv_rate = a * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_rejuv) * (f_inf - f_safe)
     d_f = aging_rate + rejuv_rate
 
     return jnp.array([d_gamma, d_f])
@@ -476,7 +481,8 @@ def fluidity_local_steady_state(
     gamma_dot_abs = jnp.abs(gamma_dot)
 
     # Flow term contribution
-    flow_term = a * jnp.power(gamma_dot_abs + 1e-20, n_rejuv)
+    # Floor at 1e-6 to prevent gradient explosion for n_rejuv < 1
+    flow_term = a * jnp.power(gamma_dot_abs + 1e-6, n_rejuv)
 
     # Steady-state fluidity
     # f_ss = (f_eq/θ + flow_term * f_inf) / (1/θ + flow_term)
@@ -530,7 +536,8 @@ def fluidity_nonlocal_steady_state(
         Steady-state stress array (Pa)
     """
     # HB flow curve: σ = τ_y + K*|γ̇|^n * sign(γ̇)
-    sigma_ss = tau_y + K * jnp.power(jnp.abs(gamma_dot) + 1e-20, n_flow)
+    # Floor at 1e-6 to prevent gradient explosion for n_flow < 1
+    sigma_ss = tau_y + K * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_flow)
     sigma_ss = sigma_ss * jnp.sign(gamma_dot + 1e-20)
 
     return sigma_ss

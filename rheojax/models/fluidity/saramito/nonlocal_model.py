@@ -869,14 +869,14 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             sigma_raw = kwargs.get("sigma_applied", _MISSING)
             if sigma_raw is _MISSING:
                 sigma_raw = kwargs.get("sigma", _MISSING)
-            sigma = (
+            sigma_val = (
                 sigma_raw
                 if sigma_raw is not _MISSING
                 else getattr(self, "_sigma_applied", None)
             )
-            if sigma is None:
+            if sigma_val is None:
                 raise ValueError("creep prediction requires sigma")
-            gamma, _ = self.simulate_creep(X, sigma)
+            gamma, _ = self.simulate_creep(X, float(sigma_val))
             return gamma
 
         return np.zeros_like(X)
