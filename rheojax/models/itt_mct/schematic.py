@@ -571,7 +571,7 @@ class ITTMCTSchematic(ITTMCTBase):
             info = self.get_glass_transition_info()
             if info["is_glass"]:
                 f_neq = info["f_neq"]
-                sigma[mask_zero] = G_eff * gamma_c * f_neq
+                sigma[mask_zero] = G_eff * gamma_c * f_neq * f_neq
             # else: sigma stays 0
 
         # Non-zero shear rates: batched diffrax solve
@@ -647,7 +647,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 if info["is_glass"]:
                     # Approximate yield stress
                     f_neq = info["f_neq"]
-                    sigma[i] = G_eff * gamma_c * f_neq
+                    sigma[i] = G_eff * gamma_c * f_neq * f_neq
                 else:
                     sigma[i] = 0.0
             else:
@@ -759,8 +759,8 @@ class ITTMCTSchematic(ITTMCTBase):
             # Strain accumulation
             dgamma_dt = gamma_dot
 
-            # Stress integrand: d(σ_integral)/dt = G_eff * γ̇ * Φ * h(γ)
-            dsigma_dt = G_eff * gamma_dot * phi_advected
+            # Stress integrand: d(σ_integral)/dt = G_eff × γ̇ × Φ_adv²  (Fuchs & Cates 2002)
+            dsigma_dt = G_eff * gamma_dot * phi_advected * phi_advected
 
             return np.concatenate([[dphi_dt], dK_dt, [dgamma_dt, dsigma_dt]])
 
@@ -1053,9 +1053,10 @@ class ITTMCTSchematic(ITTMCTBase):
             h_gamma = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
         else:
             h_gamma = np.exp(-((gamma_pre / gamma_c) ** 2))
+        h_pre = h_gamma  # h(γ_pre): strain decorrelation at the pre-shear amplitude
         state0 = np.zeros(2 + self.n_prony_modes)
-        state0[0] = h_gamma  # Φ(0) = h(γ_pre) — decorrelated by step strain
-        state0[-1] = G_inf * gamma_pre * h_gamma  # Initial stress
+        state0[0] = h_pre  # Φ(0) = h(γ_pre) — decorrelated by step strain
+        state0[1 + self.n_prony_modes] = G_inf * gamma_pre * h_pre * h_pre  # σ(0) = G_∞ γ_pre h²
 
         def rhs_numpy(t_val, state):
             state_jax = jnp.array(state)

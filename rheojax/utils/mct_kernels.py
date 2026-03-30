@@ -638,22 +638,31 @@ def glass_transition_criterion(
     The MCT exponent λ determines the critical exponents a and b via:
     Γ(1-a)²/Γ(1-2a) = Γ(1+b)²/Γ(1+2b) = λ
     """
-    # For F₁₂ model with v₁=0: v₂_c = 4
-    # General case requires solving self-consistent equation
-    if abs(v1) < 1e-10:
-        v2_critical = 4.0
-        lambda_exponent = 1.0  # F₁₂ limit
+    # F₁₂ bifurcation: exact closed-form from eliminating v₂ between the
+    # fixed-point equation f/(1-f) = v₁f + v₂f² and the marginal stability
+    # condition 1/(1-f)² = v₁ + 2v₂f.  Setting u=1/(1-f), eliminating v₂:
+    #   u² - 2u + v₁ = 0  →  u = 1 + s  where s = √(1 - v₁)
+    # Then f_c = s/(1+s) and v₂_c = (u-v₁)/f_c = (1+s)².
+    # Valid for v₁ ∈ [0, 1).  At v₁=0: s=1, f_c=0.5, v₂_c=4.
+    # Ref: Götze (2009) Sec. 4.3; verified to machine precision.
+    if v1 >= 1.0:
+        # v₁ ≥ 1: linear vertex alone drives arrest; v₂_c is not defined
+        v2_critical = 0.0
+        lambda_exponent = 0.0
     else:
-        # Solve v₁*f + v₂*f² = f for critical point
-        # This requires numerical solution in general
-        # For now, use approximate formula.
-        #
-        # Approximate v₂_critical for the F₁₂ schematic model.
-        # Exact at v₁=0 (gives v₂_c=4). For v₁≠0, this is an interpolation
-        # along the MCT transition line; see Götze (2009) Sec. 4.3.
-        # For production use, solve the bifurcation equation numerically.
-        v2_critical = (4.0 - 2.0 * v1) / (1.0 - v1 / 4.0) if v1 < 4.0 else 4.0
-        lambda_exponent = 1.0 - v1 / v2_critical  # Approximate
+        s = np.sqrt(max(1.0 - v1, 0.0))
+        if s < 1e-12:
+            v2_critical = 0.0
+            lambda_exponent = 0.0
+        else:
+            f_c = s / (1.0 + s)
+            v2_critical = (1.0 + s) ** 2
+            # MCT exponent parameter λ: the exact F₁₂ result requires
+            # solving Γ(1-a)²/Γ(1-2a) = Γ(1+b)²/Γ(1+2b) = λ.
+            # For v₁=0: λ = 0.5 (Götze 2009).  The general formula is
+            # complex; we store 1-2f_c(1-f_c) as a reasonable approximation
+            # that gives 0.5 at v₁=0 and decreases smoothly for v₁>0.
+            lambda_exponent = 1.0 - 2.0 * f_c * (1.0 - f_c)
 
     epsilon = (v2 - v2_critical) / v2_critical
     is_glass = epsilon > 0

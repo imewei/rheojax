@@ -1029,7 +1029,7 @@ class ITTMCTIsotropic(ITTMCTBase):
                 phi_t *= h_pre
 
                 G_k = k**4 * self.S_k[j] ** 2
-                stress_k[j] = G_k * phi_t
+                stress_k[j] = G_k * phi_t * phi_t
 
             sigma[i] = G_scale * gamma_pre * np.trapezoid(stress_k, self.k_grid)
 

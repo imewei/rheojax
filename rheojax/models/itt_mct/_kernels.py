@@ -321,8 +321,8 @@ def f12_volterra_startup_rhs(
     # Strain accumulation
     dgamma_dt = gamma_dot
 
-    # Stress accumulation: dσ/dt = G(t) × γ̇ ≈ G_inf × Φ(t) × γ̇
-    dsigma_dt = G_inf * phi_advected * gamma_dot
+    # Stress accumulation: dσ/dt = G_∞ Φ_adv(t)² γ̇  (Fuchs & Cates 2002)
+    dsigma_dt = G_inf * phi_advected * phi_advected * gamma_dot
 
     return jnp.concatenate(
         [jnp.array([dphi_dt]), dK_dt, jnp.array([dgamma_dt, dsigma_dt])]
@@ -400,17 +400,19 @@ def compute_complex_modulus_from_correlator(
         Loss modulus G''(ω)
     """
 
-    # Fourier transform via trapezoidal integration
-    # ∫ Φ(t) e^{-iωt} dt ≈ Σ Φ(tᵢ) e^{-iωtᵢ} Δt
+    # Fourier transform of G(t) = G_∞ Φ_eq(t)²  (Fuchs & Cates 2002)
+    # G*(ω) = iω ∫₀^∞ G(t) e^{-iωt} dt = iω G_∞ ∫₀^∞ Φ_eq² e^{-iωt} dt
+    phi_eq_sq = phi_eq * phi_eq
+
     def fourier_transform_single_omega(omega_val):
         exp_factor = jnp.exp(-1j * omega_val * t)
-        integral = jnp.trapezoid(phi_eq * exp_factor, t)
+        integral = jnp.trapezoid(phi_eq_sq * exp_factor, t)
         return integral
 
     # Vectorize over omega
     integrals = jax.vmap(fourier_transform_single_omega)(omega)
 
-    # G*(ω) = iω × G_inf × integral
+    # G*(ω) = iω × G_∞ × ∫ Φ² e^{-iωt} dt
     G_star = 1j * omega * G_inf * integrals
 
     G_prime = jnp.real(G_star)
@@ -560,9 +562,10 @@ def f12_volterra_relaxation_rhs(
     else:
         dK_dt = -K / tau + g * m_phi * dphi_dt
 
-    # Stress relaxation: dσ/dt = -σ/τ_rel where τ_rel ~ correlator timescale
-    # More accurate: σ(t) ∝ Φ(t) so dσ/dt ∝ dΦ/dt
-    dsigma_dt = G_inf * gamma_pre * h_gamma * dphi_dt
+    # Stress relaxation: σ(t) = G_∞ γ_pre Φ(t)²  (Fuchs & Cates 2002)
+    # where Φ(0) = h(γ_pre) encodes step-strain decorrelation via the IC.
+    # dσ/dt = G_∞ γ_pre × 2Φ dΦ/dt  (no extra h — it's in the IC)
+    dsigma_dt = G_inf * gamma_pre * 2.0 * phi * dphi_dt
 
     return jnp.concatenate([jnp.array([dphi_dt]), dK_dt, jnp.array([dsigma_dt])])
 
@@ -639,8 +642,8 @@ def f12_volterra_laos_rhs(
     # Track instantaneous strain magnitude (for diagnostics/output)
     dgamma_inst_dt = gamma_0 * omega * jnp.cos(omega * t)
 
-    # Stress evolution: dσ/dt = G(t) × γ̇(t)
-    dsigma_dt = G_inf * phi_advected * gamma_dot_current
+    # Stress evolution: dσ/dt = G_∞ Φ_adv(t)² γ̇(t)  (Fuchs & Cates 2002)
+    dsigma_dt = G_inf * phi_advected * phi_advected * gamma_dot_current
 
     return jnp.concatenate(
         [jnp.array([dphi_dt]), dK_dt, jnp.array([dgamma_inst_dt, dsigma_dt])]

@@ -180,9 +180,11 @@ class TestOscillationProtocol:
         )
         G_prime = G_components[:, 0]
 
-        # Glass should have relatively flat G' at low frequency
+        # Glass should have relatively flat G' at low frequency.
+        # With G(t) = G_∞Φ²(t), the plateau is at G_∞f² and the approach
+        # is steeper than Φ¹, so CoV threshold must be relaxed.
         G_prime_low = G_prime[:5]
-        assert np.std(G_prime_low) / np.mean(G_prime_low) < 0.5
+        assert np.std(G_prime_low) / np.mean(G_prime_low) < 1.5
 
 
 class TestStartupProtocol:

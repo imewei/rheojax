@@ -328,8 +328,8 @@ def make_flow_curve_with_stress_vector_field(
         # Strain accumulation
         dgamma_dt = gamma_dot
 
-        # Stress integrand: d(σ_integral)/dt = G_inf * γ̇ * Φ * h(γ)
-        dsigma_dt = G_inf * gamma_dot * phi_advected
+        # Stress integrand: d(σ_integral)/dt = G_∞ × γ̇ × Φ_adv²  (Fuchs & Cates 2002)
+        dsigma_dt = G_inf * gamma_dot * phi_advected * phi_advected
 
         # Pre-allocated output with .at[].set() for faster JIT compilation
         deriv = jnp.zeros(state_dim)
