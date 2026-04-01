@@ -2,8 +2,8 @@
 Tutorial Notebooks
 ==================
 
-RheoJAX includes 244 comprehensive tutorial notebooks organized into 21 categories:
-**Basic** (5), **Transforms** (8), **Bayesian** (9), **Advanced** (10), **I/O** (1),
+RheoJAX includes 249 comprehensive tutorial notebooks organized into 21 categories:
+**Basic** (5), **Transforms** (13), **Bayesian** (9), **Advanced** (10), **I/O** (1),
 plus 14 model family tutorial suites and a 31-notebook verification suite.
 
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
@@ -23,8 +23,8 @@ Quick Navigation
      - Fundamental rheological model fitting
      - 5 notebooks
    * - **Transforms**
-     - Data analysis workflows (FFT, TTS, LAOS, SRFS)
-     - 8 notebooks
+     - Data analysis workflows (FFT, TTS, LAOS, SRFS, Cox-Merz, Prony, Spectrum, LVE, SPP)
+     - 13 notebooks
    * - **Bayesian**
      - Bayesian inference and uncertainty quantification (including SPP)
      - 9 notebooks
@@ -380,6 +380,128 @@ Data analysis techniques for advanced rheological characterization.
    - Compute derivatives from noisy rheological data
    - Choose appropriate smoothing parameters
    - Validate derivative accuracy
+
+10b. Cox-Merz Rule Validation
+------------------------------
+
+**File**: ``examples/transforms/08-cox-merz-validation.ipynb``
+
+**Transform**: Cox-Merz rule (|η*(ω)| = η(γ̇))
+
+**Content**:
+   - Generate oscillation and flow curve data from Maxwell model
+   - Validate Cox-Merz rule with tolerance threshold
+   - Identify materials that violate Cox-Merz (associating polymers)
+   - Effect of tolerance parameter on pass/fail classification
+
+**Key Concepts**:
+   - Complex viscosity vs. steady-shear viscosity
+   - Log-log interpolation on overlapping rate range
+   - Relative deviation metrics
+   - Material-specific deviations
+
+**Learning Objectives**:
+   - Assess Cox-Merz validity for different materials
+   - Connect oscillatory and steady-shear measurements
+   - Interpret deviation metrics
+
+10c. Prony Series Conversion
+-----------------------------
+
+**File**: ``examples/transforms/09-prony-conversion.ipynb``
+
+**Transform**: Prony series (time ↔ frequency domain)
+
+**Content**:
+   - Time-to-frequency conversion (G(t) → G'(ω), G''(ω))
+   - Frequency-to-time conversion (G*(ω) → G(t))
+   - Effect of number of Prony modes on fit quality
+   - NNLS fitting for non-negative mode strengths
+
+**Key Concepts**:
+   - Prony series decomposition
+   - Domain interconversion
+   - Mode count selection
+   - Non-negative least squares
+
+**Learning Objectives**:
+   - Convert between time-domain and frequency-domain data
+   - Select appropriate number of Prony modes
+   - Assess fit quality and convergence
+
+10d. Relaxation Spectrum Inversion
+-----------------------------------
+
+**File**: ``examples/transforms/10-spectrum-inversion.ipynb``
+
+**Transform**: Continuous relaxation spectrum H(τ) recovery
+
+**Content**:
+   - Tikhonov regularization with automatic GCV λ selection
+   - Maximum entropy method comparison
+   - Effect of regularization strength on spectrum resolution
+   - Spectrum recovery from both oscillation and relaxation data
+
+**Key Concepts**:
+   - Ill-posed inverse problems
+   - Tikhonov regularization
+   - Generalized cross-validation (GCV)
+   - Maximum entropy principle
+
+**Learning Objectives**:
+   - Recover H(τ) from dynamic moduli
+   - Balance regularization (noise vs. resolution)
+   - Compare Tikhonov and MaxEnt approaches
+
+10e. LVE Startup Stress Envelope
+---------------------------------
+
+**File**: ``examples/transforms/11-lve-envelope.ipynb``
+
+**Transform**: Linear viscoelastic envelope σ_LVE⁺(t)
+
+**Content**:
+   - Compute LVE envelope from Prony series parameters
+   - Multi-rate envelope comparison
+   - Detect strain hardening/softening vs. LVE prediction
+   - Chain with PronyConversion via metadata
+
+**Key Concepts**:
+   - Startup flow experiment
+   - Linear viscoelastic prediction
+   - Strain hardening and softening
+   - Weissenberg number effects
+
+**Learning Objectives**:
+   - Predict linear viscoelastic startup stress
+   - Identify nonlinear deviations from LVE envelope
+   - Use Prony parameters for cross-domain predictions
+
+10f. SPP Decomposition (LAOS)
+------------------------------
+
+**File**: ``examples/transforms/12-spp-decomposition.ipynb``
+
+**Transform**: Sequence of Physical Processes (SPP) decomposition
+
+**Content**:
+   - SPP decomposition of LAOS stress signals
+   - Elastic/viscous Lissajous-Bowditch curves
+   - Yield stress extraction (static and dynamic)
+   - Strain amplitude sweep with nonlinearity metrics
+   - Quick analysis via ``spp_analyze()``
+
+**Key Concepts**:
+   - LAOS nonlinear viscoelasticity
+   - Lissajous-Bowditch plots
+   - S-factor and T-factor
+   - I₃/I₁ harmonic ratio
+   - Static and dynamic yield stresses
+
+**Learning Objectives**:
+   - Decompose LAOS stress into physical contributions
+   - Quantify nonlinear response with multiple metrics
+   - Interpret Lissajous curves for material classification
 
 Bayesian Inference
 ==================

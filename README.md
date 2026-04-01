@@ -5,20 +5,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
-JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, and SPP), 7 data transforms (including SRFS and SPP), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 41+ oscillation models), and 240+ tutorial notebooks across 21 categories.
+JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 45 oscillation-capable models), and 249 tutorial notebooks across 21 categories.
 
 ## Features
 
 Rheological analysis toolkit with Bayesian inference and parameter optimization:
 
 ### Core Capabilities
-- **53 Rheological Models**: Classical (3), Flow (6), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Multi-Mode (1), SGR (2), STZ (1), EPM (2), Fluidity (2), Fluidity-Saramito (2), IKH (2), FIKH (2), Hébraud-Lequeux (1), SPP LAOS (1), Giesekus (2), DMT (2), ITT-MCT (2), TNT (5), VLB (4), HVM (1), HVNM (1)
-- **7 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes)
+- **53 Rheological Models** across 22 families: Classical (3), Flow (6), Fractional Maxwell (4), Fractional Zener (4), Fractional Advanced (3), Multi-Mode (1), SGR (2), STZ (1), EPM (2), Fluidity (2), Fluidity-Saramito (2), IKH (2), FIKH (2), Hébraud-Lequeux (1), SPP LAOS (1), Giesekus (2), DMT (2), ITT-MCT (2), TNT (5), VLB (4), HVM (1), HVNM (1)
+- **11 Data Transforms**: FFT, Mastercurve (TTS), Mutation Number, OWChirp (LAOS), Smooth Derivative, SRFS (Strain-Rate Frequency Superposition), SPP (Sequence of Physical Processes), Cox-Merz, Prony Conversion, Spectrum Inversion, LVE Envelope
 - **Model-Data Compatibility Checking**: Detects when models are inappropriate for data based on physics (exponential vs power-law decay, material type classification)
 - **Bayesian Inference**: All 53 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
-- **DMTA/DMA Support**: All 41+ oscillation-capable models support tensile modulus (E*) via automatic E* ↔ G* conversion
+- **DMTA/DMA Support**: All 45 oscillation-capable models support tensile modulus (E*) via automatic E* ↔ G* conversion
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
 
 ### Model Protocol Support Matrix
@@ -80,9 +80,9 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **240+ Tutorial Notebooks**: Organized in 21 categories
+- **249 Tutorial Notebooks**: Organized in 21 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
-  - `examples/transforms/` - 8 notebooks for data transforms and analysis (including SRFS)
+  - `examples/transforms/` - 13 notebooks for data transforms and analysis (FFT, TTS, SRFS, OWChirp, Cox-Merz, Prony, Spectrum Inversion, LVE Envelope, SPP)
   - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
   - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
   - `examples/io/` - 1 notebook for TRIOS complex modulus handling

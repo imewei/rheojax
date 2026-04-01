@@ -1,0 +1,1 @@
+/Users/b80985/Projects/rheojax/docs/verification/gmm_canonical_equations.rst

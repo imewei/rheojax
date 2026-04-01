@@ -36,9 +36,9 @@ At a Glance
    * - **Performance**
      - 10-100x speedups via JAX; 5-270x optimization via NLSQ
    * - **DMTA/DMA**
-     - Automatic E* ↔ G* conversion for 41+ oscillation models with tensile deformation mode
+     - Automatic E* ↔ G* conversion for 45 oscillation-capable models with tensile deformation mode
    * - **Notebooks**
-     - 244 tutorial notebooks across 21 categories covering all model families and protocols
+     - 249 tutorial notebooks across 21 categories covering all model families and protocols
 
 Key Features
 ------------
@@ -134,6 +134,12 @@ Contents
    :caption: Tutorial Notebooks
 
    examples/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Model Verification
+
+   verification/index
 
 .. toctree::
    :maxdepth: 2
