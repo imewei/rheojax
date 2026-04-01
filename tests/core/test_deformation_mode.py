@@ -256,3 +256,167 @@ def test_maxwell_tension_params_equal_3x_shear():
 
     # Both should give same G-space parameters
     assert G0_tension == pytest.approx(G0_shear, rel=0.01)
+
+
+# ── DMTA smoke tests for additional model families ─────────────────────
+
+
+def _generate_maxwell_E_star(omega, G0=1e6, eta=1e4, nu=0.5):
+    """Generate Maxwell E* data for DMTA testing."""
+    tau = eta / G0
+    omega_tau = omega * tau
+    G_star = G0 * (
+        omega_tau**2 / (1 + omega_tau**2) + 1j * omega_tau / (1 + omega_tau**2)
+    )
+    factor = 2.0 * (1.0 + nu)
+    return G_star * factor
+
+
+def _assert_predict_in_E_space(model, omega, nu=0.5):
+    """Assert that predict returns E*-space (scaled by 2(1+nu) vs _predict)."""
+    pred_E = model.predict(omega, test_mode="oscillation")
+    pred_G = model._predict(omega)
+    factor = 2.0 * (1.0 + nu)
+    np.testing.assert_allclose(np.abs(pred_E), np.abs(pred_G) * factor, rtol=1e-6)
+
+
+@pytest.mark.smoke
+def test_giesekus_dmta_tension():
+    """Giesekus model fit with deformation_mode='tension' converts E* correctly."""
+    from rheojax.models.giesekus.single_mode import GiesekusSingleMode
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = GiesekusSingleMode()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
+
+
+@pytest.mark.smoke
+def test_vlb_local_dmta_tension():
+    """VLB local model fit with deformation_mode='tension' converts E* correctly."""
+    from rheojax.models.vlb.local import VLBLocal
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = VLBLocal()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
+
+
+@pytest.mark.smoke
+def test_hvm_local_dmta_tension():
+    """HVM local model fit with deformation_mode='tension' converts E* correctly."""
+    from rheojax.models.hvm.local import HVMLocal
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = HVMLocal()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
+
+
+@pytest.mark.smoke
+def test_hvnm_local_dmta_tension():
+    """HVNM local model fit with deformation_mode='tension' converts E* correctly."""
+    from rheojax.models.hvnm.local import HVNMLocal
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = HVNMLocal()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
+
+
+@pytest.mark.smoke
+def test_fractional_zener_dmta_tension():
+    """Fractional Zener SS fit with deformation_mode='tension' converts E* correctly."""
+    from rheojax.models.fractional.fractional_zener_ss import FractionalZenerSolidSolid
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = FractionalZenerSolidSolid()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
+
+
+@pytest.mark.smoke
+def test_dmta_glassy_poisson_ratio():
+    """DMTA conversion works with non-rubber Poisson's ratio (nu=0.35)."""
+    from rheojax.models.classical.maxwell import Maxwell
+
+    omega = np.logspace(-1, 2, 50)
+    nu = 0.35
+    E_star = _generate_maxwell_E_star(omega, nu=nu)
+
+    model = Maxwell()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode="tension",
+        poisson_ratio=nu,
+    )
+
+    _assert_predict_in_E_space(model, omega, nu=nu)
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("deformation_mode", ["tension", "bending", "compression"])
+def test_dmta_all_tensile_modes(deformation_mode):
+    """All tensile deformation modes (tension/bending/compression) use same E*<->G* conversion."""
+    from rheojax.models.classical.maxwell import Maxwell
+
+    omega = np.logspace(-1, 2, 50)
+    E_star = _generate_maxwell_E_star(omega)
+
+    model = Maxwell()
+    model.fit(
+        omega,
+        E_star,
+        test_mode="oscillation",
+        deformation_mode=deformation_mode,
+        poisson_ratio=0.5,
+    )
+
+    _assert_predict_in_E_space(model, omega)
