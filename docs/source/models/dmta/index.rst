@@ -2,7 +2,7 @@ DMTA / DMA Analysis
 ===================
 
 RheoJAX supports data from Dynamic Mechanical (Thermal) Analysis instruments
-through automatic E* |leftrightarrow| G* modulus conversion.  All 41+
+through automatic E* |leftrightarrow| G* modulus conversion.  All 45
 oscillation-capable models can fit DMTA data without any model-level changes.
 
 .. |leftrightarrow| unicode:: U+2194
@@ -38,6 +38,22 @@ This means **every OSCILLATION-capable model** in RheoJAX works with DMTA
 data after a simple modulus conversion at the ``fit()`` / ``predict()``
 boundary.
 
+Recommended Starting Points
+----------------------------
+
+1. :class:`~rheojax.models.fractional.FractionalZenerSolidSolid` --- broad glass
+   transitions (3--5 params)
+2. :class:`~rheojax.models.multi_mode.GeneralizedMaxwell` --- any spectrum shape
+   + FEM export
+3. :class:`~rheojax.models.hvm.HVMLocal` --- vitrimers with :math:`T_v`
+4. :class:`~rheojax.transforms.Mastercurve` |rarr|
+   :class:`~rheojax.models.fractional.FractionalZenerSolidSolid` ---
+   multi-temperature TTS workflow
+
+.. |rarr| unicode:: U+2192
+
+See :doc:`dmta_models` for the complete model and transform applicability guide.
+
 What's in This Section
 -----------------------
 
@@ -47,7 +63,7 @@ What's in This Section
    * - :doc:`dmta_theory`
      - E* |leftrightarrow| G* conversion, Poisson's ratio, Kramers--Kronig, relaxation spectra
    * - :doc:`dmta_models`
-     - Which model to choose (decision table, complexity ladder, 41+ compatible)
+     - **Complete inventory**: 45 compatible models, 11 transforms, decision tables, recommended starting points
    * - :doc:`dmta_numerical`
      - JIT strategy, parameter bounds, convergence, FAST_MODE, memory management
    * - :doc:`dmta_workflows`

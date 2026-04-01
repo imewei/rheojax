@@ -29,9 +29,16 @@ Multiaxial Deformation Modes
 
 Support for combined deformation protocols:
 
-- Simultaneous shear + tension (torsion-tension rheometry)
+- Simultaneous shear + tension (combined torsion-tension rheometry)
 - Biaxial extension (bubble inflation)
 - Poisson's ratio extraction from dual-mode measurements
+
+.. note::
+
+   These multiaxial modes are **not** current ``DeformationMode`` enum values.
+   The four supported modes today are ``SHEAR``, ``TENSION``, ``BENDING``, and
+   ``COMPRESSION``.  Multiaxial protocols would require new enum values and
+   tensor-based conversion logic.
 
 **Status**: Planned for v0.7.0.
 

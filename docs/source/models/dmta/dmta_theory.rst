@@ -283,13 +283,20 @@ The preferred workflow passes DMTA data directly to ``model.fit()`` with
 
 Internally, ``BaseModel.fit()`` converts :math:`E^* \to G^*` before calling the
 model's ``_fit()`` method, and ``predict()`` converts the result back to
-:math:`E^*`.  This means **all 41+ DMTA-compatible models work without any
+:math:`E^*`.  This means **all 45 oscillation-capable models work without any
 model-level changes**.
 
 .. _viscoelastic-poisson:
 
 Viscoelastic Poisson's Ratio
 ----------------------------
+
+.. note::
+
+   RheoJAX currently implements only **scalar (constant)** Poisson's ratio.
+   The frequency-dependent :math:`\nu^*(\omega)` described below is presented
+   for theoretical context; see :doc:`dmta_extensions` for the planned
+   implementation.
 
 The Poisson's ratio of polymers is **not constant** through the glass transition.
 In the glassy state :math:`\nu \approx 0.35`; in the rubbery state
