@@ -27,20 +27,18 @@ References:
 
 from __future__ import annotations
 
-from rheojax.core.jax_config import safe_import_jax
-from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
-
-jax, jnp = safe_import_jax()
-
-
 import numpy as np
-jax_gamma = jax.scipy.special.gamma
 
 from rheojax.core.base import BaseModel, ParameterSet
 from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode, TestMode
+from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
+
+jax, jnp = safe_import_jax()
+jax_gamma = jax.scipy.special.gamma
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
