@@ -446,6 +446,42 @@ class DataPage(QWidget):
         mode_layout.addWidget(self._test_mode_combo)
         layout.addLayout(mode_layout)
 
+        # Deformation mode + Poisson ratio (DMTA/DMA support)
+        deform_group = QGroupBox("Deformation")
+        deform_layout = QHBoxLayout(deform_group)
+
+        deform_mode_layout = QVBoxLayout()
+        deform_mode_layout.addWidget(QLabel("Mode:"))
+        self._deform_mode_combo = QComboBox()
+        self._deform_mode_combo.addItems(["shear", "tension", "bending", "compression"])
+        self._deform_mode_combo.setToolTip(
+            "Deformation mode used during the experiment. "
+            "Required for E* \u2194 G* conversion (tension/bending/compression)."
+        )
+        self._deform_mode_combo.currentTextChanged.connect(
+            self._on_deformation_mode_changed
+        )
+        deform_mode_layout.addWidget(self._deform_mode_combo)
+        deform_layout.addLayout(deform_mode_layout)
+
+        poisson_layout = QVBoxLayout()
+        poisson_layout.addWidget(QLabel("Poisson Ratio:"))
+        from rheojax.gui.compat import QDoubleSpinBox
+
+        self._poisson_spin = QDoubleSpinBox()
+        self._poisson_spin.setRange(0.0, 0.5)
+        self._poisson_spin.setValue(0.5)
+        self._poisson_spin.setSingleStep(0.05)
+        self._poisson_spin.setDecimals(3)
+        self._poisson_spin.setToolTip(
+            "Poisson ratio of the sample. Used only when deformation mode is not shear."
+        )
+        self._poisson_spin.valueChanged.connect(self._on_poisson_ratio_changed)
+        poisson_layout.addWidget(self._poisson_spin)
+        deform_layout.addLayout(poisson_layout)
+
+        layout.addWidget(deform_group)
+
         # Metadata display
         metadata_label = QLabel("Metadata:")
         metadata_label.setStyleSheet(
@@ -948,6 +984,26 @@ class DataPage(QWidget):
                 self._temp_combo,
             ]:
                 combo.blockSignals(False)
+
+    def _on_deformation_mode_changed(self, mode: str) -> None:
+        """Persist deformation mode selection to the store."""
+        logger.debug(
+            "Option changed",
+            page="DataPage",
+            field="deformation_mode",
+            value=mode,
+        )
+        self._store.dispatch("SET_DEFORMATION_MODE", {"deformation_mode": mode})
+
+    def _on_poisson_ratio_changed(self, value: float) -> None:
+        """Persist Poisson ratio selection to the store."""
+        logger.debug(
+            "Option changed",
+            page="DataPage",
+            field="poisson_ratio",
+            value=value,
+        )
+        self._store.dispatch("SET_POISSON_RATIO", {"poisson_ratio": value})
 
     def _reset_mapping(self) -> None:
         """Reset column mapping to defaults."""

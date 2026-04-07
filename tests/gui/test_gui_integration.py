@@ -225,12 +225,8 @@ class TestStateIntegration:
 
     @pytest.mark.smoke
     def test_action_creators(self) -> None:
-        """Test action creator functions return proper dicts."""
+        """Test effector action functions dispatch internally and return None."""
         from rheojax.gui.state.actions import (
-            bayesian_completed,
-            bayesian_failed,
-            fitting_completed,
-            fitting_failed,
             set_active_model,
             start_bayesian,
             start_fitting,
@@ -238,24 +234,13 @@ class TestStateIntegration:
             update_fit_progress,
         )
 
-        # Test action creators return dicts with type
-        action = set_active_model("maxwell")
-        assert isinstance(action, dict)
-        assert action["type"] == "SET_ACTIVE_MODEL"
-        assert action["model_name"] == "maxwell"
-
-        action = start_fitting("maxwell", "dataset_1")
-        assert action["type"] == "START_FITTING"
-
-        action = update_fit_progress(50.0)
-        assert action["type"] == "FIT_PROGRESS"
-        assert action["progress"] == 50.0
-
-        action = start_bayesian("maxwell", "dataset_1")
-        assert action["type"] == "START_BAYESIAN"
-
-        action = update_bayesian_progress(75.0)
-        assert action["type"] == "BAYESIAN_PROGRESS"
+        # All action creators are effectors: they dispatch internally
+        # and return None (not dicts).
+        assert set_active_model("maxwell") is None
+        assert start_fitting("maxwell", "dataset_1") is None
+        assert update_fit_progress(50.0) is None
+        assert start_bayesian("maxwell", "dataset_1") is None
+        assert update_bayesian_progress(75.0) is None
 
 
 # =============================================================================

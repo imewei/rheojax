@@ -282,6 +282,14 @@ class FitPage(QWidget):
         btn_layout.addWidget(self._btn_fit, 2)
         layout.addLayout(btn_layout)
 
+        self._btn_compare = QPushButton("Compare Models")
+        self._btn_compare.setProperty("variant", "secondary")
+        self._btn_compare.setToolTip(
+            "Open a multi-model overlay view for the active dataset"
+        )
+        self._btn_compare.clicked.connect(self._show_compare_models)
+        layout.addWidget(self._btn_compare)
+
         results_group = QGroupBox("Fit Results")
         results_layout = QVBoxLayout(results_group)
         self._status_text = QTextEdit()
@@ -369,7 +377,7 @@ class FitPage(QWidget):
         )
 
         if dispatch:
-            self._store.dispatch(set_active_model(model_name))
+            set_active_model(model_name)
 
         self._current_model = model_name
 
@@ -1046,6 +1054,61 @@ class FitPage(QWidget):
         )
         if hasattr(self, "_empty_results"):
             self._empty_results.hide()
+
+    def _show_compare_models(self) -> None:
+        """Open MultiView dialog overlaying fit curves for the active dataset."""
+        logger.debug("Button clicked", button_id="compare_models", page="FitPage")
+        state = self._store.get_state()
+        active_dataset_id = state.active_dataset_id
+        if not active_dataset_id:
+            from rheojax.gui.compat import QMessageBox
+
+            QMessageBox.information(
+                self,
+                "No Dataset",
+                "Please load and select a dataset before comparing models.",
+            )
+            return
+
+        fit_results = {
+            key: result
+            for key, result in state.fit_results.items()
+            if active_dataset_id in key
+        }
+
+        if not fit_results:
+            from rheojax.gui.compat import QMessageBox
+
+            QMessageBox.information(
+                self,
+                "No Fit Results",
+                "Run at least one model fit before using Compare Models.",
+            )
+            return
+
+        try:
+            from rheojax.gui.compat import QDialog, QVBoxLayout
+            from rheojax.gui.widgets.multi_view import MultiView
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Compare Models — {active_dataset_id}")
+            dialog.setMinimumSize(900, 600)
+            dlg_layout = QVBoxLayout(dialog)
+            multi_view = MultiView(parent=dialog)
+            dlg_layout.addWidget(multi_view)
+
+            dataset = state.datasets.get(active_dataset_id)
+            if dataset is not None and hasattr(multi_view, "load_dataset"):
+                multi_view.load_dataset(dataset, fit_results=fit_results)
+
+            dialog.exec()
+        except Exception as exc:
+            logger.error(
+                "Failed to open Compare Models dialog",
+                page="FitPage",
+                error=str(exc),
+                exc_info=True,
+            )
 
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""

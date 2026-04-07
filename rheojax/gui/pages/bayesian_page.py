@@ -874,7 +874,7 @@ class BayesianPage(QWidget):
         self._submitted_dataset_snapshot = dataset.clone()
 
         # Update state
-        self._store.dispatch(start_bayesian(model_name, dataset.id))
+        start_bayesian(model_name, dataset.id)
 
         # Handle warm_start
         warm_start_dict: dict[str, float] | None = None
@@ -1046,7 +1046,7 @@ class BayesianPage(QWidget):
         """
         self._overall_progress.setValue(percent)
         self._status_text.append(message)
-        self._store.dispatch(update_bayesian_progress(percent))
+        update_bayesian_progress(percent)
 
     @Slot(int, int, str)
     def _on_worker_progress(self, percent: int, total: int, message: str) -> None:
@@ -1069,7 +1069,7 @@ class BayesianPage(QWidget):
         progress_pct = int(percent / max(total, 1) * 100) if total > 0 else percent
         self._overall_progress.setValue(progress_pct)
         self._status_text.append(message)
-        self._store.dispatch(update_bayesian_progress(progress_pct))
+        update_bayesian_progress(progress_pct)
 
     @Slot(str)
     def _on_stage_changed(self, stage: str) -> None:
@@ -1793,10 +1793,15 @@ class BayesianPage(QWidget):
         """Show priors editor dialog and consume result."""
         from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
 
+        store = StateStore()
+        has_nlsq = store.get_state().fit_results.get(
+            f"{store.get_state().active_model_name}_{store.get_state().active_dataset_id}"
+        ) is not None
         dialog = BayesianOptionsDialog(
             current_options={
                 "priors": self._preset_priors,
             },
+            nlsq_result_available=has_nlsq,
             parent=self,
         )
         if (

@@ -49,6 +49,8 @@ class DiagnosticsPage(QWidget):
         self._bayesian_service = BayesianService()
         self._current_model_id: str | None = None
         self._current_inference_data: Any | None = None
+        # Render guard: skip redundant re-renders when result hasn't changed.
+        self._last_result_key: str | None = None
         self.setup_ui()
         self._connect_state_signals()
 
@@ -60,6 +62,9 @@ class DiagnosticsPage(QWidget):
         # above the scroll area so buttons are always visible.
         self._canvas = ArviZCanvas()
         main_layout.addWidget(self._canvas, 1)
+
+        # R-hat/ESS per-parameter summary (compact, collapsible)
+        main_layout.addWidget(self._create_rhat_ess_panel())
 
         # Bottom panel: Metrics and comparison (compact, fixed height)
         bottom_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -76,6 +81,79 @@ class DiagnosticsPage(QWidget):
             # Subscribe to bayesian completion
             if hasattr(signals, "bayesian_completed"):
                 signals.bayesian_completed.connect(self._on_bayesian_completed)
+
+    def _create_rhat_ess_panel(self) -> QWidget:
+        """Create per-parameter R-hat/ESS summary table."""
+        panel = QGroupBox("Per-Parameter Convergence (R-hat / ESS)")
+        layout = QVBoxLayout(panel)
+        from rheojax.gui.utils.layout_helpers import set_compact_margins
+
+        set_compact_margins(layout)
+
+        self._rhat_ess_table = QTableWidget()
+        self._rhat_ess_table.setColumnCount(3)
+        self._rhat_ess_table.setHorizontalHeaderLabels(["Parameter", "R-hat", "ESS"])
+        self._rhat_ess_table.verticalHeader().setVisible(False)
+        self._rhat_ess_table.verticalHeader().setDefaultSectionSize(22)
+        self._rhat_ess_table.horizontalHeader().setStretchLastSection(True)
+        self._rhat_ess_table.setAlternatingRowColors(True)
+        self._rhat_ess_table.setMaximumHeight(140)
+        self._rhat_ess_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self._rhat_ess_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._rhat_ess_table.setToolTip(
+            "Per-parameter convergence diagnostics. "
+            "R-hat < 1.01 and ESS > 400 indicate good mixing."
+        )
+        layout.addWidget(self._rhat_ess_table)
+
+        panel.setMaximumHeight(180)
+        return panel
+
+    def _update_rhat_ess_table(self, bayesian_result: Any) -> None:
+        """Populate the per-parameter R-hat/ESS table from a BayesianResult."""
+        try:
+            import arviz as az
+            import numpy as np
+
+            idata = self._get_inference_data(bayesian_result)
+            if idata is None or not hasattr(idata, "posterior"):
+                self._rhat_ess_table.setRowCount(0)
+                return
+
+            rhat_data = az.rhat(idata)
+            ess_data = az.ess(idata)
+
+            param_names = list(rhat_data.data_vars)
+            self._rhat_ess_table.setRowCount(len(param_names))
+
+            for row, param in enumerate(param_names):
+                rhat_val = float(np.nanmean(rhat_data[param].values))
+                ess_val = float(np.nanmin(ess_data[param].values))
+
+                rhat_item = QTableWidgetItem(f"{rhat_val:.4f}")
+                ess_item = QTableWidgetItem(f"{ess_val:.0f}")
+
+                # Colour-code: red if R-hat >= 1.01 or ESS < 400
+                if rhat_val >= 1.01:
+                    rhat_item.setForeground(
+                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#c62828")
+                    )
+                if ess_val < 400:
+                    ess_item.setForeground(
+                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#c62828")
+                    )
+
+                self._rhat_ess_table.setItem(row, 0, QTableWidgetItem(param))
+                self._rhat_ess_table.setItem(row, 1, rhat_item)
+                self._rhat_ess_table.setItem(row, 2, ess_item)
+
+        except Exception:
+            logger.debug(
+                "Could not populate R-hat/ESS table",
+                page="DiagnosticsPage",
+                exc_info=True,
+            )
+            self._rhat_ess_table.setRowCount(0)
 
     def _create_metrics_panel(self) -> QWidget:
         panel = QGroupBox("Goodness of Fit Metrics")
@@ -274,6 +352,16 @@ class DiagnosticsPage(QWidget):
         # Get Bayesian result from state
         state = self._store.get_state()
         resolved_dataset_id = dataset_id or state.active_dataset_id
+
+        # Render guard: skip if we already have this exact result displayed.
+        _result_key = f"{model_name}_{resolved_dataset_id}"
+        if _result_key == self._last_result_key:
+            logger.debug(
+                "Skipping redundant re-render",
+                result_key=_result_key,
+                page="DiagnosticsPage",
+            )
+            return
         bayesian_result: BayesianResult | None = None
 
         # Primary lookup: results are stored as "{model_name}_{dataset_id}".
@@ -323,8 +411,14 @@ class DiagnosticsPage(QWidget):
         # Build inference data from posterior samples
         self._current_inference_data = self._get_inference_data(bayesian_result)
 
+        # Mark this result as rendered (guard against redundant future calls)
+        self._last_result_key = _result_key
+
         # Update metrics table with both Bayesian diagnostics and NLSQ GOF
         self._update_metrics_table(bayesian_result, fit_result)
+
+        # Update per-parameter R-hat/ESS summary
+        self._update_rhat_ess_table(bayesian_result)
 
         # Update plot on the single canvas
         if self._current_inference_data is not None:
