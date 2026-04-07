@@ -350,6 +350,7 @@ class AppState:
     current_seed: int = 42
     auto_save_enabled: bool = True
     theme: str = "light"
+    os_theme: str = "light"  # Resolved OS color scheme ("light" or "dark")
     last_export_dir: Path | None = None
     recent_projects: list[Path] = field(default_factory=list)
 
@@ -476,6 +477,38 @@ class StateStore:
         with self._lock:
             return self._signals
 
+    def _atomic_state_and_signal(
+        self,
+        updater: Callable[[AppState], AppState],
+        signal_name: str,
+        *signal_args: Any,
+        track_undo: bool = True,
+    ) -> None:
+        """Atomically update state and emit a domain signal.
+
+        Wraps ``update_state()`` and ``emit_signal()`` so that no concurrent
+        dispatch can interleave between the state mutation and the signal
+        emission (R12-C-002 fix).
+
+        Parameters
+        ----------
+        updater : Callable[[AppState], AppState]
+            Pure function producing the next state.
+        signal_name : str
+            Name of the domain signal to emit after state mutation.
+        *signal_args : Any
+            Arguments forwarded to the signal's ``emit()`` method.
+        track_undo : bool
+            Whether to record the pre-mutation state on the undo stack.
+        """
+        with self._lock:
+            self.update_state(updater, track_undo=track_undo, emit_signal=False)
+        # Emit signals outside the lock to prevent reentrant deadlocks.
+        # The general state_changed signal is emitted first, then the
+        # domain-specific signal so subscribers see the updated state.
+        self.emit_signal("state_changed")
+        self.emit_signal(signal_name, *signal_args)
+
     def emit_signal(self, signal_name: str, *args) -> None:
         """Emit a named signal if available.
 
@@ -589,7 +622,11 @@ class StateStore:
                 with self._lock:
                     _pre_delete_dataset_id = self._state.active_dataset_id or ""
             if reducer is not None:
-                self.update_state(reducer, emit_signal=True)
+                # STATE-009 enforcement: CACHE_STEP_RESULT must never push
+                # large JAX arrays onto the undo stack regardless of what
+                # the call-site passes.
+                _track = action_type != "CACHE_STEP_RESULT"
+                self.update_state(reducer, track_undo=_track, emit_signal=True)
 
             # Domain signals are emitted intentionally outside the lock to avoid
             # deadlocks: a signal consumer that calls dispatch() or get_state()
@@ -684,6 +721,10 @@ class StateStore:
             elif action_type == "SET_THEME":
                 theme = action.get("theme", "light")
                 self.emit_signal("theme_changed", theme)
+
+            elif action_type == "SET_OS_THEME":
+                os_theme = action.get("os_theme", "light")
+                self.emit_signal("os_theme_changed", os_theme)
 
             elif action_type == "SET_PIPELINE_STEP":
                 step = action.get("step", "")
@@ -937,6 +978,7 @@ class StateStore:
             "current_seed",
             "auto_save_enabled",
             "theme",
+            "os_theme",
             "last_export_dir",
             "recent_projects",
             "deformation_mode",
@@ -970,6 +1012,16 @@ class StateStore:
                 if state.theme == theme:
                     return state
                 return replace(state, theme=theme, is_modified=True)
+
+            return updater
+
+        if action_type == "SET_OS_THEME":
+            os_theme = action.get("os_theme", "light")
+
+            def updater(state: AppState) -> AppState:
+                if state.os_theme == os_theme:
+                    return state
+                return replace(state, os_theme=os_theme)
 
             return updater
 
@@ -1522,6 +1574,16 @@ class StateStore:
                         updates[key] = prefs[key]
                 return replace(state, **updates) if updates else state
 
+            # Apply runtime settings that live outside AppState
+            if "max_undo_steps" in prefs:
+                self.set_max_undo_size(int(prefs["max_undo_steps"]))
+            if "worker_isolation_mode" in prefs:
+                import os
+
+                os.environ["RHEOJAX_WORKER_ISOLATION"] = prefs[
+                    "worker_isolation_mode"
+                ]
+
             return updater
 
         if action_type == "DELETE_SELECTED_DATASET":
@@ -1991,6 +2053,15 @@ class StateStore:
             self._undo_stack.clear()
             self._redo_stack.clear()
             logger.debug("Undo/redo history cleared")
+
+    def set_max_undo_size(self, size: int) -> None:
+        """Set the maximum undo stack depth. Thread-safe."""
+        with self._lock:
+            self._max_undo_size = max(10, min(size, 500))
+            # Trim if current stack exceeds new limit
+            while len(self._undo_stack) > self._max_undo_size:
+                self._undo_stack.pop(0)
+            logger.debug("Max undo size updated", max_undo_size=self._max_undo_size)
 
     def batch_update(
         self, updaters: list[Callable[[AppState], AppState]], track_undo: bool = True

@@ -1,8 +1,10 @@
 """State action creators for RheoJAX GUI.
 
-This module provides action functions that modify state through the StateStore
-and emit appropriate signals for UI reactivity.
-"""
+This module provides effector-style action functions that modify state through
+the StateStore and emit appropriate signals for UI reactivity.
+
+All action functions dispatch internally and return None.  Callers should NOT
+wrap them in ``store.dispatch()``."""
 
 import uuid
 from dataclasses import replace
@@ -27,18 +29,10 @@ from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
 
-# NOTE: Action creators in this module use two patterns:
-#   1. Factory functions (return dict): start_bayesian(), start_fitting()
-#   2. Effector functions (dispatch directly): store_bayesian_result(), fail_bayesian()
-# Callers must dispatch() factory results but NOT dispatch effector results.
-# R8-NEW-010: consider standardizing to one pattern in future refactor.
-#
-# NOTE (R12-C-002): Effector actions call update_state() then emit_signal() as
-# two separate operations.  A concurrent dispatch between them is possible but
-# benign: the signal argument (e.g., dataset_id) is still valid even if state
-# has advanced.  Subscribers reading store state from a signal handler should
-# call get_state() to obtain the latest snapshot rather than relying on the
-# signal argument to fully describe the current state.
+# All action creators use the effector pattern: they dispatch internally and
+# return None.  Callers should NOT wrap them in store.dispatch().
+# R12-C-002 fix: effector actions that need atomicity use
+# store._atomic_state_and_signal() to wrap update_state + emit_signal.
 
 # Dataset Actions
 
@@ -108,7 +102,10 @@ def load_dataset(
             is_modified=True,
         )
 
-    store.update_state(updater)
+    # R12-C-002: use _atomic_state_and_signal for the primary signal;
+    # the secondary dataset_selected signal is emitted separately.
+    store._atomic_state_and_signal(updater, "dataset_added", dataset_id)
+    store.emit_signal("dataset_selected", dataset_id)
 
     n_points = len(x_data) if hasattr(x_data, "__len__") else 0
     logger.info(
@@ -118,9 +115,6 @@ def load_dataset(
         n_points=n_points,
         test_mode=test_mode,
     )
-
-    store.emit_signal("dataset_added", dataset_id)
-    store.emit_signal("dataset_selected", dataset_id)
 
     return dataset_id
 
@@ -165,10 +159,8 @@ def remove_dataset(dataset_id: str) -> None:
             is_modified=True,
         )
 
-    store.update_state(updater)
-
+    store._atomic_state_and_signal(updater, "dataset_removed", dataset_id)
     logger.info("Dataset removed", dataset_id=dataset_id)
-    store.emit_signal("dataset_removed", dataset_id)
 
 
 def set_active_dataset(dataset_id: str) -> None:
@@ -190,9 +182,7 @@ def set_active_dataset(dataset_id: str) -> None:
             return state
         return replace(state, active_dataset_id=dataset_id)
 
-    store.update_state(updater)
-
-    store.emit_signal("dataset_selected", dataset_id)
+    store._atomic_state_and_signal(updater, "dataset_selected", dataset_id)
 
 
 def update_dataset(dataset_id: str, **updates) -> None:
@@ -223,9 +213,7 @@ def update_dataset(dataset_id: str, **updates) -> None:
 
         return replace(state, datasets=new_datasets, is_modified=True)
 
-    store.update_state(updater)
-
-    store.emit_signal("dataset_updated", dataset_id)
+    store._atomic_state_and_signal(updater, "dataset_updated", dataset_id)
 
 
 # Model Actions
@@ -280,6 +268,10 @@ def update_parameter(name: str, value: float) -> None:
 
         return replace(state, model_params=new_params)
 
+    # R12-C-002 note: signal args depend on state read inside the updater,
+    # so _atomic_state_and_signal cannot be used here.  The captured
+    # model_name is read under the store lock (inside update_state),
+    # making the signal arg semantically correct.
     store.update_state(updater)
     model_name = captured_model_name[0]
 
@@ -324,6 +316,7 @@ def update_parameter_bounds(name: str, min_bound: float, max_bound: float) -> No
 
         return replace(state, model_params=new_params)
 
+    # R12-C-002 note: signal args depend on state read inside the updater.
     store.update_state(updater)
     model_name = captured_model_name[0]
 
@@ -359,6 +352,7 @@ def toggle_parameter_fixed(name: str, fixed: bool) -> None:
 
         return replace(state, model_params=new_params)
 
+    # R12-C-002 note: signal args depend on state read inside the updater.
     store.update_state(updater)
     model_name = captured_model_name[0]
 
@@ -385,6 +379,7 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
         _model_name[0] = state.active_model_name
         return replace(state, model_params=default_params)
 
+    # R12-C-002 note: signal args depend on state read inside the updater.
     store.update_state(updater)
 
     if _model_name[0]:
@@ -480,30 +475,21 @@ def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
     )
 
 
-def set_active_model(model_name: str) -> dict:
-    """Create action to set the active model.
+def set_active_model(model_name: str) -> None:
+    """Set the active model (dispatches internally).
 
     Parameters
     ----------
     model_name : str
         Model name
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "SET_ACTIVE_MODEL", "model_name": model_name}
-    logger.debug(
-        "Action created",
-        action_type="SET_ACTIVE_MODEL",
-        payload_keys=["model_name"],
-    )
-    return action
+    store = StateStore()
+    logger.debug("set_active_model called", model_name=model_name)
+    store.dispatch("SET_ACTIVE_MODEL", {"model_name": model_name})
 
 
-def start_fitting(model_name: str, dataset_id: str) -> dict:
-    """Create action to start fitting.
+def start_fitting(model_name: str, dataset_id: str) -> None:
+    """Mark fitting as started (dispatches internally).
 
     Parameters
     ----------
@@ -511,96 +497,57 @@ def start_fitting(model_name: str, dataset_id: str) -> dict:
         Model name
     dataset_id : str
         Dataset identifier
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {
-        "type": "START_FITTING",
-        "model_name": model_name,
-        "dataset_id": dataset_id,
-    }
-    logger.debug(
-        "Action created",
-        action_type="START_FITTING",
-        payload_keys=["model_name", "dataset_id"],
+    store = StateStore()
+    logger.debug("start_fitting called", model_name=model_name, dataset_id=dataset_id)
+    store.dispatch(
+        "START_FITTING", {"model_name": model_name, "dataset_id": dataset_id}
     )
-    return action
 
 
-def update_fit_progress(progress: float) -> dict:
-    """Create action to update fit progress.
+def update_fit_progress(progress: float) -> None:
+    """Update fit progress (dispatches internally).
 
     Parameters
     ----------
     progress : float
         Progress percentage (0-100)
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "FIT_PROGRESS", "progress": progress}
-    logger.debug(
-        "Action created",
-        action_type="FIT_PROGRESS",
-        payload_keys=["progress"],
-    )
-    return action
+    store = StateStore()
+    store.dispatch("FIT_PROGRESS", {"progress": progress})
 
 
-def fitting_completed(result: FitResult) -> dict:
-    """Create action for fit completion.
+def fitting_completed(result: FitResult) -> None:
+    """Mark fit as completed (dispatches internally).
 
     Parameters
     ----------
     result : FitResult
         Fit result
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "FITTING_COMPLETED", "result": result}
-    logger.debug(
-        "Action created",
-        action_type="FITTING_COMPLETED",
-        payload_keys=["result"],
-    )
-    return action
+    store = StateStore()
+    logger.debug("fitting_completed called")
+    store.dispatch("FITTING_COMPLETED", {"result": result})
 
 
-def fitting_failed(error: str) -> dict:
-    """Create action for fit failure.
+def fitting_failed(error: str) -> None:
+    """Mark fit as failed (dispatches internally).
 
     Parameters
     ----------
     error : str
         Error message
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "FITTING_FAILED", "error": error}
-    logger.debug(
-        "Action created",
-        action_type="FITTING_FAILED",
-        payload_keys=["error"],
-    )
-    return action
+    store = StateStore()
+    logger.debug("fitting_failed called", error=error)
+    store.dispatch("FITTING_FAILED", {"error": error})
 
 
 # Bayesian Actions
 
 
-def start_bayesian(model_name: str, dataset_id: str) -> dict:
-    """Create action to start Bayesian inference.
+def start_bayesian(model_name: str, dataset_id: str) -> None:
+    """Mark Bayesian inference as started (dispatches internally).
 
     Parameters
     ----------
@@ -608,23 +555,12 @@ def start_bayesian(model_name: str, dataset_id: str) -> dict:
         Model name
     dataset_id : str
         Dataset identifier
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {
-        "type": "START_BAYESIAN",
-        "model_name": model_name,
-        "dataset_id": dataset_id,
-    }
-    logger.debug(
-        "Action created",
-        action_type="START_BAYESIAN",
-        payload_keys=["model_name", "dataset_id"],
+    store = StateStore()
+    logger.debug("start_bayesian called", model_name=model_name, dataset_id=dataset_id)
+    store.dispatch(
+        "START_BAYESIAN", {"model_name": model_name, "dataset_id": dataset_id}
     )
-    return action
 
 
 def store_bayesian_result(result: BayesianResult) -> None:
@@ -691,70 +627,42 @@ def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
     )
 
 
-def update_bayesian_progress(progress: float) -> dict:
-    """Create a Bayesian progress update action.
+def update_bayesian_progress(progress: float) -> None:
+    """Update Bayesian inference progress (dispatches internally).
 
     Parameters
     ----------
     progress : float
         Progress percentage (0-100)
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "BAYESIAN_PROGRESS", "progress": progress}
-    logger.debug(
-        "Action created",
-        action_type="BAYESIAN_PROGRESS",
-        payload_keys=["progress"],
-    )
-    return action
+    store = StateStore()
+    store.dispatch("BAYESIAN_PROGRESS", {"progress": progress})
 
 
-def bayesian_completed(result: BayesianResult) -> dict:
-    """Create a Bayesian completed action.
+def bayesian_completed(result: BayesianResult) -> None:
+    """Mark Bayesian inference as completed (dispatches internally).
 
     Parameters
     ----------
     result : BayesianResult
         Bayesian inference result
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "BAYESIAN_COMPLETED", "result": result}
-    logger.debug(
-        "Action created",
-        action_type="BAYESIAN_COMPLETED",
-        payload_keys=["result"],
-    )
-    return action
+    store = StateStore()
+    logger.debug("bayesian_completed called")
+    store.dispatch("BAYESIAN_COMPLETED", {"result": result})
 
 
-def bayesian_failed(error: str) -> dict:
-    """Create a Bayesian failed action.
+def bayesian_failed(error: str) -> None:
+    """Mark Bayesian inference as failed (dispatches internally).
 
     Parameters
     ----------
     error : str
         Error message
-
-    Returns
-    -------
-    dict
-        Action dict for dispatch
     """
-    action = {"type": "BAYESIAN_FAILED", "error": error}
-    logger.debug(
-        "Action created",
-        action_type="BAYESIAN_FAILED",
-        payload_keys=["error"],
-    )
-    return action
+    store = StateStore()
+    logger.debug("bayesian_failed called", error=error)
+    store.dispatch("BAYESIAN_FAILED", {"error": error})
 
 
 # Pipeline Actions
@@ -797,9 +705,7 @@ def set_jax_device(device: str) -> None:
     def updater(state: AppState) -> AppState:
         return replace(state, jax_device=device)
 
-    store.update_state(updater)
-
-    store.emit_signal("jax_device_changed", device)
+    store._atomic_state_and_signal(updater, "jax_device_changed", device)
 
 
 def update_jax_memory(used: int, total: int) -> None:
@@ -817,9 +723,9 @@ def update_jax_memory(used: int, total: int) -> None:
     def updater(state: AppState) -> AppState:
         return replace(state, jax_memory_used=used, jax_memory_total=total)
 
-    store.update_state(updater, track_undo=False, emit_signal=False)
-
-    store.emit_signal("jax_memory_updated", used, total)
+    store._atomic_state_and_signal(
+        updater, "jax_memory_updated", used, total, track_undo=False
+    )
 
 
 # Settings Actions
@@ -839,9 +745,20 @@ def set_theme(theme: str) -> None:
     def updater(state: AppState) -> AppState:
         return replace(state, theme=theme)
 
-    store.update_state(updater, track_undo=False)
+    store._atomic_state_and_signal(updater, "theme_changed", theme, track_undo=False)
 
-    store.emit_signal("theme_changed", theme)
+
+def set_os_theme(os_theme: str) -> None:
+    """Set the resolved OS color scheme.
+
+    Parameters
+    ----------
+    os_theme : str
+        Resolved OS theme ("light" or "dark")
+    """
+    store = StateStore()
+    logger.info("OS theme changed", os_theme=os_theme)
+    store.dispatch("SET_OS_THEME", {"os_theme": os_theme})
 
 
 def set_seed(seed: int) -> None:
@@ -905,10 +822,10 @@ def save_project(path: Path) -> None:
             recent_projects=recent,
         )
 
-    store.update_state(updater, track_undo=False)
-
+    store._atomic_state_and_signal(
+        updater, "project_saved", str(path), track_undo=False
+    )
     logger.info("Project saved", path=str(path))
-    store.emit_signal("project_saved", str(path))
 
 
 def load_project(path: Path, state: AppState) -> None:
@@ -945,8 +862,10 @@ def load_project(path: Path, state: AppState) -> None:
             recent_projects=recent,
         )
 
+    # R12-C-002 note: cannot use _atomic_state_and_signal because
+    # clear_history() must be called between update and signal.
     store.update_state(_load_project_updater, track_undo=False)
-    store.clear_history()  # Clear undo history on load
+    store.clear_history()
 
     logger.info(
         "Project loaded",
@@ -1001,15 +920,15 @@ def add_transform_record(
         new_history.append(record)
         return replace(state, transform_history=new_history)
 
-    store.update_state(updater)
-
+    store._atomic_state_and_signal(
+        updater, "transform_applied", transform_name, target_id
+    )
     logger.info(
         "Transform record added",
         transform_name=transform_name,
         source_id=source_id,
         target_id=target_id,
     )
-    store.emit_signal("transform_applied", transform_name, target_id)
 
 
 # --- Visual Pipeline Actions ---

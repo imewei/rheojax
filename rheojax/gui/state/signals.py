@@ -139,6 +139,7 @@ class StateSignals(QObject):
 
     # UI
     theme_changed = Signal(str)  # theme_name
+    os_theme_changed = Signal(str)  # resolved OS color scheme ("light" or "dark")
 
     # Project
     project_loaded = Signal(str)  # project_path
