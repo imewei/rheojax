@@ -191,7 +191,7 @@ class FFTAnalysis(BaseTransform):
         """
         from rheojax.core.data import RheoData
 
-        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)
+        input_shape = (len(data.x),) if hasattr(data.x, "__len__") else (1,)  # type: ignore[arg-type]
 
         with log_transform(
             logger,

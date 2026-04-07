@@ -309,10 +309,10 @@ class SPPDecomposer(BaseTransform):
         stress = data.y
 
         # Validate time steps uniformity
-        if len(t) > 2:
-            dt_all = np.diff(t)
-            dt_mean = np.mean(dt_all)
-            dt_std = np.std(dt_all)
+        if len(t) > 2:  # type: ignore[arg-type]
+            dt_all = np.diff(t)  # type: ignore[type-var]
+            dt_mean = np.mean(dt_all)  # type: ignore[arg-type]
+            dt_std = np.std(dt_all)  # type: ignore[arg-type]
             if dt_mean > 0 and (dt_std / dt_mean > 0.05):  # 5% tolerance
                 logger.warning(
                     "Non-uniform time steps detected in SPP data",
@@ -323,7 +323,7 @@ class SPPDecomposer(BaseTransform):
 
         logger.debug(
             "Input data extracted",
-            data_points=len(t),
+            data_points=len(t),  # type: ignore[arg-type]
             domain=data.domain,
         )
 

@@ -237,7 +237,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Applying SRFS shift to single dataset",
             gamma_dot_ref=gamma_dot_ref,
-            data_points=len(data.x),
+            data_points=len(data.x),  # type: ignore[arg-type]
         )
 
         # Compute shift factor
@@ -261,7 +261,7 @@ class SRFS(BaseTransform):
         logger.debug(
             "Single dataset shifted",
             shift_factor=float(a_gamma_dot),
-            original_x_range=(float(data.x[0]), float(data.x[-1])),
+            original_x_range=(float(data.x[0]), float(data.x[-1])),  # type: ignore[index]
             shifted_x_range=(float(x_shifted[0]), float(x_shifted[-1])),
         )
 

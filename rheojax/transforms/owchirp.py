@@ -20,14 +20,18 @@ from rheojax.logging import get_logger
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 
-# Array alias for runtime isinstance checks (via safe_import_jax handle)
-Array = jax.Array
+# Runtime Array class for isinstance checks
+_JaxArray = jax.Array
+
+if TYPE_CHECKING:
+    from jax import Array
+
+    from rheojax.core.data import RheoData
+else:
+    Array = _JaxArray
 
 # Module logger
 logger = get_logger(__name__)
-
-if TYPE_CHECKING:
-    from rheojax.core.data import RheoData
 
 
 @TransformRegistry.register("owchirp", type=TransformType.ANALYSIS)
@@ -114,7 +118,7 @@ class OWChirp(BaseTransform):
         self.max_harmonic = max_harmonic
 
     def _chirp_wavelet(
-        self, t: Array, t_center: float, frequency: float, width: float
+        self, t: Array, t_center: float, frequency: float | Array, width: float
     ) -> Array:
         """Generate chirp wavelet at given frequency.
 
@@ -337,7 +341,7 @@ class OWChirp(BaseTransform):
 
         logger.debug(
             "Input data extracted",
-            data_points=len(t),
+            data_points=len(t),  # type: ignore[arg-type]
             domain=data.domain,
         )
 

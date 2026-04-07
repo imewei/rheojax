@@ -269,8 +269,8 @@ class MutationNumber(BaseTransform):
 
         logger.debug(
             "Data extracted",
-            data_points=len(t),
-            time_range=(float(t[0]), float(t[-1])),
+            data_points=len(t),  # type: ignore[arg-type]
+            time_range=(float(t[0]), float(t[-1])),  # type: ignore[index]
         )
 
         # Convert to JAX arrays
