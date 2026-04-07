@@ -7,7 +7,6 @@ for all models and transforms in the rheojax package, with full JAX support.
 from __future__ import annotations
 
 import copy
-import logging
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Any
@@ -15,6 +14,8 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
+from rheojax.core.deformation_converter import DeformationModeConverter
+from rheojax.core.fit_orchestrator import FitOrchestrator
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
 from rheojax.core.test_modes import DeformationMode
@@ -56,6 +57,7 @@ class BaseModel(BayesianMixin, ABC):
         self._bayesian_result = None  # Store Bayesian inference result
         self.X_data = None  # Store data for Bayesian inference
         self.y_data = None
+        self._last_fit_kwargs: dict = {}  # Protocol state for Bayesian forwarding
         self._deformation_mode: DeformationMode | None = None
         self._poisson_ratio: float = 0.5
         self._closure_cache: OrderedDict = OrderedDict()
@@ -86,6 +88,151 @@ class BaseModel(BayesianMixin, ABC):
             Predictions
         """
         pass
+
+    def _standard_nlsq_fit(
+        self,
+        X: ArrayLike,
+        y: ArrayLike,
+        model_fn,
+        *,
+        test_mode=None,
+        default_test_mode=None,
+        normalize: bool = True,
+        **kwargs,
+    ) -> BaseModel:
+        """Standard NLSQ fitting pipeline for models with a stateless model_fn.
+
+        Handles: RheoData unpacking, test_mode resolution/caching,
+        objective creation, optimization, result validation, fitted_ flag.
+
+        Args:
+            X: Input array (or RheoData)
+            y: Target array (or None if X is RheoData)
+            model_fn: Stateless function(x, params) -> prediction.
+                Called by the optimizer; must capture test_mode from enclosing scope.
+            test_mode: Optional test mode override
+            default_test_mode: Default test mode when not provided by data or kwargs.
+                If None, defaults to 'relaxation'.
+            normalize: Whether to normalize the objective (default True)
+            **kwargs: Passed through to nlsq_optimize (use_jax, method, max_iter, etc.)
+
+        Returns:
+            self for method chaining
+        """
+        from rheojax.core.data import RheoData
+        from rheojax.logging import log_fit
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        # --- 1. Unpack RheoData vs raw arrays ---
+        if isinstance(X, RheoData):
+            rheo_data = X
+            x_np = np.asarray(rheo_data.x, dtype=float)
+            y_raw = np.asarray(rheo_data.y)
+            if np.iscomplexobj(y_raw):
+                y_np = y_raw.astype(np.complex128)
+            else:
+                y_np = y_raw.astype(float)
+            resolved_test_mode = rheo_data.test_mode
+        else:
+            x_np = np.asarray(X, dtype=float)
+            y_raw = np.asarray(y)
+            if np.iscomplexobj(y_raw):
+                y_np = y_raw.astype(np.complex128)
+            else:
+                y_np = y_raw.astype(float)
+            supplied = test_mode if test_mode is not None else kwargs.get("test_mode")
+            if supplied is not None:
+                resolved_test_mode = supplied
+            elif np.iscomplexobj(y_np):
+                resolved_test_mode = "oscillation"
+            else:
+                resolved_test_mode = default_test_mode if default_test_mode is not None else "relaxation"
+
+        # --- 2. Cache test_mode for Bayesian pipeline ---
+        self._test_mode = resolved_test_mode
+
+        # Determine test_mode string for logging
+        test_mode_str = (
+            resolved_test_mode.name
+            if hasattr(resolved_test_mode, "name")
+            else str(resolved_test_mode)
+        )
+        data_shape = (int(x_np.shape[0]),) if hasattr(x_np, "shape") else None
+
+        x_data = jnp.array(x_np)
+        y_data = jnp.array(y_np)
+
+        # --- 3. Optimize ---
+        with log_fit(
+            logger,
+            model=self.__class__.__name__,
+            data_shape=data_shape,
+            test_mode=test_mode_str,
+        ):
+            logger.debug(
+                "Creating least squares objective",
+                normalize=normalize,
+            )
+            objective = create_least_squares_objective(
+                model_fn, x_data, y_data, normalize=normalize
+            )
+
+            logger.debug(
+                "Starting NLSQ optimization",
+                use_jax=kwargs.get("use_jax", True),
+                method=kwargs.get("method", "auto"),
+                max_iter=kwargs.get("max_iter", 1000),
+            )
+
+            try:
+                result = nlsq_optimize(
+                    objective,
+                    self.parameters,
+                    use_jax=kwargs.get("use_jax", True),
+                    method=kwargs.get("method", "auto"),
+                    max_iter=kwargs.get("max_iter", 1000),
+                )
+            except Exception as e:
+                logger.error(
+                    "NLSQ optimization raised exception",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                raise
+
+            # --- 4. Validate ---
+            if not result.success:
+                if not np.isfinite(result.fun) or result.fun > 1e6 * len(x_np):
+                    logger.error(
+                        "Optimization failed",
+                        message=result.message,
+                        iterations=getattr(result, "nit", None),
+                    )
+                    raise RuntimeError(
+                        f"Optimization failed: {result.message}. "
+                        f"Try adjusting initial values, bounds, or max_iter."
+                    )
+                else:
+                    logger.warning(
+                        "Optimization did not fully converge",
+                        message=result.message,
+                        model=self.__class__.__name__,
+                    )
+
+            self._nlsq_result = result
+            self.fitted_ = True
+
+            logger.debug(
+                "Optimization completed successfully",
+                iterations=getattr(result, "nit", None),
+                final_cost=getattr(result, "fun", None),
+            )
+
+        return self
 
     def _detect_optimization_strategy(
         self,
@@ -331,297 +478,24 @@ class BaseModel(BayesianMixin, ABC):
             >>> result = model.fit(t, G_data, auto_init=True, check_physics=True,
             ...                    return_result=True)  # Full pipeline
         """
-        # Get data shape for logging
-        _shape = getattr(X, "shape", None)
-        data_shape = (
-            _shape
-            if _shape is not None
-            else (len(X) if hasattr(X, "__len__") else (1,))
-        )
-        logger.debug(
-            "Entering fit",
-            model=self.__class__.__name__,
-            data_shape=data_shape,
+        return FitOrchestrator().execute(
+            self,
+            X,
+            y,
             method=method,
+            check_compatibility=check_compatibility,
+            use_log_residuals=use_log_residuals,
+            use_multi_start=use_multi_start,
+            n_starts=n_starts,
+            perturb_factor=perturb_factor,
+            deformation_mode=deformation_mode,
+            poisson_ratio=poisson_ratio,
+            auto_init=auto_init,
+            return_result=return_result,
+            check_physics=check_physics,
+            uncertainty=uncertainty,
+            **kwargs,
         )
-
-        # Handle deformation mode: auto-detect from RheoData or explicit parameter.
-        # Always unpack RheoData regardless of whether deformation_mode was passed,
-        # so that test_mode propagation and x/y extraction happen unconditionally.
-        from rheojax.core.data import RheoData
-
-        if isinstance(X, RheoData):
-            _metadata = X.metadata
-            if deformation_mode is None:
-                deformation_mode = _metadata.get("deformation_mode", None)
-            # R10-BASE-001: propagate test_mode from RheoData metadata into kwargs
-            # so that _fit() and model_function see the correct protocol.
-            if "test_mode" in _metadata and "test_mode" not in kwargs:
-                kwargs["test_mode"] = _metadata["test_mode"]
-            # Extract x/y so _fit() always receives raw arrays, not RheoData
-            if y is None:
-                y = X.y
-            X = X.x
-
-        if deformation_mode is not None:
-            if isinstance(deformation_mode, str):
-                deformation_mode = DeformationMode(deformation_mode)
-            self._deformation_mode = deformation_mode
-            self._poisson_ratio = poisson_ratio
-
-            # Convert E* -> G* if tensile deformation mode
-            if deformation_mode.is_tensile() and y is not None:
-                from rheojax.utils.modulus_conversion import convert_modulus
-
-                y = convert_modulus(
-                    y, deformation_mode, DeformationMode.SHEAR, poisson_ratio
-                )
-                logger.info(
-                    "Converted tensile modulus to shear for fitting",
-                    model=self.__class__.__name__,
-                    from_mode=str(deformation_mode),
-                    poisson_ratio=poisson_ratio,
-                )
-        else:
-            # R10-BASE-003: Clear stale tensile mode when a new fit provides no
-            # deformation_mode. Without this, predict() would incorrectly return
-            # E* after a subsequent shear fit. Always sync _deformation_mode with
-            # the current fit's resolved value (None = shear/default).
-            self._deformation_mode = None
-
-        # Store data for potential Bayesian inference
-        self.X_data = X
-        self.y_data = y
-        # Normalize to raw arrays for consistency — fit_bayesian() must always
-        # see ndarrays here regardless of whether fit() received RheoData or arrays.
-        from rheojax.core.data import RheoData as _RheoData
-
-        if isinstance(self.X_data, _RheoData):
-            self.X_data = self.X_data.x
-        if isinstance(self.y_data, _RheoData):
-            self.y_data = self.y_data.y
-
-        # Auto-detect optimization strategy
-        use_log_residuals, use_multi_start = self._detect_optimization_strategy(
-            X, use_log_residuals, use_multi_start, n_starts
-        )
-
-        # Pass optimization strategy to _fit via kwargs.
-        # These are consumed by _fit() and should NOT leak to model_function.
-        # R12-B-006: Cleanup happens here in base.py (see the _lfk.pop() loop
-        # after self._fit() returns), NOT in individual model _fit() implementations.
-        # The stale comment about models popping these themselves was misleading.
-        kwargs["use_log_residuals"] = use_log_residuals
-        kwargs["use_multi_start"] = use_multi_start
-        kwargs["n_starts"] = n_starts
-        kwargs["perturb_factor"] = perturb_factor
-
-        # Auto-initialization: estimate initial parameters from data
-        test_mode = kwargs.get("test_mode", None)
-        if auto_init:
-            try:
-                from rheojax.utils.initialization.auto_p0 import auto_p0 as _auto_p0
-
-                p0 = _auto_p0(X, y, self, test_mode=test_mode)
-                for name, value in p0.items():
-                    try:
-                        self.parameters.set_value(name, value)
-                    except (KeyError, ValueError):
-                        pass
-                logger.info(
-                    "auto_p0 initialized parameters",
-                    model=self.__class__.__name__,
-                    n_params_set=len(p0),
-                )
-            except Exception as exc:
-                logger.warning(
-                    "auto_p0 failed, using default initial values",
-                    model=self.__class__.__name__,
-                    error=str(exc),
-                )
-
-        # Optional compatibility check before fitting
-        if check_compatibility:
-            compatibility = self._check_compatibility(X, y, test_mode)
-            if compatibility and not compatibility.get("compatible", True):
-                try:
-                    from rheojax.utils.compatibility import format_compatibility_message
-
-                    message = format_compatibility_message(compatibility)
-                    logger.warning(
-                        "Model compatibility check failed",
-                        model=self.__class__.__name__,
-                        message=message,
-                    )
-                except Exception as exc:
-                    logger.debug(
-                        "Failed to format compatibility message",
-                        error=str(exc),
-                    )
-
-        # Translate method="auto_global" into workflow kwarg for nlsq_optimize.
-        # Individual model _fit() methods forward kwargs["method"] to nlsq_optimize,
-        # but "auto_global" is a workflow selector, not an NLSQ method string.
-        # We remap it here so that _fit() sees method="auto" and workflow="auto_global".
-        if method == "auto_global":
-            kwargs.setdefault("workflow", "auto_global")
-            method = "auto"
-
-        # Call subclass implementation (which uses NLSQ via optimization module)
-        try:
-            self._fit(X, y, method=method, **kwargs)
-            self.fitted_ = True
-
-            # Strip optimization kwargs so they don't leak to model_function
-            _opt_keys = (
-                "use_log_residuals",
-                "use_multi_start",
-                "n_starts",
-                "perturb_factor",
-            )
-            _lfk = getattr(self, "_last_fit_kwargs", None)
-            if isinstance(_lfk, dict):
-                for _ok in _opt_keys:
-                    _lfk.pop(_ok, None)
-
-            # Log fit completion with key metrics
-            # Only compute R² when DEBUG logging is active.
-            # R6-OPT-001: Extract R² from NLSQ residual to avoid 100ms+ predict overhead.
-            r2 = None
-            if logger.isEnabledFor(logging.DEBUG):
-                try:
-                    from rheojax.core.data import RheoData as _RheoData
-
-                    _X_score = X.x if isinstance(X, _RheoData) else X
-                    _y_score = y
-
-                    if (
-                        getattr(self, "_nlsq_result", None) is not None
-                        and self._nlsq_result.fun is not None
-                    ):
-                        # R11-BASE-002: fun may be a residual array or a scalar RSS.
-                        fun = np.asarray(self._nlsq_result.fun)
-                        if fun.ndim == 0:
-                            # P2-Fit-6: fun is already scalar RSS — use directly.
-                            ss_res = float(np.abs(fun))
-                        else:
-                            # fun is a residual vector — compute sum(residuals^2).
-                            ss_res = float(np.sum(np.abs(fun) ** 2))
-                        y_arr = np.asarray(_y_score)
-                        ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
-                        if ss_tot > 0:
-                            r2 = 1.0 - (ss_res / ss_tot)
-                        else:
-                            r2 = 1.0 if ss_res == 0.0 else None
-                    else:
-                        r2 = self.score(_X_score, _y_score)
-                except Exception as exc:
-                    logger.debug(
-                        "R² computation failed after fit",
-                        model=self.__class__.__name__,
-                        error=str(exc),
-                    )
-
-            logger.info(
-                "Fit completed",
-                model=self.__class__.__name__,
-                fitted=self.fitted_,
-                R2=r2,
-                data_shape=data_shape,
-            )
-            logger.debug(
-                "Exiting fit",
-                model=self.__class__.__name__,
-                parameters=self.get_params(),
-            )
-
-        except RuntimeError as e:
-            logger.error(
-                "Fit failed with RuntimeError",
-                model=self.__class__.__name__,
-                error=str(e),
-                exc_info=True,
-            )
-            if return_result:
-                return self._make_error_result(test_mode, e)
-            enhanced = self._enhance_error_with_compatibility(e, X, y, test_mode)
-            if enhanced is not e:
-                raise enhanced from e
-            raise
-        except Exception as e:
-            logger.error(
-                "Fit failed with unexpected error",
-                model=self.__class__.__name__,
-                error=str(e),
-                exc_info=True,
-            )
-            if return_result:
-                return self._make_error_result(test_mode, e)
-            raise
-
-        # Post-fit physics check
-        if check_physics:
-            try:
-                import warnings as _warnings
-
-                from rheojax.io._exceptions import RheoJaxPhysicsWarning
-                from rheojax.utils.physics_checks import check_fit_physics
-
-                violations = check_fit_physics(self)
-                for v in violations:
-                    _warnings.warn(
-                        f"{v.check}: {v.message} ({v.parameter}={v.value})",
-                        RheoJaxPhysicsWarning,
-                        stacklevel=2,
-                    )
-            except Exception as exc:
-                logger.debug(
-                    "Physics check failed",
-                    model=self.__class__.__name__,
-                    error=str(exc),
-                )
-
-        # Post-fit uncertainty quantification
-        _uncertainty_result = None
-        if uncertainty is not None:
-            try:
-                from rheojax.utils.uncertainty import bootstrap_ci, hessian_ci
-
-                if uncertainty == "hessian":
-                    _uncertainty_result = hessian_ci(self, X, y, test_mode=test_mode)
-                elif uncertainty == "bootstrap":
-                    _uncertainty_result = bootstrap_ci(self, X, y, test_mode=test_mode)
-                else:
-                    logger.warning(
-                        "Unknown uncertainty method",
-                        method=uncertainty,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    "Uncertainty computation failed",
-                    model=self.__class__.__name__,
-                    method=uncertainty,
-                    error=str(exc),
-                )
-
-        # Build FitResult if requested
-        if return_result:
-            try:
-                from rheojax.utils.model_selection import build_fit_result
-
-                fit_result = build_fit_result(self, X, y, test_mode=test_mode)
-                if _uncertainty_result is not None:
-                    fit_result.metadata["uncertainty"] = _uncertainty_result
-                    fit_result.metadata["uncertainty_method"] = uncertainty
-                return fit_result
-            except Exception as exc:
-                logger.warning(
-                    "FitResult construction failed, returning self",
-                    model=self.__class__.__name__,
-                    error=str(exc),
-                )
-
-        return self
 
     def precompile(
         self,
@@ -792,34 +666,20 @@ class BaseModel(BayesianMixin, ABC):
             test_mode=test_mode,
         )
 
-        # Handle deformation mode for Bayesian: convert E* -> G* before NUTS
-        # R11-BASE-001: Extract y and test_mode from RheoData unconditionally,
-        # not only inside the deformation_mode branch.
+        # --- RheoData unpacking ---
         from rheojax.core.data import RheoData
 
         if isinstance(X, RheoData):
             if y is None:
                 y = X.y
-            # R12-B-002: Use X.test_mode property which checks _explicit_test_mode,
-            # the private cache, and metadata in priority order — instead of reading
-            # metadata dict directly which would miss explicitly set modes.
             if test_mode is None:
                 test_mode = X.test_mode
-            # Extract deformation_mode from RheoData metadata while X is still a
-            # RheoData object; this must happen before the X.x extraction below so
-            # the deformation_mode block still has access to the metadata.
             if deformation_mode is None:
                 deformation_mode = X.metadata.get("deformation_mode", None)
-            # R12-B-001: Always extract x data from RheoData at this point so that
-            # subsequent isinstance(X, RheoData) checks are no longer needed.
-            # This ensures X is always a plain array before the deformation_mode
-            # block, avoiding a subtle bug where deformation_mode=None would leave
-            # X as a RheoData object past the conversion step.
             X = jnp.array(X.x)
 
+        # --- Deformation mode: fall back to prior fit() if not given ---
         if deformation_mode is None:
-            # RheoData extraction already happened above; X is always a plain
-            # array at this point.  Fall back to deformation_mode from prior fit().
             deformation_mode = getattr(self, "_deformation_mode", None)
             if deformation_mode is not None:
                 poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
@@ -830,24 +690,14 @@ class BaseModel(BayesianMixin, ABC):
                     str(deformation_mode),
                 )
 
-        if deformation_mode is not None:
-            if isinstance(deformation_mode, str):
-                deformation_mode = DeformationMode(deformation_mode)
-            self._deformation_mode = deformation_mode
+        # --- Convert E* -> G* via shared converter ---
+        resolved_dm = DeformationModeConverter.resolve_deformation_mode(deformation_mode)
+        if resolved_dm is not None:
+            self._deformation_mode = resolved_dm
             self._poisson_ratio = poisson_ratio
-
-            if deformation_mode.is_tensile() and y is not None:
-                from rheojax.utils.modulus_conversion import convert_modulus
-
-                y = convert_modulus(
-                    y, deformation_mode, DeformationMode.SHEAR, poisson_ratio
-                )
-                logger.info(
-                    "Converted tensile modulus to shear for Bayesian inference",
-                    model=self.__class__.__name__,
-                    from_mode=str(deformation_mode),
-                    poisson_ratio=poisson_ratio,
-                )
+            y = DeformationModeConverter.convert_to_shear(
+                y, resolved_dm, poisson_ratio, self.__class__.__name__
+            )
 
         # Store data for model_function access
         self.X_data = X
@@ -975,61 +825,18 @@ class BaseModel(BayesianMixin, ABC):
             kwargs["test_mode"] = test_mode
 
         try:
-            try:
-                result = self._predict(X, **kwargs)
-            except TypeError as e:
-                err_msg = str(e)
-                if "unexpected keyword argument" in err_msg:
-                    # BASE-002: only strip kwargs we explicitly injected, not internal errors
-                    import re
-
-                    _match = re.search(r"'(\w+)'", err_msg)
-                    _injected_keys = {"test_mode", "deformation_mode", "poisson_ratio"}
-                    if _match and _match.group(1) in _injected_keys:
-                        # Safe to strip — this is a kwarg we injected
-                        stripped = dict(kwargs)
-                        stripped.pop(_match.group(1), None)
-                        try:
-                            result = self._predict(X, **stripped)
-                        except TypeError as e2:
-                            if "unexpected keyword argument" in str(e2):
-                                # Final fallback: bare call (13+ models have _predict(self, X) only)
-                                result = self._predict(X)
-                            else:
-                                raise  # Real TypeError from _predict logic — don't swallow
-                    else:
-                        # Progressive stripping for any other unexpected kwarg
-                        stripped = dict(kwargs)
-                        for key in list(stripped):
-                            if key in err_msg:
-                                del stripped[key]
-                        try:
-                            result = self._predict(X, **stripped)
-                        except TypeError as e2:
-                            if "unexpected keyword argument" in str(e2):
-                                # Final fallback: bare call (13+ models have _predict(self, X) only)
-                                result = self._predict(X)
-                            else:
-                                raise  # Real TypeError from _predict logic — don't swallow
-                else:
-                    raise
+            # ADR-004: All _predict() signatures now accept **kwargs,
+            # so we can call directly without try/except/retry.
+            result = self._predict(X, **kwargs)
 
             # Convert G* -> E* if tensile deformation mode
-            dm = deformation_mode
-            if dm is None:
-                dm = self._deformation_mode
-            if dm is not None:
-                if isinstance(dm, str):
-                    dm = DeformationMode(dm)
-                if dm.is_tensile():
-                    from rheojax.utils.modulus_conversion import convert_modulus
-
-                    nu = (
-                        poisson_ratio
-                        if poisson_ratio is not None
-                        else self._poisson_ratio
-                    )
-                    result = convert_modulus(result, DeformationMode.SHEAR, dm, nu)
+            dm = DeformationModeConverter.resolve_deformation_mode(
+                deformation_mode if deformation_mode is not None else self._deformation_mode
+            )
+            nu = poisson_ratio if poisson_ratio is not None else self._poisson_ratio
+            result = DeformationModeConverter.convert_from_shear(
+                result, dm, nu, self.__class__.__name__
+            )
 
             logger.debug(
                 "Predict completed",
