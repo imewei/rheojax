@@ -301,22 +301,17 @@ def stz_ode_rhs(
     # 2. Chi evolution
     d_chi = chi_evolution_langer2008(chi, chi_inf, d_gamma_pl, stress, sigma_y, c0)
 
-    derivatives = [d_sigma, d_chi]
+    # 3. Lambda evolution (O(1) — computed unconditionally, sliced away if unused)
+    tau_beta = args.get("tau_beta", tau0 * 100.0)
+    d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
 
-    # 3. Lambda evolution
-    if n_states >= 3:
-        tau_beta = args.get("tau_beta", tau0 * 100.0)
-        d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
-        derivatives.append(d_lambda)
+    # 4. m evolution (O(1) — computed unconditionally, sliced away if unused)
+    m_inf = args.get("m_inf", 0.1)
+    rate_m = args.get("rate_m", 1.0)
+    d_m = m_evolution(m, stress, d_gamma_pl, sigma_y, m_inf, rate_m)
 
-    # 4. m evolution
-    if n_states >= 4:
-        m_inf = args.get("m_inf", 0.1)
-        rate_m = args.get("rate_m", 1.0)
-        d_m = m_evolution(m, stress, d_gamma_pl, sigma_y, m_inf, rate_m)
-        derivatives.append(d_m)
-
-    return jnp.stack(derivatives)
+    # Fixed-size array, statically sliced to n_states (shape known at trace time)
+    return jnp.array([d_sigma, d_chi, d_lambda, d_m])[:n_states]
 
 
 def stz_creep_ode_rhs(
@@ -390,19 +385,14 @@ def stz_creep_ode_rhs(
     # 2. Chi evolution
     d_chi = chi_evolution_langer2008(chi, chi_inf, d_gamma_pl, stress, sigma_y, c0)
 
-    derivatives = [d_strain, d_chi]
+    # 3. Lambda evolution (O(1) — computed unconditionally, sliced away if unused)
+    tau_beta = args.get("tau_beta", tau0 * 100.0)
+    d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
 
-    # 3. Lambda evolution
-    if n_states >= 3:
-        tau_beta = args.get("tau_beta", tau0 * 100.0)
-        d_lambda = lambda_evolution(Lambda, chi, tau_beta, ez)
-        derivatives.append(d_lambda)
+    # 4. m evolution (O(1) — computed unconditionally, sliced away if unused)
+    m_inf = args.get("m_inf", 0.1)
+    rate_m = args.get("rate_m", 1.0)
+    d_m = m_evolution(m, stress, d_gamma_pl, sigma_y, m_inf, rate_m)
 
-    # 4. m evolution
-    if n_states >= 4:
-        m_inf = args.get("m_inf", 0.1)
-        rate_m = args.get("rate_m", 1.0)
-        d_m = m_evolution(m, stress, d_gamma_pl, sigma_y, m_inf, rate_m)
-        derivatives.append(d_m)
-
-    return jnp.stack(derivatives)
+    # Fixed-size array, statically sliced to n_states (shape known at trace time)
+    return jnp.array([d_strain, d_chi, d_lambda, d_m])[:n_states]
