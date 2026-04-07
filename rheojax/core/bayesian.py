@@ -1150,20 +1150,20 @@ class BayesianMixin:
 
                 # Apply E*→G* conversion when explicit y is provided with a
                 # tensile deformation_mode.
-                _dm = protocol_kwargs.get("deformation_mode") or getattr(
-                    self, "_deformation_mode", None
-                )
+                _dm = protocol_kwargs.get("deformation_mode")
+                if _dm is None:
+                    _dm = getattr(self, "_deformation_mode", None)
                 if _dm is not None and y_array is not None:
-                    from rheojax.core.data import DeformationMode
+                    from rheojax.core.test_modes import DeformationMode
 
                     if isinstance(_dm, str):
                         _dm = DeformationMode(_dm)
                     if _dm.is_tensile():
                         from rheojax.utils.modulus_conversion import convert_modulus
 
-                        _pr = protocol_kwargs.get("poisson_ratio") or getattr(
-                            self, "_poisson_ratio", 0.5
-                        )
+                        _pr = protocol_kwargs.get("poisson_ratio")
+                        if _pr is None:
+                            _pr = getattr(self, "_poisson_ratio", 0.5)
                         y_array = convert_modulus(
                             y_array, _dm, DeformationMode.SHEAR, _pr
                         )
