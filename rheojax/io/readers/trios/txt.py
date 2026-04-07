@@ -1060,7 +1060,8 @@ def _process_data_section(
 
     # Process sample array
     if is_complex:
-        assert y_col2 is not None and y_units2_orig is not None
+        if y_col2 is None or y_units2_orig is None:  # pragma: no cover
+            raise ValueError("y_col2 and y_units2 required for complex data")
         x_chunk, y_chunk = _process_sample_array_complex(
             sample_array, x_col, y_col, y_col2, y_units_orig, y_units2_orig
         )
@@ -1192,7 +1193,8 @@ def _process_remaining_rows(
 
             # Process row based on data type
             if is_complex:
-                assert y_col2 is not None and y_units2_orig is not None
+                if y_col2 is None or y_units2_orig is None:  # pragma: no cover
+                    raise ValueError("y_col2 and y_units2 required for complex data")
                 x_val, y_val = _process_complex_row(
                     row, x_col, y_col, y_col2, y_units_orig, y_units2_orig
                 )

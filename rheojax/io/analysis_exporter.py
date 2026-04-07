@@ -193,7 +193,11 @@ class AnalysisExporter:
         tmp_fd, tmp_path = tempfile.mkstemp(
             dir=str(filepath.parent), suffix=".tmp.xlsx"
         )
-        os.close(tmp_fd)
+        try:
+            os.close(tmp_fd)
+        except OSError:
+            os.unlink(tmp_path)
+            raise
 
         try:
             with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:

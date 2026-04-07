@@ -220,7 +220,8 @@ def load_excel(
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
     if is_complex:
-        assert y_cols is not None  # narrowing for mypy
+        if y_cols is None:  # pragma: no cover — guarded by is_complex
+            raise ValueError("y_cols must not be None for complex data")
         y_headers = [_get_column_header(df, col) for col in y_cols]
         try:
             g_prime_data = _get_column_data(df, y_cols[0])
@@ -235,7 +236,8 @@ def load_excel(
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
-        assert y_col is not None  # narrowing for mypy
+        if y_col is None:  # pragma: no cover — guarded by is_complex
+            raise ValueError("y_col must not be None for real data")
         y_headers = [_get_column_header(df, y_col)]
         try:
             y_data = _get_column_data(df, y_col)

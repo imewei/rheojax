@@ -18,39 +18,44 @@ logger = get_logger(__name__)
 __all__ = ["load_tts", "load_srfs", "load_series"]
 
 
-def _validate_glob_pattern(pattern: str) -> bool:
-    """Reject glob patterns that attempt path traversal via '..'.
+def _validate_path_no_traversal(path: Path, *, label: str = "path") -> Path:
+    """Resolve a path and reject it if it attempts directory traversal.
 
-    Returns True if the pattern is safe, False otherwise.
+    Checks for ``..`` components in both the raw string and the resolved path
+    to guard against encoded or Unicode-based traversal tricks.
+
+    Returns the resolved (absolute) path.
     """
-    if ".." in pattern:
+    raw = str(path)
+    # Check raw string for any form of ".." (catches ....// and similar tricks)
+    parts = Path(raw).parts
+    if any(part == ".." for part in parts):
         logger.warning(
-            "Glob pattern rejected: '..' path traversal is not allowed",
-            pattern=pattern,
+            "Path rejected: '..' traversal component detected",
+            **{label: raw},
         )
-        return False
-    return True
+        raise ValueError(
+            f"{label.capitalize()} '{raw}' rejected: '..' path traversal "
+            f"is not allowed."
+        )
+    return path.resolve()
 
 
 def _expand_glob(files: list[str | Path] | str) -> list[Path]:
     """Expand a glob pattern or normalise a list of paths to sorted Path objects.
 
-    Patterns containing ``..`` are rejected to prevent path traversal.
+    All paths are resolved and checked for directory traversal.
     """
     if isinstance(files, str) and ("*" in files or "?" in files):
-        if not _validate_glob_pattern(files):
-            raise ValueError(
-                f"Glob pattern '{files}' rejected: '..' path traversal "
-                f"is not allowed."
-            )
+        _validate_path_no_traversal(Path(files), label="glob pattern")
         p = Path(files)
         expanded = sorted(p.parent.glob(p.name))
         if not expanded:
             raise FileNotFoundError(f"No files matched glob pattern: '{files}'")
-        return expanded
+        return [_validate_path_no_traversal(ep, label="expanded path") for ep in expanded]
     if isinstance(files, (str, Path)):
-        return [Path(files)]
-    return [Path(f) for f in files]
+        return [_validate_path_no_traversal(Path(files), label="file path")]
+    return [_validate_path_no_traversal(Path(f), label="file path") for f in files]
 
 
 def _flatten_result(result: RheoData | list[RheoData]) -> RheoData:
@@ -264,7 +269,8 @@ def load_series(
         rd = _flatten_result(raw)
         rd.metadata["protocol"] = protocol
         if metadata_key is not None:
-            assert metadata_values is not None  # guarded above
+            if metadata_values is None:  # pragma: no cover — guarded above
+                raise ValueError("metadata_values required when metadata_key is set")
             rd.metadata[metadata_key] = metadata_values[i]
         results.append(rd)
 

@@ -443,11 +443,11 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             # R6-HDF5-001: h5py may return bytes instead of str on some
             # platforms/backends. Decode to str for downstream compatibility.
             x_units = f["x"].attrs.get("units", None)
-            if isinstance(x_units, bytes):
-                x_units = x_units.decode("utf-8")
+            if isinstance(x_units, (bytes, str)):
+                x_units = _safe_decode_hdf5_string(x_units)
             y_units = f["y"].attrs.get("units", None)
-            if isinstance(y_units, bytes):
-                y_units = y_units.decode("utf-8")
+            if isinstance(y_units, (bytes, str)):
+                y_units = _safe_decode_hdf5_string(y_units)
             logger.debug(
                 "Units loaded",
                 x_units=x_units,
@@ -457,8 +457,8 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             # Load domain
             # R6-HDF5-002: Decode bytes for top-level string attrs.
             domain = f.attrs.get("domain", "time")
-            if isinstance(domain, bytes):
-                domain = domain.decode("utf-8")
+            if isinstance(domain, (bytes, str)):
+                domain = _safe_decode_hdf5_string(domain)
             logger.debug("Domain loaded", domain=domain)
 
             # Load metadata
@@ -500,6 +500,18 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             )
 
 
+_MAX_HDF5_STRING_LEN = 4096  # Limit string attributes from untrusted HDF5 files
+
+
+def _safe_decode_hdf5_string(value: bytes | str, max_len: int = _MAX_HDF5_STRING_LEN) -> str:
+    """Decode and truncate a string value read from HDF5 attributes."""
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    if len(value) > max_len:
+        value = value[:max_len]
+    return value
+
+
 def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     """Recursively read metadata from HDF5 group.
 
@@ -515,27 +527,27 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     for key, value in group.attrs.items():
         # h5py may return bytes instead of str on some platforms
         if isinstance(value, bytes):
-            value = value.decode("utf-8")
+            value = _safe_decode_hdf5_string(value)
+        elif isinstance(value, str):
+            value = _safe_decode_hdf5_string(value)
         # R8-IO-003: decode numpy arrays of bytes from h5py string_dtype()
         elif hasattr(value, "dtype") and hasattr(value, "tolist"):
             try:
                 items = value.tolist()
                 if not isinstance(items, list):
                     # 0-d array: tolist() returns a scalar — unwrap to Python native type
-                    if isinstance(items, bytes):
-                        value = items.decode("utf-8")
-                    elif isinstance(items, str):
-                        value = items
+                    if isinstance(items, (bytes, str)):
+                        value = _safe_decode_hdf5_string(items)
                     else:
                         # int, float, bool, None — unwrap from 0-d numpy array
                         value = items
                 elif items and isinstance(items[0], bytes):
                     value = [
-                        v.decode("utf-8") if isinstance(v, bytes) else str(v)
+                        _safe_decode_hdf5_string(v) if isinstance(v, bytes) else str(v)
                         for v in items
                     ]
                 elif items and isinstance(items[0], str):
-                    value = items  # already decoded, convert from numpy to list
+                    value = [_safe_decode_hdf5_string(v) for v in items]
             except (AttributeError, UnicodeDecodeError):
                 pass
         # Restore None values from sentinel (backward-compatible with old "__None__")

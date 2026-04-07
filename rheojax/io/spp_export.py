@@ -521,7 +521,11 @@ def export_spp_hdf5(
         tmp_fd, tmp_path = tempfile.mkstemp(
             dir=str(filepath.parent), suffix=".hdf5.tmp"
         )
-        os.close(tmp_fd)
+        try:
+            os.close(tmp_fd)
+        except OSError:
+            os.unlink(tmp_path)
+            raise
         try:
             with h5py.File(tmp_path, "w") as f:
                 # Metadata group

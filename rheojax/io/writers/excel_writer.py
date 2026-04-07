@@ -80,7 +80,11 @@ def save_excel(
             tmp_fd, tmp_path = tempfile.mkstemp(
                 dir=str(filepath.parent), suffix=".tmp.xlsx"
             )
-            os.close(tmp_fd)
+            try:
+                os.close(tmp_fd)
+            except OSError:
+                os.unlink(tmp_path)
+                raise
             try:
                 with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
                     pd.DataFrame({"Info": ["No results to export"]}).to_excel(
@@ -103,7 +107,11 @@ def save_excel(
         tmp_fd, tmp_path = tempfile.mkstemp(
             dir=str(filepath.parent), suffix=".tmp.xlsx"
         )
-        os.close(tmp_fd)
+        try:
+            os.close(tmp_fd)
+        except OSError:
+            os.unlink(tmp_path)
+            raise
         try:
             with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
                 # Write parameters sheet
