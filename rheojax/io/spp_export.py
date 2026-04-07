@@ -602,7 +602,7 @@ def export_spp_hdf5(
                     logger.debug("Frenet-Serret frame datasets written")
 
             os.replace(tmp_path, str(filepath))
-            tmp_path = None  # prevent cleanup
+            tmp_path = None  # type: ignore[assignment]  # prevent cleanup
         finally:
             if tmp_path is not None:
                 try:

@@ -260,10 +260,10 @@ def auto_load(
                 )
             # Add record count to context
             if isinstance(result, list):
-                io_ctx["records"] = sum(len(r.x) for r in result)
+                io_ctx["records"] = sum(len(r.x) for r in result)  # type: ignore[arg-type, misc]
                 io_ctx["segments"] = len(result)
             else:
-                io_ctx["records"] = len(result.x)
+                io_ctx["records"] = len(result.x)  # type: ignore[arg-type]
             return result
 
         logger.debug("Detecting format from extension", extension=extension)
@@ -320,10 +320,10 @@ def auto_load(
 
         # Add record count to context
         if isinstance(result, list):
-            io_ctx["records"] = sum(len(r.x) for r in result)
+            io_ctx["records"] = sum(len(r.x) for r in result)  # type: ignore[arg-type, misc]
             io_ctx["segments"] = len(result)
         else:
-            io_ctx["records"] = len(result.x)
+            io_ctx["records"] = len(result.x)  # type: ignore[arg-type]
 
         return result
 

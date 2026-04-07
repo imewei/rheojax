@@ -476,7 +476,7 @@ def select_xy_columns(
     df: pd.DataFrame,
     test_mode: str,
     column_mappings: dict[str, ColumnMapping] | None = None,
-) -> tuple[str, str, str | None]:
+) -> tuple[str | None, str | None, str | None]:
     """Select x, y, and optional y2 columns for given test mode.
 
     For oscillation data with both G' and G'', returns both y columns

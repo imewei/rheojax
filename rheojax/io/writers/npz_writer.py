@@ -67,13 +67,13 @@ def save_npz(
     }
 
     save_fn = np.savez_compressed if compressed else np.savez
-    save_fn(filepath, **arrays)
+    save_fn(filepath, **arrays)  # type: ignore[arg-type]
 
     logger.info(
         "Saved RheoData to npz",
         filepath=str(filepath),
         compressed=compressed,
-        n_points=len(data.x),
+        n_points=len(data.x),  # type: ignore[arg-type]
     )
 
 
@@ -133,7 +133,7 @@ def save_fit_result_npz(
         arrays["_stats"] = _encode_str(json.dumps(stats))
 
     save_fn = np.savez_compressed if compressed else np.savez
-    save_fn(filepath, **arrays)
+    save_fn(filepath, **arrays)  # type: ignore[arg-type]
 
     logger.info(
         "Saved FitResult to npz",
@@ -204,7 +204,7 @@ def load_npz(filepath: str | Path) -> RheoData:
         y=y,
         x_units=x_units,
         y_units=y_units,
-        domain=domain,
+        domain=domain or "time",
         initial_test_mode=initial_test_mode,
         metadata=metadata,
         validate=True,

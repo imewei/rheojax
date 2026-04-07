@@ -236,7 +236,7 @@ class AnalysisExporter:
                     self._write_excel_plots(writer, state)
 
             os.replace(tmp_path, str(filepath))
-            tmp_path = None
+            tmp_path = None  # type: ignore[assignment]
         finally:
             if tmp_path is not None:
                 try:
@@ -542,7 +542,7 @@ class AnalysisExporter:
                 result_data = result
                 result_meta = None
             elif isinstance(result, tuple) and len(result) >= 2:
-                result_data = result[0] if isinstance(result[0], RheoData) else None
+                result_data = result[0] if isinstance(result[0], RheoData) else None  # type: ignore[assignment]
                 result_meta = result[1] if len(result) > 1 else None
             else:
                 result_data = None
@@ -554,7 +554,7 @@ class AnalysisExporter:
 
                 save_npz(result_data, transform_dir / f"{safe_name}_output.npz")
                 entry["output_file"] = f"{safe_name}_output.npz"
-                entry["output_n_points"] = len(result_data.x)
+                entry["output_n_points"] = len(result_data.x)  # type: ignore[arg-type]
 
             # Save pre-transform data
             if pre_data is not None:
@@ -812,12 +812,12 @@ class AnalysisExporter:
                 row["Input Domain"] = getattr(pre_data, "domain", "")
 
             if isinstance(result, RheoData):
-                row["Output N"] = len(result.x)
+                row["Output N"] = len(result.x)  # type: ignore[arg-type]
                 row["Output Domain"] = getattr(result, "domain", "")
             elif isinstance(result, tuple) and len(result) >= 1:
                 r0 = result[0]
                 if isinstance(r0, RheoData):
-                    row["Output N"] = len(r0.x)
+                    row["Output N"] = len(r0.x)  # type: ignore[arg-type]
                     row["Output Domain"] = getattr(r0, "domain", "")
 
             rows.append(row)

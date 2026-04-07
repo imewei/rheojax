@@ -334,6 +334,7 @@ def load_csv(
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
     if is_complex:
+        assert y_cols is not None  # narrowing for mypy
         y_headers = [_get_column_header(df, col) for col in y_cols]
         try:
             g_prime_data = _get_column_data(df, y_cols[0])
@@ -344,6 +345,7 @@ def load_csv(
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
+        assert y_col is not None  # narrowing for mypy
         y_headers = [_get_column_header(df, y_col)]
         try:
             y_data = _get_column_data(df, y_col)
@@ -551,7 +553,7 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
                     # Process element-wise: try float as-is first, then EU convert.
                     result = np.empty(str_arr.shape, dtype=float)
                     for idx in np.ndindex(str_arr.shape):
-                        val = str_arr[idx].strip()
+                        val = str(str_arr[idx]).strip()
                         if _SCI_RE.search(val):
                             try:
                                 result[idx] = float(val.replace(",", "."))
@@ -610,7 +612,7 @@ def _detect_delimiter(filepath: Path) -> str:
     # Fallback heuristic - check for common delimiters
     delimiters = [",", "\t", ";", "|"]
     counts = {d: sample.count(d) for d in delimiters}
-    best = max(counts, key=counts.get)
+    best = max(counts, key=lambda d: counts[d])
 
     # If no common delimiter found, check for space-delimited
     if counts[best] == 0:

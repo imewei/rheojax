@@ -401,7 +401,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
                     "Segment parsed",
                     start_line=seg_start,
                     end_line=seg_end,
-                    num_points=len(data.x),
+                    num_points=len(data.x),  # type: ignore[arg-type]
                 )
         except Exception as e:
             logger.error(
@@ -1060,6 +1060,7 @@ def _process_data_section(
 
     # Process sample array
     if is_complex:
+        assert y_col2 is not None and y_units2_orig is not None
         x_chunk, y_chunk = _process_sample_array_complex(
             sample_array, x_col, y_col, y_col2, y_units_orig, y_units2_orig
         )
@@ -1191,6 +1192,7 @@ def _process_remaining_rows(
 
             # Process row based on data type
             if is_complex:
+                assert y_col2 is not None and y_units2_orig is not None
                 x_val, y_val = _process_complex_row(
                     row, x_col, y_col, y_col2, y_units_orig, y_units2_orig
                 )
@@ -1455,8 +1457,8 @@ def _parse_segment(
         y_data_imag = data_array[:, y_col2]  # Loss modulus (G'')
 
         # Apply unit conversions to both components
-        y_data_real = convert_units(y_data_real, y_units, "Pa")
-        y_data_imag = convert_units(y_data_imag, y_units2, "Pa")
+        y_data_real = np.asarray(convert_units(y_data_real, y_units, "Pa"))
+        y_data_imag = np.asarray(convert_units(y_data_imag, y_units2, "Pa"))
 
         x_data_array = np.real_if_close(np.asarray(x_data))
         y_real_array = np.real_if_close(np.asarray(y_data_real))
@@ -1479,7 +1481,7 @@ def _parse_segment(
 
         # Remove NaN values
         valid_mask = ~(np.isnan(x_data_array) | np.isnan(y_data_array))
-        y_data = y_data_array
+        y_data = y_data_array  # type: ignore[assignment]
 
     x_data = x_data_array[valid_mask]
     y_data = y_data[valid_mask]
@@ -1655,7 +1657,7 @@ def _determine_xy_columns(
 
     # If we have both G' and G'' (or E' and E''), use them to construct complex modulus
     if storage_col is not None and loss_col is not None:
-        x_units = units[x_col] if x_col < len(units) else ""
+        x_units = units[x_col] if x_col is not None and x_col < len(units) else ""
         y_units = units[storage_col] if storage_col < len(units) else ""
         y_units2 = units[loss_col] if loss_col < len(units) else ""
         return x_col, x_units, storage_col, y_units, loss_col, y_units2

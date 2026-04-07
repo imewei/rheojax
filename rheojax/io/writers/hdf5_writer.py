@@ -182,7 +182,7 @@ def save_hdf5(
                 except OSError:
                     pass
 
-        ctx["data_points"] = len(data.x)
+        ctx["data_points"] = len(data.x)  # type: ignore[arg-type]
         ctx["compression"] = compression
         ctx["has_metadata"] = bool(data.metadata)
 
