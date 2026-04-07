@@ -238,9 +238,6 @@ class TestFractionalZenerSolidLiquid:
         # Results should match
         assert jnp.allclose(G_jit, G_normal)
 
-    @pytest.mark.xfail(
-        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
-    )
     def test_jax_vmap(self, model, standard_params):
         """Test vectorization with vmap."""
         t = jnp.logspace(-2, 2, 10)

@@ -153,6 +153,13 @@ def build_fit_result(
                 error=str(exc),
             )
 
+    # Backfill y_data on the real OptimizationResult when missing, so that
+    # R² and other statistical properties can be computed.
+    if opt_result is not None and opt_result.y_data is None and y is not None:
+        opt_result.y_data = np.asarray(y)
+        if opt_result.n_data is None:
+            opt_result.n_data = len(opt_result.y_data)
+
     # Many models (e.g. classical family) don't store _nlsq_result.
     # Build a minimal OptimizationResult from cached prediction residuals
     # so that AIC/BIC/R² are always available in the FitResult.

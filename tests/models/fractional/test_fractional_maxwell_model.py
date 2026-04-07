@@ -307,9 +307,6 @@ class TestFractionalMaxwellModelJAX:
         gradient = grad_fn(1e5)
         assert np.isfinite(gradient)
 
-    @pytest.mark.xfail(
-        reason="vmap over alpha not supported - alpha must be concrete for Mittag-Leffler"
-    )
     def test_vmap_over_alpha_beta(self):
         """Test vectorization over two parameters simultaneously."""
         model = FractionalMaxwellModel()
@@ -325,9 +322,6 @@ class TestFractionalMaxwellModelJAX:
         assert results.shape == (3,)
         assert np.all(np.isfinite(results))
 
-    @pytest.mark.xfail(
-        reason="Mittag-Leffler function derivatives w.r.t. tau produce NaN - numerical issue to be investigated"
-    )
     def test_hessian_computation(self):
         """Test second derivatives for two parameters."""
         model = FractionalMaxwellModel()

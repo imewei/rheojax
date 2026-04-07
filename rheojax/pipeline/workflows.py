@@ -505,11 +505,14 @@ class ModelComparisonPipeline(Pipeline):
                 if nlsq_result is not None and nlsq_result.rmse is not None:
                     # Use NLSQ 0.6.0 CurveFitResult-compatible properties
                     rmse = nlsq_result.rmse
-                    r_squared = (
-                        nlsq_result.r_squared
-                        if nlsq_result.r_squared is not None
-                        else 0.0
-                    )
+                    # Fall back to manual R² when y_data is missing from the result
+                    if nlsq_result.r_squared is not None:
+                        r_squared = nlsq_result.r_squared
+                    else:
+                        ss_res = float(np.sum(residuals**2))
+                        y_for_ss = np.abs(y) if np.iscomplexobj(y) else y
+                        ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+                        r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
                     aic = nlsq_result.aic if nlsq_result.aic is not None else np.inf
                     bic = nlsq_result.bic if nlsq_result.bic is not None else np.inf
                 else:
