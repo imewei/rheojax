@@ -20,17 +20,16 @@ Example:
 from __future__ import annotations
 
 import copy
-import functools
 import warnings
-from collections import OrderedDict
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from rheojax.core.bayesian_diagnostics import compute_diagnostics
+from rheojax.core.bayesian_result import BayesianResult, DiagnosticsDict
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.core.numpyro_model_builder import build_numpyro_model, prior_dict_to_dist
 from rheojax.core.test_modes import TestMode, detect_test_mode
 from rheojax.logging import get_logger, log_bayesian
 
@@ -61,305 +60,6 @@ if TYPE_CHECKING:
     from numpyro.infer import MCMC
 
     from rheojax.core.parameters import ParameterSet
-
-
-class DiagnosticsDict(TypedDict, total=False):
-    """Typed structure for Bayesian convergence diagnostics."""
-
-    r_hat: dict[str, float]
-    ess: dict[str, float]
-    divergences: int
-    diagnostics_valid: bool
-    total_samples: int
-    num_chains: int
-    num_samples_per_chain: int
-    error: str
-
-
-@dataclass
-class BayesianResult:
-    """Results from Bayesian inference with NUTS sampling.
-
-    This dataclass stores the complete results of NumPyro NUTS sampling,
-    including posterior samples, summary statistics, convergence diagnostics,
-    and placeholders for future model comparison metrics.
-
-    Attributes:
-        posterior_samples: Dictionary mapping parameter names to arrays of
-            posterior samples (shape: [num_samples * num_chains, ]). All arrays are float64.
-        summary: Dictionary with summary statistics for each parameter.
-            Contains nested dicts with 'mean', 'std', and quantiles.
-        diagnostics: Dictionary with convergence diagnostics including:
-            - r_hat: Gelman-Rubin statistic for each parameter (dict)
-            - ess: Effective sample size for each parameter (dict)
-            - divergences: Number of divergent transitions (int)
-        num_samples: Number of posterior samples per chain (after warmup).
-        num_chains: Number of MCMC chains used in sampling.
-        mcmc: NumPyro MCMC object containing full sampling information including
-            NUTS-specific diagnostics (energy, divergences, tree depth).
-            Required for ArviZ visualization with full diagnostics.
-        model_comparison: Dictionary for model comparison metrics (WAIC, LOO).
-            Currently a placeholder for future implementation.
-        _inference_data: Cached ArviZ InferenceData object. Automatically
-            created on first access via to_inference_data(). Do not set manually.
-
-    Example:
-        >>> result = model.fit_bayesian(X, y)
-        >>> print(result.summary["a"]["mean"])
-        >>> print(result.diagnostics["r_hat"]["a"])
-        >>> # Convert to ArviZ InferenceData for advanced plotting
-        >>> idata = result.to_inference_data()
-    """
-
-    posterior_samples: dict[str, np.ndarray]
-    summary: dict[str, dict[str, float]]
-    diagnostics: DiagnosticsDict
-    num_samples: int
-    num_chains: int
-    mcmc: MCMC | None = None
-    model_comparison: dict[str, float] = field(default_factory=dict)
-    _inference_data: Any | None = field(default=None, repr=False)
-    _inference_data_ll: Any | None = field(default=None, repr=False)
-
-    def __post_init__(self):
-        """Validate result after initialization."""
-        logger.debug(
-            "Initializing BayesianResult",
-            num_parameters=len(self.posterior_samples),
-            num_samples=self.num_samples,
-            num_chains=self.num_chains,
-        )
-        # Ensure posterior_samples are float64 numpy arrays
-        # BAY-05: skip copy when already float64 NumPy to avoid eager allocation
-        for name, samples in self.posterior_samples.items():
-            arr = np.asarray(samples)
-            if arr.dtype != np.float64:
-                arr = arr.astype(np.float64)
-            self.posterior_samples[name] = arr
-        logger.debug(
-            "BayesianResult initialized",
-            parameter_names=list(self.posterior_samples.keys()),
-        )
-
-    def to_inference_data(self, log_likelihood: bool = False) -> Any:
-        """Convert to ArviZ InferenceData format for advanced visualization.
-
-        Converts the NumPyro MCMC result to ArviZ InferenceData format, which
-        enables access to ArviZ's comprehensive plotting and diagnostic tools.
-        The conversion preserves all NUTS-specific diagnostics including energy,
-        divergences, and tree depth information.
-
-        The InferenceData object is cached after first conversion to avoid
-        repeated conversion overhead. The ``log_likelihood=False`` and
-        ``log_likelihood=True`` variants are cached independently.
-
-        Args:
-            log_likelihood: If True, compute pointwise log-likelihood for
-                WAIC/LOO model comparison (az.waic(), az.loo()). This
-                re-evaluates the model for all samples (~600-800ms slower).
-                Default False for faster conversion when only plotting.
-
-        Returns:
-            ArviZ InferenceData object containing:
-                - posterior: Posterior samples for all parameters
-                - sample_stats: NUTS diagnostics (energy, divergences, etc.)
-                - log_likelihood: Only when ``log_likelihood=True``
-                - Additional groups as available from NumPyro
-
-        Raises:
-            ImportError: If arviz is not installed
-            ValueError: If MCMC object was not stored (older results)
-
-        Example:
-            >>> result = model.fit_bayesian(X, y)
-            >>> idata = result.to_inference_data()  # Fast: no log-lik
-            >>> az.plot_trace(idata)
-            >>>
-            >>> # For model comparison (slower):
-            >>> idata_ll = result.to_inference_data(log_likelihood=True)
-            >>> az.waic(idata_ll)
-
-        Note:
-            Requires arviz package: pip install arviz
-            The MCMC object must be present (automatically stored by fit_bayesian).
-        """
-
-        logger.debug(
-            "Converting BayesianResult to InferenceData",
-            log_likelihood=log_likelihood,
-        )
-
-        # Return cached version if available
-        if log_likelihood and self._inference_data_ll is not None:
-            logger.debug("Returning cached InferenceData (with log_likelihood)")
-            return self._inference_data_ll
-        if not log_likelihood and self._inference_data is not None:
-            logger.debug("Returning cached InferenceData (without log_likelihood)")
-            return self._inference_data
-
-        # Ensure MCMC object is available
-        if self.mcmc is None:
-            logger.error("MCMC object not available for InferenceData conversion")
-            raise ValueError(
-                "MCMC object not available for conversion. "
-                "This may be a result from an older version. "
-                "Re-run fit_bayesian() to generate a compatible result."
-            )
-
-        # Import arviz (lazy import)
-        from rheojax.core.arviz_utils import import_arviz
-
-        try:
-            az = import_arviz(required=("InferenceData",))
-            logger.debug("ArviZ imported successfully")
-        except ImportError as exc:
-            logger.error("ArviZ import failed", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for InferenceData conversion. "
-                "Install it with: pip install arviz"
-            ) from exc
-
-        if log_likelihood:
-            # log_likelihood=True requires model re-evaluation (slow path).
-            # Delegate to az.from_numpyro which traces the model to extract
-            # pointwise log-likelihoods for WAIC/LOO computation.
-            logger.debug(
-                "Creating InferenceData from MCMC object (with log_likelihood)",
-            )
-            try:
-                az_full = import_arviz(required=("from_numpyro",))
-                idata = az_full.from_numpyro(self.mcmc, log_likelihood=True)
-            except ImportError as exc:
-                raise ImportError(
-                    "ArviZ is required for log-likelihood computation. "
-                    "Install it with: pip install arviz"
-                ) from exc
-            logger.info(
-                "InferenceData created successfully (with log_likelihood)",
-                num_chains=self.num_chains,
-                num_samples=self.num_samples,
-            )
-            self._inference_data_ll = idata
-            return idata
-
-        # Fast path (log_likelihood=False): build InferenceData directly from
-        # numpy arrays already present in BayesianResult, bypassing the
-        # az.from_numpyro model-trace that triggers XLA recompilation
-        # (~500-1500ms on first call). This reduces conversion to <5ms.
-        #
-        # ArviZ's from_numpyro calls numpyro.handlers.trace().get_trace() in
-        # NumPyroConverter.__init__ to discover observed sites for the
-        # observed_data / log_likelihood groups. When log_likelihood=False we
-        # don't need those groups, so we can skip the trace entirely and
-        # assemble the two groups we do need (posterior, sample_stats) from
-        # data that is already on the host.
-        logger.debug("Building InferenceData directly (fast path, no model trace)")
-
-        import xarray as xr
-
-        # --- posterior group ---
-        # Use get_samples(group_by_chain=True) to include ALL sampled sites
-        # (model parameters + deterministic sites like num_nonfinite) so the
-        # result matches what az.from_numpyro would return.
-        # self.posterior_samples only contains param_names + sigma params;
-        # deterministic sites (numpyro.deterministic) are excluded from it.
-        num_chains = self.num_chains
-        posterior_dict: dict[str, xr.DataArray] = {}
-        try:
-            # Prefer group_by_chain samples — already (num_chains, num_draws)
-            _raw_samples = self.mcmc.get_samples(group_by_chain=True)
-            if hasattr(_raw_samples, "_asdict"):
-                _raw_samples = _raw_samples._asdict()
-            for name, arr in _raw_samples.items():
-                np_arr = np.asarray(arr)
-                if np_arr.ndim >= 2:
-                    # Shape is already (num_chains, num_draws[, ...])
-                    posterior_dict[name] = xr.DataArray(
-                        np_arr, dims=("chain", "draw") + tuple(
-                            f"dim_{i}" for i in range(np_arr.ndim - 2)
-                        )
-                    )
-                else:
-                    # Fallback: reshape flat array
-                    try:
-                        shaped = np_arr.reshape(num_chains, -1)
-                    except ValueError:
-                        shaped = np_arr[np.newaxis, :]
-                    posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
-        except Exception as exc:
-            # Fall back to posterior_samples (already numpy, already on host)
-            logger.debug(
-                "get_samples(group_by_chain=True) failed, using posterior_samples",
-                error=str(exc),
-            )
-            for name, flat_arr in self.posterior_samples.items():
-                try:
-                    shaped = flat_arr.reshape(num_chains, -1)
-                except ValueError:
-                    shaped = flat_arr[np.newaxis, :]
-                posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
-
-        posterior_ds = xr.Dataset(posterior_dict)
-
-        # --- sample_stats group ---
-        # Mirrors ArviZ's NumPyroConverter.sample_stats_to_xarray() rename map.
-        _stat_rename = {
-            "potential_energy": "lp",
-            "adapt_state.step_size": "step_size",
-            "num_steps": "n_steps",
-            "accept_prob": "acceptance_rate",
-        }
-        stats_dict: dict[str, xr.DataArray] = {}
-        try:
-            try:
-                extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
-            except TypeError:
-                extra_fields = self.mcmc.get_extra_fields()
-
-            if isinstance(extra_fields, dict):
-                for stat, value in extra_fields.items():
-                    if isinstance(value, (dict, tuple)):
-                        continue
-                    arr = np.asarray(value)
-                    # Ensure (chain, draw) shape
-                    if arr.ndim == 1:
-                        try:
-                            arr = arr.reshape(num_chains, -1)
-                        except ValueError:
-                            arr = arr[np.newaxis, :]
-                    elif arr.ndim != 2:
-                        continue  # Skip unexpected shapes
-
-                    # Match ArviZ's NumPyroConverter exactly: potential_energy
-                    # becomes negated "lp". ArviZ does NOT synthesise "energy"
-                    # (which requires kinetic energy from the leapfrog integrator)
-                    # or "tree_depth" from these fields.
-                    if stat == "potential_energy":
-                        stats_dict["lp"] = xr.DataArray(-arr, dims=("chain", "draw"))
-                    else:
-                        dest_name = _stat_rename.get(stat, stat)
-                        stats_dict[dest_name] = xr.DataArray(arr, dims=("chain", "draw"))
-        except Exception as exc:
-            logger.debug(
-                "Failed to extract sample_stats from MCMC extra fields",
-                error=str(exc),
-            )
-
-        sample_stats_ds = xr.Dataset(stats_dict)
-
-        idata = az.InferenceData(
-            posterior=posterior_ds,
-            sample_stats=sample_stats_ds,
-        )
-
-        logger.info(
-            "InferenceData created successfully (fast path)",
-            num_chains=self.num_chains,
-            num_samples=self.num_samples,
-        )
-
-        self._inference_data = idata
-        return idata
 
 
 class BayesianMixin:
@@ -742,12 +442,21 @@ class BayesianMixin:
             return float(value)
 
         warm_start: dict[str, float] = {}
+        _is_fitted = getattr(self, "fitted_", False)
         for name in param_names:
             candidate = None
             if initial_values is not None and name in initial_values:
                 candidate = initial_values[name]
             else:
                 candidate = self.parameters.get_value(name)
+                # Warn if model claims to be fitted but parameter value is None,
+                # indicating NLSQ didn't write back to ParameterSet for this param.
+                if _is_fitted and candidate is None:
+                    logger.warning(
+                        "Fitted model has None parameter value — warm-start will "
+                        "use bounds midpoint instead of NLSQ estimate",
+                        parameter=name,
+                    )
             warm_start[name] = sanitize_value(name, candidate)
 
         # Add noise scale initial values.
@@ -799,11 +508,18 @@ class BayesianMixin:
         )
         user_chain_method = nuts_kwargs.pop("chain_method", None)
 
+        # Track which init strategy is actually used for diagnostics
+        self._nuts_init_strategy = "warm_start"
+
         try:
             init_strategy = init_to_value(values=warm_start_values)
             logger.debug("Using warm-start initialization", values=warm_start_values)
         except Exception as exc:
-            logger.debug("Warm-start initialization failed", exc_info=True)
+            logger.warning(
+                "Warm-start init_to_value construction failed — falling back "
+                "to uniform init",
+                error=str(exc),
+            )
             warnings.warn(
                 "Warm-start initialization failed; falling back to uniform init. "
                 "Reason: " + str(exc),
@@ -811,42 +527,29 @@ class BayesianMixin:
                 stacklevel=3,
             )
             init_strategy = init_to_uniform()
-            logger.debug("Falling back to uniform initialization")
+            self._nuts_init_strategy = "uniform_fallback"
 
         def _select_chain_method() -> str:
-            """Prefer parallel/vectorized chains when multiple chains requested.
-
-            Auto-selects optimal chain execution method:
-            - 'sequential': Single chain or user override
-            - 'parallel': Multi-chain on multi-GPU (fastest)
-            - 'vectorized': Multi-chain on single device (uses vmap)
-
-            Logs info about chain method selection for transparency.
-            """
+            """Prefer parallel/vectorized chains when multiple chains requested."""
             if user_chain_method:
                 return user_chain_method
             if num_chains <= 1:
                 return "sequential"
 
             devices = jax.devices()
-            # Count accelerators only (non-CPU) for true parallel execution.
             accelerator_count = sum(1 for d in devices if d.platform != "cpu")
             if accelerator_count >= num_chains:
                 logger.debug(
                     "Using parallel chain method", accelerator_count=accelerator_count
                 )
                 return "parallel"
-            # Fall back to vectorized on single-device setups for speed over sequential.
-            # Vectorized uses vmap for efficient multi-chain execution on a single device.
             logger.debug("Using vectorized chain method")
             return "vectorized"
 
         # Use provided seed or default to 0 for reproducibility
         rng_seed = seed if seed is not None else 0
 
-        # Warm-start-aware NUTS defaults: when the sampler starts near the
-        # posterior mode (from NLSQ), we can use a less conservative acceptance
-        # rate and shallower tree depth for faster warmup.
+        # Warm-start-aware NUTS defaults
         has_warm_start = (
             bool(warm_start_values) and hasattr(self, "fitted_") and self.fitted_
         )
@@ -870,10 +573,8 @@ class BayesianMixin:
             mcmc_kwargs["jit_model_args"] = nuts_kwargs.pop("jit_model_args")
 
         # Check if model requires forward-mode differentiation (for dynamic loops)
-        # This is needed for models that use lax.fori_loop with dynamic bounds
         use_forward_mode = nuts_kwargs.pop("forward_mode_differentiation", None)
         if use_forward_mode is None:
-            # Check if model has a flag for this
             use_forward_mode = getattr(self, "_use_forward_mode_ad", False)
         if use_forward_mode:
             nuts_kwargs["forward_mode_differentiation"] = True
@@ -907,20 +608,24 @@ class BayesianMixin:
             logger.debug("Running MCMC sampling")
             result = run_mcmc(init_strategy)
             logger.debug("MCMC sampling completed successfully")
+            self._nuts_init_strategy = "warm_start"
             return result
         except RuntimeError as e:
             if "Cannot find valid initial parameters" in str(e):
-                logger.debug(
-                    "Warm-started NUTS initialization failed, retrying with uniform init"
+                logger.warning(
+                    "Warm-started NUTS initialization failed — falling back to "
+                    "uniform init. Posterior samples may converge more slowly.",
                 )
                 warnings.warn(
-                    "Warm-started NUTS initialization failed; retrying with uniform init.",
+                    "Warm-started NUTS initialization failed; retrying with uniform init. "
+                    "NLSQ warm-start was discarded — check diagnostics carefully.",
                     RuntimeWarning,
                     stacklevel=3,
                 )
                 try:
                     result = run_mcmc(init_to_uniform())
                     logger.debug("MCMC sampling completed with uniform init")
+                    self._nuts_init_strategy = "uniform_fallback"
                     return result
                 except Exception as final_exc:
                     logger.error(
@@ -1010,12 +715,19 @@ class BayesianMixin:
                 "q95": float(qs[4]),
             }
 
-        diagnostics = self._compute_diagnostics(
+        diagnostics = compute_diagnostics(
             mcmc,
             grouped_samples if len(grouped_samples) > 0 else posterior_samples,
             num_samples=num_samples,
             num_chains=num_chains,
         )
+
+        # Include which init strategy was actually used so users can detect
+        # silent fallback from warm-start to uniform initialization.
+        init_strategy = getattr(self, "_nuts_init_strategy", "unknown")
+        diagnostics["init_strategy"] = init_strategy
+        if init_strategy == "uniform_fallback":
+            diagnostics["warm_start_failed"] = True
 
         return BayesianResult(
             posterior_samples=posterior_samples,
@@ -1190,11 +902,6 @@ class BayesianMixin:
         sampling (1 warmup, 1 sample). This caches the compiled kernel so that
         subsequent fit_bayesian() calls are 2-5x faster.
 
-        Similar to ITT-MCT's precompile() pattern, this is useful for:
-        - Interactive sessions where compilation latency matters
-        - Batch processing where the same model is fitted multiple times
-        - Benchmarking where compilation overhead should be excluded
-
         Parameters
         ----------
         X : ndarray or RheoData, optional
@@ -1241,8 +948,6 @@ class BayesianMixin:
             test_mode = TestMode(test_mode.lower())
 
         # R10-BAY-005: Save/restore _test_mode to prevent permanent mutation.
-        # _build_numpyro_model and _run_nuts_sampling may set self._test_mode
-        # as a side effect; precompile_bayesian() must leave model state intact.
         _had_test_mode = hasattr(self, "_test_mode")
         _saved_test_mode = getattr(self, "_test_mode", None)
 
@@ -1359,8 +1064,6 @@ class BayesianMixin:
             num_samples: Number of posterior samples per chain (default: 2000)
             num_chains: Number of MCMC chains (default: 4). Multiple chains
                 enable proper R-hat computation and parallel execution.
-                Chain method is auto-selected: 'parallel' on multi-GPU,
-                'vectorized' on single GPU/CPU.
             initial_values: Optional dict of initial parameter values for
                 warm-start (e.g., from NLSQ). Keys are parameter names.
             test_mode: Explicit test mode (e.g., 'relaxation', 'creep', 'oscillation').
@@ -1418,19 +1121,10 @@ class BayesianMixin:
                 protocol_kwargs[key] = nuts_kwargs.pop(key)
 
         # Save _test_mode BEFORE any mutation so it can be restored on error.
-        # fit_bayesian() should not permanently change the model's test_mode —
-        # subsequent calls to fit() or predict() must see the original mode.
-        # R12-B-011: _test_mode is intentionally a dynamic attribute (not defined in
-        # __init__) so that models that have never been fitted have no _test_mode,
-        # distinguishing "unfitted" from "fitted with RELAXATION mode".  hasattr()
-        # checks are therefore required rather than checking `is None`.
         _had_test_mode = hasattr(self, "_test_mode")  # BAY-004: track if attr existed
         _saved_test_mode = getattr(self, "_test_mode", None)
         # R12-B-005: deepcopy is intentional safety — _last_fit_kwargs may contain
         # mutable objects (arrays, sub-dicts) that get mutated during sampling.
-        # The copy is only used on the failure path (in the finally block) to
-        # revert the dict to its pre-Bayesian state; the overhead is acceptable
-        # because it happens once per fit_bayesian() call, not per NUTS step.
         _raw_lfk = getattr(self, "_last_fit_kwargs", None)
         _saved_last_fit_kwargs = (
             copy.deepcopy(_raw_lfk) if _raw_lfk is not None else None
@@ -1447,33 +1141,42 @@ class BayesianMixin:
         ) as log_ctx:
             try:
                 # Phase 1: Validation
-                # R12-B-016: double validation (requirements then bounds) is
-                # intentional — _validate_bayesian_requirements() checks structural
-                # prerequisites (NumPyro availability, parameter set existence) while
-                # _validate_parameter_bounds() checks numeric bound consistency.
-                # Separating them gives clearer error messages and allows subclasses
-                # to override only the relevant check.
                 self._validate_bayesian_requirements()
                 self._validate_parameter_bounds()
 
                 # Phase 2: Resolve test_mode and extract data
                 X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
                 y_array = y_from_rheo if y_from_rheo is not None else y
-                # R12-B-004: Design decision — on success, _test_mode is permanently
-                # updated to the Bayesian test_mode so that subsequent predict() calls
-                # use the correct mode without requiring re-specification.  The old
-                # NLSQ _test_mode is restored in the finally block only on failure.
-                # If the caller needs to revert to the NLSQ mode, call fit() again.
-                # R12-B-019: _test_mode is stored as a TestMode enum (resolved by
-                # _resolve_test_mode).  All model code should compare with
-                # TestMode members using `==` rather than string equality.
+
+                # Apply E*→G* conversion when explicit y is provided with a
+                # tensile deformation_mode.
+                _dm = protocol_kwargs.get("deformation_mode") or getattr(
+                    self, "_deformation_mode", None
+                )
+                if _dm is not None and y_array is not None:
+                    from rheojax.core.data import DeformationMode
+
+                    if isinstance(_dm, str):
+                        _dm = DeformationMode(_dm)
+                    if _dm.is_tensile():
+                        from rheojax.utils.modulus_conversion import convert_modulus
+
+                        _pr = protocol_kwargs.get("poisson_ratio") or getattr(
+                            self, "_poisson_ratio", 0.5
+                        )
+                        y_array = convert_modulus(
+                            y_array, _dm, DeformationMode.SHEAR, _pr
+                        )
+                        logger.debug(
+                            "fit_bayesian: converted tensile modulus to shear",
+                            from_mode=str(_dm),
+                            poisson_ratio=_pr,
+                        )
+
+                # R12-B-004: On success, _test_mode is permanently updated.
                 self._test_mode = test_mode
 
                 # Merge protocol kwargs into _last_fit_kwargs.
-                # Preserve values set by NLSQ _fit() (e.g., internal metadata like
-                # _stress_scale, _tau_est); only override keys explicitly passed
-                # to fit_bayesian(). Never clear protocol kwargs from _fit() —
-                # they are the ground truth for the model_function.
                 if protocol_kwargs:
                     if (
                         not hasattr(self, "_last_fit_kwargs")
@@ -1548,7 +1251,6 @@ class BayesianMixin:
                 )
 
                 # Add diagnostics to log context
-                # NOTE: divergences may be -1 (unknown) when diagnostics fail; 0 = clean
                 log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
                 r_hat_vals = result.diagnostics.get("r_hat", {}).values()
                 ess_vals = result.diagnostics.get("ess", {}).values()
@@ -1572,11 +1274,6 @@ class BayesianMixin:
             finally:
                 # Only revert state on failure — on success, _test_mode and
                 # _last_fit_kwargs must persist for subsequent predict() calls.
-                # R12-B-020: The asymmetry between the success path (state kept) and
-                # the failure path (state reverted) is intentional.  On success the
-                # Bayesian test_mode and protocol kwargs become the new ground truth
-                # so that predict() works without re-specifying arguments.  On failure
-                # we restore the NLSQ state so a previously-fitted model remains usable.
                 if not _fit_bayesian_succeeded:
                     if _had_test_mode:
                         self._test_mode = _saved_test_mode
@@ -1588,50 +1285,10 @@ class BayesianMixin:
     def _prior_dict_to_dist(prior_spec: dict, dist_module):
         """Convert a prior specification dict to a NumPyro distribution.
 
-        Supports prior dicts from the GUI PriorsEditor with format:
-            {"type": "normal", "loc": 1000, "scale": 500}
-            {"type": "uniform", "low": 0, "high": 100}
-            {"type": "lognormal", "loc": 0, "scale": 1}
-            {"type": "exponential", "rate": 0.01}
-            {"type": "halfnormal", "scale": 500}
-
-        Returns None if the spec is unrecognized.
+        Delegates to numpyro_model_builder.prior_dict_to_dist for backward
+        compatibility with subclasses that may call this static method directly.
         """
-        dist_type = prior_spec.get("type", "").lower()
-        try:
-            if dist_type == "normal":
-                return dist_module.Normal(
-                    loc=float(prior_spec["loc"]),
-                    scale=float(prior_spec["scale"]),
-                )
-            elif dist_type == "uniform":
-                return dist_module.Uniform(
-                    low=float(prior_spec["low"]),
-                    high=float(prior_spec["high"]),
-                )
-            elif dist_type == "lognormal":
-                return dist_module.LogNormal(
-                    loc=float(prior_spec.get("loc", 0)),
-                    scale=float(prior_spec.get("scale", 1)),
-                )
-            elif dist_type == "exponential":
-                return dist_module.Exponential(
-                    rate=float(prior_spec["rate"]),
-                )
-            elif dist_type in ("halfnormal", "half_normal"):
-                return dist_module.HalfNormal(
-                    scale=float(prior_spec["scale"]),
-                )
-            elif dist_type == "truncatednormal":
-                return dist_module.TruncatedNormal(
-                    loc=float(prior_spec["loc"]),
-                    scale=float(prior_spec["scale"]),
-                    low=float(prior_spec.get("low", float("-inf"))),
-                    high=float(prior_spec.get("high", float("inf"))),
-                )
-        except (KeyError, TypeError, ValueError):
-            pass
-        return None
+        return prior_dict_to_dist(prior_spec, dist_module)
 
     def _build_numpyro_model(
         self,
@@ -1644,376 +1301,36 @@ class BayesianMixin:
     ):
         """Build the NumPyro probabilistic model function.
 
-        Returns a callable model function with test_mode captured in closure.
-        Uses a per-instance cache keyed by all closure-captured state to avoid
-        rebuilding identical closures during repeated fit_bayesian() calls.
-        Skips caching when protocol_kwargs contains ndarrays (captured by ref).
+        Delegates to numpyro_model_builder.build_numpyro_model, passing self
+        as model_self for access to model_function, parameters, and caches.
         """
-        # Skip cache when ndarrays in kwargs — closure captures them by reference.
-        # Check both NumPy and JAX arrays (JAX arrays are not hashable).
-        has_ndarray_kwargs = any(
-            isinstance(v, np.ndarray) or hasattr(v, "devices")
-            for v in protocol_kwargs.values()
+        return build_numpyro_model(
+            model_self=self,
+            param_names=param_names,
+            param_bounds=param_bounds,
+            test_mode=test_mode,
+            is_complex_data=is_complex_data,
+            scale_info=scale_info,
+            **protocol_kwargs,
         )
-        # _closure_cache is eagerly initialized in BaseModel.__init__; the
-        # guard below is a safety net for non-BaseModel users of BayesianMixin.
-        if not hasattr(self, "_closure_cache"):
-            self._closure_cache: OrderedDict = OrderedDict()
-
-        prior_factory = getattr(self, "bayesian_prior_factory", None)
-        # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)
-        _param_set = getattr(self, "parameters", None)
-        _has_param_priors = False
-        if _param_set is not None and hasattr(_param_set, "values"):
-            _has_param_priors = any(
-                getattr(p, "prior", None) is not None for p in _param_set.values()
-            )
-        # Skip cache when prior_factory or param-level priors are set
-        if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
-            # R5-JAX-007: scale_info values may be JAX Device arrays when a
-            # subclass populates scale_info directly from JAX computations.
-            # JAX arrays are not hashable (raises TypeError in tuple/sorted).
-            # Coerce every value to a plain Python float so the cache key is
-            # always hashable, while preserving None → 0.0 sentinel.
-            def _to_hashable(v):
-                if v is None:
-                    return 0.0
-                try:
-                    return float(v)
-                except (TypeError, ValueError):
-                    return repr(v)
-
-            # R10-BAY-004: sorted() can raise TypeError when protocol_kwargs values
-            # are non-comparable types (e.g., arrays, custom objects). Guard with
-            # try/except and fall through to cache_key = None to skip caching.
-            try:
-                _pk_key = tuple(sorted(protocol_kwargs.items()))
-            except TypeError:
-                _pk_key = None
-
-            if _pk_key is None:
-                cache_key = None
-            else:
-                cache_key = (
-                    str(test_mode),
-                    is_complex_data,
-                    tuple(param_names),
-                    _pk_key,
-                    tuple(sorted(param_bounds.items())),
-                    tuple(
-                        sorted(
-                            (_to_hashable(k), _to_hashable(v))
-                            for k, v in scale_info.items()
-                        )
-                    ),
-                )
-            if cache_key in self._closure_cache:
-                self._closure_cache.move_to_end(cache_key)
-                return self._closure_cache[cache_key]
-        else:
-            cache_key = None
-
-        numpyro, dist, dist_transforms, _, _, _, _ = _import_numpyro()
-
-        # Extract scale values for likelihood.  The `.get(key, 0.0)` call already
-        # provides the default; the previous `or 0.0` would swallow legitimate
-        # 0.0 values from scale_info, so it has been removed.
-        # M-1 guard: if a subclass stores explicit None, fall back to 0.0.
-        def _scale_val(key: str) -> float:
-            v = scale_info.get(key, 0.0)
-            return 0.0 if v is None else v
-
-        y_real_scale = _scale_val("y_real_scale")
-        y_imag_scale = _scale_val("y_imag_scale")
-        data_scale = _scale_val("data_scale")
-        y_real_mean = _scale_val("y_real_mean")
-        y_imag_mean = _scale_val("y_imag_mean")
-        data_mean = _scale_val("data_mean")
-
-        # Capture priors at closure-build time (not re-read at trace time)
-        _captured_priors = {}
-        if hasattr(self, "parameters"):
-            for _pname in param_names:
-                _pobj = self.parameters.get(_pname)
-                if _pobj is not None:
-                    _captured_priors[_pname] = getattr(_pobj, "prior", None)
-
-        # R5-JAX-002: Determine if model returns 2-column real array [G', G'']
-        # instead of complex G* (used for complex reconstruction in the likelihood).
-        #
-        # The previous implementation called self.model_function() with dummy
-        # inputs, which: (a) could mutate self._ state in unusual subclasses,
-        # (b) triggered an extra JIT compilation with wrong shapes (wasting ~1-5s
-        # on first call), and (c) was called on every cache miss, not just once.
-        #
-        # Fix: cache the result in scale_info["model_returns_2col"] the first
-        # time it is probed.  Subsequent calls to _build_numpyro_model (e.g.,
-        # when the closure cache misses) reuse the cached value without re-probing.
-        # The probe itself is now guard-wrapped against _test_mode mutation by
-        # saving/restoring self._test_mode before/after the call.
-        if "model_returns_2col" in scale_info:
-            _model_returns_2col = bool(scale_info["model_returns_2col"])
-        else:
-            _model_returns_2col = False
-            try:
-                # B004-FIX: Use jax.eval_shape to determine output shape without
-                # triggering XLA compilation or executing the function.  This
-                # eliminates the 1-5s JIT overhead of the previous approach (which
-                # called model_function with dummy data) and avoids the _test_mode
-                # mutation/restore dance entirely.
-                #
-                # We capture non-JAX args (test_mode, protocol_kwargs) via partial
-                # since jax.eval_shape requires all positional args to be abstract.
-                _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
-                _test_X = jax.ShapeDtypeStruct((_n_probe,), jnp.float64)
-                _test_params = jax.ShapeDtypeStruct(
-                    (len(param_names),), jnp.float64
-                )
-                _probe_fn = functools.partial(
-                    self.model_function,  # type: ignore[attr-defined]
-                    test_mode=test_mode,
-                    **protocol_kwargs,
-                )
-                _out_shape = jax.eval_shape(
-                    _probe_fn,
-                    _test_X,
-                    _test_params,
-                )
-                _model_returns_2col = (
-                    hasattr(_out_shape, "ndim")
-                    and _out_shape.ndim == 2
-                    and _out_shape.shape[1] == 2
-                    and _out_shape.dtype != jnp.complex128
-                    and _out_shape.dtype != jnp.complex64
-                )
-            except Exception as exc:
-                # R10-BAY-001: Log the probe failure instead of silently swallowing it.
-                # A probe failure means _model_returns_2col defaults to False, which
-                # may cause incorrect likelihood construction for 2-column models.
-                logger.warning(
-                    "model_function probe failed — defaulting _model_returns_2col=False",
-                    error=str(exc),
-                    test_mode=str(test_mode),
-                )
-            # Cache in scale_info so the probe is only run once per fit_bayesian call
-            scale_info["model_returns_2col"] = int(_model_returns_2col)
-
-        def numpyro_model(X, y=None):
-            """NumPyro model with test_mode captured in closure."""
-            # Sample parameters from priors
-            params_dict = {}
-            for name in param_names:
-                lower, upper = param_bounds[name]
-                custom_dist = None
-                if callable(prior_factory):
-                    custom_dist = prior_factory(name, lower, upper)
-
-                # F-001 fix: Check Parameter.prior dict (set by GUI PriorsEditor)
-                # Use _captured_priors to avoid re-reading self.parameters at trace time
-                if custom_dist is None:
-                    param_prior = _captured_priors.get(name)
-                    if param_prior is not None and isinstance(param_prior, dict):
-                        custom_dist = BayesianMixin._prior_dict_to_dist(
-                            param_prior, dist
-                        )
-
-                if custom_dist is not None:
-                    params_dict[name] = numpyro.sample(name, custom_dist)
-                elif (
-                    name.lower().endswith("alpha")
-                    and lower is not None
-                    and upper is not None
-                    and 0.0 <= lower < upper <= 1.0
-                ):
-                    # Weakly-informative Beta prior for fractional orders
-                    beta_base = dist.Beta(concentration1=2.0, concentration0=2.0)
-                    if lower == 0.0 and upper == 1.0:
-                        params_dict[name] = numpyro.sample(name, beta_base)
-                    else:
-                        scale = upper - lower
-                        beta_trans = dist_transforms.AffineTransform(
-                            loc=lower, scale=scale
-                        )
-                        params_dict[name] = numpyro.sample(
-                            name,
-                            dist.TransformedDistribution(beta_base, beta_trans),
-                        )
-                elif (
-                    lower is not None
-                    and upper is not None
-                    and abs(float(upper) - float(lower))
-                    < 1e-9 * max(abs(float(lower)), abs(float(upper)), 1.0)
-                ):
-                    # PARAMS-001: fixed parameter — use deterministic instead of Uniform.
-                    # Relative epsilon 1e-9 × max(|lo|, |hi|, 1) covers float64 arithmetic
-                    # noise from bounds that should be equal but diverge through roundtrip
-                    # conversions, while staying well below any intentionally-distinct range.
-                    # The floor of 1.0 ensures near-zero params use absolute 1e-9 tolerance.
-                    # Python float comparison (not jnp.isclose) avoids TracerBoolConversionError.
-                    param_val = numpyro.deterministic(name, lower)
-                    params_dict[name] = param_val
-                else:
-                    params_dict[name] = numpyro.sample(
-                        name, dist.Uniform(low=lower, high=upper)
-                    )
-
-            # BAY-01: use jnp.stack instead of jnp.array(list-comp) so this
-            # compiles to a single XLA concatenation op in the NUTS hot path.
-            params_array = jnp.stack([params_dict[name] for name in param_names])
-
-            # Forward protocol kwargs to model_function
-            # FIKH, FMLIKH models need strain= kwarg for startup/laos modes
-            # HL model needs gdot=, t_wait= for transient protocols
-            predictions_raw = self.model_function(
-                X, params_array, test_mode, **protocol_kwargs
-            )
-
-            # Guard against NaN/Inf from ODE-based models (LAOS, startup)
-            # that can diverge for extreme parameter combinations during
-            # NUTS exploration. Two-part strategy:
-            # 1) Per-element log-probability penalty to reject NaN regions
-            # 2) Replace NaN with 0.0 to prevent downstream tracing errors
-            is_finite = jnp.isfinite(predictions_raw)
-            # SYS-12: compute penalty and count in one pass over is_finite.
-            # jnp.where emits an element-wise select; summing the boolean
-            # directly for the count re-uses the already-live is_finite buffer.
-            not_finite = ~is_finite
-            finite_penalty = jnp.where(is_finite, 0.0, -1e18).sum()
-            numpyro.factor("finite_check", finite_penalty)
-            numpyro.deterministic(
-                "num_nonfinite", not_finite.sum().astype(jnp.float64)
-            )
-            predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
-
-            # Normalize oscillation predictions: some models return (N,2) real
-            # arrays [G', G''] instead of complex G' + 1j*G''
-            if _model_returns_2col:
-                if is_complex_data:
-                    # Convert [G', G''] → complex G* for joint real/imag fitting
-                    predictions_raw = predictions_raw[:, 0] + 1j * predictions_raw[:, 1]
-                else:
-                    # Data is |G*| (scalar) — compute magnitude from components
-                    predictions_raw = jnp.sqrt(
-                        predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2 + 1e-30
-                    )
-                    # Also convert y to magnitude if it's a 2D array (model returned 2 columns
-                    # but data wasn't detected as complex)
-                    if y.ndim == 2 and y.shape[1] == 2:
-                        y = jnp.sqrt(y[:, 0] ** 2 + y[:, 1] ** 2 + 1e-30)
-
-            # Handle complex vs real predictions
-            if is_complex_data:
-                pred_real = jnp.real(predictions_raw)
-                pred_imag = jnp.imag(predictions_raw)
-                # R5-JAX-005: Never call len() on `y` inside numpyro_model —
-                # `y` is a JAX array at trace time and len() raises TypeError.
-                # scale_info["n_real"] is always set by _prepare_jax_data() at
-                # line 478 for complex data; the fallback `len(y) // 2` was
-                # only safe because scale_info is always populated before the
-                # closure is built.  Remove the fallback so a missing n_real
-                # raises an explicit KeyError rather than a cryptic tracer error.
-                n = scale_info["n_real"]
-                y_real_obs, y_imag_obs = y[:n], y[n:]
-
-                # Exponential priors on noise (inflated scale for robustness)
-                # Floor at 1% of mean magnitude to handle constant-data edge case
-                sigma_real_scale = max(y_real_scale * 10.0, y_real_mean * 0.01, 1e-3)
-                sigma_imag_scale = max(y_imag_scale * 10.0, y_imag_mean * 0.01, 1e-3)
-                sigma_real = numpyro.sample(
-                    "sigma_real", dist.Exponential(rate=1.0 / sigma_real_scale)
-                )
-                sigma_imag = numpyro.sample(
-                    "sigma_imag", dist.Exponential(rate=1.0 / sigma_imag_scale)
-                )
-                numpyro.sample(
-                    "obs_real",
-                    dist.Normal(loc=pred_real, scale=sigma_real),
-                    obs=y_real_obs,
-                )
-                numpyro.sample(
-                    "obs_imag",
-                    dist.Normal(loc=pred_imag, scale=sigma_imag),
-                    obs=y_imag_obs,
-                )
-            else:
-                # Floor at 1% of mean magnitude to handle constant-data edge case
-                sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
-                sigma = numpyro.sample(
-                    "sigma", dist.Exponential(rate=1.0 / sigma_scale)
-                )
-                numpyro.sample(
-                    "obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y
-                )
-
-        if cache_key is not None:
-            self._closure_cache[cache_key] = numpyro_model
-            # LRU eviction: keep at most 32 cached closures
-            while len(self._closure_cache) > 32:
-                self._closure_cache.popitem(last=False)
-        return numpyro_model
 
     @staticmethod
     def _compute_per_param_diagnostic(
         posterior_samples: dict[str, np.ndarray],
         num_chains: int,
         num_samples: int,
-        diagnostic_fn: Callable,
+        diagnostic_fn,
         label: str,
     ) -> tuple[dict[str, float], bool]:
         """Compute a per-parameter diagnostic (R-hat or ESS).
 
-        Reshapes flat posterior samples to (num_chains, num_samples) and applies
-        the given NumPyro diagnostic function to each parameter.
-
-        Args:
-            posterior_samples: Parameter name -> flat samples array.
-            num_chains: Number of MCMC chains.
-            num_samples: Samples per chain.
-            diagnostic_fn: NumPyro function (e.g. split_gelman_rubin, effective_sample_size).
-            label: Human-readable label for log messages (e.g. "R-hat", "ESS").
-
-        Returns:
-            (result_dict, all_succeeded) where result_dict maps parameter names
-            to diagnostic values (NaN on failure).
+        Delegates to bayesian_diagnostics.compute_per_param_diagnostic.
         """
-        result_dict: dict[str, float] = {}
-        all_succeeded = True
-        for name in posterior_samples:
-            try:
-                samples_arr = posterior_samples[name]
-                # If already shaped (num_chains, num_samples), use directly
-                if samples_arr.ndim == 2:
-                    samples_shaped = samples_arr
-                elif num_chains >= 2:
-                    # Use -1 to infer actual draws (may differ from num_samples
-                    # due to thinning, warmup inclusion, or early stopping)
-                    samples_shaped = samples_arr.reshape(num_chains, -1)
-                else:
-                    samples_shaped = samples_arr.reshape(1, -1)
-                result_dict[name] = float(diagnostic_fn(samples_shaped))
-            except Exception as exc:
-                # R12-B-008: log array size and chain count to help diagnose
-                # reshape failures caused by unexpected sample counts (e.g., thinning
-                # or early stopping causing total_samples % num_chains != 0).
-                logger.debug(
-                    "Posterior reshape failed for parameter",
-                    parameter=name,
-                    array_size=getattr(samples_arr, "size", None),
-                    num_chains=num_chains,
-                )
-                logger.warning(
-                    f"{label} computation failed for parameter",
-                    parameter=name,
-                    error=str(exc),
-                )
-                # R12-B-010: NaN fallback is correct here — it signals "diagnostic
-                # unavailable" to the caller without hiding genuine failures.
-                # Downstream code (e.g., _compute_diagnostics) filters NaN values
-                # when computing summary statistics (max R-hat, min ESS), so a NaN
-                # for one parameter does not silently corrupt the aggregate.
-                result_dict[name] = float("nan")
-                all_succeeded = False
-        return result_dict, all_succeeded
+        from rheojax.core.bayesian_diagnostics import compute_per_param_diagnostic
+
+        return compute_per_param_diagnostic(
+            posterior_samples, num_chains, num_samples, diagnostic_fn, label
+        )
 
     def _compute_diagnostics(
         self,
@@ -2024,100 +1341,9 @@ class BayesianMixin:
     ) -> DiagnosticsDict:
         """Compute convergence diagnostics from MCMC samples.
 
-        Args:
-            mcmc: NumPyro MCMC object after sampling
-            posterior_samples: Dictionary of posterior samples
-            num_samples: Number of samples per chain
-            num_chains: Number of MCMC chains
-
-        Returns:
-            Dictionary with diagnostic information:
-                - r_hat: R-hat (Gelman-Rubin) statistic per parameter (NaN if failed)
-                - ess: Effective sample size per parameter (NaN if failed)
-                - divergences: Number of divergent transitions (-1 if unknown)
-                - diagnostics_valid: Whether all diagnostics computed successfully
+        Delegates to bayesian_diagnostics.compute_diagnostics.
         """
-        numpyro, _, _, _, _, _, _ = _import_numpyro()
-
-        diagnostics: DiagnosticsDict = {}
-        all_valid = True
-
-        try:
-            r_hat_dict, r_hat_ok = self._compute_per_param_diagnostic(
-                posterior_samples,
-                num_chains,
-                num_samples,
-                numpyro.diagnostics.split_gelman_rubin,
-                "R-hat",
-            )
-            diagnostics["r_hat"] = r_hat_dict
-            all_valid = all_valid and r_hat_ok
-
-            ess_dict, ess_ok = self._compute_per_param_diagnostic(
-                posterior_samples,
-                num_chains,
-                num_samples,
-                numpyro.diagnostics.effective_sample_size,
-                "ESS",
-            )
-            diagnostics["ess"] = ess_dict
-            all_valid = all_valid and ess_ok
-
-            try:
-                try:
-                    divergences = mcmc.get_extra_fields(group_by_chain=True)[
-                        "diverging"
-                    ]
-                except TypeError:
-                    divergences = mcmc.get_extra_fields()["diverging"]
-                num_divergences = int(np.sum(divergences))
-            except (KeyError, AttributeError):
-                logger.warning(
-                    "Divergence information not available from MCMC extra fields. "
-                    "Divergence count is unknown — inspect trace plots manually."
-                )
-                num_divergences = -1
-                all_valid = False
-
-            diagnostics["divergences"] = num_divergences
-            diagnostics["total_samples"] = int(num_samples * num_chains)
-            diagnostics["num_chains"] = int(num_chains)
-            diagnostics["num_samples_per_chain"] = int(num_samples)
-
-        except Exception as e:
-            logger.error(
-                "Diagnostics computation failed entirely",
-                error=str(e),
-                exc_info=True,
-            )
-            warnings.warn(
-                f"MCMC diagnostics computation failed: {e}. "
-                "R-hat, ESS, and divergence values are unavailable. "
-                "Posterior samples may be unreliable — inspect trace plots manually.",
-                RuntimeWarning,
-                stacklevel=3,
-            )
-            diagnostics["r_hat"] = dict.fromkeys(posterior_samples.keys(), float("nan"))
-            diagnostics["ess"] = dict.fromkeys(posterior_samples.keys(), float("nan"))
-            diagnostics["divergences"] = -1
-            diagnostics["total_samples"] = int(num_samples * num_chains)
-            diagnostics["num_chains"] = int(num_chains)
-            diagnostics["num_samples_per_chain"] = int(num_samples)
-            diagnostics["error"] = str(e)
-            all_valid = False
-
-        diagnostics["diagnostics_valid"] = all_valid
-
-        actual_divergences = diagnostics.get("divergences", -1)
-        if actual_divergences > 0:
-            logger.warning(
-                "Divergent transitions detected",
-                divergences=actual_divergences,
-                total_samples=num_samples * num_chains,
-                hint="Try: different seed=, increased num_warmup, or higher target_accept_prob",
-            )
-
-        return diagnostics
+        return compute_diagnostics(mcmc, posterior_samples, num_samples, num_chains)
 
 
 __all__ = [
