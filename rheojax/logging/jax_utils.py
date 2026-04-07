@@ -3,6 +3,11 @@ RheoJAX JAX-Safe Logging Utilities.
 
 Utilities for logging JAX arrays and operations without interfering
 with JIT compilation or causing expensive device transfers.
+
+NOTE: This module uses ``import jax`` directly (inside try/except ImportError
+guards) for API introspection — trace detection, debug callbacks, and config
+reading.  These are NOT numeric imports and do not require ``safe_import_jax()``,
+which sets float64 mode for array computation.
 """
 
 import logging

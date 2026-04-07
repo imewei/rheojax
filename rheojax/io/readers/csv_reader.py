@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import re as _re
 import warnings
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,9 @@ from rheojax.io.readers._utils import (
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
+
+# Pre-compiled regex for detecting scientific notation in numeric strings
+_SCI_RE = _re.compile(r"[eE][+\-]?\d")
 
 # Exported for lightweight preview/loading helpers
 __all__ = ["load_csv", "detect_csv_delimiter"]
@@ -536,11 +540,6 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
         # Determine format from samples
         has_both = any("," in s and "." in s for s in samples)
         has_comma_only = any("," in s and "." not in s for s in samples)
-
-        # Regex to detect scientific notation (e.g. "1.23E+04", "2.5e-3")
-        import re as _re
-
-        _SCI_RE = _re.compile(r"[eE][+\-]?\d")
 
         if has_both:
             # Pick format from first sample with both separators
