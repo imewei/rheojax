@@ -140,10 +140,10 @@ def save_hdf5(
                 # Store test_mode and deformation_mode as top-level attrs
                 # (belt-and-suspenders: also in metadata dict)
                 test_mode = data.test_mode
-                if test_mode:
+                if test_mode is not None:
                     f.attrs["test_mode"] = str(test_mode)
                 deformation_mode = data.deformation_mode
-                if deformation_mode:
+                if deformation_mode is not None:
                     f.attrs["deformation_mode"] = str(deformation_mode)
 
                 # Store metadata
@@ -474,15 +474,15 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             # into metadata (belt-and-suspenders with metadata dict)
             # R6-HDF5-003: Decode bytes for top-level string attrs.
             test_mode = f.attrs.get("test_mode", None)
-            if isinstance(test_mode, bytes):
-                test_mode = test_mode.decode("utf-8")
-            if test_mode and "test_mode" not in metadata:
-                metadata["test_mode"] = test_mode
+            if test_mode is not None:
+                test_mode = _safe_decode_hdf5_string(test_mode)
+                if "test_mode" not in metadata:
+                    metadata["test_mode"] = test_mode
             deformation_mode = f.attrs.get("deformation_mode", None)
-            if isinstance(deformation_mode, bytes):
-                deformation_mode = deformation_mode.decode("utf-8")
-            if deformation_mode and "deformation_mode" not in metadata:
-                metadata["deformation_mode"] = deformation_mode
+            if deformation_mode is not None:
+                deformation_mode = _safe_decode_hdf5_string(deformation_mode)
+                if "deformation_mode" not in metadata:
+                    metadata["deformation_mode"] = deformation_mode
 
             ctx["data_points"] = len(x)
             ctx["has_metadata"] = bool(metadata)
@@ -508,6 +508,11 @@ def _safe_decode_hdf5_string(value: bytes | str, max_len: int = _MAX_HDF5_STRING
     if isinstance(value, bytes):
         value = value.decode("utf-8", errors="replace")
     if len(value) > max_len:
+        logger.warning(
+            "HDF5 string attribute truncated",
+            original_len=len(value),
+            max_len=max_len,
+        )
         value = value[:max_len]
     return value
 

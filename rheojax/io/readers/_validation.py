@@ -66,17 +66,17 @@ def _infer_protocol(data: RheoData) -> tuple[str | None, bool]:
     # initial_test_mode is an InitVar; after __post_init__ it is stored in
     # _explicit_test_mode AND metadata["detected_test_mode"].
     explicit = getattr(data, "_explicit_test_mode", None)
-    if explicit:
+    if explicit is not None:
         return explicit, False
 
     detected = data.metadata.get("detected_test_mode")
-    if detected:
+    if detected is not None:
         return detected, True
 
     # Last resort: "test_mode" key (some readers set this without the
     # "detected_" prefix)
     fallback = data.metadata.get("test_mode")
-    if fallback:
+    if fallback is not None:
         return fallback, True
 
     return None, True
