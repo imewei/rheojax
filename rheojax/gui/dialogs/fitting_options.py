@@ -87,6 +87,45 @@ class FittingOptionsDialog(QDialog):
         self.algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addRow("Optimization Method:", self.algo_combo)
 
+        # Workflow dropdown (auto / auto_global)
+        self.workflow_combo = QComboBox()
+        self.workflow_combo.addItems(["auto", "auto_global"])
+        self.workflow_combo.setToolTip(
+            "auto: single multi-start NLSQ run; "
+            "auto_global: basin-hopping global search before refinement"
+        )
+        self.workflow_combo.currentTextChanged.connect(
+            lambda text: self._on_option_changed("workflow", text)
+        )
+        algo_layout.addRow("Workflow:", self.workflow_combo)
+
+        # Auto-bounds toggle
+        self.auto_bounds_check = QCheckBox("Enable auto-bounds")
+        self.auto_bounds_check.setChecked(True)
+        self.auto_bounds_check.setToolTip(
+            "Automatically derive parameter bounds from data scale; "
+            "disable to use manually specified bounds only"
+        )
+        self.auto_bounds_check.stateChanged.connect(
+            lambda s: self._on_option_changed("auto_bounds", s != 0)
+        )
+        algo_layout.addRow("", self.auto_bounds_check)
+
+        # Stability dropdown (auto / on / off)
+        self.stability_combo = QComboBox()
+        self.stability_combo.addItems(["auto", "on", "off"])
+        self.stability_combo.setToolTip(
+            "Stability analysis after fitting: "
+            "auto = run when convergence is borderline, "
+            "on = always run, off = never run"
+        )
+        self.stability_combo.currentTextChanged.connect(
+            lambda text: self._on_option_changed(
+                "stability", None if text == "off" else text
+            )
+        )
+        algo_layout.addRow("Stability:", self.stability_combo)
+
         # Jacobian mode
         self.jacobian_combo = QComboBox()
         self.jacobian_combo.addItems(["Auto", "Forward (fwd)", "Reverse (rev)"])
@@ -98,17 +137,6 @@ class FittingOptionsDialog(QDialog):
             lambda text: self._on_option_changed("jacobian_mode", text)
         )
         algo_layout.addRow("Jacobian Mode:", self.jacobian_combo)
-
-        # Stability check
-        self.stability_check = QCheckBox("Enable stability checks")
-        self.stability_check.setChecked(False)
-        self.stability_check.setToolTip(
-            "Run stability analysis on the fitted parameters"
-        )
-        self.stability_check.stateChanged.connect(
-            lambda s: self._on_option_changed("stability", "auto" if s != 0 else None)
-        )
-        algo_layout.addRow("", self.stability_check)
 
         algo_group.setLayout(algo_layout)
         layout.addWidget(algo_group)
@@ -262,6 +290,29 @@ class FittingOptionsDialog(QDialog):
         if "verbose" in self.current_options:
             self.verbose_check.setChecked(self.current_options["verbose"])
 
+        # Workflow
+        if "workflow" in self.current_options:
+            idx = self.workflow_combo.findText(self.current_options["workflow"])
+            if idx >= 0:
+                self.workflow_combo.setCurrentIndex(idx)
+
+        # Auto-bounds
+        if "auto_bounds" in self.current_options:
+            self.auto_bounds_check.setChecked(self.current_options["auto_bounds"])
+
+        # Stability dropdown
+        if "stability" in self.current_options:
+            stability_val = self.current_options["stability"]
+            if stability_val is None:
+                text = "off"
+            elif stability_val == "on" or stability_val is True:
+                text = "on"
+            else:
+                text = str(stability_val)
+            idx = self.stability_combo.findText(text)
+            if idx >= 0:
+                self.stability_combo.setCurrentIndex(idx)
+
         # Jacobian mode
         if "jacobian_mode" in self.current_options:
             jac = self.current_options["jacobian_mode"]
@@ -270,12 +321,6 @@ class FittingOptionsDialog(QDialog):
             idx = self.jacobian_combo.findText(text)
             if idx >= 0:
                 self.jacobian_combo.setCurrentIndex(idx)
-
-        # Stability
-        if "stability" in self.current_options:
-            self.stability_check.setChecked(
-                self.current_options["stability"] is not None
-            )
 
     def _on_algorithm_changed(self, text: str) -> None:
         """Handle algorithm combo box change."""
@@ -310,6 +355,9 @@ class FittingOptionsDialog(QDialog):
         """Reset all options to defaults."""
         logger.debug("Resetting to defaults", dialog=self.__class__.__name__)
         self.algo_combo.setCurrentIndex(0)  # NLSQ
+        self.workflow_combo.setCurrentText("auto")
+        self.auto_bounds_check.setChecked(True)
+        self.stability_combo.setCurrentText("auto")
         self.max_iter_spin.setValue(5000)
         self.ftol_spin.setValue(1e-8)
         self.xtol_spin.setValue(1e-8)
@@ -318,7 +366,6 @@ class FittingOptionsDialog(QDialog):
         self.use_bounds_check.setChecked(True)
         self.verbose_check.setChecked(False)
         self.jacobian_combo.setCurrentIndex(0)  # Auto
-        self.stability_check.setChecked(False)
 
     def _on_accepted(self) -> None:
         """Handle dialog accepted."""
@@ -357,6 +404,8 @@ class FittingOptionsDialog(QDialog):
 
         options = {
             "algorithm": algorithm,
+            "workflow": self.workflow_combo.currentText(),
+            "auto_bounds": self.auto_bounds_check.isChecked(),
             "max_iter": self.max_iter_spin.value(),
             "ftol": self.ftol_spin.value(),
             "xtol": self.xtol_spin.value(),
@@ -377,9 +426,12 @@ class FittingOptionsDialog(QDialog):
             options["jacobian_mode"] = "rev"
         # else: Auto (omit to let backend decide)
 
-        # Stability
-        if self.stability_check.isChecked():
-            options["stability"] = "auto"
+        # Stability: map dropdown value to the value expected by the backend
+        stability_text = self.stability_combo.currentText()
+        if stability_text == "off":
+            options["stability"] = None
+        else:
+            options["stability"] = stability_text  # "auto" or "on"
 
         return options
 

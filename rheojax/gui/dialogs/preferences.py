@@ -158,6 +158,48 @@ class PreferencesDialog(QDialog):
         theme_group.setLayout(theme_layout)
         layout.addWidget(theme_group)
 
+        # Worker settings
+        worker_group = QGroupBox("Worker Settings")
+        worker_layout = QFormLayout()
+
+        self.worker_isolation_combo = QComboBox()
+        self.worker_isolation_combo.addItems(["subprocess", "thread"])
+        self.worker_isolation_combo.setToolTip(
+            "subprocess: each fit/Bayesian job runs in an isolated process "
+            "(safer on macOS, killable); "
+            "thread: runs in the Qt thread pool (lower overhead, not killable)"
+        )
+        self.worker_isolation_combo.currentTextChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="worker_isolation_mode",
+                value=value,
+            )
+        )
+        worker_layout.addRow("Worker Isolation Mode:", self.worker_isolation_combo)
+
+        self.max_undo_spin = QSpinBox()
+        self.max_undo_spin.setRange(10, 500)
+        self.max_undo_spin.setValue(50)
+        self.max_undo_spin.setSuffix(" steps")
+        self.max_undo_spin.setToolTip(
+            "Maximum number of undo steps kept in memory. "
+            "Larger values use more memory when fitting large datasets."
+        )
+        self.max_undo_spin.valueChanged.connect(
+            lambda value: logger.debug(
+                "Value changed",
+                dialog=self.__class__.__name__,
+                field="max_undo_steps",
+                value=value,
+            )
+        )
+        worker_layout.addRow("Max Undo Steps:", self.max_undo_spin)
+
+        worker_group.setLayout(worker_layout)
+        layout.addWidget(worker_group)
+
         # Auto-save settings
         autosave_group = QGroupBox("Auto-Save")
         autosave_layout = QVBoxLayout()
@@ -461,6 +503,17 @@ class PreferencesDialog(QDialog):
             if idx >= 0:
                 self.theme_combo.setCurrentIndex(idx)
 
+        if "worker_isolation_mode" in self.current_preferences:
+            mode = self.current_preferences["worker_isolation_mode"]
+            idx = self.worker_isolation_combo.findText(
+                mode, Qt.MatchFlag.MatchFixedString
+            )
+            if idx >= 0:
+                self.worker_isolation_combo.setCurrentIndex(idx)
+
+        if "max_undo_steps" in self.current_preferences:
+            self.max_undo_spin.setValue(self.current_preferences["max_undo_steps"])
+
         if "autosave_enabled" in self.current_preferences:
             self.autosave_check.setChecked(self.current_preferences["autosave_enabled"])
 
@@ -568,6 +621,8 @@ class PreferencesDialog(QDialog):
 
         # General
         self.theme_combo.setCurrentText("Light")
+        self.worker_isolation_combo.setCurrentText("subprocess")
+        self.max_undo_spin.setValue(50)
         self.autosave_check.setChecked(True)
         self.autosave_spin.setValue(5)
         self.recent_count_spin.setValue(10)
@@ -613,6 +668,8 @@ class PreferencesDialog(QDialog):
         preferences = {
             # General
             "theme": self.theme_combo.currentText(),
+            "worker_isolation_mode": self.worker_isolation_combo.currentText(),
+            "max_undo_steps": self.max_undo_spin.value(),
             "autosave_enabled": self.autosave_check.isChecked(),
             "autosave_interval": self.autosave_spin.value(),
             "recent_count": self.recent_count_spin.value(),

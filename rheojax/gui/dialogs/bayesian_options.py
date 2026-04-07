@@ -52,6 +52,7 @@ class BayesianOptionsDialog(QDialog):
     def __init__(
         self,
         current_options: dict[str, Any] | None = None,
+        nlsq_result_available: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         """Initialize Bayesian options dialog.
@@ -60,6 +61,9 @@ class BayesianOptionsDialog(QDialog):
         ----------
         current_options : dict[str, Any], optional
             Current Bayesian options
+        nlsq_result_available : bool
+            Whether an NLSQ fit result is available for warm-starting.
+            Shown as a read-only indicator in the Initialization section.
         parent : QWidget, optional
             Parent widget
         """
@@ -67,6 +71,7 @@ class BayesianOptionsDialog(QDialog):
         logger.debug("Initializing", class_name=self.__class__.__name__)
 
         self.current_options = current_options or {}
+        self._nlsq_result_available = nlsq_result_available
 
         self.setWindowTitle("Bayesian Inference Options")
         self.setMinimumSize(550, 600)
@@ -130,11 +135,26 @@ class BayesianOptionsDialog(QDialog):
         init_group = QGroupBox("Initialization")
         init_layout = QVBoxLayout()
 
+        # Warm-start availability indicator (read-only)
+        warmstart_status = "available" if self._nlsq_result_available else "not available"
+        warmstart_color = "#2e7d32" if self._nlsq_result_available else "#c62828"
+        self._warmstart_indicator = QLabel(
+            f"NLSQ warm-start: <b><span style='color:{warmstart_color};'>"
+            f"{warmstart_status}</span></b>"
+        )
+        self._warmstart_indicator.setToolTip(
+            "Run an NLSQ fit first to enable warm-starting for faster MCMC convergence."
+            if not self._nlsq_result_available
+            else "An NLSQ fit result is available and will be used to initialise NUTS."
+        )
+        init_layout.addWidget(self._warmstart_indicator)
+
         # Warm-start from NLSQ
         self.warmstart_check = QCheckBox(
             "Warm-start from NLSQ fit (recommended for faster convergence)"
         )
         self.warmstart_check.setChecked(True)
+        self.warmstart_check.setEnabled(self._nlsq_result_available)
         self.warmstart_check.stateChanged.connect(
             lambda s: self._on_option_changed("warm_start", s != 0)
         )

@@ -502,29 +502,63 @@ class PreviewConfirmPage(QWizardPage):
             y_col=y_col,
         )
 
+        # Resolve detected test_mode when auto-detect is on
+        detected_mode = test_mode
+        if auto_detect:
+            detected_mode = self._detect_test_mode(file_path, x_col, y_col, y2_col)
+
+        mode_label = (
+            f"<span style='color:#1976D2;'><b>{detected_mode}</b></span> (auto-detected)"
+            if auto_detect
+            else f"<b>{test_mode}</b> (manual)"
+        )
+
         # Build summary
-        summary = f"""
-<b>Import Configuration:</b><br>
-<b>File:</b> {Path(file_path).name}<br>
-<b>X Column:</b> {x_col}<br>
-<b>Y Column:</b> {y_col}<br>
-        """
+        summary = (
+            "<b>Import Configuration:</b><br>"
+            f"<b>File:</b> {Path(file_path).name}<br>"
+            f"<b>X Column:</b> {x_col}<br>"
+            f"<b>Y Column:</b> {y_col}<br>"
+        )
 
         if y2_col and y2_col != "(None)":
-            summary += f"<b>Y2 Column:</b> {y2_col}<br>"
+            summary += f"<b>Y2 Column (G''):</b> {y2_col}<br>"
 
         if temp_col and temp_col != "(None)":
             summary += f"<b>Temperature Column:</b> {temp_col}<br>"
 
-        if auto_detect:
-            summary += "<b>Test Mode:</b> Auto-detect<br>"
-        else:
-            summary += f"<b>Test Mode:</b> {test_mode}<br>"
+        summary += f"<b>Test Mode:</b> {mode_label}<br>"
 
         self.summary_label.setText(summary)
 
-        # Load preview data
+        # Load preview data (first 5 rows of selected columns)
         self._load_preview(file_path, x_col, y_col, y2_col)
+
+    def _detect_test_mode(
+        self,
+        file_path: str,
+        x_col: str,
+        y_col: str,
+        y2_col: str | None,
+    ) -> str:
+        """Heuristically detect test_mode from column names.
+
+        Falls back to the wizard's stored test_mode field or "oscillation".
+        """
+        cols_lower = " ".join(
+            c.lower() for c in [x_col, y_col, y2_col or ""] if c and c != "(None)"
+        )
+        if any(kw in cols_lower for kw in ["freq", "omega", "g'", "gp", "g''"]):
+            return "oscillation"
+        if any(kw in cols_lower for kw in ["relax", "stress", "g(t)"]):
+            return "relaxation"
+        if any(kw in cols_lower for kw in ["creep", "compliance", "j(t)"]):
+            return "creep"
+        if any(kw in cols_lower for kw in ["shear rate", "flow", "viscosity", "eta"]):
+            return "rotation"
+        # Fall back to the value stored by TestModeSelectionPage
+        stored = self.field("test_mode")
+        return stored if stored else "oscillation"
 
     def _load_preview(
         self, file_path: str, x_col: str, y_col: str, y2_col: str | None = None
@@ -562,7 +596,7 @@ class PreviewConfirmPage(QWizardPage):
             if y2_col and y2_col != "(None)":
                 cols.append(y2_col)
 
-            df_preview = df[cols]
+            df_preview = df[cols].head(5)
 
             # Update table
             self.preview_table.setRowCount(len(df_preview))
