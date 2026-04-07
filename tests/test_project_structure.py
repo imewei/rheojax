@@ -234,9 +234,7 @@ class TestConfiguration:
 class TestCICD:
     """Test suite for CI/CD configuration."""
 
-    @pytest.mark.xfail(
-        reason="CI/CD setup not yet implemented (workflows.disabled exists)"
-    )
+    @pytest.mark.smoke
     def test_github_workflows_exist(self):
         """Test that GitHub Actions workflows exist."""
         import rheojax

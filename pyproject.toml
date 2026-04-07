@@ -308,16 +308,22 @@ select = [
     "C",  # flake8-comprehensions
     "B",  # flake8-bugbear
     "UP", # pyupgrade
+    "S",  # flake8-bandit (security)
 ]
 ignore = [
     "E501",  # line too long
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
+    "S101",  # assert usage — used for internal invariants, not I/O validation
+    "S110",  # try-except-pass — legitimate for optional feature detection
+    "S112",  # try-except-continue — legitimate in iteration-with-fallback patterns
+    "S607",  # partial executable path — subprocess with list args, no shell injection
+    "S311",  # random — used for non-cryptographic purposes (seeds, sampling)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/*" = ["B", "C", "E", "F", "W"]
+"tests/*" = ["B", "C", "E", "F", "W", "S"]
 "rheojax/__init__.py" = ["E402"]  # models import must come after version setup
 "rheojax/models/*.py" = ["E402"]  # safe_import_jax() must precede JAX imports
 "rheojax/utils/mittag_leffler.py" = ["E402"]  # safe_import_jax() must precede JAX imports
