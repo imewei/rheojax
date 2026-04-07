@@ -178,11 +178,6 @@ class Maxwell(BaseModel):
                 y_np = y_np - offset
                 self._relaxation_offset = offset
                 # Store in _last_fit_kwargs for Bayesian pipeline forwarding
-                if (
-                    not hasattr(self, "_last_fit_kwargs")
-                    or self._last_fit_kwargs is None
-                ):
-                    self._last_fit_kwargs = {}
                 self._last_fit_kwargs["_relaxation_offset"] = offset
                 logger.debug(
                     "Applied relaxation offset correction",
@@ -268,6 +263,7 @@ class Maxwell(BaseModel):
                         model=self.__class__.__name__,
                     )
 
+            self._nlsq_result = result
             self.fitted_ = True
 
             # Log fitted parameters and result metrics

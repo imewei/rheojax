@@ -253,8 +253,6 @@ class SPPYieldStress(BaseModel):
         yield_type = kwargs.get("yield_type", "static")
         self._yield_type = yield_type
         # Persist yield_type for Bayesian pipeline forwarding
-        if not hasattr(self, "_last_fit_kwargs") or self._last_fit_kwargs is None:
-            self._last_fit_kwargs = {}
         self._last_fit_kwargs["yield_type"] = self._yield_type
 
         if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
