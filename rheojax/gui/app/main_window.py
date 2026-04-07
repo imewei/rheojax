@@ -152,6 +152,9 @@ class RheoJAXMainWindow(QMainWindow):
         self._connect_state_signals()
         self._init_worker_pool()
 
+        # Hook OS color-scheme changes for auto-theme
+        self._setup_os_theme_watcher()
+
         # Initial status
         self.status_bar.show_message("Ready", 3000)
         logger.info("Application initialized", window_title=self.windowTitle())
@@ -289,6 +292,11 @@ class RheoJAXMainWindow(QMainWindow):
         # Pipeline chips navigation
         self.pipeline_chips.step_clicked.connect(
             lambda step: self.navigate_to(step.name.lower())
+        )
+
+        # WorkspaceContainer page-change logging
+        self.workspace.page_changed.connect(
+            lambda page: logger.debug("Page changed", to_page=page)
         )
 
         # Sidebar navigation signals
@@ -785,6 +793,13 @@ class RheoJAXMainWindow(QMainWindow):
         # step_selected which calls navigate_to again).
         # NOTE: This guard assumes single-threaded (GUI main thread) access.
         # navigate_to must never be called from a worker thread.
+        assert (
+            QApplication.instance() is None
+            or QApplication.instance().thread() is None
+            # Only enforce the GUI-thread check when a QApplication exists.
+            # In test environments the application thread may differ.
+            or threading.current_thread() is threading.main_thread()
+        ), "navigate_to() called from a non-GUI thread — this is unsafe"
         if self._navigating:
             return
         self._navigating = True
@@ -1467,6 +1482,7 @@ class RheoJAXMainWindow(QMainWindow):
         from rheojax.gui.state.actions import clear_pipeline
 
         clear_pipeline()
+        self.pipeline_chips.reset()
         self.log("Pipeline cleared")
         self.status_bar.show_message("New pipeline created", 2000)
 
@@ -1800,12 +1816,21 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message(f"Theme: {theme.capitalize()}", 2000)
 
     def _apply_theme(self, theme: str) -> None:
-        """Apply QSS theme to the QApplication."""
+        """Apply QSS theme to the QApplication.
 
+        When *theme* is ``"auto"``, the resolved OS color scheme is detected
+        via ``QStyleHints.colorScheme()`` (Qt 6.5+) with a palette-luminance
+        fallback for older Qt versions.
+        """
         app = QApplication.instance()
         if app is None:
             return
-        chosen = "light" if theme == "auto" else theme
+
+        if theme == "auto":
+            chosen = self._detect_os_color_scheme()
+        else:
+            chosen = theme
+
         try:
             app.setStyleSheet(load_stylesheet(chosen))
             ThemeManager.set_theme(chosen)
@@ -1815,8 +1840,9 @@ class RheoJAXMainWindow(QMainWindow):
             )
             self.log(f"Failed to apply theme {theme}: {exc}")
         else:
-            # Persist theme selection into state
+            # Persist resolved theme into state
             self.store.dispatch("SET_THEME", {"theme": chosen})
+            self.store.dispatch("SET_OS_THEME", {"os_theme": chosen})
             self._plot_style = self._select_plot_style(chosen)
 
     def _select_plot_style(self, theme: str) -> str:
@@ -1825,6 +1851,80 @@ class RheoJAXMainWindow(QMainWindow):
         if theme_lower == "dark":
             return "dark"
         return "default"
+
+    @staticmethod
+    def _detect_os_color_scheme() -> str:
+        """Detect the current OS color scheme.
+
+        Tries ``QStyleHints.colorScheme()`` (Qt 6.5+) first, then falls back
+        to measuring the ``QPalette.Window`` luminance.
+
+        Returns
+        -------
+        str
+            ``"dark"`` or ``"light"``.
+        """
+        try:
+            app = QApplication.instance()
+            if app is None:
+                return "light"
+
+            # Qt 6.5+ exposes colorScheme() directly on QStyleHints
+            hints = app.styleHints()
+            if hasattr(hints, "colorScheme"):
+                from PySide6.QtCore import Qt as QtCore_Qt
+
+                scheme = hints.colorScheme()
+                if scheme == QtCore_Qt.ColorScheme.Dark:
+                    return "dark"
+                if scheme == QtCore_Qt.ColorScheme.Light:
+                    return "light"
+                # Qt.ColorScheme.Unknown — fall through to luminance check
+        except Exception:
+            pass
+
+        # Palette luminance fallback for Qt < 6.5 or Unknown scheme
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                window_color = app.palette().color(app.palette().Window)
+                # ITU-R BT.601 luma: dark if luminance < 128
+                luma = (
+                    0.299 * window_color.red()
+                    + 0.587 * window_color.green()
+                    + 0.114 * window_color.blue()
+                )
+                return "dark" if luma < 128 else "light"
+        except Exception:
+            pass
+
+        return "light"
+
+    def _setup_os_theme_watcher(self) -> None:
+        """Hook ``QStyleHints.colorSchemeChanged`` (Qt 6.5+) to re-apply auto theme.
+
+        If the user's theme preference is ``"auto"``, changes to the OS color
+        scheme are automatically reflected.  Call this once during window init.
+        """
+        try:
+            app = QApplication.instance()
+            if app is None:
+                return
+            hints = app.styleHints()
+            if hasattr(hints, "colorSchemeChanged"):
+                hints.colorSchemeChanged.connect(self._on_os_color_scheme_changed)
+                logger.debug("Connected to QStyleHints.colorSchemeChanged")
+        except Exception:
+            logger.debug("QStyleHints.colorSchemeChanged not available")
+
+    def _on_os_color_scheme_changed(self) -> None:
+        """Handle OS color scheme change.
+
+        Re-applies the theme only when the user preference is ``"auto"``.
+        """
+        state = self.store.get_state()
+        if state.theme == "auto":
+            self._apply_theme("auto")
 
     def _on_pipeline_step_changed(self, step: str, status: str) -> None:
         """Update pipeline chips when state changes."""

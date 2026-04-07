@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 
 from rheojax.gui.resources.styles.tokens import (
+    DARK_TOKENS,
+    LIGHT_TOKENS,
     BorderRadius,
     ColorPalette,
     DarkColorPalette,
@@ -32,11 +34,14 @@ STYLES_DIR = Path(__file__).parent
 
 __all__ = [
     # Stylesheet loaders
+    "_generate_qss",
     "get_light_stylesheet",
     "get_dark_stylesheet",
     "get_stylesheet",
     "STYLES_DIR",
     # Design tokens
+    "LIGHT_TOKENS",
+    "DARK_TOKENS",
     "ColorPalette",
     "DarkColorPalette",
     "ThemeManager",
@@ -104,6 +109,35 @@ def _substitute_tokens(base_qss: str, tokens: dict[str, str]) -> str:
         return tokens.get(token, token)
 
     return _TOKEN_RE.sub(_replacer, base_qss)
+
+
+def _generate_qss(theme: str) -> str:
+    """Generate a complete QSS stylesheet by substituting Python token dicts.
+
+    This is the preferred entry-point for programmatic QSS generation.
+    It reads ``base.qss`` once and substitutes tokens from ``LIGHT_TOKENS``
+    or ``DARK_TOKENS`` defined in ``tokens.py``.  Falls back to the file-based
+    token approach (``light.qss`` / ``dark.qss``) when the Python dicts are
+    not available or incomplete.
+
+    Parameters
+    ----------
+    theme : str
+        ``"light"`` or ``"dark"``.
+
+    Returns
+    -------
+    str
+        Fully-resolved QSS stylesheet.
+    """
+    from rheojax.gui.resources.styles.tokens import DARK_TOKENS, LIGHT_TOKENS
+
+    token_dict = DARK_TOKENS if theme == "dark" else LIGHT_TOKENS
+    # Convert Python dict keys to @-prefixed form expected by _substitute_tokens
+    tokens = {f"@{k}": v for k, v in token_dict.items()}
+
+    base_qss = (STYLES_DIR / "base.qss").read_text(encoding="utf-8")
+    return _substitute_tokens(base_qss, tokens)
 
 
 def get_light_stylesheet() -> str:

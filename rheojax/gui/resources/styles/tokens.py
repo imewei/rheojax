@@ -497,8 +497,139 @@ def empty_state_style() -> str:
     """
 
 
+# Python-dict mirrors of the QSS token files (light.qss / dark.qss).
+# Keys match the @token_name identifiers used in base.qss (without the @ prefix).
+# These dicts enable fully programmatic QSS generation via _generate_qss().
+
+LIGHT_TOKENS: dict[str, str] = {
+    # Background
+    "bg_main_window": "#F8FAFC",
+    "bg_surface": "#FFFFFF",
+    "bg_input": "#FFFFFF",
+    "bg_hover": "#F1F5F9",
+    "bg_pressed": "#E2E8F0",
+    "bg_canvas": "#F5F5F4",
+    "bg_alt": "#F8FAFC",
+    # Text
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "text_disabled": "#94A3B8",
+    "text_inverse": "#FFFFFF",
+    "text_on_secondary": "#334155",
+    # Border
+    "border_default": "#E2E8F0",
+    "border_input": "#CBD5E1",
+    "border_hover": "#94A3B8",
+    "border_focus": "#6366F1",
+    "border_subtle": "#E7E5E4",
+    # Primary
+    "primary": "#4338CA",
+    "primary_hover": "#4F46E5",
+    "primary_pressed": "#312E81",
+    "primary_light": "#E0E7FF",
+    "primary_dark": "#3730A3",
+    "primary_gradient_start": "#4338CA",
+    "primary_gradient_end": "#3730A3",
+    "primary_hover_grad_start": "#4F46E5",
+    "primary_hover_grad_end": "#4338CA",
+    # Selection
+    "selection_bg": "#E0E7FF",
+    "selection_text": "#1E1B4B",
+    "input_selection_bg": "#C7D2FE",
+    # Form Controls
+    "accent_checked": "#1D4ED8",
+    "accent_checked_hover": "#1E40AF",
+    "control_border": "#D6D3D1",
+    "control_border_hover": "#A8A29E",
+    "tool_checked_border": "#C7D2FE",
+    # Scrollbar
+    "scrollbar_handle": "#CBD5E1",
+    "scrollbar_hover": "#94A3B8",
+    # Tooltip
+    "tooltip_bg": "#1C1917",
+    "tooltip_text": "#FAFAF9",
+    # Button
+    "button_border": "1px solid #312E81",
+    # Disabled Controls
+    "control_disabled_bg": "#FAFAF9",
+    "control_disabled_border": "#E7E5E4",
+    # Tab
+    "tab_hover_bg": "rgba(241, 245, 249, 0.5)",
+    # Badges
+    "badge_info_bg": "#DBEAFE",
+    "badge_info_text": "#1D4ED8",
+    # Icon Button Primary
+    "icon_btn_primary_bg": "#EFF6FF",
+    "icon_btn_primary_hover": "#DBEAFE",
+}
+
+DARK_TOKENS: dict[str, str] = {
+    # Background
+    "bg_main_window": "#0F172A",
+    "bg_surface": "#1E293B",
+    "bg_input": "#020617",
+    "bg_hover": "#334155",
+    "bg_pressed": "#0F172A",
+    "bg_canvas": "#020617",
+    "bg_alt": "#0F172A",
+    # Text
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#94A3B8",
+    "text_disabled": "#64748B",
+    "text_inverse": "#FFFFFF",
+    "text_on_secondary": "#F8FAFC",
+    # Border
+    "border_default": "#334155",
+    "border_input": "#334155",
+    "border_hover": "#475569",
+    "border_focus": "#6366F1",
+    "border_subtle": "#334155",
+    # Primary
+    "primary": "#6366F1",
+    "primary_hover": "#818CF8",
+    "primary_pressed": "#4338CA",
+    "primary_light": "#312E81",
+    "primary_dark": "#4F46E5",
+    "primary_gradient_start": "#6366F1",
+    "primary_gradient_end": "#4F46E5",
+    "primary_hover_grad_start": "#818CF8",
+    "primary_hover_grad_end": "#6366F1",
+    # Selection
+    "selection_bg": "#312E81",
+    "selection_text": "#FFFFFF",
+    "input_selection_bg": "#4338CA",
+    # Form Controls
+    "accent_checked": "#6366F1",
+    "accent_checked_hover": "#818CF8",
+    "control_border": "#475569",
+    "control_border_hover": "#64748B",
+    "tool_checked_border": "#4338CA",
+    # Scrollbar
+    "scrollbar_handle": "#475569",
+    "scrollbar_hover": "#64748B",
+    # Tooltip
+    "tooltip_bg": "#F8FAFC",
+    "tooltip_text": "#0F172A",
+    # Button
+    "button_border": "none",
+    # Disabled Controls
+    "control_disabled_bg": "#1E293B",
+    "control_disabled_border": "#334155",
+    # Tab
+    "tab_hover_bg": "rgba(51, 65, 85, 0.5)",
+    # Badges
+    "badge_info_bg": "#312E81",
+    "badge_info_text": "#818CF8",
+    # Icon Button Primary
+    "icon_btn_primary_bg": "#312E81",
+    "icon_btn_primary_hover": "#3730A3",
+}
+
+
 # Export all tokens and helpers
 __all__ = [
+    "LIGHT_TOKENS",
+    "DARK_TOKENS",
     "ColorPalette",
     "DarkColorPalette",
     "ThemeManager",
