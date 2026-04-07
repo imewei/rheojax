@@ -1191,14 +1191,14 @@ class ModelService:
             _pred_kwargs: dict = {}
             if test_mode is not None:
                 _pred_kwargs["test_mode"] = test_mode
-            _dm = last_fit.get("deformation_mode") or (
-                model_kwargs.get("deformation_mode") if model_kwargs else None
-            )
-            if _dm:
+            _dm = last_fit.get("deformation_mode")
+            if _dm is None and model_kwargs:
+                _dm = model_kwargs.get("deformation_mode")
+            if _dm is not None:
                 _pred_kwargs["deformation_mode"] = _dm
-            _pr = last_fit.get("poisson_ratio") or (
-                model_kwargs.get("poisson_ratio") if model_kwargs else None
-            )
+            _pr = last_fit.get("poisson_ratio")
+            if _pr is None and model_kwargs:
+                _pr = model_kwargs.get("poisson_ratio")
             if _pr is not None:
                 _pred_kwargs["poisson_ratio"] = _pr
             try:

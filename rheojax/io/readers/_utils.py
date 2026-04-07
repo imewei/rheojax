@@ -539,7 +539,7 @@ def validate_transform(
         )
 
     # Check test_mode/transform consistency
-    if test_mode:
+    if test_mode is not None:
         # Define expected test modes for transforms
         transform_test_modes = {
             "mastercurve": "oscillation",

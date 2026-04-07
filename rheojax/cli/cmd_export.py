@@ -115,8 +115,10 @@ def _build_pipeline_from_envelope(envelope: dict):
         y = np.array(y_payload)
 
     metadata = envelope.get("metadata", {})
-    test_mode = envelope.get("test_mode") or metadata.get("test_mode")
-    if test_mode:
+    test_mode = envelope.get("test_mode")
+    if test_mode is None:
+        test_mode = metadata.get("test_mode")
+    if test_mode is not None:
         metadata["test_mode"] = test_mode
 
     data = RheoData(x=x, y=y, metadata=metadata)
