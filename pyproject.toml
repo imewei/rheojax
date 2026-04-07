@@ -96,7 +96,7 @@ dependencies = [
     "numpyro>=0.20.0,<1.0.0",
 
     # Bayesian visualization and diagnostics
-    "arviz>=0.23.4,<1.0.0",
+    "arviz>=0.23.4,<2.0.0",
     "arviz-base>=0.8.2",
     "arviz-stats>=0.8.0",
     "arviz-plots>=0.8.0",
