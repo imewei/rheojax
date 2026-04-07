@@ -241,4 +241,4 @@ class TransformWorker(QRunnable):
                 try:
                     jax.clear_caches()
                 except Exception:
-                    pass
+                    logger.debug("jax.clear_caches() failed in worker cleanup", exc_info=True)

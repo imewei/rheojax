@@ -401,7 +401,7 @@ class FitWorker(QRunnable):
                 try:
                     jax.clear_caches()
                 except Exception:
-                    pass
+                    logger.debug("jax.clear_caches() failed in worker cleanup", exc_info=True)
 
     def check_cancellation(self) -> None:
         """Check if job should be cancelled.

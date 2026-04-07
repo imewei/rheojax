@@ -304,6 +304,28 @@ except ImportError:
             ) from e
 
 
+def _is_qobject_alive(obj: object) -> bool:
+    """Check whether a QObject's C++ counterpart is still alive.
+
+    Works across PySide6 (shiboken6), PyQt6, and qtpy by trying the
+    appropriate validity check for the active binding.  Returns ``True``
+    if the binding does not expose a validity check (safe default).
+    """
+    try:
+        import shiboken6  # PySide6
+
+        return shiboken6.isValid(obj)  # type: ignore[arg-type]
+    except ImportError:
+        pass
+    try:
+        import sip  # PyQt6/PyQt5
+
+        return not sip.isdeleted(obj)  # type: ignore[arg-type]
+    except (ImportError, TypeError):
+        pass
+    return True
+
+
 def get_qt_info() -> dict[str, str]:
     """Get information about the active Qt binding.
 
@@ -324,6 +346,7 @@ __all__ = [
     "QT_BINDING",
     "QT_VERSION",
     "get_qt_info",
+    "_is_qobject_alive",
     # Core modules
     "QtCore",
     "QtGui",

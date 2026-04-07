@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 import uuid
 import webbrowser
 from pathlib import Path
@@ -896,6 +897,17 @@ class RheoJAXMainWindow(QMainWindow):
         except Exception:
             logger.debug("State unsubscribe failed during shutdown", exc_info=True)
 
+        # Notify child pages to disconnect worker signals BEFORE shutdown
+        # kills subprocesses.  This prevents queued signals from being
+        # delivered to destroyed child widgets (segfault root cause).
+        try:
+            if hasattr(self, "bayesian_page") and hasattr(
+                self.bayesian_page, "prepare_for_close"
+            ):
+                self.bayesian_page.prepare_for_close()
+        except Exception:
+            logger.debug("BayesianPage close prep failed", exc_info=True)
+
         # Attempt graceful worker shutdown with a generous timeout.
         # If workers are still running after the timeout (e.g. NUTS sampling
         # stuck in JIT-compiled XLA code that cannot be interrupted), schedule
@@ -925,6 +937,7 @@ class RheoJAXMainWindow(QMainWindow):
             _force_timer = threading.Timer(2.0, _force_exit)
             _force_timer.daemon = True
             _force_timer.start()
+
         # R10-MW-003: Disconnect only THIS window's signal connections to prevent
         # delivery to destroyed widgets during Qt object teardown.  We disconnect
         # specific slots rather than calling .disconnect() with no args, which
@@ -947,10 +960,15 @@ class RheoJAXMainWindow(QMainWindow):
         except Exception:
             logger.debug("Signal disconnect failed during shutdown", exc_info=True)
 
-        # Drain pending queued events to prevent delivery to destroyed widgets
+        # Drain pending queued events with a timed loop to ensure all
+        # already-posted cross-thread signals are delivered (and dropped
+        # by the _closing guard) before widget destruction begins.
         from rheojax.gui.compat import QApplication
 
-        QApplication.processEvents()
+        _drain_deadline = time.monotonic() + 0.2  # 200 ms max
+        while time.monotonic() < _drain_deadline:
+            QApplication.processEvents()
+            time.sleep(0.005)  # yield CPU between drain iterations
 
         logger.info("Application shutdown complete")
         event.accept()

@@ -308,15 +308,27 @@ class WorkerPool(QObject):
 
         Notes
         -----
-        This only requests cancellation - the job must check
-        its cancellation token periodically to actually stop.
+        For subprocess-based workers (ProcessWorkerAdapter), this routes
+        through ``worker.cancel()`` which triggers the SIGTERM → SIGKILL
+        escalation chain.  For thread-based workers it falls back to
+        ``token.cancel()``.
         """
         with self._job_lock:
-            if job_id in self._active_jobs:
-                token = self._active_jobs[job_id]
-                token.cancel()
-                logger.info("Cancellation requested for job", job_id=job_id)
+            worker = self._active_workers.get(job_id)
+            token = self._active_jobs.get(job_id)
+
+        if worker is not None and hasattr(worker, "cancel") and callable(worker.cancel):
+            try:
+                worker.cancel()
+                logger.info("Cancellation requested for job (via worker)", job_id=job_id)
                 return True
+            except Exception:
+                logger.debug("worker.cancel() failed, falling back to token", exc_info=True)
+
+        if token is not None:
+            token.cancel()
+            logger.info("Cancellation requested for job", job_id=job_id)
+            return True
 
         logger.warning("Job not found for cancellation", job_id=job_id)
         return False

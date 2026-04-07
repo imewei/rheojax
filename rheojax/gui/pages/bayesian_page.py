@@ -36,8 +36,8 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
     Slot,
+    _is_qobject_alive,
 )
-from rheojax.gui.jobs.bayesian_worker import BayesianWorker
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.resources.styles.tokens import (
     ColorPalette,
@@ -92,7 +92,8 @@ class BayesianPage(QWidget):
         self._bayesian_service = BayesianService()
         self._model_service = ModelService()
         self._worker_pool = WorkerPool.instance()
-        self._current_worker: BayesianWorker | None = None
+        self._current_worker: Any = None  # BayesianWorker | ProcessWorkerAdapter
+        self._closing = False
         self._is_running = False
         self._current_preset: str = "custom"
         self._preset_priors: dict[str, dict[str, Any]] | None = None
@@ -386,6 +387,64 @@ class BayesianPage(QWidget):
             # dispatch) are surfaced to the user in the BayesianPage UI.
             self._store.signals.bayesian_failed.connect(self._on_bayesian_failed)
             self._store.signals.state_changed.connect(self._sync_deformation_from_store)
+
+    def _disconnect_worker_signals(self) -> None:
+        """Disconnect this page's slots from the current worker's signals.
+
+        Disconnects only the specific slots that *this page* connected,
+        leaving WorkerPool's connections intact so it can still track
+        job completion and clean up ``_active_jobs``.
+
+        Must be called before this widget is destroyed to prevent
+        QueuedConnection delivery to a freed C++ QObject (segfault).
+        """
+        worker = self._current_worker
+        if worker is None:
+            return
+        # Map: signal name → the specific slot this page connected
+        _slot_map = {
+            "progress": self._on_worker_progress,
+            "stage_changed": self._on_stage_changed,
+            "completed": self._on_finished,
+            "failed": self._on_error,
+            "divergence_detected": self._on_divergence,
+        }
+        for sig_name, slot in _slot_map.items():
+            sig = getattr(worker.signals, sig_name, None)
+            if sig is not None:
+                try:
+                    sig.disconnect(slot)
+                except (TypeError, RuntimeError):
+                    pass
+
+    def prepare_for_close(self) -> None:
+        """Prepare this page for parent window close.
+
+        Called by MainWindow.closeEvent *before* worker_pool.shutdown()
+        to sever all cross-thread signal connections and cancel the
+        active Bayesian job.  This prevents queued signals from being
+        delivered to a destroyed widget.
+        """
+        self._closing = True
+        if self._current_worker is not None:
+            self._current_worker.cancel_token.cancel()
+        self._disconnect_worker_signals()
+        # Also disconnect store signals that target this page's slots
+        if self._store.signals is not None:
+            for sig_name, slot in (
+                ("model_selected", self._on_model_changed),
+                ("bayesian_started", self._on_bayesian_started),
+                ("bayesian_completed", self._on_bayesian_completed),
+                ("bayesian_failed", self._on_bayesian_failed),
+                ("state_changed", self._sync_deformation_from_store),
+            ):
+                sig = getattr(self._store.signals, sig_name, None)
+                if sig is not None:
+                    try:
+                        sig.disconnect(slot)
+                    except (TypeError, RuntimeError):
+                        pass
+        logger.debug("BayesianPage prepared for close")
 
     @Slot()
     def _on_model_changed(self) -> None:
@@ -1004,6 +1063,8 @@ class BayesianPage(QWidget):
         message : str
             Status message
         """
+        if self._closing or not _is_qobject_alive(self):
+            return
         # Normalize to percentage
         progress_pct = int(percent / max(total, 1) * 100) if total > 0 else percent
         self._overall_progress.setValue(progress_pct)
@@ -1019,6 +1080,8 @@ class BayesianPage(QWidget):
         stage : str
             Current stage ('warmup' or 'sampling')
         """
+        if self._closing or not _is_qobject_alive(self):
+            return
         logger.debug("MCMC stage changed", stage=stage, page="BayesianPage")
         self._status_text.append(f"Stage: {stage}")
 
@@ -1031,6 +1094,8 @@ class BayesianPage(QWidget):
         count : int
             Number of divergent transitions detected
         """
+        if self._closing or not _is_qobject_alive(self):
+            return
         self._divergence_label.setText(f"Divergences: {count}")
         if count > 0:
             logger.warning(
@@ -1052,6 +1117,10 @@ class BayesianPage(QWidget):
         result : BayesianResult (from bayesian_worker.py)
             Inference result with posterior_samples, summary, diagnostics, etc.
         """
+        if self._closing or not _is_qobject_alive(self):
+            logger.debug("Suppressing _on_finished during close")
+            return
+        self._disconnect_worker_signals()
         self._current_worker = None
         self._is_running = False
         self._btn_run.setEnabled(True)
@@ -1186,6 +1255,10 @@ class BayesianPage(QWidget):
         error_msg : str
             Error message
         """
+        if self._closing or not _is_qobject_alive(self):
+            logger.debug("Suppressing _on_error during close", error_msg=error_msg)
+            return
+        self._disconnect_worker_signals()
         self._current_worker = None
         self._is_running = False
         self._btn_run.setEnabled(True)

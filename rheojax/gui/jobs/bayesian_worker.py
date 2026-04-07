@@ -81,6 +81,9 @@ class BayesianWorkerSignals(QObject):
         super().__init__()
         # GUI-P1-001: staging buffer for elapsed-timer messages posted via
         # QMetaObject.invokeMethod from a raw threading.Thread.
+        import threading as _threading
+
+        self._elapsed_lock = _threading.Lock()
         self._pending_elapsed_msg: str = ""
 
     @Slot()
@@ -91,7 +94,8 @@ class BayesianWorkerSignals(QObject):
         from _elapsed_timer so the progress signal is always emitted from
         the main Qt thread regardless of which OS thread triggered it.
         """
-        msg = self._pending_elapsed_msg
+        with self._elapsed_lock:
+            msg = self._pending_elapsed_msg
         if msg:
             self.progress.emit(0, 0, msg)
 
@@ -391,27 +395,39 @@ class BayesianWorker(QRunnable):
                 # GUI-P1-001 fix: use QMetaObject.invokeMethod(QueuedConnection) so
                 # the slot runs on the main Qt thread even though this function runs
                 # in a raw threading.Thread (not a Qt-managed thread).
+                # Import from the compat layer's QtCore to support PySide6/PyQt6/qtpy.
+                _QMetaObject = None
+                _conn_type = None
                 try:
-                    from PySide6.QtCore import QMetaObject
-                    from PySide6.QtCore import Qt as _Qt
+                    from rheojax.gui.compat import Qt as _Qt
+                    from rheojax.gui.compat import QtCore as _QtCore
 
-                    _use_invoke = True
-                except ImportError:
-                    _use_invoke = False
+                    _QMetaObject = _QtCore.QMetaObject
+                    _conn_type = _Qt.ConnectionType.QueuedConnection
+                except (ImportError, AttributeError):
+                    pass
+
+                from rheojax.gui.compat import _is_qobject_alive
 
                 while not _nuts_done.wait(timeout=5.0):
+                    if not _is_qobject_alive(self.signals):
+                        break
                     elapsed = time.perf_counter() - _nuts_start
                     msg = f"NUTS sampling... ({elapsed:.0f}s elapsed)"
-                    if _use_invoke:
-                        # Write buffer BEFORE invokeMethod to avoid race where
-                        # the slot runs before the buffer is populated.
-                        self.signals._pending_elapsed_msg = msg
-                        QMetaObject.invokeMethod(
+                    if _QMetaObject is not None and _conn_type is not None:
+                        # Write buffer under lock, BEFORE invokeMethod, to
+                        # avoid race where the slot runs before the buffer
+                        # is populated.
+                        with self.signals._elapsed_lock:
+                            self.signals._pending_elapsed_msg = msg
+                        _QMetaObject.invokeMethod(
                             self.signals,
                             "_emit_progress_elapsed",
-                            _Qt.ConnectionType.QueuedConnection,
+                            _conn_type,
                         )
                     else:
+                        # No Qt available at all — best-effort direct emit.
+                        # This path only runs in headless/test environments.
                         self.signals.progress.emit(0, 0, msg)
 
             timer_thread = threading.Thread(target=_elapsed_timer, daemon=True)
@@ -545,7 +561,7 @@ class BayesianWorker(QRunnable):
                 try:
                     jax.clear_caches()
                 except Exception:
-                    pass
+                    logger.debug("jax.clear_caches() failed in worker cleanup", exc_info=True)
 
     def check_cancellation(self) -> None:
         """Check if job should be cancelled.
