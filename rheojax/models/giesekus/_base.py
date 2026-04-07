@@ -289,11 +289,13 @@ class GiesekusBase(BaseModel):
         float
             Approximate Wi for shear-thinning onset
         """
-        # Onset scales as 1/sqrt(α) for small α
-        if self.alpha > 1e-6:
-            return 1.0 / jnp.sqrt(self.alpha)
-        else:
-            return jnp.inf  # No shear-thinning for α=0
+        # Onset scales as 1/sqrt(α) for small α.
+        # Use jnp.maximum for gradient safety (safe under AD if ever traced).
+        return jnp.where(
+            self.alpha > 1e-6,
+            1.0 / jnp.sqrt(jnp.maximum(self.alpha, 1e-30)),
+            jnp.inf,
+        )
 
     def is_ucm_limit(self, tol: float = 1e-6) -> bool:
         """Check if model is effectively at UCM limit (α ≈ 0).

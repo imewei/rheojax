@@ -123,7 +123,7 @@ class VLBBase(BaseModel):
             Stretch ratio (dimensionless, >= 0)
         """
         tr_mu = mu_xx + mu_yy + mu_zz
-        return float(jnp.sqrt(jnp.maximum(tr_mu / 3.0, 0.0)))
+        return float(jnp.sqrt(jnp.maximum(tr_mu / 3.0, 0.0) + 1e-30))
 
     # =========================================================================
     # Dimensionless Numbers

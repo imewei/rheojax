@@ -140,6 +140,9 @@ def solve_fractional_lambda_implicit(
 
     # Compute history contribution using L1 weights
     # Full history: [λ_{n-N}, ..., λ_{n-1}, λ_n]
+    # NOTE: ndim/shape checks are static under JIT (resolved at trace time).
+    # Different history sizes trigger recompilation, which is expected for
+    # fractional ODE solvers with growing memory buffers.
     if lam_history.ndim == 0:
         # Scalar case - no history
         history_term = lam_n
@@ -208,6 +211,7 @@ def solve_fractional_lambda_explicit(
     f_n = fractional_structure_rhs(lam_n, gamma_dot_p_abs, tau_thix, Gamma)
 
     # Memory correction from history
+    # NOTE: ndim/shape checks are static under JIT (see comment in implicit solver)
     if lam_history.ndim == 0 or lam_history.shape[0] < 2:
         memory_correction = 0.0
     else:

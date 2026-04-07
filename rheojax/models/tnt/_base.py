@@ -122,7 +122,7 @@ class TNTBase(BaseModel):
             Stretch ratio (dimensionless, ≥ 0)
         """
         tr_S = S_xx + S_yy + S_zz
-        return float(jnp.sqrt(jnp.maximum(tr_S / 3.0, 0.0)))
+        return float(jnp.sqrt(jnp.maximum(tr_S / 3.0, 0.0) + 1e-30))
 
     # =========================================================================
     # Dimensionless Numbers
