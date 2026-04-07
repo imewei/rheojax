@@ -194,7 +194,7 @@ def main(args: list[str] | None = None) -> int:
 
         metadata = dict(data.metadata) if hasattr(data, "metadata") else {}
         metadata["source"] = str(parsed.input_file)
-        if test_mode:
+        if test_mode is not None:
             metadata["test_mode"] = test_mode
         envelope = create_data_envelope(x_arr, y_arr, metadata=metadata)
         envelope.write_stdout()

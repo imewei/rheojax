@@ -235,7 +235,7 @@ def plot_rheo_data(
         if is_freq_domain or np.iscomplexobj(data.y):
             # Frequency-domain data — pass deformation_mode for label selection
             freq_kwargs = dict(kwargs)
-            if deformation_mode:
+            if deformation_mode is not None:
                 freq_kwargs["deformation_mode"] = deformation_mode
 
             result = plot_frequency_domain(

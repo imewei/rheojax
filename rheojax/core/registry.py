@@ -467,7 +467,7 @@ class Registry:
                         continue
 
                 # Deformation mode filtering
-                if deformation_mode:
+                if deformation_mode is not None:
                     target_dm = (
                         DeformationMode(deformation_mode)
                         if isinstance(deformation_mode, str)

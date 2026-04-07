@@ -149,7 +149,7 @@ def plot_modulus_frequency(
         if separate_axes and np.iscomplexobj(y_data):
             # Two separate axes for storage/loss modulus
             freq_kwargs = dict(kwargs)
-            if deformation_mode:
+            if deformation_mode is not None:
                 freq_kwargs["deformation_mode"] = deformation_mode
             fig, axes = plot_frequency_domain(
                 x_data,

@@ -179,7 +179,7 @@ class DataService:
                 kwargs["y2_col"] = y2_col
             # Forward test_mode so readers can use it as a column-selection
             # hint (e.g. TRIOS select_xy_columns).  F-IO-R4-003.
-            if test_mode:
+            if test_mode is not None:
                 kwargs.setdefault("test_mode", test_mode)
 
             logger.debug("Calling auto_load", filepath=str(file_path), kwargs=kwargs)
@@ -213,7 +213,7 @@ class DataService:
                     raise ValueError("Failed to load data as RheoData")
 
             # Set test mode if provided
-            if test_mode:
+            if test_mode is not None:
                 data.metadata["test_mode"] = test_mode
                 logger.debug("Test mode set", test_mode=test_mode)
 
@@ -294,7 +294,7 @@ class DataService:
             kwargs["y_col"] = y_col
         if y2_col:
             kwargs["y2_col"] = y2_col
-        if test_mode:
+        if test_mode is not None:
             kwargs.setdefault("test_mode", test_mode)
 
         data = auto_load(str(file_path), **kwargs)
@@ -310,7 +310,7 @@ class DataService:
                 else:
                     continue
 
-            if test_mode:
+            if test_mode is not None:
                 ds.metadata["test_mode"] = test_mode
 
             ds = self._convert_units(ds)
