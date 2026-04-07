@@ -585,6 +585,22 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
         if isinstance(group[key], h5py.Group):
             metadata[key] = _read_metadata_recursive(group[key])
         else:
-            metadata[key] = group[key][:]
+            raw = group[key][:]
+            # Sanitise string datasets the same way as attributes
+            if hasattr(raw, "dtype") and raw.dtype.kind in ("S", "U", "O"):
+                try:
+                    items = raw.tolist()
+                    if isinstance(items, (bytes, str)):
+                        raw = _safe_decode_hdf5_string(items)
+                    elif isinstance(items, list) and items:
+                        raw = [
+                            _safe_decode_hdf5_string(v)
+                            if isinstance(v, (bytes, str))
+                            else v
+                            for v in items
+                        ]
+                except (AttributeError, UnicodeDecodeError):
+                    pass
+            metadata[key] = raw
 
     return metadata
