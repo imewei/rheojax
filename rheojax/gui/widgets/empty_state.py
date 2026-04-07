@@ -6,9 +6,9 @@ rules for ``QLabel[class="empty-message"]`` and ``QLabel[class="empty-desc"]``
 provide the color/font-size definitions.
 """
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from collections.abc import Callable
 
+from rheojax.gui.compat import QLabel, QPushButton, Qt, QVBoxLayout, QWidget, Signal
 from rheojax.gui.resources.styles.tokens import Spacing
 
 
@@ -74,6 +74,39 @@ class EmptyStateWidget(QWidget):
         """Update the description text (if present)."""
         if hasattr(self, "_desc_label"):
             self._desc_label.setText(text)
+
+    def set_action_button(self, label: str, callback: Callable[[], None]) -> None:
+        """Set a primary call-to-action button on the empty state.
+
+        If the button already exists (e.g. the instance was constructed with
+        ``action_text``), its text and connection are updated in-place.
+        Otherwise a new button is appended to the layout.
+
+        Parameters
+        ----------
+        label : str
+            Button label text.
+        callback : Callable[[], None]
+            Slot to invoke when the button is clicked.
+        """
+        if hasattr(self, "_action_btn"):
+            self._action_btn.setText(label)
+            # Disconnect the generic action_clicked relay and connect directly
+            try:
+                self._action_btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            self._action_btn.clicked.connect(callback)
+            self._action_btn.clicked.connect(self.action_clicked.emit)
+        else:
+            self._action_btn = QPushButton(label)
+            self._action_btn.setProperty("variant", "secondary")
+            self._action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._action_btn.clicked.connect(callback)
+            self._action_btn.clicked.connect(self.action_clicked.emit)
+            self.layout().addWidget(
+                self._action_btn, alignment=Qt.AlignmentFlag.AlignCenter
+            )
 
 
 __all__ = ["EmptyStateWidget"]

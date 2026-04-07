@@ -8,7 +8,7 @@ Swaps workspace panels based on the selected pipeline step type, defaulting
 to the HomePage when no step is selected.
 """
 
-from rheojax.gui.compat import QStackedWidget, QWidget
+from rheojax.gui.compat import QStackedWidget, QWidget, Signal
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -29,12 +29,22 @@ class WorkspaceContainer(QStackedWidget):
     "bayesian"    -> BayesianPage
     "export"      -> ExportPage
 
+    Signals
+    -------
+    page_changed : Signal(str)
+        Emitted after ``show_step()`` switches to a new page, carrying the
+        resolved step-type key (e.g. ``"fit"``) or ``"home"`` for the
+        HomePage.  The main window can log page transitions without coupling
+        to page internals.
+
     Example
     -------
     >>> container = WorkspaceContainer()  # doctest: +SKIP
     >>> container.show_step("fit")  # doctest: +SKIP
     >>> page = container.get_current_page()  # doctest: +SKIP
     """
+
+    page_changed = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the workspace container.
@@ -102,6 +112,7 @@ class WorkspaceContainer(QStackedWidget):
                 resolved="home",
             )
             self.setCurrentIndex(self._home_index)
+            self.page_changed.emit("home")
             return
 
         index = self._page_index[step_type]
@@ -113,6 +124,7 @@ class WorkspaceContainer(QStackedWidget):
             index=index,
         )
         self.setCurrentIndex(index)
+        self.page_changed.emit(step_type)
 
     def get_current_page(self) -> QWidget:
         """Get the currently visible page widget.

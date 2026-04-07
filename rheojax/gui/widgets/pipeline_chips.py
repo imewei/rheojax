@@ -196,6 +196,14 @@ class PipelineChips(QWidget):
         for chip in self._chips.values():
             self._apply_chip_style(chip, StepStatus.PENDING)
 
+    def reset(self) -> None:
+        """Reset all chips to pending status.
+
+        Convenience alias for ``reset_all()``, called on ``CLEAR_PIPELINE``
+        to ensure stale chip states are cleared after a pipeline reset.
+        """
+        self.reset_all()
+
     def _apply_chip_style(self, chip: QPushButton, status: StepStatus) -> None:
         """Apply styling to chip based on status.
 
