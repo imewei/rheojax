@@ -1,0 +1,23 @@
+include LICENSE
+include README.md
+include pyproject.toml
+recursive-include rheojax *.py *.typed *.json *.yaml
+
+prune docs
+prune examples
+prune tests
+prune scripts
+prune .github
+prune *.egg-info
+
+exclude .gitignore
+exclude .gitattributes
+exclude .pre-commit-config.yaml
+exclude .readthedocs.yaml
+exclude CLAUDE.md
+exclude AGENTS.md
+exclude CONTRIBUTING.md
+exclude DMTA_MODEL_CATALOG.md
+exclude Makefile
+exclude setup.cfg
+exclude uv.lock
