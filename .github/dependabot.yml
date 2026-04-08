@@ -10,6 +10,27 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "deps"
+    # Ignore major version bumps for critical dependencies — these need manual migration
+    ignore:
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "arviz"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jax"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "numpyro"
+        update-types: ["version-update:semver-major"]
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "ruff"
+          - "black"
+          - "mypy"
+          - "sphinx*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -21,3 +42,7 @@ updates:
       - "ci"
     commit-message:
       prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
