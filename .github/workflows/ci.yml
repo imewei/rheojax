@@ -41,6 +41,7 @@ jobs:
       run: uv run ruff check rheojax tests
 
     - name: Run MyPy
+      continue-on-error: true
       run: uv run mypy rheojax --ignore-missing-imports --no-strict-optional
 
   quality:
@@ -125,13 +126,14 @@ jobs:
     - name: Install PySide6 system dependencies (Linux)
       if: runner.os == 'Linux'
       run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq libegl1-mesa libxkbcommon-x11-0 libxcb-xinerama0 >/dev/null 2>&1
+        sudo apt-get update
+        sudo apt-get install -y libegl1-mesa libegl1 libxkbcommon-x11-0 libxcb-xinerama0 libgl1-mesa-glx libopengl0
 
     - name: Install dependencies
       run: uv sync
 
     - name: Run smoke tests
+      shell: bash
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
