@@ -206,7 +206,9 @@ def themed(token_name: str) -> str:
     if value is None:
         import logging
 
-        logging.getLogger(__name__).warning(  # nosemgrep: python-logger-credential-disclosure
+        logging.getLogger(
+            __name__
+        ).warning(  # nosemgrep: python-logger-credential-disclosure
             "Unknown design token '%s', falling back to TEXT_PRIMARY", token_name
         )
         return palette.TEXT_PRIMARY
