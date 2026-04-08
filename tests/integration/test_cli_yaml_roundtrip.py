@@ -290,10 +290,15 @@ class TestValidationEdgeCases:
 
     @pytest.mark.smoke
     def test_absolute_path_rejected(self):
+        import sys
+
+        # Use platform-appropriate absolute path:
+        # On Windows, "/etc/passwd" is not absolute (no drive letter)
+        abs_path = "C:\\data.csv" if sys.platform == "win32" else "/etc/passwd"
         config = PipelineConfig(
             version="1",
             name="absolute",
-            steps=[{"type": "load", "file": "/etc/passwd"}],
+            steps=[{"type": "load", "file": abs_path}],
         )
         errors = validate_config(config)
         assert any("relative" in e.lower() or "absolute" in e.lower() for e in errors)

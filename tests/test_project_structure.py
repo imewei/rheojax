@@ -263,7 +263,7 @@ class TestPhysicsFormulaReferences:
 
         missing_refs = []
         for kf in kernel_files:
-            content = kf.read_text()
+            content = kf.read_text(encoding="utf-8")
             # Check for equation references (Eq., equation, Eqn.)
             if not any(
                 ref in content for ref in ["Eq.", "equation", "Eqn.", "eq.", "eqn."]
@@ -378,7 +378,7 @@ class TestJnpRollBan:
             path = pathlib.Path(filepath)
             if not path.exists():
                 continue
-            content = path.read_text()
+            content = path.read_text(encoding="utf-8")
             # Find jnp.roll usage (excluding comments)
             for i, line in enumerate(content.split("\n"), 1):
                 stripped = line.strip()
