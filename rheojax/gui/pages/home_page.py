@@ -222,7 +222,7 @@ class HomePage(QWidget):
 
             version_text = f"v{__version__}"
         except ImportError:
-            version_text = "v0.6.0"
+            version_text = "v0.6.1"
 
         version_badge = QLabel(version_text)
         version_badge.setStyleSheet(f"""

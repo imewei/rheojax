@@ -5,6 +5,12 @@ All notable changes to RheoJAX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-04-08
+
+### Fixed
+- **Build**: Added `MANIFEST.in` to exclude docs/examples/tests from sdist (151 MB → 1.4 MB, fixes PyPI upload)
+- **CI**: Inlined release workflow gates (fixes `workflow_call` startup_failure on tag pushes)
+
 ## [0.6.0] - 2026-04-08
 
 ### Added - Protocol-Driven Model Inventory System
@@ -718,6 +724,7 @@ Refactored the smart initialization system to use the Template Method design pat
 
 Previous releases documented in git history.
 
+[0.6.1]: https://github.com/imewei/rheojax/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/imewei/rheojax/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/imewei/rheojax/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/imewei/rheojax/compare/v0.3.2...v0.4.0
