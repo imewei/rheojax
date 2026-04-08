@@ -1,5 +1,6 @@
 # RheoJAX - JAX-Powered Rheological Analysis
 
+[![CI](https://github.com/imewei/rheojax/actions/workflows/ci.yml/badge.svg)](https://github.com/imewei/rheojax/actions/workflows/ci.yml)
 [![PyPI version](https://badge.fury.io/py/rheojax.svg)](https://badge.fury.io/py/rheojax)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -124,7 +125,8 @@ pip install rheojax
 ```bash
 git clone https://github.com/imewei/rheojax.git
 cd rheojax
-pip install -e ".[dev]"
+uv sync              # Install all dependencies from uv.lock
+pre-commit install   # Set up pre-commit hooks
 ```
 
 ### GPU Installation (Linux + System CUDA)
@@ -902,12 +904,6 @@ See `examples/README.md` for learning path guide.
 
 RheoJAX includes an optional GUI built with PySide6/Qt6 for interactive analysis:
 
-### Installation
-
-```bash
-pip install rheojax[gui]
-```
-
 ### Launching
 
 ```bash
@@ -1003,14 +999,20 @@ Contributions are accepted. See [Contributing Guide](CONTRIBUTING.md) for detail
 git clone https://github.com/imewei/rheojax.git
 cd rheojax
 
-# Install development dependencies
-pip install -e ".[dev]"
+# Install all dependencies (uses uv.lock as single source of truth)
+uv sync
 
 # Install pre-commit hooks
 pre-commit install
 
-# Run tests
-pytest
+# Run smoke tests (CI gate, ~1838 tests)
+uv run pytest -n 4 -m "smoke"
+
+# Run full test suite (~4963 tests)
+uv run pytest -n 4
+
+# Format and lint
+make format && make quick
 ```
 
 ## License

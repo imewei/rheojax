@@ -120,9 +120,9 @@ Workflow-oriented pages:
 
 ## Requirements
 
-Install GUI dependencies:
+Install all dependencies (GUI deps are included):
 ```bash
-pip install rheojax[gui]
+uv sync
 ```
 
 **Core Dependencies:**

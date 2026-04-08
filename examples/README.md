@@ -875,7 +875,7 @@ done
 **Solution:** Install the package in development mode:
 ```bash
 cd /Users/b80985/Projects/rheojax
-pip install -e .
+uv sync
 ```
 
 ### "JAX is float32 instead of float64"

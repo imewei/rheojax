@@ -9,9 +9,9 @@ This guide walks you through launching and using the RheoJAX GUI for the first t
 Prerequisites
 =============
 
-Ensure you have RheoJAX installed with GUI support::
+Ensure you have RheoJAX installed (GUI dependencies are included)::
 
-    pip install rheojax[gui]
+    uv sync
 
 Verify the installation::
 

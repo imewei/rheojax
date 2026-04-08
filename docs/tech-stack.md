@@ -105,9 +105,9 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| **pytest** | 9.0.2 | Test framework |
-| **pytest-xdist** | 3.8.0 | Parallel test execution (capped at 4 workers) |
-| **pytest-timeout** | 2.3.1 | Per-test timeout (default 120s) |
+| **pytest** | >=9.0.2 | Test framework |
+| **pytest-xdist** | >=3.8.0 | Parallel test execution (capped at 4 workers) |
+| **pytest-timeout** | >=2.3.1 | Per-test timeout (default 120s) |
 | **pytest-cov** | | Coverage reporting |
 | **pytest-qt** | | GUI widget testing |
 | **pytest-image-diff** | | Visual regression testing |
@@ -117,9 +117,9 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **black** | 26.1.0 | Code formatting (line-length=88) |
-| **ruff** | 0.15.0 | Linting (E, W, F, I, C, B, UP rules) |
-| **mypy** | 1.19.1 | Static type checking (strict equality) |
+| **black** | >=26.1.0 | Code formatting (line-length=88) |
+| **ruff** | >=0.15.0 | Linting (E, W, F, I, C, B, UP, S rules) |
+| **mypy** | >=1.19.1 | Static type checking (strict equality) |
 | **pre-commit** | | Git hook management |
 
 ### Documentation
@@ -155,7 +155,7 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 | `make test-fast` | `pytest -m "not slow..."` | Exclude slow Bayesian (~4714) |
 | `make test-parallel` | `pytest -n $XDIST_WORKERS` | Parallel (default 4 workers) |
 | `make test-ci` | `pytest -m smoke` | CI gate (matches GitHub Actions) |
-| `make test-ci-full` | `pytest -m "not slow..."` | Extended CI (~1069 tests) |
+| `make test-ci-full` | `pytest -m "not slow..."` | Extended CI (~4714 tests) |
 | `make test-coverage` | `pytest --cov-report=html` | Coverage with HTML report |
 | `make format` | `black . && ruff --fix` | Auto-format + lint fix |
 | `make quick` | `black + ruff + smoke` | Fast quality check |
@@ -188,8 +188,8 @@ addopts = [
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-select = ["E", "W", "F", "I", "C", "B", "UP"]
-ignore = ["E501", "B008", "C901"]
+select = ["E", "W", "F", "I", "C", "B", "UP", "S"]
+ignore = ["E501", "B008", "C901", "S101", "S110", "S112", "S607", "S311"]
 ```
 
 Per-file ignores: `__init__.py` (F401 unused imports), model/transform files (E402 import order), test files (relaxed rules), notebooks (all rules).
@@ -209,8 +209,13 @@ Overrides: `rheojax.models.*` (relaxed name-defined/any-return), `rheojax.gui.*`
 
 ## CI/CD
 
-- **Status:** GitHub Actions workflows currently disabled (in `.github/workflows.disabled/`)
-- **CI gate:** Smoke tests only (~1838 tests) for fast feedback
+- **Platform:** GitHub Actions (`.github/workflows/`)
+- **Workflows:**
+  - `ci.yml` — lint (3.12 + 3.13), quality (radon), dependency-review, test (3 OS × 2 Py), docs, build, audit
+  - `release.yml` — tag-triggered PyPI publish with build provenance attestation, SBOM, GitHub Release (reuses CI via `workflow_call`)
+  - `security.yml` — CodeQL, Semgrep SAST, Gitleaks, Trivy (push/PR + weekly schedule)
+  - `dependabot-auto-merge.yml` — auto-squash-merge minor/patch dependency updates
+- **CI gate:** Smoke tests (~1838 tests) on 3 OS × 2 Python versions
 - **Local CI:** `make quick` (format + lint + smoke)
 
 ---

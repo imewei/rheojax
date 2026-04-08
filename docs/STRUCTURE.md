@@ -8,7 +8,6 @@
 docs/
 ├── README.md                         # Documentation overview and navigation guide
 ├── Makefile                          # Sphinx build commands
-├── requirements-docs.txt             # Documentation dependencies
 ├── .gitignore                        # Excluded files/folders
 ├── model-test-mode-compatibility.md  # Model-test mode matrix (53 models)
 ├── STRUCTURE.md                      # This file

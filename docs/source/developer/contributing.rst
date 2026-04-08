@@ -29,15 +29,11 @@ Development Setup
        conda create -n rheojax python=3.12
        conda activate rheojax
 
-3. **Install in Development Mode**
+3. **Install Dependencies** (uv creates ``.venv`` automatically)
 
    .. code-block:: bash
 
-       # Install with uv (preferred — manages venv + dependencies)
        uv sync
-
-       # Or with pip (legacy)
-       pip install -e ".[dev]"
 
 4. **Install Pre-commit Hooks**
 
@@ -53,14 +49,14 @@ Development Setup
 
    .. code-block:: bash
 
-       # Run smoke tests (1077 tests, ~30s-2min)
-       uv run pytest -n auto -m "smoke"
+       # Run smoke tests (~1838 tests, ~2-6 min)
+       uv run pytest -n 4 -m "smoke"
 
-       # Run standard tests (3349 tests, ~5-10 min)
-       uv run pytest -n auto -m "not slow"
+       # Run standard tests (~4714 tests, ~10-20 min)
+       uv run pytest -n 4 -m "not slow"
 
-       # Run full suite (3576 tests)
-       uv run pytest -n auto
+       # Run full suite (~4963 tests, includes slow Bayesian)
+       uv run pytest -n 4
 
        # Quick format + lint + smoke
        make format && make quick
@@ -137,7 +133,7 @@ Style Guide
 
 We follow PEP 8 with some modifications:
 
-- Line length: 100 characters (not 79)
+- Line length: 88 characters (Black default)
 - Use double quotes for strings
 - Use trailing commas in multi-line structures
 
@@ -308,14 +304,14 @@ RheoJAX uses a **tiered testing strategy** with pytest markers:
 
 .. code-block:: bash
 
-    # Tier 1: Smoke tests (~1077 tests, ~30s-2min) — used in CI
-    uv run pytest -n auto -m "smoke"
+    # Tier 1: Smoke tests (~1838 tests, ~2-6 min) — CI gate
+    uv run pytest -n 4 -m "smoke"
 
-    # Tier 2: Standard tests (~3349 tests, ~5-10 min)
-    uv run pytest -n auto -m "not slow"
+    # Tier 2: Standard tests (~4714 tests, ~10-20 min)
+    uv run pytest -n 4 -m "not slow"
 
-    # Tier 3: Full suite (~3576 tests, includes Bayesian slow tests)
-    uv run pytest -n auto
+    # Tier 3: Full suite (~4963 tests, includes slow Bayesian)
+    uv run pytest -n 4
 
     # Quick format + lint + smoke
     make format && make quick
@@ -713,22 +709,21 @@ Release Process
        # Update version in pyproject.toml
        # Update CHANGELOG.md
 
-2. **Tag Release**
+2. **Tag Release** — triggers the GitHub Actions release workflow automatically:
 
    .. code-block:: bash
 
-       git tag v0.1.0
-       git push origin v0.1.0
+       git tag v0.6.0
+       git push origin v0.6.0
 
-3. **Build and Publish**
+   The ``release.yml`` workflow will:
 
-   .. code-block:: bash
-
-       # Build package
-       python -m build
-
-       # Upload to PyPI
-       python -m twine upload dist/*
+   - Run the full CI pipeline (lint, test, docs, build)
+   - Verify the package version matches the git tag
+   - Build the package and generate build provenance attestation
+   - Publish to PyPI via trusted publishing (OIDC)
+   - Generate an SBOM (CycloneDX)
+   - Create a GitHub Release with changelog and artifacts
 
 Getting Help
 ------------

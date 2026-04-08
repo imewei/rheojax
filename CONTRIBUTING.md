@@ -20,18 +20,12 @@ git clone https://github.com/yourusername/rheojax.git
 cd rheojax
 ```
 
-3. **Create a virtual environment**:
+3. **Install dependencies** (creates `.venv` automatically):
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+uv sync
 ```
 
-4. **Install in development mode**:
-```bash
-pip install -e ".[dev]"
-```
-
-5. **Set up pre-commit hooks**:
+4. **Set up pre-commit hooks**:
 ```bash
 pre-commit install
 ```
@@ -53,27 +47,29 @@ git checkout -b feature/your-feature-name
 ### 3. Run tests
 
 ```bash
-# Run all tests
-pytest
+# Run smoke tests (~1838 tests, CI gate)
+uv run pytest -n 4 -m "smoke"
 
-# Run with coverage
-pytest --cov=rheojax
+# Run non-slow tests (~4714 tests)
+uv run pytest -n 4 -m "not slow"
+
+# Run full suite (~4963 tests)
+uv run pytest -n 4
 
 # Run specific test file
-pytest tests/test_specific.py
+uv run pytest tests/core/test_data.py
 ```
 
 ### 4. Code Quality Checks
 
 ```bash
-# Format code with Black
-black rheojax tests
+# Format + lint + smoke (recommended before committing)
+make format && make quick
 
-# Check with Ruff
-ruff check rheojax tests
-
-# Type checking with MyPy
-mypy rheojax
+# Or run individually:
+uv run black rheojax tests
+uv run ruff check rheojax tests
+uv run mypy rheojax --ignore-missing-imports --no-strict-optional
 ```
 
 ### 5. Commit your changes

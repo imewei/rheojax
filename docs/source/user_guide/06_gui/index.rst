@@ -35,13 +35,9 @@ The RheoJAX GUI provides a visual interface for:
 Installation
 ============
 
-The GUI requires additional dependencies::
+The GUI dependencies are included in the standard install::
 
-    pip install rheojax[gui]
-
-Or install PySide6 separately::
-
-    pip install PySide6
+    uv sync
 
 Launching the GUI
 =================

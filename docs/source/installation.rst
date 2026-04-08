@@ -7,9 +7,9 @@ Requirements
 * Python 3.12 or higher (3.8-3.11 NOT supported)
 * JAX >= 0.8.3
 * jaxlib >= 0.8.3 (must be compatible with JAX version)
-* NumPy >= 2.2.0
-* SciPy >= 1.14.0
-* NLSQ >= 0.6.8 (GPU-accelerated optimization)
+* NumPy >= 2.3.5
+* SciPy >= 1.17.0
+* NLSQ >= 0.6.10 (GPU-accelerated optimization)
 * NumPyro >= 0.20.0 (Bayesian inference)
 * ArviZ >= 0.23.4 (Bayesian visualization)
 
@@ -25,13 +25,14 @@ Install from PyPI:
 Development Installation
 ------------------------
 
-For development, clone the repository and install in editable mode:
+For development, clone the repository and install with uv:
 
 .. code-block:: bash
 
    git clone https://github.com/imewei/rheojax.git
    cd rheojax
-   pip install -e ".[dev]"
+   uv sync              # Install all dependencies from uv.lock
+   pre-commit install   # Set up pre-commit hooks
 
 Optional Dependencies
 ---------------------
@@ -101,33 +102,6 @@ GPU acceleration provides 20-100x speedup for large datasets.
    make gpu-check      # Verify GPU backend, devices, SVD computation
    make gpu-diagnose   # Check for plugin conflicts, version mismatches
 
-I/O Support
-~~~~~~~~~~~
-
-For additional file format support (HDF5, Excel):
-
-.. code-block:: bash
-
-   pip install "rheojax[io]"
-
-Machine Learning
-~~~~~~~~~~~~~~~~
-
-For ML-based transforms:
-
-.. code-block:: bash
-
-   pip install "rheojax[ml]"
-
-All Dependencies
-~~~~~~~~~~~~~~~~
-
-To install all optional dependencies:
-
-.. code-block:: bash
-
-   pip install "rheojax[all]"
-
 Verifying Installation
 ----------------------
 
@@ -194,4 +168,4 @@ If you encounter import errors, ensure all dependencies are installed:
 
 .. code-block:: bash
 
-   pip install -e ".[dev]"
+   uv sync

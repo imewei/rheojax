@@ -1170,14 +1170,8 @@ Install RheoJAX with all dependencies:
 
 .. code-block:: bash
 
-   pip install rheojax[all]
-
-Or install with specific extras:
-
-.. code-block:: bash
-
-   pip install rheojax[bayesian]  # NumPyro + ArviZ
-   pip install rheojax[gpu]       # JAX with CUDA (Linux only)
+   uv sync                    # All dependencies included
+   make install-jax-gpu       # Optional: GPU acceleration (Linux + CUDA)
 
 Jupyter Setup
 -------------
