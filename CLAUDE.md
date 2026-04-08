@@ -4,7 +4,7 @@ RheoJAX: JAX-accelerated rheological analysis (2-10x vs scipy).
 
 ## Stack & Commands
 
-**Stack:** Python 3.12+, JAX >=0.8.3, NLSQ >=0.6.8, NumPyro, ArviZ >=0.23.4
+**Stack:** Python 3.12+, JAX >=0.8.3, NLSQ >=0.6.10, NumPyro, ArviZ >=0.23.4
 
 ```bash
 # Testing (tiered)

@@ -140,7 +140,7 @@ Technology Stack
 **Core Dependencies**
    - Python 3.12+
    - JAX >=0.8.3 for acceleration and automatic differentiation
-   - NLSQ >=0.6.8 for GPU-accelerated optimization (workflow system, prediction intervals)
+   - NLSQ >=0.6.10 for GPU-accelerated optimization (workflow system, prediction intervals)
    - NumPyro for Bayesian inference (MCMC NUTS sampling, multi-chain parallelization)
    - ArviZ >=0.23.4 for Bayesian visualization and diagnostics
    - NumPy, SciPy for numerical operations

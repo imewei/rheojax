@@ -296,10 +296,10 @@ To add new test data fixtures:
 
 ### "ModuleNotFoundError: No module named 'rheojax'"
 
-Ensure RheoJAX is installed in development mode:
+Ensure RheoJAX is installed:
 ```bash
 cd /path/to/rheojax
-pip install -e .
+uv sync
 ```
 
 ### "ImportError: cannot import name 'mittag_leffler'"
