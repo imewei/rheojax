@@ -5,7 +5,7 @@ All notable changes to RheoJAX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-04-08
 
 ### Added - Protocol-Driven Model Inventory System
 **Type-Safe Discovery for Models and Transforms**
@@ -247,7 +247,7 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 - **User guide**: Added advanced topics (constitutive ODE models, dense suspensions, polymer networks, vitrimer models, thixotropy & yielding)
 - **GPU installation guide**: Added CUDA 13 support, GPU compatibility table (Blackwell through Kepler), structured troubleshooting
 - **Updated** `docs/source/examples/index.rst` with all 235 notebooks, 3 learning paths, navigation tables
-- **Updated** `CLAUDE.md` with current dependency versions (JAX >=0.8.3, NLSQ >=0.6.8, ArviZ >=0.23.4)
+- **Updated** `CLAUDE.md` with current dependency versions (JAX >=0.8.3, NLSQ >=0.6.10, ArviZ >=0.23.4)
 - **Updated** all CUDA references codebase-wide from "CUDA 12.1-12.9" to "CUDA 12+ or 13+"
 
 ### Added - Robustness & Correctness Fixes (Round 9-10)
@@ -277,7 +277,23 @@ Implemented the STZ model (Langer 2008) for metallic glasses and colloidal suspe
 ### Test Organization
 - **Reorganized** test files into subdirectories by model family (`tests/models/<family>/`)
   - classical/, dmt/, epm/, flow/, fractional/, hl/, ikh/, multimode/, sgr/, spp/, vlb/
-- **Test count**: 3576 tests (1077 smoke, 3349 standard, 3576 full suite)
+- **Test count**: 4963 tests (1838 smoke, 4673 standard, 4963 full suite)
+- **Platform fixes**: Fixed 5 cross-platform test failures (visual hash, Windows paths, encoding, numerical precision)
+
+### CI/CD
+- **GitHub Actions**: Full CI pipeline with lint, quality, test (3 OS × 2 Python), docs, build, audit
+- **Release automation**: Tag-triggered PyPI publish with build provenance attestation, SBOM, GitHub Release
+- **Security scanning**: Consolidated CodeQL, Semgrep SAST, Gitleaks, Trivy in single workflow
+- **Dependency management**: Dependabot with grouped updates (JAX ecosystem, Bayesian, GUI, dev)
+- **Build**: `uvx twine` for venv-free package validation, `workflow_call` reuse in release pipeline
+- **Pre-commit hooks**: Black 26.3.1, Ruff 0.15.9, MyPy 1.20.0, detect-secrets
+
+### Documentation
+- **Migrated** all install instructions from `pip install -e .[dev]` to `uv sync`
+- **Removed** references to nonexistent package extras (`[gui]`, `[io]`, `[ml]`, `[all]`, `[dev]`, `[bayesian]`)
+- **Updated** test counts across CLAUDE.md, tech-stack.md, and contributing guides
+- **Updated** CI/CD section in tech-stack.md from "disabled" to active workflow descriptions
+- **Added** CI badge to README.md
 
 ---
 
