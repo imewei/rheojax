@@ -217,9 +217,7 @@ jobs:
       run: uv build
 
     - name: Check package with twine
-      run: |
-        uv pip install "twine>=6.0.0"
-        uv run twine check dist/*
+      run: uvx twine check dist/*
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

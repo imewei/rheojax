@@ -64,9 +64,7 @@ jobs:
       run: uv build
 
     - name: Verify package metadata
-      run: |
-        uv pip install "twine>=6.0.0"
-        uv run twine check dist/*
+      run: uvx twine check dist/*
 
     - name: Generate build provenance attestation
       uses: actions/attest-build-provenance@v2
