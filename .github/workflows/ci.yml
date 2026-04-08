@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +15,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
@@ -43,6 +45,7 @@ jobs:
 
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - uses: actions/checkout@v4
@@ -87,6 +90,7 @@ jobs:
   dependency-review:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
@@ -100,6 +104,7 @@ jobs:
 
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -128,20 +133,20 @@ jobs:
 
     - name: Check minimum coverage threshold
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      env:
+        MIN_COVERAGE: '30'
       run: |
-        COVERAGE=$(python -c "
+        COVERAGE=$(uv run python -c "
         import xml.etree.ElementTree as ET
         tree = ET.parse('coverage.xml')
-        root = tree.getroot()
-        line_rate = float(root.attrib.get('line-rate', 0))
-        print(int(line_rate * 100))
+        print(int(float(tree.getroot().attrib.get('line-rate', 0)) * 100))
         ")
         echo "Current smoke test coverage: ${COVERAGE}%"
-        if [ "$COVERAGE" -lt 30 ]; then
-          echo "::error::Coverage ${COVERAGE}% is below minimum threshold of 30%"
+        if [ "$COVERAGE" -lt "$MIN_COVERAGE" ]; then
+          echo "::error::Coverage ${COVERAGE}% is below minimum threshold of ${MIN_COVERAGE}%"
           exit 1
         fi
-        echo "Coverage check passed (${COVERAGE}% >= 30%)"
+        echo "::notice::Coverage check passed (${COVERAGE}% >= ${MIN_COVERAGE}%)"
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -154,6 +159,7 @@ jobs:
 
   docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - uses: actions/checkout@v4
@@ -167,9 +173,7 @@ jobs:
       run: uv python install 3.12
 
     - name: Install dependencies
-      run: |
-        uv sync
-        uv pip install -r docs/requirements-docs.txt
+      run: uv sync
 
     - name: Build documentation
       run: uv run sphinx-build -b html docs/source docs/build
@@ -181,7 +185,9 @@ jobs:
         path: docs/build/
 
   build:
+    needs: [lint, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ['3.12', '3.13']
@@ -213,6 +219,7 @@ jobs:
 
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
 
@@ -228,6 +235,7 @@ jobs:
       run: uv sync
 
     - name: Audit dependencies
+      continue-on-error: true
       run: |
         uv pip install "pip-audit>=2.7.0"
-        uv run pip-audit --requirement <(uv export --no-dev --no-emit-project) || true
+        uv run pip-audit --requirement <(uv export --no-dev --no-emit-project)
