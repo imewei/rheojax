@@ -454,7 +454,9 @@ def _make_creep_vector_field(
             eta_D = 0.0
         # Regularization: use a fixed small viscosity floor (1 Pa·s)
         # independent of G_P to avoid decade-spanning corruption
-        eta_eff = eta_E + eta_D + 1.0  # 1 Pa·s floor prevents unbounded gamma_dot at t=0
+        eta_eff = (
+            eta_E + eta_D + 1.0
+        )  # 1 Pa·s floor prevents unbounded gamma_dot at t=0
 
         gamma_dot = sigma_residual / jnp.maximum(eta_eff, 1e-30)
 

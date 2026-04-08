@@ -403,7 +403,9 @@ def _prony_smart_init(
     # Vectorized amplitude estimation: for m(t) ~ g*exp(-t/τ),
     # find the nearest t_valid index for each tau_init in one batched step.
     # Shape: (n_modes, n_t) diff matrix → argmin over n_t axis → (n_modes,) indices.
-    dist_matrix = np.abs(t_valid[np.newaxis, :] - tau_init[:, np.newaxis])  # (n_modes, n_t)
+    dist_matrix = np.abs(
+        t_valid[np.newaxis, :] - tau_init[:, np.newaxis]
+    )  # (n_modes, n_t)
     nearest_idx = np.argmin(dist_matrix, axis=1)  # (n_modes,)
     # Estimate g from m(τ) ≈ g * exp(-1) = g * 0.368
     g_init = m_valid[nearest_idx] / 0.368 / max(n_modes, 1)

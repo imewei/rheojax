@@ -700,7 +700,9 @@ def spp_fourier_analysis(
 
         # f''(t) = sum_n [-n²ω²*An*cos - n²ω²*Bn*sin]
         n_omega2 = (n_omega**2)[:, None]
-        fdd = jnp.sum(-n_omega2 * (an[:, None] * cos_terms + bn[:, None] * sin_terms), axis=0)
+        fdd = jnp.sum(
+            -n_omega2 * (an[:, None] * cos_terms + bn[:, None] * sin_terms), axis=0
+        )
 
         # f'''(t) = sum_n [n³ω³*An*sin - n³ω³*Bn*cos]
         n_omega3 = (n_omega**3)[:, None]
@@ -1351,9 +1353,7 @@ def numerical_derivative_4th_order(
             + 4 * signal_arr[jnp.minimum(fwd_idx + k, L - 1)]
             - 3 * signal_arr[fwd_idx]
         ) / (2 * h)
-        result = result.at[fwd_idx].set(
-            jnp.where(fwd_valid, fwd_vals, result[fwd_idx])
-        )
+        result = result.at[fwd_idx].set(jnp.where(fwd_valid, fwd_vals, result[fwd_idx]))
         # Backward at end: (f[p-2k] - 4*f[p-k] + 3*f[p]) / (2*k*dt)
         bwd_idx = jnp.arange(L - boundary_k, L)
         bwd_valid = (bwd_idx - 2 * k >= 0) & (bwd_idx - k >= 0)
@@ -1362,9 +1362,7 @@ def numerical_derivative_4th_order(
             - 4 * signal_arr[jnp.maximum(bwd_idx - k, 0)]
             + 3 * signal_arr[bwd_idx]
         ) / (2 * h)
-        result = result.at[bwd_idx].set(
-            jnp.where(bwd_valid, bwd_vals, result[bwd_idx])
-        )
+        result = result.at[bwd_idx].set(jnp.where(bwd_valid, bwd_vals, result[bwd_idx]))
 
     elif order == 2:
         # 4th-order centered second derivative

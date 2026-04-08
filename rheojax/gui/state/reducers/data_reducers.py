@@ -107,9 +107,7 @@ def reduce_import_data_success(
     dataset_id = config.get("dataset_id") or str(uuid.uuid4())
     name = config.get("name", "Dataset")
     test_mode = config.get("test_mode", "oscillation")
-    file_path = (
-        Path(config.get("file_path")) if config.get("file_path") else None
-    )
+    file_path = Path(config.get("file_path")) if config.get("file_path") else None
 
     dataset = DatasetState(
         id=dataset_id,
@@ -175,9 +173,7 @@ def reduce_delete_selected_dataset(
 
         # Purge all fit/Bayesian results associated with the deleted dataset
         new_fit_results = {
-            k: v
-            for k, v in state.fit_results.items()
-            if v.dataset_id != dataset_id
+            k: v for k, v in state.fit_results.items() if v.dataset_id != dataset_id
         }
         new_bayesian_results = {
             k: v
@@ -190,8 +186,7 @@ def reduce_delete_selected_dataset(
         new_transform_history = [
             tr
             for tr in state.transform_history
-            if tr.source_dataset_id != dataset_id
-            and tr.target_dataset_id != dataset_id
+            if tr.source_dataset_id != dataset_id and tr.target_dataset_id != dataset_id
         ]
 
         return replace(

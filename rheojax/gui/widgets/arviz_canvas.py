@@ -567,9 +567,7 @@ class ArvizCanvas(BaseArviZWidget):
             if var_names is None:
                 self._plot_fallback("No non-degenerate parameters to plot")
                 return
-            self._arviz_plot(
-                az.plot_trace, self._inference_data, var_names=var_names
-            )
+            self._arviz_plot(az.plot_trace, self._inference_data, var_names=var_names)
         except ImportError:
             logger.error(
                 "ArviZ import failed",

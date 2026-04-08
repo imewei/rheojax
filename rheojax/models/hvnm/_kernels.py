@@ -235,10 +235,7 @@ def hvnm_ber_rate_interphase_stress(
     """
     # 2D von Mises stress (use eps=1e-12 to tame sqrt gradient for NUTS AD)
     sigma_vm_sq = (
-        sigma_I_xx**2
-        + sigma_I_yy**2
-        - sigma_I_xx * sigma_I_yy
-        + 3.0 * sigma_I_xy**2
+        sigma_I_xx**2 + sigma_I_yy**2 - sigma_I_xx * sigma_I_yy + 3.0 * sigma_I_xy**2
     )
     sigma_vm = jnp.sqrt(jnp.maximum(sigma_vm_sq, 0.0) + 1e-12)
     T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero

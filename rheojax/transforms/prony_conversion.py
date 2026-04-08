@@ -97,7 +97,9 @@ class PronyConversion(BaseTransform):
         G_t = np.asarray(data.y)
 
         # Determine number of modes
-        n_modes = self.n_modes if self.n_modes is not None else max(3, min(len(t) // 5, 20))
+        n_modes = (
+            self.n_modes if self.n_modes is not None else max(3, min(len(t) // 5, 20))
+        )
 
         # Fit Prony series to G(t)
         G_i, tau_i, G_e = _fit_prony_relaxation(t, G_t, n_modes)
@@ -145,7 +147,11 @@ class PronyConversion(BaseTransform):
                 "freq_to_time requires complex G* or (N, 2) array [G', G'']"
             )
 
-        n_modes = self.n_modes if self.n_modes is not None else max(3, min(len(omega) // 5, 20))
+        n_modes = (
+            self.n_modes
+            if self.n_modes is not None
+            else max(3, min(len(omega) // 5, 20))
+        )
 
         G_i, tau_i, G_e = _fit_prony_oscillation(
             omega, G_prime, G_double_prime, n_modes

@@ -152,7 +152,11 @@ class Cross(BaseModel):
                 mid_end = 2 * len(X_sorted) // 3
                 if mid_end > mid_start + 1:
                     log_gamma = np.log(np.maximum(X_sorted[mid_start:mid_end], 1e-30))
-                    log_eta = np.log(np.maximum(y_sorted[mid_start:mid_end] - eta_inf_est + 1e-10, 1e-30))
+                    log_eta = np.log(
+                        np.maximum(
+                            y_sorted[mid_start:mid_end] - eta_inf_est + 1e-10, 1e-30
+                        )
+                    )
                     coeffs = np.polyfit(log_gamma, log_eta, 1)
                     m_est = -coeffs[0]  # Negative slope gives m
                 else:

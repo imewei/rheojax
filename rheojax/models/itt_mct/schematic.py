@@ -1056,7 +1056,9 @@ class ITTMCTSchematic(ITTMCTBase):
         h_pre = h_gamma  # h(γ_pre): strain decorrelation at the pre-shear amplitude
         state0 = np.zeros(2 + self.n_prony_modes)
         state0[0] = h_pre  # Φ(0) = h(γ_pre) — decorrelated by step strain
-        state0[1 + self.n_prony_modes] = G_inf * gamma_pre * h_pre * h_pre  # σ(0) = G_∞ γ_pre h²
+        state0[1 + self.n_prony_modes] = (
+            G_inf * gamma_pre * h_pre * h_pre
+        )  # σ(0) = G_∞ γ_pre h²
 
         def rhs_numpy(t_val, state):
             state_jax = jnp.array(state)

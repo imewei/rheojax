@@ -480,7 +480,11 @@ class TNTSingleMode(TNTBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         self._test_mode = test_mode
 
@@ -564,7 +568,11 @@ class TNTSingleMode(TNTBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -624,7 +632,11 @@ class TNTSingleMode(TNTBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 

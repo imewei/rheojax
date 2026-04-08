@@ -674,7 +674,11 @@ class TNTLoopBridge(TNTBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         self._test_mode = test_mode
 
@@ -768,7 +772,11 @@ class TNTLoopBridge(TNTBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -826,7 +834,11 @@ class TNTLoopBridge(TNTBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)

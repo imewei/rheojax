@@ -41,9 +41,17 @@ class TestMIKHSmoke:
     def test_required_parameters_exist(self):
         model = MIKH()
         required = [
-            "G", "eta", "C", "gamma_dyn", "m",
-            "sigma_y0", "delta_sigma_y", "tau_thix",
-            "Gamma", "eta_inf", "mu_p",
+            "G",
+            "eta",
+            "C",
+            "gamma_dyn",
+            "m",
+            "sigma_y0",
+            "delta_sigma_y",
+            "tau_thix",
+            "Gamma",
+            "eta_inf",
+            "mu_p",
         ]
         for param in required:
             assert param in model.parameters, f"Missing parameter: {param}"

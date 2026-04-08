@@ -98,8 +98,12 @@ class DiagnosticsPage(QWidget):
         self._rhat_ess_table.horizontalHeader().setStretchLastSection(True)
         self._rhat_ess_table.setAlternatingRowColors(True)
         self._rhat_ess_table.setMaximumHeight(140)
-        self._rhat_ess_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self._rhat_ess_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._rhat_ess_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
+        self._rhat_ess_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
         self._rhat_ess_table.setToolTip(
             "Per-parameter convergence diagnostics. "
             "R-hat < 1.01 and ESS > 400 indicate good mixing."
@@ -136,11 +140,15 @@ class DiagnosticsPage(QWidget):
                 # Colour-code: red if R-hat >= 1.01 or ESS < 400
                 if rhat_val >= 1.01:
                     rhat_item.setForeground(
-                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#c62828")
+                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor(
+                            "#c62828"
+                        )
                     )
                 if ess_val < 400:
                     ess_item.setForeground(
-                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor("#c62828")
+                        __import__("PySide6.QtGui", fromlist=["QColor"]).QColor(
+                            "#c62828"
+                        )
                     )
 
                 self._rhat_ess_table.setItem(row, 0, QTableWidgetItem(param))

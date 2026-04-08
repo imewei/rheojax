@@ -139,8 +139,10 @@ REDUCER_DISPATCH: dict[str, ReducerFn] = {
 # Signal-only actions: dispatch() emits domain signals for these but
 # they do not mutate state.  Listed separately so _reduce_action can
 # return None without logging a warning.
-SIGNAL_ONLY_ACTIONS: frozenset[str] = frozenset({
-    "BAYESIAN_PROGRESS",
-    "FIT_PROGRESS",
-    "TRANSFORM_APPLIED",
-})
+SIGNAL_ONLY_ACTIONS: frozenset[str] = frozenset(
+    {
+        "BAYESIAN_PROGRESS",
+        "FIT_PROGRESS",
+        "TRANSFORM_APPLIED",
+    }
+)

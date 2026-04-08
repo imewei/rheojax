@@ -141,7 +141,7 @@ def make_fd_differentiable(
         h = scale * params_dot
         y_plus = fn(x_data, params + h)
         y_minus = fn(x_data, params - h)
-        h_norm = jnp.sqrt(jnp.sum(h ** 2) + 1e-300)
+        h_norm = jnp.sqrt(jnp.sum(h**2) + 1e-300)
         y_dot = (y_plus - y_minus) / (2.0 * h_norm)
 
         return y, y_dot
@@ -1368,7 +1368,13 @@ def nlsq_optimize(
             n_params=len(x0),
         )
         result = _run_scipy_least_squares(
-            objective, x0, nlsq_bounds, ftol, xtol, gtol, max_iter,
+            objective,
+            x0,
+            nlsq_bounds,
+            ftol,
+            xtol,
+            gtol,
+            max_iter,
             compute_covariance=compute_covariance,
         )
         parameters.set_values(result.x)
@@ -1441,7 +1447,13 @@ def nlsq_optimize(
         """
         logger.info("Using SciPy least_squares fallback")
         scipy_result = _run_scipy_least_squares(
-            objective, initial_guess, nlsq_bounds, ftol, xtol, gtol, max_iter,
+            objective,
+            initial_guess,
+            nlsq_bounds,
+            ftol,
+            xtol,
+            gtol,
+            max_iter,
             compute_covariance=compute_covariance,
         )
         if workflow == "auto_global" and not scipy_result.success:
@@ -2541,7 +2553,11 @@ def create_least_squares_objective(
         # real parameter count, so only the output *dtype* and *ndim* are
         # trusted from this probe (not the full output shape).  This is
         # sufficient for the dispatch decision (complex vs real vs 2D).
-        _x_probe = x_data_jax[:1] if x_data_jax.ndim >= 1 and x_data_jax.shape[0] > 0 else x_data_jax
+        _x_probe = (
+            x_data_jax[:1]
+            if x_data_jax.ndim >= 1 and x_data_jax.shape[0] > 0
+            else x_data_jax
+        )
         _p_probe = jnp.zeros(1, dtype=jnp.float64)
         _out_shape = jax.eval_shape(model_fn, _x_probe, _p_probe)
         _out_is_complex = jnp.issubdtype(_out_shape.dtype, jnp.complexfloating)
@@ -2634,14 +2650,14 @@ def create_least_squares_objective(
                     return jnp.concatenate([resid_col0, resid_col1])
                 else:
                     # (N, 2) pred, (N,) data: fit to magnitude |G*|
-                    y_pred_magnitude = jnp.sqrt(y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2 + 1e-30)
+                    y_pred_magnitude = jnp.sqrt(
+                        y_pred[:, 0] ** 2 + y_pred[:, 1] ** 2 + 1e-30
+                    )
 
                     _resid = y_pred_magnitude - y_data_jax
 
                     if normalize:
-                        _resid = _resid / jnp.maximum(
-                            jnp.abs(y_data_jax), _norm_floor
-                        )
+                        _resid = _resid / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
 
                     return _resid
 
@@ -2680,9 +2696,7 @@ def create_least_squares_objective(
                 _resid = y_pred_magnitude - y_data_jax
 
                 if normalize:
-                    _resid = _resid / jnp.maximum(
-                        jnp.abs(y_data_jax), _norm_floor
-                    )
+                    _resid = _resid / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
 
                 return _resid
         else:
@@ -2694,15 +2708,13 @@ def create_least_squares_objective(
 
                 if use_log_residuals:
                     # Log-space residuals
-                    _resid = jnp.log10(
-                        jnp.maximum(jnp.abs(y_pred), 1e-20)
-                    ) - jnp.log10(jnp.maximum(y_data_magnitude, 1e-20))
+                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), 1e-20)) - jnp.log10(
+                        jnp.maximum(y_data_magnitude, 1e-20)
+                    )
                 else:
                     _resid = y_pred - y_data_magnitude
                     if normalize:
-                        _resid = _resid / jnp.maximum(
-                            y_data_magnitude, _norm_floor
-                        )
+                        _resid = _resid / jnp.maximum(y_data_magnitude, _norm_floor)
 
                 return _resid
             else:
@@ -2710,15 +2722,13 @@ def create_least_squares_objective(
                 if use_log_residuals:
                     # Log-space residuals for rheological data
                     # Handle both positive and negative values by using absolute value
-                    _resid = jnp.log10(
-                        jnp.maximum(jnp.abs(y_pred), 1e-20)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax), 1e-20))
+                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), 1e-20)) - jnp.log10(
+                        jnp.maximum(jnp.abs(y_data_jax), 1e-20)
+                    )
                 else:
                     _resid = y_pred - y_data_jax
                     if normalize:
-                        _resid = _resid / jnp.maximum(
-                            jnp.abs(y_data_jax), _norm_floor
-                        )
+                        _resid = _resid / jnp.maximum(jnp.abs(y_data_jax), _norm_floor)
 
                 return _resid
 

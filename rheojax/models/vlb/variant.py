@@ -277,7 +277,8 @@ class VLBVariant(VLBBase):
         Returns params in ParameterSet order: [G0, k_d_0, eta_s, (nu), (L_max), (E_a, T_ref)].
         """
         param_values = [
-            float(v) for name in self.parameters.keys()
+            float(v)
+            for name in self.parameters.keys()
             if (v := self.parameters.get_value(name)) is not None
         ]
         return jnp.array(param_values, dtype=jnp.float64)
@@ -365,7 +366,11 @@ class VLBVariant(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         self._test_mode = test_mode
 
@@ -442,7 +447,11 @@ class VLBVariant(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         x_jax = jnp.asarray(X, dtype=jnp.float64)
 
@@ -458,7 +467,8 @@ class VLBVariant(VLBBase):
 
         # Build parameter array from ParameterSet
         param_values = [
-            float(v) for name in self.parameters.keys()
+            float(v)
+            for name in self.parameters.keys()
             if (v := self.parameters.get_value(name)) is not None
         ]
         params = jnp.array(param_values)
@@ -520,7 +530,11 @@ class VLBVariant(VLBBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 

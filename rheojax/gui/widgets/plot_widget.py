@@ -142,7 +142,9 @@ class PlotWidget(QWidget):
             # PyQtGraphCanvas
             self.canvas.clear()
             y_plot = np.real(y) if np.iscomplexobj(y) else y
-            self.canvas.plot_data(np.asarray(x, dtype=float), np.asarray(y_plot, dtype=float))
+            self.canvas.plot_data(
+                np.asarray(x, dtype=float), np.asarray(y_plot, dtype=float)
+            )
 
             if fit_result is not None:
                 x_fit = getattr(fit_result, "x_fit", None)
@@ -150,7 +152,8 @@ class PlotWidget(QWidget):
                 if x_fit is not None and y_fit is not None:
                     y_fit_plot = np.real(y_fit) if np.iscomplexobj(y_fit) else y_fit
                     self.canvas.plot_fit(
-                        np.asarray(x_fit, dtype=float), np.asarray(y_fit_plot, dtype=float)
+                        np.asarray(x_fit, dtype=float),
+                        np.asarray(y_fit_plot, dtype=float),
                     )
 
     def clear(self) -> None:

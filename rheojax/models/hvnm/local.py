@@ -907,7 +907,11 @@ class HVNMLocal(HVNMBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         self._test_mode = test_mode
 
@@ -984,7 +988,11 @@ class HVNMLocal(HVNMBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         param_values = jnp.array(
             [self.parameters.get_value(n) for n in self.parameters.keys()],
@@ -1055,7 +1063,11 @@ class HVNMLocal(HVNMBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 

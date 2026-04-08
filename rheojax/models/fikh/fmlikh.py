@@ -377,7 +377,11 @@ class FMLIKH(FIKHBase):
         _resolved = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "relaxation")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "relaxation"
+            )
         )
         mode = self._validate_test_mode(_resolved)
 
@@ -597,7 +601,11 @@ class FMLIKH(FIKHBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "startup")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "startup"
+            )
         )
         mode = self._validate_test_mode(test_mode)
         params = self._get_params_dict()

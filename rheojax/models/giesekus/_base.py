@@ -452,7 +452,9 @@ class GiesekusBase(BaseModel):
             log_gd = np.log(np.maximum(gamma_dot[-3:], 1e-30))
             log_eta = np.log(np.maximum(eta[-3:], 1e-30))
             dlog_gd = log_gd[-1] - log_gd[0]
-            slope = (log_eta[-1] - log_eta[0]) / dlog_gd if abs(dlog_gd) > 1e-30 else 0.0
+            slope = (
+                (log_eta[-1] - log_eta[0]) / dlog_gd if abs(dlog_gd) > 1e-30 else 0.0
+            )
             # Power-law index n ≈ 1 + slope, and n relates to α
             # For Giesekus: n → 0.5 as Wi → ∞, so α ≈ (1-2n)/2
             n_est = max(0.1, min(1.0, 1.0 + slope))

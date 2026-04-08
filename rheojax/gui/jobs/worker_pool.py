@@ -320,10 +320,14 @@ class WorkerPool(QObject):
         if worker is not None and hasattr(worker, "cancel") and callable(worker.cancel):
             try:
                 worker.cancel()
-                logger.info("Cancellation requested for job (via worker)", job_id=job_id)
+                logger.info(
+                    "Cancellation requested for job (via worker)", job_id=job_id
+                )
                 return True
             except Exception:
-                logger.debug("worker.cancel() failed, falling back to token", exc_info=True)
+                logger.debug(
+                    "worker.cancel() failed, falling back to token", exc_info=True
+                )
 
         if token is not None:
             token.cancel()

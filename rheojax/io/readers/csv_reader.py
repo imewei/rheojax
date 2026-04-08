@@ -369,9 +369,7 @@ def load_csv(
     # raising a confusing ValueError on instrument artefacts.
     if is_complex:
         valid_idx = np.flatnonzero(
-            np.isfinite(x_data)
-            & np.isfinite(y_data.real)
-            & np.isfinite(y_data.imag)
+            np.isfinite(x_data) & np.isfinite(y_data.real) & np.isfinite(y_data.imag)
         )
     else:
         valid_idx = np.flatnonzero(np.isfinite(x_data) & np.isfinite(y_data))

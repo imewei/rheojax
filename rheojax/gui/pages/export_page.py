@@ -559,9 +559,7 @@ class ExportPage(QWidget):
             )
             file_path = output_dir / f"fit_{safe_name}.{data_ext}"
             try:
-                self._export_service.export_fit_result(
-                    fit_result, file_path, data_ext
-                )
+                self._export_service.export_fit_result(fit_result, file_path, data_ext)
                 exported.append(str(file_path))
             except Exception as exc:
                 logger.error(

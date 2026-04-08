@@ -467,7 +467,13 @@ def _extract_data(data: Any) -> tuple[Any, Any, Any, str, dict[str, Any]]:
     if y2 is not None and not isinstance(y2, np.ndarray):
         y2 = np.asarray(y2)
 
-    return x, y, y2, str(test_mode if test_mode is not None else "relaxation"), dict(metadata) if metadata else {}
+    return (
+        x,
+        y,
+        y2,
+        str(test_mode if test_mode is not None else "relaxation"),
+        dict(metadata) if metadata else {},
+    )
 
 
 # ---------------------------------------------------------------------------

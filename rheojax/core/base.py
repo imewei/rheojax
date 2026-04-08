@@ -149,7 +149,9 @@ class BaseModel(BayesianMixin, ABC):
             elif np.iscomplexobj(y_np):
                 resolved_test_mode = "oscillation"
             else:
-                resolved_test_mode = default_test_mode if default_test_mode is not None else "relaxation"
+                resolved_test_mode = (
+                    default_test_mode if default_test_mode is not None else "relaxation"
+                )
 
         # --- 2. Cache test_mode for Bayesian pipeline ---
         self._test_mode = resolved_test_mode
@@ -691,7 +693,9 @@ class BaseModel(BayesianMixin, ABC):
                 )
 
         # --- Convert E* -> G* via shared converter ---
-        resolved_dm = DeformationModeConverter.resolve_deformation_mode(deformation_mode)
+        resolved_dm = DeformationModeConverter.resolve_deformation_mode(
+            deformation_mode
+        )
         if resolved_dm is not None:
             self._deformation_mode = resolved_dm
             self._poisson_ratio = poisson_ratio
@@ -831,7 +835,9 @@ class BaseModel(BayesianMixin, ABC):
 
             # Convert G* -> E* if tensile deformation mode
             dm = DeformationModeConverter.resolve_deformation_mode(
-                deformation_mode if deformation_mode is not None else self._deformation_mode
+                deformation_mode
+                if deformation_mode is not None
+                else self._deformation_mode
             )
             nu = poisson_ratio if poisson_ratio is not None else self._poisson_ratio
             result = DeformationModeConverter.convert_from_shear(

@@ -220,9 +220,7 @@ def vlb_normal_stress_1(mu_xx: float, mu_yy: float, G0: float) -> float:
 
 
 @jax.jit
-def vlb_free_energy(
-    mu_xx: float, mu_yy: float, mu_zz: float, G0: float
-) -> float:
+def vlb_free_energy(mu_xx: float, mu_yy: float, mu_zz: float, G0: float) -> float:
     """Elastic free energy stored in the transient network.
 
     For Gaussian chains (Vernerey et al. 2018, Polymers Eq. 5)::
@@ -509,7 +507,6 @@ def vlb_saos_moduli(omega: float, G0: float, k_d: float) -> tuple[float, float]:
     G_prime = G0 * wt2 / denom
     G_double_prime = G0 * wt / denom
     return G_prime, G_double_prime
-
 
 
 def vlb_saos_moduli_vec(
@@ -999,7 +996,6 @@ def vlb_solve_creep_gamma_dot(
     gamma_dot = remaining_stress / eta_s_safe
 
     return gamma_dot
-
 
 
 # =============================================================================

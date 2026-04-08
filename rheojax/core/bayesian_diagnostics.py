@@ -140,9 +140,7 @@ def compute_diagnostics(
 
         try:
             try:
-                divergences = mcmc.get_extra_fields(group_by_chain=True)[
-                    "diverging"
-                ]
+                divergences = mcmc.get_extra_fields(group_by_chain=True)["diverging"]
             except TypeError:
                 divergences = mcmc.get_extra_fields()["diverging"]
             num_divergences = int(np.sum(divergences))

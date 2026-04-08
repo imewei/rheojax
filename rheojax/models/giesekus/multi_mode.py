@@ -350,7 +350,11 @@ class GiesekusMultiMode(BaseModel):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "oscillation")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "oscillation"
+            )
         )
         self._test_mode = test_mode
         self._gamma_dot_applied = kwargs.get("gamma_dot")
@@ -382,11 +386,7 @@ class GiesekusMultiMode(BaseModel):
         _ode_protocols = {"relaxation", "startup", "creep", "laos"}
         _is_ode = test_mode in _ode_protocols
         _on_gpu = jax.default_backend() != "cpu"
-        _fit_fn = (
-            make_fd_differentiable(model_fn)
-            if _is_ode and _on_gpu
-            else model_fn
-        )
+        _fit_fn = make_fd_differentiable(model_fn) if _is_ode and _on_gpu else model_fn
 
         # Create objective and optimize using ParameterSet
         objective = create_least_squares_objective(
@@ -438,7 +438,11 @@ class GiesekusMultiMode(BaseModel):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "oscillation")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "oscillation"
+            )
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -484,7 +488,11 @@ class GiesekusMultiMode(BaseModel):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "oscillation")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "oscillation"
+            )
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 

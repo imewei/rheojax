@@ -1794,9 +1794,12 @@ class BayesianPage(QWidget):
         from rheojax.gui.dialogs.bayesian_options import BayesianOptionsDialog
 
         store = StateStore()
-        has_nlsq = store.get_state().fit_results.get(
-            f"{store.get_state().active_model_name}_{store.get_state().active_dataset_id}"
-        ) is not None
+        has_nlsq = (
+            store.get_state().fit_results.get(
+                f"{store.get_state().active_model_name}_{store.get_state().active_dataset_id}"
+            )
+            is not None
+        )
         dialog = BayesianOptionsDialog(
             current_options={
                 "priors": self._preset_priors,

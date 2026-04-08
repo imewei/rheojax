@@ -141,9 +141,7 @@ def build_numpyro_model(
         try:
             _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
             _test_X = jax.ShapeDtypeStruct((_n_probe,), jnp.float64)
-            _test_params = jax.ShapeDtypeStruct(
-                (len(param_names),), jnp.float64
-            )
+            _test_params = jax.ShapeDtypeStruct((len(param_names),), jnp.float64)
             _probe_fn = functools.partial(
                 model_self.model_function,
                 test_mode=test_mode,
@@ -274,9 +272,7 @@ def build_numpyro_model(
                     params_dict[name] = numpyro.sample(name, beta_base)
                 else:
                     scale = upper - lower
-                    beta_trans = dist_transforms.AffineTransform(
-                        loc=lower, scale=scale
-                    )
+                    beta_trans = dist_transforms.AffineTransform(loc=lower, scale=scale)
                     params_dict[name] = numpyro.sample(
                         name,
                         dist.TransformedDistribution(beta_base, beta_trans),
@@ -309,9 +305,7 @@ def build_numpyro_model(
         not_finite = ~is_finite
         finite_penalty = jnp.where(is_finite, 0.0, -1e18).sum()
         numpyro.factor("finite_check", finite_penalty)
-        numpyro.deterministic(
-            "num_nonfinite", not_finite.sum().astype(jnp.float64)
-        )
+        numpyro.deterministic("num_nonfinite", not_finite.sum().astype(jnp.float64))
         predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
 
         # Normalize oscillation predictions: some models return (N,2) real
@@ -355,12 +349,8 @@ def build_numpyro_model(
         else:
             # Floor at 1% of mean magnitude to handle constant-data edge case
             sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
-            sigma = numpyro.sample(
-                "sigma", dist.Exponential(rate=1.0 / sigma_scale)
-            )
-            numpyro.sample(
-                "obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y
-            )
+            sigma = numpyro.sample("sigma", dist.Exponential(rate=1.0 / sigma_scale))
+            numpyro.sample("obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y)
 
     if cache_key is not None:
         model_self._closure_cache[cache_key] = numpyro_model

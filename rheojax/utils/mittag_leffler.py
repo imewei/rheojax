@@ -370,9 +370,7 @@ def _mittag_leffler_hybrid(z, alpha, beta):
         z_pos_safe = jnp.maximum(z_b, 1.0)
         z_neg_safe = jnp.minimum(z_b, thresh_neg)
         val_pos = jax.vmap(lambda zi: _ml_asymptotic_pos(zi, a_s, b_s))(z_pos_safe)
-        val_neg_raw = jax.vmap(
-            lambda zi: _ml_asymptotic_neg(zi, a_s, b_s)
-        )(z_neg_safe)
+        val_neg_raw = jax.vmap(lambda zi: _ml_asymptotic_neg(zi, a_s, b_s))(z_neg_safe)
         # For alpha >= 1 the neg asymptotic diverges; fall back to Taylor
         val_neg = jnp.where(a_s < 1.0, val_neg_raw, val_taylor)
 

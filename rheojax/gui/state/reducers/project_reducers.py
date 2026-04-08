@@ -61,9 +61,7 @@ def reduce_save_project(
         return replace(
             state,
             project_path=project_path,
-            project_name=(
-                project_path.name if project_path else state.project_name
-            ),
+            project_name=(project_path.name if project_path else state.project_name),
             is_modified=False,
             recent_projects=recent,
         )

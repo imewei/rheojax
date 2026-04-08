@@ -207,6 +207,7 @@ class TestAutoP0Fluidity:
 class TestAutoP0GMM:
     def test_gmm_relaxation(self):
         from rheojax.models.multimode import GeneralizedMaxwell
+
         model = GeneralizedMaxwell(n_modes=3)
         t = np.logspace(-2, 2, 100)
         G_t = 500 * np.exp(-t / 0.1) + 300 * np.exp(-t / 1.0) + 200 * np.exp(-t / 10.0)

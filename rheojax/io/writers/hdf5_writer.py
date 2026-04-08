@@ -503,7 +503,9 @@ def load_hdf5(filepath: str | Path) -> RheoData:
 _MAX_HDF5_STRING_LEN = 4096  # Limit string attributes from untrusted HDF5 files
 
 
-def _safe_decode_hdf5_string(value: bytes | str, max_len: int = _MAX_HDF5_STRING_LEN) -> str:
+def _safe_decode_hdf5_string(
+    value: bytes | str, max_len: int = _MAX_HDF5_STRING_LEN
+) -> str:
     """Decode and truncate a string value read from HDF5 attributes."""
     if isinstance(value, bytes):
         value = value.decode("utf-8", errors="replace")
@@ -594,9 +596,11 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
                         raw = _safe_decode_hdf5_string(items)
                     elif isinstance(items, list) and items:
                         raw = [
-                            _safe_decode_hdf5_string(v)
-                            if isinstance(v, (bytes, str))
-                            else v
+                            (
+                                _safe_decode_hdf5_string(v)
+                                if isinstance(v, (bytes, str))
+                                else v
+                            )
                             for v in items
                         ]
                 except (AttributeError, UnicodeDecodeError):

@@ -209,7 +209,9 @@ class FractionalMaxwellModel(BaseModel):
         inv_gamma_2 = jnp.exp(-jax.lax.lgamma(1.0 + alpha_safe - beta_safe))
 
         term1 = (t_safe**alpha_safe) * inv_gamma_1
-        term2 = (tau_safe**beta_safe) * (t_safe ** (alpha_safe - beta_safe)) * inv_gamma_2
+        term2 = (
+            (tau_safe**beta_safe) * (t_safe ** (alpha_safe - beta_safe)) * inv_gamma_2
+        )
 
         J_t = (term1 + term2) / c1_safe
 

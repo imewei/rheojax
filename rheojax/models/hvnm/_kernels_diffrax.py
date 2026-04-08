@@ -72,8 +72,26 @@ def _hvnm_initial_state() -> jnp.ndarray:
     #  mu_D_xx, mu_D_yy, mu_D_xy, gamma, D,
     #  mu_I_xx, mu_I_yy, mu_I_xy, mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy, D_int]
     return jnp.array(
-        [1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0,
-         1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0],
+        [
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+        ],
         dtype=jnp.float64,
     )
 

@@ -136,7 +136,9 @@ class BayesianOptionsDialog(QDialog):
         init_layout = QVBoxLayout()
 
         # Warm-start availability indicator (read-only)
-        warmstart_status = "available" if self._nlsq_result_available else "not available"
+        warmstart_status = (
+            "available" if self._nlsq_result_available else "not available"
+        )
         warmstart_color = "#2e7d32" if self._nlsq_result_available else "#c62828"
         self._warmstart_indicator = QLabel(
             f"NLSQ warm-start: <b><span style='color:{warmstart_color};'>"

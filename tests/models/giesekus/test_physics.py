@@ -68,9 +68,9 @@ class TestDiagnosticRatios:
             ratios[0], -0.15, rtol=0.01
         ), f"Low-Wi ratio should be ≈ -0.15, got {ratios[0]:.4f}"
         # At high Wi (last points), ratio deviates toward zero
-        assert ratios[-1] > -0.15, (
-            f"High-Wi ratio should be less negative than -0.15, got {ratios[-1]:.4f}"
-        )
+        assert (
+            ratios[-1] > -0.15
+        ), f"High-Wi ratio should be less negative than -0.15, got {ratios[-1]:.4f}"
 
 
 class TestUCMLimit:

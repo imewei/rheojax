@@ -299,8 +299,12 @@ class BayesianMixin:
             # device→host transfer, avoiding 4 separate sync stalls.
             if y_real.size:
                 _stats = jnp.stack(
-                    [jnp.std(y_real), jnp.std(y_imag),
-                     jnp.mean(jnp.abs(y_real)), jnp.mean(jnp.abs(y_imag))]
+                    [
+                        jnp.std(y_real),
+                        jnp.std(y_imag),
+                        jnp.mean(jnp.abs(y_real)),
+                        jnp.mean(jnp.abs(y_imag)),
+                    ]
                 ).tolist()
                 scale_info["y_real_scale"] = _stats[0]
                 scale_info["y_imag_scale"] = _stats[1]
@@ -659,8 +663,7 @@ class BayesianMixin:
             samples_grouped = mcmc.get_samples(group_by_chain=True)
             # Flat samples = concatenate along the chain axis (axis 0)
             samples = {
-                k: v.reshape((-1,) + v.shape[2:])
-                for k, v in samples_grouped.items()
+                k: v.reshape((-1,) + v.shape[2:]) for k, v in samples_grouped.items()
             }
         except Exception as exc:
             logger.debug(

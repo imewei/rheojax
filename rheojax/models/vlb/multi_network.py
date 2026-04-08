@@ -260,12 +260,18 @@ class VLBMultiNetwork(VLBBase):
             (G_modes, kd_modes) each shape (N,)
         """
         G_arr = np.array(
-            [float(v) for i in range(self._n_modes)
-             if (v := self.parameters.get_value(f"G_{i}")) is not None]
+            [
+                float(v)
+                for i in range(self._n_modes)
+                if (v := self.parameters.get_value(f"G_{i}")) is not None
+            ]
         )
         kd_arr = np.array(
-            [float(v) for i in range(self._n_modes)
-             if (v := self.parameters.get_value(f"k_d_{i}")) is not None]
+            [
+                float(v)
+                for i in range(self._n_modes)
+                if (v := self.parameters.get_value(f"k_d_{i}")) is not None
+            ]
         )
         return G_arr, kd_arr
 
@@ -321,7 +327,11 @@ class VLBMultiNetwork(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         self._test_mode = test_mode
 
@@ -423,7 +433,11 @@ class VLBMultiNetwork(VLBBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
@@ -484,7 +498,11 @@ class VLBMultiNetwork(VLBBase):
         mode = (
             test_mode
             if test_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "flow_curve")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "flow_curve"
+            )
         )
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)
         _gd = kwargs.get("gamma_dot", _MISSING)

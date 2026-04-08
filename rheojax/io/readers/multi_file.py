@@ -52,7 +52,9 @@ def _expand_glob(files: list[str | Path] | str) -> list[Path]:
         expanded = sorted(p.parent.glob(p.name))
         if not expanded:
             raise FileNotFoundError(f"No files matched glob pattern: '{files}'")
-        return [_validate_path_no_traversal(ep, label="expanded path") for ep in expanded]
+        return [
+            _validate_path_no_traversal(ep, label="expanded path") for ep in expanded
+        ]
     if isinstance(files, (str, Path)):
         return [_validate_path_no_traversal(Path(files), label="file path")]
     return [_validate_path_no_traversal(Path(f), label="file path") for f in files]

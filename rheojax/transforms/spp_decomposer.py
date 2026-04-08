@@ -537,12 +537,14 @@ class SPPDecomposer(BaseTransform):
         # =====================================================================
 
         # Batch device-to-host transfer for array results
-        waveforms = jax.device_get({
-            "G_cage": G_cage,
-            "sigma_elastic": sigma_elastic,
-            "sigma_viscous": sigma_viscous,
-            "stress_reconstructed": stress_reconstructed,
-        })
+        waveforms = jax.device_get(
+            {
+                "G_cage": G_cage,
+                "sigma_elastic": sigma_elastic,
+                "sigma_viscous": sigma_viscous,
+                "stress_reconstructed": stress_reconstructed,
+            }
+        )
 
         self.results_ = {
             # Yield stresses
@@ -577,10 +579,21 @@ class SPPDecomposer(BaseTransform):
         }
         if core_results is not None:
             _core_keys = [
-                "Gp_t", "Gpp_t", "G_star_t", "tan_delta_t", "delta_t",
-                "disp_stress", "eq_strain_est", "Gp_t_dot", "Gpp_t_dot",
-                "G_speed", "delta_t_dot", "strain_recon", "rate_recon",
-                "stress_recon", "time_new",
+                "Gp_t",
+                "Gpp_t",
+                "G_star_t",
+                "tan_delta_t",
+                "delta_t",
+                "disp_stress",
+                "eq_strain_est",
+                "Gp_t_dot",
+                "Gpp_t_dot",
+                "G_speed",
+                "delta_t_dot",
+                "strain_recon",
+                "rate_recon",
+                "stress_recon",
+                "time_new",
             ]
             core_jax = {k: core_results[k] for k in _core_keys if k in core_results}
             core_host = jax.device_get(core_jax)
@@ -590,9 +603,7 @@ class SPPDecomposer(BaseTransform):
             self.results_["core"] = core_block
             self.results_["spp_params"] = spp_params
             if fsf_data_out is not None:
-                self.results_["fsf_data_out"] = np.asarray(
-                    jax.device_get(fsf_data_out)
-                )
+                self.results_["fsf_data_out"] = np.asarray(jax.device_get(fsf_data_out))
             if ft_out is not None:
                 self.results_["ft_out"] = np.asarray(jax.device_get(ft_out))
 

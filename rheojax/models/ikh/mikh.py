@@ -503,7 +503,11 @@ class MIKH(IKHBase):
         test_mode = (
             _kw_mode
             if _kw_mode is not None
-            else (getattr(self, "_test_mode", None) if getattr(self, "_test_mode", None) is not None else "startup")
+            else (
+                getattr(self, "_test_mode", None)
+                if getattr(self, "_test_mode", None) is not None
+                else "startup"
+            )
         )
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))
@@ -514,9 +518,7 @@ class MIKH(IKHBase):
 
         elif test_mode in ["creep", "relaxation"]:
             t = jnp.asarray(X)
-            gamma_dot = kwargs.get(
-                "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-            )
+            gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0))
             sigma_applied = kwargs.get(
                 "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
             )
@@ -630,9 +632,7 @@ class MIKH(IKHBase):
 
         # Extract protocol-specific args from kwargs, falling back to
         # cached values from _fit_ode_formulation()
-        gamma_dot = kwargs.get(
-            "gamma_dot", getattr(self, "_fit_gamma_dot", 0.0)
-        )
+        gamma_dot = kwargs.get("gamma_dot", getattr(self, "_fit_gamma_dot", 0.0))
         sigma_applied = kwargs.get(
             "sigma_applied", getattr(self, "_fit_sigma_applied", 100.0)
         )

@@ -100,7 +100,8 @@ def reduce_set_tab(
 
 
 def reduce_update_preferences(
-    action: dict[str, Any], store: StateStore,
+    action: dict[str, Any],
+    store: StateStore,
 ) -> Callable[[AppState], AppState]:
     prefs = action
 
@@ -122,9 +123,7 @@ def reduce_update_preferences(
     if "worker_isolation_mode" in prefs:
         import os
 
-        os.environ["RHEOJAX_WORKER_ISOLATION"] = prefs[
-            "worker_isolation_mode"
-        ]
+        os.environ["RHEOJAX_WORKER_ISOLATION"] = prefs["worker_isolation_mode"]
 
     return updater
 

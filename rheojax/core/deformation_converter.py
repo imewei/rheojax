@@ -72,7 +72,9 @@ class DeformationModeConverter:
 
         from rheojax.utils.modulus_conversion import convert_modulus
 
-        y_shear = convert_modulus(y, deformation_mode, DeformationMode.SHEAR, poisson_ratio)
+        y_shear = convert_modulus(
+            y, deformation_mode, DeformationMode.SHEAR, poisson_ratio
+        )
         logger.info(
             "Converted tensile modulus to shear for fitting",
             model=model_name,
@@ -106,4 +108,6 @@ class DeformationModeConverter:
 
         from rheojax.utils.modulus_conversion import convert_modulus
 
-        return convert_modulus(result, DeformationMode.SHEAR, deformation_mode, poisson_ratio)
+        return convert_modulus(
+            result, DeformationMode.SHEAR, deformation_mode, poisson_ratio
+        )

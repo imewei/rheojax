@@ -1144,9 +1144,19 @@ def ml_ikh_flow_curve_steady_state_per_mode(gamma_dot, n_modes, **params):
         [params.get(f"gamma_dyn_{i}", 1.0) for i in range(1, n_modes + 1)]
     )
     # Canonicalize to k1/k2 from tau_thix/Gamma (avoids JIT retrace)
-    tau_thix_arr = jnp.stack([params.get(f"tau_thix_{i}", 1.0 / params.get(f"k1_{i}", 1.0)) for i in range(1, n_modes + 1)])
+    tau_thix_arr = jnp.stack(
+        [
+            params.get(f"tau_thix_{i}", 1.0 / params.get(f"k1_{i}", 1.0))
+            for i in range(1, n_modes + 1)
+        ]
+    )
     k1_arr = 1.0 / jnp.maximum(tau_thix_arr, 1e-12)
-    k2_arr = jnp.stack([params.get(f"Gamma_{i}", params.get(f"k2_{i}", 0.0)) for i in range(1, n_modes + 1)])
+    k2_arr = jnp.stack(
+        [
+            params.get(f"Gamma_{i}", params.get(f"k2_{i}", 0.0))
+            for i in range(1, n_modes + 1)
+        ]
+    )
 
     # Per-mode backstress saturation: α_sat_i = C_i/γ_dyn_i
     alpha_sat_arr = C_arr / jnp.maximum(gamma_dyn_arr, 1e-12)  # (n_modes,)
@@ -1155,7 +1165,9 @@ def ml_ikh_flow_curve_steady_state_per_mode(gamma_dot, n_modes, **params):
     lambda_ss = k1_arr[:, None] / (
         k1_arr[:, None] + k2_arr[:, None] * gamma_dot_abs[None, :] + 1e-20
     )  # (n_modes, N)
-    sigma_y = sigma_y0_arr[:, None] + delta_sigma_y_arr[:, None] * lambda_ss  # (n_modes, N)
+    sigma_y = (
+        sigma_y0_arr[:, None] + delta_sigma_y_arr[:, None] * lambda_ss
+    )  # (n_modes, N)
     sigma_total = (
         jnp.sum(alpha_sat_arr[:, None] + sigma_y, axis=0) + eta_inf * gamma_dot_abs
     )  # (N,)
@@ -1191,11 +1203,23 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     gamma_dyn = params.get("gamma_dyn", 1.0)
 
     # Build mode parameter arrays at trace time, then vectorize over modes.
-    w_arr = jnp.stack([params.get(f"w_{i}", 1.0 / n_modes) for i in range(1, n_modes + 1)])
+    w_arr = jnp.stack(
+        [params.get(f"w_{i}", 1.0 / n_modes) for i in range(1, n_modes + 1)]
+    )
     # Canonicalize to k1/k2 from tau_thix/Gamma (avoids JIT retrace)
-    tau_thix_arr = jnp.stack([params.get(f"tau_thix_{i}", 1.0 / params.get(f"k1_{i}", 1.0)) for i in range(1, n_modes + 1)])
+    tau_thix_arr = jnp.stack(
+        [
+            params.get(f"tau_thix_{i}", 1.0 / params.get(f"k1_{i}", 1.0))
+            for i in range(1, n_modes + 1)
+        ]
+    )
     k1_arr = 1.0 / jnp.maximum(tau_thix_arr, 1e-12)
-    k2_arr = jnp.stack([params.get(f"Gamma_{i}", params.get(f"k2_{i}", 0.0)) for i in range(1, n_modes + 1)])
+    k2_arr = jnp.stack(
+        [
+            params.get(f"Gamma_{i}", params.get(f"k2_{i}", 0.0))
+            for i in range(1, n_modes + 1)
+        ]
+    )
 
     # Vectorized: (n_modes, 1) broadcasts against gamma_dot_abs (N,)
     lambda_ss = k1_arr[:, None] / (

@@ -231,9 +231,9 @@ class BayesianResult:
                 if np_arr.ndim >= 2:
                     # Shape is already (num_chains, num_draws[, ...])
                     posterior_dict[name] = xr.DataArray(
-                        np_arr, dims=("chain", "draw") + tuple(
-                            f"dim_{i}" for i in range(np_arr.ndim - 2)
-                        )
+                        np_arr,
+                        dims=("chain", "draw")
+                        + tuple(f"dim_{i}" for i in range(np_arr.ndim - 2)),
                     )
                 else:
                     # Fallback: reshape flat array
@@ -296,7 +296,9 @@ class BayesianResult:
                         stats_dict["energy"] = xr.DataArray(arr, dims=("chain", "draw"))
                     else:
                         dest_name = _stat_rename.get(stat, stat)
-                        stats_dict[dest_name] = xr.DataArray(arr, dims=("chain", "draw"))
+                        stats_dict[dest_name] = xr.DataArray(
+                            arr, dims=("chain", "draw")
+                        )
         except Exception as exc:
             logger.debug(
                 "Failed to extract sample_stats from MCMC extra fields",

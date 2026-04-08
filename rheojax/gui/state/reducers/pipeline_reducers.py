@@ -106,9 +106,7 @@ def reduce_transform_completed(
                     seed=seed,
                 )
             )
-        return replace(
-            state, pipeline_state=pipeline, transform_history=history
-        )
+        return replace(state, pipeline_state=pipeline, transform_history=history)
 
     return updater
 
@@ -125,9 +123,7 @@ def reduce_export_results(
         last_export_dir = (
             Path(export_path).parent if export_path else state.last_export_dir
         )
-        return replace(
-            state, pipeline_state=pipeline, last_export_dir=last_export_dir
-        )
+        return replace(state, pipeline_state=pipeline, last_export_dir=last_export_dir)
 
     return updater
 
