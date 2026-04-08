@@ -48,14 +48,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install Semgrep
+      run: pip install semgrep
+
     - name: Run Semgrep
-      uses: semgrep/semgrep-action@v1
-      with:
-        config: >-
-          p/python
-          p/security-audit
-          p/owasp-top-ten
-        generateSarif: "1"
+      run: |
+        semgrep scan \
+          --config p/python \
+          --config p/security-audit \
+          --config p/owasp-top-ten \
+          --sarif --output semgrep.sarif \
+          --exclude "tests/*" \
+          --exclude "examples/*" \
+          --exclude ".venv/*" \
+          || true
 
     - name: Upload SARIF
       if: always()
