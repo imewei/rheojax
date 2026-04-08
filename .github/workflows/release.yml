@@ -118,10 +118,10 @@ jobs:
         attestations: true
 
     - name: Generate SBOM
+      continue-on-error: true
       run: |
         uv sync
-        uv pip install "cyclonedx-bom>=5.0.0"
-        uv run cyclonedx-py environment --output sbom.json --output-format json
+        uvx cyclonedx-py environment -o sbom.json --output-format json
 
     - name: Generate changelog from commits
       run: |
@@ -137,12 +137,15 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAG_NAME: ${{ github.ref_name }}
       run: |
+        ASSETS=(dist/*)
+        [ -f sbom.json ] && ASSETS+=(sbom.json)
         gh release create "$TAG_NAME" \
           --title "RheoJAX $TAG_NAME" \
           --notes-file changelog.md \
-          dist/* sbom.json
+          "${ASSETS[@]}"
 
     - name: Upload SBOM artifact
+      if: hashFiles('sbom.json') != ''
       uses: actions/upload-artifact@v4
       with:
         name: sbom
