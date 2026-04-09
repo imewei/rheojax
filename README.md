@@ -347,7 +347,7 @@ pipeline = BayesianPipeline()
     .plot_ess(kind='local'))            # Effective sample size
 ```
 
-**Reference:** See [Bayesian Quick Start Guide](docs/BAYESIAN_QUICK_START.md) for:
+**Reference:** See [Bayesian Inference Guide](docs/source/user_guide/03_advanced_topics/bayesian_inference.rst) for:
 - When and why to use Bayesian inference
 - NLSQ → NUTS → ArviZ workflow walkthrough
 - Troubleshooting convergence issues
@@ -399,7 +399,7 @@ model.fit(t, G_t, check_compatibility=True)  # Warns if incompatible
 - Provides model recommendations when incompatible
 - Error messages explain physics mismatches
 
-**Reference:** [Model Selection Guide](docs/model_selection_guide.md) for decision flowcharts and model characteristics.
+**Reference:** [Model Selection Guide](docs/source/user_guide/02_model_usage/model_selection.rst) for decision flowcharts and model characteristics.
 
 ### Working with Parameters
 
