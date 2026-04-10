@@ -358,12 +358,21 @@ class GeneralizedMaxwell(BaseModel):
         ftol = kwargs.get("ftol", 1e-6)
         xtol = kwargs.get("xtol", 1e-6)
         gtol = kwargs.get("gtol", 1e-6)
+        use_log_residuals = kwargs.get("use_log_residuals", False)
 
         symbol = "E" if self._modulus_type == "tensile" else "G"
 
+        # Precompute log-space observation once when using log residuals.
+        _log_E_t = jnp.log10(jnp.maximum(jnp.asarray(E_t), 1e-30))
+
         # Define objective function
         def objective(params):
-            """Residual for relaxation modulus."""
+            """Residual for relaxation modulus.
+
+            Uses log-space residuals when ``use_log_residuals`` is set, so that
+            master curves spanning many decades in E(t) weight every decade
+            equally instead of being dominated by the glassy plateau.
+            """
             E_inf = params[0]
             E_i = params[1 : 1 + self._n_modes]
             tau_i = params[1 + self._n_modes :]
@@ -371,32 +380,84 @@ class GeneralizedMaxwell(BaseModel):
             # Predict relaxation modulus
             E_pred = self._predict_relaxation_jit(jnp.asarray(t), E_inf, E_i, tau_i)
 
+            if use_log_residuals:
+                return jnp.log10(jnp.maximum(E_pred, 1e-30)) - _log_E_t
             return E_pred - E_t
 
-        # Initial parameter guess (warm-start if provided, else default heuristic)
+        # Derive tau range from the actual time data so master curves spanning
+        # many decades are fittable.  Previously hardcoded to logspace(-2, 2),
+        # which silently truncated any t-range outside [0.01, 100] s.
+        t_np = np.asarray(t)
+        t_pos = t_np[t_np > 0]
+        if t_pos.size > 0:
+            log_t_lo = float(np.log10(t_pos.min()))
+            log_t_hi = float(np.log10(t_pos.max()))
+        else:
+            log_t_lo, log_t_hi = -2.0, 2.0
+        # Pad by one decade on each side and clamp to a safe numerical floor.
+        tau_lo_bound = max(10.0 ** (log_t_lo - 2.0), 1e-30)
+        tau_hi_bound = 10.0 ** (log_t_hi + 2.0)
+        if self._n_modes == 1:
+            tau_guess_arr = jnp.array([10.0 ** (0.5 * (log_t_lo + log_t_hi))])
+        else:
+            tau_guess_arr = jnp.logspace(log_t_lo, log_t_hi, self._n_modes)
+
+        # Always compute derivative-based heuristic guesses so that the
+        # multi-start retry block below can use them even when the caller
+        # supplied ``initial_params``.
+        E_inf_guess = jnp.min(E_t)
+        E_sum_guess = jnp.max(E_t) - E_inf_guess
+
+        # Derivative-based initial E_i: estimate the contribution from each
+        # tau bin using the local drop in E(t) around that tau.  This breaks
+        # the uniform-guess Jacobian degeneracy at high n_modes.
+        t_arr = np.asarray(t)
+        E_arr = np.asarray(E_t)
+        tau_arr = np.asarray(tau_guess_arr)
+        if t_arr.size >= 2 and self._n_modes > 1:
+            order = np.argsort(t_arr)
+            t_sorted = t_arr[order]
+            E_sorted = E_arr[order]
+            log_t = np.log(np.maximum(t_sorted, 1e-30))
+            dEdlogt = np.gradient(E_sorted, log_t)
+            contrib = np.interp(
+                np.log(np.clip(tau_arr, t_sorted[0], t_sorted[-1])),
+                log_t,
+                -dEdlogt,
+            )
+            contrib = np.clip(contrib, 1e-6, None)
+            contrib_sum = float(contrib.sum())
+            total = float(E_sum_guess)
+            if contrib_sum > 0 and total > 0:
+                E_i_guess = jnp.asarray(contrib * (total / contrib_sum))
+            else:
+                E_i_guess = jnp.full(self._n_modes, total / max(self._n_modes, 1))
+        else:
+            E_i_guess = jnp.full(
+                self._n_modes,
+                E_sum_guess / max(self._n_modes, 1),
+            )
+        tau_i_guess = tau_guess_arr
+
         if initial_params is not None:
             x0 = jnp.asarray(initial_params)
         else:
-            E_inf_guess = jnp.min(E_t)  # Equilibrium modulus
-            E_sum_guess = jnp.max(E_t) - E_inf_guess
-            E_i_guess = jnp.full(self._n_modes, E_sum_guess / self._n_modes)
-            tau_i_guess = jnp.logspace(-2, 2, self._n_modes)
-
             x0 = jnp.concatenate([jnp.array([E_inf_guess]), E_i_guess, tau_i_guess])
 
-        # Parameter bounds
+        # Parameter bounds — use data-derived tau range (with wide padding) so
+        # the optimizer can actually reach the relaxation times in the data.
         bounds_lower = jnp.concatenate(
             [
                 jnp.array([0.0]),
                 jnp.full(self._n_modes, 1e-12),
-                jnp.full(self._n_modes, 1e-6),
+                jnp.full(self._n_modes, tau_lo_bound),
             ]
         )
         bounds_upper = jnp.concatenate(
             [
                 jnp.array([jnp.max(E_t) * 10]),
                 jnp.full(self._n_modes, jnp.max(E_t) * 10),
-                jnp.full(self._n_modes, 1e6),
+                jnp.full(self._n_modes, tau_hi_bound),
             ]
         )
 
@@ -408,15 +469,51 @@ class GeneralizedMaxwell(BaseModel):
             penalty = softmax_penalty(E_i, scale=1e-3)
             return jnp.concatenate([residual, jnp.array([penalty])])
 
-        result_step1 = self._nlsq_fit(
-            objective_step1,
-            x0,
-            bounds=(bounds_lower, bounds_upper),
-            max_nfev=max_iter,
-            ftol=ftol,
-            xtol=xtol,
-            gtol=gtol,
-        )
+        def _run_fit_relax(x_init):
+            return self._nlsq_fit(
+                objective_step1,
+                x_init,
+                bounds=(bounds_lower, bounds_upper),
+                max_nfev=max_iter,
+                ftol=ftol,
+                xtol=xtol,
+                gtol=gtol,
+            )
+
+        result_step1 = _run_fit_relax(x0)
+
+        # --- Multi-start: Prony fitting has many local minima because
+        # adjacent modes overlap in their contributions to E(t).  Always
+        # perturb the initial guess a few times and keep the lowest-cost
+        # result.  This is ~4x the cost of a single fit but eliminates
+        # seed-specific bad minima and Jacobian-ridge stalls at once.
+        best_result = result_step1
+        if initial_params is None and self._n_modes >= 2:
+            rng_retry = np.random.default_rng(0)
+            n_p = self._n_modes
+            total_E = float(jnp.max(E_t) - jnp.min(E_t))
+            base_E = np.asarray(E_i_guess)
+            base_tau = np.asarray(tau_i_guess)
+            for attempt in range(4):
+                pert_E = rng_retry.uniform(0.3, 3.0, size=n_p)
+                pert_tau = 10.0 ** rng_retry.uniform(-0.5, 0.5, size=n_p)
+                E_init = jnp.asarray(
+                    np.clip(base_E * pert_E, 1e-6 * max(total_E, 1.0), 10.0 * max(total_E, 1.0))
+                )
+                tau_init = jnp.asarray(
+                    np.clip(base_tau * pert_tau, tau_lo_bound, tau_hi_bound)
+                )
+                x_retry = jnp.concatenate(
+                    [jnp.array([E_inf_guess]), E_init, tau_init]
+                )
+                try:
+                    result_retry = _run_fit_relax(x_retry)
+                except Exception:
+                    continue
+                if float(result_retry.cost) < float(best_result.cost):
+                    best_result = result_retry
+
+        result_step1 = best_result
 
         # Check for negative Eᵢ
         params_opt = result_step1.x
@@ -753,6 +850,7 @@ class GeneralizedMaxwell(BaseModel):
         ftol = kwargs.get("ftol", 1e-6)
         xtol = kwargs.get("xtol", 1e-6)
         gtol = kwargs.get("gtol", 1e-6)
+        use_log_residuals = kwargs.get("use_log_residuals", False)
 
         symbol = "E" if self._modulus_type == "tensile" else "G"
 
@@ -781,9 +879,33 @@ class GeneralizedMaxwell(BaseModel):
                 f"E_star must have shape (2, M), (M, 2), or be 1D concatenated [G', G\"], got {E_star.shape}"
             )
 
+        # Precompute log observations for log-residual mode so we avoid a
+        # jnp.log10 call on every optimizer iteration.
+        _log_Ep = jnp.log10(jnp.maximum(jnp.asarray(E_prime), 1e-30))
+        _log_Epp = jnp.log10(jnp.maximum(jnp.asarray(E_double_prime), 1e-30))
+
+        # Per-component scalar normalization for the linear-residual mode.
+        # We divide residuals by the RMS of each component so that E' and E''
+        # contribute with balanced weight regardless of their absolute
+        # magnitudes.  RMS is preferred over max(|obs|) because it is robust
+        # to outliers, and over per-point |obs| because per-point division
+        # amplifies noise near the low-magnitude tails of E''.
+        _Ep_rms = jnp.sqrt(jnp.mean(jnp.asarray(E_prime) ** 2))
+        _Epp_rms = jnp.sqrt(jnp.mean(jnp.asarray(E_double_prime) ** 2))
+        _Ep_scale = jnp.maximum(_Ep_rms, jnp.float64(1e-12))
+        _Epp_scale = jnp.maximum(_Epp_rms, jnp.float64(1e-12))
+
         # Define objective function
         def objective(params):
-            """Residual for complex modulus."""
+            """Residual for complex modulus.
+
+            Uses log-space residuals when ``use_log_residuals`` is set, which
+            is essential when E'(ω) and E''(ω) span many decades.  Otherwise
+            uses *relative* residuals (pred−obs)/|obs| so that E' and E''
+            contribute with balanced weight regardless of their absolute
+            magnitudes.  Absolute residuals (the old default) let the glassy
+            plateau of E' dominate the sum-of-squares and ignore E''.
+            """
             E_inf = params[0]
             E_i = params[1 : 1 + self._n_modes]
             tau_i = params[1 + self._n_modes :]
@@ -795,37 +917,93 @@ class GeneralizedMaxwell(BaseModel):
             E_prime_pred = E_star_pred[0]  # Extract G' from (2, M)
             E_double_prime_pred = E_star_pred[1]  # Extract G" from (2, M)
 
-            # Combined residual
-            residual_prime = E_prime_pred - E_prime
-            residual_double_prime = E_double_prime_pred - E_double_prime
+            if use_log_residuals:
+                resid_p = (
+                    jnp.log10(jnp.maximum(E_prime_pred, 1e-30)) - _log_Ep
+                )
+                resid_pp = (
+                    jnp.log10(jnp.maximum(E_double_prime_pred, 1e-30)) - _log_Epp
+                )
+            else:
+                resid_p = (E_prime_pred - E_prime) / _Ep_scale
+                resid_pp = (E_double_prime_pred - E_double_prime) / _Epp_scale
 
-            return jnp.concatenate([residual_prime, residual_double_prime])
+            return jnp.concatenate([resid_p, resid_pp])
 
-        # Initial parameter guess (warm-start if provided, else default heuristic)
+        # Derive tau range from the observed frequency window (τ ≈ 1/ω).
+        # Pad ±2 decades beyond the data so optimizer can reach boundary modes.
+        omega_np = np.asarray(omega)
+        omega_pos = omega_np[omega_np > 0]
+        if omega_pos.size > 0:
+            log_tau_lo_data = float(-np.log10(omega_pos.max()))
+            log_tau_hi_data = float(-np.log10(omega_pos.min()))
+        else:
+            log_tau_lo_data, log_tau_hi_data = -2.0, 2.0
+        tau_lo_bound = max(10.0 ** (log_tau_lo_data - 2.0), 1e-30)
+        tau_hi_bound = 10.0 ** (log_tau_hi_data + 2.0)
+        if self._n_modes == 1:
+            tau_i_guess = jnp.array(
+                [10.0 ** (0.5 * (log_tau_lo_data + log_tau_hi_data))]
+            )
+        else:
+            tau_i_guess = jnp.logspace(
+                log_tau_lo_data, log_tau_hi_data, self._n_modes
+            )
+
+        # Always compute derivative-based heuristic guesses so the multi-start
+        # retry block below can use them even when the caller supplied
+        # ``initial_params``.
+        E_inf_guess = jnp.min(E_prime)  # Low-frequency plateau
+        E_sum_guess = jnp.max(E_prime) - E_inf_guess
+
+        # Seed each E_i from the local storage-modulus derivative
+        # −dE'/d(ln ω) evaluated at each τ_k (since 1/τ_k ≈ ω_k).
+        omega_sorted_idx = np.argsort(omega_np)
+        omega_sorted = omega_np[omega_sorted_idx]
+        Ep_sorted = np.asarray(E_prime)[omega_sorted_idx]
+        if omega_sorted.size >= 2 and self._n_modes > 1:
+            log_omega = np.log(np.maximum(omega_sorted, 1e-30))
+            dEp_dlogw = np.gradient(Ep_sorted, log_omega)
+            tau_np = np.asarray(tau_i_guess)
+            omega_at_tau = 1.0 / np.clip(tau_np, 1e-30, None)
+            contrib = np.interp(
+                np.log(np.clip(omega_at_tau, omega_sorted[0], omega_sorted[-1])),
+                log_omega,
+                dEp_dlogw,
+            )
+            contrib = np.clip(contrib, 1e-6, None)
+            contrib_sum = float(contrib.sum())
+            total = float(E_sum_guess)
+            if contrib_sum > 0 and total > 0:
+                E_i_guess = jnp.asarray(contrib * (total / contrib_sum))
+            else:
+                E_i_guess = jnp.full(
+                    self._n_modes, E_sum_guess / max(self._n_modes, 1)
+                )
+        else:
+            E_i_guess = jnp.full(
+                self._n_modes, E_sum_guess / max(self._n_modes, 1)
+            )
+
         if initial_params is not None:
             x0 = jnp.asarray(initial_params)
         else:
-            E_inf_guess = jnp.min(E_prime)  # Low-frequency plateau
-            E_i_guess = jnp.full(
-                self._n_modes, (jnp.max(E_prime) - E_inf_guess) / self._n_modes
-            )
-            tau_i_guess = jnp.logspace(-2, 2, self._n_modes)
-
             x0 = jnp.concatenate([jnp.array([E_inf_guess]), E_i_guess, tau_i_guess])
 
-        # Parameter bounds
+        # Parameter bounds — data-derived tau range so master curves spanning
+        # many decades stay inside the box.
         bounds_lower = jnp.concatenate(
             [
                 jnp.array([0.0]),
                 jnp.full(self._n_modes, 1e-12),
-                jnp.full(self._n_modes, 1e-6),
+                jnp.full(self._n_modes, tau_lo_bound),
             ]
         )
         bounds_upper = jnp.concatenate(
             [
                 jnp.array([jnp.max(E_prime) * 10]),
                 jnp.full(self._n_modes, jnp.max(E_prime) * 10),
-                jnp.full(self._n_modes, 1e6),
+                jnp.full(self._n_modes, tau_hi_bound),
             ]
         )
 
@@ -837,15 +1015,51 @@ class GeneralizedMaxwell(BaseModel):
             penalty = softmax_penalty(E_i, scale=1e-3)
             return jnp.concatenate([residual, jnp.array([penalty])])
 
-        result_step1 = self._nlsq_fit(
-            objective_step1,
-            x0,
-            bounds=(bounds_lower, bounds_upper),
-            max_nfev=max_iter,
-            ftol=ftol,
-            xtol=xtol,
-            gtol=gtol,
-        )
+        def _run_fit(x_init):
+            return self._nlsq_fit(
+                objective_step1,
+                x_init,
+                bounds=(bounds_lower, bounds_upper),
+                max_nfev=max_iter,
+                ftol=ftol,
+                xtol=xtol,
+                gtol=gtol,
+            )
+
+        result_step1 = _run_fit(x0)
+
+        # --- Multi-start: Prony fitting has many local minima because
+        # adjacent modes overlap in their contributions to E*(ω).  Always
+        # perturb the initial guess a few times and keep the lowest-cost
+        # result.  Eliminates both seed-specific bad minima and
+        # Jacobian-ridge stalls at once.
+        best_result = result_step1
+        if initial_params is None and self._n_modes >= 2:
+            rng_retry = np.random.default_rng(0)
+            n_p = self._n_modes
+            total_E = float(jnp.max(E_prime) - jnp.min(E_prime))
+            base_E = np.asarray(E_i_guess)
+            base_tau = np.asarray(tau_i_guess)
+            for attempt in range(4):
+                pert_E = rng_retry.uniform(0.3, 3.0, size=n_p)
+                pert_tau = 10.0 ** rng_retry.uniform(-0.5, 0.5, size=n_p)
+                E_init = jnp.asarray(
+                    np.clip(base_E * pert_E, 1e-6 * total_E, 10.0 * total_E)
+                )
+                tau_init = jnp.asarray(
+                    np.clip(base_tau * pert_tau, tau_lo_bound, tau_hi_bound)
+                )
+                x_retry = jnp.concatenate(
+                    [jnp.array([E_inf_guess]), E_init, tau_init]
+                )
+                try:
+                    result_retry = _run_fit(x_retry)
+                except Exception:
+                    continue
+                if float(result_retry.cost) < float(best_result.cost):
+                    best_result = result_retry
+
+        result_step1 = best_result
 
         # Check for negative Eᵢ
         params_opt = result_step1.x

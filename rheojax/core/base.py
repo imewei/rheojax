@@ -174,12 +174,22 @@ class BaseModel(BayesianMixin, ABC):
             data_shape=data_shape,
             test_mode=test_mode_str,
         ):
+            # Honor use_log_residuals from kwargs (set by BaseModel's auto-detect
+            # in _detect_optimization_strategy or passed explicitly via fit()).
+            # Without this the flag is silently dropped for every model that
+            # routes through _standard_nlsq_fit (e.g. Zener, Jeffreys).
+            use_log_residuals = kwargs.get("use_log_residuals", False)
             logger.debug(
                 "Creating least squares objective",
                 normalize=normalize,
+                use_log_residuals=use_log_residuals,
             )
             objective = create_least_squares_objective(
-                model_fn, x_data, y_data, normalize=normalize
+                model_fn,
+                x_data,
+                y_data,
+                normalize=normalize,
+                use_log_residuals=use_log_residuals,
             )
 
             logger.debug(
@@ -692,16 +702,18 @@ class BaseModel(BayesianMixin, ABC):
                     str(deformation_mode),
                 )
 
-        # --- Convert E* -> G* via shared converter ---
+        # --- Record deformation mode on the instance ---
+        # NOTE: We intentionally do NOT convert E*→G* here.  BayesianMixin.fit_bayesian
+        # (bayesian.py:1156-1177) already performs the tensile→shear conversion using
+        # either protocol_kwargs or a fallback to self._deformation_mode.  Converting
+        # here as well caused a double-application of the 1/(2(1+ν)) factor, which
+        # silently scaled the posterior of Ge/Gm by ~1/2.7 for ν=0.35 tensile data.
         resolved_dm = DeformationModeConverter.resolve_deformation_mode(
             deformation_mode
         )
         if resolved_dm is not None:
             self._deformation_mode = resolved_dm
             self._poisson_ratio = poisson_ratio
-            y = DeformationModeConverter.convert_to_shear(
-                y, resolved_dm, poisson_ratio, self.__class__.__name__
-            )
 
         # Store data for model_function access
         self.X_data = X

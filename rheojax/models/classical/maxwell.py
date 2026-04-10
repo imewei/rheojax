@@ -215,8 +215,16 @@ class Maxwell(BaseModel):
                 else:
                     raise ValueError(f"Unsupported test mode: {test_mode}")
 
+            # Honor use_log_residuals from kwargs (set by BaseModel auto-detect
+            # or passed explicitly) so wide-range relaxation/master-curve data
+            # is fit with equal weight per decade.
+            use_log_residuals = kwargs.get("use_log_residuals", False)
             objective = create_least_squares_objective(
-                model_fn, x_data, y_data, normalize=True
+                model_fn,
+                x_data,
+                y_data,
+                normalize=True,
+                use_log_residuals=use_log_residuals,
             )
 
             logger.debug(

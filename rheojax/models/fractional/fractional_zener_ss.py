@@ -109,17 +109,21 @@ class FractionalZenerSolidSolid(BaseModel):
 
         # Define parameters with bounds and descriptions
         self.parameters = ParameterSet()
+        # Upper bounds widened to 1e11 Pa so glassy polymers (E_g ~ 1-10 GPa,
+        # G_g ~ 0.4-4 GPa) and DMTA posterior samples do not violate the Ge/Gm
+        # constraints during set_value().  tau_alpha span widened to ±10^10 s^α
+        # to cover master curves spanning ~20 decades after TTS shifting.
         self.parameters.add(
             name="Ge",
             value=1000.0,
-            bounds=(1e-3, 1e9),
+            bounds=(1e-3, 1e11),
             units="Pa",
             description="Equilibrium modulus",
         )
         self.parameters.add(
             name="Gm",
             value=1000.0,
-            bounds=(1e-3, 1e9),
+            bounds=(1e-3, 1e11),
             units="Pa",
             description="Maxwell arm modulus",
         )
@@ -133,7 +137,7 @@ class FractionalZenerSolidSolid(BaseModel):
         self.parameters.add(
             name="tau_alpha",
             value=1.0,
-            bounds=(1e-6, 1e6),
+            bounds=(1e-10, 1e10),
             units="s^α",
             description="Relaxation time",
         )
@@ -381,10 +385,22 @@ class FractionalZenerSolidSolid(BaseModel):
                 else:
                     raise ValueError(f"Unsupported test mode: {test_mode}")
 
-            # Create objective function
-            logger.debug("Creating least squares objective", normalize=True)
+            # Create objective function.  Honor ``use_log_residuals`` from
+            # kwargs so the auto-detection in ``BaseModel._detect_optimization_strategy``
+            # reaches the NLSQ residual builder for wide-range data
+            # (>8 decades in ω).  Matches the FractionalMaxwellLiquid pattern.
+            use_log_residuals = kwargs.get("use_log_residuals", False)
+            logger.debug(
+                "Creating least squares objective",
+                normalize=True,
+                use_log_residuals=use_log_residuals,
+            )
             objective = create_least_squares_objective(
-                model_fn, jnp.array(X), jnp.array(y), normalize=True
+                model_fn,
+                jnp.array(X),
+                jnp.array(y),
+                normalize=True,
+                use_log_residuals=use_log_residuals,
             )
 
             # Optimize using NLSQ TRF

@@ -196,22 +196,30 @@ def create_prony_parameter_set(
         description=f"Equilibrium {modulus_type} modulus",
     )
 
-    # Add mode strengths (must be positive)
+    # Add mode strengths (must be positive).  Lower bound is 0.0 so the
+    # optimizer can push a superfluous mode arbitrarily close to zero during
+    # element minimization; ParameterSet.set_value would otherwise reject
+    # writeback of sub-milli-Pascal values converged by NLSQ.
     for i in range(1, n_modes + 1):
         param_set.add(
             name=f"{symbol}_{i}",
             value=1e5,
-            bounds=(1e-3, modulus_upper),
+            bounds=(0.0, modulus_upper),
             units=units,
             description=f"Mode {i} strength",
         )
 
-    # Add relaxation times (wide range to handle diverse timescales)
+    # Add relaxation times.  Bounds widened to [1e-30, 1e30] so TTS master
+    # curves (which can span 20+ decades in reduced time) can be fit without
+    # the ParameterSet constraint check rejecting valid optimizer solutions.
+    # The _fit_*_mode methods derive the actual initial-guess range from the
+    # observed x-data and pad it, so the wide bound here is only a hard
+    # backstop, not the active search space.
     for i in range(1, n_modes + 1):
         param_set.add(
             name=f"tau_{i}",
             value=10.0 ** (i - 1 - n_modes / 2),  # Logarithmic spacing
-            bounds=(1e-6, 1e6),
+            bounds=(1e-30, 1e30),
             units="s",
             description=f"Mode {i} relaxation time",
         )
