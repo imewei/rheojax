@@ -327,15 +327,22 @@ def build_numpyro_model(
             n = scale_info["n_real"]
             y_real_obs, y_imag_obs = y[:n], y[n:]
 
-            # Exponential priors on noise (inflated scale for robustness)
-            sigma_real_scale = max(y_real_scale * 10.0, y_real_mean * 0.01, 1e-3)
-            sigma_imag_scale = max(y_imag_scale * 10.0, y_imag_mean * 0.01, 1e-3)
-            sigma_real = numpyro.sample(
-                "sigma_real", dist.Exponential(rate=1.0 / sigma_real_scale)
-            )
-            sigma_imag = numpyro.sample(
-                "sigma_imag", dist.Exponential(rate=1.0 / sigma_imag_scale)
-            )
+            # Let prior_factory override noise priors if it provides them
+            sigma_real_dist = None
+            sigma_imag_dist = None
+            if callable(prior_factory):
+                sigma_real_dist = prior_factory("sigma_real", 0.0, None)
+                sigma_imag_dist = prior_factory("sigma_imag", 0.0, None)
+
+            if sigma_real_dist is None:
+                sigma_real_scale = max(y_real_scale * 10.0, y_real_mean * 0.01, 1e-3)
+                sigma_real_dist = dist.Exponential(rate=1.0 / sigma_real_scale)
+            if sigma_imag_dist is None:
+                sigma_imag_scale = max(y_imag_scale * 10.0, y_imag_mean * 0.01, 1e-3)
+                sigma_imag_dist = dist.Exponential(rate=1.0 / sigma_imag_scale)
+
+            sigma_real = numpyro.sample("sigma_real", sigma_real_dist)
+            sigma_imag = numpyro.sample("sigma_imag", sigma_imag_dist)
             numpyro.sample(
                 "obs_real",
                 dist.Normal(loc=pred_real, scale=sigma_real),
@@ -347,9 +354,17 @@ def build_numpyro_model(
                 obs=y_imag_obs,
             )
         else:
-            # Floor at 1% of mean magnitude to handle constant-data edge case
-            sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
-            sigma = numpyro.sample("sigma", dist.Exponential(rate=1.0 / sigma_scale))
+            # Let prior_factory override noise prior if it provides one
+            sigma_dist = None
+            if callable(prior_factory):
+                sigma_dist = prior_factory("sigma", 0.0, None)
+
+            if sigma_dist is None:
+                # Floor at 1% of mean magnitude to handle constant-data edge case
+                sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
+                sigma_dist = dist.Exponential(rate=1.0 / sigma_scale)
+
+            sigma = numpyro.sample("sigma", sigma_dist)
             numpyro.sample("obs", dist.Normal(loc=predictions_raw, scale=sigma), obs=y)
 
     if cache_key is not None:

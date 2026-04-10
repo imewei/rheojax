@@ -295,6 +295,10 @@ class SPPYieldStress(BaseModel):
         exponent = float(coeffs[0])
         scale = float(np.exp(coeffs[1]))
 
+        # Compute NLSQ residual std for data-informed Bayesian noise prior
+        predicted = scale * gamma_0_array[valid_mask] ** exponent
+        self._nlsq_residual_std = float(np.std(sigma_array[valid_mask] - predicted))
+
         # Update parameters based on yield type
         if yield_type == "static":
             self.parameters.set_value("sigma_sy_scale", scale)
@@ -558,35 +562,42 @@ class SPPYieldStress(BaseModel):
         """
         import numpyro.distributions as dist
 
-        # Scale parameters: LogNormal priors
+        # Helper: get NLSQ-fitted value if available, else default
+        def _nlsq_value(param_name: str, default: float) -> float:
+            p = self.parameters.get(param_name)
+            if p is not None and p.value is not None and p.value > 0:
+                return float(p.value)
+            return default
+
+        # Scale parameters: LogNormal priors centered on NLSQ estimates
         if name == "G_cage":
-            # Cage modulus typically 100-10000 Pa for soft materials
-            return dist.LogNormal(loc=jnp.log(1000.0), scale=2.0)
+            center = _nlsq_value("G_cage", 1000.0)
+            return dist.LogNormal(loc=jnp.log(center), scale=1.0)
 
         elif name == "sigma_sy_scale":
-            # Static yield stress scale
-            return dist.LogNormal(loc=jnp.log(100.0), scale=2.0)
+            center = _nlsq_value("sigma_sy_scale", 100.0)
+            return dist.LogNormal(loc=jnp.log(center), scale=1.0)
 
         elif name == "sigma_dy_scale":
-            # Dynamic yield stress scale (typically < σ_sy)
-            return dist.LogNormal(loc=jnp.log(50.0), scale=2.0)
+            center = _nlsq_value("sigma_dy_scale", 50.0)
+            return dist.LogNormal(loc=jnp.log(center), scale=1.0)
 
         elif name == "eta_inf":
-            # Viscosity: wide log-normal prior
-            return dist.LogNormal(loc=jnp.log(1.0), scale=3.0)
+            center = _nlsq_value("eta_inf", 1.0)
+            return dist.LogNormal(loc=jnp.log(center), scale=1.5)
 
-        # Exponent parameters: Beta priors on [0, 2] matching bounds
+        # Exponent parameters: Beta priors on [0, 2]
         elif name == "sigma_sy_exp":
-            # Exponent bounded [0, 2]; mode at 1.0 (symmetric Beta)
+            # Weakly informative, slight preference for sublinear (mode ~0.8)
             return dist.TransformedDistribution(
-                dist.Beta(2.0, 2.0),
+                dist.Beta(2.0, 2.5),
                 dist.transforms.AffineTransform(loc=0.0, scale=2.0),
             )
 
         elif name == "sigma_dy_exp":
             # Often sublinear scaling; mode < 1.0 (skewed Beta)
             return dist.TransformedDistribution(
-                dist.Beta(2.0, 3.0),  # Skewed toward lower values
+                dist.Beta(2.0, 3.0),
                 dist.transforms.AffineTransform(loc=0.0, scale=2.0),
             )
 
@@ -598,8 +609,16 @@ class SPPYieldStress(BaseModel):
             )
 
         elif name == "noise":
-            # Noise: HalfCauchy for heavy-tailed robustness
-            return dist.HalfCauchy(scale=10.0)
+            return dist.HalfNormal(scale=5.0)
+
+        # Noise prior for likelihood (overrides default Exponential(10×data_scale))
+        elif name == "sigma":
+            # Use NLSQ residual scale if available for data-informed noise
+            resid_scale = getattr(self, "_nlsq_residual_std", None)
+            if resid_scale is not None and resid_scale > 0:
+                # Center on residual std with room to explore
+                return dist.HalfNormal(scale=max(float(resid_scale) * 3.0, 0.1))
+            return dist.HalfNormal(scale=5.0)
 
         # Default: use uniform prior
         return None
