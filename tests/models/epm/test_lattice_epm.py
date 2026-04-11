@@ -99,6 +99,115 @@ def test_lattice_epm_creep_controller():
 
 
 @pytest.mark.unit
+@pytest.mark.smoke
+def test_lattice_epm_creep_metadata_stress_respected():
+    """metadata['stress'] must drive the creep controller even when y is zero.
+
+    Regression: _run_creep used `if data.y is not None: target = mean(y)` which
+    silently ignored metadata['stress'] whenever the caller passed a dummy y
+    (the idiomatic predict-time shape). That produced target_stress=0 and a
+    flat-zero strain prediction (see examples/epm/04_epm_creep.ipynb).
+    """
+    model = LatticeEPM(L=16, dt=0.01, sigma_c_mean=0.5, sigma_c_std=0.1)
+    time = jnp.linspace(0.5, 10.0, 20)  # dt_data=0.5 (coarse, like notebook)
+    data = RheoData(
+        x=time,
+        y=jnp.zeros_like(time),
+        initial_test_mode="creep",
+        metadata={"stress": 1.0},  # above yield → unbounded creep expected
+    )
+    pred = model.predict(data, smooth=True, seed=0).y
+    # Above-yield creep must produce a clearly non-zero strain trajectory
+    assert float(jnp.max(jnp.abs(pred))) > 0.5, (
+        f"metadata['stress'] ignored: strain stayed near zero, max={float(jnp.max(pred)):.4f}"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.smoke
+def test_lattice_epm_creep_coarse_dt_matches_fine_dt():
+    """Creep prediction must be insensitive to data spacing (controller substep).
+
+    Regression: _jit_creep_kernel used dt = time[1]-time[0] as the ODE step,
+    so coarse data grids (dt_data=0.5) produced 50x-oversized Euler steps,
+    underdriving the P-controller by ~40%. After the fix, the kernel substeps
+    at self.dt internally so results agree across grid resolutions.
+    """
+    model = LatticeEPM(L=16, dt=0.01, sigma_c_mean=0.5, sigma_c_std=0.1)
+    target = 1.0  # above yield
+
+    def run(n):
+        t = jnp.linspace(0.5, 10.0, n)
+        d = RheoData(
+            x=t, y=jnp.full_like(t, target), initial_test_mode="creep"
+        )
+        return float(model.predict(d, smooth=True, seed=0).y[-1])
+
+    coarse = run(20)  # dt_data=0.5
+    fine = run(951)  # dt_data=0.01 (== self.dt, ground truth)
+    rel_err = abs(coarse - fine) / max(abs(fine), 1e-6)
+    assert rel_err < 0.15, (
+        f"coarse strain[-1]={coarse:.4f} diverges from fine={fine:.4f} "
+        f"(rel err {rel_err:.2%}) — controller substep missing"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.slow
+def test_lattice_epm_creep_round_trip_fit():
+    """Round-trip: fit EPM to its own creep simulation, recover R² > 0.9.
+
+    Regression: examples/epm/04_epm_creep.ipynb reported R²=-36.74 because
+    (1) predict-time metadata was ignored and (2) the JIT kernel underdrove
+    the controller at coarse dt. With both fixed, the model must cleanly fit
+    a ground-truth creep curve it generated itself.
+    """
+    truth = LatticeEPM(
+        L=16, dt=0.01, mu=1.0, tau_pl=1.0, sigma_c_mean=0.5, sigma_c_std=0.1
+    )
+    target = 1.0  # above yield → growing unbounded creep
+    t = jnp.linspace(0.5, 10.0, 20)
+    gamma = truth.predict(
+        RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            initial_test_mode="creep",
+            metadata={"stress": target},
+        ),
+        smooth=True,
+        seed=0,
+    ).y
+
+    fit_model = LatticeEPM(
+        L=16, dt=0.01, mu=0.8, tau_pl=2.0, sigma_c_mean=0.8, sigma_c_std=0.2
+    )
+    fit_model.fit(
+        np.asarray(t),
+        np.asarray(gamma),
+        test_mode="creep",
+        stress=target,
+        method="scipy",
+        seed=0,  # match truth-generator seed for deterministic lattice
+    )
+    pred = fit_model.predict(
+        RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            initial_test_mode="creep",
+            metadata={"stress": target},
+        ),
+        smooth=True,
+        seed=0,
+    ).y
+    g = np.asarray(gamma)
+    p = np.asarray(pred)
+    ss_res = float(np.sum((g - p) ** 2))
+    ss_tot = float(np.sum((g - g.mean()) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    assert r2 > 0.9, f"Round-trip R²={r2:.4f} (expected >0.9)"
+
+
+@pytest.mark.unit
 def test_lattice_epm_relaxation_backward_compat():
     """Test relaxation protocol for backward compatibility after EPMBase refactoring."""
     model = LatticeEPM(L=16, dt=0.01)

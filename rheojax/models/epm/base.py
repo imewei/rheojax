@@ -350,40 +350,55 @@ def _jit_relaxation_kernel(
     return jnp.concatenate([jnp.array([g_0]), moduli_scan])
 
 
-@partial(jax.jit, static_argnums=(6, 7))
+@partial(jax.jit, static_argnames=("n_steps", "L", "n_sub", "fluidity_form"))
 def _jit_creep_kernel(
     time: jax.Array,
     key: jax.Array,
     propagator_q: jax.Array,
     params_array: jax.Array,
     target_stress: float,
-    dt: float,
+    dt_sub: float,
     n_steps: int,
     L: int,
+    n_sub: int,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
-    """JIT-compiled creep simulation with P-controller.
+    """JIT-compiled creep simulation with a substepped P-controller.
+
+    The controller/integrator run at ``dt_sub`` (≤ ``self.dt``). Between
+    adjacent data points the kernel takes ``n_sub`` substeps so the ODE step
+    stays stable and the controller has enough iterations to drive the lattice
+    stress to the target even when the data cadence is coarse.
+
+    ``fluidity_form`` selects the plastic-strain-rate constitutive law, matching
+    ``rheojax.utils.epm_kernels.plastic_strain_rate``:
+      * ``"linear"`` — Bingham (plastic_rate = activation · σ · fluidity)
+      * ``"power"``  — soft-glassy power law
+      * ``"overstress"`` — Herschel-Bulkley (DEFAULT), needed for yield-stress
+        creep where bounded/unbounded regimes depend on an additive yield
+        baseline. Must match the Python ``_run_creep`` predict path so that
+        round-trip NLSQ fits converge.
 
     Args:
-        time: Time array
-        key: PRNG key
-        propagator_q: Propagator in Fourier space
-        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
-        target_stress: Target stress for creep
-        dt: Time step
-        n_steps: Number of time points minus 1
-        L: Lattice size
+        time: Time array (only its shape is used; n_steps = len(time)-1).
+        key: PRNG key.
+        propagator_q: Propagator in Fourier space.
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, n_fluid, smoothing_width].
+        target_stress: Target stress for creep.
+        dt_sub: ODE substep (stable step for the explicit integrator).
+        n_steps: Number of outer steps = len(time) - 1.
+        L: Lattice size.
+        n_sub: Number of substeps between adjacent data points.
+        fluidity_form: Constitutive law for the plastic strain rate.
 
     Returns:
-        Array of strain over time
+        Strain sampled at each data point (length n_steps + 1).
     """
     mu = params_array[0]
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
-    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
-    # creep / oscillation) keep the classical linear form for backward
-    # compatibility; changing them is a separate scope.
+    n_fluid = params_array[4]
     smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
@@ -399,10 +414,9 @@ def _jit_creep_kernel(
     thresholds = jnp.maximum(thresholds, 1e-4)
     strain = 0.0
 
-    # Augmented state: (stress, thresholds, strain, key, gdot)
     initial_strain = strain
 
-    def body_fn(carrier, _):
+    def sub_step(carrier, _):
         stress_curr, thresholds_curr, strain_curr, key_curr, gdot = carrier
 
         # P-controller: adjust shear rate to maintain target stress
@@ -412,32 +426,62 @@ def _jit_creep_kernel(
         Kp = Kp_base * (1.0 + alpha * rel_error)
         gdot_new = jnp.maximum(gdot + Kp * error, 0.0)
 
-        # Smooth plastic strain rate
+        # Smooth activation (matches epm_kernels.plastic_strain_rate)
         stress_mag = jnp.abs(stress_curr)
         activation = 0.5 * (
             1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
         )
-        plastic_strain_rate = activation * stress_curr * fluidity
 
-        # Stress evolution
+        # Plastic strain rate — fluidity_form is static, so only one branch
+        # is emitted into the compiled graph.
+        if fluidity_form == "linear":
+            plastic_strain_rate = activation * stress_curr * fluidity
+        elif fluidity_form == "power":
+            inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
+            stress_mag_safe = jnp.maximum(stress_mag, 1e-8)
+            power_term = (
+                jnp.sign(stress_curr)
+                * (stress_mag_safe * inv_scm) ** n_fluid
+                * sigma_c_mean
+            )
+            plastic_strain_rate = activation * power_term * fluidity
+        elif fluidity_form == "overstress":
+            eps = 1e-6
+            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress_power = overstress**n_fluid * (
+                sigma_c_mean ** (1.0 - n_fluid)
+            )
+            plastic_strain_rate = (
+                activation * jnp.sign(stress_curr) * overstress_power * fluidity
+            )
+        else:
+            raise ValueError(
+                f"Unknown fluidity_form={fluidity_form!r}; "
+                "must be 'linear', 'power', or 'overstress'."
+            )
+
+        # Stress evolution at dt_sub
         loading_rate = mu * gdot_new
         relaxation_rate = -mu * plastic_strain_rate
-
-        # FFT-based redistribution
         plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
         stress_q = propagator_q * plastic_strain_q
         redistribution_rate = jnp.fft.irfft2(stress_q, s=(L, L))
 
-        # Update
         new_stress = (
-            stress_curr + (loading_rate + relaxation_rate + redistribution_rate) * dt
+            stress_curr
+            + (loading_rate + relaxation_rate + redistribution_rate) * dt_sub
         )
-        new_strain = strain_curr + gdot_new * dt
+        new_strain = strain_curr + gdot_new * dt_sub
 
-        return (new_stress, thresholds_curr, new_strain, key_curr, gdot_new), new_strain
+        return (new_stress, thresholds_curr, new_strain, key_curr, gdot_new), None
+
+    def outer_step(carrier, _):
+        carrier_next, _ = jax.lax.scan(sub_step, carrier, None, length=n_sub)
+        strain_sampled = carrier_next[2]
+        return carrier_next, strain_sampled
 
     _, strains_scan = jax.lax.scan(
-        body_fn, (stress, thresholds, strain, k2, 0.0), None, length=n_steps
+        outer_step, (stress, thresholds, strain, k2, 0.0), None, length=n_steps
     )
 
     return jnp.concatenate([jnp.array([initial_strain]), strains_scan])
@@ -954,8 +998,15 @@ class EPMBase(BaseModel):
     ) -> RheoData:
         """Creep: Strain(t) at constant stress using Adaptive P-Controller.
 
+        The controller is substepped at ``self.dt`` between adjacent data
+        points so the explicit-Euler integration stays stable at coarse data
+        cadences and the controller has enough iterations to drive the
+        lattice stress to the target. Target stress is taken from
+        ``data.metadata['stress']`` if present; otherwise falls back to
+        ``mean(data.y)`` for the historical ``y=constant`` call pattern.
+
         Args:
-            data: RheoData with x=time, y=target_stress or metadata['stress'].
+            data: RheoData with x=time; target from metadata['stress'] or y.
             key: PRNG key.
             propagator_q: Precomputed propagator.
             params: Model parameters.
@@ -968,16 +1019,22 @@ class EPMBase(BaseModel):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
+        # Outer cadence from data; substep the controller at self.dt inside.
+        dt_data = float(time[1] - time[0]) if len(time) > 1 else self.dt
+        dt_sub = min(self.dt, dt_data)
+        n_sub = max(1, int(round(dt_data / dt_sub))) if dt_sub > 0 else 1
 
-        # Target stress from metadata or mean of y
-        if data.y is not None:
-            target_stress = jnp.mean(data.y)
-        else:
-            target_stress = data.metadata.get("stress", 1.0)
+        # Target stress: metadata is canonical (predict-time shape uses
+        # y=dummy_zeros + metadata['stress']). Fall back to mean(y) for the
+        # legacy test pattern that passes y=full_like(t, target_stress).
+        target_stress = data.metadata.get("stress") if data.metadata else None
+        if target_stress is None:
+            if data.y is not None and data.y.size > 0:
+                y_mean = float(jnp.mean(data.y))
+                target_stress = y_mean if abs(y_mean) > 1e-12 else 1.0
+            else:
+                target_stress = 1.0
+        target_stress = float(target_stress)
 
         # Controller Params
         Kp_base = 0.01
@@ -992,32 +1049,33 @@ class EPMBase(BaseModel):
 
         n_steps = max(0, len(time) - 1)
 
-        def body(carrier, _):
+        def sub_body(carrier, _):
             curr_epm, gdot = carrier
             stress_grid = curr_epm[0]
             curr_stress = jnp.mean(stress_grid)
 
             # Adaptive Control
             error = target_stress - curr_stress
-            # Gain scheduling: Boost gain if error is large relative to target
             rel_error = jnp.abs(error) / (jnp.abs(target_stress) + 1e-6)
             Kp = Kp_base * (1.0 + alpha * rel_error)
 
-            # Update shear rate (P-control on rate)
             gdot_new = gdot + Kp * error
-            # Prevent negative shear rate
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
-            # Step EPM
+            # Step EPM at the stable substep
             new_epm = self._epm_step(
-                curr_epm, propagator_q, gdot_new, dt, params, smooth
+                curr_epm, propagator_q, gdot_new, dt_sub, params, smooth
             )
+            return (new_epm, gdot_new), None
 
-            # Return Strain
-            return (new_epm, gdot_new), new_epm[2]
+        def outer_body(carrier, _):
+            carrier_next, _ = jax.lax.scan(sub_body, carrier, None, length=n_sub)
+            return carrier_next, carrier_next[0][2]  # sampled strain
 
         if n_steps > 0:
-            _, strains_scan = jax.lax.scan(body, aug_state, None, length=n_steps)
+            _, strains_scan = jax.lax.scan(
+                outer_body, aug_state, None, length=n_steps
+            )
             strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
         else:
             strains = jnp.array([initial_strain])
@@ -1134,6 +1192,19 @@ class EPMBase(BaseModel):
         self._cached_stress = kwargs.get("stress", 1.0)
         self._cached_gamma0 = kwargs.get("gamma0", 0.01)
         self._cached_omega = kwargs.get("omega", 1.0)
+
+        # Creep substep cache: the P-controller must run at dt ≤ self.dt for
+        # stable integration. We compute the data cadence here (outside any
+        # JIT trace) so _model_creep_jit can derive dt_sub and n_sub as
+        # Python scalars.
+        if test_mode == "creep":
+            import numpy as _np
+
+            _X_np = _np.asarray(X)
+            if _X_np.ndim >= 1 and _X_np.shape[0] > 1:
+                self._creep_dt_data = float(_X_np[1] - _X_np[0])
+            else:
+                self._creep_dt_data = self.dt
 
         data_shape = (len(X),) if hasattr(X, "__len__") else None
 
@@ -1491,15 +1562,35 @@ class EPMBase(BaseModel):
         params_array: jax.Array,
         target_stress: float,
     ) -> jax.Array:
-        """JIT-friendly creep simulation."""
+        """JIT-friendly creep simulation with controller substep.
+
+        The creep P-controller is substepped at ``self.dt`` between adjacent
+        data points. This keeps the explicit-Euler step stable regardless of
+        data cadence and gives the controller enough iterations to drive the
+        lattice stress to the target even on coarse grids (e.g. dt_data=0.5 s
+        from a 20-point creep curve). See
+        tests/models/epm/test_lattice_epm.py::test_lattice_epm_creep_coarse_dt_matches_fine_dt.
+
+        ``dt_data`` is taken from ``self._creep_dt_data``, cached in ``_fit``
+        before any JIT tracing, so slicing a traced ``time`` array here is
+        unnecessary and we avoid ConcretizationTypeError.
+        """
         n_steps = max(0, int(time.shape[0]) - 1)
-        dt = self.dt
-        if n_steps > 0:
-            # Use JAX-compatible array difference (avoids float() on traced arrays)
-            dt = time[1] - time[0]
+        dt_data = float(getattr(self, "_creep_dt_data", self.dt))
+        dt_sub = min(self.dt, dt_data) if dt_data > 0 else self.dt
+        n_sub = max(1, int(round(dt_data / dt_sub))) if dt_sub > 0 else 1
 
         return self._run_creep_kernel(
-            time, key, propagator_q, params_array, target_stress, dt, n_steps, self.L
+            time,
+            key,
+            propagator_q,
+            params_array,
+            target_stress,
+            dt_sub,
+            n_steps,
+            self.L,
+            n_sub,
+            getattr(self, "fluidity_form", "overstress"),
         )
 
     def _model_oscillation_jit(
@@ -1563,13 +1654,24 @@ class EPMBase(BaseModel):
         propagator_q: jax.Array,
         params_array: jax.Array,
         target_stress: float,
-        dt: float,
+        dt_sub: float,
         n_steps: int,
         L: int,
+        n_sub: int,
+        fluidity_form: str = "overstress",
     ) -> jax.Array:
-        """Dispatch to JIT-compiled creep kernel."""
+        """Dispatch to JIT-compiled creep kernel (substepped controller)."""
         return _jit_creep_kernel(
-            time, key, propagator_q, params_array, target_stress, dt, n_steps, L
+            time,
+            key,
+            propagator_q,
+            params_array,
+            target_stress,
+            dt_sub,
+            n_steps,
+            L,
+            n_sub,
+            fluidity_form=fluidity_form,
         )
 
     def _run_oscillation_kernel(

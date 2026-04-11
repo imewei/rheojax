@@ -694,11 +694,17 @@ class TensorialEPM(EPMBase):
         if len(time) > 1:
             dt = float(time[1] - time[0])
 
-        # Target stress from metadata or mean of y
-        if data.y is not None:
-            target_stress = jnp.mean(data.y)
-        else:
-            target_stress = data.metadata.get("stress", 1.0)
+        # Target stress: metadata is canonical; fall back to mean(y) only when
+        # the caller passed y=constant (legacy pattern). See the matching
+        # scalar fix in rheojax/models/epm/base.py::_run_creep.
+        target_stress = data.metadata.get("stress") if data.metadata else None
+        if target_stress is None:
+            if data.y is not None and data.y.size > 0:
+                y_mean = float(jnp.mean(data.y))
+                target_stress = y_mean if abs(y_mean) > 1e-12 else 1.0
+            else:
+                target_stress = 1.0
+        target_stress = float(target_stress)
 
         # Controller Params
         Kp_base = 0.01
