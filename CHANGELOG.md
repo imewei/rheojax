@@ -5,6 +5,59 @@ All notable changes to RheoJAX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — Herschel-Bulkley-Capable EPM Kernels (scalar and tensorial)
+
+Both the scalar `LatticeEPM` and the tensorial `TensorialEPM` now support **three interchangeable constitutive laws** for the plastic strain rate, selectable at model construction via a new `fluidity_form` argument. This fills a long-standing limitation where EPM could not reproduce shear-thinning Herschel-Bulkley flow curves (σ = σ_y + K·γ̇^n with n < 1) regardless of disorder distribution — the classical linear-fluidity form asymptotes to Bingham at high rates by construction.
+
+- **Added** `fluidity_form="linear"`: classical Bingham form, `plastic_rate = activation · σ · fluidity`. Backwards-compatible with the pre-0.7 EPM behavior.
+- **Added** `fluidity_form="power"`: power-law fluidity `plastic_rate ∝ (σ/σ_c)^n_fluid · σ_c / τ_pl`. Shear-thinning without an additive yield baseline; used for soft-glassy-rheology studies.
+- **Added** `fluidity_form="overstress"` *(default)*: Herschel-Bulkley overstress form `plastic_rate ∝ (|σ| − σ_c)_+^n_fluid / σ_c^(n_fluid−1) / τ_pl`. Produces the full HB shape σ = σ_y + K·γ̇^(1/n_fluid) at the NLSQ optimum. On the φ=0.80 emulsion benchmark the scalar fit reaches R²_lin = 0.9957, R²_log = 0.9985, max relative error = 7.4% — essentially at the analytical HB ceiling.
+- **Added** `n_fluid` fitted parameter for both models (default 1.0, bounds [0.5, 5.0]). The implied HB shear-thinning exponent is `n_HB = 1/n_fluid`.
+- **Modified** Default `fluidity_form` is `"overstress"` for both `LatticeEPM` and `TensorialEPM`. Downstream users who relied on the old Bingham behavior should pass `fluidity_form="linear"` explicitly.
+
+### Added — TensorialEPM Overstress Kernel Port and `.fit()` Implementation
+
+- **Added** Three-form dispatch in `rheojax.utils.epm_kernels_tensorial.compute_plastic_strain_rate` matching the scalar kernel, applied component-wise via the Prandtl-Reuss flow direction `σ'_ij / σ_eff`.
+- **Added** `fluidity_form` as a static JIT argument on `tensorial_epm_step`, threaded through from `TensorialEPM._epm_step`.
+- **Added** `TensorialEPM.fit()` — the method previously raised `NotImplementedError`. It now inherits `EPMBase._fit` via a thin delegator and supports 1D shear-only targets over all five protocols (flow_curve, startup, relaxation, creep, oscillation). On the emulsion benchmark: R²_lin = 0.9938, R²_log = 0.9988, max relative error = 9.1%, recovering σ_y = 23.59 Pa and HB exponent 0.464 — within 0.5% of the scalar fit.
+- **Fixed** `EPMBase._model_flow_curve` (and sibling `_model_startup`, `_model_relaxation`, `_model_creep`, `_model_oscillation`) previously used `jnp.mean(new_state[0])` which averages over *all three* components of the tensorial `(3, L, L)` stress field — physically meaningless because it mixes σ_xx, σ_yy, σ_xy. Introduced a new `_mean_shear_stress` helper that branches on `stress.ndim` to extract σ_xy correctly for both scalar and tensorial paths.
+- **Fixed** Warm-start formula in `tensor.py::_run_flow_curve` to account for (a) the √3 factor from the von Mises effective stress in pure shear and (b) the factor of 2 from the Budrikis-Zapperi convention `dσ_ij/dt = 2μ·ε̇`. The scalar plateau formula `σ_c + |γ̇|·τ_pl` incorrectly seeded the tensorial simulation and caused transient blow-ups.
+- **Fixed** The tensorial kernel was previously an **ideal-plastic Prandtl-Reuss model** with the plastic rate pinned at `1/(√3·τ_pl_shear)` once yielded. This meant the tensor flow curve had no rate dependence and stress grew unboundedly above a critical shear rate `γ̇_crit = 1/(√3·τ_pl_shear)`. The new overstress form replaces this with proper rate-dependent viscoplasticity.
+
+### Added — Tensorial Overstress Support for Hill Anisotropy
+
+- The overstress constitutive law works with either yield criterion (`"von_mises"` or `"hill"`). At default Hill parameters `(H=0.5, N=1.5)` Hill reduces exactly to von Mises for pure shear; anisotropic `(H, N)` values produce genuinely different stress evolution through the same overstress formula.
+
+### Added — New Tests
+
+- 5 kernel-level tests for the three `fluidity_form` options in the scalar kernel (`tests/utils/test_epm_kernels.py`)
+- 5 kernel-level tests for the three `fluidity_form` options in the tensorial kernel including Hill anisotropy interaction (`tests/utils/test_epm_kernels_tensorial.py`)
+- 5 model-level tests for `TensorialEPM` overstress behavior: default form, plateau at `σ_c/√3`, analytical HB shape verification, fit-callable scaffold (`tests/models/epm/test_tensorial_epm.py`)
+- 4 integration tests for tensorial time-domain protocols under overstress: startup, relaxation, creep, oscillation — each verifies finite, bounded, qualitatively-correct output
+
+Total EPM test count: **80** (25 scalar model + 27 scalar kernel + 28 tensorial model/kernel).
+
+### Added — Numerical Safety Nets
+
+- **Added** Parameter clamps (`sigma_c_mean`, `n_fluid`, `tau_pl` each floored at ~1e-6) and `jnp.where(jnp.isfinite(…), …, plateau_fallback)` guards in `EPMBase._model_flow_curve` and `TensorialEPM._run_flow_curve` warm-start and return paths. NLSQ can transiently probe parameter combinations where the explicit-Euler kernel produces NaN; the fallback substitutes the analytical plateau so the loss remains finite and the optimizer can recover on the next iteration.
+
+### Fixed — Example Notebook `examples/epm/01_epm_flow_curve.ipynb`
+
+- **Rewrote** cells 27–30 to show a **real side-by-side Herschel-Bulkley fit** comparing LatticeEPM (solid blue) and TensorialEPM (dashed red) on the φ=0.80 emulsion data, with N₁ plotted on the right panel. Both models now reach the HB analytical ceiling and recover physically consistent parameters.
+- **Fixed** A wavy-residual artifact where the original fit converged to a local minimum with `mu=20` slammed into the upper bound and `sigma_c_std=0.01` slammed into the lower bound. The new default (`fluidity_form="overstress"`) plus physically motivated initial guesses give a clean fit: R²_lin = 0.9957, R²_log = 0.9985, max rel err = 7.4%.
+- **Fixed** A plotting artifact where the fit curve was a 30-point polyline on log-log axes, creating visible "kinks" that looked like step shapes in the model. Cell 13 now plots the fit curve on a 200-point fine logspace grid.
+- **Fixed** A `NaN` overflow at `γ̇ > 932 s⁻¹` introduced by an earlier warm-start fix: the Bingham-form `σ_warm = σ_c + γ̇·τ_pl` initialized stress at ~5660 Pa at γ̇=1000, which raised to power `n_fluid=2.33` overflows. The new warm-start uses the power-law asymptote `σ_c + σ_c·(γ̇·τ_pl/σ_c)^(1/n_fluid)` which stays bounded.
+- **Added** Defensive `importlib.reload` block at the top of the setup cell (`cell-3`) so users with a stale Jupyter kernel don't see misleading "old-error-on-new-code-line" tracebacks after pulling updates.
+- **Added** Markdown warning in the tensorial sidebar (`cell-27`) explaining the stale-kernel issue and the two remediation options (re-run the reload cell or restart the kernel).
+- **Updated** Bumped the default lattice size from `L=32` to `L=64` in the non-FAST_MODE production path for lower finite-size noise. FAST_MODE (CI) keeps `L=32` for speed.
+
+### Documentation
+
+- **Updated** `docs/source/models/epm/lattice_epm.rst`: new `Constitutive Forms for the Plastic Strain Rate` section with the three-form table and `fluidity_form` / `n_fluid` explanations; updated Parameters table with the new fitted parameters and configuration arguments; expanded `Common Fitting Issues` table with HB-specific guidance.
+- **Updated** `docs/source/models/epm/tensorial_epm.rst`: new `Constitutive Forms and the von Mises / Tensorial Conventions` section explaining the √3 plateau factor and the factor-of-2 stress-rate convention, with a scalar-to-tensorial parameter mapping recipe. Updated Parameters/Config tables with `n_fluid` and `fluidity_form`. Replaced the `"Fitting to Shear-Only Data"` example with a HB-capable workflow that shows how to derive a working initial guess from the data plateau.
+
 ## [0.6.1] - 2026-04-08
 
 ### Fixed

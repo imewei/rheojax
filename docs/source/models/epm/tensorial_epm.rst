@@ -8,9 +8,9 @@ Quick Reference
 
 - **Use when:** Full stress tensor modeling, normal stress differences (:math:`N_1, N_2`), anisotropic yielding, flow instabilities
 
-- **Parameters:** 9 (:math:`\mu, \nu, \tau_{\text{pl,shear}}, \tau_{\text{pl,normal}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}`, :math:`w_{N1}`, :math:`H_{\text{Hill}}`, :math:`N_{\text{Hill}}`)
+- **Parameters:** 10 fitted (:math:`\mu, \nu, \tau_{\text{pl,shear}}, \tau_{\text{pl,normal}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}, n_{\text{fluid}}, w_{N1}, H_{\text{Hill}}, N_{\text{Hill}}`) + ``fluidity_form``, ``yield_criterion``, ``L``, ``dt`` config
 
-- **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma} \delta_{ij} - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c) + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}`
+- **Key equation:** :math:`\partial_t \sigma_{ij} = 2\mu \dot{\varepsilon}^e_{ij} - 2\mu \dot{\varepsilon}^p_{ij} + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\varepsilon}^p_{kl}` with :math:`\dot{\varepsilon}^p_{ij} = (\sigma'_{ij}/\sigma_\text{eff}) \cdot g_\text{eff}(\sigma_\text{eff}, \sigma_c, n_\text{fluid}) / \tau_{ij}^{pl}`
 
 - **Test modes:** flow_curve, startup, relaxation, creep, oscillation
 
@@ -239,6 +239,113 @@ The loss function for combined fitting is:
 
 Set ``w_N1 > 1`` to prioritize normal stress accuracy.
 
+.. note::
+
+   Combined :math:`[\sigma_{xy}, N_1]` fitting is not yet wired through
+   ``TensorialEPM.fit()``; the current ``fit()`` supports shear-only 1D
+   :math:`\sigma_{xy}` targets and delegates to ``EPMBase._fit``. For now,
+   ``w_N1`` is reserved for future use. You can still *predict* :math:`N_1`
+   from a shear-only fit via ``model.predict(..., test_mode="flow_curve")``
+   which returns :math:`N_1` in ``result.metadata["N1"]``.
+
+Constitutive Forms and the von Mises / Tensorial Conventions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The tensorial kernel supports the same three ``fluidity_form`` options as
+the scalar :doc:`lattice_epm` (see :ref:`fluidity_form`), applied
+component-wise through the Prandtl–Reuss flow direction:
+
+.. math::
+
+    \dot\varepsilon^{p}_{ij} = \frac{\sigma'_{ij}}{\sigma_\text{eff}}\,
+                               g_\text{eff}(\sigma_\text{eff}; \sigma_{c,\text{mean}}, n_{\text{fluid}})\,
+                               \cdot\frac{1}{\tau^{pl}_{ij}}\cdot \mathcal{A}
+
+where :math:`\sigma'_{ij}` is the deviatoric stress, :math:`\sigma_\text{eff}`
+is the yield-criterion effective stress, :math:`\tau^{pl}_{ij}` is
+``tau_pl_shear`` for :math:`ij = xy` and ``tau_pl_normal`` otherwise, and
+:math:`g_\text{eff}` is the form-dependent magnitude factor shared with the
+scalar kernel.
+
+Two subtleties distinguish the tensorial case from the scalar kernel and
+**both affect how you interpret fitted parameters**:
+
+**1. The** :math:`\sqrt{3}` **factor from von Mises.**
+For pure shear the von Mises effective stress is
+:math:`\sigma_\text{eff} = \sqrt{3}\,|\sigma_{xy}|`, so yielding begins at
+:math:`|\sigma_{xy}| = \sigma_{c,\text{mean}}/\sqrt{3}` — **a factor of**
+:math:`\sqrt{3}` **below the scalar** ``sigma_c_mean``. The macroscopic yield
+stress you'd measure from the tensorial flow curve is
+
+.. math::
+
+    \sigma_y^{\text{tensorial}} = \frac{\sigma_{c,\text{mean}}}{\sqrt{3}}
+
+so to match a measured emulsion yield stress :math:`\sigma_y \approx 24` Pa,
+set the tensorial ``sigma_c_mean`` to :math:`24\sqrt{3} \approx 41.6` Pa.
+The scalar LatticeEPM has no such factor — there, ``sigma_c_mean`` directly
+equals :math:`\sigma_y`.
+
+**2. The factor-of-2 in the stress-rate convention.**
+The tensorial stress update follows the Budrikis–Zapperi 2013 convention
+:math:`d\sigma_{ij}/dt = 2\mu\,\dot\varepsilon^e_{ij} - 2\mu\,\dot\varepsilon^p_{ij} + \mathcal{G}\,\dot\varepsilon^p`,
+so at steady state under imposed shear rate :math:`\dot\gamma` the tensor
+plastic strain rate must equal :math:`\dot\gamma/2` (half the engineering
+shear rate). This changes the analytical flow-curve formula for the
+``"overstress"`` form:
+
+.. math::
+
+    \sigma_{xy}^{\text{tensorial}}(\dot\gamma)
+        = \frac{\sigma_{c,\text{mean}}}{\sqrt{3}}
+          + \frac{1}{\sqrt{3}}
+          \left(\frac{\sqrt{3}}{2}\right)^{1/n_{\text{fluid}}}
+          \sigma_{c,\text{mean}}^{(n_{\text{fluid}}-1)/n_{\text{fluid}}}
+          \left(\dot\gamma\,\tau_{pl,\text{shear}}\right)^{1/n_{\text{fluid}}}
+
+Special cases:
+
+- :math:`n_{\text{fluid}} = 1`:
+  :math:`\sigma_{xy} = \sigma_{c,\text{mean}}/\sqrt{3} + \dot\gamma\,\tau_{pl,\text{shear}}/2`
+  (Bingham with yield plateau)
+- :math:`n_{\text{fluid}} = 2`:
+  :math:`\sigma_{xy} = \sigma_{c,\text{mean}}/\sqrt{3} + \sqrt{\sigma_{c,\text{mean}}\,\dot\gamma\,\tau_{pl,\text{shear}}/(2\sqrt{3})}`
+  (HB with :math:`n_{HB} = 0.5`)
+
+These formulas are what the warm-start in
+``TensorialEPM._run_flow_curve`` uses to seed each shear rate's simulation
+before stepping, so the flow curve converges to the HB ceiling without
+long transients.
+
+**3. Mapping scalar fit parameters to tensorial initial guesses.**
+When you have a good scalar LatticeEPM fit and want to initialize the
+tensorial model, apply the two corrections above:
+
+.. code-block:: python
+
+    import numpy as np
+    sqrt3 = np.sqrt(3.0)
+
+    # scalar_fit is a dict of fitted LatticeEPM parameters (overstress form)
+    tensor_init = {
+        "mu":            1.0,                              # decoupled — pure shear doesn't depend on mu
+        "tau_pl_shear":  2.0 * scalar_fit["tau_pl"],       # factor of 2 from tensor Hooke's law
+        "tau_pl_normal": 2.0 * scalar_fit["tau_pl"],
+        "sigma_c_mean":  sqrt3 * scalar_fit["sigma_c_mean"],  # von Mises plateau scaling
+        "sigma_c_std":   0.05 * scalar_fit["sigma_c_mean"] * sqrt3,
+        "n_fluid":       scalar_fit["n_fluid"],            # same HB exponent
+    }
+
+    model_tensor = TensorialEPM(
+        L=32, dt=0.01, nu=0.48,
+        fluidity_form="overstress",
+        **tensor_init,
+    )
+
+With these mappings the tensorial fit reaches the same Herschel–Bulkley
+ceiling as the scalar fit (typical :math:`R^2_{\text{lin}} > 0.993`,
+max relative error :math:`< 10\%` on the :math:`\phi = 0.80` emulsion).
+
 Validity and Assumptions
 ------------------------
 
@@ -432,30 +539,47 @@ Parameters
      - Plastic relaxation time for normal stresses (:math:`\sigma_{xx}, \sigma_{yy}`)
    * - ``sigma_c_mean``
      - Pa
-     - [0.1, 10.0]
-     - Mean local yield threshold
+     - [0.1, 1e6]
+     - Mean local yield threshold. **Important for the tensorial kernel**: the
+       pure-shear plateau is at :math:`\sigma_{c,\text{mean}}/\sqrt{3}` (a
+       factor of :math:`\sqrt{3}` below the scalar LatticeEPM) due to the von
+       Mises yield criterion :math:`\sigma_\text{eff} = \sqrt{3}\,|\sigma_{xy}|`.
+       To match a measured yield stress :math:`\sigma_y`, use
+       :math:`\sigma_{c,\text{mean}} = \sigma_y \cdot \sqrt{3}`.
    * - ``sigma_c_std``
      - Pa
-     - [0.0, 1.0]
+     - [0.0, 100.0]
      - Disorder strength (std dev of thresholds)
+   * - ``n_fluid``
+     - dimensionless
+     - [0.5, 5.0]
+     - Power-law / HB exponent of the plastic strain rate law. Implied HB
+       shear-thinning exponent is :math:`n_{HB} = 1/n_{\text{fluid}}`. At
+       :math:`n_{\text{fluid}}=1` the ``"overstress"`` form reduces to Bingham
+       with an explicit yield baseline. Ignored if ``fluidity_form="linear"``.
    * - ``w_N1``
      - dimensionless
      - [0.1, 10.0]
-     - Weight for :math:`N_1` in combined fitting loss
+     - Weight for :math:`N_1` in combined fitting loss (reserved for future
+       combined :math:`[\sigma_{xy}, N_1]` fit; currently ``TensorialEPM.fit``
+       supports shear-only 1D :math:`\sigma_{xy}` targets).
    * - ``hill_H``
      - dimensionless
      - [0.1, 5.0]
-     - Hill anisotropy parameter H (normal stress coupling)
+     - Hill anisotropy parameter H (normal stress coupling). Works with any
+       ``fluidity_form`` — the overstress formula uses :math:`\sigma_\text{eff}`
+       directly regardless of how it's computed.
    * - ``hill_N``
      - dimensionless
      - [0.1, 5.0]
-     - Hill anisotropy parameter N (shear amplification)
+     - Hill anisotropy parameter N (shear amplification). At :math:`H=0.5,
+       N=1.5` Hill reduces exactly to von Mises for pure shear.
 
 **Configuration (not fitted)**:
 
 .. list-table:: Configuration Parameters
    :header-rows: 1
-   :widths: 18 18 64
+   :widths: 20 20 60
 
    * - Parameter
      - Default
@@ -467,8 +591,15 @@ Parameters
      - 0.01
      - Time step for integration
    * - ``yield_criterion``
-     - "von_mises"
-     - Yield criterion: "von_mises" (isotropic) or "hill" (anisotropic)
+     - ``"von_mises"``
+     - Yield criterion: ``"von_mises"`` (isotropic) or ``"hill"`` (anisotropic)
+   * - ``fluidity_form``
+     - ``"overstress"``
+     - Plastic strain rate constitutive law. Same three values as scalar
+       LatticeEPM: ``"linear"``, ``"power"``, or ``"overstress"`` (default).
+       See :ref:`fluidity_form` in :doc:`lattice_epm` for the formulas. The
+       tensorial variant applies them component-wise through the Prandtl–Reuss
+       flow direction :math:`\sigma'_{ij}/\sigma_\text{eff}`.
    * - ``seed``
      - 0
      - Random seed for threshold initialization (reproducibility)
@@ -522,23 +653,75 @@ Basic Flow Curve with :math:`N_1` Prediction
     print(f"Shear stress: {result.y}")
     print(f"Normal stress N₁: {result.metadata['N1']}")
 
-Fitting to Shear-Only Data (Backward Compatible)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fitting to Shear-Only Data (Herschel–Bulkley flow curves)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``TensorialEPM.fit()`` is implemented via :class:`rheojax.models.epm.base.EPMBase.fit`
+and supports **shear-only** 1D :math:`\sigma_{xy}` targets. Under the hood it runs NLSQ
+(trust region reflective) against the ``_model_function_general`` forward kernel with
+``smooth=True`` tanh activation for gradient flow. The default constitutive law is
+``fluidity_form="overstress"``, which gives a full Herschel–Bulkley flow curve at the
+NLSQ optimum:
 
 .. code-block:: python
 
-    # Experimental shear stress data
-    gamma_dot = np.array([0.01, 0.1, 1.0, 10.0])
-    sigma_xy_exp = np.array([0.5, 1.2, 2.8, 5.1])
+    import numpy as np
+    from rheojax.models.epm.tensor import TensorialEPM
 
-    rheo_data = RheoData(x=gamma_dot, y=sigma_xy_exp, initial_test_mode='flow_curve')
+    # Experimental flow curve (example: concentrated emulsion)
+    gamma_dot = np.array([0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0])
+    sigma_xy_exp = np.array([24.0, 24.5, 27.0, 34.0, 55.0, 110.0, 270.0])
 
-    # Fit model to shear stress only (standard workflow)
-    model = TensorialEPM(L=32)  # Smaller L for faster fitting
-    model.fit(rheo_data, max_iter=100)
+    # Pick a physically motivated initial guess.
+    # Remember: tensorial plateau = sigma_c_mean / sqrt(3) due to von Mises,
+    # so set sigma_c_mean = sigma_y_target * sqrt(3).
+    sqrt3 = np.sqrt(3.0)
+    sigma_y_target = float(sigma_xy_exp.min())   # ~24 Pa plateau
 
-    print(f"Fitted mu: {model.params.get_value('mu'):.3f}")
-    print(f"Fitted sigma_c_mean: {model.params.get_value('sigma_c_mean'):.3f}")
+    model = TensorialEPM(
+        L=16, dt=0.01,                           # L=16 for fit speed; 32-64 for production
+        mu=1.0, nu=0.48,
+        tau_pl=2.0, tau_pl_shear=2.0, tau_pl_normal=2.0,
+        sigma_c_mean=sigma_y_target * sqrt3,     # von Mises scaling
+        sigma_c_std=0.5,
+        n_fluid=2.1,                             # HB exponent ~ 0.48
+        fluidity_form="overstress",              # default
+    )
+
+    # Widen bounds so NLSQ can explore
+    model.parameters["mu"].bounds = (0.01, 100.0)
+    model.parameters["tau_pl_shear"].bounds = (0.001, 100.0)
+    model.parameters["sigma_c_mean"].bounds = (0.1, 1000.0)
+    model.parameters["sigma_c_std"].bounds = (0.0001, 1000.0)
+    model.parameters["n_fluid"].bounds = (0.5, 5.0)
+
+    # Fit to shear stress (use_log_residuals is essential for multi-decade gdot data)
+    model.fit(gamma_dot, sigma_xy_exp, test_mode='flow_curve', use_log_residuals=True)
+
+    # Read back the physical HB parameters
+    scm_fit  = float(model.parameters.get_value("sigma_c_mean"))
+    nf_fit   = float(model.parameters.get_value("n_fluid"))
+    tau_fit  = float(model.parameters.get_value("tau_pl_shear"))
+    print(f"Tensorial fit → sigma_y = sigma_c_mean / sqrt(3) = {scm_fit/sqrt3:.2f} Pa")
+    print(f"                HB exponent n_HB = 1/n_fluid      = {1/nf_fit:.3f}")
+    print(f"                tau_pl_shear                      = {tau_fit:.3f} s")
+
+.. note::
+
+   - ``TensorialEPM.fit()`` only accepts **1D** :math:`\sigma_{xy}` data. Passing
+     a 2D target with shape ``(2, n)`` for combined :math:`[\sigma_{xy}, N_1]`
+     fitting raises ``NotImplementedError`` — that mode is reserved for a future
+     release. For now, fit on :math:`\sigma_{xy}` and inspect :math:`N_1` from
+     ``model.predict(...).metadata["N1"]``.
+   - Tensorial fits are ~5–10× slower than scalar LatticeEPM fits per NLSQ
+     iteration because each forward call runs a full 3-component FFT kernel.
+     Use ``L=16`` and data subsampling during fitting; upgrade to ``L=32-64``
+     only for final validation and production simulations.
+   - The scalar LatticeEPM fit parameters are **not** directly transferable to
+     TensorialEPM — apply the :math:`\sqrt{3}` scaling on ``sigma_c_mean`` and the
+     factor-of-2 scaling on ``tau_pl_shear`` first. See the
+     ``Mapping scalar fit parameters to tensorial initial guesses`` code block
+     in the *Constitutive Forms* section above.
 
 Fitting to Combined [:math:`\sigma_xy, N_1`] Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

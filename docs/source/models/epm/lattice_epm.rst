@@ -8,7 +8,7 @@ Quick Reference
 
 - **Use when:** Spatially-resolved modeling of amorphous solids, plastic avalanches, shear banding
 
-- **Parameters:** 6 (:math:`\mu, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}, \tau_{\text{pl}}`, L, dt)
+- **Parameters:** 7 fitted (:math:`\mu, \tau_{\text{pl}}, \sigma_{c,\text{mean}}, \sigma_{c,\text{std}}, n_{\text{fluid}}`, smoothing width, ``fluidity_form``) + 2 config (``L``, ``dt``)
 
 - **Key equation:** :math:`\partial_t \sigma_{ij} = \mu \dot{\gamma}(t) - \mu \dot{\gamma}^{pl}_{ij} + \sum_{kl} \mathcal{G}_{ij,kl} \dot{\gamma}^{pl}_{kl}`
 
@@ -301,6 +301,76 @@ Or a simpler **activated rule** with fixed rate:
 
 The finite-rate rule is convenient for **LAOS** and explicit time integration since it
 produces smooth time series.
+
+.. _fluidity_form:
+
+Constitutive Forms for the Plastic Strain Rate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The scalar EPM kernel in RheoJAX supports **three interchangeable constitutive
+laws** for the plastic strain rate, selectable at model construction time via the
+``fluidity_form`` argument to ``LatticeEPM``. The three forms generalize the
+classical activation rule ``activation · σ / τ`` to cover Bingham, soft-glassy
+power-law, and Herschel–Bulkley behavior:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 34 24 24
+
+   * - ``fluidity_form``
+     - Plastic strain rate law
+     - High-:math:`\dot\gamma` asymptote
+     - Use case
+   * - ``"linear"``
+     - :math:`\dot\varepsilon^{pl} = \mathcal{A} \cdot \sigma / \tau_{pl}`
+     - :math:`\sigma \sim \dot\gamma\,\tau_{pl}` (pure Bingham)
+     - Materials that are genuinely Newtonian at high rate (no HB curvature)
+   * - ``"power"``
+     - :math:`\dot\varepsilon^{pl} = \mathcal{A} \cdot \mathrm{sign}(\sigma) \cdot |\sigma/\sigma_{c,\text{mean}}|^{n_{\text{fluid}}} \cdot \sigma_{c,\text{mean}} / \tau_{pl}`
+     - :math:`\sigma \sim \sigma_{c,\text{mean}}\,(\dot\gamma\,\tau_{pl}/\sigma_{c,\text{mean}})^{1/n_{\text{fluid}}}` (power-law fluidity; shear-thinning but no additive yield baseline)
+     - Soft-glassy rheology; fluidity-driven flow
+   * - ``"overstress"`` ★
+     - :math:`\dot\varepsilon^{pl} = \mathcal{A} \cdot \mathrm{sign}(\sigma) \cdot (|\sigma| - \sigma_{c,\text{mean}})_+^{n_{\text{fluid}}} / \sigma_{c,\text{mean}}^{n_{\text{fluid}}-1} / \tau_{pl}`
+     - :math:`\sigma = \sigma_y + K\cdot\dot\gamma^{n_{HB}}` with :math:`\sigma_y = \sigma_{c,\text{mean}}` and :math:`n_{HB} = 1/n_{\text{fluid}}` (full Herschel–Bulkley)
+     - **Default.** Yield-stress fluids: emulsions, gels, foams, pastes, muds
+
+Here :math:`\mathcal{A}` is the smooth (tanh) or hard (step) activation function
+at the local yield threshold, and :math:`(x)_+ = \max(x, 0)` is the positive-part
+overstress. At :math:`n_{\text{fluid}} = 1` both ``"power"`` and ``"overstress"``
+reduce to a linear form, so :math:`n_{\text{fluid}}` can be interpreted as the
+inverse of the Herschel–Bulkley shear-thinning exponent you would measure from
+data (:math:`n_{HB} = 1/n_{\text{fluid}}`).
+
+**Why this matters for fitting.** The classical linear-fluidity EPM cannot
+reproduce shear-thinning flow curves with :math:`n_{HB} < 1` regardless of
+disorder distribution — the constitutive law fixes the high-rate asymptote to
+be linear in :math:`\dot\gamma`. The ``"overstress"`` form is the tensorial
+analog of Prandtl–Reuss viscoplasticity with a rate-dependent overstress term,
+and it reproduces the full HB form :math:`\sigma = \sigma_y + K\,\dot\gamma^n`
+exactly in the mean-field limit. Fitting the
+:math:`\phi = 0.80` emulsion flow curve with ``fluidity_form="overstress"``
+reaches the analytical HB ceiling (:math:`R^2_{\text{lin}} \approx 0.9957`,
+:math:`R^2_{\text{log}} \approx 0.9985`, max relative error :math:`\approx 7.4\%`).
+
+Backwards compatibility: passing ``fluidity_form="linear"`` recovers the
+classical EPM plastic rate ``activation · σ · fluidity`` bit-for-bit.
+
+.. code-block:: python
+
+    from rheojax.models.epm.lattice import LatticeEPM
+
+    # Default: Herschel-Bulkley-capable overstress form
+    model = LatticeEPM(
+        L=32, dt=0.01,
+        mu=1.0, tau_pl=3.6,
+        sigma_c_mean=24.0,
+        sigma_c_std=0.01,
+        n_fluid=2.1,           # implied HB exponent 1/n_fluid ~ 0.48
+        fluidity_form="overstress",  # default
+    )
+
+    # Classical linear Bingham form (legacy behavior)
+    legacy = LatticeEPM(L=32, fluidity_form="linear")
 
 Macroscopic Observables
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -738,7 +808,7 @@ Parameters
 
 .. list-table::
    :header-rows: 1
-   :widths: 15 10 15 60
+   :widths: 18 10 15 57
 
    * - Parameter
      - Symbol
@@ -751,23 +821,48 @@ Parameters
    * - ``sigma_c_mean``
      - :math:`\bar{\sigma}_c`
      - Pa
-     - Mean local yield stress threshold
+     - Mean local yield stress threshold. In ``fluidity_form="overstress"`` this
+       equals the Herschel–Bulkley yield stress :math:`\sigma_y` exactly
+       (scalar LatticeEPM). For TensorialEPM the pure-shear plateau is
+       :math:`\sigma_y = \sigma_{c,\text{mean}}/\sqrt{3}` due to the von Mises
+       yield criterion — see :doc:`tensorial_epm`.
    * - ``sigma_c_std``
      - :math:`\delta\sigma_c`
      - Pa
-     - Standard deviation of local yield stress (disorder)
+     - Standard deviation of local yield stress (disorder). Can be small
+       (:math:`10^{-3}\,\bar\sigma_c`) under the overstress form — the shear-thinning
+       shape is supplied by the constitutive law, not the disorder distribution.
    * - ``tau_pl``
      - :math:`\tau_{pl}`
      - s
      - Plastic relaxation time for yielded blocks
+   * - ``n_fluid``
+     - :math:`n_{\text{fluid}}`
+     - —
+     - Power-law / HB exponent of the plastic strain rate law (ignored when
+       ``fluidity_form="linear"``). The implied Herschel–Bulkley shear-thinning
+       exponent of the resulting flow curve is :math:`n_{HB} = 1/n_{\text{fluid}}`.
+       ``n_fluid = 1`` reduces ``"overstress"`` / ``"power"`` to Bingham;
+       ``n_fluid ≈ 2`` gives :math:`n_{HB} \approx 0.5` typical of HB emulsions.
+   * - ``smoothing_width``
+     - :math:`w`
+     - Pa
+     - Width of the smooth (tanh) yield activation used during gradient-based
+       fitting. Not used in hard-threshold forward simulation.
+   * - ``fluidity_form``
+     - —
+     - —
+     - Constitutive law selector (constructor argument, *not* a fitted parameter):
+       ``"linear"``, ``"power"``, or ``"overstress"`` (default). See
+       :ref:`fluidity_form` for the formulas.
    * - ``L``
      - :math:`L`
      - —
-     - Lattice size (L × L grid)
+     - Lattice size (L × L grid). Constructor argument, not fitted.
    * - ``dt``
      - :math:`\Delta t`
      - s
-     - Time step for numerical integration
+     - Time step for numerical integration. Constructor argument, not fitted.
 
 Fitting Guidance
 ----------------
@@ -835,14 +930,30 @@ Common Fitting Issues
      - Solution
    * - Fit converges but predictions unrealistic
      - Reduce L to 8-12 for faster iteration; check dt stability
-   * - Large NLSQ residuals
-     - Switch to ``use_log_residuals=True`` for flow curves
+   * - Large NLSQ residuals on a Herschel–Bulkley flow curve
+     - Ensure ``fluidity_form="overstress"`` (the default). The classical
+       ``"linear"`` form has a Bingham high-rate asymptote and cannot match
+       HB shear-thinning regardless of disorder. Use
+       ``use_log_residuals=True`` when the data span several decades of rate.
+   * - Wavy residuals with a single positive hump in the transition region
+     - Your ``fluidity_form`` is either ``"linear"`` or ``"power"``. Switch to
+       ``"overstress"`` to get an additive yield-stress baseline and proper
+       HB curvature.
+   * - Flow curve fit at ``fluidity_form="power"`` saturates near the plateau
+     - The ``"power"`` form has no additive yield baseline; its plateau is an
+       activation artifact. Use ``"overstress"`` for yield-stress fluids.
    * - Bayesian divergences > 5%
      - Increase ``num_warmup`` to 1000-2000; reduce L to 8
    * - R-hat > 1.1
      - Run longer chains (num_samples=2000+); check for multimodality
    * - Predictions too smooth (no avalanches)
      - Increase ``sigma_c_std`` (disorder) or use ``smooth=False``
+   * - ``NaN`` in the flow curve during an NLSQ iteration
+     - The base kernel clamps ``sigma_c_mean``, ``n_fluid``, and ``tau_pl`` at
+       small floors and replaces non-finite steady-state stresses with the
+       analytical plateau, so this should not happen. If it does, widen the
+       bounds on ``n_fluid`` (lower bound ~0.5) and ``sigma_c_mean`` (lower
+       bound ~:math:`10^{-3}\bar\sigma_y`).
 
 Fitting Parameters
 ~~~~~~~~~~~~~~~~~~

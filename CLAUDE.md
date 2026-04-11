@@ -77,6 +77,19 @@ All 45 oscillation-capable models auto-convert E* <-> G* at BaseModel boundary:
 model.fit(omega, E_star, test_mode="oscillation", deformation_mode="tension", poisson_ratio=0.5)
 ```
 
+### EPM Constitutive Forms (`fluidity_form`)
+Both `LatticeEPM` and `TensorialEPM` accept a `fluidity_form` constructor argument that selects the plastic-strain-rate constitutive law. **Default is `"overstress"` (Herschel-Bulkley)** — the classical Bingham form lives under `"linear"` for backwards compatibility.
+
+- `"linear"`: `plastic_rate = activation · σ · fluidity`. Bingham at high γ̇; cannot fit HB data.
+- `"power"`: `plastic_rate ∝ |σ/σ_c|^n_fluid · σ_c / τ_pl`. Shear-thinning but no additive yield baseline.
+- `"overstress"` *(default)*: `plastic_rate ∝ (|σ|−σ_c)_+^n_fluid / σ_c^(n_fluid−1) / τ_pl`. Gives σ = σ_y + K·γ̇^(1/n_fluid), the full HB form, and reaches R² > 0.99 on the emulsion HB benchmark.
+
+The `n_fluid` fitted parameter is the reciprocal of the HB shear-thinning exponent (`n_HB = 1/n_fluid`). `n_fluid ≈ 2` → `n_HB ≈ 0.5`, typical for concentrated emulsions and foams.
+
+**Tensorial gotcha**: the `TensorialEPM` pure-shear yield plateau is at `σ_c_mean / √3` (not `σ_c_mean`), due to the von Mises effective stress `σ_eff = √3·|σ_xy|`. To match a measured yield stress `σ_y` with tensorial, set `sigma_c_mean = σ_y · √3`. The scalar `LatticeEPM` has no such factor — there `sigma_c_mean` equals `σ_y` directly. Similarly, the tensorial stress-rate convention `dσ_ij/dt = 2μ·ε̇` introduces a factor of 2 in the high-rate asymptote, so the scalar `tau_pl` maps to `tau_pl_shear ≈ 2·tau_pl` on the tensorial side. See `docs/source/models/epm/tensorial_epm.rst` for the full mapping recipe.
+
+**`TensorialEPM.fit()`** is now implemented (was `NotImplementedError` before) and supports 1D shear-only `σ_xy` targets across all five protocols. Combined `[σ_xy, N₁]` fitting is still a future feature.
+
 ## Workflow: NLSQ -> Bayesian
 
 ```python
