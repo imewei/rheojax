@@ -208,6 +208,98 @@ def test_lattice_epm_creep_round_trip_fit():
 
 
 @pytest.mark.unit
+@pytest.mark.smoke
+def test_lattice_epm_relaxation_honours_fluidity_form():
+    """Fit path (JIT) and predict path (Python) must agree on relaxation.
+
+    Regression: _jit_relaxation_kernel hardcoded plastic_rate = activation * σ *
+    fluidity (linear Bingham) while _run_relaxation → epm_step honours the
+    model's fluidity_form (overstress by default). On above-yield step strains
+    the two paths diverge, making NLSQ round-trip fits impossible (same
+    pattern as the pre-fix creep kernel).
+    """
+    model = LatticeEPM(
+        L=16, dt=0.01, mu=1.0, tau_pl=1.0,
+        sigma_c_mean=0.3, sigma_c_std=0.05, n_fluid=2.0,
+    )
+    time = jnp.linspace(0.01, 5.0, 50)
+    strain = 1.0  # mu·γ = 1.0 >> σ_c_mean = 0.3 → sites yield, forms diverge
+
+    # Predict path (Python, uses epm_step with overstress)
+    pred_py = np.asarray(model.predict(
+        RheoData(x=time, y=jnp.zeros_like(time),
+                 initial_test_mode="relaxation",
+                 metadata={"gamma": strain}),
+        smooth=True, seed=0,
+    ).y)
+
+    # Fit path (JIT kernel) via model_function
+    model._test_mode = "relaxation"
+    model._cached_gamma = strain
+    model._cached_seed = 0
+    params_arr = jnp.asarray(
+        [model.parameters.get_value(n) for n in model.parameters.keys()],
+        dtype=jnp.float64,
+    )
+    pred_jit = np.asarray(model.model_function(
+        time, params_arr, test_mode="relaxation", gamma=strain, seed=0,
+    ))
+
+    max_rel_diff = float(np.max(np.abs(pred_jit - pred_py) / (np.abs(pred_py) + 1e-12)))
+    assert max_rel_diff < 0.05, (
+        f"Fit path (JIT) and predict path (Python) diverge on above-yield "
+        f"relaxation: max rel diff = {max_rel_diff:.4f}. The JIT kernel is "
+        f"ignoring fluidity_form."
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.slow
+def test_lattice_epm_relaxation_round_trip_fit():
+    """Round-trip: fit EPM to its own relaxation simulation, recover R² > 0.9.
+
+    Regression: same bug as the creep round-trip — before the fluidity_form
+    port, the JIT relaxation kernel (linear Bingham) and the Python predict
+    path (overstress HB) disagreed on above-yield parameters, so NLSQ could
+    never converge to a point that matches the ground-truth trajectory.
+    """
+    truth = LatticeEPM(
+        L=16, dt=0.01, mu=1.0, tau_pl=1.0,
+        sigma_c_mean=0.3, sigma_c_std=0.05, n_fluid=2.0,
+    )
+    strain = 1.0  # above yield
+    t = jnp.linspace(0.01, 5.0, 50)  # uniformly spaced, matches kernel assumption
+    g = truth.predict(
+        RheoData(x=t, y=jnp.zeros_like(t),
+                 initial_test_mode="relaxation",
+                 metadata={"gamma": strain}),
+        smooth=True, seed=0,
+    ).y
+
+    fit_model = LatticeEPM(
+        L=16, dt=0.01, mu=0.8, tau_pl=2.0,
+        sigma_c_mean=0.5, sigma_c_std=0.1, n_fluid=2.0,
+    )
+    fit_model.fit(
+        np.asarray(t), np.asarray(g),
+        test_mode="relaxation", gamma=strain,
+        method="scipy", seed=0, use_log_residuals=False,
+    )
+    pred = fit_model.predict(
+        RheoData(x=t, y=jnp.zeros_like(t),
+                 initial_test_mode="relaxation",
+                 metadata={"gamma": strain}),
+        smooth=True, seed=0,
+    ).y
+    g_arr = np.asarray(g)
+    p = np.asarray(pred)
+    ss_res = float(np.sum((g_arr - p) ** 2))
+    ss_tot = float(np.sum((g_arr - g_arr.mean()) ** 2))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    assert r2 > 0.9, f"Round-trip relaxation R²={r2:.4f} (expected >0.9)"
+
+
+@pytest.mark.unit
 def test_lattice_epm_relaxation_backward_compat():
     """Test relaxation protocol for backward compatibility after EPMBase refactoring."""
     model = LatticeEPM(L=16, dt=0.01)

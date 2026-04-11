@@ -267,7 +267,7 @@ def _jit_startup_kernel(
     return jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
 
 
-@partial(jax.jit, static_argnums=(6, 7))
+@partial(jax.jit, static_argnames=("n_steps", "L", "fluidity_form"))
 def _jit_relaxation_kernel(
     time: jax.Array,
     key: jax.Array,
@@ -277,30 +277,44 @@ def _jit_relaxation_kernel(
     dt: float,
     n_steps: int,
     L: int,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
     """JIT-compiled stress relaxation simulation.
 
+    ``fluidity_form`` selects the plastic-strain-rate constitutive law,
+    matching ``rheojax.utils.epm_kernels.plastic_strain_rate`` so the fit
+    path (this JIT kernel) and the predict path (Python ``_run_relaxation``
+    → ``epm_step``) produce identical trajectories for the same parameters.
+    Without this port, NLSQ round-trip fits are impossible on above-yield
+    step strains because the JIT kernel would use the linear Bingham form
+    while the predict path uses the HB overstress default.
+
+    Note: the kernel assumes a *uniformly-spaced* time grid. The caller
+    passes ``dt = time[1] - time[0]`` and the scan runs ``n_steps`` fixed
+    Euler steps of size ``dt``. Log-spaced or piecewise-uniform data will
+    silently be simulated only up to ``n_steps * dt`` physical seconds and
+    mapped back onto the non-uniform ``time`` array incorrectly. Resample
+    to uniform spacing before fitting.
+
     Args:
-        time: Time array
-        key: PRNG key
-        propagator_q: Propagator in Fourier space
-        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
-        strain_step: Applied step strain
-        dt: Time step
-        n_steps: Number of time points minus 1
-        L: Lattice size
+        time: Time array (only its shape is used).
+        key: PRNG key.
+        propagator_q: Propagator in Fourier space.
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, n_fluid, smoothing_width].
+        strain_step: Applied step strain.
+        dt: Time step (must equal ``time[1] - time[0]`` for correct mapping).
+        n_steps: Number of time points minus 1.
+        L: Lattice size.
+        fluidity_form: Constitutive law for the plastic strain rate.
 
     Returns:
-        Array of modulus G(t) over time
+        Array of modulus G(t) over time.
     """
     mu = params_array[0]
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
-    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
-    # creep / oscillation) keep the classical linear form for backward
-    # compatibility; changing them is a separate scope.
+    n_fluid = params_array[4]
     smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
@@ -321,12 +335,39 @@ def _jit_relaxation_kernel(
     def body_fn(carrier, _):
         stress_curr, thresholds_curr, strain_curr, key_curr = carrier
 
-        # Smooth plastic strain rate
+        # Smooth activation (matches epm_kernels.plastic_strain_rate)
         stress_mag = jnp.abs(stress_curr)
         activation = 0.5 * (
             1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
         )
-        plastic_strain_rate = activation * stress_curr * fluidity
+
+        # Plastic strain rate — fluidity_form is static, only one branch
+        # is emitted into the compiled graph.
+        if fluidity_form == "linear":
+            plastic_strain_rate = activation * stress_curr * fluidity
+        elif fluidity_form == "power":
+            inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
+            stress_mag_safe = jnp.maximum(stress_mag, 1e-8)
+            power_term = (
+                jnp.sign(stress_curr)
+                * (stress_mag_safe * inv_scm) ** n_fluid
+                * sigma_c_mean
+            )
+            plastic_strain_rate = activation * power_term * fluidity
+        elif fluidity_form == "overstress":
+            eps = 1e-6
+            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress_power = overstress**n_fluid * (
+                sigma_c_mean ** (1.0 - n_fluid)
+            )
+            plastic_strain_rate = (
+                activation * jnp.sign(stress_curr) * overstress_power * fluidity
+            )
+        else:
+            raise ValueError(
+                f"Unknown fluidity_form={fluidity_form!r}; "
+                "must be 'linear', 'power', or 'overstress'."
+            )
 
         # Stress evolution (no loading - relaxation only)
         relaxation_rate = -mu * plastic_strain_rate
@@ -1543,7 +1584,12 @@ class EPMBase(BaseModel):
         params_array: jax.Array,
         strain_step: float,
     ) -> jax.Array:
-        """JIT-friendly relaxation simulation."""
+        """JIT-friendly relaxation simulation.
+
+        Threads ``self.fluidity_form`` through the kernel so the fit path
+        honours the same constitutive law as the Python ``_run_relaxation``
+        predict path (which routes through ``epm_step``).
+        """
         n_steps = max(0, int(time.shape[0]) - 1)
         dt = self.dt
         if n_steps > 0:
@@ -1551,7 +1597,15 @@ class EPMBase(BaseModel):
             dt = time[1] - time[0]
 
         return self._run_relaxation_kernel(
-            time, key, propagator_q, params_array, strain_step, dt, n_steps, self.L
+            time,
+            key,
+            propagator_q,
+            params_array,
+            strain_step,
+            dt,
+            n_steps,
+            self.L,
+            getattr(self, "fluidity_form", "overstress"),
         )
 
     def _model_creep_jit(
@@ -1641,10 +1695,19 @@ class EPMBase(BaseModel):
         dt: float,
         n_steps: int,
         L: int,
+        fluidity_form: str = "overstress",
     ) -> jax.Array:
         """Dispatch to JIT-compiled relaxation kernel."""
         return _jit_relaxation_kernel(
-            time, key, propagator_q, params_array, strain_step, dt, n_steps, L
+            time,
+            key,
+            propagator_q,
+            params_array,
+            strain_step,
+            dt,
+            n_steps,
+            L,
+            fluidity_form=fluidity_form,
         )
 
     def _run_creep_kernel(
