@@ -85,20 +85,47 @@ def solve_elastic_propagator(
     return stress_redistribution
 
 
-@partial(jax.jit, static_argnames=("smooth",))
+@partial(jax.jit, static_argnames=("smooth", "fluidity_form"))
 def compute_plastic_strain_rate(
     stress: jax.Array,
     yield_thresholds: jax.Array,
     fluidity: float = 1.0,
     smooth: bool = False,
     smoothing_width: float = 0.1,
+    n_fluid: float = 1.0,
+    sigma_c_mean: float = 1.0,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
     r"""Compute the local plastic strain rate.
 
-    Supports two modes:
+    Supports two activation modes and three constitutive laws selected by
+    `fluidity_form`:
 
-    1. Hard Mode: gamma_dot_p = Gamma * sigma * Theta(\|sigma\| - sigma_c)
-    2. Smooth Mode: gamma_dot_p = Gamma * sigma * 0.5 * (1 + tanh((\|sigma\| - sigma_c)/w))
+    1. Hard activation: gamma_dot_p = f(sigma) * Theta(|sigma| - sigma_c)
+    2. Smooth activation: gamma_dot_p = f(sigma) * 0.5 * (1 + tanh((|sigma| - sigma_c)/w))
+
+    The constitutive law f(sigma) depends on `fluidity_form`:
+
+    - **"linear"** (classical Bingham):
+        f(sigma) = sigma / tau_pl
+      High-rate asymptote: stress ~ gamma_dot * tau_pl. No yield-stress baseline in the
+      asymptote.
+
+    - **"power"** (power-law fluidity, soft-glassy rheology):
+        f(sigma) = sign(sigma) * |sigma / sigma_c_mean|^n_fluid * sigma_c_mean / tau_pl
+      High-rate asymptote: stress ~ sigma_c_mean * (gamma_dot * tau_pl)^(1/n_fluid).
+      Shear-thinning but no additive yield-stress baseline.
+
+    - **"overstress"** (Herschel-Bulkley, DEFAULT):
+        f(sigma) = sign(sigma) * (|sigma| - sigma_c_mean)_+^n_fluid / (sigma_c_mean^(n_fluid-1) * tau_pl)
+      Only stress *above* the threshold contributes to plastic flow. High-rate asymptote:
+      stress ~ sigma_c_mean + sigma_c_mean * (gamma_dot * tau_pl / sigma_c_mean)^(1/n_fluid).
+      This is the full Herschel-Bulkley form sigma = sigma_y + K * gamma_dot^n_HB with
+      sigma_y = sigma_c_mean and n_HB = 1/n_fluid. Recommended for HB-like flow curves
+      (emulsions, gels, foams, yield-stress fluids in general).
+
+    At n_fluid = 1, "power" reduces to "linear"; "overstress" at n_fluid = 1 gives a
+    Bingham fluid with explicit yield stress (sigma = sigma_c_mean + gamma_dot * tau_pl).
 
     Args:
         stress: Local stress field.
@@ -106,6 +133,9 @@ def compute_plastic_strain_rate(
         fluidity: Inverse plastic timescale ($1/\tau_{pl}$).
         smooth: Whether to use the differentiable smooth approximation.
         smoothing_width: Width parameter $w$ for smoothing.
+        n_fluid: Power-law / HB exponent. The implied HB flow exponent is n_HB = 1/n_fluid.
+        sigma_c_mean: Mean yield threshold, used as the scale for the power-law forms.
+        fluidity_form: One of "linear", "power", or "overstress". Default "overstress".
 
     Returns:
         Plastic strain rate field.
@@ -121,7 +151,34 @@ def compute_plastic_strain_rate(
         # Hard threshold
         activation = (stress_mag > yield_thresholds).astype(stress.dtype)
 
-    return activation * stress * fluidity
+    if fluidity_form == "linear":
+        # Classical Bingham form: plastic_rate = activation * sigma * fluidity
+        return activation * stress * fluidity
+
+    if fluidity_form == "power":
+        # Power-law fluidity (soft-glassy rheology): no additive yield-stress baseline
+        inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
+        stress_mag_safe = jnp.maximum(stress_mag, 1e-8)
+        power_term = (
+            jnp.sign(stress) * (stress_mag_safe * inv_scm) ** n_fluid * sigma_c_mean
+        )
+        return activation * power_term * fluidity
+
+    if fluidity_form == "overstress":
+        # Herschel-Bulkley overstress law: only stress above threshold drives plastic flow.
+        # Use a small epsilon softening so the derivative at threshold is well-behaved
+        # (the expression is continuous but has zero derivative at sigma = sigma_c_mean
+        # when n_fluid > 1; the softening avoids numerical dead zones).
+        eps = 1e-6
+        overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+        # Equivalent to (overstress)^n_fluid / sigma_c_mean^(n_fluid - 1)
+        overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
+        return activation * jnp.sign(stress) * overstress_power * fluidity
+
+    raise ValueError(
+        f"Unknown fluidity_form={fluidity_form!r}; "
+        "must be 'linear', 'power', or 'overstress'."
+    )
 
 
 @jax.jit
@@ -155,7 +212,7 @@ def update_yield_thresholds(
     return jnp.where(active_mask, random_thresholds, current_thresholds)
 
 
-@partial(jax.jit, static_argnames=("smooth",))
+@partial(jax.jit, static_argnames=("smooth", "fluidity_form"))
 def epm_step(
     state: tuple[jax.Array, jax.Array, float, jax.Array],
     propagator_q: jax.Array,
@@ -163,6 +220,7 @@ def epm_step(
     dt: float,
     params: dict,
     smooth: bool = False,
+    fluidity_form: str = "overstress",
 ) -> tuple[jax.Array, jax.Array, float, jax.Array]:
     """Perform one full EPM time step.
 
@@ -195,6 +253,9 @@ def epm_step(
         fluidity=fluidity,
         smooth=smooth,
         smoothing_width=params.get("smoothing_width", 0.1),
+        n_fluid=params.get("n_fluid", 1.0),
+        sigma_c_mean=params.get("sigma_c_mean", 1.0),
+        fluidity_form=fluidity_form,
     )
 
     # 2. Compute Stress Rates

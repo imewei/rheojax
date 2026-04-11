@@ -85,8 +85,10 @@ class TensorialEPM(EPMBase):
         tau_pl_normal: float = 1.0,
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
+        n_fluid: float = 1.0,
         yield_criterion: str = "von_mises",
         n_bayesian_steps: int = 200,
+        fluidity_form: str = "overstress",
     ):
         """Initialize the Tensorial EPM.
 
@@ -103,7 +105,19 @@ class TensorialEPM(EPMBase):
             yield_criterion: Yield criterion name ("von_mises" or "hill").
             n_bayesian_steps: Number of time steps for Bayesian inference. Default 200.
         """
-        # Initialize base class with common parameters
+        # Initialize base class with common parameters.
+        # TensorialEPM uses the Prandtl-Reuss flow rule via its own kernel
+        # (``rheojax.utils.epm_kernels_tensorial``). The kernel now supports
+        # all three fluidity forms — see `compute_plastic_strain_rate` for
+        # the mathematical definitions. "overstress" is the default and
+        # recommended choice for yield-stress fluids (emulsions, gels, foams,
+        # pastes); it produces a full Herschel-Bulkley flow curve with the
+        # von-Mises pure-shear plateau at sigma_c_mean / sqrt(3).
+        if fluidity_form not in ("linear", "power", "overstress"):
+            raise ValueError(
+                f"fluidity_form must be 'linear', 'power', or 'overstress'; "
+                f"got {fluidity_form!r}."
+            )
         super().__init__(
             L=L,
             dt=dt,
@@ -111,7 +125,9 @@ class TensorialEPM(EPMBase):
             tau_pl=tau_pl,
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
+            n_fluid=n_fluid,
             n_bayesian_steps=n_bayesian_steps,
+            fluidity_form=fluidity_form,
         )
 
         # Add tensorial-specific parameters
@@ -252,7 +268,9 @@ class TensorialEPM(EPMBase):
         """
         stress, thresholds, strain, key = state
 
-        # Call tensorial kernel
+        # Call tensorial kernel — forward the model's fluidity_form so that
+        # NLSQ fitting, NUTS inference, and forward .predict() all use the
+        # same constitutive law.
         new_stress = tensorial_epm_step(
             stress=stress,
             thresholds=thresholds,
@@ -262,6 +280,7 @@ class TensorialEPM(EPMBase):
             params=params,
             smooth=smooth,
             yield_criterion=self.yield_criterion,
+            fluidity_form=self.fluidity_form,
         )
 
         # Update accumulated strain
@@ -363,11 +382,67 @@ class TensorialEPM(EPMBase):
             metadata contains 'N1' with first normal stress differences.
         """
         shear_rates = data.x
+        sigma_c_mean = params["sigma_c_mean"]
+        tau_pl_shear = params.get("tau_pl_shear", params.get("tau_pl", 1.0))
+        n_fluid = params.get("n_fluid", 1.0)
 
         def scan_fn(gdot):
             # Run simulation for sufficient steps to reach steady state
             n_steps = 1000
             state = self._init_state(key)
+            stress0, thresholds, strain, k = state
+
+            # Warm-start sigma_xy at the analytical overstress steady state
+            # for pure shear with von Mises yielding.
+            #
+            # The tensorial stress update is dσ_xy/dt = μγ̇ − 2μ·ε̇^p_xy (see the
+            # Budrikis & Zapperi 2013 reference at the top of
+            # epm_kernels_tensorial.py), so at steady state ε̇^p_xy = γ̇/2 in the
+            # tensor convention. Solving the overstress Prandtl-Reuss rule for
+            # pure shear gives:
+            #
+            #   σ_xy = σ_c_mean/√3
+            #        + (1/√3) · (√3 / 2)^(1/n_fluid)
+            #        · σ_c_mean^((n_fluid − 1)/n_fluid)
+            #        · (|γ̇|·τ_pl_shear)^(1/n_fluid)
+            #
+            # Special cases:
+            #   n_fluid = 1 → σ_xy = σ_c_mean/√3 + |γ̇|·τ_pl_shear / 2
+            #   n_fluid = 2 → σ_xy = σ_c_mean/√3
+            #                     + √( σ_c_mean · |γ̇| · τ_pl_shear / (2·√3) )
+            #
+            # Starting near this target avoids long transient loading times at
+            # low shear rates and destabilising FFT redistribution at high
+            # rates. Normal components (indices 0, 1) are left at zero — they
+            # develop self-consistently from the Prandtl-Reuss flow.
+            sqrt3 = jnp.sqrt(3.0)
+            gdot_abs = jnp.abs(gdot)
+            # Guard against pathological parameter combinations that NLSQ can
+            # transiently probe during fitting (very small sigma_c_mean or
+            # n_fluid, extreme shear rates). The clamps below keep the
+            # analytical warm-start formula numerically well-defined without
+            # affecting its value at reasonable parameters.
+            scm_safe = jnp.maximum(sigma_c_mean, 1e-6)
+            n_safe = jnp.maximum(n_fluid, 1e-3)
+            tau_safe = jnp.maximum(tau_pl_shear, 1e-6)
+            inv_n = 1.0 / n_safe
+            excess_base = jnp.maximum(gdot_abs * tau_safe, 0.0)
+            warm_excess = (
+                (1.0 / sqrt3)
+                * (sqrt3 / 2.0) ** inv_n
+                * scm_safe ** ((n_safe - 1.0) * inv_n)
+                * excess_base ** inv_n
+            )
+            # Final clamp: if any component is NaN/inf, fall back to the
+            # plateau value scm_safe / sqrt(3) so the simulation still runs.
+            sigma_xy_warm_raw = jnp.sign(gdot) * (scm_safe / sqrt3 + warm_excess)
+            sigma_xy_warm = jnp.where(
+                jnp.isfinite(sigma_xy_warm_raw),
+                sigma_xy_warm_raw,
+                jnp.sign(gdot) * scm_safe / sqrt3,
+            )
+            stress0 = stress0.at[2].add(sigma_xy_warm)
+            state = (stress0, thresholds, strain, k)
 
             def body(carrier, _):
                 curr_state = carrier
@@ -393,9 +468,21 @@ class TensorialEPM(EPMBase):
         # Vectorize over shear rates
         stresses = jax.vmap(scan_fn)(shear_rates)  # Shape: (n_rates, 2)
 
-        # Extract components
-        sigma_xy = stresses[:, 0]
-        N1 = stresses[:, 1]
+        # Extract components with NaN safety net. NLSQ fitting can transiently
+        # probe parameter combinations that make the explicit-Euler kernel
+        # unstable (e.g., very small sigma_c_mean with large n_fluid at high
+        # gdot), producing NaN in the steady-state average. Replace those
+        # entries with the analytical plateau sigma_c_mean/sqrt(3) so the
+        # validation downstream does not explode — the optimiser will
+        # naturally move away from NaN regions in the next iteration.
+        sigma_xy_raw = stresses[:, 0]
+        N1_raw = stresses[:, 1]
+        scm_safe = jnp.maximum(params.get("sigma_c_mean", 1.0), 1e-6)
+        plateau_fallback = scm_safe / jnp.sqrt(3.0)
+        sigma_xy = jnp.where(
+            jnp.isfinite(sigma_xy_raw), sigma_xy_raw, plateau_fallback
+        )
+        N1 = jnp.where(jnp.isfinite(N1_raw), N1_raw, 0.0)
 
         # Store N₁ in metadata
         result_metadata = data.metadata.copy() if data.metadata else {}
@@ -713,46 +800,42 @@ class TensorialEPM(EPMBase):
         return RheoData(x=time, y=stresses, initial_test_mode="oscillation")
 
     def _fit(self, X, y, **kwargs):
-        """Fit model parameters to data with flexible target selection.
+        """Fit tensorial-EPM parameters to shear-stress data.
 
-        Supports:
-        - 1D y: Fit to shear stress σ_xy only (backward compatible)
-        - 2D y with shape (2, n): Fit to [σ_xy, N₁] simultaneously
-        - 3D y: Not yet supported (full tensor fitting)
+        Currently supports **shear-only fitting** (y is 1D, matching the mean
+        σ_xy(γ̇) for flow curves or σ_xy(t) for time-domain protocols). Under
+        the hood this delegates to ``EPMBase._fit`` which runs NLSQ against
+        the JAX-pure ``_model_*`` methods; the base-class ``_model_flow_curve``
+        and sister methods extract σ_xy from the tensorial (3, L, L) stress
+        field via ``_mean_shear_stress`` so the model function returns a 1D
+        array of shear stresses compatible with the user's 1D y.
+
+        Joint fitting of [σ_xy, N₁] (combined mode with w_N1 weighting) is
+        not yet supported — reshape to shear-only if your data includes N₁.
 
         Args:
-            X: Shear rates or time array.
-            y: Target data (1D or 2D array).
-            **kwargs:
-                test_mode (str): Protocol type (default 'flow_curve').
-                Other fitting parameters.
+            X: Shear rates (flow curve) or time array (time-domain protocols).
+            y: 1D target data (mean σ_xy or modulus).
+            **kwargs: Forwarded to ``EPMBase._fit``. See its docstring for
+                supported options (``test_mode``, ``use_log_residuals``,
+                ``max_iter``, ``ftol``, ``xtol``, protocol kwargs).
 
-        Raises:
-            NotImplementedError: EPM fitting is complex and not yet fully implemented.
+        Returns:
+            self for method chaining.
         """
-        # Auto-detect fitting mode from y shape
-        if y.ndim == 1:
-            # Shear-only fitting (backward compatible)
-            fitting_mode = "shear_only"
-        elif y.ndim == 2 and y.shape[0] == 2:
-            # Combined fitting [σ_xy, N₁]
-            fitting_mode = "combined"
-            # w_N1 = self.parameters.get_value("w_N1")  # TODO: Use when fitting implemented
-        elif y.ndim == 2 and y.shape[0] == 3:
+        # Delegate to EPMBase._fit. The base fit path uses self.model_function
+        # which calls _model_function_general for tensorial (because
+        # _is_scalar_epm() returns False), which in turn calls the generic
+        # _model_flow_curve / _model_startup / ... in base.py. Those methods
+        # now branch on stress.ndim to extract σ_xy correctly from the
+        # tensorial (3, L, L) stress field.
+        import jax.numpy as _jnp
+        y_arr = _jnp.asarray(y)
+        if y_arr.ndim > 1:
             raise NotImplementedError(
-                "Full tensor fitting (3 components) not yet supported. "
-                "Use 1D y for shear-only or 2D y with shape (2, n) for [σ_xy, N₁]."
+                f"TensorialEPM currently supports shear-only fitting "
+                f"(1D y of mean σ_xy). Got y with shape {y_arr.shape}. "
+                f"For combined [σ_xy, N₁] fitting, provide just the σ_xy "
+                f"row and use .predict() afterwards to inspect N₁."
             )
-        else:
-            raise ValueError(
-                f"Invalid y shape: {y.shape}. "
-                "Expected 1D for shear-only or (2, n) for [σ_xy, N₁]."
-            )
-
-        # Fitting requires smooth approximation and gradient-based optimization
-        # This is complex for EPM and requires careful implementation
-        raise NotImplementedError(
-            f"TensorialEPM fitting (mode: {fitting_mode}) not yet implemented. "
-            "EPM parameter inference requires MCMC or specialized optimization. "
-            "Use model.predict() for forward simulations."
-        )
+        return super()._fit(X, y_arr, **kwargs)

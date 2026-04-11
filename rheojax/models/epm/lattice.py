@@ -63,9 +63,14 @@ class LatticeEPM(EPMBase):
         tau_pl: float = 1.0,
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
+        n_fluid: float = 1.0,
         n_bayesian_steps: int = 200,
+        fluidity_form: str = "overstress",
     ):
-        """Initialize the Lattice EPM."""
+        """Initialize the Lattice EPM.
+
+        See ``EPMBase.__init__`` for the description of ``fluidity_form``.
+        """
         # Initialize base class with common parameters
         super().__init__(
             L=L,
@@ -74,7 +79,9 @@ class LatticeEPM(EPMBase):
             tau_pl=tau_pl,
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
+            n_fluid=n_fluid,
             n_bayesian_steps=n_bayesian_steps,
+            fluidity_form=fluidity_form,
         )
 
         # Precompute Propagator (Cached)
@@ -104,20 +111,19 @@ class LatticeEPM(EPMBase):
     ) -> tuple[jax.Array, jax.Array, float, jax.Array]:
         """Perform one scalar EPM time step.
 
-        Delegates to epm_step kernel from epm_kernels module.
-
-        Args:
-            state: Current state (stress, thresholds, strain, key).
-            propagator_q: Precomputed propagator.
-            shear_rate: Imposed shear rate.
-            dt: Time step size.
-            params: Model parameters.
-            smooth: Use smooth yielding.
-
-        Returns:
-            Updated state tuple.
+        Delegates to the `epm_step` kernel from `epm_kernels`, forwarding the
+        model's `fluidity_form` so the same constitutive law is used in every
+        path (NLSQ fitting, NUTS, `.predict()`, and `_run_flow_curve`).
         """
-        return epm_step(state, propagator_q, shear_rate, dt, params, smooth)
+        return epm_step(
+            state,
+            propagator_q,
+            shear_rate,
+            dt,
+            params,
+            smooth,
+            fluidity_form=self.fluidity_form,
+        )
 
     def _predict(self, X, **kwargs) -> RheoData:
         """Simulate the model for the given protocol.

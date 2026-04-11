@@ -616,3 +616,242 @@ def test_plastic_strain_rate_incompressibility():
     np.testing.assert_allclose(
         trace, 0.0, atol=1e-10, err_msg="Plastic flow should be incompressible"
     )
+
+
+# =============================================================================
+# Tests for the three fluidity forms: linear, power, overstress
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_tensorial_overstress_form_zero_below_threshold():
+    """Overstress form produces zero plastic rate when sigma_eff <= sigma_c_mean."""
+    from rheojax.utils.epm_kernels_tensorial import compute_plastic_strain_rate
+
+    # Stress state with sigma_eff < sigma_c_mean
+    stress_tensor = jnp.array([0.2, -0.1, 0.15])  # small deviators
+    sigma_eff = 0.5  # below threshold
+    sigma_c_mean = 1.0
+    tau_pl_shear = 1.0
+    tau_pl_normal = 1.0
+    yield_mask = 1.0  # force yield_mask to 1 so we isolate the overstress factor
+
+    rate = compute_plastic_strain_rate(
+        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
+        sigma_c_mean=sigma_c_mean, n_fluid=2.0, fluidity_form="overstress",
+    )
+    # Overstress = max(sigma_eff - sigma_c_mean, eps=1e-6) ≈ 0, so all components ≈ 0
+    np.testing.assert_allclose(np.asarray(rate), 0.0, atol=5e-11)
+
+
+@pytest.mark.unit
+def test_tensorial_overstress_form_hb_magnitude_at_n_fluid_2():
+    """Overstress n_fluid=2: magnitude ~ (sigma_eff - sigma_c)^2 / sigma_c for shear."""
+    from rheojax.utils.epm_kernels_tensorial import compute_plastic_strain_rate
+
+    # Pure-shear stress state with sigma_eff well above threshold
+    stress_tensor = jnp.array([0.0, 0.0, 3.0])  # sigma_xy = 3
+    sigma_eff = 3.0 * jnp.sqrt(3.0)  # = sqrt(3) * sigma_xy ≈ 5.196
+    sigma_c_mean = 1.0
+    tau_pl_shear = 1.0
+    tau_pl_normal = 1.0
+    yield_mask = 1.0
+
+    rate = compute_plastic_strain_rate(
+        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
+        sigma_c_mean=sigma_c_mean, n_fluid=2.0, fluidity_form="overstress",
+    )
+    # For n_fluid=2: g_eff = (sigma_eff - 1)^2 / 1 = (sqrt(3)*3 - 1)^2
+    expected_g_eff = (float(sigma_eff) - sigma_c_mean) ** 2 / sigma_c_mean
+    # Shear component: (sigma_xy / sigma_eff) * g_eff / tau_pl_shear
+    expected_shear = (3.0 / float(sigma_eff)) * expected_g_eff / tau_pl_shear
+    np.testing.assert_allclose(float(rate[2]), expected_shear, rtol=1e-6)
+
+
+@pytest.mark.unit
+def test_tensorial_linear_form_gives_sigma_over_tau():
+    """Linear form: direction * sigma_eff = sigma_ij (directly)."""
+    from rheojax.utils.epm_kernels_tensorial import compute_plastic_strain_rate
+
+    stress_tensor = jnp.array([2.0, -1.0, 0.5])
+    sigma_eff = 2.5
+    tau_pl_shear = 2.0
+    tau_pl_normal = 3.0
+    yield_mask = 1.0
+
+    rate = compute_plastic_strain_rate(
+        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
+        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="linear",
+    )
+    # "linear" should give (sigma'_ij / sigma_eff) * sigma_eff / tau_pl_ij = sigma'_ij / tau_pl_ij
+    # Compute deviators (nu=0.5 default):
+    sigma_xx, sigma_yy, sigma_xy = 2.0, -1.0, 0.5
+    sigma_zz = 0.5 * (sigma_xx + sigma_yy)
+    mean_stress = (sigma_xx + sigma_yy + sigma_zz) / 3.0
+    dev_xx = sigma_xx - mean_stress
+    dev_yy = sigma_yy - mean_stress
+    expected_xx = dev_xx / tau_pl_normal
+    expected_yy = dev_yy / tau_pl_normal
+    expected_xy = sigma_xy / tau_pl_shear
+    np.testing.assert_allclose(float(rate[0]), expected_xx, rtol=1e-6)
+    np.testing.assert_allclose(float(rate[1]), expected_yy, rtol=1e-6)
+    np.testing.assert_allclose(float(rate[2]), expected_xy, rtol=1e-6)
+
+
+@pytest.mark.unit
+def test_tensorial_power_form_reduces_to_linear_at_n_fluid_1():
+    """Power form at n_fluid=1 should match linear form exactly."""
+    from rheojax.utils.epm_kernels_tensorial import compute_plastic_strain_rate
+
+    stress_tensor = jnp.array([2.0, -1.0, 0.5])
+    sigma_eff = 2.5
+    tau_pl_shear = 1.5
+    tau_pl_normal = 1.5
+    yield_mask = 1.0
+
+    rate_linear = compute_plastic_strain_rate(
+        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
+        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="linear",
+    )
+    rate_power = compute_plastic_strain_rate(
+        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
+        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="power",
+    )
+    # At n_fluid=1, power: g_eff = (sigma_eff/sigma_c)^1 * sigma_c = sigma_eff, matching linear
+    np.testing.assert_allclose(
+        np.asarray(rate_linear), np.asarray(rate_power), rtol=1e-10
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_invalid_fluidity_form_raises():
+    """Unknown fluidity_form must raise ValueError at trace time."""
+    from rheojax.utils.epm_kernels_tensorial import compute_plastic_strain_rate
+
+    stress_tensor = jnp.array([1.0, 0.0, 0.5])
+    with pytest.raises(ValueError, match="fluidity_form"):
+        compute_plastic_strain_rate(
+            stress_tensor, 1.0, 1.0, 1.0, 1.0,
+            fluidity_form="not_a_real_form",
+        )
+
+
+@pytest.mark.unit
+def test_tensorial_overstress_with_hill_yield_criterion():
+    """Hill yield criterion + overstress form should run and produce finite output.
+
+    At the default Hill parameters (H=0.5, N=1.5), the Hill criterion reduces
+    exactly to von Mises for pure shear, so the computed plastic strain rate
+    under `fluidity_form="overstress"` should match a direct overstress call
+    with the same sigma_eff. This test exercises the `yield_criterion="hill"`
+    path end-to-end through `tensorial_epm_step` to make sure the overstress
+    form compounds cleanly with Hill.
+    """
+    from rheojax.utils.epm_kernels_tensorial import (
+        compute_hill_stress,
+        compute_von_mises_stress,
+        make_tensorial_propagator_q,
+        tensorial_epm_step,
+    )
+
+    L = 16
+    nu = 0.48
+    mu = 1.0
+
+    # Stress field with pure shear at every site
+    sigma_xy_val = 3.0
+    stress = jnp.zeros((3, L, L))
+    stress = stress.at[2].set(sigma_xy_val)
+    thresholds = jnp.ones((L, L))
+
+    propagator = make_tensorial_propagator_q(L, nu, mu)
+    params = {
+        "mu": mu, "nu": nu,
+        "tau_pl_shear": 1.0, "tau_pl_normal": 1.0,
+        "sigma_c_mean": 1.0, "n_fluid": 2.0,
+        "hill_H": 0.5, "hill_N": 1.5,
+    }
+
+    # Run one step with Hill criterion
+    new_stress_hill = tensorial_epm_step(
+        stress, thresholds, 0.0, 0.01, propagator, params,
+        smooth=False, yield_criterion="hill", fluidity_form="overstress",
+    )
+
+    # Run one step with von Mises criterion
+    new_stress_vm = tensorial_epm_step(
+        stress, thresholds, 0.0, 0.01, propagator, params,
+        smooth=False, yield_criterion="von_mises", fluidity_form="overstress",
+    )
+
+    # Both should be finite
+    assert jnp.all(jnp.isfinite(new_stress_hill))
+    assert jnp.all(jnp.isfinite(new_stress_vm))
+
+    # At default Hill parameters (H=0.5, N=1.5) for pure shear, Hill ≡ von Mises,
+    # so the one-step updates should agree exactly.
+    np.testing.assert_allclose(
+        np.asarray(new_stress_hill), np.asarray(new_stress_vm), rtol=1e-10,
+        err_msg="Hill (H=0.5, N=1.5) should match von Mises on pure shear"
+    )
+
+    # Also directly verify the yield criteria match on the same state
+    stress_reshaped = jnp.moveaxis(stress, 0, -1)
+    vm = compute_von_mises_stress(stress_reshaped, nu)
+    hl = compute_hill_stress(stress_reshaped, 0.5, 1.5, nu)
+    np.testing.assert_allclose(np.asarray(vm), np.asarray(hl), rtol=1e-10)
+
+
+@pytest.mark.unit
+def test_tensorial_overstress_with_hill_anisotropy():
+    """Hill anisotropy + overstress: anisotropic Hill parameters should
+    produce different stress evolution than isotropic von Mises, confirming
+    that the overstress form genuinely uses the Hill sigma_eff (not just
+    silently falling back to von Mises).
+    """
+    from rheojax.utils.epm_kernels_tensorial import (
+        make_tensorial_propagator_q,
+        tensorial_epm_step,
+    )
+
+    L = 16
+    nu = 0.48
+    mu = 1.0
+
+    # Stress field with a mix of shear and normal components
+    stress = jnp.zeros((3, L, L))
+    stress = stress.at[0].set(2.0)   # σ_xx
+    stress = stress.at[1].set(-1.0)  # σ_yy
+    stress = stress.at[2].set(1.5)   # σ_xy
+    thresholds = jnp.ones((L, L)) * 2.0
+
+    propagator = make_tensorial_propagator_q(L, nu, mu)
+
+    # Anisotropic Hill: H=1.0, N=0.5 favors normal components over shear
+    params_aniso = {
+        "mu": mu, "nu": nu,
+        "tau_pl_shear": 1.0, "tau_pl_normal": 1.0,
+        "sigma_c_mean": 1.0, "n_fluid": 2.0,
+        "hill_H": 1.0, "hill_N": 0.5,
+    }
+    new_stress_aniso = tensorial_epm_step(
+        stress, thresholds, 0.0, 0.01, propagator, params_aniso,
+        smooth=False, yield_criterion="hill", fluidity_form="overstress",
+    )
+
+    # Isotropic von Mises for comparison
+    new_stress_vm = tensorial_epm_step(
+        stress, thresholds, 0.0, 0.01, propagator, params_aniso,
+        smooth=False, yield_criterion="von_mises", fluidity_form="overstress",
+    )
+
+    # Both should be finite
+    assert jnp.all(jnp.isfinite(new_stress_aniso))
+    assert jnp.all(jnp.isfinite(new_stress_vm))
+
+    # And they should DIFFER (anisotropy is genuinely in effect)
+    diff = jnp.max(jnp.abs(new_stress_aniso - new_stress_vm))
+    assert float(diff) > 1e-4, (
+        f"Hill anisotropy (H=1.0, N=0.5) should produce different stress "
+        f"evolution than von Mises, but max diff = {float(diff):.3e}"
+    )

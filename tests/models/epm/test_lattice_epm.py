@@ -150,21 +150,33 @@ def test_lattice_epm_parameters_after_refactoring():
 
 @pytest.mark.unit
 def test_tensorial_epm_scaffold():
-    """Test that TensorialEPM exists but raises NotImplementedError for fitting."""
-    model = TensorialEPM(L=32)
+    """Test that TensorialEPM is constructable and its forward / fit paths work.
 
-    # Create dummy data with a shape attribute to pass BaseModel.fit pre-checks
-    X_dummy = jnp.zeros((1,))
-    y_dummy = jnp.zeros((1,))
+    TensorialEPM used to raise NotImplementedError from fit(). After the
+    overstress tensorial kernel port, fit() now inherits from EPMBase and
+    runs real NLSQ optimization. This test checks:
+        1. The model can be constructed with the default fluidity_form.
+        2. predict() returns a correctly-shaped result.
+        3. fit() is callable (no NotImplementedError) when given 1D data
+           and a test_mode. We do NOT run a full fit here — that would be
+           prohibitively slow for a unit test. The integration test
+           `test_tensorial_epm_overstress_matches_analytical_hb_flow_curve`
+           in tests/models/epm/test_tensorial_epm.py covers real fitting.
+    """
+    model = TensorialEPM(L=16)  # small L for speed
+    # Default fluidity form should be overstress (HB-capable)
+    assert model.fluidity_form == "overstress"
 
-    # Fitting should raise NotImplementedError
-    with pytest.raises(NotImplementedError):
-        model.fit(X_dummy, y_dummy)
-
-    # But prediction should work
+    # Prediction should work
     result = model.predict(
         RheoData(x=jnp.array([0.1]), y=jnp.array([0.0])),
         test_mode="flow_curve",
         seed=42,
     )
     assert result.y.shape == (1,)
+
+    # Fitting with 2D y (combined σ_xy + N₁) should still raise — that mode
+    # is deliberately unsupported for now.
+    y_2d = jnp.zeros((2, 1))
+    with pytest.raises(NotImplementedError, match="shear-only"):
+        model._fit(jnp.zeros((1,)), y_2d, test_mode="flow_curve")

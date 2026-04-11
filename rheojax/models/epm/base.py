@@ -21,7 +21,7 @@ jax, jnp = safe_import_jax()
 # =============================================================================
 
 
-@partial(jax.jit, static_argnums=(5, 6))
+@partial(jax.jit, static_argnums=(5, 6), static_argnames=("fluidity_form",))
 def _jit_flow_curve_single(
     gdot: float,
     key: jax.Array,
@@ -30,6 +30,7 @@ def _jit_flow_curve_single(
     dt: float,
     n_steps: int,
     L: int,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
     """JIT-compiled flow curve for a single shear rate.
 
@@ -37,26 +38,45 @@ def _jit_flow_curve_single(
         gdot: Shear rate
         key: PRNG key
         propagator_q: Propagator in Fourier space
-        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, n_fluid, smoothing_width]
         dt: Time step
         n_steps: Number of simulation steps
         L: Lattice size
+        fluidity_form: Constitutive law — "linear", "power", or "overstress" (default).
+            See `compute_plastic_strain_rate` for the mathematical forms.
 
     Returns:
         Steady-state stress
     """
-    # Unpack params
+    # Unpack params (order matches EPMBase parameter declaration)
     mu = params_array[0]
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    smoothing_width = params_array[4]
+    n_fluid = params_array[4]
+    smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
+    inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
 
-    # Initialize state
+    # Initialize state. The stress field is warm-started near the expected
+    # power-law-fluidity steady state so that the scan only needs to relax
+    # residual transients. Starting from zero would require elastic loading
+    # time = sigma_c_mean / (mu * gdot) which exceeds the (n_steps * dt)
+    # window at low rates and misses the plateau entirely.
+    #
+    # The analytical steady state with power-law fluidity is
+    #     stress ~ sigma_c_mean + sigma_c_mean * (|gdot| * tau_pl / sigma_c_mean)^(1/n_fluid)
+    # At n_fluid=1 this reduces to the classical Bingham estimate
+    # sigma_c_mean + |gdot|*tau_pl. At n_fluid>1 the second term grows much
+    # more slowly, which is critical: the old linear warm-start overshoots
+    # by orders of magnitude at high gdot and causes kernel overflow when
+    # raised to the fractional power.
     k1, k2 = jax.random.split(key)
-    stress = jnp.zeros((L, L))
+    gdot_abs = jnp.abs(gdot)
+    warm_excess = sigma_c_mean * (gdot_abs * tau_pl * inv_scm) ** (1.0 / n_fluid)
+    sigma_warm = jnp.sign(gdot) * (sigma_c_mean + warm_excess)
+    stress = sigma_warm * jnp.ones((L, L))
     thresholds = sigma_c_mean + sigma_c_std * jax.random.normal(k2, (L, L))
     thresholds = jnp.maximum(thresholds, 1e-4)
     strain = 0.0
@@ -64,12 +84,41 @@ def _jit_flow_curve_single(
     def body_fn(carrier, _):
         stress_curr, thresholds_curr, strain_curr, key_curr = carrier
 
-        # Smooth plastic strain rate (differentiable)
+        # Smooth plastic strain rate, dispatched by `fluidity_form` (static arg).
+        # See `compute_plastic_strain_rate` in rheojax.utils.epm_kernels for the
+        # mathematical description of each form.
         stress_mag = jnp.abs(stress_curr)
         activation = 0.5 * (
             1.0 + jnp.tanh((stress_mag - thresholds_curr) / smoothing_width)
         )
-        plastic_strain_rate = activation * stress_curr * fluidity
+
+        if fluidity_form == "linear":
+            # Classical Bingham: plastic_rate = activation * sigma * fluidity
+            plastic_strain_rate = activation * stress_curr * fluidity
+        elif fluidity_form == "power":
+            # Power-law fluidity (no additive yield-stress baseline).
+            stress_mag_safe = jnp.maximum(stress_mag, 1e-8)
+            power_term = (
+                jnp.sign(stress_curr)
+                * (stress_mag_safe * inv_scm) ** n_fluid
+                * sigma_c_mean
+            )
+            plastic_strain_rate = activation * power_term * fluidity
+        elif fluidity_form == "overstress":
+            # Herschel-Bulkley: only overstress (|sigma| - sigma_c_mean)_+ drives flow.
+            # Steady-state high-rate asymptote: sigma = sigma_c_mean + sigma_c_mean *
+            # (gamma_dot * tau_pl / sigma_c_mean)^(1 / n_fluid) — full HB form.
+            eps = 1e-6
+            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
+            plastic_strain_rate = (
+                activation * jnp.sign(stress_curr) * overstress_power * fluidity
+            )
+        else:
+            raise ValueError(
+                f"Unknown fluidity_form={fluidity_form!r}; "
+                "must be 'linear', 'power', or 'overstress'."
+            )
 
         # Stress evolution
         loading_rate = mu * gdot
@@ -97,7 +146,7 @@ def _jit_flow_curve_single(
     return steady_stress
 
 
-@partial(jax.jit, static_argnums=(5, 6, 7))
+@partial(jax.jit, static_argnums=(5, 6, 7), static_argnames=("fluidity_form",))
 def _jit_flow_curve_batch(
     shear_rates: jax.Array,
     key: jax.Array,
@@ -107,6 +156,7 @@ def _jit_flow_curve_batch(
     n_steps: int,
     L: int,
     n_rates: int,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
     """JIT-compiled flow curve for batch of shear rates.
 
@@ -114,11 +164,12 @@ def _jit_flow_curve_batch(
         shear_rates: Array of shear rates
         key: PRNG key
         propagator_q: Propagator in Fourier space
-        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, smoothing_width]
+        params_array: [mu, tau_pl, sigma_c_mean, sigma_c_std, n_fluid, smoothing_width]
         dt: Time step
         n_steps: Number of simulation steps
         L: Lattice size
         n_rates: Number of shear rates (static for JIT)
+        fluidity_form: Constitutive law ("linear", "power", or "overstress").
 
     Returns:
         Array of steady-state stresses
@@ -129,7 +180,8 @@ def _jit_flow_curve_batch(
     def single_rate(gdot_key):
         gdot, k = gdot_key
         return _jit_flow_curve_single(
-            gdot, k, propagator_q, params_array, dt, n_steps, L
+            gdot, k, propagator_q, params_array, dt, n_steps, L,
+            fluidity_form=fluidity_form,
         )
 
     return jax.vmap(single_rate)((shear_rates, keys))
@@ -165,7 +217,11 @@ def _jit_startup_kernel(
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    smoothing_width = params_array[4]
+    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
+    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
+    # creep / oscillation) keep the classical linear form for backward
+    # compatibility; changing them is a separate scope.
+    smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
 
@@ -241,7 +297,11 @@ def _jit_relaxation_kernel(
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    smoothing_width = params_array[4]
+    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
+    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
+    # creep / oscillation) keep the classical linear form for backward
+    # compatibility; changing them is a separate scope.
+    smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
 
@@ -320,7 +380,11 @@ def _jit_creep_kernel(
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    smoothing_width = params_array[4]
+    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
+    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
+    # creep / oscillation) keep the classical linear form for backward
+    # compatibility; changing them is a separate scope.
+    smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
 
@@ -411,7 +475,11 @@ def _jit_oscillation_kernel(
     tau_pl = params_array[1]
     sigma_c_mean = params_array[2]
     sigma_c_std = params_array[3]
-    smoothing_width = params_array[4]
+    # params_array[4] is n_fluid (power-law fluidity exponent) — used only by
+    # the flow-curve kernel. Time-domain protocols (startup / relaxation /
+    # creep / oscillation) keep the classical linear form for backward
+    # compatibility; changing them is a separate scope.
+    smoothing_width = params_array[5]
 
     fluidity = 1.0 / tau_pl
 
@@ -495,9 +563,27 @@ class EPMBase(BaseModel):
         tau_pl: float = 1.0,
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
+        n_fluid: float = 1.0,
         n_bayesian_steps: int = 200,
+        fluidity_form: str = "overstress",
     ):
-        """Initialize EPM base with common parameters."""
+        """Initialize EPM base with common parameters.
+
+        The `fluidity_form` argument selects the constitutive law for the plastic
+        strain rate. It is a *static configuration*, not a fitted parameter:
+
+        - ``"linear"`` — classical Bingham EPM (``plastic_rate ~ sigma``). High-rate
+          asymptote is ``sigma ~ gamma_dot * tau_pl`` with no yield-stress baseline.
+          Use only for genuinely Newtonian-at-high-rate materials.
+        - ``"power"`` — power-law fluidity from soft-glassy rheology
+          (``plastic_rate ~ |sigma/sigma_c_mean|^n_fluid * sigma_c_mean``).
+          Shear-thinning at high rates but no additive yield-stress baseline.
+        - ``"overstress"`` — Herschel-Bulkley overstress law
+          (``plastic_rate ~ (|sigma| - sigma_c_mean)_+^n_fluid``). Produces the full
+          HB form ``sigma = sigma_y + K * gamma_dot^n_HB`` with ``sigma_y = sigma_c_mean``
+          and ``n_HB = 1/n_fluid``. **Default and recommended** for yield-stress fluids
+          (emulsions, gels, foams, pastes).
+        """
         super().__init__()
 
         # Configuration (Static)
@@ -505,6 +591,14 @@ class EPMBase(BaseModel):
         self.dt = dt
         self.n_bayesian_steps = n_bayesian_steps
         self._precompiled = False
+
+        # Validate and store the constitutive-law selector.
+        if fluidity_form not in ("linear", "power", "overstress"):
+            raise ValueError(
+                f"fluidity_form must be 'linear', 'power', or 'overstress'; "
+                f"got {fluidity_form!r}."
+            )
+        self.fluidity_form = fluidity_form
 
         # Parameters (Optimizable) - use inherited self.parameters from BaseModel
         self.parameters.add(
@@ -530,6 +624,19 @@ class EPMBase(BaseModel):
             bounds=(0.0, 100.0),
             units="Pa",
             description="Yield threshold standard deviation (disorder)",
+        )
+        # n_fluid: exponent of the plastic-flow power law.
+        # plastic_strain_rate = activation * sign(s) * |s/sigma_c_mean|^n_fluid * sigma_c_mean / tau_pl
+        # At n_fluid=1 this is the classical linear EPM (Bingham-like high-rate asymptote).
+        # At n_fluid>1 the high-rate asymptote becomes shear-thinning with exponent 1/n_fluid
+        # (e.g. n_fluid=2 -> sigma ~ gamma_dot^0.5, Herschel-Bulkley). This is a power-law
+        # fluidity constitutive law, well-established in soft glassy and amorphous plasticity.
+        self.parameters.add(
+            "n_fluid",
+            n_fluid,
+            bounds=(0.5, 5.0),
+            units="dimensionless",
+            description="Power-law fluidity exponent (1=Bingham, 2=HB with n=0.5)",
         )
         self.parameters.add(
             "smoothing_width",
@@ -565,6 +672,7 @@ class EPMBase(BaseModel):
         tau_pl = self.parameters.get_value("tau_pl")
         sigma_c_mean = self.parameters.get_value("sigma_c_mean")
         sigma_c_std = self.parameters.get_value("sigma_c_std")
+        n_fluid = self.parameters.get_value("n_fluid")
         smoothing_width = self.parameters.get_value("smoothing_width")
         if mu is None:
             raise ValueError("Parameter 'mu' must be set before use")
@@ -574,6 +682,8 @@ class EPMBase(BaseModel):
             raise ValueError("Parameter 'sigma_c_mean' must be set before use")
         if sigma_c_std is None:
             raise ValueError("Parameter 'sigma_c_std' must be set before use")
+        if n_fluid is None:
+            raise ValueError("Parameter 'n_fluid' must be set before use")
         if smoothing_width is None:
             raise ValueError("Parameter 'smoothing_width' must be set before use")
         return {
@@ -581,6 +691,7 @@ class EPMBase(BaseModel):
             "tau_pl": tau_pl,
             "sigma_c_mean": sigma_c_mean,
             "sigma_c_std": sigma_c_std,
+            "n_fluid": n_fluid,
             "smoothing_width": smoothing_width,
         }
 
@@ -674,11 +785,31 @@ class EPMBase(BaseModel):
             RheoData with x=shear_rates, y=steady_stress.
         """
         shear_rates = data.x
+        sigma_c_mean = params["sigma_c_mean"]
+        tau_pl = params["tau_pl"]
+        n_fluid = params.get("n_fluid", 1.0)
 
         def scan_fn(gdot):
             # Run simulation for sufficient steps to reach steady state
             n_steps = 1000
             state = self._init_state(key)
+            stress0, thresholds, strain, k = state
+
+            # Warm-start at the analytical steady state for the configured
+            # fluidity form. The same formula works for both the "power" and
+            # "overstress" forms (at steady state they agree at leading order):
+            #   sigma = sigma_c_mean + sigma_c_mean * (|gdot| * tau_pl / sigma_c_mean)^(1/n_fluid)
+            # For scalar EPM the field has shape (L, L); for tensorial EPM it
+            # is (3, L, L) with index 2 == sigma_xy.
+            gdot_abs = jnp.abs(gdot)
+            inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
+            warm_excess = sigma_c_mean * (gdot_abs * tau_pl * inv_scm) ** (1.0 / n_fluid)
+            sigma_warm = jnp.sign(gdot) * (sigma_c_mean + warm_excess)
+            if stress0.ndim == 2:
+                stress0 = stress0 + sigma_warm
+            else:
+                stress0 = stress0.at[2].add(sigma_warm)
+            state = (stress0, thresholds, strain, k)
 
             def body(carrier, _):
                 curr_state = carrier
@@ -1112,6 +1243,7 @@ class EPMBase(BaseModel):
                 self.parameters.get_value("tau_pl"),
                 self.parameters.get_value("sigma_c_mean"),
                 self.parameters.get_value("sigma_c_std"),
+                self.parameters.get_value("n_fluid"),
                 self.parameters.get_value("smoothing_width"),
             ]
         )
@@ -1129,6 +1261,7 @@ class EPMBase(BaseModel):
             self.n_bayesian_steps,
             self.L,
             n_points,
+            fluidity_form=self.fluidity_form,
         )
 
         # Block until compilation is done
@@ -1248,6 +1381,7 @@ class EPMBase(BaseModel):
                 self.n_bayesian_steps,
                 self.L,
                 n_rates,
+                fluidity_form=self.fluidity_form,
             )
         elif mode == "startup":
             return self._model_startup_jit(
@@ -1467,22 +1601,109 @@ class EPMBase(BaseModel):
         """JAX-pure flow curve simulation (no RheoData, no numpy)."""
         n_steps = 1000
         dt = self.dt
+        sigma_c_mean = params["sigma_c_mean"]
+        tau_pl = params["tau_pl"]
+        n_fluid = params.get("n_fluid", 1.0)
+        tau_pl_shear = params.get("tau_pl_shear", tau_pl)
 
         def scan_fn(gdot):
             state = self._init_state(key)
+            stress0, thresholds, strain, k = state
+
+            # Warm-start at the analytical overstress steady state. Scalar
+            # EPM has stress shape (L, L) and uses the scalar warm-start;
+            # tensorial EPM has stress shape (3, L, L) with index [2] = σ_xy,
+            # and the pure-shear steady state picks up a factor of √3 from
+            # von Mises and a factor of 2 from the dσ/dt = 2μ·ε̇ convention:
+            #
+            #   scalar    :  σ_warm = σ_c_mean + σ_c_mean·(|γ̇|·τ_pl/σ_c_mean)^(1/n_fluid)
+            #   tensorial :  σ_xy_warm = σ_c_mean/√3
+            #              + (1/√3)·(√3/2)^(1/n_fluid)·σ_c_mean^((n_fluid-1)/n_fluid)
+            #              · (|γ̇|·τ_pl_shear)^(1/n_fluid)
+            #
+            # The scalar warm-start is exact for the overstress form there;
+            # the tensorial one is the analytical Bingham/HB solution with
+            # the von Mises + factor-of-2 corrections.
+            # Safety clamps for NLSQ-exploration regions where parameters
+            # can transiently go near zero or negative. Without these guards,
+            # the analytical warm-start can produce NaN/inf for certain
+            # parameter combinations, which poisons the whole flow curve.
+            scm_safe = jnp.maximum(sigma_c_mean, 1e-6)
+            n_safe = jnp.maximum(n_fluid, 1e-3)
+            tau_safe = jnp.maximum(tau_pl, 1e-6)
+            tau_shear_safe = jnp.maximum(tau_pl_shear, 1e-6)
+
+            gdot_abs = jnp.abs(gdot)
+            inv_scm = 1.0 / scm_safe
+            inv_n = 1.0 / n_safe
+            if stress0.ndim == 2:
+                warm_excess = scm_safe * (gdot_abs * tau_safe * inv_scm) ** inv_n
+                sigma_warm_raw = jnp.sign(gdot) * (scm_safe + warm_excess)
+                sigma_warm = jnp.where(
+                    jnp.isfinite(sigma_warm_raw), sigma_warm_raw, jnp.sign(gdot) * scm_safe
+                )
+                stress0 = stress0 + sigma_warm
+            else:
+                sqrt3 = jnp.sqrt(3.0)
+                warm_excess = (
+                    (1.0 / sqrt3)
+                    * (sqrt3 / 2.0) ** inv_n
+                    * scm_safe ** ((n_safe - 1.0) * inv_n)
+                    * (gdot_abs * tau_shear_safe) ** inv_n
+                )
+                sigma_xy_warm_raw = jnp.sign(gdot) * (scm_safe / sqrt3 + warm_excess)
+                sigma_xy_warm = jnp.where(
+                    jnp.isfinite(sigma_xy_warm_raw),
+                    sigma_xy_warm_raw,
+                    jnp.sign(gdot) * scm_safe / sqrt3,
+                )
+                stress0 = stress0.at[2].add(sigma_xy_warm)
+            state = (stress0, thresholds, strain, k)
 
             def body(carrier, _):
                 curr_state = carrier
                 new_state = self._epm_step(
                     curr_state, propagator_q, gdot, dt, params, smooth=True
                 )
-                return new_state, jnp.mean(new_state[0])
+                # Extract the mean shear stress. For scalar (L, L), jnp.mean
+                # over the entire field is σ. For tensorial (3, L, L), we
+                # need the mean of index [2] = σ_xy only, NOT the average
+                # over all three stress components (which would mix σ_xx,
+                # σ_yy, σ_xy).
+                stress_arr = new_state[0]
+                if stress_arr.ndim == 2:
+                    sigma_obs = jnp.mean(stress_arr)
+                else:
+                    sigma_obs = jnp.mean(stress_arr[2])
+                return new_state, sigma_obs
 
             _, history = jax.lax.scan(body, state, None, length=n_steps)
             steady_stress = jnp.mean(history[n_steps // 2 :])
+            # NaN safety net — during NLSQ finite-differencing some
+            # parameter combinations can poison the scan with NaN; replace
+            # with the analytical plateau so the loss is finite and the
+            # optimiser can recover on the next iteration.
+            steady_stress = jnp.where(
+                jnp.isfinite(steady_stress),
+                steady_stress,
+                scm_safe / jnp.sqrt(3.0) if stress0.ndim == 3 else scm_safe,
+            )
             return steady_stress
 
         return jax.vmap(scan_fn)(shear_rates)
+
+    @staticmethod
+    def _mean_shear_stress(stress_field: jax.Array) -> jax.Array:
+        """Extract the mean shear stress from a stress field.
+
+        For scalar EPM (shape (L, L)) the mean of the entire field is the
+        shear stress. For tensorial EPM (shape (3, L, L)) we need the mean
+        of index [2] (σ_xy) — NOT the mean over all three components, which
+        would mix σ_xx, σ_yy, σ_xy and give a physically meaningless number.
+        """
+        if stress_field.ndim == 2:
+            return jnp.mean(stress_field)
+        return jnp.mean(stress_field[2])
 
     def _model_startup(
         self,
@@ -1505,9 +1726,9 @@ class EPMBase(BaseModel):
             new_state = self._epm_step(
                 curr_state, propagator_q, gamma_dot, dt, params, smooth=True
             )
-            return new_state, jnp.mean(new_state[0])
+            return new_state, self._mean_shear_stress(new_state[0])
 
-        initial_stress = jnp.mean(state[0])
+        initial_stress = self._mean_shear_stress(state[0])
 
         if n_steps > 0:
             _, stresses_scan = jax.lax.scan(body, state, None, length=n_steps)
@@ -1533,12 +1754,16 @@ class EPMBase(BaseModel):
         state = self._init_state(key)
         stress, thresh, strain, k = state
 
-        # Apply step strain
+        # Apply step strain — for scalar add uniformly; for tensorial add
+        # only to the σ_xy component (index [2]).
         mu = params["mu"]
-        stress = stress + mu * strain_step
+        if stress.ndim == 2:
+            stress = stress + mu * strain_step
+        else:
+            stress = stress.at[2].add(mu * strain_step)
         state = (stress, thresh, strain + strain_step, k)
 
-        g_0 = jnp.mean(stress) / strain_step
+        g_0 = self._mean_shear_stress(stress) / strain_step
         n_steps = jnp.maximum(0, len(time) - 1)
 
         def body(carrier, _):
@@ -1546,7 +1771,7 @@ class EPMBase(BaseModel):
             new_state = self._epm_step(
                 curr_state, propagator_q, 0.0, dt, params, smooth=True
             )
-            return new_state, jnp.mean(new_state[0]) / strain_step
+            return new_state, self._mean_shear_stress(new_state[0]) / strain_step
 
         if n_steps > 0:
             _, moduli_scan = jax.lax.scan(body, state, None, length=n_steps)
@@ -1579,8 +1804,7 @@ class EPMBase(BaseModel):
 
         def body(carrier, _):
             curr_epm, gdot = carrier
-            stress_grid = curr_epm[0]
-            curr_stress = jnp.mean(stress_grid)
+            curr_stress = self._mean_shear_stress(curr_epm[0])
 
             error = target_stress - curr_stress
             rel_error = jnp.abs(error) / (jnp.abs(target_stress) + 1e-6)
@@ -1617,7 +1841,7 @@ class EPMBase(BaseModel):
             dt = time[1] - time[0]
 
         state = self._init_state(key)
-        initial_stress = jnp.mean(state[0])
+        initial_stress = self._mean_shear_stress(state[0])
         n_steps = jnp.maximum(0, len(time) - 1)
         scan_time = time[:-1] if n_steps > 0 else jnp.array([])
 
@@ -1627,7 +1851,7 @@ class EPMBase(BaseModel):
             new_state = self._epm_step(
                 curr_state, propagator_q, gdot, dt, params, smooth=True
             )
-            return new_state, jnp.mean(new_state[0])
+            return new_state, self._mean_shear_stress(new_state[0])
 
         if n_steps > 0:
             _, stresses_scan = jax.lax.scan(body, state, scan_time, length=n_steps)

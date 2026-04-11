@@ -241,23 +241,44 @@ def get_yield_criterion(name: str) -> Callable:
     return criteria[name]
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=("fluidity_form",))
 def compute_plastic_strain_rate(
     stress_tensor: jax.Array,
     sigma_eff: jax.Array,
     tau_pl_shear: float,
     tau_pl_normal: float,
     yield_mask: jax.Array,
+    sigma_c_mean: float = 1.0,
+    n_fluid: float = 1.0,
     nu: float = 0.5,
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
-    """Compute component-wise plastic strain rate using Prandtl-Reuss flow rule.
+    r"""Compute component-wise plastic strain rate using Prandtl-Reuss flow rule.
 
-    Flow rule:
-    - Shear: ε̇ᵖ_xy = (σ_xy / σ_eff) · (1 / tau_pl_shear) · yield_mask
-    - Normal: ε̇ᵖ_xx = (σ'_xx / σ_eff) · (1 / tau_pl_normal) · yield_mask
-              ε̇ᵖ_yy = (σ'_yy / σ_eff) · (1 / tau_pl_normal) · yield_mask
+    Three constitutive laws are available via ``fluidity_form``:
 
-    where σ'_ii = σ_ii - (σ_xx + σ_yy)/2 is the deviatoric stress.
+    1. **"linear"** (Bingham, scalar-consistent):
+       g_eff = σ_eff
+       ε̇ᵖ_ij = (σ'_ij / σ_eff) · σ_eff · (1 / τ_pl_ij) · yield_mask
+             = σ'_ij · (1 / τ_pl_ij) · yield_mask
+       High-rate asymptote: σ_ij ∝ γ̇ · τ_pl (pure Bingham, no additive yield).
+
+    2. **"power"** (power-law fluidity, soft-glassy):
+       g_eff = (σ_eff / σ_c_mean)^n_fluid · σ_c_mean
+       ε̇ᵖ_ij = (σ'_ij / σ_eff) · g_eff · (1 / τ_pl_ij) · yield_mask
+       High-rate asymptote: σ_ij ∝ γ̇^(1/n_fluid) (shear-thinning, no additive yield).
+
+    3. **"overstress"** (Herschel-Bulkley, default):
+       g_eff = (σ_eff - σ_c_mean)_+^n_fluid · σ_c_mean^(1 - n_fluid)
+       ε̇ᵖ_ij = (σ'_ij / σ_eff) · g_eff · (1 / τ_pl_ij) · yield_mask
+       High-rate asymptote: σ_ij = σ_c_mean/√3 + constant · γ̇^(1/n_fluid) for pure shear.
+       This is the full HB form σ = σ_y + K·γ̇^n_HB with σ_y = σ_c_mean/√3 (von Mises
+       pure-shear plateau) and n_HB = 1/n_fluid. **Recommended default** for HB-like
+       yield-stress fluids (emulsions, gels, foams, pastes).
+
+    The Prandtl-Reuss flow direction ``σ'_ij / σ_eff`` is unchanged across forms — only
+    the magnitude factor ``g_eff`` changes. The shear and normal channels use
+    ``tau_pl_shear`` and ``tau_pl_normal`` respectively.
 
     Args:
         stress_tensor: Stress components [σ_xx, σ_yy, σ_xy], shape (..., 3).
@@ -265,8 +286,13 @@ def compute_plastic_strain_rate(
         tau_pl_shear: Plastic relaxation time for shear.
         tau_pl_normal: Plastic relaxation time for normal stresses.
         yield_mask: Binary or smooth mask (0=elastic, 1=yielding), shape (...,).
+        sigma_c_mean: Mean yield threshold — used as the stress scale for the power-law
+            and overstress forms. Default 1.0. Ignored for the "linear" form.
+        n_fluid: Power-law / HB exponent. Default 1.0. The implied HB flow exponent is
+            n_HB = 1/n_fluid. Ignored for the "linear" form.
         nu: Poisson's ratio for plane-strain σ_zz = ν(σ_xx + σ_yy). Default 0.5
             (incompressible).
+        fluidity_form: One of "linear", "power", or "overstress". Default "overstress".
 
     Returns:
         Plastic strain rate [ε̇ᵖ_xx, ε̇ᵖ_yy, ε̇ᵖ_xy], shape (..., 3).
@@ -284,14 +310,36 @@ def compute_plastic_strain_rate(
     # Avoid division by zero when sigma_eff = 0
     safe_sigma_eff = jnp.where(sigma_eff > 1e-12, sigma_eff, 1.0)
 
-    # Normal components
-    eps_dot_p_xx = (dev_xx / safe_sigma_eff) * (1.0 / tau_pl_normal) * yield_mask
-    eps_dot_p_yy = (dev_yy / safe_sigma_eff) * (1.0 / tau_pl_normal) * yield_mask
+    # Compute the form-specific magnitude factor g_eff. The Prandtl-Reuss direction
+    # (sigma'_ij / sigma_eff) is multiplied by g_eff to get the plastic-flow magnitude.
+    if fluidity_form == "linear":
+        # Bingham: plastic rate ∝ sigma'_ij directly.
+        # (direction * g_eff) = (sigma'_ij / sigma_eff) * sigma_eff = sigma'_ij.
+        g_eff = sigma_eff
+    elif fluidity_form == "power":
+        # Power-law fluidity: plastic rate ∝ (sigma_eff / sigma_c)^n_fluid.
+        inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
+        sigma_eff_safe = jnp.maximum(sigma_eff, 1e-8)
+        g_eff = (sigma_eff_safe * inv_scm) ** n_fluid * sigma_c_mean
+    elif fluidity_form == "overstress":
+        # Herschel-Bulkley: only sigma_eff ABOVE threshold drives plastic flow.
+        # Matches scalar kernel's overstress branch; eps softening keeps the derivative
+        # well-behaved at the yield surface for gradient-based fitting.
+        eps = 1e-6
+        overstress = jnp.maximum(sigma_eff - sigma_c_mean, eps)
+        g_eff = overstress ** n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
+    else:
+        raise ValueError(
+            f"Unknown fluidity_form={fluidity_form!r}; "
+            "must be 'linear', 'power', or 'overstress'."
+        )
 
-    # Shear component
-    eps_dot_p_xy = (sigma_xy / safe_sigma_eff) * (1.0 / tau_pl_shear) * yield_mask
+    # Component rates: direction * g_eff * (1 / tau_pl_ij) * yield_mask
+    eps_dot_p_xx = (dev_xx / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
+    eps_dot_p_yy = (dev_yy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
+    eps_dot_p_xy = (sigma_xy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_shear) * yield_mask
 
-    # Zero out plastic flow when not yielding (sigma_eff ≈ 0)
+    # Zero out plastic flow when there is no stress at all (sigma_eff ≈ 0)
     no_stress_mask = sigma_eff > 1e-12
     eps_dot_p_xx = jnp.where(no_stress_mask, eps_dot_p_xx, 0.0)
     eps_dot_p_yy = jnp.where(no_stress_mask, eps_dot_p_yy, 0.0)
@@ -333,7 +381,7 @@ def apply_tensorial_propagator(
     return stress_dot
 
 
-@partial(jax.jit, static_argnames=("smooth", "yield_criterion"))
+@partial(jax.jit, static_argnames=("smooth", "yield_criterion", "fluidity_form"))
 def tensorial_epm_step(
     stress: jax.Array,
     thresholds: jax.Array,
@@ -343,6 +391,7 @@ def tensorial_epm_step(
     params: dict[str, float],
     smooth: bool = False,
     yield_criterion: str = "von_mises",
+    fluidity_form: str = "overstress",
 ) -> jax.Array:
     """Perform one full tensorial EPM time step.
 
@@ -360,10 +409,15 @@ def tensorial_epm_step(
             - nu: Poisson's ratio
             - tau_pl_shear: Plastic relaxation time for shear
             - tau_pl_normal: Plastic relaxation time for normal stresses
+            - sigma_c_mean: Mean yield threshold (used by power/overstress forms)
+            - n_fluid: Power-law / HB exponent (used by power/overstress forms)
             - smoothing_width: Width for smooth yielding (if smooth=True)
             - hill_H, hill_N: Hill anisotropy parameters (if yield_criterion="hill")
         smooth: Use smooth (tanh) yielding instead of hard (step) yielding.
         yield_criterion: "von_mises" or "hill".
+        fluidity_form: Constitutive law for the plastic strain rate —
+            "linear", "power", or "overstress" (default). See
+            ``compute_plastic_strain_rate`` for the mathematical forms.
 
     Returns:
         Updated stress tensor field, shape (3, L, L).
@@ -372,6 +426,8 @@ def tensorial_epm_step(
     nu = params.get("nu", 0.3)
     tau_pl_shear = params.get("tau_pl_shear", 1.0)
     tau_pl_normal = params.get("tau_pl_normal", 1.0)
+    sigma_c_mean = params.get("sigma_c_mean", 1.0)
+    n_fluid = params.get("n_fluid", 1.0)
 
     # 1. Compute effective stress using selected criterion
     if yield_criterion == "von_mises":
@@ -395,9 +451,17 @@ def tensorial_epm_step(
         # Hard yielding (step function)
         yield_mask = (sigma_eff > thresholds).astype(stress.dtype)
 
-    # 3. Compute plastic strain rate
+    # 3. Compute plastic strain rate (form-dispatched: linear/power/overstress)
     eps_dot_p = compute_plastic_strain_rate(
-        stress_reshaped, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask, nu
+        stress_reshaped,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=sigma_c_mean,
+        n_fluid=n_fluid,
+        nu=nu,
+        fluidity_form=fluidity_form,
     )  # (L, L, 3)
 
     # Reshape back to (3, L, L) for propagator application

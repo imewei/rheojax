@@ -61,19 +61,27 @@ def test_propagator_zero_mean():
 
 @pytest.mark.unit
 def test_smooth_vs_hard_yielding():
-    """Test that smooth yielding approximates hard yielding."""
+    """Smooth yielding approximates hard yielding (linear fluidity form).
+
+    This test pins the classical linear-fluidity behavior where plastic_rate
+    is directly proportional to sigma above threshold. The default fluidity
+    form of the kernel is now "overstress" (Herschel-Bulkley), so we must
+    request "linear" explicitly here.
+    """
     stress = jnp.array([-2.0, -1.2, -0.8, 0.0, 0.8, 1.2, 2.0])
     thresholds = jnp.ones_like(stress)
 
-    # Hard mode
-    rate_hard = compute_plastic_strain_rate(stress, thresholds, smooth=False)
+    # Hard mode, linear fluidity
+    rate_hard = compute_plastic_strain_rate(
+        stress, thresholds, smooth=False, fluidity_form="linear"
+    )
     # Expected: [-2.0, -1.2, 0, 0, 0, 1.2, 2.0]
     expected_hard = jnp.where(jnp.abs(stress) > 1.0, stress, 0.0)
     np.testing.assert_allclose(rate_hard, expected_hard)
 
-    # Smooth mode
+    # Smooth mode, linear fluidity
     rate_smooth = compute_plastic_strain_rate(
-        stress, thresholds, smooth=True, smoothing_width=0.01
+        stress, thresholds, smooth=True, smoothing_width=0.01, fluidity_form="linear"
     )
 
     # Check that values far from threshold match hard mode
@@ -81,6 +89,68 @@ def test_smooth_vs_hard_yielding():
     np.testing.assert_allclose(
         rate_smooth[mask_far], expected_hard[mask_far], atol=1e-2
     )
+
+
+@pytest.mark.unit
+def test_overstress_form_gives_hb_asymptote():
+    """Overstress fluidity form should give HB asymptote at high stress.
+
+    Asymptotic check: for |sigma| >> sigma_c_mean, at n_fluid=2,
+        plastic_rate ~ (|sigma| - sigma_c_mean)^2 / sigma_c_mean / tau_pl.
+    """
+    sigma_c_mean = 10.0
+    stress = jnp.array([15.0, 20.0, 30.0])  # all above threshold
+    thresholds = jnp.full_like(stress, sigma_c_mean)
+
+    rate = compute_plastic_strain_rate(
+        stress,
+        thresholds,
+        fluidity=1.0,
+        smooth=False,
+        n_fluid=2.0,
+        sigma_c_mean=sigma_c_mean,
+        fluidity_form="overstress",
+    )
+    # plastic_rate = sign(s) * (|s| - scm)^2 / scm for n_fluid=2
+    expected = jnp.array([
+        ((15.0 - 10.0) ** 2) / 10.0,
+        ((20.0 - 10.0) ** 2) / 10.0,
+        ((30.0 - 10.0) ** 2) / 10.0,
+    ])
+    np.testing.assert_allclose(rate, expected, atol=1e-6)
+
+
+@pytest.mark.unit
+def test_overstress_form_zero_below_threshold():
+    """Overstress form produces zero plastic rate below the yield threshold."""
+    sigma_c_mean = 10.0
+    stress = jnp.array([5.0, 8.0, 9.0])  # all below threshold
+    thresholds = jnp.full_like(stress, sigma_c_mean)
+
+    rate = compute_plastic_strain_rate(
+        stress,
+        thresholds,
+        fluidity=1.0,
+        smooth=False,
+        n_fluid=2.0,
+        sigma_c_mean=sigma_c_mean,
+        fluidity_form="overstress",
+    )
+    # Hard-threshold activation is 0 below sigma_c, so rate is exactly 0
+    np.testing.assert_allclose(rate, jnp.zeros_like(rate), atol=1e-8)
+
+
+@pytest.mark.unit
+def test_fluidity_form_linear_matches_legacy_default():
+    """The 'linear' fluidity form must exactly reproduce legacy plastic_rate = activation * sigma * fluidity."""
+    stress = jnp.array([-2.0, -1.5, 0.5, 1.5, 2.0])
+    thresholds = jnp.ones_like(stress)
+    rate = compute_plastic_strain_rate(
+        stress, thresholds, fluidity=2.0, smooth=False, fluidity_form="linear"
+    )
+    # Legacy formula: activation (1 above threshold, 0 below) * stress * fluidity
+    expected = jnp.where(jnp.abs(stress) > 1.0, stress * 2.0, 0.0)
+    np.testing.assert_allclose(rate, expected, atol=1e-8)
 
 
 @pytest.mark.unit

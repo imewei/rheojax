@@ -495,3 +495,266 @@ def test_tensorial_epm_metadata_preservation():
 
     # N₁ should also be added
     assert "N1" in result.metadata
+
+
+# =============================================================================
+# Tests for the new three fluidity forms (linear, power, overstress)
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_tensorial_epm_default_fluidity_form_is_overstress():
+    """TensorialEPM should default to the HB-capable overstress form."""
+    model = TensorialEPM(L=16, dt=0.01)
+    assert model.fluidity_form == "overstress"
+
+
+@pytest.mark.unit
+def test_tensorial_epm_all_three_fluidity_forms_construct():
+    """All three fluidity forms should construct and retain the setting."""
+    for form in ("linear", "power", "overstress"):
+        model = TensorialEPM(L=16, dt=0.01, fluidity_form=form)
+        assert model.fluidity_form == form
+
+
+@pytest.mark.unit
+def test_tensorial_epm_invalid_fluidity_form_raises():
+    """Unknown fluidity_form must raise ValueError at construction time."""
+    with pytest.raises(ValueError, match="fluidity_form"):
+        TensorialEPM(L=16, dt=0.01, fluidity_form="not_a_real_form")
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_matches_analytical_hb_flow_curve():
+    """Forward-model integration test: tensorial overstress flow curve should
+    match the analytical HB shape for pure shear across 3 decades of shear
+    rate. Uses n_fluid=2 (HB exponent 1/2) as the reference case.
+
+    Analytical derivation (see tensor.py:_run_flow_curve warm-start comment):
+        σ_xy = σ_c/√3 + (1/√3) * (√3/2)^(1/n) * σ_c^((n-1)/n) * (γ̇·τ_pl)^(1/n)
+    The factor of 2 comes from the tensorial strain-rate convention
+    dσ_xy/dt = μγ̇ − 2μ·ε̇^p_xy ⇒ ε̇^p_xy = γ̇/2 at steady state.
+    """
+    import numpy as _np
+
+    model = TensorialEPM(
+        L=32, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=1.0, sigma_c_std=0.01,  # tight disorder for clean plateau
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    gdot = _np.array([0.1, 1.0, 10.0])  # sub-plateau and post-plateau rates
+    result = model.predict(gdot, test_mode="flow_curve", smooth=True, seed=42)
+    sigma_xy_meas = _np.asarray(result.y)
+
+    # Analytical expected values for n_fluid=2, σ_c=1, τ_pl_shear=1:
+    sqrt3 = _np.sqrt(3.0)
+    expected = (
+        1.0 / sqrt3
+        + (1.0 / sqrt3) * (sqrt3 / 2.0) ** (1.0 / 2.0) * (gdot * 1.0) ** (1.0 / 2.0)
+    )
+    # Expected ≈ [0.7474, 1.1146, 2.2764]
+
+    _np.testing.assert_allclose(
+        sigma_xy_meas,
+        expected,
+        rtol=0.05,  # 5% — allows for lattice noise at small L and σ_c_std
+        err_msg=(
+            f"Tensorial overstress flow curve at n_fluid=2 deviates from "
+            f"analytical HB formula: measured={sigma_xy_meas.tolist()}, "
+            f"expected={expected.tolist()}"
+        ),
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_plateau_at_sigma_c_over_sqrt3():
+    """At very low γ̇, tensorial overstress should plateau at σ_c_mean/√3
+    (the von-Mises pure-shear yield stress)."""
+    import numpy as _np
+
+    sigma_c = 10.0
+    model = TensorialEPM(
+        L=32, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=sigma_c, sigma_c_std=0.01 * sigma_c,
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    # Very low shear rate → should sit near the yield plateau
+    gdot = _np.array([1e-4])
+    result = model.predict(gdot, test_mode="flow_curve", smooth=True, seed=42)
+    sigma_xy = float(_np.asarray(result.y)[0])
+
+    expected_plateau = sigma_c / _np.sqrt(3.0)
+    rel_err = abs(sigma_xy - expected_plateau) / expected_plateau
+    assert rel_err < 0.05, (
+        f"Tensorial overstress plateau should be sigma_c/sqrt(3) = "
+        f"{expected_plateau:.4f}, got {sigma_xy:.4f} (rel err {rel_err*100:.2f}%)"
+    )
+
+
+# =============================================================================
+# Tensorial time-domain protocols with the overstress form (integration tests)
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_startup_runs_and_approaches_steady_state():
+    """Startup protocol with tensorial overstress should:
+    1. Run without error
+    2. Produce finite, bounded stresses
+    3. Show monotonic loading from ~0 toward the steady-state plateau
+
+    We do NOT assert convergence to the analytical plateau within a tight
+    tolerance because the tensorial FFT redistribution is slow to equilibrate
+    and requires many more time steps than is practical in a unit test.
+    Instead we check the qualitative loading behavior: stress should start
+    near zero, increase monotonically, and stay below a loose physical cap.
+    """
+    import numpy as _np
+
+    sigma_c = 1.0
+    model = TensorialEPM(
+        L=16, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=sigma_c, sigma_c_std=0.01,
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    # Short time series at moderate shear rate
+    time = _np.linspace(0.0, 5.0, 50)
+    result = model.predict(
+        time,
+        test_mode="startup",
+        smooth=True,
+        seed=42,
+        gamma_dot=1.0,
+    )
+    sigma_xy = _np.asarray(result.y)
+
+    # 1. finite and bounded
+    assert _np.all(_np.isfinite(sigma_xy)), "Startup produced non-finite stresses"
+    assert sigma_xy.max() < 10.0 * sigma_c, (
+        f"Startup stress should remain bounded; max={sigma_xy.max():.2f}"
+    )
+
+    # 2. Stress should be loading: the second half of the trajectory has
+    # higher mean stress than the first half (monotonic-ish loading).
+    first_half = float(_np.mean(sigma_xy[: len(sigma_xy) // 2]))
+    second_half = float(_np.mean(sigma_xy[len(sigma_xy) // 2 :]))
+    assert second_half > first_half, (
+        f"Startup should show loading; first-half mean {first_half:.3f} "
+        f"vs second-half mean {second_half:.3f}"
+    )
+
+    # 3. Final stress should be in the physically sensible range
+    # (below the HB high-rate limit σ_c/√3 + |γ̇|·τ ≈ 1.58 at γ̇=1, τ=1).
+    final_stress = float(sigma_xy[-1])
+    assert 0.0 <= final_stress < 5.0 * sigma_c, (
+        f"Final startup stress {final_stress:.3f} out of physical range"
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_relaxation_runs_and_decays():
+    """Stress relaxation with tensorial overstress should run without error
+    and produce a monotonically decaying modulus that is finite and positive.
+    """
+    import numpy as _np
+
+    model = TensorialEPM(
+        L=16, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=2.0, sigma_c_std=0.1,
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    time = _np.linspace(0.0, 3.0, 30)
+    result = model.predict(
+        time,
+        test_mode="relaxation",
+        smooth=True,
+        seed=42,
+        gamma=0.5,  # modest step strain
+    )
+    g_t = _np.asarray(result.y)
+
+    assert _np.all(_np.isfinite(g_t)), "Relaxation produced non-finite modulus"
+    # Modulus should start positive (initial stress / strain > 0)
+    assert g_t[0] > 0, f"Initial G(t=0) should be positive, got {g_t[0]:.3f}"
+    # Modulus should generally decrease over time (allow small noise)
+    assert g_t[-1] < g_t[0] * 1.1, (
+        f"Relaxation G(t) should not grow: G(0)={g_t[0]:.3f}, G(final)={g_t[-1]:.3f}"
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_creep_runs_and_strain_accumulates():
+    """Creep protocol with tensorial overstress should run without error and
+    produce monotonically accumulating strain under constant applied stress.
+    """
+    import numpy as _np
+
+    model = TensorialEPM(
+        L=16, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=1.0, sigma_c_std=0.05,
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    time = _np.linspace(0.0, 3.0, 30)
+    result = model.predict(
+        time,
+        test_mode="creep",
+        smooth=True,
+        seed=42,
+        stress=1.5,  # target stress above yield (σ_c/√3 ≈ 0.577)
+    )
+    gamma_t = _np.asarray(result.y)
+
+    assert _np.all(_np.isfinite(gamma_t)), "Creep produced non-finite strain"
+    # Strain should not decrease (monotonic non-negative evolution — allow tiny noise)
+    assert gamma_t[-1] >= gamma_t[0] - 1e-6, (
+        f"Creep strain should not decrease: γ(0)={gamma_t[0]:.4f}, γ(final)={gamma_t[-1]:.4f}"
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_epm_overstress_oscillation_runs_and_is_bounded():
+    """Oscillation (SAOS) with tensorial overstress should run without error
+    and produce a finite, bounded stress response.
+    """
+    import numpy as _np
+
+    model = TensorialEPM(
+        L=16, dt=0.01,
+        mu=1.0, nu=0.48,
+        tau_pl=1.0, tau_pl_shear=1.0, tau_pl_normal=1.0,
+        sigma_c_mean=1.0, sigma_c_std=0.05,
+        n_fluid=2.0, fluidity_form="overstress",
+    )
+
+    # Small-amplitude oscillation at one cycle of omega=1
+    time = _np.linspace(0.0, 6.28, 60)
+    result = model.predict(
+        time,
+        test_mode="oscillation",
+        smooth=True,
+        seed=42,
+        gamma0=0.01,  # small amplitude
+        omega=1.0,
+    )
+    stress_t = _np.asarray(result.y)
+
+    assert _np.all(_np.isfinite(stress_t)), "Oscillation produced non-finite stress"
+    # For small γ0 below yield, stress should remain bounded near the plateau
+    assert _np.max(_np.abs(stress_t)) < 5.0, (
+        f"Oscillation stress should remain bounded: max|σ|={_np.max(_np.abs(stress_t)):.2f}"
+    )
