@@ -450,7 +450,7 @@ class FluidityNonlocal(FluidityBase):
             jax.checkpoint(lambda ti, yi, args_i: pde_fn(cast(float, ti), yi, args_i))
         )
         solver = diffrax.Dopri5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
+        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 
         t0 = t[0]
         t1 = t[-1]
@@ -752,7 +752,7 @@ class FluidityNonlocal(FluidityBase):
 
         term = diffrax.ODETerm(jax.checkpoint(laos_pde))
         solver = diffrax.Dopri5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
+        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 
         t0 = t[0]
         t1 = t[-1]

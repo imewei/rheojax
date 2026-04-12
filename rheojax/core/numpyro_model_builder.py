@@ -360,8 +360,10 @@ def build_numpyro_model(
                 sigma_dist = prior_factory("sigma", 0.0, None)
 
             if sigma_dist is None:
-                # Floor at 1% of mean magnitude to handle constant-data edge case
-                sigma_scale = max(data_scale * 10.0, data_mean * 0.01, 1e-3)
+                # Scale noise prior to ~1× the data's peak-to-peak range.
+                # The old 10× multiplier drowned the likelihood for small N,
+                # collapsing the posterior to the prior (P0-3 fix).
+                sigma_scale = max(data_scale * 1.0, data_mean * 0.01, 1e-3)
                 sigma_dist = dist.Exponential(rate=1.0 / sigma_scale)
 
             sigma = numpyro.sample("sigma", sigma_dist)

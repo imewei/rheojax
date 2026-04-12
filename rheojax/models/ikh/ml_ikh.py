@@ -698,6 +698,30 @@ class MLIKH(IKHBase):
         times, strains = self._extract_time_strain(X, **kwargs)
         sigma_target = jnp.asarray(y)
 
+        # Data-informed initialization: scale G and sigma_y from data
+        # amplitude so the optimizer starts in a physically meaningful region.
+        stress_amp = float(jnp.max(jnp.abs(sigma_target)))
+        if stress_amp > 0 and kwargs.get("smart_init", True):
+            if self._yield_mode == "per_mode":
+                for i in range(1, self._n_modes + 1):
+                    cur_G = self.parameters.get_value(f"G_{i}")
+                    if cur_G is not None and cur_G < stress_amp * 0.1:
+                        self.parameters.set_value(
+                            f"G_{i}", stress_amp / self._n_modes
+                        )
+                    cur_sy = self.parameters.get_value(f"sigma_y0_{i}")
+                    if cur_sy is not None and cur_sy < stress_amp * 0.01:
+                        self.parameters.set_value(
+                            f"sigma_y0_{i}", stress_amp * 0.1 / self._n_modes
+                        )
+            else:
+                cur_G = self.parameters.get_value("G")
+                if cur_G is not None and cur_G < stress_amp * 0.1:
+                    self.parameters.set_value("G", stress_amp)
+                cur_sy = self.parameters.get_value("sigma_y0")
+                if cur_sy is not None and cur_sy < stress_amp * 0.01:
+                    self.parameters.set_value("sigma_y0", stress_amp * 0.1)
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=True))
@@ -733,10 +757,27 @@ class MLIKH(IKHBase):
         Fits G' and G'' independently when complex or (N, 2) input is provided.
         Falls back to magnitude-only fitting for real 1D input.
 
+        .. warning::
+
+            The IKH constitutive model has no viscosity parameter, so the
+            Maxwell relaxation time τ = η/G is approximated with η = 1e12
+            (effectively infinite).  This gives ωτ >> 1 at all accessible
+            frequencies, producing G' ≈ G (constant) and G'' ≈ 0.  As a
+            result, **SAOS fitting can only recover the elastic modulus G;
+            it cannot reproduce frequency-dependent loss behaviour**.  If
+            your data shows significant G'' variation, consider a model
+            family with an explicit viscosity parameter (e.g. Giesekus,
+            fluidity, or Maxwell).
+
         Args:
             X: Angular frequency array (omega)
             y: Complex G* = G' + iG'', (N, 2) array [G', G''], or real |G*|
         """
+        logger.warning(
+            "IKH SAOS: model has no viscosity parameter; τ approximated as "
+            "η/G with η=1e12, giving G'≈G (constant) and G''≈0. "
+            "SAOS fitting can only recover elastic modulus, not loss behaviour."
+        )
         from rheojax.utils.optimization import nlsq_optimize
 
         omega = jnp.asarray(X)

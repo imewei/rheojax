@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.test_modes import TestMode
@@ -79,6 +81,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         include_isotropic_hardening: bool = False,
         alpha_structure: float = 0.5,
         n_history: int = 100,
+        stable_dt: float = 0.01,
     ):
         """Initialize FIKHBase model.
 
@@ -87,13 +90,27 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             include_isotropic_hardening: Whether to include isotropic hardening R.
             alpha_structure: Fractional order for structure evolution (0 < α < 1).
             n_history: Number of history points for Caputo derivative.
+            stable_dt: Upper bound on the internal integration step used by the
+                explicit return-mapping kernel for strain-driven protocols
+                (startup / LAOS). When the user's data cadence exceeds
+                ``stable_dt``, the base class densifies the time/strain grid to
+                this step before invoking the scan kernel and subsamples the
+                result back to the user's time points. This decouples numerical
+                stability from data sampling — the kernel is stable when the
+                per-step strain increment ``G·Δγ`` is small relative to the
+                yield stress. Set to 0 to disable densification (legacy
+                behavior). Default 0.02 s is safe for shear rates up to ~1 s⁻¹
+                with typical thixotropic moduli; reduce for higher rates.
         """
         super().__init__()
         self.include_thermal = include_thermal
         self.include_isotropic_hardening = include_isotropic_hardening
         self.alpha_structure = alpha_structure
         self.n_history = n_history
+        self.stable_dt = float(stable_dt)
         self._test_mode: str | None = None  # For Bayesian closure
+        # Cached at fit time so NUTS uses the same densification as NLSQ
+        self._n_sub_cached = None  # type: int | None  # noqa: E501
 
         # Setup parameters
         self._setup_base_parameters()
@@ -300,6 +317,110 @@ class FIKHBase(BaseModel, FractionalModelMixin):
                 strict=False,
             )
         )
+
+    # -------------------------------------------------------------------------
+    # Return-mapping stabilization (startup / LAOS)
+    # -------------------------------------------------------------------------
+
+    def _compute_n_sub(self, times: jnp.ndarray) -> int:
+        """Compute the static substep count for return-mapping stabilization.
+
+        The explicit return-mapping kernel in ``_kernels.py`` is an incremental
+        linearization: each step applies ``σ_trial = σ_n·exp(-dt/τ) + G·Δγ``
+        followed by a radial return plus an Armstrong-Frederick back-stress
+        update. The linearization is only accurate when the per-step elastic
+        stress increment ``G·Δγ`` is small compared with the yield stress.
+        For coarse user grids (e.g. PNAS startup data at dt ≈ 1.2 s with
+        γ̇ = 1 s⁻¹ → Δγ = 1.2) the scheme produces spurious 2-step limit
+        cycles. We stabilize it by substepping the integration at
+        ``self.stable_dt`` regardless of data cadence.
+
+        Called at fit time with concrete ``times`` so the result can be cached
+        and reused as a static Python int during Bayesian tracing.
+
+        Args:
+            times: 1D array of user time points (concrete, not traced).
+
+        Returns:
+            Number of internal substeps per user interval (>= 1).
+        """
+        if self.stable_dt <= 0:
+            return 1
+        if times.shape[0] < 2:
+            return 1
+        try:
+            dt_data_max = float(np.max(np.diff(np.asarray(times))))
+        except (TypeError, ValueError):
+            # Tracer or otherwise non-concrete — fall back to no substepping
+            return 1
+        if dt_data_max <= self.stable_dt:
+            return 1
+        return max(1, int(np.ceil(dt_data_max / self.stable_dt)))
+
+    def _densify_grid_for_return_mapping(
+        self,
+        times: jnp.ndarray,
+        strains: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, int]:
+        """Densify (times, strains) onto a stable-dt grid for the scan kernel.
+
+        Uses ``self._n_sub_cached`` when set (populated at fit time) so NUTS
+        tracing reuses the same integration grid as NLSQ. Otherwise computes a
+        fresh count from ``times``.
+
+        The dense grid is built **interval-by-interval** so that the user's
+        original time points appear exactly in ``t_dense``. This matters when
+        the user's grid is not perfectly uniform (as is the case with PNAS
+        LAOS data, where dt varies by ~2% between adjacent samples): a single
+        ``jnp.linspace(t[0], t[-1], n_dense)`` would place subsampled points
+        at times slightly offset from the user's, which at oscillatory rates
+        translates into a systematic time shift in the predicted stress and
+        destroys the NLSQ objective landscape.
+
+        Args:
+            times: User-supplied time array (length N, may be non-uniform).
+            strains: User-supplied strain array (length N).
+
+        Returns:
+            Tuple ``(t_dense, strain_dense, n_sub)``. When ``n_sub == 1`` the
+            input arrays are returned unchanged. Otherwise ``t_dense`` has
+            length ``(N - 1) * n_sub + 1``; for each user interval
+            ``[times[i], times[i+1]]`` we insert ``n_sub`` equally-spaced
+            points starting at ``times[i]`` (the last point ``times[-1]`` is
+            appended). The caller should resample the kernel output by
+            ``stress[::n_sub]`` — because the construction guarantees
+            ``t_dense[i*n_sub] == times[i]``, this subsampling recovers values
+            exactly at the user's time points regardless of grid uniformity.
+        """
+        cached = getattr(self, "_n_sub_cached", None)
+        if cached is not None and cached >= 1:
+            n_sub = int(cached)
+        else:
+            n_sub = self._compute_n_sub(times)
+
+        if n_sub <= 1:
+            return times, strains, 1
+
+        # Interval-by-interval dense grid: for each [t[i], t[i+1]] emit
+        # n_sub equally-spaced points starting at t[i] (exclusive upper end),
+        # then append t[-1]. Guarantees t_dense[i*n_sub] == times[i].
+        n_data = int(times.shape[0])
+        # fractional offsets within each interval: [0, 1/n_sub, ..., (n_sub-1)/n_sub]
+        offsets = jnp.arange(n_sub, dtype=times.dtype) / n_sub  # (n_sub,)
+        # interval widths (length N-1) and left-endpoints (length N-1)
+        widths = jnp.diff(times)  # (N-1,)
+        starts = times[:-1]  # (N-1,)
+        # Outer product broadcast: (N-1, 1) + (N-1, 1) * (1, n_sub) -> (N-1, n_sub)
+        grid = starts[:, None] + widths[:, None] * offsets[None, :]
+        # Flatten to (N-1)*n_sub points, then append the final user point
+        t_dense = jnp.concatenate([grid.reshape(-1), times[-1:]])
+
+        # Strain densified by linear interpolation. For startup (linear ramp)
+        # this is exact; for LAOS (sinusoidal) it introduces a small kink
+        # error that is bounded by the local curvature × (dt_sub)² and is
+        # negligible at practical substep sizes.
+        strain_dense = jnp.interp(t_dense, times, strains)
+        return t_dense, strain_dense, n_sub
 
     def _extract_time_strain(
         self, X: ArrayLike, **kwargs

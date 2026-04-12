@@ -315,10 +315,19 @@ class HebraudLequeux(BaseModel):
 
         # --- Multi-start Nelder-Mead ---
         # x = [alpha, log10(tau), sigma_c_norm]
-        # HL yield stress ≈ sigma_c/2, so sigma_c ~ 2 for normalized data
+        # HL yield stress ≈ sigma_c/2, so sigma_c ~ 2 for normalized data.
+        #
+        # The (alpha, tau, sigma_c) landscape is degenerate: multiple
+        # triplets produce similar normalized flow curves due to the
+        # sigma_c scale invariance.  Using 5 starts spread across the
+        # physically plausible region and 200 function evaluations per
+        # start gives the simplex enough room to escape shallow basins.
         starts = [
             [0.10, -1.3, 2.5],  # alpha=0.10, tau=0.05, sigma_c=2.5
             [0.30, -2.0, 3.0],  # alpha=0.30, tau=0.01, sigma_c=3.0
+            [0.50, -0.5, 2.0],  # alpha=0.50, tau=0.32, sigma_c=2.0
+            [0.20, -1.0, 4.0],  # alpha=0.20, tau=0.10, sigma_c=4.0
+            [0.40, -1.5, 1.5],  # alpha=0.40, tau=0.03, sigma_c=1.5
         ]
 
         best_x = starts[0]
@@ -336,9 +345,9 @@ class HebraudLequeux(BaseModel):
                     method="Nelder-Mead",
                     callback=_callback,
                     options={
-                        "maxfev": 40,
-                        "xatol": 0.02,
-                        "fatol": 0.005,
+                        "maxfev": 200,
+                        "xatol": 0.01,
+                        "fatol": 0.002,
                         "adaptive": True,
                     },
                 )

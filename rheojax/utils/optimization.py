@@ -129,6 +129,12 @@ def make_fd_differentiable(
         # Primal output
         y = wrapped(x_data, params)
 
+        # INVARIANT: This JVP is correct ONLY when NLSQ sends unit basis
+        # tangent vectors e_i (one parameter perturbed at a time). NLSQ's
+        # internal jacfwd uses vmap over the identity matrix, satisfying
+        # this. If NLSQ ever batches arbitrary tangent vectors, the formula
+        # would compute J·(h/||h||) instead of J·v (P2-2 documentation).
+        #
         # Relative perturbation: scale eps by each parameter's magnitude to
         # avoid catastrophic cancellation for large-magnitude params (e.g.
         # eta_p ~ 100 Pa·s).  Without this, abs perturbation 1e-7 on a value
@@ -187,7 +193,9 @@ def _validate_optimization_result(
             "Optimization produced empty residual vector. "
             "Check that the objective function returns a non-empty array."
         )
-    residual_count = len(y_data) if y_data is not None else residuals.size
+    # For complex data, _run_scipy_least_squares splits residuals into
+    # real+imag giving 2N entries; use residuals.size to match (P1-2 fix).
+    residual_count = residuals.size
     # R10-OPT-001: auto-scale threshold by data magnitude so that the MSE
     # check works for both dimensionless log-residuals and raw Pa-scale data.
     # Fallback to 1e18 when y_data is unavailable or all-zero.
@@ -306,7 +314,10 @@ def _run_scipy_least_squares(
     # Floor at 1e-6 (not 1e-12) so that zero-valued initial parameters
     # (e.g. C=0 kinematic hardening) still get a meaningful trust region.
     # The old floor of 1e-12 caused xtol to fire immediately on those dims.
-    x_scale = np.maximum(np.abs(x0), 1e-6)
+    # Floor at 1e-3 (not 1e-6): zero-valued initial parameters (e.g. C=0
+    # kinematic hardening) need a meaningful trust region.  The old 1e-6
+    # floor made xtol fire prematurely on those dimensions (P1-5 fix).
+    x_scale = np.maximum(np.abs(x0), 1e-3)
 
     # Larger relative finite-difference step so the perturbation actually
     # registers above the ODE solver's atol (~1e-7). The default

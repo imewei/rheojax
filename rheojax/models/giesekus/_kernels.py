@@ -518,19 +518,28 @@ def giesekus_saos_moduli(
     eta_p: float,
     lambda_1: float,
     eta_s: float,
+    beta_cc: float = 1.0,
 ) -> tuple[float, float]:
     """Compute storage and loss moduli G'(ω) and G''(ω).
 
-    In the linear viscoelastic regime (small strain amplitude), the Giesekus
-    model reduces to Maxwell behavior (α-independent)::
+    Uses the Cole-Cole generalisation of the Maxwell model so that a
+    single mode can capture broadband data::
 
-        G'(ω) = G·(ωλ)² / (1 + (ωλ)²)
-        G''(ω) = G·(ωλ) / (1 + (ωλ)²) + η_s·ω
+        G*(ω) = G · (iωλ)^β / (1 + (iωλ)^β) + iωη_s
 
-    where G = η_p/λ is the elastic modulus.
+    When ``beta_cc = 1`` (default) this reduces to the standard
+    Maxwell limit (α-independent) used by the classical Giesekus
+    model in the linear regime.  When ``beta_cc < 1`` the effective
+    relaxation-time distribution broadens, allowing a single mode to
+    fit data that spans several decades.
 
-    Note: α does not appear because the quadratic τ·τ term is O(γ₀²)
-    and vanishes in the linear limit.
+    The complex power is decomposed into real arithmetic for
+    JAX-JIT compatibility::
+
+        u = (ωλ)^β · cos(β π/2)
+        v = (ωλ)^β · sin(β π/2)
+        G' = G · [u(1+u) + v²] / [(1+u)² + v²]
+        G'' = G · v / [(1+u)² + v²] + η_s·ω
 
     Parameters
     ----------
@@ -542,19 +551,30 @@ def giesekus_saos_moduli(
         Relaxation time (s)
     eta_s : float
         Solvent viscosity (Pa·s)
+    beta_cc : float, default 1.0
+        Cole-Cole broadening exponent (0 < β ≤ 1).
+        β = 1 → Maxwell.  β < 1 → broader spectrum.
 
     Returns
     -------
     tuple[float, float]
         (G', G'') in Pa
     """
-    G = eta_p / jnp.maximum(lambda_1, 1e-12)  # Elastic modulus
-    omega_lambda = omega * lambda_1
-    omega_lambda_sq = omega_lambda * omega_lambda
-    denom = 1.0 + omega_lambda_sq
+    G = eta_p / jnp.maximum(lambda_1, 1e-12)
+    omega_lambda = omega * lambda_1 + 1e-30  # floor for 0^β stability
 
-    G_prime = G * omega_lambda_sq / denom
-    G_double_prime = G * omega_lambda / denom + eta_s * omega
+    # Cole-Cole decomposition of (iωλ)^β into real components
+    wl_beta = jnp.power(omega_lambda, beta_cc)
+    cos_term = jnp.cos(beta_cc * jnp.pi / 2.0)
+    sin_term = jnp.sin(beta_cc * jnp.pi / 2.0)
+
+    u = wl_beta * cos_term
+    v = wl_beta * sin_term
+
+    denom = (1.0 + u) ** 2 + v**2 + 1e-30
+
+    G_prime = G * (u * (1.0 + u) + v**2) / denom
+    G_double_prime = G * v / denom + eta_s * omega
 
     return G_prime, G_double_prime
 
@@ -563,7 +583,7 @@ def giesekus_saos_moduli(
 giesekus_saos_moduli_vec = jax.jit(
     jax.vmap(
         giesekus_saos_moduli,
-        in_axes=(0, None, None, None),
+        in_axes=(0, None, None, None, None),
     )
 )
 

@@ -873,6 +873,13 @@ class TNTStickyRouse(TNTBase):
     ) -> jnp.ndarray:
         """Predict LAOS stress σ(t) via ODE integration.
 
+        .. warning::
+
+            The StickyRouse LAOS model is a linear multi-mode Maxwell ODE.
+            It cannot capture nonlinear yield-stress behaviour (strain
+            softening, secondary loops).  Use only for data where the LAOS
+            response is quasi-linear (small γ₀ or Newtonian-like materials).
+
         γ̇(t) = γ₀·ω·cos(ωt)
 
         Parameters

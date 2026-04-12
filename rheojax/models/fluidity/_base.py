@@ -71,8 +71,8 @@ class FluidityBase(BaseModel):
         # tau_y: Yield stress (Pa)
         self.parameters.add(
             name="tau_y",
-            value=1e3,
-            bounds=(1e1, 1e6),
+            value=10.0,
+            bounds=(1e-3, 1e6),
             units="Pa",
             description="Yield stress",
         )
@@ -80,8 +80,8 @@ class FluidityBase(BaseModel):
         # K: Flow consistency (Pa·s^n)
         self.parameters.add(
             name="K",
-            value=1e3,
-            bounds=(1e0, 1e6),
+            value=10.0,
+            bounds=(1e-3, 1e6),
             units="Pa·s^n",
             description="Flow consistency (HB K parameter)",
         )
@@ -141,6 +141,74 @@ class FluidityBase(BaseModel):
             units="dimensionless",
             description="Rejuvenation exponent",
         )
+
+    def _init_hb_from_data(
+        self, gamma_dot: np.ndarray, stress: np.ndarray
+    ) -> None:
+        """Seed HB parameters (tau_y, K, n_flow) from flow-curve data.
+
+        Estimates a Herschel-Bulkley fit ``σ = τ_y + K·γ̇^n`` directly
+        from the data so the NLSQ optimizer starts close to the
+        solution. Without this, the generic defaults are typically
+        orders of magnitude away from real measurements and the
+        optimizer terminates after a single step on the xtol criterion.
+
+        - tau_y is taken as 90 % of the smallest measured stress
+          (the low-rate plateau).
+        - n_flow is estimated from the high-rate slope of
+          log(σ - τ_y) vs log(γ̇).
+        - K is back-solved at the highest reliable shear rate.
+
+        All seeds are clipped to the parameter bounds.
+        """
+        gamma = np.abs(np.asarray(gamma_dot, dtype=float))
+        sig = np.asarray(stress, dtype=float)
+
+        if gamma.size == 0 or sig.size == 0:
+            return
+
+        # Sort by shear rate so the slope estimate is well-defined
+        order = np.argsort(gamma)
+        gamma_s = gamma[order]
+        sig_s = sig[order]
+
+        # Yield stress: low-rate plateau, slightly below the minimum
+        # measured stress (so the residual at γ̇→0 is non-zero).
+        sig_min = float(np.min(sig_s[sig_s > 0])) if np.any(sig_s > 0) else 1.0
+        tau_y_seed = max(sig_min * 0.9, 1e-3)
+
+        # Use the upper half of the (sorted) data to estimate the
+        # high-rate slope without contamination from the plateau.
+        n_pts = len(gamma_s)
+        hi = max(n_pts // 2, 2)
+        gamma_hi = gamma_s[-hi:]
+        sig_hi = sig_s[-hi:]
+        excess = sig_hi - tau_y_seed
+        mask = (gamma_hi > 0) & (excess > 0)
+        if np.count_nonzero(mask) >= 2:
+            log_g = np.log(gamma_hi[mask])
+            log_e = np.log(excess[mask])
+            slope, intercept = np.polyfit(log_g, log_e, 1)
+            n_seed = float(np.clip(slope, 0.1, 1.5))
+            K_seed = float(np.exp(intercept))
+        else:
+            n_seed = 0.5
+            K_seed = max((sig_s[-1] - tau_y_seed), 1.0) / max(
+                gamma_s[-1] ** n_seed, 1e-6
+            )
+
+        # Clip seeds to bounds before applying so set_value() does not
+        # raise on edge cases (e.g. data well below the lower bound).
+        def _clipped(name: str, value: float) -> float:
+            param = self.parameters[name]
+            lo, hi_b = param.bounds if param.bounds else (None, None)
+            lo_v = lo if lo is not None else -np.inf
+            hi_v = hi_b if hi_b is not None else np.inf
+            return float(np.clip(value, lo_v, hi_v))
+
+        self.parameters.set_value("tau_y", _clipped("tau_y", tau_y_seed))
+        self.parameters.set_value("K", _clipped("K", max(K_seed, 1e-3)))
+        self.parameters.set_value("n_flow", _clipped("n_flow", n_seed))
 
     def get_initial_fluidity(self) -> float:
         """Get initial fluidity value (equilibrium).

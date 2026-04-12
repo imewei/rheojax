@@ -368,8 +368,14 @@ class FluidityLocal(FluidityBase):
         # For creep: strain; for startup/relaxation: stress
         result = sol.ys[:, 0]
 
-        # Handle solver failure by returning NaN (optimization will avoid this)
-        result = jnp.where(sol.result == diffrax.RESULTS.successful, result, jnp.nan)
+        # Handle solver failure: use zeros (not NaN) so gradients remain
+        # finite.  jnp.where with NaN in the false branch propagates NaN
+        # gradients back through the selector (known JAX issue, P1-1 fix).
+        # The residual-level nan_to_num guard in nlsq_optimize handles the
+        # downstream penalty.
+        result = jnp.where(
+            sol.result == diffrax.RESULTS.successful, result, jnp.zeros_like(result)
+        )
 
         return result
 
@@ -575,8 +581,9 @@ class FluidityLocal(FluidityBase):
 
         term = diffrax.ODETerm(jax.checkpoint(laos_ode))
         solver = diffrax.Tsit5()
-        # Relaxed tolerances for stiff LAOS simulations with small fluidity values
-        stepsize_controller = diffrax.PIDController(rtol=1e-4, atol=1e-6)
+        # Use same tolerances as transient protocols to avoid O(1%) trajectory
+        # error accumulating over oscillation cycles (P1-3 fix).
+        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
 
         t0 = t[0]
         t1 = t[-1]

@@ -302,7 +302,9 @@ class FitOrchestrator:
                     else:
                         ss_res = float(np.sum(np.abs(fun) ** 2))
                     y_arr = np.asarray(_y_score)
-                    ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
+                    # Use np.abs()² for complex data — plain (y-mean)² gives
+                    # complex ss_tot which is meaningless (P0-4 fix).
+                    ss_tot = float(np.sum(np.abs(y_arr - np.mean(y_arr)) ** 2))
                     if ss_tot > 0:
                         r2 = 1.0 - (ss_res / ss_tot)
                     else:
