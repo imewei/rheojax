@@ -25,9 +25,19 @@ def compute_fit_quality(
     Returns:
         Dictionary with 'r_squared' and 'rmse' keys.
     """
+    y_data = np.asarray(y_data)
+    y_pred = np.asarray(y_pred)
+    # Complex G* → stack real (G') and imag (G'') as real residuals
+    if np.iscomplexobj(y_data) or np.iscomplexobj(y_pred):
+        y_data = np.concatenate([np.real(y_data).ravel(), np.imag(y_data).ravel()])
+        y_pred = np.concatenate([np.real(y_pred).ravel(), np.imag(y_pred).ravel()])
+    else:
+        y_data = np.asarray(y_data).flatten()
+        y_pred = np.asarray(y_pred).flatten()
+
     ss_res = np.sum((y_data - y_pred) ** 2)
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
-    r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    r_squared = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else 0.0
 
     if r_squared < 0:
         import warnings

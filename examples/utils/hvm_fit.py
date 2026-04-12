@@ -43,7 +43,9 @@ def get_bayesian_config() -> dict[str, int]:
         Dict with num_warmup, num_samples, num_chains.
     """
     if FAST_MODE:
-        return {"num_warmup": 50, "num_samples": 100, "num_chains": 1}
+        # 2 chains minimum for R-hat diagnostics; 200 warmup for
+        # mass-matrix adaptation on 8-param HVM/HVNM models.
+        return {"num_warmup": 200, "num_samples": 200, "num_chains": 2}
     return {"num_warmup": 500, "num_samples": 1000, "num_chains": 4}
 
 
@@ -58,12 +60,15 @@ def run_nlsq_saos(
     G_star: np.ndarray,
     **fit_kwargs: Any,
 ) -> dict[str, float]:
-    """Run NLSQ fit on SAOS data (|G*| = sqrt(G'^2 + G''^2)).
+    """Run NLSQ fit on SAOS data.
+
+    Accepts complex G* = G' + iG'' (preferred, fits both components) or
+    real |G*| magnitude (fits magnitude only, may lose phase information).
 
     Args:
         model: HVMLocal instance.
         omega: Angular frequency (rad/s).
-        G_star: Complex modulus magnitude (Pa).
+        G_star: Complex modulus G* (Pa) — complex or real magnitude.
         **fit_kwargs: Extra kwargs for model.fit().
 
     Returns:

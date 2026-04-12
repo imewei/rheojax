@@ -742,13 +742,20 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
     Returns:
         Dictionary with 'R2', 'RMSE', and 'NRMSE' keys.
     """
-    y_data = np.asarray(y_data).flatten()
-    y_pred = np.asarray(y_pred).flatten()
+    y_data = np.asarray(y_data)
+    y_pred = np.asarray(y_pred)
+    # Complex G* → stack real (G') and imag (G'') as real residuals
+    if np.iscomplexobj(y_data) or np.iscomplexobj(y_pred):
+        y_data = np.concatenate([np.real(y_data).ravel(), np.imag(y_data).ravel()])
+        y_pred = np.concatenate([np.real(y_pred).ravel(), np.imag(y_pred).ravel()])
+    else:
+        y_data = y_data.flatten()
+        y_pred = y_pred.flatten()
 
     # R-squared
     ss_res = np.sum((y_data - y_pred) ** 2)
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
-    r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    r2 = float(1.0 - (ss_res / ss_tot)) if ss_tot > 0 else 0.0
 
     if r2 < 0:
         import warnings
@@ -760,11 +767,11 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
         )
 
     # RMSE
-    rmse = np.sqrt(np.mean((y_data - y_pred) ** 2))
+    rmse = float(np.sqrt(np.mean((y_data - y_pred) ** 2)))
 
     # NRMSE (normalized by range)
     data_range = np.max(y_data) - np.min(y_data)
-    nrmse = rmse / data_range if data_range > 0 else 0.0
+    nrmse = float(rmse / data_range) if data_range > 0 else 0.0
 
     return {"R2": r2, "RMSE": rmse, "NRMSE": nrmse}
 

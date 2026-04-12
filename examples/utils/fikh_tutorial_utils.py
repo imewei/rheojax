@@ -378,6 +378,7 @@ def generate_synthetic_saos(
     n_points: int = 50,
     noise_level: float = 0.03,
     seed: int = 42,
+    gamma_0: float = 0.01,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generate synthetic SAOS data from a fitted FIKH model.
 
@@ -391,6 +392,11 @@ def generate_synthetic_saos(
         n_points: Number of frequency points.
         noise_level: Relative noise level (0.03 = 3%).
         seed: Random seed for reproducibility.
+        gamma_0: Strain amplitude used to extract G', G''. The same value
+            must be passed to ``model.fit(..., gamma_0=...)`` when fitting
+            the returned data — FIKH is nonlinear even at small strain
+            (yielding, thixotropy) so G* is amplitude-dependent and fitting
+            at a different amplitude than generation will not converge.
 
     Returns:
         Tuple of (omega, G_prime, G_double_prime) arrays in (rad/s, Pa, Pa).
@@ -400,8 +406,8 @@ def generate_synthetic_saos(
     # Log-spaced frequency points
     omega = np.logspace(np.log10(omega_range[0]), np.log10(omega_range[1]), n_points)
 
-    # For SAOS, we simulate oscillatory strain and extract G', G''
-    gamma_0 = 0.01  # Small amplitude for linear regime
+    # For SAOS, simulate oscillatory strain at the requested amplitude and
+    # extract G', G'' from the last-cycle Fourier decomposition.
 
     G_prime_list = []
     G_double_prime_list = []
@@ -1185,13 +1191,20 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
     Returns:
         Dictionary with 'R2', 'RMSE', and 'NRMSE' keys.
     """
-    y_data = np.asarray(y_data).flatten()
-    y_pred = np.asarray(y_pred).flatten()
+    y_data = np.asarray(y_data)
+    y_pred = np.asarray(y_pred)
+    # Complex G* → stack real (G') and imag (G'') as real residuals
+    if np.iscomplexobj(y_data) or np.iscomplexobj(y_pred):
+        y_data = np.concatenate([np.real(y_data).ravel(), np.imag(y_data).ravel()])
+        y_pred = np.concatenate([np.real(y_pred).ravel(), np.imag(y_pred).ravel()])
+    else:
+        y_data = y_data.flatten()
+        y_pred = y_pred.flatten()
 
     # R-squared
     ss_res = np.sum((y_data - y_pred) ** 2)
     ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
-    r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    r2 = float(1.0 - (ss_res / ss_tot)) if ss_tot > 0 else 0.0
 
     if r2 < 0:
         import warnings
@@ -1203,11 +1216,11 @@ def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, flo
         )
 
     # RMSE
-    rmse = np.sqrt(np.mean((y_data - y_pred) ** 2))
+    rmse = float(np.sqrt(np.mean((y_data - y_pred) ** 2)))
 
     # NRMSE (normalized by range)
     data_range = np.max(y_data) - np.min(y_data)
-    nrmse = rmse / data_range if data_range > 0 else 0.0
+    nrmse = float(rmse / data_range) if data_range > 0 else 0.0
 
     return {"R2": r2, "RMSE": rmse, "NRMSE": nrmse}
 
