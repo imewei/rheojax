@@ -36,7 +36,7 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
-from rheojax.utils.optimization import nlsq_optimize
+from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike
@@ -136,6 +136,7 @@ class FIKH(FIKHBase):
         include_isotropic_hardening: bool = False,
         alpha_structure: float = 0.5,
         n_history: int = 100,
+        stable_dt: float = 0.01,
     ):
         """Initialize FIKH model.
 
@@ -146,12 +147,17 @@ class FIKH(FIKHBase):
                 - α → 0: Strong memory (slow recovery)
                 - α → 1: Weak memory (fast, exponential recovery)
             n_history: History buffer size for Caputo derivative.
+            stable_dt: Internal integration substep (seconds) for startup / LAOS.
+                See ``FIKHBase`` for the full explanation. Coarse user grids
+                are densified to this step before the explicit return-mapping
+                kernel runs. Set to 0 to disable. Default 0.02 s.
         """
         super().__init__(
             include_thermal=include_thermal,
             include_isotropic_hardening=include_isotropic_hardening,
             alpha_structure=alpha_structure,
             n_history=n_history,
+            stable_dt=stable_dt,
         )
         logger.debug(
             "Initialized FIKH model",
@@ -201,15 +207,23 @@ class FIKH(FIKHBase):
         from rheojax.models.fikh._kernels import fikh_flow_curve_steady_state
 
         gamma_dot = jnp.asarray(X)
-        sigma_target = jnp.asarray(y)
+        sigma_target = jnp.asarray(y, dtype=jnp.float64)
 
-        def objective(param_values):
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            sigma_pred = fikh_flow_curve_steady_state(
-                gamma_dot, include_thermal=self.include_thermal, **p_dict
+            p_dict = dict(zip(p_names, params, strict=False))
+            return fikh_flow_curve_steady_state(
+                x_data, include_thermal=self.include_thermal, **p_dict
             )
-            return sigma_pred - sigma_target
+
+        # Flow curves span decades — log residuals give equal weight to
+        # low and high shear rate regions.
+        objective = create_least_squares_objective(
+            model_fn,
+            gamma_dot,
+            sigma_target,
+            use_log_residuals=kwargs.pop("use_log_residuals", True),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -217,7 +231,7 @@ class FIKH(FIKHBase):
     def _fit_ode_formulation(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit using ODE formulation (creep/relaxation)."""
         t = jnp.asarray(X)
-        y_target = jnp.asarray(y)
+        y_target = jnp.asarray(y, dtype=jnp.float64)
         test_mode = kwargs.get("test_mode", "relaxation")
         gamma_dot = kwargs.get("gamma_dot", 0.0)
         sigma_applied = kwargs.get("sigma_applied", 100.0)
@@ -229,13 +243,22 @@ class FIKH(FIKHBase):
         self._fit_sigma_applied = sigma_applied
         self._fit_sigma_0 = sigma_0
 
-        def objective(param_values):
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            y_pred = self._simulate_transient(
-                t, p_dict, test_mode, gamma_dot, sigma_applied, sigma_0, T_init
+            p_dict = dict(zip(p_names, params, strict=False))
+            return self._simulate_transient(
+                x_data, p_dict, test_mode, gamma_dot, sigma_applied, sigma_0, T_init
             )
-            return y_pred - y_target
+
+        # Transient data (creep/relaxation) often starts at zero — normalize=False
+        # avoids division by ~0 at early time points (same rationale as fluidity).
+        objective = create_least_squares_objective(
+            model_fn,
+            t,
+            y_target,
+            normalize=False,
+            use_log_residuals=kwargs.pop("use_log_residuals", False),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -243,13 +266,29 @@ class FIKH(FIKHBase):
     def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FIKH:
         """Fit using return mapping (startup/LAOS)."""
         times, strains = self._extract_time_strain(X, **kwargs)
-        sigma_target = jnp.asarray(y)
+        sigma_target = jnp.asarray(y, dtype=jnp.float64)
 
-        def objective(param_values):
+        # Pre-compute the stable-dt substep count from concrete times and cache
+        # it so the subsequent NUTS trace reuses the same integration grid.
+        # See FIKHBase._compute_n_sub / _densify_grid_for_return_mapping for
+        # why this is necessary (explicit return mapping is only stable when
+        # G·Δγ per step is small relative to the yield stress).
+        self._n_sub_cached = self._compute_n_sub(times)
+
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            sigma_pred = self._predict_from_params(times, strains, p_dict)
-            return sigma_pred - sigma_target
+            p_dict = dict(zip(p_names, params, strict=False))
+            return self._predict_from_params(x_data, strains, p_dict)
+
+        # Startup/LAOS stress crosses zero — normalize=False avoids
+        # division by ~0 at the zero crossings.
+        objective = create_least_squares_objective(
+            model_fn,
+            times,
+            sigma_target,
+            normalize=False,
+            use_log_residuals=kwargs.pop("use_log_residuals", False),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -285,6 +324,19 @@ class FIKH(FIKHBase):
         is_complex = jnp.iscomplexobj(y_arr)
         is_stacked = y_arr.ndim == 2 and y_arr.shape[1] == 2
 
+        # Pre-compute normalization denominators for consistent residual weighting.
+        # FIKH oscillation uses time-domain FFT (not analytical), so we handle
+        # the complex dispatch manually rather than through create_least_squares_objective.
+        _norm_floor = jnp.float64(1e-10)
+        if is_complex:
+            _norm_Gp = jnp.maximum(jnp.abs(jnp.real(y_arr)), _norm_floor)
+            _norm_Gpp = jnp.maximum(jnp.abs(jnp.imag(y_arr)), _norm_floor)
+        elif is_stacked:
+            _norm_Gp = jnp.maximum(jnp.abs(y_arr[:, 0]), _norm_floor)
+            _norm_Gpp = jnp.maximum(jnp.abs(y_arr[:, 1]), _norm_floor)
+        else:
+            _norm_mag = jnp.maximum(jnp.abs(y_arr), _norm_floor)
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=False))
@@ -295,24 +347,24 @@ class FIKH(FIKHBase):
             )
 
             if is_complex:
-                # Fit both G' and G'' by stacking residuals
+                # Fit both G' and G'' by stacking normalized residuals
                 residuals = jnp.concatenate(
                     [
-                        jnp.real(G_star_pred) - jnp.real(y_arr),
-                        jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                        (jnp.real(G_star_pred) - jnp.real(y_arr)) / _norm_Gp,
+                        (jnp.imag(G_star_pred) - jnp.imag(y_arr)) / _norm_Gpp,
                     ]
                 )
             elif is_stacked:
                 # (N, 2) array - [G', G''] format
                 residuals = jnp.concatenate(
                     [
-                        jnp.real(G_star_pred) - y_arr[:, 0],
-                        jnp.imag(G_star_pred) - y_arr[:, 1],
+                        (jnp.real(G_star_pred) - y_arr[:, 0]) / _norm_Gp,
+                        (jnp.imag(G_star_pred) - y_arr[:, 1]) / _norm_Gpp,
                     ]
                 )
             else:
                 # Fit to magnitude |G*|
-                residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
+                residuals = (jnp.abs(G_star_pred) - jnp.abs(y_arr)) / _norm_mag
 
             return residuals
 
@@ -417,7 +469,10 @@ class FIKH(FIKHBase):
         """Predict stress using parameter dictionary.
 
         This is the core prediction method used by both NLSQ fitting and
-        Bayesian inference.
+        Bayesian inference. The user's (times, strains) grid is densified to
+        the base-class ``stable_dt`` before the scan kernel runs so that the
+        explicit return mapping stays well inside its linearization regime,
+        then the result is subsampled back to the user's time points.
 
         Args:
             times: Time array.
@@ -425,7 +480,7 @@ class FIKH(FIKHBase):
             params: Parameter dictionary.
 
         Returns:
-            Predicted stress array.
+            Predicted stress array at the user's time points.
         """
         from rheojax.models.fikh._kernels import (
             fikh_scan_kernel_isothermal,
@@ -435,11 +490,15 @@ class FIKH(FIKHBase):
         # Extract alpha (can now be a traced value since it's not in static_argnums)
         alpha = params.get("alpha_structure", self.alpha_structure)
 
+        t_dense, strain_dense, n_sub = self._densify_grid_for_return_mapping(
+            times, strains
+        )
+
         if self.include_thermal:
             T_init = params.get("T_env", params.get("T_ref", 298.15))
-            sigma_series, _ = fikh_scan_kernel_thermal(
-                times,
-                strains,
+            sigma_dense, _ = fikh_scan_kernel_thermal(
+                t_dense,
+                strain_dense,
                 n_history=self.n_history,
                 alpha=alpha,
                 use_viscosity=True,
@@ -447,16 +506,18 @@ class FIKH(FIKHBase):
                 **params,
             )
         else:
-            sigma_series = fikh_scan_kernel_isothermal(
-                times,
-                strains,
+            sigma_dense = fikh_scan_kernel_isothermal(
+                t_dense,
+                strain_dense,
                 n_history=self.n_history,
                 alpha=alpha,
                 use_viscosity=True,
                 **params,
             )
 
-        return sigma_series
+        if n_sub > 1:
+            return sigma_dense[::n_sub]
+        return sigma_dense
 
     def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
         """Predict based on test_mode.

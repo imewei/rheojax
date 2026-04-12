@@ -72,22 +72,17 @@ def f_loc_herschel_bulkley(
     # (handles gradient overflow that manual jnp.where pattern misses)
     delta_smooth = scale * jax.nn.softplus(x)
 
-    # Fluidity: f = γ̇ / σ, where γ̇ = ((σ - τ_y) / K)^(1/n)
-    # So f = ((σ - τ_y)^(1/n) / K^(1/n)) / σ
-    # Simplify: f_loc = (δσ)^(1/n) / (K^(1/n) * |σ|) when σ > τ_y
-    # But for the evolution equation, we use f_loc = (δσ/K)^(1/n)
-    # which has units of 1/(Pa·s) when n=1
+    # HB shear rate: γ̇ = ((|σ| - τ_y)_+ / K)^(1/n)
+    gamma_dot_hb = jnp.power(delta_smooth / (K + eps), 1.0 / n)
 
-    # Actually the standard form is:
-    # f_loc = (max(0, |σ| - τ_y) / K)^(1/n)  [strain rate form]
-    # Then γ̇ = f_loc [this is shear rate, not fluidity]
-
-    # For fluidity f = γ̇/σ:
-    # f = ((|σ| - τ_y) / K)^(1/n) / |σ|
-
-    # Let's use the simpler form where f_loc directly gives shear rate
-    # when multiplied by stress in evolution equations
-    f_loc = jnp.power(delta_smooth / (K + eps), 1.0 / n)
+    # Fluidity = γ̇ / |σ|  [units: 1/(Pa·s)]
+    # This matches the ODE state variable f in dσ/dt = G(γ̇_ext - σ·f),
+    # where σ·f gives plastic shear rate (units 1/s).
+    # Safe denominator: |σ| is bounded away from zero when |σ| > τ_y
+    # (where gamma_dot_hb > 0), and gamma_dot_hb → 0 when |σ| ≤ τ_y
+    # (softplus smoothing), so the ratio is well-behaved.
+    sigma_abs = jnp.abs(sigma) + eps
+    f_loc = gamma_dot_hb / sigma_abs
 
     return f_loc
 
@@ -466,38 +461,30 @@ def fluidity_local_steady_state(
     Args:
         gamma_dot: Shear rate array (1/s)
         G: Elastic modulus (Pa) - not used for steady state
-        tau_y: Yield stress (Pa) - additive yield contribution
-        K: Flow consistency (Pa·s^n) - used in HB contribution
-        n_flow: Flow exponent - used in HB contribution
-        f_eq: Equilibrium fluidity (1/(Pa·s))
-        f_inf: High-shear fluidity (1/(Pa·s))
-        theta: Relaxation time (s)
-        a: Rejuvenation amplitude
-        n_rejuv: Rejuvenation exponent
+        tau_y: Yield stress (Pa) - HB plateau
+        K: Flow consistency (Pa·s^n) - HB consistency
+        n_flow: Flow exponent - HB shear-thinning exponent
+        f_eq: Equilibrium fluidity - not used for HB steady state
+        f_inf: High-shear fluidity - not used for HB steady state
+        theta: Relaxation time - not used for HB steady state
+        a: Rejuvenation amplitude - not used for HB steady state
+        n_rejuv: Rejuvenation exponent - not used for HB steady state
 
     Returns:
         Steady-state stress array (Pa)
+
+    Notes:
+        Steady-state stress depends only on the HB parameters
+        (tau_y, K, n_flow). The dynamic-fluidity parameters
+        (f_eq, f_inf, theta, a, n_rejuv) are inert at steady state
+        and are only constrained by transient protocols (startup,
+        relaxation, creep, LAOS). The flow-curve protocol can
+        therefore only fit tau_y, K, n_flow; the other six remain
+        at their initial values.
     """
-    gamma_dot_abs = jnp.abs(gamma_dot)
-
-    # Flow term contribution
-    # Floor at 1e-6 to prevent gradient explosion for n_rejuv < 1
-    flow_term = a * jnp.power(gamma_dot_abs + 1e-6, n_rejuv)
-
-    # Steady-state fluidity
-    # f_ss = (f_eq/θ + flow_term * f_inf) / (1/θ + flow_term)
-    numerator = f_eq / theta + flow_term * f_inf
-    denominator = 1.0 / theta + flow_term
-
-    f_ss = numerator / (denominator + 1e-20)
-
-    # Stress: σ = τ_y + γ̇ / f_ss
-    # The yield stress τ_y provides the finite stress at γ̇→0,
-    # ensuring yield-stress fluid behavior. K and n_flow contribute
-    # indirectly through the fluidity evolution (f_eq, f_inf dependence).
-    sigma_ss = tau_y + gamma_dot_abs / (f_ss + 1e-20)
-
-    # Preserve sign of gamma_dot
+    # HB flow curve: σ = τ_y + K*|γ̇|^n_flow * sign(γ̇)
+    # Floor at 1e-6 to prevent gradient explosion for n_flow < 1
+    sigma_ss = tau_y + K * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_flow)
     sigma_ss = sigma_ss * jnp.sign(gamma_dot + 1e-20)
 
     return sigma_ss

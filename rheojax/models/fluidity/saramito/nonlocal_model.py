@@ -54,27 +54,18 @@ logger = logging.getLogger(__name__)
 # Sentinel for distinguishing "not provided" from None/0.0 (FS-004/FS-013)
 _MISSING = object()
 
-# kwargs to strip before forwarding to nlsq_optimize (FS-005)
-_NLSQ_RESERVED = {
-    "test_mode",
+# kwargs to strip before forwarding to nlsq_optimize (FS-005).
+# Start from the central set and add model-specific extras so the two
+# never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
+from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS
+
+_NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "use_log_residuals",
     "smart_init",
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "gamma_dot",
-    "sigma_applied",
-    "gamma_0",
-    "omega",
-    "omega_laos",
-    "t_wait",
-    "n_cycles",
-    "points_per_cycle",
-    "deformation_mode",
-    "poisson_ratio",
-    "method",
     "callback",
-    "sigma_0",
 }
 
 
@@ -373,10 +364,13 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             _, sigma, _ = self._simulate_startup_internal(x_data, p_map, gamma_dot)
             return sigma
 
+        # See FluidityLocal._fit_transient: relative residuals blow up
+        # at the zero starting point of startup data.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             stress_jax,
+            normalize=False,
             use_log_residuals=False,
         )
 
@@ -418,10 +412,13 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             gamma, _ = self._simulate_creep_internal(x_data, p_map, sigma_applied)
             return gamma
 
+        # See FluidityLocal._fit_transient: relative residuals blow up
+        # at the zero starting point of creep strain.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             strain_jax,
+            normalize=False,
             use_log_residuals=False,
         )
 

@@ -33,7 +33,7 @@ from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
-from rheojax.utils.optimization import nlsq_optimize
+from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike
@@ -107,6 +107,7 @@ class FMLIKH(FIKHBase):
         shared_alpha: bool = True,
         alpha_structure: float = 0.5,
         n_history: int = 100,
+        stable_dt: float = 0.01,
     ):
         """Initialize FMLIKH model.
 
@@ -117,6 +118,8 @@ class FMLIKH(FIKHBase):
             shared_alpha: Use single fractional order (True) or per-mode (False).
             alpha_structure: Fractional order (used if shared_alpha=True).
             n_history: History buffer size.
+            stable_dt: Internal integration substep for startup / LAOS
+                return mapping. See ``FIKHBase`` for details.
         """
         if n_modes < 1:
             raise ValueError(f"n_modes must be >= 1, got {n_modes}")
@@ -130,6 +133,7 @@ class FMLIKH(FIKHBase):
             include_isotropic_hardening=include_isotropic_hardening,
             alpha_structure=alpha_structure,
             n_history=n_history,
+            stable_dt=stable_dt,
         )
 
         # Setup multi-mode parameters (overrides single G, eta, C, gamma_dyn)
@@ -262,20 +266,28 @@ class FMLIKH(FIKHBase):
     ) -> jnp.ndarray:
         """Predict stress as sum of all modes.
 
+        Runs each mode on the densified stable-dt grid, sums the dense stress
+        contributions, then subsamples the total back to the user's time
+        points. See ``FIKHBase._densify_grid_for_return_mapping`` for the
+        rationale.
+
         Args:
             times: Time array.
             strains: Strain array.
             params: Full parameter dictionary.
 
         Returns:
-            Total predicted stress.
+            Total predicted stress at the user's time points.
         """
         from rheojax.models.fikh._kernels import (
             fikh_scan_kernel_isothermal,
             fikh_scan_kernel_thermal,
         )
 
-        total_stress = jnp.zeros_like(times)
+        t_dense, strain_dense, n_sub = self._densify_grid_for_return_mapping(
+            times, strains
+        )
+        total_stress = jnp.zeros_like(t_dense)
 
         for i in range(self._n_modes):
             mode_params = self._get_mode_params(params, i)
@@ -288,8 +300,8 @@ class FMLIKH(FIKHBase):
             if self.include_thermal:
                 T_init = mode_params.get("T_env", mode_params.get("T_ref", 298.15))
                 stress_i, _ = fikh_scan_kernel_thermal(
-                    times,
-                    strains,
+                    t_dense,
+                    strain_dense,
                     n_history=self.n_history,
                     alpha=alpha,
                     use_viscosity=(i == self._n_modes - 1),
@@ -298,8 +310,8 @@ class FMLIKH(FIKHBase):
                 )
             else:
                 stress_i = fikh_scan_kernel_isothermal(
-                    times,
-                    strains,
+                    t_dense,
+                    strain_dense,
                     n_history=self.n_history,
                     alpha=alpha,
                     use_viscosity=(i == self._n_modes - 1),
@@ -308,6 +320,8 @@ class FMLIKH(FIKHBase):
 
             total_stress = total_stress + stress_i
 
+        if n_sub > 1:
+            return total_stress[::n_sub]
         return total_stress
 
     def _fit(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
@@ -329,13 +343,19 @@ class FMLIKH(FIKHBase):
     def _fit_flow_curve(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit to flow curve data."""
         gamma_dot = jnp.asarray(X)
-        sigma_target = jnp.asarray(y)
+        sigma_target = jnp.asarray(y, dtype=jnp.float64)
 
-        def objective(param_values):
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            sigma_pred = self._predict_flow_curve_from_params(gamma_dot, p_dict)
-            return sigma_pred - sigma_target
+            p_dict = dict(zip(p_names, params, strict=False))
+            return self._predict_flow_curve_from_params(x_data, p_dict)
+
+        objective = create_least_squares_objective(
+            model_fn,
+            gamma_dot,
+            sigma_target,
+            use_log_residuals=kwargs.pop("use_log_residuals", True),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -397,11 +417,18 @@ class FMLIKH(FIKHBase):
         self._fit_sigma_applied = kwargs.get("sigma_applied", 100.0)
         self._fit_sigma_0 = kwargs.get("sigma_0", 60.0)
 
-        def objective(param_values):
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            y_pred = self._predict_transient_multimode(t, p_dict, mode, **sim_kwargs)
-            return y_pred - y_target
+            p_dict = dict(zip(p_names, params, strict=False))
+            return self._predict_transient_multimode(x_data, p_dict, mode, **sim_kwargs)
+
+        objective = create_least_squares_objective(
+            model_fn,
+            t,
+            jnp.asarray(y_target, dtype=jnp.float64),
+            normalize=False,
+            use_log_residuals=kwargs.pop("use_log_residuals", False),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -409,13 +436,24 @@ class FMLIKH(FIKHBase):
     def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> FMLIKH:
         """Fit using return mapping."""
         times, strains = self._extract_time_strain(X, **kwargs)
-        sigma_target = jnp.asarray(y)
+        sigma_target = jnp.asarray(y, dtype=jnp.float64)
 
-        def objective(param_values):
+        # Pre-compute and cache the return-mapping substep count so NLSQ and
+        # NUTS share the same integration grid (see FIKHBase docstring).
+        self._n_sub_cached = self._compute_n_sub(times)
+
+        def model_fn(x_data, params):
             p_names = list(self.parameters.keys())
-            p_dict = dict(zip(p_names, param_values, strict=False))
-            sigma_pred = self._predict_from_params(times, strains, p_dict)
-            return sigma_pred - sigma_target
+            p_dict = dict(zip(p_names, params, strict=False))
+            return self._predict_from_params(x_data, strains, p_dict)
+
+        objective = create_least_squares_objective(
+            model_fn,
+            times,
+            sigma_target,
+            normalize=False,
+            use_log_residuals=kwargs.pop("use_log_residuals", False),
+        )
 
         nlsq_optimize(objective, self.parameters, **kwargs)
         return self
@@ -445,6 +483,17 @@ class FMLIKH(FIKHBase):
         is_complex = jnp.iscomplexobj(y_arr)
         is_stacked = y_arr.ndim == 2 and y_arr.shape[1] == 2
 
+        # Pre-compute normalization denominators for consistent residual weighting
+        _norm_floor = jnp.float64(1e-10)
+        if is_complex:
+            _norm_Gp = jnp.maximum(jnp.abs(jnp.real(y_arr)), _norm_floor)
+            _norm_Gpp = jnp.maximum(jnp.abs(jnp.imag(y_arr)), _norm_floor)
+        elif is_stacked:
+            _norm_Gp = jnp.maximum(jnp.abs(y_arr[:, 0]), _norm_floor)
+            _norm_Gpp = jnp.maximum(jnp.abs(y_arr[:, 1]), _norm_floor)
+        else:
+            _norm_mag = jnp.maximum(jnp.abs(y_arr), _norm_floor)
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=False))
@@ -455,20 +504,19 @@ class FMLIKH(FIKHBase):
             if is_complex:
                 residuals = jnp.concatenate(
                     [
-                        jnp.real(G_star_pred) - jnp.real(y_arr),
-                        jnp.imag(G_star_pred) - jnp.imag(y_arr),
+                        (jnp.real(G_star_pred) - jnp.real(y_arr)) / _norm_Gp,
+                        (jnp.imag(G_star_pred) - jnp.imag(y_arr)) / _norm_Gpp,
                     ]
                 )
             elif is_stacked:
-                # (N, 2) array - [G', G''] format
                 residuals = jnp.concatenate(
                     [
-                        jnp.real(G_star_pred) - y_arr[:, 0],
-                        jnp.imag(G_star_pred) - y_arr[:, 1],
+                        (jnp.real(G_star_pred) - y_arr[:, 0]) / _norm_Gp,
+                        (jnp.imag(G_star_pred) - y_arr[:, 1]) / _norm_Gpp,
                     ]
                 )
             else:
-                residuals = jnp.abs(G_star_pred) - jnp.abs(y_arr)
+                residuals = (jnp.abs(G_star_pred) - jnp.abs(y_arr)) / _norm_mag
 
             return residuals
 

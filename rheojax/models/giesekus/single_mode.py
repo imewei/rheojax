@@ -315,7 +315,8 @@ class GiesekusSingleMode(GiesekusBase):
         )
         x_jax = jnp.asarray(x, dtype=jnp.float64)
 
-        params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s])
+        beta_cc = float(self.parameters.get_value("beta_cc"))
+        params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s, beta_cc])
         # Filter out BaseModel kwargs that model_function doesn't expect
         fwd_kwargs = {
             k: v
@@ -340,7 +341,7 @@ class GiesekusSingleMode(GiesekusBase):
         X : array-like
             Independent variable
         params : array-like
-            Parameter values [eta_p, lambda_1, alpha, eta_s]
+            Parameter values [eta_p, lambda_1, alpha, eta_s, beta_cc]
         test_mode : str, optional
             Override stored test mode
         **kwargs : dict
@@ -351,7 +352,7 @@ class GiesekusSingleMode(GiesekusBase):
         jnp.ndarray
             Predicted response
         """
-        eta_p, lambda_1, alpha, eta_s = params
+        eta_p, lambda_1, alpha, eta_s, beta_cc = params
         mode = (
             test_mode
             if test_mode is not None
@@ -370,7 +371,7 @@ class GiesekusSingleMode(GiesekusBase):
 
         elif mode == "oscillation":
             G_prime, G_double_prime = giesekus_saos_moduli_vec(
-                X_jax, eta_p, lambda_1, eta_s
+                X_jax, eta_p, lambda_1, eta_s, beta_cc
             )
             # Return components if requested or if we're in a context that expects them
             # We'll use a heuristic: if we're fitting and the target has 2 columns, return 2 columns
@@ -499,8 +500,9 @@ class GiesekusSingleMode(GiesekusBase):
             (G', G'') if return_components=True, else |G*|
         """
         w = jnp.asarray(omega, dtype=jnp.float64)
+        beta_cc = float(self.parameters.get_value("beta_cc"))
         G_prime, G_double_prime = giesekus_saos_moduli_vec(
-            w, self.eta_p, self.lambda_1, self.eta_s
+            w, self.eta_p, self.lambda_1, self.eta_s, beta_cc
         )
 
         if return_components:

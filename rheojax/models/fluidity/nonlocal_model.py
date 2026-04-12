@@ -35,26 +35,19 @@ logger = get_logger(__name__)
 # Sentinel for distinguishing "not provided" from falsy values (FL-009)
 _MISSING = object()
 
-# FL-006: kwargs to pop before forwarding to nlsq_optimize
-_NLSQ_RESERVED = {
-    "test_mode",
+# FL-006: kwargs to pop before forwarding to nlsq_optimize.
+# Start from the central set and add model-specific extras so the two
+# never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
+from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS
+
+_NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "use_log_residuals",
     "smart_init",
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "gamma_dot",
-    "sigma_applied",
-    "gamma_0",
-    "omega",
-    "omega_laos",
-    "t_wait",
-    "n_cycles",
-    "points_per_cycle",
-    "deformation_mode",
-    "poisson_ratio",
-    "method",
     "callback",
+    "sigma_0",
 }
 
 
@@ -362,6 +355,7 @@ class FluidityNonlocal(FluidityBase):
         # Store for prediction
         self._gamma_dot_applied = gamma_dot
         self._sigma_applied = sigma_applied
+        self._sigma_0 = sigma_0
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
@@ -376,10 +370,14 @@ class FluidityNonlocal(FluidityBase):
                 dy=fit_dy,
             )
 
+        # See FluidityLocal._fit_transient for the rationale: relative
+        # residuals (normalize=True) blow up at the zero crossings /
+        # zero starting points of creep and startup data.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             y_jax,
+            normalize=False,
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
@@ -490,7 +488,12 @@ class FluidityNonlocal(FluidityBase):
 
         return result
 
-    def _predict_transient(self, t: np.ndarray, mode: str | None = None) -> np.ndarray:
+    def _predict_transient(
+        self,
+        t: np.ndarray,
+        mode: str | None = None,
+        sigma_0: float | None = None,
+    ) -> np.ndarray:
         """Predict transient response."""
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p = self.get_parameter_dict()
@@ -499,13 +502,16 @@ class FluidityNonlocal(FluidityBase):
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
+        if sigma_0 is None:
+            sigma_0 = getattr(self, "_sigma_0", None)
+
         result = self._simulate_pde(
             t_jax,
             p,
             mode,
             self._gamma_dot_applied,
             self._sigma_applied,
-            None,
+            sigma_0,
         )
         return np.array(result)
 
@@ -682,11 +688,15 @@ class FluidityNonlocal(FluidityBase):
             )
             return stress
 
+        # See FluidityLocal._fit_laos for the rationale: LAOS stress
+        # crosses zero, so relative residuals (normalize=True) blow up
+        # at the zero crossings and pull the optimizer away from the
+        # true parameters.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             sigma_jax,
-            normalize=True,
+            normalize=False,
         )
 
         # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
@@ -928,7 +938,9 @@ class FluidityNonlocal(FluidityBase):
             return result[:, 0] + 1j * result[:, 1]
 
         elif test_mode in ["startup", "relaxation", "creep"]:
-            return self._predict_transient(X, mode=test_mode)
+            return self._predict_transient(
+                X, mode=test_mode, sigma_0=kwargs.get("sigma_0")
+            )
 
         elif test_mode == "laos":
             # Get gamma_0 and omega from kwargs or instance attributes

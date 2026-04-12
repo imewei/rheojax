@@ -56,27 +56,18 @@ logger = logging.getLogger(__name__)
 # Sentinel for distinguishing "not provided" from None/0.0 (FS-004/FS-013)
 _MISSING = object()
 
-# kwargs to strip before forwarding to nlsq_optimize (FS-005)
-_NLSQ_RESERVED = {
-    "test_mode",
+# kwargs to strip before forwarding to nlsq_optimize (FS-005).
+# Start from the central set and add model-specific extras so the two
+# never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
+from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS
+
+_NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "use_log_residuals",
     "smart_init",
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "gamma_dot",
-    "sigma_applied",
-    "gamma_0",
-    "omega",
-    "omega_laos",
-    "t_wait",
-    "n_cycles",
-    "points_per_cycle",
-    "deformation_mode",
-    "poisson_ratio",
-    "method",
     "callback",
-    "sigma_0",
 }
 
 
@@ -361,6 +352,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # Store for prediction
         self._gamma_dot_applied = gamma_dot
         self._sigma_applied = sigma_applied
+        self._sigma_0 = sigma_0
         self._t_wait = t_wait
 
         def model_fn(x_data, params):
@@ -371,10 +363,14 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             return result
 
         use_log_residuals = kwargs.pop("use_log_residuals", False)
+        # See FluidityLocal._fit_transient: relative residuals blow up at
+        # the zero starting points of creep / startup data, so use absolute
+        # residuals here.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             y_jax,
+            normalize=False,
             use_log_residuals=use_log_residuals,
         )
 
@@ -502,7 +498,12 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         return result
 
-    def _predict_transient(self, t: np.ndarray, mode: str | None = None) -> np.ndarray:
+    def _predict_transient(
+        self,
+        t: np.ndarray,
+        mode: str | None = None,
+        sigma_0: float | None = None,
+    ) -> np.ndarray:
         """Predict transient response.
 
         Parameters
@@ -511,6 +512,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             Time array (s)
         mode : str, optional
             Protocol mode. If None, uses stored mode.
+        sigma_0 : float, optional
+            Initial stress for relaxation. Falls back to the value
+            cached during the most recent fit.
 
         Returns
         -------
@@ -524,13 +528,16 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
+        if sigma_0 is None:
+            sigma_0 = getattr(self, "_sigma_0", None)
+
         result = self._simulate_transient(
             t_jax,
             p,
             mode,
             self._gamma_dot_applied,
             self._sigma_applied,
-            None,
+            sigma_0,
             self._t_wait,
         )
         return np.array(result)
@@ -718,6 +725,100 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         return strain, fluidity
 
+    def simulate_relaxation(
+        self,
+        t: np.ndarray,
+        gamma_0: float | None = None,
+        sigma_0: float | None = None,
+        t_wait: float = 0.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Simulate stress relaxation after a step strain.
+
+        After an instantaneous step strain ``γ_0``, the stress jumps
+        elastically to ``σ_0 = G·γ_0`` and then decays under zero
+        applied rate. This is the analogue of :meth:`simulate_creep` /
+        :meth:`simulate_startup` for the relaxation protocol — without
+        it the only public path is :meth:`predict`, which silently
+        falls back to ``sigma_init = tau_y0`` (the von Mises plasticity
+        parameter is then exactly zero and stress never decays).
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s).
+        gamma_0 : float, optional
+            Step strain amplitude. The initial stress is taken as
+            ``G * gamma_0``. Mutually exclusive with ``sigma_0``.
+        sigma_0 : float, optional
+            Initial shear stress (Pa) immediately after the step.
+            Takes precedence over ``gamma_0`` if both are given.
+        t_wait : float, default 0.0
+            Pre-relaxation aging time (s). Sets the initial fluidity
+            via the same exponential schedule used by the other
+            simulate_* helpers.
+
+        Returns
+        -------
+        stress : np.ndarray
+            Shear stress τ_xy(t) (Pa).
+        fluidity : np.ndarray
+            Fluidity f(t) (1/(Pa·s)).
+        """
+        t_jax = jnp.asarray(t, dtype=jnp.float64)
+        p = self.get_parameter_dict()
+        args = self._get_saramito_ode_args(p)
+
+        f_age = p["f_age"]
+        f_flow = p["f_flow"]
+        t_a = p["t_a"]
+        G = p["G"]
+
+        # Resolve initial stress: explicit sigma_0 wins, else G*gamma_0.
+        if sigma_0 is None:
+            if gamma_0 is None:
+                raise ValueError(
+                    "simulate_relaxation requires either sigma_0 or gamma_0"
+                )
+            sigma_init = float(G) * float(gamma_0)
+        else:
+            sigma_init = float(sigma_0)
+
+        # Initial fluidity: post-flow material if t_wait==0, else aged.
+        if t_wait > 0:
+            f_init = f_age + (f_flow - f_age) * np.exp(-t_wait / t_a)
+        else:
+            f_init = f_flow
+
+        # FS-007: τ_xx(0) = σ₀² / G from the upper-convected step.
+        tau_xx_init = sigma_init**2 / (G + 1e-20)
+        # State: [τ_xx, τ_yy, τ_xy, f]
+        y0 = jnp.array([tau_xx_init, 0.0, sigma_init, f_init])
+
+        sol = self._solve_ode(saramito_local_relaxation_ode_rhs, y0, t_jax, args)
+
+        sol_ys = jnp.where(
+            sol.result == diffrax.RESULTS.successful,
+            sol.ys,
+            jnp.nan * jnp.ones_like(sol.ys),
+        )
+
+        stress = np.array(sol_ys[:, 2])  # τ_xy
+        fluidity = np.array(sol_ys[:, 3])
+
+        # Cache the IC so a downstream predict() reproduces this trace
+        # (matching the FluidityLocal._fit_transient pattern).
+        self._sigma_0 = sigma_init
+
+        self._trajectory = {
+            "t": np.array(t),
+            "tau_xx": np.array(sol_ys[:, 0]),
+            "tau_yy": np.array(sol_ys[:, 1]),
+            "tau_xy": stress,
+            "fluidity": fluidity,
+        }
+
+        return stress, fluidity
+
     # =========================================================================
     # Oscillatory Protocols (SAOS, LAOS)
     # =========================================================================
@@ -849,11 +950,14 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             _, stress = self._simulate_laos_internal(x_data, p_map, gamma_0, omega)
             return stress
 
+        # See FluidityLocal._fit_laos for the rationale: LAOS stress
+        # crosses zero, so relative residuals (normalize=True) blow up
+        # at the zero crossings.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             sigma_jax,
-            normalize=True,
+            normalize=False,
         )
 
         # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
@@ -1185,7 +1289,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             return result[:, 0] + 1j * result[:, 1]
 
         elif test_mode in ["startup", "relaxation", "creep"]:
-            return self._predict_transient(X, mode=test_mode)
+            return self._predict_transient(
+                X, mode=test_mode, sigma_0=kwargs.get("sigma_0")
+            )
 
         elif test_mode == "laos":
             if self._gamma_0 is None or self._omega_laos is None:

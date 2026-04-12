@@ -33,26 +33,19 @@ logger = get_logger(__name__)
 # Sentinel for distinguishing "not provided" from falsy values (FL-009)
 _MISSING = object()
 
-# FL-006: kwargs to pop before forwarding to nlsq_optimize
-_NLSQ_RESERVED = {
-    "test_mode",
+# FL-006: kwargs to pop before forwarding to nlsq_optimize.
+# Start from the central set and add model-specific extras so the two
+# never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
+from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS
+
+_NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "use_log_residuals",
     "smart_init",
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "gamma_dot",
-    "sigma_applied",
-    "gamma_0",
-    "omega",
-    "omega_laos",
-    "t_wait",
-    "n_cycles",
-    "points_per_cycle",
-    "deformation_mode",
-    "poisson_ratio",
-    "method",
     "callback",
+    "sigma_0",
 }
 
 
@@ -154,11 +147,15 @@ class FluidityLocal(FluidityBase):
     def _fit_flow_curve(
         self, gamma_dot: np.ndarray, stress: np.ndarray, **kwargs
     ) -> None:
-        """Fit steady-state flow curve.
+        """Fit steady-state Herschel-Bulkley flow curve.
 
-        At steady state:
-        f_ss = (f_eq/θ + a|γ̇|^n * f_inf) / (1/θ + a|γ̇|^n)
-        σ_ss = γ̇ / f_ss
+        At steady state the kernel reduces to the HB form:
+            σ_ss = τ_y + K * |γ̇|^n_flow
+
+        Only ``tau_y``, ``K`` and ``n_flow`` are constrained by this
+        protocol; the dynamic-fluidity parameters
+        (``f_eq``, ``f_inf``, ``theta``, ``a``, ``n_rejuv``) are inert
+        at steady state and remain at their initial values.
 
         Args:
             gamma_dot: Shear rate array (1/s)
@@ -172,6 +169,11 @@ class FluidityLocal(FluidityBase):
 
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
+
+        # Data-driven initialization for the HB parameters.
+        # Without this, the optimizer terminates after one step from
+        # generic defaults that are orders-of-magnitude away from data.
+        self._init_hb_from_data(gamma_dot, stress)
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
@@ -247,6 +249,10 @@ class FluidityLocal(FluidityBase):
         # Store for prediction
         self._gamma_dot_applied = gamma_dot
         self._sigma_applied = sigma_applied
+        # Cache the relaxation initial stress so predict() reproduces
+        # the IC the optimizer fitted against (otherwise predict()
+        # silently uses params["tau_y"] and the residual scale changes).
+        self._sigma_0 = sigma_0
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
@@ -254,10 +260,17 @@ class FluidityLocal(FluidityBase):
                 x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0
             )
 
+        # NOTE: normalize=False because creep strain starts at zero and
+        # startup stress crosses zero on the first step, so the relative
+        # residuals (default normalize=True) divide by ~0 at the first
+        # few points and the optimizer chases noise there instead of
+        # fitting the bulk dynamics. Empirically this lifts the creep R^2
+        # from ~0.87 (gets stuck) to ~0.998 on synthetic data.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             y_jax,
+            normalize=False,
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
@@ -360,7 +373,12 @@ class FluidityLocal(FluidityBase):
 
         return result
 
-    def _predict_transient(self, t: np.ndarray, mode: str | None = None) -> np.ndarray:
+    def _predict_transient(
+        self,
+        t: np.ndarray,
+        mode: str | None = None,
+        sigma_0: float | None = None,
+    ) -> np.ndarray:
         """Predict transient response."""
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p = self.get_parameter_dict()
@@ -369,13 +387,16 @@ class FluidityLocal(FluidityBase):
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
+        if sigma_0 is None:
+            sigma_0 = getattr(self, "_sigma_0", None)
+
         result = self._simulate_transient(
             t_jax,
             p,
             mode,
             self._gamma_dot_applied,
             self._sigma_applied,
-            None,
+            sigma_0,
         )
         return np.array(result)
 
@@ -495,11 +516,17 @@ class FluidityLocal(FluidityBase):
             _, stress = self._simulate_laos_internal(x_data, p_map, gamma_0, omega)
             return stress
 
+        # NOTE: normalize=False here. LAOS stress crosses zero at every
+        # half-cycle; relative residuals (default) divide by |y_data|, which
+        # blows up at the zero crossings and pulls the optimizer into bad
+        # regions of parameter space (R^2 dropping by orders of magnitude
+        # from a near-perfect default initial guess). Absolute residuals
+        # respect the natural Pa-scale of the data.
         objective = create_least_squares_objective(
             model_fn,
             t_jax,
             sigma_jax,
-            normalize=True,
+            normalize=False,
         )
 
         # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
@@ -777,7 +804,9 @@ class FluidityLocal(FluidityBase):
             return result[:, 0] + 1j * result[:, 1]
 
         elif test_mode in ["startup", "relaxation", "creep"]:
-            return self._predict_transient(X, mode=test_mode)
+            return self._predict_transient(
+                X, mode=test_mode, sigma_0=kwargs.get("sigma_0")
+            )
 
         elif test_mode == "laos":
             # Get gamma_0 and omega from kwargs or instance attributes

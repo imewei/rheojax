@@ -134,10 +134,16 @@ def make_fd_differentiable(
         # eta_p ~ 100 Pa·s).  Without this, abs perturbation 1e-7 on a value
         # of 100 gives relative perturbation 1e-9, at float64 precision limit.
         scale = jnp.maximum(jnp.abs(params), 1.0) * eps
+
         # Central-difference JVP: J·v ≈ (f(x + h) - f(x - h)) / (2 * ||h||)
         # where h = scale ⊙ v (element-wise product).
-        # When jacfwd sends v = e_i (unit basis), h = scale_i * e_i, so
-        # ||h|| = scale_i and this gives column i of J correctly.
+        #
+        # Correctness guarantee: jax.jacfwd always sends v = e_i (unit basis
+        # vectors) via internal vmap, so h = scale_i * e_i and ||h|| = scale_i,
+        # giving the exact i-th column of J. This is the only call pattern
+        # used by NLSQ. For arbitrary tangent vectors the formula computes a
+        # directional derivative J·(h/||h||), not J·v — but that case does
+        # not arise in our optimization pipeline.
         h = scale * params_dot
         y_plus = fn(x_data, params + h)
         y_minus = fn(x_data, params - h)
@@ -290,6 +296,23 @@ def _run_scipy_least_squares(
             res = np.nan_to_num(res, nan=1e10, posinf=1e10, neginf=-1e10)
         return res
 
+    # Per-parameter scaling so the trust-region step is well-conditioned
+    # when parameters span many orders of magnitude (e.g. fluidity models
+    # have G ~ 1e6 alongside f_eq ~ 1e-6). With the default x_scale=1.0
+    # the optimizer's xtol criterion fires after a single step on the
+    # large-magnitude parameters and the small-magnitude parameters
+    # never move.
+    #
+    # Floor at 1e-6 (not 1e-12) so that zero-valued initial parameters
+    # (e.g. C=0 kinematic hardening) still get a meaningful trust region.
+    # The old floor of 1e-12 caused xtol to fire immediately on those dims.
+    x_scale = np.maximum(np.abs(x0), 1e-6)
+
+    # Larger relative finite-difference step so the perturbation actually
+    # registers above the ODE solver's atol (~1e-7). The default
+    # eps^(1/2) ~ 1.5e-8 is below the integration tolerance for any
+    # parameter near 1.0, producing zero numerical Jacobian columns and
+    # premature xtol termination.
     scipy_result = scipy_least_squares(
         residual_fn,
         x0,
@@ -299,6 +322,8 @@ def _run_scipy_least_squares(
         gtol=gtol,
         max_nfev=max_iter * 10,
         method="trf",
+        x_scale=x_scale,
+        diff_step=1e-3,
     )
 
     cost_value = getattr(scipy_result, "cost", None)
