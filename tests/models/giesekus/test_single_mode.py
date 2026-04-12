@@ -419,7 +419,7 @@ class TestBayesianInterface:
         model = GiesekusSingleMode()
 
         X = jnp.logspace(-2, 2, 10)
-        params = jnp.array([100.0, 1.0, 0.3, 0.0])  # eta_p, lambda_1, alpha, eta_s
+        params = jnp.array([100.0, 1.0, 0.3, 0.0, 1.0])  # eta_p, lambda_1, alpha, eta_s, beta_cc
 
         y = model.model_function(X, params, test_mode="flow_curve")
 
@@ -431,7 +431,7 @@ class TestBayesianInterface:
         model = GiesekusSingleMode()
 
         X = jnp.logspace(-1, 2, 10)
-        params = jnp.array([100.0, 1.0, 0.3, 10.0])
+        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])
 
         y = model.model_function(X, params, test_mode="oscillation")
 
@@ -452,7 +452,7 @@ class TestBayesianInterface:
         model.parameters.set_value("eta_s", 5.0)
 
         gamma_dot = np.logspace(-1, 2, 20)
-        params = jnp.array([150.0, 0.5, 0.25, 5.0])  # [eta_p, lambda_1, alpha, eta_s]
+        params = jnp.array([150.0, 0.5, 0.25, 5.0, 1.0])  # [eta_p, lambda_1, alpha, eta_s, beta_cc]
 
         mf_result = np.array(
             model.model_function(gamma_dot, params, test_mode="flow_curve")
@@ -471,7 +471,7 @@ class TestBayesianInterface:
         model.parameters.set_value("eta_s", 10.0)
 
         omega = np.logspace(-2, 2, 20)
-        params = jnp.array([100.0, 1.0, 0.3, 10.0])
+        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])
 
         mf_result = np.array(
             model.model_function(omega, params, test_mode="oscillation")
@@ -604,7 +604,7 @@ class TestKwargsCaching:
         model._test_mode = "startup"
 
         t = np.linspace(0.01, 5, 50)
-        params = jnp.array([model.eta_p, model.lambda_1, model.alpha, model.eta_s])
+        params = jnp.array([model.eta_p, model.lambda_1, model.alpha, model.eta_s, model.parameters.get_value("beta_cc")])
 
         # Should not raise — reads gamma_dot from self._gamma_dot_applied
         result = model.model_function(t, params, test_mode="startup")

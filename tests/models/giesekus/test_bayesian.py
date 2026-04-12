@@ -54,7 +54,12 @@ class TestNLSQWarmStart:
 
     @pytest.mark.smoke
     def test_nlsq_fit_saos(self):
-        """Test NLSQ fitting on SAOS data."""
+        """Test NLSQ fitting on SAOS data.
+
+        Uses complex G* (not magnitude) to avoid the degenerate beta_cc / eta_p
+        trade-off that arises when fitting |G*| with the Cole-Cole broadening
+        parameter free.
+        """
         model = GiesekusSingleMode()
 
         # Generate synthetic SAOS data
@@ -64,7 +69,7 @@ class TestNLSQWarmStart:
         model.parameters.set_value("eta_s", 5.0)
 
         G_prime, G_double_prime = model.predict_saos(omega)
-        G_star = np.sqrt(G_prime**2 + G_double_prime**2)
+        G_star = G_prime + 1j * G_double_prime
 
         # Add noise
         rng = np.random.default_rng(42)
@@ -323,7 +328,7 @@ class TestModelFunction:
         """Test model_function for flow_curve mode."""
         model = GiesekusSingleMode()
 
-        params = jnp.array([100.0, 1.0, 0.3, 10.0])  # eta_p, lambda, alpha, eta_s
+        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])  # eta_p, lambda, alpha, eta_s, beta_cc
         gamma_dot = jnp.logspace(-1, 2, 20)
 
         y = model.model_function(gamma_dot, params, test_mode="flow_curve")
@@ -336,7 +341,7 @@ class TestModelFunction:
         """Test model_function for oscillation mode."""
         model = GiesekusSingleMode()
 
-        params = jnp.array([100.0, 1.0, 0.3, 10.0])
+        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])
         omega = jnp.logspace(-1, 2, 20)
 
         y = model.model_function(omega, params, test_mode="oscillation")
@@ -349,7 +354,7 @@ class TestModelFunction:
         """Test model_function is differentiable via JAX."""
         model = GiesekusSingleMode()
 
-        params = jnp.array([100.0, 1.0, 0.3, 10.0])
+        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])
         gamma_dot = jnp.logspace(-1, 2, 20)
 
         # Test gradient computation
