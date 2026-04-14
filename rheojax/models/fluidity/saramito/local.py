@@ -503,23 +503,16 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         t: np.ndarray,
         mode: str | None = None,
         sigma_0: float | None = None,
+        gamma_dot: Any = _MISSING,
+        sigma_applied: Any = _MISSING,
     ) -> np.ndarray:
         """Predict transient response.
 
-        Parameters
-        ----------
-        t : np.ndarray
-            Time array (s)
-        mode : str, optional
-            Protocol mode. If None, uses stored mode.
-        sigma_0 : float, optional
-            Initial stress for relaxation. Falls back to the value
-            cached during the most recent fit.
-
-        Returns
-        -------
-        np.ndarray
-            Predicted response
+        Protocol inputs (``gamma_dot`` for startup, ``sigma_applied`` for
+        creep, ``sigma_0`` for relaxation) are read from keyword arguments
+        when supplied so ``predict()`` works without a prior ``fit()``.
+        Any argument left as ``_MISSING`` falls back to the instance
+        attribute populated by ``_fit_*`` (legacy path).
         """
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p = self.get_parameter_dict()
@@ -528,6 +521,10 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
+        if gamma_dot is _MISSING:
+            gamma_dot = getattr(self, "_gamma_dot_applied", None)
+        if sigma_applied is _MISSING:
+            sigma_applied = getattr(self, "_sigma_applied", None)
         if sigma_0 is None:
             sigma_0 = getattr(self, "_sigma_0", None)
 
@@ -535,8 +532,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             t_jax,
             p,
             mode,
-            self._gamma_dot_applied,
-            self._sigma_applied,
+            gamma_dot,
+            sigma_applied,
             sigma_0,
             self._t_wait,
         )
@@ -1290,7 +1287,11 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
         elif test_mode in ["startup", "relaxation", "creep"]:
             return self._predict_transient(
-                X, mode=test_mode, sigma_0=kwargs.get("sigma_0")
+                X,
+                mode=test_mode,
+                sigma_0=kwargs.get("sigma_0"),
+                gamma_dot=kwargs.get("gamma_dot", _MISSING),
+                sigma_applied=kwargs.get("sigma_applied", _MISSING),
             )
 
         elif test_mode == "laos":

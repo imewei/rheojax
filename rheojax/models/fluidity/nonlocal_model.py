@@ -50,6 +50,11 @@ _NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "sigma_0",
 }
 
+# Filter for ODE protocols — keeps "method" so the caller or the default
+# "scipy" routing reaches nlsq_optimize (diffrax's custom_vjp adjoint is
+# incompatible with NLSQ's jacfwd-based Jacobian).
+_NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
+
 
 @ModelRegistry.register(
     "fluidity_nonlocal",
@@ -381,8 +386,10 @@ class FluidityNonlocal(FluidityBase):
             use_log_residuals=kwargs.get("use_log_residuals", False),
         )
 
-        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
-        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        # Keep "method" so it reaches nlsq_optimize. Transient protocols use
+        # a diffrax ODE (custom_vjp) — default to scipy if caller didn't pick.
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
+        nlsq_kwargs.setdefault("method", "scipy")
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity transient fit warning: {result.message}")
@@ -493,8 +500,17 @@ class FluidityNonlocal(FluidityBase):
         t: np.ndarray,
         mode: str | None = None,
         sigma_0: float | None = None,
+        gamma_dot: Any = _MISSING,
+        sigma_applied: Any = _MISSING,
     ) -> np.ndarray:
-        """Predict transient response."""
+        """Predict transient response.
+
+        Protocol inputs (``gamma_dot`` for startup, ``sigma_applied`` for
+        creep, ``sigma_0`` for relaxation) are read from keyword arguments
+        when supplied so ``predict()`` works without a prior ``fit()``.
+        Any argument left as ``_MISSING`` falls back to the instance
+        attribute populated by ``_fit_*`` (legacy path).
+        """
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
@@ -502,6 +518,10 @@ class FluidityNonlocal(FluidityBase):
         if mode is None:
             raise ValueError("Test mode not specified for prediction")
 
+        if gamma_dot is _MISSING:
+            gamma_dot = getattr(self, "_gamma_dot_applied", None)
+        if sigma_applied is _MISSING:
+            sigma_applied = getattr(self, "_sigma_applied", None)
         if sigma_0 is None:
             sigma_0 = getattr(self, "_sigma_0", None)
 
@@ -509,8 +529,8 @@ class FluidityNonlocal(FluidityBase):
             t_jax,
             p,
             mode,
-            self._gamma_dot_applied,
-            self._sigma_applied,
+            gamma_dot,
+            sigma_applied,
             sigma_0,
         )
         return np.array(result)
@@ -586,8 +606,12 @@ class FluidityNonlocal(FluidityBase):
     def _fit_oscillation(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None:
         """Fit SAOS data using linear viscoelastic approximation.
 
-        For small amplitude, bulk response approximates Local model.
+        For small amplitude, bulk response approximates Local model. Only
+        G and f_eq affect the Maxwell-limit residual; optimizing the full
+        parameter set produces a rank-2 Jacobian and causes NLSQ to
+        terminate prematurely on xtol. We fit the reduced (G, f_eq) set.
         """
+        from rheojax.core.parameters import ParameterSet
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
@@ -598,16 +622,34 @@ class FluidityNonlocal(FluidityBase):
         # Handle G_star format
         G_star_np = np.asarray(y)
         if np.iscomplexobj(G_star_np):
-            G_star_2d = np.column_stack([np.real(G_star_np), np.imag(G_star_np)])
+            G_prime_np = np.real(G_star_np)
+            G_dp_np = np.imag(G_star_np)
+            G_star_2d = np.column_stack([G_prime_np, G_dp_np])
         elif G_star_np.ndim == 2 and G_star_np.shape[1] == 2:
+            G_prime_np = G_star_np[:, 0]
+            G_dp_np = G_star_np[:, 1]
             G_star_2d = G_star_np
         else:
             raise ValueError(f"G_star must be complex or (M, 2), got {G_star_np.shape}")
 
         G_star_jax = jnp.asarray(G_star_2d, dtype=jnp.float64)
 
+        # Data-driven warm-start for G and f_eq.
+        self._seed_saos_from_data(np.asarray(X, dtype=float), G_prime_np, G_dp_np)
+
+        reduced = ParameterSet()
+        for name in ("G", "f_eq"):
+            src = self.parameters[name]
+            reduced.add(
+                name=name,
+                value=src.value,
+                bounds=src.bounds,
+                units=src.units,
+                description=src.description,
+            )
+
         def model_fn(x_data, params):
-            p_map = dict(zip(self.parameters.keys(), params, strict=True))
+            p_map = dict(zip(reduced.keys(), params, strict=True))
             return self._predict_saos_jit(
                 x_data,
                 p_map["G"],
@@ -623,9 +665,66 @@ class FluidityNonlocal(FluidityBase):
 
         # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
-        result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        result = nlsq_optimize(objective, reduced, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity SAOS fit warning: {result.message}")
+
+        G_fit = reduced["G"].value
+        f_eq_fit = reduced["f_eq"].value
+        if G_fit is None or f_eq_fit is None:
+            raise RuntimeError("NLSQ returned no value for SAOS parameters")
+        self.parameters.set_value("G", float(G_fit))
+        self.parameters.set_value("f_eq", float(f_eq_fit))
+
+    def _seed_saos_from_data(
+        self,
+        omega: np.ndarray,
+        G_prime: np.ndarray,
+        G_double_prime: np.ndarray,
+    ) -> None:
+        """Seed G and f_eq from SAOS data so NLSQ starts near the minimum.
+
+        G ← high-ω G' plateau; tau_eff ← crossover ω* (else location of
+        G'' peak); f_eq ← 1/(G·tau_eff). All seeds clipped to bounds.
+        """
+        omega = np.asarray(omega, dtype=float)
+        Gp = np.asarray(G_prime, dtype=float)
+        Gpp = np.asarray(G_double_prime, dtype=float)
+        if omega.size < 2:
+            return
+
+        order = np.argsort(omega)
+        Gp_sorted = Gp[order]
+        n_top = max(1, len(Gp_sorted) // 5)
+        G_seed = float(np.max(Gp_sorted[-n_top:]))
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            diff = np.log(np.maximum(Gp, 1e-300)) - np.log(np.maximum(Gpp, 1e-300))
+        sign_change = np.where(np.diff(np.sign(diff[order])) != 0)[0]
+        if sign_change.size > 0:
+            i = int(sign_change[0])
+            d0, d1 = diff[order][i], diff[order][i + 1]
+            w0, w1 = np.log(omega[order][i]), np.log(omega[order][i + 1])
+            if d1 != d0:
+                w_cross = w0 + (0.0 - d0) * (w1 - w0) / (d1 - d0)
+            else:
+                w_cross = 0.5 * (w0 + w1)
+            tau_seed = float(np.exp(-w_cross))
+        else:
+            i_peak = int(np.argmax(Gpp[order]))
+            tau_seed = 1.0 / float(omega[order][i_peak])
+
+        f_eq_seed = 1.0 / max(G_seed * tau_seed, 1e-30)
+
+        def _clipped(name: str, value: float) -> float:
+            param = self.parameters[name]
+            lo, hi = param.bounds if param.bounds else (-np.inf, np.inf)
+            lo_v = lo if lo is not None else -np.inf
+            hi_v = hi if hi is not None else np.inf
+            return float(np.clip(value, lo_v, hi_v))
+
+        self.parameters.set_value("G", _clipped("G", G_seed))
+        self.parameters.set_value("f_eq", _clipped("f_eq", f_eq_seed))
 
     # TODO (FL-010): _predict_saos_jit is duplicated in FluidityLocal.
     # Consider extracting to a shared module-level function or into _base.py.
@@ -699,8 +798,10 @@ class FluidityNonlocal(FluidityBase):
             normalize=False,
         )
 
-        # FL-006: Pop protocol/meta kwargs before forwarding to nlsq_optimize
-        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        # Keep "method" so it reaches nlsq_optimize. LAOS uses a diffrax ODE
+        # (custom_vjp) — default to scipy if caller didn't pick a method.
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
+        nlsq_kwargs.setdefault("method", "scipy")
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity LAOS fit warning: {result.message}")
@@ -939,7 +1040,11 @@ class FluidityNonlocal(FluidityBase):
 
         elif test_mode in ["startup", "relaxation", "creep"]:
             return self._predict_transient(
-                X, mode=test_mode, sigma_0=kwargs.get("sigma_0")
+                X,
+                mode=test_mode,
+                sigma_0=kwargs.get("sigma_0"),
+                gamma_dot=kwargs.get("gamma_dot", _MISSING),
+                sigma_applied=kwargs.get("sigma_applied", _MISSING),
             )
 
         elif test_mode == "laos":

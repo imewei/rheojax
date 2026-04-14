@@ -757,6 +757,66 @@ class ParameterSet:
             for name, value in zip(self._order, values, strict=False):
                 self.set_value(name, float(value))
 
+    def update(
+        self,
+        values: dict[str, float],
+        *,
+        strict: bool = True,
+    ) -> dict[str, str]:
+        """Apply a batch of name→value updates with optional failure tolerance.
+
+        Replacement for the ``for k, v in d.items(): try: set_value(k, v)
+        except: logger.warning(...)`` pattern found in notebooks that mix
+        parameters from different model schemas. Two failure modes are
+        reported separately so the caller (or a schema-migration review)
+        can tell "this key does not exist on this model" from "this value
+        violates the constraints" without scanning ERROR-level logs.
+
+        Args:
+            values: Mapping of parameter name → new value.
+            strict: When ``True`` (default), re-raises the first
+                ``KeyError`` (unknown name) or ``ValueError`` (bad value)
+                so calling code cannot silently drift out of the current
+                schema. When ``False``, collects every failure into the
+                returned dict without logging at ERROR level — useful
+                during migration to draft a single summary warning.
+
+        Returns:
+            Dict of ``{name: reason}`` for entries that failed. Empty
+            when all succeeded (including when ``values`` is empty).
+
+        Raises:
+            KeyError: (strict=True) if any name is unknown.
+            ValueError: (strict=True) if any value violates constraints.
+        """
+        failures: dict[str, str] = {}
+        for name, value in values.items():
+            if name not in self._parameters:
+                if strict:
+                    raise KeyError(f"Parameter '{name}' not found")
+                failures[name] = (
+                    f"unknown parameter (available: "
+                    f"{sorted(self._parameters.keys())})"
+                )
+                continue
+
+            param = self._parameters[name]
+            context = {
+                p.name: p.value
+                for p in self._parameters.values()
+                if p.value is not None
+            }
+            if not param.validate(float(value), context):
+                if strict:
+                    raise ValueError(
+                        f"Value {value} violates constraints for parameter '{name}'"
+                    )
+                failures[name] = f"value {value} violates constraints"
+                continue
+
+            param.value = float(value)
+        return failures
+
     def get_bounds(self) -> list[tuple[float | None, float | None]]:
         """Get bounds for all parameters.
 
