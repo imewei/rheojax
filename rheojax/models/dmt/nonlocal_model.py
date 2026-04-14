@@ -37,11 +37,12 @@ logger = get_logger(__name__)
 
 @ModelRegistry.register(
     "dmt_nonlocal",
-    protocols=[
-        Protocol.FLOW_CURVE,
-        Protocol.STARTUP,
-        Protocol.CREEP,
-    ],
+    # Only FLOW_CURVE is fully wired through both _fit and _predict.
+    # _fit_startup raises NotImplementedError and _predict has no
+    # startup/creep branches; advertising those protocols in the
+    # registry caused downstream code (e.g. predict-without-fit canary)
+    # to call into paths that raise "Unknown test_mode for prediction".
+    protocols=[Protocol.FLOW_CURVE],
     deformation_modes=[DeformationMode.SHEAR],
 )
 class DMTNonlocal(DMTBase):
