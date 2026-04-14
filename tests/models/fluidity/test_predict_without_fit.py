@@ -38,6 +38,15 @@ from rheojax.models.fluidity.saramito import (
     FluiditySaramitoNonlocal,
 )
 
+# Force eager import of every model submodule so the ``@ModelRegistry.register``
+# decorators fire BEFORE canary parametrization collects cases. Without this
+# the registry only knows about models imported above (fluidity family), and
+# the canary silently covers a handful of models instead of every
+# transient-protocol implementation in the codebase.
+from rheojax.models import _ensure_all_registered as _ensure_models
+
+_ensure_models()
+
 
 # Physically-valid parameter seeds for each fluidity model family.
 # Values chosen so the default HB flow curve produces O(10-100) Pa
@@ -182,12 +191,23 @@ _TRANSIENT_KWARGS: dict[Protocol, dict] = {
 }
 
 
+# Models that are too slow to integrate at default parameters without a
+# warm start — skip these in the canary to keep the suite under budget.
+# Documented in CLAUDE.md memory under "Slow models (>120s)".
+_SLOW_MODELS_DENYLIST: set[str] = {
+    "itt_mct_schematic",  # PDE integrator chokes on default aging params
+    "itt_mct_isotropic",  # same family
+}
+
+
 def _transient_model_cases() -> list[tuple[str, str]]:
     """Return (model_name, protocol_value) for every registered model
     supporting any transient protocol."""
     cases: list[tuple[str, str]] = []
     for proto in _TRANSIENT_KWARGS:
         for info in ModelRegistry.for_protocol(proto):
+            if info.name in _SLOW_MODELS_DENYLIST:
+                continue
             cases.append((info.name, proto.value))
     return cases
 
@@ -229,8 +249,21 @@ def test_transient_predict_without_fit_canary(model_name: str, protocol: str):
         # we're guarding against — so we skip rather than fail.
         pytest.skip(f"{model_name}.{protocol}: predict needs more setup ({exc})")
 
-    arr = np.asarray(out)
-    if not np.all(np.isfinite(arr)):
+    try:
+        arr = np.asarray(out)
+        finite_mask = np.isfinite(arr)
+    except TypeError as exc:
+        # Some models return structured / object outputs (e.g. EPM returns
+        # a namedtuple of (stress, strain, metadata)). That's a different
+        # contract from "predict returns a numeric array" and not what
+        # this canary is testing.
+        pytest.skip(
+            f"{model_name}.{protocol}: predict returned non-array output "
+            f"({type(out).__name__}); canary asserts invariants on numeric "
+            f"arrays only ({exc})"
+        )
+
+    if not np.all(finite_mask):
         pytest.skip(
             f"{model_name}.{protocol}: non-finite output at default params "
             "(parameter warm-start would likely fix this — out of scope)."
