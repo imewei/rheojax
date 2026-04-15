@@ -157,7 +157,13 @@ def plot_nlsq_fit(
     x_data = np.asarray(x_data)
     y_data = np.asarray(y_data)
 
-    # Build prediction x if not provided
+    # Build prediction x if not provided.
+    # NOTE: for transient/time-domain protocols the ODE is integrated from
+    # x_pred[0] with IC at rest (sigma=0). Extending x_pred below x_data.min()
+    # (e.g. t < 0 for a startup experiment) makes the solver ramp up over a
+    # window that was never part of the experiment, producing a large spurious
+    # spike near t=0. Keep the left edge clamped to the data minimum so the
+    # fit curve aligns with the measurement window.
     if x_pred is None:
         if log_scale and np.all(x_data > 0):
             x_pred = np.logspace(
@@ -167,7 +173,7 @@ def plot_nlsq_fit(
             )
         else:
             margin = 0.05 * (x_data.max() - x_data.min())
-            x_pred = np.linspace(x_data.min() - margin, x_data.max() + margin, 200)
+            x_pred = np.linspace(x_data.min(), x_data.max() + margin, 200)
 
     # Compute fit + uncertainty band
     y_fit, y_lower, y_upper = compute_nlsq_uncertainty_band(
@@ -409,7 +415,11 @@ def plot_arviz_diagnostics(result, param_names, fast_mode=False):
 
     # 2. Pair plot
     if len(var_names) >= 2:
+        n_subplots = len(var_names) ** 2
+        old_max = az.rcParams.get("plot.max_subplots", 40)
         try:
+            if n_subplots > old_max:
+                az.rcParams["plot.max_subplots"] = n_subplots
             axes = az.plot_pair(
                 idata,
                 var_names=var_names,
@@ -426,6 +436,8 @@ def plot_arviz_diagnostics(result, param_names, fast_mode=False):
             figs["pair"] = fig
         except Exception:
             pass
+        finally:
+            az.rcParams["plot.max_subplots"] = old_max
 
     # 3. Forest plot
     try:

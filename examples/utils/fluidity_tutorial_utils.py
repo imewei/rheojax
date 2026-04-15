@@ -177,8 +177,19 @@ def generate_synthetic_startup(
     """
     rng = np.random.default_rng(seed)
 
-    # Generate time points
-    time = np.linspace(0.01, t_end, n_points)
+    # Hybrid time grid: log-dense at early time so the stress overshoot
+    # peak (for the default params, near t ~ 1/(G·f_inf) ~ 10^-2 s) is
+    # actually sampled. A plain linspace(0.01, t_end, 100) puts the first
+    # sample at t ~ 0.1 s — already past the peak — so the "data" appears
+    # to miss the overshoot that the fit (on a finer plot grid) correctly
+    # reconstructs, producing a visual disagreement that looks like a bad
+    # fit even though the parameters are recovered.
+    n_early = max(n_points // 3, 5)
+    n_late = n_points - n_early
+    t_transition = min(0.3, t_end / 10.0)
+    t_early = np.logspace(-3, np.log10(t_transition), n_early, endpoint=False)
+    t_late = np.linspace(t_transition, t_end, n_late)
+    time = np.concatenate([t_early, t_late])
 
     # Use model's transient simulation
     model._gamma_dot_applied = gamma_dot
