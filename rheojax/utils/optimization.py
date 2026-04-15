@@ -257,6 +257,84 @@ def _extract_bounds(
     return x0, (lower, upper)
 
 
+def _warn_stuck_parameters(
+    parameters: ParameterSet,
+    x0: np.ndarray,
+    x_final: np.ndarray,
+    bounds: tuple[np.ndarray, np.ndarray],
+    rel_tol: float = 0.01,
+) -> list[str]:
+    """Emit a warning for NLSQ-fitted parameters that didn't move.
+
+    A parameter that exits optimization essentially unchanged is usually
+    one of three things:
+
+    - **Pinned intentionally** (tight bounds clamped to initial value) —
+      in which case the warning is informational.
+    - **Non-identifiable for this protocol** (the Jacobian column w.r.t.
+      this parameter is numerically zero — see the model's
+      ``identifiability_check``).
+    - **Converged at start** (rare but possible when the user warm-starts
+      from the true value).
+
+    The first two are the common cases in Fluidity, FIKH and other
+    over-parameterised dynamical models, so surfacing them helps users
+    catch silent-failure fits that achieve R² ~ 0.9+ with many parameters
+    unchanged from their initial guess.
+
+    Args:
+        parameters: ParameterSet — used only for parameter names.
+        x0: Initial parameter values, shape (n_params,).
+        x_final: Optimized parameter values, shape (n_params,).
+        bounds: (lower, upper) arrays from ``_extract_bounds``.
+        rel_tol: Relative-movement threshold. A parameter is flagged as
+            stuck if BOTH |Δx|/span < rel_tol and |Δx|/|x0| < rel_tol,
+            where span = upper - lower (finite bounds) or |x0| (infinite
+            bounds). Default 1% is the same threshold used in the Fluidity
+            tutorial identifiability recipes.
+
+    Returns:
+        List of parameter names flagged as stuck. Empty list if all moved.
+    """
+    names = list(parameters.keys())
+    lower, upper = bounds
+    x0_arr = np.asarray(x0, dtype=np.float64)
+    x_arr = np.asarray(x_final, dtype=np.float64)
+
+    stuck: list[str] = []
+    for i, name in enumerate(names):
+        dx = abs(float(x_arr[i]) - float(x0_arr[i]))
+
+        span_finite = np.isfinite(lower[i]) and np.isfinite(upper[i])
+        span = float(upper[i] - lower[i]) if span_finite else abs(float(x0_arr[i]))
+        if span <= 0.0:  # pseudo-pinned via lower == upper
+            continue
+
+        rel_span = dx / span
+        x0_scale = abs(float(x0_arr[i]))
+        # Avoid divide-by-zero when a parameter legitimately starts at 0;
+        # in that case fall back to absolute-tolerance 1e-12.
+        rel_x0 = dx / x0_scale if x0_scale > 0.0 else (0.0 if dx < 1e-12 else np.inf)
+
+        if rel_span < rel_tol and rel_x0 < rel_tol:
+            stuck.append(name)
+
+    if stuck:
+        logger.warning(
+            "NLSQ identifiability check: %d parameter(s) did not move "
+            "(< %.1f%% of bound span and < %.1f%% of initial value): %s. "
+            "This usually means these parameters are pinned, non-identifiable "
+            "for the current protocol, or the objective is flat in their "
+            "direction. Consult the model's identifiability_check() if "
+            "unexpected.",
+            len(stuck),
+            rel_tol * 100,
+            rel_tol * 100,
+            ", ".join(stuck),
+        )
+    return stuck
+
+
 def _run_scipy_least_squares(
     objective: Callable[[np.ndarray], float | np.ndarray],
     x0: np.ndarray,
@@ -1414,6 +1492,7 @@ def nlsq_optimize(
             compute_covariance=compute_covariance,
         )
         parameters.set_values(result.x)
+        _warn_stuck_parameters(parameters, original_values, result.x, nlsq_bounds)
         return result
 
     logger.info(
@@ -1547,6 +1626,7 @@ def nlsq_optimize(
         _validate_optimization_result(result, residuals_fb)
         # Write back optimal params so model state reflects the fit
         parameters.set_values(result.x)
+        _warn_stuck_parameters(parameters, original_values, result.x, nlsq_bounds)
         return result
 
     # Compute residuals at optimal point for covariance scaling.
@@ -1616,6 +1696,9 @@ def nlsq_optimize(
         fallback_result.fun = float(np.sum(residuals_fb**2))
         _validate_optimization_result(fallback_result, residuals_fb)
         parameters.set_values(fallback_result.x)
+        _warn_stuck_parameters(
+            parameters, original_values, fallback_result.x, nlsq_bounds
+        )
         return fallback_result
 
     # Ensure x is float64
@@ -1649,6 +1732,7 @@ def nlsq_optimize(
         message=result.message,
     )
 
+    _warn_stuck_parameters(parameters, original_values, result.x, nlsq_bounds)
     return result
 
 

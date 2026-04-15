@@ -296,6 +296,62 @@ models in the Fluidity family. Use this guide to select the appropriate variant.
      └── Homogeneous thixotropy ──► FluidityLocal
 
 
+Identifiability: Critical Before Fitting
+----------------------------------------
+
+**Different protocols constrain different parameter subsets.** Fitting all
+parameters to a single-protocol dataset typically produces high
+:math:`R^2` with physically wrong parameter values, because the optimizer
+terminates with inert parameters stuck at their warm-start values.
+
+Quick reference — **Local** model (9 parameters, creep includes
+rejuvenation path):
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Protocol
+     - Identifiable parameters
+   * - ``flow_curve``
+     - ``tau_y``, ``K``, ``n_flow``
+   * - ``startup``
+     - ``G``, ``f_eq``, ``f_inf``, ``theta``, ``a``, ``n_rejuv``
+   * - ``creep``
+     - ``f_eq``, ``f_inf``, ``theta``, ``a``, ``n_rejuv``
+   * - ``relaxation``
+     - ``theta`` (+ degenerate ``G·f_eq``, ``G·f_inf``)
+   * - ``oscillation`` / SAOS
+     - ``G``, ``f_eq``
+   * - ``laos``
+     - ``G``, ``f_eq``, ``f_inf``, ``theta``, ``a``, ``n_rejuv``
+
+Quick reference — **Nonlocal** model (10 parameters, HB-aging only, no
+rejuvenation):
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Protocol
+     - Identifiable parameters
+   * - ``flow_curve``
+     - ``tau_y``, ``K``, ``n_flow``
+   * - ``startup``, ``relaxation``, ``laos``
+     - ``G``, ``tau_y``, ``K``, ``n_flow``, ``theta``
+   * - ``creep``
+     - ``tau_y``, ``K``, ``n_flow``, ``theta`` *(G is inert; stress is fixed)*
+   * - ``oscillation`` / SAOS
+     - ``G``, ``f_eq``, ``theta``
+
+The full per-protocol tables — including product-degenerate groups,
+numerical proofs, and worked-example recipes — are documented on the
+:doc:`identifiability` page. Query the map programmatically with
+:py:meth:`FluidityLocal.identifiability_check() <rheojax.models.fluidity._base.FluidityBase.identifiability_check>`
+or
+:py:meth:`FluidityNonlocal.identifiability_check() <rheojax.models.fluidity._base.FluidityBase.identifiability_check>`.
+
+
 Model Documentation
 -------------------
 
@@ -305,6 +361,7 @@ Model Documentation
    fluidity_local
    fluidity_nonlocal
    saramito_evp
+   identifiability
 
 
 References

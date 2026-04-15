@@ -132,6 +132,65 @@ class FluidityNonlocal(FluidityBase):
             description="Cooperativity length (non-local diffusion scale)",
         )
 
+    # The nonlocal PDE RHS (fluidity_nonlocal_creep_pde_rhs /
+    # fluidity_nonlocal_pde_rhs) uses HB aging via f_loc(σ; tau_y, K, n_flow)
+    # and does NOT include the rejuvenation term a·|γ̇|^n·(f_inf - f) that
+    # the local ODE carries. Consequently a, n_rejuv, and f_inf never enter
+    # the nonlocal residual. ξ only matters when the f-field develops
+    # spatial variation; with a uniform initial condition and Neumann BCs
+    # the field stays uniform and ∇²f ≡ 0 for all the single-protocol
+    # benchmarks in examples/fluidity. The identifiability map below
+    # reflects this — it OVERRIDES FluidityBase._IDENTIFIABILITY.
+    _IDENTIFIABILITY = {
+        "flow_curve": {
+            # HB steady state σ = τ_y + K·γ̇^n — transient parameters inert.
+            "identifiable": ("tau_y", "K", "n_flow"),
+            "product_degenerate": (),
+            "inactive": ("G", "f_eq", "f_inf", "theta", "a", "n_rejuv", "xi"),
+        },
+        "startup": {
+            # Rate-controlled: elastic backbone G enters via dΣ/dt = G(γ̇ - Σf);
+            # f_loc uses HB params; θ sets relaxation. f_eq sets only initial
+            # f-field (decays in ~θ); rejuvenation terms absent; field stays
+            # uniform so ξ inert.
+            "identifiable": ("G", "tau_y", "K", "n_flow", "theta"),
+            "product_degenerate": (),
+            "inactive": ("f_eq", "f_inf", "a", "n_rejuv", "xi"),
+        },
+        "relaxation": {
+            # Stress decays via dΣ/dt = -G·Σ·f_avg with f relaxing toward
+            # f_loc(σ). All three HB params shape the late-time plateau; θ
+            # sets the decay rate.
+            "identifiable": ("G", "tau_y", "K", "n_flow", "theta"),
+            "product_degenerate": (),
+            "inactive": ("f_eq", "f_inf", "a", "n_rejuv", "xi"),
+        },
+        "creep": {
+            # dγ/dt = σ·f_avg. Constant σ ⇒ G drops out entirely (no Maxwell
+            # equation being integrated). f_eq only sets f(t0) which decays
+            # to f_loc in ~θ; rejuvenation absent; field uniform ⇒ ξ inert.
+            "identifiable": ("tau_y", "K", "n_flow", "theta"),
+            "product_degenerate": (),
+            "inactive": ("G", "f_eq", "f_inf", "a", "n_rejuv", "xi"),
+        },
+        "oscillation": {
+            # SAOS linearisation around f_eq gives the Maxwell-like response
+            # G'(ω), G''(ω) with τ_eff = 1/(G·f_eq). HB params enter through
+            # f_loc at the working point (σ ≈ 0 for SAOS ⇒ f_loc ≈ 0 ⇒
+            # tau_y/K/n_flow gated by softplus, weakly identifiable).
+            "identifiable": ("G", "f_eq", "theta"),
+            "product_degenerate": (),
+            "inactive": ("tau_y", "K", "n_flow", "f_inf", "a", "n_rejuv", "xi"),
+        },
+        "laos": {
+            # Large-amplitude oscillation excites the full nonlinear response:
+            # HB params and θ all active alongside G.
+            "identifiable": ("G", "tau_y", "K", "n_flow", "theta"),
+            "product_degenerate": (),
+            "inactive": ("f_eq", "f_inf", "a", "n_rejuv", "xi"),
+        },
+    }
+
     def _fit(
         self,
         X: np.ndarray,

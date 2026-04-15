@@ -210,6 +210,122 @@ class FluidityBase(BaseModel):
         self.parameters.set_value("K", _clipped("K", max(K_seed, 1e-3)))
         self.parameters.set_value("n_flow", _clipped("n_flow", n_seed))
 
+    # Parameters that enter each protocol's dynamics, partitioned by role.
+    # "identifiable": appear non-degenerately in the residual.
+    # "product_degenerate": enter only through a product with another param
+    #   (e.g. G*f in relaxation). Fitting both leaves a 1-parameter family.
+    # "inactive": do not appear in the residual at all (Jacobian column = 0).
+    _IDENTIFIABILITY = {
+        "relaxation": {
+            "identifiable": ("theta",),
+            "product_degenerate": ("G", "f_eq", "f_inf"),  # only G*f identifiable
+            "inactive": ("tau_y", "K", "n_flow", "a", "n_rejuv"),
+        },
+        "oscillation": {
+            # SAOS path uses Maxwell(G, tau_eff=1/(G*f_eq)) — so G·f_eq sets tau,
+            # but the high-freq plateau gives G independently → both identifiable.
+            "identifiable": ("G", "f_eq"),
+            "product_degenerate": (),
+            "inactive": ("tau_y", "K", "n_flow", "f_inf", "theta", "a", "n_rejuv"),
+        },
+        "flow_curve": {
+            "identifiable": ("tau_y", "K", "n_flow"),
+            "product_degenerate": (),
+            "inactive": ("G", "f_eq", "f_inf", "theta", "a", "n_rejuv"),
+        },
+        "startup": {
+            # gamma_dot != 0 so G is identifiable (λG·γ̇ term breaks the scale).
+            "identifiable": ("G", "f_eq", "f_inf", "theta", "a", "n_rejuv"),
+            "product_degenerate": (),
+            "inactive": ("tau_y", "K", "n_flow"),
+        },
+        "creep": {
+            # dγ/dt = σ_applied·f — only f is identifiable; G sets elastic jump
+            # at t=0 which is usually not in the data, so G is quasi-inactive.
+            "identifiable": ("f_eq", "f_inf", "theta", "a", "n_rejuv"),
+            "product_degenerate": (),
+            "inactive": ("G", "tau_y", "K", "n_flow"),
+        },
+        "laos": {
+            # Full ODE with time-varying gamma_dot → all dynamic params active.
+            "identifiable": ("G", "f_eq", "f_inf", "theta", "a", "n_rejuv"),
+            "product_degenerate": (),
+            "inactive": ("tau_y", "K", "n_flow"),
+        },
+    }
+
+    @classmethod
+    def identifiability_check(
+        cls, test_mode: str, verbose: bool = True
+    ) -> dict[str, tuple[str, ...]]:
+        """Report which parameters are identifiable for a given protocol.
+
+        Fluidity models have protocol-dependent identifiability: relaxation
+        alone cannot distinguish G from f (only the product G·f enters the ODE
+        at γ̇=0), and flow-curve parameters (tau_y, K, n_flow) do not appear
+        in any transient ODE. Fitting all 9 parameters to a single protocol
+        will produce a high R² with physically meaningless parameter values.
+
+        Args:
+            test_mode: Protocol name ('relaxation', 'oscillation',
+                'flow_curve', 'startup', 'creep', 'laos').
+            verbose: If True, emit a logger.warning summarizing the issue.
+
+        Returns:
+            Dictionary with keys ``identifiable``, ``product_degenerate``,
+            ``inactive`` mapping to tuples of parameter names. Degenerate
+            groups share a one-parameter scale invariance (e.g. for
+            relaxation only G·f_eq and G·f_inf are identifiable).
+
+        Example:
+            >>> from rheojax.models.fluidity import FluidityLocal
+            >>> FluidityLocal.identifiability_check("relaxation")
+            {'identifiable': ('theta',),
+             'product_degenerate': ('G', 'f_eq', 'f_inf'),
+             'inactive': ('tau_y', 'K', 'n_flow', 'a', 'n_rejuv')}
+        """
+        # Normalize aliases
+        mode = "oscillation" if test_mode == "saos" else test_mode
+        mode = "flow_curve" if mode in ("steady_shear", "rotation") else mode
+
+        if mode not in cls._IDENTIFIABILITY:
+            raise ValueError(
+                f"Unknown test_mode '{test_mode}'. "
+                f"Expected one of {sorted(cls._IDENTIFIABILITY)}."
+            )
+
+        report = cls._IDENTIFIABILITY[mode]
+
+        if verbose:
+            identifiable = report["identifiable"]
+            degenerate = report["product_degenerate"]
+            inactive = report["inactive"]
+            lines = [
+                f"Fluidity identifiability for test_mode='{mode}':",
+                f"  Identifiable ({len(identifiable)}): "
+                + (", ".join(identifiable) or "(none)"),
+            ]
+            if degenerate:
+                lines.append(
+                    f"  Product-degenerate ({len(degenerate)}): "
+                    + ", ".join(degenerate)
+                    + "  -- only their product(s) with G are identifiable"
+                )
+            if inactive:
+                lines.append(
+                    f"  Inactive ({len(inactive)}): "
+                    + ", ".join(inactive)
+                    + "  -- absent from this protocol's residual"
+                )
+            if degenerate or inactive:
+                lines.append(
+                    "  Fit only identifiable params; freeze others to "
+                    "physical values or joint-fit a second protocol."
+                )
+            logger.warning("\n".join(lines))
+
+        return report
+
     def get_initial_fluidity(self) -> float:
         """Get initial fluidity value (equilibrium).
 
