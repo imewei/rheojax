@@ -398,10 +398,13 @@ class FIKH(FIKHBase):
         )
 
         alpha = params.get("alpha_structure", self.alpha_structure)
-        n_pts = 100 * n_cycles
-        # Static slice index for last cycle extraction
-        last_cycle_start = n_pts * (n_cycles - 1) // n_cycles
-        n_last = n_pts - last_cycle_start
+        # Use n_cycles * pts_per_cycle + 1 so that dt = period / pts_per_cycle
+        # exactly, giving integer-period windows for Fourier extraction.
+        pts_per_cycle = 100
+        n_pts = n_cycles * pts_per_cycle + 1
+        # Last cycle: pts_per_cycle + 1 points spanning exactly one period
+        last_cycle_start = (n_cycles - 1) * pts_per_cycle
+        n_last = n_pts - last_cycle_start  # = pts_per_cycle + 1
 
         # Close over params/options so only omega varies
         include_thermal = self.include_thermal
@@ -438,19 +441,20 @@ class FIKH(FIKHBase):
             t_last = jax.lax.dynamic_slice(t, [last_cycle_start], [n_last])
             stress_last = jax.lax.dynamic_slice(stress, [last_cycle_start], [n_last])
 
-            # Fourier decomposition (first harmonic)
-            # F-034: use dt from actual time points (not T_cycle / n_last)
-            dt = t_last[1] - t_last[0]
-            T_cycle = t_last[-1] - t_last[0] + dt  # exact integration span
+            # Least-squares extraction of G' and G'' from last-cycle stress.
+            # σ(t) = G'·γ₀·sin(ωt) + G''·γ₀·cos(ωt)
+            # This is exact regardless of window span and avoids the G'→G''
+            # cross-talk that trapezoid Fourier integration suffers when the
+            # window doesn't span an exact integer number of periods.
+            sin_basis = gamma_0 * jnp.sin(w * t_last)
+            cos_basis = gamma_0 * jnp.cos(w * t_last)
+            A = jnp.column_stack([sin_basis, cos_basis])  # (n_last, 2)
+            # Normal equations: (AᵀA)⁻¹ Aᵀ b — 2×2 system, always well-conditioned
+            ATA = A.T @ A  # (2, 2)
+            ATb = A.T @ stress_last  # (2,)
+            coeffs = jnp.linalg.solve(ATA, ATb)  # [G', G'']
 
-            G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.sin(w * t_last), dx=dt
-            )
-            G_double_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.cos(w * t_last), dx=dt
-            )
-
-            return jnp.array([G_prime, G_double_prime])
+            return coeffs
 
         # Vectorize over all frequencies at once
         results = jax.vmap(predict_single_omega)(omega)  # (N_omega, 2)
@@ -688,60 +692,78 @@ class FIKH(FIKHBase):
         gamma_0: float = 1.0,
         omega: float = 1.0,
         T_init: float | None = None,
+        strain: ArrayLike | None = None,
     ) -> dict[str, jnp.ndarray]:
         """Predict LAOS (Large Amplitude Oscillatory Shear) response.
 
+        Integrates on the densified ``stable_dt`` grid (same as the fit path)
+        so fit and predict stay in the linearization regime of the explicit
+        return mapping. If ``strain`` is omitted, a clean sinusoid
+        ``gamma_0·sin(omega·t)`` is synthesized; pass the measured strain
+        array for fit/predict consistency on experimental data.
+
         Args:
-            t: Time array.
-            gamma_0: Strain amplitude.
-            omega: Angular frequency.
-            T_init: Initial temperature.
+            t: Time array at which to report the response.
+            gamma_0: Strain amplitude used if ``strain`` is not given.
+            omega: Angular frequency used if ``strain`` is not given.
+            T_init: Initial temperature (thermal models only).
+            strain: Optional measured strain array aligned with ``t``. When
+                supplied, ``gamma_0`` / ``omega`` are ignored for the
+                simulation and the measured trace drives the return mapping.
 
         Returns:
-            Dictionary with 'time', 'strain', 'stress', and optionally 'temperature'.
+            Dictionary with 'time', 'strain', 'stress', and optionally
+            'temperature'.
         """
         t_arr = jnp.asarray(t)
-        strain = gamma_0 * jnp.sin(omega * t_arr)
+        if strain is not None:
+            strain_arr = jnp.asarray(strain)
+        else:
+            strain_arr = gamma_0 * jnp.sin(omega * t_arr)
         params = self._get_params_dict()
 
-        from rheojax.models.fikh._kernels import (
-            fikh_scan_kernel_isothermal,
-            fikh_scan_kernel_thermal,
-        )
+        if not self.include_thermal:
+            # Reuse the fit-path predictor so the integration grid is
+            # densified identically to what NLSQ / NUTS optimize against.
+            stress = self._predict_from_params(t_arr, strain_arr, params)
+            return {
+                "time": t_arr,
+                "strain": strain_arr,
+                "stress": stress,
+            }
+
+        # Thermal path: mirror the densification that ``_predict_from_params``
+        # applies, but keep the (stress, temperature) tuple the thermal
+        # kernel returns.
+        from rheojax.models.fikh._kernels import fikh_scan_kernel_thermal
 
         alpha = params.get("alpha_structure", self.alpha_structure)
+        T_0 = T_init if T_init is not None else params.get("T_env", 298.15)
 
-        if self.include_thermal:
-            T_0 = T_init if T_init is not None else params.get("T_env", 298.15)
-            stress, temperature = fikh_scan_kernel_thermal(
-                t_arr,
-                strain,
-                n_history=self.n_history,
-                alpha=alpha,
-                use_viscosity=True,
-                T_init=T_0,
-                **params,
-            )
-            return {
-                "time": t_arr,
-                "strain": strain,
-                "stress": stress,
-                "temperature": temperature,
-            }
+        t_dense, strain_dense, n_sub = self._densify_grid_for_return_mapping(
+            t_arr, strain_arr
+        )
+        stress_dense, temperature_dense = fikh_scan_kernel_thermal(
+            t_dense,
+            strain_dense,
+            n_history=self.n_history,
+            alpha=alpha,
+            use_viscosity=True,
+            T_init=T_0,
+            **params,
+        )
+        if n_sub > 1:
+            stress = stress_dense[::n_sub]
+            temperature = temperature_dense[::n_sub]
         else:
-            stress = fikh_scan_kernel_isothermal(
-                t_arr,
-                strain,
-                n_history=self.n_history,
-                alpha=alpha,
-                use_viscosity=True,
-                **params,
-            )
-            return {
-                "time": t_arr,
-                "strain": strain,
-                "stress": stress,
-            }
+            stress = stress_dense
+            temperature = temperature_dense
+        return {
+            "time": t_arr,
+            "strain": strain_arr,
+            "stress": stress,
+            "temperature": temperature,
+        }
 
     # =========================================================================
     # Bayesian Interface

@@ -153,6 +153,116 @@ class TestFMLIKHPredictions:
         assert stress.shape == gamma_dot.shape
         assert jnp.isfinite(stress).all()
 
+    @pytest.mark.smoke
+    def test_startup_fit_with_steady_state_warmstart(self):
+        """FMLIKH startup fit must reach R^2 > 0.9 when warm-started.
+
+        Regression for the NB08 calibration bug (2026-04-13): the factory
+        default G_0=1e3, eta_0=1e6 makes the per-step elastic kick
+        G*dt*gamma_dot ~ 1200 Pa dominate the yield stress on typical
+        startup data (dt ~ 1 s, gamma_dot ~ 1 s^-1), trapping NLSQ in a
+        basin where the fit oscillates (R^2 on the order of -1e4).
+        Anchoring (sigma_y0, delta_sigma_y) to the measured steady-state
+        stress and collapsing modal stiffnesses unlocks R^2 > 0.9.
+        """
+        # Small synthetic startup: monotonic rise to a ~25 Pa plateau.
+        # dt=0.5 s x 40 points x n_sub=50 (since stable_dt=0.01) keeps
+        # the dense grid at ~2000 pts — enough to exercise the
+        # default-init trap without blowing the test budget.
+        t = jnp.linspace(0.005, 20.0, 40)
+        strain = 1.0 * t
+        sigma_ss = 25.0
+        # Simple saturating curve (no oscillation) — well within FMLIKH's
+        # representational capacity on a 2-mode fit.
+        stress_np = sigma_ss * (1.0 - np.exp(-np.asarray(t) / 2.0))
+        stress = jnp.asarray(np.maximum(stress_np, 0.1))
+
+        m = FMLIKH(n_modes=2, include_thermal=False, shared_alpha=True)
+        sig_ss = float(jnp.mean(stress[-10:]))
+        m.parameters.set_value("sigma_y0", 0.5 * sig_ss)
+        m.parameters.set_value("delta_sigma_y", 0.5 * sig_ss)
+        m.parameters.set_value("eta_inf", 0.1)
+        m.parameters.set_value("mu_p", 0.01)
+        for i, (G, eta, C) in enumerate([(1.0, 0.5, 0.5), (5.0, 2.0, 2.0)]):
+            m.parameters.set_value(f"G_{i}", G)
+            m.parameters.set_value(f"eta_{i}", eta)
+            m.parameters.set_value(f"C_{i}", C)
+            m.parameters.set_value(f"gamma_dyn_{i}", 0.1)
+
+        # Default NLSQ trust-region (no method override) produces the best
+        # R^2 on this scan-kernel protocol; method='scipy' trades ~0.06 R^2
+        # for robustness on ODE-diffrax protocols but is unneeded here.
+        m.fit(t, stress, test_mode="startup", strain=strain)
+        pred = m.predict(t, test_mode="startup", strain=strain)
+
+        ss_res = float(jnp.sum((stress - pred) ** 2))
+        ss_tot = float(jnp.sum((stress - jnp.mean(stress)) ** 2))
+        r2 = 1.0 - ss_res / ss_tot
+        assert r2 > 0.9, (
+            f"FMLIKH startup warm-start regressed: R^2 = {r2:.3f} (expected > 0.9). "
+            "Default-init startup fit is known to trap NLSQ at R^2 << 0."
+        )
+
+    @pytest.mark.smoke
+    def test_flow_curve_fit_with_hb_warmstart(self):
+        """FMLIKH flow-curve fit must reach R^2 > 0.9 when warm-started.
+
+        Regression for the NB07 calibration bug (2026-04-13): fitting from
+        the factory-default G_i = 1e3..10, eta_i = 1e6..1e4 onto a
+        near-Newtonian shear-thinning dataset traps NLSQ in a flat
+        sigma ~ 4 Pa plateau (R^2 ~ 0.43). Warm-starting from a
+        Herschel-Bulkley fit (sigma = sigma_y + K*gamma_dot^n) unlocks
+        the correct basin of attraction and should land R^2 >> 0.9.
+        """
+        from scipy.optimize import curve_fit
+
+        # Synthetic near-Newtonian HB data (mimics the NB07 dataset shape
+        # without shipping external data into the unit test).
+        gamma_dot = jnp.logspace(-2, 2, 21)
+        sigma_y_true, K_true, n_true = 0.9, 0.8, 0.9
+        rng = np.random.default_rng(42)
+        stress = (
+            sigma_y_true
+            + K_true * gamma_dot**n_true
+            + 0.02 * rng.standard_normal(gamma_dot.shape)
+        )
+        # Clip to positive to avoid log issues in the objective.
+        stress = jnp.asarray(np.maximum(np.asarray(stress), 0.1))
+
+        # HB warm start
+        hb = lambda g, sy, K, n: sy + K * g**n  # noqa: E731
+        popt, _ = curve_fit(
+            hb,
+            np.asarray(gamma_dot),
+            np.asarray(stress),
+            p0=[0.5, 4.0, 0.5],
+            maxfev=5000,
+        )
+        sy_hb, K_hb, _ = popt
+
+        m = FMLIKH(n_modes=3, include_thermal=False, shared_alpha=True)
+        m.parameters.set_value("sigma_y0", float(sy_hb))
+        m.parameters.set_value("delta_sigma_y", 0.1)
+        m.parameters.set_value("eta_inf", float(K_hb))
+        m.parameters.set_value("mu_p", 0.01)
+        for i, (G, eta, C) in enumerate([(1.0, 0.1, 0.5), (5.0, 0.5, 2.0), (10.0, 2.0, 5.0)]):
+            m.parameters.set_value(f"G_{i}", G)
+            m.parameters.set_value(f"eta_{i}", eta)
+            m.parameters.set_value(f"C_{i}", C)
+            m.parameters.set_value(f"gamma_dyn_{i}", 0.1)
+
+        m.fit(gamma_dot, stress, test_mode="flow_curve")
+        pred = m.predict(gamma_dot, test_mode="flow_curve")
+
+        # R^2 against the mean baseline.
+        ss_res = float(jnp.sum((stress - pred) ** 2))
+        ss_tot = float(jnp.sum((stress - jnp.mean(stress)) ** 2))
+        r2 = 1.0 - ss_res / ss_tot
+        assert r2 > 0.9, (
+            f"FMLIKH HB warm-start regressed: R^2 = {r2:.3f} (expected > 0.9). "
+            "Default-init flow-curve fit is known to trap NLSQ at R^2 ~ 0.43."
+        )
+
     def test_more_modes_gives_different_response(self):
         """Test that more modes changes the response."""
         t = jnp.linspace(0, 10, 100)

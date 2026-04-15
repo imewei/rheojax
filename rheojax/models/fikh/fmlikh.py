@@ -550,9 +550,13 @@ class FMLIKH(FIKHBase):
         )
 
         alpha = params.get("alpha_structure", self.alpha_structure)
-        n_pts = 100 * n_cycles
-        last_cycle_start = n_pts * (n_cycles - 1) // n_cycles
-        n_last = n_pts - last_cycle_start
+        # Use n_cycles * pts_per_cycle + 1 so that dt = period / pts_per_cycle
+        # exactly, giving integer-period windows for Fourier extraction.
+        pts_per_cycle = 100
+        n_pts = n_cycles * pts_per_cycle + 1
+        # Last cycle: pts_per_cycle + 1 points spanning exactly one period
+        last_cycle_start = (n_cycles - 1) * pts_per_cycle
+        n_last = n_pts - last_cycle_start  # = pts_per_cycle + 1
 
         # Close over constants for vmap
         include_thermal = self.include_thermal
@@ -605,18 +609,19 @@ class FMLIKH(FIKHBase):
                 total_stress, [last_cycle_start], [n_last]
             )
 
-            # Fourier decomposition (first harmonic)
-            dt = t_last[1] - t_last[0]
-            T_cycle = t_last[-1] - t_last[0] + dt
+            # Least-squares extraction of G' and G'' from last-cycle stress.
+            # σ(t) = G'·γ₀·sin(ωt) + G''·γ₀·cos(ωt)
+            # This is exact regardless of window span and avoids the G'→G''
+            # cross-talk that trapezoid Fourier integration suffers when the
+            # window doesn't span an exact integer number of periods.
+            sin_basis = gamma_0 * jnp.sin(w * t_last)
+            cos_basis = gamma_0 * jnp.cos(w * t_last)
+            A = jnp.column_stack([sin_basis, cos_basis])  # (n_last, 2)
+            ATA = A.T @ A
+            ATb = A.T @ stress_last
+            coeffs = jnp.linalg.solve(ATA, ATb)  # [G', G'']
 
-            G_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.sin(w * t_last), dx=dt
-            )
-            G_double_prime = (2 / (gamma_0 * T_cycle)) * jnp.trapezoid(
-                stress_last * jnp.cos(w * t_last), dx=dt
-            )
-
-            return jnp.array([G_prime, G_double_prime])
+            return coeffs
 
         results = jax.vmap(predict_single_omega)(omega)  # (N_omega, 2)
         return results[:, 0] + 1j * results[:, 1]

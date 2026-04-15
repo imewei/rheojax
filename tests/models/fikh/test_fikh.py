@@ -186,6 +186,55 @@ class TestFIKHPredictions:
         assert "stress" in result
         assert result["stress"].shape == result["time"].shape
 
+    @pytest.mark.smoke
+    def test_laos_fit_predict_consistency_coarse_dt(self, model):
+        """predict_laos must densify like the fit path.
+
+        Regression for the 2026-04-13 bug: predict_laos called the scan
+        kernel directly on the user's time grid, bypassing
+        ``_densify_grid_for_return_mapping``. When ``dt_data`` exceeded
+        ``stable_dt`` the explicit return mapping produced order-of-magnitude
+        numerical blow-up (R² = -73 on the FIKH LAOS notebook), while the
+        fit-internal path stayed bounded. This test pins the two paths
+        together on a deliberately coarse grid.
+        """
+        stable_dt = getattr(model, "stable_dt", 0.01)
+        # Make dt_data an order of magnitude larger than stable_dt so the
+        # explicit scheme is unstable without densification.
+        dt_data = 20 * stable_dt
+        omega = 1.0
+        gamma_0 = 0.3
+        n_periods = 5
+        t = jnp.arange(0.0, n_periods * 2 * jnp.pi / omega, dt_data)
+        strain = gamma_0 * jnp.sin(omega * t)
+
+        # Fit-path reference: what _predict_from_params produces.
+        params = model._get_params_dict()
+        sigma_fit_path = model._predict_from_params(t, strain, params)
+
+        # predict_laos driven with the same measured strain must match.
+        result = model.predict_laos(t, strain=strain)
+        sigma_pred = result["stress"]
+
+        assert sigma_pred.shape == sigma_fit_path.shape
+        # Densification makes the two paths numerically identical (bit-for-bit
+        # is not guaranteed across JAX traces, so use a tight relative tol).
+        max_abs = float(jnp.maximum(jnp.max(jnp.abs(sigma_fit_path)), 1e-6))
+        max_diff = float(jnp.max(jnp.abs(sigma_pred - sigma_fit_path)))
+        assert max_diff / max_abs < 1e-8, (
+            f"predict_laos drifted from fit path: max_diff={max_diff:.3g}, "
+            f"max_abs={max_abs:.3g} — densification likely regressed"
+        )
+
+        # Bounded, non-exploding stress (pre-fix value was ~330 Pa with
+        # data max of 21 Pa on the notebook). Assert the prediction stays
+        # within a plausible physical envelope given the parameters.
+        G = float(params.get("G", 1.0))
+        sigma_bound = 20.0 * G * gamma_0  # 20× the small-strain elastic bound
+        assert float(jnp.max(jnp.abs(sigma_pred))) < sigma_bound, (
+            "predict_laos stress blew up — densification regression"
+        )
+
     def test_thermal_startup(self, thermal_model):
         """Test thermal model produces temperature evolution."""
         from rheojax.models.fikh._kernels import fikh_scan_kernel_thermal
