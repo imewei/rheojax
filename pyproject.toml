@@ -85,8 +85,8 @@ dependencies = [
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
-    "jax>=0.8.3",     # JAX 0.8.0+ for CUDA 12/13 support
-    "jaxlib>=0.8.3",  # jaxlib 0.8.0+ - must be compatible with JAX version
+    "jax>=0.8.3,<0.10.0",     # JAX 0.8.0+ for CUDA 12/13 support; <0.10.0 until numpyro drops xla_pmap_p
+    "jaxlib>=0.8.3,<0.10.0",  # jaxlib must match JAX version
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
     "interpax>=0.3.12",   # JIT-safe interpolation (replaces scipy.interpolate)
