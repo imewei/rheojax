@@ -303,15 +303,26 @@ class BayesianResult:
                 error=str(exc),
             )
 
-        # az.from_dict accepts (chain, draw, ...) numpy arrays and is stable
-        # across ArviZ 0.x and 1.x, unlike az.InferenceData() whose constructor
-        # signature changed in 1.0 (DataTree-based, no longer accepts kwargs).
         posterior_np = {name: da.values for name, da in posterior_dict.items()}
         stats_np = {name: da.values for name, da in stats_dict.items()}
-        idata = az.from_dict(
-            posterior=posterior_np if posterior_np else None,
-            sample_stats=stats_np if stats_np else None,
-        )
+
+        # ArviZ 1.x (DataTree-based): from_dict takes a nested dict
+        #   {group_name: {var_name: array}}.
+        # ArviZ 0.x: from_dict takes keyword args (posterior=..., sample_stats=...).
+        # Both APIs use (chain, draw, ...) shaped numpy arrays.
+        _arviz_major = int(getattr(az, "__version__", "0").split(".")[0])
+        if _arviz_major >= 1:
+            data_groups: dict[str, dict[str, np.ndarray]] = {}
+            if posterior_np:
+                data_groups["posterior"] = posterior_np
+            if stats_np:
+                data_groups["sample_stats"] = stats_np
+            idata = az.from_dict(data_groups)
+        else:
+            idata = az.from_dict(
+                posterior=posterior_np if posterior_np else None,
+                sample_stats=stats_np if stats_np else None,
+            )
 
         logger.info(
             "InferenceData created successfully (fast path)",
