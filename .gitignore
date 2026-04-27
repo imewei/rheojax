@@ -208,6 +208,7 @@ specs/
 AGENTS.md
 CLAUDE.md
 GEMINI.md
+.claude-progress.md
 
 # ----------------------------------------------------------------------------
 # Operating System
