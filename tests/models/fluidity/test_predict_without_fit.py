@@ -32,11 +32,6 @@ safe_import_jax()  # float64 setup
 
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
-from rheojax.models.fluidity.saramito import (
-    FluiditySaramitoLocal,
-    FluiditySaramitoNonlocal,
-)
 
 # Force eager import of every model submodule so the ``@ModelRegistry.register``
 # decorators fire BEFORE canary parametrization collects cases. Without this
@@ -44,6 +39,11 @@ from rheojax.models.fluidity.saramito import (
 # the canary silently covers a handful of models instead of every
 # transient-protocol implementation in the codebase.
 from rheojax.models import _ensure_all_registered as _ensure_models
+from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
+from rheojax.models.fluidity.saramito import (
+    FluiditySaramitoLocal,
+    FluiditySaramitoNonlocal,
+)
 
 _ensure_models()
 

@@ -494,7 +494,7 @@ class GeneralizedMaxwell(BaseModel):
             total_E = float(jnp.max(E_t) - jnp.min(E_t))
             base_E = np.asarray(E_i_guess)
             base_tau = np.asarray(tau_i_guess)
-            for attempt in range(4):
+            for _attempt in range(4):
                 pert_E = rng_retry.uniform(0.3, 3.0, size=n_p)
                 pert_tau = 10.0 ** rng_retry.uniform(-0.5, 0.5, size=n_p)
                 E_init = jnp.asarray(
@@ -1040,7 +1040,7 @@ class GeneralizedMaxwell(BaseModel):
             total_E = float(jnp.max(E_prime) - jnp.min(E_prime))
             base_E = np.asarray(E_i_guess)
             base_tau = np.asarray(tau_i_guess)
-            for attempt in range(4):
+            for _attempt in range(4):
                 pert_E = rng_retry.uniform(0.3, 3.0, size=n_p)
                 pert_tau = 10.0 ** rng_retry.uniform(-0.5, 0.5, size=n_p)
                 E_init = jnp.asarray(

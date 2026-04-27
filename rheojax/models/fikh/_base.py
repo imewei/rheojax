@@ -404,7 +404,6 @@ class FIKHBase(BaseModel, FractionalModelMixin):
         # Interval-by-interval dense grid: for each [t[i], t[i+1]] emit
         # n_sub equally-spaced points starting at t[i] (exclusive upper end),
         # then append t[-1]. Guarantees t_dense[i*n_sub] == times[i].
-        n_data = int(times.shape[0])
         # fractional offsets within each interval: [0, 1/n_sub, ..., (n_sub-1)/n_sub]
         offsets = jnp.arange(n_sub, dtype=times.dtype) / n_sub  # (n_sub,)
         # interval widths (length N-1) and left-endpoints (length N-1)

@@ -20,6 +20,7 @@ import numpy as np
 from rheojax.core.base import ArrayLike
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+from rheojax.logging import get_logger
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
@@ -38,6 +39,8 @@ from rheojax.models.ikh._kernels import (
 )
 
 jax, jnp = safe_import_jax()
+
+logger = get_logger(__name__)
 
 
 # kwargs to filter before passing to nlsq_optimize
