@@ -36,14 +36,14 @@ from rheojax.models.fluidity.saramito import (
 
 # FluidityLocal: HB flow curve + aging/rejuvenation fluidity
 FLUIDITY_LOCAL_PARAMS: list[tuple[str, tuple[float, float]]] = [
-    ("G",       (1e3, 1e9)),
-    ("tau_y",   (1e-3, 1e6)),
-    ("K",       (1e-3, 1e6)),
-    ("n_flow",  (0.1, 2.0)),
-    ("f_eq",    (1e-12, 1e-3)),
-    ("f_inf",   (1e-6, 1.0)),
-    ("theta",   (0.1, 1e4)),
-    ("a",       (0.0, 100.0)),
+    ("G", (1e3, 1e9)),
+    ("tau_y", (1e-3, 1e6)),
+    ("K", (1e-3, 1e6)),
+    ("n_flow", (0.1, 2.0)),
+    ("f_eq", (1e-12, 1e-3)),
+    ("f_inf", (1e-6, 1.0)),
+    ("theta", (0.1, 1e4)),
+    ("a", (0.0, 100.0)),
     ("n_rejuv", (0.0, 2.0)),
 ]
 
@@ -55,22 +55,22 @@ FLUIDITY_NONLOCAL_PARAMS: list[tuple[str, tuple[float, float]]] = [
 
 # FluiditySaramitoLocal (coupling="minimal"): Saramito yield-Maxwell + aging
 FLUIDITY_SARAMITO_LOCAL_MIN_PARAMS: list[tuple[str, tuple[float, float]]] = [
-    ("G",      (1e1, 1e8)),
-    ("eta_s",  (0.0, 1e3)),
+    ("G", (1e1, 1e8)),
+    ("eta_s", (0.0, 1e3)),
     ("tau_y0", (1e-1, 1e5)),
-    ("K_HB",   (1e-2, 1e5)),
-    ("n_HB",   (0.1, 1.5)),
-    ("f_age",  (1e-12, 1e-2)),
+    ("K_HB", (1e-2, 1e5)),
+    ("n_HB", (0.1, 1.5)),
+    ("f_age", (1e-12, 1e-2)),
     ("f_flow", (1e-6, 1.0)),
-    ("t_a",    (1e-2, 1e5)),
-    ("b",      (0.0, 1e3)),
-    ("n_rej",  (0.1, 3.0)),
+    ("t_a", (1e-2, 1e5)),
+    ("b", (0.0, 1e3)),
+    ("n_rej", (0.1, 3.0)),
 ]
 
 # FluiditySaramitoLocal (coupling="full"): +2 coupling params
 FLUIDITY_SARAMITO_LOCAL_FULL_EXTRAS: list[tuple[str, tuple[float, float]]] = [
     ("tau_y_coupling", (0.0, 1e4)),
-    ("m_yield",        (0.1, 2.0)),
+    ("m_yield", (0.1, 2.0)),
 ]
 
 # FluiditySaramitoNonlocal: Saramito base + xi
@@ -110,8 +110,7 @@ class TestParameterSchema:
     def test_saramito_local_full_schema(self):
         actual = _extract(FluiditySaramitoLocal(coupling="full"))
         expected = (
-            FLUIDITY_SARAMITO_LOCAL_MIN_PARAMS
-            + FLUIDITY_SARAMITO_LOCAL_FULL_EXTRAS
+            FLUIDITY_SARAMITO_LOCAL_MIN_PARAMS + FLUIDITY_SARAMITO_LOCAL_FULL_EXTRAS
         )
         assert actual == expected
 

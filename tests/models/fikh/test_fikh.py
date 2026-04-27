@@ -231,9 +231,9 @@ class TestFIKHPredictions:
         # within a plausible physical envelope given the parameters.
         G = float(params.get("G", 1.0))
         sigma_bound = 20.0 * G * gamma_0  # 20× the small-strain elastic bound
-        assert float(jnp.max(jnp.abs(sigma_pred))) < sigma_bound, (
-            "predict_laos stress blew up — densification regression"
-        )
+        assert (
+            float(jnp.max(jnp.abs(sigma_pred))) < sigma_bound
+        ), "predict_laos stress blew up — densification regression"
 
     def test_thermal_startup(self, thermal_model):
         """Test thermal model produces temperature evolution."""

@@ -245,7 +245,9 @@ class TestFMLIKHPredictions:
         m.parameters.set_value("delta_sigma_y", 0.1)
         m.parameters.set_value("eta_inf", float(K_hb))
         m.parameters.set_value("mu_p", 0.01)
-        for i, (G, eta, C) in enumerate([(1.0, 0.1, 0.5), (5.0, 0.5, 2.0), (10.0, 2.0, 5.0)]):
+        for i, (G, eta, C) in enumerate(
+            [(1.0, 0.1, 0.5), (5.0, 0.5, 2.0), (10.0, 2.0, 5.0)]
+        ):
             m.parameters.set_value(f"G_{i}", G)
             m.parameters.set_value(f"eta_{i}", eta)
             m.parameters.set_value(f"C_{i}", C)

@@ -118,9 +118,9 @@ def test_lattice_epm_creep_metadata_stress_respected():
     )
     pred = model.predict(data, smooth=True, seed=0).y
     # Above-yield creep must produce a clearly non-zero strain trajectory
-    assert float(jnp.max(jnp.abs(pred))) > 0.5, (
-        f"metadata['stress'] ignored: strain stayed near zero, max={float(jnp.max(pred)):.4f}"
-    )
+    assert (
+        float(jnp.max(jnp.abs(pred))) > 0.5
+    ), f"metadata['stress'] ignored: strain stayed near zero, max={float(jnp.max(pred)):.4f}"
 
 
 @pytest.mark.unit
@@ -138,9 +138,7 @@ def test_lattice_epm_creep_coarse_dt_matches_fine_dt():
 
     def run(n):
         t = jnp.linspace(0.5, 10.0, n)
-        d = RheoData(
-            x=t, y=jnp.full_like(t, target), initial_test_mode="creep"
-        )
+        d = RheoData(x=t, y=jnp.full_like(t, target), initial_test_mode="creep")
         return float(model.predict(d, smooth=True, seed=0).y[-1])
 
     coarse = run(20)  # dt_data=0.5
@@ -219,19 +217,30 @@ def test_lattice_epm_relaxation_honours_fluidity_form():
     pattern as the pre-fix creep kernel).
     """
     model = LatticeEPM(
-        L=16, dt=0.01, mu=1.0, tau_pl=1.0,
-        sigma_c_mean=0.3, sigma_c_std=0.05, n_fluid=2.0,
+        L=16,
+        dt=0.01,
+        mu=1.0,
+        tau_pl=1.0,
+        sigma_c_mean=0.3,
+        sigma_c_std=0.05,
+        n_fluid=2.0,
     )
     time = jnp.linspace(0.01, 5.0, 50)
     strain = 1.0  # mu·γ = 1.0 >> σ_c_mean = 0.3 → sites yield, forms diverge
 
     # Predict path (Python, uses epm_step with overstress)
-    pred_py = np.asarray(model.predict(
-        RheoData(x=time, y=jnp.zeros_like(time),
-                 initial_test_mode="relaxation",
-                 metadata={"gamma": strain}),
-        smooth=True, seed=0,
-    ).y)
+    pred_py = np.asarray(
+        model.predict(
+            RheoData(
+                x=time,
+                y=jnp.zeros_like(time),
+                initial_test_mode="relaxation",
+                metadata={"gamma": strain},
+            ),
+            smooth=True,
+            seed=0,
+        ).y
+    )
 
     # Fit path (JIT kernel) via model_function
     model._test_mode = "relaxation"
@@ -241,9 +250,15 @@ def test_lattice_epm_relaxation_honours_fluidity_form():
         [model.parameters.get_value(n) for n in model.parameters.keys()],
         dtype=jnp.float64,
     )
-    pred_jit = np.asarray(model.model_function(
-        time, params_arr, test_mode="relaxation", gamma=strain, seed=0,
-    ))
+    pred_jit = np.asarray(
+        model.model_function(
+            time,
+            params_arr,
+            test_mode="relaxation",
+            gamma=strain,
+            seed=0,
+        )
+    )
 
     max_rel_diff = float(np.max(np.abs(pred_jit - pred_py) / (np.abs(pred_py) + 1e-12)))
     assert max_rel_diff < 0.05, (
@@ -264,32 +279,54 @@ def test_lattice_epm_relaxation_round_trip_fit():
     never converge to a point that matches the ground-truth trajectory.
     """
     truth = LatticeEPM(
-        L=16, dt=0.01, mu=1.0, tau_pl=1.0,
-        sigma_c_mean=0.3, sigma_c_std=0.05, n_fluid=2.0,
+        L=16,
+        dt=0.01,
+        mu=1.0,
+        tau_pl=1.0,
+        sigma_c_mean=0.3,
+        sigma_c_std=0.05,
+        n_fluid=2.0,
     )
     strain = 1.0  # above yield
     t = jnp.linspace(0.01, 5.0, 50)  # uniformly spaced, matches kernel assumption
     g = truth.predict(
-        RheoData(x=t, y=jnp.zeros_like(t),
-                 initial_test_mode="relaxation",
-                 metadata={"gamma": strain}),
-        smooth=True, seed=0,
+        RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            initial_test_mode="relaxation",
+            metadata={"gamma": strain},
+        ),
+        smooth=True,
+        seed=0,
     ).y
 
     fit_model = LatticeEPM(
-        L=16, dt=0.01, mu=0.8, tau_pl=2.0,
-        sigma_c_mean=0.5, sigma_c_std=0.1, n_fluid=2.0,
+        L=16,
+        dt=0.01,
+        mu=0.8,
+        tau_pl=2.0,
+        sigma_c_mean=0.5,
+        sigma_c_std=0.1,
+        n_fluid=2.0,
     )
     fit_model.fit(
-        np.asarray(t), np.asarray(g),
-        test_mode="relaxation", gamma=strain,
-        method="scipy", seed=0, use_log_residuals=False,
+        np.asarray(t),
+        np.asarray(g),
+        test_mode="relaxation",
+        gamma=strain,
+        method="scipy",
+        seed=0,
+        use_log_residuals=False,
     )
     pred = fit_model.predict(
-        RheoData(x=t, y=jnp.zeros_like(t),
-                 initial_test_mode="relaxation",
-                 metadata={"gamma": strain}),
-        smooth=True, seed=0,
+        RheoData(
+            x=t,
+            y=jnp.zeros_like(t),
+            initial_test_mode="relaxation",
+            metadata={"gamma": strain},
+        ),
+        smooth=True,
+        seed=0,
     ).y
     g_arr = np.asarray(g)
     p = np.asarray(pred)

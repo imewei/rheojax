@@ -112,11 +112,13 @@ def test_overstress_form_gives_hb_asymptote():
         fluidity_form="overstress",
     )
     # plastic_rate = sign(s) * (|s| - scm)^2 / scm for n_fluid=2
-    expected = jnp.array([
-        ((15.0 - 10.0) ** 2) / 10.0,
-        ((20.0 - 10.0) ** 2) / 10.0,
-        ((30.0 - 10.0) ** 2) / 10.0,
-    ])
+    expected = jnp.array(
+        [
+            ((15.0 - 10.0) ** 2) / 10.0,
+            ((20.0 - 10.0) ** 2) / 10.0,
+            ((30.0 - 10.0) ** 2) / 10.0,
+        ]
+    )
     np.testing.assert_allclose(rate, expected, atol=1e-6)
 
 

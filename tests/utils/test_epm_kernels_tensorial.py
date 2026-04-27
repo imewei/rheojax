@@ -637,8 +637,14 @@ def test_tensorial_overstress_form_zero_below_threshold():
     yield_mask = 1.0  # force yield_mask to 1 so we isolate the overstress factor
 
     rate = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
-        sigma_c_mean=sigma_c_mean, n_fluid=2.0, fluidity_form="overstress",
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=sigma_c_mean,
+        n_fluid=2.0,
+        fluidity_form="overstress",
     )
     # Overstress = max(sigma_eff - sigma_c_mean, eps=1e-6) ≈ 0, so all components ≈ 0
     np.testing.assert_allclose(np.asarray(rate), 0.0, atol=5e-11)
@@ -658,8 +664,14 @@ def test_tensorial_overstress_form_hb_magnitude_at_n_fluid_2():
     yield_mask = 1.0
 
     rate = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
-        sigma_c_mean=sigma_c_mean, n_fluid=2.0, fluidity_form="overstress",
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=sigma_c_mean,
+        n_fluid=2.0,
+        fluidity_form="overstress",
     )
     # For n_fluid=2: g_eff = (sigma_eff - 1)^2 / 1 = (sqrt(3)*3 - 1)^2
     expected_g_eff = (float(sigma_eff) - sigma_c_mean) ** 2 / sigma_c_mean
@@ -680,8 +692,14 @@ def test_tensorial_linear_form_gives_sigma_over_tau():
     yield_mask = 1.0
 
     rate = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
-        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="linear",
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=1.0,
+        n_fluid=1.0,
+        fluidity_form="linear",
     )
     # "linear" should give (sigma'_ij / sigma_eff) * sigma_eff / tau_pl_ij = sigma'_ij / tau_pl_ij
     # Compute deviators (nu=0.5 default):
@@ -710,12 +728,24 @@ def test_tensorial_power_form_reduces_to_linear_at_n_fluid_1():
     yield_mask = 1.0
 
     rate_linear = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
-        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="linear",
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=1.0,
+        n_fluid=1.0,
+        fluidity_form="linear",
     )
     rate_power = compute_plastic_strain_rate(
-        stress_tensor, sigma_eff, tau_pl_shear, tau_pl_normal, yield_mask,
-        sigma_c_mean=1.0, n_fluid=1.0, fluidity_form="power",
+        stress_tensor,
+        sigma_eff,
+        tau_pl_shear,
+        tau_pl_normal,
+        yield_mask,
+        sigma_c_mean=1.0,
+        n_fluid=1.0,
+        fluidity_form="power",
     )
     # At n_fluid=1, power: g_eff = (sigma_eff/sigma_c)^1 * sigma_c = sigma_eff, matching linear
     np.testing.assert_allclose(
@@ -731,7 +761,11 @@ def test_tensorial_invalid_fluidity_form_raises():
     stress_tensor = jnp.array([1.0, 0.0, 0.5])
     with pytest.raises(ValueError, match="fluidity_form"):
         compute_plastic_strain_rate(
-            stress_tensor, 1.0, 1.0, 1.0, 1.0,
+            stress_tensor,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
             fluidity_form="not_a_real_form",
         )
 
@@ -766,22 +800,40 @@ def test_tensorial_overstress_with_hill_yield_criterion():
 
     propagator = make_tensorial_propagator_q(L, nu, mu)
     params = {
-        "mu": mu, "nu": nu,
-        "tau_pl_shear": 1.0, "tau_pl_normal": 1.0,
-        "sigma_c_mean": 1.0, "n_fluid": 2.0,
-        "hill_H": 0.5, "hill_N": 1.5,
+        "mu": mu,
+        "nu": nu,
+        "tau_pl_shear": 1.0,
+        "tau_pl_normal": 1.0,
+        "sigma_c_mean": 1.0,
+        "n_fluid": 2.0,
+        "hill_H": 0.5,
+        "hill_N": 1.5,
     }
 
     # Run one step with Hill criterion
     new_stress_hill = tensorial_epm_step(
-        stress, thresholds, 0.0, 0.01, propagator, params,
-        smooth=False, yield_criterion="hill", fluidity_form="overstress",
+        stress,
+        thresholds,
+        0.0,
+        0.01,
+        propagator,
+        params,
+        smooth=False,
+        yield_criterion="hill",
+        fluidity_form="overstress",
     )
 
     # Run one step with von Mises criterion
     new_stress_vm = tensorial_epm_step(
-        stress, thresholds, 0.0, 0.01, propagator, params,
-        smooth=False, yield_criterion="von_mises", fluidity_form="overstress",
+        stress,
+        thresholds,
+        0.0,
+        0.01,
+        propagator,
+        params,
+        smooth=False,
+        yield_criterion="von_mises",
+        fluidity_form="overstress",
     )
 
     # Both should be finite
@@ -791,8 +843,10 @@ def test_tensorial_overstress_with_hill_yield_criterion():
     # At default Hill parameters (H=0.5, N=1.5) for pure shear, Hill ≡ von Mises,
     # so the one-step updates should agree exactly.
     np.testing.assert_allclose(
-        np.asarray(new_stress_hill), np.asarray(new_stress_vm), rtol=1e-10,
-        err_msg="Hill (H=0.5, N=1.5) should match von Mises on pure shear"
+        np.asarray(new_stress_hill),
+        np.asarray(new_stress_vm),
+        rtol=1e-10,
+        err_msg="Hill (H=0.5, N=1.5) should match von Mises on pure shear",
     )
 
     # Also directly verify the yield criteria match on the same state
@@ -820,29 +874,47 @@ def test_tensorial_overstress_with_hill_anisotropy():
 
     # Stress field with a mix of shear and normal components
     stress = jnp.zeros((3, L, L))
-    stress = stress.at[0].set(2.0)   # σ_xx
+    stress = stress.at[0].set(2.0)  # σ_xx
     stress = stress.at[1].set(-1.0)  # σ_yy
-    stress = stress.at[2].set(1.5)   # σ_xy
+    stress = stress.at[2].set(1.5)  # σ_xy
     thresholds = jnp.ones((L, L)) * 2.0
 
     propagator = make_tensorial_propagator_q(L, nu, mu)
 
     # Anisotropic Hill: H=1.0, N=0.5 favors normal components over shear
     params_aniso = {
-        "mu": mu, "nu": nu,
-        "tau_pl_shear": 1.0, "tau_pl_normal": 1.0,
-        "sigma_c_mean": 1.0, "n_fluid": 2.0,
-        "hill_H": 1.0, "hill_N": 0.5,
+        "mu": mu,
+        "nu": nu,
+        "tau_pl_shear": 1.0,
+        "tau_pl_normal": 1.0,
+        "sigma_c_mean": 1.0,
+        "n_fluid": 2.0,
+        "hill_H": 1.0,
+        "hill_N": 0.5,
     }
     new_stress_aniso = tensorial_epm_step(
-        stress, thresholds, 0.0, 0.01, propagator, params_aniso,
-        smooth=False, yield_criterion="hill", fluidity_form="overstress",
+        stress,
+        thresholds,
+        0.0,
+        0.01,
+        propagator,
+        params_aniso,
+        smooth=False,
+        yield_criterion="hill",
+        fluidity_form="overstress",
     )
 
     # Isotropic von Mises for comparison
     new_stress_vm = tensorial_epm_step(
-        stress, thresholds, 0.0, 0.01, propagator, params_aniso,
-        smooth=False, yield_criterion="von_mises", fluidity_form="overstress",
+        stress,
+        thresholds,
+        0.0,
+        0.01,
+        propagator,
+        params_aniso,
+        smooth=False,
+        yield_criterion="von_mises",
+        fluidity_form="overstress",
     )
 
     # Both should be finite

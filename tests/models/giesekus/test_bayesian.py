@@ -328,7 +328,9 @@ class TestModelFunction:
         """Test model_function for flow_curve mode."""
         model = GiesekusSingleMode()
 
-        params = jnp.array([100.0, 1.0, 0.3, 10.0, 1.0])  # eta_p, lambda, alpha, eta_s, beta_cc
+        params = jnp.array(
+            [100.0, 1.0, 0.3, 10.0, 1.0]
+        )  # eta_p, lambda, alpha, eta_s, beta_cc
         gamma_dot = jnp.logspace(-1, 2, 20)
 
         y = model.model_function(gamma_dot, params, test_mode="flow_curve")

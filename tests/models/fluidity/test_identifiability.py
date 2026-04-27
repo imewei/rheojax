@@ -93,8 +93,13 @@ class TestIdentifiabilityAPI:
 
 
 def _simulate_relaxation(
-    G: float, f_eq: float, f_inf: float, theta: float,
-    sigma_0: float = 500.0, t_end: float = 100.0, n_points: int = 60,
+    G: float,
+    f_eq: float,
+    f_inf: float,
+    theta: float,
+    sigma_0: float = 500.0,
+    t_end: float = 100.0,
+    n_points: int = 60,
 ) -> np.ndarray:
     """Integrate the relaxation ODE at gamma_dot=0 and return sigma(t).
 
@@ -155,12 +160,20 @@ class TestRelaxationScaleDegeneracy:
         still achieving R^2 ~ 0.999.
         """
         sigma_ref = _simulate_relaxation(
-            self._G, self._F_EQ, self._F_INF, self._THETA,
-            sigma_0=self._SIGMA_0, t_end=self._T_END,
+            self._G,
+            self._F_EQ,
+            self._F_INF,
+            self._THETA,
+            sigma_0=self._SIGMA_0,
+            t_end=self._T_END,
         )
         sigma_scaled = _simulate_relaxation(
-            lam * self._G, self._F_EQ / lam, self._F_INF / lam, self._THETA,
-            sigma_0=self._SIGMA_0, t_end=self._T_END,
+            lam * self._G,
+            self._F_EQ / lam,
+            self._F_INF / lam,
+            self._THETA,
+            sigma_0=self._SIGMA_0,
+            t_end=self._T_END,
         )
 
         # Compare where both are above the integrator's absolute tolerance.
@@ -178,12 +191,20 @@ class TestRelaxationScaleDegeneracy:
         degeneracy, so identifiability_check lists it under 'identifiable'.
         """
         sigma_a = _simulate_relaxation(
-            self._G, self._F_EQ, self._F_INF, theta=10.0,
-            sigma_0=self._SIGMA_0, t_end=self._T_END,
+            self._G,
+            self._F_EQ,
+            self._F_INF,
+            theta=10.0,
+            sigma_0=self._SIGMA_0,
+            t_end=self._T_END,
         )
         sigma_b = _simulate_relaxation(
-            self._G, self._F_EQ, self._F_INF, theta=100.0,
-            sigma_0=self._SIGMA_0, t_end=self._T_END,
+            self._G,
+            self._F_EQ,
+            self._F_INF,
+            theta=100.0,
+            sigma_0=self._SIGMA_0,
+            t_end=self._T_END,
         )
         mask = sigma_a > 1e-3 * sigma_a[0]
         assert mask.sum() >= 5, "Not enough points above tolerance floor"
@@ -209,15 +230,19 @@ class TestNonlocalIdentifiabilityAPI:
         rep = FluidityNonlocal.identifiability_check("creep", verbose=False)
         assert set(rep["identifiable"]) == {"tau_y", "K", "n_flow", "theta"}
         assert rep["product_degenerate"] == ()
-        assert set(rep["inactive"]) == {
-            "G", "f_eq", "f_inf", "a", "n_rejuv", "xi"
-        }
+        assert set(rep["inactive"]) == {"G", "f_eq", "f_inf", "a", "n_rejuv", "xi"}
 
     def test_flow_curve_partition(self):
         rep = FluidityNonlocal.identifiability_check("flow_curve", verbose=False)
         assert set(rep["identifiable"]) == {"tau_y", "K", "n_flow"}
         assert set(rep["inactive"]) == {
-            "G", "f_eq", "f_inf", "theta", "a", "n_rejuv", "xi"
+            "G",
+            "f_eq",
+            "f_inf",
+            "theta",
+            "a",
+            "n_rejuv",
+            "xi",
         }
 
     def test_startup_partition(self):
@@ -252,9 +277,7 @@ def _simulate_nonlocal_creep(
     """
     model = FluidityNonlocal(N_y=N_y, gap_width=1e-3)
     model.parameters.update(model_params, strict=True)
-    return np.asarray(
-        model.predict(t, test_mode="creep", sigma_applied=sigma_applied)
-    )
+    return np.asarray(model.predict(t, test_mode="creep", sigma_applied=sigma_applied))
 
 
 @pytest.mark.smoke
@@ -294,15 +317,15 @@ class TestNonlocalCreepInertParams:
     @pytest.mark.parametrize(
         "inert_param,scale",
         [
-            ("G",       10.0),
-            ("G",       0.1),
-            ("f_inf",   10.0),
-            ("f_inf",   0.1),
-            ("a",       10.0),
-            ("n_rejuv", 1.8),   # bounds (0, 2) -- 1.8x vs truth 1.0
-            ("n_rejuv", 0.3),   # factor 0.3 within (0, 2) bounds
-            ("xi",      10.0),
-            ("xi",      0.1),
+            ("G", 10.0),
+            ("G", 0.1),
+            ("f_inf", 10.0),
+            ("f_inf", 0.1),
+            ("a", 10.0),
+            ("n_rejuv", 1.8),  # bounds (0, 2) -- 1.8x vs truth 1.0
+            ("n_rejuv", 0.3),  # factor 0.3 within (0, 2) bounds
+            ("xi", 10.0),
+            ("xi", 0.1),
         ],
     )
     def test_inert_param_does_not_affect_creep(self, inert_param: str, scale: float):
@@ -310,7 +333,9 @@ class TestNonlocalCreepInertParams:
         to ~1e-10 relative error (integrator tolerance floor).
         """
         gamma_ref = _simulate_nonlocal_creep(
-            self._PARAMS_TRUTH, self._T, self._SIGMA_ABOVE,
+            self._PARAMS_TRUTH,
+            self._T,
+            self._SIGMA_ABOVE,
         )
 
         perturbed = dict(self._PARAMS_TRUTH)
@@ -321,16 +346,18 @@ class TestNonlocalCreepInertParams:
         # xi lower bound is 1e-9; 0.1× of 1e-5 is still fine.
 
         gamma_perturbed = _simulate_nonlocal_creep(
-            perturbed, self._T, self._SIGMA_ABOVE,
+            perturbed,
+            self._T,
+            self._SIGMA_ABOVE,
         )
 
         # Compare where reference strain is large enough to avoid dividing
         # by near-zero initial samples (γ(t0)=0 by construction).
         mask = gamma_ref > 1e-6
         assert mask.sum() >= 5, "Not enough points above strain floor"
-        rel_err = np.abs(
-            gamma_perturbed[mask] - gamma_ref[mask]
-        ) / np.abs(gamma_ref[mask])
+        rel_err = np.abs(gamma_perturbed[mask] - gamma_ref[mask]) / np.abs(
+            gamma_ref[mask]
+        )
 
         # PDE integrator tolerance is ~1e-5 rtol / 1e-7 atol, so 1e-4 is a
         # generous margin while still catching any sub-1% leakage.
@@ -348,14 +375,18 @@ class TestNonlocalCreepInertParams:
         the physics we claim it does.
         """
         gamma_ref = _simulate_nonlocal_creep(
-            self._PARAMS_TRUTH, self._T, self._SIGMA_ABOVE,
+            self._PARAMS_TRUTH,
+            self._T,
+            self._SIGMA_ABOVE,
         )
 
         # 2× tau_y (100 → 200) moves it above the applied stress (150),
         # so the system transitions from above-yield to below-yield flow.
         tau_perturbed = dict(self._PARAMS_TRUTH, tau_y=200.0)
         gamma_tau = _simulate_nonlocal_creep(
-            tau_perturbed, self._T, self._SIGMA_ABOVE,
+            tau_perturbed,
+            self._T,
+            self._SIGMA_ABOVE,
         )
         mask = gamma_ref > 1e-4
         rel_tau = np.abs(gamma_tau[mask] - gamma_ref[mask]) / np.abs(gamma_ref[mask])
@@ -367,9 +398,13 @@ class TestNonlocalCreepInertParams:
         # 5× theta slows the fluidity relaxation → less strain at intermediate t.
         theta_perturbed = dict(self._PARAMS_TRUTH, theta=50.0)
         gamma_theta = _simulate_nonlocal_creep(
-            theta_perturbed, self._T, self._SIGMA_ABOVE,
+            theta_perturbed,
+            self._T,
+            self._SIGMA_ABOVE,
         )
-        rel_theta = np.abs(gamma_theta[mask] - gamma_ref[mask]) / np.abs(gamma_ref[mask])
+        rel_theta = np.abs(gamma_theta[mask] - gamma_ref[mask]) / np.abs(
+            gamma_ref[mask]
+        )
         assert rel_theta.max() > 0.05, (
             "5× theta must shift the trajectory non-trivially; "
             f"max rel diff = {rel_theta.max():.3e}"

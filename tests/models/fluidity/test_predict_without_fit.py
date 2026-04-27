@@ -122,9 +122,7 @@ class TestFluidityPredictWithoutFit:
     def test_local_creep(self):
         model = FluidityLocal()
         model.parameters.update(_FLUIDITY_HB_PARAMS)
-        gamma = model.predict(
-            _t_grid(), test_mode="creep", sigma_applied=100.0
-        )
+        gamma = model.predict(_t_grid(), test_mode="creep", sigma_applied=100.0)
         assert np.any(np.asarray(gamma) > 0.0), (
             "Creep predict returned ~0 strain — sigma_applied kwarg "
             "likely not forwarded."
@@ -149,9 +147,7 @@ class TestFluidityPredictWithoutFit:
     def test_nonlocal_creep(self):
         model = FluidityNonlocal(N_y=21, gap_width=1e-3)
         model.parameters.update(_FLUIDITY_NONLOCAL_PARAMS)
-        gamma = model.predict(
-            _t_grid(), test_mode="creep", sigma_applied=100.0
-        )
+        gamma = model.predict(_t_grid(), test_mode="creep", sigma_applied=100.0)
         assert np.any(np.asarray(gamma) > 0.0)
 
     # --- FluiditySaramitoLocal (minimal coupling) ------------------------
@@ -214,7 +210,8 @@ def _transient_model_cases() -> list[tuple[str, str]]:
 
 @pytest.mark.smoke
 @pytest.mark.parametrize(
-    "model_name, protocol", _transient_model_cases(),
+    "model_name, protocol",
+    _transient_model_cases(),
     ids=lambda x: str(x),
 )
 def test_transient_predict_without_fit_canary(model_name: str, protocol: str):
