@@ -27,6 +27,8 @@ formats: []
 # Python configuration
 python:
   install:
-    # Install the project package — pulls all dependencies from pyproject.toml
+    # Install only docs extras — avoids pulling JAX/PySide6/test deps on RTD
     - method: pip
       path: .
+      extra_requirements:
+        - docs

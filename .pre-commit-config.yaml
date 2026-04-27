@@ -5,6 +5,11 @@
 # Note: Hook versions are pinned to ensure reproducibility.
 # Update periodically with: pre-commit autoupdate
 
+ci:
+  autoupdate_schedule: monthly
+  autoupdate_commit_msg: "chore(deps): pre-commit autoupdate"
+  autofix_commit_msg: "style: pre-commit autofix"
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
