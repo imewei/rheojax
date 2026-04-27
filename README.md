@@ -6,6 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://rheojax.readthedocs.io)
 
+> **Disclaimer:** RheoJAX is pre-release software under active development and testing. APIs, model implementations, and numerical results may change without notice. Outputs have not been independently validated for all use cases. Use at your own risk and verify critical results against established reference data before relying on them in research or industrial applications.
+
 JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 45 oscillation-capable models), and 249 tutorial notebooks across 21 categories.
 
 ## Features
