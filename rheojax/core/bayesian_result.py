@@ -255,8 +255,6 @@ class BayesianResult:
                     shaped = flat_arr[np.newaxis, :]
                 posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
 
-        posterior_ds = xr.Dataset(posterior_dict)
-
         # --- sample_stats group ---
         # Mirrors ArviZ's NumPyroConverter.sample_stats_to_xarray() rename map.
         _stat_rename = {
@@ -305,11 +303,14 @@ class BayesianResult:
                 error=str(exc),
             )
 
-        sample_stats_ds = xr.Dataset(stats_dict)
-
-        idata = az.InferenceData(
-            posterior=posterior_ds,
-            sample_stats=sample_stats_ds,
+        # az.from_dict accepts (chain, draw, ...) numpy arrays and is stable
+        # across ArviZ 0.x and 1.x, unlike az.InferenceData() whose constructor
+        # signature changed in 1.0 (DataTree-based, no longer accepts kwargs).
+        posterior_np = {name: da.values for name, da in posterior_dict.items()}
+        stats_np = {name: da.values for name, da in stats_dict.items()}
+        idata = az.from_dict(
+            posterior=posterior_np if posterior_np else None,
+            sample_stats=stats_np if stats_np else None,
         )
 
         logger.info(
