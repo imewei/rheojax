@@ -180,7 +180,13 @@ def _jit_flow_curve_batch(
     def single_rate(gdot_key):
         gdot, k = gdot_key
         return _jit_flow_curve_single(
-            gdot, k, propagator_q, params_array, dt, n_steps, L,
+            gdot,
+            k,
+            propagator_q,
+            params_array,
+            dt,
+            n_steps,
+            L,
             fluidity_form=fluidity_form,
         )
 
@@ -260,9 +266,7 @@ def _jit_startup_kernel(
         elif fluidity_form == "overstress":
             eps = 1e-6
             overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
-            overstress_power = overstress**n_fluid * (
-                sigma_c_mean ** (1.0 - n_fluid)
-            )
+            overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
             )
@@ -387,9 +391,7 @@ def _jit_relaxation_kernel(
         elif fluidity_form == "overstress":
             eps = 1e-6
             overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
-            overstress_power = overstress**n_fluid * (
-                sigma_c_mean ** (1.0 - n_fluid)
-            )
+            overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
             )
@@ -519,9 +521,7 @@ def _jit_creep_kernel(
         elif fluidity_form == "overstress":
             eps = 1e-6
             overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
-            overstress_power = overstress**n_fluid * (
-                sigma_c_mean ** (1.0 - n_fluid)
-            )
+            overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
             )
@@ -639,9 +639,7 @@ def _jit_oscillation_kernel(
         elif fluidity_form == "overstress":
             eps = 1e-6
             overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
-            overstress_power = overstress**n_fluid * (
-                sigma_c_mean ** (1.0 - n_fluid)
-            )
+            overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
             )
@@ -948,7 +946,9 @@ class EPMBase(BaseModel):
             # is (3, L, L) with index 2 == sigma_xy.
             gdot_abs = jnp.abs(gdot)
             inv_scm = 1.0 / jnp.maximum(sigma_c_mean, 1e-8)
-            warm_excess = sigma_c_mean * (gdot_abs * tau_pl * inv_scm) ** (1.0 / n_fluid)
+            warm_excess = sigma_c_mean * (gdot_abs * tau_pl * inv_scm) ** (
+                1.0 / n_fluid
+            )
             sigma_warm = jnp.sign(gdot) * (sigma_c_mean + warm_excess)
             if stress0.ndim == 2:
                 stress0 = stress0 + sigma_warm
@@ -1174,9 +1174,7 @@ class EPMBase(BaseModel):
             return carrier_next, carrier_next[0][2]  # sampled strain
 
         if n_steps > 0:
-            _, strains_scan = jax.lax.scan(
-                outer_body, aug_state, None, length=n_steps
-            )
+            _, strains_scan = jax.lax.scan(outer_body, aug_state, None, length=n_steps)
             strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
         else:
             strains = jnp.array([initial_strain])
@@ -1901,7 +1899,9 @@ class EPMBase(BaseModel):
                 warm_excess = scm_safe * (gdot_abs * tau_safe * inv_scm) ** inv_n
                 sigma_warm_raw = jnp.sign(gdot) * (scm_safe + warm_excess)
                 sigma_warm = jnp.where(
-                    jnp.isfinite(sigma_warm_raw), sigma_warm_raw, jnp.sign(gdot) * scm_safe
+                    jnp.isfinite(sigma_warm_raw),
+                    sigma_warm_raw,
+                    jnp.sign(gdot) * scm_safe,
                 )
                 stress0 = stress0 + sigma_warm
             else:

@@ -431,7 +431,7 @@ class TensorialEPM(EPMBase):
                 (1.0 / sqrt3)
                 * (sqrt3 / 2.0) ** inv_n
                 * scm_safe ** ((n_safe - 1.0) * inv_n)
-                * excess_base ** inv_n
+                * excess_base**inv_n
             )
             # Final clamp: if any component is NaN/inf, fall back to the
             # plateau value scm_safe / sqrt(3) so the simulation still runs.
@@ -479,9 +479,7 @@ class TensorialEPM(EPMBase):
         N1_raw = stresses[:, 1]
         scm_safe = jnp.maximum(params.get("sigma_c_mean", 1.0), 1e-6)
         plateau_fallback = scm_safe / jnp.sqrt(3.0)
-        sigma_xy = jnp.where(
-            jnp.isfinite(sigma_xy_raw), sigma_xy_raw, plateau_fallback
-        )
+        sigma_xy = jnp.where(jnp.isfinite(sigma_xy_raw), sigma_xy_raw, plateau_fallback)
         N1 = jnp.where(jnp.isfinite(N1_raw), N1_raw, 0.0)
 
         # Store N₁ in metadata
@@ -836,6 +834,7 @@ class TensorialEPM(EPMBase):
         # now branch on stress.ndim to extract σ_xy correctly from the
         # tensorial (3, L, L) stress field.
         import jax.numpy as _jnp
+
         y_arr = _jnp.asarray(y)
         if y_arr.ndim > 1:
             raise NotImplementedError(

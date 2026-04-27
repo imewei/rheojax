@@ -709,9 +709,7 @@ class MLIKH(IKHBase):
                 for i in range(1, self._n_modes + 1):
                     cur_G = self.parameters.get_value(f"G_{i}")
                     if cur_G is not None and cur_G < stress_amp * 0.1:
-                        self.parameters.set_value(
-                            f"G_{i}", stress_amp / self._n_modes
-                        )
+                        self.parameters.set_value(f"G_{i}", stress_amp / self._n_modes)
                     cur_sy = self.parameters.get_value(f"sigma_y0_{i}")
                     if cur_sy is not None and cur_sy < stress_amp * 0.01:
                         self.parameters.set_value(

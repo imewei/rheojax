@@ -498,14 +498,16 @@ class GeneralizedMaxwell(BaseModel):
                 pert_E = rng_retry.uniform(0.3, 3.0, size=n_p)
                 pert_tau = 10.0 ** rng_retry.uniform(-0.5, 0.5, size=n_p)
                 E_init = jnp.asarray(
-                    np.clip(base_E * pert_E, 1e-6 * max(total_E, 1.0), 10.0 * max(total_E, 1.0))
+                    np.clip(
+                        base_E * pert_E,
+                        1e-6 * max(total_E, 1.0),
+                        10.0 * max(total_E, 1.0),
+                    )
                 )
                 tau_init = jnp.asarray(
                     np.clip(base_tau * pert_tau, tau_lo_bound, tau_hi_bound)
                 )
-                x_retry = jnp.concatenate(
-                    [jnp.array([E_inf_guess]), E_init, tau_init]
-                )
+                x_retry = jnp.concatenate([jnp.array([E_inf_guess]), E_init, tau_init])
                 try:
                     result_retry = _run_fit_relax(x_retry)
                 except Exception:
@@ -918,12 +920,8 @@ class GeneralizedMaxwell(BaseModel):
             E_double_prime_pred = E_star_pred[1]  # Extract G" from (2, M)
 
             if use_log_residuals:
-                resid_p = (
-                    jnp.log10(jnp.maximum(E_prime_pred, 1e-30)) - _log_Ep
-                )
-                resid_pp = (
-                    jnp.log10(jnp.maximum(E_double_prime_pred, 1e-30)) - _log_Epp
-                )
+                resid_p = jnp.log10(jnp.maximum(E_prime_pred, 1e-30)) - _log_Ep
+                resid_pp = jnp.log10(jnp.maximum(E_double_prime_pred, 1e-30)) - _log_Epp
             else:
                 resid_p = (E_prime_pred - E_prime) / _Ep_scale
                 resid_pp = (E_double_prime_pred - E_double_prime) / _Epp_scale
@@ -946,9 +944,7 @@ class GeneralizedMaxwell(BaseModel):
                 [10.0 ** (0.5 * (log_tau_lo_data + log_tau_hi_data))]
             )
         else:
-            tau_i_guess = jnp.logspace(
-                log_tau_lo_data, log_tau_hi_data, self._n_modes
-            )
+            tau_i_guess = jnp.logspace(log_tau_lo_data, log_tau_hi_data, self._n_modes)
 
         # Always compute derivative-based heuristic guesses so the multi-start
         # retry block below can use them even when the caller supplied
@@ -977,13 +973,9 @@ class GeneralizedMaxwell(BaseModel):
             if contrib_sum > 0 and total > 0:
                 E_i_guess = jnp.asarray(contrib * (total / contrib_sum))
             else:
-                E_i_guess = jnp.full(
-                    self._n_modes, E_sum_guess / max(self._n_modes, 1)
-                )
+                E_i_guess = jnp.full(self._n_modes, E_sum_guess / max(self._n_modes, 1))
         else:
-            E_i_guess = jnp.full(
-                self._n_modes, E_sum_guess / max(self._n_modes, 1)
-            )
+            E_i_guess = jnp.full(self._n_modes, E_sum_guess / max(self._n_modes, 1))
 
         if initial_params is not None:
             x0 = jnp.asarray(initial_params)
@@ -1049,9 +1041,7 @@ class GeneralizedMaxwell(BaseModel):
                 tau_init = jnp.asarray(
                     np.clip(base_tau * pert_tau, tau_lo_bound, tau_hi_bound)
                 )
-                x_retry = jnp.concatenate(
-                    [jnp.array([E_inf_guess]), E_init, tau_init]
-                )
+                x_retry = jnp.concatenate([jnp.array([E_inf_guess]), E_init, tau_init])
                 try:
                     result_retry = _run_fit(x_retry)
                 except Exception:

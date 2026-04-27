@@ -142,9 +142,7 @@ class FluidityBase(BaseModel):
             description="Rejuvenation exponent",
         )
 
-    def _init_hb_from_data(
-        self, gamma_dot: np.ndarray, stress: np.ndarray
-    ) -> None:
+    def _init_hb_from_data(self, gamma_dot: np.ndarray, stress: np.ndarray) -> None:
         """Seed HB parameters (tau_y, K, n_flow) from flow-curve data.
 
         Estimates a Herschel-Bulkley fit ``σ = τ_y + K·γ̇^n`` directly

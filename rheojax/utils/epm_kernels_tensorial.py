@@ -327,7 +327,7 @@ def compute_plastic_strain_rate(
         # well-behaved at the yield surface for gradient-based fitting.
         eps = 1e-6
         overstress = jnp.maximum(sigma_eff - sigma_c_mean, eps)
-        g_eff = overstress ** n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
+        g_eff = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
     else:
         raise ValueError(
             f"Unknown fluidity_form={fluidity_form!r}; "
@@ -335,9 +335,15 @@ def compute_plastic_strain_rate(
         )
 
     # Component rates: direction * g_eff * (1 / tau_pl_ij) * yield_mask
-    eps_dot_p_xx = (dev_xx / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
-    eps_dot_p_yy = (dev_yy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
-    eps_dot_p_xy = (sigma_xy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_shear) * yield_mask
+    eps_dot_p_xx = (
+        (dev_xx / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
+    )
+    eps_dot_p_yy = (
+        (dev_yy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_normal) * yield_mask
+    )
+    eps_dot_p_xy = (
+        (sigma_xy / safe_sigma_eff) * g_eff * (1.0 / tau_pl_shear) * yield_mask
+    )
 
     # Zero out plastic flow when there is no stress at all (sigma_eff ≈ 0)
     no_stress_mask = sigma_eff > 1e-12
