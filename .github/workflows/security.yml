@@ -60,8 +60,7 @@ jobs:
           --sarif --output semgrep.sarif \
           --exclude "tests/*" \
           --exclude "examples/*" \
-          --exclude ".venv/*" \
-          || true
+          --exclude ".venv/*"
 
     - name: Upload SARIF
       if: always()
