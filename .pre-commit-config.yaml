@@ -19,7 +19,7 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=1000']
-        exclude: ^examples/data/experimental/
+        exclude: ^(?:examples/data/experimental|graphify-out)/
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict
