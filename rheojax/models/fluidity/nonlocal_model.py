@@ -820,12 +820,14 @@ class FluidityNonlocal(FluidityBase):
 
         gamma_0 = kwargs.pop("gamma_0", None)
         omega = kwargs.pop("omega", None)
+        f_init = kwargs.pop("f_init", None)
 
         if gamma_0 is None or omega is None:
             raise ValueError("LAOS fitting requires gamma_0 and omega")
 
         self._gamma_0 = gamma_0
         self._omega_laos = omega
+        self._laos_f_init = f_init
 
         # FL-003: Use local variables for coarser grid instead of mutating self
         fit_N_y = kwargs.pop("fit_N_y", min(self.N_y, 32))
@@ -843,6 +845,7 @@ class FluidityNonlocal(FluidityBase):
                 omega,
                 N_y=fit_N_y,
                 dy=fit_dy,
+                f_init=f_init,
             )
             return stress
 
@@ -873,6 +876,7 @@ class FluidityNonlocal(FluidityBase):
         omega: float,
         N_y: int | None = None,
         dy: float | None = None,
+        f_init: np.ndarray | None = None,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Simulate LAOS response using PDE solver.
 
@@ -901,8 +905,21 @@ class FluidityNonlocal(FluidityBase):
             "mode": 0,  # rate_controlled
         }
 
-        # Initial state (uses N_y_local for grid size)
-        y0 = self._get_initial_state("laos", params, N_y=N_y_local)
+        # Initial state: use provided profile to seed spatial gradients,
+        # or fall back to uniform f_eq (gives ∇²f≡0, identical to local model).
+        if f_init is not None:
+            f_field_init = jnp.asarray(f_init, dtype=jnp.float64)
+            if len(f_field_init) != N_y_local:
+                x_src = np.linspace(0, 1, len(f_field_init))
+                x_dst = np.linspace(0, 1, N_y_local)
+                f_field_init = jnp.asarray(
+                    np.interp(x_dst, x_src, np.asarray(f_field_init))
+                )
+            y0 = jnp.concatenate(
+                [jnp.array([0.0]), jnp.maximum(f_field_init, 1e-20)]
+            )
+        else:
+            y0 = self._get_initial_state("laos", params, N_y=N_y_local)
 
         # PDE with time-varying gamma_dot
         def laos_pde(ti, yi, args_i):
@@ -958,6 +975,7 @@ class FluidityNonlocal(FluidityBase):
         omega: float,
         n_cycles: int = 2,
         n_points_per_cycle: int = 256,
+        f_init: np.ndarray | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Simulate LAOS response.
 
@@ -981,7 +999,9 @@ class FluidityNonlocal(FluidityBase):
 
         p = self.get_parameter_dict()
 
-        strain, stress = self._simulate_laos_internal(t_jax, p, gamma_0, omega)
+        strain, stress = self._simulate_laos_internal(
+            t_jax, p, gamma_0, omega, f_init=f_init
+        )
 
         return np.array(strain), np.array(stress)
 
@@ -1048,7 +1068,10 @@ class FluidityNonlocal(FluidityBase):
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(X_jax, p_values, gamma_0, omega)
+            f_init = kwargs.get("f_init", getattr(self, "_laos_f_init", None))
+            _, stress = self._simulate_laos_internal(
+                X_jax, p_values, gamma_0, omega, f_init=f_init
+            )
             return stress
 
         return jnp.zeros_like(X_jax)
@@ -1110,9 +1133,12 @@ class FluidityNonlocal(FluidityBase):
             # Get gamma_0 and omega from kwargs or instance attributes
             gamma_0 = kwargs.get("gamma_0", self._gamma_0)
             omega = kwargs.get("omega", self._omega_laos)
+            f_init = kwargs.get("f_init", getattr(self, "_laos_f_init", None))
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS prediction requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(X_jax, p, gamma_0, omega)
+            _, stress = self._simulate_laos_internal(
+                X_jax, p, gamma_0, omega, f_init=f_init
+            )
             return np.array(stress)
 
         return np.zeros_like(X)
