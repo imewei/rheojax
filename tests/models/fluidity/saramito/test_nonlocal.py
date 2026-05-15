@@ -71,7 +71,7 @@ class TestNonlocalCreep:
         assert gamma[-1] > gamma[0]
 
     def test_creep_below_yield(self, model):
-        """Test creep with stress below yield has bounded strain."""
+        """Test creep with stress below yield returns elastic jump γ = σ/G."""
         t = np.linspace(0, 50, 50)
         sigma_applied = 50.0  # Below yield (tau_y0 = 100)
 
@@ -79,6 +79,13 @@ class TestNonlocalCreep:
 
         assert gamma.shape == t.shape
         assert np.all(np.isfinite(gamma))
+        # Below yield: α=0 → no viscous flow, strain = elastic jump σ/G
+        G = model.parameters.get_value("G")
+        expected_elastic = sigma_applied / G
+        assert np.all(gamma >= expected_elastic * 0.99), (
+            f"Below-yield creep must include elastic jump σ/G={expected_elastic:.4g}; "
+            f"got gamma[0]={gamma[0]:.4g}"
+        )
 
     def test_creep_returns_fluidity_field(self, model):
         """Test creep returns spatial fluidity field."""

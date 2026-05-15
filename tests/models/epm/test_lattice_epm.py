@@ -228,15 +228,14 @@ def test_lattice_epm_relaxation_honours_fluidity_form():
     time = jnp.linspace(0.01, 5.0, 50)
     strain = 1.0  # mu·γ = 1.0 >> σ_c_mean = 0.3 → sites yield, forms diverge
 
-    # Predict path (Python, uses epm_step with overstress)
+    # Predict path (Python, uses epm_step with overstress).
+    # Set _cached_gamma before predict() so the protocol input survives
+    # BaseModel.predict's RheoData→X.x strip (which discards metadata).
+    model._cached_gamma = float(strain)
     pred_py = np.asarray(
         model.predict(
-            RheoData(
-                x=time,
-                y=jnp.zeros_like(time),
-                initial_test_mode="relaxation",
-                metadata={"gamma": strain},
-            ),
+            time,
+            test_mode="relaxation",
             smooth=True,
             seed=0,
         ).y
@@ -244,7 +243,6 @@ def test_lattice_epm_relaxation_honours_fluidity_form():
 
     # Fit path (JIT kernel) via model_function
     model._test_mode = "relaxation"
-    model._cached_gamma = strain
     model._cached_seed = 0
     params_arr = jnp.asarray(
         [model.parameters.get_value(n) for n in model.parameters.keys()],

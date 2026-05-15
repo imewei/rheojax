@@ -585,10 +585,14 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         tau_y = params["tau_y0"]
         alpha = jnp.clip(1.0 - tau_y / (jnp.abs(sigma_applied) + 1e-20), 0.0, 1.0)
 
-        # Integrate strain: γ = ∫ α * f_avg * σ dt
+        # Elastic jump: γ_e(0) = σ₀/G — always present in Maxwell-Saramito creep.
+        # Without this, below-yield (α=0) gives γ=0 instead of the correct σ/G.
+        gamma_elastic_0 = sigma_applied / params["G"]
+
+        # Integrate viscous strain: γ_v = ∫ α * f_avg * σ dt
         gamma_dot_t = alpha * f_avg * sigma_applied
         dt_array = jnp.diff(t, prepend=t[0])
-        gamma = jnp.cumsum(gamma_dot_t * dt_array)
+        gamma = gamma_elastic_0 + jnp.cumsum(gamma_dot_t * dt_array)
 
         f_field_final = sol_ys[-1, 1:]
 

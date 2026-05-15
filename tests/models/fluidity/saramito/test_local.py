@@ -578,6 +578,54 @@ class TestFitPredictRoundtrip:
         # Predict should reproduce the simulation
         np.testing.assert_allclose(pred, strain, rtol=1e-4)
 
+    @pytest.mark.smoke
+    def test_relaxation_predict_uses_explicit_sigma_0(self, model_with_params):
+        """Regression: predict(test_mode='relaxation') must start at sigma_0, not tau_y0.
+
+        Without explicit sigma_0 the model silently falls back to tau_y0 inside
+        _simulate_transient, giving an initial stress of 100 Pa even though the
+        applied elastic jump is G*gamma_0 = 1e4 * 0.02 = 200 Pa.
+        """
+        t = np.linspace(0, 20, 30)
+        gamma_0 = 0.02
+        G = model_with_params.parameters.get_value("G")
+        sigma_0 = float(G) * gamma_0  # 200 Pa — above tau_y0=100 Pa
+
+        stress, _ = model_with_params.simulate_relaxation(t, gamma_0=gamma_0)
+
+        # Manually wire fitted state so predict() finds sigma_0 via the cache
+        model_with_params._test_mode = "relaxation"
+        model_with_params.fitted_ = True
+
+        # With explicit sigma_0: prediction must start at sigma_0
+        pred_explicit = model_with_params.predict(t, test_mode="relaxation", sigma_0=sigma_0)
+        assert np.isfinite(pred_explicit[0]), "Explicit sigma_0 path returned NaN"
+        assert abs(pred_explicit[0] - sigma_0) < 0.01 * sigma_0, (
+            f"With explicit sigma_0={sigma_0}, pred[0]={pred_explicit[0]:.2f} "
+            f"but expected ≈ sigma_0"
+        )
+
+        # Without sigma_0 kwarg the cached _sigma_0 (set by simulate_relaxation) is used
+        pred_cached = model_with_params.predict(t, test_mode="relaxation")
+        assert abs(pred_cached[0] - sigma_0) < 0.01 * sigma_0, (
+            f"Cached _sigma_0 path: pred[0]={pred_cached[0]:.2f} expected ≈ sigma_0"
+        )
+
+    def test_relaxation_predict_roundtrip(self, model_with_params):
+        """simulate_relaxation → predict roundtrip with sigma_0 kwarg."""
+        t = np.linspace(0, 30, 40)
+        gamma_0 = 0.05
+        G = model_with_params.parameters.get_value("G")
+        sigma_0 = float(G) * gamma_0
+
+        stress, _ = model_with_params.simulate_relaxation(t, gamma_0=gamma_0)
+
+        pred = model_with_params.predict(t, test_mode="relaxation", sigma_0=sigma_0)
+
+        assert pred.shape == stress.shape
+        assert np.all(np.isfinite(pred))
+        np.testing.assert_allclose(pred, stress, rtol=1e-4)
+
 
 @pytest.mark.slow
 class TestBayesianSmoke:
