@@ -70,6 +70,10 @@ _NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "callback",
 }
 
+# ODE-based transient protocols pass method='scipy' to bypass NLSQ autodiff.
+# Keep "method" out of the reserved set so it reaches nlsq_optimize.
+_NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
+
 
 @ModelRegistry.register(
     "fluidity_saramito_local",
@@ -374,8 +378,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             use_log_residuals=use_log_residuals,
         )
 
-        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
-        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        # FS-005: Use ODE-specific reserved set to let method='scipy' pass through.
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Saramito transient fit warning: {result.message}")

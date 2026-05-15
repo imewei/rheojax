@@ -421,7 +421,7 @@ class BaseModel(BayesianMixin, ABC):
     def fit(
         self,
         X: ArrayLike,
-        y: ArrayLike,
+        y: ArrayLike | None = None,
         method: str = "nlsq",
         check_compatibility: bool = False,
         use_log_residuals: bool | None = None,
@@ -841,6 +841,12 @@ class BaseModel(BayesianMixin, ABC):
             kwargs["test_mode"] = test_mode
 
         try:
+            # Unpack RheoData: _predict() expects raw arrays, not the container.
+            from rheojax.core.data import RheoData as _RheoData
+
+            if isinstance(X, _RheoData):
+                X = X.x
+
             # ADR-004: All _predict() signatures now accept **kwargs,
             # so we can call directly without try/except/retry.
             result = self._predict(X, **kwargs)
