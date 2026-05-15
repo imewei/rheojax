@@ -400,113 +400,95 @@ def plot_arviz_diagnostics(result, param_names, fast_mode=False):
         return figs
 
     num_chains = result.num_chains if hasattr(result, "num_chains") else 1
+    N = len(var_names)
 
-    # 1. Trace plot
-    try:
-        axes = az.plot_trace(
-            idata, var_names=var_names, figsize=(12, 2.5 * len(var_names))
+    def _safe_plot(plot_fn):
+        """Call ArviZ plot_fn(), cleaning up any orphaned figures on failure.
+
+        ArviZ 1.x creates the figure axes *before* validating kwargs, so a
+        ValueError on an unrecognised kwarg leaves a blank figure in
+        matplotlib's figure manager.  This helper tracks figure numbers
+        before/after and closes any orphans produced by a failed call.
+        """
+        before = set(plt.get_fignums())
+        try:
+            axes = plot_fn()
+            if hasattr(axes, "ravel"):
+                return axes.ravel()[0].figure
+            if hasattr(axes, "figure"):
+                return axes.figure
+            return plt.gcf()
+        except Exception:
+            for fnum in set(plt.get_fignums()) - before:
+                plt.close(fnum)
+            return None
+
+    # 1. Trace plot — ArviZ 1.x: figsize via figure_kwargs, not direct kwarg
+    fig = _safe_plot(
+        lambda: az.plot_trace(
+            idata, var_names=var_names, figure_kwargs={"figsize": (12, 2.5 * N)}
         )
-        fig = axes.ravel()[0].figure
+    )
+    if fig is not None:
         fig.suptitle("Trace Plots", fontsize=14, y=1.02)
         plt.tight_layout()
         figs["trace"] = fig
-    except Exception:
-        pass
 
-    # 2. Pair plot
+    # 2. Pair plot — ArviZ 1.x: no kind= / figsize= / divergences=; bump max_subplots
     if len(var_names) >= 2:
         n_subplots = len(var_names) ** 2
         old_max = az.rcParams.get("plot.max_subplots", 40)
         try:
             if n_subplots > old_max:
                 az.rcParams["plot.max_subplots"] = n_subplots
-            axes = az.plot_pair(
-                idata,
-                var_names=var_names,
-                kind="scatter",
-                divergences=True,
-                figsize=(10, 10),
-            )
-            if hasattr(axes, "ravel"):
-                fig = axes.ravel()[0].figure
-            else:
-                fig = axes.figure
-            fig.suptitle("Parameter Correlations", fontsize=14, y=1.02)
-            plt.tight_layout()
-            figs["pair"] = fig
-        except Exception:
-            pass
+            fig = _safe_plot(lambda: az.plot_pair(idata, var_names=var_names))
+            if fig is not None:
+                fig.suptitle("Parameter Correlations", fontsize=14, y=1.02)
+                plt.tight_layout()
+                figs["pair"] = fig
         finally:
             az.rcParams["plot.max_subplots"] = old_max
 
-    # 3. Forest plot
-    try:
-        axes = az.plot_forest(
-            idata,
-            var_names=var_names,
-            combined=True,
-            hdi_prob=0.95,
-            figsize=(10, max(3, 1.2 * len(var_names))),
-        )
-        if hasattr(axes, "ravel"):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = axes.figure
+    # 3. Forest plot — ArviZ 1.x: no hdi_prob= or figsize=
+    fig = _safe_plot(
+        lambda: az.plot_forest(idata, var_names=var_names, combined=True)
+    )
+    if fig is not None:
         plt.tight_layout()
         figs["forest"] = fig
-    except Exception:
-        pass
 
-    # 4. Energy plot (requires > 1 chain for meaningful comparison, but works with 1)
+    # 4. Energy plot — requires sample_stats in idata (from to_inference_data())
     if not (fast_mode and num_chains == 1):
-        try:
-            ax_energy = az.plot_energy(idata, figsize=(10, 4))
-            if hasattr(ax_energy, "figure"):
-                fig = ax_energy.figure
-            elif hasattr(ax_energy, "ravel"):
-                fig = ax_energy.ravel()[0].figure
-            else:
-                fig = plt.gcf()
+        fig = _safe_plot(
+            lambda: az.plot_energy(idata, figure_kwargs={"figsize": (10, 4)})
+        )
+        if fig is not None:
             fig.suptitle("Energy Diagnostic", fontsize=14, y=1.02)
             plt.tight_layout()
             figs["energy"] = fig
-        except Exception:
-            pass
 
-    # 5. Autocorrelation plot
-    try:
-        axes = az.plot_autocorr(
-            idata,
-            var_names=var_names,
-            figsize=(12, 2.5 * len(var_names)),
+    # 5. Autocorrelation plot — ArviZ 1.x: figsize via figure_kwargs
+    fig = _safe_plot(
+        lambda: az.plot_autocorr(
+            idata, var_names=var_names, figure_kwargs={"figsize": (12, 2.5 * N)}
         )
-        if hasattr(axes, "ravel"):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = axes.figure
+    )
+    if fig is not None:
         fig.suptitle("Autocorrelation", fontsize=14, y=1.02)
         plt.tight_layout()
         figs["autocorr"] = fig
-    except Exception:
-        pass
 
-    # 6. Rank plot (requires >= 2 chains for meaningful interpretation)
+    # 6. Rank plot — ArviZ 1.x: figsize via figure_kwargs; ≥2 chains for interpretation
     if num_chains >= 2 or not fast_mode:
-        try:
-            axes = az.plot_rank(
-                idata,
-                var_names=var_names,
-                figsize=(12, 2.5 * len(var_names)),
+        fig = _safe_plot(
+            lambda: az.plot_rank(
+                idata, var_names=var_names, figure_kwargs={"figsize": (12, 2.5 * N)}
             )
-            if hasattr(axes, "ravel"):
-                fig = axes.ravel()[0].figure
-            else:
-                fig = axes.figure
+        )
+        if fig is not None:
             fig.suptitle("Rank Plots", fontsize=14, y=1.02)
             plt.tight_layout()
             figs["rank"] = fig
-        except Exception:
-            pass
 
     return figs
 
@@ -526,6 +508,6 @@ def display_arviz_diagnostics(result, param_names, fast_mode=False):
     from IPython.display import display
 
     figs = plot_arviz_diagnostics(result, param_names, fast_mode=fast_mode)
-    for _name, fig in figs.items():
+    for fig in figs.values():
         display(fig)
         plt.close(fig)
