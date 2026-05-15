@@ -68,6 +68,11 @@ _NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "callback",
 }
 
+# ODE-based protocols (startup, creep) need method='scipy' to bypass NLSQ's
+# jacfwd, which crashes on diffrax's custom_vjp adjoint. Remove "method" from
+# the reserved set so it passes through to nlsq_optimize as an explicit arg.
+_NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
+
 
 @ModelRegistry.register(
     "fluidity_saramito_nonlocal",
@@ -374,8 +379,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             use_log_residuals=False,
         )
 
-        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
-        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        # FS-005: Use _NLSQ_RESERVED_ODE (keeps "method") so method='scipy'
+        # reaches nlsq_optimize and bypasses jacfwd on diffrax's custom_vjp.
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Nonlocal startup fit warning: {result.message}")
@@ -422,8 +428,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             use_log_residuals=False,
         )
 
-        # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
-        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
+        # FS-005: Use _NLSQ_RESERVED_ODE (keeps "method") so method='scipy'
+        # reaches nlsq_optimize and bypasses jacfwd on diffrax's custom_vjp.
+        nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Nonlocal creep fit warning: {result.message}")
