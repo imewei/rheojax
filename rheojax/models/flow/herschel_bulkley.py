@@ -152,7 +152,10 @@ class HerschelBulkley(BaseModel):
                     n_fit_points=len(log_gamma),
                 )
 
-                coeffs = np.polyfit(log_gamma, log_stress, 1)
+                finite_mask = np.isfinite(log_gamma) & np.isfinite(log_stress)
+                if finite_mask.sum() < 2:
+                    raise ValueError("Insufficient finite data points for power-law fit")
+                coeffs = np.polyfit(log_gamma[finite_mask], log_stress[finite_mask], 1)
                 n_est = coeffs[0]
                 K_est = np.exp(coeffs[1])
 
