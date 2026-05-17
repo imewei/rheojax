@@ -335,6 +335,49 @@ def _warn_stuck_parameters(
     return stuck
 
 
+def attach_y_data_to_result(
+    result: OptimizationResult, y_data: Any
+) -> None:
+    """Attach raw y_data and n_data to an OptimizationResult, if missing.
+
+    Public helper for model fit methods that bypass ``create_least_squares_objective``
+    (e.g., ITT-MCT uses ``fit_with_nlsq`` with a hand-rolled residual function;
+    GeneralizedMaxwell builds ``OptimizationResult`` directly).  Without this,
+    the result's ``r_squared`` property silently returns ``None`` because the
+    ``y_data is None`` guard kicks in.
+
+    Idempotent — only fills missing fields.
+    """
+    if y_data is None:
+        return
+    arr = np.asarray(y_data)
+    if getattr(result, "y_data", None) is None:
+        result.y_data = arr
+    if getattr(result, "n_data", None) is None:
+        try:
+            result.n_data = int(arr.shape[0])
+        except Exception:  # pragma: no cover — defensive
+            pass
+
+
+def _attach_y_data_from_objective(
+    result: OptimizationResult, objective: Callable[..., Any]
+) -> None:
+    """Attach y_data, n_data, and _use_log_residuals to an OptimizationResult.
+
+    ResidualFunction (from create_least_squares_objective) carries the raw
+    y_data as ``_y_data`` and the log-residuals flag as ``_use_log_residuals``.
+    Several inner paths (scipy fallback, DE fallback) build OptimizationResult
+    without them, which silently makes r_squared return None or a wrong value.
+    This helper closes the gap once and is idempotent.
+    """
+    attach_y_data_to_result(result, getattr(objective, "_y_data", None))
+    if not getattr(result, "_use_log_residuals", False):
+        result._use_log_residuals = bool(
+            getattr(objective, "_use_log_residuals", False)
+        )
+
+
 def _run_scipy_least_squares(
     objective: Callable[[np.ndarray], float | np.ndarray],
     x0: np.ndarray,
@@ -428,6 +471,12 @@ def _run_scipy_least_squares(
         jac = np.asarray(scipy_result.jac, dtype=np.float64)
         pcov = compute_covariance_from_jacobian(jac, final_residuals)
 
+    # OPT-YDATA-001: Pull y_data from the ResidualFunction so the result's
+    # ``r_squared`` property can compute correctly.  Note: read from the
+    # original ``objective`` (passed in by the caller), not the inner
+    # ``residual_fn`` wrapper defined above — that local wrapper never has
+    # the ``_y_data`` attribute even when the input is a ResidualFunction.
+    _y_data = getattr(objective, "_y_data", None)
     return OptimizationResult(
         x=np.asarray(scipy_result.x, dtype=np.float64),
         fun=(float(2.0 * scipy_result.cost) if hasattr(scipy_result, "cost") else rss),
@@ -450,6 +499,8 @@ def _run_scipy_least_squares(
         ),
         cost=float(cost_value) if cost_value is not None else None,
         residuals=final_residuals,
+        y_data=_y_data,
+        n_data=(int(_y_data.shape[0]) if _y_data is not None else None),
     )
 
 
@@ -524,6 +575,18 @@ def _run_differential_evolution(
     x_opt = np.asarray(de_result.x, dtype=np.float64)
     rss = float(de_result.fun)
 
+    # OPT-YDATA-001: also propagate y_data through the DE fallback path.
+    _y_data_de = getattr(objective, "_y_data", None)
+    # Recompute residuals at the optimum so r_squared can use raw residuals
+    # in the same units as y_data.
+    try:
+        _final_res = np.asarray(objective(x_opt))
+        if np.iscomplexobj(_final_res):
+            _final_res = np.concatenate([np.real(_final_res), np.imag(_final_res)])
+        _final_res = _final_res.astype(np.float64)
+    except Exception:  # pragma: no cover - defensive
+        _final_res = None
+
     return OptimizationResult(
         x=x_opt,
         fun=rss,
@@ -537,6 +600,9 @@ def _run_differential_evolution(
         optimality=None,
         active_mask=None,
         cost=rss,
+        residuals=_final_res,
+        y_data=_y_data_de,
+        n_data=(int(_y_data_de.shape[0]) if _y_data_de is not None else None),
     )
 
 
@@ -718,6 +784,11 @@ class OptimizationResult:
     # normalization weights so that R²/AIC/BIC can un-normalize for correct
     # statistics.  Shape matches residuals.  None when residuals are raw.
     _normalization_weights: np.ndarray | None = field(default=None, repr=False)
+    # When True, residuals are in log10 space (log10(y_pred) - log10(y_data)).
+    # r_squared must compute SS_tot in the same log10 space to avoid the
+    # dimensionally inconsistent SS_res(log)/SS_tot(linear) mismatch that
+    # yields spurious R²≈1.0 for poor fits spanning multiple decades.
+    _use_log_residuals: bool = field(default=False, repr=False)
 
     def _resolve_n_data(self) -> int:
         """Resolve the true observation count N.
@@ -767,10 +838,26 @@ class OptimizationResult:
         if self._normalization_weights is not None:
             residuals = residuals * np.asarray(self._normalization_weights)
 
+        # When residuals are in log10 space (use_log_residuals=True), SS_tot
+        # must also be in log10 space. Using linear SS_tot yields
+        # SS_res(log) / SS_tot(linear) — dimensionally inconsistent — which
+        # gives spurious R²≈1.0 for poor fits spanning multiple decades.
+        use_log = getattr(self, "_use_log_residuals", False)
+
         if len(residuals) == 2 * len(y_data):
             half = len(y_data)
             ss_res = np.sum(residuals[:half] ** 2) + np.sum(residuals[half:] ** 2)
-            if np.iscomplexobj(y_data):
+            if use_log:
+                if np.iscomplexobj(y_data):
+                    log_r = np.log10(np.maximum(np.abs(y_data.real), 1e-300))
+                    log_i = np.log10(np.maximum(np.abs(y_data.imag), 1e-300))
+                    ss_tot = np.sum((log_r - np.mean(log_r)) ** 2) + np.sum(
+                        (log_i - np.mean(log_i)) ** 2
+                    )
+                else:
+                    log_y = np.log10(np.maximum(np.abs(y_data), 1e-300))
+                    ss_tot = np.sum((log_y - np.mean(log_y)) ** 2)
+            elif np.iscomplexobj(y_data):
                 ss_tot = np.sum((y_data.real - np.mean(y_data.real)) ** 2) + np.sum(
                     (y_data.imag - np.mean(y_data.imag)) ** 2
                 )
@@ -778,9 +865,15 @@ class OptimizationResult:
                 ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
         else:
             ss_res = np.sum(residuals**2)
-            if np.iscomplexobj(y_data):
-                y_data = np.abs(y_data)
-            ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+            if use_log:
+                if np.iscomplexobj(y_data):
+                    y_data = np.abs(y_data)
+                log_y = np.log10(np.maximum(np.abs(y_data), 1e-300))
+                ss_tot = np.sum((log_y - np.mean(log_y)) ** 2)
+            else:
+                if np.iscomplexobj(y_data):
+                    y_data = np.abs(y_data)
+                ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
 
         if ss_tot == 0:
             logger.warning(
@@ -1699,6 +1792,8 @@ def nlsq_optimize(
         _warn_stuck_parameters(
             parameters, original_values, fallback_result.x, nlsq_bounds
         )
+        # OPT-YDATA-001: ensure y_data/n_data are attached on the fallback path
+        _attach_y_data_from_objective(fallback_result, objective)
         return fallback_result
 
     # Ensure x is float64
@@ -1717,6 +1812,11 @@ def nlsq_optimize(
 
     # Update ParameterSet with optimal values
     parameters.set_values(result.x)
+
+    # OPT-YDATA-001: belt-and-braces — guarantee y_data/n_data on the result
+    # regardless of which inner path produced it.  Idempotent: only fills
+    # missing fields.
+    _attach_y_data_from_objective(result, objective)
 
     logger.info(
         "Optimization completed successfully",
@@ -2394,6 +2494,7 @@ def fit_with_nlsq(
     residual_fn: Callable[[np.ndarray], np.ndarray],
     x0: np.ndarray,
     bounds: tuple[np.ndarray, np.ndarray] | None = None,
+    y_data: Any = None,
     **kwargs,
 ) -> OptimizationResult:
     """Fit using nonlinear least squares with residual function.
@@ -2405,6 +2506,11 @@ def fit_with_nlsq(
         residual_fn: Function that takes parameter array and returns residuals
         x0: Initial parameter values as 1D array
         bounds: Tuple of (lower, upper) bound arrays, or None for unbounded
+        y_data: Optional raw dependent-variable data.  When provided, gets
+            attached to ``OptimizationResult.y_data`` so the ``r_squared``
+            property computes correctly.  Without this, callers that pass
+            a plain residual function (rather than a ResidualFunction from
+            ``create_least_squares_objective``) see ``r_squared = None``.
         **kwargs: Additional arguments passed to optimize_with_bounds
 
     Returns:
@@ -2419,7 +2525,11 @@ def fit_with_nlsq(
     else:
         bounds_list = [(None, None)] * len(x0)
 
-    return optimize_with_bounds(residual_fn, x0, bounds_list, **kwargs)
+    result = optimize_with_bounds(residual_fn, x0, bounds_list, **kwargs)
+    # OPT-YDATA-001: ensure r_squared can compute even when the caller built
+    # a hand-rolled residual function (no ResidualFunction wrapper).
+    attach_y_data_to_result(result, y_data)
+    return result
 
 
 def residual_sum_of_squares(
@@ -2574,17 +2684,27 @@ class ResidualFunction:
     a function attribute (which breaks if the function is wrapped by decorators,
     ``functools.wraps``, ``jax.jit``, etc.).  The class is fully transparent to
     callers — it behaves like a plain function but safely exposes the weights.
+
+    The ``_y_data`` slot also carries the original dependent-variable array so
+    downstream code (``nlsq_optimize``, scipy/DE fallback paths) can attach it
+    to ``OptimizationResult`` and recover correct R²/RMSE/AIC/BIC. Without
+    this, those paths leave ``y_data=None`` and the ``r_squared`` property
+    silently returns ``None``, masking successful fits as failures.
     """
 
-    __slots__ = ("_fn", "_normalization_weights")
+    __slots__ = ("_fn", "_normalization_weights", "_y_data", "_use_log_residuals")
 
     def __init__(
         self,
         fn: Callable[[np.ndarray], np.ndarray],
         normalization_weights: np.ndarray | None = None,
+        y_data: np.ndarray | None = None,
+        use_log_residuals: bool = False,
     ) -> None:
         self._fn = fn
         self._normalization_weights = normalization_weights
+        self._y_data = y_data
+        self._use_log_residuals = use_log_residuals
 
     def __call__(self, params: np.ndarray) -> np.ndarray:
         return self._fn(params)
@@ -2878,7 +2998,19 @@ def create_least_squares_objective(
         else:
             weights = np.maximum(np.abs(y_data_np), _norm_floor_f)
 
-    return ResidualFunction(residuals, normalization_weights=weights)
+    # OPT-YDATA-001: Carry the raw y_data through so downstream optimizer
+    # wrappers can attach it to OptimizationResult.y_data — otherwise the
+    # ``r_squared`` property returns None and ``check_nlsq_quality`` reports
+    # a successful fit as 0.0 (silent failure of the R²-based convergence
+    # gate).  Convert to numpy at the boundary; we keep complex dtype intact
+    # because the r_squared property handles complex y_data correctly.
+    y_data_for_result = np.asarray(y_data)
+    return ResidualFunction(
+        residuals,
+        normalization_weights=weights,
+        y_data=y_data_for_result,
+        use_log_residuals=use_log_residuals,
+    )
 
 
 # Convenience aliases for compatibility with different naming conventions
