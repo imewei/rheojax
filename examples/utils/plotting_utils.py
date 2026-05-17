@@ -303,7 +303,7 @@ def plot_posterior_predictive(
             )
         else:
             margin = 0.05 * (x_data.max() - x_data.min())
-            x_pred = np.linspace(x_data.min() - margin, x_data.max() + margin, 100)
+            x_pred = np.linspace(x_data.min(), x_data.max() + margin, 100)
 
     n_available = len(posterior[param_names[0]])
     n_use = min(n_draws, n_available)
