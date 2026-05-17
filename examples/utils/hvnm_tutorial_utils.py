@@ -598,6 +598,15 @@ def configure_hvnm_for_fit(
             model.parameters.set_value(name, value)
 
     fittable = FITTABLE_PARAMS.get(protocol, list(HVNM_DEFAULT_PARAMS.keys()))
+
+    # Collapse bounds of non-fittable params to (value, value) so NLSQ
+    # only moves the declared fittable parameters. Without this, nlsq_optimize
+    # treats all 15 params as free, producing unphysical warm-starts.
+    for name in list(model.parameters.keys()):
+        if name not in fittable:
+            val = float(model.parameters.get_value(name))
+            model.parameters[name].bounds = (val, val)
+
     return fittable
 
 
@@ -725,6 +734,13 @@ def plot_fit_comparison(
     # Handle (N, 2) predictions - convert to complex if needed
     if hasattr(y_pred, "ndim") and y_pred.ndim == 2:
         y_pred = y_pred[:, 0] + 1j * y_pred[:, 1]
+
+    # For oscillation the model returns complex G*; take |G*| for a single
+    # unified loglog plot (avoids ComplexWarning when passing complex to matplotlib).
+    if np.iscomplexobj(y_pred):
+        y_pred = np.abs(y_pred)
+    if np.iscomplexobj(y):
+        y = np.abs(y)
 
     # Left: data vs fit
     logscale = data.protocol in ("flow_curve", "oscillation", "relaxation")
