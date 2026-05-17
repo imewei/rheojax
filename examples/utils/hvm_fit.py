@@ -141,12 +141,12 @@ def run_nlsq_protocol(
     return {p: float(model.parameters.get_value(p)) for p in param_names}
 
 
-def check_nlsq_quality(model: Any, min_r2: float = 0.0) -> dict[str, Any]:
+def check_nlsq_quality(model: Any, min_r2: float = 0.5) -> dict[str, Any]:
     """Check NLSQ fit quality and return diagnostic summary.
 
     Args:
         model: Fitted HVMLocal instance.
-        min_r2: Minimum acceptable R² (default 0.0).
+        min_r2: Minimum acceptable R² (default 0.5).
 
     Returns:
         Dict with r2, iterations, converged (bool), and message.
@@ -160,7 +160,11 @@ def check_nlsq_quality(model: Any, min_r2: float = 0.0) -> dict[str, Any]:
             "message": "No NLSQ result found — model.fit() not called?",
         }
 
-    r2 = getattr(result, "r_squared", None) or 0.0
+    # Avoid the Python `or` trap: 0.0 is falsy, so `r2 or 0.0` would mask
+    # a true R²=0.0. Use an explicit None check instead.
+    r2 = getattr(result, "r_squared", None)
+    if r2 is None:
+        r2 = 0.0
     nit = getattr(result, "nfev", None) or getattr(result, "iterations", None)
     converged = r2 >= min_r2
 
