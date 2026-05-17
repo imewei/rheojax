@@ -166,7 +166,7 @@ class BayesianResult:
         from rheojax.core.arviz_utils import import_arviz
 
         try:
-            az = import_arviz(required=("InferenceData",))
+            az = import_arviz()
             logger.debug("ArviZ imported successfully")
         except ImportError as exc:
             logger.error("ArviZ import failed", exc_info=True)
