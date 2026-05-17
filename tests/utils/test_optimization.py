@@ -758,3 +758,128 @@ class TestNlsqCurveFit:
         assert result.success
         np.testing.assert_allclose(result.x[0], 3.0, rtol=0.1)
         np.testing.assert_allclose(result.x[1], 1.0, rtol=0.1)
+
+
+class TestYDataAttachment:
+    """Regression tests for the universal y_data attachment fix (2026-05-17).
+
+    History: ``OptimizationResult.r_squared`` returned ``None`` whenever
+    ``y_data`` was missing from the result, and several inner optimizer paths
+    (scipy fallback, DE fallback, multimode/GMM custom result construction,
+    ITT-MCT's hand-rolled ``fit_with_nlsq``) built ``OptimizationResult``
+    without it.  Downstream code (e.g. ``check_nlsq_quality``) treated the
+    resulting ``None`` as ``0.0``, masking real fit failures as
+    "fits-at-the-mean" and falsely skipping Bayesian inference on successful
+    fits.
+
+    The fix lives in ``rheojax/utils/optimization.py``: ``ResidualFunction``
+    now carries ``_y_data``, ``create_least_squares_objective`` sets it,
+    ``_run_scipy_least_squares`` / ``_run_differential_evolution`` propagate
+    it, and ``nlsq_optimize`` attaches it as a belt-and-braces step.
+
+    These tests pin that contract.  In particular,
+    ``test_scipy_path_attaches_y_data`` catches the original bug where
+    ``_run_scipy_least_squares`` read ``getattr(residual_fn, "_y_data", None)``
+    on the *inner* wrapper function instead of the original ``objective``
+    argument — the wrapper never carries the attribute.
+    """
+
+    @pytest.mark.smoke
+    def test_residual_function_carries_y_data(self):
+        """create_least_squares_objective must stash _y_data on the returned
+        ResidualFunction so downstream code can recover it."""
+        from rheojax.utils.optimization import create_least_squares_objective
+
+        x = np.linspace(0.1, 10.0, 20)
+        y = 2.0 * np.exp(-0.5 * x) + 1.0
+
+        def model_fn(x_arr, params):
+            return params[0] * np.exp(-params[1] * x_arr) + params[2]
+
+        obj = create_least_squares_objective(model_fn, x, y)
+        assert hasattr(obj, "_y_data"), "ResidualFunction must expose _y_data"
+        assert obj._y_data is not None
+        np.testing.assert_array_equal(np.asarray(obj._y_data), y)
+
+    @pytest.mark.smoke
+    def test_scipy_path_attaches_y_data(self):
+        """When method='scipy', _run_scipy_least_squares must attach y_data
+        from the *objective* parameter (not its inner residual_fn wrapper).
+
+        Regression test for the residual_fn-vs-objective bug discovered while
+        verifying VLB Variant: the local residual_fn wrapper never has
+        _y_data, only the original ResidualFunction objective does.
+        """
+        from rheojax.utils.optimization import (
+            create_least_squares_objective,
+            nlsq_optimize,
+        )
+
+        # Clean exponential decay (no added noise — the regression we care
+        # about is the y_data plumbing, not optimizer accuracy on noisy data).
+        np.random.seed(0)
+        x = np.linspace(0.1, 3.0, 30)
+        true_a, true_tau = 2.0, 1.0
+        y = true_a * np.exp(-x / true_tau)
+
+        def model_fn(x_arr, params):
+            return params[0] * np.exp(-x_arr / params[1])
+
+        params = ParameterSet()
+        params.add("a", value=1.0, bounds=(0.01, 10.0))
+        params.add("tau", value=0.5, bounds=(0.1, 10.0))
+
+        objective = create_least_squares_objective(model_fn, x, y)
+        result = nlsq_optimize(objective, params, method="scipy", max_iter=200)
+
+        # Core contract: y_data MUST be on the result after a scipy-path fit.
+        assert result.y_data is not None, (
+            "scipy path must propagate y_data; otherwise r_squared is None and "
+            "check_nlsq_quality silently maps it to 0.0, masking successful fits."
+        )
+        assert result.n_data == len(y)
+        np.testing.assert_array_equal(np.asarray(result.y_data), y)
+        # r_squared must compute (not be None).  Loose lower bound — quality
+        # isn't the point, attachment is.
+        assert result.r_squared is not None
+        assert result.r_squared > 0.5, (
+            f"r_squared should compute to a sensible value, got {result.r_squared}"
+        )
+
+    @pytest.mark.smoke
+    def test_attach_y_data_helper_is_idempotent(self):
+        """attach_y_data_to_result must not clobber pre-set fields."""
+        from rheojax.utils.optimization import attach_y_data_to_result
+
+        existing_y = np.array([1.0, 2.0, 3.0])
+        result = OptimizationResult(
+            x=np.array([0.0]),
+            fun=0.0,
+            y_data=existing_y,
+            n_data=3,
+        )
+        # Passing a different y_data must not overwrite.
+        attach_y_data_to_result(result, np.array([9.0, 9.0, 9.0]))
+        np.testing.assert_array_equal(result.y_data, existing_y)
+        assert result.n_data == 3
+
+    @pytest.mark.smoke
+    def test_attach_y_data_helper_fills_missing(self):
+        """attach_y_data_to_result must populate y_data when absent."""
+        from rheojax.utils.optimization import attach_y_data_to_result
+
+        result = OptimizationResult(x=np.array([0.0]), fun=0.0)
+        y = np.array([4.0, 5.0, 6.0, 7.0])
+        attach_y_data_to_result(result, y)
+        np.testing.assert_array_equal(result.y_data, y)
+        assert result.n_data == 4
+
+    @pytest.mark.smoke
+    def test_attach_y_data_helper_handles_none(self):
+        """attach_y_data_to_result with y_data=None must be a no-op."""
+        from rheojax.utils.optimization import attach_y_data_to_result
+
+        result = OptimizationResult(x=np.array([0.0]), fun=0.0)
+        attach_y_data_to_result(result, None)
+        assert result.y_data is None
+        assert result.n_data is None

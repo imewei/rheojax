@@ -533,10 +533,20 @@ class TestVLBVariantBayesian:
         assert jnp.all(jnp.isfinite(result))
 
     @pytest.mark.slow
+    @pytest.mark.timeout(240)
     def test_fit_bayesian_bell_flow_curve(self, vlb_bell):
-        """Bayesian inference on Bell shear-thinning flow curve."""
-        # Generate synthetic data
-        gdot = np.logspace(-1, 1, 15)
+        """Bayesian inference on Bell shear-thinning flow curve.
+
+        VLBVariant uses ``method="scipy"`` for its diffrax-based ODE — every
+        gradient step needs multiple ODE solves with finite-difference
+        Jacobians, which makes even the NLSQ warm-start cost ~80s.  Combined
+        with a 1-chain NUTS run, the test cannot fit inside the default 60s
+        global timeout.  Smoke contract is just that fit_bayesian completes
+        and returns a result, so dataset and chain length are kept small.
+        """
+        # Generate synthetic data (small dataset — each gdot point costs
+        # one ODE solve per residual evaluation under the scipy path).
+        gdot = np.logspace(-1, 1, 8)
         sigma_true, _ = vlb_bell.predict_flow_curve(gdot)
         noise = np.random.default_rng(42).normal(0, 0.02 * sigma_true)
         sigma_data = sigma_true + noise
@@ -547,20 +557,23 @@ class TestVLBVariantBayesian:
         model.parameters.set_value("G0", 900.0)
         model.parameters.set_value("k_d_0", 0.8)
         model.parameters.set_value("nu", 2.5)
-        model.fit(gdot, sigma_data, test_mode="flow_curve")
+        # Cap NLSQ iterations — close-to-truth init means convergence is fast.
+        model.fit(gdot, sigma_data, test_mode="flow_curve", max_iter=100)
 
         # NLSQ should recover parameters approximately
         # (Bell has strong parameter correlations, so wide tolerance)
         assert model.G0 == pytest.approx(1000.0, rel=0.3)
         assert model.k_d_0 == pytest.approx(1.0, rel=0.5)
 
-        # Bayesian
+        # Bayesian — short chain (smoke contract is "fit_bayesian completes",
+        # not posterior quality).  num_warmup/num_samples=50 each keeps the
+        # NUTS step count modest while exercising the full pipeline.
         result = model.fit_bayesian(
             gdot,
             sigma_data,
             test_mode="flow_curve",
-            num_warmup=200,
-            num_samples=200,
+            num_warmup=50,
+            num_samples=50,
             num_chains=1,
         )
         assert result is not None

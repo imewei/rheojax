@@ -86,9 +86,13 @@ class TestGMMRelaxationMode:
             G * np.exp(-t / tau) for G, tau in zip(G_i_true, tau_i_true)
         )
 
-        # Fit GMM
+        # Fit GMM. Disable element minimization (the sibling
+        # ``test_element_minimization_reduces_n`` covers that behavior) so
+        # both modes survive and we can assert on G_1 and G_2 separately.
+        # Without this, the default optimization_factor=1.5 prunes one mode
+        # and parameters["G_2"] returns None → TypeError on the > 0 check.
         model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
-        model.fit(t, G_data, test_mode="relaxation")
+        model.fit(t, G_data, test_mode="relaxation", optimization_factor=None)
 
         # Check all moduli are positive
         G_inf_fit = model.parameters.get_value("G_inf")
