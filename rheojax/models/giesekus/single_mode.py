@@ -387,9 +387,11 @@ class GiesekusSingleMode(GiesekusBase):
             )
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
-            return self._simulate_startup_internal(
+            tau_xy = self._simulate_startup_internal(
                 X_jax, eta_p, lambda_1, alpha, gamma_dot
             )
+            # Total shear stress = polymer ODE stress + Newtonian solvent
+            return tau_xy + eta_s * gamma_dot
 
         elif mode == "relaxation":
             # Get gamma_dot from kwargs or instance attribute
@@ -429,10 +431,13 @@ class GiesekusSingleMode(GiesekusBase):
             omega = kwargs["omega"] if "omega" in kwargs else self._omega_laos
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
-            _, stress = self._simulate_laos_internal(
+            _, tau_xy = self._simulate_laos_internal(
                 X_jax, eta_p, lambda_1, alpha, gamma_0, omega
             )
-            return stress
+            # Total shear stress = polymer ODE stress + Newtonian solvent
+            # γ̇(t) = γ₀·ω·cos(ωt)
+            gamma_dot_t = gamma_0 * omega * jnp.cos(omega * X_jax)
+            return tau_xy + eta_s * gamma_dot_t
 
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
@@ -718,7 +723,8 @@ class GiesekusSingleMode(GiesekusBase):
                 np.asarray(tau_zz),
             )
 
-        return np.asarray(tau_xy)
+        # Add Newtonian solvent: total σ = τ_xy (polymer) + η_s · γ̇
+        return np.asarray(tau_xy) + self.eta_s * gamma_dot
 
     def _simulate_relaxation_internal(
         self,
@@ -1148,11 +1154,13 @@ class GiesekusSingleMode(GiesekusBase):
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
 
-        strain, stress = self._simulate_laos_internal(
+        strain, tau_xy = self._simulate_laos_internal(
             t_jax, self.eta_p, self.lambda_1, self.alpha, gamma_0, omega
         )
 
         strain_rate = gamma_0 * omega * jnp.cos(omega * t_jax)
+        # Total shear stress = polymer ODE stress + Newtonian solvent (η_s · γ̇)
+        stress = tau_xy + self.eta_s * strain_rate
 
         self._trajectory = {
             "t": np.asarray(t_jax),

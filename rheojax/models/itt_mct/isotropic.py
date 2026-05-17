@@ -1146,6 +1146,33 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         return np.array(sigma_prime), np.array(sigma_double_prime)
 
+    def model_function(
+        self,
+        X: np.ndarray,
+        params: np.ndarray,
+        test_mode: str = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Static model function for Bayesian inference.
+
+        NOTE: Bayesian inference is not yet supported for ITT-MCT Isotropic models.
+        The ISM kernel requires full k-grid integration and Prony decomposition for
+        each MCMC sample, making NUTS sampling computationally prohibitive.
+
+        Use NLSQ fitting with bootstrap resampling for uncertainty quantification.
+
+        Raises
+        ------
+        NotImplementedError
+            Always raised - Bayesian inference not supported for ITT-MCT Isotropic models
+        """
+        raise NotImplementedError(
+            "Bayesian inference is not yet supported for ITT-MCT Isotropic models. "
+            "The ISM kernel requires k-grid integration per MCMC sample, making "
+            "NUTS sampling computationally prohibitive. "
+            "Use NLSQ fitting with bootstrap resampling for uncertainty quantification."
+        )
+
     def __repr__(self) -> str:
         """Return string representation."""
         info = self.get_glass_transition_info()

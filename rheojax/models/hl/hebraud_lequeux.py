@@ -157,7 +157,8 @@ class HebraudLequeux(BaseModel):
         # Ensure grid covers relevant stress range
         # Minimum sigma_max of 5.0 to handle standard normalized cases
         # Otherwise scale with sigma_c
-        sigma_max = max(5.0, sigma_c_val * self.grid_sigma_factor)
+        sigma_c_num = sigma_c_val if sigma_c_val is not None else 1.0
+        sigma_max = max(5.0, sigma_c_num * self.grid_sigma_factor)
         return sigma_max, self.grid_n_bins
 
     def _adaptive_dt(self, t_max: float) -> tuple[float, int]:
@@ -541,7 +542,17 @@ class HebraudLequeux(BaseModel):
         t_max = float(t[-1])
         dt, n_steps = self._adaptive_dt(t_max)
 
-        # Grid sizing
+        # Warm-start sigma_c from data stress scale before grid sizing.
+        # _get_grid_params() uses sigma_c to set sigma_max = max(5, sigma_c*5).
+        # With the default sigma_c=1 Pa the grid spans ±5 Pa, which misses
+        # physical stresses (e.g. 73 Pa), making the kernel return ≈0 and the
+        # optimizer unable to converge (hits bounds: alpha→1, tau→max).
+        stress_scale = float(np.max(np.abs(stress)))
+        _current_sc = self.parameters.get_value("sigma_c")
+        if stress_scale > 0 and (_current_sc is None or _current_sc <= 1.0):
+            self.parameters.set_value("sigma_c", stress_scale / 2.0)
+
+        # Grid sizing (uses updated sigma_c)
         sigma_max, n_bins = self._get_grid_params()
 
         def model_fn(x_data, params):
@@ -593,7 +604,14 @@ class HebraudLequeux(BaseModel):
         t_max = float(t[-1])
         dt, n_steps = self._adaptive_dt(t_max)
 
-        # Grid sizing
+        # Same sigma_c warm-start as _fit_startup: LAOS stresses can far exceed
+        # the default sigma_c=1 Pa, so grid must be seeded from data amplitude.
+        stress_scale = float(np.max(np.abs(stress)))
+        _current_sc = self.parameters.get_value("sigma_c")
+        if stress_scale > 0 and (_current_sc is None or _current_sc <= 1.0):
+            self.parameters.set_value("sigma_c", stress_scale / 2.0)
+
+        # Grid sizing (uses updated sigma_c)
         sigma_max, n_bins = self._get_grid_params()
 
         def model_fn(x_data, params):
@@ -653,10 +671,24 @@ class HebraudLequeux(BaseModel):
                 "G_star must be complex array or (M, 2) array of [G', G'']"
             )
 
-        # Grid sizing
+        # Warm-start sigma_c from G* data scale before grid sizing.
+        # G' is on the order of sigma_c in the HL model (G0 = sigma_c).
+        # With default sigma_c=1 Pa, sigma_max=5 Pa — if sigma_c=73 Pa, NO
+        # grid block ever reaches the yield criterion → G''≈0 (pure elastic).
+        G_scale = float(np.mean(np.abs(G_prime_data)))
+        _current_sc = self.parameters.get_value("sigma_c")
+        if G_scale > 0 and (_current_sc is None or _current_sc <= 1.0):
+            self.parameters.set_value("sigma_c", G_scale)
+
+        # Grid sizing (uses updated sigma_c)
         sigma_max, n_bins = self._get_grid_params()
         n_cycles = kwargs.get("n_cycles", 10)
         gamma0_saos = kwargs.get("gamma0", 0.01)
+
+        # Data-scale starting point for multi-start
+        tau_est = self.parameters.get_value("tau")
+        log_tau_est = float(np.log10(tau_est if tau_est is not None else 1.0))
+        sigma_c_est = float(G_scale if G_scale > 0 else 1.0)
 
         # Safe log targets
         Gp_safe = np.maximum(np.abs(G_prime_data), 1e-10)
@@ -668,7 +700,7 @@ class HebraudLequeux(BaseModel):
             sigma_c_v = x[2]
             if not (0.01 <= alpha_v <= 0.99):
                 return 1e6
-            if not (0.01 <= sigma_c_v <= 100.0):
+            if not (0.01 <= sigma_c_v <= max(100.0, sigma_c_est * 2)):
                 return 1e6
             try:
                 result = run_saos(
@@ -691,11 +723,12 @@ class HebraudLequeux(BaseModel):
                 logger.debug("SAOS cost_fn exception: %s", exc)
                 return 1e6
 
-        # Multi-start optimization
+        # Multi-start: three generic + one data-scale informed start
         starts = [
             [0.30, -1.0, 2.0],
             [0.10, -2.0, 3.0],
             [0.50, 0.0, 1.0],
+            [0.30, log_tau_est, sigma_c_est],
         ]
         best_x = starts[0]
         best_cost = np.inf
@@ -731,7 +764,7 @@ class HebraudLequeux(BaseModel):
         # Set fitted parameters
         alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
         tau_fit = float(10.0 ** np.clip(best_x[1], -6, 4))
-        sigma_c_fit = float(np.clip(best_x[2], 0.01, 100.0))
+        sigma_c_fit = float(np.clip(best_x[2], 0.01, max(100.0, sigma_c_est * 2)))
 
         self.parameters.set_value("alpha", alpha_fit)
         self.parameters.set_value("tau", tau_fit)
