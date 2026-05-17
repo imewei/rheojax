@@ -245,7 +245,15 @@ class GeneralizedMaxwell(BaseModel):
             )
 
     def _nlsq_fit(
-        self, objective, x0, bounds, max_nfev=1000, ftol=1e-6, xtol=1e-6, gtol=1e-6
+        self,
+        objective,
+        x0,
+        bounds,
+        max_nfev=1000,
+        ftol=1e-6,
+        xtol=1e-6,
+        gtol=1e-6,
+        y_data=None,
     ) -> OptimizationResult:
         """NLSQ wrapper for consistent fitting across modes.
 
@@ -257,6 +265,9 @@ class GeneralizedMaxwell(BaseModel):
             ftol: Function tolerance
             xtol: Parameter tolerance
             gtol: Gradient tolerance
+            y_data: Optional raw dependent-variable array. When provided,
+                gets attached to the result so ``r_squared`` computes correctly.
+                If absent, also tries ``getattr(objective, "_y_data", None)``.
 
         Returns:
             OptimizationResult with fitted parameters and diagnostics
@@ -299,6 +310,21 @@ class GeneralizedMaxwell(BaseModel):
                 "  3. Too many modes for the available data"
             ) from e
 
+        # OPT-YDATA-001: compute residuals at optimum and attach y_data so
+        # ``r_squared`` works.  Without this the GMM custom path leaves
+        # residuals=None and y_data=None, masking fit success as r_squared=None.
+        from rheojax.utils.optimization import attach_y_data_to_result
+
+        try:
+            _final_res = np.asarray(objective(nlsq_result.x))
+            if np.iscomplexobj(_final_res):
+                _final_res = np.concatenate(
+                    [np.real(_final_res), np.imag(_final_res)]
+                )
+            _final_res = _final_res.astype(np.float64)
+        except Exception:  # pragma: no cover - defensive
+            _final_res = None
+
         # Convert to OptimizationResult
         result = OptimizationResult(
             x=np.asarray(nlsq_result.x),
@@ -322,7 +348,16 @@ class GeneralizedMaxwell(BaseModel):
                 else None
             ),
             nlsq_result=nlsq_result,
+            residuals=_final_res,
         )
+
+        # Prefer the explicit y_data argument; fall back to one stashed on
+        # the objective itself by the caller, then on self (set by the
+        # _fit_*_mode method that originated the call).
+        _y = y_data if y_data is not None else getattr(objective, "_y_data", None)
+        if _y is None:
+            _y = getattr(self, "_current_y_data", None)
+        attach_y_data_to_result(result, _y)
 
         logger.debug(
             "NLSQ optimization completed",
@@ -353,6 +388,9 @@ class GeneralizedMaxwell(BaseModel):
                 If None, uses default heuristic initialization
             **kwargs: NLSQ optimizer arguments
         """
+        # OPT-YDATA-001: stash y_data so _nlsq_fit can attach it to the
+        # OptimizationResult and ``r_squared`` works on _nlsq_result.
+        self._current_y_data = np.asarray(E_t)
         # Extract kwargs
         max_iter = kwargs.get("max_iter", 1000)
         ftol = kwargs.get("ftol", 1e-6)
@@ -584,6 +622,9 @@ class GeneralizedMaxwell(BaseModel):
             optimization_factor: R² threshold multiplier (e.g., 1.5 means N_opt where R²_N >= 1.5 * R²_min)
             **kwargs: NLSQ optimizer arguments
         """
+        # OPT-YDATA-001: ensure y_data is stashed (may already be set by the
+        # caller, but be robust if called directly).
+        self._current_y_data = np.asarray(y)
         # Store initial n_modes for diagnostics
         n_max = self._n_modes
         n_initial = n_max
@@ -826,6 +867,11 @@ class GeneralizedMaxwell(BaseModel):
                 cost=optimal_result.cost,
                 grad=None,
                 nlsq_result=optimal_result.nlsq_result,
+                # OPT-YDATA-001: forward y_data so r_squared is computable on
+                # the slimmed (post-element-minimization) result too.
+                residuals=getattr(optimal_result, "residuals", None),
+                y_data=getattr(optimal_result, "y_data", None),
+                n_data=getattr(optimal_result, "n_data", None),
             )
 
     def _fit_oscillation_mode(
@@ -847,6 +893,9 @@ class GeneralizedMaxwell(BaseModel):
                 If None, uses default heuristic initialization
             **kwargs: NLSQ optimizer arguments
         """
+        # OPT-YDATA-001: stash y_data so _nlsq_fit attaches it for r_squared.
+        # E_star may be complex or (M,2); attach as-is, r_squared handles both.
+        self._current_y_data = np.asarray(E_star)
         # Extract kwargs
         max_iter = kwargs.get("max_iter", 1000)
         ftol = kwargs.get("ftol", 1e-6)
@@ -1116,10 +1165,12 @@ class GeneralizedMaxwell(BaseModel):
             J_t: Creep compliance array
             optimization_factor: R² threshold multiplier for element minimization
             initial_params: Optional initial parameter guess for warm-start
-                Shape: (2*n_modes + 1,) [E_inf, E_1...E_N, tau_1...tau_N]
+                Shape: (2*n_modes + 1,) [J_0, J_1...J_N, tau_1...tau_N]
                 If None, uses default heuristic initialization
             **kwargs: NLSQ optimizer arguments
         """
+        # OPT-YDATA-001: stash y_data so _nlsq_fit attaches it for r_squared.
+        self._current_y_data = np.asarray(J_t)
         # Extract kwargs
         max_iter = kwargs.get("max_iter", 1000)
         ftol = kwargs.get("ftol", 1e-6)
@@ -1973,6 +2024,9 @@ class GeneralizedMaxwell(BaseModel):
         """
         # Store gamma_dot for predictions
         self._startup_gamma_dot = gamma_dot
+
+        # OPT-YDATA-001: stash y_data so _nlsq_fit attaches it for r_squared.
+        self._current_y_data = np.asarray(eta_plus)
 
         # Extract kwargs
         max_iter = kwargs.get("max_iter", 1000)

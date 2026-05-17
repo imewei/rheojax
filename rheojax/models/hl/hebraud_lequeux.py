@@ -141,6 +141,11 @@ class HebraudLequeux(BaseModel):
         #   500 steps → 0.6s compile, 1000 → 1.9s, 2000 → 5.8s
         # Cap at 500 for tractable fitting.
         self._max_scan_steps_creep = 500
+        # Relaxation kernel with long data (e.g. Laponite, t_max=3152 s) gives
+        # n_steps=19953 via _adaptive_dt. XLA compilation of a 20k-step scan
+        # dominates the entire fit (~30s), leaving <1s for optimization.
+        # Cap at 500 steps for fitting; _predict uses full resolution.
+        self._max_scan_steps_relax_fit = 500
         # Bayesian (forward-mode AD through scan) is much more expensive
         self._max_scan_steps_bayesian = 2000
         self._max_scan_steps_bayesian_creep = 500
@@ -467,11 +472,23 @@ class HebraudLequeux(BaseModel):
         self._last_fit_kwargs["_n_bins"] = int(n_bins)
 
     def _fit_relaxation(self, t: np.ndarray, modulus: np.ndarray, **kwargs):
-        """Fit stress relaxation modulus."""
-        from rheojax.utils.optimization import (
-            create_least_squares_objective,
-            nlsq_optimize,
-        )
+        """Fit stress relaxation modulus with G0 normalization.
+
+        The HL relaxation kernel assumes G0=1 (all stresses in normalized units
+        where the elastic plateau = 1). For physical data (G in Pa) the correct
+        approach is to divide sigma_c by G0 ≈ G(t→0) before calling the kernel,
+        then un-normalize the result. This is identical to the steady-shear path
+        that divides all stresses by stress_scale before fitting.
+
+        After this normalization:
+        - kernel sigma_c_norm = sigma_c_physical / G0 ~ O(gamma0) = O(0.01)
+        - P0 at sigma = gamma0 (normalized) ~ sigma_c_norm → ~50% initial yield
+        - kernel G_norm = G / G0 ~ O(1) throughout
+        - predict() returns G * G0 (in Pa), giving correct physical units
+        """
+        import time as _time
+
+        from scipy.optimize import minimize as scipy_minimize
 
         gamma0 = kwargs.get("gamma0")
         if gamma0 is None:
@@ -479,49 +496,117 @@ class HebraudLequeux(BaseModel):
                 "gamma0 (step strain) must be provided in kwargs for relaxation fitting"
             )
 
-        t_jax = jnp.asarray(t, dtype=jnp.float64)
-        G_jax = jnp.asarray(modulus, dtype=jnp.float64)
+        gamma0_float = float(gamma0)
+
+        # G0 ≈ G(t → 0): the elastic plateau modulus in physical units (Pa).
+        # After normalising sigma by G0, sigma_c_norm = sigma_c_physical / G0
+        # is O(gamma0), placing P0 (centred at gamma0) near sigma_c_norm
+        # → ~50% initial yield → non-trivial glass/fluid dynamics.
+        G0 = float(np.max(np.abs(modulus))) if np.any(np.abs(modulus) > 0) else 1.0
+
+        # Normalised target for the log-residual cost (both O(1))
+        G_norm_target = np.log10(np.maximum(np.abs(modulus) / G0, 1e-20))
 
         t_max = float(t[-1])
-        dt, n_steps = self._adaptive_dt(t_max)
+        # Cap n_steps at _max_scan_steps_relax_fit for fitting only.
+        # Long datasets (Laponite t_max=3152 s) produce n_steps≈20k via
+        # _adaptive_dt, causing ~30s XLA compilation that swamps the optimizer.
+        dt = max(self._min_dt, t_max / self._max_scan_steps_relax_fit)
+        n_steps = int(t_max / dt) + 1
 
-        # Grid sizing
-        sigma_max, n_bins = self._get_grid_params()
+        # Fixed sigma_max in normalised units: sigma_c_norm ~ O(0.01-0.1),
+        # so sigma_max=5 covers >> 50× sigma_c_norm throughout the search.
+        sigma_max_norm = 5.0
+        n_bins = self.grid_n_bins
 
-        def model_fn(x_data, params):
-            alpha, tau, sigma_c = params
-            time_hist, stress_hist = relaxation_kernel(
-                n_steps, gamma0, alpha, tau, sigma_c, dt, sigma_max, n_bins
-            )
+        # Safe log10 target (already computed above, used in cost_fn)
+        t_np = np.asarray(t, dtype=np.float64)
 
-            # Initial stress approximation
-            init_stress = gamma0
+        def cost_fn(x):
+            alpha_v, log_tau_v, log_sc_norm_v = x
+            tau_v = 10.0 ** log_tau_v
+            sc_norm_v = 10.0 ** log_sc_norm_v
+            if not (0.01 <= alpha_v <= 0.99):
+                return 1e6
+            if sc_norm_v <= 1e-6 or sc_norm_v > sigma_max_norm / 2:
+                return 1e6
+            try:
+                time_hist, stress_hist = relaxation_kernel(
+                    n_steps, gamma0_float, alpha_v, tau_v, sc_norm_v,
+                    dt, sigma_max_norm, n_bins,
+                )
+                init_stress = gamma0_float
+                time_full = jnp.concatenate([jnp.array([0.0]), time_hist])
+                stress_full = jnp.concatenate([jnp.array([init_stress]), stress_hist])
+                sigma_interp = np.array(jnp.interp(jnp.asarray(t_np), time_full, stress_full))
+                G_norm_pred = sigma_interp / gamma0_float  # G in [0, 1] scale
+                log_pred = np.log10(np.maximum(np.abs(G_norm_pred), 1e-20))
+                resid = log_pred - G_norm_target
+                return float(np.mean(resid ** 2))
+            except Exception as exc:
+                logger.debug("Relaxation cost_fn exception: %s", exc)
+                return 1e6
 
-            time_full = jnp.concatenate([jnp.array([0.0]), time_hist])
-            stress_full = jnp.concatenate([jnp.array([init_stress]), stress_hist])
+        # Initial parameter estimates in the search space [alpha, log10(tau), log10(sigma_c_norm)]
+        _tau_init = self.parameters.get_value("tau")
+        log_tau_init = float(np.log10(max(1e-6, _tau_init if _tau_init else 1.0)))
+        # sigma_c_norm_init: place sigma_c_norm just above gamma0 so ~20–50% initial yield
+        sc_norm_init = float(np.clip(gamma0_float * 1.5, 1e-4, 1.0))
+        log_sc_norm_init = float(np.log10(sc_norm_init))
 
-            sigma_interp = jnp.interp(x_data, time_full, stress_full)
-            return sigma_interp / gamma0
+        starts = [
+            [0.30, log_tau_init, log_sc_norm_init],
+            [0.10, log_tau_init - 1.0, log_sc_norm_init + 0.3],
+            [0.40, log_tau_init + 1.0, log_sc_norm_init - 0.3],
+        ]
+        best_x = starts[0]
+        best_cost = np.inf
+        t0_fit = _time.time()
 
-        objective = create_least_squares_objective(
-            model_fn, t_jax, G_jax, normalize=True, use_log_residuals=True
-        )
+        _callback = kwargs.get("callback")
 
-        result = nlsq_optimize(
-            objective,
-            self.parameters,
-            method="scipy",
-            use_jax=True,
-            max_iter=kwargs.get("max_iter", 500),
-        )
+        for i, x0 in enumerate(starts):
+            try:
+                res = scipy_minimize(
+                    cost_fn,
+                    x0,
+                    method="Nelder-Mead",
+                    callback=_callback,
+                    options={
+                        "maxfev": kwargs.get("max_iter", 200),
+                        "xatol": 0.02,
+                        "fatol": 0.005,
+                        "adaptive": True,
+                    },
+                )
+                if res.fun < best_cost:
+                    best_cost = res.fun
+                    best_x = res.x.copy()
+                    logger.info(
+                        f"Relax start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
+                        f"sigma_c_norm={10**res.x[2]:.4f}"
+                    )
+            except Exception as e:
+                logger.warning(f"Relaxation start {i+1} failed: {e}")
 
-        if not result.success:
-            logger.warning(f"Optimization warning: {result.message}")
+        elapsed = _time.time() - t0_fit
+        logger.info(f"HL relaxation fit: {elapsed:.1f}s, best cost={best_cost:.5f}")
 
-        # Store protocol kwargs for model_function (Bayesian inference)
-        self._last_fit_kwargs["gamma0"] = float(gamma0)
-        self._last_fit_kwargs["_sigma_max"] = float(sigma_max)
-        self._last_fit_kwargs["_n_bins"] = int(n_bins)
+        alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
+        tau_fit = float(10.0 ** np.clip(best_x[1], -6, 4))
+        sc_norm_fit = float(10.0 ** np.clip(best_x[2], -6, np.log10(sigma_max_norm / 2)))
+
+        # Un-normalise sigma_c back to physical Pa for storage in parameters
+        self.parameters.set_value("alpha", alpha_fit)
+        self.parameters.set_value("tau", tau_fit)
+        self.parameters.set_value("sigma_c", sc_norm_fit * G0)
+
+        # Store for predict() and Bayesian model_function
+        self._last_fit_kwargs["gamma0"] = gamma0_float
+        self._last_fit_kwargs["_G0_relax"] = G0
+        self._last_fit_kwargs["_sigma_max"] = sigma_max_norm
+        self._last_fit_kwargs["_n_bins"] = n_bins
 
     def _fit_startup(self, t: np.ndarray, stress: np.ndarray, **kwargs):
         """Fit startup stress transient."""
@@ -550,7 +635,9 @@ class HebraudLequeux(BaseModel):
         stress_scale = float(np.max(np.abs(stress)))
         _current_sc = self.parameters.get_value("sigma_c")
         if stress_scale > 0 and (_current_sc is None or _current_sc <= 1.0):
-            self.parameters.set_value("sigma_c", stress_scale / 2.0)
+            # Use full peak stress (not /2): startup peak ≈ σ_c at overshoot,
+            # so stress_scale is the best proxy for the true yield stress.
+            self.parameters.set_value("sigma_c", stress_scale)
 
         # Grid sizing (uses updated sigma_c)
         sigma_max, n_bins = self._get_grid_params()
@@ -851,6 +938,11 @@ class HebraudLequeux(BaseModel):
             )
         elif self._test_mode == "relaxation":
             gamma0 = self._last_fit_kwargs.get("gamma0", 1.0)
+            G0 = self._last_fit_kwargs.get("_G0_relax", 1.0)
+            # Use normalized grid stored during fit (kernel works in σ/G0 units)
+            sigma_max_norm = self._last_fit_kwargs.get("_sigma_max", 5.0)
+            n_bins_rel = self._last_fit_kwargs.get("_n_bins", int(n_bins))
+            sigma_c_norm = float(1.0 if sigma_c is None else sigma_c) / G0
             t_max = float(X_jax[-1])
             dt_pred, _ = self._adaptive_dt(t_max)
             return np.array(
@@ -859,12 +951,12 @@ class HebraudLequeux(BaseModel):
                     float(gamma0),
                     float(0.5 if alpha is None else alpha),
                     float(1.0 if tau is None else tau),
-                    float(1.0 if sigma_c is None else sigma_c),
+                    sigma_c_norm,
                     dt_pred,
-                    float(sigma_max),
-                    int(n_bins),
+                    float(sigma_max_norm),
+                    int(n_bins_rel),
                 )
-            )
+            ) * G0
         elif self._test_mode == "startup":
             gdot = self._last_fit_kwargs.get("gdot", 1.0)
             t_max = float(X_jax[-1])
@@ -1053,15 +1145,17 @@ class HebraudLequeux(BaseModel):
         elif mode == "relaxation":
             dt, n_steps = get_dt_and_n_steps(X_jax)
             gamma0 = _kw("gamma0", 1.0)
+            G0 = _kw("_G0_relax", 1.0)
+            sigma_c_norm = sigma_c / G0  # Kernel works in σ/G0 units
 
             time_hist, stress_hist = relaxation_kernel(
-                n_steps, gamma0, alpha, tau, sigma_c, dt, sigma_max, n_bins
+                n_steps, gamma0, alpha, tau, sigma_c_norm, dt, sigma_max, n_bins
             )
             # Init stress approx
             init_stress = gamma0
             time_full = jnp.concatenate([jnp.array([0.0]), time_hist])
             stress_full = jnp.concatenate([jnp.array([init_stress]), stress_hist])
-            return jnp.interp(X_jax, time_full, stress_full) / gamma0
+            return jnp.interp(X_jax, time_full, stress_full) / gamma0 * G0
 
         elif mode == "startup":
             dt, n_steps = get_dt_and_n_steps(X_jax)

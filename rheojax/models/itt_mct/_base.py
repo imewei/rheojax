@@ -378,6 +378,7 @@ class ITTMCTBase(BaseModel):
             initial_values,
             bounds=bounds,
             method="scipy",
+            y_data=sigma,
         )
 
         self.parameters.set_values(dict(zip(param_names, result.x, strict=True)))
@@ -449,6 +450,7 @@ class ITTMCTBase(BaseModel):
             residual_func,
             initial_values,
             bounds=bounds,
+            y_data=G_star,
             **kwargs,
         )
 
@@ -502,6 +504,7 @@ class ITTMCTBase(BaseModel):
             residual_func,
             initial_values,
             bounds=bounds,
+            y_data=sigma,
             **kwargs,
         )
 
@@ -555,6 +558,7 @@ class ITTMCTBase(BaseModel):
             residual_func,
             initial_values,
             bounds=bounds,
+            y_data=J,
             **kwargs,
         )
 
@@ -608,6 +612,7 @@ class ITTMCTBase(BaseModel):
             residual_func,
             initial_values,
             bounds=bounds,
+            y_data=sigma,
             **kwargs,
         )
 
@@ -664,6 +669,7 @@ class ITTMCTBase(BaseModel):
             residual_func,
             initial_values,
             bounds=bounds,
+            y_data=sigma,
             **kwargs,
         )
 
