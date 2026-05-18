@@ -1,0 +1,55 @@
+# Baseline of notebooks with the silent-skip pattern (fit/quality cell
+# unexecuted while the rest of the notebook ran). Snapshot taken 2026-05-18
+# after the STZ NB04/NB05 fix. Listed paths are skipped by the QA scanner
+# in scripts/check_notebook_execution.py.
+#
+# Goal: shrink this list to zero over time. Whenever you fix one of these
+# notebooks (re-execute cleanly), delete the corresponding line so the
+# scanner re-protects it from regression.
+#
+# A NEW notebook landing in this file constitutes a regression in the
+# pre-commit gate / CI test (tests/test_notebook_execution_consistency.py).
+#
+# Lines starting with '#' and blank lines are ignored. Paths are relative
+# to the repo root.
+
+examples/bayesian/09-spp-rheojax-workflow.ipynb
+examples/dmt/01_dmt_flow_curve.ipynb
+examples/dmt/02_dmt_startup_shear.ipynb
+examples/dmt/03_dmt_stress_relaxation.ipynb
+examples/dmt/04_dmt_creep.ipynb
+examples/fikh/08_fmlikh_startup_shear.ipynb
+examples/giesekus/01_giesekus_flow_curve.ipynb
+examples/giesekus/02_giesekus_saos.ipynb
+examples/hvm/07_hvm_overview.ipynb
+examples/ikh/02_mikh_startup_shear.ipynb
+examples/ikh/04_mikh_creep.ipynb
+examples/ikh/08_mlikh_startup_shear.ipynb
+examples/ikh/10_mlikh_creep.ipynb
+examples/ikh/12_mlikh_laos.ipynb
+examples/itt_mct/01_schematic_flow_curve.ipynb
+examples/itt_mct/02_schematic_startup_shear.ipynb
+examples/itt_mct/04_schematic_creep.ipynb
+examples/itt_mct/05_schematic_saos.ipynb
+examples/itt_mct/06_schematic_laos.ipynb
+examples/itt_mct/07_isotropic_flow_curve.ipynb
+examples/itt_mct/08_isotropic_startup_shear.ipynb
+examples/itt_mct/09_isotropic_stress_relaxation.ipynb
+examples/itt_mct/10_isotropic_creep.ipynb
+examples/itt_mct/11_isotropic_saos.ipynb
+examples/itt_mct/12_isotropic_laos.ipynb
+examples/sgr/01_sgr_flow_curve.ipynb
+examples/sgr/02_sgr_stress_relaxation.ipynb
+examples/sgr/03_sgr_saos.ipynb
+examples/sgr/04_sgr_creep.ipynb
+examples/tnt/14_tnt_loop_bridge_startup.ipynb
+examples/tnt/27_tnt_sticky_rouse_relaxation.ipynb
+examples/verification/creep/creep_mucus.ipynb
+examples/verification/creep/creep_polystyrene.ipynb
+examples/verification/oscillation/oscillation_freq_master_validation.ipynb
+examples/verification/oscillation/oscillation_mastercurve_analysis_polystyrene.ipynb
+examples/verification/oscillation/oscillation_models_evaluator.ipynb
+examples/verification/oscillation/oscillation_moo_fitting_mastercurves.ipynb
+examples/vlb/12_vlb_creep_nlsq_to_nuts.ipynb
+examples/vlb/14_vlb_startup_shear_nlsq_to_nuts.ipynb
+examples/vlb/16_vlb_laos_nlsq_to_nuts.ipynb

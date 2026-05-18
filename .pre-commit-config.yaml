@@ -55,3 +55,18 @@ repos:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
         exclude: (uv\.lock|\.ipynb)$
+
+  - repo: local
+    hooks:
+      - id: notebook-execution-consistency
+        name: Notebook execution consistency
+        description: >-
+          Flags committed notebooks where fit/quality cells are unexecuted
+          while the rest of the notebook has executed cells (silent-skip
+          pattern). Notebooks with all code cells cleared are skipped.
+        entry: >-
+          python scripts/check_notebook_execution.py
+          --allowlist scripts/notebook_execution_baseline.txt
+        language: system
+        files: \.ipynb$
+        pass_filenames: true
