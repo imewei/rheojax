@@ -19,8 +19,7 @@ examples/dmt/02_dmt_startup_shear.ipynb
 examples/dmt/03_dmt_stress_relaxation.ipynb
 examples/dmt/04_dmt_creep.ipynb
 examples/fikh/08_fmlikh_startup_shear.ipynb
-examples/giesekus/01_giesekus_flow_curve.ipynb
-examples/giesekus/02_giesekus_saos.ipynb
+
 examples/hvm/07_hvm_overview.ipynb
 examples/ikh/02_mikh_startup_shear.ipynb
 examples/ikh/04_mikh_creep.ipynb
