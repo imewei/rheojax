@@ -607,7 +607,7 @@ def get_mlikh_param_names(
         List of MLIKH parameter names.
     """
     if yield_mode == "per_mode":
-        # 7 parameters per mode + 1 global
+        # 7 parameters per mode + 2 global (eta_inf, mu_p)
         params = []
         for i in range(1, n_modes + 1):
             params.extend(
@@ -621,10 +621,10 @@ def get_mlikh_param_names(
                     f"Gamma_{i}",
                 ]
             )
-        params.append("eta_inf")
+        params.extend(["eta_inf", "mu_p"])
         return params
     else:
-        # 5 global + 3 per mode
+        # 5 global + 3 per mode + 2 global viscosity
         params = ["G", "C", "gamma_dyn", "sigma_y0", "k3"]
         for i in range(1, n_modes + 1):
             params.extend(
@@ -634,6 +634,7 @@ def get_mlikh_param_names(
                     f"w_{i}",
                 ]
             )
+        params.extend(["eta_inf", "mu_p"])
         return params
 
 

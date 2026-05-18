@@ -259,6 +259,70 @@ def load_pnas_laos(
 
 
 # =============================================================================
+# Fit Quality Guard
+# =============================================================================
+
+
+def check_nlsq_fit_quality(
+    model: Any,
+    X: np.ndarray,
+    y: np.ndarray,
+    test_mode: str,
+    r2_threshold: float = 0.90,
+    **predict_kwargs: Any,
+) -> float:
+    """Compute R² and warn before Bayesian inference if fit is poor.
+
+    A poor NLSQ warm-start (R² < threshold) causes NUTS to explore unphysical
+    parameter space: model-data mismatch flattens the likelihood, so the sampler
+    drifts far from the warm-start values.
+
+    Args:
+        model: Fitted VLBLocal (or any VLBBase subclass).
+        X: Independent variable (gamma_dot, omega, time, …).
+        y: Observed data — real or complex G*.
+        test_mode: Protocol string ('flow_curve', 'relaxation', …).
+        r2_threshold: Warn threshold (default 0.90).
+        **predict_kwargs: Forwarded to model.predict()
+            (e.g. gamma_dot=, sigma_applied=, omega=).
+
+    Returns:
+        R² value (float). Raises UserWarning if R² < r2_threshold.
+    """
+    import warnings as _warnings
+
+    y_pred = np.asarray(model.predict(X, test_mode=test_mode, **predict_kwargs))
+    y_arr = np.asarray(y)
+
+    if np.iscomplexobj(y_arr):
+        y_ref = np.abs(y_arr)
+        y_pred_ref = np.abs(y_pred)
+    else:
+        y_ref = np.asarray(y_arr, dtype=float)
+        y_pred_ref = np.asarray(y_pred, dtype=float)
+
+    ss_res = np.sum((y_ref - y_pred_ref) ** 2)
+    ss_tot = np.sum((y_ref - np.mean(y_ref)) ** 2)
+    r2 = float(1.0 - ss_res / max(float(ss_tot), 1e-12))
+
+    if r2 < r2_threshold:
+        _warnings.warn(
+            f"\n⚠  Poor NLSQ fit quality (R²={r2:.3f} < {r2_threshold}, "
+            f"test_mode='{test_mode}').\n"
+            f"   NUTS may explore unphysical parameter space from this warm-start.\n"
+            f"   Remedies: (1) use synthetic data matching the model physics; "
+            f"(2) switch to VLBMultiNetwork for multi-mode materials; "
+            f"(3) check data units or protocol mismatch.",
+            UserWarning,
+            stacklevel=2,
+        )
+    else:
+        print(f"✓  NLSQ fit quality R²={r2:.4f} ≥ {r2_threshold} — safe to proceed with Bayesian")
+
+    return r2
+
+
+# =============================================================================
 # Diagnostics
 # =============================================================================
 

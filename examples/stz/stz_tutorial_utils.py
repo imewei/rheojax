@@ -446,6 +446,129 @@ def generate_synthetic_laos(
     return time, strain_clean, stress
 
 
+def generate_synthetic_creep(
+    params: dict[str, float],
+    sigma_applied: float = 200.0,
+    t_end: float = 5.0,
+    n_points: int = 60,
+    t_start: float = 0.1,
+    noise_level: float = 0.03,
+    seed: int = 42,
+    variant: str = "standard",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate synthetic creep strain γ(t) data from STZ parameters.
+
+    Pure STZ self-consistent data — guarantees the model can fit it perfectly
+    in the noise-free limit. Use this in tutorial notebooks when real data is
+    multi-mode (e.g. polymer melt, biological gel) and cannot be matched by a
+    single-mode STZ. The total strain includes both the elastic offset
+    γ(0+) = σ/G0 and the accumulating plastic component.
+
+    Args:
+        params: STZ parameters (must include G0, sigma_y, chi_inf, tau0,
+            epsilon0, c0, ez, tau_beta for the standard variant).
+        sigma_applied: Constant applied shear stress [Pa].
+        t_end: End time of the creep window [s].
+        n_points: Number of time points.
+        t_start: Start time (avoids t=0 for the ODE solver) [s].
+        noise_level: Relative log-normal noise level (0.03 = 3%).
+        seed: Random seed.
+        variant: STZ variant.
+
+    Returns:
+        Tuple of (time, strain) arrays. Strain is positive and monotonically
+        non-decreasing.
+    """
+    from rheojax.core.jax_config import safe_import_jax
+    from rheojax.models.stz import STZConventional
+
+    jax, jnp = safe_import_jax()
+
+    model = STZConventional(variant=variant)
+    # Widen bounds for soft-matter scales (defaults target metallic glasses)
+    for p_name in ["G0", "sigma_y", "tau0"]:
+        if p_name in model.parameters.keys():
+            model.parameters.set_bounds(p_name, (1e-20, 1e20))
+    for name, value in params.items():
+        if name in model.parameters.keys():
+            model.parameters[name].value = value
+
+    time = np.linspace(t_start, t_end, n_points)
+    model._gamma_dot_applied = None
+    model._sigma_applied = sigma_applied
+    model._test_mode = "creep"
+    model.fitted_ = True
+
+    strain_clean = np.asarray(model.predict(time))
+
+    # Log-normal noise is more natural for strictly positive creep curves
+    rng = np.random.default_rng(seed)
+    log_noise = rng.normal(0.0, noise_level, size=strain_clean.shape)
+    strain = strain_clean * np.exp(log_noise)
+    return time, strain
+
+
+def generate_synthetic_saos(
+    params: dict[str, float],
+    omega_min: float = 1e-2,
+    omega_max: float = 1e2,
+    n_points: int = 32,
+    noise_level: float = 0.02,
+    seed: int = 42,
+    variant: str = "standard",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate synthetic SAOS data (G', G'') from STZ parameters.
+
+    STZ in the small-strain limit is a single Maxwell-like element; this
+    helper produces data that the same model can fit exactly. Use in tutorial
+    notebooks when real polymer data spans more frequency decades than a
+    single relaxation time can cover (e.g. PS145 over 4.5 decades).
+
+    Args:
+        params: STZ parameters (must include G0, sigma_y, chi_inf, tau0,
+            epsilon0, ez for standard).
+        omega_min: Minimum angular frequency [rad/s].
+        omega_max: Maximum angular frequency [rad/s].
+        n_points: Number of log-spaced ω points.
+        noise_level: Relative log-normal noise level (0.02 = 2%).
+        seed: Random seed.
+        variant: STZ variant.
+
+    Returns:
+        Tuple of (omega, G_prime, G_double_prime) arrays.
+    """
+    from rheojax.core.jax_config import safe_import_jax
+    from rheojax.models.stz import STZConventional
+
+    jax, jnp = safe_import_jax()
+
+    model = STZConventional(variant=variant)
+    for p_name in ["G0", "sigma_y", "tau0"]:
+        if p_name in model.parameters.keys():
+            model.parameters.set_bounds(p_name, (1e-20, 1e20))
+    for name, value in params.items():
+        if name in model.parameters.keys():
+            model.parameters[name].value = value
+
+    omega = np.logspace(np.log10(omega_min), np.log10(omega_max), n_points)
+    model._gamma_0 = 0.001  # Small-strain SAOS limit
+    model._test_mode = "oscillation"
+    model.fitted_ = True
+
+    G_pred = np.asarray(model.predict(omega))
+    if np.iscomplexobj(G_pred):
+        Gp_clean = G_pred.real
+        Gpp_clean = G_pred.imag
+    else:
+        Gp_clean = G_pred[:, 0]
+        Gpp_clean = G_pred[:, 1]
+
+    rng = np.random.default_rng(seed)
+    Gp = Gp_clean * np.exp(rng.normal(0.0, noise_level, size=Gp_clean.shape))
+    Gpp = Gpp_clean * np.exp(rng.normal(0.0, noise_level, size=Gpp_clean.shape))
+    return omega, Gp, Gpp
+
+
 def print_convergence_summary(
     result: Any,
     param_names: list[str],
