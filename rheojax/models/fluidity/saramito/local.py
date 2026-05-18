@@ -197,6 +197,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             else:
                 raise ValueError(f"Unsupported test_mode: {test_mode}")
 
+            ctx["R2"] = getattr(self, "_last_fit_r_squared", None)
             self.fitted_ = True
 
         return self
@@ -270,6 +271,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
         if not result.success:
             logger.warning(f"Saramito flow curve fit warning: {result.message}")
 
@@ -345,6 +347,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         gamma_dot = kwargs.pop("gamma_dot", None)
         sigma_applied = kwargs.pop("sigma_applied", None)
         sigma_0 = kwargs.pop("sigma_0", None)
+        # gamma_0: preferred over sigma_0 for relaxation — keeps IC consistent as G varies
+        # during NLSQ (sigma_init = params["G"] * gamma_0 instead of fixed sigma_0).
+        gamma_0 = kwargs.pop("gamma_0", None)
         t_wait = kwargs.pop("t_wait", 0.0)
         kwargs.pop("smart_init", None)  # FS-018: consistent across all _fit_* methods
 
@@ -357,12 +362,14 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         self._gamma_dot_applied = gamma_dot
         self._sigma_applied = sigma_applied
         self._sigma_0 = sigma_0
+        self._gamma_0 = gamma_0
         self._t_wait = t_wait
 
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             result = self._simulate_transient(
-                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0, t_wait
+                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0, t_wait,
+                gamma_0=gamma_0,
             )
             return result
 
@@ -381,6 +388,18 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # FS-005: Use ODE-specific reserved set to let method='scipy' pass through.
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
+        if self._last_fit_r_squared is None and result.x is not None:
+            # Fallback: OptimizationResult.r_squared can return None for ODE paths
+            # when the residual bookkeeping misses y_data.  Compute directly.
+            try:
+                resids = np.asarray(objective(result.x))
+                y_arr = np.asarray(y_jax)
+                ss_res = float(np.sum(resids**2))
+                ss_tot = float(np.sum((y_arr - np.mean(y_arr))**2))
+                self._last_fit_r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+            except Exception:
+                pass
         if not result.success:
             logger.warning(f"Saramito transient fit warning: {result.message}")
 
@@ -393,6 +412,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         sigma_applied: float | None,
         sigma_0: float | None,
         t_wait: float = 0.0,
+        gamma_0: float | None = None,
     ) -> jnp.ndarray:
         """Simulate transient response using Diffrax ODE integration.
 
@@ -451,7 +471,15 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         else:  # relaxation
             # Relaxation: rate = 0, stress decays
             ode_fn = saramito_local_relaxation_ode_rhs
-            sigma_init = sigma_0 if sigma_0 is not None else params["tau_y0"]
+            # gamma_0 keeps sigma_init consistent with G during NLSQ optimization;
+            # sigma_0 (fixed) is kept for backward compat but causes IC inconsistency
+            # when G is a free parameter (tau_xx_init = sigma_0**2/G changes with G).
+            if gamma_0 is not None:
+                sigma_init = G * gamma_0  # Scales with current G → consistent IC
+            elif sigma_0 is not None:
+                sigma_init = sigma_0
+            else:
+                sigma_init = params["tau_y0"]
             # Start with elevated fluidity (just flowed) and initial stress
             f_init_relax = f_flow
             # FS-007: Initial normal stress from step strain: τ_xx(0) = σ₀²/G
@@ -509,6 +537,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         sigma_0: float | None = None,
         gamma_dot: Any = _MISSING,
         sigma_applied: Any = _MISSING,
+        gamma_0: float | None = None,
     ) -> np.ndarray:
         """Predict transient response.
 
@@ -531,6 +560,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             sigma_applied = getattr(self, "_sigma_applied", None)
         if sigma_0 is None:
             sigma_0 = getattr(self, "_sigma_0", None)
+        if gamma_0 is None:
+            gamma_0 = getattr(self, "_gamma_0", None)
 
         result = self._simulate_transient(
             t_jax,
@@ -540,6 +571,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
             sigma_applied,
             sigma_0,
             self._t_wait,
+            gamma_0=gamma_0,
         )
         return np.array(result)
 
@@ -875,6 +907,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
         if not result.success:
             logger.warning(f"Saramito SAOS fit warning: {result.message}")
 
@@ -964,6 +997,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
         if not result.success:
             logger.warning(f"Saramito LAOS fit warning: {result.message}")
 

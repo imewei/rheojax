@@ -220,6 +220,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
                     f"Unsupported test_mode for nonlocal model: {test_mode}"
                 )
 
+            ctx["R2"] = getattr(self, "_last_fit_r_squared", None)
             self.fitted_ = True
 
         return self
@@ -273,6 +274,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         # FS-005: Strip protocol/meta kwargs before forwarding to nlsq_optimize
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
         if not result.success:
             logger.warning(f"Nonlocal flow curve fit warning: {result.message}")
 
@@ -383,6 +385,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         # reaches nlsq_optimize and bypasses jacfwd on diffrax's custom_vjp.
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
         if not result.success:
             logger.warning(f"Nonlocal startup fit warning: {result.message}")
 
@@ -432,6 +435,16 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         # reaches nlsq_optimize and bypasses jacfwd on diffrax's custom_vjp.
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
+        self._last_fit_r_squared = result.r_squared
+        if self._last_fit_r_squared is None and result.x is not None:
+            try:
+                resids = np.asarray(objective(result.x))
+                y_arr = np.asarray(strain_jax)
+                ss_res = float(np.sum(resids**2))
+                ss_tot = float(np.sum((y_arr - np.mean(y_arr))**2))
+                self._last_fit_r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+            except Exception:
+                pass
         if not result.success:
             logger.warning(f"Nonlocal creep fit warning: {result.message}")
 
