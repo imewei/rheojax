@@ -215,7 +215,10 @@ def _loop_bridge_creep_ode_rhs(
     sigma_elastic = f_B * G * S_xy
 
     # Shear rate from stress constraint
-    eta_s_reg = jnp.maximum(eta_s, 1e-10 * G * tau_b)
+    # Two-level floor: 1e-2 of η₀ provides physical regularization, and
+    # |σ_applied|/γ̇_max=1000 caps initial γ̇ so Tsit5 stays non-stiff.
+    eta_s_floor = jnp.maximum(1e-2 * G * tau_b, jnp.abs(sigma_applied) / 1000.0)
+    eta_s_reg = jnp.maximum(eta_s, eta_s_floor)
     gamma_dot = (sigma_applied - sigma_elastic) / eta_s_reg
 
     # Conformation and bridge fraction evolution (reuse rate-controlled RHS)
@@ -558,10 +561,10 @@ class TNTLoopBridge(TNTBase):
             else:
                 tau_b_est = t[-1] / 3
 
-        # Limit tau_b to ensure numerical stability with typical pre-shear rates
-        # For gamma_dot ~ 10 s⁻¹, tau_b > 10s gives Wi > 100 which is numerically stiff
-        # Use a conservative upper limit that can be refined by the optimizer
-        tau_b_est = min(tau_b_est, 10.0)
+        # Cap τ_b to the data time-window rather than a fixed 10s — slow
+        # relaxers (e.g. Laponite-aged) have τ_b ≫ 10s and the previous cap
+        # silently underestimated them, pegging the optimizer near the cap.
+        tau_b_est = float(min(tau_b_est, max(t[-1], 10.0)))
 
         # G = G₀ / f_B_eq (assuming f_B_eq ~ 0.5)
         f_B_eq_est = 0.5
@@ -1849,7 +1852,7 @@ class TNTLoopBridge(TNTBase):
         }
 
         if return_rate:
-            eta_s_reg = max(self.eta_s, 1e-10 * self.G * self.tau_b)
+            eta_s_reg = max(self.eta_s, 1e-4 * self.G * self.tau_b)
             sigma_elastic = f_B_t * self.G * S_xy_t
             gamma_dot = (sigma_applied - sigma_elastic) / eta_s_reg
             return gamma, gamma_dot

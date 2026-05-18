@@ -510,6 +510,15 @@ class TNTSingleMode(TNTBase):
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
             )
+        elif test_mode == "relaxation":
+            self.initialize_from_relaxation(np.asarray(x), np.asarray(y))
+        elif test_mode in ("startup", "creep", "laos"):
+            self.initialize_from_time_domain(
+                np.asarray(x),
+                np.real(np.asarray(y)),
+                gamma_dot=kwargs.get("gamma_dot"),
+                sigma_applied=kwargs.get("sigma_applied"),
+            )
 
         # Define model function for fitting
         def model_fn(x_fit, params):

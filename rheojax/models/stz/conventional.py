@@ -328,10 +328,16 @@ class STZConventional(STZBase):
             # Creep: Constant stress, measure strain
             # State vector: [strain, chi, Lambda, m] (strain replaces stress)
             ode_fn = stz_creep_ode_rhs
-            args["sigma_applied"] = sigma_applied if sigma_applied is not None else 0.0
+            sigma_app_safe = sigma_applied if sigma_applied is not None else 0.0
+            args["sigma_applied"] = sigma_app_safe
 
-            # Strain starts at 0
-            y0_val = 0.0
+            # Initial total strain γ(0+) = σ_applied / G0 (instantaneous elastic
+            # response to the step stress). The ODE evolves total strain because
+            # dγ_total/dt = γ̇_plastic under constant stress (dσ/dt = 0), so the
+            # elastic component must enter through the IC. Without this the
+            # prediction is missing γ_e ~ σ/G, which dominates the early-time
+            # signal for soft materials (low G0).
+            y0_val = sigma_app_safe / params["G0"]
 
             # Initial state construction
             if variant == "minimal":

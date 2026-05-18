@@ -930,10 +930,13 @@ class TNTMultiSpecies(TNTBase):
             S_xy_modes = S_state[3::4]  # Extract S_xy_i
             sigma_elastic = jnp.sum(args["G_modes"] * S_xy_modes)
 
-            # Compute shear rate from stress constraint
-            eta_s_reg = jnp.maximum(
-                args["eta_s"], 1e-10 * jnp.max(args["G_modes"] * args["tau_modes"])
+            # Two-level floor: 1e-2 of η₀ provides physical regularization,
+            # |σ_applied|/γ̇_max=1000 caps initial γ̇ so Tsit5 stays non-stiff.
+            eta_s_floor = jnp.maximum(
+                1e-2 * jnp.max(args["G_modes"] * args["tau_modes"]),
+                jnp.abs(args["sigma_applied"]) / 1000.0,
             )
+            eta_s_reg = jnp.maximum(args["eta_s"], eta_s_floor)
             gamma_dot = (args["sigma_applied"] - sigma_elastic) / eta_s_reg
 
             # Conformation evolution (multimode)
@@ -1269,9 +1272,12 @@ class TNTMultiSpecies(TNTBase):
             sigma_elastic = jnp.sum(args["G_modes"] * S_xy_modes)
 
             # Shear rate
-            eta_s_reg = jnp.maximum(
-                args["eta_s"], 1e-10 * jnp.max(args["G_modes"] * args["tau_modes"])
+            # Two-level floor matching the other creep site
+            eta_s_floor = jnp.maximum(
+                1e-2 * jnp.max(args["G_modes"] * args["tau_modes"]),
+                jnp.abs(args["sigma_applied"]) / 1000.0,
             )
+            eta_s_reg = jnp.maximum(args["eta_s"], eta_s_floor)
             gamma_dot = (args["sigma_applied"] - sigma_elastic) / eta_s_reg
 
             # Conformation evolution
@@ -1336,7 +1342,7 @@ class TNTMultiSpecies(TNTBase):
                 jnp.nan * jnp.ones_like(S_xy_modes),
             )
             sigma_elastic = jnp.sum(G_modes[None, :] * S_xy_modes, axis=1)
-            eta_s_reg = max(self.eta_s, 1e-10 * float(jnp.max(G_modes * tau_modes)))
+            eta_s_reg = max(self.eta_s, 1e-4 * float(jnp.max(G_modes * tau_modes)))
             gamma_dot = (sigma_applied - sigma_elastic) / eta_s_reg
             return gamma, np.asarray(gamma_dot)
 

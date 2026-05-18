@@ -216,6 +216,84 @@ class TNTCates(TNTBase):
             description="Solvent viscosity (Newtonian background contribution)",
         )
 
+    def _cates_seed_from_base(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        mode: str,
+        gamma_dot: float | None = None,
+        sigma_applied: float | None = None,
+    ) -> None:
+        """Map data-scale estimates to Cates-specific parameter names.
+
+        Cates uses (G_0, tau_rep, tau_break) instead of the (G, tau_b) names
+        the TNTBase warm-starts populate. This helper estimates the same
+        scales from data and writes directly to the Cates ParameterSet.
+        Sets tau_break = tau_rep / 10 as a conventional fast-breaking ratio.
+        """
+        x = np.asarray(x)
+        y_real = np.real(np.asarray(y))
+
+        if mode == "flow":
+            sort_idx = np.argsort(x)
+            gd = x[sort_idx]
+            sig = y_real[sort_idx]
+            eta_0 = float(sig[0] / max(gd[0], 1e-10))
+            # tau from shear-thinning onset, fallback to inverse high rate
+            eta = sig / np.maximum(gd, 1e-10)
+            thinning = np.where(eta < 0.9 * eta[0])[0]
+            tau_rep_est = float(1.0 / gd[thinning[0]]) if len(thinning) else float(
+                1.0 / gd[-1]
+            )
+            G0_est = float(np.clip(eta_0 / max(tau_rep_est, 1e-12), 1e0, 1e8))
+        elif mode == "relaxation":
+            sort_idx = np.argsort(x)
+            t = x[sort_idx]
+            G_t = y_real[sort_idx]
+            G0_est = float(np.maximum(G_t[0], 1e0))
+            target = G0_est / np.e
+            crossings = np.where(G_t < target)[0]
+            if len(crossings):
+                tau_rep_est = float(t[crossings[0]])
+            else:
+                t_pos = t[t > 0]
+                tau_rep_est = float(np.sqrt(t_pos[0] * t_pos[-1])) if len(t_pos) >= 2 else float(t[-1] / 3.0)
+        elif mode == "saos":
+            omega = x
+            G_p = np.real(np.asarray(y))
+            G_pp = np.imag(np.asarray(y))
+            # Plateau modulus from high-frequency G'
+            G0_est = float(np.clip(np.max(G_p), 1e0, 1e8))
+            # Crossover frequency for tau_rep
+            cross = np.where(np.diff(np.sign(G_p - G_pp)) != 0)[0]
+            if len(cross):
+                tau_rep_est = float(1.0 / omega[cross[0]])
+            else:
+                tau_rep_est = float(1.0 / np.sqrt(omega[0] * omega[-1]))
+        else:  # startup, creep, laos
+            t_pos = x[x > 0]
+            tau_rep_est = float(np.sqrt(t_pos[0] * t_pos[-1])) if len(t_pos) >= 2 else 1.0
+            if sigma_applied is not None and len(y_real) > 1:
+                strain_mid = float(np.abs(y_real[len(y_real) // 2]))
+                G0_est = float(sigma_applied) / max(strain_mid, 1e-12)
+            elif gamma_dot is not None and gamma_dot > 0:
+                G0_est = float(np.max(np.abs(y_real))) / max(gamma_dot * tau_rep_est, 1e-12)
+            else:
+                G0_est = float(np.max(np.abs(y_real)))
+
+        G0_est = float(np.clip(G0_est, 1e0, 1e8))
+        tau_rep_est = float(np.clip(tau_rep_est, 1e-4, 1e6))
+        tau_break_est = float(np.clip(tau_rep_est / 10.0, 1e-6, 1e4))
+
+        self.parameters.set_value("G_0", G0_est)
+        self.parameters.set_value("tau_rep", tau_rep_est)
+        self.parameters.set_value("tau_break", tau_break_est)
+
+        logger.debug(
+            f"Cates {mode} init: G_0={G0_est:.3e} Pa, "
+            f"tau_rep={tau_rep_est:.3e} s, tau_break={tau_break_est:.3e} s"
+        )
+
     # =========================================================================
     # Property Accessors
     # =========================================================================
@@ -308,9 +386,24 @@ class TNTCates(TNTBase):
         # Smart initialization based on protocol
         if test_mode in ["flow_curve", "steady_shear", "rotation"]:
             self.initialize_from_flow_curve(np.asarray(x), np.asarray(y))
+            # Base method writes "G"/"tau_b" only; mirror to Cates names.
+            self._cates_seed_from_base(np.asarray(x), np.asarray(y), mode="flow")
         elif test_mode == "oscillation":
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
+            )
+            self._cates_seed_from_base(np.asarray(x), np.asarray(y), mode="saos")
+        elif test_mode == "relaxation":
+            self._cates_seed_from_base(
+                np.asarray(x), np.real(np.asarray(y)), mode="relaxation"
+            )
+        elif test_mode in ("startup", "creep", "laos"):
+            self._cates_seed_from_base(
+                np.asarray(x),
+                np.real(np.asarray(y)),
+                mode=test_mode,
+                gamma_dot=kwargs.get("gamma_dot"),
+                sigma_applied=kwargs.get("sigma_applied"),
             )
 
         # Define model function for fitting

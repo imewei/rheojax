@@ -446,6 +446,11 @@ class ITTMCTBase(BaseModel):
                 y_pred = np.sqrt(G_pred[:, 0] ** 2 + G_pred[:, 1] ** 2)
             return y_combined - y_pred
 
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_oscillation.
+        # We force-override here because BaseModel.fit() injects method='nlsq'
+        # as its default, which would re-enter the broken AD path.
+        kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
             initial_values,
@@ -500,6 +505,9 @@ class ITTMCTBase(BaseModel):
             y_pred = self._predict_startup(t, gamma_dot=gamma_dot)
             return sigma - y_pred
 
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_startup
+        kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
             initial_values,
@@ -554,6 +562,9 @@ class ITTMCTBase(BaseModel):
             y_pred = self._predict_creep(t, sigma_applied=sigma_applied)
             return J - y_pred
 
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_creep
+        kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
             initial_values,
@@ -608,6 +619,9 @@ class ITTMCTBase(BaseModel):
             y_pred = self._predict_relaxation(t, gamma_pre=gamma_pre)
             return sigma - y_pred
 
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_relaxation
+        kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
             initial_values,
@@ -665,6 +679,9 @@ class ITTMCTBase(BaseModel):
             y_pred = self._predict_laos(t, gamma_0=gamma_0, omega=omega)
             return sigma - y_pred
 
+        # method="scipy" bypasses NLSQ's forward-mode AD which is
+        # incompatible with the diffrax ODE solver in _predict_laos
+        kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
             initial_values,

@@ -275,6 +275,16 @@ class VLBLocal(VLBBase):
             self.initialize_from_saos(
                 np.asarray(x), np.real(np.asarray(y)), np.imag(np.asarray(y))
             )
+        elif test_mode == "relaxation":
+            self.initialize_from_relaxation(np.asarray(x), np.asarray(y))
+        elif test_mode == "startup":
+            _gd = kwargs.get("gamma_dot")
+            if _gd is not None:
+                self.initialize_from_startup(np.asarray(x), np.asarray(y), _gd)
+        elif test_mode == "creep":
+            _sa = kwargs.get("sigma_applied")
+            if _sa is not None:
+                self.initialize_from_creep(np.asarray(x), np.asarray(y), _sa)
 
         # Define model function for fitting (exclude test_mode from kwargs to avoid duplicates)
         fwd_kwargs = {

@@ -51,6 +51,8 @@ _MLIKH_RESERVED = {
     "sigma_0",
     "deformation_mode",
     "poisson_ratio",
+    "smart_init",
+    "mikh_warmstart",
 }
 
 
@@ -103,8 +105,9 @@ class MLIKH(IKHBase):
         Gamma_i: Per-mode breakdown coefficients
         w_i: Per-mode structure weights
 
-    Global Parameters:
-        eta_inf: High-shear viscosity (both modes)
+    Global Parameters (both yield modes):
+        eta_inf: High-shear viscosity
+        mu_p: Plastic viscosity (Perzyna regularization) — controls creep/flow rate
 
     Supported Protocols:
         - FLOW_CURVE: Steady-state stress vs shear rate (analytical solution)
@@ -219,6 +222,13 @@ class MLIKH(IKHBase):
             units="Pa s",
             description="High-shear viscosity",
         )
+        self.parameters.add(
+            "mu_p",
+            value=1e-3,
+            bounds=(1e-5, 1e5),
+            units="Pa s",
+            description="Plastic viscosity (Perzyna regularization)",
+        )
 
     def _create_weighted_sum_parameters(self):
         """Create parameters for weighted-sum yield formulation."""
@@ -301,6 +311,13 @@ class MLIKH(IKHBase):
             units="Pa s",
             description="High-shear viscosity",
         )
+        self.parameters.add(
+            "mu_p",
+            value=1e-3,
+            bounds=(1e-5, 1e5),
+            units="Pa s",
+            description="Plastic viscosity (Perzyna regularization)",
+        )
 
     def _stack_mode_params(self, params, names=None):
         """Stack per-mode parameters in a single pass.
@@ -381,12 +398,13 @@ class MLIKH(IKHBase):
         """Build args dictionary for ODE integration."""
         args = {"n_modes": self._n_modes}
 
+        mu_p_val = params.get("mu_p", 1e-3)
         if self._yield_mode == "per_mode":
             # Stack all per-mode parameters in a single pass
             args.update(self._stack_mode_params(params))
             # Default arrays for optional parameters
             args["eta"] = jnp.full(self._n_modes, 1e12)
-            args["mu_p"] = jnp.full(self._n_modes, 1e-6)
+            args["mu_p"] = jnp.full(self._n_modes, mu_p_val)
             args["m"] = jnp.ones(self._n_modes)
         else:
             # Global parameters
@@ -400,7 +418,7 @@ class MLIKH(IKHBase):
             stacked = self._stack_mode_params(params, names=["tau_thix", "Gamma", "w"])
             args.update(stacked)
             args["eta"] = 1e12
-            args["mu_p"] = 1e-6
+            args["mu_p"] = mu_p_val
 
         args["eta_inf"] = params.get("eta_inf", 0.0)
 
@@ -679,6 +697,29 @@ class MLIKH(IKHBase):
         self._fit_sigma_applied = sigma_applied
         self._fit_sigma_0 = sigma_0
 
+        # Data-informed initialization for creep.
+        # Default sigma_y (30 Pa) often exceeds sigma_applied (e.g. 7 Pa), making
+        # the objective flat and the Jacobian zero.  Set sigma_y just below
+        # sigma_applied AND pick mu_p large enough to keep the ODE non-stiff:
+        #   mu_p = sigma_applied × t_span  →  γ̇_p ≈ 0.01 1/s (slow creep, non-stiff)
+        if test_mode == "creep" and kwargs.get("smart_init", True) and sigma_applied:
+            sigma_a = float(sigma_applied)
+            t_list = t.tolist() if hasattr(t, "tolist") else list(t)
+            t_span = max(float(t_list[-1]) - float(t_list[0]), 1.0) if len(t_list) > 1 else 1.0
+            mu_p_init = max(sigma_a * t_span, 0.1)  # large enough for non-stiff ODE
+            sy_total = sigma_a * 0.9  # sigma_y = 90% of applied → small overstress
+
+            if self._yield_mode == "per_mode":
+                n = self._n_modes
+                for i in range(1, n + 1):
+                    self.parameters.set_value(f"G_{i}", sigma_a * 5.0 / n)
+                    self.parameters.set_value(f"sigma_y0_{i}", sy_total * 0.4 / n)
+                    self.parameters.set_value(f"delta_sigma_y_{i}", sy_total * 0.6 / n)
+                    self.parameters.set_value(f"C_{i}", sy_total * 0.2 / n)
+
+            if "mu_p" in list(self.parameters.keys()):
+                self.parameters.set_value("mu_p", mu_p_init)
+
         def objective(param_values):
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=True))
@@ -694,18 +735,117 @@ class MLIKH(IKHBase):
         nlsq_optimize(objective, self.parameters, **filtered)
         return self
 
+    def _mikh_warmstart(
+        self,
+        times: jnp.ndarray,
+        strains: jnp.ndarray,
+        sigma_target: jnp.ndarray,
+        **kwargs,
+    ) -> None:
+        """Fit single-mode MIKH and distribute its params as MLIKH starting point.
+
+        Solves the simpler 11-parameter single-mode problem first, then
+        distributes the result across MLIKH modes with logarithmically-spaced
+        tau_thix values.  Silently returns without modifying parameters on any
+        failure so the caller can fall back to amplitude-based init.
+        """
+        from rheojax.models.ikh.mikh import MIKH
+
+        mikh = MIKH()
+
+        # Apply data-informed scaling to MIKH before fitting
+        stress_amp = float(jnp.max(jnp.abs(sigma_target)))
+        stress_ss = float(jnp.mean(sigma_target[-min(10, len(sigma_target)) :]))
+        gamma_dot_val = float(kwargs.get("gamma_dot", 1.0) or 1.0)
+        if stress_amp > 0:
+            mikh.parameters.set_value("G", stress_amp)
+            mikh.parameters.set_value("sigma_y0", max(stress_ss * 0.3, 1e-3))
+            mikh.parameters.set_value("delta_sigma_y", max(stress_ss * 0.5, 1e-3))
+            mikh.parameters.set_value("C", max(stress_ss * 0.3, 1e-3))
+            if gamma_dot_val > 0:
+                mikh.parameters.set_value("eta_inf", stress_ss / gamma_dot_val)
+
+        # Fit single-mode MIKH (fast: 11 params, return-mapping scan)
+        fit_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in _MLIKH_RESERVED
+        }
+        fit_kwargs.setdefault("max_iter", 500)
+
+        try:
+            mikh._fit_return_mapping(
+                jnp.stack([times, strains]),
+                sigma_target,
+                **fit_kwargs,
+            )
+        except Exception:
+            return
+
+        def _gv(name: str, default: float) -> float:
+            v = mikh.parameters.get_value(name)
+            return float(v) if v is not None else default
+
+        G_m = _gv("G", 1e3)
+        C_m = _gv("C", 500.0)
+        gd_m = _gv("gamma_dyn", 1.0)
+        sy0_m = _gv("sigma_y0", 10.0)
+        dsy_m = _gv("delta_sigma_y", 50.0)
+        tau_m = max(_gv("tau_thix", 1.0), 1e-6)
+        Gam_m = _gv("Gamma", 0.5)
+        etainf_m = _gv("eta_inf", 0.1)
+        mup_m = _gv("mu_p", 1e-3)
+
+        # Distribute across modes: G/n, σ_y/n, τ log-spread around τ_mikh
+        n = self._n_modes
+        for i in range(1, n + 1):
+            self.parameters.set_value(f"G_{i}", G_m / n)
+            self.parameters.set_value(f"C_{i}", C_m / n)
+            self.parameters.set_value(f"gamma_dyn_{i}", gd_m)
+            self.parameters.set_value(f"sigma_y0_{i}", sy0_m / n)
+            self.parameters.set_value(f"delta_sigma_y_{i}", dsy_m / n)
+            # tau_thix spread: mode i offset by 10^(i-1 - (n-1)/2) relative to tau_m
+            tau_i = float(
+                jnp.clip(tau_m * (10.0 ** (i - 1 - (n - 1) / 2.0)), 1e-6, 1e12)
+            )
+            self.parameters.set_value(f"tau_thix_{i}", tau_i)
+            self.parameters.set_value(f"Gamma_{i}", Gam_m)
+
+        self.parameters.set_value("eta_inf", etainf_m)
+        if "mu_p" in list(self.parameters.keys()):
+            self.parameters.set_value("mu_p", mup_m)
+
     def _fit_return_mapping(self, X: ArrayLike, y: ArrayLike, **kwargs) -> "MLIKH":
-        """Fit using return-mapping algorithm (for startup/LAOS)."""
+        """Fit using return-mapping algorithm (for startup/LAOS).
+
+        For per_mode with n_modes > 1 and startup protocol: first fits a
+        single-mode MIKH model (fast, 11 params) and distributes its result
+        across modes as a warm-start.  This avoids the local-minima problem
+        that plagues cold-start multi-mode NLSQ.
+        """
         from rheojax.utils.optimization import nlsq_optimize
 
         times, strains = self._extract_time_strain(X, **kwargs)
         sigma_target = jnp.asarray(y)
+        test_mode = kwargs.get("test_mode", "startup")
 
-        # Data-informed initialization: scale G and sigma_y from data
-        # amplitude so the optimizer starts in a physically meaningful region.
-        stress_amp = float(jnp.max(jnp.abs(sigma_target)))
-        if stress_amp > 0 and kwargs.get("smart_init", True):
-            if self._yield_mode == "per_mode":
+        # Stage 1 init: MIKH warm-start (per_mode startup only, opt-in).
+        # Fits single-mode MIKH and distributes its params as starting point.
+        # Helps when MIKH itself converges cleanly on the target data.
+        # Set mikh_warmstart=True to enable: model.fit(..., mikh_warmstart=True)
+        use_warmstart = (
+            self._yield_mode == "per_mode"
+            and self._n_modes > 1
+            and test_mode != "laos"
+            and kwargs.get("mikh_warmstart", False)
+            and kwargs.get("smart_init", True)
+        )
+        if use_warmstart:
+            self._mikh_warmstart(times, strains, sigma_target, **kwargs)
+        elif kwargs.get("smart_init", True):
+            # Fallback: amplitude-based scaling when warm-start disabled/not applicable
+            stress_amp = float(jnp.max(jnp.abs(sigma_target)))
+            if stress_amp > 0 and self._yield_mode == "per_mode":
                 for i in range(1, self._n_modes + 1):
                     cur_G = self.parameters.get_value(f"G_{i}")
                     if cur_G is not None and cur_G < stress_amp * 0.1:
@@ -715,7 +855,7 @@ class MLIKH(IKHBase):
                         self.parameters.set_value(
                             f"sigma_y0_{i}", stress_amp * 0.1 / self._n_modes
                         )
-            else:
+            elif stress_amp > 0:
                 cur_G = self.parameters.get_value("G")
                 if cur_G is not None and cur_G < stress_amp * 0.1:
                     self.parameters.set_value("G", stress_amp)

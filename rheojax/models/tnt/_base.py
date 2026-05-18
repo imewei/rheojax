@@ -302,6 +302,113 @@ class TNTBase(BaseModel):
             f"Flow curve initialization: τ_b={tau_b_est:.3e} s, G={G_est:.3e} Pa"
         )
 
+    def initialize_from_relaxation(
+        self,
+        t: np.ndarray,
+        modulus: np.ndarray,
+    ) -> None:
+        """Initialize parameters from stress-relaxation data.
+
+        Sets G ≈ G(t=0) and τ_b ≈ 1/e decay time. Falls back to the
+        geometric-mean of the time window when no decay is observed.
+        Subclasses with extra parameters may override or extend.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        modulus : np.ndarray
+            Relaxation modulus G(t) (Pa)
+        """
+        t = np.asarray(t)
+        modulus = np.asarray(modulus)
+
+        sort_idx = np.argsort(t)
+        t = t[sort_idx]
+        modulus = modulus[sort_idx]
+
+        # G(t=0) is the relaxation plateau
+        G_est = float(np.maximum(modulus[0], 1e0))
+
+        # τ_b from 1/e decay; else geometric mean of time window
+        target = G_est / np.e
+        crossings = np.where(modulus < target)[0]
+        if len(crossings) > 0:
+            tau_b_est = float(t[crossings[0]])
+        else:
+            t_pos = t[t > 0]
+            if len(t_pos) >= 2:
+                tau_b_est = float(np.sqrt(t_pos[0] * t_pos[-1]))
+            else:
+                tau_b_est = float(t[-1] / 3.0)
+
+        if "G" in self.parameters.keys():
+            self.parameters.set_value("G", np.clip(G_est, 1e0, 1e8))
+        if "tau_b" in self.parameters.keys():
+            self.parameters.set_value("tau_b", np.clip(tau_b_est, 1e-6, 1e4))
+
+        logger.debug(
+            f"Relaxation initialization: G={G_est:.3e} Pa, τ_b={tau_b_est:.3e} s"
+        )
+
+    def initialize_from_time_domain(
+        self,
+        t: np.ndarray,
+        sigma: np.ndarray,
+        gamma_dot: float | None = None,
+        sigma_applied: float | None = None,
+    ) -> None:
+        """Generic warm-start for startup/creep/LAOS time-domain protocols.
+
+        Sets G from the stress scale and τ_b from the time window so the
+        optimizer starts near the data scale rather than at G=1 Pa, which
+        otherwise pegs at the lower bound on high-modulus data.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        sigma : np.ndarray
+            Measured response (Pa for startup/LAOS, strain for creep)
+        gamma_dot : float | None
+            Applied shear rate for startup/LAOS (1/s)
+        sigma_applied : float | None
+            Applied stress for creep (Pa)
+        """
+        t = np.asarray(t)
+        sigma = np.asarray(sigma)
+
+        # Time-window estimate
+        t_pos = t[t > 0]
+        if len(t_pos) >= 2:
+            tau_b_est = float(np.sqrt(t_pos[0] * t_pos[-1]))
+        else:
+            tau_b_est = float(max(t[-1] / 3.0, 1e-3))
+
+        # G from stress scale
+        if sigma_applied is not None and len(sigma) > 1:
+            # Creep: G ≈ σ_applied / strain(τ_b) — use strain at midpoint
+            strain_mid = float(np.abs(sigma[len(sigma) // 2]))
+            if strain_mid > 1e-12:
+                G_est = float(sigma_applied) / strain_mid
+            else:
+                G_est = float(sigma_applied)
+        elif gamma_dot is not None and gamma_dot > 0:
+            # Startup/LAOS: G ≈ peak_stress / (gamma_dot * tau_b)
+            peak_stress = float(np.max(np.abs(sigma)))
+            G_est = peak_stress / max(gamma_dot * tau_b_est, 1e-12)
+        else:
+            G_est = float(np.max(np.abs(sigma)))
+
+        if "G" in self.parameters.keys():
+            self.parameters.set_value("G", np.clip(G_est, 1e0, 1e8))
+        if "tau_b" in self.parameters.keys():
+            self.parameters.set_value("tau_b", np.clip(tau_b_est, 1e-6, 1e4))
+
+        logger.debug(
+            f"Time-domain initialization: G={G_est:.3e} Pa, τ_b={tau_b_est:.3e} s"
+        )
+
     # =========================================================================
     # ODE Integration Utilities
     # =========================================================================

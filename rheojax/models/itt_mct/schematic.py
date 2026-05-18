@@ -402,7 +402,7 @@ class ITTMCTSchematic(ITTMCTBase):
             [0, t_max],
             state0,
             t_eval=t_np,
-            method="RK45",
+            method="LSODA",
             rtol=1e-8,
             atol=1e-10,
         )
@@ -766,7 +766,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         # Integrate ODE
         t_span = [0, t_max]
-        sol = solve_ivp(rhs_numpy, t_span, state0, method="RK45", rtol=1e-5, atol=1e-7)
+        sol = solve_ivp(rhs_numpy, t_span, state0, method="LSODA", rtol=1e-5, atol=1e-7)
 
         # Extract stress integral from final state
         sigma = sol.y[2 + self.n_prony_modes, -1]
@@ -901,7 +901,7 @@ class ITTMCTSchematic(ITTMCTBase):
             [0, t.max()],
             state0,
             t_eval=t,
-            method="RK45",
+            method="LSODA",
             rtol=1e-6,
             atol=1e-8,
         )
@@ -990,7 +990,7 @@ class ITTMCTSchematic(ITTMCTBase):
             [0, t.max()],
             state0,
             t_eval=t,
-            method="RK45",
+            method="LSODA",
             rtol=1e-6,
             atol=1e-8,
         )
@@ -1084,7 +1084,7 @@ class ITTMCTSchematic(ITTMCTBase):
             [0, t.max()],
             state0,
             t_eval=t,
-            method="RK45",
+            method="LSODA",
             rtol=1e-6,
             atol=1e-8,
         )
@@ -1180,7 +1180,7 @@ class ITTMCTSchematic(ITTMCTBase):
             [0, t.max()],
             state0,
             t_eval=t,
-            method="RK45",
+            method="LSODA",
             rtol=1e-6,
             atol=1e-8,
         )

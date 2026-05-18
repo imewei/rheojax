@@ -549,14 +549,12 @@ class TNTStickyRouse(TNTBase):
         else:
             y_jax = jnp.asarray(y_arr, dtype=jnp.float64)
 
-        # For relaxation, store initial stress distribution
+        # For relaxation, cache only the scalar σ(t=0); per-mode distribution
+        # is recomputed inside _predict from CURRENT G_modes so the optimizer
+        # sees G_k coupled to the prediction (was frozen at fit entry — bug).
         if test_mode == "relaxation":
-            sigma_0 = float(y[0])  # Initial stress
-            G_modes, _, _ = self._get_mode_arrays()
-            # Equal stress per mode initially
-            self._sigma_0_modes = jnp.ones(self._n_modes) * (
-                sigma_0 / jnp.sum(G_modes) * G_modes
-            )
+            self._relaxation_sigma_0 = float(y[0])
+            self._sigma_0_modes = None
 
         # Define model function for fitting
         def model_fn(x_fit, params):
@@ -635,14 +633,20 @@ class TNTStickyRouse(TNTBase):
         elif test_mode == "flow_curve":
             result = self._predict_flow_curve_vec(x_jax, G_modes, tau_eff, eta_s)
         elif test_mode == "relaxation":
-            # Initial stress distribution
-            if not hasattr(self, "_sigma_0_modes") or self._sigma_0_modes is None:
-                sigma_0 = kwargs.get("sigma_0", 1e3)
-                sigma_0_modes = jnp.ones(self._n_modes) * (
-                    sigma_0 / jnp.sum(G_modes) * G_modes
-                )
-            else:
-                sigma_0_modes = self._sigma_0_modes
+            # Compute per-mode initial stress from CURRENT G_modes each call —
+            # was previously frozen at fit entry, decoupling G_k from the fit.
+            sigma_0 = kwargs.get(
+                "sigma_0",
+                getattr(self, "_relaxation_sigma_0", None),
+            )
+            if sigma_0 is None:
+                sigma_0 = 1e3
+            G_sum = jnp.sum(G_modes)
+            sigma_0_modes = jnp.where(
+                G_sum > 0,
+                float(sigma_0) * G_modes / jnp.maximum(G_sum, 1e-12),
+                jnp.zeros_like(G_modes),
+            )
             result = self._predict_relaxation_vec(x_jax, sigma_0_modes, tau_eff)
         elif test_mode == "startup":
             _gd = kwargs.get("gamma_dot", _MISSING)
@@ -812,7 +816,16 @@ class TNTStickyRouse(TNTBase):
             S_xy_modes = conf_reshaped[:, 3]
             sigma_elastic = jnp.sum(G_modes * S_xy_modes)
 
-            eta_s_reg = jnp.maximum(eta_s, 1e-10 * jnp.sum(G_modes * tau_eff))
+            # Two-level floor to keep the creep ODE non-stiff:
+            #  (a) 1e-2 of η₀ provides a physical regularizer
+            #  (b) |σ_applied|/γ̇_max caps the initial shear rate so Tsit5
+            #      doesn't explode when fitted η_s underflows. γ̇_max=1000 1/s
+            #      is far above any realistic creep response.
+            eta_s_floor = jnp.maximum(
+                1e-2 * jnp.sum(G_modes * tau_eff),
+                jnp.abs(sigma_applied) / 1000.0,
+            )
+            eta_s_reg = jnp.maximum(eta_s, eta_s_floor)
             gamma_dot = (sigma_applied - sigma_elastic) / eta_s_reg
 
             # Conformation evolution

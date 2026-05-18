@@ -298,6 +298,128 @@ class VLBBase(BaseModel):
             f"Flow curve initialization: k_d={k_d_est:.3e} 1/s, G0={G0_est:.3e} Pa"
         )
 
+    def initialize_from_relaxation(
+        self,
+        t: np.ndarray,
+        G: np.ndarray,
+    ) -> None:
+        """Initialize parameters from stress relaxation data G(t) = G₀ exp(-k_d·t).
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        G : np.ndarray
+            Relaxation modulus G(t) (Pa)
+        """
+        t = np.asarray(t, dtype=float)
+        G = np.maximum(np.asarray(G, dtype=float), 1e-10)
+
+        G0_est = float(G[0])
+
+        if len(t) > 1 and t[-1] > t[0]:
+            log_slope = (np.log(G[-1]) - np.log(G[0])) / (t[-1] - t[0])
+            k_d_est = float(-log_slope)
+        else:
+            k_d_est = 1.0
+
+        k_d_est = max(k_d_est, 1e-6)
+
+        if "k_d" in self.parameters.keys():
+            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
+        if "G0" in self.parameters.keys():
+            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+
+        logger.debug(
+            f"Relaxation initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
+        )
+
+    def initialize_from_startup(
+        self,
+        t: np.ndarray,
+        sigma: np.ndarray,
+        gamma_dot: float,
+    ) -> None:
+        """Initialize parameters from startup shear data.
+
+        Uses the steady-state stress (σ_∞ = G₀/k_d · γ̇) and initial stress
+        rate (dσ/dt|₀ = G₀ · γ̇) to estimate G₀ and k_d.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        sigma : np.ndarray
+            Shear stress array (Pa)
+        gamma_dot : float
+            Applied shear rate (1/s)
+        """
+        t = np.asarray(t, dtype=float)
+        sigma = np.asarray(sigma, dtype=float)
+        gamma_dot = max(abs(float(gamma_dot)), 1e-10)
+
+        sigma_inf = float(sigma[-1])
+        eta_0_est = sigma_inf / gamma_dot
+
+        if len(t) > 1:
+            dt = max(float(t[1] - t[0]), 1e-12)
+            G0_est = float((sigma[1] - sigma[0]) / dt / gamma_dot)
+            G0_est = max(G0_est, eta_0_est, 1.0)
+        else:
+            G0_est = max(eta_0_est, 1.0)
+
+        k_d_est = G0_est / max(eta_0_est, 1e-10)
+
+        if "k_d" in self.parameters.keys():
+            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
+        if "G0" in self.parameters.keys():
+            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+
+        logger.debug(
+            f"Startup initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
+        )
+
+    def initialize_from_creep(
+        self,
+        t: np.ndarray,
+        gamma: np.ndarray,
+        sigma_applied: float,
+    ) -> None:
+        """Initialize parameters from creep data γ(t) = σ₀·(1 + k_d·t)/G₀.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s)
+        gamma : np.ndarray
+            Strain array γ(t)
+        sigma_applied : float
+            Applied stress σ₀ (Pa)
+        """
+        t = np.asarray(t, dtype=float)
+        gamma = np.asarray(gamma, dtype=float)
+        sigma_applied = max(abs(float(sigma_applied)), 1e-10)
+
+        gamma_0 = max(float(gamma[0]), 1e-12)
+        G0_est = sigma_applied / gamma_0
+
+        if len(t) > 1 and t[-1] > t[0]:
+            flow_rate = (float(gamma[-1]) - gamma_0) / (t[-1] - t[0])
+            k_d_est = flow_rate / gamma_0
+        else:
+            k_d_est = 1.0
+
+        k_d_est = max(k_d_est, 1e-6)
+
+        if "k_d" in self.parameters.keys():
+            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
+        if "G0" in self.parameters.keys():
+            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+
+        logger.debug(
+            f"Creep initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
+        )
+
     # =========================================================================
     # Virtual Method for Phase 2 Extensions
     # =========================================================================

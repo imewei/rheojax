@@ -182,14 +182,17 @@ class TestSTZFlowTransient:
         # Strain should be finite
         assert np.all(np.isfinite(strain))
 
-        # Initial strain should be 0
-        assert np.isclose(strain[0], 0.0, atol=1e-10)
+        # Initial total strain = elastic response σ_applied / G0
+        G0_val = model.parameters.get_value("G0")
+        assert G0_val is not None
+        expected_gamma_elastic = sigma_applied / G0_val
+        assert np.isclose(strain[0], expected_gamma_elastic, rtol=1e-6)
 
         # Strain should be monotonically increasing (positive creep)
         assert np.all(np.diff(strain) >= -1e-12)  # Allow tiny numerical noise
 
-        # Check that strain actually increases (not just zero)
-        assert strain[-1] > 0.0
+        # Plastic strain accumulates on top of the elastic baseline
+        assert strain[-1] > expected_gamma_elastic
 
     @pytest.mark.slow
     def test_variant_differences(self):

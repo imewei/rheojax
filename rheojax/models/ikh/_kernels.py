@@ -264,7 +264,7 @@ def make_ml_ikh_maxwell_ode_rhs_per_mode(n_modes):
         tau_thix_arr = args["tau_thix"]
         Gamma_arr = args["Gamma"]
         eta_arr = args.get("eta", jnp.full(n_modes, 1e12))
-        mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-6))
+        mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-3))
         m_arr = args.get("m", jnp.ones(n_modes))
 
         def mode_evolution(
@@ -490,7 +490,7 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
         tau_thix_arr = args["tau_thix"]
         Gamma_arr = args["Gamma"]
         eta_arr = args.get("eta", jnp.full(n_modes, 1e12))
-        mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-6))
+        mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-3))
         m_arr = args.get("m", jnp.ones(n_modes))
 
         def mode_creep(
