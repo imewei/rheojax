@@ -5,9 +5,9 @@ Profiles the full NLSQ -> Bayesian pipeline across multiple model types,
 measuring wall-clock time per phase and identifying bottlenecks.
 
 Usage:
-    uv run python scripts/profile_pipeline.py
-    uv run python scripts/profile_pipeline.py --model maxwell --skip-bayesian
-    uv run python scripts/profile_pipeline.py --verbose
+    uv run python scripts/run_profiling.py
+    uv run python scripts/run_profiling.py --model maxwell --skip-bayesian
+    uv run python scripts/run_profiling.py --verbose
 """
 
 from __future__ import annotations

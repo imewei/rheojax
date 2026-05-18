@@ -7,7 +7,8 @@
         test-parallel test-all-parallel test-parallel-fast test-coverage-parallel \
         clean clean-all clean-pyc clean-build clean-test clean-venv \
         format lint type-check check quick docs build publish info version \
-        verify verify-fast install-hooks check-equations
+        verify verify-fast install-hooks check-equations \
+        clean-notebooks validate-docs profile benchmark
 
 # Configuration
 PYTHON := python
@@ -193,6 +194,12 @@ help:
 	@echo "$(BOLD)$(GREEN)BUILD & PUBLISH$(RESET)"
 	@echo "  $(CYAN)build$(RESET)            Build distribution packages"
 	@echo "  $(CYAN)publish$(RESET)          Publish to PyPI (requires credentials)"
+	@echo ""
+	@echo "$(BOLD)$(GREEN)UTILITIES$(RESET)"
+	@echo "  $(CYAN)clean-notebooks$(RESET)  Strip outputs/execution counts from all example notebooks"
+	@echo "  $(CYAN)validate-docs$(RESET)    Check model RST docs for required sections and consistency"
+	@echo "  $(CYAN)profile$(RESET)          Profile NLSQ→Bayesian pipeline bottlenecks"
+	@echo "  $(CYAN)benchmark$(RESET)        Measure JAX JIT-cache, H2D, and model-init overheads"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)CLEANUP$(RESET)"
 	@echo "  $(CYAN)clean$(RESET)            Remove build artifacts and caches (preserves venv, .claude, .specify, agent-os)"
@@ -709,6 +716,30 @@ install-hooks:
 	@echo "  git commit -m 'msg'  → runs pre-commit hooks"
 	@echo "  git push             → triggers GitHub Actions CI"
 	@echo "  make verify          → full local verification (recommended before push)"
+
+# ===================
+# Physics equation reference gate
+# ===================
+# ===================
+# Script utilities
+# ===================
+clean-notebooks:
+	@echo "$(BOLD)$(BLUE)Stripping notebook outputs and execution counts...$(RESET)"
+	@$(RUN_CMD) python scripts/clean_notebook_outputs.py
+	@echo "$(BOLD)$(GREEN)✓ Notebooks cleaned$(RESET)"
+
+validate-docs:
+	@echo "$(BOLD)$(BLUE)Validating model documentation...$(RESET)"
+	@$(RUN_CMD) python scripts/validate_model_docs.py
+	@echo "$(BOLD)$(GREEN)✓ Documentation validated$(RESET)"
+
+profile:
+	@echo "$(BOLD)$(BLUE)Profiling NLSQ→Bayesian pipeline...$(RESET)"
+	@$(RUN_CMD) python scripts/run_profiling.py $(ARGS)
+
+benchmark:
+	@echo "$(BOLD)$(BLUE)Running JAX micro-benchmarks...$(RESET)"
+	@$(RUN_CMD) python scripts/micro_benchmarks.py $(ARGS)
 
 # ===================
 # Physics equation reference gate
