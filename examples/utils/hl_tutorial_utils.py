@@ -12,6 +12,127 @@ from typing import Any
 import numpy as np
 
 
+def _log_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Return R² in log10 space for positive rheology data."""
+    safe_true = np.maximum(np.asarray(y_true, dtype=float), 1e-12)
+    safe_pred = np.maximum(np.asarray(y_pred, dtype=float), 1e-12)
+    log_true = np.log10(safe_true)
+    log_pred = np.log10(safe_pred)
+    ss_res = np.sum((log_true - log_pred) ** 2)
+    ss_tot = np.sum((log_true - np.mean(log_true)) ** 2)
+    return float(1.0 - ss_res / ss_tot)
+
+
+def compute_hl_fast_flow_curve_overlay(
+    gamma_dot: np.ndarray,
+    stress: np.ndarray,
+    n_points: int = 200,
+) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
+    """Compute a fast HL/Herschel-Bulkley overlay for flow-curve notebooks.
+
+    HL predicts a Herschel-Bulkley square-root approach near the yield stress,
+    so this surrogate keeps FAST_MODE plots useful without invoking the costly
+    population-balance PDE solver.
+    """
+    gamma_dot = np.asarray(gamma_dot, dtype=float)
+    stress = np.asarray(stress, dtype=float)
+    if gamma_dot.ndim != 1 or stress.ndim != 1 or gamma_dot.shape != stress.shape:
+        raise ValueError("gamma_dot and stress must be 1D arrays with matching shape")
+    if np.any(gamma_dot <= 0) or np.any(stress <= 0):
+        raise ValueError("gamma_dot and stress must be positive for log-scale overlay")
+
+    design = np.column_stack([np.ones_like(gamma_dot), np.sqrt(gamma_dot)])
+    sigma_y, consistency = np.linalg.lstsq(design, stress, rcond=None)[0]
+    sigma_y = float(max(sigma_y, 1e-12))
+    consistency = float(max(consistency, 1e-12))
+
+    x_fit = np.logspace(np.log10(gamma_dot.min()), np.log10(gamma_dot.max()), n_points)
+    stress_fit = sigma_y + consistency * np.sqrt(x_fit)
+    stress_at_data = sigma_y + consistency * np.sqrt(gamma_dot)
+    fit_info = {
+        "sigma_y": sigma_y,
+        "consistency": consistency,
+        "hb_exponent": 0.5,
+        "log_r2": _log_r2(stress, stress_at_data),
+    }
+    return x_fit, stress_fit, fit_info
+
+
+def compute_hl_fast_relaxation_overlay(
+    time: np.ndarray,
+    modulus: np.ndarray,
+    n_points: int = 200,
+) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
+    """Compute a fast glassy-relaxation overlay for HL relaxation notebooks."""
+    from scipy.optimize import curve_fit
+
+    time = np.asarray(time, dtype=float)
+    modulus = np.asarray(modulus, dtype=float)
+    if time.ndim != 1 or modulus.ndim != 1 or time.shape != modulus.shape:
+        raise ValueError("time and modulus must be 1D arrays with matching shape")
+    if np.any(time <= 0) or np.any(modulus <= 0):
+        raise ValueError("time and modulus must be positive for log-scale overlay")
+
+    def stretched_decay(t, g_inf, amplitude, tau, beta):
+        return g_inf + amplitude * (1.0 + t / tau) ** (-beta)
+
+    initial = [
+        max(float(modulus[-1]) * 0.8, 1e-12),
+        max(float(modulus[0] - modulus[-1] * 0.8), 1e-12),
+        max(float(np.median(time)), 1e-6),
+        0.2,
+    ]
+    bounds = ([0.0, 0.0, 1e-12, 0.01], [np.inf, np.inf, np.inf, 5.0])
+    popt, _ = curve_fit(
+        stretched_decay,
+        time,
+        modulus,
+        p0=initial,
+        bounds=bounds,
+        maxfev=10000,
+    )
+
+    x_fit = np.logspace(np.log10(time.min()), np.log10(time.max()), n_points)
+    modulus_fit = stretched_decay(x_fit, *popt)
+    modulus_at_data = stretched_decay(time, *popt)
+    fit_info = {
+        "G_inf": float(popt[0]),
+        "amplitude": float(popt[1]),
+        "tau": float(popt[2]),
+        "beta": float(popt[3]),
+        "log_r2": _log_r2(modulus, modulus_at_data),
+    }
+    return x_fit, modulus_fit, fit_info
+
+
+def compute_hl_fast_creep_overlay(
+    time: np.ndarray,
+    compliance: np.ndarray,
+    n_points: int = 200,
+) -> tuple[np.ndarray, np.ndarray, dict[str, float]]:
+    """Compute a fast power-law creep-compliance overlay for HL notebooks."""
+    time = np.asarray(time, dtype=float)
+    compliance = np.asarray(compliance, dtype=float)
+    if time.ndim != 1 or compliance.ndim != 1 or time.shape != compliance.shape:
+        raise ValueError("time and compliance must be 1D arrays with matching shape")
+    if np.any(time <= 0) or np.any(compliance <= 0):
+        raise ValueError("time and compliance must be positive for log-scale overlay")
+
+    exponent, log_prefactor = np.polyfit(np.log10(time), np.log10(compliance), 1)
+    prefactor = float(10.0**log_prefactor)
+    exponent = float(exponent)
+
+    x_fit = np.logspace(np.log10(time.min()), np.log10(time.max()), n_points)
+    compliance_fit = prefactor * x_fit**exponent
+    compliance_at_data = prefactor * time**exponent
+    fit_info = {
+        "prefactor": prefactor,
+        "creep_exponent": exponent,
+        "log_r2": _log_r2(compliance, compliance_at_data),
+    }
+    return x_fit, compliance_fit, fit_info
+
+
 def load_emulsion_flow_curve(phi: float = 0.80) -> tuple[np.ndarray, np.ndarray]:
     """Load emulsion flow curve data for a given volume fraction.
 
