@@ -1,19 +1,28 @@
 # HVM Tutorial Notebooks
 
-Tutorial notebooks for the **Hybrid Vitrimer Model (HVM)** demonstrating NLSQ → NumPyro NUTS
-Bayesian inference with real experimental rheology data.
+Tutorial notebooks for the **Hybrid Vitrimer Model (HVM)**. The first notebooks introduce
+forward predictions, the middle notebooks demonstrate NLSQ and NumPyro NUTS workflows on
+experimental rheology data, and `14_hvm_fit_demo.ipynb` provides a positive-control fitting
+case where HVM-fitted curves overlap HVM-generated rheology data.
 
 ## Notebooks
 
 | # | Notebook | Protocol | Data Source | Key Physics |
 |---|----------|----------|-------------|-------------|
-| 0 | `hvm_00_overview.ipynb` | Overview | Epstein SAOS | 3-subnetwork architecture, factory methods, Arrhenius |
-| 1 | `hvm_01_flow_curve.ipynb` | Flow curve | Oil-water emulsion φ=0.74 | σ_E→0 at steady state, yield plateau |
-| 2 | `hvm_02_creep.ipynb` | Creep | PS at 160°C | Elastic jump + viscous flow, J(t) |
-| 3 | `hvm_03_relaxation.ipynb` | Relaxation | Fish muscle (567 pts) | Bi-exponential + G_P plateau |
-| 4 | `hvm_04_startup.ipynb` | Startup | PNAS Digital Twin | Stress overshoot, TST kinetics |
-| 5 | `hvm_05_saos.ipynb` | SAOS | Epstein network | Full Bayesian, posterior predictive |
-| 6 | `hvm_06_laos.ipynb` | LAOS | PNAS Digital Twin | Lissajous, harmonic analysis |
+| 1 | `01_hvm_saos.ipynb` | SAOS | HVM simulation | Linear viscoelastic moduli |
+| 2 | `02_hvm_stress_relaxation.ipynb` | Relaxation | HVM simulation | P/E/D relaxation modes |
+| 3 | `03_hvm_startup_shear.ipynb` | Startup | HVM simulation | Stress growth and rate dependence |
+| 4 | `04_hvm_creep.ipynb` | Creep | HVM simulation | Compliance and applied stress |
+| 5 | `05_hvm_flow_curve.ipynb` | Flow curve | HVM simulation | Steady-state subnetwork decomposition |
+| 6 | `06_hvm_laos.ipynb` | LAOS | HVM simulation | Nonlinear oscillatory response |
+| 7 | `07_hvm_overview.ipynb` | Overview + SAOS fit | Epstein SAOS | 3-subnetwork architecture, Arrhenius |
+| 8 | `08_hvm_flow_curve.ipynb` | Flow curve fit | Oil-water emulsion φ=0.74 | Model/data suitability check |
+| 9 | `09_hvm_creep.ipynb` | Creep fit | PS at 160°C | Model/data suitability check |
+| 10 | `10_hvm_relaxation.ipynb` | Relaxation fit | Fish muscle | NLSQ HVM fit |
+| 11 | `11_hvm_startup.ipynb` | Startup fit | PNAS Digital Twin | Model/data suitability check |
+| 12 | `12_hvm_saos.ipynb` | SAOS fit | Epstein network | NLSQ and Bayesian workflow |
+| 13 | `13_hvm_laos.ipynb` | LAOS comparison | PNAS Digital Twin | Lissajous and harmonic analysis |
+| 14 | `14_hvm_fit_demo.ipynb` | Multi-protocol fit | HVM-generated rheology data | Positive-control fitted overlays |
 
 ## Data Sources
 
@@ -32,7 +41,7 @@ All data is loaded via `examples/utils/hvm_data.py`:
 ```bash
 # Single notebook
 cd examples/hvm
-jupyter notebook hvm_00_overview.ipynb
+jupyter notebook 14_hvm_fit_demo.ipynb
 
 # All notebooks (batch)
 uv run python scripts/run_single_notebook_96h.py examples/hvm
@@ -67,6 +76,7 @@ examples/outputs/hvm/
 
 - `examples/utils/hvm_data.py` — Data loaders with dataset registry (9 datasets, 6 protocols)
 - `examples/utils/hvm_fit.py` — Fit pipeline: `run_nlsq_saos()`, `run_nuts()`, `posterior_predictive_saos()`
+- `examples/utils/hvm_demo_fit.py` — Positive-control HVM data generation and fitted overlay helpers
 - `examples/hvm/hvm_defaults.yaml` — Protocol-specific parameter hints and sampler config
 
 ## Requirements
