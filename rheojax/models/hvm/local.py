@@ -166,8 +166,14 @@ class HVMLocal(HVMBase):
     # Internal Helpers
     # =========================================================================
 
-    def _resolve_test_mode(self, kwarg_value) -> str:
-        """Resolve test_mode from kwarg, cached value, or default."""
+    def _resolve_mode_kwarg(self, kwarg_value) -> str:
+        """Resolve test_mode from kwarg, cached value, or HVM default.
+
+        This is HVM's internal helper used by ``_fit`` / ``_predict`` to pick a
+        protocol when the caller did not supply ``test_mode``. It is **distinct
+        from** ``BayesianMixin._resolve_test_mode`` (different signature) — that
+        method must remain accessible for NUTS to extract (X, y, test_mode).
+        """
         if kwarg_value is not None:
             return kwarg_value
         cached = getattr(self, "_test_mode", None)
@@ -722,7 +728,7 @@ class HVMLocal(HVMBase):
             nlsq_optimize,
         )
 
-        test_mode = self._resolve_test_mode(kwargs.get("test_mode"))
+        test_mode = self._resolve_mode_kwarg(kwargs.get("test_mode"))
         self._test_mode = test_mode
 
         x_jax = jnp.asarray(x, dtype=jnp.float64)
@@ -808,7 +814,7 @@ class HVMLocal(HVMBase):
         np.ndarray
             Predicted response
         """
-        test_mode = self._resolve_test_mode(kwargs.get("test_mode"))
+        test_mode = self._resolve_mode_kwarg(kwargs.get("test_mode"))
         param_values = jnp.array(
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
@@ -867,7 +873,7 @@ class HVMLocal(HVMBase):
         G_D = p_dict.get("G_D", 0.0)
         k_d_D = p_dict.get("k_d_D", 1.0)
 
-        mode = self._resolve_test_mode(test_mode)
+        mode = self._resolve_mode_kwarg(test_mode)
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         # Use sentinel pattern to avoid swallowing falsy values (e.g. gamma_dot=0.0)

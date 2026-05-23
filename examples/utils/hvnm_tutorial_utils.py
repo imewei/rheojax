@@ -599,13 +599,21 @@ def configure_hvnm_for_fit(
 
     fittable = FITTABLE_PARAMS.get(protocol, list(HVNM_DEFAULT_PARAMS.keys()))
 
-    # Collapse bounds of non-fittable params to (value, value) so NLSQ
-    # only moves the declared fittable parameters. Without this, nlsq_optimize
-    # treats all 15 params as free, producing unphysical warm-starts.
+    # Collapse bounds of non-fittable params to a tight bracket so NLSQ
+    # only moves the declared fittable parameters. NLSQ requires lo < hi
+    # strictly, so we use (val * (1 - eps), val * (1 + eps)) for non-zero
+    # values and a small absolute window for val == 0.
+    _EPS = 1e-9
     for name in list(model.parameters.keys()):
         if name not in fittable:
             val = float(model.parameters.get_value(name))
-            model.parameters[name].bounds = (val, val)
+            if val == 0.0:
+                lo, hi = -_EPS, _EPS
+            elif val > 0:
+                lo, hi = val * (1 - _EPS), val * (1 + _EPS)
+            else:
+                lo, hi = val * (1 + _EPS), val * (1 - _EPS)
+            model.parameters[name].bounds = (lo, hi)
 
     return fittable
 

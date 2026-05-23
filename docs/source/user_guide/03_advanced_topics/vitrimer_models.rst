@@ -789,19 +789,14 @@ RheoJAX provides 13 HVM example notebooks:
 .. code-block:: text
 
    examples/hvm/
-   ├── 01_hvm_saos.ipynb                    # SAOS with two Maxwell modes
-   ├── 02_hvm_stress_relaxation.ipynb       # Relaxation to G_P plateau
-   ├── 03_hvm_startup_shear.ipynb           # TST stress overshoot
-   ├── 04_hvm_creep.ipynb                   # Delayed compliance
-   ├── 05_hvm_flow_curve.ipynb              # Shear thinning from BER
-   ├── 06_hvm_laos.ipynb                    # Nonlinear oscillatory
-   ├── 07_hvm_overview.ipynb                # All protocols + theory
-   ├── 08_hvm_flow_curve.ipynb              # Extended flow curve
-   ├── 09_hvm_creep.ipynb                   # Extended creep
-   ├── 10_hvm_relaxation.ipynb              # Extended relaxation
-   ├── 11_hvm_startup.ipynb                 # Extended startup
-   ├── 12_hvm_saos.ipynb                    # Extended SAOS
-   └── 13_hvm_laos.ipynb                    # Extended LAOS
+   ├── 01_hvm_saos.ipynb                    # SAOS: forward + NLSQ/NUTS
+   ├── 02_hvm_stress_relaxation.ipynb       # Relaxation: forward + NLSQ/NUTS
+   ├── 03_hvm_startup_shear.ipynb           # Startup: forward + NLSQ/NUTS
+   ├── 04_hvm_creep.ipynb                   # Creep: forward + NLSQ/NUTS
+   ├── 05_hvm_flow_curve.ipynb              # Flow curve: forward + NLSQ/NUTS
+   ├── 06_hvm_laos.ipynb                    # LAOS: forward + NLSQ/NUTS
+   ├── 07_hvm_overview.ipynb                # Architecture overview + Epstein SAOS fit
+   └── 08_hvm_fit_demo.ipynb                # Multi-protocol positive-control demo
 
 **Key notebooks:**
 
@@ -817,25 +812,21 @@ HVNM Tutorials
    examples/hvnm/
    ├── 01_hvnm_saos.ipynb                   # Reinforced SAOS
    ├── 02_hvnm_stress_relaxation.ipynb      # Relaxation with interphase
-   ├── 03_hvnm_startup_shear.ipynb          # Startup with NPs
-   ├── 04_hvnm_creep.ipynb                  # Creep compliance
-   ├── 05_hvnm_flow_curve.ipynb             # Flow curves (neat vs filled)
-   ├── 06_hvnm_laos.ipynb                   # LAOS with reinforcement
-   ├── 07_hvnm_limiting_cases.ipynb         # Factory methods demo
-   ├── 08_data_intake_and_qc.ipynb          # Data preprocessing
-   ├── 09_flow_curve_nlsq_nuts.ipynb        # Bayesian flow curve
-   ├── 10_creep_compliance_nlsq_nuts.ipynb  # Bayesian creep
-   ├── 11_stress_relaxation_nlsq_nuts.ipynb # Bayesian relaxation
-   ├── 12_startup_shear_nlsq_nuts.ipynb     # Bayesian startup
-   ├── 13_saos_nlsq_nuts.ipynb              # Bayesian SAOS
-   ├── 14_laos_nlsq_nuts.ipynb              # Bayesian LAOS
-   └── 15_global_multi_protocol.ipynb       # Multi-protocol fitting
+   ├── 03_hvnm_startup_shear.ipynb          # Startup: forward + NLSQ/NUTS
+   ├── 04_hvnm_creep.ipynb                  # Creep: forward + NLSQ/NUTS
+   ├── 05_hvnm_flow_curve.ipynb             # Flow curve: forward + NLSQ/NUTS
+   ├── 06_hvnm_laos.ipynb                   # LAOS: forward + NLSQ/NUTS
+   ├── 07_hvnm_limiting_cases.ipynb         # Factory methods + phi=0 HVM recovery
+   ├── 08_data_intake_and_qc.ipynb          # Real-data intake & QC tutorial
+   └── 09_global_multi_protocol.ipynb       # Multi-protocol joint fit
 
-**Key notebooks:**
+**Notebook structure:**
 
-- **07**: Demonstrates all 5 factory methods and limiting cases
-- **09-14**: Full NLSQ to NUTS workflow for each protocol
-- **15**: Global fitting across multiple protocols (advanced)
+- **01-06**: Each notebook has Part A (forward HVNM prediction) and Part B
+  (NLSQ + NUTS Bayesian fit on HVNM-synthetic positive-control data).
+- **07**: Demonstrates all 5 factory methods and limiting cases (phi=0 -> HVM).
+- **08**: Real-data ingestion and quality-control tutorial.
+- **09**: Joint fitting across multiple protocols (flow + SAOS).
 
 References
 ==========

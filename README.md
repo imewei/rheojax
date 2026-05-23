@@ -96,8 +96,8 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
   - `examples/fluidity/` - 24 notebooks: Fluidity local/nonlocal + Saramito local/nonlocal (6 protocols each)
   - `examples/giesekus/` - 7 notebooks: Giesekus model (6 protocols + normal stresses)
   - `examples/hl/` - 6 notebooks: Hebraud-Lequeux model (6 protocols)
-  - `examples/hvm/` - 13 notebooks: Hybrid Vitrimer Model (6 basic + 7 advanced tutorials)
-  - `examples/hvnm/` - 15 notebooks: Hybrid Vitrimer Nanocomposite (7 basic + 8 NLSQ/NUTS)
+  - `examples/hvm/` - 8 notebooks: Hybrid Vitrimer Model (per-protocol forward + NLSQ/NUTS fit, plus overview and multi-protocol demo)
+  - `examples/hvnm/` - 9 notebooks: Hybrid Vitrimer Nanocomposite (per-protocol forward + NLSQ/NUTS, plus limiting-cases, data intake, multi-protocol)
   - `examples/ikh/` - 12 notebooks: MIKH + MLIKH models (6 protocols each)
   - `examples/itt_mct/` - 12 notebooks: ITT-MCT Schematic + Isotropic (6 protocols each)
   - `examples/sgr/` - 6 notebooks: Soft Glassy Rheology (6 protocols)
@@ -798,36 +798,25 @@ examples/
 │   ├── 04_hl_saos.ipynb
 │   ├── 05_hl_startup.ipynb
 │   └── 06_hl_laos.ipynb
-├── hvm/                         # 13 notebooks: Hybrid Vitrimer Model
-│   ├── 01_hvm_saos.ipynb
-│   ├── 02_hvm_stress_relaxation.ipynb
-│   ├── 03_hvm_startup_shear.ipynb
-│   ├── 04_hvm_creep.ipynb
-│   ├── 05_hvm_flow_curve.ipynb
-│   ├── 06_hvm_laos.ipynb
-│   ├── 07_hvm_overview.ipynb               # Overview tutorial
-│   ├── 08_hvm_flow_curve.ipynb             # Advanced flow curve
-│   ├── 09_hvm_creep.ipynb                  # Advanced creep
-│   ├── 10_hvm_relaxation.ipynb             # Advanced relaxation
-│   ├── 11_hvm_startup.ipynb                # Advanced startup
-│   ├── 12_hvm_saos.ipynb                   # Advanced SAOS
-│   └── 13_hvm_laos.ipynb                   # Advanced LAOS
-├── hvnm/                        # 15 notebooks: Hybrid Vitrimer Nanocomposite
-│   ├── 01_hvnm_saos.ipynb
-│   ├── 02_hvnm_stress_relaxation.ipynb
-│   ├── 03_hvnm_startup_shear.ipynb
-│   ├── 04_hvnm_creep.ipynb
-│   ├── 05_hvnm_flow_curve.ipynb
-│   ├── 06_hvnm_laos.ipynb
+├── hvm/                         # 8 notebooks: Hybrid Vitrimer Model (Part A forward + Part B fit)
+│   ├── 01_hvm_saos.ipynb                   # SAOS: forward + NLSQ/NUTS
+│   ├── 02_hvm_stress_relaxation.ipynb      # Relaxation: forward + NLSQ/NUTS
+│   ├── 03_hvm_startup_shear.ipynb          # Startup: forward + NLSQ/NUTS
+│   ├── 04_hvm_creep.ipynb                  # Creep: forward + NLSQ/NUTS
+│   ├── 05_hvm_flow_curve.ipynb             # Flow curve: forward + NLSQ/NUTS
+│   ├── 06_hvm_laos.ipynb                   # LAOS: forward + NLSQ/NUTS
+│   ├── 07_hvm_overview.ipynb               # Architecture overview + Epstein SAOS fit
+│   └── 08_hvm_fit_demo.ipynb               # Multi-protocol positive-control demo
+├── hvnm/                        # 9 notebooks: Hybrid Vitrimer Nanocomposite (Part A forward + Part B fit)
+│   ├── 01_hvnm_saos.ipynb                  # SAOS: forward + NLSQ/NUTS
+│   ├── 02_hvnm_stress_relaxation.ipynb     # Relaxation: forward + NLSQ/NUTS
+│   ├── 03_hvnm_startup_shear.ipynb         # Startup: forward + NLSQ/NUTS
+│   ├── 04_hvnm_creep.ipynb                 # Creep: forward + NLSQ/NUTS
+│   ├── 05_hvnm_flow_curve.ipynb            # Flow curve: forward + NLSQ/NUTS
+│   ├── 06_hvnm_laos.ipynb                  # LAOS: forward + NLSQ/NUTS
 │   ├── 07_hvnm_limiting_cases.ipynb        # phi=0 → HVM recovery
-│   ├── 08_data_intake_and_qc.ipynb         # Data intake & QC
-│   ├── 09_flow_curve_nlsq_nuts.ipynb       # NLSQ → NUTS workflow
-│   ├── 10_creep_compliance_nlsq_nuts.ipynb
-│   ├── 11_stress_relaxation_nlsq_nuts.ipynb
-│   ├── 12_startup_shear_nlsq_nuts.ipynb
-│   ├── 13_saos_nlsq_nuts.ipynb
-│   ├── 14_laos_nlsq_nuts.ipynb
-│   └── 15_global_multi_protocol.ipynb      # Multi-protocol fitting
+│   ├── 08_data_intake_and_qc.ipynb         # Real-data intake & QC tutorial
+│   └── 09_global_multi_protocol.ipynb      # Multi-protocol joint fit
 ├── ikh/                         # 12 notebooks: MIKH + MLIKH models
 │   ├── 01_mikh_flow_curve.ipynb
 │   ├── 02_mikh_startup_shear.ipynb

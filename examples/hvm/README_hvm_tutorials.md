@@ -1,28 +1,29 @@
 # HVM Tutorial Notebooks
 
-Tutorial notebooks for the **Hybrid Vitrimer Model (HVM)**. The first notebooks introduce
-forward predictions, the middle notebooks demonstrate NLSQ and NumPyro NUTS workflows on
-experimental rheology data, and `14_hvm_fit_demo.ipynb` provides a positive-control fitting
-case where HVM-fitted curves overlap HVM-generated rheology data.
+Tutorial notebooks for the **Hybrid Vitrimer Model (HVM)**. Each protocol notebook is now
+split into two parts: **Part A** demonstrates forward HVM prediction (no fitting), and
+**Part B** runs the NLSQ + NumPyro NUTS Bayesian fitting pipeline on representative data.
+`07_hvm_overview.ipynb` is the architecture overview, and `08_hvm_fit_demo.ipynb` is the
+multi-protocol positive-control fit demo where HVM-fitted curves overlap HVM-generated data.
 
 ## Notebooks
 
-| # | Notebook | Protocol | Data Source | Key Physics |
+| # | Notebook | Protocol | Part B Data | Key Physics |
 |---|----------|----------|-------------|-------------|
-| 1 | `01_hvm_saos.ipynb` | SAOS | HVM simulation | Linear viscoelastic moduli |
-| 2 | `02_hvm_stress_relaxation.ipynb` | Relaxation | HVM simulation | P/E/D relaxation modes |
-| 3 | `03_hvm_startup_shear.ipynb` | Startup | HVM simulation | Stress growth and rate dependence |
-| 4 | `04_hvm_creep.ipynb` | Creep | HVM simulation | Compliance and applied stress |
-| 5 | `05_hvm_flow_curve.ipynb` | Flow curve | HVM simulation | Steady-state subnetwork decomposition |
-| 6 | `06_hvm_laos.ipynb` | LAOS | HVM simulation | Nonlinear oscillatory response |
-| 7 | `07_hvm_overview.ipynb` | Overview + SAOS fit | Epstein SAOS | 3-subnetwork architecture, Arrhenius |
-| 8 | `08_hvm_flow_curve.ipynb` | Flow curve fit | Oil-water emulsion φ=0.74 | Model/data suitability check |
-| 9 | `09_hvm_creep.ipynb` | Creep fit | PS at 160°C | Model/data suitability check |
-| 10 | `10_hvm_relaxation.ipynb` | Relaxation fit | Fish muscle | NLSQ HVM fit |
-| 11 | `11_hvm_startup.ipynb` | Startup fit | PNAS Digital Twin | Model/data suitability check |
-| 12 | `12_hvm_saos.ipynb` | SAOS fit | Epstein network | NLSQ and Bayesian workflow |
-| 13 | `13_hvm_laos.ipynb` | LAOS comparison | PNAS Digital Twin | Lissajous and harmonic analysis |
-| 14 | `14_hvm_fit_demo.ipynb` | Multi-protocol fit | HVM-generated rheology data | Positive-control fitted overlays |
+| 1 | `01_hvm_saos.ipynb` | SAOS | Epstein network + HVM-synthetic multi-T | Linear viscoelastic moduli, Arrhenius validation |
+| 2 | `02_hvm_stress_relaxation.ipynb` | Stress relaxation | Fish muscle | P/E/D relaxation modes |
+| 3 | `03_hvm_startup_shear.ipynb` | Startup shear | HVM-synthetic | Stress growth, rate dependence, V_act sensitivity |
+| 4 | `04_hvm_creep.ipynb` | Creep | HVM-synthetic | Compliance, retardation spectrum, terminal η_D |
+| 5 | `05_hvm_flow_curve.ipynb` | Flow curve | Oil-water emulsion φ=0.74 | Steady-state subnetwork decomposition |
+| 6 | `06_hvm_laos.ipynb` | LAOS | PNAS Digital Twin | Lissajous, harmonics, normal stress differences |
+| 7 | `07_hvm_overview.ipynb` | Overview + quick SAOS fit | Epstein SAOS | 3-subnetwork architecture, factor-of-2, Arrhenius |
+| 8 | `08_hvm_fit_demo.ipynb` | Multi-protocol fit | HVM-synthetic positive control | Cross-protocol fitted overlays |
+
+Each protocol notebook (1–6) is structured as:
+- **Part A — Forward Prediction**: build an `HVMLocal` model, simulate the protocol, visualise the response, and discuss the physical signature.
+- **Part B — NLSQ + NUTS Bayesian Fit**: fit the model to experimental or HVM-synthetic data; show convergence diagnostics, posterior predictive checks, and parameter credible intervals.
+
+During the 2026-05-22 consolidation the older fit-only notebooks (08–13) were merged into Part B of their respective protocol notebooks, and the multi-protocol positive-control demo was renumbered from `14_hvm_fit_demo.ipynb` to `08_hvm_fit_demo.ipynb` so the sequence is contiguous (01–08).
 
 ## Data Sources
 
@@ -41,7 +42,7 @@ All data is loaded via `examples/utils/hvm_data.py`:
 ```bash
 # Single notebook
 cd examples/hvm
-jupyter notebook 14_hvm_fit_demo.ipynb
+jupyter notebook 08_hvm_fit_demo.ipynb
 
 # All notebooks (batch)
 uv run python scripts/run_single_notebook_96h.py examples/hvm

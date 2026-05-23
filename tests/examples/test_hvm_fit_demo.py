@@ -27,5 +27,5 @@ def test_hvm_demo_fits_overlap_generated_rheology_data():
 
 
 def test_hvm_fit_demo_notebook_exists():
-    notebook = EXAMPLES_DIR / "hvm" / "14_hvm_fit_demo.ipynb"
+    notebook = EXAMPLES_DIR / "hvm" / "08_hvm_fit_demo.ipynb"
     assert notebook.exists()

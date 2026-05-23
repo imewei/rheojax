@@ -78,6 +78,8 @@ def _protocol_grid(protocol: str) -> tuple[np.ndarray, dict[str, float]]:
         return np.logspace(-2, 3, 60), {"sigma_applied": 100.0}
     if protocol == "startup":
         return np.linspace(0.01, 10.0, 80), {"gamma_dot": 1.0}
+    if protocol == "oscillation":
+        return np.logspace(-2, 2, 32), {}
     raise ValueError(f"Unsupported HVM demo protocol: {protocol!r}")
 
 
@@ -112,10 +114,24 @@ def generate_hvm_demo_data(
     noise_level: float = 0.01,
     seed: int = 7,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, float], HVMLocal]:
-    """Generate small reproducible rheology data from the HVM positive control."""
+    """Generate small reproducible rheology data from the HVM positive control.
+
+    For ``protocol="oscillation"`` returns complex ``G* = G' + i G''``.
+    """
 
     x_data, predict_kwargs = _protocol_grid(protocol)
     true_model = make_hvm_demo_model()
+
+    if protocol == "oscillation":
+        Gp, Gdp = true_model.predict_saos(x_data)
+        Gp = np.asarray(Gp, dtype=float)
+        Gdp = np.asarray(Gdp, dtype=float)
+        if noise_level:
+            rng = np.random.default_rng(seed)
+            Gp = Gp * np.exp(rng.normal(0.0, noise_level, size=Gp.shape))
+            Gdp = Gdp * np.exp(rng.normal(0.0, noise_level, size=Gdp.shape))
+        return x_data, Gp + 1j * Gdp, predict_kwargs, true_model
+
     y_clean = np.array(
         true_model.predict(x_data, test_mode=protocol, **predict_kwargs),
         dtype=float,
@@ -143,15 +159,71 @@ def fit_hvm_demo_protocol(
         seed=seed,
     )
 
-    fit_model = make_hvm_demo_model(INITIAL_PARAMS)
-    fit_model.fit(
-        x_data,
-        y_data,
-        test_mode=protocol,
-        use_log_residuals=protocol != "startup",
-        max_iter=2_000,
-        **predict_kwargs,
-    )
+    # Data-anchored G_P initialization. INITIAL_PARAMS sets G_P=50 (2x the
+    # ground truth); NLSQ trades that against G_E/k_d_D and ends in a local
+    # minimum where R^2 ~ 0.97 instead of ~1, with visible curve offset in
+    # the overlay plot. Seeding G_P from the data asymptote drops NLSQ into
+    # the global basin of attraction.
+    G_P_seed: float | None = None
+    if protocol == "relaxation":
+        # G(t -> inf) = G_P
+        plateau_tail = np.asarray(y_data[-5:], dtype=float)
+        plateau_tail = plateau_tail[np.isfinite(plateau_tail) & (plateau_tail > 0)]
+        if plateau_tail.size:
+            G_P_seed = float(np.median(plateau_tail))
+    elif protocol == "startup":
+        # sigma(t -> inf) approx G_P * gamma_dot * t + viscous offset, so the
+        # terminal slope reads off G_P directly.
+        gamma_dot = float(predict_kwargs.get("gamma_dot", 1.0))
+        n_tail = min(10, max(2, len(x_data) // 4))
+        x_tail = np.asarray(x_data[-n_tail:], dtype=float)
+        y_tail = np.asarray(y_data[-n_tail:], dtype=float)
+        if x_tail[-1] > x_tail[0] and gamma_dot > 0:
+            slope = (y_tail[-1] - y_tail[0]) / (x_tail[-1] - x_tail[0])
+            G_P_candidate = slope / gamma_dot
+            if np.isfinite(G_P_candidate) and G_P_candidate > 0:
+                G_P_seed = float(G_P_candidate)
+
+    fit_kwargs: dict = {
+        "test_mode": protocol,
+        "use_log_residuals": protocol != "startup",
+        "max_iter": 5_000,
+        "ftol": 1e-10,
+        "xtol": 1e-10,
+        "gtol": 1e-10,
+    }
+
+    def _build_seeded_model(ge_scale: float = 1.0) -> HVMLocal:
+        m = make_hvm_demo_model(INITIAL_PARAMS)
+        if G_P_seed is not None:
+            m.parameters.set_value("G_P", G_P_seed)
+        if ge_scale != 1.0:
+            m.parameters.set_value("G_E", float(INITIAL_PARAMS["G_E"] * ge_scale))
+        return m
+
+    # For startup the local NLSQ stops at xtol-success in a basin where G_E
+    # does not move from INITIAL_PARAMS. workflow="auto_global" does not help
+    # there because differential evolution only runs after TRF *fails*, and
+    # TRF reports success. A short manual multi-start over G_E (the param
+    # that gets pinned) reliably finds the global basin.
+    if protocol == "startup":
+        best_model: HVMLocal | None = None
+        best_cost = float("inf")
+        for ge_scale in (0.5, 1.0, 2.0, 4.0):
+            trial = _build_seeded_model(ge_scale=ge_scale)
+            trial.fit(x_data, y_data, **fit_kwargs, **predict_kwargs)
+            trial_pred = np.asarray(
+                trial.predict(x_data, test_mode=protocol, **predict_kwargs)
+            )
+            cost = float(np.sum((y_data - trial_pred) ** 2))
+            if cost < best_cost:
+                best_cost = cost
+                best_model = trial
+        assert best_model is not None
+        fit_model = best_model
+    else:
+        fit_model = _build_seeded_model()
+        fit_model.fit(x_data, y_data, **fit_kwargs, **predict_kwargs)
 
     x_fit = _fit_grid(protocol)
     y_data_fit = np.asarray(fit_model.predict(x_data, test_mode=protocol, **predict_kwargs))
