@@ -677,10 +677,14 @@ class ITTMCTIsotropic(ITTMCTBase):
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
 
-        # Modulus scale
-        G_scale = kBT / sigma_d**3
+        # Dimensionless wavevector and MCT prefactor.
+        # The proper MCT stress integral is dimensionless when written in
+        # q = k·σ_d. Without the σ_d⁵ scaling and the (1/60π²) geometric
+        # prefactor (Brader/Fuchs 2009), a bare Σ_k k⁴ ... would produce
+        # ~10^28 "Pa" — orders of magnitude off the physical kBT/σ_d³ scale.
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
 
-        # R10-ISM-001: hoist glass check and f(k) once, shared across all γ̇ values.
         info = self.get_glass_transition_info()
         is_glass = info["is_glass"]
         if is_glass:
@@ -692,49 +696,37 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         sigma = np.zeros_like(gamma_dot)
 
-        # R10-ISM-003: correct ITT-MCT flow curve uses full time integral
         # σ(γ̇) = γ̇ · ∫₀^∞ G(t) · h(γ̇t) dt
-        # where G(t) = G_scale · Σ_k k⁴ S(k)² · Φ(k,t)²
-        # and h(γ) = exp(-(γ/γ_c)²) is the strain decorrelation.
-        # Using a single t_eff = 1/γ̇ was an O(1)-point approximation
-        # that misses the entire shape of G(t) and underestimates the
-        # integral by orders of magnitude near the glass transition.
-        #
-        # Use t_max = 100 * tau_k_max to cover full correlator decay.
-        # The h(γ̇t) factor suppresses contributions beyond t ~ gamma_c/gamma_dot,
-        # so the integral naturally converges even for the glass state.
+        # where G(t) = G_prefactor · ∫ dq q⁴ S(q)² Φ(q,t)²
         t_max_global = float(100.0 * tau_k_arr.max())
-
-        # Linear time grid is more stable for the exponential × Gaussian integrand
         t_int = np.linspace(0.0, t_max_global, 500)
 
-        # Pre-compute G(t) on the shared grid (vectorized over k using broadcasting)
-        # phi_k shape: (n_t, n_k)
         exp_decay = np.exp(-t_int[:, None] / tau_k_arr[None, :])  # (n_t, n_k)
         if is_glass:
             phi_k_eq = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
         else:
             phi_k_eq = exp_decay  # (n_t, n_k)
 
-        # G_k weights: k⁴ S(k)²
-        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
+        # Dimensionless integrand q⁴ S(q)² Φ(q,t)²
+        G_k_weights = q_grid**4 * self.S_k**2  # (n_k,)
 
-        # G(t) = G_scale · Σ_k G_k · Φ(k,t)²  shape: (n_t,)
-        G_t = G_scale * np.sum(G_k_weights[None, :] * phi_k_eq**2, axis=1)
+        # G(t) = G_prefactor · ∫ dq q⁴ S² Φ²   shape (n_t,)
+        G_t = G_prefactor * np.trapezoid(
+            G_k_weights[None, :] * phi_k_eq**2, q_grid, axis=-1
+        )
 
         for i, gd in enumerate(gamma_dot):
             if gd < 1e-15:
                 # Zero shear rate: yield stress for glass, zero for fluid.
-                # Estimate: σ_y ≈ G_scale · gamma_c · Σ_k G_k·f_k² / Σ_k G_k (weighted plateau)
+                # σ_y ≈ G_prefactor · γ_c · ∫dq q⁴ S² f²  weighted by k-integral norm.
                 if is_glass:
-                    G_k_total = float(np.sum(G_k_weights))
+                    G_k_total = float(np.trapezoid(G_k_weights, q_grid))
                     if G_k_total > 0:
+                        weighted = float(
+                            np.trapezoid(G_k_weights * f_k_arr**2, q_grid)
+                        )
                         sigma[i] = (
-                            G_scale
-                            * gamma_c
-                            * float(np.sum(G_k_weights * f_k_arr**2))
-                            / G_k_total
-                            * 0.1
+                            G_prefactor * gamma_c * weighted / G_k_total * 0.1
                         )
                 else:
                     sigma[i] = 0.0
@@ -785,9 +777,11 @@ class ITTMCTIsotropic(ITTMCTBase):
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
 
-        G_scale = kBT / sigma_d**3
+        # Dimensionless wavevector q = k·σ_d and MCT geometric prefactor;
+        # see _predict_flow_curve for the unit-analysis discussion.
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
 
-        # R10-ISM-001: hoist glass check once.
         info = self.get_glass_transition_info()
         is_glass = info["is_glass"]
         if is_glass:
@@ -797,22 +791,8 @@ class ITTMCTIsotropic(ITTMCTBase):
         else:
             f_k_arr = np.zeros(len(self.k_grid))
 
-        # R10-ISM-004/005: replace the Maxwell approximation
-        # G'(ω) = Σ_k G_k·[f_k + (1-f_k)·ω²τ²/(1+ω²τ²)] with the correct
-        # Fourier transform of G(t) = G_scale·Σ_k G_k·Φ(k,t)².
-        #
-        # The Maxwell formula misses the f_k² plateau contribution and the
-        # cross-term 2f_k(1-f_k) in Φ². With Φ(k,t) = f_k + (1-f_k)e^{-t/τ_k}:
-        # Φ² = f_k² + 2f_k(1-f_k)e^{-t/τ_k} + (1-f_k)²e^{-2t/τ_k}
-        # FT gives three contributions: G_e plateau, mode at τ_k, mode at τ_k/2.
-        # We compute the Fourier integral numerically on a dense time grid so all
-        # contributions (including the elastic plateau from f_k²) are captured.
-        #
-        # Numerical strategy for each omega: use a per-frequency linear grid that
-        # covers the correlator decay (t_max = 100*tau_k_max) with enough points
-        # to resolve the oscillation period 2π/ω (at least 20 points per period).
-        # This avoids Nyquist aliasing when omega is large.
-        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
+        # G(t) = G_prefactor · ∫dq q⁴ S² Φ²; G'(ω), G''(ω) by Fourier transform.
+        G_k_weights = q_grid**4 * self.S_k**2  # (n_k,)
         G_prime = np.zeros_like(omega)
         G_double_prime = np.zeros_like(omega)
 
@@ -825,13 +805,15 @@ class ITTMCTIsotropic(ITTMCTBase):
 
             t_w = np.linspace(0.0, t_max_w, n_t_w)
 
-            # G(t) = G_scale · Σ_k k⁴ S(k)² · Φ(k,t)²  (vectorized over k)
+            # G(t) = G_prefactor · ∫dq q⁴ S(q)² Φ(q,t)²  (vectorized over q,t)
             exp_decay = np.exp(-t_w[:, None] / tau_k_arr[None, :])
             if is_glass:
                 phi_k_w = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
             else:
                 phi_k_w = exp_decay
-            G_t_w = G_scale * np.sum(G_k_weights[None, :] * phi_k_w**2, axis=1)
+            G_t_w = G_prefactor * np.trapezoid(
+                G_k_weights[None, :] * phi_k_w**2, q_grid, axis=-1
+            )
 
             # Numerical Fourier transform:
             # G'(ω) = ω ∫₀^∞ G(t) sin(ωt) dt
@@ -879,9 +861,12 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
         tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
-        G_scale = kBT / sigma_d**3
 
-        # R10-ISM-001: hoist glass check and f(k) out of any inner loop.
+        # Dimensionless wavevector q = k·σ_d and MCT prefactor; see
+        # _predict_flow_curve for the unit-analysis discussion.
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
+
         info = self.get_glass_transition_info()
         is_glass = info["is_glass"]
         if is_glass:
@@ -891,26 +876,24 @@ class ITTMCTIsotropic(ITTMCTBase):
         else:
             f_k_arr = np.zeros(len(self.k_grid))
 
-        # R10-ISM-002: replace triple-nested Python loop with vectorized computation.
-        # Old code: O(n_t × n_sub × n_k) Python iterations where n_sub varied per t.
-        # New code: O(1) numpy calls. We precompute G(t) on a shared fine grid,
-        # then integrate σ(t) = γ̇ · ∫₀ᵗ G(s) · h(γ̇s) ds via cumulative trapezoid.
+        # σ(t) = γ̇ · ∫₀ᵗ G(s) · h(γ̇s) ds  with  G(s) = G_prefactor · ∫dq q⁴ S² Φ²
         t_max_val = float(np.max(t))
         n_fine = max(500, 2 * len(t))
         t_fine = np.linspace(0.0, t_max_val, n_fine)
 
-        # phi_k_fine shape: (n_fine, n_k) — vectorized over k via broadcasting
         exp_decay = np.exp(-t_fine[:, None] / tau_k_arr[None, :])
         if is_glass:
             phi_k_fine = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
         else:
             phi_k_fine = exp_decay
 
-        # G_k weights: k⁴ S(k)²
-        G_k_weights = self.k_grid**4 * self.S_k**2  # (n_k,)
+        # Dimensionless integrand q⁴ S(q)² Φ²
+        G_k_weights = q_grid**4 * self.S_k**2  # (n_k,)
 
-        # G(t_fine) = G_scale · Σ_k G_k · Φ(k,t)²   shape: (n_fine,)
-        G_t_fine = G_scale * np.sum(G_k_weights[None, :] * phi_k_fine**2, axis=1)
+        # G(t_fine) = G_prefactor · ∫dq q⁴ S² Φ²   shape: (n_fine,)
+        G_t_fine = G_prefactor * np.trapezoid(
+            G_k_weights[None, :] * phi_k_fine**2, q_grid, axis=-1
+        )
 
         # Strain decorrelation on the fine grid
         gamma_t_fine = gamma_dot * t_fine
@@ -1009,7 +992,10 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert gamma_c is not None
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
-        G_scale = kBT / sigma_d**3
+
+        # Dimensionless wavevector q = k·σ_d and MCT prefactor.
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
 
         h_pre = np.exp(-((gamma_pre / gamma_c) ** 2))
 
@@ -1028,10 +1014,12 @@ class ITTMCTIsotropic(ITTMCTBase):
                 phi_t = f_k + (1 - f_k) * np.exp(-t_val / tau_k)
                 phi_t *= h_pre
 
-                G_k = k**4 * self.S_k[j] ** 2
+                # Dimensionless integrand: q⁴ S(q)² Φ²
+                G_k = q_grid[j] ** 4 * self.S_k[j] ** 2
                 stress_k[j] = G_k * phi_t * phi_t
 
-            sigma[i] = G_scale * gamma_pre * np.trapezoid(stress_k, self.k_grid)
+            # ∫ dq q⁴ S² Φ²  with q_grid as integration variable
+            sigma[i] = G_prefactor * gamma_pre * np.trapezoid(stress_k, q_grid)
 
         return sigma
 
@@ -1071,7 +1059,10 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert gamma_c is not None
 
         Gamma_k = self.k_grid**2 * D0 / self.S_k
-        G_scale = kBT / sigma_d**3
+
+        # Dimensionless wavevector q = k·σ_d and MCT prefactor.
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
 
         sigma = np.zeros_like(t)
 
@@ -1089,9 +1080,9 @@ class ITTMCTIsotropic(ITTMCTBase):
                 tau_k = 1.0 / Gamma_k[j]
                 f_k = self._compute_nonergodicity_parameter(k)
 
-                # Simplified LAOS response
+                # Simplified LAOS response with dimensionless integrand q⁴ S²
                 wt = omega * tau_k
-                G_k = k**4 * self.S_k[j] ** 2
+                G_k = q_grid[j] ** 4 * self.S_k[j] ** 2
 
                 # In-phase and out-of-phase contributions
                 G_prime_k = G_k * (f_k + (1 - f_k) * wt**2 / (1 + wt**2))
@@ -1102,7 +1093,8 @@ class ITTMCTIsotropic(ITTMCTBase):
                     G_prime_k * gamma_t + G_double_prime_k * gamma_dot_t / omega
                 )
 
-            sigma[i] = G_scale * np.trapezoid(stress_k, self.k_grid)
+            # ∫dq q⁴ S² ... with q_grid as the integration variable
+            sigma[i] = G_prefactor * np.trapezoid(stress_k, q_grid)
 
         return sigma
 

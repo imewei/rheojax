@@ -363,6 +363,73 @@ def generate_synthetic_relaxation(
     return time, stress
 
 
+def generate_synthetic_creep(
+    model: Any,
+    sigma_applied: float = 7.0,
+    t_end: float = 300.0,
+    n_points: int = 200,
+    noise_level: float = 0.02,
+    seed: int = 42,
+    return_strain: bool = False,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Generate synthetic creep data from a fitted MIKH/MLIKH model.
+
+    Calls model.predict(test_mode="creep", sigma_applied=...) which integrates
+    the IKH ODE forward and returns cumulative strain gamma(t). Shear rate
+    gamma_dot(t) is obtained by numerical differentiation. By construction
+    the synthetic data is exactly consistent with the model's ODE — fitting
+    it back to the same model architecture is a positive control.
+
+    Args:
+        model: Fitted MIKH or MLIKH model instance.
+        sigma_applied: Constant applied shear stress (Pa).
+        t_end: End time in seconds.
+        n_points: Number of time points (linear-spaced for stable gradient).
+        noise_level: Relative log-normal noise level (0.02 = 2%).
+        seed: Random seed.
+        return_strain: If True, return strain; if False, return shear rate.
+
+    Returns:
+        Tuple of (time, y, sigma_applied) where y is shear rate (default)
+        or cumulative strain (return_strain=True).
+    """
+    rng = np.random.default_rng(seed)
+
+    # Linear time grid — np.gradient is most stable on uniform spacing,
+    # and creep transients are typically short relative to t_end so a
+    # uniform grid resolves them adequately.
+    time = np.linspace(0.0, t_end, n_points)
+
+    # The IKH creep predict returns cumulative strain gamma(t)
+    strain_clean = np.asarray(
+        model.predict(time, test_mode="creep", sigma_applied=sigma_applied),
+        dtype=float,
+    ).flatten()
+
+    if return_strain:
+        if noise_level > 0:
+            strain = strain_clean * np.exp(rng.normal(0.0, noise_level, size=strain_clean.shape))
+        else:
+            strain = strain_clean
+        return time, strain, sigma_applied
+
+    # Differentiate to get shear rate; protect against negative values from
+    # numerical noise near the gradient endpoints.
+    gamma_dot_clean = np.gradient(strain_clean, time)
+    gamma_dot_clean = np.maximum(gamma_dot_clean, 0.0)
+
+    if noise_level > 0:
+        # Multiplicative log-normal noise so it scales with the local rate
+        # (uniform in log-space, appropriate for transient + steady values).
+        gamma_dot = gamma_dot_clean * np.exp(
+            rng.normal(0.0, noise_level, size=gamma_dot_clean.shape)
+        )
+    else:
+        gamma_dot = gamma_dot_clean
+
+    return time, gamma_dot, sigma_applied
+
+
 def generate_synthetic_saos(
     model: Any,
     omega_range: tuple[float, float] = (0.01, 100.0),
@@ -372,8 +439,17 @@ def generate_synthetic_saos(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generate synthetic SAOS data from a fitted IKH model.
 
-    Uses small-amplitude oscillatory shear (SAOS) to extract G' and G''
-    from the linearized response of the IKH model.
+    The linear viscoelastic response of MIKH at small strain reduces to a
+    Maxwell-element with (G, eta) — and ``MIKH._fit_saos_frequency_domain``
+    fits using exactly those Maxwell analytical expressions. Generating
+    the data with the same Maxwell formulas therefore makes this a clean
+    positive control: the NLSQ fit recovers (G, eta) within the noise level.
+
+    The previous implementation extracted G' and G'' by fitting sin/cos
+    coefficients to a LAOS simulation at gamma_0 = 1e-3. At that amplitude
+    MIKH is fully elastic for typical (G, sigma_y) calibrations, so the
+    cos-coefficient (i.e. G'') was numerical noise and clamped to 1e-10,
+    yielding a 7-decade gap between the data and the Maxwell prediction.
 
     Args:
         model: Fitted MIKH or MLIKH model instance.
@@ -390,67 +466,56 @@ def generate_synthetic_saos(
     # Log-spaced frequency points
     omega = np.logspace(np.log10(omega_range[0]), np.log10(omega_range[1]), n_points)
 
-    # For SAOS, we use small amplitude to stay in linear regime
-    gamma_0 = 0.001  # Very small strain amplitude
+    # Maxwell analytical SAOS — linear-regime response of MIKH or MLIKH.
+    # MIKH has scalar (G, eta); MLIKH has per-mode (G_i, ...) plus mu_p
+    # (plastic viscosity). Sum the modes as a parallel multi-Maxwell.
+    param_keys = list(model.parameters.keys())
+    if "G" in param_keys and "eta" in param_keys:
+        # Single-mode MIKH
+        G_modes = [float(model.parameters.get_value("G"))]
+        eta_total = float(model.parameters.get_value("eta"))
+        tau_modes = [eta_total / max(G_modes[0], 1e-30)]
+    else:
+        # Multi-mode MLIKH — use G_i, eta_i (if exists), else G_i and mu_p
+        mode_indices = sorted(
+            int(k.split("_")[1]) for k in param_keys
+            if k.startswith("G_") and k.split("_", 1)[1].isdigit()
+        )
+        if not mode_indices:
+            raise ValueError(
+                "Model has no recognized linear-viscoelastic parameters (need "
+                "'G'+'eta' or 'G_i'+'mu_p')."
+            )
+        G_modes = [float(model.parameters.get_value(f"G_{i}")) for i in mode_indices]
+        # MLIKH uses tau_thix_i (thixotropic restructuring timescale) as the
+        # mode relaxation time. mu_p/G_i is microseconds for typical
+        # calibrations — outside the SAOS measurement window — whereas
+        # tau_thix_i is seconds, giving a meaningful Maxwell-like spectrum.
+        tau_modes = [
+            float(model.parameters.get_value(f"tau_thix_{i}"))
+            for i in mode_indices
+        ]
 
-    G_prime_list = []
-    G_double_prime_list = []
+    # Sum of parallel Maxwell modes
+    G_prime_clean = np.zeros_like(omega)
+    G_double_prime_clean = np.zeros_like(omega)
+    for G_i, tau_i in zip(G_modes, tau_modes, strict=True):
+        wt = omega * tau_i
+        G_prime_clean += G_i * wt**2 / (1.0 + wt**2)
+        G_double_prime_clean += G_i * wt / (1.0 + wt**2)
 
-    for w in omega:
-        # Generate one cycle of oscillation
-        period = 2 * np.pi / w
-        n_points_cycle = 200
-        t = np.linspace(0, 3 * period, 3 * n_points_cycle)  # 3 cycles for steady state
-
-        # Get stress response via LAOS at small amplitude
-        try:
-            stress = model.predict_laos(t, gamma_0=gamma_0, omega=w)
-            stress = np.asarray(stress).flatten()
-
-            # Extract last cycle for analysis
-            last_cycle_start = 2 * n_points_cycle
-            t_cycle = t[last_cycle_start:]
-            stress_cycle = stress[last_cycle_start:]
-            _strain_cycle = gamma_0 * np.sin(w * t_cycle)
-
-            # Fit to extract G' and G''
-            # σ(t) = G'γ₀sin(ωt) + G''γ₀cos(ωt)
-            # Use least squares: σ = a*sin(ωt) + b*cos(ωt)
-            sin_term = np.sin(w * t_cycle)
-            cos_term = np.cos(w * t_cycle)
-            A = np.column_stack([sin_term, cos_term])
-            coeffs, _, _, _ = np.linalg.lstsq(A, stress_cycle, rcond=None)
-
-            G_p = coeffs[0] / gamma_0
-            G_pp = coeffs[1] / gamma_0
-
-        except Exception:
-            # Fallback: use Maxwell model approximation
-            G = model.parameters.get_value("G")
-            eta = model.parameters.get_value("eta")
-            tau = eta / G
-            wt = w * tau
-            G_p = G * wt**2 / (1 + wt**2)
-            G_pp = G * wt / (1 + wt**2)
-
-        G_prime_list.append(max(G_p, 1e-10))
-        G_double_prime_list.append(max(G_pp, 1e-10))
-
-    G_prime = np.array(G_prime_list)
-    G_double_prime = np.array(G_double_prime_list)
-
-    # Add noise
-    noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
-    noise_pp = rng.normal(
-        0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
-    )
-
-    G_prime = G_prime + noise_p
-    G_double_prime = G_double_prime + noise_pp
-
-    # Ensure positive moduli
-    G_prime = np.maximum(G_prime, 1e-10)
-    G_double_prime = np.maximum(G_double_prime, 1e-10)
+    # Multiplicative log-normal noise so noise scales with each modulus
+    # individually (additive Gaussian on a mean-scaled noise produces
+    # near-zero values where G'' is small, which then get clamped and
+    # break log-log plots).
+    if noise_level > 0:
+        noise_p = rng.normal(0.0, noise_level, size=G_prime_clean.shape)
+        noise_pp = rng.normal(0.0, noise_level, size=G_double_prime_clean.shape)
+        G_prime = G_prime_clean * np.exp(noise_p)
+        G_double_prime = G_double_prime_clean * np.exp(noise_pp)
+    else:
+        G_prime = G_prime_clean
+        G_double_prime = G_double_prime_clean
 
     return omega, G_prime, G_double_prime
 

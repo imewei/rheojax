@@ -323,9 +323,8 @@ def generate_synthetic_creep_schematic(
     J_clean = model._predict_creep(time, sigma_applied=sigma_applied)
     J_clean = np.asarray(J_clean).flatten()
 
-    noise = rng.normal(0, noise_level * np.mean(np.abs(J_clean)), size=J_clean.shape)
-    J = J_clean + noise
-    J = np.maximum(J, 1e-15)
+    log_noise = rng.normal(0.0, noise_level, size=J_clean.shape)
+    J = np.maximum(J_clean, 1e-30) * np.exp(log_noise)
 
     return time, J
 
@@ -366,8 +365,8 @@ def generate_synthetic_creep_isotropic(
     J_clean = model._predict_creep(time, sigma_applied=sigma_applied)
     J_clean = np.asarray(J_clean).flatten()
 
-    noise = rng.normal(0, noise_level * np.mean(np.abs(J_clean)), size=J_clean.shape)
-    J = np.maximum(J_clean + noise, 1e-15)
+    log_noise = rng.normal(0.0, noise_level, size=J_clean.shape)
+    J = np.maximum(J_clean, 1e-30) * np.exp(log_noise)
 
     return time, J
 
