@@ -340,13 +340,20 @@ def generate_synthetic_creep_isotropic(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate synthetic creep compliance data from a fitted ISM model.
 
+    Returns the creep compliance J(t) = γ(t)/σ₀, which is the quantity the
+    ITT-MCT creep fit (``_fit_creep``) and ``model.predict(test_mode="creep")``
+    operate on — matching ``generate_synthetic_creep_schematic`` and the
+    codebase-wide convention that the creep observable is compliance, not
+    strain. In the linear regime J(t) is stress-independent, so ``sigma_0``
+    sets only the experimental strain scale, not the compliance.
+
     Args:
         model: Fitted ITTMCTIsotropic model instance.
         sigma_applied: Applied stress in Pa (alternative: sigma_0).
         sigma_0: Alias for sigma_applied.
         t_end: End time in seconds.
         n_points: Number of time points.
-        noise_level: Relative noise level.
+        noise_level: Relative noise level for compliance.
         seed: Random seed.
 
     Returns:
@@ -362,13 +369,58 @@ def generate_synthetic_creep_isotropic(
 
     time = np.logspace(-2, np.log10(t_end), n_points)
 
+    # Creep compliance J(t) from the model (stress-independent in linear regime).
     J_clean = model._predict_creep(time, sigma_applied=sigma_applied)
     J_clean = np.asarray(J_clean).flatten()
 
+    # Multiplicative noise on the compliance.
     log_noise = rng.normal(0.0, noise_level, size=J_clean.shape)
     J = np.maximum(J_clean, 1e-30) * np.exp(log_noise)
 
     return time, J
+
+
+def generate_synthetic_laos_isotropic(
+    model: Any,
+    gamma_0: float = 0.15,
+    omega: float = 1.0,
+    n_cycles: int = 4,
+    n_points: int = 300,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate synthetic LAOS (time, strain, stress) from an ISM model.
+
+    The imposed strain is gamma(t) = gamma_0 * sin(omega * t); the stress is the
+    model's LAOS prediction. Unlike the positive-definite moduli/compliance
+    generators (which use multiplicative log-normal noise), LAOS stress is a
+    signed oscillatory signal crossing zero, so additive Gaussian noise scaled
+    to the stress amplitude is the appropriate noise model.
+
+    Args:
+        model: ITTMCTIsotropic instance (parameters define the ground truth).
+        gamma_0: Strain amplitude (gamma_0 > gamma_c gives nonlinear response).
+        omega: Angular frequency (rad/s).
+        n_cycles: Number of oscillation cycles spanned by the time grid.
+        n_points: Number of time samples.
+        noise_level: Additive noise as a fraction of the stress amplitude.
+        seed: Random seed.
+
+    Returns:
+        Tuple of (time, strain, stress) arrays in (s, -, Pa).
+    """
+    rng = np.random.default_rng(seed)
+    time = np.linspace(0.0, n_cycles * 2.0 * np.pi / omega, n_points)
+    strain = gamma_0 * np.sin(omega * time)
+
+    stress_clean = np.asarray(
+        model.predict(time, test_mode="laos", gamma_0=gamma_0, omega=omega)
+    ).flatten()
+    amp = float(np.max(np.abs(stress_clean)))
+    stress = stress_clean + rng.normal(
+        0.0, noise_level * max(amp, 1e-30), size=stress_clean.shape
+    )
+    return time, strain, stress
 
 
 # =============================================================================
@@ -725,21 +777,27 @@ def load_itt_mct_parameters(
     with open(param_file) as f:
         params = json.load(f)
 
-    # Validate glass state if required
-    if require_glass and "v2" in params:
-        v2 = params["v2"]
-        if v2 <= 4.0:
-            print(f"Warning: Loaded v2={v2:.3f} is in fluid state (v2 <= 4).")
-            print("Using default glass-state parameters for yield stress calculations.")
-            # Return defaults for glass state
+    # Validate glass state if required. Schematic uses v2 > 4; the isotropic
+    # (ISM) model is a glass for phi above the MCT transition (~0.516 for
+    # Percus-Yevick hard spheres), so it must be validated on phi, not v2.
+    if require_glass:
+        schematic_fluid = model_name == "schematic" and params.get("v2", 99) <= 4.0
+        isotropic_fluid = model_name == "isotropic" and params.get("phi", 0) <= 0.516
+        if schematic_fluid or isotropic_fluid:
+            bad = f"v2={params.get('v2')}" if schematic_fluid else f"phi={params.get('phi')}"
+            print(f"Warning: Loaded parameters are in the fluid state ({bad}).")
+            print("Falling back to default glass-state parameters.")
             if model_name == "schematic":
                 params = {"v2": 4.2, "Gamma": 1.0, "gamma_c": 0.1, "G_inf": 1000.0}
             else:
+                # Representative dense colloidal-glass values (1 um PMMA-like
+                # hard spheres at 298 K): these yield a physical Pa-scale
+                # plateau modulus, not the 1 m / 1 J placeholders.
                 params = {
-                    "phi": 0.55,
-                    "sigma_d": 1.0,
-                    "kBT": 1.0,
-                    "tau_0": 1.0,
+                    "phi": 0.58,
+                    "sigma_d": 1e-6,
+                    "D0": 1e-12,
+                    "kBT": 4.11e-21,
                     "gamma_c": 0.1,
                 }
 
@@ -767,6 +825,143 @@ def load_itt_mct_glass_info(
 
     with open(info_file) as f:
         return json.load(f)
+
+
+def fit_isotropic_phi(
+    model: Any,
+    X: np.ndarray,
+    y_data: np.ndarray,
+    test_mode: str,
+    phi_bounds: tuple[float, float] = (0.50, 0.63),
+    **predict_kwargs: Any,
+) -> float:
+    """Refine the volume fraction phi against any-protocol data.
+
+    For the ITT-MCT Isotropic model the microscopic parameters (D0, sigma_d,
+    kBT) are fixed by the flow-curve calibration; the volume fraction phi is the
+    one shape parameter the *other* protocols constrain. Because phi enters the
+    structure factor S(k) and the MCT vertex, it must be refit through
+    ``update_structure_factor`` (recomputing S(k)/vertex), not via ``set_value``
+    alone — the protocol ``model.fit`` path keeps S(k) cached and also tries to
+    move the degenerate, badly-scaled microscopic parameters, so a direct
+    ``model.fit`` is ill-conditioned here.
+
+    A 1-D bounded search over phi is used. Positive-definite observables
+    (compliance, complex modulus) are compared in log space; signed observables
+    (e.g. LAOS stress) use a scale-normalised linear residual.
+
+    Args:
+        model: ITTMCTIsotropic instance (mutated in place to the best phi).
+        X: Independent variable (time or angular frequency).
+        y_data: Observable — real array, or complex G* for oscillation.
+        test_mode: One of "creep", "oscillation", "laos", "relaxation", ...
+        phi_bounds: Search bounds for phi.
+        **predict_kwargs: Extra kwargs forwarded to ``model.predict`` (e.g.
+            ``sigma_0``, ``gamma_0``, ``omega``, ``gamma_pre``).
+
+    Returns:
+        The fitted volume fraction phi.
+    """
+    from scipy.optimize import minimize_scalar
+
+    y = np.asarray(y_data)
+    is_complex = np.iscomplexobj(y)
+    if is_complex:
+        y_vec = np.concatenate([np.real(y).ravel(), np.imag(y).ravel()])
+    else:
+        y_vec = y.ravel()
+
+    # Log residuals for positive observables; linear (scaled) for signed data.
+    use_log = is_complex or bool(np.all(y_vec > 0))
+    target = np.log(np.maximum(y_vec, 1e-30)) if use_log else y_vec
+    scale = max(float(np.std(y_vec)), 1e-30)
+
+    def _loss(phi: float) -> float:
+        model.update_structure_factor(phi=float(phi))
+        p = np.asarray(model.predict(X, test_mode=test_mode, **predict_kwargs))
+        if is_complex:
+            p_vec = np.concatenate([np.real(p).ravel(), np.imag(p).ravel()])
+        else:
+            p_vec = p.ravel()
+        if use_log:
+            return float(np.mean((np.log(np.maximum(p_vec, 1e-30)) - target) ** 2))
+        return float(np.mean(((p_vec - target) / scale) ** 2))
+
+    res = minimize_scalar(_loss, bounds=phi_bounds, method="bounded")
+    model.update_structure_factor(phi=float(res.x))
+    return float(res.x)
+
+
+def fit_isotropic_gamma_c(
+    model: Any,
+    X: np.ndarray,
+    y_data: np.ndarray,
+    test_mode: str,
+    gamma_c_bounds: tuple[float, float] | None = None,
+    **predict_kwargs: Any,
+) -> float:
+    """Refine the cage-breaking strain gamma_c against nonlinear-protocol data.
+
+    Unlike phi (which enters the structure factor S(k) and the MCT vertex, and
+    so must be refit through ``update_structure_factor``), gamma_c only scales
+    the strain decorrelation h(gamma/gamma_c). It is therefore set directly with
+    ``set_value`` and found by a fast 1-D bounded search over the cached kernels.
+
+    gamma_c is the parameter that *nonlinear* protocols (LAOS, large-amplitude
+    startup) constrain, because it sets the strain scale at which cages break —
+    in the linear regime (creep, SAOS) gamma_c is inert.
+
+    Args:
+        model: ITTMCTIsotropic instance (mutated in place to the best gamma_c).
+        X: Independent variable (time).
+        y_data: Observable (e.g. LAOS stress, signed).
+        test_mode: Protocol name, e.g. "laos" or "startup".
+        gamma_c_bounds: Search bounds for gamma_c. If None, the model's own
+            parameter constraints are used; otherwise the request is clamped to
+            those constraints so the search never proposes a value ``set_value``
+            would reject.
+        **predict_kwargs: Extra kwargs forwarded to ``model.predict`` (e.g.
+            ``gamma_0``, ``omega``).
+
+    Returns:
+        The fitted gamma_c.
+    """
+    from scipy.optimize import minimize_scalar
+
+    y = np.asarray(y_data).ravel()
+    scale = max(float(np.std(y)), 1e-30)
+
+    # Respect the model's hard constraints on gamma_c (set_value enforces them).
+    lo_c, hi_c = model.parameters["gamma_c"].bounds
+    if gamma_c_bounds is None:
+        lo, hi = float(lo_c), float(hi_c)
+    else:
+        lo = max(float(gamma_c_bounds[0]), float(lo_c))
+        hi = min(float(gamma_c_bounds[1]), float(hi_c))
+
+    def _loss(gamma_c: float) -> float:
+        model.parameters.set_value("gamma_c", float(gamma_c))
+        p = np.asarray(
+            model.predict(X, test_mode=test_mode, **predict_kwargs)
+        ).ravel()
+        return float(np.mean(((p - y) / scale) ** 2))
+
+    res = minimize_scalar(_loss, bounds=(lo, hi), method="bounded")
+    model.parameters.set_value("gamma_c", float(res.x))
+    return float(res.x)
+
+
+def fit_isotropic_phi_creep(
+    model: Any,
+    t: np.ndarray,
+    J_data: np.ndarray,
+    sigma_0: float,
+    phi_bounds: tuple[float, float] = (0.50, 0.63),
+) -> float:
+    """Refine phi from creep-compliance data (thin wrapper of fit_isotropic_phi)."""
+    return fit_isotropic_phi(
+        model, t, J_data, "creep", phi_bounds=phi_bounds, sigma_0=sigma_0
+    )
 
 
 def set_model_parameters(model: Any, params: dict[str, float]) -> None:

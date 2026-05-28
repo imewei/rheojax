@@ -232,6 +232,153 @@ class TestISMProtocols:
         assert sigma.shape == t.shape
 
 
+class TestISMCreepVolterra:
+    """Physics checks for the Volterra (history-integral) creep solver."""
+
+    @pytest.mark.smoke
+    def test_creep_monotone_and_instantaneous(self):
+        """J(t) is monotone non-decreasing and J(t->0) -> 1/G(0)."""
+        model = ITTMCTIsotropic(phi=0.55, n_k=40)
+        g, _tau, G_inf = model._relaxation_modulus_prony_modes()
+        G0 = G_inf + g.sum()
+
+        t = np.logspace(-9, 2, 80)
+        J = model._predict_creep(t)
+
+        assert np.all(np.isfinite(J))
+        assert np.min(np.diff(J)) >= -1e-6 * (J.max() - J.min())
+        # Earliest time is far below the fastest relaxation -> elastic limit.
+        assert J[0] == pytest.approx(1.0 / G0, rel=1e-3)
+
+    def test_creep_glass_plateau(self):
+        """Glass: long-time compliance reaches the inverse plateau 1/G_inf."""
+        model = ITTMCTIsotropic(phi=0.60, n_k=40)
+        _, _, G_inf = model._relaxation_modulus_prony_modes()
+        assert model.get_glass_transition_info()["is_glass"]
+        assert G_inf > 0.0
+
+        t = np.logspace(-3, 5, 120)
+        J = model._predict_creep(t)
+        assert J[-1] * G_inf == pytest.approx(1.0, rel=2e-2)
+
+    def test_creep_fluid_viscous_limit(self):
+        """Fluid: late-time J(t) -> t/eta with eta = sum(g_i tau_i) = int G dt."""
+        model = ITTMCTIsotropic(phi=0.45, n_k=40)
+        g, tau, G_inf = model._relaxation_modulus_prony_modes()
+        assert not model.get_glass_transition_info()["is_glass"]
+        assert G_inf == pytest.approx(0.0, abs=1e-12)
+
+        eta = float(np.sum(g * tau))
+        t = np.logspace(-3, 3, 120)
+        J = model._predict_creep(t)
+
+        late = t > 100 * tau.max()
+        assert np.any(late)
+        rel = np.abs(J[late] - t[late] / eta) / (t[late] / eta)
+        assert np.max(rel) < 5e-2
+
+    def test_creep_modes_reconstruct_modulus(self):
+        """G(t) from Prony modes matches the direct MCT k-integral proxy."""
+        model = ITTMCTIsotropic(phi=0.58, n_k=40)
+        g, tau, G_inf = model._relaxation_modulus_prony_modes()
+
+        # Direct proxy G(t) = G_pref * int dq q^4 S^2 Phi^2 (same as oscillation).
+        D0 = model.parameters.get_value("D0")
+        kBT = model.parameters.get_value("kBT")
+        sigma_d = model.parameters.get_value("sigma_d")
+        assert D0 is not None and kBT is not None and sigma_d is not None
+        Gamma_k = model.k_grid**2 * D0 / model.S_k
+        tau_k = 1.0 / np.maximum(Gamma_k, 1e-30)
+        q_grid = model.k_grid * sigma_d
+        G_pref = kBT / (60.0 * np.pi**2 * sigma_d**3)
+        f_k = np.array(
+            [model._compute_nonergodicity_parameter(k) for k in model.k_grid]
+        )
+        weights = q_grid**4 * model.S_k**2
+
+        t_chk = np.array([1e-4, 1e-3, 1e-2, 1e-1])
+        phi_kt = f_k[None, :] + (1.0 - f_k[None, :]) * np.exp(
+            -t_chk[:, None] / tau_k[None, :]
+        )
+        G_direct = G_pref * np.trapezoid(weights[None, :] * phi_kt**2, q_grid, axis=-1)
+        G_modes = G_inf + (g[None, :] * np.exp(-t_chk[:, None] / tau[None, :])).sum(
+            axis=1
+        )
+        np.testing.assert_allclose(G_modes, G_direct, rtol=1e-10)
+
+    @pytest.mark.smoke
+    def test_creep_stress_independent(self):
+        """Linear-regime compliance does not depend on applied stress."""
+        model = ITTMCTIsotropic(phi=0.55, n_k=40)
+        t = np.logspace(-2, 2, 40)
+        J1 = model.predict(t, test_mode="creep", sigma_applied=1.0)
+        J100 = model.predict(t, test_mode="creep", sigma_applied=100.0)
+        np.testing.assert_allclose(J1, J100, rtol=1e-10)
+
+
+class TestISMOscillationAnalytic:
+    """SAOS limits and consistency with the creep Volterra solver."""
+
+    @pytest.mark.smoke
+    def test_glass_low_frequency_plateau(self):
+        """Glass: G'(omega -> 0) -> G_inf, G''(omega -> 0) -> 0."""
+        model = ITTMCTIsotropic(phi=0.60, n_k=40)
+        _, _, G_inf = model._relaxation_modulus_prony_modes()
+        assert G_inf > 0.0
+
+        omega = np.logspace(-6, -3, 12)
+        G_star = model.predict(omega, test_mode="oscillation")
+        G_prime = np.real(G_star)
+        G_double = np.imag(G_star)
+        assert np.allclose(G_prime, G_inf, rtol=1e-3)
+        assert np.all(np.abs(G_double) < 1e-2 * G_inf)
+
+    def test_high_frequency_instantaneous_modulus(self):
+        """G'(omega -> inf) -> G(0) = G_inf + sum(g_i)."""
+        model = ITTMCTIsotropic(phi=0.55, n_k=40)
+        g, tau, G_inf = model._relaxation_modulus_prony_modes()
+        G0 = G_inf + float(g.sum())
+
+        # Pick omega well above 1/tau_min so every mode is past its corner.
+        omega_floor = 1e3 / float(tau.min())
+        omega = np.logspace(np.log10(omega_floor), np.log10(omega_floor) + 3, 8)
+        G_prime = np.real(model.predict(omega, test_mode="oscillation"))
+        assert np.allclose(G_prime, G0, rtol=5e-3)
+
+    def test_low_frequency_loss_gives_viscosity(self):
+        """Fluid: G''(omega)/omega -> eta_0 = sum(g_i * tau_i) at low omega."""
+        model = ITTMCTIsotropic(phi=0.45, n_k=40)
+        g, tau, G_inf = model._relaxation_modulus_prony_modes()
+        assert G_inf == pytest.approx(0.0, abs=1e-12)
+        eta = float(np.sum(g * tau))
+
+        omega = np.array([1e-3 / tau.max()])  # well below 1/tau_max
+        G_double = float(np.imag(model.predict(omega, test_mode="oscillation"))[0])
+        assert G_double / float(omega[0]) == pytest.approx(eta, rel=1e-3)
+
+    @pytest.mark.smoke
+    def test_no_dropouts_across_decades(self):
+        """Across many decades the analytic G*(omega) has no spurious zeros."""
+        model = ITTMCTIsotropic(phi=0.58, n_k=40)
+        omega = np.logspace(-3, 3, 100)
+        G_star = model.predict(omega, test_mode="oscillation")
+        assert np.all(np.real(G_star) > 0)
+        assert np.all(np.imag(G_star) >= 0)
+
+    def test_kramers_kronig_static_consistency(self):
+        """Same Prony modes drive both J(t) and G*(omega): J(inf)*G_inf == 1."""
+        model = ITTMCTIsotropic(phi=0.60, n_k=40)
+        _, _, G_inf = model._relaxation_modulus_prony_modes()
+        assert G_inf > 0.0
+
+        # Static limits from the two protocols must agree (1/G_inf == J_inf).
+        J_inf = float(model._predict_creep(np.array([1e6]))[0])
+        G_prime_zero = float(
+            np.real(model.predict(np.array([1e-6]), test_mode="oscillation"))[0]
+        )
+        assert J_inf * G_prime_zero == pytest.approx(1.0, rel=5e-3)
+
+
 class TestISMFluidVsGlass:
     """Tests comparing fluid and glass behavior in ISM."""
 

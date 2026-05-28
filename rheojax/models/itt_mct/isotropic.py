@@ -52,6 +52,7 @@ from rheojax.utils.structure_factor import (
     mct_vertex_isotropic,
     percus_yevick_sk,
 )
+from rheojax.utils.volterra_creep import creep_compliance_from_prony
 
 jax, jnp = safe_import_jax()
 
@@ -748,81 +749,44 @@ class ITTMCTIsotropic(ITTMCTBase):
         return_components: bool = False,
         **kwargs,
     ) -> np.ndarray:
-        """Predict linear viscoelastic moduli G*(ω).
+        """Predict linear viscoelastic moduli G*(ω) in closed form.
+
+        The relaxation modulus G(t) is the exact Prony series
+        ``G(t) = G_∞ + Σ gᵢ e^{-t/τᵢ}`` returned by
+        ``_relaxation_modulus_prony_modes`` (the same modes the Volterra creep
+        solver uses). For a Prony series the Fourier transform is closed-form:
+
+            G*(ω) = G_∞ + Σ gᵢ · (iωτᵢ) / (1 + iωτᵢ),
+
+        so ``G'(ω) = G_∞ + Σ gᵢ (ωτᵢ)²/(1+(ωτᵢ)²)`` and
+        ``G''(ω) = Σ gᵢ ωτᵢ/(1+(ωτᵢ)²)``. This eliminates the truncation
+        artefacts that plagued the earlier time-domain ``∫G(t)sin(ωt)dt`` (any
+        finite t_max gave random low-frequency values for glasses with a
+        plateau modulus) and guarantees Kramers-Kronig consistency with the
+        creep compliance built from the same modes.
 
         Parameters
         ----------
         omega : np.ndarray
-            Angular frequency (rad/s)
+            Angular frequency (rad/s).
         return_components : bool, default False
-            If True, return (G', G'') as shape (n, 2)
+            If True, return (G', G'') as shape (n, 2).
 
         Returns
         -------
         np.ndarray
-            Complex modulus G* = G' + iG'' by default.
-            If return_components=True, returns (n, 2) array [G', G''].
+            Complex modulus G* = G' + iG'' by default; (n, 2) array of
+            (G', G'') if ``return_components=True``.
         """
-        omega = np.asarray(omega)
+        omega = np.asarray(omega, dtype=np.float64)
+        g, tau, G_inf = self._relaxation_modulus_prony_modes()
 
-        D0 = self.parameters.get_value("D0")
-        kBT = self.parameters.get_value("kBT")
-        sigma_d = self.parameters.get_value("sigma_d")
+        # G*(ω) = G_inf + Σ g_i · (iωτ_i) / (1 + iωτ_i),  shape (n_ω, n_modes).
+        iwt = 1j * np.outer(omega, tau)
+        G_star = G_inf + (g[None, :] * iwt / (1.0 + iwt)).sum(axis=-1)
 
-        assert D0 is not None
-        assert kBT is not None
-        assert sigma_d is not None
-
-        # Bare relaxation rates: Γ(k) = k²D₀/S(k)
-        Gamma_k = self.k_grid**2 * D0 / self.S_k
-        tau_k_arr = 1.0 / np.maximum(Gamma_k, 1e-30)
-
-        # Dimensionless wavevector q = k·σ_d and MCT geometric prefactor;
-        # see _predict_flow_curve for the unit-analysis discussion.
-        q_grid = self.k_grid * sigma_d
-        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
-
-        info = self.get_glass_transition_info()
-        is_glass = info["is_glass"]
-        if is_glass:
-            f_k_arr = np.array(
-                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
-            )
-        else:
-            f_k_arr = np.zeros(len(self.k_grid))
-
-        # G(t) = G_prefactor · ∫dq q⁴ S² Φ²; G'(ω), G''(ω) by Fourier transform.
-        G_k_weights = q_grid**4 * self.S_k**2  # (n_k,)
-        G_prime = np.zeros_like(omega)
-        G_double_prime = np.zeros_like(omega)
-
-        for idx, w in enumerate(omega):
-            t_max_w = float(100.0 * tau_k_arr.max())
-            # Ensure >= 20 points per oscillation period (Nyquist × 10 safety margin)
-            T_period = 2.0 * np.pi / w
-            n_t_w = max(2000, int(np.ceil(20.0 * t_max_w / T_period)))
-            n_t_w = min(n_t_w, 50000)  # Cap to avoid excessive memory use
-
-            t_w = np.linspace(0.0, t_max_w, n_t_w)
-
-            # G(t) = G_prefactor · ∫dq q⁴ S(q)² Φ(q,t)²  (vectorized over q,t)
-            exp_decay = np.exp(-t_w[:, None] / tau_k_arr[None, :])
-            if is_glass:
-                phi_k_w = f_k_arr[None, :] + (1.0 - f_k_arr[None, :]) * exp_decay
-            else:
-                phi_k_w = exp_decay
-            G_t_w = G_prefactor * np.trapezoid(
-                G_k_weights[None, :] * phi_k_w**2, q_grid, axis=-1
-            )
-
-            # Numerical Fourier transform:
-            # G'(ω) = ω ∫₀^∞ G(t) sin(ωt) dt
-            # G''(ω) = ω ∫₀^∞ G(t) cos(ωt) dt
-            sin_wt = np.sin(w * t_w)
-            cos_wt = np.cos(w * t_w)
-            G_prime[idx] = w * np.trapezoid(G_t_w * sin_wt, t_w)
-            G_double_prime[idx] = w * np.trapezoid(G_t_w * cos_wt, t_w)
-
+        G_prime = np.real(G_star)
+        G_double_prime = np.imag(G_star)
         if return_components:
             return np.column_stack([G_prime, G_double_prime])
         return G_prime + 1j * G_double_prime
@@ -910,28 +874,37 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         return sigma
 
-    def _predict_creep(
+    def _relaxation_modulus_prony_modes(
         self,
-        t: np.ndarray,
-        sigma_applied: float = 1.0,
-        **kwargs,
-    ) -> np.ndarray:
-        """Predict creep compliance J(t).
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        """Exact Prony decomposition of the linear relaxation modulus G(t).
 
-        Parameters
-        ----------
-        t : np.ndarray
-            Time array (s)
-        sigma_applied : float, default 1.0
-            Applied stress (Pa)
+        The shear modulus is the MCT k-integral of the squared correlator,
+
+            G(t) = G_pref · ∫ dq q⁴ S(q)² Φ_q(t)²,
+
+        using the same equilibrium correlator proxy as the oscillation, flow
+        and startup methods: Φ_q(t) = e^{-t/τ_q} (fluid) or
+        Φ_q(t) = f_q + (1-f_q) e^{-t/τ_q} (glass). Squaring expands into a
+        finite sum of exponentials, so G(t) is *exactly* a Prony series
+
+            G(t) = G_∞ + Σ_k a_k e^{-t/τ_q,k} + Σ_k b_k e^{-2t/τ_q,k},
+
+        with the trapezoidal q-quadrature weights folded into the amplitudes.
+        Returning these modes lets the creep solver invert the Volterra
+        identity exactly (see ``creep_compliance_from_prony``) and guarantees
+        J(t) is the convolution-inverse of the very G(t) whose Fourier
+        transform gives G*(ω).
 
         Returns
         -------
-        np.ndarray
-            Creep compliance J(t) (1/Pa)
+        g : np.ndarray
+            Prony amplitudes a_k, b_k (Pa).
+        tau : np.ndarray
+            Corresponding relaxation times τ_q,k and τ_q,k/2 (s).
+        G_inf : float
+            Equilibrium plateau modulus (Pa); 0 for a fluid.
         """
-        t = np.asarray(t)
-
         D0 = self.parameters.get_value("D0")
         kBT = self.parameters.get_value("kBT")
         sigma_d = self.parameters.get_value("sigma_d")
@@ -940,24 +913,92 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert kBT is not None
         assert sigma_d is not None
 
+        # Bare relaxation times τ_q = S(q) / (q² D₀) and the MCT prefactor.
         Gamma_k = self.k_grid**2 * D0 / self.S_k
-        G_scale = kBT / sigma_d**3
+        tau_k = 1.0 / np.maximum(Gamma_k, 1e-30)
+        q_grid = self.k_grid * sigma_d
+        G_prefactor = kBT / (60.0 * np.pi**2 * sigma_d**3)
 
-        # Simplified creep: J(t) ≈ t/η + 1/G_∞ for fluid
         info = self.get_glass_transition_info()
-
-        if info["is_glass"]:
-            # Glass: bounded compliance approaching J_∞
-            J_inf = 1.0 / (G_scale * 1e3)  # Approximate
-            tau_eff = 1.0 / np.mean(Gamma_k)
-            J = J_inf * (1 - np.exp(-t / tau_eff))
+        is_glass = info["is_glass"]
+        if is_glass:
+            f_k = np.array(
+                [self._compute_nonergodicity_parameter(k) for k in self.k_grid]
+            )
         else:
-            # Fluid: viscous flow
-            eta_eff = G_scale / np.mean(Gamma_k)
-            J_0 = 1.0 / G_scale
-            J = J_0 + t / eta_eff
+            f_k = np.zeros(len(self.k_grid))
 
-        return J
+        # Trapezoidal quadrature weights w_q so that ∫ f dq ≈ Σ_q w_q f_q.
+        w_q = np.empty_like(q_grid)
+        w_q[0] = 0.5 * (q_grid[1] - q_grid[0])
+        w_q[-1] = 0.5 * (q_grid[-1] - q_grid[-2])
+        w_q[1:-1] = 0.5 * (q_grid[2:] - q_grid[:-2])
+
+        # Per-q modulus weight: G_pref · w_q · q⁴ S(q)².
+        c_q = G_prefactor * w_q * q_grid**4 * self.S_k**2
+
+        # Φ² = f² + 2f(1-f) e^{-t/τ} + (1-f)² e^{-2t/τ}.
+        G_inf = float(np.sum(c_q * f_k**2))  # constant (plateau) term
+        a_k = c_q * 2.0 * f_k * (1.0 - f_k)  # e^{-t/τ_q}
+        b_k = c_q * (1.0 - f_k) ** 2  # e^{-2t/τ_q}
+
+        g = np.concatenate([a_k, b_k])
+        tau = np.concatenate([tau_k, 0.5 * tau_k])
+
+        # Drop negligible / non-positive amplitudes for a leaner ODE system.
+        keep = g > (g.max() * 1e-12) if g.size and g.max() > 0 else np.zeros_like(g, bool)
+        return g[keep], tau[keep], G_inf
+
+    def _predict_creep(
+        self,
+        t: np.ndarray,
+        sigma_applied: float = 1.0,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict creep compliance J(t) by inverting the LVE Volterra identity.
+
+        Creep compliance and the relaxation modulus obey the linear-response
+        convolution identity
+
+            ∫₀ᵗ G(t - s) · J(s) ds = t,
+
+        a Volterra integral equation of the first kind. The modulus G(t) is the
+        exact Prony series of the MCT k-integral (see
+        ``_relaxation_modulus_prony_modes``); the identity is then inverted
+        exactly through the history-state ODE system in
+        ``creep_compliance_from_prony``. The instantaneous compliance
+        J(0⁺) = 1/G(0), the glass plateau J(∞) = 1/G_∞, and the fluid viscous
+        branch J(t) → t/η all emerge directly from G(t) rather than being
+        prescribed by separate heuristics.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Time array (s).
+        sigma_applied : float, default 1.0
+            Applied stress (Pa). Linear-regime compliance is
+            stress-independent; this argument is accepted for API symmetry and
+            does not scale J(t).
+
+        Returns
+        -------
+        np.ndarray
+            Creep compliance J(t) (1/Pa).
+        """
+        t = np.asarray(t, dtype=np.float64)
+
+        g, tau, G_inf = self._relaxation_modulus_prony_modes()
+        if g.size == 0:
+            # Degenerate (no relaxation modes): purely elastic plateau.
+            G0 = max(G_inf, 1e-30)
+            return np.full_like(t, 1.0 / G0)
+
+        # creep_compliance_from_prony requires a strictly increasing, non-negative
+        # grid. Solve on the sorted unique times, then map back to the request.
+        t_clamped = np.clip(t, 0.0, None)
+        t_sorted, inverse = np.unique(t_clamped, return_inverse=True)
+        J_sorted = creep_compliance_from_prony(t_sorted, g, tau, G_inf=G_inf)
+        return J_sorted[inverse]
 
     def _predict_relaxation(
         self,
