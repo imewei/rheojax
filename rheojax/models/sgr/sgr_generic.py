@@ -1283,30 +1283,28 @@ class SGRGeneric(BaseModel):
 
         epsilon = 1e-12
         t_safe = jnp.maximum(t_scaled, epsilon)
-        exp = x - 1.0
+        # eta_plus = INT_0^t G ds with G ~ (1+s/tau0)^(1-x) gives exponent (2-x):
+        # 1<x<2 grows (no finite zero-shear viscosity), x>2 saturates to
+        # eta_0 = G0*G0(x)*tau0/(x-2) analytically. (Earlier versions used x-1
+        # plus a steady-state clamp; that clamp encoded the old, incorrect
+        # exponent and would now wrongly cap the growing 1<x<2 regime, so it is
+        # removed — kept in lockstep with SGRConventional.)
+        exp = 2.0 - x
 
-        def x_near_one(_):
+        def exp_near_zero(_):
+            # INT (1+s/tau0)^(-1) ds = tau0 * ln(1 + t/tau0)   (x = 2)
             return G0_scale * G0_dim * tau0 * jnp.log(1.0 + t_safe)
 
-        def x_not_one(_):
-            result = (
+        def exp_nonzero(_):
+            # [(1+t/tau0)^(2-x) - 1] / (2-x)
+            return (
                 G0_scale * G0_dim * tau0 * ((jnp.power(1.0 + t_safe, exp) - 1.0) / exp)
             )
-            # R10-SGR-004: clamp to steady-state viscosity for x > 1 to prevent
-            # divergence when exp > 0 (x > 1, including the Newtonian regime x >= 2).
-            # At steady state: eta_0 = G0 * tau0 / (x - 1) for x > 1.
-            exp_safe = jnp.where(exp > 0, exp, 1.0)  # avoid division by zero
-            eta_ss = jnp.where(
-                exp > 0,
-                G0_scale * G0_dim * tau0 / exp_safe,
-                1e30,
-            )
-            return jnp.minimum(result, eta_ss)
 
         eta_plus = jax.lax.cond(
             jnp.abs(exp) < 1e-6,
-            x_near_one,
-            x_not_one,
+            exp_near_zero,
+            exp_nonzero,
             operand=None,
         )
 
@@ -1379,8 +1377,12 @@ class SGRGeneric(BaseModel):
         epsilon = 1e-12
         t_safe = jnp.maximum(t_scaled, epsilon)
 
-        # Power-law form: G(t) ~ (1 + t/tau0)^(x-2)
-        G_t = G0_scale * G0_dim / jnp.power(1.0 + t_safe, 2.0 - x)
+        # Power-law form: G(t) ~ (1 + t/tau0)^(1-x), i.e. G(t) ~ t^(1-x) for
+        # 1 < x < 2 — the theoretical SGR relaxation exponent (Fourier-
+        # consistent with SAOS G', G'' ~ omega^(x-1); negative of the creep
+        # exponent x-1). Kept in lockstep with SGRConventional so the
+        # relaxation parity test holds at all x. (Old form used x-2.)
+        G_t = G0_scale * G0_dim / jnp.power(1.0 + t_safe, x - 1.0)
 
         return G_t
 

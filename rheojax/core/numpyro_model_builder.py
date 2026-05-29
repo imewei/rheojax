@@ -167,6 +167,17 @@ def build_numpyro_model(
             )
         scale_info["model_returns_2col"] = int(_model_returns_2col)
 
+    # Likelihood space read from the model instance, encoded as a numeric flag
+    # (1.0 = log, 0.0 = linear) so it participates in the float-valued closure
+    # cache key — otherwise a linear and a log fit of the same model would
+    # collide in the cache.
+    if "likelihood_log" not in scale_info:
+        scale_info["likelihood_log"] = (
+            1.0
+            if getattr(model_self, "_bayes_likelihood_space", "linear") == "log"
+            else 0.0
+        )
+
     # Skip cache when prior_factory or param-level priors are set
     if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
         # R5-JAX-007: scale_info values may be JAX Device arrays when a
@@ -240,6 +251,8 @@ def build_numpyro_model(
     # model_returns_2col was already probed and cached in scale_info
     # before the cache key was computed (see block above).
     _model_returns_2col = bool(scale_info.get("model_returns_2col", 0))
+    # Log-space likelihood flag (set from model_self._bayes_likelihood_space).
+    _likelihood_log = bool(scale_info.get("likelihood_log", 0.0))
 
     def numpyro_model(X, y=None):
         """NumPyro model with test_mode captured in closure."""
@@ -352,6 +365,26 @@ def build_numpyro_model(
                 "obs_imag",
                 dist.Normal(loc=pred_imag, scale=sigma_imag),
                 obs=y_imag_obs,
+            )
+        elif _likelihood_log:
+            # Log-space likelihood: log(y) ~ Normal(log(pred), sigma), i.e.
+            # y ~ LogNormal(log(pred), sigma). Appropriate when y spans several
+            # decades — residuals are relative, so every decade is weighted
+            # equally instead of the largest points dominating the fit.
+            sigma_dist = None
+            if callable(prior_factory):
+                sigma_dist = prior_factory("sigma", 0.0, None)
+            if sigma_dist is None:
+                # Log-space residual scale is dimensionless and O(0.1–1);
+                # Exponential(mean=0.5) is weakly informative.
+                sigma_dist = dist.Exponential(rate=1.0 / 0.5)
+
+            sigma = numpyro.sample("sigma", sigma_dist)
+            # Floor predictions away from zero so log() is finite (NaN-guarded
+            # zeros above would otherwise map to -inf).
+            pred_pos = jnp.maximum(predictions_raw, 1e-30)
+            numpyro.sample(
+                "obs", dist.LogNormal(loc=jnp.log(pred_pos), scale=sigma), obs=y
             )
         else:
             # Let prior_factory override noise prior if it provides one

@@ -477,10 +477,16 @@ class BayesianMixin:
             if "sigma_imag" not in warm_start:
                 warm_start["sigma_imag"] = max(y_imag_scale * 0.1, 1e-6)
         else:
-            _ds = scale_info.get("data_scale")
-            data_scale = _ds if _ds is not None else 0.0
             if "sigma" not in warm_start:
-                warm_start["sigma"] = max(data_scale * 0.1, 1e-6)
+                if getattr(self, "_bayes_likelihood_space", "linear") == "log":
+                    # Log-space residuals are dimensionless and O(0.1–1); the
+                    # linear data_scale (which can be thousands) would be a wildly
+                    # wrong init for a LogNormal noise scale.
+                    warm_start["sigma"] = 0.3
+                else:
+                    _ds = scale_info.get("data_scale")
+                    data_scale = _ds if _ds is not None else 0.0
+                    warm_start["sigma"] = max(data_scale * 0.1, 1e-6)
 
         return warm_start
 
@@ -575,6 +581,12 @@ class BayesianMixin:
             mcmc_kwargs["progress_bar"] = nuts_kwargs.pop("progress_bar")
         if "jit_model_args" in nuts_kwargs:
             mcmc_kwargs["jit_model_args"] = nuts_kwargs.pop("jit_model_args")
+
+        # Defensive: likelihood_space is a fit_bayesian-level option consumed
+        # upstream (it selects the likelihood, not a sampler setting). Strip it
+        # here too so it can never reach NUTS.__init__() — e.g. under a partial
+        # module reload where an older fit_bayesian forwarded it through.
+        nuts_kwargs.pop("likelihood_space", None)
 
         # Check if model requires forward-mode differentiation (for dynamic loops)
         use_forward_mode = nuts_kwargs.pop("forward_mode_differentiation", None)
@@ -1123,6 +1135,19 @@ class BayesianMixin:
             if key in protocol_keys_all:
                 protocol_kwargs[key] = nuts_kwargs.pop(key)
 
+        # Likelihood space: "linear" (default, Normal residuals) or "log"
+        # (LogNormal — Normal residuals in log space). Log space is the
+        # correct choice when the observable spans several decades (e.g. a
+        # flow curve), where a single linear noise scale is dominated by the
+        # largest points and biases the posterior toward fitting only the top
+        # decade. Stored on self so the model builder and warm-start can read it.
+        likelihood_space = nuts_kwargs.pop("likelihood_space", "linear")
+        if likelihood_space not in ("linear", "log"):
+            raise ValueError(
+                f"likelihood_space must be 'linear' or 'log', got {likelihood_space!r}"
+            )
+        self._bayes_likelihood_space = likelihood_space
+
         # Save _test_mode BEFORE any mutation so it can be restored on error.
         _had_test_mode = hasattr(self, "_test_mode")  # BAY-004: track if attr existed
         _saved_test_mode = getattr(self, "_test_mode", None)
@@ -1203,6 +1228,21 @@ class BayesianMixin:
                 y_jax = jax_data["y_jax"]
                 is_complex_data = jax_data["is_complex"]
                 scale_info = jax_data["scale_info"]
+
+                # Log-space likelihood requires real, strictly positive data
+                # (LogNormal support is (0, ∞)). Fail loudly rather than produce
+                # NaNs deep in the sampler.
+                if self._bayes_likelihood_space == "log":
+                    if is_complex_data:
+                        raise ValueError(
+                            "likelihood_space='log' is not supported for complex "
+                            "(oscillation) data; use 'linear'."
+                        )
+                    if bool(jnp.any(y_jax <= 0)):
+                        raise ValueError(
+                            "likelihood_space='log' requires strictly positive y "
+                            "(data contains values <= 0)."
+                        )
 
                 # Phase 4: Get parameter bounds
                 param_names = list(self.parameters)

@@ -205,11 +205,11 @@ class TestSGRConventionalPredictions:
         ), f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
 
     def test_relaxation_mode_power_law_decay(self):
-        """Test G(t) shows power-law decay t^(x-2) at long times."""
+        """Test G(t) shows power-law decay t^(1-x) at long times."""
         model = SGRConventional()
 
         # Set parameters for power-law regime
-        x_val = 1.5  # Decay exponent should be -0.5
+        x_val = 1.5  # Decay exponent 1-x = -0.5 (coincides with old x-2 here)
         model.parameters.set_value("x", x_val)
         model.parameters.set_value("G0", 1e3)
         model.parameters.set_value("tau0", 1e-3)
@@ -233,7 +233,7 @@ class TestSGRConventionalPredictions:
         # Check G(t) decreases with time
         assert G_t[0] > G_t[-1], "G(t) should decay with time"
 
-        # Check power-law decay: G(t) ~ t^(x-2) = t^(-0.5) at long times
+        # Check power-law decay: G(t) ~ t^(1-x) = t^(-0.5) at long times
         # Use later time points where power-law dominates
         late_idx = slice(25, 45)
         log_t = np.log10(t[late_idx])
@@ -242,7 +242,7 @@ class TestSGRConventionalPredictions:
         # Linear fit in log-log space
         slope_G = np.polyfit(log_t, log_G, 1)[0]
 
-        # Expected slope: x - 2 = -0.5
+        # Expected slope: 1 - x = -0.5
         assert -0.7 < slope_G < -0.3, f"G(t) slope {slope_G} not near -0.5"
 
         # Check plateau at short times (should be near G0)
@@ -250,6 +250,75 @@ class TestSGRConventionalPredictions:
         expected_G0 = model.parameters.get_value("G0")
         # At very short times, should be within order of magnitude of G0
         assert 0.1 * expected_G0 < early_G < 10 * expected_G0
+
+    def test_relaxation_modulus_power_law_exponent(self):
+        """G(t) must decay as t^(1-x) for 1 < x < 2 (SGR relaxation exponent).
+
+        Regression for the relaxation exponent. The kernel previously used
+        (x-2), which only coincides with the theoretical (1-x) at x=1.5. The
+        asymptotic log-log slope of G(t) is measured in the t >> tau0 regime
+        and must equal 1-x — the negative of the creep exponent (x-1) and
+        Fourier-consistent with SAOS G', G'' ~ omega^(x-1). At x=1.2 the buggy
+        (x-2)=-0.8 vs correct (1-x)=-0.2 differ sharply.
+        """
+        from rheojax.utils.sgr_kernels import power_law_exponent
+
+        tau0 = 1e-3
+        t = np.logspace(1, 5, 60)  # t/tau0 in [1e4, 1e8] -> power-law regime
+        for x_val in (1.2, 1.5, 1.8):
+            model = SGRConventional()
+            model.parameters.set_value("x", x_val)
+            model.parameters.set_value("G0", 1.0)
+            model.parameters.set_value("tau0", tau0)
+            model._test_mode = "relaxation"
+            G_t = np.asarray(model.predict(t))
+
+            slope = np.polyfit(np.log(t), np.log(G_t), 1)[0]
+            expected = -float(power_law_exponent(x_val))  # 1 - x = -(x-1)
+            assert expected == pytest.approx(1.0 - x_val, abs=1e-9)
+            assert slope == pytest.approx(expected, abs=0.02), (
+                f"relaxation log-log slope {slope:.3f} != 1-x ({expected:.3f}) "
+                f"at x={x_val}"
+            )
+
+    def test_startup_growth_coefficient_power_law_exponent(self):
+        """eta_plus(t) = INT G ds must grow as t^(2-x) for 1 < x < 2.
+
+        Regression for the startup exponent. eta_plus is the time integral of
+        the relaxation modulus G ~ t^(1-x), so its long-time exponent is (2-x).
+        The kernel previously used (x-1), which only coincides with (2-x) at
+        x=1.5; at x=1.2 the buggy (x-1)=0.2 vs correct (2-x)=0.8 differ sharply.
+        Also checks that x>2 (Newtonian regime) saturates to a finite eta_0.
+        """
+        tau0 = 1e-3
+        t = np.logspace(1, 5, 60)  # t/tau0 >> 1 -> power-law regime
+        for x_val in (1.2, 1.5, 1.8):
+            model = SGRConventional()
+            model.parameters.set_value("x", x_val)
+            model.parameters.set_value("G0", 1.0)
+            model.parameters.set_value("tau0", tau0)
+            model._test_mode = "startup"
+            model._startup_gamma_dot = 1.0  # eta_plus is the LVE envelope (gamma_dot-independent)
+            eta_plus = np.asarray(model.predict(t))
+
+            slope = np.polyfit(np.log(t), np.log(eta_plus), 1)[0]
+            expected = 2.0 - x_val
+            assert slope == pytest.approx(expected, abs=0.02), (
+                f"startup log-log slope {slope:.3f} != 2-x ({expected:.3f}) "
+                f"at x={x_val}"
+            )
+
+        # x > 2 (Newtonian regime): eta_plus saturates to a finite eta_0
+        m = SGRConventional()
+        m.parameters.set_value("x", 2.5)
+        m.parameters.set_value("G0", 1.0)
+        m.parameters.set_value("tau0", tau0)
+        m._test_mode = "startup"
+        m._startup_gamma_dot = 1.0
+        ep = np.asarray(m.predict(np.logspace(2, 7, 50)))
+        assert ep[-1] == pytest.approx(ep[-5], rel=0.05), (
+            "eta_plus should saturate to a finite zero-shear viscosity for x>2"
+        )
 
     def test_creep_mode_compliance_prediction(self):
         """Test J(t) creep compliance is positive and monotonically increasing."""
@@ -284,6 +353,38 @@ class TestSGRConventionalPredictions:
         G0 = model.parameters.get_value("G0")
         # Should be roughly inverse relationship (within factor of 10)
         assert 0.01 / G0 < J_initial < 100 / G0
+
+    def test_creep_compliance_power_law_exponent(self):
+        """J(t) must grow as t^(x-1) for 1 < x < 2 (SGR creep exponent).
+
+        Regression for the creep exponent. The kernel previously used (2-x),
+        which only coincides with the theoretical (x-1) at x=1.5. The
+        asymptotic log-log slope of J(t) is measured in the t >> tau0
+        power-law regime and must equal x-1 — matching
+        utils.sgr_kernels.power_law_exponent and the canonical SAOS scaling
+        G', G'' ~ omega^(x-1). At x=1.2 the buggy (2-x)=0.8 vs correct
+        (x-1)=0.2 differ sharply, so this test discriminates the fix.
+        """
+        from rheojax.utils.sgr_kernels import power_law_exponent
+
+        tau0 = 1e-3
+        # t/tau0 in [1e4, 1e8] -> deep in the power-law (t >> tau0) regime
+        t = np.logspace(1, 5, 60)
+        for x_val in (1.2, 1.5, 1.8):
+            model = SGRConventional()
+            model.parameters.set_value("x", x_val)
+            model.parameters.set_value("G0", 1.0)
+            model.parameters.set_value("tau0", tau0)
+            model._test_mode = "creep"
+            J_t = np.asarray(model.predict(t))
+
+            slope = np.polyfit(np.log(t), np.log(J_t), 1)[0]
+            expected = float(power_law_exponent(x_val))  # = x - 1
+            assert expected == pytest.approx(x_val - 1.0, abs=1e-9)
+            assert slope == pytest.approx(expected, abs=0.02), (
+                f"creep log-log slope {slope:.3f} != x-1 ({expected:.3f}) "
+                f"at x={x_val}"
+            )
 
     def test_steady_shear_flow_curve(self):
         """Test eta(gamma_dot) viscosity shows shear-thinning behavior."""

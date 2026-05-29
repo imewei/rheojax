@@ -1008,7 +1008,7 @@ class SGRConventional(BaseModel):
 
         Computes relaxation modulus with power-law decay:
             G(t) ~ G0 at short times (t << tau0)
-            G(t) ~ t^(x-2) at long times (t >> tau0) for 1 < x < 2
+            G(t) ~ t^(1-x) at long times (t >> tau0) for 1 < x < 2
 
         The relaxation modulus is related to the frequency-domain response
         via Fourier transform. For SGR, we use the inverse relationship:
@@ -1027,7 +1027,7 @@ class SGRConventional(BaseModel):
             Relaxation modulus G(t) with shape (M,)
 
         Notes:
-            - Power-law decay G(t) ~ t^(x-2) for large t
+            - Power-law decay G(t) ~ t^(1-x) for large t
             - Plateau G(t) = G0 at short times
         """
         # Dimensionless time
@@ -1036,21 +1036,19 @@ class SGRConventional(BaseModel):
         # Compute equilibrium modulus factor (dimensionless)
         G0_dim = G0(x)
 
-        # Relaxation modulus using power-law form
-        # Power-law decay exponent: x - 2.0 (embedded in formula below)
-        # At short times: G(t) -> G0_dim * G0_scale
-        # At long times: G(t) ~ (t/tau0)^(x-2) * G0_scale
-
-        # Use a smooth transition formula
-        # G(t) = G0_scale * G0_dim * (1 + t_scaled)^(x-2)
-        # This gives correct short-time and long-time limits
+        # Relaxation modulus using power-law form.
+        # Decay exponent (1-x): G(t) ~ t^(1-x) for 1 < x < 2 — the theoretical
+        # SGR result (negative of the creep exponent x-1; Fourier-consistent
+        # with SAOS G', G'' ~ omega^(x-1)). Earlier versions used x-2, which
+        # only coincides with 1-x at x=1.5.
+        #   At short times (t << tau0): G(t) -> G0_dim * G0_scale (plateau)
+        #   At long times  (t >> tau0): G(t) ~ (t/tau0)^(1-x) * G0_scale
 
         epsilon = 1e-12  # Prevent division by zero
         t_safe = jnp.maximum(t_scaled, epsilon)
 
-        # Power-law form with smooth crossover
-        # For x < 2: decay, for x >= 2: approaches constant
-        G_t = G0_scale * G0_dim / jnp.power(1.0 + t_safe, 2.0 - x)
+        # Smooth crossover: (1 + t_scaled)^(1-x) = 1 / (1 + t_scaled)^(x-1)
+        G_t = G0_scale * G0_dim / jnp.power(1.0 + t_safe, x - 1.0)
 
         return G_t
 
@@ -1068,7 +1066,7 @@ class SGRConventional(BaseModel):
             J(t) = 1 / G(t)
 
         For more accurate results, uses proper compliance formula:
-            J(t) ~ t^(2-x) / G0 for large t (1 < x < 2)
+            J(t) ~ t^(x-1) / G0 for large t (1 < x < 2)
 
         Args:
             t: Time array (s)
@@ -1081,7 +1079,7 @@ class SGRConventional(BaseModel):
 
         Notes:
             - Monotonicity enforced via jnp.maximum.accumulate()
-            - Power-law growth J(t) ~ t^(2-x) for large t
+            - Power-law growth J(t) ~ t^(x-1) for large t
         """
         # Dimensionless time
         t_scaled = t / tau0
@@ -1089,14 +1087,19 @@ class SGRConventional(BaseModel):
         # Compute equilibrium modulus factor
         G0_dim = G0(x)
 
-        # Creep compliance power-law exponent
-        growth_exp = 2.0 - x
+        # Creep compliance power-law exponent: J(t) ~ t^(x-1) for 1 < x < 2.
+        # This is the theoretical SGR creep exponent — complementary to the
+        # relaxation decay t^(1-x) (exponents sum to zero) and Fourier-
+        # consistent with the canonical SAOS scaling G', G'' ~ omega^(x-1).
+        # See utils.sgr_kernels.power_law_exponent(x) = x - 1.
+        # (Earlier versions used 2-x, which only coincides with x-1 at x=1.5.)
+        growth_exp = x - 1.0
 
         epsilon = 1e-12
         t_safe = jnp.maximum(t_scaled, epsilon)
 
         # Creep compliance with power-law growth
-        # J(t) = (1 / (G0_scale * G0_dim)) * (1 + t_scaled)^(2-x)
+        # J(t) = (1 / (G0_scale * G0_dim)) * (1 + t_scaled)^(x-1)
         J_t = jnp.power(1.0 + t_safe, growth_exp) / (G0_scale * G0_dim)
 
         # Monotonicity enforced by physical parameter bounds, not in NUTS path
@@ -1328,10 +1331,10 @@ class SGRConventional(BaseModel):
 
         Computes stress growth coefficient η⁺(t) = σ(t)/γ̇ = ∫₀ᵗ G(s) ds.
 
-        For SGR's power-law relaxation G(t) ~ G₀ · (1 + t/τ₀)^(x-2):
-            η⁺(t) = ∫₀ᵗ G(s) ds = G₀ · τ₀ · G₀(x) · [(1+t/τ₀)^(x-1) - 1] / (x-1)
+        For SGR's power-law relaxation G(t) ~ G₀ · (1 + t/τ₀)^(1-x):
+            η⁺(t) = ∫₀ᵗ G(s) ds = G₀ · τ₀ · G₀(x) · [(1+t/τ₀)^(2-x) - 1] / (2-x)
 
-        Special case for x=1:
+        Special case for x=2:
             η⁺(t) = G₀ · τ₀ · G₀(x) · ln(1 + t/τ₀)
 
         Args:
@@ -1361,19 +1364,22 @@ class SGRConventional(BaseModel):
         epsilon = 1e-12
         t_safe = jnp.maximum(t_scaled, epsilon)
 
-        # Stress growth exponent: x - 1
-        exp = x - 1.0
+        # Stress growth exponent. With G(s) ~ (1+s/tau0)^(1-x), the integral
+        # eta_plus = INT_0^t G ds ~ (1+t/tau0)^(2-x), so the exponent is (2-x):
+        # for 1<x<2 it grows (no finite zero-shear viscosity); for x>2 it
+        # saturates to eta_0 = G0*G0(x)*tau0/(x-2). (Earlier versions used x-1.)
+        exp = 2.0 - x
 
         # Integral of G(t) from 0 to t
-        # ∫ G₀·G₀(x)·(1+s/τ₀)^(x-2) ds = G₀·G₀(x)·τ₀ · [(1+t/τ₀)^(x-1) - 1]/(x-1)
+        # INT G0*G0(x)*(1+s/tau0)^(1-x) ds = G0*G0(x)*tau0 * [(1+t/tau0)^(2-x) - 1]/(2-x)
 
-        # Handle special case x ≈ 1 separately
-        def x_near_one(_):
-            # ln(1 + t/tau0) for x = 1
+        # Handle the singular case exp ~ 0 (x ~ 2) separately
+        def exp_near_zero(_):
+            # INT (1+s/tau0)^(-1) ds = tau0 * ln(1 + t/tau0)   (x = 2)
             return G0_scale * G0_dim * tau0 * jnp.log(1.0 + t_safe)
 
-        def x_not_one(_):
-            # [(1+t/tau0)^(x-1) - 1] / (x-1)
+        def exp_nonzero(_):
+            # [(1+t/tau0)^(2-x) - 1] / (2-x)
             return (
                 G0_scale * G0_dim * tau0 * ((jnp.power(1.0 + t_safe, exp) - 1.0) / exp)
             )
@@ -1381,8 +1387,8 @@ class SGRConventional(BaseModel):
         # Use lax.cond for JIT-compatible branching
         eta_plus = jax.lax.cond(
             jnp.abs(exp) < 1e-6,
-            x_near_one,
-            x_not_one,
+            exp_near_zero,
+            exp_nonzero,
             operand=None,
         )
 

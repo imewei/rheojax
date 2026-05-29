@@ -259,6 +259,7 @@ def plot_posterior_predictive(
     ci_color="C0",
     ci_alpha=0.3,
     ax=None,
+    include_noise=True,
     **model_kwargs,
 ):
     """Plot posterior predictive check with 95% credible interval.
@@ -308,25 +309,55 @@ def plot_posterior_predictive(
     n_available = len(posterior[param_names[0]])
     n_use = min(n_draws, n_available)
 
+    # Snapshot the model's current parameters so the per-draw mutation below
+    # does not corrupt downstream point estimates (e.g. NLSQ values read by a
+    # later comparison table or saved to disk). Restored in the finally block.
+    _saved_params = {name: model.parameters.get_value(name) for name in param_names}
     pred_samples = []
-    for i in range(n_use):
-        for name in param_names:
-            model.parameters.set_value(name, float(posterior[name][i]))
-        pred_i = model.predict(x_pred, test_mode=test_mode, **model_kwargs)
-        pred_arr = _extract_y(pred_i)
-        if np.iscomplexobj(pred_arr):
-            pred_arr = np.abs(pred_arr)
-        pred_samples.append(pred_arr)
+    try:
+        for i in range(n_use):
+            for name in param_names:
+                model.parameters.set_value(name, float(posterior[name][i]))
+            pred_i = model.predict(x_pred, test_mode=test_mode, **model_kwargs)
+            pred_arr = _extract_y(pred_i)
+            if np.iscomplexobj(pred_arr):
+                pred_arr = np.abs(pred_arr)
+            pred_samples.append(pred_arr)
+    finally:
+        for name, value in _saved_params.items():
+            model.parameters.set_value(name, value)
 
     pred_samples = np.array(pred_samples)
     pred_median = np.median(pred_samples, axis=0)
-    pred_lo = np.percentile(pred_samples, 2.5, axis=0)
-    pred_hi = np.percentile(pred_samples, 97.5, axis=0)
+
+    # Posterior predictive band. The clean per-draw predictions capture only
+    # parameter (epistemic) uncertainty, which collapses to a hairline for a
+    # well-constrained fit. A genuine posterior predictive check also folds in
+    # the observation noise sampled by the model ("sigma"), giving the interval
+    # where new data should actually fall. The noise model matches the
+    # likelihood space used during inference.
+    space = getattr(model, "_bayes_likelihood_space", "linear")
+    sigma_samples = posterior.get("sigma")
+    ci_label = "95% CI"
+    if include_noise and sigma_samples is not None and not np.iscomplexobj(pred_samples):
+        sigma_use = np.asarray(sigma_samples).ravel()[:n_use]
+        rng = np.random.default_rng(0)
+        z = rng.standard_normal(pred_samples.shape)
+        if space == "log":
+            # y ~ LogNormal(log(pred), sigma): multiplicative noise.
+            ppc = pred_samples * np.exp(sigma_use[:, None] * z)
+        else:
+            ppc = pred_samples + sigma_use[:, None] * z
+        ci_label = "95% predictive interval"
+    else:
+        ppc = pred_samples
+    pred_lo = np.percentile(ppc, 2.5, axis=0)
+    pred_hi = np.percentile(ppc, 97.5, axis=0)
 
     # Plot
     plot_fn = ax.loglog if log_scale else ax.plot
     ax.fill_between(
-        x_pred, pred_lo, pred_hi, alpha=ci_alpha, color=ci_color, label="95% CI"
+        x_pred, pred_lo, pred_hi, alpha=ci_alpha, color=ci_color, label=ci_label
     )
     plot_fn(x_pred, pred_median, "-", lw=2, color=ci_color, label="Posterior median")
     plot_fn(x_data, y_data, "ko", markersize=5, label="Data", zorder=3)
