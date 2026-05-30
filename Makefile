@@ -625,6 +625,20 @@ clean-all: clean
 	rm -rf .eggs/ 2>/dev/null || true
 	rm -rf .cache/ 2>/dev/null || true
 	rm -rf .benchmarks/ 2>/dev/null || true
+	find . -type d -name outputs \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name figures \
+		-not -path "./.venv/*" \
+		-not -path "./venv/*" \
+		-not -path "./.claude/*" \
+		-not -path "./.specify/*" \
+		-not -path "./agent-os/*" \
+		-exec rm -rf {} + 2>/dev/null || true
 	@echo "$(BOLD)$(GREEN)✓ Deep clean complete!$(RESET)"
 	@echo "$(BOLD)Protected directories preserved:$(RESET) .venv/, venv/, .claude/, .specify/, agent-os/"
 
