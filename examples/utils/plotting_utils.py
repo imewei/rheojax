@@ -159,15 +159,20 @@ def plot_nlsq_fit(
 
     # Build prediction x if not provided.
     # NOTE: for transient/time-domain protocols the ODE is integrated from
-    # x_pred[0] with IC at rest (sigma=0). Extending x_pred below x_data.min()
-    # (e.g. t < 0 for a startup experiment) makes the solver ramp up over a
-    # window that was never part of the experiment, producing a large spurious
-    # spike near t=0. Keep the left edge clamped to the data minimum so the
-    # fit curve aligns with the measurement window.
+    # x_pred[0] with IC at rest (sigma=0, gamma=0). Extending x_pred below
+    # x_data.min() restarts the integration clock earlier than the measurement,
+    # so the strain/stress ramps up from zero over a window that was never part
+    # of the experiment -- e.g. a creep curve diving toward zero below the first
+    # data point. Clamp the left edge to the data minimum for these protocols so
+    # the fit curve aligns with the measurement window. Rate-/frequency-domain
+    # protocols (flow_curve, oscillation) are not IC-sensitive and may extend
+    # the grid leftward for a little visual headroom.
+    _time_domain_modes = {"startup", "creep", "laos", "relaxation"}
+    _left_pad = 0.0 if test_mode in _time_domain_modes else 0.3
     if x_pred is None:
         if log_scale and np.all(x_data > 0):
             x_pred = np.logspace(
-                np.log10(x_data.min()) - 0.3,
+                np.log10(x_data.min()) - _left_pad,
                 np.log10(x_data.max()) + 0.2,
                 200,
             )
@@ -339,7 +344,11 @@ def plot_posterior_predictive(
     space = getattr(model, "_bayes_likelihood_space", "linear")
     sigma_samples = posterior.get("sigma")
     ci_label = "95% CI"
-    if include_noise and sigma_samples is not None and not np.iscomplexobj(pred_samples):
+    if (
+        include_noise
+        and sigma_samples is not None
+        and not np.iscomplexobj(pred_samples)
+    ):
         sigma_use = np.asarray(sigma_samples).ravel()[:n_use]
         rng = np.random.default_rng(0)
         z = rng.standard_normal(pred_samples.shape)
@@ -481,9 +490,7 @@ def plot_arviz_diagnostics(result, param_names, fast_mode=False):
             az.rcParams["plot.max_subplots"] = old_max
 
     # 3. Forest plot — ArviZ 1.x: no hdi_prob= or figsize=
-    fig = _safe_plot(
-        lambda: az.plot_forest(idata, var_names=var_names, combined=True)
-    )
+    fig = _safe_plot(lambda: az.plot_forest(idata, var_names=var_names, combined=True))
     if fig is not None:
         plt.tight_layout()
         figs["forest"] = fig

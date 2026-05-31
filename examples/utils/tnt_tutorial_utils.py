@@ -217,6 +217,325 @@ def load_ml_ikh_creep(
     return time, shear_rate, initial_stress, final_stress
 
 
+def generate_synthetic_creep(
+    params: dict[str, float] | None = None,
+    sigma_applied: float = 5.0,
+    t_start: float = 1e-2,
+    t_end: float = 50.0,
+    n_points: int = 80,
+    noise_level: float = 0.02,
+    seed: int = 42,
+    breakage: Literal["constant", "bell", "power_law", "stretch_creation"] = "constant",
+) -> tuple[np.ndarray, np.ndarray, float, dict[str, float]]:
+    """Generate synthetic single-mode TNT creep strain γ(t) data.
+
+    The ML-IKH step-stress data (``load_ml_ikh_creep``) is near-pure viscous
+    flow: the strain is dominated by the long-time t/η₀ term, so the elastic
+    modulus G is effectively unidentifiable. NLSQ then drives G to its lower
+    bound and τ_b → 0, which produces a singular covariance matrix (non-finite
+    parameter uncertainties) and a pathologically stiff ODE whose extrapolated
+    fit curve evaluates to NaN. Self-consistent synthetic data keeps all three
+    parameters identifiable so the tutorial demonstrates a clean fit and
+    well-conditioned uncertainty quantification.
+
+    Args:
+        params: TNT single-mode parameters; defaults to a physically balanced
+            set (G=50 Pa, τ_b=2 s, η_s=0.5 Pa·s) where the elastic and viscous
+            compliance contributions are comparable over the time window.
+        sigma_applied: Constant applied shear stress [Pa].
+        t_start: Start time (avoids t=0 for the ODE solver) [s].
+        t_end: End time of the creep window [s].
+        n_points: Number of log-spaced time points.
+        noise_level: Relative log-normal noise level (0.02 = 2%).
+        seed: Random seed.
+        breakage: TNT breakage variant.
+
+    Returns:
+        Tuple of (time, strain, sigma_applied, true_params). Strain is strictly
+        positive and monotonically non-decreasing.
+    """
+    from rheojax.models.tnt import TNTSingleMode
+
+    if params is None:
+        params = {"G": 50.0, "tau_b": 2.0, "eta_s": 0.5}
+
+    model = TNTSingleMode(breakage=breakage)
+    for name, value in params.items():
+        if name in model.parameters.keys():
+            model.parameters.set_value(name, value)
+
+    time = np.logspace(np.log10(t_start), np.log10(t_end), n_points)
+    strain_clean = np.asarray(
+        model.predict(time, test_mode="creep", sigma_applied=sigma_applied)
+    )
+
+    # Log-normal noise is natural for strictly positive creep curves; skip the
+    # t≈0 point where strain→0 (log noise is undefined / amplifies to NaN).
+    rng = np.random.default_rng(seed)
+    log_noise = rng.normal(0.0, noise_level, size=strain_clean.shape)
+    log_noise[strain_clean <= 0] = 0.0
+    strain = strain_clean * np.exp(log_noise)
+
+    return time, strain, sigma_applied, dict(params)
+
+
+def generate_synthetic_saos(
+    params: dict[str, float] | None = None,
+    omega_min: float = 1e-1,
+    omega_max: float = 1e2,
+    n_points: int = 24,
+    noise_level: float = 0.02,
+    seed: int = 42,
+    breakage: Literal["constant", "bell", "power_law", "stretch_creation"] = "constant",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, float]]:
+    """Generate synthetic single-mode TNT SAOS data (G', G'').
+
+    A single-mode (Maxwell) transient network has ONE relaxation time, so it
+    predicts G' ~ omega^2 at low frequency, a single G'/G'' crossover, and a
+    U-shaped tan(delta) (the eta_s*omega solvent term turns G'' back up at high
+    omega). Real coordination-network / polymer SAOS (e.g. the Ni-histidine
+    `load_epstein_saos` data) instead shows a broad power-law spectrum
+    (G' ~ omega^~0.9, monotonically decreasing tan(delta)) that NO single-mode
+    parameter set can match -- the fit is structurally capped. Self-consistent
+    single-mode data keeps the inverse problem well-posed so the tutorial can
+    demonstrate a clean, independent G'/G'' fit.
+
+    Args:
+        params: TNT single-mode parameters; defaults to G=1000 Pa, tau_b=0.5 s,
+            eta_s=0.1 Pa·s (crossover near omega=2 rad/s, well inside the
+            window).
+        omega_min: Minimum angular frequency [rad/s].
+        omega_max: Maximum angular frequency [rad/s].
+        n_points: Number of log-spaced omega points.
+        noise_level: Relative log-normal noise level (0.02 = 2%).
+        seed: Random seed.
+        breakage: TNT breakage variant.
+
+    Returns:
+        Tuple of (omega, G_prime, G_double_prime, true_params).
+    """
+    from rheojax.models.tnt import TNTSingleMode
+
+    if params is None:
+        params = {"G": 1000.0, "tau_b": 0.5, "eta_s": 0.1}
+
+    model = TNTSingleMode(breakage=breakage)
+    for name, value in params.items():
+        if name in model.parameters.keys():
+            model.parameters.set_value(name, value)
+
+    omega = np.logspace(np.log10(omega_min), np.log10(omega_max), n_points)
+    Gp_clean, Gpp_clean = model.predict_saos(omega)
+    Gp_clean = np.asarray(Gp_clean)
+    Gpp_clean = np.asarray(Gpp_clean)
+
+    # Log-normal noise keeps both moduli strictly positive
+    rng = np.random.default_rng(seed)
+    Gp = Gp_clean * np.exp(rng.normal(0.0, noise_level, size=Gp_clean.shape))
+    Gpp = Gpp_clean * np.exp(rng.normal(0.0, noise_level, size=Gpp_clean.shape))
+
+    return omega, Gp, Gpp, dict(params)
+
+
+def generate_synthetic_laos(
+    params: dict[str, float] | None = None,
+    gamma_0: float = 1.5,
+    omega: float = 1.0,
+    n_cycles: int = 10,
+    n_points_per_cycle: int = 20,
+    noise_level: float = 0.03,
+    seed: int = 42,
+    breakage: Literal["constant", "bell", "power_law", "stretch_creation"] = "bell",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, dict[str, float]]:
+    """Generate synthetic single-mode TNT LAOS data (strain, stress).
+
+    LAOS is a *nonlinear* protocol: the point of the tutorial is the higher
+    (odd) stress harmonics. The "constant" breakage variant is essentially a
+    linear (UCM) element -- it produces a pure sinusoid (I3/I1 ~ 1e-3 at any
+    amplitude), so it can NEVER reproduce the third-harmonic peak that real
+    LAOS data shows; fitting it to nonlinear experimental data (e.g.
+    load_pnas_laos) pins eta_s ~ 0 and caps R^2 ~ 0.93. Genuine nonlinearity
+    requires stress-dependent breakage. Defaulting to ``breakage="bell"`` gives
+    real odd-harmonic content (I3/I1 ~ 0.03-0.09 over gamma_0 ~ 1-2) that the
+    same single-mode Bell model can fit exactly -- a well-posed nonlinear-LAOS
+    recovery test.
+
+    Args:
+        params: TNT single-mode parameters; defaults to G=50 Pa, tau_b=2 s,
+            eta_s=0.5 Pa·s, nu=5 (Bell stress sensitivity).
+        gamma_0: Strain amplitude (large for LAOS).
+        omega: Angular frequency [rad/s].
+        n_cycles: Number of oscillation cycles.
+        n_points_per_cycle: Samples per cycle.
+        noise_level: Relative Gaussian noise on stress (0.03 = 3%).
+        seed: Random seed.
+        breakage: TNT breakage variant ("bell" for nonlinear LAOS).
+
+    Returns:
+        Tuple of (time, strain, stress, gamma_0, true_params).
+    """
+    from rheojax.models.tnt import TNTSingleMode
+
+    if params is None:
+        params = {"G": 50.0, "tau_b": 2.0, "eta_s": 0.5, "nu": 5.0}
+
+    model = TNTSingleMode(breakage=breakage)
+    for name, value in params.items():
+        if name in model.parameters.keys():
+            model.parameters.set_value(name, value)
+
+    period = 2.0 * np.pi / omega
+    n_points = n_cycles * n_points_per_cycle
+    time = np.linspace(0.0, n_cycles * period, n_points, endpoint=False)
+    strain = gamma_0 * np.sin(omega * time)
+
+    stress_clean = np.asarray(
+        model.predict(time, test_mode="laos", gamma_0=gamma_0, omega=omega)
+    )
+
+    # Additive Gaussian noise (stress crosses zero, so log-noise is unsuitable)
+    rng = np.random.default_rng(seed)
+    scale = noise_level * np.mean(np.abs(stress_clean))
+    stress = stress_clean + rng.normal(0.0, scale, size=stress_clean.shape)
+
+    # Keep only the params that exist for this variant in the returned truth
+    true_params = {k: v for k, v in params.items() if k in model.parameters.keys()}
+    return time, strain, stress, gamma_0, true_params
+
+
+# =============================================================================
+# Generic self-consistent synthetic data (works for ANY configured TNT variant)
+# =============================================================================
+# The variant tutorials (Cates, Loop-Bridge, Multi-Species, Sticky-Rouse) fit
+# models with different parameter sets, and several are multi-mode. Real
+# experimental data (Carbopol flow, Laponite relaxation, Ni-histidine SAOS, PNAS
+# LAOS) is either a different material class or a broader spectrum than a given
+# variant can represent, so those fits cap well below R^2 ~ 1. To keep every
+# tutorial well-posed, each notebook generates data from ITS OWN model with a
+# known parameter set and fits it back. These helpers take an already-configured
+# model instance and return noisy, self-consistent data for one protocol.
+
+
+def _lognormal_noise(clean: np.ndarray, noise_level: float, seed: int) -> np.ndarray:
+    """Multiplicative log-normal noise (keeps strictly-positive signals positive)."""
+    clean = np.asarray(clean)
+    rng = np.random.default_rng(seed)
+    return clean * np.exp(rng.normal(0.0, noise_level, size=clean.shape))
+
+
+def _additive_noise(clean: np.ndarray, noise_level: float, seed: int) -> np.ndarray:
+    """Additive Gaussian noise scaled to the signal (for zero-crossing signals)."""
+    clean = np.asarray(clean)
+    rng = np.random.default_rng(seed)
+    scale = noise_level * float(np.mean(np.abs(clean)))
+    return clean + rng.normal(0.0, scale, size=clean.shape)
+
+
+def synth_flow_curve(
+    model: Any,
+    gamma_dot: np.ndarray,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Synthetic steady-shear flow curve from a configured TNT model.
+
+    Returns (gamma_dot, stress).
+    """
+    clean = np.asarray(model.predict(gamma_dot, test_mode="flow_curve"))
+    return np.asarray(gamma_dot), _lognormal_noise(clean, noise_level, seed)
+
+
+def synth_startup(
+    model: Any,
+    t: np.ndarray,
+    gamma_dot: float,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Synthetic startup-shear stress sigma(t) at constant gamma_dot.
+
+    Returns (t, stress). Additive noise (stress starts near 0).
+    """
+    clean = np.asarray(model.predict(t, test_mode="startup", gamma_dot=gamma_dot))
+    return np.asarray(t), _additive_noise(clean, noise_level, seed)
+
+
+def synth_relaxation(
+    model: Any,
+    t: np.ndarray,
+    gamma_dot: float = 1.0,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Synthetic stress-relaxation modulus G(t).
+
+    Returns (t, G_t). Log-normal noise (G(t) > 0).
+    """
+    clean = np.asarray(model.predict(t, test_mode="relaxation", gamma_dot=gamma_dot))
+    return np.asarray(t), _lognormal_noise(clean, noise_level, seed)
+
+
+def synth_creep(
+    model: Any,
+    t: np.ndarray,
+    sigma_applied: float,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Synthetic creep strain gamma(t) under constant stress.
+
+    Returns (t, strain). Log-normal noise, but the gamma(t0)=0 IC point is kept
+    exact (log noise is undefined there).
+    """
+    clean = np.asarray(model.predict(t, test_mode="creep", sigma_applied=sigma_applied))
+    noisy = _lognormal_noise(clean, noise_level, seed)
+    noisy = np.where(clean <= 0, clean, noisy)
+    return np.asarray(t), noisy
+
+
+def synth_saos(
+    model: Any,
+    omega: np.ndarray,
+    noise_level: float = 0.02,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Synthetic SAOS moduli.
+
+    Returns (omega, G_prime, G_double_prime). Handles models that return a
+    complex G* or a real (N, 2) [G', G''] array.
+    """
+    pred = np.asarray(model.predict(omega, test_mode="oscillation"))
+    if np.iscomplexobj(pred):
+        gp, gpp = np.real(pred), np.imag(pred)
+    else:
+        gp, gpp = pred[:, 0], pred[:, 1]
+    rng = np.random.default_rng(seed)
+    gp = gp * np.exp(rng.normal(0.0, noise_level, size=gp.shape))
+    gpp = gpp * np.exp(rng.normal(0.0, noise_level, size=gpp.shape))
+    return np.asarray(omega), gp, gpp
+
+
+def synth_laos(
+    model: Any,
+    gamma_0: float,
+    omega: float,
+    n_cycles: int = 10,
+    n_points_per_cycle: int = 20,
+    noise_level: float = 0.03,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Synthetic LAOS data from a configured TNT model.
+
+    Returns (t, strain, stress). Additive noise (stress crosses zero).
+    """
+    period = 2.0 * np.pi / omega
+    n_points = n_cycles * n_points_per_cycle
+    t = np.linspace(0.0, n_cycles * period, n_points, endpoint=False)
+    strain = gamma_0 * np.sin(omega * t)
+    clean = np.asarray(model.predict(t, test_mode="laos", gamma_0=gamma_0, omega=omega))
+    return t, strain, _additive_noise(clean, noise_level, seed)
+
+
 def load_pnas_laos(
     omega: float = 1.0,
     strain_amplitude_index: int = 5,
