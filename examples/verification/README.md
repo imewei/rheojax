@@ -24,6 +24,19 @@ These notebooks validate **data integrity and protocol correctness**, not model 
 | [05_validate_saos.ipynb](05_validate_saos.ipynb) | SAOS | G'(ω), G''(ω), tan(δ) |
 | [06_validate_laos.ipynb](06_validate_laos.ipynb) | LAOS | Harmonics, Lissajous curves |
 
+## Case Studies
+
+Protocol-aligned subdirectories contain material-specific fitting demonstrations:
+
+| Subdirectory | Protocol | Notebooks | Materials |
+|---|---|---|---|
+| [`flow_curve/`](flow_curve/) | Flow Curve | 1 | Emulsion (Bayesian HB fit) |
+| [`creep/`](creep/) | Creep | 3 | Mucus, periapical abscess, polystyrene |
+| [`stress_relaxation/`](stress_relaxation/) | Stress Relaxation | 6 | Fish muscle, laponite, liquid foam, PE, PP, PS |
+| [`saos/`](saos/) | SAOS | 3 | Chia pudding, metal-coordinated network, multi-model comparison |
+
+> **Note:** TTS/Mastercurve demonstrations belong in [`examples/transforms/`](../transforms/); startup shear and LAOS case studies are covered by the root validators above.
+
 ## Quick Start
 
 ### FAST Mode (2 files per protocol, ~1 min)
