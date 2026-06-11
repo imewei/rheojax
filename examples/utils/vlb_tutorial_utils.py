@@ -37,8 +37,90 @@ def get_fast_mode() -> bool:
 def get_bayesian_config() -> dict[str, int]:
     """Return MCMC configuration based on FAST_MODE."""
     if FAST_MODE:
-        return {"num_warmup": 50, "num_samples": 100, "num_chains": 1}
+        return {"num_warmup": 100, "num_samples": 100, "num_chains": 1}
     return {"num_warmup": 500, "num_samples": 1000, "num_chains": 4}
+
+
+# =============================================================================
+# Synthetic Data Generators (fallback when experimental files are missing)
+# =============================================================================
+
+
+def _generate_synthetic_creep(
+    max_points: int | None = None, seed: int = 42
+) -> tuple[np.ndarray, np.ndarray]:
+    """Maxwell creep compliance J(t) = (1 + k_d·t) / G0 with 3% relative noise.
+
+    True params: G0=500 Pa, k_d=0.2 1/s → τ=5 s, η₀=2500 Pa·s.
+    Time window spans the elastic intercept (t << τ) AND viscous slope (t >> τ)
+    so that both G0 and k_d are individually identifiable.
+    """
+    G0_true, k_d_true = 500.0, 0.2
+    tau = 1.0 / k_d_true
+    t = np.logspace(np.log10(0.05 * tau), np.log10(30.0 * tau), 200)
+    J_true = (1.0 + k_d_true * t) / G0_true
+    rng = np.random.default_rng(seed)
+    J = J_true * (1.0 + 0.03 * rng.standard_normal(len(t)))
+    J = np.maximum(J, 1e-12)
+    if max_points is not None and len(t) > max_points:
+        idx = np.linspace(0, len(t) - 1, max_points, dtype=int)
+        t, J = t[idx], J[idx]
+    return t, J
+
+
+def _generate_synthetic_startup(
+    gamma_dot: float = 1.0, max_points: int | None = None, seed: int = 42
+) -> tuple[np.ndarray, np.ndarray]:
+    """Maxwell startup shear σ(t) = η₀·γ̇·(1 − exp(−k_d·t)) with 3% noise.
+
+    True params: G0=100 Pa, k_d=0.5 1/s → τ=2 s, η₀=200 Pa·s.
+    """
+    G0_true, k_d_true = 100.0, 0.5
+    tau = 1.0 / k_d_true
+    t = np.logspace(np.log10(0.05 * tau), np.log10(20.0 * tau), 200)
+    eta0 = G0_true / k_d_true
+    sigma_true = eta0 * gamma_dot * (1.0 - np.exp(-k_d_true * t))
+    rng = np.random.default_rng(seed)
+    sigma = sigma_true * (1.0 + 0.03 * rng.standard_normal(len(t)))
+    sigma = np.maximum(sigma, 0.0)
+    if max_points is not None and len(t) > max_points:
+        idx = np.linspace(0, len(t) - 1, max_points, dtype=int)
+        t, sigma = t[idx], sigma[idx]
+    return t, sigma
+
+
+def _generate_synthetic_laos(
+    omega: float = 1.0,
+    gamma_0: float = 0.5,
+    max_points: int | None = None,
+    seed: int = 42,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """VLBLocal LAOS stress with 3% additive noise.
+
+    True params: G0=100 Pa, k_d=2.0 1/s.
+    Uses VLBLocal.predict() directly so data and fitting model are self-consistent.
+    """
+    from rheojax.models import VLBLocal
+
+    G0_true, k_d_true = 100.0, 2.0
+    T_cycle = 2.0 * np.pi / omega
+    t = np.linspace(0.0, 5.0 * T_cycle, 500)
+    strain = gamma_0 * np.sin(omega * t)
+
+    model_gen = VLBLocal()
+    model_gen.parameters.set_value("G0", G0_true)
+    model_gen.parameters.set_value("k_d", k_d_true)
+    stress_true = np.asarray(
+        model_gen.predict(t, test_mode="laos", gamma_0=gamma_0, omega=omega)
+    )
+
+    rng = np.random.default_rng(seed)
+    noise_std = 0.03 * float(np.std(stress_true))
+    stress = stress_true + noise_std * rng.standard_normal(len(t))
+    if max_points is not None and len(t) > max_points:
+        idx = np.linspace(0, len(t) - 1, max_points, dtype=int)
+        t, strain, stress = t[idx], strain[idx], stress[idx]
+    return t, strain, stress
 
 
 # =============================================================================
@@ -137,6 +219,25 @@ def load_foam_relaxation(
     return time, G_t
 
 
+def load_synthetic_creep(
+    max_points: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate synthetic Maxwell creep compliance data.
+
+    Used in place of real creep data to ensure both G0 and k_d are individually
+    identifiable: the time window spans both the elastic intercept (t << τ) and
+    the viscous flow regime (t >> τ) so the NUTS posterior converges cleanly.
+
+    Args:
+        max_points: If set, subsample to this many points.
+
+    Returns:
+        (time, J) in (s, 1/Pa). True: G0=500 Pa, k_d=0.2 1/s.
+    """
+    print("[SYNTHETIC] True params: G0=500.0 Pa, k_d=0.2 1/s  (τ=5.0 s, η₀=2500 Pa·s)")
+    return _generate_synthetic_creep(max_points=max_points)
+
+
 def load_ps_creep(
     temperature: int = 190,
     max_points: int | None = None,
@@ -196,7 +297,21 @@ def load_pnas_startup(
     data_dir = Path(__file__).parent / ".." / "data" / "ikh"
     fpath = data_dir / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
     if not fpath.exists():
-        raise FileNotFoundError(f"PNAS data not found at: {fpath.resolve()}")
+        import warnings as _w
+        _w.warn(
+            f"PNAS data not found at: {fpath.resolve()}\n"
+            "Falling back to synthetic Maxwell startup data (G0=100 Pa, k_d=0.5 1/s).",
+            UserWarning,
+            stacklevel=2,
+        )
+        t, sigma = _generate_synthetic_startup(
+            gamma_dot=gamma_dot, max_points=max_points
+        )
+        print(
+            f"[SYNTHETIC] True params: G0=100.0 Pa, k_d=0.5 1/s"
+            f"  (γ̇={gamma_dot} 1/s, σ_ss={100.0 / 0.5 * gamma_dot:.1f} Pa)"
+        )
+        return t, sigma
 
     df = pd.read_excel(fpath, sheet_name=sheet, header=None)
     data = df.iloc[3:, [0, 1]].dropna().astype(float)
@@ -239,7 +354,23 @@ def load_pnas_laos(
     data_dir = Path(__file__).parent / ".." / "data" / "ikh"
     fpath = data_dir / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
     if not fpath.exists():
-        raise FileNotFoundError(f"PNAS data not found at: {fpath.resolve()}")
+        import warnings as _w
+        _w.warn(
+            f"PNAS data not found at: {fpath.resolve()}\n"
+            "Falling back to synthetic Maxwell LAOS data (G0=100 Pa, k_d=2.0 1/s).",
+            UserWarning,
+            stacklevel=2,
+        )
+        # Map strain_amplitude_index 0..11 → γ₀ 0.05..0.60 (logarithmic spacing)
+        gamma_0 = 0.05 * 10 ** (strain_amplitude_index / 11.0 * np.log10(12.0))
+        t, s_arr, stress = _generate_synthetic_laos(
+            omega=omega, gamma_0=gamma_0, max_points=max_points
+        )
+        print(
+            f"[SYNTHETIC] True params: G0=100.0 Pa, k_d=2.0 1/s"
+            f"  (ω={omega} rad/s, γ₀={gamma_0:.3f})"
+        )
+        return t, s_arr, stress
 
     df = pd.read_excel(fpath, sheet_name=sheet, header=None)
     col_t = strain_amplitude_index * 4
@@ -269,9 +400,11 @@ def check_nlsq_fit_quality(
     y: np.ndarray,
     test_mode: str,
     r2_threshold: float = 0.90,
+    noise_fraction: float | None = None,
+    n_params: int = 2,
     **predict_kwargs: Any,
 ) -> float:
-    """Compute R² and warn before Bayesian inference if fit is poor.
+    """Compute R² (and optionally reduced χ²) before Bayesian inference.
 
     A poor NLSQ warm-start (R² < threshold) causes NUTS to explore unphysical
     parameter space: model-data mismatch flattens the likelihood, so the sampler
@@ -283,6 +416,11 @@ def check_nlsq_fit_quality(
         y: Observed data — real or complex G*.
         test_mode: Protocol string ('flow_curve', 'relaxation', …).
         r2_threshold: Warn threshold (default 0.90).
+        noise_fraction: Relative noise level ε (e.g. 0.03 for 3%).  When set,
+            computes reduced chi-squared χ²_red = Σ[(y-ŷ)²/(ε|y|)²] / (N-k).
+            A well-fitting model gives χ²_red ≈ 1.0.  Pass None (default) to
+            skip chi-squared (use for real data where ε is unknown).
+        n_params: Number of free parameters k for χ²_red denominator (default 2).
         **predict_kwargs: Forwarded to model.predict()
             (e.g. gamma_dot=, sigma_applied=, omega=).
 
@@ -319,6 +457,25 @@ def check_nlsq_fit_quality(
     else:
         print(f"✓  NLSQ fit quality R²={r2:.4f} ≥ {r2_threshold} — safe to proceed with Bayesian")
 
+    if noise_fraction is not None:
+        n = len(y_ref)
+        dof = max(n - n_params, 1)
+        sigma_i = noise_fraction * np.maximum(np.abs(y_ref), 1e-30)
+        chi2 = float(np.sum(((y_ref - y_pred_ref) / sigma_i) ** 2))
+        chi2_red = chi2 / dof
+        if 0.5 <= chi2_red <= 2.0:
+            print(f"✓  χ²_red = {chi2_red:.3f} ≈ 1.0 — fit consistent with ε={noise_fraction:.1%} noise")
+        elif chi2_red > 2.0:
+            print(
+                f"⚠  χ²_red = {chi2_red:.3f} >> 1 — systematic deviations "
+                f"(model–data mismatch or ε underestimated)"
+            )
+        else:
+            print(
+                f"⚠  χ²_red = {chi2_red:.3f} << 1 — possible overfitting "
+                f"or ε overestimated"
+            )
+
     return r2
 
 
@@ -330,10 +487,17 @@ def check_nlsq_fit_quality(
 def print_convergence(result: Any, param_names: list[str]) -> bool:
     """Print convergence diagnostics from a BayesianResult.
 
+    Thresholds are scaled to FAST_MODE (1 chain, 100 samples) vs full mode
+    (4 chains, 1000 samples).  In FAST_MODE R-hat > 1.10 or ESS < 40 flags
+    a parameter; in full mode the stricter R-hat > 1.05 or ESS < 400 applies.
+
     Returns:
-        True if all R-hat < 1.05 and ESS > 100.
+        True if all parameters pass the mode-appropriate thresholds.
     """
     diag = result.diagnostics
+
+    rhat_max = 1.10 if FAST_MODE else 1.05
+    ess_min = 40 if FAST_MODE else 400
 
     print("Convergence Diagnostics")
     print("=" * 50)
@@ -345,7 +509,7 @@ def print_convergence(result: Any, param_names: list[str]) -> bool:
         r_hat = diag.get("r_hat", {}).get(p, float("nan"))
         ess = diag.get("ess", {}).get(p, float("nan"))
         flag = ""
-        if r_hat > 1.05 or ess < 100:
+        if r_hat > rhat_max or ess < ess_min:
             flag = " *"
             all_ok = False
         print(f"{p:>10s}  {r_hat:8.4f}  {ess:8.0f}{flag}")
@@ -353,6 +517,13 @@ def print_convergence(result: Any, param_names: list[str]) -> bool:
     n_div = diag.get("divergences", diag.get("num_divergences", 0))
     print(f"\nDivergences: {n_div}")
     print(f"Convergence: {'PASSED' if all_ok else 'CHECK REQUIRED'}")
+    if FAST_MODE:
+        print(
+            "\nNote: FAST_MODE uses 1 chain (100 samples). R-hat is a split-chain"
+            f"\n      estimate — less reliable than multi-chain. Thresholds relaxed to"
+            f"\n      R-hat < {rhat_max}, ESS > {ess_min}. Use FAST_MODE=False for"
+            "\n      publication-quality diagnostics (4 chains, 1000 samples)."
+        )
     return all_ok
 
 
