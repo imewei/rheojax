@@ -401,6 +401,7 @@ def check_nlsq_fit_quality(
     test_mode: str,
     r2_threshold: float = 0.90,
     noise_fraction: float | None = None,
+    noise_sigma: float | None = None,
     n_params: int = 2,
     **predict_kwargs: Any,
 ) -> float:
@@ -418,8 +419,11 @@ def check_nlsq_fit_quality(
         r2_threshold: Warn threshold (default 0.90).
         noise_fraction: Relative noise level ε (e.g. 0.03 for 3%).  When set,
             computes reduced chi-squared χ²_red = Σ[(y-ŷ)²/(ε|y|)²] / (N-k).
-            A well-fitting model gives χ²_red ≈ 1.0.  Pass None (default) to
-            skip chi-squared (use for real data where ε is unknown).
+            Use for protocols with proportional noise (creep, startup, SAOS).
+        noise_sigma: Absolute noise std σ (e.g. 0.03*std(y)).  When set,
+            computes χ²_red = Σ[(y-ŷ)²/σ²] / (N-k).
+            Use for LAOS (additive noise uniform across all time points).
+            Takes precedence over noise_fraction when both are supplied.
         n_params: Number of free parameters k for χ²_red denominator (default 2).
         **predict_kwargs: Forwarded to model.predict()
             (e.g. gamma_dot=, sigma_applied=, omega=).
@@ -457,23 +461,28 @@ def check_nlsq_fit_quality(
     else:
         print(f"✓  NLSQ fit quality R²={r2:.4f} ≥ {r2_threshold} — safe to proceed with Bayesian")
 
-    if noise_fraction is not None:
+    if noise_sigma is not None or noise_fraction is not None:
         n = len(y_ref)
         dof = max(n - n_params, 1)
-        sigma_i = noise_fraction * np.maximum(np.abs(y_ref), 1e-30)
+        if noise_sigma is not None:
+            sigma_i = float(noise_sigma)
+            noise_label = f"σ={noise_sigma:.3g} (absolute)"
+        else:
+            sigma_i = noise_fraction * np.maximum(np.abs(y_ref), 1e-30)  # type: ignore[operator]
+            noise_label = f"ε={noise_fraction:.1%} (relative)"  # type: ignore[str-format]
         chi2 = float(np.sum(((y_ref - y_pred_ref) / sigma_i) ** 2))
         chi2_red = chi2 / dof
         if 0.5 <= chi2_red <= 2.0:
-            print(f"✓  χ²_red = {chi2_red:.3f} ≈ 1.0 — fit consistent with ε={noise_fraction:.1%} noise")
+            print(f"✓  χ²_red = {chi2_red:.3f} ≈ 1.0 — fit consistent with {noise_label} noise")
         elif chi2_red > 2.0:
             print(
                 f"⚠  χ²_red = {chi2_red:.3f} >> 1 — systematic deviations "
-                f"(model–data mismatch or ε underestimated)"
+                f"(model–data mismatch or noise underestimated)"
             )
         else:
             print(
                 f"⚠  χ²_red = {chi2_red:.3f} << 1 — possible overfitting "
-                f"or ε overestimated"
+                f"or noise overestimated"
             )
 
     return r2
