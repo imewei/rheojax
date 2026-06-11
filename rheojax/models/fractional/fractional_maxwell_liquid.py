@@ -352,7 +352,15 @@ class FractionalMaxwellLiquid(BaseModel):
         else:
             x_data = jnp.array(X)
             y_data = jnp.array(y)
-            test_mode = kwargs.get("test_mode", "relaxation")
+            # Complex y → G*(ω) = G' + iG'' → oscillation (frequency-domain).
+            # FitOrchestrator unpacks RheoData before calling _fit, so the
+            # isinstance(X, RheoData) branch above is never reached from the
+            # orchestrator path.  Auto-detect here prevents the relaxation-model
+            # being used on mastercurve data, which causes a (N,) vs (2N,)
+            # shape mismatch in r_squared (normalization weights are always 2N
+            # for complex y).
+            _y_is_complex = np.iscomplexobj(np.asarray(y)) if y is not None else False
+            test_mode = kwargs.get("test_mode", "oscillation" if _y_is_complex else "relaxation")
 
         # R13-FML-001: Store test_mode so Bayesian inference picks up the correct
         # protocol (otherwise _resolve_test_mode defaults to 'relaxation').
@@ -394,6 +402,21 @@ class FractionalMaxwellLiquid(BaseModel):
                         "Smart initialization failed, using defaults",
                         error=str(e),
                     )
+
+            # Apply user-provided initial values so the optimizer starts from
+            # the correct region of parameter space.  Smart init (above) always
+            # fails silently because rheojax.utils.initialization doesn't exist
+            # yet, so without this block the optimizer inherits the class
+            # defaults (Gm=1e6, tau=1) and slides down the Gm·τ^α ridge to a
+            # degenerate local minimum (Gm≈20 Pa, τ≈1e5 s).
+            _initial_values = kwargs.get("initial_values", None)
+            if _initial_values is not None:
+                for _pname, _pval in _initial_values.items():
+                    self.parameters.set_value(_pname, float(_pval))
+                logger.debug(
+                    "User initial_values applied to parameters",
+                    initial_values=dict(_initial_values),
+                )
 
             # Create objective function with stateless predictions
             def model_fn(x, params):
@@ -485,6 +508,7 @@ class FractionalMaxwellLiquid(BaseModel):
                     f"Try adjusting initial values, bounds, or max_iter."
                 )
 
+            self._nlsq_result = result
             self.fitted_ = True
             ctx["final_params"] = self.parameters.to_dict()
             ctx["success"] = True

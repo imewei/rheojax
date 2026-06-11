@@ -1739,6 +1739,15 @@ def nlsq_optimize(
         residuals_raw = np.asarray(_cached_fun)
     else:
         residuals_raw = np.asarray(objective(x_opt))
+    # P2-Fit-10: NLSQ may store N residuals when the objective returns 2N
+    # (complex-split: [G', G''] concatenated). Detect via normalization
+    # weights length and recompute to avoid the (N,)*(2N,) broadcast crash
+    # in r_squared. The extra call is cheap — trace is already compiled.
+    _nw_obj = getattr(objective, "_normalization_weights", None)
+    if _nw_obj is not None and residuals_raw.ndim == 1:
+        _nw_len = len(np.asarray(_nw_obj))
+        if len(residuals_raw) != _nw_len:
+            residuals_raw = np.asarray(objective(x_opt))
     if np.iscomplexobj(residuals_raw):
         residuals_np = np.concatenate(
             [np.real(residuals_raw), np.imag(residuals_raw)]
@@ -2988,9 +2997,16 @@ def create_least_squares_objective(
         # transfer.  np.asarray on a numpy array is zero-copy.
         y_data_np = np.asarray(y_data)
         if y_data_is_complex:
-            w_real = np.maximum(np.abs(np.real(y_data_np)), _norm_floor_f)
-            w_imag = np.maximum(np.abs(np.imag(y_data_np)), _norm_floor_f)
-            weights = np.concatenate([w_real, w_imag])
+            if _static_dispatch == "real":
+                # Real-output model on complex input data: residuals are (N,)
+                # magnitude-based (Case 3 in residuals()), so weights must also
+                # be (N,) — otherwise r_squared broadcasts (N,) * (2N,) and
+                # raises ValueError.
+                weights = np.maximum(np.abs(y_data_np), _norm_floor_f)
+            else:
+                w_real = np.maximum(np.abs(np.real(y_data_np)), _norm_floor_f)
+                w_imag = np.maximum(np.abs(np.imag(y_data_np)), _norm_floor_f)
+                weights = np.concatenate([w_real, w_imag])
         elif y_data_np.ndim == 2 and y_data_np.shape[-1] == 2:
             w0 = np.maximum(np.abs(y_data_np[:, 0]), _norm_floor_f)
             w1 = np.maximum(np.abs(y_data_np[:, 1]), _norm_floor_f)
