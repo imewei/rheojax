@@ -98,7 +98,7 @@ class PronyConversion(BaseTransform):
 
         # Determine number of modes
         n_modes = (
-            self.n_modes if self.n_modes is not None else max(3, min(len(t) // 5, 20))
+            self.n_modes if self.n_modes is not None else max(5, min(len(t) // 5, 20))
         )
 
         # Fit Prony series to G(t)
@@ -111,9 +111,16 @@ class PronyConversion(BaseTransform):
         # Convert to frequency domain
         omega = self.omega_out
         if omega is None:
+            # Use the data time range to set the valid frequency range:
+            # ω ∈ [1/t_max, 1/t_min].  The wider [0.1/τ_max, 10/τ_min] range
+            # extends into the extrapolation regime where the Prony fit is
+            # poorly constrained, inflating G'' relative errors.
+            t_positive = t[t > 0]
+            t_min = float(np.min(t_positive))
+            t_max = float(np.max(t_positive))
             omega = np.logspace(
-                np.log10(0.1 / np.max(tau_i)),
-                np.log10(10.0 / np.min(tau_i)),
+                np.log10(1.0 / t_max),
+                np.log10(1.0 / t_min),
                 100,
             )
 
@@ -150,7 +157,7 @@ class PronyConversion(BaseTransform):
         n_modes = (
             self.n_modes
             if self.n_modes is not None
-            else max(3, min(len(omega) // 5, 20))
+            else max(5, min(len(omega) // 5, 20))
         )
 
         G_i, tau_i, G_e = _fit_prony_oscillation(
@@ -163,9 +170,11 @@ class PronyConversion(BaseTransform):
 
         t = self.t_out
         if t is None:
+            # Mirror the time→freq convention: output t ∈ [1/omega_max, 1/omega_min],
+            # which is the data-informed range rather than the wider tau_i-based range.
             t = np.logspace(
-                np.log10(np.min(tau_i) / 10),
-                np.log10(np.max(tau_i) * 10),
+                np.log10(1.0 / np.max(omega)),
+                np.log10(1.0 / np.min(omega)),
                 100,
             )
 
@@ -251,7 +260,13 @@ def _fit_prony_relaxation(
     # is not necessarily the largest time.  np.max guarantees t_max >= t_min,
     # preventing a ValueError from log10 of a non-positive number.
     t_max = float(np.max(t_positive))
-    tau_i = np.logspace(np.log10(t_min), np.log10(t_max), n_modes)
+    # Use n+2 log-spaced values and drop the two edge modes.  Modes at exactly
+    # tau = t_min / t_max are only "visible" in the outermost data points (high
+    # noise), so NNLS assigns them spurious weight that creates G''(ω) artifacts
+    # at ω ≈ 1/t_min.  Dropping the edges keeps modes well inside the data
+    # range where they are reliably constrained.
+    tau_all = np.logspace(np.log10(t_min), np.log10(t_max), n_modes + 2)
+    tau_i = tau_all[1:-1]
 
     # Equilibrium modulus estimate: G(t→∞) ≈ G at maximum time.
     # Use the G value at argmax(t) to handle unsorted time arrays correctly.
@@ -283,7 +298,11 @@ def _fit_prony_oscillation(
     G_prime = G_prime[sort_idx]
     G_double_prime = G_double_prime[sort_idx]
 
-    tau_i = np.logspace(np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes)
+    # Same n+2 / drop-edges approach as _fit_prony_relaxation: modes at exactly
+    # 1/omega_max and 1/omega_min are at the boundary of the informative range
+    # and pick up spurious weight that distorts G(t) predictions.
+    tau_all = np.logspace(np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes + 2)
+    tau_i = tau_all[1:-1]
 
     G_e = max(float(np.min(G_prime)), 0.0)
 
