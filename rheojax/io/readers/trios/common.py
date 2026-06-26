@@ -627,7 +627,7 @@ def convert_unit(
     if conversions is None:
         conversions = TRIOS_UNIT_CONVERSIONS
 
-    if source_unit is None or source_unit == target_unit:
+    if source_unit is None or source_unit == "" or source_unit == target_unit:
         return values, target_unit
 
     # Look up conversion

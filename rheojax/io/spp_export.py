@@ -263,6 +263,9 @@ def export_spp_txt(
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
+        for _vec_name, _vec in (("T_vec", T_vec), ("N_vec", N_vec), ("B_vec", B_vec)):
+            if _vec.ndim != 2 or _vec.shape[1] != 3:
+                raise ValueError(f"{_vec_name} must be shape (n, 3), got {_vec.shape}")
 
         fsf_data_out = np.column_stack(
             [
@@ -429,17 +432,7 @@ def _write_spp_fsf_txt(
                 "Binormal(y)",
                 "Binormal(z)",
             ]
-            headers2 = [
-                "[-]",
-                "[1/s]",
-                "[Pa]",
-                "[-]",
-                "[1/s]",
-                "[Pa]",
-                "[-]",
-                "[1/s]",
-                "[Pa]",
-            ]
+            headers2 = ["[-]"] * 9  # All FSF components are dimensionless unit vectors
             f.write("\t".join(headers1) + "\r\n")
             f.write("\t".join(headers2) + "\r\n")
 
@@ -694,6 +687,9 @@ def export_spp_csv(
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
+        for _vec_name, _vec in (("T_vec", T_vec), ("N_vec", N_vec), ("B_vec", B_vec)):
+            if _vec.ndim != 2 or _vec.shape[1] != 3:
+                raise ValueError(f"{_vec_name} must be shape (n, 3), got {_vec.shape}")
         columns["T_x"] = T_vec[:, 0]
         columns["T_y"] = T_vec[:, 1]
         columns["T_z"] = T_vec[:, 2]
@@ -916,6 +912,9 @@ def to_matlab_dict(
         T_vec = np.asarray(spp_results["T_vec"])
         N_vec = np.asarray(spp_results["N_vec"])
         B_vec = np.asarray(spp_results["B_vec"])
+        for _vec_name, _vec in (("T_vec", T_vec), ("N_vec", N_vec), ("B_vec", B_vec)):
+            if _vec.ndim != 2 or _vec.shape[1] != 3:
+                raise ValueError(f"{_vec_name} must be shape (n, 3), got {_vec.shape}")
 
         fsf_data_out = np.column_stack(
             [

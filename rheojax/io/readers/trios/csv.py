@@ -344,6 +344,15 @@ def _default_x_units(test_mode: str) -> str:
     return "s"
 
 
+def _default_y_units(test_mode: str) -> str:
+    """Get default y-axis units for a test mode."""
+    if test_mode == "creep":
+        return "1/Pa"
+    elif test_mode == "rotation":
+        return "Pa*s"
+    return "Pa"
+
+
 def extract_units_from_header(
     header: list[str],
     unit_row: list[str] | None = None,
@@ -948,7 +957,7 @@ def load_trios_csv(
 
             # Get units
             x_units = units.get(x_col, "")
-            y_units = units.get(y_col, "Pa")
+            y_units = units.get(y_col, _default_y_units(detected_mode))
 
             # Handle complex modulus case
             if y2_col is not None:
