@@ -279,7 +279,10 @@ class Cross(BaseModel):
         """
         # η(γ̇) = η_∞ + (η_0 - η_∞) / [1 + (λγ̇)^m]
         lambda_gamma = lambda_ * jnp.abs(gamma_dot)
-        denominator = 1.0 + jnp.power(lambda_gamma, m)
+        # Guard 0^m (m<1) whose backward pass is inf at gamma_dot=0 (NaN gradient).
+        safe_lambda_gamma = jnp.where(lambda_gamma > 0, lambda_gamma, 1.0)
+        power_term = jnp.where(lambda_gamma > 0, jnp.power(safe_lambda_gamma, m), 0.0)
+        denominator = 1.0 + power_term
         return eta_inf + (eta0 - eta_inf) / denominator
 
     @staticmethod

@@ -272,7 +272,7 @@ class FractionalMaxwellGel(BaseModel):
         # G* = c_alpha * i_omega_alpha / (1 + i_omega_beta * eta/c_alpha)
         #    = i_omega_alpha / (1/c_alpha + i_omega_beta * eta/c_alpha^2) ? No.
 
-        G_star = c_alpha * i_omega_alpha / (1.0 + denominator_term)
+        G_star = c_alpha * i_omega_alpha * denominator_term / (1.0 + denominator_term)
 
         # Extract storage and loss moduli
         G_prime = jnp.real(G_star)

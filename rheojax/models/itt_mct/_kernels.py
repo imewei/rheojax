@@ -485,8 +485,9 @@ def f12_volterra_creep_rhs(
         dK_dt = -K / tau + g * m_phi * dphi_dt
 
     # Strain rate from stress constraint (simplified)
-    # σ = G(t) × γ̇ → γ̇ ≈ σ / G(t) where G(t) ≈ G_inf × Φ
-    G_current = G_inf * jnp.maximum(phi_advected, 1e-10)
+    # σ = G(t) × γ̇ → γ̇ ≈ σ / G(t) where G(t) = G_inf × Φ²
+    # (Fuchs & Cates 2002; consistent with the startup/SAOS kernels which use Φ²)
+    G_current = G_inf * jnp.maximum(phi_advected, 1e-10) ** 2
     gamma_dot_target = sigma_applied / G_current
 
     # Smooth adjustment toward target rate

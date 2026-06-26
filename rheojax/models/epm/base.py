@@ -1979,7 +1979,7 @@ class EPMBase(BaseModel):
         if len(time) > 1:
             dt = time[1] - time[0]
 
-        n_steps = jnp.maximum(0, len(time) - 1)
+        n_steps = max(0, len(time) - 1)  # static int for lax.scan length
         state = self._init_state(key)
 
         def body(carrier, _):
@@ -2025,7 +2025,7 @@ class EPMBase(BaseModel):
         state = (stress, thresh, strain + strain_step, k)
 
         g_0 = self._mean_shear_stress(stress) / strain_step
-        n_steps = jnp.maximum(0, len(time) - 1)
+        n_steps = max(0, len(time) - 1)  # static int for lax.scan length
 
         def body(carrier, _):
             curr_state = carrier
@@ -2061,7 +2061,7 @@ class EPMBase(BaseModel):
         state = self._init_state(key)
         aug_state = (state, 0.0)
         initial_strain = state[2]
-        n_steps = jnp.maximum(0, len(time) - 1)
+        n_steps = max(0, len(time) - 1)  # static int for lax.scan length
 
         def body(carrier, _):
             curr_epm, gdot = carrier
@@ -2103,7 +2103,7 @@ class EPMBase(BaseModel):
 
         state = self._init_state(key)
         initial_stress = self._mean_shear_stress(state[0])
-        n_steps = jnp.maximum(0, len(time) - 1)
+        n_steps = max(0, len(time) - 1)  # static int for lax.scan length
         scan_time = time[:-1] if n_steps > 0 else jnp.array([])
 
         def body(carrier, t):

@@ -831,6 +831,21 @@ class BaseModel(BayesianMixin, ABC):
                     model=self.__class__.__name__,
                 )
 
+        # Preserve the test mode declared on a RheoData container. predict()
+        # unpacks X.x below, which strips the metadata that _predict() relies
+        # on to dispatch — without this, RheoData(metadata={'test_mode':'creep'})
+        # silently fell back to self._test_mode (RELAXATION) and returned the
+        # wrong response. Only fills in when the caller did not pass test_mode.
+        if test_mode is None:
+            from rheojax.core.data import RheoData as _RheoData
+
+            if isinstance(X, _RheoData):
+                _declared = getattr(X, "test_mode", None)
+                if _declared is None:
+                    _declared = X.metadata.get("test_mode")
+                if _declared is not None:
+                    test_mode = _declared
+
         # Set test_mode if provided (for data generation without fitting)
         _had_test_mode = hasattr(self, "_test_mode")
         _old_test_mode = getattr(self, "_test_mode", None)

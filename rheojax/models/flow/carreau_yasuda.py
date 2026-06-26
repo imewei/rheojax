@@ -296,7 +296,10 @@ class CarreauYasuda(BaseModel):
         """
         # η(γ̇) = η_∞ + (η_0 - η_∞) [1 + (λγ̇)^a]^((n-1)/a)
         lambda_gamma = lambda_ * jnp.abs(gamma_dot)
-        factor = jnp.power(1.0 + jnp.power(lambda_gamma, a), (n - 1.0) / a)
+        # Guard 0^a (a<1) whose backward pass is inf at gamma_dot=0 (NaN gradient).
+        safe_lambda_gamma = jnp.where(lambda_gamma > 0, lambda_gamma, 1.0)
+        power_term = jnp.where(lambda_gamma > 0, jnp.power(safe_lambda_gamma, a), 0.0)
+        factor = jnp.power(1.0 + power_term, (n - 1.0) / a)
         return eta_inf + (eta0 - eta_inf) * factor
 
     @staticmethod

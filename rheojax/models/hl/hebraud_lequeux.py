@@ -421,6 +421,8 @@ class HebraudLequeux(BaseModel):
             raise ValueError(
                 "stress_target must be provided in kwargs for creep fitting"
             )
+        # Guard against zero/near-zero stress_target (creep divides by it).
+        stress_target = max(abs(float(stress_target)), 1e-15)
 
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         J_jax = jnp.asarray(compliance, dtype=jnp.float64)

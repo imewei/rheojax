@@ -568,7 +568,9 @@ def run_creep(
     gamma_full = jnp.concatenate([jnp.array([0.0]), gamma_hist])
 
     gamma_t = jnp.interp(t, time_full, gamma_full)
-    return gamma_t / stress_target
+    # Guard stress_target == 0 (creep compliance J = gamma / stress).
+    stress_target_safe = jnp.where(jnp.abs(stress_target) > 1e-15, stress_target, 1e-15)
+    return gamma_t / stress_target_safe
 
 
 def run_laos(
@@ -630,6 +632,7 @@ def saos_kernel(
     Returns:
         (G_prime, G_double_prime) tuple
     """
+    omega_val = max(abs(float(omega_val)), 1e-12)  # enforce positive frequency
     period = 2.0 * jnp.pi / omega_val
     if dt is None:
         dt = min(0.005, float(period) / 100.0)

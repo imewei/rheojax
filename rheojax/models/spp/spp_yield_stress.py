@@ -660,11 +660,11 @@ class SPPYieldStress(BaseModel):
         result = {"gamma_0": gamma_0_array}
 
         if yield_type in ("static", "both"):
-            sigma_sy = sigma_sy_scale * jnp.power(gamma_0_jax, sigma_sy_exp)
+            sigma_sy = sigma_sy_scale * jnp.power(jnp.abs(gamma_0_jax), sigma_sy_exp)
             result["sigma_sy"] = np.array(sigma_sy)
 
         if yield_type in ("dynamic", "both"):
-            sigma_dy = sigma_dy_scale * jnp.power(gamma_0_jax, sigma_dy_exp)
+            sigma_dy = sigma_dy_scale * jnp.power(jnp.abs(gamma_0_jax), sigma_dy_exp)
             result["sigma_dy"] = np.array(sigma_dy)
 
         return result

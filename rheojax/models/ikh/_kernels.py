@@ -749,7 +749,7 @@ def radial_return_step_corrected(state, inputs, params):
     # For AF: dα = C·dγ_p·sign(ξ) - γ_dyn·|α|^(m-1)·α·|dγ_p|
     # The second term modifies the effective hardening
     alpha_abs = jnp.abs(alpha_n)
-    af_correction = gamma_dyn * jnp.power(alpha_abs + 1e-6, m - 1) * sign_xi * alpha_n
+    af_correction = gamma_dyn * jnp.power(alpha_abs + 1e-6, m - 1) * alpha_n
 
     # Denominator with regularization to prevent singularity
     # denom = G + C - γ_dyn·|α|^(m-1)·sign(ξ)·α

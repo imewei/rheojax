@@ -443,7 +443,7 @@ class GeneralizedMaxwell(BaseModel):
         # Always compute derivative-based heuristic guesses so that the
         # multi-start retry block below can use them even when the caller
         # supplied ``initial_params``.
-        E_inf_guess = jnp.min(E_t)
+        E_inf_guess = jnp.maximum(jnp.min(E_t), 0.0)
         E_sum_guess = jnp.max(E_t) - E_inf_guess
 
         # Derivative-based initial E_i: estimate the contribution from each
@@ -998,7 +998,7 @@ class GeneralizedMaxwell(BaseModel):
         # Always compute derivative-based heuristic guesses so the multi-start
         # retry block below can use them even when the caller supplied
         # ``initial_params``.
-        E_inf_guess = jnp.min(E_prime)  # Low-frequency plateau
+        E_inf_guess = jnp.maximum(jnp.min(E_prime), 0.0)  # Low-frequency plateau
         E_sum_guess = jnp.max(E_prime) - E_inf_guess
 
         # Seed each E_i from the local storage-modulus derivative
@@ -1193,8 +1193,8 @@ class GeneralizedMaxwell(BaseModel):
             return J_pred - J_t
 
         # Compute data-based bounds (needed regardless of warm-start)
-        J_0 = jnp.min(J_t)  # Initial compliance (instant response)
-        J_inf = jnp.max(J_t)  # Final compliance (long-time)
+        J_0 = jnp.maximum(jnp.min(J_t), 1e-12)  # Initial compliance, clamped positive
+        J_inf = jnp.maximum(jnp.max(J_t), 1e-12)  # Final compliance, clamped positive
 
         # Initial parameter guess (warm-start if provided, else default heuristic)
         if initial_params is not None:
