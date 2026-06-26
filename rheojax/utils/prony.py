@@ -458,22 +458,23 @@ def select_optimal_n(
     # R8-PRONY-002: warn when falling back to minimum N
     if max(r2_values.values()) > 0:
         logger.warning(
-            "select_optimal_n: no N satisfies R\u00b2 threshold %.4f. "
-            "Returning minimum N=%d (R\u00b2=%.4f). Consider adjusting optimization_factor.",
-            r2_threshold,
-            n_opt,
-            r2_values.get(n_opt, float("nan")),
+            "select_optimal_n: no N satisfies R\u00b2 threshold. "
+            "Returning minimum N. Consider adjusting optimization_factor.",
+            r2_threshold=r2_threshold,
+            n_opt=n_opt,
+            r2_at_n_opt=r2_values.get(n_opt, float("nan")),
+            optimization_factor=optimization_factor,
         )
     else:
         # R10-PRONY-001: r2_max <= 0 means the best fit is worse than a flat line —
         # this is a strong signal of data quality issues or a fundamentally wrong model.
         # Elevate from info to warning so it is not silently overlooked.
         logger.warning(
-            "select_optimal_n: best R\u00b2=%.4f is non-positive (fit worse than "
-            "flat-line baseline). Returning minimum N=%d. Check data quality and "
+            "select_optimal_n: best R\u00b2 is non-positive (fit worse than "
+            "flat-line baseline). Returning minimum N. Check data quality and "
             "model choice.",
-            r2_max,
-            n_opt,
+            r2_max=r2_max,
+            n_opt=n_opt,
         )
     return n_opt
 

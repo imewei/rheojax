@@ -666,7 +666,12 @@ def glass_transition_criterion(
             # that gives 0.5 at v₁=0 and decreases smoothly for v₁>0.
             lambda_exponent = 1.0 - 2.0 * f_c * (1.0 - f_c)
 
-    epsilon = (v2 - v2_critical) / v2_critical
+    if v2_critical > 0:
+        epsilon = (v2 - v2_critical) / v2_critical
+    else:
+        # When v2_critical = 0 (degenerate regime where v1 >= 1 or s < 1e-12),
+        # epsilon is inf if v2 > 0 (system always in glass), -inf if v2 <= 0 (never in glass)
+        epsilon = float("inf") if v2 > 0 else float("-inf")
     is_glass = epsilon > 0
 
     # Non-ergodicity parameter: solve MCT self-consistency equation

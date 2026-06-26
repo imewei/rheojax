@@ -6,7 +6,7 @@ Model equation (in compliance):
 
 Extraction strategy:
     - Ge: from high-frequency limit (1/J_min)
-    - Gk: from difference in compliances
+    - Gk: from series compliance relationship
     - tau: from transition frequency
     - alpha: from slope or default to 0.5
 """
@@ -55,7 +55,11 @@ class FractionalKVZenerInitializer(BaseInitializer):
         )
 
         # Gk: from modulus difference
-        Gk_init = max(features["high_plateau"] - features["low_plateau"], epsilon)
+        Gk_init = max(
+            (features["high_plateau"] * features["low_plateau"])
+            / (features["high_plateau"] - features["low_plateau"] + epsilon),
+            epsilon,
+        )
         logger.debug(
             "Estimated Gk from modulus difference",
             Gk=Gk_init,

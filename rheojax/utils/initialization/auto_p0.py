@@ -399,7 +399,12 @@ def _infer_test_mode(
         # characteristic of flow curves (viscosity vs shear rate) even when
         # x_pos.min() < 1.0.  Without this, low-shear-rate flow curves are
         # misidentified as oscillation.
-        if decades > 2.0 and len(y_positive) > 1 and np.all(np.diff(y_positive) <= 0):
+        y_positive_filtered = y_positive[X > 0]
+        if (
+            decades > 2.0
+            and len(y_positive_filtered) > 1
+            and np.all(np.diff(y_positive_filtered) <= 0)
+        ):
             return "flow"
         if decades > 2.0 and x_pos.min() < 1.0:
             return "oscillation"

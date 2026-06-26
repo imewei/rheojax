@@ -195,7 +195,11 @@ def _validate_optimization_result(
         )
     # For complex data, _run_scipy_least_squares splits residuals into
     # real+imag giving 2N entries; use residuals.size to match (P1-2 fix).
-    residual_count = residuals.size
+    residual_count = (
+        residuals.size // 2
+        if getattr(result, "_is_complex_split", False)
+        else residuals.size
+    )
     # R10-OPT-001: auto-scale threshold by data magnitude so that the MSE
     # check works for both dimensionless log-residuals and raw Pa-scale data.
     # Fallback to 1e18 when y_data is unavailable or all-zero.
@@ -851,8 +855,9 @@ class OptimizationResult:
                 if np.iscomplexobj(y_data):
                     log_r = np.log10(np.maximum(np.abs(y_data.real), 1e-300))
                     log_i = np.log10(np.maximum(np.abs(y_data.imag), 1e-300))
-                    ss_tot = np.sum((log_r - np.mean(log_r)) ** 2) + np.sum(
-                        (log_i - np.mean(log_i)) ** 2
+                    log_concatenated = np.concatenate([log_r, log_i])
+                    ss_tot = np.sum(
+                        (log_concatenated - np.mean(log_concatenated)) ** 2
                     )
                 else:
                     log_y = np.log10(np.maximum(np.abs(y_data), 1e-300))
@@ -2354,6 +2359,9 @@ def nlsq_curve_fit(
             result.residuals = residuals
             result.fun = float(np.sum(residuals**2))
             result.cost = result.fun
+            result._is_complex_split = np.iscomplexobj(y_data_np) and np.iscomplexobj(
+                y_pred_np
+            )
         else:
             # Legacy tuple result or no native delegation
             success = (
@@ -2404,6 +2412,9 @@ def nlsq_curve_fit(
                 # observations are N. AIC/BIC must use the observation count N.
                 n_data=len(y_data_np),
                 diagnostics=diagnostics,
+                _is_complex_split=(
+                    np.iscomplexobj(y_data_np) and np.iscomplexobj(y_pred_np)
+                ),
             )
 
         # Update ParameterSet with optimal values
@@ -2824,6 +2835,10 @@ def create_least_squares_objective(
 
     def residuals(params: np.ndarray) -> np.ndarray:
         """Compute residual vector for all data points."""
+        # Data-relative floor for log-residual guards: scale the clamp by the
+        # data magnitude so it never masks real small-but-finite values nor
+        # vanishes for large-magnitude data (replaces hardcoded 1e-20).
+        _data_floor = jnp.max(jnp.abs(y_data_jax)) * 1e-15
         # OPT-02: Avoid unconditional host→device transfer on every iteration.
         # NLSQ passes NumPy arrays; JAX's own gradient passes jax.Array.
         # isinstance check is a Python-level no-op for JAX arrays.
@@ -2854,11 +2869,11 @@ def create_least_squares_objective(
                     # Log-space residuals: abs() intentionally strips sign because
                     # G' and G'' are physically positive; normalize is implicit
                     resid_real = jnp.log10(
-                        jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-20))
+                        jnp.maximum(jnp.abs(y_pred[:, 0]), _data_floor)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor))
                     resid_imag = jnp.log10(
-                        jnp.maximum(jnp.abs(y_pred[:, 1]), 1e-20)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-20))
+                        jnp.maximum(jnp.abs(y_pred[:, 1]), _data_floor)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor))
                 else:
                     resid_real = y_pred[:, 0] - jnp.real(y_data_jax)
                     resid_imag = y_pred[:, 1] - jnp.imag(y_data_jax)
@@ -2879,11 +2894,11 @@ def create_least_squares_objective(
                         # Log-space residuals: abs() intentionally strips sign because
                         # G' and G'' are physically positive; normalize is implicit
                         resid_col0 = jnp.log10(
-                            jnp.maximum(jnp.abs(y_pred[:, 0]), 1e-20)
-                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 0]), 1e-20))
+                            jnp.maximum(jnp.abs(y_pred[:, 0]), _data_floor)
+                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 0]), _data_floor))
                         resid_col1 = jnp.log10(
-                            jnp.maximum(jnp.abs(y_pred[:, 1]), 1e-20)
-                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 1]), 1e-20))
+                            jnp.maximum(jnp.abs(y_pred[:, 1]), _data_floor)
+                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 1]), _data_floor))
                     else:
                         resid_col0 = y_pred[:, 0] - y_data_jax[:, 0]
                         resid_col1 = y_pred[:, 1] - y_data_jax[:, 1]
@@ -2918,11 +2933,11 @@ def create_least_squares_objective(
                     # Log-space residuals for rheological data (mastercurves)
                     # Use magnitudes to avoid log of negative numbers
                     resid_real = jnp.log10(
-                        jnp.maximum(jnp.abs(jnp.real(y_pred)), 1e-20)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), 1e-20))
+                        jnp.maximum(jnp.abs(jnp.real(y_pred)), _data_floor)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor))
                     resid_imag = jnp.log10(
-                        jnp.maximum(jnp.abs(jnp.imag(y_pred)), 1e-20)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), 1e-20))
+                        jnp.maximum(jnp.abs(jnp.imag(y_pred)), _data_floor)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor))
                     # Note: normalize has no effect in log space (already relative)
                 else:
                     # Linear residuals (default)
@@ -2957,8 +2972,8 @@ def create_least_squares_objective(
 
                 if use_log_residuals:
                     # Log-space residuals
-                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), 1e-20)) - jnp.log10(
-                        jnp.maximum(y_data_magnitude, 1e-20)
+                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), _data_floor)) - jnp.log10(
+                        jnp.maximum(y_data_magnitude, _data_floor)
                     )
                 else:
                     _resid = y_pred - y_data_magnitude
@@ -2971,8 +2986,8 @@ def create_least_squares_objective(
                 if use_log_residuals:
                     # Log-space residuals for rheological data
                     # Handle both positive and negative values by using absolute value
-                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), 1e-20)) - jnp.log10(
-                        jnp.maximum(jnp.abs(y_data_jax), 1e-20)
+                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), _data_floor)) - jnp.log10(
+                        jnp.maximum(jnp.abs(y_data_jax), _data_floor)
                     )
                 else:
                     _resid = y_pred - y_data_jax
