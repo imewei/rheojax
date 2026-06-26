@@ -100,10 +100,18 @@ class CoxMerz(BaseTransform):
         flow_meta = getattr(flow_data, "metadata", {}) or {}
         flow_y_units = getattr(flow_data, "y_units", "") or ""
 
-        # Detect viscosity from y_units (most reliable indicator) or metadata
+        # Detect viscosity from y_units (most reliable indicator) or metadata.
+        # Normalize case + separators so "Pa.s", "Pa·s", "Pa*s", "Pa s", "mPa.s",
+        # "pa.s" all collapse to a token containing "pas" (stress "Pa"/"kPa" do not).
+        _units_norm = (
+            flow_y_units.lower()
+            .replace(".", "")
+            .replace("·", "")
+            .replace("*", "")
+            .replace(" ", "")
+        )
         is_viscosity = (
-            "Pa.s" in flow_y_units
-            or "Pa·s" in flow_y_units
+            "pas" in _units_norm
             or flow_meta.get("quantity") == "viscosity"
             or flow_meta.get("is_viscosity")
         )

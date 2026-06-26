@@ -347,7 +347,12 @@ class ColumnMapperDialog(QDialog):
                 if text == "(none)":
                     continue
                 for pattern in patterns:
-                    if re.search(r'\b' + re.escape(pattern) + r'\b', text):
+                    # Alphanumeric boundaries (not \b): \b fails after symbolic
+                    # modulus patterns like g', g'', g* whose last char is non-word,
+                    # while still preventing 'g' from matching inside 'log'/'gpp'.
+                    if re.search(
+                        r"(?<![a-z0-9])" + re.escape(pattern) + r"(?![a-z0-9])", text
+                    ):
                         combo.setCurrentIndex(i)
                         return True
             return False

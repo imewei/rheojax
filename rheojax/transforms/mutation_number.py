@@ -197,6 +197,10 @@ class MutationNumber(BaseTransform):
             # Integrate from t_max to infinity
             t_max = t[-1]
             tail_integral = A * tau * jnp.exp(-t_max / tau)
+            # A non-decaying tail (slope >= 0) has a divergent integral and
+            # cannot be extrapolated — contribute zero rather than a fabricated
+            # huge relaxation time that would dominate the mutation number.
+            tail_integral = jnp.where(slope < -1e-20, tail_integral, 0.0)
 
             return float(tail_integral)
 

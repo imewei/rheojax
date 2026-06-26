@@ -189,13 +189,16 @@ def _fit_single(
     elif np.any(~np.isfinite(y_arr)):
         raise ValueError("Data contains NaN/Inf in y column")
 
-    # Validate data shape for oscillation mode: accept complex G*, real (N,2), or real (N,)
-    if test_mode == "oscillation" and not np.iscomplexobj(y_arr) and y_arr.ndim != 2:
-        raise ValueError(
-            "Oscillation test mode requires complex y data (G' + iG'') or "
-            "two-column real data [G', G'']. "
-            "Use --y-cols to specify storage and loss modulus columns."
-        )
+    # Validate data shape for oscillation mode: accept complex G*, single-column
+    # magnitude |G*| (N,), or two-column real [G', G''] (N,2). Reject only shapes
+    # that are genuinely unusable (3-D+, or 2-D with !=1,2 columns).
+    if test_mode == "oscillation" and not np.iscomplexobj(y_arr):
+        if y_arr.ndim > 2 or (y_arr.ndim == 2 and y_arr.shape[1] not in (1, 2)):
+            raise ValueError(
+                "Oscillation test mode accepts complex G* data, single-column "
+                "magnitude |G*|, or two-column real [G', G'']. "
+                "Use --y-cols to specify storage and loss modulus columns."
+            )
 
     # Create model (registration happens at import time in main)
     from rheojax.core.registry import ModelRegistry

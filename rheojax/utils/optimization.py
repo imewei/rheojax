@@ -153,7 +153,7 @@ def make_fd_differentiable(
         h = scale * params_dot
         y_plus = fn(x_data, params + h)
         y_minus = fn(x_data, params - h)
-        h_norm = jnp.sqrt(jnp.sum(h**2) + 1e-300)
+        h_norm = jnp.maximum(jnp.sqrt(jnp.sum(h**2)), 1e-30)
         y_dot = (y_plus - y_minus) / (2.0 * h_norm)
 
         return y, y_dot
@@ -505,6 +505,15 @@ def _run_scipy_least_squares(
         residuals=final_residuals,
         y_data=_y_data,
         n_data=(int(_y_data.shape[0]) if _y_data is not None else None),
+        # P1-2: scipy least_squares splits complex y into [real, imag] (2N real
+        # residuals). Mark it so _validate_optimization_result and observation
+        # counts use N, not 2N.
+        _is_complex_split=(
+            _y_data is not None
+            and np.iscomplexobj(np.asarray(_y_data))
+            and not np.iscomplexobj(final_residuals)
+            and len(final_residuals) == 2 * len(_y_data)
+        ),
     )
 
 
@@ -855,9 +864,12 @@ class OptimizationResult:
                 if np.iscomplexobj(y_data):
                     log_r = np.log10(np.maximum(np.abs(y_data.real), 1e-300))
                     log_i = np.log10(np.maximum(np.abs(y_data.imag), 1e-300))
-                    log_concatenated = np.concatenate([log_r, log_i])
-                    ss_tot = np.sum(
-                        (log_concatenated - np.mean(log_concatenated)) ** 2
+                    # Center each component about its own mean (mirrors the
+                    # non-log complex branch below). Concatenating and centering
+                    # about one combined mean inflates SS_tot when G' and G''
+                    # differ in scale, giving an artificially high R².
+                    ss_tot = np.sum((log_r - np.mean(log_r)) ** 2) + np.sum(
+                        (log_i - np.mean(log_i)) ** 2
                     )
                 else:
                     log_y = np.log10(np.maximum(np.abs(y_data), 1e-300))
@@ -1767,6 +1779,19 @@ def nlsq_optimize(
         residuals=residuals_np,
         compute_covariance=compute_covariance,
     )
+
+    # P1-2: from_nlsq is called without y_data, so it cannot detect a complex
+    # split. residuals_np is [real, imag] (length 2N) whenever the objective's
+    # residuals were complex or it returned 2N real residuals for complex y.
+    # Mark it so _validate_optimization_result halves the MSE denominator
+    # (RSS/N, not RSS/2N) and observation counts use N.
+    _y_obj = getattr(objective, "_y_data", None)
+    if np.iscomplexobj(residuals_raw) or (
+        _y_obj is not None
+        and np.iscomplexobj(np.asarray(_y_obj))
+        and len(residuals_np) == 2 * len(np.asarray(_y_obj))
+    ):
+        result._is_complex_split = True
 
     # P1-6: Propagate normalization weights from the objective closure so that
     # R²/AIC/BIC can un-normalize residuals for correct statistics.
