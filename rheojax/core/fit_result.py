@@ -543,7 +543,7 @@ class FitResult:
             model_name=_bytes_to_str(data["model_name"]),
             model_class_name=_bytes_to_str(data["model_class_name"]),
             protocol=_bytes_to_str(data["protocol"]) or None,
-            params=dict(zip(param_names, param_values, strict=False)),
+            params=dict(zip(param_names, param_values, strict=True)),
             params_units={},
             n_params=int(data["n_params"]),
             optimization_result=opt_result,

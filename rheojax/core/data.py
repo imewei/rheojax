@@ -747,23 +747,41 @@ class RheoData:
         )
         new_x = self._ensure_array(new_x)
 
-        if np.iscomplexobj(self.y):
+        # Sort data into ascending x order for np.interp/jnp.interp compatibility
+        # (both functions assume strictly increasing x)
+        x_for_interp = self.x
+        y_for_interp = self.y
+        if len(x_for_interp) > 1:
+            x_np = _coerce_ndarray(x_for_interp)
+            diffs = np.diff(x_np)
+            if np.all(diffs < 0):  # strictly decreasing
+                # Reverse both arrays to make x increasing
+                if isinstance(x_for_interp, jnp.ndarray):
+                    x_for_interp = jnp.flip(x_for_interp)
+                    y_for_interp = jnp.flip(y_for_interp)
+                else:
+                    x_for_interp = np.flip(x_for_interp)
+                    y_for_interp = np.flip(y_for_interp)
+
+        if np.iscomplexobj(y_for_interp):
             # Complex data: interpolate real and imaginary parts separately.
             # jnp.interp and np.interp do not support complex arrays — the
             # imaginary part would be silently discarded.
-            if isinstance(self.x, jnp.ndarray):
-                new_y_real = jnp.interp(new_x, self.x, jnp.real(self.y))
-                new_y_imag = jnp.interp(new_x, self.x, jnp.imag(self.y))
+            if isinstance(x_for_interp, jnp.ndarray):
+                new_y_real = jnp.interp(new_x, x_for_interp, jnp.real(y_for_interp))
+                new_y_imag = jnp.interp(new_x, x_for_interp, jnp.imag(y_for_interp))
             else:
-                new_y_real = np.interp(new_x, self.x, np.real(self.y))
-                new_y_imag = np.interp(new_x, self.x, np.imag(self.y))
+                new_y_real = np.interp(new_x, x_for_interp, np.real(y_for_interp))
+                new_y_imag = np.interp(new_x, x_for_interp, np.imag(y_for_interp))
             new_y = new_y_real + 1j * new_y_imag
-        elif isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
+        elif isinstance(x_for_interp, jnp.ndarray) or isinstance(
+            y_for_interp, jnp.ndarray
+        ):
             # Use JAX interpolation
-            new_y = jnp.interp(new_x, self.x, self.y)
+            new_y = jnp.interp(new_x, x_for_interp, y_for_interp)
         else:
             # Use NumPy interpolation
-            new_y = np.interp(new_x, self.x, self.y)
+            new_y = np.interp(new_x, x_for_interp, y_for_interp)
 
         return RheoData(
             x=new_x,
