@@ -305,6 +305,7 @@ class FFTAnalysis(BaseTransform):
                     "psd": self.return_psd,
                     "original_domain": "time",
                     "n_points": len(t),
+                    "t0": float(t[0]),
                     "dt": float(dt),
                     # Store complex coefficients as serializable list (T-010)
                     "fft_complex": fft_result.tolist(),
@@ -371,6 +372,7 @@ class FFTAnalysis(BaseTransform):
         # Get original parameters
         # _fft_meta is guaranteed non-None here (passed the transform check above)
         n_points = _fft_meta.get("n_points")
+        t0 = _fft_meta.get("t0", 0.0)
         dt = _fft_meta.get("dt")
         fft_complex = _fft_meta.get("fft_complex")
 
@@ -394,7 +396,7 @@ class FFTAnalysis(BaseTransform):
         y_reconstructed = jnp.fft.irfft(fft_complex, n=n_points)
 
         # Reconstruct time array
-        t = jnp.arange(n_points) * dt
+        t = t0 + jnp.arange(n_points) * dt
 
         # Create metadata
         new_metadata = (data.metadata or {}).copy()

@@ -191,7 +191,7 @@ class MutationNumber(BaseTransform):
             intercept = log_G_mean - slope * t_mean
 
             # Extract parameters (guard slope near zero)
-            tau = -1.0 / jnp.where(jnp.abs(slope) > 1e-20, slope, -1e-20)
+            tau = -1.0 / jnp.where(slope < -1e-20, slope, -1e-20)
             A = jnp.exp(intercept)
 
             # Integrate from t_max to infinity

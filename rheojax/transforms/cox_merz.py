@@ -96,9 +96,19 @@ class CoxMerz(BaseTransform):
         gamma_dot = np.asarray(flow_data.x)
         y_flow = np.asarray(flow_data.y)
 
-        # Flow data might be σ(γ̇) or η(γ̇) — detect by metadata or magnitude
+        # Flow data might be σ(γ̇) or η(γ̇) — detect by y_units, then metadata, else assume stress
         flow_meta = getattr(flow_data, "metadata", {}) or {}
-        if flow_meta.get("quantity") == "viscosity" or flow_meta.get("is_viscosity"):
+        flow_y_units = getattr(flow_data, "y_units", "") or ""
+
+        # Detect viscosity from y_units (most reliable indicator) or metadata
+        is_viscosity = (
+            "Pa.s" in flow_y_units
+            or "Pa·s" in flow_y_units
+            or flow_meta.get("quantity") == "viscosity"
+            or flow_meta.get("is_viscosity")
+        )
+
+        if is_viscosity:
             eta_steady_raw = y_flow
         else:
             # Assume stress → η = σ/γ̇
