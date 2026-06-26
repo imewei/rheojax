@@ -186,19 +186,29 @@ class BatchPipeline:
             # the calling thread blocks at as_completed(). Use WorkerPool for
             # GUI integration.
             with ThreadPoolExecutor(max_workers=n_workers) as executor:
+                # Map each future to its input index so results can be restored to
+                # input-file order — as_completed() yields in completion order, which
+                # would otherwise make self.results non-deterministic vs the
+                # sequential path.
                 futures = {
-                    executor.submit(process_one, fp): fp for fp in normalized_paths
+                    executor.submit(process_one, fp): i
+                    for i, fp in enumerate(normalized_paths)
                 }
 
+                indexed_results: dict[int, tuple] = {}
                 for future in as_completed(futures):
+                    idx = futures[future]
                     file_path, result, metrics, error = future.result()
                     if error is None:
-                        self.results.append((file_path, result, metrics))
+                        indexed_results[idx] = (file_path, result, metrics)
                     else:
                         self.errors.append((file_path, error))
                         warnings.warn(
                             f"Failed to process {file_path}: {error}", stacklevel=2
                         )
+
+                for idx in sorted(indexed_results):
+                    self.results.append(indexed_results[idx])
         else:
             # Phase 1: Optionally pre-load files in parallel (I/O only, thread-safe)
             preloaded: dict[Path, RheoData] = {}
@@ -334,7 +344,18 @@ class BatchPipeline:
             for future in as_completed(futures):
                 fp, data, err = future.result()
                 if err is None and data is not None:
-                    loaded[fp] = data  # type: ignore[assignment]
+                    if isinstance(data, list):
+                        # auto_load may return multiple segments; the batch
+                        # pipeline expects a single RheoData per file.
+                        if len(data) > 1:
+                            logger.debug(
+                                "Parallel preload got multiple segments; using first",
+                                filepath=str(fp),
+                                n_segments=len(data),
+                            )
+                        loaded[fp] = data[0] if data else None
+                    else:
+                        loaded[fp] = data
                 elif err is not None:
                     logger.debug(
                         "Parallel preload failed for file",

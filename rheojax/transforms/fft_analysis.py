@@ -278,7 +278,7 @@ class FFTAnalysis(BaseTransform):
             if self.return_psd:
                 # Power spectral density
                 logger.debug("Computing power spectral density")
-                spectrum = jnp.abs(fft_result) ** 2 / (n * dt)
+                spectrum = jnp.abs(fft_result) ** 2 * (dt / n)
                 # One-sided PSD: double non-DC, non-Nyquist bins
                 spectrum = spectrum.at[1:-1].set(spectrum[1:-1] * 2.0)
             else:

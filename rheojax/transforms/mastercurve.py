@@ -875,8 +875,13 @@ class Mastercurve(BaseTransform):
             # Get shift factor
             a_T = shift_factors[T]
 
-            # Apply horizontal shift
-            x_shifted = data.x * a_T
+            # Apply horizontal shift. Frequency and time are reciprocal domains:
+            # reduced frequency is ω·a_T, but reduced time is t/a_T. Applying ×a_T
+            # to a relaxation/creep time axis shifts it the wrong way.
+            if getattr(data, "domain", "frequency") == "time":
+                x_shifted = data.x / a_T
+            else:
+                x_shifted = data.x * a_T
 
             # Apply vertical shift if requested
             y_shifted = data.y
