@@ -195,6 +195,7 @@ dmypy.json
 # AI-Powered Development Tools
 # ----------------------------------------------------------------------------
 .agent/
+.agents/
 .claude/
 .code/
 .specify/
