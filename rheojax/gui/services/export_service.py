@@ -347,9 +347,9 @@ class ExportService:
                     # Add metadata
                     if hasattr(result, "metadata"):
                         meta_group = f.create_group("metadata")
-                        for key, value in result.metadata.items():
-                            if isinstance(value, (str, int, float, bool)):
-                                meta_group.attrs[key] = value
+                        sanitized_meta = _sanitize_metadata(result.metadata)
+                        for key, value in sanitized_meta.items():
+                            meta_group.attrs[key] = value
                 logger.debug("Wrote posterior samples to HDF5")
 
             elif format in ["xlsx", "xls"]:

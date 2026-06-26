@@ -389,7 +389,7 @@ def run_analyze(args: Namespace) -> int:
         except Exception as e:
             logger.error("Bayesian inference failed", exc_info=True)
             print(f"Bayesian inference failed: {e}", file=sys.stderr)
-            # Don't fail the whole command if Bayesian fails
+            return 1
 
     return 0
 

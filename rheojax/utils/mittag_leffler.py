@@ -169,7 +169,9 @@ def _ml_taylor(z, alpha, beta, n_iter=300):
     abs_terms = jnp.where((k > 0) & (abs_z < 1e-300), 0.0, abs_terms)
 
     # R11-ML-001: Zero out negligible terms to avoid unnecessary computation
-    abs_terms = jnp.where(abs_terms < 1e-30 * jnp.max(abs_terms), 0.0, abs_terms)
+    max_term = jnp.max(abs_terms)
+    threshold = jnp.maximum(1e-30 * max_term, 1e-300)
+    abs_terms = jnp.where(abs_terms < threshold, 0.0, abs_terms)
 
     # Sign: z^k = |z|^k for z >= 0,  (-1)^k |z|^k for z < 0.
     # Fused sign computation — no separate neg_sign variable.

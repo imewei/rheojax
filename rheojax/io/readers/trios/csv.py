@@ -890,6 +890,10 @@ def load_trios_csv(
 
     # Convert tables to RheoData
     rheo_data_list: list[RheoData] = []
+    # Track segments to detect dangerous partial data loss (most segments
+    # dropped after NaN filtering while a few survive).
+    total_segments = 0
+    skipped_segments = 0
 
     for table_idx, table in enumerate(trios_file.tables):
         df = table.df
@@ -922,6 +926,7 @@ def load_trios_csv(
         )
 
         for seg_idx, seg_df in enumerate(segments):
+            total_segments += 1
             # Select x/y columns
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
@@ -1016,6 +1021,7 @@ def load_trios_csv(
             y_data = y_data[valid_mask]
 
             if len(x_data) == 0:
+                skipped_segments += 1
                 warnings.warn(
                     f"Segment {seg_idx} has no valid data after NaN filtering and was skipped.",
                     RheoJaxValidationWarning,
@@ -1056,6 +1062,23 @@ def load_trios_csv(
                 test_mode=detected_mode,
                 is_complex=is_complex,
             )
+
+    # Catch dangerous partial data loss: if more than half of the parsed
+    # segments were dropped during NaN filtering (but some survived), the
+    # caller is silently getting an incomplete dataset — fail loudly.
+    # All-valid (skipped == 0) and all-skipped (handled below) are preserved.
+    if rheo_data_list and skipped_segments > total_segments * 0.5:
+        logger.error(
+            "Excessive segment loss during NaN filtering",
+            filepath=str(filepath),
+            skipped_segments=skipped_segments,
+            total_segments=total_segments,
+        )
+        raise ValueError(
+            f"{skipped_segments} of {total_segments} segments were dropped as "
+            f"empty after NaN filtering from {filepath}; refusing to return a "
+            f"partially loaded dataset."
+        )
 
     if not rheo_data_list:
         logger.error("No valid data segments parsed", filepath=str(filepath))

@@ -371,7 +371,7 @@ def _jacobian_fallback_pcov(
         jac = np.zeros((m, k), dtype=np.float64)
         for j in range(k):
             # Forward-difference one column at a time
-            eps_j = eps * max(abs(param_vals[j]), 1.0)
+            eps_j = eps * (abs(param_vals[j]) + eps)
             params_plus = param_vals.copy()
             params_plus[j] += eps_j
             jac[:, j] = (residual_vec(params_plus) - base_res) / eps_j

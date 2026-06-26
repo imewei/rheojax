@@ -1041,8 +1041,10 @@ class BaseModel(BayesianMixin, ABC):
             ss_tot = np.sum((y - np.mean(y)) ** 2)
 
         # Handle edge cases
-        if ss_tot == 0:
-            # All y values are constant — R² is undefined
+        eps = np.finfo(float).eps
+        scale = max(1.0, np.max(np.abs(y)))
+        if ss_tot == 0 or abs(ss_tot) < eps * scale ** 2:
+            # All y values are (effectively) constant — R² is undefined
             logger.warning("R² undefined for constant data (ss_tot=0)")
             return np.nan
 

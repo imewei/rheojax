@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 # Module-level overrides (set via configure()), guarded by _config_lock
 _overrides: dict[str, Any] = {}
-_config_lock = threading.Lock()
+# RLock so get_parallel_config() can call get_default_workers() (which also
+# acquires this lock) while holding it, giving a consistent snapshot.
+_config_lock = threading.RLock()
 
 # SYS-04: Cache the JAX GPU device count so jax.devices() is called at most
 # once per process.  Initialised to None (sentinel = "not yet queried").
@@ -107,14 +109,15 @@ def get_parallel_config() -> dict[str, Any]:
     """
     with _config_lock:
         overrides_snapshot = dict(_overrides)
-    return {
-        "n_workers": get_default_workers(),
-        "isolation": overrides_snapshot.get("isolation")
-        or os.environ.get("RHEOJAX_WORKER_ISOLATION", "subprocess"),
-        "sequential": is_sequential_mode(),
-        "warm_pool": overrides_snapshot.get("warm_pool", False)
-        or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
-    }
+        n_workers_val = get_default_workers()
+        return {
+            "n_workers": n_workers_val,
+            "isolation": overrides_snapshot.get("isolation")
+            or os.environ.get("RHEOJAX_WORKER_ISOLATION", "subprocess"),
+            "sequential": is_sequential_mode(),
+            "warm_pool": overrides_snapshot.get("warm_pool", False)
+            or os.environ.get("RHEOJAX_WARM_POOL", "0") == "1",
+        }
 
 
 def configure(

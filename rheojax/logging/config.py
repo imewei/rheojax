@@ -104,6 +104,7 @@ class LogConfig:
                 f"Invalid log level: {self.level}. "
                 f"Must be one of: {', '.join(valid_levels)}"
             )
+        self.level = self.level.upper()
 
     @classmethod
     def from_env(cls) -> "LogConfig":

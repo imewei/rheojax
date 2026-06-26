@@ -221,7 +221,7 @@ class MastercurvePipeline(Pipeline):
                 y_units=d.y_units,
                 metadata={**(d.metadata or {}), "temperature": temp},
             )
-            for d, temp in zip(datasets, temperatures, strict=False)
+            for d, temp in zip(datasets, temperatures, strict=True)
         ]
 
         # For simplicity, concatenate all data
@@ -231,7 +231,7 @@ class MastercurvePipeline(Pipeline):
         all_temps = np.concatenate(
             [
                 np.full(len(d.x), temp)
-                for d, temp in zip(datasets, temperatures, strict=False)
+                for d, temp in zip(datasets, temperatures, strict=True)
             ]
         )
 
@@ -1075,7 +1075,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
 
         # Process each amplitude
         for i, (gamma_0, data) in enumerate(
-            zip(gamma_0_values, stress_data, strict=False)
+            zip(gamma_0_values, stress_data, strict=True)
         ):
             amplitude_start = time.perf_counter()
 
