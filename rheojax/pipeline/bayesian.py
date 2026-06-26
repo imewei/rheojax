@@ -26,7 +26,7 @@ from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_bayesian, log_fit
-from rheojax.pipeline.base import Pipeline
+from rheojax.pipeline.base import Pipeline, _is_jax_array
 
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
@@ -122,10 +122,10 @@ class BayesianPipeline(Pipeline):
         y = self.data.y
 
         # Convert to numpy for fitting
-        if isinstance(X, jnp.ndarray):
-            X = np.array(X)
-        if isinstance(y, jnp.ndarray):
-            y = np.array(y)
+        if _is_jax_array(X):
+            X = np.asarray(X)
+        if _is_jax_array(y):
+            y = np.asarray(y)
 
         logger.debug(
             "Starting NLSQ fit",
@@ -272,10 +272,10 @@ class BayesianPipeline(Pipeline):
         y = self.data.y
 
         # Convert to numpy
-        if isinstance(X, jnp.ndarray):
-            X = np.array(X)
-        if isinstance(y, jnp.ndarray):
-            y = np.array(y)
+        if _is_jax_array(X):
+            X = np.asarray(X)
+        if _is_jax_array(y):
+            y = np.asarray(y)
 
         # Extract initial values from NLSQ fit for warm-start
         initial_values = None

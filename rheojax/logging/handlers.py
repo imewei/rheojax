@@ -113,7 +113,7 @@ class RheoJAXMemoryHandler(MemoryHandler):
             True if buffer should be flushed.
         """
         if self.target is None and len(self.buffer) >= self.capacity:
-            self.buffer = self.buffer[-(self.capacity - 1) :]
+            self.buffer = self.buffer[-self.capacity :]
             return False
         return super().shouldFlush(record)
 

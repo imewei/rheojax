@@ -253,10 +253,13 @@ def main(args: list[str] | None = None) -> int:
         if test_mode is None and hasattr(data, "metadata"):
             test_mode = data.metadata.get("test_mode")
     if test_mode is None:
-        test_mode = "oscillation"
         print(
-            f"Note: No test mode detected, defaulting to '{test_mode}'", file=sys.stderr
+            "Error: Could not auto-detect test mode. "
+            "Use --test-mode to specify (oscillation, relaxation, creep, "
+            "flow_curve, startup, laos).",
+            file=sys.stderr,
         )
+        return 1
 
     # Build shared kwargs for deformation mode
     mode_kwargs: dict = {}

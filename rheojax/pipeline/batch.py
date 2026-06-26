@@ -387,6 +387,8 @@ class BatchPipeline:
         # R12-E-006: pre-initialize metrics so transform replay errors can be
         # recorded inside the loop below before fit metrics are appended.
         metrics: dict[str, Any] = {}
+        _fit_X = None
+        _fit_y = None
 
         # R10-BATCH-001: Replay template steps on the newly loaded data.
         # Steps are recorded as ("fit", model_obj) or ("transform", transform_obj)
@@ -429,6 +431,8 @@ class BatchPipeline:
                     fit_kwargs_replay.setdefault("poisson_ratio", _poisson_ratio)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
+                _fit_X = np.asarray(X)
+                _fit_y = np.asarray(y)
                 pipeline.steps.append((step_action, new_model))
                 logger.debug(
                     "Replayed fit step",
@@ -575,8 +579,12 @@ class BatchPipeline:
         # Compute metrics if model was fitted
         if pipeline._last_model is not None:
             model = pipeline._last_model
-            X = np.asarray(result.x)
-            y = np.asarray(result.y)
+            if _fit_X is not None and _fit_y is not None:
+                X = _fit_X
+                y = _fit_y
+            else:
+                X = np.asarray(result.x)
+                y = np.asarray(result.y)
 
             with log_fit(
                 logger,

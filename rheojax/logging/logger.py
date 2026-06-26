@@ -121,7 +121,14 @@ def get_logger(name: str, **context) -> RheoJAXLogger:
     """
     # Build a collision-free cache key (no hash() — avoids hash collisions)
     try:
-        cache_key = (name, tuple(sorted((k, str(v)) for k, v in context.items())))
+        cache_key = (
+            name,
+            tuple(
+                sorted(
+                    (k, type(v).__name__, str(v)) for k, v in context.items()
+                )
+            ),
+        )
     except Exception:
         # Unhashable context values — skip caching
         logger = logging.getLogger(name)
