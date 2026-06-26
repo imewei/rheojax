@@ -29,17 +29,12 @@ repos:
         args: ['--pytest-test-first']
         exclude: ^tests/(fixtures/|gui/visual/)
 
-  - repo: https://github.com/psf/black
-    rev: 26.3.1
-    hooks:
-      - id: black
-        language_version: python3.13
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.9
     hooks:
       - id: ruff
         args: [--fix]
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.20.0

@@ -339,9 +339,6 @@ Structured, JAX-safe logging system.
 | `context.py` | Contextual loggers (log_bayesian, log_fit, log_pipeline_stage) |
 | `formatters.py` | Standard, detailed, JSON output formats |
 | `handlers.py` | File + console handlers |
-| `jax_utils.py` | JAX tracing-safe utilities |
-| `metrics.py` | Performance metrics tracking |
-| `exporters.py` | BatchingExporter, CallbackExporter |
 
 **Environment variables:** `RHEOJAX_LOG_LEVEL`, `RHEOJAX_LOG_FILE`, `RHEOJAX_LOG_FORMAT`.
 

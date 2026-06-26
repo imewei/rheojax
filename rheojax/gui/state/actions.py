@@ -394,22 +394,6 @@ def reset_parameters(default_params: dict[str, ParameterState]) -> None:
 # Fit Actions
 
 
-def start_fit(model_name: str, dataset_id: str) -> None:
-    """Mark fit as started.
-
-    Parameters
-    ----------
-    model_name : str
-        Model name
-    dataset_id : str
-        Dataset identifier
-    """
-    store = StateStore()
-    logger.info("Fit started", model_name=model_name, dataset_id=dataset_id)
-
-    store.emit_signal("fit_started", model_name, dataset_id)
-
-
 def store_fit_result(result: FitResult) -> None:
     """Store a completed fit result.
 
@@ -446,35 +430,6 @@ def store_fit_result(result: FitResult) -> None:
     )
 
 
-def fail_fit(model_name: str, dataset_id: str, error: str) -> None:
-    """Mark fit as failed.
-
-    Parameters
-    ----------
-    model_name : str
-        Model name
-    dataset_id : str
-        Dataset identifier
-    error : str
-        Error message
-    """
-    store = StateStore()
-    logger.error(
-        "Fit failed",
-        model_name=model_name,
-        dataset_id=dataset_id,
-        error=error,
-    )
-
-    # GUI-R6-009: dispatch() already emits fit_failed in the FITTING_FAILED
-    # handler — the explicit emit_signal here was a duplicate causing
-    # connected slots (error dialogs, counters) to fire twice.
-    store.dispatch(
-        "FITTING_FAILED",
-        {"model_name": model_name, "dataset_id": dataset_id, "error": error},
-    )
-
-
 def set_active_model(model_name: str) -> None:
     """Set the active model (dispatches internally).
 
@@ -503,18 +458,6 @@ def start_fitting(model_name: str, dataset_id: str) -> None:
     store.dispatch(
         "START_FITTING", {"model_name": model_name, "dataset_id": dataset_id}
     )
-
-
-def update_fit_progress(progress: float) -> None:
-    """Update fit progress (dispatches internally).
-
-    Parameters
-    ----------
-    progress : float
-        Progress percentage (0-100)
-    """
-    store = StateStore()
-    store.dispatch("FIT_PROGRESS", {"progress": progress})
 
 
 def fitting_completed(result: FitResult) -> None:
@@ -599,34 +542,6 @@ def store_bayesian_result(result: BayesianResult) -> None:
     )
 
 
-def fail_bayesian(model_name: str, dataset_id: str, error: str) -> None:
-    """Mark Bayesian inference as failed.
-
-    Parameters
-    ----------
-    model_name : str
-        Model name
-    dataset_id : str
-        Dataset identifier
-    error : str
-        Error message
-    """
-    store = StateStore()
-    logger.error(
-        "Bayesian inference failed",
-        model_name=model_name,
-        dataset_id=dataset_id,
-        error=error,
-    )
-
-    # GUI-R6-009: dispatch() already emits bayesian_failed in the
-    # BAYESIAN_FAILED handler — removed duplicate emit_signal.
-    store.dispatch(
-        "BAYESIAN_FAILED",
-        {"model_name": model_name, "dataset_id": dataset_id, "error": error},
-    )
-
-
 def update_bayesian_progress(progress: float) -> None:
     """Update Bayesian inference progress (dispatches internally).
 
@@ -708,26 +623,6 @@ def set_jax_device(device: str) -> None:
     store._atomic_state_and_signal(updater, "jax_device_changed", device)
 
 
-def update_jax_memory(used: int, total: int) -> None:
-    """Update JAX memory usage.
-
-    Parameters
-    ----------
-    used : int
-        Used memory in bytes
-    total : int
-        Total memory in bytes
-    """
-    store = StateStore()
-
-    def updater(state: AppState) -> AppState:
-        return replace(state, jax_memory_used=used, jax_memory_total=total)
-
-    store._atomic_state_and_signal(
-        updater, "jax_memory_updated", used, total, track_undo=False
-    )
-
-
 # Settings Actions
 
 
@@ -748,19 +643,6 @@ def set_theme(theme: str) -> None:
     store._atomic_state_and_signal(updater, "theme_changed", theme, track_undo=False)
 
 
-def set_os_theme(os_theme: str) -> None:
-    """Set the resolved OS color scheme.
-
-    Parameters
-    ----------
-    os_theme : str
-        Resolved OS theme ("light" or "dark")
-    """
-    store = StateStore()
-    logger.info("OS theme changed", os_theme=os_theme)
-    store.dispatch("SET_OS_THEME", {"os_theme": os_theme})
-
-
 def set_seed(seed: int) -> None:
     """Set random seed.
 
@@ -774,22 +656,6 @@ def set_seed(seed: int) -> None:
 
     def updater(state: AppState) -> AppState:
         return replace(state, current_seed=seed)
-
-    store.update_state(updater, track_undo=False)
-
-
-def set_auto_save(enabled: bool) -> None:
-    """Enable/disable auto-save.
-
-    Parameters
-    ----------
-    enabled : bool
-        Auto-save enabled
-    """
-    store = StateStore()
-
-    def updater(state: AppState) -> AppState:
-        return replace(state, auto_save_enabled=enabled)
 
     store.update_state(updater, track_undo=False)
 

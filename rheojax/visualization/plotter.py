@@ -956,9 +956,6 @@ def plot_fit_with_uncertainty(
                 y_lower = None
                 y_upper = None
 
-        def scatter_fn(x, y, **kw):
-            return ax.scatter(x, y, **kw)
-
         # Determine plot functions based on log scales
         if log_x and log_y:
             plot_fn = ax.loglog
@@ -1020,7 +1017,7 @@ def plot_fit_with_uncertainty(
         )
 
         # Plot data points
-        scatter_fn(
+        ax.scatter(
             x_data_plot,
             y_data_plot,
             s=style_params["lines.markersize"] ** 2,

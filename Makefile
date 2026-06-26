@@ -176,7 +176,7 @@ help:
 	@echo "  PYTEST_FULL_VALIDATION=1   Force production MCMC (2000/1000 samples)"
 	@echo ""
 	@echo "$(BOLD)$(GREEN)CODE QUALITY$(RESET)"
-	@echo "  $(CYAN)format$(RESET)           Format code with black and ruff"
+	@echo "  $(CYAN)format$(RESET)           Format code with ruff"
 	@echo "  $(CYAN)lint$(RESET)             Run linting checks (ruff)"
 	@echo "  $(CYAN)type-check$(RESET)       Run type checking (mypy)"
 	@echo "  $(CYAN)check$(RESET)            Run all checks (format + lint + type)"
@@ -465,8 +465,8 @@ test-validation:
 # Code quality targets
 # ===================
 format:
-	@echo "$(BOLD)$(BLUE)Formatting code with black and ruff...$(RESET)"
-	$(RUN_CMD) black $(PACKAGE_NAME) tests
+	@echo "$(BOLD)$(BLUE)Formatting code with ruff...$(RESET)"
+	$(RUN_CMD) ruff format $(PACKAGE_NAME) tests
 	$(RUN_CMD) ruff check --fix $(PACKAGE_NAME) tests
 	@echo "$(BOLD)$(GREEN)✓ Code formatted!$(RESET)"
 

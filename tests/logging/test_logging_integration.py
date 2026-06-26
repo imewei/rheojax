@@ -12,17 +12,11 @@ import pytest
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import (
-    ConvergenceTracker,
-    IterationLogger,
     configure_logging,
     get_logger,
-    log_array_info,
-    log_bayesian,
     log_fit,
-    log_jax_config,
     log_operation,
     reset_config,
-    timed,
 )
 
 jax, jnp = safe_import_jax()
@@ -96,27 +90,6 @@ class TestLoggingWithMaxwellModel:
         assert log_capture.has_message("model_fit started")
         assert log_capture.has_message("model_fit completed")
 
-    @pytest.mark.smoke
-    def test_timed_decorator_with_model_fit(self, log_capture):
-        """Test @timed decorator with actual model fitting."""
-        from rheojax.models import Maxwell
-
-        logger = get_logger("rheojax.models.test")
-
-        @timed(logger=logger, level=logging.INFO)
-        def fit_maxwell(t, G_t):
-            model = Maxwell()
-            model.fit(t, G_t, test_mode="relaxation")
-            return model
-
-        t = np.logspace(-3, 2, 30)
-        G_t = 1000.0 * np.exp(-t / 1.0)
-
-        model = fit_maxwell(t, G_t)
-
-        assert model is not None
-        assert log_capture.has_message("fit_maxwell completed")
-
 
 class TestLoggingWithFractionalModels:
     """Test logging with fractional viscoelastic models."""
@@ -177,26 +150,6 @@ class TestLoggingJAXOperations:
     """Test JAX-specific logging utilities with real JAX operations."""
 
     @pytest.mark.smoke
-    def test_log_array_info_with_jax_array(self):
-        """Test log_array_info with actual JAX arrays."""
-        x = jnp.ones((100, 50), dtype=jnp.float64)
-
-        info = log_array_info(x, "test_array")
-
-        assert info["test_array_shape"] == (100, 50)
-        assert "float64" in info["test_array_dtype"]
-        assert info["test_array_size"] == 5000
-
-    @pytest.mark.smoke
-    def test_log_jax_config_returns_valid_info(self):
-        """Test log_jax_config returns JAX configuration."""
-        config = log_jax_config()
-
-        assert "jax_version" in config
-        assert "default_backend" in config
-        assert "devices" in config
-
-    @pytest.mark.smoke
     def test_log_operation_with_jax_computation(self, log_capture):
         """Test log_operation with JAX computation."""
         logger = get_logger("rheojax.core.test")
@@ -210,49 +163,6 @@ class TestLoggingJAXOperations:
 
         assert log_capture.has_message("jax_computation started")
         assert log_capture.has_message("jax_computation completed")
-
-
-class TestIterationLoggingWithOptimization:
-    """Test iteration logging with actual optimization loops."""
-
-    @pytest.mark.smoke
-    def test_iteration_logger_tracks_optimization(self, log_capture):
-        """Test IterationLogger with simulated optimization."""
-        logger = get_logger("rheojax.optimization.test")
-        iter_logger = IterationLogger(logger, log_every=10, level=logging.DEBUG)
-
-        # Simulate optimization loop
-        cost = 1.0
-        for i in range(50):
-            cost *= 0.95  # Exponential decay
-            iter_logger.log(cost=cost, grad_norm=0.1 * cost)
-
-        iter_logger.log_final(converged=True, method="NLSQ")
-
-        assert iter_logger.iteration == 50
-        assert log_capture.has_message("Iteration 10")
-        assert log_capture.has_message("Iteration 20")
-        assert log_capture.has_message("completed")
-
-    @pytest.mark.smoke
-    def test_convergence_tracker_with_real_costs(self, log_capture):
-        """Test ConvergenceTracker with realistic cost sequence."""
-        logger = get_logger("rheojax.optimization.test")
-        tracker = ConvergenceTracker(
-            logger, tolerance=1e-4, patience=3, min_iterations=5
-        )
-
-        # Simulate converging cost sequence
-        costs = [1.0, 0.5, 0.25, 0.125, 0.0625, 0.0624, 0.0623, 0.0623, 0.0623]
-
-        converged = False
-        for cost in costs:
-            converged = tracker.update(cost)
-            if converged:
-                break
-
-        assert converged
-        assert log_capture.has_message("Convergence achieved")
 
 
 class TestLoggingWithDataTransforms:
