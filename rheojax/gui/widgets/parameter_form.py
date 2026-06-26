@@ -71,7 +71,10 @@ class ParameterFormBuilder(QWidget):
             if ptype == "float":
                 widget = QDoubleSpinBox()
                 widget.blockSignals(True)
+                default = spec["default"]
                 lo, hi = spec.get("range", (0.0, 1e6))
+                lo = min(lo, default)
+                hi = max(hi, default)
                 widget.setRange(lo, hi)
                 # Adaptive decimals: 4 for small ranges, 2 for large
                 decimals = 4 if (hi - lo) < 10 else 2
@@ -85,8 +88,11 @@ class ParameterFormBuilder(QWidget):
             elif ptype == "int":
                 widget = QSpinBox()
                 widget.blockSignals(True)
+                default = int(spec["default"])
                 lo, hi = spec.get("range", (0, 1000))
-                widget.setRange(int(lo), int(hi))
+                lo = min(int(lo), default)
+                hi = max(int(hi), default)
+                widget.setRange(lo, hi)
                 widget.setValue(int(spec["default"]))
                 widget.blockSignals(False)
                 widget.valueChanged.connect(self._on_change)

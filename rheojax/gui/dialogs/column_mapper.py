@@ -6,6 +6,7 @@ Simple dialog for column reassignment.
 """
 
 from pathlib import Path
+import re
 
 import pandas as pd
 
@@ -346,7 +347,7 @@ class ColumnMapperDialog(QDialog):
                 if text == "(none)":
                     continue
                 for pattern in patterns:
-                    if pattern in text:
+                    if re.search(r'\b' + re.escape(pattern) + r'\b', text):
                         combo.setCurrentIndex(i)
                         return True
             return False

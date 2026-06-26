@@ -341,6 +341,7 @@ class PriorsEditor(QWidget):
             current_param=self._current_param,
         )
         self._update_param_visibility(dist)
+        self._update_param_ranges(dist)
 
         # Load defaults for new distribution
         defaults = DIST_DEFAULTS.get(dist, {})
@@ -379,6 +380,19 @@ class PriorsEditor(QWidget):
                     visible = param_name in required_params
                     label_widget.setVisible(visible)
                     field_widget.setVisible(visible)
+
+    def _update_param_ranges(self, dist: str) -> None:
+        """Update spinbox ranges based on distribution type."""
+        for spinbox in self._param_spinboxes.values():
+            spinbox.setRange(-1e12, 1e12)
+        if dist in ["normal", "lognormal", "halfnormal", "exponential"]:
+            self._param_spinboxes["scale"].setRange(1e-12, 1e12)
+        elif dist == "gamma":
+            self._param_spinboxes["concentration"].setRange(1e-12, 1e12)
+            self._param_spinboxes["rate"].setRange(1e-12, 1e12)
+        elif dist == "beta":
+            self._param_spinboxes["concentration0"].setRange(1e-12, 1e12)
+            self._param_spinboxes["concentration1"].setRange(1e-12, 1e12)
 
     def _update_preview(self) -> None:
         """Update the preview plot."""
@@ -438,35 +452,53 @@ class PriorsEditor(QWidget):
         if dist == "normal":
             loc = self._param_spinboxes["loc"].value()
             scale = self._param_spinboxes["scale"].value()
+            if scale <= 0:
+                raise ValueError("scale must be positive for normal distribution")
             rv = stats.norm(loc=loc, scale=scale)
             x = np.linspace(loc - 4 * scale, loc + 4 * scale, 200)
         elif dist == "lognormal":
             loc = self._param_spinboxes["loc"].value()
             scale = self._param_spinboxes["scale"].value()
+            if scale <= 0:
+                raise ValueError("scale must be positive for lognormal distribution")
             rv = stats.lognorm(s=scale, loc=0, scale=np.exp(loc))
             x = np.linspace(0.001, rv.ppf(0.999), 200)
         elif dist == "uniform":
             low = self._param_spinboxes["low"].value()
             high = self._param_spinboxes["high"].value()
+            if low >= high:
+                raise ValueError("low must be less than high for uniform distribution")
             rv = stats.uniform(loc=low, scale=high - low)
             margin = (high - low) * 0.1
             x = np.linspace(low - margin, high + margin, 200)
         elif dist == "halfnormal":
             scale = self._param_spinboxes["scale"].value()
+            if scale <= 0:
+                raise ValueError("scale must be positive for halfnormal distribution")
             rv = stats.halfnorm(scale=scale)
             x = np.linspace(0, 4 * scale, 200)
         elif dist == "exponential":
             scale = self._param_spinboxes["scale"].value()
+            if scale <= 0:
+                raise ValueError("scale must be positive for exponential distribution")
             rv = stats.expon(scale=scale)
             x = np.linspace(0, 5 * scale, 200)
         elif dist == "gamma":
             conc = self._param_spinboxes["concentration"].value()
             rate = self._param_spinboxes["rate"].value()
+            if conc <= 0:
+                raise ValueError("concentration must be positive for gamma distribution")
+            if rate <= 0:
+                raise ValueError("rate must be positive for gamma distribution")
             rv = stats.gamma(a=conc, scale=1 / rate)
             x = np.linspace(0, rv.ppf(0.999), 200)
         elif dist == "beta":
             a = self._param_spinboxes["concentration0"].value()
             b = self._param_spinboxes["concentration1"].value()
+            if a <= 0:
+                raise ValueError("concentration0 must be positive for beta distribution")
+            if b <= 0:
+                raise ValueError("concentration1 must be positive for beta distribution")
             rv = stats.beta(a=a, b=b)
             x = np.linspace(0.001, 0.999, 200)
         else:

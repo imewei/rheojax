@@ -63,8 +63,6 @@ class ExportPage(QWidget):
         self.setup_ui()
         # R6-GUI-001: Use QueuedConnection so _perform_export runs after the
         # current event handler returns, preventing button-click blocking.
-        from PySide6.QtCore import Qt
-
         self.export_requested.connect(
             self._perform_export, Qt.ConnectionType.QueuedConnection
         )
@@ -720,8 +718,6 @@ class ExportPage(QWidget):
         config : dict
             Export configuration
         """
-        from PySide6.QtCore import Qt as _Qt
-
         from rheojax.gui.compat import QThreadPool
         from rheojax.gui.jobs.export_worker import ExportWorker
 
@@ -1064,12 +1060,12 @@ class ExportPage(QWidget):
         worker.setAutoDelete(False)
         worker.signals.progress.connect(
             lambda pct, label: progress.setLabelText(label),
-            _Qt.ConnectionType.QueuedConnection,
+            Qt.ConnectionType.QueuedConnection,
         )
         worker.signals.completed.connect(
-            _on_completed, _Qt.ConnectionType.QueuedConnection
+            _on_completed, Qt.ConnectionType.QueuedConnection
         )
-        worker.signals.failed.connect(_on_failed, _Qt.ConnectionType.QueuedConnection)
+        worker.signals.failed.connect(_on_failed, Qt.ConnectionType.QueuedConnection)
         # R13-GUI-EXP-002: set the cancellation flag AND close the dialog so
         # the ExportWorker actually stops between stages (not just visually).
         progress.canceled.connect(lambda: (_cancelled.set(), progress.close()))

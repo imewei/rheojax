@@ -1234,7 +1234,7 @@ class FitPlotter:
         # Residuals
         if n_rows == 2 and y_pred_data is not None:
             residuals = y_data - y_pred_data
-            denom = np.maximum(np.abs(y_data), np.max(np.abs(y_data)) * 1e-10)
+            denom = np.where(np.abs(y_data) > 1e-12, np.abs(y_data), 1.0)
             pct_resid = residuals / denom * 100
 
             ax_resid.scatter(
@@ -1345,6 +1345,7 @@ class FitPlotter:
                 comp_pred = extract_fn(y_pred_data)
                 residuals = comp_data - comp_pred
                 denom = np.maximum(np.abs(comp_data), np.max(np.abs(comp_data)) * 1e-10)
+                denom = np.maximum(denom, 1e-12)  # Ensure minimum denominator
                 pct = residuals / denom * 100
 
                 pos_mask = np.isfinite(comp_data) & (comp_data > 0)

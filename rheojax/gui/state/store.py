@@ -404,10 +404,9 @@ class StateStore:
 
                     app = QCoreApplication.instance()
                     if app is not None and QThread.currentThread() != app.thread():
-                        logger.warning(
-                            "StateStore created from non-main thread. "
-                            "Qt signals may have incorrect thread affinity.",
-                            current_thread=str(QThread.currentThread()),
+                        raise RuntimeError(
+                            "StateStore must be created on the main Qt thread. "
+                            "Qt signals require main-thread affinity for correct behavior."
                         )
                 except ImportError:
                     pass  # PySide6 not available (e.g., headless test environment)
