@@ -1226,9 +1226,13 @@ class GeneralizedMaxwell(BaseModel):
         modulus_names = [f"{symbol}_inf"] + [
             f"{symbol}_{i+1}" for i in range(self._n_modes)
         ]
-        registered_modulus_upper = jnp.asarray(
-            [self.parameters[name].bounds[1] for name in modulus_names]
-        )
+        registered_modulus_upper_values = []
+        for name in modulus_names:
+            parameter_bounds = self.parameters[name].bounds
+            if parameter_bounds is None:
+                raise RuntimeError(f"Missing registered bounds for parameter '{name}'")
+            registered_modulus_upper_values.append(parameter_bounds[1])
+        registered_modulus_upper = jnp.asarray(registered_modulus_upper_values)
         data_modulus_upper = 1.0 / J_0 * 10
         bounds_upper = jnp.concatenate(
             [
