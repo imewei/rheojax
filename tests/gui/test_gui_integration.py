@@ -231,14 +231,12 @@ class TestStateIntegration:
             start_bayesian,
             start_fitting,
             update_bayesian_progress,
-            update_fit_progress,
         )
 
         # All action creators are effectors: they dispatch internally
         # and return None (not dicts).
         assert set_active_model("maxwell") is None
         assert start_fitting("maxwell", "dataset_1") is None
-        assert update_fit_progress(50.0) is None
         assert start_bayesian("maxwell", "dataset_1") is None
         assert update_bayesian_progress(75.0) is None
 
