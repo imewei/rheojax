@@ -60,6 +60,11 @@ logger = get_logger(__name__)
 # Terminal message types that end the poll loop
 _TERMINAL_TYPES = frozenset({"completed", "failed", "cancelled"})
 
+# ``fork`` is unsafe once JAX or Qt has initialized background threads.  Keep
+# the context local to GUI workers rather than changing the application's
+# process-wide multiprocessing default.
+_WORKER_START_METHOD = "spawn"
+
 
 # ---------------------------------------------------------------------------
 # Subprocess entry point (must be module-level for pickling with "spawn")
@@ -187,8 +192,13 @@ class ProcessWorkerAdapter(QRunnable):
         self._process_timeout = process_timeout
         self._kill_timeout = kill_timeout
 
+        # Process, Queue, and Event must all originate from one explicit
+        # context.  On Linux the implicit default is ``fork``, which can
+        # deadlock or crash after JAX initializes its multithreaded runtime.
+        self._mp_context = mp.get_context(_WORKER_START_METHOD)
+
         # Cancellation token backed by mp.Event
-        self._cancel_token = ProcessCancellationToken()
+        self._cancel_token = ProcessCancellationToken(context=self._mp_context)
 
         # Will be set when the process is started
         self._process: mp.Process | None = None
@@ -207,8 +217,8 @@ class ProcessWorkerAdapter(QRunnable):
         Called by QThreadPool.  Blocks the pool thread until the child
         process finishes (or is killed).
         """
-        self._result_queue = mp.Queue()
-        self._process = mp.Process(
+        self._result_queue = self._mp_context.Queue()
+        self._process = self._mp_context.Process(
             target=_subprocess_entry,
             args=(self._work_fn, self._result_queue, self._cancel_token.event),
             daemon=True,
