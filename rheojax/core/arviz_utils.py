@@ -104,6 +104,8 @@ def arviz_plot_kwargs(
 
         if "marginals" in normalized:
             normalized.setdefault("marginal", normalized.pop("marginals"))
+        else:
+            normalized.setdefault("marginal", False)
 
         divergences = normalized.pop("divergences", None)
         if divergences is not None:
@@ -117,8 +119,8 @@ def arviz_plot_kwargs(
         inner_prob = 0.5 if hdi_prob > 0.5 else hdi_prob / 2
         normalized.setdefault("ci_probs", (inner_prob, hdi_prob))
 
-    elif plot_name == "plot_autocorr" and "combined" in normalized:
-        combined = normalized.pop("combined")
+    elif plot_name == "plot_autocorr":
+        combined = normalized.pop("combined", False)
         normalized.setdefault(
             "sample_dims", ("chain", "draw") if combined else ("draw",)
         )

@@ -86,6 +86,18 @@ def test_plot_pair_kwargs_map_arviz_1_divergences_and_marginal() -> None:
     }
 
 
+def test_plot_pair_kwargs_preserve_legacy_default_without_marginals() -> None:
+    current_arviz = SimpleNamespace(__version__="1.1.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_pair",
+        divergences=False,
+    )
+
+    assert kwargs == {"marginal": False, "visuals": {"divergence": False}}
+
+
 def test_plot_pair_kwargs_reject_unavailable_arviz_1_plot_kind() -> None:
     current_arviz = SimpleNamespace(__version__="1.1.0")
 
@@ -133,6 +145,18 @@ def test_plot_autocorr_kwargs_map_arviz_1_chain_combination(
     )
 
     assert kwargs == {"sample_dims": sample_dims, "max_lag": 25}
+
+
+def test_plot_autocorr_kwargs_preserve_legacy_default_without_combined() -> None:
+    current_arviz = SimpleNamespace(__version__="1.1.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_autocorr",
+        max_lag=25,
+    )
+
+    assert kwargs == {"sample_dims": ("draw",), "max_lag": 25}
 
 
 def test_arviz_figure_uses_legacy_axes_figure() -> None:
