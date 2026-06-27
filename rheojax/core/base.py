@@ -860,6 +860,10 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.core.data import RheoData as _RheoData
 
             if isinstance(X, _RheoData):
+                # Keep protocol metadata available after unwrapping the public
+                # container.  Models that need inputs such as step strain or
+                # target stress can consume this internal mapping in _predict.
+                kwargs["_rheo_metadata"] = dict(X.metadata)
                 X = X.x
 
             # ADR-004: All _predict() signatures now accept **kwargs,

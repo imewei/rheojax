@@ -162,6 +162,10 @@ class LatticeEPM(EPMBase):
                 metadata["gamma0"] = self._cached_gamma0
             if hasattr(self, "_cached_omega"):
                 metadata["omega"] = self._cached_omega
+            # BaseModel.predict unwraps RheoData before dispatch.  Request
+            # metadata is forwarded separately and must override fit-time
+            # caches so each prediction uses the caller's protocol inputs.
+            metadata.update(kwargs.get("_rheo_metadata", {}))
             rheo_data = RheoData(
                 x=x_array, y=dummy_y, initial_test_mode=test_mode, metadata=metadata
             )
