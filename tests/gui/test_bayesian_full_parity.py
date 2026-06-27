@@ -88,5 +88,6 @@ def test_bayesian_full_parity_notebook_like_relaxation():
     digest = hashlib.sha256(buf.getvalue()).hexdigest()
 
     assert len(digest) == 64
-    # Golden hash captures notebook-like parity; update only on intentional changes.
+    # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib;
+    # the constructor compatibility layer does not affect the rendered values.
     assert digest == "801d50fcc8650f5dc8b287600c32b3ef91ac121f468e21eb45290b1269f1a89e"
