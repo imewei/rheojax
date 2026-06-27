@@ -10,6 +10,7 @@ from typing import Any
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 
+from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
 from rheojax.gui.compat import (
     QComboBox,
     QHBoxLayout,
@@ -523,37 +524,10 @@ class ArvizCanvas(BaseArviZWidget):
         concurrently and may return the wrong figure.
         """
         import matplotlib.pyplot as plt
-        import numpy as np
 
         pre = set(plt.get_fignums())
         result = plot_fn(*args, **kwargs)
-
-        # Extract figure from ArviZ return value rather than using plt.gcf()
-        fig = None
-        if hasattr(result, "figure"):
-            fig = result.figure
-        elif isinstance(result, np.ndarray) and result.size > 0:
-            ax_item = result.ravel()[0]
-            if hasattr(ax_item, "figure"):
-                fig = ax_item.figure
-        elif isinstance(result, list) and result:
-            # GUI-R6-007: Some ArviZ versions return list-of-axes
-            first = result[0]
-            if isinstance(first, np.ndarray) and first.size > 0:
-                fig = first.ravel()[0].figure
-            elif hasattr(first, "figure"):
-                fig = first.figure
-
-        if fig is None:
-            logger.error(
-                "ArviZ plot function returned unrecognized result type: %s. "
-                "Cannot extract figure safely under concurrency.",
-                type(result).__name__,
-            )
-            raise RuntimeError(
-                f"ArviZ plot function returned unrecognized result type: {type(result).__name__}. "
-                "Cannot extract figure safely under concurrency."
-            )
+        fig = arviz_figure(result)
 
         self._copy_arviz_figure(fig)
         self._close_new_figures(pre)
@@ -595,8 +569,12 @@ class ArvizCanvas(BaseArviZWidget):
             self._arviz_plot(
                 az.plot_pair,
                 self._inference_data,
-                var_names=var_names,
-                divergences=has_divergences,
+                **arviz_plot_kwargs(
+                    az,
+                    "plot_pair",
+                    var_names=var_names,
+                    divergences=has_divergences,
+                ),
             )
         except ImportError:
             logger.error(
@@ -618,9 +596,13 @@ class ArvizCanvas(BaseArviZWidget):
             self._arviz_plot(
                 az.plot_forest,
                 self._inference_data,
-                var_names=var_names,
-                hdi_prob=self._hdi_prob,
-                combined=True,
+                **arviz_plot_kwargs(
+                    az,
+                    "plot_forest",
+                    var_names=var_names,
+                    hdi_prob=self._hdi_prob,
+                    combined=True,
+                ),
             )
         except ImportError:
             logger.error(
@@ -730,7 +712,15 @@ class ArvizCanvas(BaseArviZWidget):
         try:
             import arviz as az
 
-            self._arviz_plot(az.plot_autocorr, self._inference_data)
+            self._arviz_plot(
+                az.plot_autocorr,
+                self._inference_data,
+                **arviz_plot_kwargs(
+                    az,
+                    "plot_autocorr",
+                    combined=False,
+                ),
+            )
         except ImportError:
             logger.error(
                 "ArviZ import failed",

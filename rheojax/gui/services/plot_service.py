@@ -17,7 +17,11 @@ import numpy as np
 from matplotlib import rc_params_from_file
 from matplotlib.figure import Figure
 
-from rheojax.core.arviz_utils import inference_data_from_dict
+from rheojax.core.arviz_utils import (
+    arviz_figure,
+    arviz_plot_kwargs,
+    inference_data_from_dict,
+)
 from rheojax.core.data import RheoData
 from rheojax.gui.resources import available_plot_styles, load_plot_style
 from rheojax.logging import get_logger
@@ -652,22 +656,6 @@ class PlotService:
                     parameters=list(posterior_samples.keys()),
                 )
 
-                def _extract_figure(axes_result: Any) -> Figure:
-                    """Extract Figure from ArviZ axes (single Axes, ndarray, or list)."""
-                    import numpy as _np
-
-                    if hasattr(axes_result, "figure"):
-                        return axes_result.figure
-                    if isinstance(axes_result, _np.ndarray) and axes_result.size > 0:
-                        return axes_result.ravel()[0].figure
-                    if isinstance(axes_result, list) and axes_result:
-                        first = axes_result[0]
-                        if isinstance(first, _np.ndarray) and first.size > 0:
-                            return first.ravel()[0].figure
-                        if hasattr(first, "figure"):
-                            return first.figure
-                    return plt.gcf()
-
                 # Create plot based on type
                 plot_funcs = {
                     "trace": az.plot_trace,
@@ -683,8 +671,11 @@ class PlotService:
                     logger.error(f"Unknown ArviZ plot type: {plot_type}")
                     raise ValueError(f"Unknown plot type: {plot_type}")
 
-                axes_result = plot_funcs[plot_type](idata, **kwargs)
-                fig = _extract_figure(axes_result)
+                plot_name = plot_funcs[plot_type].__name__
+                axes_result = plot_funcs[plot_type](
+                    idata, **arviz_plot_kwargs(az, plot_name, **kwargs)
+                )
+                fig = arviz_figure(axes_result)
 
             logger.info("Plot generated", plot_type=f"arviz_{plot_type}")
             logger.debug(

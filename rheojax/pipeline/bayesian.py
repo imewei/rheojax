@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from rheojax.core.arviz_utils import import_arviz
+from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs, import_arviz
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
@@ -770,21 +770,20 @@ class BayesianPipeline(Pipeline):
         # Create pair plot
         axes = az.plot_pair(
             idata,
-            var_names=var_names,
-            kind=kind,
-            divergences=divergences,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_pair",
+                var_names=var_names,
+                kind=kind,
+                divergences=divergences,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif hasattr(axes, "ravel"):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -882,21 +881,20 @@ class BayesianPipeline(Pipeline):
         # Create forest plot
         axes = az.plot_forest(
             idata,
-            var_names=var_names,
-            combined=combined,
-            hdi_prob=hdi_prob,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_forest",
+                var_names=var_names,
+                combined=combined,
+                hdi_prob=hdi_prob,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -1051,20 +1049,19 @@ class BayesianPipeline(Pipeline):
         # Create autocorrelation plot
         axes = az.plot_autocorr(
             idata,
-            var_names=var_names,
-            combined=combined,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_autocorr",
+                var_names=var_names,
+                combined=combined,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
