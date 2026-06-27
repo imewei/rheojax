@@ -354,6 +354,23 @@ class TestGMMOscillationMode:
 class TestGMMCreepMode:
     """Test GMM creep mode prediction and fitting."""
 
+    def test_creep_fit_respects_registered_modulus_bounds(self):
+        """Creep optimizer results must remain valid ParameterSet values."""
+        t = np.logspace(-2, 2, 60)
+        J_data = 1e-3 + (5e-7 - 1e-3) * np.exp(-t / 10.0)
+        J_data[0] = -1e-6  # Representative additive-noise outlier
+
+        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model.fit(
+            t,
+            J_data,
+            test_mode="creep",
+            optimization_factor=None,
+            max_iter=10,
+        )
+
+        assert model.parameters.get_value("G_1") <= model.parameters["G_1"].bounds[1]
+
     def test_creep_backward_euler_stability(self):
         """Creep simulation using backward-Euler should be unconditionally stable."""
         # Create GMM with known parameters

@@ -1223,13 +1223,25 @@ class GeneralizedMaxwell(BaseModel):
                 jnp.full(self._n_modes, 1e-6),
             ]
         )
+        modulus_names = [f"{symbol}_inf"] + [
+            f"{symbol}_{i+1}" for i in range(self._n_modes)
+        ]
+        registered_modulus_upper = jnp.asarray(
+            [self.parameters[name].bounds[1] for name in modulus_names]
+        )
+        data_modulus_upper = 1.0 / J_0 * 10
         bounds_upper = jnp.concatenate(
             [
-                jnp.array([1.0 / J_0 * 10]),
-                jnp.full(self._n_modes, 1.0 / J_0 * 10),
+                jnp.minimum(data_modulus_upper, registered_modulus_upper),
                 jnp.full(self._n_modes, 1e6),
             ]
         )
+
+        # No optimizer result should be legal for NLSQ but illegal for the
+        # ParameterSet it is written back to.  Noisy compliance can make the
+        # data-derived guess and ceiling enormous, so keep both inside the
+        # model's registered hard bounds.
+        x0 = jnp.clip(x0, bounds_lower, bounds_upper)
 
         # Step 1: Fit with softmax penalty
         def objective_step1(params):
