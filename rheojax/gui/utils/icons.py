@@ -33,6 +33,7 @@ For Qt icons:
 
 import sys
 from enum import Enum, auto
+from threading import Lock
 
 from rheojax.gui.compat import QApplication, QIcon, QStyle
 from rheojax.logging import get_logger
@@ -436,6 +437,7 @@ class IconProvider:
 
 # Module-level singleton for convenience
 _default_provider: IconProvider | None = None
+_default_provider_lock = Lock()
 
 
 def get_icon_provider(allow_emoji: bool = False) -> IconProvider:
@@ -453,12 +455,14 @@ def get_icon_provider(allow_emoji: bool = False) -> IconProvider:
     """
     global _default_provider
     logger.debug("Getting icon provider singleton", allow_emoji=allow_emoji)
-    if (
-        _default_provider is None
-        or _default_provider._allow_emoji_requested != allow_emoji
-    ):
-        logger.debug("Creating new IconProvider singleton", allow_emoji=allow_emoji)
-        _default_provider = IconProvider(allow_emoji=allow_emoji)
-    else:
-        logger.debug("Returning existing IconProvider singleton")
-    return _default_provider
+    with _default_provider_lock:
+        if (
+            _default_provider is None
+            or _default_provider._allow_emoji_requested != allow_emoji
+        ):
+            logger.debug("Creating new IconProvider singleton", allow_emoji=allow_emoji)
+            _default_provider = IconProvider(allow_emoji=allow_emoji)
+        else:
+            logger.debug("Returning existing IconProvider singleton")
+        provider = _default_provider
+    return provider
