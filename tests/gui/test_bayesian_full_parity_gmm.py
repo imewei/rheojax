@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.core.data import RheoData
 from rheojax.gui.services.bayesian_service import BayesianService
 
@@ -57,7 +58,7 @@ def test_bayesian_full_parity_gmm_like():
         k: v.reshape(chains, draws_per_chain)
         for k, v in result.posterior_samples.items()
     }
-    idata = az.from_dict(posterior=posterior)
+    idata = inference_data_from_dict({"posterior": posterior})
     rhat = az.rhat(idata)
     ess = az.ess(idata)
 
@@ -82,4 +83,4 @@ def test_bayesian_full_parity_gmm_like():
     digest = hashlib.sha256(buf.getvalue()).hexdigest()
 
     assert len(digest) == 64
-    assert digest == "e4912aea76c83876c659699a0eb067e3306cedf5eac32bc07f54bffcb406fe7a"
+    assert digest == "e5159224bab91ffc4a448add8b6a6cd0705d9ae90e31e2d72206fbfb92bdaf3d"

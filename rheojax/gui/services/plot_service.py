@@ -17,6 +17,7 @@ import numpy as np
 from matplotlib import rc_params_from_file
 from matplotlib.figure import Figure
 
+from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.core.data import RheoData
 from rheojax.gui.resources import available_plot_styles, load_plot_style
 from rheojax.logging import get_logger
@@ -644,7 +645,7 @@ class PlotService:
                             idata_dict[k] = v.reshape(1, -1)
                     else:
                         idata_dict[k] = v
-                idata = az.from_dict(idata_dict)
+                idata = inference_data_from_dict({"posterior": idata_dict})
 
                 logger.debug(
                     "ArviZ InferenceData created",
