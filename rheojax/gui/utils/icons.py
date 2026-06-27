@@ -295,11 +295,11 @@ class IconProvider:
             Allow emoji on supported platforms (default: False)
         """
         logger.debug("Initializing IconProvider", allow_emoji=allow_emoji)
-        self._allow_emoji = allow_emoji and emoji_safe()
+        self._allow_emoji_requested = allow_emoji
         logger.debug(
             "IconProvider initialized",
             allow_emoji_requested=allow_emoji,
-            emoji_enabled=self._allow_emoji,
+            emoji_enabled=self.uses_emoji,
         )
 
     @property
@@ -311,7 +311,7 @@ class IconProvider:
         bool
             True if emoji icons are enabled and safe
         """
-        return self._allow_emoji
+        return self._allow_emoji_requested and emoji_safe()
 
     def get_category_icon(self, category: str) -> str:
         """Get icon for a model category.
@@ -326,10 +326,9 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
-        logger.debug(
-            "Getting category icon", category=category, uses_emoji=self._allow_emoji
-        )
-        if self._allow_emoji:
+        uses_emoji = self.uses_emoji
+        logger.debug("Getting category icon", category=category, uses_emoji=uses_emoji)
+        if uses_emoji:
             icon = self.CATEGORY_ICONS_EMOJI.get(
                 category, self.CATEGORY_ICONS_EMOJI.get("other", "[?]")
             )
@@ -353,8 +352,9 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
-        logger.debug("Getting status icon", status=status, uses_emoji=self._allow_emoji)
-        if self._allow_emoji:
+        uses_emoji = self.uses_emoji
+        logger.debug("Getting status icon", status=status, uses_emoji=uses_emoji)
+        if uses_emoji:
             icon = self.STATUS_ICONS_EMOJI.get(status, "[?]")
         else:
             icon = self.STATUS_ICONS_ASCII.get(status, "[?]")
@@ -374,10 +374,9 @@ class IconProvider:
         str
             Icon text (ASCII or emoji based on settings)
         """
-        logger.debug(
-            "Getting file icon", file_type=file_type, uses_emoji=self._allow_emoji
-        )
-        if self._allow_emoji:
+        uses_emoji = self.uses_emoji
+        logger.debug("Getting file icon", file_type=file_type, uses_emoji=uses_emoji)
+        if uses_emoji:
             icon = self.FILE_ICONS_EMOJI.get(file_type, "[?]")
         else:
             icon = self.FILE_ICONS_ASCII.get(file_type, "[?]")
@@ -454,8 +453,9 @@ def get_icon_provider(allow_emoji: bool = False) -> IconProvider:
     """
     global _default_provider
     logger.debug("Getting icon provider singleton", allow_emoji=allow_emoji)
-    if _default_provider is None or _default_provider._allow_emoji != (
-        allow_emoji and emoji_safe()
+    if (
+        _default_provider is None
+        or _default_provider._allow_emoji_requested != allow_emoji
     ):
         logger.debug("Creating new IconProvider singleton", allow_emoji=allow_emoji)
         _default_provider = IconProvider(allow_emoji=allow_emoji)

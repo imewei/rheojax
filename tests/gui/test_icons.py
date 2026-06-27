@@ -173,6 +173,28 @@ class TestIconProvider:
             provider = IconProvider(allow_emoji=True)
             assert provider.uses_emoji is True
 
+    def test_existing_provider_tracks_platform_safety(self):
+        """Test a cached provider cannot leak emoji after a platform transition."""
+        from rheojax.gui.utils.icons import IconProvider
+
+        with patch.object(sys, "platform", "linux"):
+            provider = IconProvider(allow_emoji=True)
+            assert provider.get_category_icon("classical") == "\U0001f535"
+
+        with patch.object(sys, "platform", "darwin"):
+            assert provider.uses_emoji is False
+            getters = (
+                provider.get_category_icon,
+                provider.get_status_icon,
+                provider.get_file_icon,
+            )
+            for getter in getters:
+                assert getter("unknown").isascii()
+
+        with patch.object(sys, "platform", "linux"):
+            assert provider.uses_emoji is True
+            assert provider.get_category_icon("classical") == "\U0001f535"
+
 
 class TestGetIconProvider:
     """Tests for get_icon_provider singleton function."""

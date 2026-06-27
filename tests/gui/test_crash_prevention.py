@@ -35,24 +35,29 @@ IS_MACOS = sys.platform == "darwin"
 class TestEmojiCrashPrevention:
     """Tests verifying emoji crash prevention mechanisms."""
 
-    def test_icon_provider_never_returns_emoji_on_macos(self):
+    def test_icon_provider_never_returns_emoji_on_macos(self, monkeypatch):
         """Verify IconProvider returns ASCII-only icons on macOS."""
         from rheojax.gui.utils.icons import IconProvider, emoji_safe
 
-        # On macOS, emoji_safe should return False
-        if IS_MACOS:
-            assert emoji_safe() is False
+        monkeypatch.setattr(sys, "platform", "darwin")
+        assert emoji_safe() is False
 
         # Provider should never use emoji on macOS regardless of setting
         provider = IconProvider(allow_emoji=True)
-
-        if IS_MACOS:
-            assert provider.uses_emoji is False
+        assert provider.uses_emoji is False
 
         # All icons should be ASCII
-        for category in provider.CATEGORY_ICONS_ASCII.keys():
-            icon = provider.get_category_icon(category)
-            assert all(ord(c) < 128 for c in icon), f"Non-ASCII in category {category}"
+        icon_groups = (
+            (provider.get_category_icon, provider.CATEGORY_ICONS_ASCII),
+            (provider.get_status_icon, provider.STATUS_ICONS_ASCII),
+            (provider.get_file_icon, provider.FILE_ICONS_ASCII),
+        )
+        for getter, icon_types in icon_groups:
+            for icon_type in [*icon_types, "unknown"]:
+                icon = getter(icon_type)
+                assert all(ord(c) < 128 for c in icon), (
+                    f"Non-ASCII icon for {icon_type}"
+                )
 
     def test_all_category_icons_are_ascii(self, ascii_checker):
         """Verify all category icons contain only ASCII characters."""
