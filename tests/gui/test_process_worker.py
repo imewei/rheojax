@@ -343,22 +343,24 @@ class TestProcessWorkerAdapter:
 
         assert len(cancelled_count) == 1
 
-    @pytest.mark.timeout(15)
-    def test_child_uses_spawn_after_jax_initialization(self):
-        """A JAX-initialized parent must never fork the subprocess worker."""
-        import jax.numpy as jnp
 
-        from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+@pytest.mark.skipif(not _HAS_PYSIDE6, reason="PySide6 not available")
+@pytest.mark.timeout(15)
+def test_child_uses_spawn_after_jax_initialization():
+    """A JAX-initialized parent must never fork the subprocess worker."""
+    import jax.numpy as jnp
 
-        jnp.asarray([1.0]).block_until_ready()
+    from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
 
-        adapter = ProcessWorkerAdapter(_work_fn_report_start_method)
-        results = []
-        adapter.signals.completed.connect(results.append)
+    jnp.asarray([1.0]).block_until_ready()
 
-        adapter.run()
+    adapter = ProcessWorkerAdapter(_work_fn_report_start_method)
+    results = []
+    adapter.signals.completed.connect(results.append)
 
-        assert results == ["spawn"]
+    adapter.run()
+
+    assert results == ["spawn"]
 
 
 # ===========================================================================
