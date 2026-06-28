@@ -67,9 +67,7 @@ StressType = Literal["linear", "fene"]
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.CREEP,
-    ],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    ])
 class VLBNonlocal(VLBBase):
     """Nonlocal VLB with tensor diffusion for shear banding.
 

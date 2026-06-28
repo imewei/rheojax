@@ -52,14 +52,7 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FractionalKelvinVoigt(BaseModel):
     """Fractional Kelvin-Voigt model: Spring and SpringPot in parallel.
 

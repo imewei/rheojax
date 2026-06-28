@@ -68,14 +68,7 @@ logger = get_logger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class GeneralizedMaxwell(BaseModel):
     """Generalized Maxwell Model with N exponential relaxation modes.
 

@@ -34,14 +34,7 @@ jax, jnp = safe_import_jax()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class TensorialEPM(EPMBase):
     """3-Component Tensorial Lattice EPM.
 

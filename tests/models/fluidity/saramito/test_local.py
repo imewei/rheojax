@@ -654,18 +654,6 @@ class TestBayesianSmoke:
         assert hasattr(result, "posterior_samples")
 
 
-class TestSaramitoDMTA:
-    """Test DMTA registration for Saramito local model (TC-015)."""
-
-    @pytest.mark.smoke
-    def test_saramito_local_shear_only(self):
-        """Test Saramito local is registered as shear-only."""
-        from rheojax.core.test_modes import DeformationMode
-
-        info = ModelRegistry.get_info("fluidity_saramito_local")
-        assert DeformationMode.SHEAR in info.deformation_modes
-        assert DeformationMode.TENSION not in info.deformation_modes
-
 
 class TestHelperMethods:
     """Tests for helper and analysis methods."""

@@ -43,8 +43,6 @@ _IKH_RESERVED = {
     "gamma_dot",
     "sigma_applied",
     "sigma_0",
-    "deformation_mode",
-    "poisson_ratio",
 }
 
 
@@ -57,14 +55,7 @@ _IKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class MIKH(IKHBase):
     r"""Maxwell-Isotropic-Kinematic Hardening (MIKH) Model.
 

@@ -49,8 +49,6 @@ _MLIKH_RESERVED = {
     "gamma_dot",
     "sigma_applied",
     "sigma_0",
-    "deformation_mode",
-    "poisson_ratio",
     "smart_init",
     "mikh_warmstart",
 }
@@ -65,14 +63,7 @@ _MLIKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class MLIKH(IKHBase):
     """Multi-Lambda Isotropic-Kinematic Hardening (ML-IKH) Model.
 

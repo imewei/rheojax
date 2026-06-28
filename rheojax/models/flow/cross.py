@@ -36,8 +36,7 @@ logger = get_logger(__name__)
 
 
 @ModelRegistry.register(
-    "cross", protocols=[Protocol.FLOW_CURVE], deformation_modes=[DeformationMode.SHEAR]
-)
+    "cross", protocols=[Protocol.FLOW_CURVE])
 class Cross(BaseModel):
     """Cross model for non-Newtonian flow (ROTATION only).
 

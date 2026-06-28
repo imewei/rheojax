@@ -76,14 +76,7 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 @ModelRegistry.register(
     "giesekus_single",
     protocols=[
@@ -93,14 +86,7 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class GiesekusSingleMode(GiesekusBase):
     """Single-mode Giesekus nonlinear viscoelastic model.
 
@@ -321,7 +307,7 @@ class GiesekusSingleMode(GiesekusBase):
         fwd_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+            if k != "test_mode"
         }
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) real [G', G''] for oscillation;

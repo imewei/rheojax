@@ -123,6 +123,7 @@ doc/build/
 docs/source/_autosummary/
 docs/source/_generated/
 docs/source/api/generated/
+docs/superpowers
 
 # MkDocs
 /site
@@ -313,3 +314,6 @@ graphify-out/_COMMUNITY_*.md
 
 # Three-brain output
 three-brain-out/
+
+# Superpowers brainstorming visual companion
+.superpowers/

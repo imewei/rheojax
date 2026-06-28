@@ -88,14 +88,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class ITTMCTSchematic(ITTMCTBase):
     """ITT-MCT Schematic F₁₂ Model.
 

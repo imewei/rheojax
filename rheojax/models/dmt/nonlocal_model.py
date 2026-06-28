@@ -42,9 +42,7 @@ logger = get_logger(__name__)
     # startup/creep branches; advertising those protocols in the
     # registry caused downstream code (e.g. predict-without-fit canary)
     # to call into paths that raise "Unknown test_mode for prediction".
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class DMTNonlocal(DMTBase):
     r"""Nonlocal (1D) DMT model for shear banding analysis.
 

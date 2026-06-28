@@ -70,14 +70,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FractionalBurgersModel(BaseModel):
     """Fractional Burgers model.
 

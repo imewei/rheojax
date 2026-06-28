@@ -84,9 +84,7 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    ])
 class FluiditySaramitoLocal(FluiditySaramitoBase):
     r"""Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
 

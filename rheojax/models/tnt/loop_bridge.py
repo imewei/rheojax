@@ -315,14 +315,7 @@ def _loop_bridge_relaxation_ode_rhs(
 
 @ModelRegistry.register(
     "tnt_loop_bridge",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
 class TNTLoopBridge(TNTBase):
     """Loop-bridge kinetics model for telechelic polymer networks.
 

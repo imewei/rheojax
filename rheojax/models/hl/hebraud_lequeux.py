@@ -53,14 +53,7 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class HebraudLequeux(BaseModel):
     """Hébraud–Lequeux (HL) Model for Soft Glassy Materials.
 

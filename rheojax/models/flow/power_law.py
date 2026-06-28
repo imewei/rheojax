@@ -36,9 +36,7 @@ logger = get_logger(__name__)
 
 @ModelRegistry.register(
     "power_law",
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class PowerLaw(BaseModel):
     """Power Law model for non-Newtonian flow (ROTATION only).
 

@@ -37,9 +37,7 @@ logger = get_logger(__name__)
 
 @ModelRegistry.register(
     "bingham",
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class Bingham(BaseModel):
     """Bingham model for linear viscoplastic flow (ROTATION only).
 

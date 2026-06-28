@@ -81,14 +81,7 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class SGRConventional(BaseModel):
     """Soft Glassy Rheology (SGR) Conventional Model.
 

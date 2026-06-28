@@ -37,9 +37,7 @@ logger = get_logger(__name__)
 
 @ModelRegistry.register(
     "herschel_bulkley",
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class HerschelBulkley(BaseModel):
     """Herschel-Bulkley model for viscoplastic flow (ROTATION only).
 

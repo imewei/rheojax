@@ -88,14 +88,7 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_multi_species",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
 class TNTMultiSpecies(TNTBase):
     """Multi-species Transient Network Theory model.
 

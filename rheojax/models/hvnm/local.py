@@ -82,14 +82,7 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 @ModelRegistry.register(
     "hvnm",
     protocols=[
@@ -99,14 +92,7 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class HVNMLocal(HVNMBase):
     """Local (0D) Hybrid Vitrimer Nanocomposite Model.
 
@@ -935,8 +921,6 @@ class HVNMLocal(HVNMBase):
             if k
             not in (
                 "test_mode",
-                "deformation_mode",
-                "poisson_ratio",
                 "use_log_residuals",
                 "use_jax",
                 "method",
@@ -1001,7 +985,7 @@ class HVNMLocal(HVNMBase):
         fwd_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+            if k != "test_mode"
         }
         result = np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)

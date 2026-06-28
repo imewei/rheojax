@@ -80,9 +80,7 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.FLOW_CURVE,
         Protocol.CREEP,
         Protocol.STARTUP,
-    ],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    ])
 class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     """Nonlocal (1D) Fluidity-Saramito Model with spatial diffusion.
 

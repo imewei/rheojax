@@ -56,9 +56,7 @@ if TYPE_CHECKING:
     protocols=[
         Protocol.FLOW_CURVE,
         Protocol.LAOS,
-    ],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    ])
 class SPPYieldStress(BaseModel):
     """SPP-based yield stress model for LAOS analysis.
 

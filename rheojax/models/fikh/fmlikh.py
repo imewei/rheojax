@@ -52,14 +52,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FMLIKH(FIKHBase):
     r"""Fractional Multi-Layer Isotropic-Kinematic Hardening (FMLIKH) Model.
 

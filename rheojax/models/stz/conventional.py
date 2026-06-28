@@ -43,8 +43,6 @@ _STZ_RESERVED = {
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "deformation_mode",
-    "poisson_ratio",
 }
 
 
@@ -57,14 +55,7 @@ _STZ_RESERVED = {
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class STZConventional(STZBase):
     """Conventional Shear Transformation Zone (STZ) Model.
 

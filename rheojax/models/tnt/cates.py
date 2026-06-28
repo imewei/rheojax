@@ -94,14 +94,7 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_cates",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
 class TNTCates(TNTBase):
     """Cates living polymer (wormlike micelle) model.
 

@@ -38,9 +38,7 @@ logger = get_logger(__name__)
 
 @ModelRegistry.register(
     "carreau_yasuda",
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class CarreauYasuda(BaseModel):
     """Carreau-Yasuda model for non-Newtonian flow (ROTATION only).
 

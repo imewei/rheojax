@@ -68,14 +68,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class ITTMCTIsotropic(ITTMCTBase):
     """ITT-MCT Isotropically Sheared Model with k-resolved correlators.
 

@@ -98,14 +98,7 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 @ModelRegistry.register(
     "tnt",
     protocols=[
@@ -115,14 +108,7 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class TNTSingleMode(TNTBase):
     """Single-mode Transient Network Theory model.
 

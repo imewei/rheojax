@@ -85,14 +85,7 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class VLBMultiNetwork(VLBBase):
     """Multi-network VLB model: M transient + optional permanent + solvent.
 
@@ -459,7 +452,7 @@ class VLBMultiNetwork(VLBBase):
         fwd_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+            if k != "test_mode"
         }
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) [G', G''] for oscillation;
