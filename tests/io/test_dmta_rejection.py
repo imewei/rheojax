@@ -54,7 +54,7 @@ def test_hdf5_encoded_tensile_markers_rejected(tmp_path, location, name, value):
     f = tmp_path / f"{location}_{name}.h5"
     _write_hdf5_with_geometry_marker(f, location, name, value)
 
-    with pytest.raises(UnsupportedDataError):
+    with pytest.raises(UnsupportedDataError, match="Unsupported measurement geometry"):
         load_hdf5(f)
 
 

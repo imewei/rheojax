@@ -479,7 +479,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                 marker = _normalize_hdf5_geometry_marker(marker)
                 if marker in {"tension", "tensile", "bending", "compression"}:
                     raise UnsupportedDataError(
-                        f"Unsupported tensile measurement geometry: {marker}"
+                        f"Unsupported measurement geometry: {marker}"
                     )
 
             # Restore test_mode from top-level attrs

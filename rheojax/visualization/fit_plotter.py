@@ -39,6 +39,12 @@ _GRID_ALPHA = 0.3
 _GRID_LINESTYLE = "--"
 
 
+def _reject_removed_plot_options(kwargs: dict[str, Any]) -> None:
+    """Reject removed public plotting options before model evaluation."""
+    if "deformation_mode" in kwargs:
+        raise TypeError("deformation_mode was removed because RheoJAX is shear-only")
+
+
 def compute_credible_band(
     model_fn: Any,
     x_pred: np.ndarray,
@@ -441,6 +447,7 @@ class FitPlotter:
             For scalar + residuals: 1D ndarray of 2 Axes.
             For no residuals: single Axes or 1D ndarray.
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug("Plotting NLSQ fit", style=style, confidence=confidence)
 
         x_data = _ensure_numpy(x_data)
@@ -610,6 +617,7 @@ class FitPlotter:
         -------
         tuple[Figure, Axes or ndarray]
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug(
             "Plotting Bayesian fit",
             style=style,
@@ -824,6 +832,7 @@ class FitPlotter:
         tuple[Figure, ndarray]
             Figure and 1D array of 2 Axes.
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug("Plotting NLSQ vs Bayesian comparison", style=style)
 
         x_data = _ensure_numpy(x_data)

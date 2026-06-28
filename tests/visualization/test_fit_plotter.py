@@ -33,6 +33,30 @@ def test_fit_plotter_signatures_exclude_deformation_mode(method_name):
     assert "deformation_mode" not in parameters
 
 
+@pytest.mark.parametrize(
+    "method_name", ["plot_nlsq", "plot_bayesian", "plot_comparison"]
+)
+def test_fit_plotter_rejects_legacy_deformation_mode_before_model_evaluation(
+    method_name,
+):
+    """Removed plotting options fail at the public entry point."""
+    model = MagicMock()
+    model.parameters = {}
+    model.model_function.side_effect = AssertionError("model evaluated")
+    x = np.array([1.0, 2.0])
+    y = np.array([2.0, 1.0])
+    result = MagicMock()
+
+    args = [x, y, result, model]
+    if method_name == "plot_comparison":
+        args.insert(3, MagicMock())
+
+    with pytest.raises(TypeError, match="removed because RheoJAX is shear-only"):
+        getattr(FitPlotter(), method_name)(*args, deformation_mode="tension")
+
+    model.model_function.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
