@@ -65,8 +65,9 @@ def test_reject_dmta_kwargs():
 
 
 def test_no_tensile_modulus_type():
-    from rheojax.utils.prony import create_prony_parameter_set
     from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
+    from rheojax.utils.prony import create_prony_parameter_set
+
     assert "modulus_type" not in inspect.signature(create_prony_parameter_set).parameters
     assert "modulus_type" not in inspect.signature(GeneralizedMaxwell.__init__).parameters
     with pytest.raises(TypeError):
@@ -86,3 +87,5 @@ def test_rheodata_clean():
     assert not hasattr(d, "deformation_mode")
 
 
+def test_pipeline_clean():
+    assert _hits("pipeline", ("deformation_mode", "poisson_ratio")) == []

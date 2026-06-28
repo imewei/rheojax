@@ -339,15 +339,6 @@ class Pipeline:
                             _tm = _meta.get("test_mode")
                             if _tm is not None:
                                 fit_kwargs["test_mode"] = _tm
-                        # R9-PIPE-DMT: propagate deformation_mode for DMTA data
-                        if "deformation_mode" not in fit_kwargs:
-                            _dm = _meta.get("deformation_mode")
-                            if _dm is not None:
-                                fit_kwargs["deformation_mode"] = _dm
-                        if "poisson_ratio" not in fit_kwargs:
-                            _pr = _meta.get("poisson_ratio")
-                            if _pr is not None:
-                                fit_kwargs["poisson_ratio"] = _pr
                 # R12-E-001: forward method kwarg to model.fit()
                 fit_kwargs["method"] = method
                 model_obj.fit(X, y, **fit_kwargs)
@@ -586,12 +577,6 @@ class Pipeline:
                         excel_payload["parameters"] = parameters
                     if fit_quality:
                         excel_payload["fit_quality"] = fit_quality
-                    # R13-PIPE-XLS-002: propagate deformation_mode for
-                    # correct E'/G' column labels in the Predictions sheet.
-                    if self.data.metadata:
-                        _dm = self.data.metadata.get("deformation_mode")
-                        if _dm is not None:
-                            excel_payload["deformation_mode"] = _dm
                     save_excel(excel_payload, path, **kwargs)
                 elif format == "csv":
                     # R13-PIPE-CSV-001: Handle complex and 2D y arrays
@@ -810,20 +795,12 @@ class Pipeline:
 
         # Auto-propagate metadata
         # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
-        # values such as test_mode="" or deformation_mode="shear" (empty string).
+        # values such as test_mode="" (empty string).
         _meta = getattr(self.data, "metadata", None) or {}
         if "test_mode" not in bayesian_kwargs:
             _tm = _meta.get("test_mode")
             if _tm is not None:
                 bayesian_kwargs["test_mode"] = _tm
-        if "deformation_mode" not in bayesian_kwargs:
-            _dm = _meta.get("deformation_mode")
-            if _dm is not None:
-                bayesian_kwargs["deformation_mode"] = _dm
-        if "poisson_ratio" not in bayesian_kwargs:
-            _pr = _meta.get("poisson_ratio")
-            if _pr is not None:
-                bayesian_kwargs["poisson_ratio"] = _pr
 
         if seed is not None:
             bayesian_kwargs["seed"] = seed
@@ -909,12 +886,7 @@ class Pipeline:
         X = np.asarray(self.data.x)
         y = np.asarray(self.data.y)
 
-        # Forward deformation_mode from metadata
         _meta = getattr(self.data, "metadata", None) or {}
-        if "deformation_mode" not in kwargs:
-            dm = _meta.get("deformation_mode")
-            if dm is not None:
-                kwargs["deformation_mode"] = dm
         if "test_mode" not in kwargs:
             tm = _meta.get("test_mode")
             if tm is not None:
@@ -987,10 +959,6 @@ class Pipeline:
 
         # Forward metadata
         _meta = getattr(self.data, "metadata", None) or {}
-        if "deformation_mode" not in kwargs:
-            dm = _meta.get("deformation_mode")
-            if dm is not None:
-                kwargs["deformation_mode"] = dm
         if "test_mode" not in kwargs:
             tm = _meta.get("test_mode")
             if tm is not None:
@@ -1260,20 +1228,12 @@ class Pipeline:
 
         # Auto-propagate metadata
         # Use explicit `is not None` guards — truthy check swallows falsy-but-valid
-        # values such as test_mode="" or deformation_mode="shear".
+        # values such as test_mode="".
         _meta = getattr(self.data, "metadata", None) or {}
         if "test_mode" not in fit_kwargs:
             _tm = _meta.get("test_mode")
             if _tm is not None:
                 fit_kwargs["test_mode"] = _tm
-        if "deformation_mode" not in fit_kwargs:
-            _dm = _meta.get("deformation_mode")
-            if _dm is not None:
-                fit_kwargs["deformation_mode"] = _dm
-        if "poisson_ratio" not in fit_kwargs:
-            _pr = _meta.get("poisson_ratio")
-            if _pr is not None:
-                fit_kwargs["poisson_ratio"] = _pr
 
         test_mode = fit_kwargs.pop("test_mode", None)
 
