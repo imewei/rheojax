@@ -1125,10 +1125,6 @@ class BayesianMixin:
             "gamma0",
             "sigma0",
             "stress_target",
-            # DMTA boundary kwargs — consumed by BaseModel.fit(), must not leak
-            # to NUTS. E*→G* conversion is already applied to self.y_data by fit().
-            "deformation_mode",
-            "poisson_ratio",
         }
 
         for key in list(nuts_kwargs):
@@ -1175,31 +1171,6 @@ class BayesianMixin:
                 # Phase 2: Resolve test_mode and extract data
                 X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
                 y_array = y_from_rheo if y_from_rheo is not None else y
-
-                # Apply E*→G* conversion when explicit y is provided with a
-                # tensile deformation_mode.
-                _dm = protocol_kwargs.get("deformation_mode")
-                if _dm is None:
-                    _dm = getattr(self, "_deformation_mode", None)
-                if _dm is not None and y_array is not None:
-                    from rheojax.core.test_modes import DeformationMode
-
-                    if isinstance(_dm, str):
-                        _dm = DeformationMode(_dm)
-                    if _dm.is_tensile():
-                        from rheojax.utils.modulus_conversion import convert_modulus
-
-                        _pr = protocol_kwargs.get("poisson_ratio")
-                        if _pr is None:
-                            _pr = getattr(self, "_poisson_ratio", 0.5)
-                        y_array = convert_modulus(
-                            y_array, _dm, DeformationMode.SHEAR, _pr
-                        )
-                        logger.debug(
-                            "fit_bayesian: converted tensile modulus to shear",
-                            from_mode=str(_dm),
-                            poisson_ratio=_pr,
-                        )
 
                 # R12-B-004: On success, _test_mode is permanently updated.
                 self._test_mode = test_mode

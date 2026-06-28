@@ -14,11 +14,9 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
-from rheojax.core.deformation_converter import DeformationModeConverter
 from rheojax.core.fit_orchestrator import FitOrchestrator
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 
 # Module-level logger
@@ -30,6 +28,16 @@ jax, jnp = safe_import_jax()
 # Type alias for arrays (accepts both NumPy and JAX arrays)
 # Note: jnp.ndarray is dynamically imported, so we use np.ndarray for type checking
 type ArrayLike = np.ndarray
+
+
+def _reject_dmta_kwargs(kwargs: dict) -> None:
+    """Reject deprecated DMTA kwargs: deformation_mode and poisson_ratio."""
+    for key in ("deformation_mode", "poisson_ratio"):
+        if key in kwargs:
+            raise ValueError(
+                f"Passing '{key}' as a keyword argument is no longer supported. "
+                "DMTA/shear conversion must be handled externally."
+            )
 
 
 class BaseModel(BayesianMixin, ABC):
@@ -58,8 +66,6 @@ class BaseModel(BayesianMixin, ABC):
         self.X_data = None  # Store data for Bayesian inference
         self.y_data = None
         self._last_fit_kwargs: dict = {}  # Protocol state for Bayesian forwarding
-        self._deformation_mode: DeformationMode | None = None
-        self._poisson_ratio: float = 0.5
         self._closure_cache: OrderedDict = OrderedDict()
 
     @abstractmethod
@@ -428,8 +434,6 @@ class BaseModel(BayesianMixin, ABC):
         use_multi_start: bool | None = None,
         n_starts: int = 5,
         perturb_factor: float = 0.3,
-        deformation_mode: str | DeformationMode | None = None,
-        poisson_ratio: float = 0.5,
         auto_init: bool = False,
         return_result: bool = False,
         check_physics: bool = False,
@@ -490,6 +494,7 @@ class BaseModel(BayesianMixin, ABC):
             >>> result = model.fit(t, G_data, auto_init=True, check_physics=True,
             ...                    return_result=True)  # Full pipeline
         """
+        _reject_dmta_kwargs(kwargs)
         return FitOrchestrator().execute(
             self,
             X,
@@ -500,8 +505,6 @@ class BaseModel(BayesianMixin, ABC):
             use_multi_start=use_multi_start,
             n_starts=n_starts,
             perturb_factor=perturb_factor,
-            deformation_mode=deformation_mode,
-            poisson_ratio=poisson_ratio,
             auto_init=auto_init,
             return_result=return_result,
             check_physics=check_physics,
@@ -595,7 +598,7 @@ class BaseModel(BayesianMixin, ABC):
 
         return compile_time
 
-    def fit_bayesian(  # extends BayesianMixin signature with DMTA params
+    def fit_bayesian(  # extends BayesianMixin signature
         self,
         X: ArrayLike,
         y: ArrayLike | None = None,
@@ -605,8 +608,6 @@ class BaseModel(BayesianMixin, ABC):
         initial_values: dict[str, float] | None = None,
         test_mode: str | None = None,
         seed: int | None = None,
-        deformation_mode: str | DeformationMode | None = None,
-        poisson_ratio: float = 0.5,
         **nuts_kwargs,
     ) -> BayesianResult:
         """Perform Bayesian inference using NumPyro NUTS sampler.
@@ -661,6 +662,7 @@ class BaseModel(BayesianMixin, ABC):
             ...     test_mode='creep'
             ... )
         """
+        _reject_dmta_kwargs(nuts_kwargs)
         # Get data shape for logging
         _shape = getattr(X, "shape", None)
         data_shape = (
@@ -686,34 +688,7 @@ class BaseModel(BayesianMixin, ABC):
                 y = X.y
             if test_mode is None:
                 test_mode = X.test_mode
-            if deformation_mode is None:
-                deformation_mode = X.metadata.get("deformation_mode", None)
             X = jnp.array(X.x)
-
-        # --- Deformation mode: fall back to prior fit() if not given ---
-        if deformation_mode is None:
-            deformation_mode = getattr(self, "_deformation_mode", None)
-            if deformation_mode is not None:
-                poisson_ratio = getattr(self, "_poisson_ratio", poisson_ratio)
-                logger.warning(
-                    "fit_bayesian() using deformation_mode='%s' from prior "
-                    "fit(). Pass deformation_mode explicitly if this is not "
-                    "intended.",
-                    str(deformation_mode),
-                )
-
-        # --- Record deformation mode on the instance ---
-        # NOTE: We intentionally do NOT convert E*→G* here.  BayesianMixin.fit_bayesian
-        # (bayesian.py:1156-1177) already performs the tensile→shear conversion using
-        # either protocol_kwargs or a fallback to self._deformation_mode.  Converting
-        # here as well caused a double-application of the 1/(2(1+ν)) factor, which
-        # silently scaled the posterior of Ge/Gm by ~1/2.7 for ν=0.35 tensile data.
-        resolved_dm = DeformationModeConverter.resolve_deformation_mode(
-            deformation_mode
-        )
-        if resolved_dm is not None:
-            self._deformation_mode = resolved_dm
-            self._poisson_ratio = poisson_ratio
 
         # Store data for model_function access
         self.X_data = X
@@ -789,8 +764,6 @@ class BaseModel(BayesianMixin, ABC):
         self,
         X: ArrayLike,
         test_mode: str | None = None,
-        deformation_mode: str | DeformationMode | None = None,
-        poisson_ratio: float | None = None,
         **kwargs,
     ) -> ArrayLike:
         """Make predictions.
@@ -800,16 +773,12 @@ class BaseModel(BayesianMixin, ABC):
             test_mode: Optional test mode ('oscillation', 'relaxation', 'creep', 'flow').
                       If provided, sets model's test_mode before prediction.
                       Useful for data generation without fitting.
-            deformation_mode: Optional deformation mode for output conversion.
-                If None, uses the mode stored from fit(). If tensile, converts
-                G* predictions to E* space.
-            poisson_ratio: Poisson's ratio for conversion. If None, uses value
-                stored from fit() (default 0.5).
             **kwargs: Additional arguments passed to the internal _predict method.
 
         Returns:
-            Model predictions (in E* space if deformation_mode is tensile)
+            Model predictions
         """
+        _reject_dmta_kwargs(kwargs)
         x_shape = getattr(X, "shape", None) or (len(X),)
         logger.debug(
             "Predict called",
@@ -869,17 +838,6 @@ class BaseModel(BayesianMixin, ABC):
             # ADR-004: All _predict() signatures now accept **kwargs,
             # so we can call directly without try/except/retry.
             result = self._predict(X, **kwargs)
-
-            # Convert G* -> E* if tensile deformation mode
-            dm = DeformationModeConverter.resolve_deformation_mode(
-                deformation_mode
-                if deformation_mode is not None
-                else self._deformation_mode
-            )
-            nu = poisson_ratio if poisson_ratio is not None else self._poisson_ratio
-            result = DeformationModeConverter.convert_from_shear(
-                result, dm, nu, self.__class__.__name__
-            )
 
             logger.debug(
                 "Predict completed",

@@ -25,10 +25,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from rheojax.core.deformation_converter import DeformationModeConverter
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.post_fit_validator import PostFitValidator
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
@@ -38,7 +36,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_converter = DeformationModeConverter()
 _validator = PostFitValidator()
 
 
@@ -57,8 +54,6 @@ class FitOrchestrator:
         use_multi_start: bool | None = None,
         n_starts: int = 5,
         perturb_factor: float = 0.3,
-        deformation_mode: str | DeformationMode | None = None,
-        poisson_ratio: float = 0.5,
         auto_init: bool = False,
         return_result: bool = False,
         check_physics: bool = False,
@@ -90,21 +85,7 @@ class FitOrchestrator:
         model._last_fit_kwargs = {}
 
         # --- RheoData unpacking ---
-        X, y, deformation_mode, kwargs = self._unpack_rheodata(
-            X, y, deformation_mode, kwargs
-        )
-
-        # --- deformation mode conversion (E* -> G*) ---
-        resolved_dm = _converter.resolve_deformation_mode(deformation_mode)
-        if resolved_dm is not None:
-            model._deformation_mode = resolved_dm
-            model._poisson_ratio = poisson_ratio
-            y = _converter.convert_to_shear(
-                y, resolved_dm, poisson_ratio, model.__class__.__name__
-            )
-        else:
-            # Clear stale tensile mode (R10-BASE-003)
-            model._deformation_mode = None
+        X, y, kwargs = self._unpack_rheodata(X, y, kwargs)
 
         # --- store data for Bayesian warm-start ---
         model.X_data = X
@@ -191,23 +172,20 @@ class FitOrchestrator:
     def _unpack_rheodata(
         X: ArrayLike,
         y: ArrayLike | None,
-        deformation_mode: str | DeformationMode | None,
         kwargs: dict,
-    ) -> tuple[ArrayLike, ArrayLike, str | DeformationMode | None, dict]:
-        """Extract arrays, test_mode, and deformation_mode from RheoData."""
+    ) -> tuple[ArrayLike, ArrayLike | None, dict]:
+        """Extract arrays and test_mode from RheoData."""
         from rheojax.core.data import RheoData
 
         if isinstance(X, RheoData):
             _metadata = X.metadata
-            if deformation_mode is None:
-                deformation_mode = _metadata.get("deformation_mode", None)
             # R10-BASE-001: propagate test_mode from RheoData
             if "test_mode" in _metadata and "test_mode" not in kwargs:
                 kwargs["test_mode"] = _metadata["test_mode"]
             if y is None:
                 y = X.y
             X = X.x
-        return X, y, deformation_mode, kwargs
+        return X, y, kwargs
 
     @staticmethod
     def _normalize_stored_data(model: Any) -> None:
