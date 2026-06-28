@@ -577,9 +577,6 @@ def make_fit_worker(
 
     x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
 
-    # Get deformation_mode and poisson_ratio from metadata or options
-    deformation_mode = metadata.get("deformation_mode")
-    poisson_ratio = metadata.get("poisson_ratio")
 
     work_fn = partial(
         _fit_work_entry,
@@ -591,8 +588,6 @@ def make_fit_worker(
         options=options or {},
         y2_data=y2_data,
         metadata=metadata,
-        deformation_mode=deformation_mode,
-        poisson_ratio=poisson_ratio,
         dataset_id=dataset_id,
     )
 
@@ -670,8 +665,6 @@ def make_bayesian_worker(
     priors: dict[str, Any] | None = None,
     seed: int = 42,
     cancel_token: Any | None = None,
-    deformation_mode: str | None = None,
-    poisson_ratio: float | None = None,
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
 ) -> Any:
@@ -697,10 +690,7 @@ def make_bayesian_worker(
         Random seed for reproducibility.
     cancel_token : CancellationToken, optional
         Only used in thread mode.
-    deformation_mode : str, optional
-        Deformation mode for DMTA.
-    poisson_ratio : float, optional
-        Poisson ratio for E-to-G conversion.
+
     fitted_model_state : dict, optional
         Full model state for warm-start.
     dataset_id : str
@@ -726,8 +716,6 @@ def make_bayesian_worker(
             priors=priors,
             seed=seed,
             cancel_token=cancel_token,
-            deformation_mode=deformation_mode,
-            poisson_ratio=poisson_ratio,
             fitted_model_state=fitted_model_state,
             dataset_id=dataset_id,
         )
@@ -766,8 +754,6 @@ def make_bayesian_worker(
         seed=seed,
         y2_data=y2_data,
         metadata=metadata,
-        deformation_mode=deformation_mode,
-        poisson_ratio=poisson_ratio,
         fitted_model_state=safe_model_state,
         dataset_id=dataset_id,
     )

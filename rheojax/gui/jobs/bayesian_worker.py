@@ -139,8 +139,6 @@ class BayesianWorker(QRunnable):
         priors: dict[str, Any] | None = None,
         seed: int = 42,
         cancel_token: CancellationToken | None = None,
-        deformation_mode: str | None = None,
-        poisson_ratio: float | None = None,
         fitted_model_state: dict[str, Any] | None = None,
         dataset_id: str = "",
     ):
@@ -166,10 +164,7 @@ class BayesianWorker(QRunnable):
             Random seed for reproducibility
         cancel_token : CancellationToken, optional
             Token for cancellation support
-        deformation_mode : str, optional
-            Deformation mode for DMTA (e.g., 'tension', 'shear')
-        poisson_ratio : float, optional
-            Poisson ratio for E*-G* conversion
+
         dataset_id : str, default=""
             Dataset identifier for result association
         """
@@ -191,8 +186,6 @@ class BayesianWorker(QRunnable):
         self._warm_start = warm_start
         self._priors = priors or {}
         self._seed = seed
-        self._deformation_mode = deformation_mode
-        self._poisson_ratio = poisson_ratio
         self._fitted_model_state = fitted_model_state
         self._dataset_id = dataset_id
 
@@ -348,10 +341,7 @@ class BayesianWorker(QRunnable):
 
             svc = BayesianService()
             mcmc_kwargs: dict[str, Any] = {"seed": self._seed}
-            if self._deformation_mode is not None:
-                mcmc_kwargs["deformation_mode"] = self._deformation_mode
-            if self._poisson_ratio is not None:
-                mcmc_kwargs["poisson_ratio"] = self._poisson_ratio
+
             # F-HL-005 fix: Pass fitted model state for stateful models
             if self._fitted_model_state:
                 mcmc_kwargs["fitted_model_state"] = self._fitted_model_state

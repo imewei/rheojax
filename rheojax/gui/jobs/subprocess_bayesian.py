@@ -31,8 +31,6 @@ def run_bayesian_isolated(
     cancel_event: mp.Event,
     y2_data: np.ndarray | None = None,
     metadata: dict[str, Any] | None = None,
-    deformation_mode: str | None = None,
-    poisson_ratio: float | None = None,
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
 ) -> dict[str, Any]:
@@ -66,10 +64,7 @@ def run_bayesian_isolated(
         Imaginary part for complex modulus (oscillation).
     metadata : dict or None
         Additional metadata for RheoData.
-    deformation_mode : str or None
-        Deformation mode (tension, shear, ...).
-    poisson_ratio : float or None
-        Poisson ratio for E* <-> G* conversion.
+
     fitted_model_state : dict or None
         Fitted model instance variables to transfer.
     dataset_id : str
@@ -137,10 +132,7 @@ def run_bayesian_isolated(
     mcmc_kwargs: dict[str, Any] = {
         "seed": seed,
     }
-    if deformation_mode is not None:
-        mcmc_kwargs["deformation_mode"] = deformation_mode
-    if poisson_ratio is not None:
-        mcmc_kwargs["poisson_ratio"] = poisson_ratio
+
     if priors:
         mcmc_kwargs["custom_priors"] = priors
     if fitted_model_state is not None:

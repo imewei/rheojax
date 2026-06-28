@@ -63,9 +63,7 @@ from rheojax.gui.state.reducers.project_reducers import (
 )
 from rheojax.gui.state.reducers.ui_reducers import (
     reduce_check_compatibility,
-    reduce_set_deformation_mode,
     reduce_set_os_theme,
-    reduce_set_poisson_ratio,
     reduce_set_tab,
     reduce_set_theme,
     reduce_set_workflow_mode,
@@ -86,8 +84,6 @@ REDUCER_DISPATCH: dict[str, ReducerFn] = {
     "SET_THEME": reduce_set_theme,
     "SET_OS_THEME": reduce_set_os_theme,
     "SET_WORKFLOW_MODE": reduce_set_workflow_mode,
-    "SET_DEFORMATION_MODE": reduce_set_deformation_mode,
-    "SET_POISSON_RATIO": reduce_set_poisson_ratio,
     "SET_TAB": reduce_set_tab,
     "NAVIGATE_TAB": reduce_set_tab,
     "CHECK_COMPATIBILITY": reduce_check_compatibility,

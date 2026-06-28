@@ -222,34 +222,6 @@ class BayesianPage(QWidget):
         )
         layout.addWidget(self._warmstart_check)
 
-        # Deformation mode (DMTA / DMA support)
-        deform_label = QLabel("Deformation Mode:")
-        layout.addWidget(deform_label)
-        self._deformation_combo = QComboBox()
-        self._deformation_combo.addItems(["Shear", "Tension", "Bending", "Compression"])
-        self._deformation_combo.setToolTip(
-            "Select deformation mode (Tension for DMTA/DMA data)"
-        )
-        self._deformation_combo.currentTextChanged.connect(
-            self._on_deformation_mode_changed
-        )
-        layout.addWidget(self._deformation_combo)
-
-        poisson_layout = QHBoxLayout()
-        poisson_layout.addWidget(QLabel("Poisson:"))
-        from rheojax.gui.compat import QDoubleSpinBox
-
-        self._poisson_spin = QDoubleSpinBox()
-        self._poisson_spin.setRange(0.0, 0.5)
-        self._poisson_spin.setValue(0.5)
-        self._poisson_spin.setSingleStep(0.05)
-        self._poisson_spin.setDecimals(3)
-        self._poisson_spin.setToolTip(
-            "Poisson ratio for E*-G* conversion (rubber=0.5, glassy=0.35)"
-        )
-        self._poisson_spin.valueChanged.connect(self._on_poisson_ratio_changed)
-        poisson_layout.addWidget(self._poisson_spin)
-        layout.addLayout(poisson_layout)
 
         # Priors editor button
         btn_priors = QPushButton("Edit Priors...")
@@ -386,7 +358,6 @@ class BayesianPage(QWidget):
             # WorkerPool path (main_window._on_job_failed → BAYESIAN_FAILED
             # dispatch) are surfaced to the user in the BayesianPage UI.
             self._store.signals.bayesian_failed.connect(self._on_bayesian_failed)
-            self._store.signals.state_changed.connect(self._sync_deformation_from_store)
 
     def _disconnect_worker_signals(self) -> None:
         """Disconnect this page's slots from the current worker's signals.
@@ -436,7 +407,6 @@ class BayesianPage(QWidget):
                 ("bayesian_started", self._on_bayesian_started),
                 ("bayesian_completed", self._on_bayesian_completed),
                 ("bayesian_failed", self._on_bayesian_failed),
-                ("state_changed", self._sync_deformation_from_store),
             ):
                 sig = getattr(self._store.signals, sig_name, None)
                 if sig is not None:
@@ -455,64 +425,9 @@ class BayesianPage(QWidget):
         if model_name:
             self._model_label.setText(f"Model: {model_name}")
             # F-010 fix: Validate DMTA support for selected model
-            self._update_deformation_combo(model_name)
         else:
             self._model_label.setText("Model: (select in Fit tab)")
 
-    def _update_deformation_combo(self, model_name: str) -> None:
-        """Enable/disable deformation mode combo based on model DMTA support."""
-        try:
-            from rheojax.gui.services.model_service import ModelService
-
-            svc = ModelService()
-            supported = svc.get_supported_deformation_modes(model_name)
-        except Exception:
-            supported = []
-        has_tension = "tension" in supported
-        self._deformation_combo.setEnabled(has_tension)
-        if not has_tension:
-            was_blocked = self._deformation_combo.blockSignals(True)
-            self._deformation_combo.setCurrentIndex(0)  # "Shear"
-            self._deformation_combo.blockSignals(was_blocked)
-            self._deformation_combo.setToolTip(
-                f"Model '{model_name}' supports shear deformation only"
-            )
-        else:
-            self._deformation_combo.setToolTip(
-                "Select deformation mode (Tension for DMTA/DMA data)"
-            )
-
-    @Slot()
-    def _sync_deformation_from_store(self) -> None:
-        """Sync deformation mode and Poisson ratio from store state."""
-        state = self._store.get_state()
-
-        # Sync deformation combo
-        mode_text = state.deformation_mode.capitalize()  # "shear" -> "Shear"
-        current = self._deformation_combo.currentText()
-        if current != mode_text:
-            was_blocked = self._deformation_combo.blockSignals(True)
-            idx = self._deformation_combo.findText(mode_text)
-            if idx >= 0:
-                self._deformation_combo.setCurrentIndex(idx)
-            self._deformation_combo.blockSignals(was_blocked)
-
-        # Sync Poisson ratio
-        if abs(self._poisson_spin.value() - state.poisson_ratio) > 1e-6:
-            was_blocked = self._poisson_spin.blockSignals(True)
-            self._poisson_spin.setValue(state.poisson_ratio)
-            self._poisson_spin.blockSignals(was_blocked)
-
-    def _on_deformation_mode_changed(self, mode: str) -> None:
-        """Dispatch deformation mode change to store (bidirectional sync)."""
-        if mode:
-            self._store.dispatch(
-                "SET_DEFORMATION_MODE", {"deformation_mode": mode.lower()}
-            )
-
-    def _on_poisson_ratio_changed(self, value: float) -> None:
-        """Dispatch Poisson ratio change to store (bidirectional sync)."""
-        self._store.dispatch("SET_POISSON_RATIO", {"poisson_ratio": value})
 
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
@@ -910,9 +825,6 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
 
-        # Get DMTA deformation mode and Poisson ratio from UI
-        deform_text = self._deformation_combo.currentText().lower()
-        poisson_val = self._poisson_spin.value()
 
         # F-HL-005 fix: Extract fitted model state
         fitted_model_state = None
@@ -954,8 +866,6 @@ class BayesianPage(QWidget):
             warm_start=warm_start_dict,
             priors=config.get("priors"),
             seed=config.get("seed", state.current_seed),
-            deformation_mode=deform_text if deform_text != "shear" else None,
-            poisson_ratio=poisson_val if deform_text != "shear" else None,
             fitted_model_state=fitted_model_state,
             dataset_id=self._submitted_dataset_id,
         )
@@ -985,7 +895,6 @@ class BayesianPage(QWidget):
             num_chains=config.get("num_chains", 4),
             has_warm_start=warm_start_dict is not None,
             has_priors=bool(config.get("priors")),
-            deformation_mode=deform_text,
             page="BayesianPage",
         )
 

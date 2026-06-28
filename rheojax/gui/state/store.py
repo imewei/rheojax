@@ -340,10 +340,6 @@ class AppState:
     # Provenance
     transform_history: list[TransformRecord] = field(default_factory=list)
 
-    # DMTA / Deformation
-    deformation_mode: str = "shear"  # shear, tension, bending, compression
-    poisson_ratio: float = 0.5  # rubber default
-
     # Settings
     workflow_mode: WorkflowMode = WorkflowMode.FITTING
     current_seed: int = 42
@@ -979,8 +975,6 @@ class StateStore:
             "os_theme",
             "last_export_dir",
             "recent_projects",
-            "deformation_mode",
-            "poisson_ratio",
             "visual_pipeline",
         ]:
             old_val = getattr(old_state, attr, None)

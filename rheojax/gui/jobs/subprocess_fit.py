@@ -27,8 +27,6 @@ def run_fit_isolated(
     cancel_event: mp.Event,
     y2_data: np.ndarray | None = None,
     metadata: dict[str, Any] | None = None,
-    deformation_mode: str | None = None,
-    poisson_ratio: float | None = None,
     dataset_id: str = "",
 ) -> dict[str, Any]:
     """Run NLSQ fitting in an isolated subprocess.
@@ -68,11 +66,6 @@ def run_fit_isolated(
     start_time = time.perf_counter()
     fit_kwargs = options.copy()
     max_iter = int(fit_kwargs.get("max_iter", 100)) or 100
-
-    if deformation_mode is not None:
-        fit_kwargs["deformation_mode"] = deformation_mode
-    if poisson_ratio is not None:
-        fit_kwargs["poisson_ratio"] = poisson_ratio
 
     last_iteration = 0
     last_loss = float("inf")
