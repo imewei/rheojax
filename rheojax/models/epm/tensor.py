@@ -16,7 +16,6 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.epm.base import EPMBase
 from rheojax.utils.epm_kernels_tensorial import (
     make_tensorial_propagator_q,

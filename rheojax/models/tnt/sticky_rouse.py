@@ -107,7 +107,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_multimode_ode_rhs,

@@ -63,7 +63,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, TestMode
+from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.sgr_kernels import G0, Gp
 

@@ -25,7 +25,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     ikh_creep_ode_rhs,

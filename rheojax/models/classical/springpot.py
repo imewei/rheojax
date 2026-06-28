@@ -31,7 +31,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, TestMode, detect_test_mode
+from rheojax.core.test_modes import TestMode, detect_test_mode
 from rheojax.logging import get_logger
 
 # Module logger

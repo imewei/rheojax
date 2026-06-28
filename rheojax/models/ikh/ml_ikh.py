@@ -25,7 +25,6 @@ from rheojax.logging import get_logger
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     make_ml_ikh_creep_ode_rhs_per_mode,

@@ -41,7 +41,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.hvnm._base import HVNMBase
 from rheojax.models.hvnm._kernels import (
     hvnm_ber_rate_constant_interphase,

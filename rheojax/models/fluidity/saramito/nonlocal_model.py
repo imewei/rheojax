@@ -36,7 +36,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (
