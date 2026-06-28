@@ -72,3 +72,10 @@ def test_no_tensile_modulus_type():
     with pytest.raises(TypeError):
         GeneralizedMaxwell(modulus_type="tensile")
 
+
+def test_registry_clean():
+    from rheojax.core.registry import ModelRegistry, Registry
+    assert "deformation_mode" not in inspect.signature(ModelRegistry.find).parameters
+    assert "deformation_mode" not in inspect.signature(Registry.find_compatible).parameters
+    assert not hasattr(ModelRegistry.get_info("maxwell"), "deformation_modes")
+
