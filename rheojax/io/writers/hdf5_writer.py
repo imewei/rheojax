@@ -476,9 +476,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                 metadata.get("deformation_mode"),
             )
             for marker in geometry_markers:
-                if marker is None:
-                    continue
-                marker = _safe_decode_hdf5_string(marker).lower()
+                marker = _normalize_hdf5_geometry_marker(marker)
                 if marker in {"tension", "tensile", "bending", "compression"}:
                     raise UnsupportedDataError(
                         f"Unsupported tensile measurement geometry: {marker}"
@@ -510,6 +508,24 @@ def load_hdf5(filepath: str | Path) -> RheoData:
 
 
 _MAX_HDF5_STRING_LEN = 4096  # Limit string attributes from untrusted HDF5 files
+
+
+def _normalize_hdf5_geometry_marker(value: Any) -> str | None:
+    """Normalize a scalar or one-element HDF5 string attribute."""
+    if isinstance(value, np.ndarray):
+        if value.size != 1:
+            return None
+        value = value.reshape(-1)[0]
+    elif isinstance(value, (list, tuple)):
+        if len(value) != 1:
+            return None
+        value = value[0]
+
+    if isinstance(value, np.generic):
+        value = value.item()
+    if not isinstance(value, (bytes, str)):
+        return None
+    return _safe_decode_hdf5_string(value).strip().lower()
 
 
 def _safe_decode_hdf5_string(

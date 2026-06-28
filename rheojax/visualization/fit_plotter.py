@@ -395,7 +395,6 @@ class FitPlotter:
         show_uncertainty: bool = True,
         n_pred_points: int = 200,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, Axes | np.ndarray]:
         """Plot NLSQ fit with uncertainty band and optional residuals.
@@ -432,8 +431,6 @@ class FitPlotter:
             Number of points for the smooth prediction curve (default: 200).
         style : str
             Plot style ('default', 'publication', 'presentation').
-        deformation_mode : str, optional
-            Ignored. Modulus labels are always G'/G''.
         **kwargs
             Additional arguments forwarded to model_function (e.g., test_mode).
 
@@ -569,7 +566,6 @@ class FitPlotter:
         n_pred_points: int = 200,
         show_residuals: bool = False,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, Axes | np.ndarray]:
         """Plot Bayesian posterior predictive with credible interval.
@@ -607,8 +603,6 @@ class FitPlotter:
             If True, add residuals subplot using posterior median.
         style : str
             Plot style.
-        deformation_mode : str, optional
-            Ignored. Modulus labels are always G'/G''.
         **kwargs
             Additional arguments forwarded to model_function.
 
@@ -792,7 +786,6 @@ class FitPlotter:
         max_draws: int = 500,
         n_pred_points: int = 200,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, np.ndarray]:
         """Side-by-side comparison of NLSQ and Bayesian fits.
@@ -823,8 +816,6 @@ class FitPlotter:
             Prediction grid density.
         style : str
             Plot style.
-        deformation_mode : str, optional
-            For axis labels.
         **kwargs
             Forwarded to model_function.
 
