@@ -137,14 +137,11 @@ def save_hdf5(
                 f.attrs["domain"] = data.domain
                 logger.debug("Domain stored", domain=data.domain)
 
-                # Store test_mode and deformation_mode as top-level attrs
+                # Store test_mode as top-level attrs
                 # (belt-and-suspenders: also in metadata dict)
                 test_mode = data.test_mode
                 if test_mode is not None:
                     f.attrs["test_mode"] = str(test_mode)
-                deformation_mode = data.deformation_mode
-                if deformation_mode is not None:
-                    f.attrs["deformation_mode"] = str(deformation_mode)
 
                 # Store metadata
                 if data.metadata:
@@ -470,7 +467,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                     metadata_keys=list(metadata.keys()),
                 )
 
-            # Restore test_mode/deformation_mode from top-level attrs
+            # Restore test_mode from top-level attrs
             # into metadata (belt-and-suspenders with metadata dict)
             # R6-HDF5-003: Decode bytes for top-level string attrs.
             test_mode = f.attrs.get("test_mode", None)
@@ -478,11 +475,6 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                 test_mode = _safe_decode_hdf5_string(test_mode)
                 if "test_mode" not in metadata:
                     metadata["test_mode"] = test_mode
-            deformation_mode = f.attrs.get("deformation_mode", None)
-            if deformation_mode is not None:
-                deformation_mode = _safe_decode_hdf5_string(deformation_mode)
-                if "deformation_mode" not in metadata:
-                    metadata["deformation_mode"] = deformation_mode
 
             ctx["data_points"] = len(x)
             ctx["has_metadata"] = bool(metadata)
@@ -573,7 +565,7 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     # name collides with an already-loaded attribute.  Without this guard the
     # dataset loop would silently overwrite the attribute value, corrupting
     # metadata that was intentionally stored as a scalar attribute (e.g.
-    # test_mode, deformation_mode stored as belt-and-suspenders duplicates).
+    # test_mode stored as belt-and-suspenders duplicates).
     for key in group.keys():
         if key in metadata:
             # Attribute with the same name already loaded — skip the

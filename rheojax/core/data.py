@@ -589,41 +589,14 @@ class RheoData:
         return mode
 
     @property
-    def deformation_mode(self) -> str:
-        """Get deformation mode from metadata.
-
-        Returns 'shear' if not explicitly set. Possible values:
-        'shear', 'tension', 'bending', 'compression'.
-        """
-        return self.metadata.get("deformation_mode", "shear")
-
-    @property
     def storage_modulus_label(self) -> str:
-        """Get appropriate storage modulus label based on deformation mode.
-
-        Returns "E'" for tensile/bending/compression, "G'" for shear.
-        """
-        from rheojax.core.test_modes import DeformationMode
-
-        try:
-            dm = DeformationMode(self.deformation_mode)
-            return "E'" if dm.is_tensile() else "G'"
-        except ValueError:
-            return "G'"
+        """Get storage modulus label. Always returns "G'" (shear)."""
+        return "G'"
 
     @property
     def loss_modulus_label(self) -> str:
-        """Get appropriate loss modulus label based on deformation mode.
-
-        Returns 'E"' for tensile/bending/compression, 'G"' for shear.
-        """
-        from rheojax.core.test_modes import DeformationMode
-
-        try:
-            dm = DeformationMode(self.deformation_mode)
-            return 'E"' if dm.is_tensile() else 'G"'
-        except ValueError:
-            return 'G"'
+        """Get loss modulus label. Always returns 'G"' (shear)."""
+        return 'G"'
 
     def __getitem__(self, idx):
         """Support indexing and slicing."""

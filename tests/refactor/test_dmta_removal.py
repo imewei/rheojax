@@ -79,3 +79,10 @@ def test_registry_clean():
     assert "deformation_mode" not in inspect.signature(Registry.find_compatible).parameters
     assert not hasattr(ModelRegistry.get_info("maxwell"), "deformation_modes")
 
+
+def test_rheodata_clean():
+    from rheojax.core.data import RheoData
+    d = RheoData(x=np.array([1.0, 2, 3]), y=np.array([1.0, 2, 3]))
+    assert not hasattr(d, "deformation_mode")
+
+

@@ -59,6 +59,15 @@ class TestRheoDataCreation:
         assert data.y_units == y_units
 
     @pytest.mark.smoke
+    def test_modulus_labels_always_shear(self):
+        """Test that RheoData storage/loss modulus labels are always shear (G'/G\")."""
+        x = np.array([1, 2, 3])
+        y = np.array([10, 20, 30])
+        data = RheoData(x=x, y=y)
+        assert data.storage_modulus_label == "G'"
+        assert data.loss_modulus_label == 'G"'
+
+    @pytest.mark.smoke
     def test_create_with_domain_type(self):
         """Test creating RheoData with domain specification."""
         x = np.array([0.1, 0.2, 0.3])

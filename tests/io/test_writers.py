@@ -482,7 +482,7 @@ class TestHDF5ModeRoundTrip:
         assert loaded.metadata.get("test_mode") == "oscillation"
 
     def test_deformation_mode_round_trip(self, tmp_path):
-        """deformation_mode stored as top-level attr and recovered on load."""
+        """deformation_mode is not stored as top-level attr, but survives in metadata recursive load/save."""
         data = RheoData(
             x=np.array([1.0, 2.0]),
             y=np.array([100.0, 200.0]),
@@ -490,6 +490,12 @@ class TestHDF5ModeRoundTrip:
         )
         filepath = tmp_path / "deformation_rt.h5"
         save_hdf5(data, str(filepath))
+
+        import h5py
+        with h5py.File(filepath, "r") as f:
+            assert "deformation_mode" not in f.attrs
+            assert "test_mode" in f.attrs
+
         loaded = load_hdf5(str(filepath))
         assert loaded.metadata.get("deformation_mode") == "tension"
         assert loaded.metadata.get("test_mode") == "oscillation"
