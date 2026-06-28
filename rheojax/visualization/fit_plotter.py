@@ -406,9 +406,8 @@ class FitPlotter:
         - Uncertainty band from covariance matrix (shaded, if available)
         - Optional residuals subplot
 
-        For complex oscillation data, creates separate panels for G'/G''
-        (or E'/E'' based on deformation_mode), each with its own uncertainty
-        band and residuals.
+        For complex oscillation data, creates separate panels for G'/G'', each
+        with its own uncertainty band and residuals.
 
         Parameters
         ----------
@@ -434,7 +433,7 @@ class FitPlotter:
         style : str
             Plot style ('default', 'publication', 'presentation').
         deformation_mode : str, optional
-            'tension'/'bending'/'compression' for E'/E'' labels.
+            Ignored. Modulus labels are always G'/G''.
         **kwargs
             Additional arguments forwarded to model_function (e.g., test_mode).
 
@@ -519,8 +518,6 @@ class FitPlotter:
 
         # Modulus labels
         storage_label, loss_label, _ = "G'", 'G"', "Modulus"
-        if deformation_mode in ("tension", "bending", "compression"):
-            storage_label, loss_label = "E'", 'E"'
 
         model_name = fit_result.model_name or fit_result.model_class_name or ""
         band_label = f"{int(confidence * 100)}% CI"
@@ -611,7 +608,7 @@ class FitPlotter:
         style : str
             Plot style.
         deformation_mode : str, optional
-            Deformation mode for axis labels.
+            Ignored. Modulus labels are always G'/G''.
         **kwargs
             Additional arguments forwarded to model_function.
 
@@ -676,8 +673,6 @@ class FitPlotter:
 
         # Labels
         storage_label, loss_label = "G'", 'G"'
-        if deformation_mode in ("tension", "bending", "compression"):
-            storage_label, loss_label = "E'", 'E"'
 
         band_label = f"{int(credible_level * 100)}% CI"
         model_name = getattr(model, "__class__", type(model)).__name__

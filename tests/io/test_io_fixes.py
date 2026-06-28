@@ -47,13 +47,14 @@ import pytest
 
 
 class TestExcelDeformationMode:
-    """F-IO-001: Excel reader must detect and store deformation_mode."""
+    """Legacy Excel DMTA inputs must be rejected."""
 
     @pytest.mark.smoke
     def test_excel_explicit_deformation_mode(self, tmp_path):
-        """load_excel with explicit deformation_mode='tension' sets metadata."""
+        """load_excel rejects explicit deformation_mode='tension'."""
         pd = pytest.importorskip("pandas")
         pytest.importorskip("openpyxl")
+        from rheojax.io._exceptions import UnsupportedDataError
         from rheojax.io.readers.excel_reader import load_excel
 
         omega = np.logspace(-1, 2, 20)
@@ -66,22 +67,20 @@ class TestExcelDeformationMode:
         )
         df.to_excel(fpath, index=False)
 
-        data = load_excel(
-            fpath,
-            x_col="omega (rad/s)",
-            y_cols=["E' (Pa)", "E'' (Pa)"],
-            deformation_mode="tension",
-        )
-
-        assert data.metadata["deformation_mode"] == "tension"
-        assert np.iscomplexobj(data.y)
-        assert len(data.x) == 20
+        with pytest.raises(UnsupportedDataError):
+            load_excel(
+                fpath,
+                x_col="omega (rad/s)",
+                y_cols=["E' (Pa)", "E'' (Pa)"],
+                deformation_mode="tension",
+            )
 
     @pytest.mark.smoke
     def test_excel_auto_detect_deformation_mode(self, tmp_path):
-        """load_excel auto-detects tension from E' column names."""
+        """load_excel rejects E' column names."""
         pd = pytest.importorskip("pandas")
         pytest.importorskip("openpyxl")
+        from rheojax.io._exceptions import UnsupportedDataError
         from rheojax.io.readers.excel_reader import load_excel
 
         omega = np.logspace(-1, 2, 15)
@@ -94,13 +93,12 @@ class TestExcelDeformationMode:
         )
         df.to_excel(fpath, index=False)
 
-        data = load_excel(
-            fpath,
-            x_col="omega (rad/s)",
-            y_cols=["E' (Pa)", "E'' (Pa)"],
-        )
-
-        assert data.metadata.get("deformation_mode") == "tension"
+        with pytest.raises(UnsupportedDataError):
+            load_excel(
+                fpath,
+                x_col="omega (rad/s)",
+                y_cols=["E' (Pa)", "E'' (Pa)"],
+            )
 
     @pytest.mark.smoke
     def test_excel_shear_not_set_for_g_prime(self, tmp_path):

@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
-from rheojax.io._exceptions import RheoJaxValidationWarning
+from rheojax.io._exceptions import RheoJaxValidationWarning, UnsupportedDataError
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
@@ -466,6 +466,23 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                     "Metadata loaded",
                     metadata_keys=list(metadata.keys()),
                 )
+
+            # Reject legacy DMTA files only after loading the required datasets,
+            # so malformed files still report missing x/y before geometry.
+            geometry_markers = (
+                f.attrs.get("measurement_geometry"),
+                f.attrs.get("deformation_mode"),
+                metadata.get("measurement_geometry"),
+                metadata.get("deformation_mode"),
+            )
+            for marker in geometry_markers:
+                if marker is None:
+                    continue
+                marker = _safe_decode_hdf5_string(marker).lower()
+                if marker in {"tension", "tensile", "bending", "compression"}:
+                    raise UnsupportedDataError(
+                        f"Unsupported tensile measurement geometry: {marker}"
+                    )
 
             # Restore test_mode from top-level attrs
             # into metadata (belt-and-suspenders with metadata dict)

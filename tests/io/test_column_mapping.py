@@ -111,36 +111,32 @@ def test_match_loss_modulus_text():
 
 
 # ---------------------------------------------------------------------------
-# Tensile moduli E'/E'' (DMTA)
+# Tensile moduli E'/E'' (DMTA) are unsupported
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.smoke
 def test_match_tensile_storage_eprime():
     cf = match_column("E'")
-    assert cf is not None
-    assert cf.canonical_name == "tensile_storage_modulus"
+    assert cf is None
 
 
 @pytest.mark.smoke
 def test_match_tensile_storage_estor():
     cf = match_column("E_stor")
-    assert cf is not None
-    assert cf.canonical_name == "tensile_storage_modulus"
+    assert cf is None
 
 
 @pytest.mark.smoke
 def test_match_tensile_loss_edoubleprime():
     cf = match_column("E''")
-    assert cf is not None
-    assert cf.canonical_name == "tensile_loss_modulus"
+    assert cf is None
 
 
 @pytest.mark.smoke
 def test_match_tensile_loss_eloss():
     cf = match_column("E_loss")
-    assert cf is not None
-    assert cf.canonical_name == "tensile_loss_modulus"
+    assert cf is None
 
 
 # ---------------------------------------------------------------------------

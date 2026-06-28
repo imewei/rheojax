@@ -20,6 +20,9 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pandas as pd
     from numpy.typing import NDArray
 
 __all__ = [
@@ -153,7 +156,7 @@ _BENDING_MODULUS_PATTERNS: list[re.Pattern] = [
 _COMPRESSION_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
-        r"E[-_]?comp",  # E_compression, E-comp
+        r"\bE[-_]?comp",  # E_compression, E-comp (not ActiveCompression)
         r"\bcompression\b",  # compression (keyword, word-bounded)
         r"modulus[-_\s]*comp",  # modulus_compression
         r"\bcompressive\b",  # Compressive modulus (word-bounded)
@@ -434,6 +437,7 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
     if suffix in [".xlsx", ".xls"]:
         try:
             import pandas as pd
+
             xl = pd.ExcelFile(filepath)
             for sheet in xl.sheet_names:
                 df = xl.parse(sheet, nrows=5)
@@ -450,7 +454,7 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
         # Text files (CSV, TSV, TXT, JSON)
         try:
             # Check file content (only first 200 lines to avoid loading large files completely)
-            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            with open(filepath, encoding="utf-8", errors="ignore") as f:
                 lines = [f.readline() for _ in range(200)]
                 content = "".join(lines)
 
@@ -482,8 +486,6 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
         except Exception as e:
             if type(e).__name__ == "UnsupportedDataError" or isinstance(e, UnsupportedDataError):
                 raise
-
-
 
 # =============================================================================
 # Transform Validation

@@ -29,20 +29,8 @@ def _modulus_labels(
     data: RheoData | None = None,
     y_units: str | None = None,
 ) -> tuple[str, str, str]:
-    """Return (storage_label, loss_label, generic_label) based on deformation mode.
-
-    For tension/bending/compression → E'/E''/Modulus; otherwise G'/G''/Modulus.
-    """
-    deformation = None
-    if data is not None:
-        deformation = getattr(data, "deformation_mode", None) or (
-            data.metadata.get("deformation_mode") if data.metadata else None
-        )
-
+    """Return shear storage, loss, and generic modulus labels."""
     units = y_units or (data.y_units if data else None) or "Pa"
-
-    if deformation in ("tension", "bending", "compression"):
-        return f"E' ({units})", f'E" ({units})', f"Modulus ({units})"
     return f"G' ({units})", f'G" ({units})', f"Modulus ({units})"
 
 
@@ -216,14 +204,6 @@ def plot_rheo_data(
         test_mode = _meta.get("test_mode", "")
 
         # Select plot type based on domain and test mode
-        # VIS-P1-004: Forward deformation mode for E'/G' label selection
-        kwargs = dict(kwargs)
-        deformation_mode = kwargs.pop("deformation_mode", None)
-        if deformation_mode is None:
-            deformation_mode = getattr(data, "deformation_mode", None) or _meta.get(
-                "deformation_mode"
-            )
-
         # VIS-P2-003: Detect frequency-domain data even when y is real (e.g., only G' stored)
         is_freq_domain = getattr(data, "domain", None) == "frequency" or _meta.get(
             "test_mode"
@@ -233,18 +213,13 @@ def plot_rheo_data(
         )
 
         if is_freq_domain or np.iscomplexobj(data.y):
-            # Frequency-domain data — pass deformation_mode for label selection
-            freq_kwargs = dict(kwargs)
-            if deformation_mode is not None:
-                freq_kwargs["deformation_mode"] = deformation_mode
-
             result = plot_frequency_domain(
                 _ensure_numpy(data.x),
                 _ensure_numpy(data.y),
                 x_units=data.x_units,
                 y_units=data.y_units,
                 style=style,
-                **freq_kwargs,
+                **kwargs,
             )
         elif test_mode in ("startup", "laos"):
             # Startup and LAOS: time/strain vs stress (linear axes)
@@ -418,8 +393,6 @@ def plot_frequency_domain(
         y_units: Units for modulus
         style: Plotting style
         **kwargs: Additional keyword arguments for matplotlib plot.
-            deformation_mode: str, optional — 'tension'/'bending'/'compression'
-            causes labels to show E'/E'' instead of G'/G''.
 
     Returns:
         Tuple of (Figure, np.ndarray of Axes). For complex data the array has
@@ -434,13 +407,9 @@ def plot_frequency_domain(
         # VIS-010: Set font sizes on axes directly instead of mutating
         # global plt.rcParams (which permanently pollutes process state)
 
-        # VIS-P1-004: Deformation-mode aware labels (E' vs G')
-        kwargs = dict(kwargs)
-        deformation_mode = kwargs.pop("deformation_mode", None)
-        is_tensile = deformation_mode in ("tension", "bending", "compression")
         units = y_units or "Pa"
-        storage_sym = "E'" if is_tensile else "G'"
-        loss_sym = 'E"' if is_tensile else 'G"'
+        storage_sym = "G'"
+        loss_sym = 'G"'
 
         if np.iscomplexobj(y):
             # Complex data - plot storage and loss on separate subplots
