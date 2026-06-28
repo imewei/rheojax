@@ -443,7 +443,6 @@ class BatchPipeline:
                 }
                 for _k in _batch_strip_keys:
                     fit_kwargs_replay.pop(_k, None)
-                _reject_dmta_kwargs(fit_kwargs_replay)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
                 _fit_X = np.asarray(X)

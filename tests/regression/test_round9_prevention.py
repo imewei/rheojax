@@ -17,7 +17,6 @@ import numpy as np
 import pytest
 
 from rheojax.core.bayesian import BayesianMixin
-from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 
