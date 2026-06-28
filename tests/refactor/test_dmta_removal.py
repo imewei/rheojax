@@ -1,6 +1,6 @@
 # tests/refactor/test_dmta_removal.py
 import inspect
-import pathlib
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,7 +8,7 @@ import pytest
 from rheojax.core.base import BaseModel
 from rheojax.models import Maxwell
 
-RJ = pathlib.Path("rheojax")
+RJ = Path(__file__).resolve().parents[2] / "rheojax"
 IDENTS = (
     "DeformationMode",
     "deformation_mode",

@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from rheojax.core.base import _reject_dmta_kwargs
 from rheojax.core.data import RheoData
 from rheojax.logging import get_logger, log_fit, log_pipeline_stage
 from rheojax.pipeline.base import Pipeline
@@ -424,6 +425,7 @@ class BatchPipeline:
                 y = np.asarray(pipeline.data.y)
                 _lfk = getattr(step_obj, "_last_fit_kwargs", None)
                 fit_kwargs_replay = dict(_lfk) if _lfk is not None else {}
+                _reject_dmta_kwargs(fit_kwargs_replay)
                 # Strip internal tracking keys and protocol-specific kwargs
                 # that should not be replayed from the template to new datasets.
                 _batch_strip_keys = {
@@ -441,6 +443,7 @@ class BatchPipeline:
                 }
                 for _k in _batch_strip_keys:
                     fit_kwargs_replay.pop(_k, None)
+                _reject_dmta_kwargs(fit_kwargs_replay)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
                 _fit_X = np.asarray(X)
@@ -499,6 +502,9 @@ class BatchPipeline:
                         filepath=str(path),
                     )
                     continue
+                _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
+                if _template_bayes is not None:
+                    _reject_dmta_kwargs(dict(_template_bayes))
                 try:
                     X = np.asarray(pipeline.data.x)
                     if pipeline.data.y is None:
@@ -514,7 +520,6 @@ class BatchPipeline:
                     # These are stored by Pipeline.fit_bayesian() on the model
                     # as _last_bayesian_kwargs (separate from _last_fit_kwargs
                     # which only holds protocol kwargs from NLSQ).
-                    _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
                     if _template_bayes is not None:
                         for _bk in (
                             "num_warmup",
@@ -525,6 +530,7 @@ class BatchPipeline:
                         ):
                             if _bk in _template_bayes:
                                 _bayes_kwargs.setdefault(_bk, _template_bayes[_bk])
+                    _reject_dmta_kwargs(_bayes_kwargs)
                     bayes_result = pipeline._last_model.fit_bayesian(
                         X, y, **_bayes_kwargs
                     )
@@ -546,8 +552,9 @@ class BatchPipeline:
 
             elif step_action == "export":
                 # Replay export step for each processed file.
+                export_config = step_obj if isinstance(step_obj, dict) else {}
+                _reject_dmta_kwargs(export_config)
                 try:
-                    export_config = step_obj if isinstance(step_obj, dict) else {}
                     _out_path = export_config.get("output_path", "")
                     _fmt = export_config.get("format", "directory")
                     per_file_out = None
