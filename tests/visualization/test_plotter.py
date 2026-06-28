@@ -385,6 +385,20 @@ class TestSaveFigure:
         plt.close(fig)
 
 
+def test_plot_frequency_domain_uses_shear_modulus_labels():
+    """Frequency-domain plots always label storage/loss as G'/G''."""
+    freq = np.logspace(-1, 1, 20)
+    modulus = 1e9 * (1j * freq) / (1 + 1j * freq)
+
+    fig, axes = plot_frequency_domain(freq, modulus)
+
+    assert "G'" in axes[0].get_ylabel()
+    assert 'G"' in axes[1].get_ylabel()
+    assert "E'" not in axes[0].get_ylabel()
+    assert 'E"' not in axes[1].get_ylabel()
+    plt.close(fig)
+
+
 def test_filter_positive_partial():
     """Test _filter_positive with some negative values."""
     from rheojax.visualization.plotter import _filter_positive
