@@ -90,18 +90,6 @@ Examples:
         help="Maximum optimization iterations (default: 1000)",
     )
     parser.add_argument(
-        "--deformation-mode",
-        type=str,
-        default=None,
-        help="Deformation mode for DMTA (tension, shear, bending, compression)",
-    )
-    parser.add_argument(
-        "--poisson-ratio",
-        type=float,
-        default=None,
-        help="Poisson ratio for E*-G* conversion (default: 0.5 for rubber)",
-    )
-    parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
@@ -242,17 +230,6 @@ def main(args: list[str] | None = None) -> int:
             "test_mode": test_mode,
             "max_iter": parsed.max_iter,
         }
-        if parsed.deformation_mode is not None:
-            fit_kwargs["deformation_mode"] = parsed.deformation_mode
-        if parsed.poisson_ratio is not None:
-            fit_kwargs["poisson_ratio"] = parsed.poisson_ratio
-
-        # Auto-propagate deformation_mode from loaded data metadata
-        if fit_kwargs.get("deformation_mode") is None and hasattr(data, "metadata"):
-            auto_dm = data.metadata.get("deformation_mode")
-            if auto_dm is not None:
-                fit_kwargs["deformation_mode"] = auto_dm
-
         model.fit(data.x, data.y, **fit_kwargs)
         fit_time = time.perf_counter() - start_time
 

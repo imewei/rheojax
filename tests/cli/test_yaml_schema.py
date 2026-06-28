@@ -183,6 +183,21 @@ class TestValidateConfig:
         errors = validate_config(config)
         assert any("model" in e for e in errors)
 
+    @pytest.mark.unit
+    def test_fit_params_is_a_supported_key(self):
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell", "params": {"G": 1.0}},
+            ],
+        )
+
+        errors = validate_config(config)
+
+        assert not any("params" in error for error in errors)
+
 
 class TestPathSafety:
     @pytest.mark.unit

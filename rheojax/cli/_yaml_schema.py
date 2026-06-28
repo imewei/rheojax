@@ -52,8 +52,6 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "y_col",
             "y_cols",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
         ],
     },
     "transform": {
@@ -66,9 +64,8 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "method",
             "max_iter",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
             "use_jax",  # SER-003: PipelineBuilder passes use_jax to fit steps
+            "params",
         ],
     },
     "bayesian": {
@@ -81,8 +78,6 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "warm_start",
             "target_accept_prob",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
         ],
     },
     "export": {
@@ -272,19 +267,15 @@ def validate_config(config: PipelineConfig) -> list[str]:
                     f"{step_label} ({step_type}): Missing required key '{req}'."
                 )
 
-        # For steps with fixed allowed keys, warn about unknown keys.
-        # Treated as a warning (not an error) because callers legitimately pass
-        # extra kwargs such as target_accept_prob, seed, custom_priors, ftol, etc.
+        # Steps with fixed schemas reject unknown keys instead of silently
+        # accepting configuration that the runner may ignore.
         if step_type not in _OPEN_KWARGS_STEPS:
             allowed = set(schema["required"]) | set(schema["optional"])
             unknown = step_keys - allowed
             if unknown:
-                logger.warning(
-                    "Unknown keys in pipeline step",
-                    step=step_label,
-                    step_type=step_type,
-                    unknown=sorted(unknown),
-                    allowed=sorted(allowed),
+                errors.append(
+                    f"{step_label} ({step_type}): Unknown keys {sorted(unknown)}. "
+                    f"Allowed keys: {sorted(allowed)}."
                 )
 
         # P3-3: Log a warning if the transform name isn't in the registry.
