@@ -112,29 +112,6 @@ COLUMN_MAPPINGS: dict[str, tuple[list[str], str, list[str]]] = {
         "Pa",
         ["oscillation"],
     ),
-    "tensile_storage_modulus": (
-        [
-            r"^e'$",
-            r"^e_prime$",
-            r"^e_stor$",
-            r"^tensile[\s_]?storage[\s_]?modulus$",
-            r"^young'?s?[\s_]?storage[\s_]?modulus$",
-        ],
-        "Pa",
-        ["oscillation"],
-    ),
-    "tensile_loss_modulus": (
-        [
-            r"^e''$",
-            r'^e"$',
-            r"^e_double_prime$",
-            r"^e_loss$",
-            r"^tensile[\s_]?loss[\s_]?modulus$",
-            r"^young'?s?[\s_]?loss[\s_]?modulus$",
-        ],
-        "Pa",
-        ["oscillation"],
-    ),
     "viscosity": (
         [r"^viscosity$", r"^η$", r"^eta$"],
         "Pa.s",
@@ -841,11 +818,8 @@ def _compute_complex_modulus(
         g_prime = df["storage_modulus"].values
         g_double_prime = df["loss_modulus"].values
         return g_prime + 1j * g_double_prime, "shear"
-    if "tensile_storage_modulus" in df.columns and "tensile_loss_modulus" in df.columns:
-        e_prime = df["tensile_storage_modulus"].values
-        e_double_prime = df["tensile_loss_modulus"].values
-        return e_prime + 1j * e_double_prime, "tension"
     return None, None
+
 
 
 # =============================================================================
@@ -895,15 +869,13 @@ def _detect_test_type(df: pd.DataFrame) -> str | None:
     """
     columns = set(df.columns)
 
-    # Priority 1: Oscillatory (frequency domain) — includes tensile moduli (DMTA)
+    # Priority 1: Oscillatory (frequency domain)
     has_frequency = "angular_frequency" in columns
     has_moduli = "storage_modulus" in columns or "loss_modulus" in columns
-    has_tensile_moduli = (
-        "tensile_storage_modulus" in columns or "tensile_loss_modulus" in columns
-    )
 
-    if has_frequency and (has_moduli or has_tensile_moduli):
+    if has_frequency and has_moduli:
         return "oscillation"
+
 
     # Priority 2: Creep (time domain, constant stress)
     has_time = "time" in columns
@@ -1233,19 +1205,17 @@ def _interval_to_rheodata_oscillation(
         y = mapped_df["complex_modulus"].values
         deformation_mode = "shear"
     else:
-        # Fallback to storage modulus only (shear or tensile)
+        # Fallback to storage modulus only
         if "storage_modulus" in mapped_df.columns:
             y = mapped_df["storage_modulus"].values
             deformation_mode = "shear"
-        elif "tensile_storage_modulus" in mapped_df.columns:
-            y = mapped_df["tensile_storage_modulus"].values
-            deformation_mode = "tension"
         else:
             raise ValueError(
-                "Oscillation data requires 'storage_modulus'/'loss_modulus' or "
-                "'tensile_storage_modulus'/'tensile_loss_modulus' columns. "
+                "Oscillation data requires 'storage_modulus'/'loss_modulus' columns. "
                 f"Available columns: {list(mapped_df.columns)}"
             )
+
+
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa

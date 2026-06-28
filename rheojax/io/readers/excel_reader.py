@@ -9,11 +9,12 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.io._exceptions import UnsupportedDataError
 from rheojax.io.readers._utils import (
     VALID_TEST_MODES,
     VALID_TRANSFORMS,
     construct_complex_modulus,
-    detect_deformation_mode_from_columns,
+    check_tensile_guard,
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
@@ -207,6 +208,15 @@ def load_excel(
         df = df.rename(columns=column_mapping)
         logger.debug("Applied column_mapping", mapping=column_mapping)
 
+    # Guard: check for tensile/E* columns/units/mode
+    if deformation_mode is not None and deformation_mode.lower() in ["tension", "bending", "compression"]:
+        raise UnsupportedDataError(
+            f"Unsupported deformation mode '{deformation_mode}' requested. "
+            "RheoJAX only supports shear deformation mode."
+        )
+    check_tensile_guard(df.columns, units=y_units)
+
+
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
 
@@ -349,18 +359,12 @@ def load_excel(
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
 
-    # Auto-detect deformation mode from y column names if not provided
+    # Set deformation mode to shear (as RheoJAX only supports shear)
     if deformation_mode is None:
-        detected_deformation = detect_deformation_mode_from_columns(y_headers, y_units)
-        if detected_deformation is not None:
-            deformation_mode = detected_deformation
-            logger.debug(
-                "Auto-detected deformation mode", deformation_mode=deformation_mode
-            )
+        deformation_mode = "shear"
 
-    # Store deformation mode in metadata for BaseModel.fit() auto-detection
-    if deformation_mode is not None:
-        final_metadata["deformation_mode"] = deformation_mode
+    final_metadata["deformation_mode"] = deformation_mode
+
 
     logger.info(
         "File parsed",

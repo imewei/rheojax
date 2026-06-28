@@ -59,3 +59,9 @@ class RheoJaxConvergenceWarning(UserWarning):
     Examples: maximum iterations reached, gradient norm above threshold,
     active bound constraints at the solution, or poor condition number.
     """
+
+
+class UnsupportedDataError(ValueError):
+    """Raised for unsupported measurement geometry. RheoJAX is shear-only;
+    tensile/bending/compression (DMTA/DMA, E*) data is not supported."""
+
