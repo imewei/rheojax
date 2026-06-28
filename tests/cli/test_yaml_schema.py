@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from rheojax.cli._yaml_schema import PipelineConfig, load_config, validate_config
@@ -194,9 +196,11 @@ class TestValidateConfig:
             ],
         )
 
-        errors = validate_config(config)
+        with patch("rheojax.cli._yaml_schema.logger.warning") as warning:
+            errors = validate_config(config)
 
         assert not any("params" in error for error in errors)
+        warning.assert_not_called()
 
 
 class TestPathSafety:

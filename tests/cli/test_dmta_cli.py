@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from rheojax.cli._yaml_runner import apply_overrides, config_to_builder
 from rheojax.cli._yaml_schema import PipelineConfig, validate_config
 
 
@@ -48,6 +49,34 @@ def test_yaml_validator_rejects_removed_step_key(removed_key: str) -> None:
     assert any(removed_key in error for error in errors)
 
 
+@pytest.mark.parametrize("removed_key", ["deformation_mode", "poisson_ratio"])
+def test_yaml_validator_rejects_removed_default_key(removed_key: str) -> None:
+    config = PipelineConfig(
+        version="1",
+        name="Removed default",
+        defaults={removed_key: "tension"},
+        steps=[{"type": "load", "file": "data.csv"}],
+    )
+
+    errors = validate_config(config)
+
+    assert any("defaults" in error.lower() and removed_key in error for error in errors)
+
+
+@pytest.mark.parametrize("removed_key", ["deformation_mode", "poisson_ratio"])
+def test_yaml_validator_rejects_removed_default_from_override(removed_key: str) -> None:
+    config = PipelineConfig(
+        version="1",
+        name="Removed override",
+        steps=[{"type": "load", "file": "data.csv"}],
+    )
+    overridden = apply_overrides(config, [f"defaults.{removed_key}=tension"])
+
+    errors = validate_config(overridden)
+
+    assert any("defaults" in error.lower() and removed_key in error for error in errors)
+
+
 @pytest.mark.parametrize(
     "step, passthrough_keys",
     [
@@ -77,10 +106,15 @@ def test_yaml_validator_accepts_supported_passthrough_keys(
     config = PipelineConfig(version="1", name="Passthrough", steps=steps)
 
     errors = validate_config(config)
+    builder = config_to_builder(config)
+    builder_kwargs = next(
+        kwargs for step_type, kwargs in builder.steps if step_type == step["type"]
+    )
 
     assert not any(
         key in error for key in passthrough_keys for error in errors
     )
+    assert all(builder_kwargs[key] == step[key] for key in passthrough_keys)
 
 
 def test_yaml_validator_warns_but_accepts_unrelated_unknown_key() -> None:

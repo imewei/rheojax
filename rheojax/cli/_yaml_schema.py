@@ -65,6 +65,7 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "max_iter",
             "test_mode",
             "use_jax",  # SER-003: PipelineBuilder passes use_jax to fit steps
+            "params",
         ],
     },
     "bayesian": {
@@ -217,6 +218,11 @@ def validate_config(config: PipelineConfig) -> list[str]:
 
     if not config.name or not config.name.strip():
         errors.append("Config 'name' must be a non-empty string.")
+
+    try:
+        _reject_dmta_kwargs(config.defaults)
+    except ValueError as exc:
+        errors.append(f"Config defaults: {exc}")
 
     if not config.steps:
         errors.append("Pipeline must have at least one step.")
