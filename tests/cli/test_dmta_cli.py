@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from rheojax.cli._yaml_schema import PipelineConfig, validate_config
@@ -44,3 +46,57 @@ def test_yaml_validator_rejects_removed_step_key(removed_key: str) -> None:
     errors = validate_config(config)
 
     assert any(removed_key in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "step, passthrough_keys",
+    [
+        (
+            {
+                "type": "fit",
+                "model": "maxwell",
+                "ftol": 1e-8,
+                "xtol": 1e-8,
+            },
+            ("ftol", "xtol"),
+        ),
+        (
+            {"type": "bayesian", "custom_priors": {"G": "lognormal"}},
+            ("custom_priors",),
+        ),
+    ],
+)
+def test_yaml_validator_accepts_supported_passthrough_keys(
+    step: dict,
+    passthrough_keys: tuple[str, ...],
+) -> None:
+    steps = [{"type": "load", "file": "data.csv"}]
+    if step["type"] == "bayesian":
+        steps.append({"type": "fit", "model": "maxwell"})
+    steps.append(step)
+    config = PipelineConfig(version="1", name="Passthrough", steps=steps)
+
+    errors = validate_config(config)
+
+    assert not any(
+        key in error for key in passthrough_keys for error in errors
+    )
+
+
+def test_yaml_validator_warns_but_accepts_unrelated_unknown_key() -> None:
+    config = PipelineConfig(
+        version="1",
+        name="Unknown key",
+        steps=[
+            {"type": "load", "file": "data.csv"},
+            {"type": "fit", "model": "maxwell", "future_fit_option": True},
+        ],
+    )
+
+    with patch("rheojax.cli._yaml_schema.logger.warning") as warning:
+        errors = validate_config(config)
+
+    assert not any("future_fit_option" in error for error in errors)
+    warning.assert_called_once()
+    assert warning.call_args.args[0] == "Unknown keys in pipeline step"
+    assert warning.call_args.kwargs["unknown"] == ["future_fit_option"]

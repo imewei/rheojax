@@ -65,7 +65,6 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "max_iter",
             "test_mode",
             "use_jax",  # SER-003: PipelineBuilder passes use_jax to fit steps
-            "params",
         ],
     },
     "bayesian": {
@@ -209,6 +208,7 @@ def validate_config(config: PipelineConfig) -> list[str]:
         ...         print(e)
     """
     from rheojax.cli._yaml_runner import _STEP_ALLOWED_DEFAULTS  # noqa: PLC0415
+    from rheojax.core.base import _reject_dmta_kwargs  # noqa: PLC0415
 
     errors: list[str] = []
 
@@ -249,6 +249,11 @@ def validate_config(config: PipelineConfig) -> list[str]:
             )
             continue
 
+        try:
+            _reject_dmta_kwargs(step)
+        except ValueError as exc:
+            errors.append(f"{step_label} ({step_type}): {exc}")
+
         schema = STEP_SCHEMAS[step_type]
         # Merge only the defaults that are relevant to this step type,
         # so that e.g. test_mode from defaults is not flagged as unknown
@@ -267,15 +272,19 @@ def validate_config(config: PipelineConfig) -> list[str]:
                     f"{step_label} ({step_type}): Missing required key '{req}'."
                 )
 
-        # Steps with fixed schemas reject unknown keys instead of silently
-        # accepting configuration that the runner may ignore.
+        # For steps with fixed allowed keys, warn about unknown keys.
+        # Treated as a warning (not an error) because callers legitimately pass
+        # extra kwargs such as target_accept_prob, seed, custom_priors, ftol, etc.
         if step_type not in _OPEN_KWARGS_STEPS:
             allowed = set(schema["required"]) | set(schema["optional"])
             unknown = step_keys - allowed
             if unknown:
-                errors.append(
-                    f"{step_label} ({step_type}): Unknown keys {sorted(unknown)}. "
-                    f"Allowed keys: {sorted(allowed)}."
+                logger.warning(
+                    "Unknown keys in pipeline step",
+                    step=step_label,
+                    step_type=step_type,
+                    unknown=sorted(unknown),
+                    allowed=sorted(allowed),
                 )
 
         # P3-3: Log a warning if the transform name isn't in the registry.
