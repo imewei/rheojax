@@ -62,3 +62,13 @@ def test_reject_dmta_kwargs():
         model.fit_bayesian(t, G, test_mode="relaxation", deformation_mode="tensile")
     with pytest.raises(ValueError, match="poisson_ratio"):
         model.fit_bayesian(t, G, test_mode="relaxation", poisson_ratio=0.5)
+
+
+def test_no_tensile_modulus_type():
+    from rheojax.utils.prony import create_prony_parameter_set
+    from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
+    assert "modulus_type" not in inspect.signature(create_prony_parameter_set).parameters
+    assert "modulus_type" not in inspect.signature(GeneralizedMaxwell.__init__).parameters
+    with pytest.raises(TypeError):
+        GeneralizedMaxwell(modulus_type="tensile")
+

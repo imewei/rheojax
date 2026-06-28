@@ -32,7 +32,7 @@ class TestGMMRelaxationMode:
         G_data = G0_true * np.exp(-t / tau_true)
 
         # Fit GMM with N=1
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Check total modulus (G_inf + G_1) recovers G0_true
@@ -52,7 +52,7 @@ class TestGMMRelaxationMode:
     def test_internal_variable_exponential_decay(self):
         """Internal-variable update should produce exponential decay."""
         # Create GMM with known parameters
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.parameters.set_value("G_inf", 0.0)
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("G_2", 1e4)
@@ -91,7 +91,7 @@ class TestGMMRelaxationMode:
         # both modes survive and we can assert on G_1 and G_2 separately.
         # Without this, the default optimization_factor=1.5 prunes one mode
         # and parameters["G_2"] returns None → TypeError on the > 0 check.
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.fit(t, G_data, test_mode="relaxation", optimization_factor=None)
 
         # Check all moduli are positive
@@ -119,7 +119,7 @@ class TestGMMRelaxationMode:
         )
 
         # Fit GMM with N=3 (over-parameterized)
-        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=3)
         model.fit(t, G_data, test_mode="relaxation", optimization_factor=1.5)
 
         # Check element minimization occurred
@@ -146,7 +146,7 @@ class TestGMMRelaxationMode:
         )
 
         # Fit GMM with sufficient modes
-        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=3)
         model.fit(t, G_data, test_mode="relaxation", optimization_factor=1.5)
 
         # Check R² from element minimization diagnostics
@@ -168,7 +168,7 @@ class TestGMMOscillationMode:
     def test_oscillation_closed_form_equations(self):
         """Oscillation prediction should match analytical Fourier transform."""
         # Create GMM with known parameters
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.parameters.set_value("G_inf", 1e3)
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("G_2", 1e4)
@@ -200,7 +200,7 @@ class TestGMMOscillationMode:
         tau = 0.1
 
         # GMM with N=1
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.parameters.set_value("G_inf", 0.0)
         model.parameters.set_value("G_1", G0)
         model.parameters.set_value("tau_1", tau)
@@ -256,7 +256,7 @@ class TestGMMOscillationMode:
         G_star_data = np.column_stack([G_prime_data, G_double_prime_data])
 
         # Fit GMM
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.fit(omega, G_star_data, test_mode="oscillation")
 
         # Check convergence
@@ -278,7 +278,7 @@ class TestGMMOscillationMode:
     def test_oscillation_tan_delta(self):
         """Tan delta (G''/G') should be physically reasonable."""
         # Create GMM with known parameters
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.parameters.set_value("G_inf", 1e3)
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("G_2", 1e4)
@@ -322,7 +322,7 @@ class TestGMMOscillationMode:
         G_star_data = np.column_stack([G_prime_data, G_double_prime_data])
 
         # Fit GMM with N=4 (over-parameterized)
-        model = GeneralizedMaxwell(n_modes=4, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=4)
         model.fit(omega, G_star_data, test_mode="oscillation", optimization_factor=1.5)
 
         # Check element minimization occurred
@@ -336,7 +336,7 @@ class TestGMMOscillationMode:
 
     def test_oscillation_output_shape(self):
         """Oscillation output should be a 1D complex array (N,) for G* = G' + iG''."""
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.parameters.set_value("G_inf", 1e3)
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("G_2", 1e4)
@@ -360,7 +360,7 @@ class TestGMMCreepMode:
         J_data = 1e-3 + (5e-7 - 1e-3) * np.exp(-t / 10.0)
         J_data[0] = -1e-6  # Representative additive-noise outlier
 
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(
             t,
             J_data,
@@ -374,7 +374,7 @@ class TestGMMCreepMode:
     def test_creep_backward_euler_stability(self):
         """Creep simulation using backward-Euler should be unconditionally stable."""
         # Create GMM with known parameters
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.parameters.set_value("G_inf", 1e3)
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("G_2", 1e4)
@@ -404,7 +404,7 @@ class TestGMMCreepMode:
     def test_creep_compliance_calculation(self):
         """Creep compliance J(t) = ε(t)/σ₀ should be correctly calculated."""
         # Create GMM with known parameters (Maxwell liquid)
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.parameters.set_value("G_inf", 0.0)  # Maxwell liquid
         model.parameters.set_value("G_1", 1e5)
         model.parameters.set_value("tau_1", 0.1)
@@ -439,7 +439,7 @@ class TestGMMCreepMode:
         tau = 0.1
 
         # GMM with N=1
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.parameters.set_value("G_inf", 0.0)
         model.parameters.set_value("G_1", G0)
         model.parameters.set_value("tau_1", tau)
@@ -465,7 +465,7 @@ class TestGMMCreepMode:
         tau_i_true = np.array([0.01, 1.0])
 
         # Create reference GMM for generating data
-        model_ref = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model_ref = GeneralizedMaxwell(n_modes=2)
         model_ref.parameters.set_value("G_inf", G_inf_true)
         model_ref.parameters.set_value("G_1", G_i_true[0])
         model_ref.parameters.set_value("G_2", G_i_true[1])
@@ -475,7 +475,7 @@ class TestGMMCreepMode:
         J_data = model_ref.predict(t)
 
         # Fit GMM with N=4 (over-parameterized)
-        model = GeneralizedMaxwell(n_modes=4, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=4)
         model.fit(t, J_data, test_mode="creep", optimization_factor=1.5)
 
         # Check element minimization occurred

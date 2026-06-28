@@ -48,8 +48,8 @@ def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any
     model_kwargs: dict[str, Any] = {}
 
     if "maxwell" in model_name.lower() and "generalized" in model_name.lower():
-        # Match G_1, G_2, ... or E_1, E_2, ... (tensile DMTA)
-        g_pattern = re.compile(r"^[GE]_(\d+)$")
+        # Match G_1, G_2, ...
+        g_pattern = re.compile(r"^G_(\d+)$")
         g_indices = [
             int(m.group(1)) for name in param_names if (m := g_pattern.match(name))
         ]
