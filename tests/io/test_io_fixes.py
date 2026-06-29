@@ -54,7 +54,6 @@ class TestExcelDeformationMode:
         """load_excel rejects explicit deformation_mode='tension'."""
         pd = pytest.importorskip("pandas")
         pytest.importorskip("openpyxl")
-        from rheojax.io._exceptions import UnsupportedDataError
         from rheojax.io.readers.excel_reader import load_excel
 
         omega = np.logspace(-1, 2, 20)
@@ -67,7 +66,7 @@ class TestExcelDeformationMode:
         )
         df.to_excel(fpath, index=False)
 
-        with pytest.raises(UnsupportedDataError):
+        with pytest.raises(TypeError, match="deformation_mode.*shear-only"):
             load_excel(
                 fpath,
                 x_col="omega (rad/s)",

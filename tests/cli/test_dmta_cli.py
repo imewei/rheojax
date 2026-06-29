@@ -46,7 +46,7 @@ def test_yaml_validator_rejects_removed_step_key(removed_key: str) -> None:
 
     errors = validate_config(config)
 
-    assert any(removed_key in error for error in errors)
+    assert any(removed_key in error and "shear-only" in error for error in errors)
 
 
 @pytest.mark.parametrize("removed_key", ["deformation_mode", "poisson_ratio"])
@@ -60,7 +60,10 @@ def test_yaml_validator_rejects_removed_default_key(removed_key: str) -> None:
 
     errors = validate_config(config)
 
-    assert any("defaults" in error.lower() and removed_key in error for error in errors)
+    assert any(
+        "defaults" in error.lower() and removed_key in error and "shear-only" in error
+        for error in errors
+    )
 
 
 @pytest.mark.parametrize("removed_key", ["deformation_mode", "poisson_ratio"])
@@ -74,7 +77,10 @@ def test_yaml_validator_rejects_removed_default_from_override(removed_key: str) 
 
     errors = validate_config(overridden)
 
-    assert any("defaults" in error.lower() and removed_key in error for error in errors)
+    assert any(
+        "defaults" in error.lower() and removed_key in error and "shear-only" in error
+        for error in errors
+    )
 
 
 @pytest.mark.parametrize(

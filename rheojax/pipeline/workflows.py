@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from rheojax.core.base import _reject_dmta_kwargs
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
@@ -318,7 +318,7 @@ def _fit_model_in_subprocess(
     Module-level function required for pickling on spawn context.
     Returns a serializable dict of results (no JAX arrays).
     """
-    _reject_dmta_kwargs(fit_kwargs)
+    reject_removed_options(fit_kwargs)
 
     import numpy as np
 
@@ -430,7 +430,7 @@ class ModelComparisonPipeline(Pipeline):
         Returns:
             self for method chaining
         """
-        _reject_dmta_kwargs(fit_kwargs)
+        reject_removed_options(fit_kwargs)
 
         self.data = data
         X = np.array(data.x)
@@ -588,7 +588,7 @@ class ModelComparisonPipeline(Pipeline):
 
     def _run_parallel(self, X, y, n_workers=None, **fit_kwargs) -> None:
         """Run model fits in parallel subprocesses."""
-        _reject_dmta_kwargs(fit_kwargs)
+        reject_removed_options(fit_kwargs)
 
         from rheojax.parallel.config import get_default_workers
         from rheojax.parallel.pool import PersistentProcessPool
@@ -1166,7 +1166,7 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         Returns:
             self for method chaining
         """
-        _reject_dmta_kwargs(fit_kwargs)
+        reject_removed_options(fit_kwargs)
 
         from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 

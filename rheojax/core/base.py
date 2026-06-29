@@ -13,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.fit_orchestrator import FitOrchestrator
 from rheojax.core.jax_config import safe_import_jax
@@ -28,19 +29,6 @@ jax, jnp = safe_import_jax()
 # Type alias for arrays (accepts both NumPy and JAX arrays)
 # Note: jnp.ndarray is dynamically imported, so we use np.ndarray for type checking
 type ArrayLike = np.ndarray
-
-
-_REMOVED_DMTA_KWARGS = ("deformation_mode", "poisson_ratio")
-
-
-def _reject_dmta_kwargs(kwargs: dict) -> None:
-    present = [k for k in _REMOVED_DMTA_KWARGS if k in kwargs]
-    if present:
-        raise TypeError(
-            f"{', '.join(present)} no longer supported — RheoJAX is shear-only "
-            f"(DMTA/tensile removed). Remove these arguments."
-        )
-
 
 
 class BaseModel(BayesianMixin, ABC):
@@ -497,7 +485,7 @@ class BaseModel(BayesianMixin, ABC):
             >>> result = model.fit(t, G_data, auto_init=True, check_physics=True,
             ...                    return_result=True)  # Full pipeline
         """
-        _reject_dmta_kwargs(kwargs)
+        reject_removed_options(kwargs)
         return FitOrchestrator().execute(
             self,
             X,
@@ -665,7 +653,7 @@ class BaseModel(BayesianMixin, ABC):
             ...     test_mode='creep'
             ... )
         """
-        _reject_dmta_kwargs(nuts_kwargs)
+        reject_removed_options(nuts_kwargs)
         # Get data shape for logging
         _shape = getattr(X, "shape", None)
         data_shape = (
@@ -781,7 +769,7 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Model predictions
         """
-        _reject_dmta_kwargs(kwargs)
+        reject_removed_options(kwargs)
         x_shape = getattr(X, "shape", None) or (len(X),)
         logger.debug(
             "Predict called",

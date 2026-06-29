@@ -80,7 +80,7 @@ def test_pipeline_fit_rejects_removed_kwargs_before_model(
     _SpyModel.reset()
     model = _SpyModel()
 
-    with pytest.raises(ValueError, match=removed_key):
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         Pipeline(data=shear_data).fit(model, **{removed_key: value})
 
     assert _SpyModel.fit_calls == []
@@ -106,7 +106,7 @@ def test_pipeline_bayesian_rejects_removed_kwargs_before_model(
     pipeline = Pipeline(data=shear_data)
     pipeline._last_model = _SpyModel()
 
-    with pytest.raises(ValueError, match=removed_key):
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         pipeline.fit_bayesian(**{removed_key: value})
 
     assert _SpyModel.bayesian_calls == []
@@ -137,10 +137,13 @@ def test_pipeline_bayesian_preserves_sampling_and_test_mode(shear_data):
     ]
 
 
-@pytest.mark.parametrize(("entrypoint", "removed_key", "value"), (
-    ("nlsq", "deformation_mode", "tension"),
-    ("bayesian", "poisson_ratio", 0.5),
-))
+@pytest.mark.parametrize(
+    ("entrypoint", "removed_key", "value"),
+    (
+        ("nlsq", "deformation_mode", "tension"),
+        ("bayesian", "poisson_ratio", 0.5),
+    ),
+)
 def test_specialized_bayesian_pipeline_rejects_before_model(
     shear_data, entrypoint, removed_key, value
 ):
@@ -148,7 +151,7 @@ def test_specialized_bayesian_pipeline_rejects_before_model(
     pipeline = BayesianPipeline(data=shear_data)
     model = _SpyModel()
 
-    with pytest.raises(ValueError, match=removed_key):
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         if entrypoint == "nlsq":
             pipeline.fit_nlsq(model, **{removed_key: value})
         else:
@@ -169,10 +172,8 @@ def test_model_comparison_rejects_removed_kwargs_before_model(
         "rheojax.pipeline.workflows.ModelRegistry.create",
         side_effect=lambda _name: _SpyModel(),
     ):
-        with pytest.raises(ValueError, match=removed_key):
-            ModelComparisonPipeline(["spy"]).run(
-                shear_data, **{removed_key: value}
-            )
+        with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
+            ModelComparisonPipeline(["spy"]).run(shear_data, **{removed_key: value})
 
     assert _SpyModel.fit_calls == []
 
@@ -184,9 +185,7 @@ def test_model_comparison_preserves_supported_kwargs(shear_data):
         "rheojax.pipeline.workflows.ModelRegistry.create",
         side_effect=lambda _name: _SpyModel(),
     ):
-        ModelComparisonPipeline(["spy"]).run(
-            shear_data, method="scipy", max_iter=23
-        )
+        ModelComparisonPipeline(["spy"]).run(shear_data, method="scipy", max_iter=23)
 
     assert _SpyModel.fit_calls == [
         {"test_mode": "relaxation", "method": "scipy", "max_iter": 23}
@@ -203,7 +202,7 @@ def test_batch_fit_replay_rejects_removed_kwargs_before_model(
     template = Pipeline()
     template.steps = [("fit", template_model)]
 
-    with pytest.raises(ValueError, match=removed_key):
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         BatchPipeline(template)._process_file(
             tmp_path / "input.csv", preloaded_data=shear_data
         )

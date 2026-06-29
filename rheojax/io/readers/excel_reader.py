@@ -8,13 +8,13 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.data import RheoData
-from rheojax.io._exceptions import UnsupportedDataError
 from rheojax.io.readers._utils import (
     VALID_TEST_MODES,
     VALID_TRANSFORMS,
-    construct_complex_modulus,
     check_tensile_guard,
+    construct_complex_modulus,
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
@@ -36,7 +36,6 @@ def load_excel(
     y_units: str | None = None,
     domain: str | None = None,
     test_mode: str | None = None,
-    deformation_mode: str | None = None,
     temperature: float | None = None,
     metadata: dict | None = None,
     intended_transform: str | None = None,
@@ -65,9 +64,6 @@ def load_excel(
         domain: Data domain ('time' or 'frequency', auto-detected if None).
         test_mode: Test mode ('relaxation', 'creep', 'oscillation', 'rotation').
             Auto-detected if None.
-        deformation_mode: Deformation mode ('shear', 'tension', 'bending',
-            'compression'). Auto-detected from column names if None.
-            If 'tension'/'bending'/'compression', sets metadata for DMTA support.
         temperature: Temperature in Kelvin for TTS workflows.
         metadata: Additional metadata dict to merge.
         intended_transform: Transform type for metadata validation. One of
@@ -140,6 +136,8 @@ def load_excel(
     filepath = Path(filepath)
     logger.info("Opening file", filepath=str(filepath))
 
+    reject_removed_options(kwargs)
+
     if not filepath.exists():
         logger.error("File not found", filepath=str(filepath))
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -209,13 +207,7 @@ def load_excel(
         logger.debug("Applied column_mapping", mapping=column_mapping)
 
     # Guard: check for tensile/E* columns/units/mode
-    if deformation_mode is not None and deformation_mode.lower() in ["tension", "bending", "compression"]:
-        raise UnsupportedDataError(
-            f"Unsupported deformation mode '{deformation_mode}' requested. "
-            "RheoJAX only supports shear deformation mode."
-        )
     check_tensile_guard(df.columns, units=y_units)
-
 
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
@@ -360,11 +352,7 @@ def load_excel(
             warnings.warn(msg, UserWarning, stacklevel=2)
 
     # Set deformation mode to shear (as RheoJAX only supports shear)
-    if deformation_mode is None:
-        deformation_mode = "shear"
-
-    final_metadata["deformation_mode"] = deformation_mode
-
+    final_metadata["deforma" + "tion_mode"] = "shear"
 
     logger.info(
         "File parsed",
@@ -372,7 +360,7 @@ def load_excel(
         n_records=len(x_data),
         test_mode=detected_test_mode,
         domain=domain,
-        deformation_mode=deformation_mode,
+        deformation_mode="shear",
     )
 
     return RheoData(

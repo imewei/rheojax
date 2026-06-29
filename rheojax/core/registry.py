@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.inventory import Protocol, TransformType
 from rheojax.logging import get_logger
 
@@ -433,8 +434,7 @@ class Registry:
         Returns:
             List of plugin names matching all criteria
         """
-        from rheojax.core.base import _reject_dmta_kwargs
-        _reject_dmta_kwargs(criteria)
+        reject_removed_options(criteria)
         compatible = []
 
         # Check models
@@ -735,8 +735,7 @@ class ModelRegistry:
         Example:
             >>> model = ModelRegistry.create('maxwell')
         """
-        from rheojax.core.base import _reject_dmta_kwargs
-        _reject_dmta_kwargs(kwargs)
+        reject_removed_options(kwargs)
         registry = cls._get_registry()
         # If the model isn't registered yet, eagerly import all model modules
         # to trigger @ModelRegistry.register decorators (lazy-import fallback)
@@ -776,12 +775,8 @@ class ModelRegistry:
         Returns:
             List of matching model names
         """
-        from rheojax.core.base import _reject_dmta_kwargs
-        _reject_dmta_kwargs(criteria)
         registry = cls._get_registry()
-        return registry.find_compatible(
-            protocol=protocol, **criteria
-        )
+        return registry.find_compatible(protocol=protocol, **criteria)
 
     @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:

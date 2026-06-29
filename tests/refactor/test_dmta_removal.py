@@ -40,7 +40,7 @@ def test_base_signatures_clean():
         assert "deformation_mode" not in p and "poisson_ratio" not in p, n
 
 
-def test_reject_dmta_kwargs():
+def test_removed_options_are_rejected():
     model = Maxwell()
     t = np.logspace(-2, 2, 10)
     G = np.ones_like(t)
@@ -106,21 +106,21 @@ def test_legacy_kwargs_raise():
             call()
 
 
-def test_registry_find_compatible_rejects_removed_deformation_mode():
+@pytest.mark.parametrize("removed_key", ("deformation_mode", "poisson_ratio"))
+def test_registry_find_compatible_rejects_removed_option(removed_key):
     from rheojax.core.registry import Registry
 
     registry = Registry()
-    with pytest.raises(TypeError, match="shear-only"):
-        registry.find_compatible(
-            protocol="relaxation", deformation_mode="shear"
-        )
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
+        registry.find_compatible(protocol="relaxation", **{removed_key: "legacy"})
 
 
-def test_model_registry_create_rejects_removed_poisson_ratio():
+@pytest.mark.parametrize("removed_key", ("deformation_mode", "poisson_ratio"))
+def test_model_registry_create_rejects_removed_option(removed_key):
     from rheojax.core.registry import ModelRegistry
 
-    with pytest.raises(TypeError, match="shear-only"):
-        ModelRegistry.create("maxwell", poisson_ratio=0.5)
+    with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
+        ModelRegistry.create("maxwell", **{removed_key: "legacy"})
 
 
 def test_symbols_removed():

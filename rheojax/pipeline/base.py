@@ -25,7 +25,8 @@ from typing import Any
 
 import numpy as np
 
-from rheojax.core.base import BaseModel, BaseTransform, _reject_dmta_kwargs
+from rheojax.core._validation import reject_removed_options
+from rheojax.core.base import BaseModel, BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry, TransformRegistry
@@ -299,7 +300,7 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data loaded. Call load() first.")
 
-        _reject_dmta_kwargs(fit_kwargs)
+        reject_removed_options(fit_kwargs)
 
         # Create model if string
         if isinstance(model, str):
@@ -753,7 +754,7 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data loaded. Call load() first.")
 
-        _reject_dmta_kwargs(bayesian_kwargs)
+        reject_removed_options(bayesian_kwargs)
 
         # Resolve model
         if model is not None:
@@ -1220,7 +1221,7 @@ class Pipeline:
         if self.data is None:
             raise ValueError("No data loaded. Call load() first.")
 
-        _reject_dmta_kwargs(fit_kwargs)
+        reject_removed_options(fit_kwargs)
 
         from rheojax.utils.model_selection import compare_models as _compare
 

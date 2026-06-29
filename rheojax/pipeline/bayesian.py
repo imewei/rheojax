@@ -21,8 +21,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs, import_arviz
-from rheojax.core.base import BaseModel, _reject_dmta_kwargs
+from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_bayesian, log_fit
@@ -109,7 +110,7 @@ class BayesianPipeline(Pipeline):
             logger.error("No data loaded for NLSQ fit")
             raise ValueError("No data loaded. Call load() first.")
 
-        _reject_dmta_kwargs(nlsq_kwargs)
+        reject_removed_options(nlsq_kwargs)
 
         # Create model if string
         if isinstance(model, str):
@@ -247,7 +248,7 @@ class BayesianPipeline(Pipeline):
             logger.error("No data loaded for Bayesian inference")
             raise ValueError("No data loaded. Call load() first.")
 
-        _reject_dmta_kwargs(nuts_kwargs)
+        reject_removed_options(nuts_kwargs)
 
         # Get data
         X = self.data.x

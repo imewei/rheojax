@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -209,7 +210,6 @@ def validate_config(config: PipelineConfig) -> list[str]:
         ...         print(e)
     """
     from rheojax.cli._yaml_runner import _STEP_ALLOWED_DEFAULTS  # noqa: PLC0415
-    from rheojax.core.base import _reject_dmta_kwargs  # noqa: PLC0415
 
     errors: list[str] = []
 
@@ -220,8 +220,8 @@ def validate_config(config: PipelineConfig) -> list[str]:
         errors.append("Config 'name' must be a non-empty string.")
 
     try:
-        _reject_dmta_kwargs(config.defaults)
-    except ValueError as exc:
+        reject_removed_options(config.defaults)
+    except TypeError as exc:
         errors.append(f"Config defaults: {exc}")
 
     if not config.steps:
@@ -256,8 +256,8 @@ def validate_config(config: PipelineConfig) -> list[str]:
             continue
 
         try:
-            _reject_dmta_kwargs(step)
-        except ValueError as exc:
+            reject_removed_options(step)
+        except TypeError as exc:
             errors.append(f"{step_label} ({step_type}): {exc}")
 
         schema = STEP_SCHEMAS[step_type]
