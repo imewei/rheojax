@@ -94,13 +94,19 @@ def test_reader_metadata_rejects_removed_keys_before_data_construction(
 
 
 @pytest.mark.parametrize("location", ("top", "metadata"))
-def test_hdf5_shear_legacy_marker_is_not_propagated(tmp_path, location):
-    f = tmp_path / f"{location}_legacy_shear.h5"
-    _write_hdf5_with_geometry_marker(f, location, "deformation_mode", "shear")
+@pytest.mark.parametrize(
+    ("removed_key", "value"),
+    (("deformation_mode", "shear"), ("poisson_ratio", 0.5)),
+)
+def test_hdf5_removed_metadata_is_not_propagated(
+    tmp_path, location, removed_key, value
+):
+    f = tmp_path / f"{location}_{removed_key}.h5"
+    _write_hdf5_with_geometry_marker(f, location, removed_key, value)
 
     loaded = load_hdf5(f)
 
-    assert "deformation_mode" not in loaded.metadata
+    assert removed_key not in loaded.metadata
 
 
 def test_hdf5_irrelevant_numeric_and_array_geometry_metadata_loads(tmp_path):
