@@ -118,6 +118,45 @@ def test_removed_options_are_rejected():
         model.fit_bayesian(t, G, test_mode="relaxation", poisson_ratio=0.5)
 
 
+def test_maxwell_shear_relaxation_fit_matches_pre_strip_baseline():
+    """The shear-only fit remains numerically identical to the pre-strip fit."""
+    from rheojax.core.data import RheoData
+
+    t = np.logspace(-3.0, -0.3, 48, dtype=np.float64)
+    G0_source = 240_000.0
+    eta_source = 7_200.0
+    modulus = G0_source * np.exp(-t / (eta_source / G0_source))
+    modulus *= 1.0 + 0.002 * np.sin(np.arange(t.size, dtype=np.float64) * 0.7)
+    data = RheoData(
+        x=t,
+        y=modulus,
+        domain="time",
+        metadata={"test_mode": "relaxation"},
+    )
+
+    model = Maxwell()
+    model.parameters.set_value("G0", 100_000.0)
+    model.parameters.set_value("eta", 1_000.0)
+    model.fit(
+        data,
+        modulus,
+        method="nlsq",
+        use_log_residuals=False,
+        use_multi_start=False,
+        use_jax=False,
+        max_iter=1000,
+    )
+
+    # Golden values captured from pre-strip commit 4bcaf2b1 (36442db4^),
+    # with the same data/options plus the then-supported deformation_mode="shear".
+    np.testing.assert_allclose(
+        model.parameters.get_value("G0"), 255_241.9942542794, rtol=2e-5
+    )
+    np.testing.assert_allclose(
+        model.parameters.get_value("eta"), 7_133.151654600744, rtol=2e-5
+    )
+
+
 def test_no_tensile_modulus_type():
     from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
     from rheojax.utils.prony import create_prony_parameter_set
