@@ -105,3 +105,11 @@ def test_legacy_kwargs_raise():
         with pytest.raises(TypeError, match="shear-only"):
             call()
 
+
+def test_symbols_removed():
+    with pytest.raises(ImportError):
+        from rheojax.core import DeformationMode  # noqa
+    with pytest.raises(ImportError):
+        from rheojax.utils import POISSON_PRESETS  # noqa
+
+
