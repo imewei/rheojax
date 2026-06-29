@@ -51,7 +51,7 @@ def test_fit_plotter_rejects_legacy_deformation_mode_before_model_evaluation(
     if method_name == "plot_comparison":
         args.insert(3, MagicMock())
 
-    with pytest.raises(TypeError, match="removed because RheoJAX is shear-only"):
+    with pytest.raises(TypeError, match="deformation_mode.*shear-only"):
         getattr(FitPlotter(), method_name)(*args, deformation_mode="tension")
 
     model.model_function.assert_not_called()

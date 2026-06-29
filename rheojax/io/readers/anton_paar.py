@@ -802,24 +802,20 @@ def _compute_relaxation_modulus(df: pd.DataFrame) -> pd.DataFrame:
 
 def _compute_complex_modulus(
     df: pd.DataFrame,
-) -> tuple[np.ndarray | None, str | None]:
-    """Calculate complex modulus G* = G' + i*G'' or E* = E' + i*E''.
-
-    Checks shear modulus columns first, then tensile modulus columns.
+) -> np.ndarray | None:
+    """Calculate complex shear modulus G* = G' + i*G''.
 
     Args:
         df: DataFrame with canonical column names
 
     Returns:
-        Tuple of (complex array, deformation_mode) where deformation_mode
-        is "shear", "tension", or None if cannot compute.
+        Complex modulus array, or None if it cannot be computed.
     """
     if "storage_modulus" in df.columns and "loss_modulus" in df.columns:
         g_prime = df["storage_modulus"].values
         g_double_prime = df["loss_modulus"].values
-        return g_prime + 1j * g_double_prime, "shear"
-    return None, None
-
+        return g_prime + 1j * g_double_prime
+    return None
 
 
 # =============================================================================
@@ -1197,18 +1193,16 @@ def _interval_to_rheodata_oscillation(
         else np.arange(len(mapped_df))
     )
 
-    # Compute complex modulus G* = G' + i*G'' or E* = E' + i*E''
-    modulus_star, deformation_mode = _compute_complex_modulus(mapped_df)
+    # Compute complex shear modulus G* = G' + i*G''
+    modulus_star = _compute_complex_modulus(mapped_df)
     if modulus_star is not None:
         y = modulus_star
     elif "complex_modulus" in mapped_df.columns:
         y = mapped_df["complex_modulus"].values
-        deformation_mode = "shear"
     else:
         # Fallback to storage modulus only
         if "storage_modulus" in mapped_df.columns:
             y = mapped_df["storage_modulus"].values
-            deformation_mode = "shear"
         else:
             raise ValueError(
                 "Oscillation data requires 'storage_modulus'/'loss_modulus' columns. "
@@ -1231,10 +1225,6 @@ def _interval_to_rheodata_oscillation(
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
-
-    # Set deformation_mode if detected from column names
-    if deformation_mode is not None:
-        metadata["deformation_mode"] = deformation_mode
 
     return RheoData(
         x=x,

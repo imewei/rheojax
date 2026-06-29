@@ -277,7 +277,6 @@ class AnalysisExporter:
         if data is not None:
             dm = getattr(data, "metadata", None) or {}
             metadata["test_mode"] = dm.get("test_mode")
-            metadata["deformation_mode"] = dm.get("deformation_mode")
             metadata["domain"] = getattr(data, "domain", None)
             metadata["x_units"] = getattr(data, "x_units", None)
             metadata["y_units"] = getattr(data, "y_units", None)
@@ -432,7 +431,6 @@ class AnalysisExporter:
             for key in (
                 "domain",
                 "test_mode",
-                "deformation_mode",
                 "n_points",
                 "x_units",
                 "y_units",

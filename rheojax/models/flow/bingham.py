@@ -184,7 +184,7 @@ class Bingham(BaseModel):
 
         Args:
             X: Shear rate data (γ̇)
-            **kwargs: Additional keyword arguments (deformation_mode, etc.)
+            **kwargs: Additional keyword arguments
 
         Returns:
             Predicted stress σ(γ̇)

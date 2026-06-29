@@ -587,8 +587,8 @@ class FractionalMaxwellModel(BaseModel):
         """Predict response.
 
         R13-FMM-002: Delegates to BaseModel.predict() for plain-array inputs so
-        that deformation_mode (E*->G* conversion) and test_mode restoration are
-        handled correctly.  Only RheoData inputs bypass super() because they
+        that test_mode restoration is handled correctly.  Only RheoData inputs
+        bypass super() because they
         return a RheoData wrapper object.
 
         Args:
@@ -603,7 +603,6 @@ class FractionalMaxwellModel(BaseModel):
         if isinstance(X, RheoData):
             return self.predict_rheodata(X, test_mode=test_mode)
         else:
-            # Delegate to BaseModel.predict() which handles deformation_mode
-            # conversion (DMTA E*->G*->E*) and test_mode restoration in its
-            # finally block.
+            # Delegate to BaseModel.predict() which handles
+            # test_mode restoration in its finally block.
             return super().predict(X, test_mode=test_mode, **kwargs)

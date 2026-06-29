@@ -19,6 +19,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
@@ -41,8 +42,7 @@ _GRID_LINESTYLE = "--"
 
 def _reject_removed_plot_options(kwargs: dict[str, Any]) -> None:
     """Reject removed public plotting options before model evaluation."""
-    if "deformation_mode" in kwargs:
-        raise TypeError("deformation_mode was removed because RheoJAX is shear-only")
+    reject_removed_options(kwargs)
 
 
 def compute_credible_band(

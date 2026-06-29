@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-_REMOVED_OPTIONS = ("deforma" + "tion_mode", "poisson" + "_ratio")
+# Deliberate exception to the retired-token clean sweep: this module is the
+# single rejection boundary that recognizes legacy public keyword arguments.
+# Production code must never store or forward these names.
+REMOVED_OPTION_NAMES = ("deforma" + "tion_mode", "poisson" + "_ratio")
 
 
 def reject_removed_options(options: Mapping[str, object]) -> None:
@@ -16,7 +19,7 @@ def reject_removed_options(options: Mapping[str, object]) -> None:
     Raises:
         TypeError: If a removed DMTA option is present.
     """
-    present = [key for key in _REMOVED_OPTIONS if key in options]
+    present = [key for key in REMOVED_OPTION_NAMES if key in options]
     if not present:
         return
 

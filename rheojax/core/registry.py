@@ -757,6 +757,9 @@ class ModelRegistry:
             >>> print(models)
             ['maxwell', 'zener', 'springpot', ...]
         """
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         return registry.get_all_models()
 

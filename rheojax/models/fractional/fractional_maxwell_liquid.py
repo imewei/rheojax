@@ -650,8 +650,8 @@ class FractionalMaxwellLiquid(BaseModel):
         """Predict response.
 
         R13-FML-002: Delegates to BaseModel.predict() for plain-array inputs so
-        that deformation_mode (E*->G* conversion) and test_mode restoration are
-        handled correctly.  Only RheoData inputs bypass super() because they
+        that test_mode restoration is handled correctly.  Only RheoData inputs
+        bypass super() because they
         return a RheoData wrapper object.
 
         Args:

@@ -5,7 +5,6 @@ to reduce BaseModel to a thin delegation layer.
 
 The orchestrator handles:
 - RheoData unpacking and test_mode propagation
-- Deformation mode conversion (E* -> G*)
 - Auto-initialization (auto_p0)
 - Optimization strategy detection (log-residuals, multi-start)
 - Compatibility checks

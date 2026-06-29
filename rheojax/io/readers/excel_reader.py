@@ -351,16 +351,12 @@ def load_excel(
         for msg in warning_messages:
             warnings.warn(msg, UserWarning, stacklevel=2)
 
-    # Set deformation mode to shear (as RheoJAX only supports shear)
-    final_metadata["deforma" + "tion_mode"] = "shear"
-
     logger.info(
         "File parsed",
         filepath=str(filepath),
         n_records=len(x_data),
         test_mode=detected_test_mode,
         domain=domain,
-        deformation_mode="shear",
     )
 
     return RheoData(

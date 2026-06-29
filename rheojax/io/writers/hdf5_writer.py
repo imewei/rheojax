@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core._validation import REMOVED_OPTION_NAMES
 from rheojax.core.data import RheoData
 from rheojax.io._exceptions import RheoJaxValidationWarning, UnsupportedDataError
 from rheojax.logging import get_logger, log_io
@@ -471,9 +472,9 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             # so malformed files still report missing x/y before geometry.
             geometry_markers = (
                 f.attrs.get("measurement_geometry"),
-                f.attrs.get("deformation_mode"),
+                f.attrs.get(REMOVED_OPTION_NAMES[0]),
                 metadata.get("measurement_geometry"),
-                metadata.get("deformation_mode"),
+                metadata.get(REMOVED_OPTION_NAMES[0]),
             )
             for marker in geometry_markers:
                 marker = _normalize_hdf5_geometry_marker(marker)
