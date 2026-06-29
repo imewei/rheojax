@@ -163,8 +163,8 @@ class TestFitResult:
 
     def test_metadata(self):
         result = _make_fit_result()
-        result.metadata["deformation_mode"] = "tension"
-        assert result.metadata["deformation_mode"] == "tension"
+        result.metadata["operator"] = "analyst"
+        assert result.metadata["operator"] == "analyst"
 
 
 class TestFitResultSummary:

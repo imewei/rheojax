@@ -1,4 +1,7 @@
 # tests/io/test_dmta_rejection.py
+import importlib
+from unittest.mock import patch
+
 import h5py
 import numpy as np
 import pandas as pd
@@ -56,6 +59,48 @@ def test_hdf5_encoded_tensile_markers_rejected(tmp_path, location, name, value):
 
     with pytest.raises(UnsupportedDataError, match="Unsupported measurement geometry"):
         load_hdf5(f)
+
+
+@pytest.mark.parametrize("reader_name", ("csv_reader", "excel_reader"))
+@pytest.mark.parametrize("removed_key", ("deformation_mode", "poisson_ratio"))
+def test_reader_metadata_rejects_removed_keys_before_data_construction(
+    tmp_path, reader_name, removed_key
+):
+    module = importlib.import_module(f"rheojax.io.readers.{reader_name}")
+    if reader_name == "csv_reader":
+        path = tmp_path / "shear.csv"
+        pd.DataFrame({"time": [1.0, 2.0], "stress": [3.0, 4.0]}).to_csv(
+            path, index=False
+        )
+        load = module.load_csv
+    else:
+        pytest.importorskip("openpyxl")
+        path = tmp_path / "shear.xlsx"
+        pd.DataFrame({"time": [1.0, 2.0], "stress": [3.0, 4.0]}).to_excel(
+            path, index=False
+        )
+        load = module.load_excel
+
+    with patch.object(module, "RheoData") as rheodata_constructor:
+        with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
+            load(
+                path,
+                x_col="time",
+                y_col="stress",
+                metadata={removed_key: "shear"},
+            )
+
+    rheodata_constructor.assert_not_called()
+
+
+@pytest.mark.parametrize("location", ("top", "metadata"))
+def test_hdf5_shear_legacy_marker_is_not_propagated(tmp_path, location):
+    f = tmp_path / f"{location}_legacy_shear.h5"
+    _write_hdf5_with_geometry_marker(f, location, "deformation_mode", "shear")
+
+    loaded = load_hdf5(f)
+
+    assert "deformation_mode" not in loaded.metadata
 
 
 def test_hdf5_irrelevant_numeric_and_array_geometry_metadata_loads(tmp_path):

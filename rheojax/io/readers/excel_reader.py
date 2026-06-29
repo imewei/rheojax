@@ -319,6 +319,7 @@ def load_excel(
     # Merge with user metadata
     final_metadata: dict[str, Any] = {**source_metadata}
     if metadata:
+        reject_removed_options(metadata)
         final_metadata.update(metadata)
 
     # Add temperature if provided

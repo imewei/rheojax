@@ -482,6 +482,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                     raise UnsupportedDataError(
                         f"Unsupported measurement geometry: {marker}"
                     )
+            metadata.pop(REMOVED_OPTION_NAMES[0], None)
 
             # Restore test_mode from top-level attrs
             # into metadata (belt-and-suspenders with metadata dict)
