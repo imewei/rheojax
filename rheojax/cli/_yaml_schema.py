@@ -221,7 +221,7 @@ def validate_config(config: PipelineConfig) -> list[str]:
 
     try:
         reject_removed_options(config.defaults)
-    except TypeError as exc:
+    except (ValueError, TypeError) as exc:
         errors.append(f"Config defaults: {exc}")
 
     if not config.steps:
@@ -257,7 +257,7 @@ def validate_config(config: PipelineConfig) -> list[str]:
 
         try:
             reject_removed_options(step)
-        except TypeError as exc:
+        except (ValueError, TypeError) as exc:
             errors.append(f"{step_label} ({step_type}): {exc}")
 
         schema = STEP_SCHEMAS[step_type]
