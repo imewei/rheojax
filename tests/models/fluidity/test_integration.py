@@ -15,7 +15,6 @@ jax, jnp = safe_import_jax()
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
 
 
