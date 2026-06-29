@@ -30,14 +30,17 @@ jax, jnp = safe_import_jax()
 type ArrayLike = np.ndarray
 
 
+_REMOVED_DMTA_KWARGS = ("deformation_mode", "poisson_ratio")
+
+
 def _reject_dmta_kwargs(kwargs: dict) -> None:
-    """Reject deprecated DMTA kwargs: deformation_mode and poisson_ratio."""
-    for key in ("deformation_mode", "poisson_ratio"):
-        if key in kwargs:
-            raise ValueError(
-                f"Passing '{key}' as a keyword argument is no longer supported. "
-                "DMTA/shear conversion must be handled externally."
-            )
+    present = [k for k in _REMOVED_DMTA_KWARGS if k in kwargs]
+    if present:
+        raise TypeError(
+            f"{', '.join(present)} no longer supported — RheoJAX is shear-only "
+            f"(DMTA/tensile removed). Remove these arguments."
+        )
+
 
 
 class BaseModel(BayesianMixin, ABC):

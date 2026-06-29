@@ -433,6 +433,8 @@ class Registry:
         Returns:
             List of plugin names matching all criteria
         """
+        from rheojax.core.base import _reject_dmta_kwargs
+        _reject_dmta_kwargs(criteria)
         compatible = []
 
         # Check models
@@ -733,6 +735,8 @@ class ModelRegistry:
         Example:
             >>> model = ModelRegistry.create('maxwell')
         """
+        from rheojax.core.base import _reject_dmta_kwargs
+        _reject_dmta_kwargs(kwargs)
         registry = cls._get_registry()
         # If the model isn't registered yet, eagerly import all model modules
         # to trigger @ModelRegistry.register decorators (lazy-import fallback)
@@ -772,6 +776,8 @@ class ModelRegistry:
         Returns:
             List of matching model names
         """
+        from rheojax.core.base import _reject_dmta_kwargs
+        _reject_dmta_kwargs(criteria)
         registry = cls._get_registry()
         return registry.find_compatible(
             protocol=protocol, **criteria

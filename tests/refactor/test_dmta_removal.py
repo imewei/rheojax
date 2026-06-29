@@ -46,21 +46,21 @@ def test_reject_dmta_kwargs():
     G = np.ones_like(t)
 
     # Test fit
-    with pytest.raises(ValueError, match="deformation_mode"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.fit(t, G, test_mode="relaxation", deformation_mode="tensile")
-    with pytest.raises(ValueError, match="poisson_ratio"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.fit(t, G, test_mode="relaxation", poisson_ratio=0.5)
 
     # Test predict
-    with pytest.raises(ValueError, match="deformation_mode"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.predict(t, test_mode="relaxation", deformation_mode="tensile")
-    with pytest.raises(ValueError, match="poisson_ratio"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.predict(t, test_mode="relaxation", poisson_ratio=0.5)
 
     # Test fit_bayesian
-    with pytest.raises(ValueError, match="deformation_mode"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.fit_bayesian(t, G, test_mode="relaxation", deformation_mode="tensile")
-    with pytest.raises(ValueError, match="poisson_ratio"):
+    with pytest.raises(TypeError, match="shear-only"):
         model.fit_bayesian(t, G, test_mode="relaxation", poisson_ratio=0.5)
 
 
@@ -89,3 +89,19 @@ def test_rheodata_clean():
 
 def test_pipeline_clean():
     assert _hits("pipeline", ("deformation_mode", "poisson_ratio")) == []
+
+
+def test_legacy_kwargs_raise():
+    from rheojax.core.registry import ModelRegistry
+    m = ModelRegistry.create("maxwell")
+    x = np.logspace(-1, 1, 10)
+    y = np.exp(-x)
+    for call in (
+        lambda: m.fit(x, y, deformation_mode="tension"),
+        lambda: m.predict(x, poisson_ratio=0.5),
+        lambda: m.fit_bayesian(x, y, deformation_mode="tension"),
+        lambda: ModelRegistry.find(protocol="oscillation", deformation_mode="shear"),
+    ):
+        with pytest.raises(TypeError, match="shear-only"):
+            call()
+
