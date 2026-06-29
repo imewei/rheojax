@@ -28,7 +28,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 
 from rheojax.gui.state import actions as pipeline_actions
-from rheojax.gui.state.store import StateStore, StepStatus
+from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
