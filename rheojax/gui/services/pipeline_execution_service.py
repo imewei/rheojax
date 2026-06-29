@@ -34,13 +34,6 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# DMTA parameter resolution helper (P1-1, P2-1, P2-4)
-# ---------------------------------------------------------------------------
-
-
-
-
 def _coerce_bayesian_int(
     config: dict[str, Any], key: str, default: int, *, max_val: int = 50_000
 ) -> int:
