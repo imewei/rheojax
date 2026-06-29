@@ -106,6 +106,23 @@ def test_legacy_kwargs_raise():
             call()
 
 
+def test_registry_find_compatible_rejects_removed_deformation_mode():
+    from rheojax.core.registry import Registry
+
+    registry = Registry()
+    with pytest.raises(TypeError, match="shear-only"):
+        registry.find_compatible(
+            protocol="relaxation", deformation_mode="shear"
+        )
+
+
+def test_model_registry_create_rejects_removed_poisson_ratio():
+    from rheojax.core.registry import ModelRegistry
+
+    with pytest.raises(TypeError, match="shear-only"):
+        ModelRegistry.create("maxwell", poisson_ratio=0.5)
+
+
 def test_symbols_removed():
     with pytest.raises(ImportError):
         from rheojax.core import DeformationMode  # noqa
