@@ -12,17 +12,15 @@ RheoJAX provides a unified framework for analyzing experimental rheology data wi
 - Flexible API design (Pipeline, Modular, Core layers)
 - All 53 rheological models with examples across 22 families
 - Advanced transforms for experimental data analysis (including SRFS, SPP)
-- DMTA/DMA support with E* ↔ G* conversion workflows
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**240+ Tutorial Notebooks** (all complete ✅) organized into 21 categories:
+**230+ Tutorial Notebooks** (all complete ✅) organized into 20 categories:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
 - **Transform Workflows** (8 notebooks ✅) - Data analysis techniques (FFT, TTS, SRFS, SPP)
 - **Bayesian Inference** (9 notebooks ✅) - Uncertainty quantification (including SPP LAOS)
 - **Advanced Workflows** (10 notebooks ✅) - Production patterns (including SGR and SPP)
 - **I/O** (1 notebook ✅) - TRIOS complex modulus handling
 - **DMT Thixotropic Models** (6 notebooks ✅) - Structural-kinetics thixotropy across all 6 protocols
-- **DMTA/DMA Analysis** (8 notebooks ✅) - Modulus conversion, GMM fitting, real-data workflows
 - **EPM Mesoscopic Models** (6 notebooks ✅) - Elasto-Plastic Model for amorphous solids across 5 protocols + visualization
 - **SGR Soft Glassy Models** (6 notebooks ✅) - Soft Glassy Rheology across all 6 protocols
 - **STZ Amorphous Solid Models** (6 notebooks ✅) - Shear Transformation Zones across all 6 protocols
