@@ -685,10 +685,7 @@ Material Characterization Capabilities
 
 **Total parameters**: :math:`2N + 1` (one E_inf, N moduli, N times)
 
-**Modulus type** (``modulus_type`` constructor argument):
-   - ``modulus_type='shear'``: Uses G (shear modulus) symbols
-   - ``modulus_type='tensile'``: Uses E (tensile modulus) symbols
-   - **Internal logic identical**, only parameter names differ
+
 
 Parameter Interpretation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1227,10 +1224,10 @@ Sample Applications: DMA (Solid Mechanics)
       mastercurve, shifts = mc.transform(multi_temp_datasets)
 
       # Fit GMM (element minimization)
-      gmm = GeneralizedMaxwell(n_modes=10, modulus_type='tensile')
+      gmm = GeneralizedMaxwell(n_modes=10)
       gmm.fit(
           mastercurve.x,      # Shifted frequency (rad/s)
-          mastercurve.y,      # Complex modulus [E', E"] (Pa)
+          mastercurve.y,      # Complex modulus [G', G"] (Pa)
           test_mode='oscillation',
           optimization_factor=1.5
       )
@@ -1788,75 +1785,7 @@ Bayesian Inference with Prior Safety
    plt.legend()
    plt.show()
 
-DMA Workflow (Solid Mechanics)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
-
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
-   from rheojax.transforms.mastercurve import Mastercurve
-   from rheojax.core.data import RheoData
-   import numpy as np
-   import matplotlib.pyplot as plt
-
-   # 1. Load DMA frequency sweep data at multiple temperatures
-   temps = [20, 40, 60, 80, 100]  # °C
-   datasets = []
-
-   for T in temps:
-       # Example: load from file
-       # omega, E_prime, E_double_prime = load_dma_data(T)
-       omega = np.logspace(-2, 2, 50)  # rad/s
-       E_prime = 1e6 * (omega / 1.0)**0.15  # Pa (example: weak frequency dependence)
-       E_double_prime = 1e5 * omega**0.3  # Pa (example: loss modulus)
-
-       data = RheoData(
-           x=omega,
-           y=np.column_stack([E_prime, E_double_prime]),
-           domain='frequency',
-           metadata={'temperature': T + 273.15}
-       )
-       datasets.append(data)
-
-   # 2. Construct mastercurve (automatic shift factors)
-   mc = Mastercurve(reference_temp=60+273.15, auto_shift=True)
-   mastercurve, shifts = mc.transform(datasets)
-
-   # 3. Fit GMM
-   gmm = GeneralizedMaxwell(n_modes=10, modulus_type='tensile')
-   gmm.fit(
-       mastercurve.x,
-       mastercurve.y,
-       test_mode='oscillation',
-       optimization_factor=1.5
-   )
-
-   # 4. Extract relaxation spectrum
-   spectrum = gmm.get_relaxation_spectrum()
-   E_i = spectrum['E_i']
-   tau_i = spectrum['tau_i']
-
-   # 5. Plot spectrum
-   plt.figure(figsize=(10, 6))
-
-   plt.subplot(2, 1, 1)
-   plt.semilogx(tau_i, E_i, 'o-')
-   plt.xlabel('Relaxation time τ (s)')
-   plt.ylabel('Mode strength E_i (Pa)')
-   plt.title(f'Discrete Relaxation Spectrum (N={gmm._n_modes} modes)')
-   plt.grid(True)
-
-   plt.subplot(2, 1, 2)
-   omega_master = mastercurve.x
-   E_star_pred = gmm.predict(omega_master)
-   plt.loglog(omega_master, E_star_pred[:, 0], label="E' (GMM)")
-   plt.loglog(omega_master, E_star_pred[:, 1], label='E" (GMM)')
-   plt.loglog(mastercurve.x, mastercurve.y[:, 0], 'o', alpha=0.5, label="E' (data)")
-   plt.loglog(mastercurve.x, mastercurve.y[:, 1], 's', alpha=0.5, label='E" (data)')
-   plt.xlabel('Reduced frequency ω (rad/s)')
-   plt.ylabel('Modulus (Pa)')
-   plt.legend()
-   plt.grid(True)
 
    plt.tight_layout()
    plt.show()

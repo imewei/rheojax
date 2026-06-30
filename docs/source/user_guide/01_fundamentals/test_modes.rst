@@ -578,36 +578,7 @@ Model Compatibility with Test Modes
      - ✗
      - ✓
 
-.. _test_modes_dmta:
 
-7. DMTA / DMA (Tensile Oscillation)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**What it is**: Apply oscillatory tensile (or bending/compression) deformation and measure :math:`E^*(\omega)`
-
-**Instruments**: DMTA (TA Instruments RSA-G2, Netzsch DMA, Mettler Toledo DMA/SDTA, PerkinElmer DMA 8000)
-
-**Output**: :math:`E'(\omega)` (storage modulus, tensile) and :math:`E''(\omega)` (loss modulus, tensile)
-
-**Relationship to shear**: :math:`E = 2(1+\nu)G` where :math:`\nu` is the Poisson ratio
-
-**In RheoJAX**: All oscillation-capable models (41 of 53) accept DMTA data directly:
-
-.. code-block:: python
-
-   from rheojax.models import FractionalZenerSolidSolid
-
-   model = FractionalZenerSolidSolid()
-   model.fit(omega, E_star,
-             test_mode='oscillation',
-             deformation_mode='tension',
-             poisson_ratio=0.5)  # rubber
-
-   # predict() returns E* automatically
-   E_pred = model.predict(omega, test_mode='oscillation')
-
-RheoJAX converts :math:`E^* \to G^*` before fitting (model parameters stay in shear space)
-and converts back on ``predict()``. See :doc:`/models/dmta/index` for theory and workflows.
 
 **Key distinctions**:
 

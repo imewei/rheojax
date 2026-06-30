@@ -45,9 +45,7 @@ Quick Navigation
    * - **DMT**
      - de Souza Mendes-Thompson thixotropic models
      - 6 notebooks
-   * - **DMTA**
-     - Dynamic Mechanical Thermal Analysis (E* ↔ G* workflows)
-     - 8 notebooks
+
    * - **EPM**
      - Elasto-plastic models (Lattice + Tensorial)
      - 6 notebooks
@@ -930,22 +928,7 @@ DMT — Thixotropic Models (6 notebooks)
    5. ``05_dmt_saos.ipynb`` — Small-amplitude oscillatory shear
    6. ``06_dmt_laos.ipynb`` — Large-amplitude oscillatory shear
 
-DMTA — Dynamic Mechanical Thermal Analysis (8 notebooks)
----------------------------------------------------------
 
-**Directory**: ``examples/dmta/``
-
-**Feature**: Automatic E* ↔ G* modulus conversion for tensile, bending, and compression oscillatory data.
-
-**Notebooks**:
-   1. ``01_dmta_basics.ipynb`` — DMTA fundamentals and deformation modes
-   2. ``02_dmta_master_curve.ipynb`` — Temperature-frequency mastercurves for E*
-   3. ``03_dmta_fractional_models.ipynb`` — Fractional models for broad relaxation spectra
-   4. ``04_dmta_relaxation.ipynb`` — Relaxation modulus from DMTA data
-   5. ``05_dmta_vitrimer.ipynb`` — Vitrimer DMTA with HVM model
-   6. ``06_dmta_model_selection.ipynb`` — Systematic model selection for E* data
-   7. ``07_dmta_tts_pipeline.ipynb`` — TTS pipeline with tensile modulus
-   8. ``08_dmta_cross_domain.ipynb`` — Cross-domain fitting (tension + shear)
 
 EPM — Elasto-Plastic Models (6 notebooks)
 ------------------------------------------

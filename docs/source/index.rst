@@ -35,8 +35,6 @@ At a Glance
      - 11 transforms (FFT, mastercurve/TTS, SRFS, SPP, OWChirp, derivatives, mutation number, Prony conversion, spectrum inversion, LVE envelope, Cox-Merz)
    * - **Performance**
      - 10-100x speedups via JAX; 5-270x optimization via NLSQ
-   * - **DMTA/DMA**
-     - Automatic E* ↔ G* conversion for 45 oscillation-capable models with tensile deformation mode
    * - **Notebooks**
      - 249 tutorial notebooks across 21 categories covering all model families and protocols
 
@@ -104,6 +102,9 @@ Working with Parameters
    # Get/set values
    E = params.get_value("E")
    params.set_value("tau", 2.5)
+
+   # Use shear modulus G instead of E for parameters/plots where applicable
+   # (RheoJAX is now strictly shear-only)
 
 ----
 
@@ -180,7 +181,7 @@ Community and Support
         year = {2024-2026},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
-        version = {0.6.1}
+        version = {0.7.0}
       }
 
 Indices and Tables

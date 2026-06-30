@@ -71,17 +71,7 @@ Non-Newtonian flow models:
 * ``HerschelBulkley``, ``Bingham``, ``PowerLaw``
 * ``CarreauYasuda``, ``Cross``, ``Casson``
 
-DMTA / DMA Data
-~~~~~~~~~~~~~~~~
 
-For Dynamic Mechanical Analyzer data in tension, compression, or bending:
-
-.. code-block:: python
-
-   model.fit(omega, E_star, test_mode='oscillation',
-             deformation_mode='tension', poisson_ratio=0.5)
-
-See :doc:`models/dmta/index` for the complete DMTA guide.
 
 Working with Transforms
 -----------------------

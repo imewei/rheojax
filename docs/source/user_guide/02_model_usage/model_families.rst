@@ -1027,9 +1027,7 @@ some contexts):
 - **HVM** (1): Hybrid vitrimer — 3 subnetworks + TST kinetics
 - **HVNM** (1): Vitrimer nanocomposite — 4 subnetworks + Guth-Gold
 
-**DMTA/DMA Support:** All 41+ oscillation-capable models also support tensile modulus (E*)
-via automatic E* ↔ G* conversion when ``deformation_mode='tension'`` is specified.
-See :doc:`/models/dmta/index` for details.
+
 
 Always start simple and add complexity only when necessary.
 

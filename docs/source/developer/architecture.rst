@@ -69,7 +69,7 @@ Module Structure
     |   |--- bayesian.py     # Bayesian inference engine (NumPyro NUTS)
     |   |--- data.py         # RheoData container (JAX-native)
     |   |--- parameters.py   # ParameterSet with bounds/priors
-    |   |--- test_modes.py   # Test mode detection + DeformationMode enum
+    |   |--- test_modes.py   # Test mode detection
     |   |--- registry.py     # ModelRegistry + TransformRegistry
     |   |--- inventory.py    # Protocol enum + model capability discovery
     |   \--- jax_config.py   # safe_import_jax() for float64
@@ -105,7 +105,7 @@ Module Structure
     |   |--- optimization.py     # NLSQ interface (5-270x vs scipy)
     |   |--- prony.py            # Prony series decomposition
     |   |--- mct_kernels.py      # MCT numerical kernels
-    |   |--- modulus_conversion.py  # E* ↔ G* conversion (DMTA)
+
     |   \--- initialization/     # Smart parameter initialization
     |--- pipeline/           # High-level workflows
     |   |--- base.py         # Pipeline (fluent API)
@@ -142,7 +142,7 @@ Component Relationships
     +----v-----------v------------v--------+
     |           Core Components             |
     |  RheoData, Parameters, BayesianMixin  |
-    |  Registry, DeformationMode, Logging   |
+    |  Registry, Logging                    |
     \-----+--------------------------+-------+
          |                          |
     +----v-----+              +----v-----+
@@ -185,8 +185,7 @@ Model Hierarchy
     All 53 models support: .fit(), .predict(), .fit_bayesian(),
     .sample_prior(), .get_credible_intervals()
 
-    DMTA: 41+ oscillation-capable models accept deformation_mode='tension'
-    for automatic E* ↔ G* conversion
+
 
 Transform Hierarchy
 ~~~~~~~~~~~~~~~~~~~
@@ -315,11 +314,10 @@ Models and transforms are registered for discovery:
 
     from rheojax.core.registry import ModelRegistry, TransformRegistry
 
-    # Register model with protocols and optional deformation modes
+    # Register model with protocols
     @ModelRegistry.register(
         name="CustomModel",
         protocols=[Protocol.RELAXATION, Protocol.CREEP, Protocol.OSCILLATION],
-        deformation_modes=[DeformationMode.SHEAR, DeformationMode.TENSION]
     )
     class CustomModel(BaseModel):
         pass

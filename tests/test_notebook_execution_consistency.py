@@ -27,6 +27,8 @@ from check_notebook_execution import (
     _allowlist_matches,
     _load_allowlist,
     check_notebook,
+)
+from check_notebook_execution import (
     main as scanner_main,
 )
 

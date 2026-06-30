@@ -8,11 +8,11 @@ from typing import Any
 
 from rheojax.core.data import RheoData
 from rheojax.io._exceptions import UnsupportedDataError
+from rheojax.io.readers._utils import check_file_for_unsupported_data
 from rheojax.io.readers.anton_paar import load_anton_paar
 from rheojax.io.readers.csv_reader import detect_csv_delimiter, load_csv
 from rheojax.io.readers.excel_reader import load_excel
 from rheojax.io.readers.trios import load_trios
-from rheojax.io.readers._utils import check_file_for_unsupported_data
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)

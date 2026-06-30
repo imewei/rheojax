@@ -169,8 +169,8 @@ quality without assuming a parametric model:
    # Retrieve the model-free shift factors
    temps, log_aT = mc.get_auto_shift_factors()
 
-This is especially useful for DMTA temperature sweeps where a single WLF or Arrhenius
-model may not capture the full :math:`T_g` transition region.  See
+This is especially useful for temperature sweeps where a single WLF or Arrhenius
+model may not capture the full transition region.  See
 ``examples/transforms/06-mastercurve_auto_shift.ipynb`` for a complete tutorial.
 
 Troubleshooting
@@ -194,11 +194,7 @@ References
 - Dealy, J. M. & Plazek, D. J. "Time-Temperature Superposition — A Users Guide." *Rheol.
   Bull.* 78(2), 16-21 (2009).
 
-.. seealso::
 
-   For DMTA temperature sweep data, see :doc:`/models/dmta/dmta_workflows`
-   Workflow 2 (master curve from multi-T DMTA) and
-   ``examples/dmta/07_dmta_tts_pipeline.ipynb``.
 
 See also
 --------

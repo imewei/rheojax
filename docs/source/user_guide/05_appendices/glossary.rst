@@ -44,32 +44,7 @@ Moduli and Mechanical Properties
 **Compliance** (:math:`J`)
    Inverse of modulus; strain per unit stress (:math:`\text{Pa}^{-1}`).
 
-**Young's Modulus** (:math:`E`)
-   Tensile (axial) modulus; ratio of tensile stress to tensile strain (Pa).
 
-**Complex Young's Modulus** (:math:`E^*`)
-   :math:`E^* = E' + iE''`; tensile analog of the complex shear modulus :math:`G^*`.
-
-**Storage Modulus (tensile)** (:math:`E'`)
-   In-phase (elastic) component of the complex Young's modulus from DMTA (Pa).
-
-**Loss Modulus (tensile)** (:math:`E''`)
-   Out-of-phase (viscous) component of the complex Young's modulus from DMTA (Pa).
-
-**Poisson's Ratio** (:math:`\nu`)
-   Ratio of transverse to axial strain; relates :math:`E` and :math:`G` via :math:`E = 2(1+\nu)G`. Typical values: rubber :math:`\approx 0.5`, glassy polymer :math:`\approx 0.35`.
-
-DMTA / DMA
-----------
-
-**DMTA (Dynamic Mechanical Thermal Analysis)**
-   Oscillatory technique measuring :math:`E^*(\omega, T)` under tensile, bending, or compression deformation. Widely used for polymer glass transitions and temperature sweeps.
-
-**DMA (Dynamic Mechanical Analysis)**
-   Synonym for DMTA; sometimes specifically refers to isothermal frequency sweeps in tensile geometry.
-
-**Deformation Mode**
-   The type of mechanical loading applied to the sample: shear, tension, bending, or compression. In RheoJAX, set via ``deformation_mode='tension'`` in ``fit()`` / ``predict()``.
 
 Viscosity
 ---------
@@ -247,18 +222,6 @@ Symbols Quick Reference
      - Stress
      - Pa
      - :math:`10^0 - 10^6`
-   * - :math:`E'`
-     - Storage modulus (tensile)
-     - Pa
-     - :math:`10^6 - 10^{10}`
-   * - :math:`E''`
-     - Loss modulus (tensile)
-     - Pa
-     - :math:`10^6 - 10^{10}`
-   * - :math:`\nu`
-     - Poisson's ratio
-     - dimensionless
-     - 0.3 - 0.5
 
 See Also
 --------

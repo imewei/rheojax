@@ -271,15 +271,6 @@ Not following the 16-week course? Choose a path that matches your goals:
    2. :doc:`03_advanced_topics/vitrimer_models` — HVM and HVNM models
    3. :doc:`03_advanced_topics/bayesian_inference` — Bayesian parameter estimation
 
-.. admonition:: DMTA / DMA Analysis (2 weeks)
-   :class: tip
-
-   For researchers analyzing tensile, bending, or compression oscillatory data:
-
-   1. :doc:`01_fundamentals/test_modes` — DMTA as a test mode (E* vs G*)
-   2. :doc:`01_fundamentals/model_capabilities` — DMTA-compatible models (41 of 53)
-   3. :doc:`/models/dmta/index` — Modulus conversion theory and workflows
-   4. :doc:`03_advanced_topics/bayesian_inference` — Uncertainty quantification for DMTA fits
 
 .. admonition:: Dense Suspensions & Glasses (4 weeks)
    :class: note

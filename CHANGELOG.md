@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-29
+
+### Changed
+- **BREAKING (0.7.0):** RheoJAX is now shear-only. Removed DMTA — `DeformationMode`, the `deformation_mode`/`poisson_ratio` parameters, `modulus_conversion`/`POISSON_PRESETS`, and tensile `modulus_type`. Migration: convert tensile data to shear externally before loading; remove `deformation_mode`/`poisson_ratio` from calls, CLI flags, and YAML configs.
+
 ### Added — Herschel-Bulkley-Capable EPM Kernels (scalar and tensorial)
 
 Both the scalar `LatticeEPM` and the tensorial `TensorialEPM` now support **three interchangeable constitutive laws** for the plastic strain rate, selectable at model construction via a new `fluidity_form` argument. This fills a long-standing limitation where EPM could not reproduce shear-thinning Herschel-Bulkley flow curves (σ = σ_y + K·γ̇^n with n < 1) regardless of disorder distribution — the classical linear-fluidity form asymptotes to Bingham at high rates by construction.

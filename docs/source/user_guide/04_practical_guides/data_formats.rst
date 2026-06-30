@@ -74,7 +74,7 @@ Key Fields
      - Explicit test mode; auto-detected if not provided
    * - ``metadata``
      - dict | None
-     - Additional context (temperature, deformation_mode, poisson_ratio, etc.)
+     - Additional context (temperature, etc.)
    * - ``validate``
      - bool
      - If True (default), validates NaN, Inf, shape matching on creation
@@ -92,9 +92,6 @@ Data Access Properties
    * - ``.test_mode``
      - str
      - Auto-detected or explicit test mode
-   * - ``.deformation_mode``
-     - str
-     - From metadata; defaults to ``"shear"``
    * - ``.shape``
      - tuple
      - Shape of y data
@@ -111,17 +108,17 @@ Data Access Properties
    * - Property
      - Description
    * - ``.storage_modulus`` / ``.y_real``
-     - G' (storage modulus) or E' for DMTA
+     - G' (storage modulus)
    * - ``.loss_modulus`` / ``.y_imag``
-     - G'' (loss modulus) or E'' for DMTA
+     - G'' (loss modulus)
    * - ``.modulus``
      - |G*| = sqrt(G'² + G''²)
    * - ``.tan_delta``
      - tan(δ) = G''/G'
    * - ``.storage_modulus_label``
-     - ``"G'"`` (shear) or ``"E'"`` (tensile)
+     - ``"G'"``
    * - ``.loss_modulus_label``
-     - ``"G''"`` (shear) or ``"E''"`` (tensile)
+     - ``"G''"``
 
 Methods
 ~~~~~~~
@@ -172,7 +169,7 @@ Models declare which protocols they support via the registry.
 
 .. code-block:: python
 
-   from rheojax.core.test_modes import TestModeEnum, DeformationMode
+   from rheojax.core.test_modes import TestModeEnum
 
    # All test modes
    TestModeEnum.RELAXATION     # "relaxation"
@@ -370,109 +367,6 @@ Small-amplitude oscillatory shear measures frequency-dependent viscoelasticity.
 
 **Compatible models**: Maxwell, Zener, Springpot, all Fractional models, SGR models,
 Generalized Maxwell, IKH, FIKH, DMT, Giesekus, HVM, HVNM, TNT, VLB, ITT-MCT (41+ models)
-
-DMTA / DMA Oscillation (Tensile)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Dynamic Mechanical Thermal Analysis measures frequency-dependent viscoelasticity in tension, bending, or compression.
-
-**Physical setup**: Apply sinusoidal tensile (or bending) deformation, measure force response
-
-**Output**: Complex Young's modulus :math:`E^*(\omega) = E'(\omega) + i E''(\omega)`
-
-**Conversion**: :math:`E^* = 2(1 + \nu) \cdot G^*` where :math:`\nu` is Poisson's ratio
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 30 50
-
-   * - Field
-     - Value
-     - Notes
-   * - **x**
-     - angular frequency ``omega`` (rad/s)
-     - Positive, typically log-spaced
-   * - **y**
-     - complex Young's modulus ``E*(omega)`` (Pa)
-     - **Complex**: ``E' + 1j * E''``
-   * - **domain**
-     - ``'frequency'``
-     - Required
-   * - **test_mode**
-     - ``'oscillation'``
-     - Same as shear SAOS
-   * - **deformation_mode**
-     - ``'tension'``
-     - Passed to ``fit()`` / ``predict()``
-   * - **poisson_ratio**
-     - float (e.g., 0.5 for rubber)
-     - Required for E* → G* conversion
-
-**Deformation modes**:
-
-.. code-block:: python
-
-   from rheojax.core.test_modes import DeformationMode
-
-   DeformationMode.SHEAR         # "shear" — rotational rheometer (G*)
-   DeformationMode.TENSION       # "tension" — DMTA tensile (E*)
-   DeformationMode.BENDING       # "bending" — DMA bending (E*)
-   DeformationMode.COMPRESSION   # "compression" — compression DMA (E*)
-
-**Poisson's ratio presets**:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 40 20
-
-   * - Material
-     - ν
-   * - rubber / elastomer / hydrogel
-     - 0.50
-   * - semicrystalline
-     - 0.40
-   * - thermoset
-     - 0.38
-   * - glassy_polymer
-     - 0.35
-   * - metal / foam
-     - 0.30
-
-**Example with E* data**:
-
-.. code-block:: python
-
-   from rheojax.models import FractionalZenerSolidSolid
-
-   # DMTA data: E*(omega) = E'(omega) + i*E''(omega)
-   omega = np.logspace(-2, 2, 50)
-   E_prime = 3e9 * np.ones(50)
-   E_double_prime = 1e8 * omega**0.3
-   E_star = E_prime + 1j * E_double_prime
-
-   # Fit — model converts E* → G* internally
-   model = FractionalZenerSolidSolid()
-   model.fit(omega, E_star,
-             test_mode='oscillation',
-             deformation_mode='tension',
-             poisson_ratio=0.5)
-
-   # predict() returns E* automatically
-   E_pred = model.predict(omega, test_mode='oscillation')
-
-**CSV auto-detection**: The CSV reader auto-detects ``E'`` and ``E''`` columns
-and sets ``deformation_mode='tension'`` in metadata:
-
-.. code-block:: python
-
-   from rheojax.io import load_csv
-
-   data = load_csv("dmta_data.csv", x_col="f", y_cols=["E' (Pa)", "E'' (Pa)"])
-   print(data.deformation_mode)  # "tension" (auto-detected)
-
-**Compatible models**: All 41 oscillation-capable models (Classical, Fractional, SGR, IKH, HVM, HVNM, etc.)
-
-See :doc:`/models/dmta/index` for the complete DMTA guide.
 
 Flow Curve (Steady Shear)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -973,8 +867,6 @@ depend on the test mode.
        X,                              # x-data array or RheoData object
        y=None,                         # y-data (ignored if X is RheoData)
        test_mode='oscillation',        # Required for multi-protocol models
-       deformation_mode=None,          # 'tension' for DMTA
-       poisson_ratio=None,             # Required with deformation_mode
        method='nlsq',                  # 'nlsq', 'scipy', 'auto'
        **kwargs                        # Protocol kwargs: gamma_dot, sigma_applied, etc.
    )
@@ -1047,13 +939,6 @@ Test Mode Data Formats
      - Pa
      - —
      - domain='frequency'
-   * - **DMTA**
-     - frequency (1D)
-     - E*(ω) complex
-     - rad/s
-     - Pa
-     - ``deformation_mode``, ``poisson_ratio``
-     - E'/E'' columns
    * - **flow_curve**
      - shear rate (1D)
      - σ (1D)
@@ -1160,9 +1045,7 @@ Model Protocol Support
    * - 1 (flow only)
      - 6
      - PowerLaw, Carreau, Cross, HB, CarreauYasuda, Casson
-   * - **DMTA-compatible**
-     - **41**
-     - All models with OSCILLATION protocol
+
 
 Common Patterns
 ---------------
@@ -1237,11 +1120,7 @@ For oscillation data, construct complex arrays:
    print(data.loss_modulus)     # G''
    print(data.tan_delta)        # tan(delta) = G''/G'
 
-.. note::
 
-   For DMTA/DMA data, the CSV reader auto-detects E'/E'' columns and stores
-   ``deformation_mode='tension'`` in ``metadata``.
-   See :doc:`/models/dmta/dmta_workflows` Workflow 4 for details.
 
 Further Reading
 ---------------
@@ -1251,4 +1130,3 @@ Further Reading
 - :doc:`pipeline_api` — Pipeline API for fluent workflows
 - :doc:`/api/core` — Full API reference for RheoData
 - :doc:`/api/transforms` — Full API reference for transforms
-- :doc:`/models/dmta/index` — DMTA guide

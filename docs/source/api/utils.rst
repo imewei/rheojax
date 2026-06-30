@@ -1,7 +1,7 @@
 Utilities (rheojax.utils)
 =========================
 
-The utils module provides numerical utilities for rheological analysis, including special functions, optimization tools, fit quality metrics, device detection, and modulus conversion for DMTA support.
+The utils module provides numerical utilities for rheological analysis, including special functions, optimization tools, fit quality metrics, and device detection.
 
 Mittag-Leffler Functions
 ------------------------
@@ -225,15 +225,10 @@ Create Prony Parameter Set
 
     from rheojax.utils.prony import create_prony_parameter_set
 
-    # Create 3-mode Prony series (shear modulus)
-    params = create_prony_parameter_set(n_modes=3, modulus_type='shear')
+    # Create 3-mode Prony series
+    params = create_prony_parameter_set(n_modes=3)
     print(list(params.keys()))
     # ['G_inf', 'G_1', 'G_2', 'G_3', 'tau_1', 'tau_2', 'tau_3']
-
-    # Create 5-mode Prony series (tensile modulus)
-    params_tensile = create_prony_parameter_set(n_modes=5, modulus_type='tensile')
-    print(list(params_tensile.keys()))
-    # ['E_inf', 'E_1', ..., 'E_5', 'tau_1', ..., 'tau_5']
 
 Element Minimization with Warm-Start
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1086,122 +1081,6 @@ See Also
 - :doc:`../user_guide/getting_started` - Basic fitting examples
 - :mod:`rheojax.utils.optimization` - Optimization functions using these strategies
 
-Modulus Conversion (DMTA Support)
----------------------------------
-
-.. automodule:: rheojax.utils.modulus_conversion
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-The modulus conversion module provides utilities for converting between
-shear modulus G* and Young's modulus E* for DMTA/DMA data analysis.
-
-The fundamental relationship from isotropic linear elasticity:
-
-.. math::
-
-   E^*(\omega) = 2(1 + \nu) \, G^*(\omega)
-
-where :math:`\nu` is the Poisson's ratio of the material.
-
-Functions
-~~~~~~~~~
-
-.. autofunction:: rheojax.utils.modulus_conversion.convert_modulus
-   :noindex:
-
-   Array-level conversion between E* and G* using Poisson's ratio.
-
-   Converts complex modulus arrays in either direction:
-
-   - ``tension`` → ``shear``: :math:`G^* = E^* / 2(1+\nu)`
-   - ``shear`` → ``tension``: :math:`E^* = 2(1+\nu) \, G^*`
-
-.. autofunction:: rheojax.utils.modulus_conversion.convert_rheodata
-   :noindex:
-
-   RheoData-level conversion with automatic metadata update (units, deformation_mode).
-
-Material Presets
-~~~~~~~~~~~~~~~~
-
-.. data:: rheojax.utils.modulus_conversion.POISSON_PRESETS
-
-   Dictionary of common Poisson's ratio values by material class:
-
-   .. list-table::
-      :header-rows: 1
-      :widths: 30 20 50
-
-      * - Material
-        - :math:`\nu`
-        - Notes
-      * - ``rubber`` / ``elastomer``
-        - 0.50
-        - Incompressible (E = 3G)
-      * - ``hydrogel``
-        - 0.50
-        - Water-swollen networks
-      * - ``semicrystalline``
-        - 0.40
-        - PE, PP, PA, PET
-      * - ``thermoset``
-        - 0.38
-        - Epoxies, polyesters
-      * - ``glassy_polymer``
-        - 0.35
-        - PS, PMMA, PC below Tg
-      * - ``metal``
-        - 0.30
-        - Steel, aluminum
-      * - ``foam``
-        - 0.30
-        - Open-cell foams
-
-Examples
-~~~~~~~~
-
-Array-Level Conversion
-^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-    import numpy as np
-    from rheojax.utils.modulus_conversion import convert_modulus, POISSON_PRESETS
-
-    # DMTA data: E* from tensile DMA
-    omega = np.logspace(-2, 2, 50)
-    E_prime = 3e9 * np.ones(50)       # E' (Pa)
-    E_double_prime = 1e8 * omega**0.3  # E'' (Pa)
-    E_star = E_prime + 1j * E_double_prime
-
-    # Convert to G* for rubber (v=0.5, factor=3)
-    G_star = convert_modulus(E_star, "tension", "shear", poisson_ratio=0.5)
-    # G* = E* / 3 for rubber
-
-    # Use preset Poisson's ratio
-    nu = POISSON_PRESETS["glassy_polymer"]  # 0.35
-    G_star = convert_modulus(E_star, "tension", "shear", poisson_ratio=nu)
-
-Fitting DMTA Data Directly
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-    from rheojax.models import Maxwell
-
-    # All models accept deformation_mode in fit()/predict()
-    model = Maxwell()
-    model.fit(
-        omega, E_star,
-        test_mode='oscillation',
-        deformation_mode='tension',
-        poisson_ratio=0.5,
-    )
-
-    # predict() returns E* when fitted with tensile deformation_mode
-    E_pred = model.predict(omega, test_mode='oscillation')
 
 Device Utilities
 ----------------

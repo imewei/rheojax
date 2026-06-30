@@ -1,1 +1,1 @@
-/Users/b80985/Projects/rheojax/docs/verification/giesekus_math_verification.md
+../../verification/giesekus_math_verification.md

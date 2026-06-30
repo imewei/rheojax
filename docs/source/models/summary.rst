@@ -1358,9 +1358,6 @@ By Material Type
    * - NP-Filled Vitrimers
      - HVNMLocal, HVMLocal (unfilled)
      - Dual TST kinetics, Guth-Gold amplification, Payne effect
-   * - DMTA/DMA Specimens
-     - FZSS, GeneralizedMaxwell, Zener
-     - Set ``deformation_mode='tension'``; auto E*↔G* conversion
 
 By Application
 ~~~~~~~~~~~~~~
@@ -1474,28 +1471,6 @@ Bayesian Inference Support
 See :doc:`/user_guide/bayesian_inference` for comprehensive Bayesian analysis guide.
 
 
-DMTA / DMA Support
--------------------
-
-**All 49 oscillation-capable models support DMTA data** through automatic :math:`E^* \leftrightarrow G^*`
-conversion at the ``BaseModel`` boundary:
-
-* **Tensile modulus conversion:** :math:`E^* = 2(1 + \nu) G^*` applied automatically when ``deformation_mode='tension'``
-* **Poisson ratio presets:** rubber (0.5), glassy polymer (0.35), semicrystalline (0.40)
-* **Transparent workflow:** Model parameters stay in shear space; conversion at fit/predict boundary
-* **CSV auto-detection:** Columns named ``E'``, ``E''``, or ``E*`` automatically set ``deformation_mode='tension'``
-
-.. code-block:: python
-
-   from rheojax.models import FractionalZenerSolidSolid
-
-   model = FractionalZenerSolidSolid()
-   model.fit(omega, E_star, test_mode='oscillation',
-             deformation_mode='tension', poisson_ratio=0.5)
-   E_pred = model.predict(omega)  # Returns E* automatically
-
-See :doc:`/models/dmta/index` for DMTA theory, model compatibility, and workflow guides.
-
 
 Next Steps
 ----------
@@ -1511,7 +1486,6 @@ Next Steps
 * **VLB models:** :doc:`/models/vlb/index` for VLB transient networks (hydrogels, vitrimers, self-healing polymers)
 * **HVM models:** :doc:`/models/hvm/index` for hybrid vitrimer constitutive models
 * **HVNM models:** :doc:`/models/hvnm/index` for vitrimer nanocomposite models
-* **DMTA support:** :doc:`/models/dmta/index` for tensile modulus conversion and DMA workflows
 * **SRFS transform:** :doc:`/transforms/srfs` for strain-rate frequency superposition
 * **Example notebooks:** 246 examples across 20+ directories in ``examples/``
 
