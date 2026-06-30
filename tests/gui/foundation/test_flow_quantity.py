@@ -1,6 +1,8 @@
 import pytest
+
 import rheojax.models  # noqa: ensure registration
 from rheojax.core.registry import ModelRegistry
+
 
 def test_all_flow_curve_models_have_flow_quantity():
     """Every flow_curve model must declare flow_quantity = 'viscosity' or 'stress'."""
