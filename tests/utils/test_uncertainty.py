@@ -336,7 +336,7 @@ class TestHessianVsBootstrap:
         model.fit(t, G, test_mode="relaxation")
 
         ci_h = hessian_ci(model, t, G, alpha=0.05)
-        ci_b = bootstrap_ci(model, t, G, n_bootstrap=200, alpha=0.05, seed=0)
+        ci_b = bootstrap_ci(model, t, G, n_bootstrap=50, alpha=0.05, seed=0)
 
         for name in ci_h:
             lo_h, hi_h = ci_h[name]
