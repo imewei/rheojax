@@ -141,6 +141,7 @@ class BayesianWorker(QRunnable):
         cancel_token: CancellationToken | None = None,
         fitted_model_state: dict[str, Any] | None = None,
         dataset_id: str = "",
+        target_accept: float = 0.8,
     ):
         """Initialize Bayesian worker.
 
@@ -188,6 +189,7 @@ class BayesianWorker(QRunnable):
         self._seed = seed
         self._fitted_model_state = fitted_model_state
         self._dataset_id = dataset_id
+        self._target_accept = target_accept
 
         # Track progress
         self._current_stage = "warmup"
@@ -340,7 +342,7 @@ class BayesianWorker(QRunnable):
             from rheojax.gui.services.bayesian_service import BayesianService
 
             svc = BayesianService()
-            mcmc_kwargs: dict[str, Any] = {"seed": self._seed}
+            mcmc_kwargs: dict[str, Any] = {"seed": self._seed, "target_accept_prob": self._target_accept}
 
             # F-HL-005 fix: Pass fitted model state for stateful models
             if self._fitted_model_state:

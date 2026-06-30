@@ -667,6 +667,7 @@ def make_bayesian_worker(
     cancel_token: Any | None = None,
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
+    target_accept: float = 0.8,
 ) -> Any:
     """Create a Bayesian worker (subprocess or thread mode).
 
@@ -718,6 +719,7 @@ def make_bayesian_worker(
             cancel_token=cancel_token,
             fitted_model_state=fitted_model_state,
             dataset_id=dataset_id,
+            target_accept=target_accept,
         )
 
     # Subprocess mode — use functools.partial with module-level entry
@@ -756,6 +758,7 @@ def make_bayesian_worker(
         metadata=metadata,
         fitted_model_state=safe_model_state,
         dataset_id=dataset_id,
+        target_accept=target_accept,
     )
 
     return ProcessWorkerAdapter(work_fn)

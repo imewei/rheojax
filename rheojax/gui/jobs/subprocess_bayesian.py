@@ -33,6 +33,7 @@ def run_bayesian_isolated(
     metadata: dict[str, Any] | None = None,
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
+    target_accept: float = 0.8,
 ) -> dict[str, Any]:
     """Run NUTS Bayesian sampling in an isolated subprocess.
 
@@ -131,6 +132,7 @@ def run_bayesian_isolated(
     # Build kwargs for BayesianService.run_mcmc()
     mcmc_kwargs: dict[str, Any] = {
         "seed": seed,
+        "target_accept_prob": target_accept,
     }
 
     if priors:
