@@ -123,6 +123,7 @@ class FIKH(FIKHBase):
         >>> sigma_pred = model.predict_startup(t_new, gamma_dot=1.0)
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         include_thermal: bool = True,

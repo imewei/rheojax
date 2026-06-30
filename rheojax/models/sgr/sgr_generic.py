@@ -135,6 +135,7 @@ class SGRGeneric(BaseModel):
         - Reference: Fuereder & Ilg 2013 PRE 88, 042134
     """
 
+    flow_quantity: str = "stress"
     def __init__(self, dynamic_x: bool = False):
         """Initialize SGR GENERIC Model.
 

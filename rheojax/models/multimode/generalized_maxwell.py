@@ -112,6 +112,7 @@ class GeneralizedMaxwell(BaseModel):
         >>> print(f"Optimal modes: {model._n_modes}")  # Auto-reduced from 3
     """
 
+    flow_quantity: str = "viscosity"
     def __init__(self, n_modes: int = 3):
         """Initialize Generalized Maxwell Model.
 

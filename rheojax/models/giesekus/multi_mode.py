@@ -121,6 +121,7 @@ class GiesekusMultiMode(BaseModel):
     GeneralizedMaxwell : Linear multi-mode Maxwell model
     """
 
+    flow_quantity: str = "stress"
     def __init__(self, n_modes: int = 3):
         """Initialize multi-mode Giesekus model.
 

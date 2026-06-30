@@ -132,6 +132,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
     >>> intervals = model.get_credible_intervals(result.posterior_samples)
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         coupling: Literal["minimal", "full"] = "minimal",

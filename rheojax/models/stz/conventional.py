@@ -67,6 +67,7 @@ class STZConventional(STZBase):
     - SAOS/LAOS: Diffrax ODE integration + FFT for harmonic analysis
     """
 
+    flow_quantity: str = "stress"
     def __init__(self, variant: VariantType = "standard"):
         """Initialize STZ Conventional Model.
 

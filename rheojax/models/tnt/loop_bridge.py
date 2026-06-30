@@ -388,6 +388,7 @@ class TNTLoopBridge(TNTBase):
     TNTCates : Living polymer (wormlike micelle) model
     """
 
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize TNT loop-bridge model."""
         super().__init__()

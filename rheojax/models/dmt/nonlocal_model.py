@@ -110,6 +110,7 @@ class DMTNonlocal(DMTBase):
         yielding fluids." J. Rheol. 46, 573-589.
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         closure: Literal["exponential", "herschel_bulkley"] = "exponential",

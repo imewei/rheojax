@@ -114,6 +114,7 @@ class VLBVariant(VLBBase):
         If True, enable Arrhenius temperature dependence
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         breakage: BreakageType = "constant",

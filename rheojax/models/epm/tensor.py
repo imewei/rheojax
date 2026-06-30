@@ -66,6 +66,7 @@ class TensorialEPM(EPMBase):
         yield_criterion (str): "von_mises" or "hill". Default "von_mises".
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         L: int = 64,

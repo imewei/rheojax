@@ -90,6 +90,7 @@ class VLBNonlocal(VLBBase):
         Gap width (m)
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         breakage: BreakageType = "constant",

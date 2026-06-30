@@ -140,6 +140,7 @@ class GiesekusSingleMode(GiesekusBase):
     GiesekusMultiMode : Multi-mode extension with N relaxation times
     """
 
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize single-mode Giesekus model."""
         super().__init__()

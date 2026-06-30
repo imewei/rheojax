@@ -64,6 +64,7 @@ class Carreau(BaseModel):
         ROTATION (steady shear) only
     """
 
+    flow_quantity: str = "viscosity"
     def __init__(self):
         """Initialize Carreau model."""
         super().__init__()

@@ -127,6 +127,7 @@ class HVNMLocal(HVNMBase):
     >>> model.parameters.set_value("phi", 0.0)
     """
 
+    flow_quantity: str = "stress"
     def __init__(
         self,
         kinetics: Literal["stress", "stretch"] = "stress",

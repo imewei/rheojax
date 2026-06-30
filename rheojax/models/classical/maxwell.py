@@ -75,6 +75,7 @@ class Maxwell(BaseModel):
         >>> G_t = model.predict(data)
     """
 
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize Maxwell model with default parameters."""
         super().__init__()

@@ -78,6 +78,7 @@ class HebraudLequeux(BaseModel):
         parameters: ParameterSet containing alpha, tau, sigma_c.
     """
 
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize Hébraud–Lequeux Model."""
         super().__init__()

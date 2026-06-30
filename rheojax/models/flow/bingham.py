@@ -62,6 +62,7 @@ class Bingham(BaseModel):
         ROTATION (steady shear) only
     """
 
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize Bingham model."""
         super().__init__()
