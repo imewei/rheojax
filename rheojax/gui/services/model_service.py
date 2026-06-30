@@ -701,6 +701,8 @@ class ModelService:
         params: dict[str, Any],
         test_mode: str | None = None,
         progress_callback: Callable[[int, float], None] | None = None,
+        *,
+        model_config: dict | None = None,
         **fit_kwargs: Any,
     ) -> FitResult:
         """Run NLSQ fitting with progress updates.
@@ -741,8 +743,10 @@ class ModelService:
 
         try:
             model_name = self._normalize_model_name(model_name)
-            # Create model instance
-            model = self._registry.create_instance(model_name, plugin_type="model")
+            # Create model instance (model_config overrides constructor defaults, e.g. n_modes)
+            model = self._registry.create_instance(
+                model_name, plugin_type="model", **(model_config or {})
+            )
             logger.debug("Model instance created", model=model_name)
 
             # Set initial parameter values if provided

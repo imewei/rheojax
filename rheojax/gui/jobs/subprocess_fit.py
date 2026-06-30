@@ -28,6 +28,7 @@ def run_fit_isolated(
     y2_data: np.ndarray | None = None,
     metadata: dict[str, Any] | None = None,
     dataset_id: str = "",
+    model_config: dict | None = None,
 ) -> dict[str, Any]:
     """Run NLSQ fitting in an isolated subprocess.
 
@@ -95,6 +96,7 @@ def run_fit_isolated(
         rheo_data,
         params=initial_params,
         progress_callback=progress_callback,
+        model_config=model_config,
         **fit_kwargs,
     )
 
