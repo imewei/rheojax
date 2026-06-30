@@ -454,31 +454,31 @@ class TestUnicodeEdgeCases:
         assert ord(emoji) > 0xFFFF  # Beyond BMP
 
 
-@pytest.mark.macos_only
-@pytest.mark.skipif(not IS_MACOS, reason="macOS-specific tests")
-class TestMacOSSpecific:
-    """Tests specific to macOS platform."""
+class TestPlatformIconBehavior:
+    """Platform-agnostic tests for emoji/icon behavior across OSes."""
 
-    def test_emoji_safe_returns_false(self):
-        """Verify emoji_safe() returns False on macOS."""
-        from rheojax.gui.utils.icons import emoji_safe
+    def test_emoji_safe_matches_platform(self):
+        """emoji_safe() returns True on non-macOS, False on macOS."""
+        from rheojax.gui.utils.icons import emoji_safe, is_macos
 
-        assert emoji_safe() is False
+        assert emoji_safe() == (not is_macos())
 
-    def test_is_macos_returns_true(self):
-        """Verify is_macos() returns True on macOS."""
+    def test_is_macos_reflects_sys_platform(self):
+        """is_macos() matches sys.platform on every OS."""
+        import sys
+
         from rheojax.gui.utils.icons import is_macos
 
-        assert is_macos() is True
+        assert is_macos() == (sys.platform == "darwin")
 
-    def test_icon_provider_forced_ascii_on_macos(self):
-        """Verify IconProvider uses ASCII even when emoji requested."""
-        from rheojax.gui.utils.icons import IconProvider
+    def test_icon_provider_respects_platform_emoji_support(self):
+        """IconProvider honours allow_emoji only when emoji are safe."""
+        from rheojax.gui.utils.icons import IconProvider, is_macos
 
-        # Even with allow_emoji=True, should not use emoji on macOS
         provider = IconProvider(allow_emoji=True)
-        assert provider.uses_emoji is False
-
-        # Icons should be ASCII
+        # macOS forces ASCII; all other platforms honour allow_emoji=True
+        assert provider.uses_emoji == (not is_macos())
         icon = provider.get_category_icon("classical")
-        assert all(ord(c) < 128 for c in icon)
+        assert icon  # never empty regardless of platform
+        if is_macos():
+            assert all(ord(c) < 128 for c in icon)

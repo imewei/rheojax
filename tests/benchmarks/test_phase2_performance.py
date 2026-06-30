@@ -17,7 +17,7 @@ import pytest
 
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
-from rheojax.models import Maxwell, Zener
+from rheojax.models import Maxwell
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -139,18 +139,27 @@ class TestGPUAcceleration:
     """
 
     @pytest.mark.benchmark
-    @pytest.mark.gpu
-    def test_gpu_vs_cpu_performance(self):
-        """Compare CPU vs GPU performance (if GPU available)."""
-        pytest.skip(
-            "GPU benchmarking requires GPU hardware - marked for manual testing"
-        )
+    def test_active_backend_fitting_performance(self):
+        """Verify fitting performance on the active JAX backend (CPU or GPU)."""
+        import jax
 
-        # NOTE: This would be implemented when GPU is available
-        # Expected code:
-        # - jax.device_put(arrays, device=gpu_device)
-        # - Compare fitting times on CPU vs GPU
-        # - Target: ≥5x speedup on GPU
+        backend = jax.default_backend()
+        t = np.logspace(-2, 2, 100)
+        G = 1e6 * np.exp(-t / 1.0)
+        data = RheoData(x=t, y=G, domain="time")
+        model = Maxwell()
+
+        try:
+            model.fit(data.x, data.y)  # JIT warmup
+        except Exception as e:
+            pytest.skip(f"Warmup failed on {backend}: {e}")
+
+        start = time.time()
+        model.fit(data.x, data.y)
+        elapsed = time.time() - start
+
+        print(f"\n  Backend: {backend}, fit time: {elapsed*1000:.1f}ms")
+        assert elapsed < 5.0, f"Post-JIT fit on {backend} took {elapsed:.3f}s (>5s)"
 
 
 class TestMemoryProfiling:
@@ -264,29 +273,32 @@ class TestScalability:
 
         model = Maxwell()
 
-        # Time fitting
+        # JIT warmup on a small slice so compilation doesn't inflate timing
+        warmup_t = np.logspace(-2, 2, 10)
+        warmup_G = 1e6 * np.exp(-warmup_t / 1.0)
+        try:
+            Maxwell().fit(warmup_t, warmup_G)
+        except Exception as e:
+            pytest.skip(f"JIT warmup failed: {e}")
+
+        # Timed fitting (post-JIT)
         start = time.time()
         try:
             model.fit(data.x, data.y)
-            fit_time = time.time() - start
-
-            print(
-                f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)"
-            )
-
-            # Performance should be reasonable
-            # Target: <10s for N=10000
-            if N <= 10:
-                assert fit_time < 1.0, f"N={N} should fit in <1s"
-            elif N <= 100:
-                assert fit_time < 2.0, f"N={N} should fit in <2s"
-            elif N <= 1000:
-                assert fit_time < 10.0, f"N={N} should fit in <10s"
-            else:  # N=10000
-                assert fit_time < 60.0, f"N={N} should fit in <60s"
-
         except Exception as e:
             pytest.skip(f"Fitting N={N} failed: {e}")
+        fit_time = time.time() - start
+
+        print(f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)")
+
+        if N <= 10:
+            assert fit_time < 1.0, f"N={N} should fit in <1s post-JIT"
+        elif N <= 100:
+            assert fit_time < 2.0, f"N={N} should fit in <2s post-JIT"
+        elif N <= 1000:
+            assert fit_time < 10.0, f"N={N} should fit in <10s post-JIT"
+        else:
+            assert fit_time < 60.0, f"N={N} should fit in <60s post-JIT"
 
 
 # Performance benchmarking results table generation
