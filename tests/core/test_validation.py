@@ -16,9 +16,9 @@ def test_reject_removed_options_names_single_offending_option(removed_key):
         reject_removed_options({removed_key: object()})
 
     message = str(exc_info.value)
-    assert f"Removed option '{removed_key}' is" in message
+    assert f"Removed option(s) '{removed_key}'" in message
     assert "shear-only" in message
-    assert "Remove this option." in message
+    assert "Remove them." in message
 
 
 def test_reject_removed_options_orders_multiple_offending_options():
@@ -28,9 +28,10 @@ def test_reject_removed_options_orders_multiple_offending_options():
         reject_removed_options(options)
 
     message = str(exc_info.value)
-    assert "Removed options 'deformation_mode', 'poisson_ratio' are" in message
+    assert "'deformation_mode'" in message
+    assert "'poisson_ratio'" in message
     assert "shear-only" in message
-    assert "Remove these options." in message
+    assert "Remove them." in message
 
 
 def test_reject_removed_options_accepts_mapping_without_mutating_it():

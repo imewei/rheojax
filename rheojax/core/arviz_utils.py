@@ -116,6 +116,8 @@ def arviz_plot_kwargs(
     elif plot_name == "plot_forest" and "hdi_prob" in normalized:
         hdi_prob = normalized.pop("hdi_prob")
         normalized.setdefault("ci_kind", "hdi")
+        # ponytail: heuristic inner HDI band — 0.5 for prob>0.5, half otherwise;
+        # replace with explicit ci_probs kwarg if ArviZ exposes a migration guide.
         inner_prob = 0.5 if hdi_prob > 0.5 else hdi_prob / 2
         normalized.setdefault("ci_probs", (inner_prob, hdi_prob))
 
