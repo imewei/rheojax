@@ -7,8 +7,6 @@ Guards against the 5 regression patterns introduced by previous AI agents:
   d. finally cleanup without success guards
   e. Overly broad exception swallowing
 
-Plus systemic gap:
-  f. Pipeline never forwarding deformation_mode to models (DMTA)
 """
 
 from __future__ import annotations
@@ -19,7 +17,6 @@ import numpy as np
 import pytest
 
 from rheojax.core.bayesian import BayesianMixin
-from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 
@@ -286,140 +283,6 @@ class TestEqualBoundsDeterministic:
             assert not np.all(
                 np.asarray(a_samples) == np.asarray(a_samples)[0]
             ), "Param with bounds (0, 1e-6) should NOT be treated as deterministic"
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Category 5: DMTA Pipeline deformation_mode propagation
-#   Systemic gap: Pipeline never forwarded deformation_mode
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestPipelineDMTAPropagation:
-    """Guard: Pipeline must forward deformation_mode from data.metadata."""
-
-    @pytest.fixture
-    def dmta_data(self):
-        """RheoData with DMTA metadata (deformation_mode + poisson_ratio)."""
-        omega = np.logspace(-1, 2, 30)
-        E_star = 3e9 * omega**2 / (1 + omega**2) + 1j * 3e9 * omega / (1 + omega**2)
-        return RheoData(
-            x=omega,
-            y=np.abs(E_star),
-            x_units="rad/s",
-            y_units="Pa",
-            domain="frequency",
-            metadata={
-                "test_mode": "oscillation",
-                "deformation_mode": "tension",
-                "poisson_ratio": 0.5,
-            },
-            validate=False,
-        )
-
-    @pytest.mark.smoke
-    def test_pipeline_fit_propagates_deformation_mode(self, dmta_data):
-        """Pipeline.fit() must pass deformation_mode from data metadata to model.fit()."""
-        from rheojax.core.base import BaseModel
-        from rheojax.core.registry import ModelRegistry
-        from rheojax.core.test_modes import DeformationMode
-        from rheojax.pipeline import Pipeline
-
-        class _DmtaTracer(BaseModel):
-            """Model that records kwargs it receives in fit()."""
-
-            def __init__(self):
-                super().__init__()
-                self.parameters.add("a", value=1.0, bounds=(0.01, 1e12))
-
-            def _fit(self, X, y, **kwargs):
-                return self
-
-            def _predict(self, X):
-                return np.ones_like(X)
-
-        ModelRegistry.register("_dmta_tracer")(_DmtaTracer)
-        try:
-            p = Pipeline()
-            p.data = dmta_data
-            p.fit("_dmta_tracer")
-            model = p._last_model
-            # deformation_mode is consumed at BaseModel.fit() boundary and stored as model attr
-            assert hasattr(
-                model, "_deformation_mode"
-            ), "Pipeline.fit() did not propagate deformation_mode — model has no _deformation_mode"
-            assert (
-                model._deformation_mode == DeformationMode.TENSION
-            ), f"Expected TENSION, got {model._deformation_mode}"
-            assert (
-                model._poisson_ratio == 0.5
-            ), "Pipeline.fit() did not propagate poisson_ratio from data.metadata"
-        finally:
-            ModelRegistry.unregister("_dmta_tracer")
-
-    @pytest.mark.smoke
-    def test_pipeline_fit_does_not_override_explicit_deformation(self, dmta_data):
-        """Explicit deformation_mode kwarg must take precedence over metadata."""
-        from rheojax.core.base import BaseModel
-        from rheojax.core.registry import ModelRegistry
-        from rheojax.core.test_modes import DeformationMode
-        from rheojax.pipeline import Pipeline
-
-        class _DmtaTracer2(BaseModel):
-            def __init__(self):
-                super().__init__()
-                self.parameters.add("a", value=1.0, bounds=(0.01, 1e12))
-
-            def _fit(self, X, y, **kwargs):
-                return self
-
-            def _predict(self, X):
-                return np.ones_like(X)
-
-        ModelRegistry.register("_dmta_tracer2")(_DmtaTracer2)
-        try:
-            p = Pipeline()
-            p.data = dmta_data
-            p.fit("_dmta_tracer2", deformation_mode="bending")
-            model = p._last_model
-            assert (
-                model._deformation_mode == DeformationMode.BENDING
-            ), "Explicit deformation_mode kwarg was overridden by metadata"
-        finally:
-            ModelRegistry.unregister("_dmta_tracer2")
-
-    @pytest.mark.smoke
-    def test_bayesian_pipeline_nlsq_propagates_deformation(self, dmta_data):
-        """BayesianPipeline.fit_nlsq() must propagate deformation_mode."""
-        from rheojax.core.base import BaseModel
-        from rheojax.core.registry import ModelRegistry
-        from rheojax.core.test_modes import DeformationMode
-        from rheojax.pipeline.bayesian import BayesianPipeline
-
-        class _DmtaTracer3(BaseModel):
-            def __init__(self):
-                super().__init__()
-                self.parameters.add("a", value=1.0, bounds=(0.01, 1e12))
-
-            def _fit(self, X, y, **kwargs):
-                return self
-
-            def _predict(self, X):
-                return np.ones_like(X)
-
-        ModelRegistry.register("_dmta_tracer3")(_DmtaTracer3)
-        try:
-            bp = BayesianPipeline()
-            bp.data = dmta_data
-            bp.fit_nlsq("_dmta_tracer3")
-            model = bp._last_model
-            assert hasattr(
-                model, "_deformation_mode"
-            ), "BayesianPipeline.fit_nlsq() did not propagate deformation_mode"
-            assert (
-                model._deformation_mode == DeformationMode.TENSION
-            ), f"Expected TENSION, got {model._deformation_mode}"
-        finally:
-            ModelRegistry.unregister("_dmta_tracer3")
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -201,36 +201,6 @@ TRIOS_COLUMN_MAPPINGS: dict[str, ColumnMapping] = {
         is_y_candidate=True,
         priority=5,
     ),
-    # Tensile moduli (y-axis for oscillation — DMTA/DMA)
-    "tensile_storage_modulus": ColumnMapping(
-        canonical_name="tensile_storage_modulus",
-        patterns=[
-            r"^e'$",
-            r"^e_prime$",
-            r"^e_stor$",
-            r"^tensile[\s_]?storage[\s_]?modulus$",
-            r"^young'?s?[\s_]?storage[\s_]?modulus$",
-        ],
-        si_unit="Pa",
-        applicable_modes=["oscillation"],
-        is_y_candidate=True,
-        priority=5,
-    ),
-    "tensile_loss_modulus": ColumnMapping(
-        canonical_name="tensile_loss_modulus",
-        patterns=[
-            r"^e''$",
-            r'^e"$',
-            r"^e_double_prime$",
-            r"^e_loss$",
-            r"^tensile[\s_]?loss[\s_]?modulus$",
-            r"^young'?s?[\s_]?loss[\s_]?modulus$",
-        ],
-        si_unit="Pa",
-        applicable_modes=["oscillation"],
-        is_y_candidate=True,
-        priority=5,
-    ),
     # Stress/Strain (y-axis for creep/relaxation)
     "compliance": ColumnMapping(
         canonical_name="compliance",
@@ -380,14 +350,12 @@ def detect_test_type(
                     return True
         return False
 
-    # Check for oscillation (highest priority) — includes tensile moduli (DMTA)
+    # Check for oscillation (highest priority)
     has_shear_moduli = has_column("storage_modulus") or has_column("loss_modulus")
-    has_tensile_moduli = has_column("tensile_storage_modulus") or has_column(
-        "tensile_loss_modulus"
-    )
-    if has_column("angular_frequency") and (has_shear_moduli or has_tensile_moduli):
+    if has_column("angular_frequency") and has_shear_moduli:
         logger.debug("Detected test type: oscillation")
         return "oscillation"
+
 
     # Check for creep
     if has_column("time") and has_column("compliance"):
@@ -532,25 +500,17 @@ def select_xy_columns(
     if test_mode == "oscillation":
         storage_col = None
         loss_col = None
-        tensile_storage_col = None
-        tensile_loss_col = None
         for _, col, name in y_candidates:
             if name == "storage_modulus":
                 storage_col = col
             elif name == "loss_modulus":
                 loss_col = col
-            elif name == "tensile_storage_modulus":
-                tensile_storage_col = col
-            elif name == "tensile_loss_modulus":
-                tensile_loss_col = col
 
-        # Prefer shear (G'/G'') if both present; fall back to tensile (E'/E'')
+        # Prefer shear (G'/G'')
         if storage_col and loss_col:
             y_col = storage_col
             y2_col = loss_col
-        elif tensile_storage_col and tensile_loss_col:
-            y_col = tensile_storage_col
-            y2_col = tensile_loss_col
+
 
         if y2_col is not None:
             logger.debug(
@@ -805,21 +765,7 @@ def segment_to_rheodata(
             except (TypeError, ValueError):
                 pass
 
-    # Propagate deformation_mode from segment metadata (set by column detection)
-    # If not explicitly set, infer from y_column name
-    if "deformation_mode" not in metadata:
-        y_col_lower = (segment.y_column or "").lower()
-        _TENSILE_TOKENS = {
-            "e'",
-            "e''",
-            "e*",
-            "tensile",
-            "young",
-            "e_prime",
-            "e_double_prime",
-        }
-        if any(t in y_col_lower for t in _TENSILE_TOKENS):
-            metadata["deformation_mode"] = "tension"
+
 
     if segment.auxiliary_columns:
         metadata["auxiliary_columns"] = {

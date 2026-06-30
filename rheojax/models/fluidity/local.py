@@ -15,7 +15,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.fluidity._base import FluidityBase
 from rheojax.models.fluidity._kernels import (
@@ -64,14 +63,7 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FluidityLocal(FluidityBase):
     """Local (0D) Fluidity Model for yield-stress fluids.
 

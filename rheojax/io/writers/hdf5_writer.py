@@ -11,8 +11,9 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core._validation import REMOVED_OPTION_NAMES
 from rheojax.core.data import RheoData
-from rheojax.io._exceptions import RheoJaxValidationWarning
+from rheojax.io._exceptions import RheoJaxValidationWarning, UnsupportedDataError
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
@@ -137,14 +138,11 @@ def save_hdf5(
                 f.attrs["domain"] = data.domain
                 logger.debug("Domain stored", domain=data.domain)
 
-                # Store test_mode and deformation_mode as top-level attrs
+                # Store test_mode as top-level attrs
                 # (belt-and-suspenders: also in metadata dict)
                 test_mode = data.test_mode
                 if test_mode is not None:
                     f.attrs["test_mode"] = str(test_mode)
-                deformation_mode = data.deformation_mode
-                if deformation_mode is not None:
-                    f.attrs["deformation_mode"] = str(deformation_mode)
 
                 # Store metadata
                 if data.metadata:
@@ -470,7 +468,24 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                     metadata_keys=list(metadata.keys()),
                 )
 
-            # Restore test_mode/deformation_mode from top-level attrs
+            # Reject legacy DMTA files only after loading the required datasets,
+            # so malformed files still report missing x/y before geometry.
+            geometry_markers = (
+                f.attrs.get("measurement_geometry"),
+                f.attrs.get(REMOVED_OPTION_NAMES[0]),
+                metadata.get("measurement_geometry"),
+                metadata.get(REMOVED_OPTION_NAMES[0]),
+            )
+            for marker in geometry_markers:
+                marker = _normalize_hdf5_geometry_marker(marker)
+                if marker in {"tension", "tensile", "bending", "compression"}:
+                    raise UnsupportedDataError(
+                        f"Unsupported measurement geometry: {marker}"
+                    )
+            for removed_option in REMOVED_OPTION_NAMES:
+                metadata.pop(removed_option, None)
+
+            # Restore test_mode from top-level attrs
             # into metadata (belt-and-suspenders with metadata dict)
             # R6-HDF5-003: Decode bytes for top-level string attrs.
             test_mode = f.attrs.get("test_mode", None)
@@ -478,11 +493,6 @@ def load_hdf5(filepath: str | Path) -> RheoData:
                 test_mode = _safe_decode_hdf5_string(test_mode)
                 if "test_mode" not in metadata:
                     metadata["test_mode"] = test_mode
-            deformation_mode = f.attrs.get("deformation_mode", None)
-            if deformation_mode is not None:
-                deformation_mode = _safe_decode_hdf5_string(deformation_mode)
-                if "deformation_mode" not in metadata:
-                    metadata["deformation_mode"] = deformation_mode
 
             ctx["data_points"] = len(x)
             ctx["has_metadata"] = bool(metadata)
@@ -501,6 +511,24 @@ def load_hdf5(filepath: str | Path) -> RheoData:
 
 
 _MAX_HDF5_STRING_LEN = 4096  # Limit string attributes from untrusted HDF5 files
+
+
+def _normalize_hdf5_geometry_marker(value: Any) -> str | None:
+    """Normalize a scalar or one-element HDF5 string attribute."""
+    if isinstance(value, np.ndarray):
+        if value.size != 1:
+            return None
+        value = value.reshape(-1)[0]
+    elif isinstance(value, (list, tuple)):
+        if len(value) != 1:
+            return None
+        value = value[0]
+
+    if isinstance(value, np.generic):
+        value = value.item()
+    if not isinstance(value, (bytes, str)):
+        return None
+    return _safe_decode_hdf5_string(value).strip().lower()
 
 
 def _safe_decode_hdf5_string(
@@ -573,7 +601,7 @@ def _read_metadata_recursive(group: Any) -> dict[str, Any]:
     # name collides with an already-loaded attribute.  Without this guard the
     # dataset loop would silently overwrite the attribute value, corrupting
     # metadata that was intentionally stored as a scalar attribute (e.g.
-    # test_mode, deformation_mode stored as belt-and-suspenders duplicates).
+    # test_mode stored as belt-and-suspenders duplicates).
     for key in group.keys():
         if key in metadata:
             # Attribute with the same name already loaded — skip the

@@ -137,27 +137,17 @@ def plot_modulus_frequency(
         x_data = _ensure_numpy(data.x)
         y_data = _ensure_numpy(data.y)
 
-        # VIS-P1-004: Deformation-mode aware labels
         storage_label, loss_label, _generic = _modulus_labels(data)
-        # Pop deformation_mode so it doesn't leak to matplotlib
-        deformation_mode = kwargs.pop("deformation_mode", None)
-        if deformation_mode is None:
-            deformation_mode = getattr(data, "deformation_mode", None) or (
-                data.metadata or {}
-            ).get("deformation_mode")
 
         if separate_axes and np.iscomplexobj(y_data):
             # Two separate axes for storage/loss modulus
-            freq_kwargs = dict(kwargs)
-            if deformation_mode is not None:
-                freq_kwargs["deformation_mode"] = deformation_mode
             fig, axes = plot_frequency_domain(
                 x_data,
                 y_data,
                 x_units=data.x_units,
                 y_units=data.y_units,
                 style=style,
-                **freq_kwargs,
+                **kwargs,
             )
 
             axes[0].set_title(f"Storage Modulus ({storage_label.split(' ')[0]})")
@@ -455,7 +445,6 @@ def plot_model_fit(
                 f"Data and predictions shape mismatch: data={y_data.shape}, predictions={y_pred.shape}"
             )
 
-        # Deformation-mode aware labels (E'/E'' for DMTA, G'/G'' for shear)
         fit_storage_label, fit_loss_label, _ = _modulus_labels(data)
 
         if show_residuals:

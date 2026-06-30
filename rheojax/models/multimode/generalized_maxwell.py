@@ -35,7 +35,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import lazy_import as _lazy_import
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, TestMode
+from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.optimization import OptimizationResult
 from rheojax.utils.prony import (
@@ -68,14 +68,7 @@ logger = get_logger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class GeneralizedMaxwell(BaseModel):
     """Generalized Maxwell Model with N exponential relaxation modes.
 
@@ -103,15 +96,14 @@ class GeneralizedMaxwell(BaseModel):
 
     Parameters:
         n_modes: Number of relaxation modes (N)
-        modulus_type: 'shear' (G) or 'tensile' (E)
 
     Attributes:
-        parameters: ParameterSet containing E_inf, E_i, tau_i (or G equivalents)
+        parameters: ParameterSet containing G_inf, G_i, tau_i
 
     Example:
         >>> from rheojax.models.generalized_maxwell import GeneralizedMaxwell
         >>> import numpy as np
-        >>> model = GeneralizedMaxwell(n_modes=3, modulus_type='shear')
+        >>> model = GeneralizedMaxwell(n_modes=3)
         >>> t = np.logspace(-3, 2, 50)
         >>> G_data = ...  # Relaxation modulus data
         >>> model.fit(t, G_data, test_mode='relaxation', optimization_factor=1.5)
@@ -120,32 +112,25 @@ class GeneralizedMaxwell(BaseModel):
         >>> print(f"Optimal modes: {model._n_modes}")  # Auto-reduced from 3
     """
 
-    def __init__(self, n_modes: int = 3, modulus_type: str = "shear"):
+    def __init__(self, n_modes: int = 3):
         """Initialize Generalized Maxwell Model.
 
         Args:
             n_modes: Number of exponential relaxation modes (N ≥ 1)
-            modulus_type: 'shear' for G (default) or 'tensile' for E
 
         Raises:
-            ValueError: If n_modes < 1 or modulus_type invalid
+            ValueError: If n_modes < 1
         """
         super().__init__()
 
         if n_modes < 1:
             raise ValueError(f"n_modes must be ≥ 1, got {n_modes}")
 
-        if modulus_type not in ["shear", "tensile"]:
-            raise ValueError(
-                f"modulus_type must be 'shear' or 'tensile', got '{modulus_type}'"
-            )
-
         self._n_modes = n_modes
-        self._modulus_type = modulus_type
         self._test_mode: TestMode | str | None = None
 
         # Create Prony parameter set
-        self.parameters = create_prony_parameter_set(n_modes, modulus_type)
+        self.parameters = create_prony_parameter_set(n_modes)
 
         # Store NLSQ result for warm-start and diagnostics
         self._nlsq_result: OptimizationResult | None = None
@@ -186,7 +171,6 @@ class GeneralizedMaxwell(BaseModel):
             data_shape=X.shape,
             test_mode=test_mode,
             n_modes=self._n_modes,
-            modulus_type=self._modulus_type,
         ) as ctx:
             logger.debug(
                 "Processing GMM input data",
@@ -234,7 +218,7 @@ class GeneralizedMaxwell(BaseModel):
                 raise
 
             # Log fitted parameters
-            symbol = "E" if self._modulus_type == "tensile" else "G"
+            symbol = "G"
             ctx["n_modes_final"] = self._n_modes
             ctx[f"{symbol}_inf"] = self.parameters.get_value(f"{symbol}_inf")
 
@@ -398,7 +382,7 @@ class GeneralizedMaxwell(BaseModel):
         gtol = kwargs.get("gtol", 1e-6)
         use_log_residuals = kwargs.get("use_log_residuals", False)
 
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Precompute log-space observation once when using log residuals.
         _log_E_t = jnp.log10(jnp.maximum(jnp.asarray(E_t), 1e-30))
@@ -635,7 +619,7 @@ class GeneralizedMaxwell(BaseModel):
         xtol = kwargs.get("xtol", 1e-6)
         gtol = kwargs.get("gtol", 1e-6)
 
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Convert data to JAX arrays (once)
         X_jax = jnp.asarray(X)
@@ -837,7 +821,7 @@ class GeneralizedMaxwell(BaseModel):
             # Rebuild ParameterSet with n_optimal modes
             self._n_modes = n_optimal
             self.parameters = create_prony_parameter_set(
-                n_optimal, modulus_type=self._modulus_type
+                n_optimal
             )
 
             # Set fitted parameter values
@@ -903,7 +887,7 @@ class GeneralizedMaxwell(BaseModel):
         gtol = kwargs.get("gtol", 1e-6)
         use_log_residuals = kwargs.get("use_log_residuals", False)
 
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Standardize input shape to (2, M)
         E_star = np.asarray(E_star)
@@ -1177,7 +1161,7 @@ class GeneralizedMaxwell(BaseModel):
         xtol = kwargs.get("xtol", 1e-6)
         gtol = kwargs.get("gtol", 1e-6)
 
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Define objective function (predict creep from GMM simulation)
         def objective(params):
@@ -1223,13 +1207,29 @@ class GeneralizedMaxwell(BaseModel):
                 jnp.full(self._n_modes, 1e-6),
             ]
         )
+        modulus_names = [f"{symbol}_inf"] + [
+            f"{symbol}_{i+1}" for i in range(self._n_modes)
+        ]
+        registered_modulus_upper_values = []
+        for name in modulus_names:
+            parameter_bounds = self.parameters[name].bounds
+            if parameter_bounds is None:
+                raise RuntimeError(f"Missing registered bounds for parameter '{name}'")
+            registered_modulus_upper_values.append(parameter_bounds[1])
+        registered_modulus_upper = jnp.asarray(registered_modulus_upper_values)
+        data_modulus_upper = 1.0 / J_0 * 10
         bounds_upper = jnp.concatenate(
             [
-                jnp.array([1.0 / J_0 * 10]),
-                jnp.full(self._n_modes, 1.0 / J_0 * 10),
+                jnp.minimum(data_modulus_upper, registered_modulus_upper),
                 jnp.full(self._n_modes, 1e6),
             ]
         )
+
+        # No optimizer result should be legal for NLSQ but illegal for the
+        # ParameterSet it is written back to.  Noisy compliance can make the
+        # data-derived guess and ceiling enormous, so keep both inside the
+        # model's registered hard bounds.
+        x0 = jnp.clip(x0, bounds_lower, bounds_upper)
 
         # Step 1: Fit with softmax penalty
         def objective_step1(params):
@@ -1391,7 +1391,7 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Relaxation modulus array
         """
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
@@ -1453,9 +1453,9 @@ class GeneralizedMaxwell(BaseModel):
             omega: Angular frequency array
 
         Returns:
-            Complex modulus G* = G' + iG'' (or E* for tensile)
+            Complex modulus G* = G' + iG''
         """
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
@@ -1564,7 +1564,7 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Creep compliance array
         """
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
@@ -1617,7 +1617,7 @@ class GeneralizedMaxwell(BaseModel):
         # Estimate parameter uncertainties from diagonal of covariance matrix
         # Cov ≈ inv(J^T J) if well-conditioned
         param_uncertainties = {}
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         if nlsq_result.jac is not None and cond_number < 1e10:
             try:
@@ -1828,12 +1828,12 @@ class GeneralizedMaxwell(BaseModel):
         return priors
 
     def get_relaxation_spectrum(self) -> dict:
-        """Get discrete relaxation spectrum (E_i, τ_i).
+        """Get discrete relaxation spectrum (G_i, τ_i).
 
         Returns:
-            Dictionary with 'E_inf', 'E_i', 'tau_i'
+            Dictionary with 'G_inf', 'G_i', 'tau_i'
         """
-        symbol = "E" if self._modulus_type == "tensile" else "G"
+        symbol = "G"
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = np.array(
@@ -1939,7 +1939,7 @@ class GeneralizedMaxwell(BaseModel):
         # Fit by matching average viscosity
         eta_avg = np.mean(eta)
 
-        symbol = "G" if self._modulus_type == "shear" else "E"
+        symbol = "G"
 
         # Initialize with simple estimate: distribute η₀ across modes
         eta_per_mode = eta_avg / self._n_modes
@@ -1983,7 +1983,7 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Viscosity array (constant η₀ for all shear rates)
         """
-        symbol = "G" if self._modulus_type == "shear" else "E"
+        symbol = "G"
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
@@ -2034,7 +2034,7 @@ class GeneralizedMaxwell(BaseModel):
         xtol = kwargs.get("xtol", 1e-6)
         gtol = kwargs.get("gtol", 1e-6)
 
-        symbol = "G" if self._modulus_type == "shear" else "E"
+        symbol = "G"
 
         # Define objective function
         def objective(params):
@@ -2136,7 +2136,7 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Stress growth coefficient η⁺(t) (Pa.s)
         """
-        symbol = "G" if self._modulus_type == "shear" else "E"
+        symbol = "G"
         gamma_dot = getattr(self, "_startup_gamma_dot", 1.0)
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
@@ -2228,7 +2228,7 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Stress response σ(t) (Pa)
         """
-        symbol = "G" if self._modulus_type == "shear" else "E"
+        symbol = "G"
         omega = getattr(self, "_laos_omega", 1.0)
         gamma_0 = getattr(self, "_laos_gamma_0", 0.01)
 

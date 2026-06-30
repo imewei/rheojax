@@ -13,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
 from rheojax.gui.services.model_service import normalize_model_name
@@ -449,7 +450,7 @@ class BayesianService:
                 else:
                     idata_dict[param_name] = arr
 
-            idata = az.from_dict(idata_dict)
+            idata = inference_data_from_dict({"posterior": idata_dict})
 
             # Calculate R-hat (Gelman-Rubin statistic)
             rhat = az.rhat(idata)
@@ -635,7 +636,7 @@ class BayesianService:
                         k: v.reshape(1, -1) if v.ndim == 1 else v
                         for k, v in result.posterior_samples.items()
                     }
-                    idata = az.from_dict(idata_dict)
+                    idata = inference_data_from_dict({"posterior": idata_dict})
 
                 # WAIC/LOO require log_likelihood group
                 if not hasattr(idata, "log_likelihood"):

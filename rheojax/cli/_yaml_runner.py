@@ -32,19 +32,15 @@ logger = get_logger(__name__)
 _STEP_ALLOWED_DEFAULTS: dict[str, set[str]] = {
     "load": {
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
         "format",
         "x_col",
         "y_col",
         "y_cols",
     },
     "transform": set(),  # transforms take their own kwargs, not protocol defaults
-    "fit": {"test_mode", "deformation_mode", "poisson_ratio", "method", "max_iter"},
+    "fit": {"test_mode", "method", "max_iter"},
     "bayesian": {
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
         "num_warmup",
         "num_samples",
         "num_chains",
@@ -252,16 +248,12 @@ _STEP_ALLOWED_KEYS: dict[str, set[str]] = {
         "y_col",
         "y_cols",
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
     },
     "fit": {
         "model",
         "method",
         "max_iter",
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
         "use_jax",
         "params",
     },
@@ -273,8 +265,6 @@ _STEP_ALLOWED_KEYS: dict[str, set[str]] = {
         "warm_start",
         "target_accept_prob",
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
     },
     "export": {"output", "format"},
     # "transform" is intentionally absent — open kwargs by design.

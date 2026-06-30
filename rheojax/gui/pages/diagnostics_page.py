@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.gui.compat import (
     QAbstractItemView,
     QBrush,
@@ -494,8 +495,6 @@ class DiagnosticsPage(QWidget):
         arviz.InferenceData or None
         """
         try:
-            import arviz as az
-
             # Use stored InferenceData if available (has sample_stats for energy plot)
             inference_data = getattr(result, "inference_data", None)
             if inference_data is not None:
@@ -547,9 +546,11 @@ class DiagnosticsPage(QWidget):
                     else:
                         sample_stats_dict[stat_name] = arr
 
-            return az.from_dict(
-                posterior=idata_dict,
-                sample_stats=sample_stats_dict,
+            return inference_data_from_dict(
+                {
+                    "posterior": idata_dict,
+                    "sample_stats": sample_stats_dict,
+                }
             )
 
         except Exception as e:

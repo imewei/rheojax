@@ -1,1 +1,1 @@
-/Users/b80985/Projects/rheojax/docs/verification/fractional_models_equation_verification.md
+../../verification/fractional_models_equation_verification.md

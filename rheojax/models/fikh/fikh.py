@@ -33,7 +33,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, Protocol, TestMode
+from rheojax.core.test_modes import Protocol, TestMode
 from rheojax.logging import get_logger
 from rheojax.models.fikh._base import FIKHBase
 from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
@@ -55,14 +55,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FIKH(FIKHBase):
     r"""Fractional Isotropic-Kinematic Hardening (FIKH) Model.
 

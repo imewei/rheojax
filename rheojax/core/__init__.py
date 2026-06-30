@@ -19,7 +19,6 @@ from .parameters import (
 )
 from .registry import ModelRegistry, PluginInfo, PluginType, Registry, TransformRegistry
 from .test_modes import (
-    DeformationMode,
     TestMode,
     detect_test_mode,
     validate_test_mode,
@@ -49,7 +48,6 @@ __all__ = [
     "ModelRegistry",
     "TransformRegistry",
     # Test modes and deformation geometry
-    "DeformationMode",
     "TestMode",
     "detect_test_mode",
     "validate_test_mode",

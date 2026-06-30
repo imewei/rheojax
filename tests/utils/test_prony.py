@@ -82,19 +82,11 @@ class TestParameterSetCreation:
 
     def test_shear_modulus_creation(self):
         """Create shear modulus parameters (G_inf, G_i, tau_i)."""
-        params = create_prony_parameter_set(n_modes=3, modulus_type="shear")
+        params = create_prony_parameter_set(n_modes=3)
 
         expected_names = ["G_inf", "G_1", "G_2", "G_3", "tau_1", "tau_2", "tau_3"]
         assert list(params.keys()) == expected_names
         assert len(params) == 7  # 2*3 + 1
-
-    def test_tensile_modulus_creation(self):
-        """Create tensile modulus parameters (E_inf, E_i, tau_i)."""
-        params = create_prony_parameter_set(n_modes=2, modulus_type="tensile")
-
-        expected_names = ["E_inf", "E_1", "E_2", "tau_1", "tau_2"]
-        assert list(params.keys()) == expected_names
-        assert len(params) == 5  # 2*2 + 1
 
     def test_invalid_n_modes(self):
         """n_modes < 1 should raise ValueError."""

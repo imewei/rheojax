@@ -224,14 +224,6 @@ normalize vendor-specific column names to canonical RheoJAX names:
      - Pa
      - oscillation
      - 5
-   * - ``tensile_storage_modulus``
-     - Pa
-     - oscillation
-     - 5
-   * - ``tensile_loss_modulus``
-     - Pa
-     - oscillation
-     - 5
    * - ``complex_modulus``
      - Pa
      - oscillation
@@ -389,17 +381,7 @@ Test Mode Detection
 
 Falls back to unit-based detection (``rad/s`` → oscillation, ``1/s`` + ``Pa·s`` → rotation).
 
-Deformation Mode Detection
----------------------------
 
-``detect_deformation_mode_from_columns()`` distinguishes DMTA from shear:
-
-- **Tensile**: E', E'', E*, tensile, Young's
-- **Shear**: G', G'', G*, shear modulus
-- **Bending**: E_bend, flexural (overrides tensile)
-- **Compression**: E_comp, compressive (overrides tensile)
-
-Geometry-specific modes (bending/compression) override generic tensile when both match.
 
 
 Instrument-Specific Readers
@@ -624,8 +606,7 @@ HDF5 Writer/Reader
 
 - Bytes → str decoding for cross-platform compatibility
 - Recursive metadata reconstruction
-- Belt-and-suspenders: test_mode/deformation_mode from both top-level attrs and
-  metadata dict
+- Belt-and-suspenders: test_mode from both top-level attrs and metadata dict
 
 NPZ Writer/Reader
 ------------------
@@ -647,7 +628,7 @@ Excel Writer
 - Atomic write via temp file + ``os.replace()``
 - Multi-sheet workbook: Parameters, Fit Quality, Predictions, Residuals
 - Complex array handling (G* split into G'/G'' columns)
-- Deformation-mode–aware labels (E'/E'' for tensile, G'/G'' for shear)
+- Standard column labels (G'/G'' for shear)
 - Embedded matplotlib plots via ``openpyxl.drawing.image``
 - JAX/numpy scalar → Python native type conversion
 
@@ -720,7 +701,7 @@ BaseModel
 ``RheoData`` metadata flows to ``BaseModel.fit()``:
 
 - ``test_mode`` → protocol-specific kernel dispatch
-- ``deformation_mode`` → E* ↔ G* conversion at model boundary
+
 - ``metadata["gamma_dot"]`` → flow curve protocol kwargs
 - ``metadata["temperature"]`` → TTS shift factor
 

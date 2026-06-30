@@ -61,7 +61,7 @@ class FitResult:
         X: Raw input array used for fitting.
         y: Raw target array used for fitting.
         timestamp: ISO-8601 timestamp of when the fit was performed.
-        metadata: Arbitrary extra info (deformation_mode, poisson_ratio, …).
+        metadata: Arbitrary extra info.
     """
 
     model_name: str
@@ -637,7 +637,6 @@ class ModelInfo:
         param_units: Mapping of name → unit string.
         n_params: Number of parameters.
         protocols: List of supported Protocol enum values.
-        deformation_modes: List of supported DeformationMode enum values.
         supports_bayesian: Whether the model supports Bayesian inference.
         doc: First paragraph of the model docstring.
     """
@@ -650,7 +649,6 @@ class ModelInfo:
     param_units: dict[str, str]
     n_params: int
     protocols: list[Any]
-    deformation_modes: list[Any]
     supports_bayesian: bool
     doc: str | None = None
 
@@ -708,7 +706,6 @@ class ModelInfo:
             param_units=param_units,
             n_params=n_params,
             protocols=list(info.protocols),
-            deformation_modes=list(info.deformation_modes),
             supports_bayesian=supports_bayesian,
             doc=info.doc,
         )

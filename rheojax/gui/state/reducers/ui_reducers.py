@@ -1,8 +1,7 @@
 """UI and settings action reducers.
 
-Handles: SET_THEME, SET_OS_THEME, SET_WORKFLOW_MODE, SET_DEFORMATION_MODE,
-SET_POISSON_RATIO, SET_TAB, NAVIGATE_TAB, UPDATE_PREFERENCES,
-CHECK_COMPATIBILITY.
+Handles: SET_THEME, SET_OS_THEME, SET_WORKFLOW_MODE, SET_TAB, NAVIGATE_TAB,
+UPDATE_PREFERENCES, CHECK_COMPATIBILITY.
 """
 
 from __future__ import annotations
@@ -60,31 +59,6 @@ def reduce_set_workflow_mode(
 
     return updater
 
-
-def reduce_set_deformation_mode(
-    action: dict[str, Any],
-) -> Callable[[AppState], AppState]:
-    mode = action.get("deformation_mode", "shear")
-
-    def updater(state: AppState) -> AppState:
-        if state.deformation_mode == mode:
-            return state
-        return replace(state, deformation_mode=mode, is_modified=True)
-
-    return updater
-
-
-def reduce_set_poisson_ratio(
-    action: dict[str, Any],
-) -> Callable[[AppState], AppState]:
-    ratio = action.get("poisson_ratio", 0.5)
-
-    def updater(state: AppState) -> AppState:
-        if state.poisson_ratio == ratio:
-            return state
-        return replace(state, poisson_ratio=ratio, is_modified=True)
-
-    return updater
 
 
 def reduce_set_tab(

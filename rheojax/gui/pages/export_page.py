@@ -79,16 +79,6 @@ class ExportPage(QWidget):
             metadata.setdefault("name", dataset.name)
         if getattr(dataset, "file_path", None):
             metadata.setdefault("file", str(dataset.file_path))
-
-        # Propagate deformation_mode/poisson_ratio from AppState into metadata
-        app_state = self._store.get_state()
-        deformation_mode = getattr(app_state, "deformation_mode", "shear")
-        if deformation_mode != "shear":
-            metadata.setdefault("deformation_mode", deformation_mode)
-            metadata.setdefault(
-                "poisson_ratio", getattr(app_state, "poisson_ratio", 0.5)
-            )
-
         # Reconstruct complex modulus G* = G' + i·G'' when y2_data is present
         y = dataset.y_data
         y2 = getattr(dataset, "y2_data", None)

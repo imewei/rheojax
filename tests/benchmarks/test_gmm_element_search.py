@@ -140,7 +140,7 @@ def test_benchmark_element_search_n5_relaxation(synthetic_relaxation_data, bench
     t, G_t = synthetic_relaxation_data
 
     def run_element_search():
-        gmm = GeneralizedMaxwell(n_modes=5, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=5)
         gmm.fit(t, G_t, test_mode="relaxation", optimization_factor=1.5)
         return gmm._n_modes, gmm._element_minimization_diagnostics
 
@@ -167,7 +167,7 @@ def test_benchmark_element_search_n10_relaxation(synthetic_relaxation_data, benc
     t, G_t = synthetic_relaxation_data
 
     def run_element_search():
-        gmm = GeneralizedMaxwell(n_modes=10, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=10)
         gmm.fit(t, G_t, test_mode="relaxation", optimization_factor=1.5)
         return gmm._n_modes, gmm._element_minimization_diagnostics
 
@@ -192,7 +192,7 @@ def test_benchmark_element_search_n20_relaxation(synthetic_relaxation_data, benc
     t, G_t = synthetic_relaxation_data
 
     def run_element_search():
-        gmm = GeneralizedMaxwell(n_modes=20, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=20)
         gmm.fit(
             t,
             G_t,
@@ -225,7 +225,7 @@ def test_benchmark_element_search_n10_oscillation(
     omega, G_star = synthetic_oscillation_data
 
     def run_element_search():
-        gmm = GeneralizedMaxwell(n_modes=10, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=10)
         gmm.fit(omega, G_star, test_mode="oscillation", optimization_factor=1.5)
         return gmm._n_modes, gmm._element_minimization_diagnostics
 
@@ -250,7 +250,7 @@ def test_benchmark_element_search_n10_creep(synthetic_creep_data, benchmark):
     t, J_t = synthetic_creep_data
 
     def run_element_search():
-        gmm = GeneralizedMaxwell(n_modes=10, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=10)
         gmm.fit(
             t,
             J_t,
@@ -282,7 +282,7 @@ def test_speedup_measurement_n10_relaxation(synthetic_relaxation_data):
     # Run 3 times to account for JIT compilation
     times = []
     for i in range(3):
-        gmm = GeneralizedMaxwell(n_modes=10, modulus_type="shear")
+        gmm = GeneralizedMaxwell(n_modes=10)
         start = time.time()
         gmm.fit(t, G_t, test_mode="relaxation", optimization_factor=1.5)
         elapsed = time.time() - start
@@ -324,7 +324,7 @@ def test_early_termination_effectiveness(synthetic_relaxation_data):
     t, G_t = synthetic_relaxation_data
 
     # Use high optimization_factor to trigger early termination
-    gmm = GeneralizedMaxwell(n_modes=15, modulus_type="shear")
+    gmm = GeneralizedMaxwell(n_modes=15)
 
     start = time.time()
     gmm.fit(t, G_t, test_mode="relaxation", optimization_factor=2.0)

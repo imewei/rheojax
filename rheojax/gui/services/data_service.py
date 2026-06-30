@@ -512,26 +512,8 @@ class DataService:
             )
 
         logger.debug("_convert_units completed")
-        # Preserve deformation_mode and poisson_ratio stored in metadata so
-        # that DMTA data keeps its tensile-mode context after unit conversion.
         metadata = dict(data.metadata)
-        deformation_mode = getattr(data, "deformation_mode", None)
-        # Preserve all deformation modes (including "shear") so that DMTA data
-        # retains its tensile-mode context and shear data is not silently dropped
-        # after unit conversion (GUI-013).
-        if deformation_mode is not None:
-            # deformation_mode property reads from metadata["deformation_mode"];
-            # write it back explicitly so the new RheoData inherits it.
-            metadata["deformation_mode"] = deformation_mode
-        # poisson_ratio is stored in metadata by the BaseModel fit boundary.
-        # getattr falls back to None for plain RheoData objects that have no
-        # explicit poisson_ratio attribute beyond what is in metadata.
-        # Use explicit None check instead of `or` to preserve 0.0 (GUI-004).
-        poisson_ratio = metadata.get("poisson_ratio")
-        if poisson_ratio is None:
-            poisson_ratio = getattr(data, "_poisson_ratio", None)
-        if poisson_ratio is not None:
-            metadata["poisson_ratio"] = poisson_ratio
+
         return RheoData(
             x=x,
             y=y,

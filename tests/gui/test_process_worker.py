@@ -69,6 +69,13 @@ def _work_fn_quick_result(progress_queue, cancel_event):
     return {"done": True}
 
 
+def _work_fn_report_start_method(progress_queue, cancel_event):
+    """Report the child start method across the real pickling boundary."""
+    import multiprocessing as child_mp
+
+    return child_mp.get_start_method()
+
+
 def _work_fn_wait_for_cancel(progress_queue, cancel_event):
     """Work function that loops until cancel event is set."""
     import time
@@ -120,10 +127,13 @@ class TestProcessCancellationToken:
         """Cancel in parent, observe in child."""
         from rheojax.gui.jobs.cancellation import ProcessCancellationToken
 
-        token = ProcessCancellationToken()
-        result_queue = mp.Queue()
+        context = mp.get_context("spawn")
+        token = ProcessCancellationToken(context=context)
+        result_queue = context.Queue()
 
-        p = mp.Process(target=_child_wait_for_cancel, args=(token.event, result_queue))
+        p = context.Process(
+            target=_child_wait_for_cancel, args=(token.event, result_queue)
+        )
         p.start()
         time.sleep(0.1)
         token.cancel()
@@ -164,10 +174,11 @@ class TestSubprocessEntry:
     def test_successful_function_puts_completed(self):
         from rheojax.gui.jobs.process_adapter import _subprocess_entry
 
-        result_queue = mp.Queue()
-        cancel_event = mp.Event()
+        context = mp.get_context("spawn")
+        result_queue = context.Queue()
+        cancel_event = context.Event()
 
-        p = mp.Process(
+        p = context.Process(
             target=_subprocess_entry,
             args=(_work_fn_success, result_queue, cancel_event),
         )
@@ -182,10 +193,11 @@ class TestSubprocessEntry:
     def test_exception_puts_failed(self):
         from rheojax.gui.jobs.process_adapter import _subprocess_entry
 
-        result_queue = mp.Queue()
-        cancel_event = mp.Event()
+        context = mp.get_context("spawn")
+        result_queue = context.Queue()
+        cancel_event = context.Event()
 
-        p = mp.Process(
+        p = context.Process(
             target=_subprocess_entry,
             args=(_work_fn_raises, result_queue, cancel_event),
         )
@@ -200,10 +212,11 @@ class TestSubprocessEntry:
     def test_cancellation_puts_cancelled(self):
         from rheojax.gui.jobs.process_adapter import _subprocess_entry
 
-        result_queue = mp.Queue()
-        cancel_event = mp.Event()
+        context = mp.get_context("spawn")
+        result_queue = context.Queue()
+        cancel_event = context.Event()
 
-        p = mp.Process(
+        p = context.Process(
             target=_subprocess_entry,
             args=(_work_fn_cancellation, result_queue, cancel_event),
         )
@@ -216,10 +229,11 @@ class TestSubprocessEntry:
     def test_progress_messages_forwarded(self):
         from rheojax.gui.jobs.process_adapter import _subprocess_entry
 
-        result_queue = mp.Queue()
-        cancel_event = mp.Event()
+        context = mp.get_context("spawn")
+        result_queue = context.Queue()
+        cancel_event = context.Event()
 
-        p = mp.Process(
+        p = context.Process(
             target=_subprocess_entry,
             args=(_work_fn_with_progress, result_queue, cancel_event),
         )
@@ -328,6 +342,25 @@ class TestProcessWorkerAdapter:
         adapter.run()
 
         assert len(cancelled_count) == 1
+
+
+@pytest.mark.skipif(not _HAS_PYSIDE6, reason="PySide6 not available")
+@pytest.mark.timeout(15)
+def test_child_uses_spawn_after_jax_initialization():
+    """A JAX-initialized parent must never fork the subprocess worker."""
+    import jax.numpy as jnp
+
+    from rheojax.gui.jobs.process_adapter import ProcessWorkerAdapter
+
+    jnp.asarray([1.0]).block_until_ready()
+
+    adapter = ProcessWorkerAdapter(_work_fn_report_start_method)
+    results = []
+    adapter.signals.completed.connect(results.append)
+
+    adapter.run()
+
+    assert results == ["spawn"]
 
 
 # ===========================================================================

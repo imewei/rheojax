@@ -35,7 +35,7 @@ core -> [io, logging, utils, models*]
 1. Abstract model interface (`_fit`, `_predict`)
 2. NLSQ optimization orchestrator (`fit()` at 368 lines, 44cc)
 3. Bayesian inference bridge (`fit_bayesian()` overrides `BayesianMixin`)
-4. DMTA/deformation mode converter
+4. Modulus converter
 5. Serialization (`to_dict`, `from_dict`)
 6. Scoring (`score`, `R2`)
 7. Parameter management (`get_params`, `set_params`)
@@ -54,7 +54,7 @@ core -> [io, logging, utils, models*]
 Split `BaseModel.fit()` into a composition of strategies:
 
 1. **Extract `FitOrchestrator`** — move the 368-line `fit()` body into a separate class that composes: data preparation, strategy detection, optimization dispatch, post-fit validation. BaseModel delegates to it.
-2. **Extract `DeformationModeConverter`** — the E*/G* conversion logic (repeated in both `fit()` and `fit_bayesian()`) becomes a standalone utility called at the boundary.
+2. **Extract `ModulusConverter`** — the conversion logic becomes a standalone utility called at the boundary.
 3. **Extract `PostFitValidator`** — physics checks + uncertainty quantification become a composable post-processor.
 
 ### Consequences

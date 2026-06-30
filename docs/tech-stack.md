@@ -226,12 +226,12 @@ Overrides: `rheojax.models.*` (relaxed name-defined/any-return), `rheojax.gui.*`
 
 ```
 tests/
-├── core/           # base, data, parameters, bayesian, float64, deformation_mode
+├── core/           # base, data, parameters, bayesian, float64
 ├── models/         # 26 model test suites (including hvm/, hvnm/)
 ├── transforms/     # 12 transform test suites
 ├── pipeline/       # Pipeline + BayesianPipeline
-├── utils/          # optimization, compatibility, initialization, modulus_conversion
-├── io/             # readers + DMTA + writers
+├── utils/          # optimization, compatibility, initialization
+├── io/             # readers + writers
 ├── gui/            # PySide6 widget tests
 ├── integration/    # End-to-end (NLSQ → NUTS)
 ├── validation/     # pyrheo, hermes-rheo (local only)
@@ -266,7 +266,7 @@ docs/
 │   ├── basic/ (5), advanced/ (10), bayesian/ (9)
 │   ├── tnt/ (30), fluidity/ (24), hvnm/ (15), vlb/ (16)
 │   ├── hvm/ (13), fikh/ (12), ikh/ (12), itt_mct/ (12)
-│   ├── dmta/ (8), transforms/ (8), verification/ (7)
+│   ├── transforms/ (8), verification/ (7)
 │   ├── epm/ (6), giesekus/ (6), hl/ (6), sgr/ (6), stz/ (6), dmt/ (6)
 │   ├── io/ (1)
 │   └── data/                # Sample datasets by protocol

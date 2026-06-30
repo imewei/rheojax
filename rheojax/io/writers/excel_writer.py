@@ -142,10 +142,7 @@ def save_excel(
                         "Creating predictions dataframe",
                         num_predictions=len(results["predictions"]),
                     )
-                    pred_df = _create_predictions_dataframe(
-                        results["predictions"],
-                        deformation_mode=results.get("deformation_mode"),
-                    )
+                    pred_df = _create_predictions_dataframe(results["predictions"])
                     pred_df.to_excel(writer, sheet_name="Predictions", index=False)
                     sheets_written.append("Predictions")
                     logger.debug("Predictions sheet written", rows=len(pred_df))
@@ -251,39 +248,32 @@ def _create_quality_dataframe(fit_quality: dict[str, Any]) -> Any:
 
 def _create_predictions_dataframe(
     predictions: np.ndarray,
-    deformation_mode: str | None = None,
 ) -> Any:
     """Create DataFrame for predictions.
 
-    Handles complex arrays (G*=G'+iG'' or E*=E'+iE'') by splitting into
-    separate columns. Column labels use the appropriate modulus prefix
-    based on the deformation mode.
+    Handles complex arrays (G*=G'+iG'') by splitting into separate columns.
 
     Args:
         predictions: Array of predictions (real or complex)
-        deformation_mode: Deformation mode ('tension', 'bending',
-            'compression', or None for shear). Controls column label prefix.
-
     Returns:
         pandas DataFrame
     """
     import pandas as pd
 
     predictions = np.asarray(predictions)
-    prefix = "E" if deformation_mode in {"tension", "bending", "compression"} else "G"
     if np.iscomplexobj(predictions):
         return pd.DataFrame(
             {
                 "Index": np.arange(len(predictions)),
-                f"{prefix}' (Storage)": np.real(predictions),
-                f"{prefix}'' (Loss)": np.imag(predictions),
+                "G' (Storage)": np.real(predictions),
+                "G'' (Loss)": np.imag(predictions),
             }
         )
     if predictions.ndim == 2:
-        # GMM output returns (N, 2) real arrays [G'/E', G''/E'']
+        # GMM output returns (N, 2) real arrays [G', G'']
         col_names = [f"Component_{i}" for i in range(predictions.shape[1])]
         if predictions.shape[1] == 2:
-            col_names = [f"{prefix}' (Storage)", f"{prefix}'' (Loss)"]
+            col_names = ["G' (Storage)", "G'' (Loss)"]
         df_dict = {"Index": np.arange(len(predictions))}
         for i, name in enumerate(col_names):
             df_dict[name] = predictions[:, i]

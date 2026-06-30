@@ -25,40 +25,6 @@ if TYPE_CHECKING:
     from rheojax.core.data import RheoData
 
 
-class DeformationMode(StrEnum):
-    """Deformation geometry mode for rheological measurements.
-
-    This enum classifies the type of mechanical deformation applied during
-    a rheological measurement. Shear-based instruments (rotational rheometers)
-    measure G*(w), while tensile/bending/compression instruments (DMTA/DMA)
-    measure E*(w). The relationship is:
-
-        E*(w) = 2(1 + v) * G*(w)
-
-    where v is Poisson's ratio of the material.
-    """
-
-    SHEAR = "shear"
-    TENSION = "tension"
-    BENDING = "bending"
-    COMPRESSION = "compression"
-
-    def __str__(self) -> str:
-        return self.value
-
-    def is_tensile(self) -> bool:
-        """True if this deformation mode produces Young's modulus E*.
-
-        Tension, bending, and compression geometries all measure E*,
-        while shear measures G*.
-        """
-        return self in (
-            DeformationMode.TENSION,
-            DeformationMode.BENDING,
-            DeformationMode.COMPRESSION,
-        )
-
-
 class TestModeEnum(StrEnum):
     """Enumeration of rheological test modes.
 

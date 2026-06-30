@@ -55,7 +55,6 @@ JAX-native data container with automatic test mode detection.
 RheoData
 ├── .x, .y                  → arrays (JAX float64)
 ├── .test_mode               → auto-detected from data structure
-├── .deformation_mode        → SHEAR | TENSION
 ├── .to_jax() / .to_numpy() → array conversion
 ├── .interpolate() / .resample() / .smooth() / .derivative() / .integral()
 ├── .storage_modulus / .loss_modulus / .tan_delta  (oscillation properties)
@@ -118,18 +117,17 @@ Singleton pattern with decorator-based registration.
 @ModelRegistry.register(
     "maxwell",
     protocols=[Protocol.OSCILLATION, Protocol.RELAXATION],
-    deformation_modes=[DeformationMode.SHEAR, DeformationMode.TENSION]
 )
 class Maxwell(BaseModel):
     ...
 ```
 
-**PluginInfo** dataclass stores: `name`, `plugin_class`, `plugin_type`, `protocols`, `deformation_modes`, `metadata`, `doc`.
+**PluginInfo** dataclass stores: `name`, `plugin_class`, `plugin_type`, `protocols`, `metadata`, `doc`.
 
 **Registry API:**
-- `register(name, plugin_class, plugin_type, protocols=[], deformation_modes=[], ...)`
+- `register(name, plugin_class, plugin_type, protocols=[], ...)`
 - `get_plugin(name)` → PluginInfo
-- `list_models(protocol=None, deformation_mode=None)` → filtered list
+- `list_models(protocol=None)` → filtered list
 - `list_transforms(transform_type=None)` → filtered list
 
 ---
@@ -195,12 +193,7 @@ Models handle three input formats:
 2. **Real `(N, 2)` [G', G'']:** Element-wise residuals on both columns
 3. **Real `(N,)` |G*|:** Magnitude-only fallback
 
-### DMTA / DMA Support
 
-49 oscillation-capable models auto-convert E* ↔ G* at BaseModel boundary:
-```python
-model.fit(omega, E_star, test_mode="oscillation", deformation_mode="tension", poisson_ratio=0.5)
-```
 
 ---
 

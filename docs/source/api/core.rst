@@ -164,48 +164,6 @@ TestMode
    - ``LAOS``: Large Amplitude Oscillatory Shear
    - ``UNKNOWN``: Unknown or ambiguous test type
 
-DeformationMode
-~~~~~~~~~~~~~~~
-
-.. autoclass:: rheojax.core.test_modes.DeformationMode
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :noindex:
-
-   Deformation geometry for rheological measurements. Controls whether
-   models work with shear modulus G* or Young's modulus E*.
-
-   **Values:**
-
-   - ``SHEAR``: Rotational rheometer geometry (measures G*)
-   - ``TENSION``: DMTA/DMA tensile geometry (measures E*)
-   - ``BENDING``: DMTA/DMA bending geometry (measures E*)
-   - ``COMPRESSION``: DMTA/DMA compression geometry (measures E*)
-
-   **Conversion:**
-
-   .. math::
-
-      E^*(\omega) = 2(1 + \nu) \, G^*(\omega)
-
-   where :math:`\nu` is the Poisson's ratio of the material.
-
-   **Usage with models:**
-
-   .. code-block:: python
-
-      from rheojax.models import Maxwell
-
-      model = Maxwell()
-      model.fit(
-          omega, E_star,
-          test_mode='oscillation',
-          deformation_mode='tension',
-          poisson_ratio=0.5,  # rubber
-      )
-
-   See :mod:`rheojax.utils.modulus_conversion` for array-level conversion utilities.
 
 Functions
 ~~~~~~~~~

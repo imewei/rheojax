@@ -32,7 +32,7 @@ class TestNLSQDiagnostics:
         G_data = G_true + noise
 
         # Fit GMM
-        model = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=2)
         model.fit(t, G_data, test_mode="relaxation", optimization_factor=1.5)
 
         # Extract diagnostics
@@ -63,7 +63,7 @@ class TestConvergenceClassification:
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
         # Fit GMM with N=1 (should converge well)
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Extract and classify diagnostics
@@ -80,7 +80,7 @@ class TestConvergenceClassification:
         G_data = G_true + np.random.normal(0, 1e5, size=t.shape)  # High noise
 
         # Fit GMM with N=5 modes (overfitting)
-        model = GeneralizedMaxwell(n_modes=5, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=5)
 
         try:
             model.fit(
@@ -105,7 +105,7 @@ class TestConvergenceClassification:
         G_data = np.ones_like(t) * 1e6  # Constant modulus (no relaxation)
 
         # Fit GMM with multiple modes (should fail with infeasible initial guess)
-        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=3)
 
         # Expect RuntimeError due to infeasible initial guess (constant data)
         with pytest.raises(RuntimeError, match="NLSQ optimization failed"):
@@ -123,7 +123,7 @@ class TestTieredPriorConstruction:
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
         # Fit GMM
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Construct priors
@@ -148,7 +148,7 @@ class TestTieredPriorConstruction:
         G_true = 1e6 + 5e5 * np.exp(-t / 0.1)
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Construct priors with explicit "suspicious" classification
@@ -170,7 +170,7 @@ class TestTieredPriorConstruction:
         G_data = np.ones_like(t) * 1e6
 
         # Fit GMM (should fail with RuntimeError due to infeasible initial guess)
-        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=3)
 
         # Expect RuntimeError during fit, not during prior construction
         with pytest.raises(RuntimeError, match="NLSQ optimization failed"):
@@ -186,7 +186,7 @@ class TestTieredPriorConstruction:
         G_true = 1e6 + 5e5 * np.exp(-t / 0.1)
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Manually create hard failure diagnostics
@@ -224,7 +224,7 @@ class TestBayesianIntegration:
         G_true = 1e6 + 5e5 * np.exp(-t / 0.1)
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # fit_bayesian should work with NLSQ warm-start

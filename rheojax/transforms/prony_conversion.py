@@ -130,6 +130,9 @@ class PronyConversion(BaseTransform):
         result_data = RheoData(
             x=omega,
             y=G_star,
+            x_units="rad/s",
+            y_units="Pa",
+            domain="frequency",
             metadata={
                 "test_mode": "oscillation",
                 "source_transform": "prony_conversion",
@@ -183,6 +186,9 @@ class PronyConversion(BaseTransform):
         result_data = RheoData(
             x=t,
             y=G_t,
+            x_units="s",
+            y_units="Pa",
+            domain="time",
             metadata={
                 "test_mode": "relaxation",
                 "source_transform": "prony_conversion",

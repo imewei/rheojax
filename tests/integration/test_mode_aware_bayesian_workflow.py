@@ -187,6 +187,7 @@ def test_bayesian_workflow_creep_mode():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(600)
 @pytest.mark.integration
 def test_bayesian_workflow_oscillation_mode():
     """Test Bayesian workflow for oscillation mode with frequency sweep.
@@ -257,6 +258,7 @@ def test_bayesian_workflow_oscillation_mode():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(600)
 @pytest.mark.integration
 def test_bayesian_workflow_fractional_model_relaxation():
     """Test Bayesian workflow for fractional Maxwell model in relaxation mode.

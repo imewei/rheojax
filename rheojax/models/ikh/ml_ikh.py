@@ -25,7 +25,6 @@ from rheojax.logging import get_logger
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     make_ml_ikh_creep_ode_rhs_per_mode,
@@ -49,8 +48,6 @@ _MLIKH_RESERVED = {
     "gamma_dot",
     "sigma_applied",
     "sigma_0",
-    "deformation_mode",
-    "poisson_ratio",
     "smart_init",
     "mikh_warmstart",
 }
@@ -65,14 +62,7 @@ _MLIKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class MLIKH(IKHBase):
     """Multi-Lambda Isotropic-Kinematic Hardening (ML-IKH) Model.
 

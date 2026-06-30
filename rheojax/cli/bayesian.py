@@ -43,9 +43,6 @@ Examples:
   # Output as JSON
   rheojax bayesian data.csv --model maxwell --x-col time --y-col G_t --json
 
-  # DMTA data with deformation mode
-  rheojax bayesian dmta.csv --model maxwell --x-col freq --y-cols "E_prime,E_double_prime" \\
-      --deformation-mode tension --poisson-ratio 0.5 --warm-start
         """,
     )
 
@@ -113,18 +110,6 @@ Examples:
         "--warm-start",
         action="store_true",
         help="Run NLSQ first and use results to warm-start NUTS",
-    )
-    parser.add_argument(
-        "--deformation-mode",
-        type=str,
-        default=None,
-        help="Deformation mode for DMTA (tension, shear, bending, compression)",
-    )
-    parser.add_argument(
-        "--poisson-ratio",
-        type=float,
-        default=None,
-        help="Poisson ratio for E*-G* conversion (default: 0.5 for rubber)",
     )
     parser.add_argument(
         "--json",
@@ -261,24 +246,11 @@ def main(args: list[str] | None = None) -> int:
         )
         return 1
 
-    # Build shared kwargs for deformation mode
-    mode_kwargs: dict = {}
-    if parsed.deformation_mode is not None:
-        mode_kwargs["deformation_mode"] = parsed.deformation_mode
-    if parsed.poisson_ratio is not None:
-        mode_kwargs["poisson_ratio"] = parsed.poisson_ratio
-
-    # Auto-propagate deformation_mode from loaded data metadata
-    if mode_kwargs.get("deformation_mode") is None and hasattr(data, "metadata"):
-        auto_dm = data.metadata.get("deformation_mode")
-        if auto_dm is not None:
-            mode_kwargs["deformation_mode"] = auto_dm
-
     # Optional NLSQ warm-start
     if parsed.warm_start:
         print("Running NLSQ warm-start...", file=sys.stderr)
         try:
-            model.fit(data.x, data.y, test_mode=test_mode, **mode_kwargs)
+            model.fit(data.x, data.y, test_mode=test_mode)
             print("  NLSQ warm-start complete", file=sys.stderr)
             logger.info("NLSQ warm-start complete", model=parsed.model)
         except Exception as e:
@@ -311,7 +283,6 @@ def main(args: list[str] | None = None) -> int:
             num_samples=parsed.samples,
             num_chains=parsed.chains,
             seed=parsed.seed,
-            **mode_kwargs,
         )
 
         sampling_time = time.perf_counter() - start_time

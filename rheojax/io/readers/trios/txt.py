@@ -1506,17 +1506,7 @@ def _parse_segment(
     segment_metadata["columns"] = columns
     segment_metadata["units"] = units
 
-    # Detect deformation mode from column names
-    col_names_lower = [c.lower() for c in columns]
-    if any(
-        "tensile" in c
-        or c.startswith("e' ")
-        or c == "e'"
-        or c.startswith("e'' ")
-        or c == "e''"
-        for c in col_names_lower
-    ):
-        segment_metadata["deformation_mode"] = "tension"
+
 
     # Add temperature if found (step_temperature is already in Kelvin)
     if step_temperature is not None:
@@ -1614,10 +1604,6 @@ def _determine_xy_columns(
     ]
 
     y_priorities = [
-        "tensile storage modulus",
-        "tensile loss modulus",
-        "e' ",
-        "e'' ",
         "storage modulus",
         "loss modulus",
         "stress",
@@ -1640,22 +1626,14 @@ def _determine_xy_columns(
             break
 
     # Check for BOTH storage and loss modulus (for complex modulus construction)
-    # Also handles tensile (E'/E'') patterns for DMTA data
     storage_col = None
     loss_col = None
     for i, col in enumerate(columns_lower):
-        if (
-            "storage modulus" in col
-            or "tensile storage modulus" in col
-            or col.startswith("e' ")
-        ) and i != x_col:
+        if "storage modulus" in col and i != x_col:
             storage_col = i
-        elif (
-            "loss modulus" in col
-            or "tensile loss modulus" in col
-            or col.startswith("e'' ")
-        ) and i != x_col:
+        elif "loss modulus" in col and i != x_col:
             loss_col = i
+
 
     # If we have both G' and G'' (or E' and E''), use them to construct complex modulus
     if storage_col is not None and loss_col is not None:

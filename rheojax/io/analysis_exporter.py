@@ -277,7 +277,6 @@ class AnalysisExporter:
         if data is not None:
             dm = getattr(data, "metadata", None) or {}
             metadata["test_mode"] = dm.get("test_mode")
-            metadata["deformation_mode"] = dm.get("deformation_mode")
             metadata["domain"] = getattr(data, "domain", None)
             metadata["x_units"] = getattr(data, "x_units", None)
             metadata["y_units"] = getattr(data, "y_units", None)
@@ -432,7 +431,6 @@ class AnalysisExporter:
             for key in (
                 "domain",
                 "test_mode",
-                "deformation_mode",
                 "n_points",
                 "x_units",
                 "y_units",
@@ -717,23 +715,20 @@ class AnalysisExporter:
         x_arr = np.asarray(data.x)
         y_arr = np.asarray(data.y)
 
-        dm = state["metadata"].get("deformation_mode")
-        prefix = "E" if dm in ("tension", "bending", "compression") else "G"
-
         if np.iscomplexobj(y_arr):
             df = pd.DataFrame(
                 {
                     "x": x_arr,
-                    f"{prefix}' (Storage)": np.real(y_arr),
-                    f"{prefix}'' (Loss)": np.imag(y_arr),
+                    "G' (Storage)": np.real(y_arr),
+                    "G'' (Loss)": np.imag(y_arr),
                 }
             )
         elif y_arr.ndim == 2 and y_arr.shape[1] == 2:
             df = pd.DataFrame(
                 {
                     "x": x_arr,
-                    f"{prefix}' (Storage)": y_arr[:, 0],
-                    f"{prefix}'' (Loss)": y_arr[:, 1],
+                    "G' (Storage)": y_arr[:, 0],
+                    "G'' (Loss)": y_arr[:, 1],
                 }
             )
         else:
@@ -752,23 +747,20 @@ class AnalysisExporter:
         fc = np.asarray(fr.fitted_curve)
         X = np.asarray(fr.X) if fr.X is not None else np.arange(len(fc))
 
-        dm = state["metadata"].get("deformation_mode")
-        prefix = "E" if dm in ("tension", "bending", "compression") else "G"
-
         if np.iscomplexobj(fc):
             df = pd.DataFrame(
                 {
                     "x": X,
-                    f"{prefix}' (Fit)": np.real(fc),
-                    f"{prefix}'' (Fit)": np.imag(fc),
+                    "G' (Fit)": np.real(fc),
+                    "G'' (Fit)": np.imag(fc),
                 }
             )
         elif fc.ndim == 2 and fc.shape[1] == 2:
             df = pd.DataFrame(
                 {
                     "x": X,
-                    f"{prefix}' (Fit)": fc[:, 0],
-                    f"{prefix}'' (Fit)": fc[:, 1],
+                    "G' (Fit)": fc[:, 0],
+                    "G'' (Fit)": fc[:, 1],
                 }
             )
         else:

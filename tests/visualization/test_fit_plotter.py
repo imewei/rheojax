@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -21,6 +22,39 @@ from rheojax.visualization.fit_plotter import (
 )
 
 jax, jnp = safe_import_jax()
+
+
+@pytest.mark.parametrize(
+    "method_name", ["plot_nlsq", "plot_bayesian", "plot_comparison"]
+)
+def test_fit_plotter_signatures_exclude_deformation_mode(method_name):
+    """Shear-only plotting APIs do not expose the removed deformation mode."""
+    parameters = inspect.signature(getattr(FitPlotter, method_name)).parameters
+    assert "deformation_mode" not in parameters
+
+
+@pytest.mark.parametrize(
+    "method_name", ["plot_nlsq", "plot_bayesian", "plot_comparison"]
+)
+def test_fit_plotter_rejects_legacy_deformation_mode_before_model_evaluation(
+    method_name,
+):
+    """Removed plotting options fail at the public entry point."""
+    model = MagicMock()
+    model.parameters = {}
+    model.model_function.side_effect = AssertionError("model evaluated")
+    x = np.array([1.0, 2.0])
+    y = np.array([2.0, 1.0])
+    result = MagicMock()
+
+    args = [x, y, result, model]
+    if method_name == "plot_comparison":
+        args.insert(3, MagicMock())
+
+    with pytest.raises(TypeError, match="deformation_mode.*shear-only"):
+        getattr(FitPlotter(), method_name)(*args, deformation_mode="tension")
+
+    model.model_function.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -337,25 +371,6 @@ class TestFitPlotterNLSQ:
         assert fig is not None
         assert isinstance(axes, np.ndarray)
         assert axes.shape == (2, 2)  # 2 rows (fit+resid) x 2 cols (G', G'')
-        plt.close(fig)
-
-    def test_deformation_mode_labels(
-        self, plotter, simple_data, mock_fit_result, mock_model
-    ):
-        """Deformation mode affects axis labels."""
-        x, y, _ = simple_data
-
-        fig, _ = plotter.plot_nlsq(
-            x,
-            y,
-            mock_fit_result,
-            mock_model,
-            show_residuals=False,
-            deformation_mode="tension",
-        )
-
-        # Just verify it doesn't crash — label checking is visual
-        assert fig is not None
         plt.close(fig)
 
 

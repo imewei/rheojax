@@ -100,10 +100,13 @@ def test_warm_start_workflow_fit_then_fit_bayesian():
     model = Maxwell()
 
     # Generate synthetic data with known parameters
-    t = np.linspace(0.1, 10, 30)
     G0_true = 1e5
     eta_true = 1e3
     tau_true = eta_true / G0_true
+    # Sample across the relaxation window so G0 and eta are separately
+    # identifiable. Starting at 0.1 s would already be 10 * tau_true and
+    # leave nearly every observation numerically indistinguishable from zero.
+    t = np.linspace(0.1 * tau_true, 10 * tau_true, 30)
     G_true = G0_true * np.exp(-t / tau_true)
 
     # Step 1: Fit with NLSQ to get point estimates
@@ -130,6 +133,7 @@ def test_warm_start_workflow_fit_then_fit_bayesian():
         num_chains=1,
         initial_values=initial_values,
         target_accept_prob=0.99,
+        seed=0,
     )
 
     # Check that Bayesian result is obtained

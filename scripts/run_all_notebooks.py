@@ -74,7 +74,7 @@ def run_notebook(nb_path, timeout=600):
 
     except CellExecutionError as e:
         lines = str(e).split("\n")
-        error_lines = [l for l in lines if l.strip()][-5:]
+        error_lines = [line for line in lines if line.strip()][-5:]
         return False, "\n".join(error_lines), time.time() - start
     except Exception as e:
         return False, f"{type(e).__name__}: {e}", time.time() - start

@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 class TestProjectStructure:
@@ -235,21 +236,24 @@ class TestCICD:
     """Test suite for CI/CD configuration."""
 
     @pytest.mark.smoke
-    def test_github_workflows_exist(self):
-        """Test that GitHub Actions workflows exist."""
+    def test_mirror_workflow_contract(self):
+        """Test the supported GitHub-to-OSTI mirror workflow contract."""
         import rheojax
 
         project_root = Path(rheojax.__file__).parent.parent
         workflows_dir = project_root / ".github" / "workflows"
-        if not workflows_dir.exists():
-            workflows_dir = project_root / ".github" / "workflows_disabled"
-
-        assert workflows_dir.exists(), "Missing .github/workflows or workflows_disabled directory"
+        assert workflows_dir.exists(), "Missing .github/workflows directory"
         assert workflows_dir.is_dir()
 
-        # Check for CI workflow
-        ci_workflow = workflows_dir / "ci.yml"
-        assert ci_workflow.exists(), "Missing ci.yml workflow"
+        mirror_workflow = workflows_dir / "mirror.yml"
+        assert mirror_workflow.is_file(), "Missing mirror.yml workflow"
+
+        workflow = yaml.load(mirror_workflow.read_text(), Loader=yaml.BaseLoader)
+        assert workflow["name"] == "Mirror to OSTI GitLab"
+        assert set(workflow["on"]) == {"push", "workflow_dispatch"}
+        assert set(workflow["on"]["push"]["branches"]) == {"main", "master"}
+        assert set(workflow["jobs"]) == {"mirror"}
+        assert workflow["jobs"]["mirror"]["runs-on"] == "ubuntu-latest"
 
 
 class TestPhysicsFormulaReferences:

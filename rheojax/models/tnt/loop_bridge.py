@@ -70,7 +70,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_saos_moduli_vec,
@@ -315,14 +314,7 @@ def _loop_bridge_relaxation_ode_rhs(
 
 @ModelRegistry.register(
     "tnt_loop_bridge",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
 class TNTLoopBridge(TNTBase):
     """Loop-bridge kinetics model for telechelic polymer networks.
 

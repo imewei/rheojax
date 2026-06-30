@@ -474,8 +474,6 @@ class ExportService:
                     "version": "1.0",
                     "model_name": state.get("model_name"),
                     "test_mode": state.get("test_mode"),
-                    "deformation_mode": state.get("deformation_mode", "shear"),
-                    "poisson_ratio": state.get("poisson_ratio", 0.5),
                     "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 }
 

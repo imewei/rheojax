@@ -1434,12 +1434,7 @@ class RheoJAXMainWindow(QMainWindow):
                 test_mode = getattr(state, "test_mode", None)
                 if test_mode is not None:
                     config["test_mode"] = test_mode
-                dm = getattr(state, "deformation_mode", None)
-                if dm is not None:
-                    config["deformation_mode"] = dm
-                pr = getattr(state, "poisson_ratio", None)
-                if pr is not None:
-                    config["poisson_ratio"] = pr
+
 
             elif step.step_type == "bayesian":
                 state = self.store.get_state()

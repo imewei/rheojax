@@ -15,7 +15,6 @@ jax, jnp = safe_import_jax()
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.fluidity import FluidityLocal, FluidityNonlocal
 
 
@@ -358,34 +357,6 @@ class TestFluidityPredictBeforeFit:
         with pytest.raises((ValueError, AttributeError)):
             model.predict(X)
 
-
-@pytest.mark.unit
-class TestFluidityDMTA:
-    """TC-015: Test DMTA deformation mode support for fluidity models."""
-
-    def test_local_supports_shear(self):
-        """Test FluidityLocal supports SHEAR deformation mode."""
-        info = ModelRegistry.get_info("fluidity_local")
-        assert info is not None
-        assert DeformationMode.SHEAR in info.deformation_modes
-
-    def test_local_supports_tension(self):
-        """Test FluidityLocal supports TENSION deformation mode."""
-        info = ModelRegistry.get_info("fluidity_local")
-        assert info is not None
-        assert DeformationMode.TENSION in info.deformation_modes
-
-    def test_nonlocal_supports_shear(self):
-        """Test FluidityNonlocal supports SHEAR deformation mode."""
-        info = ModelRegistry.get_info("fluidity_nonlocal")
-        assert info is not None
-        assert DeformationMode.SHEAR in info.deformation_modes
-
-    def test_nonlocal_supports_tension(self):
-        """Test FluidityNonlocal supports TENSION deformation mode."""
-        info = ModelRegistry.get_info("fluidity_nonlocal")
-        assert info is not None
-        assert DeformationMode.TENSION in info.deformation_modes
 
 
 @pytest.mark.unit

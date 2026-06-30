@@ -22,7 +22,7 @@ Development Phases
    - 53 rheological models across 22 families
    - 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
    - Pipeline API for fluent workflows
-   - 246 tutorial notebooks across 21 categories (basic, transforms, bayesian, advanced, dmta, and 16 model family suites)
+   - 238 tutorial notebooks across 20 categories (basic, transforms, bayesian, advanced, and 16 model family suites)
 
 **Phase 3 (Complete)**: Bayesian Inference
    - NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
@@ -84,17 +84,7 @@ Development Phases
    - Factor-of-2 relaxation, Guth-Gold strain amplification for HVNM
    - 5 factory methods each for limiting cases
 
-**Phase 11 (Complete)**: DMTA / DMA Support (v0.6.0)
-   - DeformationMode enum (SHEAR, TENSION, BENDING, COMPRESSION) in ``core.test_modes``
-   - ``convert_modulus()`` utility for array-level E* ↔ G* conversion via Poisson's ratio
-   - BaseModel ``fit()``/``predict()``/``fit_bayesian()`` accept ``deformation_mode`` and ``poisson_ratio``
-   - Automatic E* → G* conversion at model boundary; G* → E* reconversion in ``predict()``
-   - CSV reader auto-detects E'/E'' columns and sets deformation metadata
-   - ModelRegistry ``find(deformation_mode=)`` filtering — 49 models support TENSION, 10 shear-only
-   - Poisson ratio presets: rubber (0.5), glassy polymer (0.35), semicrystalline (0.40)
-   - 8 DMTA handbook pages (theory, workflows, models, protocols, knowledge, numerical, extensions)
-   - 8 DMTA tutorial notebooks covering basics through cross-domain validation
-   - 33 new tests (modulus conversion, deformation mode enum, registry integration)
+
 
 ----
 

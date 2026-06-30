@@ -38,7 +38,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import log_fit
 from rheojax.models.fluidity.saramito._base import FluiditySaramitoBase
 from rheojax.models.fluidity.saramito._kernels import (
@@ -84,9 +83,7 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    ])
 class FluiditySaramitoLocal(FluiditySaramitoBase):
     r"""Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
 

@@ -22,11 +22,6 @@ from rheojax.utils.model_selection import (
     build_fit_result,
     compare_models,
 )
-from rheojax.utils.modulus_conversion import (
-    POISSON_PRESETS,
-    convert_modulus,
-    convert_rheodata,
-)
 from rheojax.utils.optimization import (
     OptimizationResult,
     create_least_squares_objective,
@@ -63,10 +58,6 @@ __all__ = [
     # Metrics utilities
     "compute_fit_quality",
     "r2_complex",
-    # Modulus conversion (DMTA/DMA support)
-    "convert_modulus",
-    "convert_rheodata",
-    "POISSON_PRESETS",
     # Physics validation
     "PhysicsViolation",
     "check_fit_physics",

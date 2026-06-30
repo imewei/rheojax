@@ -64,7 +64,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     build_tnt_creep_ode_rhs,
@@ -98,14 +97,7 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 @ModelRegistry.register(
     "tnt",
     protocols=[
@@ -115,14 +107,7 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class TNTSingleMode(TNTBase):
     """Single-mode Transient Network Theory model.
 

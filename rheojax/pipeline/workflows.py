@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
@@ -317,6 +318,8 @@ def _fit_model_in_subprocess(
     Module-level function required for pickling on spawn context.
     Returns a serializable dict of results (no JAX arrays).
     """
+    reject_removed_options(fit_kwargs)
+
     import numpy as np
 
     from rheojax.core.jax_config import safe_import_jax
@@ -427,27 +430,20 @@ class ModelComparisonPipeline(Pipeline):
         Returns:
             self for method chaining
         """
+        reject_removed_options(fit_kwargs)
+
         self.data = data
         X = np.array(data.x)
         y = np.array(data.y)
 
-        # Auto-propagate test_mode, deformation_mode, poisson_ratio from
-        # data.metadata into fit_kwargs (consistent with Pipeline.fit() and
-        # BayesianPipeline.fit_nlsq()).
+        # Auto-propagate test_mode from data.metadata into fit_kwargs
+        # (consistent with Pipeline.fit() and BayesianPipeline.fit_nlsq()).
         _meta = getattr(data, "metadata", None)
         if _meta is not None:
             if "test_mode" not in fit_kwargs:
                 _tm = _meta.get("test_mode")
                 if _tm is not None:
                     fit_kwargs["test_mode"] = _tm
-            if "deformation_mode" not in fit_kwargs:
-                _dm = _meta.get("deformation_mode")
-                if _dm is not None:
-                    fit_kwargs["deformation_mode"] = _dm
-            if "poisson_ratio" not in fit_kwargs:
-                _pr = _meta.get("poisson_ratio")
-                if _pr is not None:
-                    fit_kwargs["poisson_ratio"] = _pr
 
         logger.info(
             "Starting model comparison",
@@ -592,6 +588,8 @@ class ModelComparisonPipeline(Pipeline):
 
     def _run_parallel(self, X, y, n_workers=None, **fit_kwargs) -> None:
         """Run model fits in parallel subprocesses."""
+        reject_removed_options(fit_kwargs)
+
         from rheojax.parallel.config import get_default_workers
         from rheojax.parallel.pool import PersistentProcessPool
 
@@ -1168,6 +1166,8 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         Returns:
             self for method chaining
         """
+        reject_removed_options(fit_kwargs)
+
         from rheojax.models.spp.spp_yield_stress import SPPYieldStress
 
         if not self._gamma_0_values:

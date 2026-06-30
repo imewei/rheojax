@@ -20,6 +20,9 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pandas as pd
     from numpy.typing import NDArray
 
 __all__ = [
@@ -29,7 +32,8 @@ __all__ = [
     "extract_unit_from_header",
     "detect_domain",
     "detect_test_mode_from_columns",
-    "detect_deformation_mode_from_columns",
+    "check_tensile_guard",
+    "check_file_for_unsupported_data",
     "validate_transform",
     "construct_complex_modulus",
     "UNIFIED_UNIT_CONVERSIONS",
@@ -152,7 +156,7 @@ _BENDING_MODULUS_PATTERNS: list[re.Pattern] = [
 _COMPRESSION_MODULUS_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
-        r"E[-_]?comp",  # E_compression, E-comp
+        r"\bE[-_]?comp",  # E_compression, E-comp (not ActiveCompression)
         r"\bcompression\b",  # compression (keyword, word-bounded)
         r"modulus[-_\s]*comp",  # modulus_compression
         r"\bcompressive\b",  # Compressive modulus (word-bounded)
@@ -372,90 +376,116 @@ def detect_test_mode_from_columns(
 
 
 # =============================================================================
-# Deformation Mode Detection (DMTA/DMA)
+# Tensile Guard (DMTA/DMA Rejection)
 # =============================================================================
 
 
-def detect_deformation_mode_from_columns(
-    y_headers: list[str],
-    y_units: str | None = None,
-) -> str | None:
-    """Detect deformation mode (shear vs tensile) from column names.
+def check_tensile_guard(
+    headers: list[str] | set[str] | pd.Index,
+    units: str | None = None,
+    source: str = "columns",
+) -> None:
+    """Scan headers and units for tensile/E* and other unsupported deformation modes (bending, compression).
 
-    Checks y-axis column names for E' / E'' (tensile/DMTA) vs G' / G'' (shear)
-    patterns. If both are present or neither is found, returns None.
-
-    Args:
-        y_headers: Y column header(s)
-        y_units: Y units string (optional, for additional context)
-
-    Returns:
-        'tension' if tensile modulus detected, 'shear' if shear modulus
-        detected, 'bending' if bending/flexural modulus detected,
-        'compression' if compressive modulus detected, or None if
-        ambiguous or unknown.
+    Raises UnsupportedDataError if any matches are found.
     """
-    all_text = " ".join(y_headers)
+    from rheojax.io._exceptions import UnsupportedDataError
 
-    tensile_score = sum(1 for p in _TENSILE_MODULUS_PATTERNS if p.search(all_text))
-    shear_score = sum(1 for p in _SHEAR_MODULUS_PATTERNS if p.search(all_text))
-    bending_score = sum(1 for p in _BENDING_MODULUS_PATTERNS if p.search(all_text))
-    compression_score = sum(
-        1 for p in _COMPRESSION_MODULUS_PATTERNS if p.search(all_text)
-    )
+    headers_list = [str(h) for h in headers]
+    all_text = " ".join(headers_list).lower()
 
-    # Also check units string for E or G indicators
-    if y_units:
-        if re.search(r"\bE['\"\*]", y_units):
-            tensile_score += 1
-        if re.search(r"\bG['\"\*]", y_units):
-            shear_score += 1
+    # Check column names/text for tensile/E*
+    for p in _TENSILE_MODULUS_PATTERNS:
+        if p.search(all_text):
+            raise UnsupportedDataError(
+                f"Tensile/E* data detected: matching pattern '{p.pattern}' in {source}. "
+                "RheoJAX only supports shear deformation mode."
+            )
 
-    scores = {
-        "tension": tensile_score,
-        "shear": shear_score,
-        "bending": bending_score,
-        "compression": compression_score,
-    }
-    nonzero = {k: v for k, v in scores.items() if v > 0}
+    # Check for other unsupported modes: bending
+    for p in _BENDING_MODULUS_PATTERNS:
+        if p.search(all_text):
+            raise UnsupportedDataError(
+                f"Bending data detected: matching pattern '{p.pattern}' in {source}. "
+                "RheoJAX only supports shear deformation mode."
+            )
 
-    # R11-DMTA-001: Geometry-specific modes (bending/compression) override
-    # generic tensile when both match, because bending/compression column
-    # names (e.g. "E_bending") also trigger tensile E-patterns.
-    if bending_score > 0:
-        logger.debug(
-            "Deformation mode detected (bending overrides tensile)",
-            mode="bending",
-            scores=scores,
-            y_headers=y_headers,
-        )
-        return "bending"
-    if compression_score > 0:
-        logger.debug(
-            "Deformation mode detected (compression overrides tensile)",
-            mode="compression",
-            scores=scores,
-            y_headers=y_headers,
-        )
-        return "compression"
+    # Check for other unsupported modes: compression
+    for p in _COMPRESSION_MODULUS_PATTERNS:
+        if p.search(all_text):
+            raise UnsupportedDataError(
+                f"Compression data detected: matching pattern '{p.pattern}' in {source}. "
+                "RheoJAX only supports shear deformation mode."
+            )
 
-    if len(nonzero) == 1:
-        mode = next(iter(nonzero))
-        logger.debug(
-            "Deformation mode detected",
-            mode=mode,
-            score=nonzero[mode],
-            y_headers=y_headers,
-        )
-        return mode
+    # Check units string
+    if units:
+        units_str = str(units)
+        # E', E'', E* in units
+        if re.search(r"\bE['\"\*]", units_str):
+            raise UnsupportedDataError(
+                f"Tensile/E* data detected in units: '{units_str}'. "
+                "RheoJAX only supports shear deformation mode."
+            )
 
-    logger.debug(
-        "Deformation mode ambiguous or unknown",
-        scores=scores,
-        y_headers=y_headers,
-    )
-    return None
 
+def check_file_for_unsupported_data(filepath: Path) -> None:
+    """Read the start of the file or sheet headers and raise UnsupportedDataError if tensile/E* data is detected."""
+    from rheojax.io._exceptions import UnsupportedDataError
+
+    suffix = filepath.suffix.lower()
+    if suffix in [".xlsx", ".xls"]:
+        try:
+            import pandas as pd
+
+            xl = pd.ExcelFile(filepath)
+            for sheet in xl.sheet_names:
+                df = xl.parse(sheet, nrows=5)
+                # Check column headers
+                headers = list(df.columns)
+                # Also check values in first row if they might contain headers/metadata
+                for row_idx in range(min(len(df), 3)):
+                    headers.extend([str(val) for val in df.iloc[row_idx] if pd.notna(val)])
+                check_tensile_guard(headers, source=f"Excel sheet '{sheet}'")
+        except Exception as e:
+            if type(e).__name__ == "UnsupportedDataError" or isinstance(e, UnsupportedDataError):
+                raise
+    else:
+        # Text files (CSV, TSV, TXT, JSON)
+        try:
+            # Check file content (only first 200 lines to avoid loading large files completely)
+            with open(filepath, encoding="utf-8", errors="ignore") as f:
+                lines = [f.readline() for _ in range(200)]
+                content = "".join(lines)
+
+            # Check for patterns in the raw content
+            for p in _TENSILE_MODULUS_PATTERNS:
+                if p.search(content):
+                    raise UnsupportedDataError(
+                        f"Unsupported tensile data detected: matching pattern '{p.pattern}' in file content. "
+                        "RheoJAX only supports shear deformation mode."
+                    )
+            for p in _BENDING_MODULUS_PATTERNS:
+                if p.search(content):
+                    raise UnsupportedDataError(
+                        f"Unsupported bending data detected: matching pattern '{p.pattern}' in file content. "
+                        "RheoJAX only supports shear deformation mode."
+                    )
+            for p in _COMPRESSION_MODULUS_PATTERNS:
+                if p.search(content):
+                    raise UnsupportedDataError(
+                        f"Unsupported compression data detected: matching pattern '{p.pattern}' in file content. "
+                        "RheoJAX only supports shear deformation mode."
+                    )
+            # Check for units as well
+            if re.search(r"\bE['\"\*]", content):
+                raise UnsupportedDataError(
+                    "Unsupported tensile data detected in file content. "
+                    "RheoJAX only supports shear deformation mode."
+                )
+        except Exception as e:
+            if type(e).__name__ == "UnsupportedDataError" or isinstance(e, UnsupportedDataError):
+                raise
 
 # =============================================================================
 # Transform Validation

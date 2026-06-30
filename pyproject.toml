@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rheojax"
-version = "0.6.1"
+version = "0.7.0"
 description = "Unified rheological analysis framework with JAX acceleration"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -329,3 +329,8 @@ disable_error_code = ["name-defined", "no-any-return"]
 [[tool.mypy.overrides]]
 module = ["rheojax.gui.*", "rheojax.cli.*"]
 ignore_errors = true  # GUI/CLI modules have PySide6 stub issues
+
+[dependency-groups]
+dev = [
+    "libcst>=1.8.6",
+]

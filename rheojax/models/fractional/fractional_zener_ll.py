@@ -54,7 +54,6 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 
 logger = get_logger(__name__)
 
@@ -65,14 +64,7 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FractionalZenerLiquidLiquid(BaseModel):
     """Fractional Zener Liquid-Liquid model.
 

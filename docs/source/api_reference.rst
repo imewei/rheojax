@@ -77,10 +77,9 @@ Core Components
 - :class:`rheojax.core.registry.ModelRegistry` - Model discovery and instantiation
 - :class:`rheojax.core.registry.TransformRegistry` - Transform discovery and instantiation
 
-**Test Modes & Deformation**:
+**Test Modes**:
 
 - :class:`rheojax.core.test_modes.TestMode` - Test mode enumeration (OSCILLATION, RELAXATION, CREEP, ...)
-- :class:`rheojax.core.test_modes.DeformationMode` - Deformation geometry (SHEAR, TENSION, BENDING, COMPRESSION)
 - :func:`rheojax.core.test_modes.detect_test_mode` - Automatic test mode detection
 
 Models (53 total)

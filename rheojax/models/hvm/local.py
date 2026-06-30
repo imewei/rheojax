@@ -40,7 +40,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.hvm._base import HVMBase
 from rheojax.models.hvm._kernels import (
     hvm_ber_rate_constant,
@@ -75,14 +74,7 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 @ModelRegistry.register(
     "hvm",
     protocols=[
@@ -92,14 +84,7 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class HVMLocal(HVMBase):
     """Local (0D) Hybrid Vitrimer Model.
 
@@ -752,8 +737,6 @@ class HVMLocal(HVMBase):
             if k
             not in (
                 "test_mode",
-                "deformation_mode",
-                "poisson_ratio",
                 "use_log_residuals",
                 "use_jax",
                 "method",
@@ -822,7 +805,7 @@ class HVMLocal(HVMBase):
         fwd_kwargs = {
             k: v
             for k, v in kwargs.items()
-            if k not in ("test_mode", "deformation_mode", "poisson_ratio")
+            if k != "test_mode"
         }
         result = np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)

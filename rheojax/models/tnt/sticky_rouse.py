@@ -107,7 +107,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.tnt._base import TNTBase
 from rheojax.models.tnt._kernels import (
     tnt_multimode_ode_rhs,
@@ -125,14 +124,7 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_sticky_rouse",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
 class TNTStickyRouse(TNTBase):
     """Sticky Rouse model for associative polymers.
 
@@ -242,12 +234,14 @@ class TNTStickyRouse(TNTBase):
                 name=f"G_{k}",
                 value=G_default,
                 bounds=(1e0, 1e8),
+                units="Pa",
                 description=f"Mode {k} modulus (Pa)",
             )
             self.parameters.add(
                 name=f"tau_R_{k}",
                 value=tau_R_default,
                 bounds=(1e-6, 1e4),
+                units="s",
                 description=f"Mode {k} Rouse relaxation time (s)",
             )
 
@@ -256,12 +250,14 @@ class TNTStickyRouse(TNTBase):
             name="tau_s",
             value=0.1,
             bounds=(1e-6, 1e4),
+            units="s",
             description="Sticker lifetime (s)",
         )
         self.parameters.add(
             name="eta_s",
             value=0.0,
             bounds=(0.0, 1e4),
+            units="Pa·s",
             description="Solvent viscosity (Pa·s)",
         )
 

@@ -42,7 +42,6 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._base import ITTMCTBase
 from rheojax.models.itt_mct._kernels import extract_laos_harmonics
@@ -68,14 +67,7 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class ITTMCTIsotropic(ITTMCTBase):
     """ITT-MCT Isotropically Sheared Model with k-resolved correlators.
 

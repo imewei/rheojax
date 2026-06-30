@@ -267,6 +267,53 @@ def test_lattice_epm_relaxation_honours_fluidity_form():
 
 
 @pytest.mark.unit
+def test_lattice_epm_relaxation_uses_rheodata_gamma_metadata():
+    """RheoData gamma metadata must reach the EPM relaxation runner.
+
+    BaseModel.predict unwraps RheoData before calling ``_predict``.  The EPM
+    boundary must preserve the protocol metadata during that unwrap, including
+    overriding any gamma cached by an earlier fit.
+    """
+    model = LatticeEPM(
+        L=16,
+        dt=0.01,
+        mu=1.0,
+        tau_pl=1.0,
+        sigma_c_mean=0.3,
+        sigma_c_std=0.05,
+        n_fluid=2.0,
+    )
+    time = jnp.linspace(0.01, 5.0, 50)
+    strain = 1.0
+    model._cached_gamma = 0.1
+
+    public = np.asarray(
+        model.predict(
+            RheoData(
+                x=time,
+                y=jnp.zeros_like(time),
+                initial_test_mode="relaxation",
+                metadata={"gamma": strain},
+            ),
+            smooth=True,
+            seed=0,
+        ).y
+    )
+    params = jnp.asarray(model.parameters.get_values(), dtype=jnp.float64)
+    expected = np.asarray(
+        model.model_function(
+            time,
+            params,
+            test_mode="relaxation",
+            gamma=strain,
+            seed=0,
+        )
+    )
+
+    np.testing.assert_allclose(public, expected, rtol=1e-10, atol=1e-12)
+
+
+@pytest.mark.unit
 @pytest.mark.slow
 def test_lattice_epm_relaxation_round_trip_fit():
     """Round-trip: fit EPM to its own relaxation simulation, recover R² > 0.9.

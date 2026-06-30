@@ -19,7 +19,6 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
@@ -42,9 +41,7 @@ logger = get_logger(__name__)
     # startup/creep branches; advertising those protocols in the
     # registry caused downstream code (e.g. predict-without-fit canary)
     # to call into paths that raise "Unknown test_mode for prediction".
-    protocols=[Protocol.FLOW_CURVE],
-    deformation_modes=[DeformationMode.SHEAR],
-)
+    protocols=[Protocol.FLOW_CURVE])
 class DMTNonlocal(DMTBase):
     r"""Nonlocal (1D) DMT model for shear banding analysis.
 

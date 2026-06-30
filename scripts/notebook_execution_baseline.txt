@@ -45,10 +45,6 @@ examples/tnt/14_tnt_loop_bridge_startup.ipynb
 examples/tnt/27_tnt_sticky_rouse_relaxation.ipynb
 examples/verification/creep/creep_mucus.ipynb
 examples/verification/creep/creep_polystyrene.ipynb
-examples/verification/oscillation/oscillation_freq_master_validation.ipynb
-examples/verification/oscillation/oscillation_mastercurve_analysis_polystyrene.ipynb
-examples/verification/oscillation/oscillation_models_evaluator.ipynb
-examples/verification/oscillation/oscillation_moo_fitting_mastercurves.ipynb
 examples/vlb/12_vlb_creep_nlsq_to_nuts.ipynb
 examples/vlb/14_vlb_startup_shear_nlsq_to_nuts.ipynb
 examples/vlb/16_vlb_laos_nlsq_to_nuts.ipynb

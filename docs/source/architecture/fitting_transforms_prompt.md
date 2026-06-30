@@ -12,7 +12,7 @@ are complete and you have produced the audit summary described below.
    - `rheojax/core/parameters.py` — `Parameter`, `ParameterSet`, `ParameterConstraint`
    - `rheojax/core/data.py` — `RheoData` container
    - `rheojax/core/bayesian.py` — `BayesianMixin`, `BayesianResult`
-   - `rheojax/core/test_modes.py` — `TestModeEnum`, `DeformationMode`, `Protocol`
+   - `rheojax/core/test_modes.py` — `TestModeEnum`, `Protocol`
    - `rheojax/core/inventory.py` — `Protocol`, `TransformType` enums
    - `rheojax/utils/optimization.py` — `create_least_squares_objective()`,
      `nlsq_optimize()`, `OptimizationResult`
@@ -163,7 +163,7 @@ class ModelInfo:
     name: str                           # canonical name from registry
     model_class: type[BaseModel]        # the actual class
     protocols: list[Protocol]           # from registration
-    deformation_modes: list[DeformationMode]
+
     param_names: list[str]              # from ParameterSet.keys()
     param_bounds: dict[str, tuple]      # from ParameterSet.get_bounds()
     param_units: dict[str, str]         # from Parameter.units

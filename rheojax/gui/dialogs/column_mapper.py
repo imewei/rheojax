@@ -5,8 +5,8 @@ Column Mapper Dialog
 Simple dialog for column reassignment.
 """
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pandas as pd
 

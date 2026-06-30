@@ -63,7 +63,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, TestMode
+from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.sgr_kernels import G0, Gp
 
@@ -88,14 +88,7 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class SGRGeneric(BaseModel):
     """Soft Glassy Rheology (SGR) GENERIC Thermodynamic Framework Model.
 
@@ -949,8 +942,6 @@ class SGRGeneric(BaseModel):
             "is_stress",
             "use_log_residuals",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _SGR_RESERVED}
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)

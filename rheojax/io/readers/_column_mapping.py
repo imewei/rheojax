@@ -106,35 +106,6 @@ CANONICAL_FIELDS: dict[str, CanonicalField] = {
         is_y_candidate=True,
         priority=10,
     ),
-    "tensile_storage_modulus": CanonicalField(
-        canonical_name="tensile_storage_modulus",
-        patterns=[
-            r"^e'$",
-            r"^e_prime$",
-            r"^e_stor$",
-            r"^tensile[\s_]?storage[\s_]?modulus$",
-            r"^young'?s?[\s_]?storage[\s_]?modulus$",
-        ],
-        si_unit="Pa",
-        applicable_modes=["oscillation"],
-        is_y_candidate=True,
-        priority=5,
-    ),
-    "tensile_loss_modulus": CanonicalField(
-        canonical_name="tensile_loss_modulus",
-        patterns=[
-            r"^e''$",
-            r'^e"$',
-            r"^e_double_prime$",
-            r"^e_loss$",
-            r"^tensile[\s_]?loss[\s_]?modulus$",
-            r"^young'?s?[\s_]?loss[\s_]?modulus$",
-        ],
-        si_unit="Pa",
-        applicable_modes=["oscillation"],
-        is_y_candidate=True,
-        priority=5,
-    ),
     "compliance": CanonicalField(
         canonical_name="compliance",
         patterns=[

@@ -21,7 +21,6 @@ from rheojax.models import HVNMLocal
 
 from .hvnm_tutorial_utils import ProtocolData
 
-
 # Ground-truth parameters for HVNM positive-control data generation.
 # Shared with HVM TRUE_PARAMS for the 8 backbone params + HVNM-specific
 # nanoparticle/interface parameters set from HVNM_DEFAULT_PARAMS scale.

@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.inventory import Protocol, TransformType
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -41,7 +41,6 @@ class PluginInfo:
     metadata: dict[str, Any]
     doc: str | None = None
     protocols: list[Protocol] = field(default_factory=list)
-    deformation_modes: list[DeformationMode] = field(default_factory=list)
     transform_type: TransformType | None = None
 
     def __post_init__(self):
@@ -112,7 +111,6 @@ class Registry:
         validate: bool = False,
         force: bool = False,
         protocols: list[Protocol | str] | None = None,
-        deformation_modes: list[DeformationMode | str] | None = None,
         transform_type: TransformType | str | None = None,
     ):
         """Register a plugin in the registry.
@@ -160,20 +158,6 @@ class Registry:
                 elif isinstance(p, Protocol):  # type: ignore[unreachable]
                     normalized_protocols.append(p)
 
-        # Normalize deformation_modes
-        normalized_deformation_modes: list[DeformationMode] = []
-        if deformation_modes:
-            for dm in deformation_modes:
-                if isinstance(dm, str):
-                    try:
-                        normalized_deformation_modes.append(DeformationMode(dm))
-                    except ValueError:
-                        logger.warning(
-                            f"Invalid deformation_mode '{dm}' for plugin '{name}'"
-                        )
-                elif isinstance(dm, DeformationMode):  # type: ignore[unreachable]
-                    normalized_deformation_modes.append(dm)
-
         # Normalize transform_type
         normalized_transform_type = None
         if transform_type:
@@ -194,7 +178,6 @@ class Registry:
             plugin_type=plugin_enum,
             metadata=metadata or {},
             protocols=normalized_protocols,
-            deformation_modes=normalized_deformation_modes,
             transform_type=normalized_transform_type,
         )
 
@@ -438,7 +421,6 @@ class Registry:
     def find_compatible(
         self,
         protocol: Protocol | str | None = None,
-        deformation_mode: DeformationMode | str | None = None,
         transform_type: TransformType | str | None = None,
         **criteria,
     ) -> list[str]:
@@ -446,13 +428,13 @@ class Registry:
 
         Args:
             protocol: Filter models by supported protocol
-            deformation_mode: Filter models by supported deformation mode
             transform_type: Filter transforms by type
             **criteria: Additional criteria to match against plugin metadata
 
         Returns:
             List of plugin names matching all criteria
         """
+        reject_removed_options(criteria)
         compatible = []
 
         # Check models
@@ -465,28 +447,6 @@ class Registry:
                     )
                     if target_proto not in info.protocols:
                         continue
-
-                # Deformation mode filtering
-                if deformation_mode is not None:
-                    target_dm = (
-                        DeformationMode(deformation_mode)
-                        if isinstance(deformation_mode, str)
-                        else deformation_mode
-                    )
-                    if (
-                        info.deformation_modes
-                        and target_dm not in info.deformation_modes
-                    ):
-                        continue
-                    elif not info.deformation_modes:
-                        # Models without explicit deformation_modes are shear-only
-                        if target_dm != DeformationMode.SHEAR:
-                            logger.debug(
-                                "Excluding model without deformation_modes for non-shear query",
-                                model=name,
-                                requested_mode=str(target_dm),
-                            )
-                            continue
 
                 if self._matches_criteria(info.metadata, criteria):
                     compatible.append(name)
@@ -539,7 +499,6 @@ class Registry:
                     "module": info.plugin_class.__module__,
                     "metadata": info.metadata,
                     "protocols": [str(p) for p in info.protocols],
-                    "deformation_modes": [str(dm) for dm in info.deformation_modes],
                 }
                 for name, info in self._models.items()
             },
@@ -616,7 +575,6 @@ class Registry:
                 "class": info.plugin_class.__name__,
                 "description": info.doc.split("\n")[0] if info.doc else "",
                 "protocols": [p.value for p in info.protocols],
-                "deformation_modes": [dm.value for dm in info.deformation_modes],
             }
             inventory["all_models"].append(model_entry)
             for p in info.protocols:
@@ -727,7 +685,6 @@ class ModelRegistry:
         cls,
         name: str,
         protocols: list[Protocol | str] | None = None,
-        deformation_modes: list[DeformationMode | str] | None = None,
         **metadata,
     ):
         """Decorator for registering a model.
@@ -735,9 +692,6 @@ class ModelRegistry:
         Args:
             name: Name for the model
             protocols: List of supported protocols
-            deformation_modes: List of supported deformation modes (shear, tension,
-                bending, compression). Models with oscillation protocol that work
-                in G-space can support all 4 modes via automatic E*<->G* conversion.
             **metadata: Additional metadata for the model
 
         Returns:
@@ -745,8 +699,7 @@ class ModelRegistry:
 
         Example:
             >>> @ModelRegistry.register('maxwell',
-            ...     protocols=['relaxation', 'oscillation'],
-            ...     deformation_modes=['shear', 'tension', 'bending', 'compression'])
+            ...     protocols=['relaxation', 'oscillation'])
             >>> class Maxwell(BaseModel):
             ...     pass
         """
@@ -759,7 +712,6 @@ class ModelRegistry:
                 PluginType.MODEL,
                 metadata=metadata,
                 protocols=protocols,
-                deformation_modes=deformation_modes,
             )
             return model_class
 
@@ -783,6 +735,7 @@ class ModelRegistry:
         Example:
             >>> model = ModelRegistry.create('maxwell')
         """
+        reject_removed_options(kwargs)
         registry = cls._get_registry()
         # If the model isn't registered yet, eagerly import all model modules
         # to trigger @ModelRegistry.register decorators (lazy-import fallback)
@@ -804,6 +757,9 @@ class ModelRegistry:
             >>> print(models)
             ['maxwell', 'zener', 'springpot', ...]
         """
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         return registry.get_all_models()
 
@@ -811,23 +767,19 @@ class ModelRegistry:
     def find(
         cls,
         protocol: Protocol | str | None = None,
-        deformation_mode: DeformationMode | str | None = None,
         **criteria,
     ) -> list[str]:
         """Find models matching criteria.
 
         Args:
             protocol: Filter by supported protocol
-            deformation_mode: Filter by supported deformation mode
             **criteria: Additional metadata criteria
 
         Returns:
             List of matching model names
         """
         registry = cls._get_registry()
-        return registry.find_compatible(
-            protocol=protocol, deformation_mode=deformation_mode, **criteria
-        )
+        return registry.find_compatible(protocol=protocol, **criteria)
 
     @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:
@@ -875,8 +827,7 @@ class ModelRegistry:
     def compatible_models(cls, data: Any) -> list[PluginInfo]:
         """Find models compatible with a RheoData instance.
 
-        Reads ``data.test_mode`` (maps to protocol) and
-        ``data.metadata.get("deformation_mode")`` to filter models.
+        Reads ``data.test_mode`` (maps to protocol) to filter models.
 
         Args:
             data: RheoData instance with test_mode metadata.
@@ -895,14 +846,8 @@ class ModelRegistry:
 
         protocol = test_mode if test_mode else None
 
-        deformation_mode = None
-        metadata = getattr(data, "metadata", {})
-        if isinstance(metadata, dict):
-            deformation_mode = metadata.get("deformation_mode")
-
         names = registry.find_compatible(
             protocol=protocol,
-            deformation_mode=deformation_mode,
         )
         return [
             registry.get_info(n, PluginType.MODEL)

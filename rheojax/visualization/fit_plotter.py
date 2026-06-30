@@ -19,6 +19,8 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from rheojax.core._validation import reject_removed_options
+from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
 from rheojax.visualization.plotter import (
@@ -36,6 +38,11 @@ logger = get_logger(__name__)
 # Grid styling (consistent with plotter.py)
 _GRID_ALPHA = 0.3
 _GRID_LINESTYLE = "--"
+
+
+def _reject_removed_plot_options(kwargs: dict[str, Any]) -> None:
+    """Reject removed public plotting options before model evaluation."""
+    reject_removed_options(kwargs)
 
 
 def compute_credible_band(
@@ -270,58 +277,68 @@ def generate_diagnostic_suite(
     # 1. Pair plot (parameter correlations)
     try:
         axes = az.plot_pair(
-            trace, var_names=var_names, marginals=True, divergences=True
+            trace,
+            **arviz_plot_kwargs(
+                az,
+                "plot_pair",
+                var_names=var_names,
+                marginals=True,
+                divergences=True,
+            ),
         )
-        fig_pair = axes.ravel()[0].figure if hasattr(axes, "ravel") else axes.figure
-        diagnostics["pair"] = fig_pair
+        diagnostics["pair"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("Pair plot failed", error=str(e))
 
     # 2. Forest plot (parameter estimates with 95% HDI)
     try:
-        axes = az.plot_forest(trace, var_names=var_names, combined=True, hdi_prob=0.95)
-        fig_forest = (
-            axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
+        axes = az.plot_forest(
+            trace,
+            **arviz_plot_kwargs(
+                az,
+                "plot_forest",
+                var_names=var_names,
+                combined=True,
+                hdi_prob=0.95,
+            ),
         )
-        diagnostics["forest"] = fig_forest
+        diagnostics["forest"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("Forest plot failed", error=str(e))
 
     # 3. Energy plot (NUTS diagnostics)
     try:
         axes = az.plot_energy(trace)
-        fig_energy = (
-            axes.ravel()[0].figure
-            if hasattr(axes, "ravel")
-            else (axes.figure if hasattr(axes, "figure") else axes[0].figure)
-        )
-        diagnostics["energy"] = fig_energy
+        diagnostics["energy"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("Energy plot failed", error=str(e))
 
     # 4. Autocorrelation plot
     try:
-        axes = az.plot_autocorr(trace, var_names=var_names)
-        fig_autocorr = (
-            axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
+        axes = az.plot_autocorr(
+            trace,
+            **arviz_plot_kwargs(
+                az,
+                "plot_autocorr",
+                var_names=var_names,
+                combined=False,
+            ),
         )
-        diagnostics["autocorr"] = fig_autocorr
+        diagnostics["autocorr"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("Autocorrelation plot failed", error=str(e))
 
     # 5. Rank plot (convergence check)
     try:
         axes = az.plot_rank(trace, var_names=var_names)
-        fig_rank = axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
-        diagnostics["rank"] = fig_rank
+        diagnostics["rank"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("Rank plot failed", error=str(e))
 
     # 6. ESS plot (effective sample size)
     try:
         axes = az.plot_ess(trace, var_names=var_names, kind="local")
-        fig_ess = axes.ravel()[0].figure if hasattr(axes, "ravel") else axes[0].figure
-        diagnostics["ess"] = fig_ess
+        diagnostics["ess"] = arviz_figure(axes)
     except Exception as e:
         logger.warning("ESS plot failed", error=str(e))
 
@@ -384,7 +401,6 @@ class FitPlotter:
         show_uncertainty: bool = True,
         n_pred_points: int = 200,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, Axes | np.ndarray]:
         """Plot NLSQ fit with uncertainty band and optional residuals.
@@ -395,9 +411,8 @@ class FitPlotter:
         - Uncertainty band from covariance matrix (shaded, if available)
         - Optional residuals subplot
 
-        For complex oscillation data, creates separate panels for G'/G''
-        (or E'/E'' based on deformation_mode), each with its own uncertainty
-        band and residuals.
+        For complex oscillation data, creates separate panels for G'/G'', each
+        with its own uncertainty band and residuals.
 
         Parameters
         ----------
@@ -422,8 +437,6 @@ class FitPlotter:
             Number of points for the smooth prediction curve (default: 200).
         style : str
             Plot style ('default', 'publication', 'presentation').
-        deformation_mode : str, optional
-            'tension'/'bending'/'compression' for E'/E'' labels.
         **kwargs
             Additional arguments forwarded to model_function (e.g., test_mode).
 
@@ -434,6 +447,7 @@ class FitPlotter:
             For scalar + residuals: 1D ndarray of 2 Axes.
             For no residuals: single Axes or 1D ndarray.
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug("Plotting NLSQ fit", style=style, confidence=confidence)
 
         x_data = _ensure_numpy(x_data)
@@ -508,8 +522,6 @@ class FitPlotter:
 
         # Modulus labels
         storage_label, loss_label, _ = "G'", 'G"', "Modulus"
-        if deformation_mode in ("tension", "bending", "compression"):
-            storage_label, loss_label = "E'", 'E"'
 
         model_name = fit_result.model_name or fit_result.model_class_name or ""
         band_label = f"{int(confidence * 100)}% CI"
@@ -561,7 +573,6 @@ class FitPlotter:
         n_pred_points: int = 200,
         show_residuals: bool = False,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, Axes | np.ndarray]:
         """Plot Bayesian posterior predictive with credible interval.
@@ -599,8 +610,6 @@ class FitPlotter:
             If True, add residuals subplot using posterior median.
         style : str
             Plot style.
-        deformation_mode : str, optional
-            Deformation mode for axis labels.
         **kwargs
             Additional arguments forwarded to model_function.
 
@@ -608,6 +617,7 @@ class FitPlotter:
         -------
         tuple[Figure, Axes or ndarray]
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug(
             "Plotting Bayesian fit",
             style=style,
@@ -665,8 +675,6 @@ class FitPlotter:
 
         # Labels
         storage_label, loss_label = "G'", 'G"'
-        if deformation_mode in ("tension", "bending", "compression"):
-            storage_label, loss_label = "E'", 'E"'
 
         band_label = f"{int(credible_level * 100)}% CI"
         model_name = getattr(model, "__class__", type(model)).__name__
@@ -786,7 +794,6 @@ class FitPlotter:
         max_draws: int = 500,
         n_pred_points: int = 200,
         style: str = "default",
-        deformation_mode: str | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, np.ndarray]:
         """Side-by-side comparison of NLSQ and Bayesian fits.
@@ -817,8 +824,6 @@ class FitPlotter:
             Prediction grid density.
         style : str
             Plot style.
-        deformation_mode : str, optional
-            For axis labels.
         **kwargs
             Forwarded to model_function.
 
@@ -827,6 +832,7 @@ class FitPlotter:
         tuple[Figure, ndarray]
             Figure and 1D array of 2 Axes.
         """
+        _reject_removed_plot_options(kwargs)
         logger.debug("Plotting NLSQ vs Bayesian comparison", style=style)
 
         x_data = _ensure_numpy(x_data)
@@ -1111,8 +1117,9 @@ class FitPlotter:
     def _make_pred_grid(self, x_data: np.ndarray, n_points: int) -> np.ndarray:
         """Create a dense prediction grid matching the data range."""
         x_min, x_max = (
-            np.min(x_data[x_data > 0]) if np.any(x_data > 0) else np.min(x_data)
-        ), np.max(x_data)
+            (np.min(x_data[x_data > 0]) if np.any(x_data > 0) else np.min(x_data)),
+            np.max(x_data),
+        )
         # Use log spacing if data spans > 1.5 decades
         if x_min > 0 and x_max / x_min > 30:
             return np.logspace(np.log10(x_min), np.log10(x_max), n_points)

@@ -28,7 +28,7 @@ class TestGMMBayesianInference:
     def test_model_function_relaxation_mode(self):
         """Test model_function works in relaxation mode."""
         # Create model
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
 
         # Fit to set test_mode
         t = np.logspace(-3, 2, 30)
@@ -47,7 +47,7 @@ class TestGMMBayesianInference:
     def test_model_function_oscillation_mode(self):
         """Test model_function works in oscillation mode."""
         # Create model
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
 
         # Fit to set test_mode
         omega = np.logspace(-2, 2, 30)
@@ -67,7 +67,7 @@ class TestGMMBayesianInference:
     def test_model_function_creep_mode(self):
         """Test model_function works in creep mode."""
         # Create model
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
 
         # Fit to set test_mode
         t = np.logspace(-3, 2, 30)
@@ -93,7 +93,7 @@ class TestGMMBayesianInference:
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
         # Step 1: Fit with NLSQ
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Extract NLSQ estimates for warm-start
@@ -138,7 +138,7 @@ class TestGMMBayesianInference:
         G_data = G_true + np.random.normal(0, 5e3, size=t.shape)  # Low noise
 
         # Fit model
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Bayesian inference with NLSQ warm-start
@@ -178,7 +178,7 @@ class TestGMMBayesianInference:
         G_data = G_true + np.random.normal(0, 5e3, size=t.shape)
 
         # Fit model
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Bayesian inference
@@ -226,7 +226,7 @@ class TestGMMBayesianPriorSafetyIntegration:
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
         # Fit with NLSQ
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
         model.fit(t, G_data, test_mode="relaxation")
 
         # Check that NLSQ converged well
@@ -255,7 +255,7 @@ class TestGMMBayesianPipelineBugs:
 
     @pytest.mark.smoke
     def test_infer_model_kwargs_gmm(self):
-        """F-GMM-001: infer_model_kwargs detects n_modes from G_i and E_i names."""
+        """F-GMM-001: infer_model_kwargs detects n_modes from G_i names."""
         from rheojax.gui.services.model_service import infer_model_kwargs
 
         # Shear: G_inf, G_1, G_2, tau_1, tau_2 → n_modes=2
@@ -263,13 +263,6 @@ class TestGMMBayesianPipelineBugs:
             "generalized_maxwell", ["G_inf", "G_1", "G_2", "tau_1", "tau_2"]
         )
         assert result == {"n_modes": 2}
-
-        # Tensile DMTA: E_inf, E_1, E_2, E_3 → n_modes=3
-        result = infer_model_kwargs(
-            "Generalized Maxwell",
-            ["E_inf", "E_1", "E_2", "E_3", "tau_1", "tau_2", "tau_3"],
-        )
-        assert result == {"n_modes": 3}
 
         # Single mode
         result = infer_model_kwargs("generalized_maxwell", ["G_inf", "G_1", "tau_1"])
@@ -286,7 +279,7 @@ class TestGMMBayesianPipelineBugs:
     @pytest.mark.smoke
     def test_model_function_laos_kwargs(self):
         """F-GMM-002: model_function uses _laos_omega/_laos_gamma_0 from self attrs."""
-        model = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=1)
 
         # Set params and test_mode manually (simulate post-fit state)
         model.parameters.set_value("G_inf", 1e5)
@@ -320,7 +313,7 @@ class TestGMMBayesianPipelineBugs:
         G_true = 1e6 + 5e5 * np.exp(-t / 0.5)
         G_data = G_true + np.random.normal(0, 1e4, size=t.shape)
 
-        model = GeneralizedMaxwell(n_modes=3, modulus_type="shear")
+        model = GeneralizedMaxwell(n_modes=3)
         model.fit(t, G_data, test_mode="relaxation", optimization_factor=1.5)
 
         n_final = model._n_modes

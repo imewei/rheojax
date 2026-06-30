@@ -1,1 +1,1 @@
-/Users/b80985/Projects/rheojax/docs/verification/vlb_equation_verification.md
+../../verification/vlb_equation_verification.md

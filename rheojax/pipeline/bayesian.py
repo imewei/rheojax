@@ -21,7 +21,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from rheojax.core.arviz_utils import import_arviz
+from rheojax.core._validation import reject_removed_options
+from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs, import_arviz
 from rheojax.core.base import BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
@@ -94,8 +95,8 @@ class BayesianPipeline(Pipeline):
             ValueError: If data not loaded
 
         Note:
-            This method writes resolved ``deformation_mode``, ``poisson_ratio``,
-            and ``test_mode`` back to ``self.data.metadata`` so that a subsequent
+            This method writes resolved ``test_mode`` back to
+            ``self.data.metadata`` so that a subsequent
             ``fit_bayesian()`` call inherits these settings without the caller
             having to repeat them.
 
@@ -108,6 +109,8 @@ class BayesianPipeline(Pipeline):
         if self.data is None:
             logger.error("No data loaded for NLSQ fit")
             raise ValueError("No data loaded. Call load() first.")
+
+        reject_removed_options(nlsq_kwargs)
 
         # Create model if string
         if isinstance(model, str):
@@ -143,7 +146,7 @@ class BayesianPipeline(Pipeline):
                 else "unknown"
             ),
         ) as ctx:
-            # BP-002: auto-propagate test_mode and deformation_mode from data metadata
+            # BP-002: auto-propagate test_mode from data metadata
             if hasattr(self, "data") and self.data is not None:
                 _meta = getattr(self.data, "metadata", None)
                 if _meta is not None:
@@ -151,15 +154,6 @@ class BayesianPipeline(Pipeline):
                         _tm = _meta.get("test_mode")
                         if _tm is not None:
                             nlsq_kwargs["test_mode"] = _tm
-                    # R9-PIPE-DMT: propagate deformation_mode for DMTA data
-                    if "deformation_mode" not in nlsq_kwargs:
-                        _dm = _meta.get("deformation_mode")
-                        if _dm is not None:
-                            nlsq_kwargs["deformation_mode"] = _dm
-                    if "poisson_ratio" not in nlsq_kwargs:
-                        _pr = _meta.get("poisson_ratio")
-                        if _pr is not None:
-                            nlsq_kwargs["poisson_ratio"] = _pr
             # Remove 'method' from nlsq_kwargs to prevent "multiple values"
             # TypeError since we explicitly pass method="nlsq" below.
             nlsq_kwargs.pop("method", None)
@@ -168,23 +162,10 @@ class BayesianPipeline(Pipeline):
             ctx["r_squared"] = r_squared
             ctx["n_parameters"] = len(model_obj.parameters)
 
-        # R10-PIPE-BAY-001: Write resolved deformation_mode and poisson_ratio back
-        # to data.metadata so fit_bayesian() can propagate them without the caller
-        # having to repeat these kwargs on the Bayesian call.
         # R12-E-005 (part): ensure metadata dict exists before writing test_mode.
         if self.data is not None and self.data.metadata is None:
             self.data.metadata = {}
         if self.data is not None and self.data.metadata is not None:
-            _dm_resolved = nlsq_kwargs.get("deformation_mode")
-            if _dm_resolved is None:
-                _dm_resolved = self.data.metadata.get("deformation_mode")
-            if _dm_resolved is not None:
-                self.data.metadata["deformation_mode"] = _dm_resolved
-            _pr_resolved = nlsq_kwargs.get("poisson_ratio")
-            if _pr_resolved is None:
-                _pr_resolved = self.data.metadata.get("poisson_ratio")
-            if _pr_resolved is not None:
-                self.data.metadata["poisson_ratio"] = _pr_resolved
             # R12-E-005: write resolved test_mode back to metadata so
             # fit_bayesian() reads the correct mode without the caller
             # having to repeat the kwarg.
@@ -267,6 +248,8 @@ class BayesianPipeline(Pipeline):
             logger.error("No data loaded for Bayesian inference")
             raise ValueError("No data loaded. Call load() first.")
 
+        reject_removed_options(nuts_kwargs)
+
         # Get data
         X = self.data.x
         y = self.data.y
@@ -290,18 +273,11 @@ class BayesianPipeline(Pipeline):
                 n_initial_values=len(initial_values),
             )
 
-        # Get test_mode and deformation_mode from data metadata if available.
+        # Get test_mode from data metadata if available.
         # Convert test_mode string to TestMode enum for model_function dispatch.
         test_mode = None
-        deformation_mode = None
-        poisson_ratio = None
         if hasattr(self.data, "metadata") and self.data.metadata is not None:
             test_mode = self.data.metadata.get("test_mode")
-            # R9-PIPE-DMT: propagate deformation_mode for DMTA data
-            deformation_mode = self.data.metadata.get("deformation_mode")
-            _pr = self.data.metadata.get("poisson_ratio")
-            if _pr is not None:
-                poisson_ratio = _pr
         # test_mode is passed as-is to fit_bayesian(), which handles
         # str → TestMode conversion internally (bayesian.py:1093-1094).
 
@@ -331,10 +307,6 @@ class BayesianPipeline(Pipeline):
                 "num_chains": num_chains,
                 "initial_values": initial_values,
             }
-            if deformation_mode is not None:
-                _bay_kwargs["deformation_mode"] = deformation_mode
-            if poisson_ratio is not None:
-                _bay_kwargs["poisson_ratio"] = poisson_ratio
             _bay_kwargs.update(nuts_kwargs)
             result = self._last_model.fit_bayesian(X, y, **_bay_kwargs)
 
@@ -770,21 +742,20 @@ class BayesianPipeline(Pipeline):
         # Create pair plot
         axes = az.plot_pair(
             idata,
-            var_names=var_names,
-            kind=kind,
-            divergences=divergences,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_pair",
+                var_names=var_names,
+                kind=kind,
+                divergences=divergences,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif hasattr(axes, "ravel"):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -882,21 +853,20 @@ class BayesianPipeline(Pipeline):
         # Create forest plot
         axes = az.plot_forest(
             idata,
-            var_names=var_names,
-            combined=combined,
-            hdi_prob=hdi_prob,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_forest",
+                var_names=var_names,
+                combined=combined,
+                hdi_prob=hdi_prob,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -1051,20 +1021,19 @@ class BayesianPipeline(Pipeline):
         # Create autocorrelation plot
         axes = az.plot_autocorr(
             idata,
-            var_names=var_names,
-            combined=combined,
-            **plot_kwargs,
+            **arviz_plot_kwargs(
+                az,
+                "plot_autocorr",
+                var_names=var_names,
+                combined=combined,
+                **plot_kwargs,
+            ),
         )
 
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig

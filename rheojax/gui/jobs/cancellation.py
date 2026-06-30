@@ -182,10 +182,12 @@ class ProcessCancellationToken:
         self,
         job_id: str | None = None,
         event: mp.synchronize.Event | None = None,
+        context: mp.context.BaseContext | None = None,
     ) -> None:
         import multiprocessing as _mp
 
-        self._cancelled = event if event is not None else _mp.Event()
+        mp_context = context if context is not None else _mp.get_context()
+        self._cancelled = event if event is not None else mp_context.Event()
         self._error: Exception | None = None
         self._job_id = job_id
         self._cancel_start_time: float | None = None

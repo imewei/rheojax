@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.core.data import RheoData
 from rheojax.logging import get_logger, log_fit, log_pipeline_stage
 from rheojax.pipeline.base import Pipeline
@@ -106,8 +107,7 @@ class BatchPipeline:
             lam_init, sigma_0, lam_0, gamma_0, omega_laos, n_cycles,
             points_per_cycle) are stripped from the template's fit kwargs
             because they are data-dependent and should not be reused
-            across datasets.  DMTA kwargs (deformation_mode, poisson_ratio)
-            and solver settings (method) are preserved.
+            across datasets. Solver settings (method) are preserved.
 
         Example:
             >>> batch.process_files(['data1.csv', 'data2.csv'])
@@ -425,6 +425,7 @@ class BatchPipeline:
                 y = np.asarray(pipeline.data.y)
                 _lfk = getattr(step_obj, "_last_fit_kwargs", None)
                 fit_kwargs_replay = dict(_lfk) if _lfk is not None else {}
+                reject_removed_options(fit_kwargs_replay)
                 # Strip internal tracking keys and protocol-specific kwargs
                 # that should not be replayed from the template to new datasets.
                 _batch_strip_keys = {
@@ -442,14 +443,6 @@ class BatchPipeline:
                 }
                 for _k in _batch_strip_keys:
                     fit_kwargs_replay.pop(_k, None)
-                # R12-E-003: forward deformation_mode and poisson_ratio from
-                # the template model so DMTA fits are replayed correctly.
-                _deformation_mode = getattr(step_obj, "_deformation_mode", None)
-                if _deformation_mode is not None:
-                    fit_kwargs_replay.setdefault("deformation_mode", _deformation_mode)
-                _poisson_ratio = getattr(step_obj, "_poisson_ratio", None)
-                if _poisson_ratio is not None:
-                    fit_kwargs_replay.setdefault("poisson_ratio", _poisson_ratio)
                 new_model.fit(X, y, **fit_kwargs_replay)
                 pipeline._last_model = new_model
                 _fit_X = np.asarray(X)
@@ -508,6 +501,9 @@ class BatchPipeline:
                         filepath=str(path),
                     )
                     continue
+                _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
+                if _template_bayes is not None:
+                    reject_removed_options(dict(_template_bayes))
                 try:
                     X = np.asarray(pipeline.data.x)
                     if pipeline.data.y is None:
@@ -519,18 +515,10 @@ class BatchPipeline:
                     # Forward test_mode from fit replay
                     if "test_mode" in fit_kwargs_replay:
                         _bayes_kwargs["test_mode"] = fit_kwargs_replay["test_mode"]
-                    # Forward deformation_mode/poisson_ratio
-                    _dm = fit_kwargs_replay.get("deformation_mode")
-                    if _dm is not None:
-                        _bayes_kwargs["deformation_mode"] = _dm
-                    _pr = fit_kwargs_replay.get("poisson_ratio")
-                    if _pr is not None:
-                        _bayes_kwargs["poisson_ratio"] = _pr
                     # Carry Bayesian sampling kwargs from the template model.
                     # These are stored by Pipeline.fit_bayesian() on the model
                     # as _last_bayesian_kwargs (separate from _last_fit_kwargs
                     # which only holds protocol kwargs from NLSQ).
-                    _template_bayes = getattr(step_obj, "_last_bayesian_kwargs", None)
                     if _template_bayes is not None:
                         for _bk in (
                             "num_warmup",
@@ -541,6 +529,7 @@ class BatchPipeline:
                         ):
                             if _bk in _template_bayes:
                                 _bayes_kwargs.setdefault(_bk, _template_bayes[_bk])
+                    reject_removed_options(_bayes_kwargs)
                     bayes_result = pipeline._last_model.fit_bayesian(
                         X, y, **_bayes_kwargs
                     )
@@ -562,8 +551,9 @@ class BatchPipeline:
 
             elif step_action == "export":
                 # Replay export step for each processed file.
+                export_config = step_obj if isinstance(step_obj, dict) else {}
+                reject_removed_options(export_config)
                 try:
-                    export_config = step_obj if isinstance(step_obj, dict) else {}
                     _out_path = export_config.get("output_path", "")
                     _fmt = export_config.get("format", "directory")
                     per_file_out = None

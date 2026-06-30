@@ -15,7 +15,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger, log_fit
 from rheojax.models.stz._base import STZBase, VariantType
 from rheojax.models.stz._kernels import (
@@ -43,8 +42,6 @@ _STZ_RESERVED = {
     "use_multi_start",
     "n_starts",
     "perturb_factor",
-    "deformation_mode",
-    "poisson_ratio",
 }
 
 
@@ -57,14 +54,7 @@ _STZ_RESERVED = {
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class STZConventional(STZBase):
     """Conventional Shear Transformation Zone (STZ) Model.
 

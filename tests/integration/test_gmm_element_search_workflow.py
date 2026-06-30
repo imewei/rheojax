@@ -39,7 +39,7 @@ def test_gmm_single_mode_fitting():
     G_data = G0 * np.exp(-t / tau)
 
     # Fit GMM with single mode
-    gmm = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+    gmm = GeneralizedMaxwell(n_modes=1)
     gmm.fit(t, G_data, test_mode=TestMode.RELAXATION)
 
     # Verify fitting succeeded
@@ -83,7 +83,7 @@ def test_gmm_multi_mode_fitting():
     G_data = G_true + noise
 
     # Fit GMM with multiple modes
-    gmm = GeneralizedMaxwell(n_modes=2, modulus_type="shear")
+    gmm = GeneralizedMaxwell(n_modes=2)
     gmm.fit(t, G_data, test_mode=TestMode.RELAXATION, optimization_factor=1.2)
 
     # Verify fitting
@@ -147,7 +147,7 @@ def test_cross_model_consistency():
     assert maxwell_pred[0] > maxwell_pred[-1]  # Monotonic decay
 
     # Fit GMM with single mode
-    gmm = GeneralizedMaxwell(n_modes=1, modulus_type="shear")
+    gmm = GeneralizedMaxwell(n_modes=1)
     gmm.fit(t, G_data, test_mode=TestMode.RELAXATION)
     assert gmm.fitted_ is True
 

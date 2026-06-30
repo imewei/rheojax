@@ -146,7 +146,7 @@ where:
    k_{\text{BER}} = \nu_0 \exp\left(-\frac{E_a}{RT}\right) \exp\left(\alpha \text{tr}(\boldsymbol{\mu}^E)\right)
 
 .. note::
-   The :math:`\cosh` form allows both tensile and compressive stresses to accelerate exchange (symmetric activation).
+   The :math:`\cosh` form allows both positive and negative stresses to accelerate exchange (symmetric activation).
 
 HVNM Extension: The Interphase Subnetwork
 ------------------------------------------

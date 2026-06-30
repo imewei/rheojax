@@ -1,1 +1,1 @@
-/Users/b80985/Projects/rheojax/docs/verification/hl_model_equations.md
+../../verification/hl_model_equations.md

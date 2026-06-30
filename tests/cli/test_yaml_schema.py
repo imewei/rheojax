@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from rheojax.cli._yaml_schema import PipelineConfig, load_config, validate_config
@@ -182,6 +184,23 @@ class TestValidateConfig:
         )
         errors = validate_config(config)
         assert any("model" in e for e in errors)
+
+    @pytest.mark.unit
+    def test_fit_params_is_a_supported_key(self):
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell", "params": {"G": 1.0}},
+            ],
+        )
+
+        with patch("rheojax.cli._yaml_schema.logger.warning") as warning:
+            errors = validate_config(config)
+
+        assert not any("params" in error for error in errors)
+        warning.assert_not_called()
 
 
 class TestPathSafety:

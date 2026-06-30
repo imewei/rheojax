@@ -48,8 +48,8 @@ def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any
     model_kwargs: dict[str, Any] = {}
 
     if "maxwell" in model_name.lower() and "generalized" in model_name.lower():
-        # Match G_1, G_2, ... or E_1, E_2, ... (tensile DMTA)
-        g_pattern = re.compile(r"^[GE]_(\d+)$")
+        # Match G_1, G_2, ...
+        g_pattern = re.compile(r"^G_(\d+)$")
         g_indices = [
             int(m.group(1)) for name in param_names if (m := g_pattern.match(name))
         ]
@@ -497,27 +497,6 @@ class ModelService:
                 "error": str(e),
             }
 
-    def get_supported_deformation_modes(self, model_name: str) -> list[str]:
-        """Return list of supported deformation mode strings for a model.
-
-        Returns empty list for shear-only models (no DMTA support).
-        """
-        if _is_placeholder_model(model_name):
-            return []
-        try:
-            from rheojax.core.registry import ModelRegistry
-
-            model_name = self._normalize_model_name(model_name)
-            reg_info = ModelRegistry.get_info(model_name)
-            if reg_info and reg_info.deformation_modes:
-                return [dm.value for dm in reg_info.deformation_modes]
-        except Exception:
-            logger.debug(
-                "Could not get deformation modes",
-                model=model_name,
-                exc_info=True,
-            )
-        return []
 
     def supports_fitting(self, model_name: str) -> bool:
         """Check if a model supports NLSQ fitting (not just prediction).
@@ -877,15 +856,8 @@ class ModelService:
             model.fit(x, y, **fit_kwargs)
             logger.debug("Model fit completed", model=model_name)
 
-            # Get fitted values — forward deformation_mode/poisson_ratio so that
-            # DMTA models return E* (tensile) rather than G* (shear).
+            # Get fitted values
             _post_fit_predict_kwargs: dict = {"test_mode": test_mode}
-            _dm = fit_kwargs.get("deformation_mode")
-            if _dm:
-                _post_fit_predict_kwargs["deformation_mode"] = _dm
-            _pr = fit_kwargs.get("poisson_ratio")
-            if _pr is not None:
-                _post_fit_predict_kwargs["poisson_ratio"] = _pr
             y_pred = model.predict(x, **_post_fit_predict_kwargs)
 
             # Calculate residuals
@@ -1185,22 +1157,10 @@ class ModelService:
                     if attr in fitted_state:
                         setattr(model, attr, fitted_state[attr])
 
-            # Predict — forward deformation_mode/poisson_ratio so that DMTA models
-            # return E* (tensile) rather than G* (shear) on the predict path.
-            last_fit = getattr(model, "_last_fit_kwargs", {}) or {}
+            # Predict
             _pred_kwargs: dict = {}
             if test_mode is not None:
                 _pred_kwargs["test_mode"] = test_mode
-            _dm = last_fit.get("deformation_mode")
-            if _dm is None and model_kwargs:
-                _dm = model_kwargs.get("deformation_mode")
-            if _dm is not None:
-                _pred_kwargs["deformation_mode"] = _dm
-            _pr = last_fit.get("poisson_ratio")
-            if _pr is None and model_kwargs:
-                _pr = model_kwargs.get("poisson_ratio")
-            if _pr is not None:
-                _pred_kwargs["poisson_ratio"] = _pr
             try:
                 result = model.predict(x_values, **_pred_kwargs)
             except TypeError:

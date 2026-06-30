@@ -6,7 +6,9 @@ Tests for rheojax.gui.utils.icons module which provides
 platform-safe icon handling to prevent macOS CoreText crashes.
 """
 
+import inspect
 import sys
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -173,6 +175,37 @@ class TestIconProvider:
             provider = IconProvider(allow_emoji=True)
             assert provider.uses_emoji is True
 
+    def test_existing_provider_tracks_platform_safety(self):
+        """Test a cached provider cannot leak emoji after a platform transition."""
+        from rheojax.gui.utils.icons import IconProvider
+
+        emoji_icons = ("\U0001f535", "\U00002705", "\U0001f4c4")
+        ascii_icons = ("[C]", "[+]", "[CSV]")
+
+        with patch.object(sys, "platform", "linux"):
+            provider = IconProvider(allow_emoji=True)
+            assert (
+                provider.get_category_icon("classical"),
+                provider.get_status_icon("success"),
+                provider.get_file_icon("csv"),
+            ) == emoji_icons
+
+        with patch.object(sys, "platform", "darwin"):
+            assert provider.uses_emoji is False
+            assert (
+                provider.get_category_icon("classical"),
+                provider.get_status_icon("success"),
+                provider.get_file_icon("csv"),
+            ) == ascii_icons
+
+        with patch.object(sys, "platform", "linux"):
+            assert provider.uses_emoji is True
+            assert (
+                provider.get_category_icon("classical"),
+                provider.get_status_icon("success"),
+                provider.get_file_icon("csv"),
+            ) == emoji_icons
+
 
 class TestGetIconProvider:
     """Tests for get_icon_provider singleton function."""
@@ -190,6 +223,52 @@ class TestGetIconProvider:
 
         provider = get_icon_provider(allow_emoji=False)
         assert provider.uses_emoji is False
+
+    def test_concurrent_callers_receive_their_requested_provider(self, monkeypatch):
+        """Test a global replacement cannot change another caller's return value."""
+        import rheojax.gui.utils.icons as icons
+
+        monkeypatch.setattr(icons, "_default_provider", None)
+        monkeypatch.setattr(sys, "platform", "linux")
+
+        source_lines, start_line = inspect.getsourcelines(icons.get_icon_provider)
+        return_line = next(
+            start_line + offset
+            for offset, line in enumerate(source_lines)
+            if line.lstrip().startswith("return ")
+        )
+        first_at_return = threading.Event()
+        resume_first = threading.Event()
+        first_result = []
+
+        def pause_at_return(frame, event, arg):
+            if (
+                frame.f_code is icons.get_icon_provider.__code__
+                and event == "line"
+                and frame.f_lineno == return_line
+            ):
+                first_at_return.set()
+                assert resume_first.wait(timeout=2)
+            return pause_at_return
+
+        def request_emoji_provider():
+            sys.settrace(pause_at_return)
+            try:
+                first_result.append(icons.get_icon_provider(allow_emoji=True))
+            finally:
+                sys.settrace(None)
+
+        first_caller = threading.Thread(target=request_emoji_provider)
+        first_caller.start()
+        assert first_at_return.wait(timeout=2)
+
+        ascii_provider = icons.get_icon_provider(allow_emoji=False)
+        resume_first.set()
+        first_caller.join(timeout=2)
+
+        assert not first_caller.is_alive()
+        assert first_result[0].uses_emoji is True
+        assert ascii_provider.uses_emoji is False
 
 
 class TestStandardIcon:

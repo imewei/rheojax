@@ -21,7 +21,6 @@ import numpy as np
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
@@ -55,14 +54,7 @@ _MISSING = object()
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class DMTLocal(DMTBase):
     """Local (0D) DMT model for homogeneous thixotropic flow.
 
@@ -279,8 +271,6 @@ class DMTLocal(DMTBase):
             "omega_laos",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = nlsq_curve_fit(
@@ -532,8 +522,6 @@ class DMTLocal(DMTBase):
             "omega_laos",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
@@ -705,8 +693,6 @@ class DMTLocal(DMTBase):
             "omega_laos",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
@@ -1046,8 +1032,6 @@ class DMTLocal(DMTBase):
             "omega_laos",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
@@ -1213,8 +1197,6 @@ class DMTLocal(DMTBase):
             "omega_laos",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)
@@ -1560,8 +1542,6 @@ class DMTLocal(DMTBase):
             "omega",
             "n_cycles",
             "points_per_cycle",
-            "deformation_mode",
-            "poisson_ratio",
         }
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _dmt_reserved}
         result = fit_with_nlsq(residual_fn, params_array, bounds=bounds, **nlsq_kwargs)

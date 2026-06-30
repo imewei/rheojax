@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from rheojax.core._validation import reject_removed_options
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -52,8 +53,6 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "y_col",
             "y_cols",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
         ],
     },
     "transform": {
@@ -66,9 +65,8 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "method",
             "max_iter",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
             "use_jax",  # SER-003: PipelineBuilder passes use_jax to fit steps
+            "params",
         ],
     },
     "bayesian": {
@@ -81,8 +79,6 @@ STEP_SCHEMAS: dict[str, dict[str, list[str]]] = {
             "warm_start",
             "target_accept_prob",
             "test_mode",
-            "deformation_mode",
-            "poisson_ratio",
         ],
     },
     "export": {
@@ -223,6 +219,11 @@ def validate_config(config: PipelineConfig) -> list[str]:
     if not config.name or not config.name.strip():
         errors.append("Config 'name' must be a non-empty string.")
 
+    try:
+        reject_removed_options(config.defaults)
+    except (ValueError, TypeError) as exc:
+        errors.append(f"Config defaults: {exc}")
+
     if not config.steps:
         errors.append("Pipeline must have at least one step.")
         return errors  # Nothing more to validate
@@ -253,6 +254,11 @@ def validate_config(config: PipelineConfig) -> list[str]:
                 f"Valid types: {sorted(VALID_STEP_TYPES)}."
             )
             continue
+
+        try:
+            reject_removed_options(step)
+        except (ValueError, TypeError) as exc:
+            errors.append(f"{step_label} ({step_type}): {exc}")
 
         schema = STEP_SCHEMAS[step_type]
         # Merge only the defaults that are relevant to this step type,

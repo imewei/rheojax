@@ -52,8 +52,6 @@ type ArrayLike = np.ndarray | list | float
 _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
     {
         "test_mode",
-        "deformation_mode",
-        "poisson_ratio",
         "seed",
         "method",
         "num_warmup",

@@ -460,13 +460,13 @@ class TestCSVReaderEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# Coverage Gap-4: HDF5 test_mode / deformation_mode round-trip
+# Coverage Gap-4: HDF5 test_mode round-trip
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
 class TestHDF5ModeRoundTrip:
-    """Gap-4: test_mode and deformation_mode survive HDF5 write → read."""
+    """Gap-4: test_mode survives HDF5 write → read."""
 
     @pytest.mark.smoke
     def test_test_mode_round_trip(self, tmp_path):
@@ -479,19 +479,6 @@ class TestHDF5ModeRoundTrip:
         filepath = tmp_path / "mode_rt.h5"
         save_hdf5(data, str(filepath))
         loaded = load_hdf5(str(filepath))
-        assert loaded.metadata.get("test_mode") == "oscillation"
-
-    def test_deformation_mode_round_trip(self, tmp_path):
-        """deformation_mode stored as top-level attr and recovered on load."""
-        data = RheoData(
-            x=np.array([1.0, 2.0]),
-            y=np.array([100.0, 200.0]),
-            metadata={"deformation_mode": "tension", "test_mode": "oscillation"},
-        )
-        filepath = tmp_path / "deformation_rt.h5"
-        save_hdf5(data, str(filepath))
-        loaded = load_hdf5(str(filepath))
-        assert loaded.metadata.get("deformation_mode") == "tension"
         assert loaded.metadata.get("test_mode") == "oscillation"
 
     def test_missing_modes_no_error(self, tmp_path):

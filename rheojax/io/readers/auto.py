@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from rheojax.core.data import RheoData
+from rheojax.io._exceptions import UnsupportedDataError
+from rheojax.io.readers._utils import check_file_for_unsupported_data
 from rheojax.io.readers.anton_paar import load_anton_paar
 from rheojax.io.readers.csv_reader import detect_csv_delimiter, load_csv
 from rheojax.io.readers.excel_reader import load_excel
@@ -23,7 +25,9 @@ _FATAL_EXCEPTIONS = (
     MemoryError,
     PermissionError,
     OSError,
+    UnsupportedDataError,
 )
+
 
 # File size threshold for warning (100 MB)
 _FILE_SIZE_WARNING_BYTES = 100 * 1024 * 1024
@@ -52,7 +56,6 @@ _CSV_KWARGS = {
     # R13-AUTO-001: "validate" removed — load_csv does not accept it as a
     # named parameter, so it would leak through **kwargs to pd.read_csv()
     # and cause a TypeError.
-    "deformation_mode",
     # R6-AUTO-001: Include commonly-used load_csv kwargs so they are not
     # silently dropped when users pass them through auto_load().
     "x_units",
@@ -79,7 +82,6 @@ _EXCEL_KWARGS = {
     # R13-AUTO-001: "validate" removed — load_excel does not accept it as a
     # named parameter, so it would leak through **kwargs to pd.read_excel()
     # and cause a TypeError.
-    "deformation_mode",
     # R6-AUTO-002: Include commonly-used load_excel kwargs so they are not
     # silently dropped when users pass them through auto_load().
     "x_units",
@@ -208,6 +210,10 @@ def auto_load(
 
     if filepath.is_dir():
         raise IsADirectoryError(f"Expected a file, got a directory: {filepath}")
+
+    # Pre-scan file for unsupported tensile/E* data
+    check_file_for_unsupported_data(filepath)
+
 
     # Warn about large files that may consume significant memory
     file_size = filepath.stat().st_size

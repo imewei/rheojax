@@ -59,7 +59,6 @@ from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.utils.mittag_leffler import mittag_leffler_e
 
 logger = get_logger(__name__)
@@ -71,14 +70,7 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FractionalPoyntingThomson(BaseModel):
     """Fractional Poynting-Thomson model.
 

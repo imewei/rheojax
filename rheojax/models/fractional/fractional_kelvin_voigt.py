@@ -34,7 +34,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode, TestMode
+from rheojax.core.test_modes import TestMode
 from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
@@ -52,14 +52,7 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class FractionalKelvinVoigt(BaseModel):
     """Fractional Kelvin-Voigt model: Spring and SpringPot in parallel.
 
@@ -559,8 +552,8 @@ class FractionalKelvinVoigt(BaseModel):
         """Predict response.
 
         R13-FKV-002: Delegates to BaseModel.predict() for plain-array inputs so
-        that deformation_mode (E*->G* conversion) and test_mode restoration are
-        handled correctly.  Only RheoData inputs bypass super() because they
+        that test_mode restoration is handled correctly.  Only RheoData inputs
+        bypass super() because they
         return a RheoData wrapper object.
 
         Args:

@@ -130,34 +130,32 @@ def validate_prony_parameters(
 
 
 def create_prony_parameter_set(
-    n_modes: int, modulus_type: str = "shear"
+    n_modes: int
 ) -> ParameterSet:
     """Create ParameterSet for N-mode Prony series.
 
     Dynamically generates parameters:
-    - E_inf (or G_inf for shear): Equilibrium modulus
-    - E_1...E_N (or G_1...G_N): Mode strengths
+    - G_inf: Equilibrium modulus
+    - G_1...G_N: Mode strengths
     - tau_1...tau_N: Relaxation times
 
     Args:
         n_modes: Number of Maxwell modes (N ≥ 1)
-        modulus_type: 'shear' for G(t) or 'tensile' for E(t)
 
     Returns:
         ParameterSet with 2N+1 parameters configured for Prony series
 
     Raises:
-        ValueError: If n_modes < 1 or modulus_type invalid
+        ValueError: If n_modes < 1
 
     Example:
-        >>> params = create_prony_parameter_set(n_modes=3, modulus_type='shear')
+        >>> params = create_prony_parameter_set(n_modes=3)
         >>> list(params.keys())
         ['G_inf', 'G_1', 'G_2', 'G_3', 'tau_1', 'tau_2', 'tau_3']
     """
     logger.debug(
         "Creating Prony ParameterSet",
         n_modes=n_modes,
-        modulus_type=modulus_type,
     )
 
     if n_modes < 1:
@@ -167,25 +165,13 @@ def create_prony_parameter_set(
         )
         raise ValueError(f"n_modes must be ≥ 1, got {n_modes}")
 
-    if modulus_type not in ["shear", "tensile"]:
-        logger.error(
-            "Invalid modulus_type for Prony ParameterSet",
-            modulus_type=modulus_type,
-            valid_types=["shear", "tensile"],
-        )
-        raise ValueError(
-            f"modulus_type must be 'shear' or 'tensile', got {modulus_type}"
-        )
-
     param_set = ParameterSet()
 
     # Choose symbol based on modulus type
-    symbol = "G" if modulus_type == "shear" else "E"
+    symbol = "G"
     units = "Pa"
 
-    # Tensile moduli (E) are ~3x shear moduli (G) and real DMTA polymer
-    # data can reach ~10 GPa, so tensile bounds must be wider.
-    modulus_upper = 1e12 if modulus_type == "tensile" else 1e9
+    modulus_upper = 1e9
 
     # Add equilibrium modulus (can be zero for liquids)
     param_set.add(
@@ -193,7 +179,7 @@ def create_prony_parameter_set(
         value=1e3,
         bounds=(0.0, modulus_upper),
         units=units,
-        description=f"Equilibrium {modulus_type} modulus",
+        description="Equilibrium shear modulus",
     )
 
     # Add mode strengths (must be positive).  Lower bound is 0.0 so the
@@ -227,7 +213,6 @@ def create_prony_parameter_set(
     logger.info(
         "Created Prony ParameterSet",
         n_modes=n_modes,
-        modulus_type=modulus_type,
         n_parameters=len(param_set),
     )
     return param_set
@@ -520,7 +505,7 @@ def softmax_penalty(E_i: ArrayLike, scale: float = 1.0):
 
 
 def warm_start_from_n_modes(
-    params_n: ArrayLike, n_target: int, modulus_type: str = "shear"
+    params_n: ArrayLike, n_target: int
 ) -> ArrayLike:
     """Extract warm-start parameters for reduced-mode fit from N-mode solution.
 
@@ -529,21 +514,19 @@ def warm_start_from_n_modes(
     NLSQ fits during element search optimization.
 
     Algorithm:
-    1. Extract E_inf, E_i, tau_i from N-mode params
+    1. Extract G_inf, G_i, tau_i from N-mode params
     2. If n_target < N: Truncate to first n_target modes (keep strongest modes)
     3. If n_target > N: Pad with zeros/default values (edge case, typically not used)
     4. If n_target == N: Return params unchanged
 
     Parameter Layout:
-    - params_n format: [E_inf, E_1, E_2, ..., E_N, tau_1, tau_2, ..., tau_N]
+    - params_n format: [G_inf, G_1, G_2, ..., G_N, tau_1, tau_2, ..., tau_N]
     - Total length: 2*N + 1
 
     Args:
         params_n: Fitted parameters from N-mode optimization
             Shape: (2*N + 1,) where N is current number of modes
         n_target: Target number of modes for next fit (typically N-1)
-        modulus_type: 'shear' (G) or 'tensile' (E) - currently not used,
-            but kept for API consistency
 
     Returns:
         Initial parameters for n_target-mode fit
@@ -554,19 +537,19 @@ def warm_start_from_n_modes(
 
     Example:
         >>> # 5-mode fit result
-        >>> params_5 = np.array([1e3, 1e6, 5e5, 2e5, 8e4, 3e4,  # E_inf, E_1..E_5
+        >>> params_5 = np.array([1e3, 1e6, 5e5, 2e5, 8e4, 3e4,  # G_inf, G_1..G_5
         ...                      1e-2, 1e-1, 1.0, 1e1, 1e2])    # tau_1..tau_5
-        >>> # Warm-start for 4-mode fit (truncate weakest mode E_5)
+        >>> # Warm-start for 4-mode fit (truncate weakest mode G_5)
         >>> params_4 = warm_start_from_n_modes(params_5, n_target=4)
         >>> print(params_4.shape)
         (9,)  # 2*4 + 1 = 9 parameters
-        >>> # E_inf, E_1..E_4, tau_1..tau_4
+        >>> # G_inf, G_1..G_4, tau_1..tau_4
         >>> print(params_4)
         [1.e+03 1.e+06 5.e+05 2.e+05 8.e+04 1.e-02 1.e-01 1.e+00 1.e+01]
 
     Notes:
         - Truncation assumes modes are ordered by importance (strongest first)
-        - For GMM fitting, this ordering is typically achieved by sorting by E_i
+        - For GMM fitting, this ordering is typically achieved by sorting by G_i
         - Warm-start can provide 2-5x speedup in element minimization
         - Compilation reuse provides additional speedup when combined with this
     """
@@ -574,7 +557,6 @@ def warm_start_from_n_modes(
         "Extracting warm-start parameters",
         n_target=n_target,
         params_length=len(params_n) if hasattr(params_n, "__len__") else 1,
-        modulus_type=modulus_type,
     )
 
     if n_target < 1:

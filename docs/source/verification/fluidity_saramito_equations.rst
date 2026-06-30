@@ -1,1 +1,1 @@
-/Users/b80985/Projects/rheojax/docs/verification/fluidity_saramito_equations.rst
+../../verification/fluidity_saramito_equations.rst

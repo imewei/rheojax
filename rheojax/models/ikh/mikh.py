@@ -25,7 +25,6 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.registry import ModelRegistry
-from rheojax.core.test_modes import DeformationMode
 from rheojax.models.ikh._base import IKHBase
 from rheojax.models.ikh._kernels import (
     ikh_creep_ode_rhs,
@@ -43,8 +42,6 @@ _IKH_RESERVED = {
     "gamma_dot",
     "sigma_applied",
     "sigma_0",
-    "deformation_mode",
-    "poisson_ratio",
 }
 
 
@@ -57,14 +54,7 @@ _IKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ],
-    deformation_modes=[
-        DeformationMode.SHEAR,
-        DeformationMode.TENSION,
-        DeformationMode.BENDING,
-        DeformationMode.COMPRESSION,
-    ],
-)
+    ])
 class MIKH(IKHBase):
     r"""Maxwell-Isotropic-Kinematic Hardening (MIKH) Model.
 
