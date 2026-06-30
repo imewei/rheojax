@@ -59,6 +59,10 @@ class TransformService:
             "derivative": SmoothDerivative,
             "mutation_number": MutationNumber,
             "spp": SPPDecomposer,
+            # registry key aliases (same class, backward-compatible)
+            "fft_analysis": FFTAnalysis,
+            "smooth_derivative": SmoothDerivative,
+            "spp_decomposer": SPPDecomposer,
             "cox_merz": CoxMerz,
             "lve_envelope": LVEEnvelope,
             "prony_conversion": PronyConversion,
@@ -79,6 +83,26 @@ class TransformService:
         """
         logger.debug("Getting available transforms")
         return list(self._transforms.keys())
+
+    def resolve(self, key: str) -> type:
+        """Return the transform class for a registry key or legacy alias.
+
+        Parameters
+        ----------
+        key : str
+            Registry key (e.g. ``fft_analysis``) or legacy alias (e.g. ``fft``).
+
+        Returns
+        -------
+        type
+            Transform class.
+
+        Raises
+        ------
+        KeyError
+            If ``key`` is not recognised.
+        """
+        return self._transforms[key]
 
     def get_transform_params(self, name: str) -> dict[str, Any]:
         """Get configurable parameters for transform.

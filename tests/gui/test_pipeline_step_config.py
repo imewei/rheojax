@@ -130,9 +130,10 @@ class TestTransformNameMapping:
         available = service.get_available_transforms()
 
         meta_keys = {m["key"] for m in metadata}
-        assert meta_keys == set(
-            available
-        ), f"Metadata keys {meta_keys} != available {set(available)}"
+        # Aliases in _transforms have no display metadata; meta keys are a subset.
+        assert meta_keys <= set(available), (
+            f"Metadata keys {meta_keys} not subset of available {set(available)}"
+        )
 
     @pytest.mark.unit
     def test_all_display_names_are_unique(self, qapp_module):
