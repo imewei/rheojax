@@ -41,8 +41,9 @@ class NutsStep(QWidget):
         self._target.setValue(0.8)
         self._skip_btn = QPushButton("Skip NUTS", self)
         self._run_btn = QPushButton("▶ Sample", self)
+        self._result = QLabel("", self)
         lay = QVBoxLayout(self)
-        for w in (self._banner, self._target, self._skip_btn, self._run_btn):
+        for w in (self._banner, self._target, self._skip_btn, self._run_btn, self._result):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
@@ -65,9 +66,14 @@ class NutsStep(QWidget):
         self._skipped = False
         cfg = {"target_accept": self._target.value()}
         warm_start = (self._state.nlsq_result or {}).get("params", {})
-        self._state.nuts_result = self._sample_fn(
-            self.suggested_priors(), warm_start, cfg
-        )
+        try:
+            result = self._sample_fn(self.suggested_priors(), warm_start, cfg)
+        except NotImplementedError:
+            # ponytail: real sampler wiring is out of scope here (tracked separately);
+            # this guard only keeps an unwired Sample button from crashing the Qt slot.
+            self._result.setText("NUTS sampler is not wired up yet.")
+            return
+        self._state.nuts_result = result
         self.edited.emit()
         self.finished.emit()
 

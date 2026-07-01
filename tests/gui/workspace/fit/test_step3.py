@@ -45,3 +45,14 @@ def test_nlsq_handles_none_r_squared(qtbot):
     with qtbot.waitSignal(step.finished, timeout=2000):
         step.run()
     assert st.nlsq_result["r_squared"] is None
+
+
+def test_nlsq_run_without_wired_fit_fn_does_not_crash(qtbot):
+    """Clicking Run before the real solver is wired must not raise NotImplementedError
+    from inside the Qt slot (which can abort the process under PySide6 6.x)."""
+    st = FitState(protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0})
+    step = NlsqStep(st)  # no fit_fn injected -> falls back to _default_fit_fn stub
+    qtbot.addWidget(step)
+    step.run()  # must not raise
+    assert st.nlsq_result is None
+    assert step.is_ready() is False

@@ -56,12 +56,18 @@ class NlsqStep(QWidget):
 
     def run(self) -> None:
         # Multi-start config is transient widget state — not stored in FitState
-        res = self._fit_fn(
-            self._state.model_key,
-            self._state.model_config,
-            self._state.data_ref,
-            self._state.column_map,
-        )
+        try:
+            res = self._fit_fn(
+                self._state.model_key,
+                self._state.model_config,
+                self._state.data_ref,
+                self._state.column_map,
+            )
+        except NotImplementedError:
+            # ponytail: real solver wiring is out of scope here (tracked separately);
+            # this guard only keeps an unwired Run button from crashing the Qt slot.
+            self._result.setText("NLSQ solver is not wired up yet.")
+            return
         # Normalize to dict: ModelService.fit() returns FitResult (dataclass), fakes return dict
         if isinstance(res, dict):
             self._state.nlsq_result = res
