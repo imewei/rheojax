@@ -38,8 +38,11 @@ def input_contract(protocol: str, model_key: str | None = None) -> InputContract
         raise ValueError(f"unknown protocol: {protocol}")
     t = _TEMPLATES[protocol]
     y_quantity = None
-    if protocol == "flow_curve" and model_key is not None:
-        y_quantity = getattr(ModelRegistry.create(model_key), "flow_quantity", None)
+    if protocol == "flow_curve":
+        if model_key is not None:
+            y_quantity = getattr(ModelRegistry.create(model_key), "flow_quantity", None)
+        else:
+            y_quantity = "stress"  # default per spec §8: every flow_curve contract needs a y-column
         cols = [ColumnSpec("shear_rate", "1/s"),
                 ColumnSpec("viscosity" if y_quantity == "viscosity" else "stress",
                            "Pa·s" if y_quantity == "viscosity" else "Pa")]

@@ -179,6 +179,18 @@ def run_bayesian_isolated(
                 if var_name in ss:
                     sample_stats_np[var_name] = np.asarray(ss[var_name].values)
 
+    from rheojax.gui.foundation.metrics import bfmi as _bfmi
+
+    energy_arr = sample_stats_np.get("energy")
+    if energy_arr is not None:
+        # energy_arr shape: (chains, draws); compute per-chain BFMI and average
+        if energy_arr.ndim == 2:
+            bfmi_val = float(np.mean([_bfmi(energy_arr[c]) for c in range(energy_arr.shape[0])]))
+        else:
+            bfmi_val = _bfmi(energy_arr)
+    else:
+        bfmi_val = float("nan")
+
     return {
         "model_name": model_name,
         "dataset_id": dataset_id,
@@ -195,5 +207,6 @@ def run_bayesian_isolated(
         "num_chains": num_chains,
         "inference_data": None,  # Not picklable, too large for mp.Queue
         "sample_stats": sample_stats_np,  # Raw arrays for energy plot
+        "bfmi": bfmi_val,
         "diagnostics_valid": bayesian_result.diagnostics_valid,
     }

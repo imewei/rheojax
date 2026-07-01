@@ -29,6 +29,13 @@ from rheojax.transforms import (
 
 logger = get_logger(__name__)
 
+# ponytail: map unified registry keys → legacy dispatch keys used by if/elif chain
+_LEGACY_MAP: dict[str, str] = {
+    "fft_analysis": "fft",
+    "smooth_derivative": "derivative",
+    "spp_decomposer": "spp",
+}
+
 
 class TransformService:
     """Service for rheological transform operations.
@@ -556,6 +563,7 @@ class TransformService:
         """
         logger.debug("Entering apply_transform", transform=name, params=params)
         logger.info("Starting transform", transform=name)
+        name = _LEGACY_MAP.get(name, name)  # normalise unified → legacy dispatch key
         try:
             if name not in self._transforms:
                 logger.error("Unknown transform requested", transform=name)
@@ -1064,6 +1072,7 @@ class TransformService:
             Validation warnings
         """
         logger.debug("Entering validate_transform_input", transform=name)
+        name = _LEGACY_MAP.get(name, name)  # normalise unified → legacy dispatch key
         warnings = []
 
         # Check if transform requires multiple datasets
