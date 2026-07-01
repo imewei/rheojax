@@ -1,3 +1,5 @@
+import pytest
+
 from rheojax.gui.workspace.controller import Step, WorkflowController
 
 
@@ -38,3 +40,23 @@ def test_can_advance_blocked_by_validate():
     assert c.can_advance() is False
     c.advance()
     assert c.current == 0 and c.reached == {0}   # advance() was a no-op
+
+def test_on_edit_bumps_revision():
+    ready = [True, True, True, True]
+    c = _ctl(ready)
+    assert c.revision == 0
+    c.advance(); c.advance()
+    c.on_edit(1)
+    assert c.revision == 1
+    c.on_edit(0)
+    assert c.revision == 2
+
+def test_on_edit_rejects_invalid_index():
+    ready = [True, True, True, True]
+    c = _ctl(ready)
+    c.advance()
+    with pytest.raises(ValueError):
+        c.on_edit(-1)
+    with pytest.raises(ValueError):
+        c.on_edit(4)                             # len(steps) == 4, valid range [0, 4)
+    assert c.reached == {0, 1} and c.revision == 0  # rejected edits are no-ops

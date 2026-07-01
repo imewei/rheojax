@@ -23,6 +23,7 @@ class StepperCanvas(QWidget):
         self._stack = QStackedWidget(self)
         for i, step in enumerate(controller.steps):
             b = QPushButton(f"{i + 1} {step.title}", self)
+            b.setCheckable(True)
             b.clicked.connect(lambda _=False, idx=i: self.step_clicked.emit(idx))
             self._buttons.append(b)
             self._rail.addWidget(b)
@@ -36,9 +37,14 @@ class StepperCanvas(QWidget):
         old = self._stack.widget(index)
         self._stack.insertWidget(index, widget)
         self._stack.removeWidget(old)
+        if old is not None:
+            old.deleteLater()
 
     def is_enabled(self, index: int) -> bool:
         return self._buttons[index].isEnabled()
+
+    def is_active(self, index: int) -> bool:
+        return self._buttons[index].isChecked()
 
     def current_index(self) -> int:
         return self._stack.currentIndex()
@@ -49,4 +55,5 @@ class StepperCanvas(QWidget):
     def refresh(self) -> None:
         for i, b in enumerate(self._buttons):
             b.setEnabled(i in self._ctl.reached)
+            b.setChecked(i == self._ctl.current)
         self._stack.setCurrentIndex(self._ctl.current)

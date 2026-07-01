@@ -42,4 +42,7 @@ class LibraryRail(QWidget):
 
     def select_row(self, row: int) -> None:
         self._list.setCurrentRow(row)
-        self.dataset_selected.emit(self._list.item(row).data(Qt.ItemDataRole.UserRole))
+        item = self._list.item(row)
+        if item is None:
+            return
+        self.dataset_selected.emit(item.data(Qt.ItemDataRole.UserRole))

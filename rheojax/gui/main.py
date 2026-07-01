@@ -378,11 +378,29 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
-        if args.maximized:
-            workspace_window.showMaximized()
-        else:
-            workspace_window.show()
+        _show_main_window(workspace_window, args.maximized)
         logger.info("RheoJAX GUI workspace shell ready", version=__version__)
+
+        if args.project:
+            logger.info(
+                "Workspace shell: project loading not yet implemented",
+                path=str(args.project),
+            )
+            print(
+                "NOTE: --project is not yet supported by the workspace shell "
+                "(--workspace); ignored.",
+                file=sys.stderr,
+            )
+        if args.import_file:
+            logger.info(
+                "Workspace shell: data import not yet implemented",
+                path=str(args.import_file),
+            )
+            print(
+                "NOTE: --import is not yet supported by the workspace shell "
+                "(--workspace); ignored.",
+                file=sys.stderr,
+            )
 
         exit_code = app.exec()
         logger.info("Application exiting", exit_code=exit_code)

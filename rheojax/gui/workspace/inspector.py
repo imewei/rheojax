@@ -19,11 +19,18 @@ class InspectorPanel(QWidget):
 
     def set_tab_widget(self, name: str, widget: QWidget) -> None:
         idx = self._index[name]
+        old = self._tabs.widget(idx)
+        was_current = self._tabs.currentIndex() == idx
         self._tabs.removeTab(idx)
         self._tabs.insertTab(idx, widget, name)
+        if was_current:
+            self._tabs.setCurrentIndex(idx)
+        if old is not None:
+            old.deleteLater()
 
     def show_tab(self, name: str) -> None:
         self._tabs.setCurrentIndex(self._index[name])
 
     def current_tab(self) -> str:
-        return self._TABS[self._tabs.currentIndex()]
+        idx = self._tabs.currentIndex()
+        return self._TABS[idx] if 0 <= idx < len(self._TABS) else ""

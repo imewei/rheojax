@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QLabel,
     QMainWindow,
     QPushButton,
     QSplitter,
@@ -26,24 +27,35 @@ def _skeleton_steps(ids: list[str]) -> list[Step]:
 
 class WorkspaceWindow(QMainWindow):
     mode_changed = Signal(str)
+    MODES = ("fit", "transform")
 
     def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = app_state
-        self._mode = app_state.ui.get("mode", "fit")
+        initial_mode = app_state.ui.get("mode", "fit")
+        self._mode = initial_mode if initial_mode in self.MODES else "fit"
         self._controllers = {
             "fit": FitController(_skeleton_steps(FitController.STEP_IDS)),
             "transform": TransformController(_skeleton_steps(TransformController.STEP_IDS)),
         }
 
+        self.setWindowTitle("RheoJAX Workspace")
+        self.resize(1200, 800)
+
         bar = QToolBar(self)
         self.addToolBar(bar)
         self._fit_btn = QPushButton("Fit", self)
         self._tx_btn = QPushButton("Transform", self)
+        self._fit_btn.setCheckable(True)
+        self._tx_btn.setCheckable(True)
         self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
         self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
         bar.addWidget(self._fit_btn)
         bar.addWidget(self._tx_btn)
+        self._status_label = QLabel(self)
+        bar.addWidget(self._status_label)
+        self._sync_mode_buttons()
+        self._refresh_status_label()
 
         self._rail = LibraryRail(app_state.library, self)
         self._inspector = InspectorPanel(self)
@@ -59,6 +71,8 @@ class WorkspaceWindow(QMainWindow):
         return self._mode
 
     def set_mode(self, mode: str) -> None:
+        if mode not in self.MODES:
+            raise ValueError(f"unknown mode {mode!r}; expected one of {self.MODES}")
         if mode == self._mode:
             return
         self._mode = mode
@@ -69,7 +83,25 @@ class WorkspaceWindow(QMainWindow):
             old_canvas.deleteLater()
         self._canvas = new_canvas
         self._state.ui["mode"] = mode
+        self._sync_mode_buttons()
         self.mode_changed.emit(mode)
+
+    def _sync_mode_buttons(self) -> None:
+        self._fit_btn.setChecked(self._mode == "fit")
+        self._tx_btn.setChecked(self._mode == "transform")
+
+    def _refresh_status_label(self) -> None:
+        # ponytail: "active project" status deferred — needs the Plan 3/4
+        # AppState.project slice, which doesn't exist yet (spec §4.3).
+        try:
+            from rheojax.gui.utils.jax_utils import get_jax_info
+
+            info = get_jax_info()
+            fp = "float64 ✓" if info.get("float64_enabled") else "float64 ✗"
+            device = info.get("default_device", "?")
+            self._status_label.setText(f"{fp}  |  {device}")
+        except Exception:
+            self._status_label.setText("")
 
     def active_step_count(self) -> int:
         return len(self._controllers[self._mode].steps)
