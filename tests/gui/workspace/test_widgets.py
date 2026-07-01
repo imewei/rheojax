@@ -144,7 +144,11 @@ def test_window_invalid_persisted_mode_falls_back_to_fit(qtbot):
 def test_window_step_click_navigates(qtbot):
     # Clicking a reached step button must move controller.current AND the
     # displayed stack index — regression test for the click -> goto() wiring.
+    # Uses transform mode: its steps are still trivially-ready skeleton stubs,
+    # so this generic navigation-mechanics test doesn't need to satisfy the
+    # real fit workflow's per-step readiness gating (protocol/model/data/...).
     win = WorkspaceWindow(AppState()); qtbot.addWidget(win)
+    win.set_mode("transform")
     ctl = win._controllers[win.mode()]
     ctl.advance(); ctl.advance()          # reached {0,1,2}, current == 2
     win._canvas.refresh()
