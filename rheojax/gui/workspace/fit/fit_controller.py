@@ -52,8 +52,21 @@ def build_fit_controller(app_state: AppState):
 
             body.edited.connect(_on_edit)
 
+    # Wire Protocol/Model edits -> Data step refresh, so the contract/combo
+    # rebuild after Step 1 completes (connected after the _on_edit loop above,
+    # so invalidation/state-update runs first, then refresh sees fresh state).
+    protocol_body, data_body = bodies[0], bodies[1]
+    if hasattr(protocol_body, "edited") and hasattr(data_body, "refresh"):
+        protocol_body.edited.connect(data_body.refresh)
+
+    # Wire NLSQ edits -> NutsStep.reset_skip, so a stale "skipped" decision
+    # doesn't survive an NLSQ re-run that invalidates nuts_result.
+    nlsq_body, nuts_body = bodies[2], bodies[3]
+    if hasattr(nlsq_body, "edited") and hasattr(nuts_body, "reset_skip"):
+        nlsq_body.edited.connect(nuts_body.reset_skip)
+
     # Wire NUTS finish -> Visualize refresh so Diagnostics tab appears after sampling
-    nuts_body, visualize_body = bodies[3], bodies[4]
+    visualize_body = bodies[4]
     if hasattr(nuts_body, "finished") and hasattr(visualize_body, "refresh"):
         nuts_body.finished.connect(visualize_body.refresh)
 
