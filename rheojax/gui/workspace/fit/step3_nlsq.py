@@ -67,11 +67,13 @@ class NlsqStep(QWidget):
             self._state.nlsq_result = res
         else:
             self._state.nlsq_result = {
-                "params": res.parameters,
+                "params": res.params,
                 "r_squared": res.r_squared,
                 "success": getattr(res, "success", True),
             }
         r2 = self._state.nlsq_result.get("r_squared", float("nan"))
+        if r2 is None:
+            r2 = float("nan")
         self._result.setText(f"R²={r2:.3f}")
         self.edited.emit()
         self.finished.emit()

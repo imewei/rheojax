@@ -1,3 +1,5 @@
+import types
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -19,3 +21,27 @@ def test_nlsq_runs_and_stores_result(qtbot):
     assert st.nlsq_result["r_squared"] == 0.99
     assert calls["args"][0] == "maxwell"
     assert step.is_ready() is True
+
+
+def test_nlsq_reads_params_from_non_dict_result(qtbot):
+    """Non-dict fit_fn results (e.g. FitResult) must be read via `.params`, not `.parameters`."""
+    st = FitState(protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0})
+    fake_result = types.SimpleNamespace(params={"G0": 1000.0}, r_squared=0.9, success=True)
+    def fake_fit(model_key, model_config, data_ref, column_map):
+        return fake_result
+    step = NlsqStep(st, fit_fn=fake_fit); qtbot.addWidget(step)
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+    assert st.nlsq_result["params"] == {"G0": 1000.0}
+    assert st.nlsq_result["r_squared"] == 0.9
+
+
+def test_nlsq_handles_none_r_squared(qtbot):
+    """A present-but-None r_squared must not crash the result label formatting."""
+    st = FitState(protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0})
+    def fake_fit(model_key, model_config, data_ref, column_map):
+        return {"params": {"G0": 1000.0}, "r_squared": None}
+    step = NlsqStep(st, fit_fn=fake_fit); qtbot.addWidget(step)
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+    assert st.nlsq_result["r_squared"] is None
