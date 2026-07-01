@@ -15,6 +15,13 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.gui.foundation.metrics import (
+    param_uncertainties as _param_uncertainties,
+)
+from rheojax.gui.foundation.metrics import (
+    reduced_chi_squared as _reduced_chi_squared,
+)
+
 
 def run_fit_isolated(
     model_name: str,
@@ -137,6 +144,17 @@ def run_fit_isolated(
         "y_fit": _to_numpy(getattr(service_result, "y_fit", None)),
         "residuals": _to_numpy(getattr(service_result, "residuals", None)),
         "pcov": _to_numpy(getattr(service_result, "pcov", None)),
+        "reduced_chi_squared": _reduced_chi_squared(
+            float(getattr(service_result, "chi_squared", 0.0)),
+            len(x_data),
+            len(service_result.parameters),
+            sigma2=svc_metadata.get("sigma2"),
+        ),
+        "uncertainties": (
+            _param_uncertainties(_to_numpy(getattr(service_result, "pcov", None)))
+            if getattr(service_result, "pcov", None) is not None
+            else None
+        ),
         "rmse": (
             float(svc_metadata["rmse"])
             if svc_metadata.get("rmse") is not None
