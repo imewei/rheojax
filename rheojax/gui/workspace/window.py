@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.foundation.state import AppState
-from rheojax.gui.workspace.controller import FitController, Step, TransformController
+from rheojax.gui.workspace.controller import Step, TransformController
+from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
 from rheojax.gui.workspace.stepper_canvas import StepperCanvas
@@ -34,8 +35,9 @@ class WorkspaceWindow(QMainWindow):
         self._state = app_state
         initial_mode = app_state.ui.get("mode", "fit")
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
+        fit_ctl, self._fit_bodies = build_fit_controller(app_state)
         self._controllers = {
-            "fit": FitController(_skeleton_steps(FitController.STEP_IDS)),
+            "fit": fit_ctl,
             "transform": TransformController(_skeleton_steps(TransformController.STEP_IDS)),
         }
 
@@ -61,6 +63,7 @@ class WorkspaceWindow(QMainWindow):
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
+        self._install_bodies(self._mode, self._canvas)
         self._splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._splitter.addWidget(self._rail)
         self._splitter.addWidget(self._canvas)
@@ -75,10 +78,20 @@ class WorkspaceWindow(QMainWindow):
             raise ValueError(f"unknown mode {mode!r}; expected one of {self.MODES}")
         if mode == self._mode:
             return
+        leaving_fit = self._mode == "fit"
         self._mode = mode
         new_canvas = StepperCanvas(self._controllers[mode], self)
         self._wire_canvas(new_canvas)
+        self._install_bodies(mode, new_canvas)
         old_canvas = self._splitter.replaceWidget(1, new_canvas)
+        if leaving_fit:
+            # fit bodies are persistent, stateful widgets owned by the fit
+            # controller (not disposable skeleton stubs) — pull them out of
+            # the outgoing canvas before it's deleted, or deleteLater() would
+            # cascade-delete them along with their QStackedWidget parent.
+            for body in self._fit_bodies:
+                body.setParent(self)
+                body.hide()
         if old_canvas is not None:
             old_canvas.deleteLater()
         self._canvas = new_canvas
@@ -102,6 +115,15 @@ class WorkspaceWindow(QMainWindow):
             self._status_label.setText(f"{fp}  |  {device}")
         except Exception:
             self._status_label.setText("")
+
+    def fit_bodies(self) -> list[QWidget]:
+        return self._fit_bodies
+
+    def _install_bodies(self, mode: str, canvas: StepperCanvas) -> None:
+        # transform mode still uses skeleton placeholder bodies (Plan 4's job).
+        if mode == "fit":
+            for i, body in enumerate(self._fit_bodies):
+                canvas.set_body(i, body)
 
     def active_step_count(self) -> int:
         return len(self._controllers[self._mode].steps)

@@ -144,7 +144,11 @@ def test_window_invalid_persisted_mode_falls_back_to_fit(qtbot):
 def test_window_step_click_navigates(qtbot):
     # Clicking a reached step button must move controller.current AND the
     # displayed stack index — regression test for the click -> goto() wiring.
+    # Uses transform mode: its steps are still trivially-ready skeleton stubs,
+    # so this generic navigation-mechanics test doesn't need to satisfy the
+    # real fit workflow's per-step readiness gating (protocol/model/data/...).
     win = WorkspaceWindow(AppState()); qtbot.addWidget(win)
+    win.set_mode("transform")
     ctl = win._controllers[win.mode()]
     ctl.advance(); ctl.advance()          # reached {0,1,2}, current == 2
     win._canvas.refresh()
@@ -155,3 +159,30 @@ def test_window_step_click_navigates(qtbot):
     assert b.args == [0]
     assert win.current_step() == 0        # controller navigated back
     assert win._canvas.current_index() == 0  # displayed body followed
+
+
+def test_window_fit_bodies_survive_mode_round_trip(qtbot):
+    # Regression test: switching fit -> transform -> fit used to risk
+    # cascade-deleting the persistent fit bodies. StepperCanvas.set_body()
+    # reparents each body as a real Qt child of its QStackedWidget, so the
+    # outgoing canvas's deleteLater() would cascade-delete its child tree —
+    # including the fit bodies — leaving self._fit_bodies holding dangling
+    # C++ objects that raise RuntimeError on the next fit-mode entry. The fix
+    # detaches each body (body.setParent(self); body.hide()) before the old
+    # canvas is scheduled for deletion.
+    win = WorkspaceWindow(AppState()); qtbot.addWidget(win)
+    original_bodies = list(win.fit_bodies())
+    assert len(original_bodies) == 6
+
+    destroyed = []
+    for body in original_bodies:
+        body.destroyed.connect(lambda *, b=body: destroyed.append(b))
+
+    win.set_mode("transform")
+    _flush_deleted_widgets()
+    win.set_mode("fit")
+    _flush_deleted_widgets()
+
+    assert destroyed == []                         # none of the 6 fit bodies were freed
+    assert win.fit_bodies() == original_bodies     # same instances, not just non-None
+    assert win.fit_bodies()[0].is_ready() is False  # no RuntimeError touching a live widget
