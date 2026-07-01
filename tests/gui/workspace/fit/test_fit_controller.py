@@ -27,3 +27,21 @@ def test_window_uses_real_fit_steps(qtbot):
     qtbot.addWidget(win)
     assert win.active_step_count() == 6  # fit controller has 6 real steps
     assert hasattr(win.fit_bodies()[0], "set_protocol")
+
+
+def test_window_auto_advances_when_step_becomes_ready(qtbot):
+    # Regression: nothing in production wiring ever called
+    # WorkflowController.advance() -- the workflow was stuck on step 0 forever.
+    # Driving the real Step 1 body to "ready" must auto-advance the fit
+    # controller's `reached`/`current` WITHOUT the test calling .advance().
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    ctl = win._controllers["fit"]
+    assert ctl.reached == {0}
+    assert win.current_step() == 0
+
+    win.fit_bodies()[0].set_protocol("oscillation")
+    win.fit_bodies()[0].set_model("maxwell")
+
+    assert 1 in ctl.reached
+    assert win.current_step() == 1

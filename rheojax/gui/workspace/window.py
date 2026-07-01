@@ -40,6 +40,13 @@ class WorkspaceWindow(QMainWindow):
             "fit": fit_ctl,
             "transform": TransformController(_skeleton_steps(TransformController.STEP_IDS)),
         }
+        # Auto-advance the fit workflow whenever a step's edits make it ready.
+        # Connected after build_fit_controller so each body's own edited ->
+        # invalidation wiring (inside build_fit_controller) has already run
+        # by the time this handler inspects state.
+        for body in self._fit_bodies:
+            if hasattr(body, "edited"):
+                body.edited.connect(self._on_fit_body_edited)
 
         self.setWindowTitle("RheoJAX Workspace")
         self.resize(1200, 800)
@@ -136,4 +143,11 @@ class WorkspaceWindow(QMainWindow):
 
     def _on_step_clicked(self, index: int) -> None:
         if self._controllers[self._mode].goto(index):
+            self._canvas.refresh()
+
+    def _on_fit_body_edited(self) -> None:
+        ctl = self._controllers["fit"]
+        if ctl.can_advance():
+            ctl.advance()
+        if self._mode == "fit":
             self._canvas.refresh()
