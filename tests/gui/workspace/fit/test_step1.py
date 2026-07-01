@@ -1,11 +1,15 @@
 import pytest
+
 pytest.importorskip("PySide6")
 import rheojax.models  # noqa
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.workspace.fit.step1_protocol_model import ProtocolModelStep
 
+
 def test_model_list_filters_by_protocol(qtbot):
-    st = FitState(); step = ProtocolModelStep(st); qtbot.addWidget(step)
+    st = FitState()
+    step = ProtocolModelStep(st)
+    qtbot.addWidget(step)
     assert step.is_ready() is False
     step.set_protocol("oscillation")
     keys = step.model_keys()

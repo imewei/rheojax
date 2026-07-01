@@ -1,23 +1,37 @@
 from __future__ import annotations
+
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel
+from PySide6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
+
 
 class ProtocolModelStep(QWidget):
     edited = Signal()
 
     def __init__(self, state: FitState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        # Model registration is lazy; ensure it happened before find()/create() are used.
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         self._state = state
-        self._protocol = QComboBox(self); self._protocol.addItems([""] + _PROTOCOLS)
+        self._protocol = QComboBox(self)
+        self._protocol.addItems([""] + _PROTOCOLS)
         self._model = QComboBox(self)
         self._params = QLabel("", self)
         lay = QVBoxLayout(self)
-        for w in (QLabel("Protocol"), self._protocol, QLabel("Model"), self._model,
-                  QLabel("Parameters"), self._params):
+        for w in (
+            QLabel("Protocol"),
+            self._protocol,
+            QLabel("Model"),
+            self._model,
+            QLabel("Parameters"),
+            self._params,
+        ):
             lay.addWidget(w)
         self._protocol.currentTextChanged.connect(self._on_protocol)
         self._model.currentTextChanged.connect(self._on_model)
