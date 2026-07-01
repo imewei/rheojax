@@ -24,3 +24,18 @@ def test_library_rail_lists_and_emits(qtbot):
     with qtbot.waitSignal(rail.dataset_selected, timeout=1000) as blocker:
         rail.select_row(0)
     assert blocker.args == ["a"]
+
+
+from rheojax.gui.workspace.controller import Step, WorkflowController
+from rheojax.gui.workspace.stepper_canvas import StepperCanvas
+
+
+def test_stepper_rail_reflects_reached(qtbot):
+    steps = [Step(str(i), f"S{i}", lambda: True, lambda: True) for i in range(3)]
+    ctl = WorkflowController(steps); ctl.advance()       # reached {0,1}
+    canvas = StepperCanvas(ctl); qtbot.addWidget(canvas); canvas.refresh()
+    assert canvas.is_enabled(1) is True
+    assert canvas.is_enabled(2) is False                 # unreached
+    with qtbot.waitSignal(canvas.step_clicked, timeout=1000) as b:
+        canvas.click_step(1)
+    assert b.args == [1]
