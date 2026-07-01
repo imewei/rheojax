@@ -32,3 +32,12 @@ def test_data_step_contract_and_filter(qtbot):
     step.select_dataset("osc1")
     assert st.data_ref == "osc1"
     assert step.needs_hz_conversion() is True  # units x=Hz, contract wants rad/s
+
+
+def test_data_step_none_contract_does_not_raise(qtbot):
+    st = FitState()  # protocol never set -> self._contract is None
+    lib = DatasetLibrary()
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    assert step.needs_hz_conversion() is False
+    step._on_select("some_id")  # must not raise AttributeError on None contract

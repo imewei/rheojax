@@ -48,7 +48,7 @@ class DataStep(QWidget):
 
     def _on_select(self, ds_id: str) -> None:
         self._state.data_ref = ds_id or None
-        if ds_id:
+        if ds_id and self._contract:
             # default column map = role -> positional index
             self._state.column_map = {
                 c.role: i for i, c in enumerate(self._contract.columns)
@@ -61,7 +61,11 @@ class DataStep(QWidget):
         self.edited.emit()
 
     def needs_hz_conversion(self) -> bool:
-        if "x" not in self._contract.unit_conversions or not self._state.data_ref:
+        if (
+            not self._contract
+            or "x" not in self._contract.unit_conversions
+            or not self._state.data_ref
+        ):
             return False
         ref = self._library.get(self._state.data_ref)
         return ref.units.get("x", "").lower() in ("hz", "hertz")
