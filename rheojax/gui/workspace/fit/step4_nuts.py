@@ -79,3 +79,8 @@ class NutsStep(QWidget):
 
     def is_ready(self) -> bool:
         return self._skipped or self._state.nuts_result is not None
+
+    def reset_skip(self) -> None:
+        """Clear a stale skip decision when an upstream NLSQ re-run invalidates
+        nuts_result (see _FIT_CASCADE["nlsq_result"] in invalidation.py)."""
+        self._skipped = False
