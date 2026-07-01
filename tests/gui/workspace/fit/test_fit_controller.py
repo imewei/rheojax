@@ -2,6 +2,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 import rheojax.models  # noqa
+from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.window import WorkspaceWindow
@@ -45,3 +46,44 @@ def test_window_auto_advances_when_step_becomes_ready(qtbot):
 
     assert 1 in ctl.reached
     assert win.current_step() == 1
+
+
+def test_model_only_edit_restores_still_valid_dataset_selection(qtbot):
+    # Regression: a Step-1 edit that changes only the model (protocol
+    # unchanged) triggers the invalidation cascade (fit_controller._on_edit)
+    # BEFORE DataStep.refresh() runs, clearing state.data_ref/column_map.
+    # Since dataset filtering is by protocol only, the already-selected
+    # dataset is still valid for the new model -- refresh()'s still_valid
+    # branch must restore data_ref/column_map to match it, not leave them
+    # cleared forever (which silently defeats Step 2's is_ready()/auto-advance).
+    app = AppState()
+    app.library.add(
+        DatasetRef(
+            id="osc1",
+            name="osc1",
+            protocol_type="oscillation",
+            origin="imported",
+            units={"x": "rad/s"},
+            row_count=64,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    ctl, bodies = build_fit_controller(app)
+    for b in bodies:
+        qtbot.addWidget(b)
+
+    bodies[0].set_protocol("oscillation")
+    bodies[0].set_model("maxwell")
+    bodies[1].select_dataset("osc1")
+    assert app.fit.data_ref == "osc1"
+    assert app.fit.column_map
+    assert bodies[1].is_ready() is True
+
+    bodies[0].set_model("zener")  # model-only edit; protocol unchanged
+
+    assert app.fit.data_ref == "osc1"
+    assert app.fit.column_map
+    assert bodies[1].is_ready() is True
+    assert bodies[1]._source.currentText() == "osc1"

@@ -57,7 +57,14 @@ class DataStep(QWidget):
         self._source.setCurrentText(current if still_valid else "")
         self._source.blockSignals(False)
 
-        if not still_valid and (self._state.data_ref is not None or self._state.column_map):
+        if still_valid:
+            # The upstream Step-1 edit cascade clears state.data_ref/column_map
+            # before refresh() runs (it can't tell the old selection is still
+            # valid for the new protocol/model). Re-derive them here via the
+            # same logic _on_select uses for a fresh pick, since signals were
+            # blocked above and _on_select was never triggered for `current`.
+            self._on_select(current)
+        elif self._state.data_ref is not None or self._state.column_map:
             self._state.data_ref = None
             self._state.column_map = {}
             self._guard.setText("")
