@@ -718,6 +718,34 @@ class TestQtIntegration:
         window.deleteLater()
 
     @pytest.mark.smoke
+    def test_workspace_cli_flag_registered(self) -> None:
+        """The --workspace flag exists and defaults to False."""
+        from rheojax.gui.main import parse_args
+
+        assert parse_args([]).workspace is False
+        assert parse_args(["--workspace"]).workspace is True
+
+    @pytest.mark.smoke
+    def test_create_workspace_window_reachable_from_entrypoint(self, qapp) -> None:
+        """The exact function --workspace triggers must build a real WorkspaceWindow.
+
+        This is the entrypoint-level regression test: it proves the new
+        workspace shell is reachable from `rheojax-gui --workspace`, not
+        just constructible in isolation (dead code from a user's perspective
+        otherwise).
+        """
+        from rheojax.gui.main import _create_workspace_window
+        from rheojax.gui.workspace.window import WorkspaceWindow
+
+        window = _create_workspace_window()
+
+        assert isinstance(window, WorkspaceWindow)
+        assert window.mode() == "fit"
+        assert window.active_step_count() == 6
+
+        window.deleteLater()
+
+    @pytest.mark.smoke
     def test_state_signals_creation(self, qapp) -> None:
         """Test state signals can be created and used."""
         from rheojax.gui.state.signals import StateSignals

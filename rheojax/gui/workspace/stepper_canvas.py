@@ -40,6 +40,9 @@ class StepperCanvas(QWidget):
     def is_enabled(self, index: int) -> bool:
         return self._buttons[index].isEnabled()
 
+    def current_index(self) -> int:
+        return self._stack.currentIndex()
+
     def click_step(self, index: int) -> None:
         self._buttons[index].click()
 

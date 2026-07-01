@@ -42,6 +42,7 @@ def test_stepper_rail_reflects_reached(qtbot):
 
 
 from PySide6.QtWidgets import QLabel
+
 from rheojax.gui.workspace.inspector import InspectorPanel
 
 
@@ -64,3 +65,19 @@ def test_window_mode_switch(qtbot):
         win.set_mode("transform")
     assert b.args == ["transform"] and win.mode() == "transform"
     assert win.active_step_count() == 5
+
+
+def test_window_step_click_navigates(qtbot):
+    # Clicking a reached step button must move controller.current AND the
+    # displayed stack index — regression test for the click -> goto() wiring.
+    win = WorkspaceWindow(AppState()); qtbot.addWidget(win)
+    ctl = win._controllers[win.mode()]
+    ctl.advance(); ctl.advance()          # reached {0,1,2}, current == 2
+    win._canvas.refresh()
+    assert win.current_step() == 2 and win._canvas.current_index() == 2
+
+    with qtbot.waitSignal(win._canvas.step_clicked, timeout=1000) as b:
+        win._canvas.click_step(0)
+    assert b.args == [0]
+    assert win.current_step() == 0        # controller navigated back
+    assert win._canvas.current_index() == 0  # displayed body followed

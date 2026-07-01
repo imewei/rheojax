@@ -30,7 +30,7 @@ class WorkspaceWindow(QMainWindow):
     def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = app_state
-        self._mode = "fit"
+        self._mode = app_state.ui.get("mode", "fit")
         self._controllers = {
             "fit": FitController(_skeleton_steps(FitController.STEP_IDS)),
             "transform": TransformController(_skeleton_steps(TransformController.STEP_IDS)),
@@ -47,7 +47,8 @@ class WorkspaceWindow(QMainWindow):
 
         self._rail = LibraryRail(app_state.library, self)
         self._inspector = InspectorPanel(self)
-        self._canvas = StepperCanvas(self._controllers["fit"], self)
+        self._canvas = StepperCanvas(self._controllers[self._mode], self)
+        self._wire_canvas(self._canvas)
         self._splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._splitter.addWidget(self._rail)
         self._splitter.addWidget(self._canvas)
@@ -62,10 +63,23 @@ class WorkspaceWindow(QMainWindow):
             return
         self._mode = mode
         new_canvas = StepperCanvas(self._controllers[mode], self)
-        self._splitter.replaceWidget(1, new_canvas)
+        self._wire_canvas(new_canvas)
+        old_canvas = self._splitter.replaceWidget(1, new_canvas)
+        if old_canvas is not None:
+            old_canvas.deleteLater()
         self._canvas = new_canvas
         self._state.ui["mode"] = mode
         self.mode_changed.emit(mode)
 
     def active_step_count(self) -> int:
         return len(self._controllers[self._mode].steps)
+
+    def current_step(self) -> int:
+        return self._controllers[self._mode].current
+
+    def _wire_canvas(self, canvas: StepperCanvas) -> None:
+        canvas.step_clicked.connect(self._on_step_clicked)
+
+    def _on_step_clicked(self, index: int) -> None:
+        if self._controllers[self._mode].goto(index):
+            self._canvas.refresh()

@@ -1,5 +1,6 @@
 from rheojax.gui.workspace.controller import Step, WorkflowController
 
+
 def _ctl(ready):
     steps = [Step(id=str(i), title=str(i),
                   is_ready=(lambda i=i: ready[i]), validate=(lambda: True))
@@ -28,3 +29,12 @@ def test_edit_relocks_downstream():
     c.advance(); c.advance(); c.advance()     # reached {0,1,2,3}
     c.on_edit(1)                              # editing step 1
     assert c.reached == {0, 1}               # 2,3 re-locked
+
+def test_can_advance_blocked_by_validate():
+    # is_ready() true but validate() false must still block advancement
+    steps = [Step(id="0", title="0", is_ready=lambda: True, validate=lambda: False),
+             Step(id="1", title="1", is_ready=lambda: True, validate=lambda: True)]
+    c = WorkflowController(steps)
+    assert c.can_advance() is False
+    c.advance()
+    assert c.current == 0 and c.reached == {0}   # advance() was a no-op

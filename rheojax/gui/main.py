@@ -12,6 +12,7 @@ Usage
     rheojax-gui --import FILE      # Import data file on startup
     rheojax-gui --maximized        # Start window maximized
     rheojax-gui --verbose          # Enable verbose logging
+    rheojax-gui --workspace        # Launch the new workspace shell (preview)
     rheojax-gui --help             # Show help
 
 Example
@@ -54,6 +55,18 @@ from rheojax.logging import configure_logging, get_logger, is_configured  # noqa
 
 # Module-level logger
 logger = get_logger(__name__)
+
+
+def _create_workspace_window() -> "WorkspaceWindow":  # noqa: F821
+    """Construct the Plan 2 workspace shell window (preview, ``--workspace``).
+
+    Kept as a standalone import point so it can be unit-tested without
+    entering the Qt event loop.
+    """
+    from rheojax.gui.foundation.state import AppState
+    from rheojax.gui.workspace.window import WorkspaceWindow
+
+    return WorkspaceWindow(AppState())
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -170,6 +183,12 @@ For more information, visit: https://github.com/imewei/rheojax
         "-M",
         action="store_true",
         help="Start the main window maximized",
+    )
+
+    parser.add_argument(
+        "--workspace",
+        action="store_true",
+        help="Launch the new workspace shell (preview) instead of the legacy main window",
     )
 
     parser.add_argument(
@@ -345,6 +364,37 @@ def main(argv: list[str] | None = None) -> int:
     app.setStyleSheet(stylesheet)
 
     logger.debug("Qt application initialized", font_size=base_font_size)
+
+    # Workspace shell (preview): early-return path, kept separate from the
+    # legacy window's project/import/smoke-fit hooks below since those are
+    # RheoJAXMainWindow-specific APIs the workspace shell does not have yet.
+    if args.workspace:
+        logger.debug("Launching workspace shell (preview)")
+        try:
+            workspace_window = _create_workspace_window()
+        except Exception as e:
+            logger.error("Failed to create workspace window", error=str(e), exc_info=True)
+            print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
+            return 1
+
+        app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
+        if args.maximized:
+            workspace_window.showMaximized()
+        else:
+            workspace_window.show()
+        logger.info("RheoJAX GUI workspace shell ready", version=__version__)
+
+        exit_code = app.exec()
+        logger.info("Application exiting", exit_code=exit_code)
+        try:
+            from multiprocessing import resource_tracker
+
+            tracker = resource_tracker._resource_tracker
+            if tracker._pid is not None:
+                tracker._stop()
+        except Exception:
+            pass
+        return exit_code
 
     # Import main window after Qt app is created
     logger.debug("Importing main window module")
