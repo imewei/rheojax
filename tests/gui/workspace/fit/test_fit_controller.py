@@ -87,3 +87,53 @@ def test_model_only_edit_restores_still_valid_dataset_selection(qtbot):
     assert app.fit.column_map
     assert bodies[1].is_ready() is True
     assert bodies[1]._source.currentText() == "osc1"
+
+
+def test_export_step_unlocked_once_visualize_reached(qtbot):
+    # Regression: ExportStep (index 5) was structurally unreachable.
+    # WorkflowController.advance() is only ever invoked from
+    # WorkspaceWindow._on_fit_body_edited, which is only wired to bodies with
+    # an `edited` signal (indices 0-3). VisualizeStep (4) and ExportStep (5)
+    # have no `edited` signal, so nothing ever pushed `reached` past index 4
+    # once the user landed there after NUTS finished. Both steps fall back to
+    # the trivial `is_ready=lambda: True` default in build_fit_controller, so
+    # the gap is purely navigational: index 5 must be unlocked (added to
+    # `reached`) as soon as index 4 is reached, without forcing `current`
+    # to jump there.
+    app = AppState()
+    app.library.add(
+        DatasetRef(
+            id="osc1",
+            name="osc1",
+            protocol_type="oscillation",
+            origin="imported",
+            units={"x": "rad/s"},
+            row_count=64,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    win = WorkspaceWindow(app)
+    qtbot.addWidget(win)
+    ctl = win._controllers["fit"]
+    assert ctl.reached == {0}  # nothing unlocked prematurely before Step 1 is filled in
+
+    bodies = win.fit_bodies()
+    bodies[2]._fit_fn = lambda *a, **k: {
+        "params": {"a": 1.0},
+        "r_squared": 0.99,
+        "success": True,
+    }
+    bodies[3]._sample_fn = lambda *a, **k: {"posterior_samples": {}, "sample_stats": None}
+
+    bodies[0].set_protocol("oscillation")
+    bodies[0].set_model("maxwell")
+    bodies[1].select_dataset("osc1")
+    bodies[2].run()  # NLSQ
+    bodies[3].run()  # NUTS
+
+    assert ctl.current == 4  # landed on Visualize; not force-advanced past it
+    assert 5 in ctl.reached  # Export unlocked because Visualize is trivially ready
+    assert ctl.goto(5) is True
+    assert ctl.current == 5

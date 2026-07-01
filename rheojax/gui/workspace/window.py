@@ -149,5 +149,16 @@ class WorkspaceWindow(QMainWindow):
         ctl = self._controllers["fit"]
         if ctl.can_advance():
             ctl.advance()
+        # Unlock (but don't navigate to) any trailing steps whose predecessor
+        # is trivially ready. VisualizeStep/ExportStep have no `edited` signal,
+        # so nothing else ever re-checks whether step 5 (Export) has become
+        # reachable once the user is already sitting on step 4 (Visualize) --
+        # arriving there doesn't itself fire this handler again. This walks
+        # forward unlocking `reached` without forcing `current` past it, so
+        # the step rail button becomes clickable at the user's own pace.
+        i = ctl.current
+        while i + 1 < len(ctl.steps) and ctl.steps[i].is_ready() and (i + 1) not in ctl.reached:
+            ctl.reached.add(i + 1)
+            i += 1
         if self._mode == "fit":
             self._canvas.refresh()
