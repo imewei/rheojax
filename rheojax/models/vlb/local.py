@@ -139,7 +139,7 @@ class VLBLocal(VLBBase):
     VLBMultiNetwork : Multi-network VLB with N transient + permanent + solvent
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize single-network VLB model."""
         super().__init__()

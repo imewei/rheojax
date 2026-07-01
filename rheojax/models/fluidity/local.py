@@ -87,7 +87,7 @@ class FluidityLocal(FluidityBase):
     - SAOS/LAOS: ODE integration + FFT for moduli
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize Local Fluidity Model."""
         super().__init__()

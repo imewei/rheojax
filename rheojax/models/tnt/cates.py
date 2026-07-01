@@ -158,7 +158,7 @@ class TNTCates(TNTBase):
     TNTLoopBridge : Two-species loop-bridge kinetics
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize Cates living polymer model."""
         super().__init__()

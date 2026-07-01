@@ -66,7 +66,7 @@ class CarreauYasuda(BaseModel):
         ROTATION (steady shear) only
     """
 
-    flow_quantity: str = "viscosity"
+    flow_quantity = "viscosity"
     def __init__(self):
         """Initialize Carreau-Yasuda model."""
         super().__init__()

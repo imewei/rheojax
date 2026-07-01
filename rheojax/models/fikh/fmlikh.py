@@ -92,7 +92,7 @@ class FMLIKH(FIKHBase):
         >>> G_values = [model.parameters.get_value(f'G_{i}') for i in range(3)]
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         n_modes: int = 3,

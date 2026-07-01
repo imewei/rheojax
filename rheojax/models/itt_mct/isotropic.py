@@ -117,7 +117,7 @@ class ITTMCTIsotropic(ITTMCTBase):
     ... )
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         phi: float | None = None,

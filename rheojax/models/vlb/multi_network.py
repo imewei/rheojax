@@ -118,7 +118,7 @@ class VLBMultiNetwork(VLBBase):
     VLBLocal : Single transient network (2 parameters)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         n_modes: int = 2,

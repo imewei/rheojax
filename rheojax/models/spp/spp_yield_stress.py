@@ -125,7 +125,7 @@ class SPPYieldStress(BaseModel):
     >>> print(result.summary)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize SPP yield stress model."""
         super().__init__()

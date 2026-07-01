@@ -63,7 +63,7 @@ class Cross(BaseModel):
         ROTATION (steady shear) only
     """
 
-    flow_quantity: str = "viscosity"
+    flow_quantity = "viscosity"
     def __init__(self):
         """Initialize Cross model."""
         super().__init__()

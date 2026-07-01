@@ -8,19 +8,6 @@ from __future__ import annotations
 
 import math
 
-# PriorsEditor emits lowercase names. prior_dict_to_dist (numpyro_model_builder.py:37)
-# expects lowercase "type". Keys must match exactly or the prior silently becomes None.
-_DIST_MAP: dict[str, str] = {
-    "lognormal": "lognormal",
-    "normal": "normal",
-    "halfnormal": "halfnormal",
-    "uniform": "uniform",
-    "exponential": "exponential",
-    "truncatednormal": "truncatednormal",
-    "gamma": "gamma",
-    "beta": "beta",
-}
-
 
 def adapt_prior(editor_dict: dict) -> dict:
     """Convert one PriorsEditor entry to the ``prior_dict_to_dist`` format.
@@ -43,7 +30,7 @@ def adapt_prior(editor_dict: dict) -> dict:
     """
     dist_name = editor_dict["distribution"].lower()
     params = dict(editor_dict.get("params", {}))
-    t = _DIST_MAP.get(dist_name, dist_name)
+    t = dist_name
     # PriorsEditor stores scale for exponential, but NumPyro Exponential uses rate
     if dist_name == "exponential" and "scale" in params:
         scale = params.pop("scale")

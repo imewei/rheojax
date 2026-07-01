@@ -534,6 +534,7 @@ def make_fit_worker(
     options: dict[str, Any] | None = None,
     cancel_token: Any | None = None,
     dataset_id: str = "",
+    model_config: dict | None = None,
 ) -> Any:
     """Create a fit worker (subprocess or thread mode).
 
@@ -589,6 +590,7 @@ def make_fit_worker(
         y2_data=y2_data,
         metadata=metadata,
         dataset_id=dataset_id,
+        model_config=model_config,
     )
 
     return ProcessWorkerAdapter(work_fn)

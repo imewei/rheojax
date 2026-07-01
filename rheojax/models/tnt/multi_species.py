@@ -128,7 +128,7 @@ class TNTMultiSpecies(TNTBase):
     GeneralizedMaxwell : Mathematical multi-mode decomposition
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self, n_species: int = 2):
         """Initialize multi-species TNT model.
 

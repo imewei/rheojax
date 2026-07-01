@@ -85,7 +85,7 @@ class FractionalMaxwellLiquid(BaseModel):
         >>> G_t = model.predict(data)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize Fractional Maxwell Liquid model."""
         super().__init__()

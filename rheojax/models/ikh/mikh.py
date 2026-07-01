@@ -97,7 +97,7 @@ class MIKH(IKHBase):
         mu_p: Plastic viscosity for Perzyna regularization [Pa·s]
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         super().__init__()
         self._test_mode = None  # Store test mode for Bayesian

@@ -118,7 +118,7 @@ class HVMLocal(HVMBase):
     >>> result = model.simulate_startup(t, gamma_dot=1.0, return_full=True)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         kinetics: Literal["stress", "stretch"] = "stress",

@@ -129,7 +129,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     >>> model.plot_fluidity_profile()  # Shows spatial variation
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         coupling: Literal["minimal", "full"] = "minimal",

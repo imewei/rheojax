@@ -117,7 +117,7 @@ class MLIKH(IKHBase):
         yield_mode: Yield formulation ('per_mode' or 'weighted_sum')
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         n_modes: int = 2,

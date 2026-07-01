@@ -63,7 +63,7 @@ class HerschelBulkley(BaseModel):
         ROTATION (steady shear) only
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize Herschel-Bulkley model."""
         super().__init__()

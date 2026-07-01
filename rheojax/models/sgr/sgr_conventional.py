@@ -123,7 +123,7 @@ class SGRConventional(BaseModel):
         - Float64 precision critical for numerical stability near x=1
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self, dynamic_x: bool = False):
         """Initialize SGR Conventional Model.
 

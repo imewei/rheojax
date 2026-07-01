@@ -162,7 +162,7 @@ class TNTSingleMode(TNTBase):
     TNTCates : Living polymer (wormlike micelle) model
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         breakage: BreakageType = "constant",

@@ -103,7 +103,7 @@ class DMTLocal(DMTBase):
         Rheol. Acta 52, 673-694.
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         closure: Literal["exponential", "herschel_bulkley"] = "exponential",

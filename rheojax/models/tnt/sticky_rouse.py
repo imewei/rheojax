@@ -170,7 +170,7 @@ class TNTStickyRouse(TNTBase):
     >>> tau_eff = model.get_effective_times()
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self, n_modes: int = 3):
         """Initialize Sticky Rouse model.
 

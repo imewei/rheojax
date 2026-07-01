@@ -47,7 +47,7 @@ class LatticeEPM(EPMBase):
         dt (float): Time step. Default 0.01.
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         L: int = 64,

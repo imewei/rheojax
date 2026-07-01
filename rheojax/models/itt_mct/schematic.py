@@ -163,7 +163,7 @@ class ITTMCTSchematic(ITTMCTBase):
     ... )
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(
         self,
         epsilon: float | None = None,

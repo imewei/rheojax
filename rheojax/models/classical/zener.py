@@ -79,7 +79,7 @@ class Zener(BaseModel):
         >>> G_t = model.predict(data)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self):
         """Initialize Zener model with default parameters."""
         super().__init__()

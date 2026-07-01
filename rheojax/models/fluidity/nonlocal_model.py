@@ -92,7 +92,7 @@ class FluidityNonlocal(FluidityBase):
         gap_width: Physical gap width (m)
     """
 
-    flow_quantity: str = "stress"
+    flow_quantity = "stress"
     def __init__(self, N_y: int = 64, gap_width: float = 1e-3):
         """Initialize Non-Local Fluidity Model.
 
