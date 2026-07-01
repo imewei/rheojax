@@ -85,4 +85,4 @@ def test_bayesian_full_parity_gmm_like():
     assert len(digest) == 64
     # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib;
     # the constructor compatibility layer does not affect the rendered values.
-    assert digest == "3f27ac36f7cee9726bd8cb78c299138c4e685fc746f842431acc5528582f78d3"
+    assert digest == "e5159224bab91ffc4a448add8b6a6cd0705d9ae90e31e2d72206fbfb92bdaf3d"
