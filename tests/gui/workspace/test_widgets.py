@@ -51,3 +51,16 @@ def test_inspector_tabs(qtbot):
     ins.set_tab_widget("log", QLabel("hi"))
     ins.show_tab("log")
     assert ins.current_tab() == "log"
+
+
+from rheojax.gui.foundation.state import AppState
+from rheojax.gui.workspace.window import WorkspaceWindow
+
+
+def test_window_mode_switch(qtbot):
+    win = WorkspaceWindow(AppState()); qtbot.addWidget(win)
+    assert win.mode() == "fit"
+    with qtbot.waitSignal(win.mode_changed, timeout=1000) as b:
+        win.set_mode("transform")
+    assert b.args == ["transform"] and win.mode() == "transform"
+    assert win.active_step_count() == 5
