@@ -61,6 +61,8 @@ class VisualizeStep(QWidget):
         self._refresh_residuals()
         if self._state.nuts_result is not None and "Diagnostics" not in self._names:
             self._add_diagnostics_tab()
+        elif self._state.nuts_result is None and "Diagnostics" in self._names:
+            self._remove_diagnostics_tab()
         self._refresh_diagnostics()
 
     def tab_names(self) -> list[str]:
@@ -80,7 +82,7 @@ class VisualizeStep(QWidget):
             self._overlay.plot_line(np.asarray(x), np.asarray(y_fit), name="Fit")
         nuts = self._state.nuts_result or {}
         band = nuts.get("y_band")
-        if band:
+        if band is not None:
             lo, hi = band
             self._overlay.plot_line(
                 np.asarray(x), np.asarray(lo), name="Posterior lo", line_style="dash"
@@ -105,6 +107,15 @@ class VisualizeStep(QWidget):
             grid.addWidget(canvas, i // 2, i % 2)
             self._arviz_canvases[plot_name] = canvas
         self._add("Diagnostics", page)
+
+    def _remove_diagnostics_tab(self) -> None:
+        idx = self._names.index("Diagnostics")
+        page = self._tabs.widget(idx)
+        self._tabs.removeTab(idx)
+        if page is not None:
+            page.deleteLater()
+        self._arviz_canvases.clear()
+        self._names.remove("Diagnostics")
 
     def _refresh_diagnostics(self) -> None:
         if not self._arviz_canvases:
