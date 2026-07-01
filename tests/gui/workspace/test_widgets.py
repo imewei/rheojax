@@ -39,3 +39,15 @@ def test_stepper_rail_reflects_reached(qtbot):
     with qtbot.waitSignal(canvas.step_clicked, timeout=1000) as b:
         canvas.click_step(1)
     assert b.args == [1]
+
+
+from PySide6.QtWidgets import QLabel
+from rheojax.gui.workspace.inspector import InspectorPanel
+
+
+def test_inspector_tabs(qtbot):
+    ins = InspectorPanel(); qtbot.addWidget(ins)
+    assert ins.tab_names() == ["params", "priors", "log"]
+    ins.set_tab_widget("log", QLabel("hi"))
+    ins.show_tab("log")
+    assert ins.current_tab() == "log"
