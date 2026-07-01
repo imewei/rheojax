@@ -148,7 +148,7 @@ def run_fit_isolated(
             float(getattr(service_result, "chi_squared", 0.0)),
             len(x_data),
             len(service_result.parameters),
-            sigma2=svc_metadata.get("sigma2"),
+            sigma2=svc_metadata.get("sigma2", 1.0),
         ),
         "uncertainties": (
             _param_uncertainties(_to_numpy(getattr(service_result, "pcov", None)))

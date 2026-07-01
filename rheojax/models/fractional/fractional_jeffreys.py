@@ -99,7 +99,7 @@ class FractionalJeffreysModel(BaseModel):
     >>> G_t = model.predict(t)
     """
 
-    flow_quantity: str = "viscosity"
+    flow_quantity: str = "stress"
     def __init__(self):
         """Initialize Fractional Jeffreys model."""
         super().__init__()

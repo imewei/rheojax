@@ -27,6 +27,9 @@ def reduced_chi_squared(
     sigma2:
         Per-point noise variance. If None the result is NaN — returning 1.0
         by setting sigma2=rss/dof would be trivially circular and misleading.
+        When the true noise variance is unknown, callers should pass
+        ``sigma2=1.0`` to obtain ``rss/dof`` — a meaningful unnormalized
+        residual per degree of freedom.
 
     Returns
     -------

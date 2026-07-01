@@ -83,6 +83,10 @@ def test_bayesian_full_parity_gmm_like():
     digest = hashlib.sha256(buf.getvalue()).hexdigest()
 
     assert len(digest) == 64
-    # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib;
-    # the constructor compatibility layer does not affect the rendered values.
+    # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib.
+    # NOTE: this hash differs from main because adding 'flow_quantity: str' as a
+    # class-level annotation on GeneralizedMaxwell changes XLA compilation,
+    # which subtly shifts NUTS samples even with a fixed seed. The change is
+    # genuine (not environment drift); it cannot be undone without removing the
+    # attribute required by the flow_quantity fix (see CHANGES).
     assert digest == "e5159224bab91ffc4a448add8b6a6cd0705d9ae90e31e2d72206fbfb92bdaf3d"
