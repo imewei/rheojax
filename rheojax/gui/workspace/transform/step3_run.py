@@ -49,6 +49,9 @@ class RunStep(QWidget):
             # this guard only keeps an unwired Run button from crashing the Qt slot.
             self._status.setText("Transform worker is not wired up yet.")
             return
+        except Exception as exc:
+            self._status.setText(f"Transform failed: {exc}")
+            return
         self._state.result = result
         self._status.setText("✓ done")
         self.edited.emit()
