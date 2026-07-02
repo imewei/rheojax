@@ -92,3 +92,39 @@ def test_make_fit_fn_normalizes_parameters_key_to_params(monkeypatch):
     result = fit_fn("power_law", {}, "d1", {"x": 0, "y": 1})
     assert result["params"] == {"a": 1.0}
     assert result["parameters"] == {"a": 1.0}  # original key preserved
+
+
+def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
+    from rheojax.gui.foundation.state import FitState
+    from rheojax.gui.state.store import ParameterState
+    from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
+
+    class _FakeInstance:
+        parameters = {
+            "a": ParameterState(name="a", value=1.0, min_bound=0.0, max_bound=10.0,
+                                 fixed=False, unit="Pa", description=""),
+            "b": ParameterState(name="b", value=2.0, min_bound=0.0, max_bound=5.0,
+                                 fixed=True, unit="s", description=""),
+        }
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.step3_nlsq.ModelRegistry.create",
+        lambda name, **kw: _FakeInstance(),
+    )
+
+    captured = {}
+
+    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
+        captured["initial_params"] = initial_params
+        return {"params": {"a": 1.0, "b": 2.0}, "r_squared": 0.5, "success": True}
+
+    st = FitState(model_key="m", model_config={})
+    step = NlsqStep(st, fit_fn=fake_fit_fn)
+    step.load_parameters_from_model()
+    table_params = step.parameter_table().get_parameters()
+    assert table_params["b"].fixed is True
+
+    step.run()
+    ip = captured["initial_params"]
+    assert ip["a"] == {"value": 1.0, "bounds": (0.0, 10.0), "fixed": False}
+    assert ip["b"] == {"value": 2.0, "bounds": (0.0, 5.0), "fixed": True}

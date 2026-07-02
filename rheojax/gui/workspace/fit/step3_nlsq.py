@@ -12,10 +12,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
-def _default_fit_fn(model_key, model_config, data_ref, column_map):
+def _default_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
     # NOTE: `data_ref` is a str id — the real implementation must:
     # 1. Load RheoData: `library.load_payload(data_ref)` (pass library to NlsqStep at build time)
     # 2. Use real signature: ModelService().fit(model_key, rheodata, {}, model_config=model_config)
@@ -39,6 +41,7 @@ class NlsqStep(QWidget):
         super().__init__(parent)
         self._state = state
         self._fit_fn = fit_fn or _default_fit_fn
+        self._table = ParameterTable(self)
         self._ms_enabled = QCheckBox("multi-start", self)
         self._ms_count = QSpinBox(self)
         self._ms_count.setRange(1, 64)
@@ -46,9 +49,18 @@ class NlsqStep(QWidget):
         self._run_btn = QPushButton("▶ Run NLSQ", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
-        for w in (self._ms_enabled, self._ms_count, self._run_btn, self._result):
+        for w in (self._table, self._ms_enabled, self._ms_count, self._run_btn, self._result):
             lay.addWidget(w)
         self._run_btn.clicked.connect(self.run)
+
+    def parameter_table(self) -> ParameterTable:
+        return self._table
+
+    def load_parameters_from_model(self) -> None:
+        if not self._state.model_key:
+            return
+        instance = ModelRegistry.create(self._state.model_key, **self._state.model_config)
+        self._table.set_parameters(dict(instance.parameters))
 
     def set_multistart(self, enabled: bool, count: int) -> None:
         self._ms_enabled.setChecked(enabled)
@@ -56,12 +68,18 @@ class NlsqStep(QWidget):
 
     def run(self) -> None:
         # Multi-start config is transient widget state — not stored in FitState
+        table_params = self._table.get_parameters()
+        initial_params = {
+            name: {"value": p.value, "bounds": (p.min_bound, p.max_bound), "fixed": p.fixed}
+            for name, p in table_params.items()
+        } or None
         try:
             res = self._fit_fn(
                 self._state.model_key,
                 self._state.model_config,
                 self._state.data_ref,
                 self._state.column_map,
+                initial_params=initial_params,
             )
         except NotImplementedError:
             # ponytail: real solver wiring is out of scope here (tracked separately);

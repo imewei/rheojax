@@ -27,14 +27,14 @@ def _make_fit_fn(library):
     cancel button exists yet), so a local, throwaway Queue/Event is enough.
     """
 
-    def _fit_fn(model_key, model_config, data_ref, column_map):
+    def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
         rheo_data = library.load_payload(data_ref)
         result = run_fit_isolated(
             model_key,
             rheo_data.x,
             rheo_data.y,
             test_mode=None,
-            initial_params={},
+            initial_params=initial_params or {},
             options={},
             progress_queue=multiprocessing.Queue(),
             cancel_event=multiprocessing.Event(),
