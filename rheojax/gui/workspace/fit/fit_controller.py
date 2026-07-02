@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import multiprocessing
+
 from rheojax.gui.foundation.invalidation import invalidate_downstream
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
+from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
 from rheojax.gui.workspace.controller import FitController, Step
 from rheojax.gui.workspace.fit.step1_protocol_model import ProtocolModelStep
 from rheojax.gui.workspace.fit.step2_data import DataStep
@@ -15,13 +19,72 @@ from rheojax.gui.workspace.fit.step6_export import ExportStep
 _CHANGED = ["model_key", "column_map", "nlsq_result", "nuts_result", None, None]
 
 
+def _make_fit_fn(library):
+    """Build the real (synchronous) fit_fn NlsqStep.run() calls.
+
+    Runs subprocess_fit.run_fit_isolated to completion before returning --
+    NlsqStep's control flow is fully synchronous today (no progress bar or
+    cancel button exists yet), so a local, throwaway Queue/Event is enough.
+    """
+
+    def _fit_fn(model_key, model_config, data_ref, column_map):
+        rheo_data = library.load_payload(data_ref)
+        result = run_fit_isolated(
+            model_key,
+            rheo_data.x,
+            rheo_data.y,
+            test_mode=None,
+            initial_params={},
+            options={},
+            progress_queue=multiprocessing.Queue(),
+            cancel_event=multiprocessing.Event(),
+            dataset_id=data_ref,
+            model_config=model_config,
+        )
+        # ponytail: run_fit_isolated's real result dict key is "parameters"
+        # (see ModelService.fit()'s FitResult), but NlsqStep/NutsStep/tests
+        # are all written against a "params" key (step3_nlsq.py's own
+        # FitResult-normalization branch uses `res.params`). Alias it here
+        # so NUTS warm-start/priors don't silently see an empty dict.
+        if isinstance(result, dict) and "params" not in result and "parameters" in result:
+            result = {**result, "params": result["parameters"]}
+        return result
+
+    return _fit_fn
+
+
+def _make_sample_fn(library, fit_state):
+    """Build the real (synchronous) sample_fn NutsStep.run() calls."""
+
+    def _sample_fn(priors, warm_start, config):
+        rheo_data = library.load_payload(fit_state.data_ref)
+        return run_bayesian_isolated(
+            fit_state.model_key,
+            rheo_data.x,
+            rheo_data.y,
+            test_mode=None,
+            num_warmup=500,
+            num_samples=1000,
+            num_chains=4,
+            warm_start=warm_start,
+            priors=priors,
+            seed=0,
+            progress_queue=multiprocessing.Queue(),
+            cancel_event=multiprocessing.Event(),
+            dataset_id=fit_state.data_ref,
+            target_accept=config.get("target_accept", 0.8),
+        )
+
+    return _sample_fn
+
+
 def build_fit_controller(app_state: AppState):
     st = app_state.fit
     bodies = [
         ProtocolModelStep(st),
         DataStep(st, app_state.library),
-        NlsqStep(st),
-        NutsStep(st),
+        NlsqStep(st, fit_fn=_make_fit_fn(app_state.library)),
+        NutsStep(st, sample_fn=_make_sample_fn(app_state.library, st)),
         VisualizeStep(st),
         ExportStep(st, app_state.library),
     ]
