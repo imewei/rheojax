@@ -82,3 +82,25 @@ def test_apply_unit_conversion_multiplies_x_by_2pi(qtbot):
     assert np.allclose(converted.x, np.array([1.0, 2.0, 3.0]) * 2 * np.pi)
     assert step.unit_conversion_applied() is True
     assert step.needs_hz_conversion() is False  # already converted, guard clears
+
+
+def test_apply_unit_conversion_is_idempotent(qtbot):
+    st = FitState(protocol="oscillation")
+    lib = DatasetLibrary()
+    lib.add(_ref("hz_data", "oscillation"))
+    lib.store_payload("hz_data", _RheoData([1.0, 2.0, 3.0], [1, 2, 3]))
+    lib._by_id["hz_data"] = DatasetRef(
+        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
+        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+    )
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("hz_data")
+
+    step.apply_unit_conversion()
+    once = np.asarray(lib.load_payload("hz_data").x).copy()
+
+    step.apply_unit_conversion()  # calling again must not re-scale
+    twice = np.asarray(lib.load_payload("hz_data").x)
+
+    assert np.allclose(once, twice)

@@ -161,7 +161,7 @@ class DataStep(QWidget):
 
     def apply_unit_conversion(self) -> None:
         """Execute the Hz -> rad/s (x2pi) conversion flagged by needs_hz_conversion()."""
-        if not self._state.data_ref:
+        if not self._state.data_ref or self._unit_converted:
             return
         rheo_data = self._library.load_payload(self._state.data_ref)
         rheo_data.x = np.asarray(rheo_data.x) * (2 * np.pi)
