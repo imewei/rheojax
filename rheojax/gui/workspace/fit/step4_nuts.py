@@ -25,10 +25,17 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
     """
     reasons: list[str] = []
     for name, r_hat in (nuts_result.get("r_hat") or {}).items():
-        if r_hat is not None and r_hat > _R_HAT_THRESHOLD:
+        if r_hat is None:
+            continue
+        # `nan > threshold` is always False in Python, so a degenerate chain
+        # (e.g. zero-variance) whose az.rhat() legitimately returns NaN would
+        # otherwise silently read as "converged" instead of "unverifiable".
+        if (isinstance(r_hat, float) and math.isnan(r_hat)) or r_hat > _R_HAT_THRESHOLD:
             reasons.append(f"r_hat too high for {name}")
     for name, ess in (nuts_result.get("ess") or {}).items():
-        if ess is not None and ess < _ESS_MIN:
+        if ess is None:
+            continue
+        if (isinstance(ess, float) and math.isnan(ess)) or ess < _ESS_MIN:
             reasons.append(f"ESS too low for {name}")
     sample_stats = nuts_result.get("sample_stats") or {}
     # Prefer run_bayesian_isolated's own per-chain-averaged "bfmi" (correct);
@@ -52,13 +59,25 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
             b = bfmi(energy)
             if b < _BFMI_MIN:
                 reasons.append("BFMI too low")
-    diverging = sample_stats.get("diverging")
-    # diverging may be a flat list (test fixtures), or a real (num_chains,
-    # num_samples) NumPy array from ArviZ sample_stats -- `sum(1 for d in ...
-    # if d)` would iterate chain rows and raise ValueError on the multi-
-    # element truthiness check. np.asarray(...).sum() counts True entries
-    # correctly regardless of dimensionality.
-    n_divergences = int(np.asarray(diverging).sum()) if diverging is not None else 0
+    # Prefer run_bayesian_isolated's own top-level "divergences" count --
+    # it comes straight from mcmc.get_extra_fields() (BayesianService's
+    # get_diagnostics()), independent of ArviZ InferenceData conversion.
+    # sample_stats["diverging"] only exists when result.to_inference_data()
+    # succeeded (bayesian_service.py wraps that call in a try/except with a
+    # None fallback); when it fails, sample_stats comes back {} and the
+    # fallback path below would wrongly report zero divergences even though
+    # the authoritative count is sitting unused right here.
+    top_level_divergences = nuts_result.get("divergences")
+    if top_level_divergences is not None:
+        n_divergences = int(top_level_divergences)
+    else:
+        diverging = sample_stats.get("diverging")
+        # diverging may be a flat list (test fixtures), or a real (num_chains,
+        # num_samples) NumPy array from ArviZ sample_stats -- `sum(1 for d in
+        # ... if d)` would iterate chain rows and raise ValueError on the
+        # multi-element truthiness check. np.asarray(...).sum() counts True
+        # entries correctly regardless of dimensionality.
+        n_divergences = int(np.asarray(diverging).sum()) if diverging is not None else 0
     if n_divergences:
         reasons.append(f"{n_divergences} divergent transitions")
     return {
