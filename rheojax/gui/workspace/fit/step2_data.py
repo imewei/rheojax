@@ -9,6 +9,8 @@ from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidg
 from rheojax.gui.foundation.contract import input_contract
 from rheojax.gui.foundation.library import DatasetLibrary
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.resources.styles.tokens import field_label_style
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 def _validate_shape_and_values(rheo_data) -> list[str]:
@@ -56,9 +58,12 @@ class DataStep(QWidget):
         self._convert_btn = QPushButton("⇄ Convert Hz → rad/s", self)
         self._error_label = QLabel("", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
+        source_caption = QLabel("Source")
+        source_caption.setStyleSheet(field_label_style())
         for w in (
             self._expected,
-            QLabel("Source"),
+            source_caption,
             self._source,
             self._guard,
             self._convert_btn,

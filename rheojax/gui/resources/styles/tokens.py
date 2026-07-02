@@ -488,6 +488,21 @@ def section_header_style() -> str:
     """
 
 
+def field_label_style() -> str:
+    """Generate a caption-style label for form fields (e.g. "Protocol", "Model").
+
+    Distinguishes field captions from body/value text with a smaller,
+    medium-weight, secondary-colored treatment.
+    """
+    typography = Typography
+
+    return f"""
+        color: {themed("TEXT_SECONDARY")};
+        font-size: {typography.SIZE_SM}pt;
+        font-weight: {typography.WEIGHT_MEDIUM};
+    """
+
+
 def empty_state_style() -> str:
     """Generate empty state placeholder style string."""
     spacing = Spacing
@@ -645,5 +660,6 @@ __all__ = [
     "card_style",
     "status_badge_style",
     "section_header_style",
+    "field_label_style",
     "empty_state_style",
 ]

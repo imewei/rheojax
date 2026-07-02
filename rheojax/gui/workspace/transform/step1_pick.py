@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 import rheojax.transforms  # noqa: F401
 from rheojax.core.registry import TransformRegistry
 from rheojax.gui.foundation.state import TransformState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class TransformPickStep(QWidget):
@@ -20,7 +21,9 @@ class TransformPickStep(QWidget):
                 it = QListWidgetItem(f"{k}   [{cat}]")
                 it.setData(Qt.ItemDataRole.UserRole, k)
                 self._list.addItem(it)
-        QVBoxLayout(self).addWidget(self._list)
+        lay = QVBoxLayout(self)
+        set_panel_margins(lay)
+        lay.addWidget(self._list)
         self._list.itemClicked.connect(lambda it: self._select(it.data(Qt.ItemDataRole.UserRole)))
 
     def groups(self) -> dict[str, list[str]]:

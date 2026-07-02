@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QTabWidget, QVBoxLayout, QWid
 import rheojax.transforms  # noqa: F401
 from rheojax.core.registry import TransformRegistry
 from rheojax.gui.foundation.state import TransformState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 
 _DOMAIN_CHANGING = {"spectral", "decomposition"}
@@ -46,7 +47,9 @@ class TransformVisualizeStep(QWidget):
         self._state = state
         self._tabs = QTabWidget(self)
         self._names: list[str] = []
-        QVBoxLayout(self).addWidget(self._tabs)
+        lay = QVBoxLayout(self)
+        set_panel_margins(lay)
+        lay.addWidget(self._tabs)
         self.refresh()
 
     def refresh(self) -> None:

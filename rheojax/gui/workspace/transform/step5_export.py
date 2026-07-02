@@ -8,7 +8,9 @@ from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import TransformState
+from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.export_service import ExportService
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class TransformExportStep(QWidget):
@@ -27,7 +29,10 @@ class TransformExportStep(QWidget):
         self._save_btn = QPushButton("＋ Save output → library", self)
         self._export_btn = QPushButton("⤓ Export", self)
         lay = QVBoxLayout(self)
-        for w in (QLabel("Export"), self._save_btn, self._export_btn):
+        set_panel_margins(lay)
+        caption = QLabel("Export")
+        caption.setStyleSheet(field_label_style())
+        for w in (caption, self._save_btn, self._export_btn):
             lay.addWidget(w)
         self._save_btn.clicked.connect(self.save_to_library)
         self._export_btn.clicked.connect(lambda: self.export_bundle(Path.cwd()))

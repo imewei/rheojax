@@ -348,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     base_font = QFont()
     base_font.setFamilies(
         [
+            "Inter",
             "Segoe UI",
             "Helvetica Neue",
             "Helvetica",

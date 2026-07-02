@@ -17,7 +17,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, Typography
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.logging import get_logger
 
@@ -155,7 +155,7 @@ class PipelineChips(QWidget):
         """
         arrow = QLabel("→")
         font = QFont()
-        font.setPointSize(14)
+        font.setPointSize(Typography.SIZE_LG)
         font.setBold(True)
         arrow.setFont(font)
         arrow.setAlignment(Qt.AlignCenter)

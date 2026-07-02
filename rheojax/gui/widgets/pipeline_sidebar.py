@@ -22,6 +22,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.selectors import (
     get_pipeline_name,
@@ -92,12 +93,15 @@ class PipelineSidebar(QWidget):
         self.setMaximumWidth(300)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(6)
+        root.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
+        root.setSpacing(Spacing.XS)
 
         # --- Pipeline name ---
         name_label = QLabel("Pipeline")
-        name_label.setStyleSheet("font-weight: bold; font-size: 10pt; color: #374151;")
+        name_label.setStyleSheet(
+            f"font-weight: bold; font-size: {Typography.SIZE_SM}pt;"
+            f" color: {themed('TEXT_SECONDARY')};"
+        )
         root.addWidget(name_label)
 
         self._name_edit = QLineEdit()
@@ -124,7 +128,9 @@ class PipelineSidebar(QWidget):
 
         # --- Step list ---
         steps_label = QLabel("Steps")
-        steps_label.setStyleSheet("font-size: 8pt; color: #6B7280; margin-top: 4px;")
+        steps_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_XS}pt; color: {themed('TEXT_MUTED')}; margin-top: 4px;"
+        )
         root.addWidget(steps_label)
 
         self._list = QListWidget()
@@ -173,7 +179,8 @@ class PipelineSidebar(QWidget):
         # --- Datasets placeholder ---
         datasets_label = QLabel("Datasets")
         datasets_label.setStyleSheet(
-            "font-weight: bold; font-size: 9pt; color: #374151; margin-top: 6px;"
+            f"font-weight: bold; font-size: {Typography.SIZE_XS}pt;"
+            f" color: {themed('TEXT_SECONDARY')}; margin-top: {Spacing.SM}px;"
         )
         root.addWidget(datasets_label)
 

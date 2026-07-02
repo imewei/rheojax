@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.foundation.library import DatasetLibrary
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class LibraryRail(QWidget):
@@ -22,6 +23,7 @@ class LibraryRail(QWidget):
         self._list = QListWidget(self)
         self._import = QPushButton("+ Import data…", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
         lay.addWidget(self._list)
         lay.addWidget(self._import)
         self._list.itemClicked.connect(
