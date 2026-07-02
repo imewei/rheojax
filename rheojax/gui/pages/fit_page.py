@@ -601,6 +601,25 @@ class FitPage(QWidget):
             self._compat_label.setText("Select a dataset to enable fitting")
             self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
 
+        # The Fit Results panel/residuals plot show whatever the *previous*
+        # dataset's fit produced -- refresh them for the new dataset instead
+        # of leaving the old dataset's results on screen.
+        from rheojax.gui.state import selectors
+
+        fit_result = (
+            selectors.get_fit_result(model_name, dataset.id)
+            if dataset is not None and model_name
+            else None
+        )
+        if fit_result is not None:
+            self.apply_fit_result(fit_result)
+        else:
+            self._status_text.clear()
+            self._status_text.setStyleSheet("")
+            self._residuals_panel.clear()
+            if hasattr(self, "_empty_results"):
+                self._empty_results.show()
+
         self._update_fit_enabled()
 
     def _on_mode_changed(self, mode: str) -> None:

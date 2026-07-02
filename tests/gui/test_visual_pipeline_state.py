@@ -281,8 +281,10 @@ class TestUpdateStepConfig:
         update_step_config(id0, {"new_option": True})
         step0 = get_pipeline_step_by_id(id0)
         step1 = get_pipeline_step_by_id(id1)
-        # The edited step keeps its status but loses its cached result.
-        assert step0.status == StepStatus.COMPLETE
+        # The edited step loses its cached result AND its own COMPLETE
+        # status -- a config change means the sidebar must not keep
+        # showing green for output that no longer matches the new config.
+        assert step0.status == StepStatus.PENDING
         assert get_pipeline_step_result(id0) is None
         # Downstream steps are fully reset.
         assert step1.status == StepStatus.PENDING

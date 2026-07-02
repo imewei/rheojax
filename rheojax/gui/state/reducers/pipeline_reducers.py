@@ -157,6 +157,17 @@ def reduce_remove_pipeline_step(
 
     def _remove_step(state: AppState) -> AppState:
         vp = state.visual_pipeline.clone()
+        removed_idx = next(
+            (i for i, s in enumerate(vp.steps) if s.id == step_id), None
+        )
+        # Every step downstream of the removed one had its output computed
+        # against a pipeline that no longer exists -- invalidate them the
+        # same way reduce_update_step_config invalidates downstream steps.
+        if removed_idx is not None:
+            for s in vp.steps[removed_idx + 1 :]:
+                vp.step_results.pop(s.id, None)
+                if s.status == StepStatus.COMPLETE:
+                    s.status = StepStatus.PENDING
         vp.steps = [s for s in vp.steps if s.id != step_id]
         for i, s in enumerate(vp.steps):
             s.position = i
@@ -190,8 +201,13 @@ def reduce_reorder_pipeline_step(
         for i, s in enumerate(vp.steps):
             s.position = i
         # When reordering, clear ALL cached results -- pipeline semantics
-        # change fundamentally and any cached output may be invalid.
+        # change fundamentally and any cached output may be invalid. Demote
+        # every step's status to match, so the sidebar doesn't keep showing
+        # a stale COMPLETE badge with no backing result.
         vp.step_results.clear()
+        for s in vp.steps:
+            if s.status == StepStatus.COMPLETE:
+                s.status = StepStatus.PENDING
         return replace(state, visual_pipeline=vp, is_modified=True)
 
     return _reorder_step
@@ -224,12 +240,13 @@ def reduce_update_step_config(
                 break
         idx = next((i for i, s in enumerate(vp.steps) if s.id == step_id), None)
         if idx is not None:
-            # Clear the edited step's cached result (config changed
-            # -> old result is stale), but preserve its status so an
-            # in-progress execution is not disrupted.
+            # Clear the edited step's cached result (config changed -> old
+            # result is stale) and demote its own status to match, so the
+            # sidebar doesn't keep showing COMPLETE with no backing result.
             vp.step_results.pop(step_id, None)
-            # STATE-007: Use idx+1 so only *downstream* steps are
-            # invalidated. The edited step keeps its status.
+            if vp.steps[idx].status == StepStatus.COMPLETE:
+                vp.steps[idx].status = StepStatus.PENDING
+            # STATE-007: Use idx+1 so downstream steps are invalidated too.
             for s in vp.steps[idx + 1 :]:
                 vp.step_results.pop(s.id, None)
                 if s.status == StepStatus.COMPLETE:

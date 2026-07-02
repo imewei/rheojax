@@ -356,15 +356,6 @@ class DiagnosticsPage(QWidget):
         state = self._store.get_state()
         resolved_dataset_id = dataset_id or state.active_dataset_id
 
-        # Render guard: skip if we already have this exact result displayed.
-        _result_key = f"{model_name}_{resolved_dataset_id}"
-        if _result_key == self._last_result_key:
-            logger.debug(
-                "Skipping redundant re-render",
-                result_key=_result_key,
-                page="DiagnosticsPage",
-            )
-            return
         bayesian_result: BayesianResult | None = None
 
         # Primary lookup: results are stored as "{model_name}_{dataset_id}".
@@ -405,6 +396,20 @@ class DiagnosticsPage(QWidget):
                 "No Bayesian Results",
                 f"No Bayesian inference results found for model '{model_name}'.\n"
                 "Run Bayesian inference first from the Bayesian tab.",
+            )
+            return
+
+        # Render guard: skip if we already have this exact result displayed.
+        # Includes the result's own timestamp so a re-run against the same
+        # model/dataset (different priors/settings, same key) still renders.
+        _result_key = (
+            f"{model_name}_{resolved_dataset_id}_{getattr(bayesian_result, 'timestamp', None)}"
+        )
+        if _result_key == self._last_result_key:
+            logger.debug(
+                "Skipping redundant re-render",
+                result_key=_result_key,
+                page="DiagnosticsPage",
             )
             return
 
@@ -577,6 +582,17 @@ class DiagnosticsPage(QWidget):
         fit_result : FitResult, optional
             NLSQ fit result for R-squared, Chi-squared, MPE
         """
+        # Reset any background coloring from a previous render first -- a
+        # metric left uncolored below (e.g. no matching NLSQ fit_result)
+        # must not keep showing a stale SUCCESS/WARNING/ERROR color from
+        # whatever model was last displayed.
+        from rheojax.gui.compat import QBrush
+
+        for row, col in self._metric_cell_map.values():
+            item = self._gof_table.item(row, col)
+            if item:
+                item.setBackground(QBrush())
+
         # Map metric names to values
         values: dict[str, str] = dict.fromkeys(self._metric_names, "--")
 

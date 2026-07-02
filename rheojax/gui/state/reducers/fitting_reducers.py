@@ -113,7 +113,12 @@ def reduce_store_fit_result(
         fits[key] = fit_state
 
         pipeline = state.pipeline_state.clone()
-        pipeline.steps[PipelineStep.FIT] = StepStatus.COMPLETE
+        # Scope the chip to the currently active selection -- a fit
+        # completing for a dataset/model the user has since switched away
+        # from must not flip the chip green for whatever is active now.
+        pipeline.sync_fit_chip(
+            PipelineStep.FIT, fits, state.active_model_name, state.active_dataset_id
+        )
         pipeline.current_step = PipelineStep.FIT
 
         # R10-STO-003: Do NOT overwrite active_dataset_id / active_model_name

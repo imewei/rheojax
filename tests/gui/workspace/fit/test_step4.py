@@ -26,6 +26,19 @@ def test_nuts_run_without_wired_sample_fn_does_not_crash(qtbot):
     assert step.is_ready() is False
 
 
+def test_nuts_sampler_failure_is_reported_without_escaping_qt_slot(qtbot):
+    st = FitState(nlsq_result={"params": {"G0": 1000.0}})
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("sampler failed")
+
+    step = NutsStep(st, sample_fn=fail)
+    qtbot.addWidget(step)
+    step.run()
+    assert st.nuts_result is None
+    assert "sampler failed" in step._result.text()
+
+
 def test_reset_skip_clears_stale_skip_decision(qtbot):
     # Regression: skip() sets _skipped=True permanently. If NLSQ is later
     # re-run (invalidating nuts_result via the cascade), is_ready() must not
