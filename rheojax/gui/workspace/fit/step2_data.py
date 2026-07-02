@@ -44,6 +44,7 @@ class DataStep(QWidget):
         self._state = state
         self._library = library
         self._errors: list[str] = []
+        self._unit_converted = False
         # Guard: protocol may be None on a fresh AppState; defer contract build until set
         self._contract, cols_text = self._build_contract()
         self._expected = QLabel(cols_text, self)
@@ -115,6 +116,7 @@ class DataStep(QWidget):
         self._source.setCurrentText(ds_id)
 
     def _on_select(self, ds_id: str) -> None:
+        self._unit_converted = False
         self._state.data_ref = ds_id or None
         errors: list[str] = []
         if ds_id and self._contract:
@@ -146,6 +148,8 @@ class DataStep(QWidget):
         return list(self._errors)
 
     def needs_hz_conversion(self) -> bool:
+        if self.unit_conversion_applied():
+            return False
         if (
             not self._contract
             or "x" not in self._contract.unit_conversions
@@ -154,6 +158,20 @@ class DataStep(QWidget):
             return False
         ref = self._library.get(self._state.data_ref)
         return ref.units.get("x", "").lower() in ("hz", "hertz")
+
+    def apply_unit_conversion(self) -> None:
+        """Execute the Hz -> rad/s (x2pi) conversion flagged by needs_hz_conversion()."""
+        if not self._state.data_ref:
+            return
+        rheo_data = self._library.load_payload(self._state.data_ref)
+        rheo_data.x = np.asarray(rheo_data.x) * (2 * np.pi)
+        self._library.store_payload(self._state.data_ref, rheo_data)
+        self._unit_converted = True
+        self._guard.setText("")
+        self.edited.emit()
+
+    def unit_conversion_applied(self) -> bool:
+        return self._unit_converted
 
     def is_ready(self) -> bool:
         return bool(

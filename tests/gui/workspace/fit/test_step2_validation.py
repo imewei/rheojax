@@ -58,3 +58,27 @@ def test_data_step_ready_on_valid_data(qtbot):
     step.select_dataset("good")
     assert step.validation_errors() == []
     assert step.is_ready() is True
+
+
+def test_apply_unit_conversion_multiplies_x_by_2pi(qtbot):
+    st = FitState(protocol="oscillation")
+    lib = DatasetLibrary()
+    lib.add(_ref("hz_data", "oscillation"))
+    rd = _RheoData([1.0, 2.0, 3.0], [1, 2, 3])
+    lib.store_payload("hz_data", rd)
+    lib._by_id["hz_data"] = DatasetRef(
+        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
+        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+    )
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("hz_data")
+    assert step.needs_hz_conversion() is True
+    assert step.unit_conversion_applied() is False
+
+    step.apply_unit_conversion()
+
+    converted = lib.load_payload("hz_data")
+    assert np.allclose(converted.x, np.array([1.0, 2.0, 3.0]) * 2 * np.pi)
+    assert step.unit_conversion_applied() is True
+    assert step.needs_hz_conversion() is False  # already converted, guard clears
