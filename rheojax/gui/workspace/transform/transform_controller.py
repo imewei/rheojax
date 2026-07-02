@@ -64,4 +64,11 @@ def build_transform_controller(app_state: AppState):
     if hasattr(pick_body, "edited") and hasattr(slots_body, "refresh"):
         pick_body.edited.connect(slots_body.refresh)
 
+    # Wire Run finish -> Visualize refresh so the tabs reflect the completed
+    # transform_key/result instead of the construction-time (None) state
+    # (mirrors fit_controller.py's NutsStep.finished -> VisualizeStep.refresh).
+    run_body, visualize_body = bodies[2], bodies[3]
+    if hasattr(run_body, "finished") and hasattr(visualize_body, "refresh"):
+        run_body.finished.connect(visualize_body.refresh)
+
     return ctl, bodies

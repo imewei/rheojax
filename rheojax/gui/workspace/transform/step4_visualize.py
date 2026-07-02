@@ -45,11 +45,36 @@ class TransformVisualizeStep(QWidget):
         super().__init__(parent)
         self._state = state
         self._tabs = QTabWidget(self)
-        primary = "Input vs output" if self.view_mode() == "overlay" else "Output"
-        self._names = [primary, "Result"]
-        self._tabs.addTab(self._build_primary_tab(), primary)
-        self._tabs.addTab(self._build_result_tab(), "Result")
+        self._names: list[str] = []
         QVBoxLayout(self).addWidget(self._tabs)
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Rebuild tabs from the current transform_key/result.
+
+        Bodies are constructed eagerly (before a transform is picked and
+        before RunStep has produced a result), so the tab layout must be
+        recomputed here rather than frozen in __init__ -- otherwise it
+        stays stuck at construction-time (empty, transform_key=None)
+        forever. The view mode itself can change (overlay <-> separate
+        canvases) once the real transform_key/result are known, so this
+        rebuilds from scratch (mirrors SlotsStep.refresh()) rather than
+        re-plotting onto persistent canvases. Call after RunStep emits
+        `finished`.
+        """
+        while self._tabs.count():
+            widget = self._tabs.widget(0)
+            self._tabs.removeTab(0)
+            if widget is not None:
+                widget.deleteLater()
+        self._names = []
+        primary = "Input vs output" if self.view_mode() == "overlay" else "Output"
+        self._add(primary, self._build_primary_tab())
+        self._add("Result", self._build_result_tab())
+
+    def _add(self, name: str, widget: QWidget) -> None:
+        self._tabs.addTab(widget, name)
+        self._names.append(name)
 
     def _category(self) -> str:
         if self._state.transform_key is None:
