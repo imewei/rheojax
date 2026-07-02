@@ -11,19 +11,13 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.foundation.state import AppState
-from rheojax.gui.workspace.controller import Step, TransformController
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
 from rheojax.gui.workspace.stepper_canvas import StepperCanvas
-
-
-def _skeleton_steps(ids: list[str]) -> list[Step]:
-    # ponytail: trivially-ready stubs; Plans 3/4 replace bodies + real is_ready
-    return [
-        Step(id=i, title=i.replace("_", " ").title(), is_ready=lambda: True, validate=lambda: True)
-        for i in ids
-    ]
+from rheojax.gui.workspace.transform.transform_controller import (
+    build_transform_controller,
+)
 
 
 class WorkspaceWindow(QMainWindow):
@@ -36,17 +30,21 @@ class WorkspaceWindow(QMainWindow):
         initial_mode = app_state.ui.get("mode", "fit")
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
         fit_ctl, self._fit_bodies = build_fit_controller(app_state)
+        transform_ctl, self._transform_bodies = build_transform_controller(app_state)
         self._controllers = {
             "fit": fit_ctl,
-            "transform": TransformController(_skeleton_steps(TransformController.STEP_IDS)),
+            "transform": transform_ctl,
         }
-        # Auto-advance the fit workflow whenever a step's edits make it ready.
-        # Connected after build_fit_controller so each body's own edited ->
-        # invalidation wiring (inside build_fit_controller) has already run
-        # by the time this handler inspects state.
+        # Auto-advance each workflow whenever a step's edits make it ready.
+        # Connected after build_*_controller so each body's own edited ->
+        # invalidation wiring (inside build_*_controller) has already run by
+        # the time these handlers inspect state.
         for body in self._fit_bodies:
             if hasattr(body, "edited"):
                 body.edited.connect(self._on_fit_body_edited)
+        for body in self._transform_bodies:
+            if hasattr(body, "edited"):
+                body.edited.connect(self._on_transform_body_edited)
 
         self.setWindowTitle("RheoJAX Workspace")
         self.resize(1200, 800)
@@ -85,20 +83,20 @@ class WorkspaceWindow(QMainWindow):
             raise ValueError(f"unknown mode {mode!r}; expected one of {self.MODES}")
         if mode == self._mode:
             return
-        leaving_fit = self._mode == "fit"
+        old_bodies = self._fit_bodies if self._mode == "fit" else self._transform_bodies
         self._mode = mode
         new_canvas = StepperCanvas(self._controllers[mode], self)
         self._wire_canvas(new_canvas)
         self._install_bodies(mode, new_canvas)
         old_canvas = self._splitter.replaceWidget(1, new_canvas)
-        if leaving_fit:
-            # fit bodies are persistent, stateful widgets owned by the fit
-            # controller (not disposable skeleton stubs) — pull them out of
-            # the outgoing canvas before it's deleted, or deleteLater() would
-            # cascade-delete them along with their QStackedWidget parent.
-            for body in self._fit_bodies:
-                body.setParent(self)
-                body.hide()
+        # Both fit and transform bodies are persistent, stateful widgets
+        # owned by their controller (not disposable skeleton stubs) — pull
+        # them out of the outgoing canvas before it's deleted, or
+        # deleteLater() would cascade-delete them along with their
+        # QStackedWidget parent.
+        for body in old_bodies:
+            body.setParent(self)
+            body.hide()
         if old_canvas is not None:
             old_canvas.deleteLater()
         self._canvas = new_canvas
@@ -126,11 +124,13 @@ class WorkspaceWindow(QMainWindow):
     def fit_bodies(self) -> list[QWidget]:
         return self._fit_bodies
 
+    def transform_bodies(self) -> list[QWidget]:
+        return self._transform_bodies
+
     def _install_bodies(self, mode: str, canvas: StepperCanvas) -> None:
-        # transform mode still uses skeleton placeholder bodies (Plan 4's job).
-        if mode == "fit":
-            for i, body in enumerate(self._fit_bodies):
-                canvas.set_body(i, body)
+        bodies = self._fit_bodies if mode == "fit" else self._transform_bodies
+        for i, body in enumerate(bodies):
+            canvas.set_body(i, body)
 
     def active_step_count(self) -> int:
         return len(self._controllers[self._mode].steps)
@@ -145,20 +145,29 @@ class WorkspaceWindow(QMainWindow):
         if self._controllers[self._mode].goto(index):
             self._canvas.refresh()
 
-    def _on_fit_body_edited(self) -> None:
-        ctl = self._controllers["fit"]
+    def _advance_and_unlock(self, mode: str) -> None:
+        # Shared by both workflows: auto-advance the controller once its
+        # current step becomes ready, then walk forward unlocking (but not
+        # navigating past) any trailing steps whose predecessor is trivially
+        # ready. Read-only tail steps (Visualize/Export-only bodies) have no
+        # `edited` signal, so nothing else ever re-checks whether the final
+        # step has become reachable once the user is already sitting on the
+        # step just before it -- arriving there doesn't itself fire this
+        # handler again. See test_export_step_unlocked_once_visualize_reached
+        # (fit) and test_window_transform_export_step_reachable_without_
+        # forced_navigation (transform) for the regression this guards.
+        ctl = self._controllers[mode]
         if ctl.can_advance():
             ctl.advance()
-        # Unlock (but don't navigate to) any trailing steps whose predecessor
-        # is trivially ready. VisualizeStep/ExportStep have no `edited` signal,
-        # so nothing else ever re-checks whether step 5 (Export) has become
-        # reachable once the user is already sitting on step 4 (Visualize) --
-        # arriving there doesn't itself fire this handler again. This walks
-        # forward unlocking `reached` without forcing `current` past it, so
-        # the step rail button becomes clickable at the user's own pace.
         i = ctl.current
         while i + 1 < len(ctl.steps) and ctl.steps[i].is_ready() and (i + 1) not in ctl.reached:
             ctl.reached.add(i + 1)
             i += 1
-        if self._mode == "fit":
+        if self._mode == mode:
             self._canvas.refresh()
+
+    def _on_fit_body_edited(self) -> None:
+        self._advance_and_unlock("fit")
+
+    def _on_transform_body_edited(self) -> None:
+        self._advance_and_unlock("transform")
