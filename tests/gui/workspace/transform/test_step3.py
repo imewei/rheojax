@@ -35,3 +35,16 @@ def test_run_without_wired_run_fn_does_not_crash(qtbot):
     assert st.result is None
     assert step.is_ready() is False
     assert "not wired up yet" in step._status.text()
+
+
+def test_transform_failure_is_reported_without_escaping_qt_slot(qtbot):
+    st = TransformState(transform_key="cox_merz", slots={})
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("transform failed")
+
+    step = RunStep(st, run_fn=fail)
+    qtbot.addWidget(step)
+    step.run()
+    assert st.result is None
+    assert "transform failed" in step._status.text()

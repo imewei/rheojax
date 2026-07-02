@@ -181,6 +181,9 @@ class NutsStep(QWidget):
             # this guard only keeps an unwired Sample button from crashing the Qt slot.
             self._result.setText("NUTS sampler is not wired up yet.")
             return
+        except Exception as exc:
+            self._result.setText(f"NUTS failed: {exc}")
+            return
         result["verdict"] = _diagnostics_verdict(result)
         self._state.nuts_result = result
         self.edited.emit()

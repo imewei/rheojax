@@ -56,3 +56,16 @@ def test_nlsq_run_without_wired_fit_fn_does_not_crash(qtbot):
     step.run()  # must not raise
     assert st.nlsq_result is None
     assert step.is_ready() is False
+
+
+def test_nlsq_solver_failure_is_reported_without_escaping_qt_slot(qtbot):
+    st = FitState(protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0})
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("optimizer failed")
+
+    step = NlsqStep(st, fit_fn=fail)
+    qtbot.addWidget(step)
+    step.run()
+    assert st.nlsq_result is None
+    assert "optimizer failed" in step._result.text()

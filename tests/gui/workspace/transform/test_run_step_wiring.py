@@ -70,8 +70,10 @@ def test_run_fn_raises_on_worker_failure(qapp, monkeypatch):
 
     ctl, bodies = build_transform_controller(app)
     run_step = bodies[2]
-    # RunStep.run() only catches NotImplementedError; any other exception the
-    # real run_fn raises propagates, and the status label stays untouched
-    # ("" -- never reaches the "✓ done" line). This documents that contract.
-    with pytest.raises(RuntimeError):
-        run_step.run()
+    # RunStep.run() catches any exception the real run_fn raises (here a
+    # RuntimeError wrapping the worker's reported error) and reports it in
+    # the status label instead of letting it escape the Qt slot.
+    run_step.run()
+
+    assert app.transform.result is None
+    assert "bad params" in run_step._status.text()

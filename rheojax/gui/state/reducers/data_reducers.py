@@ -41,9 +41,28 @@ def reduce_set_test_mode(
             ds.metadata = {**ds.metadata, "test_mode": mode}
             ds.is_modified = True
             datasets[dataset_id] = ds
+            fit_results = {
+                key: result
+                for key, result in state.fit_results.items()
+                if result.dataset_id != dataset_id
+            }
+            bayesian_results = {
+                key: result
+                for key, result in state.bayesian_results.items()
+                if result.dataset_id != dataset_id
+            }
+        else:
+            fit_results = state.fit_results
+            bayesian_results = state.bayesian_results
         # Only update datasets -- do NOT change current_tab as a side-effect.
         # Tab navigation should be an explicit user action, not implicit.
-        return replace(state, datasets=datasets, is_modified=True)
+        return replace(
+            state,
+            datasets=datasets,
+            fit_results=fit_results,
+            bayesian_results=bayesian_results,
+            is_modified=True,
+        )
 
     return updater
 
@@ -66,7 +85,23 @@ def reduce_auto_detect_test_mode(
         ds.is_modified = True
         datasets = state.datasets.copy()
         datasets[dataset_id] = ds
-        return replace(state, datasets=datasets, is_modified=True)
+        fit_results = {
+            key: result
+            for key, result in state.fit_results.items()
+            if result.dataset_id != dataset_id
+        }
+        bayesian_results = {
+            key: result
+            for key, result in state.bayesian_results.items()
+            if result.dataset_id != dataset_id
+        }
+        return replace(
+            state,
+            datasets=datasets,
+            fit_results=fit_results,
+            bayesian_results=bayesian_results,
+            is_modified=True,
+        )
 
     return updater
 
