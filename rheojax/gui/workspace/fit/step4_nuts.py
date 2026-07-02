@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 
+import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
@@ -35,7 +37,14 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
     # that top-level key is absent, e.g. in standalone/unit-test callers.
     top_level_bfmi = nuts_result.get("bfmi")
     if top_level_bfmi is not None:
-        if top_level_bfmi < _BFMI_MIN:
+        if isinstance(top_level_bfmi, float) and math.isnan(top_level_bfmi):
+            # subprocess_bayesian.run_bayesian_isolated() sets bfmi=nan when
+            # the ArviZ InferenceData had no "energy" sample_stat to compute
+            # it from -- that's a genuinely unverifiable diagnostic, not a
+            # passing one; `nan < _BFMI_MIN` is always False in Python, which
+            # would otherwise silently report "converged".
+            reasons.append("BFMI unavailable (energy stat missing)")
+        elif top_level_bfmi < _BFMI_MIN:
             reasons.append("BFMI too low")
     else:
         energy = sample_stats.get("energy")
@@ -44,8 +53,12 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
             if b < _BFMI_MIN:
                 reasons.append("BFMI too low")
     diverging = sample_stats.get("diverging")
-    diverging = [] if diverging is None else diverging
-    n_divergences = sum(1 for d in diverging if d)
+    # diverging may be a flat list (test fixtures), or a real (num_chains,
+    # num_samples) NumPy array from ArviZ sample_stats -- `sum(1 for d in ...
+    # if d)` would iterate chain rows and raise ValueError on the multi-
+    # element truthiness check. np.asarray(...).sum() counts True entries
+    # correctly regardless of dimensionality.
+    n_divergences = int(np.asarray(diverging).sum()) if diverging is not None else 0
     if n_divergences:
         reasons.append(f"{n_divergences} divergent transitions")
     return {
