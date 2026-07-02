@@ -114,12 +114,20 @@ def build_fit_controller(app_state: AppState):
         VisualizeStep(st),
         ExportStep(st, app_state.library),
     ]
+    validators = [
+        lambda b=bodies[0]: b.is_ready(),
+        lambda b=bodies[1]: b.is_ready() and not b.validation_errors(),
+        lambda b=bodies[2]: b.is_ready(),
+        lambda b=bodies[3]: b.is_ready(),  # True if skipped, per NutsStep.is_ready()
+        lambda: True,   # Visualize is read-only
+        lambda: True,   # Export just saves/writes
+    ]
     steps = [
         Step(
             id=FitController.STEP_IDS[i],
             title=FitController.STEP_IDS[i],
             is_ready=getattr(bodies[i], "is_ready", lambda: True),
-            validate=lambda: True,
+            validate=validators[i],
         )
         for i in range(len(bodies))
     ]
