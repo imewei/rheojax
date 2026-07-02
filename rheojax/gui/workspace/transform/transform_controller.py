@@ -51,6 +51,19 @@ def build_transform_controller(app_state: AppState):
                     # fit_controller.py's identical fix for the same hazard).
                     for attr, val in vars(new_tx).items():
                         setattr(app_state.transform, attr, val)
+                elif idx == 1 and app_state.transform.result is not None:
+                    # Refilling a slot clears only the stale result -- NOT
+                    # slots/config, since slots is exactly the field the user
+                    # is actively setting via SlotsStep.fill() right now.
+                    # Without this, RunStep.is_ready() (result is not None)
+                    # stays True after a slot change, and the window's
+                    # _advance_and_unlock forward-unlock loop immediately
+                    # re-adds Visualize/Export to `reached`, undoing the
+                    # re-lock that ctl.on_edit(1) just applied and leaving a
+                    # stale result reachable/exportable for a dataset that
+                    # was never actually run.
+                    app_state.transform.result = None
+                    app_state.transform.revision += 1
 
             body.edited.connect(_on_edit)
 

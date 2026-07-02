@@ -79,6 +79,40 @@ def test_window_transform_export_step_reachable_without_forced_navigation(qtbot)
     assert ctl.current == 4
 
 
+def test_editing_slots_invalidates_stale_result(qtbot):
+    # Regression: refilling a slot (step 1) with a different dataset must
+    # invalidate a previously-computed `result`. Before the fix, only idx==0
+    # (re-picking the transform) cleared `result`; refilling a slot only
+    # called ctl.on_edit(1), which re-locks `reached` to {0, 1} but leaves
+    # `state.result` untouched. RunStep.is_ready() checks `result is not
+    # None`, so it stayed True, and the window's `_advance_and_unlock`
+    # forward-unlock loop (wired to fire right after `_on_edit`) immediately
+    # re-added 2/3/4 to `reached`, undoing the re-lock -- leaving stale
+    # output reachable/exportable for a dataset that was never actually run.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win.set_mode("transform")
+    ctl = win._controllers["transform"]
+
+    bodies = win.transform_bodies()
+    bodies[2]._run_fn = lambda *a, **k: {"input": None, "output": None}
+
+    bodies[0].set_transform("cox_merz")
+    bodies[1].fill("oscillation", "ds1")
+    bodies[1].fill("flow_curve", "ds2")
+    bodies[2].run()
+
+    assert win._state.transform.result is not None
+    assert 4 in ctl.reached  # Export reachable, mirrors the sibling test above
+
+    bodies[1].fill("oscillation", "ds1-different")  # refill with a new dataset
+
+    assert win._state.transform.result is None
+    assert bodies[2].is_ready() is False
+    assert 4 not in ctl.reached
+    assert ctl.goto(4) is False  # Export no longer trivially reachable
+
+
 def test_picking_transform_rebuilds_slots_specs(qtbot):
     # Regression guard: bodies are all constructed eagerly at controller-build
     # time, before the user has picked a transform (transform_key is None).
