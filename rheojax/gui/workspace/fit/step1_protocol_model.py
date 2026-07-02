@@ -74,6 +74,12 @@ def _make_config_widget(annotation: Any, default: Any):
 
 class ProtocolModelStep(QWidget):
     edited = Signal()
+    # Fired only for constructor-config widget edits (model/protocol
+    # unchanged). Kept separate from `edited` so fit_controller.py can
+    # invalidate downstream with the narrower "model_config" cascade key
+    # instead of "model_key" -- the latter clears model_config itself,
+    # which would wipe out the very edit this signal reports.
+    config_edited = Signal()
 
     def __init__(self, state: FitState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -153,7 +159,7 @@ class ProtocolModelStep(QWidget):
             name: getter() for name, (_w, getter) in self._config_widgets.items()
         }
         self._refresh_preview()
-        self.edited.emit()
+        self.config_edited.emit()
 
     def set_model_config(self, config: dict[str, Any]) -> None:
         """Test/programmatic helper: apply a config dict to the widgets, then commit it."""
