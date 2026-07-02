@@ -114,12 +114,19 @@ def build_transform_controller(app_state: AppState):
         TransformVisualizeStep(st),
         TransformExportStep(st, app_state.library),
     ]
+    validators = [
+        lambda b=bodies[0]: b.is_ready(),
+        lambda b=bodies[1]: b.is_ready(),
+        lambda b=bodies[2]: b.is_ready(),
+        lambda: True,   # Visualize is read-only
+        lambda: True,   # Export just saves/writes
+    ]
     steps = [
         Step(
             id=TransformController.STEP_IDS[i],
             title=TransformController.STEP_IDS[i],
             is_ready=getattr(bodies[i], "is_ready", lambda: True),
-            validate=lambda: True,
+            validate=validators[i],
         )
         for i in range(len(bodies))
     ]
