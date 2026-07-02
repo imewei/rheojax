@@ -67,7 +67,6 @@ def _infer_protocol_type(library, transform_key, slots) -> str | None:
 
 def _make_run_fn(library):
     def _run(transform_key, slots, config):
-        from rheojax.gui.services.transform_service import TransformService
 
         data = _resolve_slot_data(library, transform_key, slots)
         worker = TransformWorker(transform_key, data, params=config)

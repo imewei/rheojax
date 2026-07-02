@@ -6,7 +6,9 @@ pytest.importorskip("PySide6")
 import rheojax.transforms  # noqa: F401
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import AppState
-from rheojax.gui.workspace.transform.transform_controller import build_transform_controller
+from rheojax.gui.workspace.transform.transform_controller import (
+    build_transform_controller,
+)
 
 
 class _RheoData:
