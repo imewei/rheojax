@@ -54,4 +54,14 @@ def build_transform_controller(app_state: AppState):
 
             body.edited.connect(_on_edit)
 
+    # Wire TransformPick edits -> Slots refresh, so `_specs` (frozen at
+    # transform_key=None construction time) gets rebuilt against the picked
+    # transform. Connected after the _on_edit loop above, so the
+    # slots/config/result invalidation runs first and refresh() rebuilds
+    # specs against the already-cleared state (mirrors fit_controller.py's
+    # ProtocolModel -> DataStep.refresh wiring).
+    pick_body, slots_body = bodies[0], bodies[1]
+    if hasattr(pick_body, "edited") and hasattr(slots_body, "refresh"):
+        pick_body.edited.connect(slots_body.refresh)
+
     return ctl, bodies

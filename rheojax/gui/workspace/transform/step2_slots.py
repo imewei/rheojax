@@ -20,10 +20,26 @@ class SlotsStep(QWidget):
         super().__init__(parent)
         self._state = state
         self._library = library
-        self._specs = transform_slots(state.transform_key)
-        lay = QVBoxLayout(self)
+        self._specs: list[SlotSpec] = []
+        self._layout = QVBoxLayout(self)
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Rebuild slot specs + displayed labels from the current transform_key.
+
+        Bodies are constructed eagerly (before the user picks a transform),
+        so `_specs` must be recomputed here rather than frozen in __init__ --
+        otherwise it stays stuck at the `transform_key=None` fallback forever.
+        Call after Step 1 (TransformPickStep) emits `edited`.
+        """
+        self._specs = transform_slots(self._state.transform_key)
+        while self._layout.count():
+            item = self._layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
         for s in self._specs:
-            lay.addWidget(
+            self._layout.addWidget(
                 QLabel(
                     f"Slot: {s.name} ({s.accepts or 'any'})"
                     + (" [list]" if s.is_list else "")
