@@ -40,9 +40,16 @@ class RunStep(QWidget):
         self._btn.clicked.connect(self.run)
 
     def run(self) -> None:
-        self._state.result = self._run_fn(
-            self._state.transform_key, self._state.slots, self._state.config
-        )
+        try:
+            result = self._run_fn(
+                self._state.transform_key, self._state.slots, self._state.config
+            )
+        except NotImplementedError:
+            # ponytail: real worker wiring is out of scope here (tracked separately);
+            # this guard only keeps an unwired Run button from crashing the Qt slot.
+            self._status.setText("Transform worker is not wired up yet.")
+            return
+        self._state.result = result
         self._status.setText("✓ done")
         self.edited.emit()
         self.finished.emit()
