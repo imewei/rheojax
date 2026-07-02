@@ -29,11 +29,20 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
         if ess is not None and ess < _ESS_MIN:
             reasons.append(f"ESS too low for {name}")
     sample_stats = nuts_result.get("sample_stats") or {}
-    energy = sample_stats.get("energy")
-    if energy is not None and len(energy) > 0:
-        b = bfmi(energy)
-        if b < _BFMI_MIN:
+    # Prefer run_bayesian_isolated's own per-chain-averaged "bfmi" (correct);
+    # only recompute from the flattened multi-chain energy array (biased --
+    # mixes cross-chain energy-level offsets into one variance calc) when
+    # that top-level key is absent, e.g. in standalone/unit-test callers.
+    top_level_bfmi = nuts_result.get("bfmi")
+    if top_level_bfmi is not None:
+        if top_level_bfmi < _BFMI_MIN:
             reasons.append("BFMI too low")
+    else:
+        energy = sample_stats.get("energy")
+        if energy is not None and len(energy) > 0:
+            b = bfmi(energy)
+            if b < _BFMI_MIN:
+                reasons.append("BFMI too low")
     diverging = sample_stats.get("diverging")
     diverging = [] if diverging is None else diverging
     n_divergences = sum(1 for d in diverging if d)
