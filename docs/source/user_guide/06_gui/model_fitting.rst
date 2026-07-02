@@ -73,8 +73,10 @@ Initial parameters
 The GUI uses initial parameters from the current application state when
 available; otherwise it falls back to model defaults.
 
-At the moment, the Fit page does not expose an editable parameters table.
-To fully control initial values/bounds/fixed parameters, use the Python API.
+The **Parameters** panel is a fully editable table (Value / Min / Max columns,
+plus a **Fixed** checkbox per row) populated from the model defaults or the
+current state. Edit a cell to change the initial value or bound before
+fitting, and check **Fixed** to hold a parameter constant during the fit.
 
 Running the Fit
 ===============
@@ -83,18 +85,15 @@ Starting a Fit
 --------------
 
 1. Ensure data is loaded and model selected
-2. Configure options (or use defaults)
+2. Adjust the parameter table and/or click **"Options..."** to configure the
+   optimizer (or use defaults)
 3. Click **"Fit Model"** button
 
 Progress
 --------
 
-During fitting the application status bar updates with progress.
-
-Stopping a Fit
---------------
-
-Click **"Cancel"** to stop early (results may be partial).
+Fitting runs on a background worker thread; the application status bar
+updates with progress while the GUI stays responsive.
 
 Fit Results
 ===========
@@ -170,38 +169,28 @@ Advanced Options
 Optimization Settings
 ---------------------
 
-Access via **Settings > Fitting Options**:
+Click **"Options..."** on the Fit page to open the Fitting Options dialog:
 
 - **Algorithm**: NLSQ algorithm variant
 - **Max Iterations**: Iteration limit
 - **Tolerance**: Convergence criteria (ftol, xtol)
 - **Multi-start**: Number of random initializations
-
-Warm Start
-----------
-
-Use previous fit results as starting point:
-
-1. Fit with model A
-2. Switch to similar model B
-3. Enable **Warm Start** checkbox
-4. Fit model B (starts from model A values)
+- **Bounds**: Parameter bound overrides
+- **Verbose**: Print solver progress
 
 Batch Fitting
 -------------
 
-Fit multiple datasets with same model:
-
-1. Load all datasets
-2. Configure model once
-3. Click **Fit All Datasets**
+To apply a fit (and any other steps) across many files at once, build a
+pipeline in the sidebar and run it over a folder using the **Batch** panel,
+rather than fitting datasets one at a time on the Fit page.
 
 Tips for Good Fits
 ==================
 
 1. **Start simple**: Try simpler models first
 2. **Check data range**: Ensure data spans model features
-3. **Initial values**: Use Auto Initialize or manual estimates
+3. **Initial values**: Adjust the parameter table or set bounds manually
 4. **Bounds**: Set physically meaningful constraints
 5. **Check residuals**: Look for systematic patterns
 6. **Compare models**: Use R² and AIC for model selection

@@ -1,6 +1,6 @@
 # RheoJAX Documentation Structure
 
-**Last Updated:** February 9, 2026
+**Last Updated:** July 2, 2026
 
 ## Production Documentation
 

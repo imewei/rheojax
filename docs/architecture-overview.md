@@ -337,6 +337,25 @@ Structured, JAX-safe logging system.
 
 ---
 
+## GUI (`gui/`)
+
+PySide6/Qt6 desktop app (`rheojax-gui`). Two architectures currently coexist:
+
+| Layer | Shipped default | `--workspace` preview |
+|-------|------------------|------------------------|
+| Shell | `app/main_window.py` (`RheoJAXMainWindow`) | `workspace/window.py` (`WorkspaceWindow`) |
+| Pages | `pages/*.py`, one flat panel per stage, no step indicator | `workspace/fit/step1..6`, `workspace/transform/step1..5`, rendered as a numbered wizard by `stepper_canvas.py` |
+| State | `state/store.py` — single `AppState` dataclass + `StateStore` singleton (Redux-like: `dispatch()` → `reducers/*.py` → new state → Qt signal via `signals.py`) | `foundation/state.py` — lightweight `AppState(library, fit: FitState, transform: TransformState, jobs, project)`, one instance per `WorkspaceWindow`, no reducer/signal layer |
+| Background execution | `jobs/worker_pool.py` (QThreadPool, in-process threads: `fit_worker.py`, `bayesian_worker.py`, ...) | `jobs/process_adapter.py` (true OS subprocess isolation via `subprocess_fit.py`/`subprocess_bayesian.py`) |
+
+**Invalidation cascade** (`foundation/invalidation.py::invalidate_downstream()`): editing an earlier step (e.g. model choice) clears dependent downstream `FitState`/`TransformState` fields (`nlsq_result`, `nuts_result`, ...) via a static cascade table, and `WorkflowController.on_edit()` (`workspace/controller.py`) re-locks every step after the edited one in the stepper UI — prevents a stale result from surviving an upstream edit.
+
+**Other layers:** `services/` (business logic called by pages/controllers — `data_service.py`, `transform_service.py`, `pipeline_execution_service.py` for the drag/drop visual pipeline builder, ...), `widgets/` (reusable Qt widgets — `parameter_table.py`, `plot_canvas.py`, `pipeline_sidebar.py`, ...), `dialogs/` (modal dialogs — `import_wizard.py`, `fitting_options.py`, ...).
+
+See [GUI Reference Guide](source/user_guide/06_gui/index.rst) for end-user docs of the shipped default GUI.
+
+---
+
 ## Critical Design Invariants
 
 ### 1. Float64 Enforcement (MANDATORY)

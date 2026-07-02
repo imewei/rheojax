@@ -903,6 +903,9 @@ rheojax-gui
 # Start maximized (useful on high-DPI desktops)
 rheojax-gui --maximized
 
+# Preview the new step-wizard workspace shell (experimental)
+rheojax-gui --workspace
+
 # Or from Python
 from rheojax.gui import main
 main()
