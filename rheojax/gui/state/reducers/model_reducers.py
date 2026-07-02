@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from rheojax.gui.state.store import AppState
 
-from rheojax.gui.state.store import StepStatus
+from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,6 +31,19 @@ def reduce_set_active_model(
         }
         if model_params is not None:
             kwargs["model_params"] = model_params
+        # Rescope the Fit/Bayesian chips to the newly active model -- see
+        # the matching fix in data_reducers.reduce_set_active_dataset.
+        pipeline = state.pipeline_state.clone()
+        pipeline.sync_fit_chip(
+            PipelineStep.FIT, state.fit_results, model_name, state.active_dataset_id
+        )
+        pipeline.sync_fit_chip(
+            PipelineStep.BAYESIAN,
+            state.bayesian_results,
+            model_name,
+            state.active_dataset_id,
+        )
+        kwargs["pipeline_state"] = pipeline
         return replace(state, **kwargs)
 
     return updater

@@ -108,6 +108,9 @@ class NlsqStep(QWidget):
             # this guard only keeps an unwired Run button from crashing the Qt slot.
             self._result.setText("NLSQ solver is not wired up yet.")
             return
+        except Exception as exc:
+            self._result.setText(f"NLSQ failed: {exc}")
+            return
         # Normalize to dict: ModelService.fit() returns FitResult (dataclass), fakes return dict
         if isinstance(res, dict):
             self._state.nlsq_result = res

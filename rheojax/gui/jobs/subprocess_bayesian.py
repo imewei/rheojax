@@ -15,6 +15,10 @@ from typing import Any
 
 import numpy as np
 
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def run_bayesian_isolated(
     model_name: str,
@@ -172,8 +176,13 @@ def run_bayesian_isolated(
     credible_intervals: dict[str, tuple[float, float, float]] = {}
     try:
         credible_intervals = service.get_credible_intervals(bayesian_result)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error(
+            "Credible interval computation failed; returning empty intervals",
+            model_name=model_name,
+            error=str(exc),
+            exc_info=True,
+        )
 
     # Extract sample_stats arrays for energy/divergence plots.
     # Full InferenceData is not picklable, but raw NumPy arrays are.

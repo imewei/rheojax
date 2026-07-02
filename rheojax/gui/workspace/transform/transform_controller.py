@@ -70,7 +70,13 @@ def _infer_protocol_type(library, transform_key, slots) -> str:
 
 def _make_run_fn(library):
     def _run(transform_key, slots, config):
-
+        # Snapshot slots up front: the caller's dict is the live, mutable
+        # FitState/TransformState.slots object, and loop.exec() below pumps
+        # GUI events (including the Slots step, still interactive) while
+        # this run is in flight. Reading the live dict again after the wait
+        # (e.g. for protocol_type) could see a different selection than the
+        # one `data` was actually resolved from.
+        slots = dict(slots)
         data = _resolve_slot_data(library, transform_key, slots)
         worker = TransformWorker(transform_key, data, params=config)
         loop = QEventLoop()

@@ -239,6 +239,25 @@ class PipelineState:
         """Create a deep copy of this pipeline state."""
         return replace(self, steps=copy.deepcopy(self.steps))
 
+    def sync_fit_chip(
+        self,
+        step: "PipelineStep",
+        results: dict[str, Any],
+        model_name: str | None,
+        dataset_id: str | None,
+    ) -> None:
+        """Set `steps[step]` to COMPLETE/PENDING based on whether a result
+        exists for the given model/dataset combo. Used to keep the header
+        Fit/Bayesian progress chip scoped to the currently active selection
+        instead of a stale global flag (mutates in place; call on a clone).
+        """
+        if self.steps.get(step) in (StepStatus.ACTIVE, StepStatus.ERROR):
+            return
+        has_result = bool(model_name and dataset_id) and (
+            f"{model_name}_{dataset_id}" in results
+        )
+        self.steps[step] = StepStatus.COMPLETE if has_result else StepStatus.PENDING
+
 
 @dataclass
 class TransformRecord:

@@ -211,7 +211,24 @@ def update_dataset(dataset_id: str, **updates) -> None:
         new_datasets = state.datasets.copy()
         new_datasets[dataset_id] = updated_dataset
 
-        return replace(state, datasets=new_datasets, is_modified=True)
+        new_fit_results = {
+            key: result
+            for key, result in state.fit_results.items()
+            if result.dataset_id != dataset_id
+        }
+        new_bayesian_results = {
+            key: result
+            for key, result in state.bayesian_results.items()
+            if result.dataset_id != dataset_id
+        }
+
+        return replace(
+            state,
+            datasets=new_datasets,
+            fit_results=new_fit_results,
+            bayesian_results=new_bayesian_results,
+            is_modified=True,
+        )
 
     store._atomic_state_and_signal(updater, "dataset_updated", dataset_id)
 

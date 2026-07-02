@@ -294,7 +294,9 @@ class ParameterTable(QTableWidget):
         checkbox = QCheckBox()
         checkbox.setChecked(checked)
         checkbox.stateChanged.connect(
-            lambda state: self._on_fixed_toggled(param_name, state == Qt.Checked)
+            lambda state: self._on_fixed_toggled(
+                param_name, state == Qt.CheckState.Checked.value
+            )
         )
 
         layout.addWidget(checkbox)

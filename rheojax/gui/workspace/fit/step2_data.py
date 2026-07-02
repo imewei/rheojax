@@ -84,12 +84,23 @@ class DataStep(QWidget):
 
     def refresh(self) -> None:
         """Rebuild contract/label/combo from current state (call after Step 1 edits)."""
+        old_y_quantity = self._contract.y_quantity if self._contract else None
         self._contract, cols_text = self._build_contract()
         self._expected.setText(cols_text)
 
         current = self._source.currentText()
         new_datasets = self.available_datasets()
-        still_valid = bool(current) and current in new_datasets
+        # A model switch within the same protocol can change what the y
+        # column *means* (e.g. flow_curve: "stress" vs "viscosity") without
+        # changing which datasets are protocol-eligible. Force re-selection
+        # rather than silently reinterpreting the previously-picked column
+        # as a different physical quantity.
+        y_quantity_changed = (
+            self._contract is not None and self._contract.y_quantity != old_y_quantity
+        )
+        still_valid = (
+            bool(current) and current in new_datasets and not y_quantity_changed
+        )
 
         self._source.blockSignals(True)
         self._source.clear()

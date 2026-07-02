@@ -8,7 +8,7 @@ from rheojax.gui.foundation.state import FitState
 _FIT_CASCADE = {
     "protocol":     ("data_ref", "column_map", "control_vars", "model_config", "nlsq_result", "nuts_result"),
     "model_key":    ("data_ref", "column_map", "control_vars", "model_config", "nlsq_result", "nuts_result"),
-    "model_config": ("data_ref", "column_map", "nlsq_result", "nuts_result"),
+    "model_config": ("nlsq_result", "nuts_result"),
     "data_ref":     ("column_map", "nlsq_result", "nuts_result"),
     "column_map":   ("nlsq_result", "nuts_result"),
     "nlsq_result":  ("nuts_result",),

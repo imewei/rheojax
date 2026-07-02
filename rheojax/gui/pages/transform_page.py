@@ -274,6 +274,29 @@ class TransformPage(QWidget):
 
         self._rebuild_detail(meta)
 
+    def refresh_dataset_checklist(self, *_args: Any) -> None:
+        """Add newly-imported datasets to the multi-dataset checklist.
+
+        Called on `dataset_added` so datasets imported after a multi-dataset
+        transform (Mastercurve/SRFS) was selected still show up, without
+        rebuilding the whole detail panel and losing existing checkmarks/
+        parameter edits.
+        """
+        if self._dataset_checklist is None:
+            return
+        existing_ids = {
+            self._dataset_checklist.item(i).data(Qt.UserRole)
+            for i in range(self._dataset_checklist.count())
+        }
+        state = self._store.get_state()
+        for ds_id, ds in state.datasets.items():
+            if ds_id in existing_ids:
+                continue
+            item = QListWidgetItem(ds.name)
+            item.setData(Qt.UserRole, ds_id)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            self._dataset_checklist.addItem(item)
+
     def _rebuild_detail(self, meta: dict[str, Any]) -> None:
         """Tear down and rebuild the scrollable detail content."""
         # Disconnect old param form signal before clearing to avoid stale callbacks

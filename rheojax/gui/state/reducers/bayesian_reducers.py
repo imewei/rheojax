@@ -117,7 +117,14 @@ def reduce_store_bayesian_result(
         bayes[key] = bayes_state
 
         pipeline = state.pipeline_state.clone()
-        pipeline.steps[PipelineStep.BAYESIAN] = StepStatus.COMPLETE
+        # Scope the chip to the currently active selection -- see the
+        # matching fix in fitting_reducers.reduce_store_fit_result.
+        pipeline.sync_fit_chip(
+            PipelineStep.BAYESIAN,
+            bayes,
+            state.active_model_name,
+            state.active_dataset_id,
+        )
         pipeline.current_step = PipelineStep.BAYESIAN
 
         # R8-NEW-009: don't overwrite active_model_name / active_dataset_id
