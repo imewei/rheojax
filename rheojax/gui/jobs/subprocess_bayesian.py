@@ -34,6 +34,7 @@ def run_bayesian_isolated(
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
     target_accept: float = 0.8,
+    model_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run NUTS Bayesian sampling in an isolated subprocess.
 
@@ -70,6 +71,10 @@ def run_bayesian_isolated(
         Fitted model instance variables to transfer.
     dataset_id : str
         Identifier for the dataset being analysed.
+    model_config : dict or None
+        Constructor kwargs for the model (n_modes/variant/kinetics/...), same
+        shape as ModelService.fit()'s model_config -- overrides the
+        warm-start-name inference heuristic in BayesianService.run_mcmc().
 
     Returns
     -------
@@ -139,6 +144,8 @@ def run_bayesian_isolated(
         mcmc_kwargs["custom_priors"] = priors
     if fitted_model_state is not None:
         mcmc_kwargs["fitted_model_state"] = fitted_model_state
+    if model_config:
+        mcmc_kwargs["model_config"] = model_config
 
     service = BayesianService()
     bayesian_result = service.run_mcmc(

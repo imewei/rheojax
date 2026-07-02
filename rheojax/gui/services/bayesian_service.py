@@ -149,6 +149,15 @@ class BayesianService:
                 if warm_start
                 else {}
             )
+            # The caller's explicit model_config (e.g. Fit Step 1's
+            # constructor-config UI: n_modes/variant/kinetics/...) takes
+            # priority over the warm-start-name heuristic above, mirroring
+            # ModelService.fit()'s model_config passthrough (model_service.py
+            # around line 748) so NUTS sees the same model construction NLSQ
+            # did instead of silently falling back to constructor defaults.
+            model_config = kwargs.pop("model_config", None)
+            if model_config:
+                model_kwargs = {**model_kwargs, **model_config}
             # Create model instance
             model = self._registry.create_instance(
                 model_name, plugin_type="model", **model_kwargs
