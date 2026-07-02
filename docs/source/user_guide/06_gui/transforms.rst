@@ -123,19 +123,22 @@ Basic Workflow
 --------------
 
 1. Navigate to **Transform** page
-2. Select source dataset from dropdown
-3. Choose transform from list
-4. Configure parameters
-5. Click **Apply Transform**
-6. Review result in preview
-7. **Accept** to add as new dataset
+2. Choose a transform from the sidebar list. Single-dataset transforms
+   (FFT, IFFT, Derivative) act on the application's active dataset; for
+   multi-dataset transforms (Mastercurve, SRFS) check the datasets to
+   include from the dataset checklist
+3. Configure parameters in the auto-generated form
+4. Review the live before/after preview, which updates automatically as you
+   change parameters
+5. Click **Apply Transform** to commit the result as a new dataset
 
 Transform Preview
 -----------------
 
-Before accepting:
+Before applying:
 
-- View transformed data plot
+- View the before/after transformed data plot (updates automatically,
+  debounced, as parameters change)
 - Check data ranges
 - Verify expected behavior
 - Adjust parameters if needed
@@ -158,11 +161,11 @@ Chaining Transforms
 
 Apply multiple transforms sequentially:
 
-1. Apply first transform
-2. Accept result as new dataset
-3. Select new dataset
-4. Apply next transform
-5. Repeat as needed
+1. Apply the first transform (result is added as a new dataset and becomes
+   active)
+2. Select the new dataset if it isn't already active
+3. Apply the next transform
+4. Repeat as needed
 
 Transform Parameters
 ====================
