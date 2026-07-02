@@ -4,6 +4,7 @@ import math
 import multiprocessing
 
 import numpy as np
+from PySide6.QtCore import QEventLoop, QObject, QRunnable, QThreadPool, Signal
 
 from rheojax.gui.foundation.invalidation import invalidate_downstream
 from rheojax.gui.foundation.state import AppState
@@ -44,13 +45,61 @@ def _r2_sort_key(result: dict | None) -> float:
     return -1.0 if math.isnan(v) else v
 
 
-def _make_fit_fn(library, fit_state):
-    """Build the real (synchronous) fit_fn NlsqStep.run() calls.
+class _CallableWorkerSignals(QObject):
+    completed = Signal(object)
+    failed = Signal(object)
 
-    Runs subprocess_fit.run_fit_isolated to completion before returning --
-    NlsqStep's control flow is fully synchronous today (no progress bar or
-    cancel button exists yet), so a local, throwaway Queue/Event is enough.
+
+class _CallableWorker(QRunnable):
+    """Runs an arbitrary no-arg callable on a QThreadPool thread."""
+
+    def __init__(self, fn) -> None:
+        super().__init__()
+        self._fn = fn
+        self.signals = _CallableWorkerSignals()
+
+    def run(self) -> None:
+        try:
+            result = self._fn()
+        except Exception as exc:  # noqa: BLE001 - re-raised on the GUI thread by _run_on_thread
+            self.signals.failed.emit(exc)
+        else:
+            self.signals.completed.emit(result)
+
+
+def _run_on_thread(fn):
+    """Run *fn* on a QThreadPool thread while pumping a local QEventLoop, so
+    the GUI stays responsive -- mirrors transform_controller.py's
+    _make_run_fn. The calling function still returns synchronously (or
+    re-raises *fn*'s exception here, on the caller's thread), but the actual
+    NLSQ/NUTS computation no longer blocks the GUI thread directly, which
+    used to freeze the entire app (repaints, Cancel, everything) for the
+    full duration of every real fit/sample run.
     """
+    worker = _CallableWorker(fn)
+    loop = QEventLoop()
+    outcome: dict = {}
+
+    def _on_completed(result):
+        outcome["result"] = result
+        loop.quit()
+
+    def _on_failed(exc):
+        outcome["error"] = exc
+        loop.quit()
+
+    worker.signals.completed.connect(_on_completed)
+    worker.signals.failed.connect(_on_failed)
+    QThreadPool.globalInstance().start(worker)
+    loop.exec()
+
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["result"]
+
+
+def _make_fit_fn(library, fit_state):
+    """Build the real fit_fn NlsqStep.run() calls."""
 
     def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
                 multi_start=None):
@@ -82,18 +131,20 @@ def _make_fit_fn(library, fit_state):
                     )
                     for name, cfg in initial_params.items()
                 }
-            result = run_fit_isolated(
-                model_key,
-                rheo_data.x,
-                rheo_data.y,
-                test_mode=test_mode,
-                initial_params=start_params or {},
-                options={},
-                progress_queue=multiprocessing.Queue(),
-                cancel_event=multiprocessing.Event(),
-                dataset_id=data_ref,
-                model_config=model_config,
-                metadata=metadata,
+            result = _run_on_thread(
+                lambda start_params=start_params: run_fit_isolated(
+                    model_key,
+                    rheo_data.x,
+                    rheo_data.y,
+                    test_mode=test_mode,
+                    initial_params=start_params or {},
+                    options={},
+                    progress_queue=multiprocessing.Queue(),
+                    cancel_event=multiprocessing.Event(),
+                    dataset_id=data_ref,
+                    model_config=model_config,
+                    metadata=metadata,
+                )
             )
             r2 = _r2_sort_key(result)
             best_r2 = _r2_sort_key(best) if best else -1.0
@@ -120,27 +171,29 @@ def _make_fit_fn(library, fit_state):
 
 
 def _make_sample_fn(library, fit_state):
-    """Build the real (synchronous) sample_fn NutsStep.run() calls."""
+    """Build the real sample_fn NutsStep.run() calls."""
 
     def _sample_fn(priors, warm_start, config):
         rheo_data = library.load_payload(fit_state.data_ref)
-        return run_bayesian_isolated(
-            fit_state.model_key,
-            rheo_data.x,
-            rheo_data.y,
-            test_mode=fit_state.protocol,
-            num_warmup=500,
-            num_samples=1000,
-            num_chains=4,
-            warm_start=warm_start,
-            priors=priors,
-            seed=0,
-            progress_queue=multiprocessing.Queue(),
-            cancel_event=multiprocessing.Event(),
-            dataset_id=fit_state.data_ref,
-            target_accept=config.get("target_accept", 0.8),
-            model_config=fit_state.model_config,
-            metadata=getattr(rheo_data, "metadata", None),
+        return _run_on_thread(
+            lambda: run_bayesian_isolated(
+                fit_state.model_key,
+                rheo_data.x,
+                rheo_data.y,
+                test_mode=fit_state.protocol,
+                num_warmup=500,
+                num_samples=1000,
+                num_chains=4,
+                warm_start=warm_start,
+                priors=priors,
+                seed=0,
+                progress_queue=multiprocessing.Queue(),
+                cancel_event=multiprocessing.Event(),
+                dataset_id=fit_state.data_ref,
+                target_accept=config.get("target_accept", 0.8),
+                model_config=fit_state.model_config,
+                metadata=getattr(rheo_data, "metadata", None),
+            )
         )
 
     return _sample_fn
@@ -218,6 +271,17 @@ def build_fit_controller(app_state: AppState):
         protocol_body.edited.connect(nlsq_body.load_parameters_from_model)
     if hasattr(protocol_body, "config_edited") and hasattr(nlsq_body, "load_parameters_from_model"):
         protocol_body.config_edited.connect(nlsq_body.load_parameters_from_model)
+
+    # Wire every upstream edit that invalidates nlsq_result (protocol/model,
+    # constructor-config, and data/column-map changes) -> NlsqStep.refresh_display,
+    # so the "R²=..." label is cleared instead of showing a stale readout for
+    # a fit that state.nlsq_result no longer reflects.
+    if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "refresh_display"):
+        protocol_body.edited.connect(nlsq_body.refresh_display)
+    if hasattr(protocol_body, "config_edited") and hasattr(nlsq_body, "refresh_display"):
+        protocol_body.config_edited.connect(nlsq_body.refresh_display)
+    if hasattr(data_body, "edited") and hasattr(nlsq_body, "refresh_display"):
+        data_body.edited.connect(nlsq_body.refresh_display)
 
     # Wire NLSQ edits -> NutsStep.reset_skip, so a stale "skipped" decision
     # doesn't survive an NLSQ re-run that invalidates nuts_result.

@@ -85,20 +85,37 @@ class VisualizeStep(QWidget):
         x, y, y_fit = result.get("x"), result.get("y"), result.get("y_fit")
         if x is None or y is None:
             return
+        x = np.asarray(x)
+        y = np.asarray(y)
         self._overlay.clear()
-        self._overlay.plot_data(np.asarray(x), np.asarray(y), name="Data")
+        # PyQtGraph rejects complex dtype arrays outright. Oscillation-mode
+        # data/fits carry y = G' + i*G'' as a genuine complex array (see
+        # RheoData.is_complex) -- split into separate real/imag traces
+        # instead of collapsing to abs() (as ResidualsPanel does for a
+        # single scalar residual), since G' and G'' are both independently
+        # meaningful curves here.
+        if np.iscomplexobj(y):
+            self._overlay.plot_data(x, y.real, name="Data (G')")
+            self._overlay.plot_data(x, y.imag, name="Data (G'')")
+        else:
+            self._overlay.plot_data(x, y, name="Data")
         if y_fit is not None:
-            self._overlay.plot_line(np.asarray(x), np.asarray(y_fit), name="Fit")
+            y_fit = np.asarray(y_fit)
+            if np.iscomplexobj(y_fit):
+                self._overlay.plot_line(x, y_fit.real, name="Fit (G')")
+                self._overlay.plot_line(x, y_fit.imag, name="Fit (G'')")
+            else:
+                self._overlay.plot_line(x, y_fit, name="Fit")
         nuts = self._state.nuts_result or {}
         band = nuts.get("y_band")
         if band is not None:
             lo, hi = band
-            self._overlay.plot_line(
-                np.asarray(x), np.asarray(lo), name="Posterior lo", line_style="dash"
-            )
-            self._overlay.plot_line(
-                np.asarray(x), np.asarray(hi), name="Posterior hi", line_style="dash"
-            )
+            lo = np.asarray(lo)
+            hi = np.asarray(hi)
+            if np.iscomplexobj(lo) or np.iscomplexobj(hi):
+                lo, hi = np.abs(lo), np.abs(hi)
+            self._overlay.plot_line(x, lo, name="Posterior lo", line_style="dash")
+            self._overlay.plot_line(x, hi, name="Posterior hi", line_style="dash")
 
     def _refresh_residuals(self) -> None:
         result = self._state.nlsq_result or {}

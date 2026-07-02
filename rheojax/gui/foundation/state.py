@@ -13,6 +13,14 @@ class FitState:
     model_config: dict[str, Any] = field(default_factory=dict)
     data_ref: str | None = None
     column_map: dict[str, Any] = field(default_factory=dict)
+    # ponytail: plumbed through the invalidation cascade (contract.py declares
+    # per-protocol required names like "sigma0"/"gamma0") but no GUI step
+    # writes to it, and no fit/sample call reads it -- real runs still get
+    # protocol kwargs from data.metadata (ModelService.fit()'s
+    # _PROTOCOL_KWARGS). Building a working control_vars UI needs the
+    # contract.py names reconciled with ModelService's actual kwarg
+    # vocabulary first (they don't match 1:1 today, e.g. "gamma_dot0" vs
+    # "gdot"); do that reconciliation before wiring a widget to this field.
     control_vars: dict[str, float] = field(default_factory=dict)
     nlsq_config: dict = field(default_factory=dict)       # multi-start / solver settings
     nlsq_result: Any | None = None  # FitResult from ModelService.fit(); typed Any to avoid circular import

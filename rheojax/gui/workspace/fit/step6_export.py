@@ -32,7 +32,11 @@ class ExportStep(QWidget):
         self._export_btn.clicked.connect(lambda: self.export_bundle(Path.cwd()))
 
     def bundle_manifest(self) -> list[str]:
-        items = ["parameters", "fitted_curve", "figures", "provenance"]
+        # ponytail: "figures" isn't listed -- export_bundle() has no figure
+        # writer (VisualizeStep's canvases are pyqtgraph, not matplotlib
+        # Figures export_service.export_figure() expects); add it back only
+        # once that's actually wired.
+        items = ["parameters", "fitted_curve", "provenance"]
         if self._state.nuts_result is not None:
             items += ["posterior_samples", "diagnostics"]
         return items

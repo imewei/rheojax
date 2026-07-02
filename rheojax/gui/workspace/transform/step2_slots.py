@@ -132,7 +132,9 @@ class SlotsStep(QWidget):
         return list(self._specs)
 
     def candidates(self, slot_name: str) -> list[str]:
-        spec = next(s for s in self._specs if s.name == slot_name)
+        spec = next((s for s in self._specs if s.name == slot_name), None)
+        if spec is None:
+            return []
         refs = (
             self._library.datasets_of_type(spec.accepts)
             if spec.accepts
@@ -141,6 +143,8 @@ class SlotsStep(QWidget):
         return [r.id for r in refs]
 
     def fill(self, slot_name: str, value) -> None:
+        if not any(s.name == slot_name for s in self._specs):
+            raise ValueError(f"unknown slot: {slot_name!r}")
         self._state.slots[slot_name] = value
         self.edited.emit()
 

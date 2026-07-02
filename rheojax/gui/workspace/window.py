@@ -162,7 +162,12 @@ class WorkspaceWindow(QMainWindow):
         if ctl.can_advance():
             ctl.advance()
         i = ctl.current
-        while i + 1 < len(ctl.steps) and ctl.steps[i].is_ready() and (i + 1) not in ctl.reached:
+        while (
+            i + 1 < len(ctl.steps)
+            and ctl.steps[i].is_ready()
+            and ctl.steps[i].validate()
+            and (i + 1) not in ctl.reached
+        ):
             ctl.reached.add(i + 1)
             i += 1
         if self._mode == mode:
