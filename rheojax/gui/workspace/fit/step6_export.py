@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.services.export_service import ExportService
 
 
 class ExportStep(QWidget):
@@ -16,12 +22,14 @@ class ExportStep(QWidget):
         super().__init__(parent)
         self._state = state
         self._library = library
+        self._export_service = ExportService()
         self._save_btn = QPushButton("＋ Save fit → library", self)
         self._export_btn = QPushButton("⤓ Export", self)
         lay = QVBoxLayout(self)
         for w in (QLabel("Export bundle"), self._save_btn, self._export_btn):
             lay.addWidget(w)
         self._save_btn.clicked.connect(self.save_to_library)
+        self._export_btn.clicked.connect(lambda: self.export_bundle(Path.cwd()))
 
     def bundle_manifest(self) -> list[str]:
         items = ["parameters", "fitted_curve", "figures", "provenance"]
@@ -30,13 +38,54 @@ class ExportStep(QWidget):
         return items
 
     def provenance(self) -> dict:
-        return {
+        prov = {
             "model_key": self._state.model_key,
             "model_config": self._state.model_config,
             "protocol": self._state.protocol,
             "data_ref": self._state.data_ref,
             "revision": self._state.revision,
         }
+        if self._state.nuts_result and "verdict" in self._state.nuts_result:
+            prov["convergence_verdict"] = self._state.nuts_result["verdict"]
+        return prov
+
+    def export_bundle(self, directory: Path | str) -> dict[str, Path]:
+        """Write parameters/fitted-curve/provenance (+ posterior, if run) to `directory`."""
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        written: dict[str, Path] = {}
+
+        result = self._state.nlsq_result or {}
+        params_path = directory / "parameters.csv"
+        self._export_service.export_parameters(
+            SimpleNamespace(parameters=result.get("params", {})), params_path
+        )
+        written["parameters"] = params_path
+
+        x, y_fit = result.get("x"), result.get("y_fit")
+        if x is not None and y_fit is not None:
+            curve_path = directory / "fitted_curve.csv"
+            np.savetxt(
+                curve_path,
+                np.column_stack([x, y_fit]),
+                delimiter=",",
+                header="x,y_fit",
+                comments="",
+            )
+            written["fitted_curve"] = curve_path
+
+        if self._state.nuts_result is not None:
+            posterior_path = directory / "posterior_samples.nc"
+            self._export_service.export_posterior_netcdf(
+                self._state.nuts_result, posterior_path
+            )
+            written["posterior_samples"] = posterior_path
+
+        provenance_path = directory / "provenance.json"
+        provenance_path.write_text(json.dumps(self.provenance(), default=str, indent=2))
+        written["provenance"] = provenance_path
+
+        return written
 
     def save_to_library(self) -> str:
         new_id = f"{self._state.model_key}_fit_{self._state.revision}"
@@ -57,5 +106,11 @@ class ExportStep(QWidget):
                 ),
             )
         )
+        result = self._state.nlsq_result or {}
+        x, y_fit = result.get("x"), result.get("y_fit")
+        if x is not None and y_fit is not None:
+            self._library.store_payload(
+                new_id, SimpleNamespace(x=np.asarray(x), y=np.asarray(y_fit))
+            )
         self.exported.emit()
         return new_id

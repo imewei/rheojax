@@ -1,11 +1,37 @@
 from __future__ import annotations
 
+import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.contract import input_contract
 from rheojax.gui.foundation.library import DatasetLibrary
 from rheojax.gui.foundation.state import FitState
+
+
+def _validate_shape_and_values(rheo_data) -> list[str]:
+    """Shape/NaN/monotonicity checks against a loaded RheoData. Empty = valid."""
+    errors: list[str] = []
+    x = np.asarray(rheo_data.x)
+    y = np.asarray(rheo_data.y)
+    if x.shape[0] != y.shape[0]:
+        errors.append(f"x/y length mismatch: {x.shape[0]} vs {y.shape[0]}")
+        return errors  # remaining checks assume matching length
+    x_has_nan = bool(np.isnan(x).any())
+    if x_has_nan:
+        errors.append("x contains NaN values")
+    if np.isnan(y).any():
+        errors.append("y contains NaN values")
+    # Monotonicity is undefined in the presence of NaNs (diff/comparisons
+    # against NaN are always False, which would spuriously flag "not
+    # monotonic" on top of the NaN error already reported above).
+    if (
+        not x_has_nan
+        and x.shape[0] > 1
+        and not (np.all(np.diff(x) > 0) or np.all(np.diff(x) < 0))
+    ):
+        errors.append("x is not monotonic")
+    return errors
 
 
 class DataStep(QWidget):
@@ -17,14 +43,23 @@ class DataStep(QWidget):
         super().__init__(parent)
         self._state = state
         self._library = library
+        self._errors: list[str] = []
+        self._unit_converted = False
         # Guard: protocol may be None on a fresh AppState; defer contract build until set
         self._contract, cols_text = self._build_contract()
         self._expected = QLabel(cols_text, self)
         self._source = QComboBox(self)
         self._source.addItems([""] + self.available_datasets())
         self._guard = QLabel("", self)
+        self._error_label = QLabel("", self)
         lay = QVBoxLayout(self)
-        for w in (self._expected, QLabel("Source"), self._source, self._guard):
+        for w in (
+            self._expected,
+            QLabel("Source"),
+            self._source,
+            self._guard,
+            self._error_label,
+        ):
             lay.addWidget(w)
         self._source.currentTextChanged.connect(self._on_select)
 
@@ -68,6 +103,7 @@ class DataStep(QWidget):
             self._state.data_ref = None
             self._state.column_map = {}
             self._guard.setText("")
+            self._set_errors([])
             self.edited.emit()
 
     def expected_columns(self) -> list[str]:
@@ -80,7 +116,9 @@ class DataStep(QWidget):
         self._source.setCurrentText(ds_id)
 
     def _on_select(self, ds_id: str) -> None:
+        self._unit_converted = False
         self._state.data_ref = ds_id or None
+        errors: list[str] = []
         if ds_id and self._contract:
             # default column map = role -> positional index
             self._state.column_map = {
@@ -91,9 +129,27 @@ class DataStep(QWidget):
                 if self.needs_hz_conversion()
                 else ""
             )
+            try:
+                payload = self._library.load_payload(ds_id)
+            except KeyError:
+                # No payload loaded yet for this ref (e.g. metadata-only entry
+                # in tests/catalog browsing); nothing to validate against.
+                payload = None
+            if payload is not None:
+                errors = _validate_shape_and_values(payload)
+        self._set_errors(errors)
         self.edited.emit()
 
+    def _set_errors(self, errors: list[str]) -> None:
+        self._errors = errors
+        self._error_label.setText("⚠ " + "; ".join(errors) if errors else "")
+
+    def validation_errors(self) -> list[str]:
+        return list(self._errors)
+
     def needs_hz_conversion(self) -> bool:
+        if self.unit_conversion_applied():
+            return False
         if (
             not self._contract
             or "x" not in self._contract.unit_conversions
@@ -103,5 +159,21 @@ class DataStep(QWidget):
         ref = self._library.get(self._state.data_ref)
         return ref.units.get("x", "").lower() in ("hz", "hertz")
 
+    def apply_unit_conversion(self) -> None:
+        """Execute the Hz -> rad/s (x2pi) conversion flagged by needs_hz_conversion()."""
+        if not self._state.data_ref or self._unit_converted:
+            return
+        rheo_data = self._library.load_payload(self._state.data_ref)
+        rheo_data.x = np.asarray(rheo_data.x) * (2 * np.pi)
+        self._library.store_payload(self._state.data_ref, rheo_data)
+        self._unit_converted = True
+        self._guard.setText("")
+        self.edited.emit()
+
+    def unit_conversion_applied(self) -> bool:
+        return self._unit_converted
+
     def is_ready(self) -> bool:
-        return bool(self._state.data_ref and self._state.column_map)
+        return bool(
+            self._state.data_ref and self._state.column_map and not self._errors
+        )

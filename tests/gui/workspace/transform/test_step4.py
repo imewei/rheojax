@@ -77,3 +77,19 @@ def test_result_tab_handles_missing_result_without_crashing(qtbot):
     step = TransformVisualizeStep(st)
     qtbot.addWidget(step)
     assert step._tabs.count() == 2
+
+
+def test_category_handles_unregistered_transform_key_without_crashing(qtbot, monkeypatch):
+    # Regression: TransformRegistry.get_info() can return None for a key that
+    # isn't registered (mirrors the guard in transform_controller.py's
+    # _is_same_domain, added in the same task). Before the fix, _category()
+    # called str(info.transform_type) unconditionally and raised AttributeError.
+    from rheojax.core.registry import TransformRegistry
+
+    monkeypatch.setattr(TransformRegistry, "get_info", classmethod(lambda cls, key: None))
+
+    st = TransformState(transform_key="not_a_real_transform")
+    step = TransformVisualizeStep(st)
+    qtbot.addWidget(step)
+    assert step._category() == "analysis"
+    assert step.view_mode() == "overlay"

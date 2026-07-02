@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from PySide6.QtWidgets import QGridLayout, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.gui.foundation.state import FitState
@@ -71,6 +71,15 @@ class VisualizeStep(QWidget):
     def arviz_plots(self) -> list[str]:
         return list(_ARVIZ_PLOTS) if self._state.nuts_result is not None else []
 
+    def diagnostics_badge_text(self) -> str:
+        nuts = self._state.nuts_result
+        if not nuts or "verdict" not in nuts:
+            return ""
+        verdict = nuts["verdict"]
+        if verdict.get("converged"):
+            return "✓ converged"
+        return "⚠ not-converged: " + "; ".join(verdict.get("reasons", []))
+
     def _refresh_overlay(self) -> None:
         result = self._state.nlsq_result or {}
         x, y, y_fit = result.get("x"), result.get("y"), result.get("y_fit")
@@ -100,12 +109,18 @@ class VisualizeStep(QWidget):
 
     def _add_diagnostics_tab(self) -> None:
         page = QWidget(self)
-        grid = QGridLayout(page)
+        outer = QVBoxLayout(page)
+        badge = QLabel(self.diagnostics_badge_text(), page)
+        outer.addWidget(badge)
+        grid_widget = QWidget(page)
+        grid = QGridLayout(grid_widget)
         for i, plot_name in enumerate(_ARVIZ_PLOTS):
-            canvas = ArvizCanvas(page)
+            canvas = ArvizCanvas(grid_widget)
             canvas.set_plot_type(plot_name)
             grid.addWidget(canvas, i // 2, i % 2)
             self._arviz_canvases[plot_name] = canvas
+        outer.addWidget(grid_widget)
+        self._badge_label = badge
         self._add("Diagnostics", page)
 
     def _remove_diagnostics_tab(self) -> None:
@@ -116,8 +131,15 @@ class VisualizeStep(QWidget):
             page.deleteLater()
         self._arviz_canvases.clear()
         self._names.remove("Diagnostics")
+        # ponytail: drop the dangling reference so a later refresh() (before
+        # deleteLater's deferred Qt cleanup actually runs) can't touch a
+        # widget whose parent tab no longer exists.
+        if hasattr(self, "_badge_label"):
+            del self._badge_label
 
     def _refresh_diagnostics(self) -> None:
+        if hasattr(self, "_badge_label"):
+            self._badge_label.setText(self.diagnostics_badge_text())
         if not self._arviz_canvases:
             return
         idata = self._inference_data()

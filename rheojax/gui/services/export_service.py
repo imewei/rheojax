@@ -429,6 +429,48 @@ class ExportService:
             )
             raise RuntimeError(f"Export failed: {e}") from e
 
+    def export_posterior_netcdf(self, result: dict, path: Path | str) -> None:
+        """Write NUTS posterior samples to NetCDF via ArviZ InferenceData.
+
+        `result` uses the same shape VisualizeStep._inference_data() reads:
+        {"posterior_samples": {name: flat_or_chain_array}, "sample_stats":
+        {...} | None, "num_chains": int}.
+
+        Note: builds the InferenceData via
+        ``rheojax.core.arviz_utils.inference_data_from_dict`` rather than
+        calling ``arviz.from_dict`` directly — installed ArviZ 1.x accepts
+        the groups mapping positionally (``from_dict(populated_groups)``),
+        not as ``posterior=``/``sample_stats=`` keywords, and that helper
+        already bridges the 0.x/1.x calling-convention difference (same
+        helper `VisualizeStep._inference_data()` uses).
+        """
+        from rheojax.core.arviz_utils import inference_data_from_dict
+
+        posterior_samples = result.get("posterior_samples") or {}
+        num_chains = result.get("num_chains", 1) or 1
+
+        def _to_chain_draw(samples):
+            arr = np.asarray(samples)
+            if arr.ndim != 1:
+                return arr
+            if num_chains > 1 and arr.size % num_chains == 0:
+                return arr.reshape(num_chains, -1)
+            return arr.reshape(1, -1)
+
+        posterior = {name: _to_chain_draw(s) for name, s in posterior_samples.items()}
+        sample_stats = result.get("sample_stats")
+        sample_stats_dict = (
+            {name: _to_chain_draw(s) for name, s in sample_stats.items()}
+            if sample_stats
+            else None
+        )
+        idata = inference_data_from_dict(
+            {"posterior": posterior, "sample_stats": sample_stats_dict}
+        )
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        idata.to_netcdf(str(path))
+
     def save_project(
         self,
         state: dict[str, Any],

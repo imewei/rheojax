@@ -2,13 +2,107 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from PySide6.QtCore import QEventLoop, QThreadPool
+
+from rheojax.core.registry import TransformRegistry
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.jobs.transform_worker import TransformWorker
 from rheojax.gui.workspace.controller import Step, TransformController
+from rheojax.gui.workspace.transform.slots_spec import transform_slots
 from rheojax.gui.workspace.transform.step1_pick import TransformPickStep
 from rheojax.gui.workspace.transform.step2_slots import SlotsStep
 from rheojax.gui.workspace.transform.step3_run import RunStep
 from rheojax.gui.workspace.transform.step4_visualize import TransformVisualizeStep
 from rheojax.gui.workspace.transform.step5_export import TransformExportStep
+
+_DOMAIN_CHANGING = {"spectral", "decomposition"}
+
+
+def _resolve_slot_data(library, transform_key, slots):
+    """Resolve filled slot ids to RheoData payloads, in transform_slots() order.
+
+    Single slot -> one RheoData. is_list slot -> list[RheoData]. Multiple
+    (typed-pair) slots -> list[RheoData] in spec order (matches cox_merz's
+    positional [oscillation, flow_curve] expectation).
+    """
+    specs = transform_slots(transform_key)
+    if len(specs) == 1 and not specs[0].is_list:
+        return library.load_payload(slots[specs[0].name])
+    if len(specs) == 1 and specs[0].is_list:
+        return [library.load_payload(i) for i in slots[specs[0].name]]
+    return [library.load_payload(slots[s.name]) for s in specs]
+
+
+def _is_same_domain(transform_key: str) -> bool:
+    info = TransformRegistry.get_info(transform_key)
+    if info is None:
+        return True  # unrecognized key -> conservative default, preserve type
+    category = str(info.transform_type).split(".")[-1].lower()
+    return category not in _DOMAIN_CHANGING
+
+
+def _infer_protocol_type(library, transform_key, slots) -> str | None:
+    """Same-domain transforms (superposition/processing/analysis) plausibly
+    keep the input's protocol type; domain-changing transforms (spectral/
+    decomposition) get None, matching the design spec's own documented
+    fallback ("stored but not offered to typed Fit slots" for outputs whose
+    protocol isn't determined). Per-transform-exact output typing (e.g. does
+    prony_conversion's spectrum count as "relaxation"?) is a refinement left
+    for a follow-up once each of the 14 transforms' real output domain is
+    confirmed -- this default only ever *under*-offers a derived dataset to
+    Fit, never mis-tags one.
+    """
+    if not _is_same_domain(transform_key):
+        return None
+    specs = transform_slots(transform_key)
+    if not specs:
+        return None
+    first = slots.get(specs[0].name)
+    if isinstance(first, list):
+        first = first[0] if first else None
+    if not first:
+        return None
+    return library.get(first).protocol_type
+
+
+def _make_run_fn(library):
+    def _run(transform_key, slots, config):
+
+        data = _resolve_slot_data(library, transform_key, slots)
+        worker = TransformWorker(transform_key, data, params=config)
+        loop = QEventLoop()
+        outcome: dict = {}
+
+        def _on_completed(tr):
+            outcome["result"] = tr
+            loop.quit()
+
+        def _on_failed(msg):
+            outcome["error"] = msg
+            loop.quit()
+
+        def _on_cancelled():
+            outcome["cancelled"] = True
+            loop.quit()
+
+        worker.signals.completed.connect(_on_completed)
+        worker.signals.failed.connect(_on_failed)
+        worker.signals.cancelled.connect(_on_cancelled)
+        QThreadPool.globalInstance().start(worker)
+        loop.exec()
+
+        if "error" in outcome:
+            raise RuntimeError(outcome["error"])
+        if outcome.get("cancelled"):
+            raise RuntimeError("Transform cancelled")
+
+        tr = outcome["result"]
+        return {
+            "output": tr.data,
+            "result": tr.extras,
+            "protocol_type": _infer_protocol_type(library, transform_key, slots),
+        }
+    return _run
 
 
 def build_transform_controller(app_state: AppState):
@@ -16,16 +110,23 @@ def build_transform_controller(app_state: AppState):
     bodies = [
         TransformPickStep(st),
         SlotsStep(st, app_state.library),
-        RunStep(st),
+        RunStep(st, run_fn=_make_run_fn(app_state.library)),
         TransformVisualizeStep(st),
         TransformExportStep(st, app_state.library),
+    ]
+    validators = [
+        lambda b=bodies[0]: b.is_ready(),
+        lambda b=bodies[1]: b.is_ready(),
+        lambda b=bodies[2]: b.is_ready(),
+        lambda: True,   # Visualize is read-only
+        lambda: True,   # Export just saves/writes
     ]
     steps = [
         Step(
             id=TransformController.STEP_IDS[i],
             title=TransformController.STEP_IDS[i],
             is_ready=getattr(bodies[i], "is_ready", lambda: True),
-            validate=lambda: True,
+            validate=validators[i],
         )
         for i in range(len(bodies))
     ]
