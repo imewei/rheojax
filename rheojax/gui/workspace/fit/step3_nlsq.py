@@ -117,12 +117,27 @@ class NlsqStep(QWidget):
                 "r_squared": res.r_squared,
                 "success": getattr(res, "success", True),
             }
+        self.refresh_display()
+        self.edited.emit()
+        self.finished.emit()
+
+    def refresh_display(self) -> None:
+        """Sync the result label to current state.
+
+        Called both after a run and whenever an upstream edit invalidates
+        nlsq_result -- without this, the label kept showing a stale
+        "R²=..." readout for a fit that was already discarded.
+        """
+        if self._state.nlsq_result is None:
+            self._result.setText("")
+            return
         r2 = self._state.nlsq_result.get("r_squared", float("nan"))
         if r2 is None:
             r2 = float("nan")
         self._result.setText(f"R²={r2:.3f}")
-        self.edited.emit()
-        self.finished.emit()
 
     def is_ready(self) -> bool:
-        return self._state.nlsq_result is not None
+        return bool(
+            self._state.nlsq_result is not None
+            and self._state.nlsq_result.get("success", True)
+        )

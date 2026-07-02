@@ -113,10 +113,20 @@ class ProtocolModelStep(QWidget):
 
     def _on_protocol(self, p: str) -> None:
         self._state.protocol = p or None
+        # Block signals across clear()+addItems(): if a model was already
+        # selected, clear() alone would synchronously fire
+        # currentTextChanged("") -> _on_model("") -> an `edited` emission,
+        # then this method would emit a second time below -- double-running
+        # fit_controller.py's invalidation cascade for one user action.
+        # Instead, resync explicitly via a single _on_model() call after
+        # repopulating, so exactly one `edited` emission covers both the
+        # protocol change and the resulting model reset.
+        self._model.blockSignals(True)
         self._model.clear()
         if p:
             self._model.addItems([""] + sorted(ModelRegistry.find(protocol=p)))
-        self.edited.emit()
+        self._model.blockSignals(False)
+        self._on_model(self._model.currentText())
 
     def model_keys(self) -> list[str]:
         return [

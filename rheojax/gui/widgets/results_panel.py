@@ -97,7 +97,7 @@ class ResultsPanel(QWidget):
             lines.append("Summary:")
             for name, stats in result.summary.items():
                 mean = stats.get("mean", 0.0)
-                sd = stats.get("sd", 0.0)
+                sd = stats.get("std", 0.0)
                 lines.append(f"  {name}: {mean:.4g} ± {sd:.4g}")
         self.bayes_text.setText("\n".join(lines))
         logger.debug(

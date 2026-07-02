@@ -181,8 +181,15 @@ class NutsStep(QWidget):
             # this guard only keeps an unwired Sample button from crashing the Qt slot.
             self._result.setText("NUTS sampler is not wired up yet.")
             return
-        result["verdict"] = _diagnostics_verdict(result)
+        verdict = _diagnostics_verdict(result)
+        result["verdict"] = verdict
         self._state.nuts_result = result
+        status = (
+            "✓ converged"
+            if verdict["converged"]
+            else "⚠ " + "; ".join(verdict["reasons"])
+        )
+        self._result.setText(status)
         self.edited.emit()
         self.finished.emit()
 
@@ -193,3 +200,4 @@ class NutsStep(QWidget):
         """Clear a stale skip decision when an upstream NLSQ re-run invalidates
         nuts_result (see _FIT_CASCADE["nlsq_result"] in invalidation.py)."""
         self._skipped = False
+        self._result.setText("")

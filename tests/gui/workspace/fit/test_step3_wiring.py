@@ -81,7 +81,7 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
     assert app.fit.nuts_result["r_hat"] == {"a": 1.0}
 
 
-def test_make_fit_fn_normalizes_parameters_key_to_params(monkeypatch):
+def test_make_fit_fn_normalizes_parameters_key_to_params(monkeypatch, qapp):
     # subprocess_fit.run_fit_isolated's real return dict uses key "parameters"
     # (see ModelService.fit()'s FitResult), but every downstream consumer of
     # FitState.nlsq_result (NutsStep.suggested_priors/run, step3_nlsq.py's own
@@ -177,7 +177,7 @@ def test_multistart_forwards_config_to_fit_fn():
     assert captured["multi_start"] == {"enabled": True, "count": 5}
 
 
-def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypatch):
+def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypatch, qapp):
     # Exercises _make_fit_fn's real restart loop (not just NlsqStep forwarding
     # the multi_start dict). Restart 2 (the 3rd call) returns the best
     # r_squared, so the winning result must come from that call. The "b"
@@ -230,7 +230,7 @@ def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypat
     assert any(v != 1.0 for v in a_values[1:])  # restarts jitter it
 
 
-def test_multistart_restart_loop_recovers_from_nan_r_squared(monkeypatch):
+def test_multistart_restart_loop_recovers_from_nan_r_squared(monkeypatch, qapp):
     # Regression: the first (unjittered) restart returns NaN r_squared (a
     # degenerate fit). `r2 > best_r2` and `best_r2 > r2` are both always
     # False when either side is NaN, so a naive comparison would let that
