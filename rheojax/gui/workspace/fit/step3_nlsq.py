@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.state.store import ParameterState
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
@@ -61,7 +62,23 @@ class NlsqStep(QWidget):
         if not self._state.model_key:
             return
         instance = ModelRegistry.create(self._state.model_key, **self._state.model_config)
-        self._table.set_parameters(dict(instance.parameters))
+        # instance.parameters is a ParameterSet of core.parameters.Parameter
+        # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs gui.state.store
+        # .ParameterState (`.min_bound`/`.max_bound`/`.fixed`). Convert here,
+        # mirroring ModelService.get_parameter_defaults()'s same conversion.
+        params = {
+            name: ParameterState(
+                name=name,
+                value=float(getattr(p, "value", 0.0)),
+                min_bound=float(p.bounds[0]),
+                max_bound=float(p.bounds[1]),
+                fixed=False,
+                unit=getattr(p, "units", ""),
+                description=getattr(p, "description", ""),
+            )
+            for name, p in dict(instance.parameters).items()
+        }
+        self._table.set_parameters(params)
 
     def set_multistart(self, enabled: bool, count: int) -> None:
         self._ms_enabled.setChecked(enabled)

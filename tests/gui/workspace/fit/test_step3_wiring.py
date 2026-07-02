@@ -95,16 +95,19 @@ def test_make_fit_fn_normalizes_parameters_key_to_params(monkeypatch):
 
 
 def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
+    from types import SimpleNamespace
+
     from rheojax.gui.foundation.state import FitState
-    from rheojax.gui.state.store import ParameterState
     from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
 
+    # Mimics rheojax.core.parameters.Parameter's real shape (`.value`,
+    # `.bounds` tuple, `.units`, `.description` -- no `.fixed`, no
+    # `.min_bound`/`.max_bound`), which is what ModelRegistry.create(...)
+    # .parameters actually returns in production.
     class _FakeInstance:
         parameters = {
-            "a": ParameterState(name="a", value=1.0, min_bound=0.0, max_bound=10.0,
-                                 fixed=False, unit="Pa", description=""),
-            "b": ParameterState(name="b", value=2.0, min_bound=0.0, max_bound=5.0,
-                                 fixed=True, unit="s", description=""),
+            "a": SimpleNamespace(value=1.0, bounds=(0.0, 10.0), units="Pa", description=""),
+            "b": SimpleNamespace(value=2.0, bounds=(0.0, 5.0), units="s", description=""),
         }
 
     monkeypatch.setattr(
@@ -123,7 +126,17 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
     step = NlsqStep(st, fit_fn=fake_fit_fn)
     step.load_parameters_from_model()
     table_params = step.parameter_table().get_parameters()
-    assert table_params["b"].fixed is True
+    assert table_params["a"].value == 1.0
+    assert table_params["a"].min_bound == 0.0
+    assert table_params["a"].max_bound == 10.0
+    assert table_params["b"].fixed is False  # defaults never carry fixed=True
+
+    # Simulate a user checking "fixed" for "b" via the table (the real UI
+    # path is the checkbox widget's toggled signal -> _on_fixed_toggled()).
+    from dataclasses import replace
+
+    table_params["b"] = replace(table_params["b"], fixed=True)
+    step.parameter_table().set_parameters(table_params)
 
     step.run()
     ip = captured["initial_params"]
