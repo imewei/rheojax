@@ -1,12 +1,68 @@
 from __future__ import annotations
 
+import inspect
+import typing
+from typing import Any, Literal, get_args, get_origin
+
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
+
+
+def _constructor_params(model_key: str) -> list[tuple[str, Any, Any]]:
+    """Introspect a model class's __init__ for configurable constructor kwargs.
+
+    Returns (name, annotation, default) tuples, skipping `self` and any
+    parameter without a default (required positional args are data, not
+    config, and are never asked for here).
+    """
+    cls = ModelRegistry.get_info(model_key).plugin_class
+    sig = inspect.signature(cls.__init__)
+    # Model modules use `from __future__ import annotations`, so
+    # param.annotation is a plain string at runtime; resolve it to the real
+    # type via get_type_hints (falls back to the unresolved param.annotation
+    # if resolution fails, e.g. a missing import in the model's module).
+    try:
+        hints = typing.get_type_hints(cls.__init__)
+    except Exception:
+        hints = {}
+    out: list[tuple[str, Any, Any]] = []
+    for name, param in sig.parameters.items():
+        if name == "self" or param.default is inspect.Parameter.empty:
+            continue
+        out.append((name, hints.get(name, param.annotation), param.default))
+    return out
+
+
+def _make_config_widget(annotation: Any, default: Any):
+    """Return (widget, getter) for a supported annotation, or (None, None)."""
+    if annotation is bool:
+        w = QCheckBox()
+        w.setChecked(bool(default))
+        return w, w.isChecked
+    if get_origin(annotation) is Literal:
+        w = QComboBox()
+        w.addItems([str(a) for a in get_args(annotation)])
+        w.setCurrentText(str(default))
+        return w, w.currentText
+    if annotation is int:
+        w = QSpinBox()
+        w.setRange(-1_000_000, 1_000_000)
+        w.setValue(int(default))
+        return w, w.value
+    return None, None
 
 
 class ProtocolModelStep(QWidget):
@@ -19,9 +75,11 @@ class ProtocolModelStep(QWidget):
 
         _ensure_all_registered()
         self._state = state
+        self._config_widgets: dict[str, tuple[QWidget, Any]] = {}
         self._protocol = QComboBox(self)
         self._protocol.addItems([""] + _PROTOCOLS)
         self._model = QComboBox(self)
+        self._config_form = QFormLayout()
         self._params = QLabel("", self)
         lay = QVBoxLayout(self)
         for w in (
@@ -29,10 +87,11 @@ class ProtocolModelStep(QWidget):
             self._protocol,
             QLabel("Model"),
             self._model,
-            QLabel("Parameters"),
-            self._params,
         ):
             lay.addWidget(w)
+        lay.addLayout(self._config_form)
+        lay.addWidget(QLabel("Parameters"))
+        lay.addWidget(self._params)
         self._protocol.currentTextChanged.connect(self._on_protocol)
         self._model.currentTextChanged.connect(self._on_model)
 
@@ -47,7 +106,11 @@ class ProtocolModelStep(QWidget):
         self.edited.emit()
 
     def model_keys(self) -> list[str]:
-        return [self._model.itemText(i) for i in range(self._model.count()) if self._model.itemText(i)]
+        return [
+            self._model.itemText(i)
+            for i in range(self._model.count())
+            if self._model.itemText(i)
+        ]
 
     def set_model(self, key: str) -> None:
         self._model.setCurrentText(key)
@@ -55,10 +118,57 @@ class ProtocolModelStep(QWidget):
     def _on_model(self, key: str) -> None:
         self._state.model_key = key or None
         self._state.model_config = {}
-        if key:
-            params = list(ModelRegistry.create(key).parameters.keys())
-            self._params.setText(", ".join(params))
+        self._rebuild_config_widgets(key)
+        self._refresh_preview()
         self.edited.emit()
+
+    def _rebuild_config_widgets(self, key: str) -> None:
+        while self._config_form.rowCount():
+            self._config_form.removeRow(0)
+        self._config_widgets.clear()
+        if not key:
+            return
+        for name, annotation, default in _constructor_params(key):
+            widget, getter = _make_config_widget(annotation, default)
+            if widget is None:
+                continue  # unsupported annotation type — stays at model default
+            self._config_widgets[name] = (widget, getter)
+            self._config_form.addRow(name, widget)
+            if isinstance(widget, QCheckBox):
+                widget.toggled.connect(self._on_config_changed)
+            elif isinstance(widget, QComboBox):
+                widget.currentTextChanged.connect(self._on_config_changed)
+            elif isinstance(widget, QSpinBox):
+                widget.valueChanged.connect(self._on_config_changed)
+
+    def _on_config_changed(self, *_args: Any) -> None:
+        self._state.model_config = {
+            name: getter() for name, (_w, getter) in self._config_widgets.items()
+        }
+        self._refresh_preview()
+        self.edited.emit()
+
+    def set_model_config(self, config: dict[str, Any]) -> None:
+        """Test/programmatic helper: apply a config dict to the widgets, then commit it."""
+        for name, value in config.items():
+            entry = self._config_widgets.get(name)
+            if entry is None:
+                continue
+            widget, _getter = entry
+            if isinstance(widget, QCheckBox):
+                widget.setChecked(bool(value))
+            elif isinstance(widget, QComboBox):
+                widget.setCurrentText(str(value))
+            elif isinstance(widget, QSpinBox):
+                widget.setValue(int(value))
+        self._on_config_changed()
+
+    def _refresh_preview(self) -> None:
+        if not self._state.model_key:
+            self._params.setText("")
+            return
+        instance = ModelRegistry.create(self._state.model_key, **self._state.model_config)
+        self._params.setText(", ".join(instance.parameters.keys()))
 
     def is_ready(self) -> bool:
         return bool(self._state.protocol and self._state.model_key)
