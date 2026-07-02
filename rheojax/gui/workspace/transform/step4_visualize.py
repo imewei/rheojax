@@ -80,6 +80,8 @@ class TransformVisualizeStep(QWidget):
         if self._state.transform_key is None:
             return "analysis"  # safe default; view_mode() → "overlay"
         info = TransformRegistry.get_info(self._state.transform_key)
+        if info is None:
+            return "analysis"  # unrecognized key -> same safe default as above
         return str(info.transform_type).split(".")[-1].lower()
 
     def view_mode(self) -> str:
