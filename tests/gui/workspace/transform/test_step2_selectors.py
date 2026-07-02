@@ -66,3 +66,29 @@ def test_refresh_drops_selection_no_longer_in_candidates(qtbot):
     step = SlotsStep(st, lib)
     qtbot.addWidget(step)
     assert "input" not in st.slots
+
+
+def test_list_slot_not_ready_when_emptied_via_remove(qtbot):
+    st = TransformState(transform_key="mastercurve")
+    lib = DatasetLibrary()
+    lib.add(_ref("s1", "oscillation"))
+    step = SlotsStep(st, lib)
+    qtbot.addWidget(step)
+
+    step._list_add_combos["datasets"].setCurrentText("s1")
+    step._list_add_buttons["datasets"].click()
+    assert step.is_ready() is True
+
+    step._list_widgets["datasets"].setCurrentRow(0)
+    step._list_remove_buttons["datasets"].click()
+    assert st.slots["datasets"] == []
+    assert step.is_ready() is False
+
+
+def test_list_slot_not_ready_when_all_candidates_go_stale_on_refresh(qtbot):
+    st = TransformState(transform_key="mastercurve", slots={"datasets": ["gone1", "gone2"]})
+    lib = DatasetLibrary()  # neither id was ever added -> both go stale on refresh
+    step = SlotsStep(st, lib)
+    qtbot.addWidget(step)
+    assert st.slots["datasets"] == []
+    assert step.is_ready() is False

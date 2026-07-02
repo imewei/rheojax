@@ -145,4 +145,10 @@ class SlotsStep(QWidget):
         self.edited.emit()
 
     def is_ready(self) -> bool:
-        return all(s.name in self._state.slots for s in self._specs)
+        for s in self._specs:
+            value = self._state.slots.get(s.name)
+            if s.name not in self._state.slots:
+                return False
+            if s.is_list and not value:
+                return False
+        return True
