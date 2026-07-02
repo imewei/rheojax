@@ -42,6 +42,8 @@ class WorkspaceWindow(QMainWindow):
         for body in self._fit_bodies:
             if hasattr(body, "edited"):
                 body.edited.connect(self._on_fit_body_edited)
+            if hasattr(body, "config_edited"):
+                body.config_edited.connect(self._on_fit_body_edited)
         for body in self._transform_bodies:
             if hasattr(body, "edited"):
                 body.edited.connect(self._on_transform_body_edited)

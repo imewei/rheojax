@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import multiprocessing
 
 import numpy as np
@@ -21,7 +22,29 @@ from rheojax.gui.workspace.fit.step6_export import ExportStep
 _CHANGED = ["model_key", "column_map", "nlsq_result", "nuts_result", None, None]
 
 
-def _make_fit_fn(library):
+def _r2_sort_key(result: dict | None) -> float:
+    """Multi-start restart-selection key: treat missing/NaN r_squared as the
+    worst possible score (-1.0), never as itself.
+
+    subprocess_fit.run_fit_isolated's r_squared can legitimately come back
+    NaN (a degenerate fit). `nan > x` and `x > nan` are both always False in
+    Python, so once a NaN became `best_r2` no later, better restart could
+    ever replace it -- defeating multi-start under exactly the failure
+    conditions it exists to escape.
+    """
+    if not result:
+        return -1.0
+    v = result.get("r_squared")
+    if v is None:
+        return -1.0
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return -1.0
+    return -1.0 if math.isnan(v) else v
+
+
+def _make_fit_fn(library, fit_state):
     """Build the real (synchronous) fit_fn NlsqStep.run() calls.
 
     Runs subprocess_fit.run_fit_isolated to completion before returning --
@@ -32,6 +55,16 @@ def _make_fit_fn(library):
     def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
                 multi_start=None):
         rheo_data = library.load_payload(data_ref)
+        # ponytail: Step 1's protocol combo uses the same vocabulary as
+        # Protocol.value ("flow_curve"/"creep"/"relaxation"/"startup"/
+        # "oscillation"/"laos"), which is exactly what ModelService.fit()'s
+        # test_mode expects. Previously this was hardcoded to None, which
+        # fell through to data.metadata.get("test_mode", "oscillation") on
+        # an empty metadata dict (metadata was never forwarded either) --
+        # every real fit silently ran as "oscillation" no matter what
+        # protocol the user picked.
+        test_mode = fit_state.protocol
+        metadata = getattr(rheo_data, "metadata", None)
         ms = multi_start or {}
         count = ms.get("count", 1) if ms.get("enabled") else 1
         rng = np.random.default_rng(0)
@@ -53,16 +86,17 @@ def _make_fit_fn(library):
                 model_key,
                 rheo_data.x,
                 rheo_data.y,
-                test_mode=None,
+                test_mode=test_mode,
                 initial_params=start_params or {},
                 options={},
                 progress_queue=multiprocessing.Queue(),
                 cancel_event=multiprocessing.Event(),
                 dataset_id=data_ref,
                 model_config=model_config,
+                metadata=metadata,
             )
-            r2 = result.get("r_squared") if result.get("r_squared") is not None else -1
-            best_r2 = best.get("r_squared") if best and best.get("r_squared") is not None else -1
+            r2 = _r2_sort_key(result)
+            best_r2 = _r2_sort_key(best) if best else -1.0
             if best is None or r2 > best_r2:
                 best = result
         # ponytail: run_fit_isolated's real result dict key is "parameters"
@@ -94,7 +128,7 @@ def _make_sample_fn(library, fit_state):
             fit_state.model_key,
             rheo_data.x,
             rheo_data.y,
-            test_mode=None,
+            test_mode=fit_state.protocol,
             num_warmup=500,
             num_samples=1000,
             num_chains=4,
@@ -106,6 +140,7 @@ def _make_sample_fn(library, fit_state):
             dataset_id=fit_state.data_ref,
             target_accept=config.get("target_accept", 0.8),
             model_config=fit_state.model_config,
+            metadata=getattr(rheo_data, "metadata", None),
         )
 
     return _sample_fn
@@ -116,7 +151,7 @@ def build_fit_controller(app_state: AppState):
     bodies = [
         ProtocolModelStep(st),
         DataStep(st, app_state.library),
-        NlsqStep(st, fit_fn=_make_fit_fn(app_state.library)),
+        NlsqStep(st, fit_fn=_make_fit_fn(app_state.library, st)),
         NutsStep(st, sample_fn=_make_sample_fn(app_state.library, st)),
         VisualizeStep(st),
         ExportStep(st, app_state.library),
@@ -140,36 +175,49 @@ def build_fit_controller(app_state: AppState):
     ]
     ctl = FitController(steps)
 
+    def _cascade_and_relock(idx: int, changed: str | None) -> None:
+        ctl.on_edit(idx)
+        if changed:
+            new_fit = invalidate_downstream(app_state.fit, changed)
+            # Mutate in place so step bodies (which hold a reference to
+            # app_state.fit via `st`) see the cleared fields immediately.
+            # FitState is non-frozen, so setattr works without replace().
+            for attr, val in vars(new_fit).items():
+                setattr(app_state.fit, attr, val)
+
     for i, body in enumerate(bodies):
         if hasattr(body, "edited"):
-
-            def _on_edit(idx=i):
-                ctl.on_edit(idx)
-                changed = _CHANGED[idx]
-                if changed:
-                    new_fit = invalidate_downstream(app_state.fit, changed)
-                    # Mutate in place so step bodies (which hold a reference to
-                    # app_state.fit via `st`) see the cleared fields immediately.
-                    # FitState is non-frozen, so setattr works without replace().
-                    for attr, val in vars(new_fit).items():
-                        setattr(app_state.fit, attr, val)
-
-            body.edited.connect(_on_edit)
+            body.edited.connect(lambda idx=i: _cascade_and_relock(idx, _CHANGED[idx]))
+        # ProtocolModelStep also fires config_edited for constructor-config
+        # widget changes (model/protocol unchanged) -- those must cascade
+        # with the narrower "model_config" key, not _CHANGED[idx] ==
+        # "model_key" (which would wipe the model_config edit right back to
+        # {} via invalidation.py's _CLEAR, silently discarding it before any
+        # real NLSQ/NUTS run ever saw it).
+        if hasattr(body, "config_edited"):
+            body.config_edited.connect(lambda idx=i: _cascade_and_relock(idx, "model_config"))
 
     # Wire Protocol/Model edits -> Data step refresh, so the contract/combo
-    # rebuild after Step 1 completes (connected after the _on_edit loop above,
-    # so invalidation/state-update runs first, then refresh sees fresh state).
+    # rebuild after Step 1 completes (connected after the _cascade_and_relock
+    # loop above, so invalidation/state-update runs first, then refresh sees
+    # fresh state).
     protocol_body, data_body = bodies[0], bodies[1]
     if hasattr(protocol_body, "edited") and hasattr(data_body, "refresh"):
         protocol_body.edited.connect(data_body.refresh)
+    if hasattr(protocol_body, "config_edited") and hasattr(data_body, "refresh"):
+        protocol_body.config_edited.connect(data_body.refresh)
 
     # Wire Protocol/Model edits -> NlsqStep.load_parameters_from_model, so the
     # ParameterTable stays seeded with whatever model is currently selected
     # (protocol-only edits are a safe no-op -- load_parameters_from_model()
-    # guards on self._state.model_key being set).
+    # guards on self._state.model_key being set). Constructor-config changes
+    # (e.g. n_modes) can also change the model's parameter set, so
+    # config_edited needs the same reseed.
     nlsq_body = bodies[2]
     if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "load_parameters_from_model"):
         protocol_body.edited.connect(nlsq_body.load_parameters_from_model)
+    if hasattr(protocol_body, "config_edited") and hasattr(nlsq_body, "load_parameters_from_model"):
+        protocol_body.config_edited.connect(nlsq_body.load_parameters_from_model)
 
     # Wire NLSQ edits -> NutsStep.reset_skip, so a stale "skipped" decision
     # doesn't survive an NLSQ re-run that invalidates nuts_result.

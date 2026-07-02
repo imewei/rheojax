@@ -101,6 +101,12 @@ def _make_run_fn(library):
 
         tr = outcome["result"]
         return {
+            # step4_visualize.py's "Input vs output" overlay tab reads
+            # payload["input"] via _xy() (tolerant of the list shape from
+            # is_list/typed-pair slots -- it just returns None for those,
+            # same as a missing key). `data` is already resolved above;
+            # without this the Input trace was silently never plotted.
+            "input": data,
             "output": tr.data,
             "result": tr.extras,
             "protocol_type": _infer_protocol_type(library, transform_key, slots),

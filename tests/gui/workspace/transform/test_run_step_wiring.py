@@ -45,6 +45,12 @@ def test_build_transform_controller_injects_real_run_fn(qapp, monkeypatch):
     assert app.transform.result["output"].x[0] == 1.0
     # "smooth_derivative" is same-domain (not spectral/decomposition) -> protocol_type preserved
     assert app.transform.result["protocol_type"] == "flow_curve"
+    # Regression: step4_visualize.py's "Input vs output" overlay tab reads
+    # payload["input"] -- _make_run_fn resolved the slot data into `data`
+    # right before invoking the worker but never attached it to the result
+    # dict, so the Input trace was silently never plotted in the real app.
+    assert app.transform.result["input"] is not None
+    assert app.transform.result["input"].x[0] == 0.0
 
 
 def test_run_fn_raises_on_worker_failure(qapp, monkeypatch):

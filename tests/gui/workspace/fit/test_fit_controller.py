@@ -30,6 +30,29 @@ def test_controller_gating_and_invalidation(qtbot):
     assert ctl.reached == {0}  # downstream re-locked
 
 
+def test_config_widget_edit_survives_invalidation_cascade(qtbot):
+    # Regression: build_fit_controller wired ProtocolModelStep's constructor-
+    # config widgets to the same `edited` signal used for protocol/model
+    # swaps, which invalidates downstream with the "model_key" cascade key.
+    # That cascade clears model_config back to {} (invalidation.py's _CLEAR),
+    # so every real n_modes/kinetics/etc widget edit was silently discarded
+    # the instant it fired -- app_state.fit.model_config never reflected
+    # what Step 1 displayed. Constructor-config widgets must use the
+    # narrower "model_config" cascade (via config_edited) which leaves
+    # model_config itself untouched.
+    app = AppState()
+    ctl, bodies = build_fit_controller(app)
+    for b in bodies:
+        qtbot.addWidget(b)
+    bodies[0].set_protocol("relaxation")
+    bodies[0].set_model("generalized_maxwell")
+    assert app.fit.model_config == {}
+
+    bodies[0].set_model_config({"n_modes": 4})
+
+    assert app.fit.model_config == {"n_modes": 4}
+
+
 def test_window_uses_real_fit_steps(qtbot):
     win = WorkspaceWindow(AppState())
     qtbot.addWidget(win)

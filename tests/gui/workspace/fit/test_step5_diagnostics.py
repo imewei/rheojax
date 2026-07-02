@@ -102,6 +102,54 @@ def test_diagnostics_verdict_nan_bfmi_flags_unavailable_not_converged():
     assert any("BFMI unavailable" in r for r in v["reasons"])
 
 
+def test_diagnostics_verdict_nan_rhat_flags_not_converged():
+    # Regression: az.rhat() can legitimately return NaN for a degenerate
+    # (zero-variance) chain. `nan > _R_HAT_THRESHOLD` is always False in
+    # Python, so the old code silently treated this as converged -- unlike
+    # the dedicated NaN guard bfmi already had.
+    result = {
+        "r_hat": {"a": float("nan")},
+        "ess": {"a": 800},
+        "bfmi": 0.5,
+        "sample_stats": {"diverging": np.zeros((4, 1000), dtype=bool)},
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert any("r_hat" in r for r in v["reasons"])
+
+
+def test_diagnostics_verdict_nan_ess_flags_not_converged():
+    # Regression: az.ess() can also legitimately return NaN. `nan <
+    # _ESS_MIN` is always False, so this silently passed as converged too.
+    result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": float("nan")},
+        "bfmi": 0.5,
+        "sample_stats": {"diverging": np.zeros((4, 1000), dtype=bool)},
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert any("ESS" in r for r in v["reasons"])
+
+
+def test_diagnostics_verdict_prefers_top_level_divergences_over_empty_sample_stats():
+    # Regression: when result.to_inference_data() fails (wrapped in a
+    # try/except None fallback in bayesian_service.py), sample_stats comes
+    # back {} and the old code always reported 0 divergences even though
+    # the authoritative count (from mcmc.get_extra_fields(), independent of
+    # ArviZ conversion) is sitting unused in nuts_result["divergences"].
+    result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": 800},
+        "bfmi": 0.5,
+        "divergences": 7,
+        "sample_stats": {},
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert "7 divergent transitions" in v["reasons"]
+
+
 def test_nuts_step_run_attaches_verdict(qtbot):
     st = FitState(nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9})
 
