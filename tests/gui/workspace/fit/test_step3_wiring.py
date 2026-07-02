@@ -149,6 +149,59 @@ def test_multistart_forwards_config_to_fit_fn():
     assert captured["multi_start"] == {"enabled": True, "count": 5}
 
 
+def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypatch):
+    # Exercises _make_fit_fn's real restart loop (not just NlsqStep forwarding
+    # the multi_start dict). Restart 2 (the 3rd call) returns the best
+    # r_squared, so the winning result must come from that call. The "b"
+    # parameter is fixed=True; its "value" must be identical across all 3
+    # calls to run_fit_isolated -- if the jitter overwrote it (Finding 1),
+    # calls 2 and 3 would see a perturbed "value" for "b".
+    calls = []
+
+    def fake_run_fit_isolated(model_name, x_data, y_data, test_mode, initial_params,
+                               options, progress_queue, cancel_event, y2_data=None,
+                               metadata=None, dataset_id="", model_config=None):
+        calls.append(initial_params)
+        r_squared = [0.5, 0.7, 0.95][len(calls) - 1]
+        return {"params": {"a": 1.0, "b": 2.0}, "r_squared": r_squared, "success": True}
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.fit_controller.run_fit_isolated",
+        fake_run_fit_isolated,
+    )
+
+    lib = DatasetLibrary()
+    lib.add(
+        DatasetRef(id="d1", name="d1", protocol_type="flow_curve", origin="imported",
+                   units={}, row_count=2, hash="h", provenance={}, lineage=[])
+    )
+    lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
+
+    fit_fn = _make_fit_fn(lib)
+    initial_params = {
+        "a": {"value": 1.0, "bounds": (0.0, 10.0), "fixed": False},
+        "b": {"value": 2.0, "bounds": (0.0, 5.0), "fixed": True},
+    }
+    result = fit_fn(
+        "power_law", {}, "d1", {"x": 0, "y": 1},
+        initial_params=initial_params,
+        multi_start={"enabled": True, "count": 3},
+    )
+
+    assert len(calls) == 3
+    assert result["r_squared"] == 0.95
+
+    # Fixed param "b" must be unchanged across every restart.
+    for call_params in calls:
+        assert call_params["b"]["value"] == 2.0
+        assert call_params["b"]["fixed"] is True
+
+    # Non-fixed param "a" is allowed to differ across restarts (jittered).
+    a_values = [call_params["a"]["value"] for call_params in calls]
+    assert a_values[0] == 1.0  # first run uses caller's value unperturbed
+    assert any(v != 1.0 for v in a_values[1:])  # restarts jitter it
+
+
 def test_multistart_disabled_by_default():
     from rheojax.gui.foundation.state import FitState
     from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep

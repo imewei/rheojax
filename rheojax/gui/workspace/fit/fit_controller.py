@@ -42,7 +42,11 @@ def _make_fit_fn(library):
             start_params = initial_params
             if i > 0 and initial_params:
                 start_params = {
-                    name: {**cfg, "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2))}
+                    name: (
+                        cfg
+                        if cfg.get("fixed") is True
+                        else {**cfg, "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2))}
+                    )
                     for name, cfg in initial_params.items()
                 }
             result = run_fit_isolated(
@@ -57,7 +61,9 @@ def _make_fit_fn(library):
                 dataset_id=data_ref,
                 model_config=model_config,
             )
-            if best is None or (result.get("r_squared") or -1) > (best.get("r_squared") or -1):
+            r2 = result.get("r_squared") if result.get("r_squared") is not None else -1
+            best_r2 = best.get("r_squared") if best and best.get("r_squared") is not None else -1
+            if best is None or r2 > best_r2:
                 best = result
         # ponytail: run_fit_isolated's real result dict key is "parameters"
         # (see ModelService.fit()'s FitResult), but NlsqStep/NutsStep/tests
