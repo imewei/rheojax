@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
+from rheojax.gui.utils.layout_helpers import set_zero_margins
+
 
 class InspectorPanel(QWidget):
     _TABS = ["params", "priors", "log"]
@@ -12,7 +14,9 @@ class InspectorPanel(QWidget):
         self._index: dict[str, int] = {}
         for name in self._TABS:
             self._index[name] = self._tabs.addTab(QWidget(self), name)
-        QVBoxLayout(self).addWidget(self._tabs)
+        lay = QVBoxLayout(self)
+        set_zero_margins(lay)
+        lay.addWidget(self._tabs)
 
     def tab_names(self) -> list[str]:
         return list(self._TABS)

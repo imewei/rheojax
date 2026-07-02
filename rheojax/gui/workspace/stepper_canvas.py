@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margins
 from rheojax.gui.workspace.controller import WorkflowController
 
 
@@ -28,7 +29,9 @@ class StepperCanvas(QWidget):
             self._buttons.append(b)
             self._rail.addWidget(b)
             self._stack.addWidget(QWidget(self))  # placeholder body
+        set_toolbar_margins(self._rail)
         lay = QVBoxLayout(self)
+        set_zero_margins(lay)
         lay.addLayout(self._rail)
         lay.addWidget(self._stack)
         self.refresh()
