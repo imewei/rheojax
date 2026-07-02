@@ -74,6 +74,12 @@ def _make_fit_fn(library):
         # which is present under either key.
         if isinstance(best, dict) and "params" not in best and "parameters" in best:
             best = {**best, "params": best["parameters"]}
+        # run_fit_isolated never returns "x"/"y" (only "x_fit"/"y_fit") -- but
+        # step5_visualize.py and step6_export.py both key off "x"/"y" to plot
+        # the overlay/residuals and write fitted_curve.csv. Attach them from
+        # the already-loaded rheo_data so downstream consumers see real data.
+        if isinstance(best, dict):
+            best = {**best, "x": rheo_data.x, "y": rheo_data.y}
         return best
 
     return _fit_fn
@@ -156,11 +162,24 @@ def build_fit_controller(app_state: AppState):
     if hasattr(protocol_body, "edited") and hasattr(data_body, "refresh"):
         protocol_body.edited.connect(data_body.refresh)
 
+    # Wire Protocol/Model edits -> NlsqStep.load_parameters_from_model, so the
+    # ParameterTable stays seeded with whatever model is currently selected
+    # (protocol-only edits are a safe no-op -- load_parameters_from_model()
+    # guards on self._state.model_key being set).
+    nlsq_body = bodies[2]
+    if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "load_parameters_from_model"):
+        protocol_body.edited.connect(nlsq_body.load_parameters_from_model)
+
     # Wire NLSQ edits -> NutsStep.reset_skip, so a stale "skipped" decision
     # doesn't survive an NLSQ re-run that invalidates nuts_result.
-    nlsq_body, nuts_body = bodies[2], bodies[3]
+    nuts_body = bodies[3]
     if hasattr(nlsq_body, "edited") and hasattr(nuts_body, "reset_skip"):
         nlsq_body.edited.connect(nuts_body.reset_skip)
+
+    # Wire NLSQ finish -> NutsStep.load_suggested_priors, so the PriorsEditor
+    # is seeded from the fresh MAP estimate as soon as NLSQ produces a result.
+    if hasattr(nlsq_body, "finished") and hasattr(nuts_body, "load_suggested_priors"):
+        nlsq_body.finished.connect(nuts_body.load_suggested_priors)
 
     # Wire NUTS finish -> Visualize refresh so Diagnostics tab appears after sampling
     visualize_body = bodies[4]
