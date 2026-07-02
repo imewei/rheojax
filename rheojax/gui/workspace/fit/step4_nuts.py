@@ -30,11 +30,12 @@ def _diagnostics_verdict(nuts_result: dict) -> dict:
             reasons.append(f"ESS too low for {name}")
     sample_stats = nuts_result.get("sample_stats") or {}
     energy = sample_stats.get("energy")
-    if energy:
+    if energy is not None and len(energy) > 0:
         b = bfmi(energy)
         if b < _BFMI_MIN:
             reasons.append("BFMI too low")
-    diverging = sample_stats.get("diverging") or []
+    diverging = sample_stats.get("diverging")
+    diverging = [] if diverging is None else diverging
     n_divergences = sum(1 for d in diverging if d)
     if n_divergences:
         reasons.append(f"{n_divergences} divergent transitions")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 pytest.importorskip("PySide6")
@@ -29,6 +30,38 @@ def test_diagnostics_verdict_not_converged_high_rhat():
     v = _diagnostics_verdict(result)
     assert v["converged"] is False
     assert any("r_hat" in r for r in v["reasons"])
+
+
+def test_diagnostics_verdict_numpy_arrays_converged():
+    # Regression: sample_stats["energy"]/["diverging"] are real numpy arrays
+    # in production (see subprocess_bayesian.py's sample_stats_np build-up),
+    # not Python lists. `if energy:` and `... or []` both call bool() on the
+    # array, which raises ValueError for arrays with more than one element.
+    result = {
+        "r_hat": {"a": 1.0, "b": 1.01},
+        "ess": {"a": 800, "b": 900},
+        "sample_stats": {
+            "energy": np.array([1.0, 1.05, 0.98, 1.02] * 25),
+            "diverging": np.array([False] * 100),
+        },
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is True
+    assert v["reasons"] == []
+
+
+def test_diagnostics_verdict_numpy_arrays_not_converged_divergences():
+    result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": 800},
+        "sample_stats": {
+            "energy": np.array([1.0, 1.05, 0.98, 1.02] * 25),
+            "diverging": np.array([False] * 95 + [True] * 5),
+        },
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert any("divergent" in r for r in v["reasons"])
 
 
 def test_nuts_step_run_attaches_verdict(qtbot):
