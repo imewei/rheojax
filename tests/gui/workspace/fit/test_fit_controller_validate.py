@@ -62,3 +62,18 @@ def test_protocol_model_step_validate_requires_model(qtbot):
     bodies[0].set_protocol("flow_curve")
     bodies[0].set_model("power_law")
     assert ctl.steps[0].validate() is True
+
+
+def test_nuts_step_validate_true_when_not_converged(qtbot):
+    """A not-converged verdict must never hard-block validate() -- it flags,
+    it does not gate. Only presence of a result (or an explicit skip) may
+    gate NutsStep.is_ready()/validate()."""
+    app = AppState()
+    ctl, bodies = build_fit_controller(app)
+    for b in bodies:
+        qtbot.addWidget(b)
+    bodies[3]._state.nuts_result = {
+        "params": {"a": 1.0},
+        "verdict": {"converged": False, "reasons": ["r_hat too high for a"]},
+    }
+    assert ctl.steps[3].validate() is True
