@@ -67,9 +67,18 @@ class TransformExportStep(QWidget):
         return written
 
     def save_to_library(self) -> str | None:
-        ptype = (self._state.result or {}).get("protocol_type")
-        if not ptype:
+        # `.get("protocol_type")` returns None when the result dict never
+        # carried the key at all (e.g. a genuinely scalar/typeless output
+        # with no dataset-shaped payload to register -- see
+        # test_scalar_output_not_saved). transform_controller._run() always
+        # includes the key, using "" (not None) for domain-changing
+        # transforms whose output has no rheological protocol but is still a
+        # real, storable RheoData -- per design §7 those must be "stored but
+        # not offered to typed Fit slots", not silently dropped entirely.
+        result = self._state.result or {}
+        if "protocol_type" not in result:
             return None
+        ptype = result.get("protocol_type") or ""
         base_id = f"{self._state.transform_key}_out"
         new_id = base_id
         suffix = 2

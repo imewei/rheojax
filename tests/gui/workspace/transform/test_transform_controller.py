@@ -4,10 +4,14 @@ import pytest
 
 pytest.importorskip("PySide6")
 import rheojax.transforms  # noqa
+from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.workspace.transform.slots_spec import SlotSpec
-from rheojax.gui.workspace.transform.transform_controller import build_transform_controller
+from rheojax.gui.workspace.transform.transform_controller import (
+    _infer_protocol_type,
+    build_transform_controller,
+)
 from rheojax.gui.workspace.window import WorkspaceWindow
 
 
@@ -176,3 +180,33 @@ def test_run_finish_refreshes_visualize_step(qtbot):
     assert len(primary.findChildren(PyQtGraphCanvas)) == 2
     result_tab = visualize_body._tabs.widget(visualize_body._tabs.count() - 1)
     assert "n_peaks" in result_tab.text()
+
+
+def test_infer_protocol_type_returns_empty_string_not_none_for_domain_changing():
+    # Regression: domain-changing transforms (spectral/decomposition) must
+    # still return a real `str` ("", not None) so save_to_library() can tell
+    # "genuinely unresolvable" apart from "known but typeless" -- per design
+    # §7, such outputs are "stored but not offered to typed Fit slots", not
+    # silently dropped from the library entirely.
+    lib = DatasetLibrary()
+    lib.add(
+        DatasetRef(
+            id="rel1", name="rel1", protocol_type="relaxation", origin="imported",
+            units={}, row_count=3, hash="h", provenance={}, lineage=[],
+        )
+    )
+    ptype = _infer_protocol_type(lib, "fft_analysis", {"input": "rel1"})
+    assert ptype == ""
+    assert ptype is not None
+
+
+def test_infer_protocol_type_same_domain_still_resolves_real_type():
+    lib = DatasetLibrary()
+    lib.add(
+        DatasetRef(
+            id="osc1", name="osc1", protocol_type="oscillation", origin="imported",
+            units={}, row_count=3, hash="h", provenance={}, lineage=[],
+        )
+    )
+    ptype = _infer_protocol_type(lib, "smooth_derivative", {"input": "osc1"})
+    assert ptype == "oscillation"

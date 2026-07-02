@@ -41,27 +41,30 @@ def _is_same_domain(transform_key: str) -> bool:
     return category not in _DOMAIN_CHANGING
 
 
-def _infer_protocol_type(library, transform_key, slots) -> str | None:
+def _infer_protocol_type(library, transform_key, slots) -> str:
     """Same-domain transforms (superposition/processing/analysis) plausibly
     keep the input's protocol type; domain-changing transforms (spectral/
-    decomposition) get None, matching the design spec's own documented
-    fallback ("stored but not offered to typed Fit slots" for outputs whose
-    protocol isn't determined). Per-transform-exact output typing (e.g. does
-    prony_conversion's spectrum count as "relaxation"?) is a refinement left
-    for a follow-up once each of the 14 transforms' real output domain is
-    confirmed -- this default only ever *under*-offers a derived dataset to
-    Fit, never mis-tags one.
+    decomposition), and any case where the input protocol can't be resolved,
+    get "" (empty string, never None), matching the design spec's own
+    documented fallback: such outputs are "stored but not offered to typed
+    Fit slots" (design §7) -- `""` never equality-matches a real protocol
+    string in `DatasetLibrary.datasets_of_type()`, so it's excluded from
+    typed Fit slots while still being a valid, storable `DatasetRef`.
+    Per-transform-exact output typing (e.g. does prony_conversion's spectrum
+    count as "relaxation"?) is a refinement left for a follow-up once each of
+    the 14 transforms' real output domain is confirmed -- this default only
+    ever *under*-offers a derived dataset to Fit, never mis-tags one.
     """
     if not _is_same_domain(transform_key):
-        return None
+        return ""
     specs = transform_slots(transform_key)
     if not specs:
-        return None
+        return ""
     first = slots.get(specs[0].name)
     if isinstance(first, list):
         first = first[0] if first else None
     if not first:
-        return None
+        return ""
     return library.get(first).protocol_type
 
 

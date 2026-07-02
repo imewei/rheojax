@@ -8,7 +8,12 @@ from typing import Any
 class DatasetRef:
     id: str
     name: str
-    protocol_type: str               # always a real protocol, even for derived datasets
+    protocol_type: str               # a real protocol name, or "" for a derived dataset
+                                      # whose transform output has no determinable
+                                      # rheological protocol (design §7: "stored but
+                                      # not offered to typed Fit slots" -- "" never
+                                      # equality-matches a real protocol in
+                                      # datasets_of_type() below)
     origin: str                      # "imported" | "derived"
     units: dict[str, str]
     row_count: int
