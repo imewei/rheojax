@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.state import TransformState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 def _default_run_fn(transform_key, slots, config):
@@ -35,6 +36,7 @@ class RunStep(QWidget):
         self._btn = QPushButton("▶ Run transform", self)
         self._status = QLabel("", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
         lay.addWidget(self._btn)
         lay.addWidget(self._status)
         self._btn.clicked.connect(self.run)
