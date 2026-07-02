@@ -100,6 +100,7 @@ dependencies = [
     "arviz-base>=0.8.2",
     "arviz-stats>=0.8.0",
     "arviz-plots>=0.8.0",
+    "h5netcdf>=1.8.1",     # NetCDF backend for arviz InferenceData.to_netcdf()
 
     # Data structures (used directly in bayesian.py for InferenceData)
     "xarray>=2026.1.0,<2027.0.0",
