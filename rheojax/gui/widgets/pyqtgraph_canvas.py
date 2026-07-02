@@ -35,7 +35,14 @@ try:
 except ImportError:
     PYQTGRAPH_AVAILABLE = False
 
-from rheojax.gui.compat import QComboBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from rheojax.gui.compat import (
+    QComboBox,
+    QHBoxLayout,
+    QPushButton,
+    Qt,
+    QVBoxLayout,
+    QWidget,
+)
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -321,14 +328,17 @@ class PyQtGraphCanvas(QWidget):
             color = self.COLORS[self._color_index % len(self.COLORS)]
             self._color_index += 1
 
-        # Map line style to Qt pen style
+        # Map line style to Qt pen style. Must be a real Qt.PenStyle enum
+        # member, not a bare int -- newer PySide6 (6.11+) QPen.setStyle()
+        # rejects plain ints (this was never exercised end-to-end until fit
+        # results carried real x/y data through to the overlay).
         style_map = {
-            "solid": 1,  # Qt.SolidLine
-            "dash": 2,  # Qt.DashLine
-            "dot": 3,  # Qt.DotLine
-            "dashdot": 4,  # Qt.DashDotLine
+            "solid": Qt.PenStyle.SolidLine,
+            "dash": Qt.PenStyle.DashLine,
+            "dot": Qt.PenStyle.DotLine,
+            "dashdot": Qt.PenStyle.DashDotLine,
         }
-        style = style_map.get(line_style, 1)
+        style = style_map.get(line_style, Qt.PenStyle.SolidLine)
 
         pen = mkPen(color, width=line_width, style=style)
         item = self._plot_widget.plot(x, y, name=name, pen=pen)
