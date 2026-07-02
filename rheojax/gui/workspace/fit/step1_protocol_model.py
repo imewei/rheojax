@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
 
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.resources.styles.tokens import field_label_style
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
 
@@ -95,15 +97,22 @@ class ProtocolModelStep(QWidget):
         self._config_form = QFormLayout()
         self._params = QLabel("", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
+        protocol_caption = QLabel("Protocol")
+        protocol_caption.setStyleSheet(field_label_style())
+        model_caption = QLabel("Model")
+        model_caption.setStyleSheet(field_label_style())
         for w in (
-            QLabel("Protocol"),
+            protocol_caption,
             self._protocol,
-            QLabel("Model"),
+            model_caption,
             self._model,
         ):
             lay.addWidget(w)
         lay.addLayout(self._config_form)
-        lay.addWidget(QLabel("Parameters"))
+        params_caption = QLabel("Parameters")
+        params_caption.setStyleSheet(field_label_style())
+        lay.addWidget(params_caption)
         lay.addWidget(self._params)
         self._protocol.currentTextChanged.connect(self._on_protocol)
         self._model.currentTextChanged.connect(self._on_model)

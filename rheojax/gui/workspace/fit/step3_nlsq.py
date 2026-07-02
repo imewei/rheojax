@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.state.store import ParameterState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
@@ -51,6 +52,7 @@ class NlsqStep(QWidget):
         self._run_btn = QPushButton("▶ Run NLSQ", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
         for w in (self._table, self._ms_enabled, self._ms_count, self._run_btn, self._result):
             lay.addWidget(w)
         self._run_btn.clicked.connect(self.run)

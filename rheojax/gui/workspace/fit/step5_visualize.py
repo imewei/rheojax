@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QGridLayout, QLabel, QTabWidget, QVBoxLayout, QWid
 
 from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
@@ -48,7 +49,9 @@ class VisualizeStep(QWidget):
 
         # NOTE: Do NOT add Diagnostics here — nuts_result is always None at
         # controller build time. refresh() adds it once NUTS completes.
-        QVBoxLayout(self).addWidget(self._tabs)
+        lay = QVBoxLayout(self)
+        set_panel_margins(lay)
+        lay.addWidget(self._tabs)
         self.refresh()
 
     def _add(self, name: str, widget: QWidget) -> None:

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, 
 from rheojax.gui.foundation.metrics import bfmi
 from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.priors_editor import PriorsEditor
 
 _R_HAT_THRESHOLD = 1.05
@@ -121,6 +122,7 @@ class NutsStep(QWidget):
         self._run_btn = QPushButton("▶ Sample", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
+        set_panel_margins(lay)
         for w in (
             self._banner,
             self._priors_editor,
