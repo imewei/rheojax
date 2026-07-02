@@ -27,6 +27,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -253,7 +254,9 @@ class BayesianOptionsDialog(QDialog):
             "(R-hat < 1.01, ESS > 400)"
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666; font-size: 11px;")
+        info_label.setStyleSheet(
+            f"color: {themed('TEXT_MUTED')}; font-size: {Typography.SIZE_SM}pt;"
+        )
         layout.addWidget(info_label)
 
         layout.addStretch()

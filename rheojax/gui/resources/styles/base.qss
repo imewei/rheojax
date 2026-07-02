@@ -18,7 +18,6 @@ QWidget {
     background-color: @bg_surface;
     color: @text_primary;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
-    font-size: 13px;
 }
 
 QWidget:disabled {
@@ -197,7 +196,7 @@ QTabBar::tab {
     padding: 12px 24px;
     margin-right: 2px;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 11pt;
 }
 
 QTabBar::tab:hover {
@@ -233,7 +232,7 @@ QHeaderView::section {
     border-right: 1px solid @border_default;
     padding: 8px 12px;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 10pt;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -631,7 +630,7 @@ QGroupBox::title {
     subcontrol-position: top left;
     padding: 4px 12px;
     color: @text_secondary;
-    font-size: 12px;
+    font-size: 10pt;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -664,7 +663,7 @@ QProgressBar {
     height: 8px;
     text-align: center;
     color: @text_primary;
-    font-size: 10px;
+    font-size: 9pt;
 }
 
 QProgressBar::chunk {
@@ -722,13 +721,13 @@ QMenuBar::item:selected {
 
 QLabel[class="empty-message"] {
     color: @text_disabled;
-    font-size: 13px;
+    font-size: 12pt;
     padding: 0;
 }
 
 QLabel[class="empty-desc"] {
     color: @text_disabled;
-    font-size: 11px;
+    font-size: 10pt;
     padding: 0;
 }
 
@@ -736,7 +735,7 @@ QLabel[class="empty-desc"] {
 
 QPushButton[density="compact"] {
     padding: 4px 12px;
-    font-size: 11px;
+    font-size: 10pt;
     min-width: 60px;
 }
 

@@ -21,7 +21,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -76,7 +76,9 @@ class PipelineTemplateDialog(QDialog):
         instruction = QLabel(
             "Select a template to use as the starting point for your pipeline."
         )
-        instruction.setStyleSheet("font-size: 10pt; color: gray;")
+        instruction.setStyleSheet(
+            f"font-size: {Typography.SIZE_SM}pt; color: {themed('TEXT_MUTED')};"
+        )
         instruction.setWordWrap(True)
         root.addWidget(instruction)
 
@@ -93,7 +95,9 @@ class PipelineTemplateDialog(QDialog):
         left_layout.setSpacing(Spacing.XS)
 
         list_label = QLabel("Templates")
-        list_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        list_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_SM}pt; font-weight: {Typography.WEIGHT_BOLD};"
+        )
         left_layout.addWidget(list_label)
 
         self.template_list = QListWidget()
@@ -110,12 +114,16 @@ class PipelineTemplateDialog(QDialog):
         right_layout.setSpacing(Spacing.XS)
 
         preview_label = QLabel("Preview")
-        preview_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        preview_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_SM}pt; font-weight: {Typography.WEIGHT_BOLD};"
+        )
         right_layout.addWidget(preview_label)
 
         self.preview_edit = QTextEdit()
         self.preview_edit.setReadOnly(True)
-        self.preview_edit.setStyleSheet("font-family: monospace; font-size: 10pt;")
+        self.preview_edit.setStyleSheet(
+            f"font-family: {Typography.FONT_FAMILY_MONO}; font-size: {Typography.SIZE_SM}pt;"
+        )
         self.preview_edit.setPlaceholderText("Select a template to preview its YAML...")
         right_layout.addWidget(self.preview_edit)
 
@@ -127,7 +135,9 @@ class PipelineTemplateDialog(QDialog):
 
         # Description row beneath the splitter
         self.description_label = QLabel("")
-        self.description_label.setStyleSheet("font-size: 10pt; color: gray;")
+        self.description_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_SM}pt; color: {themed('TEXT_MUTED')};"
+        )
         self.description_label.setWordWrap(True)
         root.addWidget(self.description_label)
 

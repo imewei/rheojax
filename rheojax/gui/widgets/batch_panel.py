@@ -28,7 +28,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -92,7 +92,9 @@ class BatchPanel(QWidget):
 
         # Title
         title = QLabel("Batch Processing")
-        title.setStyleSheet("font-size: 13pt; font-weight: bold;")
+        title.setStyleSheet(
+            f"font-size: {Typography.SIZE_MD}pt; font-weight: {Typography.WEIGHT_BOLD};"
+        )
         root.addWidget(title)
 
         # Directory + pattern group
@@ -135,7 +137,7 @@ class BatchPanel(QWidget):
         files_layout = QVBoxLayout(files_group)
 
         self.files_count_label = QLabel("Files Found: 0")
-        self.files_count_label.setStyleSheet("font-size: 10pt;")
+        self.files_count_label.setStyleSheet(f"font-size: {Typography.SIZE_SM}pt;")
         files_layout.addWidget(self.files_count_label)
 
         self.file_table = QTableWidget(0, 3)
@@ -189,7 +191,9 @@ class BatchPanel(QWidget):
 
         # Status label
         self.status_label = QLabel("Ready.")
-        self.status_label.setStyleSheet("font-size: 10pt; color: gray;")
+        self.status_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_SM}pt; color: {themed('TEXT_MUTED')};"
+        )
         progress_layout.addWidget(self.status_label)
 
         root.addWidget(progress_group)

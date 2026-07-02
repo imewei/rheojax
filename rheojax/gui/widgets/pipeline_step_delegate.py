@@ -17,6 +17,7 @@ from rheojax.gui.compat import (
     QtWidgets,
     QWidget,
 )
+from rheojax.gui.resources.styles.tokens import Typography
 from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
@@ -151,7 +152,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         position_text = str(index.row() + 1)
         pos_font = QFont()
         pos_font.setBold(True)
-        pos_font.setPointSize(9)
+        pos_font.setPointSize(Typography.SIZE_XS)
         painter.setFont(pos_font)
         painter.setPen(QColor("#374151"))  # gray-700
 
@@ -165,7 +166,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
 
         # Draw step name
         name_font = QFont()
-        name_font.setPointSize(9)
+        name_font.setPointSize(Typography.SIZE_XS)
         painter.setFont(name_font)
         painter.setPen(QColor("#111827") if not is_selected else QColor("#1E1B4B"))
 
@@ -187,7 +188,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         # Draw step_type label (muted, right-aligned)
         if step_type:
             type_font = QFont()
-            type_font.setPointSize(8)
+            type_font.setPointSize(Typography.SIZE_XS)
             painter.setFont(type_font)
             painter.setPen(QColor("#9CA3AF"))  # gray-400
 

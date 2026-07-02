@@ -8,7 +8,7 @@ Displays summary metrics for the latest fit and Bayesian runs.
 from __future__ import annotations
 
 from rheojax.gui.compat import QLabel, QTextEdit, QVBoxLayout, QWidget
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, Typography
 from rheojax.gui.state.store import BayesianResult, FitResult
 from rheojax.logging import get_logger
 
@@ -26,18 +26,22 @@ class ResultsPanel(QWidget):
         layout.setSpacing(Spacing.XS)
 
         self.fit_label = QLabel("Fit Results")
-        self.fit_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.fit_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_MD_SM}pt; font-weight: {Typography.WEIGHT_BOLD};"
+        )
         self.fit_text = QTextEdit()
         self.fit_text.setReadOnly(True)
         self.fit_text.setMaximumHeight(120)
-        self.fit_text.setStyleSheet("font-size: 11pt;")
+        self.fit_text.setStyleSheet(f"font-size: {Typography.SIZE_MD_SM}pt;")
 
         self.bayes_label = QLabel("Bayesian Results")
-        self.bayes_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.bayes_label.setStyleSheet(
+            f"font-size: {Typography.SIZE_MD_SM}pt; font-weight: {Typography.WEIGHT_BOLD};"
+        )
         self.bayes_text = QTextEdit()
         self.bayes_text.setReadOnly(True)
         self.bayes_text.setMaximumHeight(140)
-        self.bayes_text.setStyleSheet("font-size: 11pt;")
+        self.bayes_text.setStyleSheet(f"font-size: {Typography.SIZE_MD_SM}pt;")
 
         layout.addWidget(self.fit_label)
         layout.addWidget(self.fit_text)
