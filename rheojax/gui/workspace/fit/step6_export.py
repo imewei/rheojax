@@ -30,13 +30,16 @@ class ExportStep(QWidget):
         return items
 
     def provenance(self) -> dict:
-        return {
+        prov = {
             "model_key": self._state.model_key,
             "model_config": self._state.model_config,
             "protocol": self._state.protocol,
             "data_ref": self._state.data_ref,
             "revision": self._state.revision,
         }
+        if self._state.nuts_result and "verdict" in self._state.nuts_result:
+            prov["convergence_verdict"] = self._state.nuts_result["verdict"]
+        return prov
 
     def save_to_library(self) -> str:
         new_id = f"{self._state.model_key}_fit_{self._state.revision}"

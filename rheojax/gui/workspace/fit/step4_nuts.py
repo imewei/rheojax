@@ -5,9 +5,43 @@ from collections.abc import Callable
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from rheojax.gui.foundation.metrics import bfmi
 from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.widgets.priors_editor import PriorsEditor
+
+_R_HAT_THRESHOLD = 1.05
+_ESS_MIN = 400
+_BFMI_MIN = 0.3
+
+
+def _diagnostics_verdict(nuts_result: dict) -> dict:
+    """Summarize NUTS convergence diagnostics into a pass/fail verdict.
+
+    Per the design (Step 4), this never blocks progress -- callers only use
+    it to flag a warning badge; NutsStep.is_ready() ignores it entirely.
+    """
+    reasons: list[str] = []
+    for name, r_hat in (nuts_result.get("r_hat") or {}).items():
+        if r_hat is not None and r_hat > _R_HAT_THRESHOLD:
+            reasons.append(f"r_hat too high for {name}")
+    for name, ess in (nuts_result.get("ess") or {}).items():
+        if ess is not None and ess < _ESS_MIN:
+            reasons.append(f"ESS too low for {name}")
+    sample_stats = nuts_result.get("sample_stats") or {}
+    energy = sample_stats.get("energy")
+    if energy:
+        b = bfmi(energy)
+        if b < _BFMI_MIN:
+            reasons.append("BFMI too low")
+    diverging = sample_stats.get("diverging") or []
+    n_divergences = sum(1 for d in diverging if d)
+    if n_divergences:
+        reasons.append(f"{n_divergences} divergent transitions")
+    return {
+        "converged": not reasons,
+        "reasons": reasons,
+    }
 
 
 def _default_sample_fn(priors, init, config):
@@ -105,6 +139,7 @@ class NutsStep(QWidget):
             # this guard only keeps an unwired Sample button from crashing the Qt slot.
             self._result.setText("NUTS sampler is not wired up yet.")
             return
+        result["verdict"] = _diagnostics_verdict(result)
         self._state.nuts_result = result
         self.edited.emit()
         self.finished.emit()
