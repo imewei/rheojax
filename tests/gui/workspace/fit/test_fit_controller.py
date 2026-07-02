@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 pytest.importorskip("PySide6")
@@ -6,6 +7,12 @@ from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.window import WorkspaceWindow
+
+
+class _RheoData:
+    def __init__(self, x, y):
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
 
 
 def test_controller_gating_and_invalidation(qtbot):
@@ -70,6 +77,9 @@ def test_model_only_edit_restores_still_valid_dataset_selection(qtbot):
             lineage=[],
         )
     )
+    app.library.store_payload(
+        "osc1", _RheoData(np.linspace(0.1, 10.0, 64), np.linspace(1.0, 5.0, 64))
+    )
     ctl, bodies = build_fit_controller(app)
     for b in bodies:
         qtbot.addWidget(b)
@@ -113,6 +123,9 @@ def test_export_step_unlocked_once_visualize_reached(qtbot):
             provenance={},
             lineage=[],
         )
+    )
+    app.library.store_payload(
+        "osc1", _RheoData(np.linspace(0.1, 10.0, 64), np.linspace(1.0, 5.0, 64))
     )
     win = WorkspaceWindow(app)
     qtbot.addWidget(win)
