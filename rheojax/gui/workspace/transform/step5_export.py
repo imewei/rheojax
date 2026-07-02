@@ -40,7 +40,16 @@ class TransformExportStep(QWidget):
         ptype = (self._state.result or {}).get("protocol_type")
         if not ptype:
             return None
-        new_id = f"{self._state.transform_key}_out"
+        base_id = f"{self._state.transform_key}_out"
+        new_id = base_id
+        suffix = 2
+        while True:
+            try:
+                self._library.get(new_id)
+            except KeyError:
+                break
+            new_id = f"{base_id}_{suffix}"
+            suffix += 1
         lineage: list[str] = []
         for v in self._state.slots.values():
             if isinstance(v, list):
