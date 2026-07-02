@@ -57,5 +57,15 @@ class ExportStep(QWidget):
                 ),
             )
         )
+        result = self._state.nlsq_result or {}
+        x, y_fit = result.get("x"), result.get("y_fit")
+        if x is not None and y_fit is not None:
+            from types import SimpleNamespace
+
+            import numpy as np
+
+            self._library.store_payload(
+                new_id, SimpleNamespace(x=np.asarray(x), y=np.asarray(y_fit))
+            )
         self.exported.emit()
         return new_id

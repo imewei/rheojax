@@ -69,5 +69,8 @@ class TransformExportStep(QWidget):
                 lineage=lineage,
             )
         )
+        output = (self._state.result or {}).get("output")
+        if output is not None:
+            self._library.store_payload(new_id, output)
         self.exported.emit()
         return new_id
