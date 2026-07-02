@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import multiprocessing
 
+import numpy as np
+
 from rheojax.gui.foundation.invalidation import invalidate_downstream
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
@@ -27,28 +29,46 @@ def _make_fit_fn(library):
     cancel button exists yet), so a local, throwaway Queue/Event is enough.
     """
 
-    def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
+    def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
+                multi_start=None):
         rheo_data = library.load_payload(data_ref)
-        result = run_fit_isolated(
-            model_key,
-            rheo_data.x,
-            rheo_data.y,
-            test_mode=None,
-            initial_params=initial_params or {},
-            options={},
-            progress_queue=multiprocessing.Queue(),
-            cancel_event=multiprocessing.Event(),
-            dataset_id=data_ref,
-            model_config=model_config,
-        )
+        ms = multi_start or {}
+        count = ms.get("count", 1) if ms.get("enabled") else 1
+        rng = np.random.default_rng(0)
+        best = None
+        for i in range(max(count, 1)):
+            # First run uses the caller's initial_params as-is; restarts 2..N
+            # jitter each value by +/-20% (seeded, so runs are reproducible).
+            start_params = initial_params
+            if i > 0 and initial_params:
+                start_params = {
+                    name: {**cfg, "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2))}
+                    for name, cfg in initial_params.items()
+                }
+            result = run_fit_isolated(
+                model_key,
+                rheo_data.x,
+                rheo_data.y,
+                test_mode=None,
+                initial_params=start_params or {},
+                options={},
+                progress_queue=multiprocessing.Queue(),
+                cancel_event=multiprocessing.Event(),
+                dataset_id=data_ref,
+                model_config=model_config,
+            )
+            if best is None or (result.get("r_squared") or -1) > (best.get("r_squared") or -1):
+                best = result
         # ponytail: run_fit_isolated's real result dict key is "parameters"
         # (see ModelService.fit()'s FitResult), but NlsqStep/NutsStep/tests
         # are all written against a "params" key (step3_nlsq.py's own
         # FitResult-normalization branch uses `res.params`). Alias it here
-        # so NUTS warm-start/priors don't silently see an empty dict.
-        if isinstance(result, dict) and "params" not in result and "parameters" in result:
-            result = {**result, "params": result["parameters"]}
-        return result
+        # so NUTS warm-start/priors don't silently see an empty dict. Only
+        # the winning restart needs this — comparisons above use r_squared,
+        # which is present under either key.
+        if isinstance(best, dict) and "params" not in best and "parameters" in best:
+            best = {**best, "params": best["parameters"]}
+        return best
 
     return _fit_fn
 

@@ -17,7 +17,8 @@ from rheojax.gui.foundation.state import FitState
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
-def _default_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
+def _default_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
+                     multi_start=None):
     # NOTE: `data_ref` is a str id — the real implementation must:
     # 1. Load RheoData: `library.load_payload(data_ref)` (pass library to NlsqStep at build time)
     # 2. Use real signature: ModelService().fit(model_key, rheodata, {}, model_config=model_config)
@@ -80,6 +81,10 @@ class NlsqStep(QWidget):
                 self._state.data_ref,
                 self._state.column_map,
                 initial_params=initial_params,
+                multi_start={
+                    "enabled": self._ms_enabled.isChecked(),
+                    "count": self._ms_count.value(),
+                },
             )
         except NotImplementedError:
             # ponytail: real solver wiring is out of scope here (tracked separately);

@@ -114,7 +114,8 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
 
     captured = {}
 
-    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None):
+    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
+                     multi_start=None):
         captured["initial_params"] = initial_params
         return {"params": {"a": 1.0, "b": 2.0}, "r_squared": 0.5, "success": True}
 
@@ -128,3 +129,38 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
     ip = captured["initial_params"]
     assert ip["a"] == {"value": 1.0, "bounds": (0.0, 10.0), "fixed": False}
     assert ip["b"] == {"value": 2.0, "bounds": (0.0, 5.0), "fixed": True}
+
+
+def test_multistart_forwards_config_to_fit_fn():
+    from rheojax.gui.foundation.state import FitState
+    from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
+
+    captured = {}
+
+    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
+                     multi_start=None):
+        captured["multi_start"] = multi_start
+        return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
+
+    st = FitState(model_key="m", model_config={})
+    step = NlsqStep(st, fit_fn=fake_fit_fn)
+    step.set_multistart(True, 5)
+    step.run()
+    assert captured["multi_start"] == {"enabled": True, "count": 5}
+
+
+def test_multistart_disabled_by_default():
+    from rheojax.gui.foundation.state import FitState
+    from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
+
+    captured = {}
+
+    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
+                     multi_start=None):
+        captured["multi_start"] = multi_start
+        return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
+
+    st = FitState(model_key="m", model_config={})
+    step = NlsqStep(st, fit_fn=fake_fit_fn)
+    step.run()
+    assert captured["multi_start"] == {"enabled": False, "count": 8}
