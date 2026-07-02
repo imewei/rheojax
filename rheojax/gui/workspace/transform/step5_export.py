@@ -33,7 +33,7 @@ class TransformExportStep(QWidget):
         self._export_btn.clicked.connect(lambda: self.export_bundle(Path.cwd()))
 
     def bundle_manifest(self) -> list[str]:
-        return ["output", "result", "figures", "provenance"]
+        return ["output", "result", "provenance"]
 
     def provenance(self) -> dict:
         return {
