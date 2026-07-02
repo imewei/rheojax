@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QLabel,
     QSpinBox,
@@ -61,6 +62,12 @@ def _make_config_widget(annotation: Any, default: Any):
         w = QSpinBox()
         w.setRange(-1_000_000, 1_000_000)
         w.setValue(int(default))
+        return w, w.value
+    if annotation is float:
+        w = QDoubleSpinBox()
+        w.setRange(-1_000_000.0, 1_000_000.0)
+        w.setDecimals(6)
+        w.setValue(float(default))
         return w, w.value
     return None, None
 
@@ -138,7 +145,7 @@ class ProtocolModelStep(QWidget):
                 widget.toggled.connect(self._on_config_changed)
             elif isinstance(widget, QComboBox):
                 widget.currentTextChanged.connect(self._on_config_changed)
-            elif isinstance(widget, QSpinBox):
+            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 widget.valueChanged.connect(self._on_config_changed)
 
     def _on_config_changed(self, *_args: Any) -> None:
@@ -161,6 +168,8 @@ class ProtocolModelStep(QWidget):
                 widget.setCurrentText(str(value))
             elif isinstance(widget, QSpinBox):
                 widget.setValue(int(value))
+            elif isinstance(widget, QDoubleSpinBox):
+                widget.setValue(float(value))
         self._on_config_changed()
 
     def _refresh_preview(self) -> None:
