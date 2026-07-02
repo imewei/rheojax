@@ -33,14 +33,24 @@ def _fake_nlsq_result(*args, **kwargs):
 
 
 def _fake_nuts_result(*args, **kwargs):
-    # Realistically-shaped run_bayesian_isolated() output.
+    # Realistically-shaped run_bayesian_isolated() output. sample_stats
+    # arrays are real (num_chains, num_samples) NumPy arrays here -- matching
+    # subprocess_bayesian.py's actual sample_stats_np build-up and
+    # fit_controller.py's num_chains=4 -- not a flat Python-bool list with
+    # num_chains=1. A flat 1D fixture never exercised
+    # step4_nuts._diagnostics_verdict()'s 2D-array-truthiness crash
+    # (`sum(1 for d in diverging if d)` raises ValueError on a >1-element
+    # per-chain row), which only reproduces on this multi-chain shape.
+    num_chains, num_samples = 4, 25
+    diverging = np.zeros((num_chains, num_samples), dtype=bool)
+    energy = np.full((num_chains, num_samples), 1.0)
     return {
         "posterior_samples": {"eta": [1.4, 1.5, 1.6], "G": [2.4, 2.5, 2.6]},
-        "sample_stats": {"energy": [1.0, 1.1, 0.9], "diverging": [False, False, False]},
+        "sample_stats": {"energy": energy, "diverging": diverging},
         "r_hat": {"eta": 1.0, "G": 1.0},
         "ess": {"eta": 500, "G": 500},
         "bfmi": 0.5,
-        "num_chains": 1,
+        "num_chains": num_chains,
     }
 
 
@@ -103,6 +113,9 @@ def test_full_fit_workflow_seeds_tables_and_exports(monkeypatch, qapp, tmp_path)
     #    monkeypatched run_bayesian_isolated).
     bodies[3].run()
     assert app_state.fit.nuts_result["posterior_samples"]
+    # Regression: _diagnostics_verdict() must not crash on the realistic
+    # multi-chain sample_stats shape above.
+    assert app_state.fit.nuts_result["verdict"]["converged"] is True
 
     # 6. Export: the CSV write was silently skipped before Finding 2's fix
     #    because nlsq_result["x"] was always None.

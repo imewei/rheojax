@@ -81,6 +81,21 @@ class ExportStep(QWidget):
             )
             written["posterior_samples"] = posterior_path
 
+            # bundle_manifest() promises a "diagnostics" item whenever NUTS
+            # ran; write the R-hat/ESS/BFMI/divergences/verdict data (all
+            # already computed and stored on nuts_result) as its own file
+            # instead of only folding the verdict into provenance.json.
+            diagnostics_path = directory / "diagnostics.json"
+            diagnostics = {
+                k: self._state.nuts_result.get(k)
+                for k in ("r_hat", "ess", "bfmi", "divergences", "verdict")
+                if k in self._state.nuts_result
+            }
+            diagnostics_path.write_text(
+                json.dumps(diagnostics, default=str, indent=2)
+            )
+            written["diagnostics"] = diagnostics_path
+
         provenance_path = directory / "provenance.json"
         provenance_path.write_text(json.dumps(self.provenance(), default=str, indent=2))
         written["provenance"] = provenance_path

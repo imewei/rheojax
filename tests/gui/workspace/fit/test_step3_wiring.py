@@ -29,8 +29,8 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
                                     num_samples, num_chains, warm_start, priors, seed,
                                     progress_queue, cancel_event, y2_data=None,
                                     metadata=None, fitted_model_state=None,
-                                    dataset_id="", target_accept=0.8):
-        calls["sample"] = (model_name, target_accept)
+                                    dataset_id="", target_accept=0.8, model_config=None):
+        calls["sample"] = (model_name, target_accept, model_config)
         return {"posterior_samples": {"a": [1.0, 1.1]}, "r_hat": {"a": 1.0}}
 
     monkeypatch.setattr(
@@ -63,6 +63,11 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
     nuts_step._target.setValue(0.85)
     nuts_step.run()
     assert calls["sample"][1] == 0.85
+    # Regression: NUTS must forward the user's Step 1 model_config through to
+    # run_bayesian_isolated (see _make_sample_fn in fit_controller.py), same
+    # as NLSQ's fit_fn does above -- otherwise the model is silently
+    # reconstructed with constructor defaults for NUTS only.
+    assert calls["sample"][2] == {"n_modes": 2}
     assert app.fit.nuts_result["r_hat"] == {"a": 1.0}
 
 

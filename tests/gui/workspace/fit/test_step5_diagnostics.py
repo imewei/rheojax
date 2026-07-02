@@ -64,6 +64,44 @@ def test_diagnostics_verdict_numpy_arrays_not_converged_divergences():
     assert any("divergent" in r for r in v["reasons"])
 
 
+def test_diagnostics_verdict_2d_multichain_diverging_does_not_crash():
+    # Regression: real ArviZ sample_stats["diverging"] is shape
+    # (num_chains, num_samples), e.g. (4, 1000) for the GUI's 4-chain NUTS
+    # runs (fit_controller.py num_chains=4). `sum(1 for d in diverging if d)`
+    # iterates per-chain rows (each a >1-element bool array) and `if d:`
+    # raises "truth value of an array with more than one element is
+    # ambiguous" -- this must count divergences across the whole array
+    # instead of crashing.
+    diverging = np.zeros((4, 1000), dtype=bool)
+    diverging[0, 5] = True
+    diverging[2, 100:103] = True
+    result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": 800},
+        "bfmi": 0.5,
+        "sample_stats": {"diverging": diverging},
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert "4 divergent transitions" in v["reasons"]
+
+
+def test_diagnostics_verdict_nan_bfmi_flags_unavailable_not_converged():
+    # Regression: subprocess_bayesian.run_bayesian_isolated() sets
+    # bfmi=float("nan") when the InferenceData had no "energy" sample_stat.
+    # `nan < _BFMI_MIN` is always False in Python, so the old code silently
+    # treated a genuinely unverifiable diagnostic as passing.
+    result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": 800},
+        "bfmi": float("nan"),
+        "sample_stats": {"diverging": np.zeros((4, 1000), dtype=bool)},
+    }
+    v = _diagnostics_verdict(result)
+    assert v["converged"] is False
+    assert any("BFMI unavailable" in r for r in v["reasons"])
+
+
 def test_nuts_step_run_attaches_verdict(qtbot):
     st = FitState(nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9})
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.contract import input_contract
 from rheojax.gui.foundation.library import DatasetLibrary
@@ -51,6 +53,7 @@ class DataStep(QWidget):
         self._source = QComboBox(self)
         self._source.addItems([""] + self.available_datasets())
         self._guard = QLabel("", self)
+        self._convert_btn = QPushButton("⇄ Convert Hz → rad/s", self)
         self._error_label = QLabel("", self)
         lay = QVBoxLayout(self)
         for w in (
@@ -58,10 +61,12 @@ class DataStep(QWidget):
             QLabel("Source"),
             self._source,
             self._guard,
+            self._convert_btn,
             self._error_label,
         ):
             lay.addWidget(w)
         self._source.currentTextChanged.connect(self._on_select)
+        self._convert_btn.clicked.connect(self.apply_unit_conversion)
 
     def _build_contract(self):
         """Derive (contract, label text) from the current state's protocol/model_key."""
@@ -132,8 +137,14 @@ class DataStep(QWidget):
             try:
                 payload = self._library.load_payload(ds_id)
             except KeyError:
-                # No payload loaded yet for this ref (e.g. metadata-only entry
-                # in tests/catalog browsing); nothing to validate against.
+                # No payload stored for this ref (e.g. a metadata-only/
+                # catalog-browsed DatasetRef, or a derived dataset saved
+                # without a payload -- see step6_export.py's save_to_library
+                # when x/y_fit are missing). This is a real error, not a
+                # "nothing to validate" no-op: without it, is_ready() would
+                # report True for a dataset with no actual data, deferring
+                # the failure to a KeyError crash later in NLSQ/NUTS.
+                errors = ["dataset has no data payload loaded"]
                 payload = None
             if payload is not None:
                 errors = _validate_shape_and_values(payload)
@@ -161,11 +172,24 @@ class DataStep(QWidget):
 
     def apply_unit_conversion(self) -> None:
         """Execute the Hz -> rad/s (x2pi) conversion flagged by needs_hz_conversion()."""
-        if not self._state.data_ref or self._unit_converted:
+        if not self.needs_hz_conversion():
+            # Subsumes the old data_ref/already-converted guard, and also
+            # refuses to scale data whose units were never actually Hz --
+            # important now that this is wired to a real button click
+            # instead of only being called from tests.
             return
         rheo_data = self._library.load_payload(self._state.data_ref)
         rheo_data.x = np.asarray(rheo_data.x) * (2 * np.pi)
         self._library.store_payload(self._state.data_ref, rheo_data)
+        # Persist the conversion in the library's authoritative units
+        # metadata, not just this widget's transient _unit_converted flag --
+        # _on_select() unconditionally resets that flag to False on every
+        # call, including refresh()'s still_valid branch re-selecting the
+        # SAME already-converted dataset. Without updating DatasetRef.units,
+        # needs_hz_conversion() would report True again and a second click
+        # would silently re-apply the x2pi conversion.
+        ref = self._library.get(self._state.data_ref)
+        self._library.add(replace(ref, units={**ref.units, "x": "rad/s"}))
         self._unit_converted = True
         self._guard.setText("")
         self.edited.emit()

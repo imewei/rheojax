@@ -105,6 +105,7 @@ def _make_sample_fn(library, fit_state):
             cancel_event=multiprocessing.Event(),
             dataset_id=fit_state.data_ref,
             target_accept=config.get("target_accept", 0.8),
+            model_config=fit_state.model_config,
         )
 
     return _sample_fn

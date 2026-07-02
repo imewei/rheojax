@@ -59,3 +59,29 @@ def test_scalar_output_not_saved(qtbot):
     step = TransformExportStep(st, lib)
     qtbot.addWidget(step)
     assert step.save_to_library() is None
+
+
+def test_save_domain_changing_output_with_empty_protocol_type_still_stores(qtbot):
+    # Regression: transform_controller._infer_protocol_type() deliberately
+    # returns "" (not None) for domain-changing transforms (spectral/
+    # decomposition) whose output has a real payload but no determinable
+    # rheological protocol. save_to_library() used to no-op on ANY falsy
+    # protocol_type (including ""), so these outputs could never be saved to
+    # the library at all -- contradicting design §7's "stored but not
+    # offered to typed Fit slots" for such outputs.
+    st = TransformState(
+        transform_key="fft_analysis",
+        slots={"input": "rel1"},
+        result={"output": "rd", "protocol_type": ""},
+    )
+    lib = DatasetLibrary()
+    step = TransformExportStep(st, lib)
+    qtbot.addWidget(step)
+    new_id = step.save_to_library()
+    assert new_id is not None
+    ref = lib.get(new_id)
+    assert ref.origin == "derived"
+    assert ref.protocol_type == ""
+    # "" never matches a real protocol query -> not offered to typed Fit slots.
+    assert new_id not in [r.id for r in lib.datasets_of_type("oscillation")]
+    assert lib.load_payload(new_id) == "rd"
