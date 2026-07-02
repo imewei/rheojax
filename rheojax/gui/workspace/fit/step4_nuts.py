@@ -5,8 +5,9 @@ from collections.abc import Callable
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from rheojax.gui.foundation.priors import map_centered_priors
+from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.widgets.priors_editor import PriorsEditor
 
 
 def _default_sample_fn(priors, init, config):
@@ -36,6 +37,7 @@ class NutsStep(QWidget):
         self._sample_fn = sample_fn or _default_sample_fn
         self._skipped = False
         self._banner = QLabel("⚡ warm-started from NLSQ MAP", self)
+        self._priors_editor = PriorsEditor(self)
         self._target = QDoubleSpinBox(self)
         self._target.setRange(0.5, 0.999)
         self._target.setValue(0.8)
@@ -43,15 +45,38 @@ class NutsStep(QWidget):
         self._run_btn = QPushButton("▶ Sample", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
-        for w in (self._banner, self._target, self._skip_btn, self._run_btn, self._result):
+        for w in (
+            self._banner,
+            self._priors_editor,
+            self._target,
+            self._skip_btn,
+            self._run_btn,
+            self._result,
+        ):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
+
+    def priors_editor(self) -> PriorsEditor:
+        return self._priors_editor
 
     def suggested_priors(self) -> dict:
         # nlsq_result is a normalized dict (see NlsqStep.run()); key is "params"
         params = (self._state.nlsq_result or {}).get("params", {})
         return map_centered_priors(params)  # safe: FitResult was normalized to dict in step 3
+
+    def load_suggested_priors(self) -> None:
+        """Seed the editable PriorsEditor from the NLSQ MAP estimate.
+
+        Converts map_centered_priors()'s {"type": ..., ...} shape into
+        PriorsEditor.set_prior(name, dist, **params) calls.
+        """
+        suggested = self.suggested_priors()
+        self._priors_editor.set_parameters(list(suggested.keys()))
+        for name, prior in suggested.items():
+            dist = prior.get("type", "normal")
+            params = {k: v for k, v in prior.items() if k != "type"}
+            self._priors_editor.set_prior(name, dist, **params)
 
     def set_target_accept(self, v: float) -> None:
         self._target.setValue(v)
@@ -66,8 +91,15 @@ class NutsStep(QWidget):
         self._skipped = False
         cfg = {"target_accept": self._target.value()}
         warm_start = (self._state.nlsq_result or {}).get("params", {})
+        # Build priors from the (possibly user-edited) PriorsEditor; if the editor
+        # was never seeded via load_suggested_priors(), it's empty and we fall back
+        # to the raw suggested_priors(), matching pre-Task-7 behavior exactly.
+        edited_priors = self._priors_editor.get_all_priors()
+        priors = {
+            name: adapt_prior(entry) for name, entry in edited_priors.items()
+        } or self.suggested_priors()
         try:
-            result = self._sample_fn(self.suggested_priors(), warm_start, cfg)
+            result = self._sample_fn(priors, warm_start, cfg)
         except NotImplementedError:
             # ponytail: real sampler wiring is out of scope here (tracked separately);
             # this guard only keeps an unwired Sample button from crashing the Qt slot.
