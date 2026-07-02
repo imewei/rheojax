@@ -1303,11 +1303,14 @@ class BayesianPage(QWidget):
         else:
             self._ess_label.setText("ESS: --")
 
-        # Divergences (-1 = unknown/unavailable)
+        # Divergences (-1 = unknown/unavailable -- must not read as "clean")
         divergences = result.diagnostics.get("divergences", 0)
         if divergences == -1:
-            divergences = 0  # Treat unknown as zero for display
-        if divergences > 0:
+            self._divergence_label.setText("Divergences: unknown")
+            self._divergence_label.setStyleSheet(
+                f"color: {ColorPalette.WARNING}; font-weight: bold;"
+            )
+        elif divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
             self._divergence_label.setStyleSheet(
                 f"color: {ColorPalette.ERROR}; font-weight: bold;"

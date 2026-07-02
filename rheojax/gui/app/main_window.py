@@ -361,6 +361,7 @@ class RheoJAXMainWindow(QMainWindow):
             )
         )
         signals.dataset_added.connect(self._on_dataset_added)
+        signals.dataset_added.connect(self.transform_page.refresh_dataset_checklist)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
 
         # GUI-016: keep selected pipeline step config in sync with page changes
@@ -2267,7 +2268,14 @@ class RheoJAXMainWindow(QMainWindow):
     def _update_fit_plot(self, fit_result: FitResult) -> None:
         """Render fit plot and residuals on fit page using PlotService."""
 
-        dataset = self.store.get_active_dataset()
+        # Use the dataset the fit was actually run against, not whatever is
+        # active now -- the user may have switched datasets while the fit
+        # worker was running (same TOCTOU class as R10-STO-003/GUI-011).
+        dataset = (
+            self.store.get_dataset(fit_result.dataset_id)
+            if fit_result.dataset_id
+            else None
+        ) or self.store.get_active_dataset()
         if dataset is None:
             return
 
