@@ -55,8 +55,8 @@ def test_picking_transform_invalidates_downstream_state(qtbot):
 
 
 def test_window_transform_export_step_reachable_without_forced_navigation(qtbot):
-    # Regression: TransformExportStep (index 4) has only an `exported`
-    # signal, not `edited`; TransformVisualizeStep (index 3) is read-only
+    # Regression: TransformExportStep (index 4) has only a
+    # `dataset_commit_requested` signal, not `edited`; TransformVisualizeStep (index 3) is read-only
     # with no signal at all. If window.py only wired `edited` from bodies
     # 0-2 to advance()+refresh with no forward-unlock loop, index 4 would
     # stay permanently unreachable once the workflow lands on Visualize --

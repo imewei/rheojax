@@ -56,6 +56,16 @@ def test_pick_fill_run_save_round_trips_through_library(qapp, monkeypatch):
 
     ctl, bodies = build_transform_controller(app_state)
 
+    # TransformExportStep no longer commits to the library itself -- it only
+    # requests a commit via dataset_commit_requested. Simulate the Task-10
+    # WorkspaceWindow._commit_dataset handler that will perform it.
+    def _handle(ref, payload, overwrite):
+        app_state.library.add(ref, overwrite=overwrite)
+        if payload is not None:
+            app_state.library.store_payload(ref.id, payload)
+
+    bodies[4].dataset_commit_requested.connect(_handle)
+
     # 1. Pick a single-slot transform ("smooth_derivative", not "derivative"
     #    -- the latter is a TransformService-only alias, not a real
     #    TransformRegistry entry).

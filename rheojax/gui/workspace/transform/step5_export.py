@@ -14,7 +14,7 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class TransformExportStep(QWidget):
-    exported = Signal()
+    dataset_commit_requested = Signal(object, object, bool)  # ref, payload | None, overwrite
 
     def __init__(
         self,
@@ -100,21 +100,17 @@ class TransformExportStep(QWidget):
                 lineage.extend(str(x) for x in v)
             elif v is not None:
                 lineage.append(str(v))
-        self._library.add(
-            DatasetRef(
-                id=new_id,
-                name=new_id,
-                protocol_type=ptype,
-                origin="derived",
-                units={},
-                row_count=0,
-                hash="",
-                provenance=self.provenance(),
-                lineage=lineage,
-            )
+        ref = DatasetRef(
+            id=new_id,
+            name=new_id,
+            protocol_type=ptype,
+            origin="derived",
+            units={},
+            row_count=0,
+            hash="",
+            provenance=self.provenance(),
+            lineage=lineage,
         )
         output = (self._state.result or {}).get("output")
-        if output is not None:
-            self._library.store_payload(new_id, output)
-        self.exported.emit()
+        self.dataset_commit_requested.emit(ref, output, False)
         return new_id

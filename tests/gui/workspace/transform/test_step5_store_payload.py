@@ -24,6 +24,16 @@ def test_save_to_library_stores_payload(qtbot):
     lib = DatasetLibrary()
     step = TransformExportStep(st, lib)
     qtbot.addWidget(step)
+
+    # Widget only requests a commit; simulate the Task-10
+    # WorkspaceWindow._commit_dataset handler that performs it.
+    def _handle(ref, payload, overwrite):
+        lib.add(ref, overwrite=overwrite)
+        if payload is not None:
+            lib.store_payload(ref.id, payload)
+
+    step.dataset_commit_requested.connect(_handle)
+
     new_id = step.save_to_library()
     assert new_id is not None
     payload = lib.load_payload(new_id)  # must not raise KeyError
