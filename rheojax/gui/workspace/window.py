@@ -36,6 +36,10 @@ class WorkspaceWindow(QMainWindow):
         self._notifier.changed.connect(self._mark_dirty)
         self._pipeline_service = PipelineExecutionService()
         self._pipeline_stop_event: threading.Event | None = None
+        self._active_jobs_action_pending = False
+        self._pipeline_service.phase_worker_ready.connect(
+            self._on_phase_worker_ready, Qt.ConnectionType.QueuedConnection
+        )
 
         self.setWindowTitle("RheoJAX Workspace")
         self.resize(1200, 800)
@@ -176,7 +180,9 @@ class WorkspaceWindow(QMainWindow):
         return wrapped
 
     def _on_new(self) -> None:
-        self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+        self._maybe_confirm_active_jobs(
+            lambda: self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+        )
 
     def _on_open(self) -> None:
         from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -199,7 +205,9 @@ class WorkspaceWindow(QMainWindow):
                 self._state.project.dirty = False
                 self._state.project.path = path
 
-        self._maybe_confirm_unsaved_changes(_open)
+        self._maybe_confirm_active_jobs(
+            lambda: self._maybe_confirm_unsaved_changes(_open)
+        )
 
     def _on_save(self) -> None:
         if self._state.project.path is None:
@@ -235,7 +243,60 @@ class WorkspaceWindow(QMainWindow):
             self._state.project.dirty = False
 
     def _on_close(self) -> None:
-        self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+        self._maybe_confirm_active_jobs(
+            lambda: self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+        )
+
+    def _maybe_confirm_active_jobs(self, proceed) -> None:
+        if not self._state.active_jobs.by_id:
+            proceed()
+            return
+        if self._active_jobs_action_pending:
+            # A Close/New/Open request is already being handled (dialog shown or poll in
+            # flight) -- ignore this second trigger rather than showing a second dialog or
+            # starting a second, independent polling chain that could both call proceed().
+            return
+        self._active_jobs_action_pending = True
+
+        from PySide6.QtWidgets import QMessageBox
+
+        choice = QMessageBox.question(
+            self, "Jobs Running",
+            f"{len(self._state.active_jobs.by_id)} job(s) still running. Cancel them and continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            self._active_jobs_action_pending = False
+            return
+
+        from PySide6.QtCore import QThreadPool
+
+        from rheojax.gui.workspace.pipeline.cancel_runnable import CancelWorkerRunnable
+
+        if self._pipeline_stop_event is not None:
+            self._pipeline_stop_event.set()  # stops PipelineBatchRunner from advancing to
+                                               # further queued datasets (Task 7's run() loop)
+        for job in self._state.active_jobs.by_id.values():
+            worker = job.get("worker")
+            if worker is not None:
+                QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))
+
+        self._poll_active_jobs_then(proceed, remaining_polls=120)  # 120 * 250ms = 30s
+
+    def _poll_active_jobs_then(self, proceed, remaining_polls: int) -> None:
+        if not self._state.active_jobs.by_id or remaining_polls <= 0:
+            self._active_jobs_action_pending = False
+            proceed()
+            return
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(250, lambda: self._poll_active_jobs_then(proceed, remaining_polls - 1))
+
+    def _on_phase_worker_ready(self, dataset_id: str, step_id: str, phase: str, worker) -> None:
+        job = self._state.active_jobs.by_id.get(dataset_id)
+        if job is not None:
+            job["worker"] = worker
 
     def _maybe_confirm_unsaved_changes(self, proceed) -> None:
         if not self._state.project.dirty:
