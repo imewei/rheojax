@@ -4,7 +4,13 @@
 Getting Started
 ===============
 
-This guide walks you through launching and using the RheoJAX GUI for the first time.
+.. note::
+
+   This guide covers the **Legacy Page-Based Window** (``rheojax-gui --legacy``).
+   By default, ``rheojax-gui`` now launches the modern **Workspace Shell**
+   with Fit, Transform, and Pipeline modes. Workspace documentation is coming soon.
+
+This guide walks you through launching and using the legacy RheoJAX GUI for the first time.
 
 Prerequisites
 =============

@@ -897,14 +897,17 @@ RheoJAX includes an optional GUI built with PySide6/Qt6 for interactive analysis
 ### Launching
 
 ```bash
-# From command line
+# From command line (launches workspace shell by default)
 rheojax-gui
+
+# Launch the legacy main window instead
+rheojax-gui --legacy
 
 # Start maximized (useful on high-DPI desktops)
 rheojax-gui --maximized
 
-# Preview the new step-wizard workspace shell (experimental)
-rheojax-gui --workspace
+# Open a saved project file
+rheojax-gui --project analysis.rheojax
 
 # Or from Python
 from rheojax.gui import main
@@ -916,9 +919,11 @@ main()
 - **Data Loading**: Import CSV, Excel, TRIOS, and Anton Paar formats with preview
 - **Model Fitting**: Interactive NLSQ curve fitting with real-time visualization
 - **Bayesian Inference**: MCMC sampling with progress tracking
+- **Pipeline Mode**: Batch fit/transform/export workflows over multiple datasets
 - **Diagnostics**: ArviZ plots (trace, forest, pair, energy, ESS, rank, autocorr)
 - **Transforms**: Apply mastercurve, FFT, and derivative transforms
 - **Export**: Save results, figures, and reports in multiple formats
+- **Project Save/Load**: Store and restore complete analysis projects (.rheojax format)
 
 See [GUI Reference Guide](https://rheojax.readthedocs.io/user_guide/06_gui/index.html) for detailed documentation.
 

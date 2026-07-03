@@ -7,10 +7,19 @@ GUI Reference Guide
 RheoJAX provides an optional graphical user interface (GUI) built with PySide6/Qt6
 for interactive rheological analysis workflows.
 
+.. warning::
+
+   **Workspace Shell is now the default** (as of v0.7.0+): ``rheojax-gui`` launches
+   the modern **Workspace Shell** with Fit, Transform, and Pipeline modes by default.
+   This guide documents the **Legacy Page-Based Window**, which is still available
+   via ``rheojax-gui --legacy`` but no longer the default. See
+   :doc:`workspace_getting_started` for the new default.
+
 .. toctree::
    :maxdepth: 2
    :caption: GUI Documentation
 
+   workspace_getting_started
    getting_started
    data_loading
    model_fitting
@@ -51,10 +60,10 @@ Or from Python::
     from rheojax.gui import main
     main()
 
-Architecture
-============
+Architecture (Legacy Window)
+============================
 
-The GUI follows a modern architecture pattern:
+The legacy page-based window uses the following architecture:
 
 - **State Management**: Redux-like centralized state store with undo/redo
 - **Service Layer**: Business logic abstraction via services (ModelService, etc.)
@@ -64,7 +73,7 @@ The GUI follows a modern architecture pattern:
 Key Components
 --------------
 
-**Pages** (Main Views):
+**Pages** (Main Views, Legacy Only):
 
 - ``DataPage``: Data import and preview
 - ``FitPage``: Model selection and NLSQ fitting
