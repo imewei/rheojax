@@ -3,7 +3,7 @@ for a finished batch job (design spec §3.3)."""
 from __future__ import annotations
 
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from rheojax.gui.workspace.controller import WorkflowController
 
@@ -62,7 +62,9 @@ class PipelineController(WorkflowController):
 
 def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None):
     from rheojax.gui.workspace.controller import Step
-    from rheojax.gui.workspace.pipeline.step1_configure_run import PipelineConfigureRunStep
+    from rheojax.gui.workspace.pipeline.step1_configure_run import (
+        PipelineConfigureRunStep,
+    )
 
     body = PipelineConfigureRunStep(app_state.pipeline, app_state.library)
     ctl = PipelineController(
