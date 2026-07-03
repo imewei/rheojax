@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QLabel,
@@ -27,13 +29,43 @@ class WorkspaceWindow(QMainWindow):
 
     def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._state = app_state
-        initial_mode = app_state.ui.mode
-        self._mode = initial_mode if initial_mode in self.MODES else "fit"
+        self._epoch = 0
         self._notifier = DatasetLibraryNotifier()
         self._notifier.changed.connect(self._mark_dirty)
-        fit_ctl, self._fit_bodies = build_fit_controller(app_state)
-        transform_ctl, self._transform_bodies = build_transform_controller(app_state)
+
+        self.setWindowTitle("RheoJAX Workspace")
+        self.resize(1200, 800)
+
+        bar = QToolBar(self)
+        self.addToolBar(bar)
+        self._fit_btn = QPushButton("Fit", self)
+        self._tx_btn = QPushButton("Transform", self)
+        self._fit_btn.setCheckable(True)
+        self._tx_btn.setCheckable(True)
+        self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
+        self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
+        bar.addWidget(self._fit_btn)
+        bar.addWidget(self._tx_btn)
+        self._status_label = QLabel(self)
+        bar.addWidget(self._status_label)
+        self._build_file_menu()
+
+        self._build_workspace(app_state)
+
+    def _build_file_menu(self) -> None:
+        menu = self.menuBar().addMenu("&File")
+        menu.addAction("&New", self._on_new, "Ctrl+N")
+        menu.addAction("&Open...", self._on_open, "Ctrl+O")
+        menu.addAction("&Save", self._on_save, "Ctrl+S")
+        menu.addAction("Save &As...", self._on_save_as, "Ctrl+Shift+S")
+        menu.addAction("&Close", self._on_close)
+
+    def _build_workspace(self, state: AppState) -> None:
+        self._state = state
+        initial_mode = state.ui.mode
+        self._mode = initial_mode if initial_mode in self.MODES else "fit"
+        fit_ctl, self._fit_bodies = build_fit_controller(state)
+        transform_ctl, self._transform_bodies = build_transform_controller(state)
         self._controllers = {
             "fit": fit_ctl,
             "transform": transform_ctl,
@@ -55,25 +87,10 @@ class WorkspaceWindow(QMainWindow):
             if hasattr(body, "dataset_commit_requested"):
                 body.dataset_commit_requested.connect(self._commit_dataset)
 
-        self.setWindowTitle("RheoJAX Workspace")
-        self.resize(1200, 800)
-
-        bar = QToolBar(self)
-        self.addToolBar(bar)
-        self._fit_btn = QPushButton("Fit", self)
-        self._tx_btn = QPushButton("Transform", self)
-        self._fit_btn.setCheckable(True)
-        self._tx_btn.setCheckable(True)
-        self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
-        self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
-        bar.addWidget(self._fit_btn)
-        bar.addWidget(self._tx_btn)
-        self._status_label = QLabel(self)
-        bar.addWidget(self._status_label)
         self._sync_mode_buttons()
         self._refresh_status_label()
 
-        self._rail = LibraryRail(app_state.library, self)
+        self._rail = LibraryRail(state.library, self)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -83,6 +100,112 @@ class WorkspaceWindow(QMainWindow):
         self._splitter.addWidget(self._canvas)
         self._splitter.addWidget(self._inspector)
         self.setCentralWidget(self._splitter)
+
+    def _dispose_workspace(self) -> None:
+        for body in list(self._fit_bodies) + list(self._transform_bodies):
+            if hasattr(body, "edited"):
+                try:
+                    body.edited.disconnect(self._on_fit_body_edited)
+                except (RuntimeError, TypeError):
+                    pass
+                try:
+                    body.edited.disconnect(self._on_transform_body_edited)
+                except (RuntimeError, TypeError):
+                    pass
+            if hasattr(body, "config_edited"):
+                try:
+                    body.config_edited.disconnect(self._on_fit_body_edited)
+                except (RuntimeError, TypeError):
+                    pass
+            if hasattr(body, "dataset_commit_requested"):
+                try:
+                    body.dataset_commit_requested.disconnect(self._commit_dataset)
+                except (RuntimeError, TypeError):
+                    pass
+            body.deleteLater()
+        for widget in (self._canvas, self._rail, self._inspector, self._splitter):
+            widget.deleteLater()
+        self._controllers = {}
+        self._fit_bodies = []
+        self._transform_bodies = []
+
+    def _rebuild(self, new_state: AppState) -> None:
+        self._epoch += 1
+        self._dispose_workspace()
+        self._build_workspace(new_state)
+
+    def _guard(self, epoch_at_connect: int, fn):
+        def wrapped(*args, **kwargs):
+            if epoch_at_connect == self._epoch:
+                return fn(*args, **kwargs)
+            return None
+
+        return wrapped
+
+    def _on_new(self) -> None:
+        self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+
+    def _on_open(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+
+        def _open():
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Open Project", "", "RheoJAX Project (*.rheojax)"
+            )
+            if path:
+                from rheojax.gui.foundation.project_codec import load_project_v2
+
+                self._rebuild(load_project_v2(path))
+                self._state.project.dirty = False
+                self._state.project.path = path
+
+        self._maybe_confirm_unsaved_changes(_open)
+
+    def _on_save(self) -> None:
+        if self._state.project.path is None:
+            self._on_save_as()
+            return
+        from rheojax.gui.foundation.project_codec import save_project_v2
+
+        save_project_v2(self._state, self._state.project.path)
+        self._state.project.dirty = False
+
+    def _on_save_as(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Project As", "", "RheoJAX Project (*.rheojax)"
+        )
+        if path:
+            from rheojax.gui.foundation.project_codec import save_project_v2
+
+            save_project_v2(self._state, path)
+            self._state.project.path = path
+            self._state.project.name = Path(path).stem
+            self._state.project.dirty = False
+
+    def _on_close(self) -> None:
+        self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+
+    def _maybe_confirm_unsaved_changes(self, proceed) -> None:
+        if not self._state.project.dirty:
+            proceed()
+            return
+        from PySide6.QtWidgets import QMessageBox
+
+        choice = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            "Save changes before continuing?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+        )
+        if choice == QMessageBox.StandardButton.Save:
+            self._on_save()
+            proceed()
+        elif choice == QMessageBox.StandardButton.Discard:
+            proceed()
 
     def mode(self) -> str:
         return self._mode
