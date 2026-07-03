@@ -29,6 +29,15 @@ def test_pipeline_context_from_library_empty_ids():
     assert pipeline_context_from_library(lib, []) == {}
 
 
+def test_context_includes_dataset_id():
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    lib.store_payload("d1", object())
+    ctx = pipeline_context_from_library(lib, ["d1"])
+    assert ctx["dataset_id"] == "d1"
+    assert "data" in ctx
+
+
 def test_pipeline_context_from_library_works_for_derived_datasets_too():
     """The whole point: a derived dataset (no backing file) must still be
     usable as pipeline input via context-seeding, unlike the file-path-only
