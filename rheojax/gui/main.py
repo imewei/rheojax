@@ -7,12 +7,13 @@ main event loop.
 
 Usage
 -----
-    rheojax-gui                    # Launch GUI
+    rheojax-gui                    # Launch GUI (workspace shell, now the default)
+    rheojax-gui --legacy           # Launch the legacy main window
     rheojax-gui --project FILE     # Open project
-    rheojax-gui --import FILE      # Import data file on startup
+    rheojax-gui --import FILE --protocol PROTOCOL   # Import data file on startup
     rheojax-gui --maximized        # Start window maximized
     rheojax-gui --verbose          # Enable verbose logging
-    rheojax-gui --workspace        # Launch the new workspace shell (preview)
+    rheojax-gui --workspace        # Deprecated no-op alias (workspace is now default)
     rheojax-gui --help             # Show help
 
 Example
@@ -154,21 +155,29 @@ For more information, visit: https://github.com/imewei/rheojax
         """,
     )
 
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--project",
         "-p",
         type=Path,
         metavar="FILE",
         help="Project file to open on startup (.rheojax)",
     )
-
-    parser.add_argument(
+    group.add_argument(
         "--import",
         "-i",
         dest="import_file",
         type=Path,
         metavar="FILE",
-        help="Data file to import on startup (TRIOS, Excel, CSV, etc.)",
+        help="Data file to import on startup (requires --protocol)",
+    )
+
+    parser.add_argument(
+        "--protocol",
+        type=str,
+        metavar="PROTOCOL",
+        help="Protocol for --import (required together): flow_curve, creep, relaxation, "
+        "startup, oscillation, laos",
     )
 
     parser.add_argument(
@@ -188,7 +197,12 @@ For more information, visit: https://github.com/imewei/rheojax
     parser.add_argument(
         "--workspace",
         action="store_true",
-        help="Launch the new workspace shell (preview) instead of the legacy main window",
+        help="Deprecated no-op alias; the workspace shell is now the default",
+    )
+
+    parser.add_argument(
+        "--legacy", action="store_true",
+        help="Launch the legacy main window instead of the (now default) workspace shell",
     )
 
     parser.add_argument(
@@ -197,7 +211,14 @@ For more information, visit: https://github.com/imewei/rheojax
         version=f"%(prog)s {__version__}",
     )
 
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    if args.import_file and not args.protocol:
+        parser.error("--protocol is required when --import is given")
+    if args.protocol and not args.import_file:
+        parser.error("--protocol is only valid together with --import")
+
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -369,8 +390,18 @@ def main(argv: list[str] | None = None) -> int:
     # Workspace shell (preview): early-return path, kept separate from the
     # legacy window's project/import/smoke-fit hooks below since those are
     # RheoJAXMainWindow-specific APIs the workspace shell does not have yet.
-    if args.workspace:
-        logger.debug("Launching workspace shell (preview)")
+    if not args.legacy:
+        if args.workspace:
+            logger.warning(
+                "--workspace is deprecated and no longer needed -- the workspace shell is now "
+                "the default. This flag will be removed in a future release."
+            )
+            print(
+                "WARNING: --workspace is deprecated (workspace is now the default); "
+                "this flag will be removed in a future release.",
+                file=sys.stderr,
+            )
+        logger.debug("Launching workspace shell (now the default)")
         try:
             workspace_window = _create_workspace_window()
         except Exception as e:
@@ -383,25 +414,27 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("RheoJAX GUI workspace shell ready", version=__version__)
 
         if args.project:
-            logger.info(
-                "Workspace shell: project loading not yet implemented",
-                path=str(args.project),
-            )
-            print(
-                "NOTE: --project is not yet supported by the workspace shell "
-                "(--workspace); ignored.",
-                file=sys.stderr,
-            )
+            from rheojax.gui.foundation.project_codec import load_project_v2
+
+            try:
+                loaded_state = load_project_v2(args.project)
+            except (ValueError, FileNotFoundError) as e:
+                logger.error("Failed to load project", path=str(args.project), error=str(e))
+                print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
+                return 1
+            workspace_window._rebuild(loaded_state)
+            workspace_window._state.project.path = str(args.project)
+
         if args.import_file:
-            logger.info(
-                "Workspace shell: data import not yet implemented",
-                path=str(args.import_file),
-            )
-            print(
-                "NOTE: --import is not yet supported by the workspace shell "
-                "(--workspace); ignored.",
-                file=sys.stderr,
-            )
+            from rheojax.gui.foundation.import_service import import_dataset
+
+            try:
+                ref, data = import_dataset(args.import_file, args.protocol)
+            except (ValueError, FileNotFoundError) as e:
+                logger.error("Failed to import data", path=str(args.import_file), error=str(e))
+                print(f"ERROR: Failed to import data: {e}", file=sys.stderr)
+                return 1
+            workspace_window._commit_dataset(ref, data, overwrite=False)
 
         exit_code = app.exec()
         logger.info("Application exiting", exit_code=exit_code)

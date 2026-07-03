@@ -29,4 +29,4 @@ def pipeline_context_from_library(lib: DatasetLibrary, ids: list[str]) -> dict[s
     """
     if not ids:
         return {}
-    return {"data": lib.load_payload(ids[0])}
+    return {"data": lib.load_payload(ids[0]), "dataset_id": ids[0]}

@@ -196,7 +196,6 @@ class DataStep(QWidget):
             return
         rheo_data = self._library.load_payload(self._state.data_ref)
         rheo_data.x = np.asarray(rheo_data.x) * (2 * np.pi)
-        self._library.store_payload(self._state.data_ref, rheo_data)
         # Persist the conversion in the library's authoritative units
         # metadata, not just this widget's transient _unit_converted flag --
         # _on_select() unconditionally resets that flag to False on every
@@ -204,8 +203,12 @@ class DataStep(QWidget):
         # SAME already-converted dataset. Without updating DatasetRef.units,
         # needs_hz_conversion() would report True again and a second click
         # would silently re-apply the x2pi conversion.
+        # add(overwrite=True) clears any stale payload under this id, so it
+        # must run BEFORE store_payload() re-establishes the converted data --
+        # doing it after would wipe out the very payload just stored.
         ref = self._library.get(self._state.data_ref)
-        self._library.add(replace(ref, units={**ref.units, "x": "rad/s"}))
+        self._library.add(replace(ref, units={**ref.units, "x": "rad/s"}), overwrite=True)
+        self._library.store_payload(self._state.data_ref, rheo_data)
         self._unit_converted = True
         self._guard.setText("")
         self.edited.emit()

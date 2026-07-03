@@ -23,7 +23,7 @@ from worker threads (GUI-006).  The per-action signals (e.g.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, Signal
 
@@ -31,7 +31,19 @@ from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
+if TYPE_CHECKING:
+    from rheojax.gui.workspace.pipeline.models import FitStepResult, PhaseResult
+
 logger = get_logger(__name__)
+
+
+class WorkerIsolationRequiredError(RuntimeError):
+    """Raised when a Pipeline-mode fit step runs under thread-mode worker isolation.
+
+    Distinct from ordinary step failures so ``execute()``'s per-step exception
+    handling can re-raise it as a fatal precondition error instead of
+    recording it as a per-step ``status="failed"`` result.
+    """
 
 
 def _coerce_bayesian_int(
@@ -87,6 +99,17 @@ class PipelineExecutionService(QObject):
     pipeline_started = Signal()
     pipeline_completed = Signal()
     pipeline_failed = Signal(str)
+
+    step_phase_started = Signal(str, str)      # step_id, phase ("nlsq" | "nuts")
+    step_phase_completed = Signal(str, str)
+    step_phase_failed = Signal(str, str, str)  # step_id, phase, error
+    phase_worker_ready = Signal(str, str, str, object)  # dataset_id, step_id, phase, worker
+    dataset_run_started = Signal(str)               # dataset_id -- emitted once per dataset,
+                                                       # right before its execute() call, so
+                                                       # active_jobs is populated one dataset at
+                                                       # a time rather than for the whole batch
+                                                       # upfront
+    dataset_run_finished = Signal(str, object)      # dataset_id, PipelineRunResult
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -202,6 +225,237 @@ class PipelineExecutionService(QObject):
             pipeline_actions.set_pipeline_running(False)
             self.pipeline_failed.emit(error_msg)
             raise
+
+    def execute(
+        self,
+        steps: list,
+        initial_context: dict,
+        library,
+        stop_requested,
+    ):
+        """Run a Pipeline-mode batch (transform/fit/export steps) over one dataset.
+
+        Distinct from ``execute_all``/``execute_single_step`` (the visual
+        pipeline builder's load/transform/fit/bayesian/export steps, driven
+        by ``StepStatus`` dispatch). This is the new Pipeline batch-execution
+        mode's per-dataset runner: it consumes ``foundation.state.PipelineStepConfig``
+        and reports results via ``PipelineRunResult``/``FitStepResult``
+        (``workspace.pipeline.models``) rather than caching into the state store.
+        """
+        from rheojax.gui.workspace.pipeline.models import PipelineRunResult
+
+        seen_ids: set[str] = set()
+        for step in steps:
+            if step.id in seen_ids:
+                raise ValueError(f"duplicate pipeline step id: {step.id!r}")
+            seen_ids.add(step.id)
+
+        context = dict(initial_context)
+        step_results: dict = {}
+
+        for i, step in enumerate(steps):
+            if stop_requested.is_set():
+                return PipelineRunResult(step_results=step_results, status="cancelled")
+
+            self.step_started.emit(step.id)
+            try:
+                if step.step_type == "transform":
+                    # A transform's output is "consumed downstream" -- and therefore worth a
+                    # persisted DatasetRef -- when a later step exists (and can read it from
+                    # context["data"]), OR when this transform is the run's terminal step but
+                    # follows an earlier transform (part of a transform chain, so its output is
+                    # the chain's addressable end product). A lone terminal transform preceded
+                    # only by unrelated steps (e.g. a fit) is a throwaway preview and stays
+                    # unpersisted.
+                    is_last = i == len(steps) - 1
+                    consumed_downstream = (not is_last) or any(
+                        s.step_type == "transform" for s in steps[:i]
+                    )
+                    step_results[step.id] = self._execute_pipeline_transform(
+                        step, context, library, persist=consumed_downstream
+                    )
+                elif step.step_type == "fit":
+                    step_results[step.id] = self._execute_pipeline_fit(step, context)
+                elif step.step_type == "export":
+                    step_results[step.id] = self._execute_pipeline_export(step, context)
+                else:
+                    raise ValueError(f"Unknown pipeline step_type: {step.step_type!r}")
+            except WorkerIsolationRequiredError:
+                # Fatal precondition error (misconfigured environment), not a
+                # per-step runtime failure -- propagate out of execute() itself.
+                raise
+            except Exception as exc:
+                self.step_failed.emit(step.id, str(exc))
+                return PipelineRunResult(step_results=step_results, status="failed", error=str(exc))
+            self.step_completed.emit(step.id)
+
+        return PipelineRunResult(step_results=step_results, status="completed")
+
+    def _execute_pipeline_transform(self, step, context: dict, library, persist: bool) -> dict:
+        """Run one Pipeline-mode transform step against its sole primary slot.
+
+        Named distinctly from ``_execute_transform`` (the visual pipeline
+        builder's handler above) since the two take different step shapes
+        and report results differently.
+
+        ``persist`` controls whether the transformed output is written into
+        ``library`` as a new derived ``DatasetRef`` (per §3.4: retained only
+        if a later step consumes it, or export explicitly requests it) --
+        the caller decides this from whether a later step in the same run
+        actually reads the output.
+        """
+        import uuid
+
+        from rheojax.gui.foundation.library import DatasetRef
+        from rheojax.gui.workspace.transform.slots_spec import transform_slots
+        from rheojax.gui.workspace.transform.transform_controller import (
+            infer_output_protocol,
+        )
+
+        if self._transform_service is None:
+            from rheojax.gui.services.transform_service import TransformService
+            self._transform_service = TransformService()
+
+        transform_key = step.config["name"]
+        specs = transform_slots(transform_key)
+        primary_slot = specs[0].name
+        dataset_id = context["dataset_id"]
+
+        result = self._transform_service.apply_transform(
+            transform_key, context["data"], {k: v for k, v in step.config.items() if k != "name"}
+        )
+        transformed = result[0] if isinstance(result, tuple) else result
+        protocol_type = infer_output_protocol(library, transform_key, {primary_slot: dataset_id})
+
+        context["data"] = transformed
+        new_dataset_id = None
+        if persist:
+            new_dataset_id = uuid.uuid4().hex
+            library.add(DatasetRef(
+                id=new_dataset_id, name=f"{transform_key}_{dataset_id}", protocol_type=protocol_type,
+                origin="derived", units={}, row_count=0, hash="", provenance={"pipeline_step": step.id},
+                lineage=[dataset_id],
+            ))
+            library.store_payload(new_dataset_id, transformed)
+            # A later step (another transform, or infer_output_protocol() on one further down
+            # the chain) must see the NEWLY persisted dataset as the current one, not the
+            # original input -- otherwise a 3-transform chain's third step would still report
+            # lineage=["d1"] instead of the immediately-preceding derived dataset's id.
+            context["dataset_id"] = new_dataset_id
+
+        return {"output": transformed, "protocol_type": protocol_type, "dataset_id": new_dataset_id}
+
+    def _execute_pipeline_fit(self, step, context: dict) -> FitStepResult:
+        """Run one Pipeline-mode fit step: synchronous NLSQ, then optional NUTS.
+
+        Named distinctly from ``_execute_fit`` (the visual pipeline builder's
+        handler below), which takes a different step shape.
+        """
+        from rheojax.gui.jobs.process_adapter import (
+            get_worker_isolation_mode,
+            make_bayesian_worker,
+            make_fit_worker,
+        )
+        from rheojax.gui.workspace.pipeline.models import FitStepResult
+
+        if get_worker_isolation_mode() != "subprocess":
+            raise WorkerIsolationRequiredError(
+                "Pipeline fit steps require subprocess worker isolation "
+                "(set RHEOJAX_WORKER_ISOLATION=subprocess); thread-mode is not supported."
+            )
+
+        config = step.config
+        dataset_id = context["dataset_id"]
+
+        self.step_phase_started.emit(step.id, "nlsq")
+        nlsq_worker = make_fit_worker(
+            model_name=config["model_name"],
+            data=context["data"],
+            initial_params=config.get("initial_params"),
+            options=config.get("nlsq_options"),
+            dataset_id=dataset_id,
+            model_config=config.get("model_config"),
+        )
+        self.phase_worker_ready.emit(dataset_id, step.id, "nlsq", nlsq_worker)
+        nlsq_phase = self._run_worker_phase(nlsq_worker)
+        if nlsq_phase.status == "completed":
+            self.step_phase_completed.emit(step.id, "nlsq")
+        else:
+            self.step_phase_failed.emit(step.id, "nlsq", nlsq_phase.error or "")
+
+        if not config.get("run_nuts", False) or nlsq_phase.status != "completed":
+            return FitStepResult(nlsq=nlsq_phase, nuts=None)
+
+        nuts_cfg = config.get("nuts_config", {})
+        warm_start = (nlsq_phase.result or {}).get("parameters", {})
+        self.step_phase_started.emit(step.id, "nuts")
+        nuts_worker = make_bayesian_worker(
+            model_name=config["model_name"],
+            data=context["data"],
+            num_warmup=nuts_cfg.get("num_warmup", 500),
+            num_samples=nuts_cfg.get("num_samples", 1000),
+            num_chains=nuts_cfg.get("num_chains", 4),
+            warm_start=warm_start if nuts_cfg.get("warm_start", True) else None,
+            priors=nuts_cfg.get("priors"),
+            seed=nuts_cfg.get("seed", 0),
+            dataset_id=dataset_id,
+            target_accept=nuts_cfg.get("target_accept", 0.8),
+        )
+        self.phase_worker_ready.emit(dataset_id, step.id, "nuts", nuts_worker)
+        nuts_phase = self._run_worker_phase(nuts_worker)
+        if nuts_phase.status == "completed":
+            self.step_phase_completed.emit(step.id, "nuts")
+        else:
+            self.step_phase_failed.emit(step.id, "nuts", nuts_phase.error or "")
+
+        return FitStepResult(nlsq=nlsq_phase, nuts=nuts_phase)
+
+    @staticmethod
+    def _run_worker_phase(worker) -> PhaseResult:
+        """Runs `worker` (FitWorker or ProcessWorkerAdapter) synchronously, capturing its
+        terminal signal via a plain (same-thread) connection -- must be called from the same
+        thread execute() itself runs on. worker.run() blocks that thread until the terminal
+        message arrives, so the local closures below fire before this function returns."""
+        from rheojax.gui.workspace.pipeline.models import PhaseResult
+
+        captured: dict = {}
+
+        def _on_completed(result):
+            captured["status"] = "completed"
+            captured["result"] = result
+
+        def _on_failed(error):
+            captured["status"] = "failed"
+            captured["error"] = error
+
+        def _on_cancelled():
+            captured["status"] = "cancelled"
+
+        worker.signals.completed.connect(_on_completed)
+        worker.signals.failed.connect(_on_failed)
+        worker.signals.cancelled.connect(_on_cancelled)
+        worker.run()
+        return PhaseResult(
+            status=captured.get("status", "failed"),
+            result=captured.get("result"),
+            error=captured.get("error"),
+        )
+
+    def _execute_pipeline_export(self, step, context: dict) -> dict:
+        """Run one Pipeline-mode export step via ExportService.export_data.
+
+        Named distinctly from ``_execute_export`` (the visual pipeline
+        builder's handler below), which takes a different step shape and
+        supports multiple artefact types (fit/bayesian results too).
+        """
+        if self._export_service is None:
+            from rheojax.gui.services.export_service import ExportService
+            self._export_service = ExportService()
+
+        path = step.config["path"]
+        fmt = step.config.get("format")
+        self._export_service.export_data(context["data"], path, format=fmt)
+        return {"paths": [path]}
 
     # ------------------------------------------------------------------
     # Internal routing

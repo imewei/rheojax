@@ -26,7 +26,14 @@ class DatasetLibrary:
         self._by_id: dict[str, DatasetRef] = {}
         self._payloads: dict[str, Any] = {}  # id -> RheoData; needed to resolve data_ref strings
 
-    def add(self, ref: DatasetRef) -> None:
+    def add(self, ref: DatasetRef, overwrite: bool = False) -> None:
+        if not overwrite and ref.id in self._by_id:
+            raise ValueError(f"Dataset id {ref.id!r} already exists (pass overwrite=True to replace)")
+        # An overwrite replaces the reference AND clears any stale payload under the old
+        # reference -- without this, a caller that overwrites a ref but doesn't also call
+        # store_payload() (e.g. a fit export whose result has no derived RheoData) would leave
+        # the PREVIOUS ref's payload silently reachable under the new ref's id/metadata.
+        self._payloads.pop(ref.id, None)
         self._by_id[ref.id] = ref
 
     def get(self, id: str) -> DatasetRef:

@@ -41,7 +41,7 @@ def _is_same_domain(transform_key: str) -> bool:
     return category not in _DOMAIN_CHANGING
 
 
-def _infer_protocol_type(library, transform_key, slots) -> str:
+def infer_output_protocol(library, transform_key, slots) -> str:
     """Same-domain transforms (superposition/processing/analysis) plausibly
     keep the input's protocol type; domain-changing transforms (spectral/
     decomposition), and any case where the input protocol can't be resolved,
@@ -115,7 +115,7 @@ def _make_run_fn(library):
             "input": data,
             "output": tr.data,
             "result": tr.extras,
-            "protocol_type": _infer_protocol_type(library, transform_key, slots),
+            "protocol_type": infer_output_protocol(library, transform_key, slots),
         }
     return _run
 
