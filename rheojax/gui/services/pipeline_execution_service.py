@@ -88,6 +88,17 @@ class PipelineExecutionService(QObject):
     pipeline_completed = Signal()
     pipeline_failed = Signal(str)
 
+    step_phase_started = Signal(str, str)      # step_id, phase ("nlsq" | "nuts")
+    step_phase_completed = Signal(str, str)
+    step_phase_failed = Signal(str, str, str)  # step_id, phase, error
+    phase_worker_ready = Signal(str, str, str, object)  # dataset_id, step_id, phase, worker
+    dataset_run_started = Signal(str)               # dataset_id -- emitted once per dataset,
+                                                       # right before its execute() call, so
+                                                       # active_jobs is populated one dataset at
+                                                       # a time rather than for the whole batch
+                                                       # upfront
+    dataset_run_finished = Signal(str, object)      # dataset_id, PipelineRunResult
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         # Lazy service creation — instantiated on first use per step type.
@@ -202,6 +213,78 @@ class PipelineExecutionService(QObject):
             pipeline_actions.set_pipeline_running(False)
             self.pipeline_failed.emit(error_msg)
             raise
+
+    def execute(
+        self,
+        steps: list,
+        initial_context: dict,
+        library,
+        stop_requested,
+    ):
+        """Run a Pipeline-mode batch (transform/fit/export steps) over one dataset.
+
+        Distinct from ``execute_all``/``execute_single_step`` (the visual
+        pipeline builder's load/transform/fit/bayesian/export steps, driven
+        by ``StepStatus`` dispatch). This is the new Pipeline batch-execution
+        mode's per-dataset runner: it consumes ``foundation.state.PipelineStepConfig``
+        and reports results via ``PipelineRunResult``/``FitStepResult``
+        (``workspace.pipeline.models``) rather than caching into the state store.
+        """
+        from rheojax.gui.workspace.pipeline.models import PipelineRunResult
+
+        context = dict(initial_context)
+        step_results: dict = {}
+
+        for step in steps:
+            if stop_requested.is_set():
+                return PipelineRunResult(step_results=step_results, status="cancelled")
+
+            self.step_started.emit(step.id)
+            try:
+                if step.step_type == "transform":
+                    step_results[step.id] = self._execute_pipeline_transform(step, context, library)
+                elif step.step_type == "fit":
+                    raise NotImplementedError("fit step handling added in a later task")
+                elif step.step_type == "export":
+                    raise NotImplementedError("export step handling added in a later task")
+                else:
+                    raise ValueError(f"Unknown pipeline step_type: {step.step_type!r}")
+            except Exception as exc:
+                self.step_failed.emit(step.id, str(exc))
+                return PipelineRunResult(step_results=step_results, status="failed", error=str(exc))
+            self.step_completed.emit(step.id)
+
+        return PipelineRunResult(step_results=step_results, status="completed")
+
+    def _execute_pipeline_transform(self, step, context: dict, library) -> dict:
+        """Run one Pipeline-mode transform step against its sole primary slot.
+
+        Named distinctly from ``_execute_transform`` (the visual pipeline
+        builder's handler above) since the two take different step shapes
+        and report results differently.
+        """
+        from rheojax.gui.workspace.transform.slots_spec import transform_slots
+        from rheojax.gui.workspace.transform.transform_controller import (
+            infer_output_protocol,
+        )
+
+        if self._transform_service is None:
+            from rheojax.gui.services.transform_service import TransformService
+            self._transform_service = TransformService()
+
+        transform_key = step.config["name"]
+        specs = transform_slots(transform_key)
+        primary_slot = specs[0].name
+        dataset_id = context["dataset_id"]
+
+        result = self._transform_service.apply_transform(
+            transform_key, context["data"], {k: v for k, v in step.config.items() if k != "name"}
+        )
+        transformed = result[0] if isinstance(result, tuple) else result
+        protocol_type = infer_output_protocol(library, transform_key, {primary_slot: dataset_id})
+
+        context["data"] = transformed
+        return {"output": transformed, "protocol_type": protocol_type}
 
     # ------------------------------------------------------------------
     # Internal routing
