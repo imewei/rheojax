@@ -220,13 +220,18 @@ def save_project_v2(state, path: Path) -> None:
                     # RheoData is handled above (save_hdf5, not write_result_arrays -- this is
                     # a real RheoData, not a result dict), into transform_results/ (the same
                     # prefix, since it's the same kind of payload).
+                    # A failed transform step may carry "output": None -- mirror the "no ref
+                    # means no output" convention _restore_result_dict already uses on load,
+                    # rather than crashing inside save_hdf5.
                     output = step_record.pop("output")
-                    result_id = uuid.uuid4().hex
-                    rel = f"transform_results/{result_id}.hdf5"
-                    full = tmp_root / rel
-                    full.parent.mkdir(parents=True, exist_ok=True)
-                    save_hdf5(output, str(full))
-                    _register_binary(rel)
+                    result_id = None
+                    if output is not None:
+                        result_id = uuid.uuid4().hex
+                        rel = f"transform_results/{result_id}.hdf5"
+                        full = tmp_root / rel
+                        full.parent.mkdir(parents=True, exist_ok=True)
+                        save_hdf5(output, str(full))
+                        _register_binary(rel)
                     step_record["output_ref"] = result_id
                 step_results_out[step_id] = step_record
             record["step_results"] = step_results_out
@@ -422,12 +427,17 @@ def load_project_v2(path: Path):
                     elif "output_ref" in step_record:
                         # Inverse of save_project_v2's "output" -> "output_ref" persistence
                         # for a "transform" pipeline step's record (see the matching comment
-                        # there).
+                        # there). A None ref_id means the step had no output (e.g. a failed
+                        # transform) -- mirror _restore_result_dict's "no ref means no output"
+                        # convention rather than validating a None id.
                         ref_id = step_record.pop("output_ref")
-                        _validate_ref_id(ref_id)
-                        step_record["output"] = load_hdf5(
-                            str(tmp_root / "transform_results" / f"{ref_id}.hdf5")
-                        )
+                        if ref_id is None:
+                            step_record["output"] = None
+                        else:
+                            _validate_ref_id(ref_id)
+                            step_record["output"] = load_hdf5(
+                                str(tmp_root / "transform_results" / f"{ref_id}.hdf5")
+                            )
             state.job_history = JobHistoryState(by_id=job_history_dict)
 
             project_dict = json.loads((tmp_root / "project.json").read_text())

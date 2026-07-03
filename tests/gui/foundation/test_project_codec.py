@@ -326,6 +326,28 @@ def test_round_trip_job_history_with_transform_step_output(tmp_path):
     assert step_record["protocol_type"] == "oscillation"
 
 
+def test_job_history_transform_step_output_none_round_trips(tmp_path):
+    # A failed transform pipeline step's record (step_type == "other") may carry
+    # "output": None -- save_project_v2 must not crash trying to save_hdf5(None, ...),
+    # and load_project_v2 must round-trip it back to "output": None (the same "no ref
+    # means no output" convention _restore_result_dict uses for fit/NUTS results).
+    state = AppState()
+    state.job_history.by_id["job1"] = {
+        "dataset_id": "d1", "status": "failed", "error": "transform raised",
+        "step_results": {
+            "s1": {"step_type": "other", "output": None,
+                   "protocol_type": "oscillation", "dataset_id": None},
+        },
+    }
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)  # must not raise
+    loaded = load_project_v2(path)
+
+    step_record = loaded.job_history.by_id["job1"]["step_results"]["s1"]
+    assert step_record["output"] is None
+    assert "output_ref" not in step_record
+
+
 def test_load_rejects_wrong_version(tmp_path):
     path = tmp_path / "v1_style.rheojax"
     with zipfile.ZipFile(path, "w") as zf:

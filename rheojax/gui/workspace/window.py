@@ -146,16 +146,23 @@ class WorkspaceWindow(QMainWindow):
         self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
 
     def _on_open(self) -> None:
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
 
         def _open():
             path, _ = QFileDialog.getOpenFileName(
                 self, "Open Project", "", "RheoJAX Project (*.rheojax)"
             )
             if path:
+                from zipfile import BadZipFile
+
                 from rheojax.gui.foundation.project_codec import load_project_v2
 
-                self._rebuild(load_project_v2(path))
+                try:
+                    new_state = load_project_v2(path)
+                except (ValueError, FileNotFoundError, OSError, BadZipFile) as exc:
+                    QMessageBox.critical(self, "Open Failed", str(exc))
+                    return
+                self._rebuild(new_state)
                 self._state.project.dirty = False
                 self._state.project.path = path
 
@@ -165,13 +172,19 @@ class WorkspaceWindow(QMainWindow):
         if self._state.project.path is None:
             self._on_save_as()
             return
+        from PySide6.QtWidgets import QMessageBox
+
         from rheojax.gui.foundation.project_codec import save_project_v2
 
-        save_project_v2(self._state, self._state.project.path)
+        try:
+            save_project_v2(self._state, self._state.project.path)
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            QMessageBox.critical(self, "Save Failed", str(exc))
+            return
         self._state.project.dirty = False
 
     def _on_save_as(self) -> None:
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
 
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Project As", "", "RheoJAX Project (*.rheojax)"
@@ -179,7 +192,11 @@ class WorkspaceWindow(QMainWindow):
         if path:
             from rheojax.gui.foundation.project_codec import save_project_v2
 
-            save_project_v2(self._state, path)
+            try:
+                save_project_v2(self._state, path)
+            except (ValueError, FileNotFoundError, OSError) as exc:
+                QMessageBox.critical(self, "Save Failed", str(exc))
+                return
             self._state.project.path = path
             self._state.project.name = Path(path).stem
             self._state.project.dirty = False
@@ -203,7 +220,8 @@ class WorkspaceWindow(QMainWindow):
         )
         if choice == QMessageBox.StandardButton.Save:
             self._on_save()
-            proceed()
+            if not self._state.project.dirty:
+                proceed()
         elif choice == QMessageBox.StandardButton.Discard:
             proceed()
 
