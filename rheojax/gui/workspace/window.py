@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
@@ -25,13 +27,15 @@ from rheojax.gui.workspace.transform.transform_controller import (
 
 class WorkspaceWindow(QMainWindow):
     mode_changed = Signal(str)
-    MODES = ("fit", "transform")
+    MODES = ("fit", "transform", "pipeline")
 
     def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._epoch = 0
         self._notifier = DatasetLibraryNotifier()
         self._notifier.changed.connect(self._mark_dirty)
+        self._pipeline_service = PipelineExecutionService()
+        self._pipeline_stop_event: threading.Event | None = None
 
         self.setWindowTitle("RheoJAX Workspace")
         self.resize(1200, 800)
@@ -40,12 +44,16 @@ class WorkspaceWindow(QMainWindow):
         self.addToolBar(bar)
         self._fit_btn = QPushButton("Fit", self)
         self._tx_btn = QPushButton("Transform", self)
+        self._pipeline_btn = QPushButton("Pipeline", self)
         self._fit_btn.setCheckable(True)
         self._tx_btn.setCheckable(True)
+        self._pipeline_btn.setCheckable(True)
         self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
         self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
+        self._pipeline_btn.clicked.connect(lambda: self.set_mode("pipeline"))
         bar.addWidget(self._fit_btn)
         bar.addWidget(self._tx_btn)
+        bar.addWidget(self._pipeline_btn)
         self._status_label = QLabel(self)
         bar.addWidget(self._status_label)
         self._build_file_menu()
@@ -64,11 +72,20 @@ class WorkspaceWindow(QMainWindow):
         self._state = state
         initial_mode = state.ui.mode
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
+        from rheojax.gui.workspace.pipeline.controller import build_pipeline_controller
+
         fit_ctl, self._fit_bodies = build_fit_controller(state)
         transform_ctl, self._transform_bodies = build_transform_controller(state)
+        pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(state, self._pipeline_service)
         self._controllers = {
             "fit": fit_ctl,
             "transform": transform_ctl,
+            "pipeline": pipeline_ctl,
+        }
+        self._body_lists = {
+            "fit": self._fit_bodies,
+            "transform": self._transform_bodies,
+            "pipeline": self._pipeline_bodies,
         }
         # Auto-advance each workflow whenever a step's edits make it ready.
         # Connected after build_*_controller so each body's own edited ->
@@ -86,6 +103,11 @@ class WorkspaceWindow(QMainWindow):
                 body.edited.connect(self._on_transform_body_edited)
             if hasattr(body, "dataset_commit_requested"):
                 body.dataset_commit_requested.connect(self._commit_dataset)
+        for body in self._pipeline_bodies:
+            if hasattr(body, "edited"):
+                body.edited.connect(self._on_pipeline_body_edited)
+            if hasattr(body, "run_requested"):
+                body.run_requested.connect(self._on_pipeline_run_requested)
 
         self._sync_mode_buttons()
         self._refresh_status_label()
@@ -102,7 +124,7 @@ class WorkspaceWindow(QMainWindow):
         self.setCentralWidget(self._splitter)
 
     def _dispose_workspace(self) -> None:
-        for body in list(self._fit_bodies) + list(self._transform_bodies):
+        for body in list(self._fit_bodies) + list(self._transform_bodies) + list(self._pipeline_bodies):
             if hasattr(body, "edited"):
                 try:
                     body.edited.disconnect(self._on_fit_body_edited)
@@ -110,6 +132,10 @@ class WorkspaceWindow(QMainWindow):
                     pass
                 try:
                     body.edited.disconnect(self._on_transform_body_edited)
+                except (RuntimeError, TypeError):
+                    pass
+                try:
+                    body.edited.disconnect(self._on_pipeline_body_edited)
                 except (RuntimeError, TypeError):
                     pass
             if hasattr(body, "config_edited"):
@@ -122,12 +148,19 @@ class WorkspaceWindow(QMainWindow):
                     body.dataset_commit_requested.disconnect(self._commit_dataset)
                 except (RuntimeError, TypeError):
                     pass
+            if hasattr(body, "run_requested"):
+                try:
+                    body.run_requested.disconnect(self._on_pipeline_run_requested)
+                except (RuntimeError, TypeError):
+                    pass
             body.deleteLater()
         for widget in (self._canvas, self._rail, self._inspector, self._splitter):
             widget.deleteLater()
         self._controllers = {}
+        self._body_lists = {}
         self._fit_bodies = []
         self._transform_bodies = []
+        self._pipeline_bodies = []
 
     def _rebuild(self, new_state: AppState) -> None:
         self._epoch += 1
@@ -233,7 +266,7 @@ class WorkspaceWindow(QMainWindow):
             raise ValueError(f"unknown mode {mode!r}; expected one of {self.MODES}")
         if mode == self._mode:
             return
-        old_bodies = self._fit_bodies if self._mode == "fit" else self._transform_bodies
+        old_bodies = self._body_lists[self._mode]
         self._mode = mode
         new_canvas = StepperCanvas(self._controllers[mode], self)
         self._wire_canvas(new_canvas)
@@ -266,6 +299,7 @@ class WorkspaceWindow(QMainWindow):
     def _sync_mode_buttons(self) -> None:
         self._fit_btn.setChecked(self._mode == "fit")
         self._tx_btn.setChecked(self._mode == "transform")
+        self._pipeline_btn.setChecked(self._mode == "pipeline")
 
     def _refresh_status_label(self) -> None:
         # ponytail: "active project" status deferred — needs the Plan 3/4
@@ -287,7 +321,7 @@ class WorkspaceWindow(QMainWindow):
         return self._transform_bodies
 
     def _install_bodies(self, mode: str, canvas: StepperCanvas) -> None:
-        bodies = self._fit_bodies if mode == "fit" else self._transform_bodies
+        bodies = self._body_lists[mode]
         for i, body in enumerate(bodies):
             canvas.set_body(i, body)
 
@@ -335,3 +369,20 @@ class WorkspaceWindow(QMainWindow):
 
     def _on_transform_body_edited(self) -> None:
         self._advance_and_unlock("transform")
+
+    def _on_pipeline_body_edited(self) -> None:
+        pass  # mirrors _on_fit_body_edited/_on_transform_body_edited's advance-eligibility recheck
+
+    def _on_pipeline_run_requested(self) -> None:
+        from PySide6.QtCore import QThreadPool
+
+        from rheojax.gui.workspace.pipeline.batch_runner import PipelineBatchRunner
+
+        pipeline_state = self._state.pipeline
+        self._pipeline_stop_event = threading.Event()
+        runner = PipelineBatchRunner(
+            service=self._pipeline_service, steps=pipeline_state.steps,
+            selected_dataset_ids=pipeline_state.selected_dataset_ids, library=self._state.library,
+            stop_requested=self._pipeline_stop_event,
+        )
+        QThreadPool.globalInstance().start(runner)
