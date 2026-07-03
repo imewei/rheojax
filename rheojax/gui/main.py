@@ -154,21 +154,29 @@ For more information, visit: https://github.com/imewei/rheojax
         """,
     )
 
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--project",
         "-p",
         type=Path,
         metavar="FILE",
         help="Project file to open on startup (.rheojax)",
     )
-
-    parser.add_argument(
+    group.add_argument(
         "--import",
         "-i",
         dest="import_file",
         type=Path,
         metavar="FILE",
-        help="Data file to import on startup (TRIOS, Excel, CSV, etc.)",
+        help="Data file to import on startup (requires --protocol)",
+    )
+
+    parser.add_argument(
+        "--protocol",
+        type=str,
+        metavar="PROTOCOL",
+        help="Protocol for --import (required together): flow_curve, creep, relaxation, "
+        "startup, oscillation, laos",
     )
 
     parser.add_argument(
@@ -197,7 +205,14 @@ For more information, visit: https://github.com/imewei/rheojax
         version=f"%(prog)s {__version__}",
     )
 
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    if args.import_file and not args.protocol:
+        parser.error("--protocol is required when --import is given")
+    if args.protocol and not args.import_file:
+        parser.error("--protocol is only valid together with --import")
+
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -383,25 +398,27 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("RheoJAX GUI workspace shell ready", version=__version__)
 
         if args.project:
-            logger.info(
-                "Workspace shell: project loading not yet implemented",
-                path=str(args.project),
-            )
-            print(
-                "NOTE: --project is not yet supported by the workspace shell "
-                "(--workspace); ignored.",
-                file=sys.stderr,
-            )
+            from rheojax.gui.foundation.project_codec import load_project_v2
+
+            try:
+                loaded_state = load_project_v2(args.project)
+            except (ValueError, FileNotFoundError) as e:
+                logger.error("Failed to load project", path=str(args.project), error=str(e))
+                print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
+                return 1
+            workspace_window._rebuild(loaded_state)
+            workspace_window._state.project.path = str(args.project)
+
         if args.import_file:
-            logger.info(
-                "Workspace shell: data import not yet implemented",
-                path=str(args.import_file),
-            )
-            print(
-                "NOTE: --import is not yet supported by the workspace shell "
-                "(--workspace); ignored.",
-                file=sys.stderr,
-            )
+            from rheojax.gui.foundation.import_service import import_dataset
+
+            try:
+                ref, data = import_dataset(args.import_file, args.protocol)
+            except (ValueError, FileNotFoundError) as e:
+                logger.error("Failed to import data", path=str(args.import_file), error=str(e))
+                print(f"ERROR: Failed to import data: {e}", file=sys.stderr)
+                return 1
+            workspace_window._commit_dataset(ref, data, overwrite=False)
 
         exit_code = app.exec()
         logger.info("Application exiting", exit_code=exit_code)
