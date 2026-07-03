@@ -80,7 +80,9 @@ class WorkspaceWindow(QMainWindow):
 
         fit_ctl, self._fit_bodies = build_fit_controller(state)
         transform_ctl, self._transform_bodies = build_transform_controller(state)
-        pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(state, self._pipeline_service)
+        pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(
+            state, self._pipeline_service, epoch=self._epoch, guard=self._guard
+        )
         self._controllers = {
             "fit": fit_ctl,
             "transform": transform_ctl,

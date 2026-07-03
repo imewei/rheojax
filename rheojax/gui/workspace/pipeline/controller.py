@@ -19,13 +19,28 @@ from rheojax.gui.workspace.controller import WorkflowController
 class PipelineController(WorkflowController):
     STEP_IDS = ["configure_run"]
 
-    def __init__(self, app_state, service, on_dirty: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        app_state,
+        service,
+        on_dirty: Callable[[], None],
+        epoch: int = 0,
+        guard: Callable[[int, Callable], Callable] | None = None,
+    ) -> None:
         self._state = app_state
         self._service = service
         self._on_dirty = on_dirty
         super().__init__(steps=[])
-        self._service.dataset_run_started.connect(self._on_dataset_run_started)
-        self._service.dataset_run_finished.connect(self._commit_job_result)
+        on_started = self._on_dataset_run_started
+        on_finished = self._commit_job_result
+        # guard() no-ops these handlers once WorkspaceWindow._epoch advances past
+        # `epoch` (a rebuild happened), so a stale controller left connected to the
+        # persistent PipelineExecutionService can't write into a discarded AppState.
+        if guard is not None:
+            on_started = guard(epoch, on_started)
+            on_finished = guard(epoch, on_finished)
+        self._service.dataset_run_started.connect(on_started)
+        self._service.dataset_run_finished.connect(on_finished)
 
     def _on_dataset_run_started(self, dataset_id: str) -> None:
         # Registers ONE dataset's active_jobs entry right before it starts running -- not the
@@ -45,12 +60,18 @@ class PipelineController(WorkflowController):
         self._on_dirty()
 
 
-def build_pipeline_controller(app_state, service):
+def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None):
     from rheojax.gui.workspace.controller import Step
     from rheojax.gui.workspace.pipeline.step1_configure_run import PipelineConfigureRunStep
 
     body = PipelineConfigureRunStep(app_state.pipeline, app_state.library)
-    ctl = PipelineController(app_state, service, on_dirty=lambda: setattr(app_state.project, "dirty", True))
+    ctl = PipelineController(
+        app_state,
+        service,
+        on_dirty=lambda: setattr(app_state.project, "dirty", True),
+        epoch=epoch,
+        guard=guard,
+    )
     ctl.steps = [Step(id="configure_run", title="Configure & Run", is_ready=body.is_ready, validate=lambda: True)]
     ctl.reached = {0}
     return ctl, [body]
