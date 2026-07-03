@@ -7,12 +7,13 @@ main event loop.
 
 Usage
 -----
-    rheojax-gui                    # Launch GUI
+    rheojax-gui                    # Launch GUI (workspace shell, now the default)
+    rheojax-gui --legacy           # Launch the legacy main window
     rheojax-gui --project FILE     # Open project
-    rheojax-gui --import FILE      # Import data file on startup
+    rheojax-gui --import FILE --protocol PROTOCOL   # Import data file on startup
     rheojax-gui --maximized        # Start window maximized
     rheojax-gui --verbose          # Enable verbose logging
-    rheojax-gui --workspace        # Launch the new workspace shell (preview)
+    rheojax-gui --workspace        # Deprecated no-op alias (workspace is now default)
     rheojax-gui --help             # Show help
 
 Example
@@ -196,7 +197,12 @@ For more information, visit: https://github.com/imewei/rheojax
     parser.add_argument(
         "--workspace",
         action="store_true",
-        help="Launch the new workspace shell (preview) instead of the legacy main window",
+        help="Deprecated no-op alias; the workspace shell is now the default",
+    )
+
+    parser.add_argument(
+        "--legacy", action="store_true",
+        help="Launch the legacy main window instead of the (now default) workspace shell",
     )
 
     parser.add_argument(
@@ -384,8 +390,18 @@ def main(argv: list[str] | None = None) -> int:
     # Workspace shell (preview): early-return path, kept separate from the
     # legacy window's project/import/smoke-fit hooks below since those are
     # RheoJAXMainWindow-specific APIs the workspace shell does not have yet.
-    if args.workspace:
-        logger.debug("Launching workspace shell (preview)")
+    if not args.legacy:
+        if args.workspace:
+            logger.warning(
+                "--workspace is deprecated and no longer needed -- the workspace shell is now "
+                "the default. This flag will be removed in a future release."
+            )
+            print(
+                "WARNING: --workspace is deprecated (workspace is now the default); "
+                "this flag will be removed in a future release.",
+                file=sys.stderr,
+            )
+        logger.debug("Launching workspace shell (now the default)")
         try:
             workspace_window = _create_workspace_window()
         except Exception as e:
