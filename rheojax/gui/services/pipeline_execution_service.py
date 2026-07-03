@@ -258,7 +258,7 @@ class PipelineExecutionService(QObject):
                 elif step.step_type == "fit":
                     step_results[step.id] = self._execute_pipeline_fit(step, context)
                 elif step.step_type == "export":
-                    raise NotImplementedError("export step handling added in a later task")
+                    step_results[step.id] = self._execute_pipeline_export(step, context)
                 else:
                     raise ValueError(f"Unknown pipeline step_type: {step.step_type!r}")
             except WorkerIsolationRequiredError:
@@ -397,6 +397,25 @@ class PipelineExecutionService(QObject):
             result=captured.get("result"),
             error=captured.get("error"),
         )
+
+    def _execute_pipeline_export(self, step, context: dict) -> dict:
+        """Run one Pipeline-mode export step via ExportService.export_data.
+
+        Named distinctly from ``_execute_export`` (the visual pipeline
+        builder's handler below), which takes a different step shape and
+        supports multiple artefact types (fit/bayesian results too).
+        """
+        if self._export_service is None:
+            from rheojax.gui.services.export_service import ExportService
+            self._export_service = ExportService()
+
+        path = step.config["path"]
+        fmt = step.config.get("format")
+        try:
+            self._export_service.export_data(context["data"], path, format=fmt)
+            return {"paths": [path]}
+        except Exception:
+            return {"paths": []}
 
     # ------------------------------------------------------------------
     # Internal routing

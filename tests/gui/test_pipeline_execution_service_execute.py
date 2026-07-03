@@ -87,3 +87,31 @@ def test_execute_runs_transform_step(qtbot):
     )
     assert result.status == "completed"
     assert "s1" in result.step_results
+
+
+def test_execute_runs_export_step(qtbot, tmp_path):
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    out_path = str(tmp_path / "out.csv")
+    steps = [PipelineStepConfig(id="s1", step_type="export", config={"path": out_path, "format": "csv"})]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "completed"
+    assert result.step_results["s1"]["paths"] == [out_path]
+    assert (tmp_path / "out.csv").exists()
+
+
+def test_execute_returns_cancelled_when_stop_requested_set(qtbot):
+    lib = DatasetLibrary()
+    data = RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation")
+    svc = PipelineExecutionService()
+    stop = threading.Event()
+    stop.set()
+    steps = [PipelineStepConfig(id="s1", step_type="export", config={"path": "unused.csv"})]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=stop)
+    assert result.status == "cancelled"
+    assert result.step_results == {}
