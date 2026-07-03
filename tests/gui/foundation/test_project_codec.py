@@ -8,6 +8,7 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.project_codec import (
+    load_project_v2,
     read_result_arrays,
     save_project_v2,
     write_result_arrays,
@@ -15,6 +16,9 @@ from rheojax.gui.foundation.project_codec import (
 from rheojax.gui.foundation.state import (
     AppState,
     FitState,
+    NlsqConfig,
+    NutsConfig,
+    ParameterConfig,
     PipelineState,
     PipelineStepConfig,
     TransformState,
@@ -228,3 +232,137 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
 
     # atomic write: no leftover temp files
     assert not list(tmp_path.glob(f"{out_path.name}.tmp-*"))
+
+
+def test_round_trip_full_state(tmp_path):
+    state = AppState()
+    ref = _dataset_ref("d1")
+    payload = RheoData(x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation")
+    state.library.add(ref)
+    state.library.store_payload("d1", payload)
+    state.fit = FitState(
+        protocol="oscillation", model_key="maxwell",
+        nlsq_config=NlsqConfig(n_starts=5, parameters=[
+            ParameterConfig(name="G0", value=1.0, lower=0.0, upper=10.0, fixed=False)
+        ]),
+        nuts_config=NutsConfig(run_nuts=False),
+        nlsq_result={"parameters": {"G0": 1.0}, "x_fit": np.array([1.0, 2.0])},
+    )
+    # transform.result holds real RheoData under "input"/"output" (transform_controller.py's
+    # actual shape) plus non-array extras -- this must survive the round trip too (§6.1 fix).
+    state.transform.result = {
+        "input": payload, "output": payload, "protocol_type": "oscillation",
+    }
+
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+    loaded = load_project_v2(path)
+
+    assert loaded.fit.protocol == "oscillation"
+    assert loaded.fit.model_key == "maxwell"
+    assert loaded.fit.nlsq_config.n_starts == 5
+    assert loaded.fit.nlsq_config.parameters == [
+        ParameterConfig(name="G0", value=1.0, lower=0.0, upper=10.0, fixed=False)
+    ]
+    assert loaded.fit.nuts_config.run_nuts is False
+    assert loaded.fit.nlsq_result["parameters"] == {"G0": 1.0}
+    np.testing.assert_array_equal(loaded.fit.nlsq_result["x_fit"], np.array([1.0, 2.0]))
+    assert loaded.library.get("d1").protocol_type == "oscillation"
+    restored_payload = loaded.library.load_payload("d1")
+    np.testing.assert_array_equal(restored_payload.x, payload.x)
+    assert loaded.transform.result["protocol_type"] == "oscillation"
+    np.testing.assert_array_equal(loaded.transform.result["input"].x, payload.x)
+    np.testing.assert_array_equal(loaded.transform.result["output"].x, payload.x)
+
+
+def test_round_trip_job_history_with_fit_phase_results(tmp_path):
+    state = AppState()
+    state.job_history.by_id["job1"] = {
+        "dataset_id": "d1", "status": "completed", "error": None,
+        "step_results": {
+            "s1": {
+                "step_type": "fit",
+                "nlsq": {"status": "completed", "error": None,
+                         "result": {"parameters": {"G0": 2.0}, "x_fit": np.array([3.0, 4.0])}},
+                "nuts": None,
+            },
+        },
+    }
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+    loaded = load_project_v2(path)
+
+    phase = loaded.job_history.by_id["job1"]["step_results"]["s1"]["nlsq"]
+    assert phase["status"] == "completed"
+    assert phase["result"]["parameters"] == {"G0": 2.0}
+    np.testing.assert_array_equal(phase["result"]["x_fit"], np.array([3.0, 4.0]))
+    assert "result_ref" not in phase  # rehydrated back to a plain "result" dict, not left as a reference
+
+
+def test_round_trip_job_history_with_transform_step_output(tmp_path):
+    # A Pipeline "transform" step's job_history record embeds a real RheoData under "output"
+    # (Plan 2's PipelineBatchRunner._prepare_job_record(), step_type == "other") -- this must
+    # round-trip via save_hdf5/load_hdf5 (transform_results/), not raise TypeError from
+    # json.dumps() trying to serialize the RheoData directly.
+    state = AppState()
+    output_payload = RheoData(x=[0.1, 1.0], y=[5.0, 6.0], initial_test_mode="oscillation")
+    state.job_history.by_id["job1"] = {
+        "dataset_id": "d1", "status": "completed", "error": None,
+        "step_results": {
+            "s1": {"step_type": "other", "output": output_payload,
+                   "protocol_type": "oscillation", "dataset_id": None},
+        },
+    }
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)  # must not raise TypeError
+    loaded = load_project_v2(path)
+
+    step_record = loaded.job_history.by_id["job1"]["step_results"]["s1"]
+    assert "output_ref" not in step_record
+    np.testing.assert_array_equal(step_record["output"].x, output_payload.x)
+    assert step_record["protocol_type"] == "oscillation"
+
+
+def test_load_rejects_wrong_version(tmp_path):
+    path = tmp_path / "v1_style.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "1.0"}))
+    with pytest.raises(ValueError, match="version"):
+        load_project_v2(path)
+
+
+def test_load_rejects_duplicate_zip_entries(tmp_path):
+    path = tmp_path / "dup.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "y"}))
+    with pytest.raises(ValueError, match="duplicate"):
+        load_project_v2(path)
+
+
+def test_load_rejects_disallowed_member(tmp_path):
+    path = tmp_path / "extra.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        zf.writestr("not_in_schema.txt", "hi")
+    with pytest.raises(ValueError, match="not_in_schema"):
+        load_project_v2(path)
+
+
+def test_load_rejects_checksum_mismatch(tmp_path):
+    state = AppState()
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+
+    import shutil
+    corrupted = tmp_path / "corrupted.rheojax"
+    shutil.copy(path, corrupted)
+    # Rewrite the zip with a tampered project.json (zipfile can't edit in place -- rebuild).
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(corrupted, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "project.json":
+                data = b'{"path": "TAMPERED", "name": null}'
+            dst.writestr(item, data)
+    with pytest.raises(ValueError, match="checksum"):
+        load_project_v2(corrupted)

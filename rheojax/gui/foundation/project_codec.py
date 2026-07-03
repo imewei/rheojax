@@ -23,7 +23,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import h5py
 import numpy as np
 
-from rheojax.io import save_hdf5
+from rheojax.io import load_hdf5, save_hdf5
 
 
 def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> Any:
@@ -251,3 +251,171 @@ def save_project_v2(state, path: Path) -> None:
             if tmp_zip.exists():
                 tmp_zip.unlink()
             raise
+
+
+_ALLOWED_TOP_LEVEL = {
+    "metadata.json", "manifest.json", "library/manifest.json", "fit.json",
+    "transform.json", "pipeline.json", "job_history.json", "project.json", "ui.json",
+}
+_ALLOWED_PREFIXES = ("library/", "fit_results/", "transform_results/", "job_results/")
+
+_MAX_MEMBERS = 10_000
+_MAX_TOTAL_BYTES = 2 * 1024**3
+_MAX_MEMBER_BYTES = 500 * 1024**2
+
+
+def _is_allowed_member(name: str) -> bool:
+    if name in _ALLOWED_TOP_LEVEL:
+        return True
+    return any(name.startswith(p) and name.endswith((".hdf5", "/manifest.json")) for p in _ALLOWED_PREFIXES)
+
+
+def load_project_v2(path: Path):
+    """Decode a versioned .rheojax v2 ZIP archive back into an AppState (spec §6.2):
+    archive-member allowlist, size/count limits, duplicate-entry rejection, encrypted/
+    unsupported-compression rejection, SHA-256 checksum verification, all-or-nothing decode."""
+    from rheojax.gui.foundation.library import DatasetRef
+    from rheojax.gui.foundation.state import (
+        AppState,
+        FitState,
+        JobHistoryState,
+        NlsqConfig,
+        NutsConfig,
+        ParameterConfig,
+        PipelineState,
+        PipelineStepConfig,
+        ProjectState,
+        TransformState,
+        UiState,
+    )
+
+    path = Path(path)
+    with ZipFile(path) as zf:
+        infos = zf.infolist()
+
+        if len(infos) > _MAX_MEMBERS:
+            raise ValueError(f"Archive has {len(infos)} members, exceeds limit of {_MAX_MEMBERS}")
+
+        seen_names: set[str] = set()
+        total_bytes = 0
+        for info in infos:
+            if info.filename in seen_names:
+                raise ValueError(f"Archive contains duplicate member: {info.filename}")
+            seen_names.add(info.filename)
+            if info.flag_bits & 0x1:
+                raise ValueError(f"Archive member {info.filename} is encrypted; rejected")
+            if info.compress_type not in (0, 8):  # ZIP_STORED, ZIP_DEFLATED
+                raise ValueError(f"Archive member {info.filename} uses an unsupported compression type")
+            if info.file_size > _MAX_MEMBER_BYTES:
+                raise ValueError(f"Archive member {info.filename} exceeds the {_MAX_MEMBER_BYTES}-byte limit")
+            total_bytes += info.file_size
+            if not _is_allowed_member(info.filename):
+                raise ValueError(f"Archive contains a disallowed member: {info.filename}")
+        if total_bytes > _MAX_TOTAL_BYTES:
+            raise ValueError(f"Archive's total uncompressed size exceeds {_MAX_TOTAL_BYTES} bytes")
+
+        metadata = json.loads(zf.read("metadata.json"))
+        if metadata.get("version") != _ARCHIVE_VERSION:
+            raise ValueError(
+                f"Unsupported project version {metadata.get('version')!r}, expected {_ARCHIVE_VERSION!r}"
+            )
+
+        manifest = json.loads(zf.read("manifest.json"))
+        checksums = manifest["members"]
+        for name in seen_names:
+            if name in ("manifest.json", "metadata.json"):
+                continue
+            data = zf.read(name)
+            expected = checksums.get(name, {}).get("sha256")
+            actual = hashlib.sha256(data).hexdigest()
+            if expected != actual:
+                raise ValueError(f"checksum mismatch for archive member: {name}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            for name in seen_names:
+                dest = tmp_root / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(zf.read(name))
+
+            state = AppState()
+
+            library_manifest = json.loads((tmp_root / "library" / "manifest.json").read_text())
+            for ref_dict in library_manifest:
+                ref = DatasetRef(**ref_dict)
+                state.library.add(ref)
+                hdf5_path = tmp_root / "library" / f"{ref.id}.hdf5"
+                if hdf5_path.exists():
+                    state.library.store_payload(ref.id, load_hdf5(str(hdf5_path)))
+
+            def _restore_result_dict(ref_id: str | None, meta: dict | None, result_dir: str) -> dict | None:
+                """Inverse of save_project_v2's _persist_result_dict -- the ONE restoration
+                path for any persisted fit/NUTS/phase result dict, used below for both
+                fit.json's nlsq_result/nuts_result and every job_history.json fit-step phase
+                result, mirroring how they share one persistence path on save."""
+                if ref_id is None:
+                    return None
+                result_path = tmp_root / result_dir / f"{ref_id}.hdf5"
+                return read_result_arrays(result_path, meta)
+
+            fit_dict = json.loads((tmp_root / "fit.json").read_text())
+            for result_key in ("nlsq_result", "nuts_result"):
+                ref_id = fit_dict.pop(f"{result_key}_ref", None)
+                meta = fit_dict.pop(f"{result_key}_meta", None)
+                fit_dict[result_key] = _restore_result_dict(ref_id, meta, "fit_results")
+            nlsq_cfg = fit_dict.pop("nlsq_config", {}) or {}
+            nuts_cfg = fit_dict.pop("nuts_config", {}) or {}
+            raw_parameters = nlsq_cfg.pop("parameters", []) or []
+            state.fit = FitState(
+                **{k: v for k, v in fit_dict.items() if k in FitState.__dataclass_fields__},
+                nlsq_config=NlsqConfig(
+                    **nlsq_cfg, parameters=[ParameterConfig(**p) for p in raw_parameters]
+                ),
+                nuts_config=NutsConfig(**nuts_cfg),
+            )
+
+            transform_dict = json.loads((tmp_root / "transform.json").read_text())
+            result_refs = transform_dict.pop("result_refs", {}) or {}
+            result_extras = transform_dict.pop("result_extras", {}) or {}
+            restored_result: dict | None = None
+            if any(result_refs.values()) or result_extras:
+                restored_result = dict(result_extras)
+                for side in ("input", "output"):
+                    ref_id = result_refs.get(side)
+                    if ref_id is not None:
+                        restored_result[side] = load_hdf5(str(tmp_root / "transform_results" / f"{ref_id}.hdf5"))
+            transform_dict["result"] = restored_result
+            state.transform = TransformState(**transform_dict)
+
+            pipeline_dict = json.loads((tmp_root / "pipeline.json").read_text())
+            pipeline_dict["steps"] = [PipelineStepConfig(**s) for s in pipeline_dict.get("steps", [])]
+            state.pipeline = PipelineState(**pipeline_dict)
+
+            job_history_dict = json.loads((tmp_root / "job_history.json").read_text())
+            for record in job_history_dict.values():
+                for step_record in record.get("step_results", {}).values():
+                    if step_record.get("step_type") == "fit":
+                        for phase_key in ("nlsq", "nuts"):
+                            phase = step_record.get(phase_key)
+                            if phase is None:
+                                continue
+                            ref_id = phase.pop("result_ref", None)
+                            meta = phase.pop("result_meta", None)
+                            phase["result"] = _restore_result_dict(ref_id, meta, "job_results")
+                    elif "output_ref" in step_record:
+                        # Inverse of save_project_v2's "output" -> "output_ref" persistence
+                        # for a "transform" pipeline step's record (see the matching comment
+                        # there).
+                        ref_id = step_record.pop("output_ref")
+                        step_record["output"] = load_hdf5(
+                            str(tmp_root / "transform_results" / f"{ref_id}.hdf5")
+                        )
+            state.job_history = JobHistoryState(by_id=job_history_dict)
+
+            project_dict = json.loads((tmp_root / "project.json").read_text())
+            state.project = ProjectState(path=project_dict.get("path"), name=project_dict.get("name"))
+
+            ui_dict = json.loads((tmp_root / "ui.json").read_text())
+            state.ui = UiState(**ui_dict)
+
+            return state
