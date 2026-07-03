@@ -1,4 +1,6 @@
+import hashlib
 import json
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.project_codec import (
+    _validate_ref_id,
     load_project_v2,
     read_result_arrays,
     save_project_v2,
@@ -366,3 +369,56 @@ def test_load_rejects_checksum_mismatch(tmp_path):
             dst.writestr(item, data)
     with pytest.raises(ValueError, match="checksum"):
         load_project_v2(corrupted)
+
+
+def test_load_rejects_zip_slip_member_name(tmp_path):
+    """Vector 1 (CWE-22): a zip member name like 'library/../../../evil.hdf5' satisfies
+    the pre-fix allowlist (startswith('library/') and endswith('.hdf5')) but resolves
+    outside tmp_root on extraction. _is_allowed_member must reject any '..' path segment
+    before the prefix/suffix check runs, so this never reaches extraction at all."""
+    path = tmp_path / "evil.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        zf.writestr("library/../../../evil.hdf5", b"payload")
+    with pytest.raises(ValueError, match="disallowed member"):
+        load_project_v2(path)
+
+
+def test_load_rejects_ref_id_path_traversal_in_manifest(tmp_path):
+    """Vector 2 (CWE-22): a ref id read from JSON *content* (library/manifest.json here)
+    never passes through the zip member allowlist -- it's just a string field -- so a
+    '../'-containing id must be caught separately by _validate_ref_id when building the
+    HDF5 path from it."""
+    members = {
+        "library/manifest.json": json.dumps([{
+            "id": "../../../evil", "name": "d1", "protocol_type": "oscillation",
+            "origin": "imported", "units": {}, "row_count": 1, "hash": "h",
+            "provenance": {}, "lineage": [],
+        }]).encode(),
+        "fit.json": b"{}",
+        "transform.json": json.dumps({"result_refs": {}, "result_extras": {}}).encode(),
+        "pipeline.json": json.dumps({"steps": []}).encode(),
+        "job_history.json": b"{}",
+        "project.json": json.dumps({"path": None, "name": None}).encode(),
+        "ui.json": b"{}",
+    }
+    manifest = {"members": {
+        name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+        for name, data in members.items()
+    }}
+    path = tmp_path / "evil_ref_id.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        for name, data in members.items():
+            zf.writestr(name, data)
+        zf.writestr("manifest.json", json.dumps(manifest))
+    with pytest.raises(ValueError, match="invalid archive reference id"):
+        load_project_v2(path)
+
+
+def test_validate_ref_id_rejects_traversal_and_accepts_uuid():
+    good = uuid.uuid4().hex
+    assert _validate_ref_id(good) == good
+    for bad in ("../../etc/passwd", "foo/bar", "foo\\bar", "", None):
+        with pytest.raises(ValueError):
+            _validate_ref_id(bad)

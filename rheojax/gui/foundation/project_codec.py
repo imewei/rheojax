@@ -265,9 +265,20 @@ _MAX_MEMBER_BYTES = 500 * 1024**2
 
 
 def _is_allowed_member(name: str) -> bool:
+    if "\\" in name or name.startswith("/") or any(part == ".." for part in name.split("/")):
+        return False
     if name in _ALLOWED_TOP_LEVEL:
         return True
     return any(name.startswith(p) and name.endswith((".hdf5", "/manifest.json")) for p in _ALLOWED_PREFIXES)
+
+
+def _validate_ref_id(ref_id: str) -> str:
+    """Rejects a ref id that could escape tmp_root when interpolated into a path
+    (spec §6.2) -- legitimate ids are always uuid4().hex, which never contains
+    '/', '\\', or '..'."""
+    if not ref_id or "/" in ref_id or "\\" in ref_id or ".." in ref_id:
+        raise ValueError(f"invalid archive reference id: {ref_id!r}")
+    return ref_id
 
 
 def load_project_v2(path: Path):
@@ -333,8 +344,11 @@ def load_project_v2(path: Path):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_root = Path(tmpdir)
+            resolved_root = tmp_root.resolve()
             for name in seen_names:
                 dest = tmp_root / name
+                if resolved_root not in dest.resolve().parents:
+                    raise ValueError(f"archive member resolves outside extraction root: {name}")
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(zf.read(name))
 
@@ -343,6 +357,7 @@ def load_project_v2(path: Path):
             library_manifest = json.loads((tmp_root / "library" / "manifest.json").read_text())
             for ref_dict in library_manifest:
                 ref = DatasetRef(**ref_dict)
+                _validate_ref_id(ref.id)
                 state.library.add(ref)
                 hdf5_path = tmp_root / "library" / f"{ref.id}.hdf5"
                 if hdf5_path.exists():
@@ -355,6 +370,7 @@ def load_project_v2(path: Path):
                 result, mirroring how they share one persistence path on save."""
                 if ref_id is None:
                     return None
+                _validate_ref_id(ref_id)
                 result_path = tmp_root / result_dir / f"{ref_id}.hdf5"
                 return read_result_arrays(result_path, meta)
 
@@ -383,6 +399,7 @@ def load_project_v2(path: Path):
                 for side in ("input", "output"):
                     ref_id = result_refs.get(side)
                     if ref_id is not None:
+                        _validate_ref_id(ref_id)
                         restored_result[side] = load_hdf5(str(tmp_root / "transform_results" / f"{ref_id}.hdf5"))
             transform_dict["result"] = restored_result
             state.transform = TransformState(**transform_dict)
@@ -407,6 +424,7 @@ def load_project_v2(path: Path):
                         # for a "transform" pipeline step's record (see the matching comment
                         # there).
                         ref_id = step_record.pop("output_ref")
+                        _validate_ref_id(ref_id)
                         step_record["output"] = load_hdf5(
                             str(tmp_root / "transform_results" / f"{ref_id}.hdf5")
                         )
