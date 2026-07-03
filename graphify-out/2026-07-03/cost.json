@@ -1,0 +1,31 @@
+{
+  "runs": [
+    {
+      "date": "2026-05-06T15:40:29.442253+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 6,
+      "type": "incremental"
+    },
+    {
+      "date": "2026-07-01T08:19:29.655330+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 89
+    },
+    {
+      "date": "2026-07-02T15:54:56.627069+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 59
+    },
+    {
+      "date": "2026-07-02T19:57:52.873098+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 35
+    }
+  ],
+  "total_input_tokens": 0,
+  "total_output_tokens": 0
+}
