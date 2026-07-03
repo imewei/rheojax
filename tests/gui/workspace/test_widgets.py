@@ -136,7 +136,7 @@ def test_window_set_mode_rejects_unknown_mode(qtbot):
 
 def test_window_invalid_persisted_mode_falls_back_to_fit(qtbot):
     state = AppState()
-    state.ui["mode"] = "not-a-real-mode"
+    state.ui.mode = "not-a-real-mode"
     win = WorkspaceWindow(state); qtbot.addWidget(win)
     assert win.mode() == "fit"             # invalid persisted state doesn't crash construction
 
