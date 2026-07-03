@@ -43,3 +43,14 @@ class PipelineController(WorkflowController):
         self._state.job_history.by_id[job_id] = record
         self._state.pipeline.job_id = job_id
         self._on_dirty()
+
+
+def build_pipeline_controller(app_state, service):
+    from rheojax.gui.workspace.controller import Step
+    from rheojax.gui.workspace.pipeline.step1_configure_run import PipelineConfigureRunStep
+
+    body = PipelineConfigureRunStep(app_state.pipeline, app_state.library)
+    ctl = PipelineController(app_state, service, on_dirty=lambda: setattr(app_state.project, "dirty", True))
+    ctl.steps = [Step(id="configure_run", title="Configure & Run", is_ready=body.is_ready, validate=lambda: True)]
+    ctl.reached = {0}
+    return ctl, [body]
