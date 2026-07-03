@@ -147,6 +147,27 @@ def test_transform_output_not_persisted_when_no_later_step_consumes_it(qtbot):
     assert {r.id for r in lib.all()} == {"d1"}
 
 
+def test_terminal_transform_after_unrelated_fit_step_is_not_persisted(qtbot):
+    # A terminal transform preceded only by an unrelated fit step (not another transform)
+    # has nothing downstream reading its output -- it must NOT be persisted, even though
+    # len(steps) > 1.
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "relaxation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[100.0, 50.0, 10.0], initial_test_mode="relaxation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(id="s1", step_type="fit",
+                            config={"model_name": "maxwell", "run_nuts": False}),
+        PipelineStepConfig(id="s2", step_type="transform", config={"name": "smooth_derivative"}),
+    ]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "completed"
+    assert result.step_results["s2"]["dataset_id"] is None
+    assert {r.id for r in lib.all()} == {"d1"}
+
+
 def test_transform_output_persisted_when_a_second_transform_follows(qtbot):
     # A transform->transform chain must also count as "consumed downstream" -- the first
     # transform's output is exactly what the second transform reads from context["data"].

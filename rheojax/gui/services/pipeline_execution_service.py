@@ -253,7 +253,7 @@ class PipelineExecutionService(QObject):
         context = dict(initial_context)
         step_results: dict = {}
 
-        for step in steps:
+        for i, step in enumerate(steps):
             if stop_requested.is_set():
                 return PipelineRunResult(step_results=step_results, status="cancelled")
 
@@ -261,15 +261,16 @@ class PipelineExecutionService(QObject):
             try:
                 if step.step_type == "transform":
                     # A transform's output is "consumed downstream" -- and therefore worth a
-                    # persisted DatasetRef -- whenever it is part of a real multi-step run
-                    # rather than a standalone preview. Step types are only ever
-                    # transform/fit/export, so "another step exists anywhere in this run"
-                    # (before OR after) is exactly "len(steps) > 1": a transform->export or
-                    # transform->transform chain persists every transform's output, since each
-                    # is either read by a later step in-memory (context["data"]) or is itself
-                    # the run's terminal derived dataset worth keeping addressable; a lone
-                    # transform run by itself is a throwaway preview and stays unpersisted.
-                    consumed_downstream = len(steps) > 1
+                    # persisted DatasetRef -- when a later step exists (and can read it from
+                    # context["data"]), OR when this transform is the run's terminal step but
+                    # follows an earlier transform (part of a transform chain, so its output is
+                    # the chain's addressable end product). A lone terminal transform preceded
+                    # only by unrelated steps (e.g. a fit) is a throwaway preview and stays
+                    # unpersisted.
+                    is_last = i == len(steps) - 1
+                    consumed_downstream = (not is_last) or any(
+                        s.step_type == "transform" for s in steps[:i]
+                    )
                     step_results[step.id] = self._execute_pipeline_transform(
                         step, context, library, persist=consumed_downstream
                     )
