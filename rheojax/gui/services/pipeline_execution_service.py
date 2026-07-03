@@ -23,7 +23,7 @@ from worker threads (GUI-006).  The per-action signals (e.g.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, Signal
 
@@ -31,7 +31,19 @@ from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
+if TYPE_CHECKING:
+    from rheojax.gui.workspace.pipeline.models import FitStepResult, PhaseResult
+
 logger = get_logger(__name__)
+
+
+class WorkerIsolationRequiredError(RuntimeError):
+    """Raised when a Pipeline-mode fit step runs under thread-mode worker isolation.
+
+    Distinct from ordinary step failures so ``execute()``'s per-step exception
+    handling can re-raise it as a fatal precondition error instead of
+    recording it as a per-step ``status="failed"`` result.
+    """
 
 
 def _coerce_bayesian_int(
@@ -244,11 +256,15 @@ class PipelineExecutionService(QObject):
                 if step.step_type == "transform":
                     step_results[step.id] = self._execute_pipeline_transform(step, context, library)
                 elif step.step_type == "fit":
-                    raise NotImplementedError("fit step handling added in a later task")
+                    step_results[step.id] = self._execute_pipeline_fit(step, context)
                 elif step.step_type == "export":
                     raise NotImplementedError("export step handling added in a later task")
                 else:
                     raise ValueError(f"Unknown pipeline step_type: {step.step_type!r}")
+            except WorkerIsolationRequiredError:
+                # Fatal precondition error (misconfigured environment), not a
+                # per-step runtime failure -- propagate out of execute() itself.
+                raise
             except Exception as exc:
                 self.step_failed.emit(step.id, str(exc))
                 return PipelineRunResult(step_results=step_results, status="failed", error=str(exc))
@@ -285,6 +301,102 @@ class PipelineExecutionService(QObject):
 
         context["data"] = transformed
         return {"output": transformed, "protocol_type": protocol_type}
+
+    def _execute_pipeline_fit(self, step, context: dict) -> FitStepResult:
+        """Run one Pipeline-mode fit step: synchronous NLSQ, then optional NUTS.
+
+        Named distinctly from ``_execute_fit`` (the visual pipeline builder's
+        handler below), which takes a different step shape.
+        """
+        from rheojax.gui.jobs.process_adapter import (
+            get_worker_isolation_mode,
+            make_bayesian_worker,
+            make_fit_worker,
+        )
+        from rheojax.gui.workspace.pipeline.models import FitStepResult
+
+        if get_worker_isolation_mode() != "subprocess":
+            raise WorkerIsolationRequiredError(
+                "Pipeline fit steps require subprocess worker isolation "
+                "(set RHEOJAX_WORKER_ISOLATION=subprocess); thread-mode is not supported."
+            )
+
+        config = step.config
+        dataset_id = context["dataset_id"]
+
+        self.step_phase_started.emit(step.id, "nlsq")
+        nlsq_worker = make_fit_worker(
+            model_name=config["model_name"],
+            data=context["data"],
+            initial_params=config.get("initial_params"),
+            options=config.get("nlsq_options"),
+            dataset_id=dataset_id,
+            model_config=config.get("model_config"),
+        )
+        self.phase_worker_ready.emit(dataset_id, step.id, "nlsq", nlsq_worker)
+        nlsq_phase = self._run_worker_phase(nlsq_worker)
+        if nlsq_phase.status == "completed":
+            self.step_phase_completed.emit(step.id, "nlsq")
+        else:
+            self.step_phase_failed.emit(step.id, "nlsq", nlsq_phase.error or "")
+
+        if not config.get("run_nuts", False) or nlsq_phase.status != "completed":
+            return FitStepResult(nlsq=nlsq_phase, nuts=None)
+
+        nuts_cfg = config.get("nuts_config", {})
+        warm_start = (nlsq_phase.result or {}).get("parameters", {})
+        self.step_phase_started.emit(step.id, "nuts")
+        nuts_worker = make_bayesian_worker(
+            model_name=config["model_name"],
+            data=context["data"],
+            num_warmup=nuts_cfg.get("num_warmup", 500),
+            num_samples=nuts_cfg.get("num_samples", 1000),
+            num_chains=nuts_cfg.get("num_chains", 4),
+            warm_start=warm_start if nuts_cfg.get("warm_start", True) else None,
+            priors=nuts_cfg.get("priors"),
+            seed=nuts_cfg.get("seed", 0),
+            dataset_id=dataset_id,
+            target_accept=nuts_cfg.get("target_accept", 0.8),
+        )
+        self.phase_worker_ready.emit(dataset_id, step.id, "nuts", nuts_worker)
+        nuts_phase = self._run_worker_phase(nuts_worker)
+        if nuts_phase.status == "completed":
+            self.step_phase_completed.emit(step.id, "nuts")
+        else:
+            self.step_phase_failed.emit(step.id, "nuts", nuts_phase.error or "")
+
+        return FitStepResult(nlsq=nlsq_phase, nuts=nuts_phase)
+
+    @staticmethod
+    def _run_worker_phase(worker) -> PhaseResult:
+        """Runs `worker` (FitWorker or ProcessWorkerAdapter) synchronously, capturing its
+        terminal signal via a plain (same-thread) connection -- must be called from the same
+        thread execute() itself runs on. worker.run() blocks that thread until the terminal
+        message arrives, so the local closures below fire before this function returns."""
+        from rheojax.gui.workspace.pipeline.models import PhaseResult
+
+        captured: dict = {}
+
+        def _on_completed(result):
+            captured["status"] = "completed"
+            captured["result"] = result
+
+        def _on_failed(error):
+            captured["status"] = "failed"
+            captured["error"] = error
+
+        def _on_cancelled():
+            captured["status"] = "cancelled"
+
+        worker.signals.completed.connect(_on_completed)
+        worker.signals.failed.connect(_on_failed)
+        worker.signals.cancelled.connect(_on_cancelled)
+        worker.run()
+        return PhaseResult(
+            status=captured.get("status", "failed"),
+            result=captured.get("result"),
+            error=captured.get("error"),
+        )
 
     # ------------------------------------------------------------------
     # Internal routing
