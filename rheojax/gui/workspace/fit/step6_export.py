@@ -16,7 +16,7 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class ExportStep(QWidget):
-    exported = Signal()
+    dataset_commit_requested = Signal(object, object, bool)  # ref, payload | None, overwrite
 
     def __init__(
         self, state: FitState, library: DatasetLibrary, parent: QWidget | None = None
@@ -113,28 +113,25 @@ class ExportStep(QWidget):
 
     def save_to_library(self) -> str:
         new_id = f"{self._state.model_key}_fit_{self._state.revision}"
-        self._library.add(
-            DatasetRef(
-                id=new_id,
-                name=new_id,
-                protocol_type=self._state.protocol,
-                origin="derived",
-                units={},
-                row_count=0,
-                hash="",
-                provenance=self.provenance(),
-                lineage=(
-                    [self._state.data_ref]
-                    if self._state.data_ref
-                    else []
-                ),
-            )
+        ref = DatasetRef(
+            id=new_id,
+            name=new_id,
+            protocol_type=self._state.protocol,
+            origin="derived",
+            units={},
+            row_count=0,
+            hash="",
+            provenance=self.provenance(),
+            lineage=(
+                [self._state.data_ref]
+                if self._state.data_ref
+                else []
+            ),
         )
         result = self._state.nlsq_result or {}
         x, y_fit = result.get("x"), result.get("y_fit")
+        output = None
         if x is not None and y_fit is not None:
-            self._library.store_payload(
-                new_id, SimpleNamespace(x=np.asarray(x), y=np.asarray(y_fit))
-            )
-        self.exported.emit()
+            output = SimpleNamespace(x=np.asarray(x), y=np.asarray(y_fit))
+        self.dataset_commit_requested.emit(ref, output, True)
         return new_id
