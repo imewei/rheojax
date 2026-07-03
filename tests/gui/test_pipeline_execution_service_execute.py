@@ -104,6 +104,30 @@ def test_execute_runs_export_step(qtbot, tmp_path):
     assert (tmp_path / "out.csv").exists()
 
 
+def test_execute_reports_failed_when_export_raises(qtbot, tmp_path, monkeypatch):
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+
+    from rheojax.gui.services.export_service import ExportService
+
+    def _raise(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(ExportService, "export_data", _raise)
+
+    out_path = str(tmp_path / "out.csv")
+    steps = [PipelineStepConfig(id="s1", step_type="export", config={"path": out_path, "format": "csv"})]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "failed"
+    assert "disk full" in result.error
+    assert "s1" not in result.step_results
+    assert not (tmp_path / "out.csv").exists()
+
+
 def test_execute_returns_cancelled_when_stop_requested_set(qtbot):
     lib = DatasetLibrary()
     data = RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation")

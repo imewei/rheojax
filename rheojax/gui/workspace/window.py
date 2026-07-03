@@ -437,6 +437,12 @@ class WorkspaceWindow(QMainWindow):
         pass  # mirrors _on_fit_body_edited/_on_transform_body_edited's advance-eligibility recheck
 
     def _on_pipeline_run_requested(self) -> None:
+        if self._state.active_jobs.by_id:
+            # A batch is already running -- ignore a repeat "Run All" trigger rather than
+            # starting a second PipelineBatchRunner, which would orphan the first runner's
+            # stop event and race active_jobs/DatasetLibrary from two worker threads.
+            return
+
         from PySide6.QtCore import QThreadPool
 
         from rheojax.gui.workspace.pipeline.batch_runner import PipelineBatchRunner

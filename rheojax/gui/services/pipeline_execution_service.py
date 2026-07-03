@@ -454,11 +454,8 @@ class PipelineExecutionService(QObject):
 
         path = step.config["path"]
         fmt = step.config.get("format")
-        try:
-            self._export_service.export_data(context["data"], path, format=fmt)
-            return {"paths": [path]}
-        except Exception:
-            return {"paths": []}
+        self._export_service.export_data(context["data"], path, format=fmt)
+        return {"paths": [path]}
 
     # ------------------------------------------------------------------
     # Internal routing

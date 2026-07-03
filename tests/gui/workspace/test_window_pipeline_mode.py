@@ -57,3 +57,24 @@ def test_run_all_populates_active_jobs(qtbot, tmp_path, monkeypatch):
 
     assert "d1" in captured
     assert "d1" in captured["d1"]
+
+
+def test_run_all_ignored_while_batch_already_running(qtbot, monkeypatch):
+    from PySide6.QtCore import QThreadPool
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win.set_mode("pipeline")
+
+    start_calls = []
+    monkeypatch.setattr(
+        QThreadPool.globalInstance(), "start", lambda *a, **kw: start_calls.append((a, kw))
+    )
+
+    # Simulate a batch already in flight.
+    state.active_jobs.by_id["d1"] = {"worker": None}
+
+    win._on_pipeline_run_requested()
+
+    assert start_calls == []
