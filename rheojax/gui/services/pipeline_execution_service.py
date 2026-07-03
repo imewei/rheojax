@@ -244,6 +244,12 @@ class PipelineExecutionService(QObject):
         """
         from rheojax.gui.workspace.pipeline.models import PipelineRunResult
 
+        seen_ids: set[str] = set()
+        for step in steps:
+            if step.id in seen_ids:
+                raise ValueError(f"duplicate pipeline step id: {step.id!r}")
+            seen_ids.add(step.id)
+
         context = dict(initial_context)
         step_results: dict = {}
 
@@ -254,7 +260,19 @@ class PipelineExecutionService(QObject):
             self.step_started.emit(step.id)
             try:
                 if step.step_type == "transform":
-                    step_results[step.id] = self._execute_pipeline_transform(step, context, library)
+                    # A transform's output is "consumed downstream" -- and therefore worth a
+                    # persisted DatasetRef -- whenever it is part of a real multi-step run
+                    # rather than a standalone preview. Step types are only ever
+                    # transform/fit/export, so "another step exists anywhere in this run"
+                    # (before OR after) is exactly "len(steps) > 1": a transform->export or
+                    # transform->transform chain persists every transform's output, since each
+                    # is either read by a later step in-memory (context["data"]) or is itself
+                    # the run's terminal derived dataset worth keeping addressable; a lone
+                    # transform run by itself is a throwaway preview and stays unpersisted.
+                    consumed_downstream = len(steps) > 1
+                    step_results[step.id] = self._execute_pipeline_transform(
+                        step, context, library, persist=consumed_downstream
+                    )
                 elif step.step_type == "fit":
                     step_results[step.id] = self._execute_pipeline_fit(step, context)
                 elif step.step_type == "export":
@@ -272,13 +290,22 @@ class PipelineExecutionService(QObject):
 
         return PipelineRunResult(step_results=step_results, status="completed")
 
-    def _execute_pipeline_transform(self, step, context: dict, library) -> dict:
+    def _execute_pipeline_transform(self, step, context: dict, library, persist: bool) -> dict:
         """Run one Pipeline-mode transform step against its sole primary slot.
 
         Named distinctly from ``_execute_transform`` (the visual pipeline
         builder's handler above) since the two take different step shapes
         and report results differently.
+
+        ``persist`` controls whether the transformed output is written into
+        ``library`` as a new derived ``DatasetRef`` (per §3.4: retained only
+        if a later step consumes it, or export explicitly requests it) --
+        the caller decides this from whether a later step in the same run
+        actually reads the output.
         """
+        import uuid
+
+        from rheojax.gui.foundation.library import DatasetRef
         from rheojax.gui.workspace.transform.slots_spec import transform_slots
         from rheojax.gui.workspace.transform.transform_controller import (
             infer_output_protocol,
@@ -300,7 +327,22 @@ class PipelineExecutionService(QObject):
         protocol_type = infer_output_protocol(library, transform_key, {primary_slot: dataset_id})
 
         context["data"] = transformed
-        return {"output": transformed, "protocol_type": protocol_type}
+        new_dataset_id = None
+        if persist:
+            new_dataset_id = uuid.uuid4().hex
+            library.add(DatasetRef(
+                id=new_dataset_id, name=f"{transform_key}_{dataset_id}", protocol_type=protocol_type,
+                origin="derived", units={}, row_count=0, hash="", provenance={"pipeline_step": step.id},
+                lineage=[dataset_id],
+            ))
+            library.store_payload(new_dataset_id, transformed)
+            # A later step (another transform, or infer_output_protocol() on one further down
+            # the chain) must see the NEWLY persisted dataset as the current one, not the
+            # original input -- otherwise a 3-transform chain's third step would still report
+            # lineage=["d1"] instead of the immediately-preceding derived dataset's id.
+            context["dataset_id"] = new_dataset_id
+
+        return {"output": transformed, "protocol_type": protocol_type, "dataset_id": new_dataset_id}
 
     def _execute_pipeline_fit(self, step, context: dict) -> FitStepResult:
         """Run one Pipeline-mode fit step: synchronous NLSQ, then optional NUTS.

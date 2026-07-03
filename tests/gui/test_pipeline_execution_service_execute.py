@@ -115,3 +115,84 @@ def test_execute_returns_cancelled_when_stop_requested_set(qtbot):
                           library=lib, stop_requested=stop)
     assert result.status == "cancelled"
     assert result.step_results == {}
+
+
+def test_transform_output_persisted_when_export_step_follows(qtbot, tmp_path):
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(id="s1", step_type="transform", config={"name": "smooth_derivative"}),
+        PipelineStepConfig(id="s2", step_type="export", config={"path": str(tmp_path / "out.csv"), "format": "csv"}),
+    ]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "completed"
+    # exactly one new library entry beyond the original "d1"
+    new_ids = {r.id for r in lib.all()} - {"d1"}
+    assert len(new_ids) == 1
+
+
+def test_transform_output_not_persisted_when_no_later_step_consumes_it(qtbot):
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [PipelineStepConfig(id="s1", step_type="transform", config={"name": "smooth_derivative"})]
+    svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                library=lib, stop_requested=threading.Event())
+    assert {r.id for r in lib.all()} == {"d1"}
+
+
+def test_transform_output_persisted_when_a_second_transform_follows(qtbot):
+    # A transform->transform chain must also count as "consumed downstream" -- the first
+    # transform's output is exactly what the second transform reads from context["data"].
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(id="s1", step_type="transform", config={"name": "smooth_derivative"}),
+        PipelineStepConfig(id="s2", step_type="transform", config={"name": "smooth_derivative"}),
+    ]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "completed"
+    new_ids = {r.id for r in lib.all()} - {"d1"}
+    assert len(new_ids) == 2  # both transforms' outputs persisted
+
+
+def test_second_transform_lineage_points_at_first_transforms_output_not_original(qtbot):
+    # context["dataset_id"] must be updated to the newly-persisted id after each persisted
+    # transform, so a later step's infer_output_protocol() lookup (and any lineage it records)
+    # reflects the immediately-preceding derived dataset, not the original input dataset.
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "oscillation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[1.0, 2.0, 3.0], initial_test_mode="oscillation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(id="s1", step_type="transform", config={"name": "smooth_derivative"}),
+        PipelineStepConfig(id="s2", step_type="transform", config={"name": "smooth_derivative"}),
+    ]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    first_new_id = result.step_results["s1"]["dataset_id"]
+    second_ref = lib.get(result.step_results["s2"]["dataset_id"])
+    assert second_ref.lineage == [first_new_id]  # not ["d1"]
+
+
+def test_duplicate_step_ids_rejected(qtbot):
+    lib = DatasetLibrary()
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(id="s1", step_type="export", config={"path": "a.csv"}),
+        PipelineStepConfig(id="s1", step_type="export", config={"path": "b.csv"}),
+    ]
+    with pytest.raises(ValueError, match="duplicate"):
+        svc.execute(steps=steps, initial_context={"data": object(), "dataset_id": "d1"},
+                    library=lib, stop_requested=threading.Event())
