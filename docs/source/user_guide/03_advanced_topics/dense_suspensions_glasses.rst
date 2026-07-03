@@ -762,4 +762,4 @@ See Also
 - :doc:`/models/fluidity/index` — Fluidity models
 
 .. note::
-   For questions or issues with ITT-MCT models, consult the `RheoJAX GitHub Issues <https://github.com/username/rheojax/issues>`_ or refer to the original publications above.
+   For questions or issues with ITT-MCT models, consult the `RheoJAX GitHub Issues <https://github.com/imewei/rheojax/issues>`_ or refer to the original publications above.

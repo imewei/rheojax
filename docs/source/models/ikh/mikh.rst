@@ -1332,10 +1332,6 @@ References
    viscoplastic model." *Journal of Non-Newtonian Fluid Mechanics*, 158, 154-161
    (2009). https://doi.org/10.1016/j.jnnfm.2008.12.001
 
-.. [4] de Souza Mendes, P. R. and Thompson, R. L. "Time-dependent yield stress
-   materials." *Annual Review of Fluid Mechanics*, 51, 421-449 (2019).
-   https://doi.org/10.1146/annurev-fluid-010518-040305
-
 .. [5] Armstrong, P. J. and Frederick, C. O. "A mathematical representation of the
    multiaxial Bauschinger effect." *CEGB Report RD/B/N731* (1966).
    https://doi.org/10.3184/096034007X207589

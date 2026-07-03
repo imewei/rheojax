@@ -241,7 +241,7 @@ Representative values from the paper (for model waxy crude):
 - C = 70 Pa
 - m = 0.25
 
-**RheoJAX (mikh.py):** Parameters are: G, eta, C, gamma_dyn (=q for m=1), m, sigma_y0, delta_sigma_y (=k3), tau_thix (=1/k1), Gamma (=k2), eta_inf, mu_p — **11 parameters** vs 9 in the paper. The extra parameters are eta_inf (background viscosity, distinct from mu_p) and sigma_y0 (the paper implicitly includes this as part of the steady-state balance).
+**RheoJAX (`mikh.py`):** Parameters are: G, eta, C, gamma_dyn (=q for m=1), m, sigma_y0, delta_sigma_y (=k3), tau_thix (=1/k1), Gamma (=k2), eta_inf, mu_p — **11 parameters** vs 9 in the paper. The extra parameters are eta_inf (background viscosity, distinct from mu_p) and sigma_y0 (the paper implicitly includes this as part of the steady-state balance).
 
 ---
 

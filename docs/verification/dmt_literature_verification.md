@@ -220,7 +220,7 @@ Dullaert-Mewis model specifically, it would require a new model family with:
 - [Dullaert & Mewis 2006 (ScienceDirect)](https://www.sciencedirect.com/science/article/abs/pii/S0377025706001431)
 - [Dullaert & Mewis 2005 (J. Rheol.)](https://sor.scitation.org/doi/10.1122/1.2039868)
 - [Larson & Wei 2019 Review](https://pubs.aip.org/sor/jor/article/63/3/477/241126/A-review-of-thixotropy-and-its-rheological)
-- [Armstrong et al. LAOS study (UDel)](https://bpb-us-w2.wpmucdn.com/sites.udel.edu/dist/8/715/files/2014/11/Armstrong-et-al-Thixotropy-of-Transient-and-LAOS-08152015-1zaa32b.pdf)
+- [Armstrong et al. 2016 LAOS study (J. Rheol.)](https://doi.org/10.1122/1.4943986)
 - [de Souza Mendes & Thompson 2013 (Rheol. Acta)](https://link.springer.com/article/10.1007/s00397-013-0699-1)
 - [Gas Bubbles in Dullaert-Mewis Fluid (ResearchGate)](https://www.researchgate.net/publication/270432311_Dynamic_of_Gas_Bubbles_Surrounded_by_a_Dullaert-Mewis_Thixotropic_Fluid)
 - [Turbulent Pipe Flow of Thixotropic Fluids (arXiv)](https://arxiv.org/abs/2501.01597)

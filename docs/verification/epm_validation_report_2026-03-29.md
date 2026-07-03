@@ -149,7 +149,7 @@ The lattice EPM is correctly described as a spatial generalization of HL (1998).
 |-------|--------|
 | Secrets in code | None found |
 | Input sanitization | N/A (numerical library) |
-| `assert` usage | 18 instances in base.py/tensor.py — parameter guards, not security-critical |
+| `assert` usage | 18 instances in `base.py`/`tensor.py` — parameter guards, not security-critical |
 | Dependency vulnerabilities | Not applicable (JAX/NumPy/SciPy stack) |
 | Code injection | No string eval/exec, no user-supplied code paths |
 

@@ -1640,8 +1640,8 @@ References
    DOI: `10.1122/1.4978259 <https://doi.org/10.1122/1.4978259>`_
    :download:`PDF <../../../reference/geri_2017_thermokinematic_memory.pdf>`
 
-.. [4] Fielding, S. M., et al. "Aging and rheology in soft materials."
-   *Journal of Rheology*, 53(1), 39-64 (2009). https://doi.org/10.1122/1.3018902
+.. [4] Fielding, S. M., Sollich, P., and Cates, M. E. "Aging and rheology in soft materials."
+   *Journal of Rheology*, 44(2), 323-369 (2000). https://doi.org/10.1122/1.551088
 
 .. [5] Mewis, J. and Wagner, N. J. "Thixotropy." *Advances in Colloid and Interface
    Science*, 147-148, 214-227 (2009). https://doi.org/10.1016/j.cis.2008.09.005
