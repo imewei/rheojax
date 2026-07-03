@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
@@ -27,8 +28,10 @@ class WorkspaceWindow(QMainWindow):
     def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = app_state
-        initial_mode = app_state.ui.get("mode", "fit")
+        initial_mode = app_state.ui.mode
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
+        self._notifier = DatasetLibraryNotifier()
+        self._notifier.changed.connect(self._mark_dirty)
         fit_ctl, self._fit_bodies = build_fit_controller(app_state)
         transform_ctl, self._transform_bodies = build_transform_controller(app_state)
         self._controllers = {
@@ -44,9 +47,13 @@ class WorkspaceWindow(QMainWindow):
                 body.edited.connect(self._on_fit_body_edited)
             if hasattr(body, "config_edited"):
                 body.config_edited.connect(self._on_fit_body_edited)
+            if hasattr(body, "dataset_commit_requested"):
+                body.dataset_commit_requested.connect(self._commit_dataset)
         for body in self._transform_bodies:
             if hasattr(body, "edited"):
                 body.edited.connect(self._on_transform_body_edited)
+            if hasattr(body, "dataset_commit_requested"):
+                body.dataset_commit_requested.connect(self._commit_dataset)
 
         self.setWindowTitle("RheoJAX Workspace")
         self.resize(1200, 800)
@@ -102,9 +109,18 @@ class WorkspaceWindow(QMainWindow):
         if old_canvas is not None:
             old_canvas.deleteLater()
         self._canvas = new_canvas
-        self._state.ui["mode"] = mode
+        self._state.ui.mode = mode
         self._sync_mode_buttons()
         self.mode_changed.emit(mode)
+
+    def _mark_dirty(self) -> None:
+        self._state.project.dirty = True
+
+    def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
+        self._state.library.add(ref, overwrite=overwrite)
+        if payload is not None:
+            self._state.library.store_payload(ref.id, payload)
+        self._notifier.changed.emit()
 
     def _sync_mode_buttons(self) -> None:
         self._fit_btn.setChecked(self._mode == "fit")
