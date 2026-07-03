@@ -17,7 +17,7 @@ References:
     - Park, S. W., & Schapery, R. A. (1999). Methods of interconversion between
       linear viscoelastic material functions. Part I—A numerical method based on
       Prony series. International Journal of Solids and Structures, 36(11), 1653-1675.
-    - pyvisco: https://github.com/saintsfan342000/pyvisco
+    - pyvisco: https://github.com/NatLabRockies/pyvisco
 """
 
 from __future__ import annotations
