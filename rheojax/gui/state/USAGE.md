@@ -2,6 +2,12 @@
 
 Complete state management system for the RheoJAX GUI with immutable updates, undo/redo, and Qt signal integration.
 
+## Note: Legacy Architecture
+
+This document describes the **legacy page-based GUI's state management system**
+(used by `rheojax-gui --legacy`). The default Workspace Shell uses a different
+foundation-based architecture in `rheojax.gui.foundation`.
+
 ## Architecture
 
 ### Core Components
