@@ -64,8 +64,35 @@ class TransformState:
     revision: int = 0
 
 @dataclass
-class JobsState:
+class PipelineStepConfig:
+    id: str
+    step_type: str            # "transform" | "fit" | "export"
+    config: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class JobResultRef:
+    result_id: str
+
+@dataclass
+class ActiveJobsState:
     by_id: dict[str, dict] = field(default_factory=dict)
+
+@dataclass
+class JobHistoryState:
+    by_id: dict[str, dict] = field(default_factory=dict)
+
+@dataclass
+class PipelineState:
+    steps: list[PipelineStepConfig] = field(default_factory=list)
+    selected_dataset_ids: list[str] = field(default_factory=list)
+    name: str | None = None
+    job_id: str | None = None
+
+@dataclass
+class UiState:
+    mode: str = "fit"
+    theme: str = "system"
+    inspector_tab: str = "log"
 
 @dataclass
 class ProjectState:
@@ -78,12 +105,15 @@ class AppState:
     library: DatasetLibrary = field(default_factory=DatasetLibrary)
     fit: FitState = field(default_factory=FitState)
     transform: TransformState = field(default_factory=TransformState)
-    jobs: JobsState = field(default_factory=JobsState)
+    pipeline: PipelineState = field(default_factory=PipelineState)
+    active_jobs: ActiveJobsState = field(default_factory=ActiveJobsState)
+    job_history: JobHistoryState = field(default_factory=JobHistoryState)
     project: ProjectState = field(default_factory=ProjectState)
-    ui: dict[str, Any] = field(default_factory=lambda: {"mode": "fit"})
+    ui: UiState = field(default_factory=UiState)
 
 # re-export replace for invalidation.py
 __all__ = [
-    "ParameterConfig", "NlsqConfig", "NutsConfig",
-    "FitState", "TransformState", "JobsState", "ProjectState", "AppState", "replace",
+    "ParameterConfig", "NlsqConfig", "NutsConfig", "FitState", "TransformState",
+    "PipelineStepConfig", "JobResultRef", "ActiveJobsState", "JobHistoryState",
+    "PipelineState", "UiState", "ProjectState", "AppState", "replace",
 ]

@@ -1,5 +1,17 @@
 from rheojax.gui.foundation.invalidation import invalidate_downstream
-from rheojax.gui.foundation.state import FitState, NlsqConfig, NutsConfig, ParameterConfig
+from rheojax.gui.foundation.state import (
+    ActiveJobsState,
+    AppState,
+    FitState,
+    JobHistoryState,
+    JobResultRef,
+    NlsqConfig,
+    NutsConfig,
+    ParameterConfig,
+    PipelineState,
+    PipelineStepConfig,
+    UiState,
+)
 
 
 def test_nlsq_config_defaults():
@@ -66,3 +78,36 @@ def test_changing_columnmap_keeps_data_clears_fits():
     assert new.data_ref == "d1"          # data kept
     assert new.nlsq_result is None       # fit cleared
     assert new.revision == 3
+
+
+def test_pipeline_step_config_fields():
+    step = PipelineStepConfig(id="s1", step_type="fit", config={"run_nuts": True})
+    assert step.step_type == "fit"
+
+
+def test_job_result_ref():
+    ref = JobResultRef(result_id="abc123")
+    assert ref.result_id == "abc123"
+
+
+def test_pipeline_state_defaults():
+    ps = PipelineState()
+    assert ps.steps == []
+    assert ps.selected_dataset_ids == []
+    assert ps.job_id is None
+
+
+def test_ui_state_defaults():
+    ui = UiState()
+    assert ui.mode == "fit"
+    assert ui.theme == "system"
+    assert ui.inspector_tab == "log"
+
+
+def test_app_state_has_pipeline_and_job_slices():
+    state = AppState()
+    assert isinstance(state.pipeline, PipelineState)
+    assert isinstance(state.active_jobs, ActiveJobsState)
+    assert isinstance(state.job_history, JobHistoryState)
+    assert isinstance(state.ui, UiState)
+    assert state.ui.mode == "fit"
