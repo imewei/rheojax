@@ -685,8 +685,8 @@
     "semantic_hash": "c6573297a2604bee30fe8809cf6bcc33"
   },
   "rheojax/io/readers/_utils.py": {
-    "mtime": 1783154327.079112,
-    "ast_hash": "60fa1f095931e3515aaf7dc61b08301d",
+    "mtime": 1783158442.4258857,
+    "ast_hash": "7b29fe04d5f7d4a139bbffe68ba8e7ad",
     "semantic_hash": ""
   },
   "rheojax/io/readers/_validation.py": {
@@ -2270,8 +2270,8 @@
     "semantic_hash": "68bfb153d8aa5cf5fa94185bfb98de23"
   },
   "tests/io/test_readers.py": {
-    "mtime": 1783155688.8114443,
-    "ast_hash": "bb3d324ee511e3bfb2ceb82a39fde736",
+    "mtime": 1783158502.4778528,
+    "ast_hash": "27a8abafb35a65a305c46bb3e944a1bb",
     "semantic_hash": ""
   },
   "tests/io/test_spp_export.py": {

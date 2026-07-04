@@ -177,28 +177,57 @@ _TIME_KEYWORDS = {"time", "t"}
 def find_column_by_pattern(
     columns: list[str], columns_lower: list[str], patterns: list[str]
 ) -> str | None:
-    """Find the first column whose lowercased name contains one of *patterns*.
+    """Find the column whose name matches one of *patterns*, preferring an
+    exact match over a substring match and refusing to guess when multiple
+    distinct columns are equally plausible candidates.
 
-    Checks patterns in priority order (not column order), matching the
-    precedence CSV/Excel auto-detection has always used. A pattern must match
-    as a whole token — bounded by non-alphanumeric characters rather than
-    ``\\b``, since ``\\b`` fails after symbolic suffixes like "g'"/"g''" whose
-    last character is already non-word (same approach as ColumnMapperDialog's
-    auto-detect).
+    An exact match (the whole column name, lowercased, equals a pattern) is
+    unambiguous and always wins. A substring/token match (the pattern
+    appears as a whole word inside a longer header, e.g. "Time (s)" for
+    pattern "time") is used only when it uniquely identifies one column.
+
+    Checking patterns in flat priority order used to mean a column like
+    "Relaxation Time" (a derived/metadata value, not the swept axis) could
+    win over "Angular Frequency" (the file's actual x-axis) just because
+    "time" happened to be earlier in the pattern list than "frequency" --
+    silently importing the wrong independent variable. If no column is an
+    exact match and more than one column plausibly matches a different
+    pattern, that ambiguity is real: return None so the caller raises
+    "could not auto-detect" instead of guessing (a pattern must match as a
+    whole token -- bounded by non-alphanumeric characters rather than
+    ``\\b``, since ``\\b`` fails after symbolic suffixes like "g'"/"g''"
+    whose last character is already non-word -- same approach as
+    ColumnMapperDialog's auto-detect).
 
     Args:
         columns: Original-case column names.
         columns_lower: Same columns, lowercased (index-aligned with columns).
-        patterns: Substrings to search for, in priority order.
+        patterns: Substrings to search for.
 
     Returns:
-        The original-case column name of the first match, or None.
+        The original-case column name of the unambiguous match, or None.
     """
+    exact_matches: list[str] = []
+    substring_matches: list[str] = []
+    seen_exact: set[str] = set()
+    seen_substring: set[str] = set()
     for pattern in patterns:
         regex = re.compile(r"(?<![a-z0-9])" + re.escape(pattern) + r"(?![a-z0-9])")
         for col, col_lower in zip(columns, columns_lower, strict=True):
-            if regex.search(col_lower):
-                return col
+            if col_lower == pattern:
+                if col not in seen_exact:
+                    exact_matches.append(col)
+                    seen_exact.add(col)
+            elif regex.search(col_lower) and col not in seen_substring:
+                substring_matches.append(col)
+                seen_substring.add(col)
+
+    if len(exact_matches) == 1:
+        return exact_matches[0]
+    if exact_matches:
+        return None
+    if len(substring_matches) == 1:
+        return substring_matches[0]
     return None
 
 

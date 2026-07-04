@@ -444,6 +444,38 @@ data point 1	1.0	100
         with pytest.raises(ValueError, match="auto-detect"):
             auto_load(str(csv_file), x_col=1, header=None)
 
+    def test_auto_detect_prefers_exact_match_over_ambiguous_substring(self, tmp_path):
+        """Regression (Codex adversarial review of PR #39): patterns were
+        checked in flat priority order, so ANY column containing "time" as
+        a whole-word substring (e.g. "Relaxation Time", a derived/metadata
+        value) won over the file's actual frequency-sweep x-axis "Angular
+        Frequency" just because "time" was earlier in the pattern list --
+        silently importing the wrong independent variable. An exact match
+        against a pattern must always win over a mere substring match."""
+        csv_file = tmp_path / "ambiguous.csv"
+        csv_file.write_text(
+            "Relaxation Time,Angular Frequency,G',G''\n"
+            "10.0,0.1,1000.0,100.0\n"
+            "12.0,1.0,1200.0,150.0\n"
+        )
+
+        data = auto_load(str(csv_file))
+
+        np.testing.assert_allclose(data.x, [0.1, 1.0])
+
+    def test_auto_detect_raises_when_multiple_columns_ambiguously_match(self, tmp_path):
+        """When no column is an exact match and two distinct columns each
+        only plausibly match a different x-axis pattern, auto-detection
+        must not silently guess which one is the real independent variable
+        -- it should raise so the user can specify explicitly."""
+        csv_file = tmp_path / "truly_ambiguous.csv"
+        csv_file.write_text(
+            "Sample Time Log,Sweep Frequency Log,Stress\n1.0,0.1,10.0\n2.0,1.0,20.0\n"
+        )
+
+        with pytest.raises(ValueError, match="auto-detect"):
+            auto_load(str(csv_file))
+
     def test_auto_detect_headerless_multi_column_csv_still_raises(self, tmp_path):
         """A headerless file with more than 2 columns must NOT be guessed at
         (which pair does the caller want?) -- silently picking two of many
