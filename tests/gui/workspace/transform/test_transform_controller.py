@@ -182,7 +182,7 @@ def test_run_finish_refreshes_visualize_step(qtbot):
     assert "n_peaks" in result_tab.text()
 
 
-def test_infer_protocol_type_returns_empty_string_not_none_for_domain_changing():
+def test_infer_output_protocol_returns_empty_string_not_none_for_domain_changing():
     # Regression: domain-changing transforms (spectral/decomposition) must
     # still return a real `str` ("", not None) so save_to_library() can tell
     # "genuinely unresolvable" apart from "known but typeless" -- per design
@@ -200,7 +200,7 @@ def test_infer_protocol_type_returns_empty_string_not_none_for_domain_changing()
     assert ptype is not None
 
 
-def test_infer_protocol_type_same_domain_still_resolves_real_type():
+def test_infer_output_protocol_same_domain_still_resolves_real_type():
     lib = DatasetLibrary()
     lib.add(
         DatasetRef(

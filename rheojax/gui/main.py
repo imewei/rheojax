@@ -59,7 +59,7 @@ logger = get_logger(__name__)
 
 
 def _create_workspace_window() -> "WorkspaceWindow":  # noqa: F821
-    """Construct the Plan 2 workspace shell window (preview, ``--workspace``).
+    """Construct the workspace shell window (now the default entry point).
 
     Kept as a standalone import point so it can be unit-tested without
     entering the Qt event loop.
@@ -145,11 +145,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rheojax-gui                              # Launch GUI
+  rheojax-gui                              # Launch GUI (workspace shell, now the default)
+  rheojax-gui --legacy                     # Launch the legacy main window
   rheojax-gui --project analysis.rheojax     # Open project file
-  rheojax-gui --import data.xlsx          # Import data on startup
+  rheojax-gui --import data.xlsx --protocol relaxation  # Import data on startup
   rheojax-gui --maximized                 # Start maximized (per-window manager)
   rheojax-gui --verbose                   # Enable verbose logging
+  rheojax-gui --workspace                 # Deprecated no-op alias (workspace is now default)
 
 For more information, visit: https://github.com/imewei/rheojax
         """,
