@@ -518,7 +518,17 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
             # through to "could not auto-detect" below rather than guessing
             # which pair of columns the user wants — avoids silently
             # discarding the other columns' data.
-            if len(df.columns) == 2 and all(_looks_numeric(c) for c in df.columns):
+            # Only applies when the caller supplied NEITHER x_col nor y_col/
+            # y_cols -- same VIS-AUTO-001 rule as below: a caller-supplied
+            # column specifier must never be silently overwritten by a guess.
+            headerless_2col = (
+                "x_col" not in kwargs
+                and "y_col" not in kwargs
+                and "y_cols" not in kwargs
+                and len(df.columns) == 2
+                and all(_looks_numeric(c) for c in df.columns)
+            )
+            if headerless_2col:
                 kwargs["x_col"] = 0
                 kwargs["y_col"] = 1
                 kwargs["header"] = None

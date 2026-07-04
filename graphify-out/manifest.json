@@ -560,8 +560,8 @@
     "semantic_hash": "c6499d716bab95045030f6dcc0574b81"
   },
   "rheojax/gui/widgets/arviz_canvas.py": {
-    "mtime": 1783153405.7476835,
-    "ast_hash": "d2abc224aee22672fe4c41c0af25a4d6",
+    "mtime": 1783155724.3500152,
+    "ast_hash": "1a0328132e6f26d4b40ed7517c7545c3",
     "semantic_hash": ""
   },
   "rheojax/gui/widgets/base_arviz_widget.py": {
@@ -700,8 +700,8 @@
     "semantic_hash": ""
   },
   "rheojax/io/readers/auto.py": {
-    "mtime": 1783153325.7669597,
-    "ast_hash": "7f951e11be640f6b08311cde3f321fda",
+    "mtime": 1783155634.8771024,
+    "ast_hash": "03cf41f297bd7d026f4ab375090578ec",
     "semantic_hash": ""
   },
   "rheojax/io/readers/csv_reader.py": {
@@ -2270,8 +2270,8 @@
     "semantic_hash": "68bfb153d8aa5cf5fa94185bfb98de23"
   },
   "tests/io/test_readers.py": {
-    "mtime": 1783153476.0334408,
-    "ast_hash": "23099c322b53973d835c710ac3c614dc",
+    "mtime": 1783155688.8114443,
+    "ast_hash": "bb3d324ee511e3bfb2ceb82a39fde736",
     "semantic_hash": ""
   },
   "tests/io/test_spp_export.py": {

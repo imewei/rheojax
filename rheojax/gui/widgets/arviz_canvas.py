@@ -541,7 +541,13 @@ class ArvizCanvas(BaseArviZWidget):
             if var_names is None:
                 self._plot_fallback("No non-degenerate parameters to plot")
                 return
-            self._arviz_plot(az.plot_trace, self._inference_data, var_names=var_names)
+            # Trace plots use 2 subplots per variable (trace + marginal),
+            # which exceeds arviz's default plot.max_subplots=40 past ~20
+            # parameters. Same failure class as _plot_pair below.
+            with az.rc_context({"plot.max_subplots": len(var_names) * 2}):
+                self._arviz_plot(
+                    az.plot_trace, self._inference_data, var_names=var_names
+                )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -599,17 +605,21 @@ class ArvizCanvas(BaseArviZWidget):
             if var_names is None:
                 self._plot_fallback("No non-degenerate parameters to plot")
                 return
-            self._arviz_plot(
-                az.plot_forest,
-                self._inference_data,
-                **arviz_plot_kwargs(
-                    az,
-                    "plot_forest",
-                    var_names=var_names,
-                    hdi_prob=self._hdi_prob,
-                    combined=True,
-                ),
-            )
+            # Same max_subplots safety margin as _plot_trace/_plot_pair --
+            # forest plots don't usually need it (rows stack in one axes
+            # with combined=True) but scope it generously anyway.
+            with az.rc_context({"plot.max_subplots": len(var_names) * 2}):
+                self._arviz_plot(
+                    az.plot_forest,
+                    self._inference_data,
+                    **arviz_plot_kwargs(
+                        az,
+                        "plot_forest",
+                        var_names=var_names,
+                        hdi_prob=self._hdi_prob,
+                        combined=True,
+                    ),
+                )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
@@ -627,12 +637,15 @@ class ArvizCanvas(BaseArviZWidget):
             if var_names is None:
                 self._plot_fallback("No non-degenerate parameters to plot")
                 return
-            self._arviz_plot(
-                az.plot_posterior,
-                self._inference_data,
-                var_names=var_names,
-                hdi_prob=self._hdi_prob,
-            )
+            # Posterior plots use 1 subplot per variable -- same max_subplots
+            # ceiling as _plot_trace/_plot_pair for very high parameter counts.
+            with az.rc_context({"plot.max_subplots": len(var_names)}):
+                self._arviz_plot(
+                    az.plot_posterior,
+                    self._inference_data,
+                    var_names=var_names,
+                    hdi_prob=self._hdi_prob,
+                )
         except ImportError:
             logger.error(
                 "ArviZ import failed",
