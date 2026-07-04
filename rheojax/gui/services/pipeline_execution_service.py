@@ -275,7 +275,20 @@ class PipelineExecutionService(QObject):
                         step, context, library, persist=consumed_downstream
                     )
                 elif step.step_type == "fit":
-                    step_results[step.id] = self._execute_pipeline_fit(step, context)
+                    fit_result = self._execute_pipeline_fit(step, context)
+                    step_results[step.id] = fit_result
+                    # A fit step's outcome is its LAST phase that actually ran (nuts if
+                    # requested and reached, else nlsq) -- a failed/cancelled phase must not
+                    # be reported as an overall "completed" pipeline run just because the
+                    # per-step call itself didn't raise.
+                    terminal_phase = fit_result.nuts if fit_result.nuts is not None else fit_result.nlsq
+                    if terminal_phase.status != "completed":
+                        self.step_failed.emit(step.id, terminal_phase.error or "")
+                        return PipelineRunResult(
+                            step_results=step_results,
+                            status=terminal_phase.status,
+                            error=terminal_phase.error,
+                        )
                 elif step.step_type == "export":
                     step_results[step.id] = self._execute_pipeline_export(step, context)
                 else:

@@ -123,6 +123,37 @@ def test_batch_runner_job_record_round_trips_through_save_project_v2(qtbot, tmp_
     assert "result_ref" not in loaded_phase
 
 
+def test_batch_runner_emits_finished_with_failed_record_on_fatal_precondition_error(
+    qtbot, monkeypatch
+):
+    # A WorkerIsolationRequiredError (misconfigured environment) escaping execute() must
+    # still result in dataset_run_finished being emitted with a terminal "failed" record
+    # -- otherwise this dataset's active_jobs entry (registered by dataset_run_started,
+    # which already fired) is never cleared by PipelineController._commit_job_result(),
+    # leaving it stuck "running" forever. The batch must also stop rather than repeat the
+    # identical fatal error for every remaining dataset.
+    monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "thread")
+    lib = DatasetLibrary()
+    for id_ in ("d1", "d2"):
+        lib.add(_ref(id_, "relaxation"))
+        lib.store_payload(id_, RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation"))
+    svc = PipelineExecutionService()
+    steps = [PipelineStepConfig(id="s1", step_type="fit",
+                                 config={"model_name": "maxwell", "run_nuts": False})]
+    runner = PipelineBatchRunner(service=svc, steps=steps, selected_dataset_ids=["d1", "d2"],
+                                  library=lib, stop_requested=threading.Event())
+    started, records = [], []
+    svc.dataset_run_started.connect(lambda dsid: started.append(dsid))
+    svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
+    with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
+        runner.run()
+    assert started == ["d1"]  # fatal precondition error stops the batch -- d2 never started
+    assert len(records) == 1
+    assert records[0]["status"] == "failed"
+    assert "subprocess" in records[0]["error"]
+    assert records[0]["step_results"] == {}
+
+
 def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(qtbot, tmp_path, monkeypatch):
     # A "transform" step's record must carry its RheoData under literally "output" so
     # save_project_v2's `elif "output" in step_record` branch detects and persists it.
