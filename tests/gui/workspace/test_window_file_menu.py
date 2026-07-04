@@ -44,6 +44,30 @@ def test_maybe_confirm_unsaved_save_success_proceeds(qtbot, monkeypatch):
     assert calls == [1]
 
 
+def test_maybe_confirm_unsaved_save_blocked_by_active_jobs_warns_and_aborts(qtbot, monkeypatch):
+    # Reachable when _maybe_confirm_active_jobs gave up waiting (30s poll timeout) with
+    # active_jobs still non-empty: Save is unconditionally blocked in that state, so
+    # picking "Save" here must not silently no-op -- it must warn the user that the
+    # whole Close/New/Open action was aborted, not just fail to save.
+    win = _win(qtbot)
+    win._state.project.dirty = True
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Save
+    )
+    warning_calls = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warning_calls.append(1))
+    save_calls = []
+    monkeypatch.setattr(win, "_on_save", lambda: save_calls.append(1))
+
+    calls = []
+    win._maybe_confirm_unsaved_changes(lambda: calls.append(1))
+
+    assert warning_calls == [1]  # user told the action was aborted
+    assert save_calls == []      # _on_save (and its own separate dialog) never invoked
+    assert calls == []           # proceed() never called -- Close/New/Open did not happen
+
+
 def test_maybe_confirm_unsaved_discard_still_proceeds(qtbot, monkeypatch):
     win = _win(qtbot)
     win._state.project.dirty = True

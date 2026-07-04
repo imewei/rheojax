@@ -346,6 +346,21 @@ class WorkspaceWindow(QMainWindow):
             | QMessageBox.StandardButton.Cancel,
         )
         if choice == QMessageBox.StandardButton.Save:
+            if self._state.active_jobs.by_id:
+                # Reachable when _maybe_confirm_active_jobs gave up waiting for jobs to
+                # finish cancelling (its 30s poll timeout) with active_jobs still
+                # non-empty -- Save is unconditionally blocked in that state
+                # (_blocked_by_active_jobs), so calling it here would silently leave
+                # `proceed()` never called with no indication that the Close/New/Open
+                # the user already confirmed was itself aborted. Tell them directly
+                # instead of showing only the generic "Cannot save" dialog.
+                QMessageBox.warning(
+                    self, "Cannot Save",
+                    "Some jobs are still finishing cancellation, so the project can't "
+                    "be saved yet. This action was cancelled -- try again shortly, or "
+                    "choose Discard to proceed without saving.",
+                )
+                return
             self._on_save()
             if not self._state.project.dirty:
                 proceed()
