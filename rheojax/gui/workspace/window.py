@@ -430,14 +430,29 @@ class WorkspaceWindow(QMainWindow):
         if not paths:
             return
 
+        self._launch_import([Path(p) for p in paths])
+
+    def _launch_import(
+        self,
+        file_paths: list,
+        x_col: str | None = None,
+        y_col: str | None = None,
+        y2_col: str | None = None,
+        temp_col: str | None = None,
+    ) -> None:
         from PySide6.QtCore import QThreadPool
 
         from rheojax.gui.jobs.import_worker import ImportWorker
         from rheojax.gui.services.data_service import DataService
 
-        file_paths = [Path(p) for p in paths]
         worker = ImportWorker(
-            data_service=DataService(), file_path=file_paths[0], file_paths=file_paths
+            data_service=DataService(),
+            file_path=file_paths[0],
+            file_paths=file_paths,
+            x_col=x_col,
+            y_col=y_col,
+            y2_col=y2_col,
+            temp_col=temp_col,
         )
         # QueuedConnection guarantees the callback runs on the main thread --
         # ImportWorker emits its signals from a QThreadPool worker thread.
@@ -451,6 +466,7 @@ class WorkspaceWindow(QMainWindow):
         # holds the ImportWorker/ImportWorkerSignals QObject, so it would
         # otherwise be garbage-collected mid-run and drop the signal.
         self._active_import_worker = worker
+        self._pending_import_paths = file_paths
         QThreadPool.globalInstance().start(worker)
 
     def _on_import_completed(self, datasets: list) -> None:
@@ -495,7 +511,32 @@ class WorkspaceWindow(QMainWindow):
             self._commit_dataset(ref, rheo_data, overwrite=False)
 
     def _on_import_failed(self, error_msg: str) -> None:
-        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QDialog, QMessageBox
+
+        # Root cause: this import path has no column-mapping step, so a CSV
+        # whose headers don't match auto_load's heuristic name list (see
+        # rheojax/io/readers/auto.py::_try_csv) fails with no way for the
+        # user to specify columns. Give them one via the existing (until now
+        # unwired) ColumnMapperDialog, then retry with the chosen mapping.
+        # ponytail: matched on message text rather than a typed exception --
+        # auto_load raises plain ValueError for every failure mode. Upgrade
+        # to a dedicated exception type if more branches need to key off it.
+        paths = getattr(self, "_pending_import_paths", None) or []
+        if len(paths) == 1 and "auto-detect" in error_msg.lower():
+            from rheojax.gui.dialogs.column_mapper import ColumnMapperDialog
+
+            dialog = ColumnMapperDialog(str(paths[0]), parent=self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                mapping = dialog.get_mapping()
+                if mapping.get("x") and mapping.get("y"):
+                    self._launch_import(
+                        paths,
+                        x_col=mapping["x"],
+                        y_col=mapping["y"],
+                        y2_col=mapping.get("y2"),
+                        temp_col=mapping.get("temperature"),
+                    )
+                    return
 
         QMessageBox.critical(self, "Import Failed", error_msg)
 

@@ -3,9 +3,10 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from rheojax.core.data import RheoData
+from rheojax.gui.dialogs.column_mapper import ColumnMapperDialog
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.workspace.window import WorkspaceWindow
 
@@ -93,3 +94,70 @@ def test_import_failed_shows_message_box(qtbot, monkeypatch):
     win._on_import_failed("boom")
 
     assert messages == ["boom"]
+
+
+def test_import_failed_with_undetected_columns_offers_column_mapper(
+    qtbot, tmp_path, monkeypatch
+):
+    # Regression: a single-file import whose headers don't match auto_load's
+    # heuristic column-name list used to dead-end with a raw error dialog
+    # and no way to specify columns. It should offer ColumnMapperDialog and
+    # retry with the user's mapping instead.
+    source = tmp_path / "weird.csv"
+    source.write_text("foo,bar\n1.0,2.0\n2.0,3.0\n")
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win._pending_import_paths = [source]
+
+    monkeypatch.setattr(
+        ColumnMapperDialog, "exec", lambda self: QDialog.DialogCode.Accepted
+    )
+    monkeypatch.setattr(
+        ColumnMapperDialog, "get_mapping", lambda self: {"x": "foo", "y": "bar"}
+    )
+    relaunches = []
+    monkeypatch.setattr(
+        win, "_launch_import", lambda *a, **k: relaunches.append((a, k))
+    )
+
+    win._on_import_failed(
+        "Could not parse CSV as TRIOS or generic CSV: Could not auto-detect "
+        "columns: Could not auto-detect x and y columns. "
+        "Please specify x_col and y_col.. Please specify x_col and y_col."
+    )
+
+    assert len(relaunches) == 1
+    args, kwargs = relaunches[0]
+    assert args == ([source],)
+    assert kwargs == {
+        "x_col": "foo",
+        "y_col": "bar",
+        "y2_col": None,
+        "temp_col": None,
+    }
+
+
+def test_import_failed_undetected_columns_cancelled_shows_message_box(
+    qtbot, tmp_path, monkeypatch
+):
+    source = tmp_path / "weird.csv"
+    source.write_text("foo,bar\n1.0,2.0\n")
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win._pending_import_paths = [source]
+
+    monkeypatch.setattr(
+        ColumnMapperDialog, "exec", lambda self: QDialog.DialogCode.Rejected
+    )
+    messages = []
+    monkeypatch.setattr(
+        QMessageBox, "critical", lambda *a, **k: messages.append(a[-1])
+    )
+
+    win._on_import_failed("Could not auto-detect x and y columns.")
+
+    assert messages == ["Could not auto-detect x and y columns."]
