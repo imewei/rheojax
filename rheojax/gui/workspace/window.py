@@ -434,7 +434,7 @@ class WorkspaceWindow(QMainWindow):
 
     def _launch_import(
         self,
-        file_paths: list,
+        file_paths: list[Path],
         x_col: str | None = None,
         y_col: str | None = None,
         y2_col: str | None = None,
@@ -459,14 +459,18 @@ class WorkspaceWindow(QMainWindow):
         worker.signals.completed.connect(
             self._on_import_completed, Qt.ConnectionType.QueuedConnection
         )
+        # file_paths is bound per-connection (not read from shared instance
+        # state) so that a second import launched before this worker's
+        # "failed" signal is delivered can never make the failure handler
+        # act on the wrong file's paths.
         worker.signals.failed.connect(
-            self._on_import_failed, Qt.ConnectionType.QueuedConnection
+            lambda msg, fp=file_paths: self._on_import_failed(msg, fp),
+            Qt.ConnectionType.QueuedConnection,
         )
         # Keep a reference alive for the worker's lifetime -- nothing else
         # holds the ImportWorker/ImportWorkerSignals QObject, so it would
         # otherwise be garbage-collected mid-run and drop the signal.
         self._active_import_worker = worker
-        self._pending_import_paths = file_paths
         QThreadPool.globalInstance().start(worker)
 
     def _on_import_completed(self, datasets: list) -> None:
@@ -510,7 +514,15 @@ class WorkspaceWindow(QMainWindow):
             )
             self._commit_dataset(ref, rheo_data, overwrite=False)
 
-    def _on_import_failed(self, error_msg: str) -> None:
+    # Extensions ColumnMapperDialog can actually parse (see its _load_data) --
+    # anything else (.tri, .json, .dat, ...) falls back to a raw pd.read_csv
+    # attempt there too, so offering the dialog for those would just stack a
+    # second, more confusing failure on top of the original one.
+    _COLUMN_MAPPABLE_SUFFIXES = {".csv", ".txt", ".xlsx", ".xls"}
+
+    def _on_import_failed(
+        self, error_msg: str, file_paths: list[Path] | None = None
+    ) -> None:
         from PySide6.QtWidgets import QDialog, QMessageBox
 
         # Root cause: this import path has no column-mapping step, so a CSV
@@ -521,8 +533,13 @@ class WorkspaceWindow(QMainWindow):
         # ponytail: matched on message text rather than a typed exception --
         # auto_load raises plain ValueError for every failure mode. Upgrade
         # to a dedicated exception type if more branches need to key off it.
-        paths = getattr(self, "_pending_import_paths", None) or []
-        if len(paths) == 1 and "auto-detect" in error_msg.lower():
+        paths = file_paths or []
+        offer_mapper = (
+            len(paths) == 1
+            and paths[0].suffix.lower() in self._COLUMN_MAPPABLE_SUFFIXES
+            and "auto-detect" in error_msg.lower()
+        )
+        if offer_mapper:
             from rheojax.gui.dialogs.column_mapper import ColumnMapperDialog
 
             dialog = ColumnMapperDialog(str(paths[0]), parent=self)
