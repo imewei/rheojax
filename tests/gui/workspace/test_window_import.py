@@ -231,3 +231,46 @@ def test_overlapping_imports_do_not_cross_wire_failure_paths(
     qtbot.wait(50)
 
     assert calls == [("boom", [source_a])]
+
+
+def test_import_failed_unparseable_file_skips_broken_column_mapper(
+    qtbot, tmp_path, monkeypatch
+):
+    # Regression: some files that fail auto_load's column-detection (and so
+    # match the "auto-detect" retry gate) are also genuinely unparseable by
+    # pandas itself -- e.g. a preamble with inconsistent field counts per
+    # row, like a RepTate Prony-mode export. ColumnMapperDialog re-reads the
+    # file independently and hits the same parse error; its own except
+    # branch only shows a warning and leaves the dialog open with empty
+    # column lists (self.columns stays []). Opening that broken dialog on
+    # top of the warning was confusing -- it should be skipped so the user
+    # sees just the one original error.
+    source = tmp_path / "malformed.csv"
+    source.write_text("line1\nline2\na,b,c\n1,2,3\n4,5,6\n")
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+
+    exec_calls = []
+    monkeypatch.setattr(
+        ColumnMapperDialog,
+        "exec",
+        lambda self: exec_calls.append(1) or QDialog.DialogCode.Accepted,
+    )
+    warnings_shown = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *a, **k: warnings_shown.append(a[-1])
+    )
+    messages = []
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))
+
+    win._on_import_failed(
+        "Could not parse CSV as TRIOS or generic CSV: Could not auto-detect "
+        "columns: Error tokenizing data. Please specify x_col and y_col.",
+        [source],
+    )
+
+    assert exec_calls == []
+    assert len(warnings_shown) == 1  # ColumnMapperDialog's own load-failure warning
+    assert len(messages) == 1

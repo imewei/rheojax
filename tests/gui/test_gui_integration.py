@@ -436,6 +436,34 @@ class TestWidgetIntegration:
 
         canvas.close()
 
+    def test_arviz_canvas_pair_plot_with_many_parameters(
+        self, qapp: QApplication, qtbot: Any
+    ) -> None:
+        """Regression: a full pair-plot matrix needs len(var_names)**2
+        subplots, which exceeded arviz's default plot.max_subplots=40 for
+        any model with more than 6 parameters (e.g. GeneralizedMaxwell with
+        3+ modes has 8) -- the plot silently failed to render."""
+        import numpy as np
+
+        from rheojax.core.arviz_utils import inference_data_from_dict
+        from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+
+        canvas = ArvizCanvas()
+        qtbot.addWidget(canvas)
+
+        rng = np.random.default_rng(0)
+        n_params = 8
+        posterior = {f"param_{i}": rng.normal(size=(2, 50)) for i in range(n_params)}
+        idata = inference_data_from_dict({"posterior": posterior})
+
+        canvas.set_inference_data(idata)
+        canvas._current_plot_type = "pair"
+        canvas._refresh_plot()
+
+        assert not canvas._status_label.text().startswith("Error generating plot")
+
+        canvas.close()
+
 
 # =============================================================================
 # Full End-to-End Workflow Tests

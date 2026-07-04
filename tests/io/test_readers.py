@@ -400,6 +400,60 @@ data point 1	1.0	100
 
         assert isinstance(data, RheoData)
 
+    def test_auto_detect_substring_match_finds_column_containing_pattern(
+        self, tmp_path
+    ):
+        """Regression: y-column heuristic used exact match, so a header like
+        "Relaxation Modulus" (containing "modulus" but not equal to it) was
+        never recognized even though "Time" matched "time" for x."""
+        csv_file = tmp_path / "relaxation.csv"
+        csv_file.write_text(
+            "Time\tRelaxation Modulus\n0.001\t383502000.0\n0.01\t380000000.0\n"
+        )
+
+        data = auto_load(str(csv_file))
+
+        np.testing.assert_allclose(data.x, [0.001, 0.01])
+        np.testing.assert_allclose(data.y, [383502000.0, 380000000.0])
+
+    def test_auto_detect_headerless_two_column_csv(self, tmp_path):
+        """Regression: a headerless (x, y) CSV has its first data row misread
+        as column names by pandas' default header=0, so none of the heuristic
+        column-name patterns match anything -- auto-detection should treat
+        the unambiguous 2-column case positionally instead of failing."""
+        csv_file = tmp_path / "headerless.csv"
+        csv_file.write_text("1.0,10.0\n2.0,20.0\n3.0,30.0\n")
+
+        data = auto_load(str(csv_file))
+
+        np.testing.assert_allclose(data.x, [1.0, 2.0, 3.0])
+        np.testing.assert_allclose(data.y, [10.0, 20.0, 30.0])
+
+    def test_auto_detect_headerless_two_column_does_not_clobber_caller_x_col(
+        self, tmp_path
+    ):
+        """Regression: the headerless-2-column branch used to unconditionally
+        set kwargs["x_col"]=0/kwargs["y_col"]=1, even when the caller already
+        supplied x_col (or y_col) explicitly -- silently discarding it. A
+        caller-supplied column must never be overwritten by a guess; if
+        auto-detection genuinely can't determine the missing column it
+        should raise rather than silently pick a position for it."""
+        csv_file = tmp_path / "headerless.csv"
+        csv_file.write_text("1.0,10.0\n2.0,20.0\n3.0,30.0\n")
+
+        with pytest.raises(ValueError, match="auto-detect"):
+            auto_load(str(csv_file), x_col=1, header=None)
+
+    def test_auto_detect_headerless_multi_column_csv_still_raises(self, tmp_path):
+        """A headerless file with more than 2 columns must NOT be guessed at
+        (which pair does the caller want?) -- silently picking two of many
+        columns would be exactly the silent-data-loss this project forbids."""
+        csv_file = tmp_path / "headerless_wide.csv"
+        csv_file.write_text("1.0,10.0,100.0\n2.0,20.0,200.0\n")
+
+        with pytest.raises(ValueError, match="auto-detect"):
+            auto_load(str(csv_file))
+
     def test_auto_detect_fallback_logic(self, tmp_path):
         """Test fallback logic when format is ambiguous."""
         # Create file with ambiguous extension
