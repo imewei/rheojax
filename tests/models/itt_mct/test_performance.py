@@ -179,9 +179,9 @@ class TestDiffraxCompilation:
         predict_time = time.time() - start
 
         # After precompilation, prediction should be fast (< 5s for simple case)
-        assert (
-            predict_time < 10
-        ), f"After precompile(), prediction took {predict_time:.1f}s (expected <10s)"
+        assert predict_time < 10, (
+            f"After precompile(), prediction took {predict_time:.1f}s (expected <10s)"
+        )
 
     @pytest.mark.slow
     @pytest.mark.timeout(600)
@@ -250,9 +250,9 @@ class TestPronyPerformance:
         r2_multi = 1 - ss_res_multi / ss_tot
 
         # Multi-start should be at least as good as single-start
-        assert (
-            r2_multi >= r2_single - 0.01
-        ), f"Multi-start R²={r2_multi:.4f} should be >= single-start R²={r2_single:.4f}"
+        assert r2_multi >= r2_single - 0.01, (
+            f"Multi-start R²={r2_multi:.4f} should be >= single-start R²={r2_single:.4f}"
+        )
 
         # Both should achieve reasonable fit
         assert r2_multi > 0.95, f"Multi-start R²={r2_multi:.4f}, expected > 0.95"

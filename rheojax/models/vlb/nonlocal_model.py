@@ -66,7 +66,8 @@ StressType = Literal["linear", "fene"]
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.CREEP,
-    ])
+    ],
+)
 class VLBNonlocal(VLBBase):
     """Nonlocal VLB with tensor diffusion for shear banding.
 
@@ -91,6 +92,7 @@ class VLBNonlocal(VLBBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         breakage: BreakageType = "constant",

@@ -15,7 +15,12 @@ def test_commit_job_result_moves_active_to_history_and_marks_dirty(qtbot):
     dirty_calls = []
     ctl = PipelineController(state, svc, on_dirty=lambda: dirty_calls.append(1))
 
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     ctl._commit_job_result("d1", record)
 
     assert "d1" not in state.active_jobs.by_id
@@ -32,7 +37,12 @@ def test_commit_job_result_connected_to_dataset_run_finished(qtbot):
     svc = PipelineExecutionService()
     ctl = PipelineController(state, svc, on_dirty=lambda: None)
 
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     with qtbot.waitSignal(svc.dataset_run_finished, timeout=1000):
         svc.dataset_run_finished.emit("d1", record)
     assert "d1" not in state.active_jobs.by_id
@@ -58,9 +68,16 @@ def test_commit_job_result_calls_notify_when_provided(qtbot):
     state.active_jobs.by_id["d1"] = {"status": "running"}
     svc = PipelineExecutionService()
     notify_calls = []
-    ctl = PipelineController(state, svc, on_dirty=lambda: None, notify=lambda: notify_calls.append(1))
+    ctl = PipelineController(
+        state, svc, on_dirty=lambda: None, notify=lambda: notify_calls.append(1)
+    )
 
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     ctl._commit_job_result("d1", record)
 
     assert notify_calls == [1]
@@ -70,9 +87,16 @@ def test_commit_job_result_tolerates_missing_notify(qtbot):
     state = AppState()
     state.active_jobs.by_id["d1"] = {"status": "running"}
     svc = PipelineExecutionService()
-    ctl = PipelineController(state, svc, on_dirty=lambda: None)  # notify defaults to None
+    ctl = PipelineController(
+        state, svc, on_dirty=lambda: None
+    )  # notify defaults to None
 
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     ctl._commit_job_result("d1", record)  # must not raise
 
 
@@ -86,12 +110,26 @@ def test_pipeline_produced_dataset_visible_in_rail_after_job_commits(qtbot):
     qtbot.addWidget(win)
     assert win._rail.count() == 0
 
-    win._state.library.add(DatasetRef(
-        id="derived1", name="derived1", protocol_type="oscillation", origin="derived",
-        units={}, row_count=0, hash="", provenance={}, lineage=["d1"],
-    ))
+    win._state.library.add(
+        DatasetRef(
+            id="derived1",
+            name="derived1",
+            protocol_type="oscillation",
+            origin="derived",
+            units={},
+            row_count=0,
+            hash="",
+            provenance={},
+            lineage=["d1"],
+        )
+    )
     win._state.active_jobs.by_id["d1"] = {"status": "running"}
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     with qtbot.waitSignal(win._pipeline_service.dataset_run_finished, timeout=1000):
         win._pipeline_service.dataset_run_finished.emit("d1", record)
 
@@ -110,13 +148,20 @@ def test_stale_controller_guarded_after_rebuild_does_not_mutate_discarded_state(
     stale_ctl = win._controllers["pipeline"]
     stale_state.active_jobs.by_id["d1"] = {"status": "running"}
 
-    win._rebuild(AppState())  # bumps win._epoch; stale_ctl's connections survive regardless
+    win._rebuild(
+        AppState()
+    )  # bumps win._epoch; stale_ctl's connections survive regardless
     fresh_state = win._state
     fresh_ctl = win._controllers["pipeline"]
     assert fresh_ctl is not stale_ctl
     assert fresh_state is not stale_state
 
-    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    record = {
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
+        "step_results": {},
+    }
     with qtbot.waitSignal(win._pipeline_service.dataset_run_finished, timeout=1000):
         win._pipeline_service.dataset_run_finished.emit("d1", record)
 

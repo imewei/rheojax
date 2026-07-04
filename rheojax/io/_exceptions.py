@@ -64,4 +64,3 @@ class RheoJaxConvergenceWarning(UserWarning):
 class UnsupportedDataError(ValueError):
     """Raised for unsupported measurement geometry. RheoJAX is shear-only;
     tensile/bending/compression (DMTA/DMA, E*) data is not supported."""
-

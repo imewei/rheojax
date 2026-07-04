@@ -156,9 +156,7 @@ def reduce_set_active_dataset(
                 state.active_model_name,
                 dataset_id,
             )
-            return replace(
-                state, active_dataset_id=dataset_id, pipeline_state=pipeline
-            )
+            return replace(state, active_dataset_id=dataset_id, pipeline_state=pipeline)
         return state
 
     return updater

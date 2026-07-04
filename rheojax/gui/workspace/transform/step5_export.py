@@ -14,7 +14,9 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class TransformExportStep(QWidget):
-    dataset_commit_requested = Signal(object, object, bool)  # ref, payload | None, overwrite
+    dataset_commit_requested = Signal(
+        object, object, bool
+    )  # ref, payload | None, overwrite
 
     def __init__(
         self,

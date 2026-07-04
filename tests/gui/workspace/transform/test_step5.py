@@ -42,7 +42,7 @@ def test_save_derived_with_protocol_type(qtbot):
     st = TransformState(
         transform_key="prony_conversion",
         slots={"input": "rel1"},
-        result={"output": "rd", "protocol_type": "oscillation"}
+        result={"output": "rd", "protocol_type": "oscillation"},
     )
     lib = DatasetLibrary()
     step = TransformExportStep(st, lib)
@@ -86,9 +86,7 @@ def test_save_to_library_does_not_overwrite_on_repeat_transform_key(qtbot):
 
 def test_scalar_output_not_saved(qtbot):
     st = TransformState(
-        transform_key="mutation_number",
-        slots={"input": "r"},
-        result={"output": 0.42}
+        transform_key="mutation_number", slots={"input": "r"}, result={"output": 0.42}
     )
     lib = DatasetLibrary()
     step = TransformExportStep(st, lib)

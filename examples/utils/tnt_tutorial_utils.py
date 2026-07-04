@@ -877,7 +877,7 @@ def plot_weissenberg_number_effects(
         color="red",
         ls="--",
         alpha=0.5,
-        label=f"Wi = 1 (1/tau_b = {1.0/tau_b:.2g} 1/s)",
+        label=f"Wi = 1 (1/tau_b = {1.0 / tau_b:.2g} 1/s)",
     )
 
     ax.set_xlabel("Shear rate [1/s]", fontsize=12)
@@ -1183,7 +1183,7 @@ def print_nu_interpretation(nu: float) -> None:
     print("\nPhysical implications:")
     print(f"  - Effective lifetime: tau_eff = tau_b * exp(-{nu:.1f} * (lambda - 1))")
     print(f"  - At lambda = 2: tau_eff/tau_b = {np.exp(-nu):.4f}")
-    print(f"  - At lambda = 3: tau_eff/tau_b = {np.exp(-2*nu):.4g}")
+    print(f"  - At lambda = 3: tau_eff/tau_b = {np.exp(-2 * nu):.4g}")
 
 
 # =============================================================================
@@ -1688,8 +1688,7 @@ def get_tnt_param_names(model_class: str, **kwargs: Any) -> list[str]:
 
     if model_class not in dispatch:
         raise ValueError(
-            f"Unknown model_class '{model_class}'. "
-            f"Available: {list(dispatch.keys())}"
+            f"Unknown model_class '{model_class}'. Available: {list(dispatch.keys())}"
         )
 
     return dispatch[model_class]()

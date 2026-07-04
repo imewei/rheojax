@@ -244,7 +244,7 @@ class TestValidationDataset:
                         x=time, y=stress, x_units="s", y_units="Pa", domain="time"
                     ),
                     "expected": TestMode.RELAXATION,
-                    "description": f"Relaxation case {i+1}",
+                    "description": f"Relaxation case {i + 1}",
                 }
             )
 
@@ -262,7 +262,7 @@ class TestValidationDataset:
                         x=time, y=strain, x_units="s", y_units="unitless", domain="time"
                     ),
                     "expected": TestMode.CREEP,
-                    "description": f"Creep case {i+1}",
+                    "description": f"Creep case {i + 1}",
                 }
             )
 
@@ -291,7 +291,7 @@ class TestValidationDataset:
                         domain="frequency",
                     ),
                     "expected": TestMode.OSCILLATION,
-                    "description": f"Oscillation case {i+1}",
+                    "description": f"Oscillation case {i + 1}",
                 }
             )
 
@@ -319,7 +319,7 @@ class TestValidationDataset:
                         domain="time",
                     ),
                     "expected": TestMode.ROTATION,
-                    "description": f"Rotation case {i+1}",
+                    "description": f"Rotation case {i + 1}",
                 }
             )
 
@@ -340,7 +340,7 @@ class TestValidationDataset:
                         domain="frequency",
                     ),
                     "expected": TestMode.OSCILLATION,
-                    "description": f"Complex modulus case {i+1}",
+                    "description": f"Complex modulus case {i + 1}",
                 }
             )
 
@@ -365,15 +365,15 @@ class TestValidationDataset:
         accuracy = (correct / total) * 100
 
         # Print results
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Test Mode Detection Validation Results")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Total test cases: {total}")
         print(f"Correct detections: {correct}")
         print(f"Failed detections: {total - correct}")
         print(f"Accuracy: {accuracy:.2f}%")
         print(f"Target: >95%")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         if failed_cases:
             print(f"\nFailed cases:")
@@ -382,9 +382,9 @@ class TestValidationDataset:
                 print(f"    Expected: {case['expected']}, Detected: {case['detected']}")
 
         # Assert >95% accuracy
-        assert (
-            accuracy > 95.0
-        ), f"Detection accuracy {accuracy:.2f}% is below target of 95%"
+        assert accuracy > 95.0, (
+            f"Detection accuracy {accuracy:.2f}% is below target of 95%"
+        )
 
 
 if __name__ == "__main__":

@@ -226,7 +226,9 @@ def fit_hvm_demo_protocol(
         fit_model.fit(x_data, y_data, **fit_kwargs, **predict_kwargs)
 
     x_fit = _fit_grid(protocol)
-    y_data_fit = np.asarray(fit_model.predict(x_data, test_mode=protocol, **predict_kwargs))
+    y_data_fit = np.asarray(
+        fit_model.predict(x_data, test_mode=protocol, **predict_kwargs)
+    )
     y_fit = np.asarray(fit_model.predict(x_fit, test_mode=protocol, **predict_kwargs))
 
     return HVMFitDemoResult(

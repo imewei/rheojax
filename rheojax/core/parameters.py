@@ -795,8 +795,7 @@ class ParameterSet:
                 if strict:
                     raise KeyError(f"Parameter '{name}' not found")
                 failures[name] = (
-                    f"unknown parameter (available: "
-                    f"{sorted(self._parameters.keys())})"
+                    f"unknown parameter (available: {sorted(self._parameters.keys())})"
                 )
                 continue
 
@@ -896,8 +895,7 @@ class ParameterSet:
             if name not in self._parameters:
                 available = list(self._parameters.keys())
                 raise KeyError(
-                    f"Parameter '{name}' not found. "
-                    f"Available parameters: {available}"
+                    f"Parameter '{name}' not found. Available parameters: {available}"
                 )
             values.append(self.get_value(name))
         return tuple(values)

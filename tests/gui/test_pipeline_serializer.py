@@ -260,11 +260,7 @@ class TestFromYaml:
     def test_steps_have_pending_status(self):
         """All steps from from_yaml must start with PENDING status."""
         yaml_str = (
-            "version: '1'\n"
-            "name: S\n"
-            "steps:\n"
-            "  - type: load\n"
-            "    file: data/f.csv\n"
+            "version: '1'\nname: S\nsteps:\n  - type: load\n    file: data/f.csv\n"
         )
         steps, _ = from_yaml(yaml_str)
         assert steps[0].status == StepStatus.PENDING
@@ -277,18 +273,14 @@ class TestFromYaml:
 
     def test_missing_type_raises(self):
         """from_yaml must raise ValueError when a step is missing 'type'."""
-        yaml_str = "version: '1'\n" "name: Bad\n" "steps:\n" "  - file: data/x.csv\n"
+        yaml_str = "version: '1'\nname: Bad\nsteps:\n  - file: data/x.csv\n"
         with pytest.raises(ValueError, match="type"):
             from_yaml(yaml_str)
 
     def test_absolute_path_rejected(self):
         """from_yaml must reject absolute file paths in strict mode."""
         yaml_str = (
-            "version: '1'\n"
-            "name: Bad\n"
-            "steps:\n"
-            "  - type: load\n"
-            "    file: /etc/passwd\n"
+            "version: '1'\nname: Bad\nsteps:\n  - type: load\n    file: /etc/passwd\n"
         )
         with pytest.raises(ValueError, match="absolute"):
             from_yaml(yaml_str, strict=True)

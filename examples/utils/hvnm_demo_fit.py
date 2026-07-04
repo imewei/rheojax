@@ -231,7 +231,9 @@ def make_synthetic_protocol_data(
         )
         if noise_level:
             rng = np.random.default_rng(seed)
-            sigma = sigma + np.std(sigma) * rng.normal(0.0, noise_level, size=sigma.shape)
+            sigma = sigma + np.std(sigma) * rng.normal(
+                0.0, noise_level, size=sigma.shape
+            )
         gamma = laos_gamma_0 * np.sin(laos_omega * time)
         return ProtocolData(
             protocol="laos",
@@ -250,7 +252,9 @@ def make_synthetic_protocol_data(
         )
 
     x_data, y_data, predict_kwargs, _ = generate_hvnm_demo_data(
-        protocol, noise_level=noise_level, seed=seed,
+        protocol,
+        noise_level=noise_level,
+        seed=seed,
     )
 
     if protocol == "flow_curve":
@@ -268,7 +272,7 @@ def make_synthetic_protocol_data(
     if protocol == "oscillation":
         G_prime = np.real(y_data)
         G_double_prime = np.imag(y_data)
-        G_star_mag = np.sqrt(G_prime ** 2 + G_double_prime ** 2)
+        G_star_mag = np.sqrt(G_prime**2 + G_double_prime**2)
         return ProtocolData(
             protocol="oscillation",
             x=x_data,
@@ -298,7 +302,9 @@ def fit_hvnm_demo_protocol(
 ) -> HVNMFitDemoResult:
     """Fit one HVNM protocol and return arrays for raw-data/fitted overlays."""
     x_data, y_data, predict_kwargs, true_model = generate_hvnm_demo_data(
-        protocol, noise_level=noise_level, seed=seed,
+        protocol,
+        noise_level=noise_level,
+        seed=seed,
     )
     fit_model = make_hvnm_demo_model(INITIAL_PARAMS)
 
@@ -315,12 +321,18 @@ def fit_hvnm_demo_protocol(
     x_fit = _fit_grid(protocol)
     if protocol == "oscillation":
         Gp_data, Gdp_data = fit_model.predict_saos(x_data)
-        y_data_fit = np.asarray(Gp_data, dtype=float) + 1j * np.asarray(Gdp_data, dtype=float)
+        y_data_fit = np.asarray(Gp_data, dtype=float) + 1j * np.asarray(
+            Gdp_data, dtype=float
+        )
         Gp_fit, Gdp_fit = fit_model.predict_saos(x_fit)
         y_fit = np.asarray(Gp_fit, dtype=float) + 1j * np.asarray(Gdp_fit, dtype=float)
     else:
-        y_data_fit = np.asarray(fit_model.predict(x_data, test_mode=protocol, **predict_kwargs))
-        y_fit = np.asarray(fit_model.predict(x_fit, test_mode=protocol, **predict_kwargs))
+        y_data_fit = np.asarray(
+            fit_model.predict(x_data, test_mode=protocol, **predict_kwargs)
+        )
+        y_fit = np.asarray(
+            fit_model.predict(x_fit, test_mode=protocol, **predict_kwargs)
+        )
 
     return HVNMFitDemoResult(
         protocol=protocol,

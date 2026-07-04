@@ -239,12 +239,12 @@ class TestChunkingDataIntegrity:
         )
         chunked_data = _aggregate_chunks(synthetic_trios_small, chunk_size=500)
 
-        assert (
-            np.asarray(full_data.x).dtype == np.asarray(chunked_data.x).dtype
-        ), f"x dtype mismatch: {full_data.x.dtype} vs {chunked_data.x.dtype}"
-        assert (
-            np.asarray(full_data.y).dtype == np.asarray(chunked_data.y).dtype
-        ), f"y dtype mismatch: {full_data.y.dtype} vs {chunked_data.y.dtype}"
+        assert np.asarray(full_data.x).dtype == np.asarray(chunked_data.x).dtype, (
+            f"x dtype mismatch: {full_data.x.dtype} vs {chunked_data.x.dtype}"
+        )
+        assert np.asarray(full_data.y).dtype == np.asarray(chunked_data.y).dtype, (
+            f"y dtype mismatch: {full_data.y.dtype} vs {chunked_data.y.dtype}"
+        )
 
     def test_finite_values_check(self, synthetic_trios_medium):
         """Test that loaded data contains only finite values."""
@@ -252,12 +252,12 @@ class TestChunkingDataIntegrity:
             load_trios(str(synthetic_trios_medium), chunk_size=1000)
         )
 
-        assert np.all(
-            np.isfinite(np.asarray(chunked_data.x))
-        ), "Chunked data contains non-finite x values"
-        assert np.all(
-            np.isfinite(np.asarray(chunked_data.y))
-        ), "Chunked data contains non-finite y values"
+        assert np.all(np.isfinite(np.asarray(chunked_data.x))), (
+            "Chunked data contains non-finite x values"
+        )
+        assert np.all(np.isfinite(np.asarray(chunked_data.y))), (
+            "Chunked data contains non-finite y values"
+        )
 
 
 # =============================================================================
@@ -343,9 +343,9 @@ class TestChunkingEdgeCases:
         unique_count = len(np.unique(np.asarray(data.x)))
         total_count = len(data.x)
         # Allow 1% tolerance for boundary points
-        assert (
-            unique_count >= total_count * 0.99
-        ), f"Too many duplicate time points: {unique_count}/{total_count}"
+        assert unique_count >= total_count * 0.99, (
+            f"Too many duplicate time points: {unique_count}/{total_count}"
+        )
 
 
 # =============================================================================

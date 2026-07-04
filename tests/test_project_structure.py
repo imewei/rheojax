@@ -218,9 +218,9 @@ class TestConfiguration:
 
         with open(pyproject, "rb") as f:
             config = tomllib.load(f)
-        assert (
-            "tool" in config and "pytest" in config["tool"]
-        ), "Missing [tool.pytest] in pyproject.toml"
+        assert "tool" in config and "pytest" in config["tool"], (
+            "Missing [tool.pytest] in pyproject.toml"
+        )
 
     def test_pre_commit_config_exists(self):
         """Test that pre-commit configuration exists."""
@@ -415,9 +415,9 @@ class TestDatasetIdPropagation:
         import dataclasses
 
         field_names = [f.name for f in dataclasses.fields(FitResult)]
-        assert (
-            "dataset_id" in field_names
-        ), "FitResult must have a dataset_id field for multi-dataset warm-start support"
+        assert "dataset_id" in field_names, (
+            "FitResult must have a dataset_id field for multi-dataset warm-start support"
+        )
 
     @pytest.mark.smoke
     def test_fit_worker_accepts_dataset_id(self):
@@ -428,9 +428,9 @@ class TestDatasetIdPropagation:
             from rheojax.gui.jobs.fit_worker import FitWorker
 
             sig = inspect.signature(FitWorker.__init__)
-            assert (
-                "dataset_id" in sig.parameters
-            ), "FitWorker.__init__ must accept dataset_id parameter"
+            assert "dataset_id" in sig.parameters, (
+                "FitWorker.__init__ must accept dataset_id parameter"
+            )
         except ImportError:
             pytest.skip("GUI module not available")
 

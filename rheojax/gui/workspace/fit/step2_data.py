@@ -207,7 +207,9 @@ class DataStep(QWidget):
         # must run BEFORE store_payload() re-establishes the converted data --
         # doing it after would wipe out the very payload just stored.
         ref = self._library.get(self._state.data_ref)
-        self._library.add(replace(ref, units={**ref.units, "x": "rad/s"}), overwrite=True)
+        self._library.add(
+            replace(ref, units={**ref.units, "x": "rad/s"}), overwrite=True
+        )
         self._library.store_payload(self._state.data_ref, rheo_data)
         self._unit_converted = True
         self._guard.setText("")

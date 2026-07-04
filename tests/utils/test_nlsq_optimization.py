@@ -138,9 +138,9 @@ class TestNLSQOptimizer:
             value = param.value
             # Convert to array to check dtype
             arr_value = np.array(value)
-            assert arr_value.dtype == np.float64 or isinstance(
-                value, float
-            ), f"Parameter {name} value is not float64: {type(value)}"
+            assert arr_value.dtype == np.float64 or isinstance(value, float), (
+                f"Parameter {name} value is not float64: {type(value)}"
+            )
 
     @pytest.mark.smoke
     def test_convergence_simple_problem(self):

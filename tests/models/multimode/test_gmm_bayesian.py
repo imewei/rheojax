@@ -331,11 +331,11 @@ class TestGMMBayesianPipelineBugs:
 
         # Posterior should have n_final modes, not 3
         expected_params = (
-            {f"G_{i+1}" for i in range(n_final)}
-            | {f"tau_{i+1}" for i in range(n_final)}
+            {f"G_{i + 1}" for i in range(n_final)}
+            | {f"tau_{i + 1}" for i in range(n_final)}
             | {"G_inf"}
         )
         for name in expected_params:
-            assert (
-                name in result.posterior_samples
-            ), f"Missing {name} in posterior (n_modes={n_final})"
+            assert name in result.posterior_samples, (
+                f"Missing {name} in posterior (n_modes={n_final})"
+            )

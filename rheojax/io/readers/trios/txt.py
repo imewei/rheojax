@@ -1506,8 +1506,6 @@ def _parse_segment(
     segment_metadata["columns"] = columns
     segment_metadata["units"] = units
 
-
-
     # Add temperature if found (step_temperature is already in Kelvin)
     if step_temperature is not None:
         segment_metadata["temperature"] = step_temperature
@@ -1633,7 +1631,6 @@ def _determine_xy_columns(
             storage_col = i
         elif "loss modulus" in col and i != x_col:
             loss_col = i
-
 
     # If we have both G' and G'' (or E' and E''), use them to construct complex modulus
     if storage_col is not None and loss_col is not None:

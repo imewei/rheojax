@@ -8,8 +8,17 @@ from rheojax.gui.workspace.window import WorkspaceWindow
 
 
 def _ref(id_):
-    return DatasetRef(id=id_, name=id_, protocol_type="oscillation", origin="derived",
-                      units={}, row_count=1, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=id_,
+        name=id_,
+        protocol_type="oscillation",
+        origin="derived",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_commit_dataset_adds_ref_and_marks_dirty(qtbot):
@@ -46,7 +55,9 @@ def test_fit_body_dataset_commit_requested_routes_to_commit_dataset(qtbot):
     state = AppState()
     win = WorkspaceWindow(state)
     qtbot.addWidget(win)
-    fit_export_body = next(b for b in win._fit_bodies if hasattr(b, "dataset_commit_requested"))
+    fit_export_body = next(
+        b for b in win._fit_bodies if hasattr(b, "dataset_commit_requested")
+    )
     fit_export_body.dataset_commit_requested.emit(_ref("d2"), None, True)
     assert state.library.get("d2").id == "d2"
 
@@ -65,9 +76,14 @@ def test_commit_dataset_refreshes_library_rail(qtbot):
     assert win._rail.count() == 1
 
 
-@pytest.mark.parametrize("edited_signal", [
-    "_on_fit_body_edited", "_on_transform_body_edited", "_on_pipeline_body_edited",
-])
+@pytest.mark.parametrize(
+    "edited_signal",
+    [
+        "_on_fit_body_edited",
+        "_on_transform_body_edited",
+        "_on_pipeline_body_edited",
+    ],
+)
 def test_body_edited_marks_project_dirty(qtbot, edited_signal):
     # Fit/Transform/Pipeline step config edits (nlsq_config, priors, pipeline steps) are
     # all persisted into the project archive -- silently NOT dirtying on edit means a

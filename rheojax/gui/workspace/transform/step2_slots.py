@@ -90,7 +90,9 @@ class SlotsStep(QWidget):
 
     def _add_list_slot_widgets(self, spec: SlotSpec) -> None:
         current_list = [
-            v for v in self._state.slots.get(spec.name, []) if v in self.candidates(spec.name)
+            v
+            for v in self._state.slots.get(spec.name, [])
+            if v in self.candidates(spec.name)
         ]
         if current_list != self._state.slots.get(spec.name, []):
             self._state.slots[spec.name] = current_list
@@ -118,7 +120,9 @@ class SlotsStep(QWidget):
             item = list_widget.currentItem()
             if item is None:
                 return
-            values = [v for v in self._state.slots.get(spec.name, []) if v != item.text()]
+            values = [
+                v for v in self._state.slots.get(spec.name, []) if v != item.text()
+            ]
             self.fill(spec.name, values)
             self.refresh()
 

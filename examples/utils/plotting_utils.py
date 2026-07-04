@@ -213,7 +213,7 @@ def plot_nlsq_fit(
             y_upper,
             alpha=band_alpha,
             color=band_color,
-            label=f"{confidence*100:.0f}% CI",
+            label=f"{confidence * 100:.0f}% CI",
             zorder=1,
         )
 

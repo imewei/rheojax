@@ -214,7 +214,6 @@ def auto_load(
     # Pre-scan file for unsupported tensile/E* data
     check_file_for_unsupported_data(filepath)
 
-
     # Warn about large files that may consume significant memory
     file_size = filepath.stat().st_size
     if file_size > _FILE_SIZE_WARNING_BYTES:

@@ -321,9 +321,9 @@ class TestFluidityLocalNLSQToNUTS:
         assert result.diagnostics["divergences"] < 10, "Too many divergences"
 
         max_r_hat = max(result.diagnostics["r_hat"].values())
-        assert (
-            max_r_hat < 1.2
-        ), f"Max R-hat = {max_r_hat:.3f} indicates poor convergence"
+        assert max_r_hat < 1.2, (
+            f"Max R-hat = {max_r_hat:.3f} indicates poor convergence"
+        )
 
         min_ess = min(result.diagnostics["ess"].values())
         assert min_ess > 50, f"Min ESS = {min_ess:.1f} is too low"
@@ -507,9 +507,9 @@ class TestDiagnosticsValidation:
         # All R-hat values should be positive
         for name, r_hat in result.diagnostics["r_hat"].items():
             assert r_hat > 0, f"R-hat for {name} should be positive"
-            assert (
-                r_hat < 2
-            ), f"R-hat for {name} = {r_hat:.3f} indicates severe non-convergence"
+            assert r_hat < 2, (
+                f"R-hat for {name} = {r_hat:.3f} indicates severe non-convergence"
+            )
 
     @pytest.mark.slow
     def test_ess_computation(self, flow_curve_data):
@@ -535,9 +535,9 @@ class TestDiagnosticsValidation:
         total_samples = 200 * 1
         for name, ess in result.diagnostics["ess"].items():
             assert ess > 0, f"ESS for {name} should be positive"
-            assert (
-                ess <= total_samples * 1.5
-            ), f"ESS for {name} = {ess:.1f} exceeds samples"
+            assert ess <= total_samples * 1.5, (
+                f"ESS for {name} = {ess:.1f} exceeds samples"
+            )
 
 
 # ============================================================================

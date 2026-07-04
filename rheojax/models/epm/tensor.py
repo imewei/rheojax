@@ -33,7 +33,8 @@ jax, jnp = safe_import_jax()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class TensorialEPM(EPMBase):
     """3-Component Tensorial Lattice EPM.
 
@@ -67,6 +68,7 @@ class TensorialEPM(EPMBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         L: int = 64,

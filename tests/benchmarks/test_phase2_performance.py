@@ -64,9 +64,9 @@ class TestJAXvsNumPyPerformance:
         # NOTE: Pure NumPy baseline would be implemented here
         # For now, we verify JAX performance is reasonable
         # Relaxed threshold to account for varying machine performance and CI environments
-        assert (
-            time_jax < 20.0
-        ), f"Fitting {N} points should take <20s, got {time_jax:.3f}s"
+        assert time_jax < 20.0, (
+            f"Fitting {N} points should take <20s, got {time_jax:.3f}s"
+        )
 
         # Target: ≥2x speedup (would compare against NumPy baseline)
         print(f"  Performance: {N} points fitted in {time_jax:.3f}s")
@@ -121,9 +121,9 @@ class TestJITCompilationOverhead:
         print(f"  Estimated JIT overhead: {overhead:.2f}ms")
 
         # Target: overhead <100ms
-        assert (
-            overhead < 1000
-        ), f"JIT overhead {overhead:.2f}ms too large (target <1000ms)"
+        assert overhead < 1000, (
+            f"JIT overhead {overhead:.2f}ms too large (target <1000ms)"
+        )
 
         # Verify numerical consistency
         assert np.allclose(pred_first, pred_second)
@@ -158,7 +158,7 @@ class TestGPUAcceleration:
         model.fit(data.x, data.y)
         elapsed = time.time() - start
 
-        print(f"\n  Backend: {backend}, fit time: {elapsed*1000:.1f}ms")
+        print(f"\n  Backend: {backend}, fit time: {elapsed * 1000:.1f}ms")
         assert elapsed < 5.0, f"Post-JIT fit on {backend} took {elapsed:.3f}s (>5s)"
 
 
@@ -198,20 +198,20 @@ class TestMemoryProfiling:
             print(f"\n  Memory usage:")
             print(f"    Start: {mem_start:.1f} MB")
             print(
-                f"    After data creation: {mem_after_data:.1f} MB (+{mem_after_data-mem_start:.1f} MB)"
+                f"    After data creation: {mem_after_data:.1f} MB (+{mem_after_data - mem_start:.1f} MB)"
             )
             print(
-                f"    After fitting: {mem_after_fit:.1f} MB (+{mem_after_fit-mem_start:.1f} MB)"
+                f"    After fitting: {mem_after_fit:.1f} MB (+{mem_after_fit - mem_start:.1f} MB)"
             )
             print(
-                f"    After prediction: {mem_after_predict:.1f} MB (+{mem_after_predict-mem_start:.1f} MB)"
+                f"    After prediction: {mem_after_predict:.1f} MB (+{mem_after_predict - mem_start:.1f} MB)"
             )
 
             # Memory usage should be reasonable (<500 MB for this workflow)
             total_usage = mem_after_predict - mem_start
-            assert (
-                total_usage < 500
-            ), f"Memory usage {total_usage:.1f} MB excessive for simple workflow"
+            assert total_usage < 500, (
+                f"Memory usage {total_usage:.1f} MB excessive for simple workflow"
+            )
 
         except Exception as e:
             pytest.skip(f"Memory profiling failed: {e}")
@@ -247,9 +247,9 @@ class TestMemoryProfiling:
             print(f"\n  Memory growth over 10 iterations: {memory_growth:.1f} MB")
 
             # Should not grow significantly (< 100 MB for 10 iterations)
-            assert (
-                memory_growth < 100
-            ), f"Possible memory leak: {memory_growth:.1f} MB growth"
+            assert memory_growth < 100, (
+                f"Possible memory leak: {memory_growth:.1f} MB growth"
+            )
         else:
             pytest.skip("Not enough successful iterations to check for memory leaks")
 
@@ -289,7 +289,9 @@ class TestScalability:
             pytest.skip(f"Fitting N={N} failed: {e}")
         fit_time = time.time() - start
 
-        print(f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time/N*1000:.3f}ms per point)")
+        print(
+            f"\n  N={N}: Fit time = {fit_time:.3f}s ({fit_time / N * 1000:.3f}ms per point)"
+        )
 
         if N <= 10:
             assert fit_time < 1.0, f"N={N} should fit in <1s post-JIT"

@@ -11,8 +11,17 @@ class _RheoData:
 
 
 def _ref(i, protocol):
-    return DatasetRef(id=i, name=i, protocol_type=protocol, origin="imported",
-                       units={}, row_count=1, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=i,
+        name=i,
+        protocol_type=protocol,
+        origin="imported",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_pipeline_context_from_library_seeds_data():
@@ -43,9 +52,19 @@ def test_pipeline_context_from_library_works_for_derived_datasets_too():
     usable as pipeline input via context-seeding, unlike the file-path-only
     load step."""
     lib = DatasetLibrary()
-    lib.add(DatasetRef(id="derived1", name="derived1", protocol_type="oscillation",
-                        origin="derived", units={}, row_count=1, hash="", provenance={},
-                        lineage=["a"]))
+    lib.add(
+        DatasetRef(
+            id="derived1",
+            name="derived1",
+            protocol_type="oscillation",
+            origin="derived",
+            units={},
+            row_count=1,
+            hash="",
+            provenance={},
+            lineage=["a"],
+        )
+    )
     payload = _RheoData([3.0], [4.0])
     lib.store_payload("derived1", payload)
     ctx = pipeline_context_from_library(lib, ["derived1"])

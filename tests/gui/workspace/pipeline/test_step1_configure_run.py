@@ -8,8 +8,17 @@ from rheojax.gui.workspace.pipeline.step1_configure_run import PipelineConfigure
 
 
 def _ref(id_):
-    return DatasetRef(id=id_, name=id_, protocol_type="oscillation", origin="imported",
-                      units={}, row_count=1, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=id_,
+        name=id_,
+        protocol_type="oscillation",
+        origin="imported",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_add_step_appends_to_state(qtbot):
@@ -61,7 +70,10 @@ def test_add_step_from_ui_collects_fit_config(qtbot):
     step._fit_model_combo.setCurrentText("maxwell")
     step._fit_run_nuts_checkbox.setChecked(False)
     step._on_add_step_clicked()
-    assert state.pipeline.steps[0].config == {"model_name": "maxwell", "run_nuts": False}
+    assert state.pipeline.steps[0].config == {
+        "model_name": "maxwell",
+        "run_nuts": False,
+    }
 
 
 def test_add_step_from_ui_collects_export_config(qtbot):
@@ -72,7 +84,10 @@ def test_add_step_from_ui_collects_export_config(qtbot):
     step._export_path_edit.setText("/tmp/out_{id}.csv")
     step._export_format_combo.setCurrentText("csv")
     step._on_add_step_clicked()
-    assert state.pipeline.steps[0].config == {"path": "/tmp/out_{id}.csv", "format": "csv"}
+    assert state.pipeline.steps[0].config == {
+        "path": "/tmp/out_{id}.csv",
+        "format": "csv",
+    }
 
 
 def test_is_ready_false_when_a_step_has_incomplete_config(qtbot):

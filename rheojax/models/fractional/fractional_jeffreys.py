@@ -69,7 +69,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
-    ])
+    ],
+)
 class FractionalJeffreysModel(BaseModel):
     """Fractional Jeffreys model.
 
@@ -100,6 +101,7 @@ class FractionalJeffreysModel(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Fractional Jeffreys model."""
         super().__init__()
@@ -612,7 +614,6 @@ class FractionalJeffreysModel(BaseModel):
         # Fall back to self._test_mode only for backward compatibility
 
         if test_mode is None:
-
             test_mode = getattr(self, "_test_mode", TestMode.RELAXATION)
 
         # Normalize test_mode to handle both string and TestMode enum

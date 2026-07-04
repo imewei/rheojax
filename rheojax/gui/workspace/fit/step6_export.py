@@ -16,7 +16,9 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
 class ExportStep(QWidget):
-    dataset_commit_requested = Signal(object, object, bool)  # ref, payload | None, overwrite
+    dataset_commit_requested = Signal(
+        object, object, bool
+    )  # ref, payload | None, overwrite
 
     def __init__(
         self, state: FitState, library: DatasetLibrary, parent: QWidget | None = None
@@ -100,9 +102,7 @@ class ExportStep(QWidget):
                 for k in ("r_hat", "ess", "bfmi", "divergences", "verdict")
                 if k in self._state.nuts_result
             }
-            diagnostics_path.write_text(
-                json.dumps(diagnostics, default=str, indent=2)
-            )
+            diagnostics_path.write_text(json.dumps(diagnostics, default=str, indent=2))
             written["diagnostics"] = diagnostics_path
 
         provenance_path = directory / "provenance.json"
@@ -122,11 +122,7 @@ class ExportStep(QWidget):
             row_count=0,
             hash="",
             provenance=self.provenance(),
-            lineage=(
-                [self._state.data_ref]
-                if self._state.data_ref
-                else []
-            ),
+            lineage=([self._state.data_ref] if self._state.data_ref else []),
         )
         result = self._state.nlsq_result or {}
         x, y_fit = result.get("x"), result.get("y_fit")

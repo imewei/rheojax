@@ -716,9 +716,9 @@ def test_warm_start_complex_data_nuts_convergence():
     for param in ["Ge", "Gm", "eta"]:
         samples = result.posterior_samples[param]
         unique_ratio = len(np.unique(samples)) / len(samples)
-        assert (
-            unique_ratio > 0.95
-        ), f"{param} samples lack diversity: {unique_ratio*100:.1f}%"
+        assert unique_ratio > 0.95, (
+            f"{param} samples lack diversity: {unique_ratio * 100:.1f}%"
+        )
 
     # 2. Verify convergence diagnostics
     for param in ["Ge", "Gm", "eta"]:
@@ -737,9 +737,9 @@ def test_warm_start_complex_data_nuts_convergence():
 
     assert abs(Ge_mean - Ge_true) / Ge_true < 0.1, f"Ge estimate off: {Ge_mean:.2e}"
     assert abs(Gm_mean - Gm_true) / Gm_true < 0.1, f"Gm estimate off: {Gm_mean:.2e}"
-    assert (
-        abs(eta_mean - eta_true) / eta_true < 0.1
-    ), f"eta estimate off: {eta_mean:.2e}"
+    assert abs(eta_mean - eta_true) / eta_true < 0.1, (
+        f"eta estimate off: {eta_mean:.2e}"
+    )
 
     # 4. Verify posterior uncertainties are reasonable
     # Standard deviations should be non-zero but not huge
@@ -752,9 +752,9 @@ def test_warm_start_complex_data_nuts_convergence():
     # 5. Check no divergences occurred
     # Divergences indicate numerical instability in NUTS
     num_divergences = result.diagnostics["divergences"]
-    assert (
-        num_divergences == 0
-    ), f"Found {num_divergences} divergences (indicates NUTS issues)"
+    assert num_divergences == 0, (
+        f"Found {num_divergences} divergences (indicates NUTS issues)"
+    )
 
 
 def test_cold_start_vs_warm_start_comparison():
@@ -961,9 +961,9 @@ def test_default_num_chains_is_four():
     num_chains_param = sig.parameters.get("num_chains")
 
     assert num_chains_param is not None
-    assert (
-        num_chains_param.default == 4
-    ), f"Default num_chains should be 4, got {num_chains_param.default}"
+    assert num_chains_param.default == 4, (
+        f"Default num_chains should be 4, got {num_chains_param.default}"
+    )
 
 
 def test_multichain_rhat_computation():

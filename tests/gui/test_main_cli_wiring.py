@@ -17,7 +17,16 @@ def test_protocol_without_import_is_rejected():
 
 def test_project_and_import_are_mutually_exclusive():
     with pytest.raises(SystemExit):
-        parse_args(["--project", "p.rheojax", "--import", "data.csv", "--protocol", "oscillation"])
+        parse_args(
+            [
+                "--project",
+                "p.rheojax",
+                "--import",
+                "data.csv",
+                "--protocol",
+                "oscillation",
+            ]
+        )
 
 
 def test_import_with_protocol_parses_successfully():
@@ -64,7 +73,9 @@ def _reuse_qapplication_singleton(monkeypatch):
             return getattr(real_qapplication_cls, name)
 
         def __call__(self, *args, **kwargs):
-            return real_qapplication_cls.instance() or real_qapplication_cls(*args, **kwargs)
+            return real_qapplication_cls.instance() or real_qapplication_cls(
+                *args, **kwargs
+            )
 
     monkeypatch.setattr(compat, "QApplication", _QApplicationProxy())
 
@@ -79,7 +90,9 @@ def test_default_launch_constructs_workspace_window(monkeypatch, tmp_path):
         created["workspace"] = True
         raise SystemExit(0)  # short-circuit before app.exec() actually blocks
 
-    monkeypatch.setattr(main_module, "_create_workspace_window", _fake_create_workspace_window)
+    monkeypatch.setattr(
+        main_module, "_create_workspace_window", _fake_create_workspace_window
+    )
     with pytest.raises(SystemExit):
         main_module.main([])
     assert created.get("workspace") is True
@@ -96,7 +109,9 @@ def test_legacy_flag_constructs_main_window(monkeypatch):
             created["legacy"] = True
             raise SystemExit(0)
 
-    monkeypatch.setattr("rheojax.gui.app.main_window.RheoJAXMainWindow", _FakeMainWindow)
+    monkeypatch.setattr(
+        "rheojax.gui.app.main_window.RheoJAXMainWindow", _FakeMainWindow
+    )
     with pytest.raises(SystemExit):
         main_module.main(["--legacy"])
     assert created.get("legacy") is True

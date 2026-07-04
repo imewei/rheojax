@@ -81,7 +81,10 @@ class WorkspaceWindow(QMainWindow):
         fit_ctl, self._fit_bodies = build_fit_controller(state)
         transform_ctl, self._transform_bodies = build_transform_controller(state)
         pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(
-            state, self._pipeline_service, epoch=self._epoch, guard=self._guard,
+            state,
+            self._pipeline_service,
+            epoch=self._epoch,
+            guard=self._guard,
             notify=self._notifier.changed.emit,
         )
         self._controllers = {
@@ -137,7 +140,11 @@ class WorkspaceWindow(QMainWindow):
         self.setCentralWidget(self._splitter)
 
     def _dispose_workspace(self) -> None:
-        for body in list(self._fit_bodies) + list(self._transform_bodies) + list(self._pipeline_bodies):
+        for body in (
+            list(self._fit_bodies)
+            + list(self._transform_bodies)
+            + list(self._pipeline_bodies)
+        ):
             if hasattr(body, "edited"):
                 try:
                     body.edited.disconnect(self._on_fit_body_edited)
@@ -198,7 +205,9 @@ class WorkspaceWindow(QMainWindow):
 
     def _on_new(self) -> None:
         self._maybe_confirm_active_jobs(
-            lambda: self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+            lambda: self._maybe_confirm_unsaved_changes(
+                lambda: self._rebuild(AppState())
+            )
         )
 
     def _on_open(self) -> None:
@@ -237,7 +246,8 @@ class WorkspaceWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
 
         QMessageBox.information(
-            self, "Jobs Running",
+            self,
+            "Jobs Running",
             f"Cannot {action} while {len(self._state.active_jobs.by_id)} job(s) are still "
             "running. Wait for them to finish, or cancel them via Close/New/Open first.",
         )
@@ -282,7 +292,9 @@ class WorkspaceWindow(QMainWindow):
 
     def _on_close(self) -> None:
         self._maybe_confirm_active_jobs(
-            lambda: self._maybe_confirm_unsaved_changes(lambda: self._rebuild(AppState()))
+            lambda: self._maybe_confirm_unsaved_changes(
+                lambda: self._rebuild(AppState())
+            )
         )
 
     def _maybe_confirm_active_jobs(self, proceed) -> None:
@@ -299,7 +311,8 @@ class WorkspaceWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
 
         choice = QMessageBox.question(
-            self, "Jobs Running",
+            self,
+            "Jobs Running",
             f"{len(self._state.active_jobs.by_id)} job(s) still running. Cancel them and continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
@@ -314,7 +327,7 @@ class WorkspaceWindow(QMainWindow):
 
         if self._pipeline_stop_event is not None:
             self._pipeline_stop_event.set()  # stops PipelineBatchRunner from advancing to
-                                               # further queued datasets (Task 7's run() loop)
+            # further queued datasets (Task 7's run() loop)
         for job in self._state.active_jobs.by_id.values():
             worker = job.get("worker")
             if worker is not None:
@@ -329,9 +342,13 @@ class WorkspaceWindow(QMainWindow):
             return
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(250, lambda: self._poll_active_jobs_then(proceed, remaining_polls - 1))
+        QTimer.singleShot(
+            250, lambda: self._poll_active_jobs_then(proceed, remaining_polls - 1)
+        )
 
-    def _on_phase_worker_ready(self, dataset_id: str, step_id: str, phase: str, worker) -> None:
+    def _on_phase_worker_ready(
+        self, dataset_id: str, step_id: str, phase: str, worker
+    ) -> None:
         job = self._state.active_jobs.by_id.get(dataset_id)
         if job is not None:
             job["worker"] = worker
@@ -360,7 +377,8 @@ class WorkspaceWindow(QMainWindow):
                 # the user already confirmed was itself aborted. Tell them directly
                 # instead of showing only the generic "Cannot save" dialog.
                 QMessageBox.warning(
-                    self, "Cannot Save",
+                    self,
+                    "Cannot Save",
                     "Some jobs are still finishing cancellation, so the project can't "
                     "be saved yet. This action was cancelled -- try again shortly, or "
                     "choose Discard to proceed without saving.",
@@ -654,8 +672,10 @@ class WorkspaceWindow(QMainWindow):
         pipeline_state = self._state.pipeline
         self._pipeline_stop_event = threading.Event()
         runner = PipelineBatchRunner(
-            service=self._pipeline_service, steps=pipeline_state.steps,
-            selected_dataset_ids=pipeline_state.selected_dataset_ids, library=self._state.library,
+            service=self._pipeline_service,
+            steps=pipeline_state.steps,
+            selected_dataset_ids=pipeline_state.selected_dataset_ids,
+            library=self._state.library,
             stop_requested=self._pipeline_stop_event,
         )
         QThreadPool.globalInstance().start(runner)

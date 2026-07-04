@@ -186,9 +186,9 @@ class TestMIKH:
         # and the rate of decrease shows backstress influence
         stress_during_reversal = stress[100:150]
         # Use a few steps into reversal since first point may be same
-        assert (
-            stress_during_reversal[5] < stress_at_reversal
-        ), "Stress should decrease on reversal"
+        assert stress_during_reversal[5] < stress_at_reversal, (
+            "Stress should decrease on reversal"
+        )
 
         # 3. The stress drop during unloading should be steeper than
         # without kinematic hardening (more softening effect)
@@ -211,9 +211,9 @@ class TestMIKH:
 
         # The hardening case should show different behavior
         # (not necessarily larger drop, but distinct pattern)
-        assert not np.allclose(
-            stress[100:150], stress_no_kin[100:150], rtol=0.05
-        ), "Kinematic hardening should produce different reversal behavior"
+        assert not np.allclose(stress[100:150], stress_no_kin[100:150], rtol=0.05), (
+            "Kinematic hardening should produce different reversal behavior"
+        )
 
     def test_thixotropy_buildup(self):
         """Test structural buildup at rest."""
@@ -737,9 +737,9 @@ class TestIKHKernels:
 
         # Stress should be limited by hardening
         assert sigma_new > 50.0, "Stress should increase due to hardening"
-        assert (
-            sigma_new < 50.0 + 100.0 * 0.5
-        ), "Stress should be less than elastic prediction"
+        assert sigma_new < 50.0 + 100.0 * 0.5, (
+            "Stress should be less than elastic prediction"
+        )
 
     def test_flow_curve_steady_state_kernel(self):
         """Test steady-state flow curve kernel including backstress saturation."""

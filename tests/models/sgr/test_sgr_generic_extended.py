@@ -147,9 +147,9 @@ class TestThermodynamicConsistency:
         """Test thermodynamic consistency across parameter space."""
         state = np.array([sigma, lam])
         result = model.verify_thermodynamic_consistency(state)
-        assert result[
-            "thermodynamically_consistent"
-        ], f"Inconsistent at sigma={sigma}, lambda={lam}"
+        assert result["thermodynamically_consistent"], (
+            f"Inconsistent at sigma={sigma}, lambda={lam}"
+        )
 
 
 # =============================================================================
@@ -211,9 +211,9 @@ class TestShearBandingDetection:
         if result is not None:
             # Lever rule: f_low + f_high = 1
             total_fraction = result["fraction_low"] + result["fraction_high"]
-            assert (
-                abs(total_fraction - 1.0) < 1e-6
-            ), f"Lever rule violated: {total_fraction}"
+            assert abs(total_fraction - 1.0) < 1e-6, (
+                f"Lever rule violated: {total_fraction}"
+            )
 
 
 # =============================================================================
@@ -528,9 +528,9 @@ class TestDynamicX:
         S = -(lam * np.log(lam) + (1 - lam) * np.log(1 - lam))
         expected_dFdx = -S
 
-        assert (
-            abs(grad[2] - expected_dFdx) < 1e-6
-        ), f"dF/dx = {grad[2]}, expected -S = {expected_dFdx}"
+        assert abs(grad[2] - expected_dFdx) < 1e-6, (
+            f"dF/dx = {grad[2]}, expected -S = {expected_dFdx}"
+        )
 
     @pytest.mark.smoke
     def test_evolve_x_aging(self, dynamic_x_model):
@@ -600,9 +600,9 @@ class TestDynamicX:
         # Should still be thermodynamically consistent
         state = np.array([100.0, 0.5, 1.5])
         result = dynamic_x_model.verify_thermodynamic_consistency(state)
-        assert result[
-            "thermodynamically_consistent"
-        ], "Combined mode should be consistent"
+        assert result["thermodynamically_consistent"], (
+            "Combined mode should be consistent"
+        )
 
 
 # =============================================================================
@@ -636,6 +636,6 @@ class TestPropertyBased:
 
             # Verify thermodynamic consistency
             result = model.verify_thermodynamic_consistency(state)
-            assert result[
-                "thermodynamically_consistent"
-            ], f"Inconsistent at x={x}, G0={G0}, state={state}"
+            assert result["thermodynamically_consistent"], (
+                f"Inconsistent at x={x}, G0={G0}, state={state}"
+            )

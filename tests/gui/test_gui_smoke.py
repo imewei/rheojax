@@ -88,9 +88,9 @@ class TestModuleImports:
         from rheojax.gui.state.signals import StateSignals
 
         assert StateSignals is not None, "StateSignals should import successfully"
-        assert hasattr(
-            StateSignals, "state_changed"
-        ), "StateSignals should have state_changed signal"
+        assert hasattr(StateSignals, "state_changed"), (
+            "StateSignals should have state_changed signal"
+        )
 
     @pytest.mark.smoke
     def test_gui_services_imports(self) -> None:
@@ -177,9 +177,9 @@ class TestStateManagement:
 
         state = AppState()
 
-        assert (
-            state.project_name == "Untitled"
-        ), "Default project name should be 'Untitled'"
+        assert state.project_name == "Untitled", (
+            "Default project name should be 'Untitled'"
+        )
         assert state.current_tab == "home", "Default tab should be 'home'"
         assert state.theme == "light", "Default theme should be 'light'"
         assert state.auto_save_enabled is True, "Auto-save should be enabled by default"
@@ -247,9 +247,9 @@ class TestStateManagement:
 
         assert cloned.id == original.id, "Cloned ID should match"
         assert cloned is not original, "Clone should be different object"
-        assert (
-            cloned.metadata is not original.metadata
-        ), "Metadata should be deep copied"
+        assert cloned.metadata is not original.metadata, (
+            "Metadata should be deep copied"
+        )
 
     @pytest.mark.smoke
     @pytest.mark.skipif(
@@ -262,17 +262,17 @@ class TestStateManagement:
         pipeline = PipelineState()
 
         assert isinstance(pipeline.steps, dict), "Steps should be a dict"
-        assert len(pipeline.steps) == len(
-            PipelineStep
-        ), "Should have all pipeline steps"
+        assert len(pipeline.steps) == len(PipelineStep), (
+            "Should have all pipeline steps"
+        )
 
         for step in PipelineStep:
-            assert (
-                step in pipeline.steps
-            ), f"PipelineStep.{step.name} should be in steps"
-            assert (
-                pipeline.steps[step] == StepStatus.PENDING
-            ), f"All steps should start as PENDING"
+            assert step in pipeline.steps, (
+                f"PipelineStep.{step.name} should be in steps"
+            )
+            assert pipeline.steps[step] == StepStatus.PENDING, (
+                f"All steps should start as PENDING"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.skipif(
@@ -298,9 +298,9 @@ class TestStateManagement:
         expected_statuses = {"PENDING", "ACTIVE", "COMPLETE", "WARNING", "ERROR"}
         actual_statuses = {status.name for status in StepStatus}
 
-        assert (
-            actual_statuses == expected_statuses
-        ), "StepStatus should have all expected values"
+        assert actual_statuses == expected_statuses, (
+            "StepStatus should have all expected values"
+        )
 
     @pytest.mark.smoke
     @pytest.mark.skipif(
@@ -416,12 +416,12 @@ class TestStateManagement:
         from rheojax.gui.services.bayesian_service import BayesianResult as ServiceBR
         from rheojax.gui.state.store import BayesianResult as StoreBR
 
-        assert (
-            StoreBR is ServiceBR
-        ), "Service BayesianResult should be imported from store"
-        assert (
-            StoreBR is WorkerBR
-        ), "Worker BayesianResult should be imported from store"
+        assert StoreBR is ServiceBR, (
+            "Service BayesianResult should be imported from store"
+        )
+        assert StoreBR is WorkerBR, (
+            "Worker BayesianResult should be imported from store"
+        )
 
     @pytest.mark.smoke
     @pytest.mark.skipif(
@@ -510,9 +510,9 @@ class TestServiceInstantiation:
         service = ModelService()
 
         assert service is not None, "ModelService should instantiate"
-        assert hasattr(
-            service, "get_available_models"
-        ), "Should have get_available_models method"
+        assert hasattr(service, "get_available_models"), (
+            "Should have get_available_models method"
+        )
 
         # Test get_available_models returns proper structure
         try:
@@ -546,9 +546,9 @@ class TestServiceInstantiation:
         service = PlotService()
 
         assert service is not None, "PlotService should instantiate"
-        assert hasattr(
-            service, "get_available_styles"
-        ), "Should have get_available_styles method"
+        assert hasattr(service, "get_available_styles"), (
+            "Should have get_available_styles method"
+        )
 
         styles = service.get_available_styles()
         assert isinstance(styles, list), "Styles should be a list"
@@ -565,9 +565,9 @@ class TestServiceInstantiation:
 
         assert isinstance(palette, list), "Palette should be a list"
         assert len(palette) > 0, "Palette should have colors"
-        assert all(
-            isinstance(c, str) and c.startswith("#") for c in palette
-        ), "All colors should be hex codes"
+        assert all(isinstance(c, str) and c.startswith("#") for c in palette), (
+            "All colors should be hex codes"
+        )
 
     @pytest.mark.smoke
     def test_export_service_instantiation(self) -> None:
@@ -662,9 +662,9 @@ class TestStylesheetLoading:
 
             # Check for common QSS elements
             assert "{" in css and "}" in css, f"{theme}: Should have selector blocks"
-            assert (
-                "color:" in css or "background:" in css or "border:" in css
-            ), f"{theme}: Should have style properties"
+            assert "color:" in css or "background:" in css or "border:" in css, (
+                f"{theme}: Should have style properties"
+            )
 
     @pytest.mark.smoke
     def test_stylesheet_resource_files_exist(self) -> None:
@@ -843,9 +843,9 @@ class TestIntegrationScenarios:
         }
 
         assert len(services) == 6, "All services should be instantiated"
-        assert all(
-            service is not None for service in services.values()
-        ), "All services should be non-None"
+        assert all(service is not None for service in services.values()), (
+            "All services should be non-None"
+        )
 
 
 # =============================================================================
@@ -1006,9 +1006,9 @@ class TestJaxUtils:
 
         assert isinstance(info["devices"], list), "devices should be a list"
         assert len(info["devices"]) > 0, "devices should not be empty"
-        assert all(
-            isinstance(d, str) for d in info["devices"]
-        ), "devices should contain strings"
+        assert all(isinstance(d, str) for d in info["devices"]), (
+            "devices should contain strings"
+        )
 
     @pytest.mark.smoke
     def test_get_jax_info_default_device_is_string(self) -> None:
@@ -1017,9 +1017,9 @@ class TestJaxUtils:
 
         info = get_jax_info()
 
-        assert isinstance(
-            info["default_device"], str
-        ), "default_device should be a string"
+        assert isinstance(info["default_device"], str), (
+            "default_device should be a string"
+        )
 
     @pytest.mark.smoke
     def test_get_jax_info_memory_values_are_numeric(self) -> None:
@@ -1028,12 +1028,12 @@ class TestJaxUtils:
 
         info = get_jax_info()
 
-        assert isinstance(
-            info["memory_used_mb"], (int, float)
-        ), "memory_used_mb should be numeric"
-        assert isinstance(
-            info["memory_total_mb"], (int, float)
-        ), "memory_total_mb should be numeric"
+        assert isinstance(info["memory_used_mb"], (int, float)), (
+            "memory_used_mb should be numeric"
+        )
+        assert isinstance(info["memory_total_mb"], (int, float)), (
+            "memory_total_mb should be numeric"
+        )
 
     @pytest.mark.smoke
     def test_get_jax_info_float64_is_bool(self) -> None:
@@ -1042,9 +1042,9 @@ class TestJaxUtils:
 
         info = get_jax_info()
 
-        assert isinstance(
-            info["float64_enabled"], bool
-        ), "float64_enabled should be bool"
+        assert isinstance(info["float64_enabled"], bool), (
+            "float64_enabled should be bool"
+        )
 
     @pytest.mark.smoke
     def test_get_jax_device_info_still_works(self) -> None:
@@ -1056,9 +1056,9 @@ class TestJaxUtils:
         # Original function returns nested structure
         assert "memory" in info, "get_jax_device_info should return 'memory'"
         assert "backend" in info, "get_jax_device_info should return 'backend'"
-        assert (
-            "float64_enabled" in info
-        ), "get_jax_device_info should return 'float64_enabled'"
+        assert "float64_enabled" in info, (
+            "get_jax_device_info should return 'float64_enabled'"
+        )
 
 
 if __name__ == "__main__":

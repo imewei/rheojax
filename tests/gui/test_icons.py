@@ -319,9 +319,9 @@ class TestNoEmojiInQtWidgets:
             # Emoji range: U+1F300 to U+1FAFF (and others)
             for char in icon:
                 code = ord(char)
-                assert not (
-                    0x1F300 <= code <= 0x1FAFF
-                ), f"Emoji codepoint in {category}"
+                assert not (0x1F300 <= code <= 0x1FAFF), (
+                    f"Emoji codepoint in {category}"
+                )
                 assert not (0x2600 <= code <= 0x26FF), f"Misc symbol in {category}"
                 assert not (0x2700 <= code <= 0x27BF), f"Dingbat in {category}"
 

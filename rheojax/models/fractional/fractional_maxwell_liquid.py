@@ -57,7 +57,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
-    ])
+    ],
+)
 class FractionalMaxwellLiquid(BaseModel):
     """Fractional Maxwell Liquid model: Spring in series with SpringPot.
 
@@ -86,6 +87,7 @@ class FractionalMaxwellLiquid(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Fractional Maxwell Liquid model."""
         super().__init__()
@@ -353,7 +355,9 @@ class FractionalMaxwellLiquid(BaseModel):
             # shape mismatch in r_squared (normalization weights are always 2N
             # for complex y).
             _y_is_complex = np.iscomplexobj(np.asarray(y)) if y is not None else False
-            test_mode = kwargs.get("test_mode", "oscillation" if _y_is_complex else "relaxation")
+            test_mode = kwargs.get(
+                "test_mode", "oscillation" if _y_is_complex else "relaxation"
+            )
 
         # R13-FML-001: Store test_mode so Bayesian inference picks up the correct
         # protocol (otherwise _resolve_test_mode defaults to 'relaxation').

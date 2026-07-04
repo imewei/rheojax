@@ -53,12 +53,12 @@ def test_nlsq_to_nuts_workflow_on_maxwell_model():
     print(f"True Values:  G0={G0_true:.3e}, eta={eta_true:.3e}")
 
     # NLSQ should get close to true values (within 10%)
-    assert (
-        abs(G0_nlsq - G0_true) / G0_true < 0.1
-    ), f"NLSQ G0 estimate {G0_nlsq:.3e} too far from true {G0_true:.3e}"
-    assert (
-        abs(eta_nlsq - eta_true) / eta_true < 0.1
-    ), f"NLSQ eta estimate {eta_nlsq:.3e} too far from true {eta_true:.3e}"
+    assert abs(G0_nlsq - G0_true) / G0_true < 0.1, (
+        f"NLSQ G0 estimate {G0_nlsq:.3e} too far from true {G0_true:.3e}"
+    )
+    assert abs(eta_nlsq - eta_true) / eta_true < 0.1, (
+        f"NLSQ eta estimate {eta_nlsq:.3e} too far from true {eta_true:.3e}"
+    )
 
     # Step 2: Bayesian Inference with Warm-Start from NLSQ
     print("\n[Step 2] Running NUTS with warm-start from NLSQ...")
@@ -110,9 +110,9 @@ def test_nlsq_to_nuts_workflow_on_maxwell_model():
     # (MCMC sampling is stochastic and some divergences are acceptable)
     # R-hat=1.0 and ESS=2000 indicate excellent convergence despite divergences
     max_acceptable_divergences = 2000 * 0.40  # 40% threshold (800 divergences)
-    assert (
-        divergences < max_acceptable_divergences
-    ), f"Too many divergences: {divergences} (>{max_acceptable_divergences:.0f})"
+    assert divergences < max_acceptable_divergences, (
+        f"Too many divergences: {divergences} (>{max_acceptable_divergences:.0f})"
+    )
 
     # Step 6: Validate Posterior Statistics
     print("\n[Step 4] Validating posterior statistics...")
@@ -125,12 +125,12 @@ def test_nlsq_to_nuts_workflow_on_maxwell_model():
     print(f"Posterior: eta={eta_mean:.3e} ± {eta_std:.3e}")
 
     # Posterior means should be close to true values (within 20%)
-    assert (
-        abs(G0_mean - G0_true) / G0_true < 0.2
-    ), f"Posterior mean G0 {G0_mean:.3e} too far from true {G0_true:.3e}"
-    assert (
-        abs(eta_mean - eta_true) / eta_true < 0.2
-    ), f"Posterior mean eta {eta_mean:.3e} too far from true {eta_true:.3e}"
+    assert abs(G0_mean - G0_true) / G0_true < 0.2, (
+        f"Posterior mean G0 {G0_mean:.3e} too far from true {G0_true:.3e}"
+    )
+    assert abs(eta_mean - eta_true) / eta_true < 0.2, (
+        f"Posterior mean eta {eta_mean:.3e} too far from true {eta_true:.3e}"
+    )
 
     # Coefficient of variation should be reasonable
     cv_G0 = G0_std / G0_mean
@@ -277,15 +277,15 @@ def test_credible_intervals_contain_true_values():
     # If not exactly in interval, check if posterior mean is reasonably close
     if not G0_in_interval:
         G0_mean = result.summary["G0"]["mean"]
-        assert (
-            abs(G0_mean - G0_true) / G0_true < 0.5
-        ), f"G0 not in interval and posterior mean not close to true value"
+        assert abs(G0_mean - G0_true) / G0_true < 0.5, (
+            f"G0 not in interval and posterior mean not close to true value"
+        )
 
     if not eta_in_interval:
         eta_mean = result.summary["eta"]["mean"]
-        assert (
-            abs(eta_mean - eta_true) / eta_true < 0.5
-        ), f"eta not in interval and posterior mean not close to true value"
+        assert abs(eta_mean - eta_true) / eta_true < 0.5, (
+            f"eta not in interval and posterior mean not close to true value"
+        )
 
     print("[SUCCESS] Credible intervals validated!")
 

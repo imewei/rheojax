@@ -18,8 +18,17 @@ class _RheoData:
 
 
 def _ref(i, protocol):
-    return DatasetRef(id=i, name=i, protocol_type=protocol, origin="imported",
-                       units={}, row_count=1, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=i,
+        name=i,
+        protocol_type=protocol,
+        origin="imported",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_build_transform_controller_injects_real_run_fn(qapp, monkeypatch):

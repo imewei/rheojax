@@ -54,7 +54,8 @@ _STZ_RESERVED = {
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class STZConventional(STZBase):
     """Conventional Shear Transformation Zone (STZ) Model.
 
@@ -68,6 +69,7 @@ class STZConventional(STZBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, variant: VariantType = "standard"):
         """Initialize STZ Conventional Model.
 

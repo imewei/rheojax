@@ -192,9 +192,7 @@ class TestMaxwellANSYSRelaxation:
         data_range = y_true.max() - y_true.min()
         relative_error = rmse / data_range
 
-        assert (
-            relative_error < 0.15
-        ), (  # Relaxed for numerical tolerance
+        assert relative_error < 0.15, (  # Relaxed for numerical tolerance
             f"ANSYS relaxation relative error {relative_error:.4f} > 10%"
         )
 
@@ -301,9 +299,7 @@ class TestMaxwellANSYSCreep:
         data_range = y_true.max() - y_true.min()
         relative_error = rmse / data_range
 
-        assert (
-            relative_error < 0.15
-        ), (  # Relaxed for numerical tolerance
+        assert relative_error < 0.15, (  # Relaxed for numerical tolerance
             f"ANSYS creep relative error {relative_error:.4f} > 10%"
         )
 
@@ -402,9 +398,9 @@ class TestFractionalZenerANSYS:
         data_range = y_true.max() - y_true.min()
         relative_error = rmse / data_range
 
-        assert (
-            relative_error < 0.15
-        ), f"ANSYS fractional relative error {relative_error:.4f} > 15%"
+        assert relative_error < 0.15, (
+            f"ANSYS fractional relative error {relative_error:.4f} > 15%"
+        )
 
 
 # =============================================================================
@@ -440,9 +436,7 @@ class TestPronySeries:
 
         # Check accuracy
         relative_error = np.max(np.abs(predictions - G_t) / G_t)
-        assert (
-            relative_error < 0.05
-        ), (  # Relaxed for numerical tolerance
+        assert relative_error < 0.05, (  # Relaxed for numerical tolerance
             f"Single-mode Prony series error {relative_error:.4f} > 1%"
         )
 
@@ -505,9 +499,9 @@ class TestParameterEstimation:
         G0_error = abs(G0_fitted - G0_ref) / G0_ref
         eta_error = abs(eta_fitted - eta_ref) / eta_ref
 
-        assert (
-            G0_error < 0.15
-        ), f"G0 recovery error {G0_error:.2%}"  # Relaxed for numerical tolerance
-        assert (
-            eta_error < 0.15
-        ), f"eta recovery error {eta_error:.2%}"  # Relaxed for numerical tolerance
+        assert G0_error < 0.15, (
+            f"G0 recovery error {G0_error:.2%}"
+        )  # Relaxed for numerical tolerance
+        assert eta_error < 0.15, (
+            f"eta recovery error {eta_error:.2%}"
+        )  # Relaxed for numerical tolerance

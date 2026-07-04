@@ -10,8 +10,17 @@ from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 
 
 def _ref(i, protocol):
-    return DatasetRef(id=i, name=i, protocol_type=protocol, origin="imported",
-                       units={}, row_count=2, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=i,
+        name=i,
+        protocol_type=protocol,
+        origin="imported",
+        units={},
+        row_count=2,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 class _RheoData:

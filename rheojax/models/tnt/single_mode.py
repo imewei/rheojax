@@ -97,7 +97,8 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "tnt",
     protocols=[
@@ -107,7 +108,8 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class TNTSingleMode(TNTBase):
     """Single-mode Transient Network Theory model.
 
@@ -163,6 +165,7 @@ class TNTSingleMode(TNTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         breakage: BreakageType = "constant",

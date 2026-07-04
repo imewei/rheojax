@@ -55,7 +55,10 @@ def run_notebook(nb_path, timeout=600):
         nb.cells.insert(0, setup_cell)
 
         client = NotebookClient(
-            nb, timeout=timeout, kernel_name="python3", allow_errors=False,
+            nb,
+            timeout=timeout,
+            kernel_name="python3",
+            allow_errors=False,
         )
 
         original_cwd = os.getcwd()
@@ -94,7 +97,8 @@ def _print_result(index, total, name, success, error, duration):
 def discover_notebooks(base_dir):
     """Find all runnable notebooks, excluding archive/checkpoint/hidden files."""
     return sorted(
-        nb for nb in Path(base_dir).rglob("*.ipynb")
+        nb
+        for nb in Path(base_dir).rglob("*.ipynb")
         if "archive" not in str(nb)
         and not nb.name.startswith(".")
         and "checkpoint" not in str(nb)

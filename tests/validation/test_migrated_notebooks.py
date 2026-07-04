@@ -156,7 +156,7 @@ def _execute_notebook(notebook_path: Path, timeout: int = 600) -> nbformat.Noteb
         ep.preprocess(nb, {"metadata": {"path": str(notebook_path.parent)}})
     except Exception as e:
         raise RuntimeError(
-            f"Notebook execution failed: {notebook_path}\n" f"Error: {str(e)}"
+            f"Notebook execution failed: {notebook_path}\nError: {str(e)}"
         ) from e
 
     return nb
@@ -430,9 +430,9 @@ def _validate_array_match(
     arr1 = np.asarray(arr1)
     arr2 = np.asarray(arr2)
 
-    assert (
-        arr1.shape == arr2.shape
-    ), f"Array shape mismatch: {arr1.shape} vs {arr2.shape}"
+    assert arr1.shape == arr2.shape, (
+        f"Array shape mismatch: {arr1.shape} vs {arr2.shape}"
+    )
 
     # Compute relative error
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -756,12 +756,12 @@ class TestTransformNotebooks:
     def test_transform_notebook_structure(self, examples_dir):
         """Verify transforms notebooks directory exists and has expected structure."""
         transforms_dir = examples_dir / "transforms"
-        assert (
-            transforms_dir.exists()
-        ), f"Transforms notebooks directory not found: {transforms_dir}"
-        assert (
-            transforms_dir.is_dir()
-        ), f"transforms/ is not a directory: {transforms_dir}"
+        assert transforms_dir.exists(), (
+            f"Transforms notebooks directory not found: {transforms_dir}"
+        )
+        assert transforms_dir.is_dir(), (
+            f"transforms/ is not a directory: {transforms_dir}"
+        )
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -842,7 +842,7 @@ class TestTransformNotebooks:
                 f"FFT characteristic time error too large:\n"
                 f"  Expected τ = {tau_true:.4f} s\n"
                 f"  Detected τ = {tau_fft:.4f} s\n"
-                f"  Relative error = {relative_error*100:.2f}%"
+                f"  Relative error = {relative_error * 100:.2f}%"
             )
 
     @pytest.mark.validation
@@ -916,9 +916,9 @@ class TestTransformNotebooks:
                             found_windows.append(window)
 
         # Should demonstrate at least 3 window functions
-        assert (
-            len(found_windows) >= 3
-        ), f"Expected at least 3 window functions, found {len(found_windows)}: {found_windows}"
+        assert len(found_windows) >= 3, (
+            f"Expected at least 3 window functions, found {len(found_windows)}: {found_windows}"
+        )
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -974,9 +974,9 @@ class TestTransformNotebooks:
         """Verify mastercurve TTS notebook exists."""
         mc_notebook = examples_dir / "transforms" / "02-mastercurve-tts.ipynb"
         assert mc_notebook.exists(), f"Mastercurve notebook not found: {mc_notebook}"
-        assert (
-            mc_notebook.is_file()
-        ), f"Mastercurve notebook is not a file: {mc_notebook}"
+        assert mc_notebook.is_file(), (
+            f"Mastercurve notebook is not a file: {mc_notebook}"
+        )
 
     @pytest.mark.validation
     @pytest.mark.slow
@@ -1143,9 +1143,9 @@ class TestTransformNotebooks:
     def test_mutation_number_notebook_exists(self, examples_dir):
         """Verify mutation number notebook exists."""
         mn_notebook = examples_dir / "transforms" / "03-mutation-number.ipynb"
-        assert (
-            mn_notebook.exists()
-        ), f"Mutation number notebook not found: {mn_notebook}"
+        assert mn_notebook.exists(), (
+            f"Mutation number notebook not found: {mn_notebook}"
+        )
         assert mn_notebook.is_file()
 
     @pytest.mark.validation
@@ -1221,9 +1221,9 @@ class TestTransformNotebooks:
                         if method not in found_methods:
                             found_methods.append(method)
 
-        assert (
-            len(found_methods) >= 2
-        ), f"Expected 2+ integration methods, found {len(found_methods)}"
+        assert len(found_methods) >= 2, (
+            f"Expected 2+ integration methods, found {len(found_methods)}"
+        )
 
     # ========================================================================
     # OWChirp LAOS Analysis Notebook Tests (Task Group 2.4 - Priority 2)
@@ -1340,9 +1340,9 @@ class TestTransformNotebooks:
     def test_smooth_derivative_notebook_exists(self, examples_dir):
         """Verify smooth derivative notebook exists."""
         sd_notebook = examples_dir / "transforms" / "05-smooth-derivative.ipynb"
-        assert (
-            sd_notebook.exists()
-        ), f"Smooth derivative notebook not found: {sd_notebook}"
+        assert sd_notebook.exists(), (
+            f"Smooth derivative notebook not found: {sd_notebook}"
+        )
         assert sd_notebook.is_file()
 
     @pytest.mark.validation
@@ -1445,9 +1445,9 @@ class TestBayesianNotebooks:
     def test_bayesian_notebook_structure(self, examples_dir):
         """Verify Bayesian notebooks directory exists and has expected structure."""
         bayesian_dir = examples_dir / "bayesian"
-        assert (
-            bayesian_dir.exists()
-        ), f"Bayesian notebooks directory not found: {bayesian_dir}"
+        assert bayesian_dir.exists(), (
+            f"Bayesian notebooks directory not found: {bayesian_dir}"
+        )
         assert bayesian_dir.is_dir(), f"bayesian/ is not a directory: {bayesian_dir}"
 
     # ========================================================================
@@ -1693,9 +1693,9 @@ class TestBayesianNotebooks:
                                     found_convergence_check = True
                                     break
 
-                assert (
-                    found_convergence_check
-                ), f"Convergence check not found in {notebook_name}"
+                assert found_convergence_check, (
+                    f"Convergence check not found in {notebook_name}"
+                )
 
 
 class TestAdvancedNotebooks:
@@ -1706,9 +1706,9 @@ class TestAdvancedNotebooks:
     def test_advanced_notebook_structure(self, examples_dir):
         """Verify advanced notebooks directory exists and has expected structure."""
         advanced_dir = examples_dir / "advanced"
-        assert (
-            advanced_dir.exists()
-        ), f"Advanced notebooks directory not found: {advanced_dir}"
+        assert advanced_dir.exists(), (
+            f"Advanced notebooks directory not found: {advanced_dir}"
+        )
         assert advanced_dir.is_dir(), f"advanced/ is not a directory: {advanced_dir}"
 
 
@@ -1744,14 +1744,14 @@ class TestFrameworkSmoke:
     @pytest.mark.notebook_smoke
     def test_tolerance_levels(self, tolerance, convergence_thresholds):
         """Verify tolerance levels are reasonable."""
-        assert (
-            0 < tolerance < 1e-4
-        ), f"Numerical tolerance {tolerance} seems unreasonable"
+        assert 0 < tolerance < 1e-4, (
+            f"Numerical tolerance {tolerance} seems unreasonable"
+        )
         assert convergence_thresholds["rhat"] > 1.0, "R-hat threshold should be > 1.0"
         assert convergence_thresholds["ess"] > 0, "ESS threshold should be positive"
-        assert (
-            0 < convergence_thresholds["divergence_rate"] < 1
-        ), "Divergence rate should be in (0,1)"
+        assert 0 < convergence_thresholds["divergence_rate"] < 1, (
+            "Divergence rate should be in (0,1)"
+        )
 
     @pytest.mark.notebook_smoke
     def test_notebook_execution_helper(self):

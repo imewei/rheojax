@@ -996,7 +996,7 @@ class BaseModel(BayesianMixin, ABC):
         # Handle edge cases
         eps = np.finfo(float).eps
         scale = max(1.0, np.max(np.abs(y)))
-        if ss_tot == 0 or abs(ss_tot) < eps * scale ** 2:
+        if ss_tot == 0 or abs(ss_tot) < eps * scale**2:
             # All y values are (effectively) constant — R² is undefined
             logger.warning("R² undefined for constant data (ss_tot=0)")
             return np.nan

@@ -18,8 +18,15 @@ class _RheoData:
 
 def _ref(i, protocol):
     return DatasetRef(
-        id=i, name=i, protocol_type=protocol, origin="imported",
-        units={}, row_count=3, hash="h", provenance={}, lineage=[],
+        id=i,
+        name=i,
+        protocol_type=protocol,
+        origin="imported",
+        units={},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
 
 
@@ -67,8 +74,15 @@ def test_apply_unit_conversion_multiplies_x_by_2pi(qtbot):
     rd = _RheoData([1.0, 2.0, 3.0], [1, 2, 3])
     lib.store_payload("hz_data", rd)
     lib._by_id["hz_data"] = DatasetRef(
-        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
-        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+        id="hz_data",
+        name="hz_data",
+        protocol_type="oscillation",
+        origin="imported",
+        units={"x": "Hz"},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
     step = DataStep(st, lib)
     qtbot.addWidget(step)
@@ -90,8 +104,15 @@ def test_apply_unit_conversion_is_idempotent(qtbot):
     lib.add(_ref("hz_data", "oscillation"))
     lib.store_payload("hz_data", _RheoData([1.0, 2.0, 3.0], [1, 2, 3]))
     lib._by_id["hz_data"] = DatasetRef(
-        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
-        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+        id="hz_data",
+        name="hz_data",
+        protocol_type="oscillation",
+        origin="imported",
+        units={"x": "Hz"},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
     step = DataStep(st, lib)
     qtbot.addWidget(step)
@@ -116,8 +137,15 @@ def test_convert_button_wired_to_apply_unit_conversion(qtbot):
     lib.add(_ref("hz_data", "oscillation"))
     lib.store_payload("hz_data", _RheoData([1.0, 2.0, 3.0], [1, 2, 3]))
     lib._by_id["hz_data"] = DatasetRef(
-        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
-        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+        id="hz_data",
+        name="hz_data",
+        protocol_type="oscillation",
+        origin="imported",
+        units={"x": "Hz"},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
     step = DataStep(st, lib)
     qtbot.addWidget(step)
@@ -163,8 +191,15 @@ def test_apply_unit_conversion_persists_across_reselect(qtbot):
     lib.add(_ref("hz_data", "oscillation"))
     lib.store_payload("hz_data", _RheoData([1.0, 2.0, 3.0], [1, 2, 3]))
     lib._by_id["hz_data"] = DatasetRef(
-        id="hz_data", name="hz_data", protocol_type="oscillation", origin="imported",
-        units={"x": "Hz"}, row_count=3, hash="h", provenance={}, lineage=[],
+        id="hz_data",
+        name="hz_data",
+        protocol_type="oscillation",
+        origin="imported",
+        units={"x": "Hz"},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
     step = DataStep(st, lib)
     qtbot.addWidget(step)

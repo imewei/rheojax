@@ -235,7 +235,7 @@ def get_yield_criterion(name: str) -> Callable:
 
     if name not in criteria:
         raise ValueError(
-            f"Unknown yield criterion: {name}. " f"Available: {list(criteria.keys())}"
+            f"Unknown yield criterion: {name}. Available: {list(criteria.keys())}"
         )
 
     return criteria[name]

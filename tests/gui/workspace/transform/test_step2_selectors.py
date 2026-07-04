@@ -10,8 +10,17 @@ from rheojax.gui.workspace.transform.step2_slots import SlotsStep
 
 
 def _ref(i, protocol):
-    return DatasetRef(id=i, name=i, protocol_type=protocol, origin="imported",
-                       units={}, row_count=1, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=i,
+        name=i,
+        protocol_type=protocol,
+        origin="imported",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_single_slot_combo_box_selection_fills_state(qtbot):
@@ -86,7 +95,9 @@ def test_list_slot_not_ready_when_emptied_via_remove(qtbot):
 
 
 def test_list_slot_not_ready_when_all_candidates_go_stale_on_refresh(qtbot):
-    st = TransformState(transform_key="mastercurve", slots={"datasets": ["gone1", "gone2"]})
+    st = TransformState(
+        transform_key="mastercurve", slots={"datasets": ["gone1", "gone2"]}
+    )
     lib = DatasetLibrary()  # neither id was ever added -> both go stale on refresh
     step = SlotsStep(st, lib)
     qtbot.addWidget(step)

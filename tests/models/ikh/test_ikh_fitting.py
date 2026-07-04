@@ -203,9 +203,9 @@ class TestMIKHNLSQ:
         fitted_sigma_y0 = model.parameters.get_value("sigma_y0")
         fitted_eta_inf = model.parameters.get_value("eta_inf")
 
-        assert (
-            5.0 < fitted_sigma_y0 < 45.0
-        ), f"sigma_y0 = {fitted_sigma_y0} out of range"
+        assert 5.0 < fitted_sigma_y0 < 45.0, (
+            f"sigma_y0 = {fitted_sigma_y0} out of range"
+        )
         assert 0.01 < fitted_eta_inf < 1.0, f"eta_inf = {fitted_eta_inf} out of range"
 
 

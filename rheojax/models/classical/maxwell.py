@@ -42,7 +42,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
-    ])
+    ],
+)
 class Maxwell(BaseModel):
     """Maxwell viscoelastic model (spring and dashpot in series).
 
@@ -76,6 +77,7 @@ class Maxwell(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Maxwell model with default parameters."""
         super().__init__()

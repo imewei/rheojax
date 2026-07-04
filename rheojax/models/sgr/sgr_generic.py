@@ -88,7 +88,8 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class SGRGeneric(BaseModel):
     """Soft Glassy Rheology (SGR) GENERIC Thermodynamic Framework Model.
 
@@ -136,6 +137,7 @@ class SGRGeneric(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, dynamic_x: bool = False):
         """Initialize SGR GENERIC Model.
 

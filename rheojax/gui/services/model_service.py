@@ -497,7 +497,6 @@ class ModelService:
                 "error": str(e),
             }
 
-
     def supports_fitting(self, model_name: str) -> bool:
         """Check if a model supports NLSQ fitting (not just prediction).
 

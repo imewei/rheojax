@@ -222,7 +222,6 @@ class BayesianPage(QWidget):
         )
         layout.addWidget(self._warmstart_check)
 
-
         # Priors editor button
         btn_priors = QPushButton("Edit Priors...")
         btn_priors.setToolTip("View or edit prior distributions used for this run")
@@ -427,7 +426,6 @@ class BayesianPage(QWidget):
             # F-010 fix: Validate DMTA support for selected model
         else:
             self._model_label.setText("Model: (select in Fit tab)")
-
 
     def _on_run_clicked(self) -> None:
         """Handle run button click."""
@@ -824,7 +822,6 @@ class BayesianPage(QWidget):
             warm_start=warm_start_dict is not None,
             page="BayesianPage",
         )
-
 
         # F-HL-005 fix: Extract fitted model state
         fitted_model_state = None

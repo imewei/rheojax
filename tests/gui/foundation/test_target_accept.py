@@ -1,12 +1,13 @@
 """Task 7: target_accept passthrough — signature-level test, no MCMC runs."""
+
 import inspect
 
-import nlsq  # noqa: F401 — must precede any rheojax.core imports
 import jax  # noqa: F401
+import nlsq  # noqa: F401 — must precede any rheojax.core imports
 
-from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
-from rheojax.gui.jobs.process_adapter import make_bayesian_worker
 from rheojax.gui.jobs.bayesian_worker import BayesianWorker
+from rheojax.gui.jobs.process_adapter import make_bayesian_worker
+from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
 
 
 def test_target_accept_param_present():

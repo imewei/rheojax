@@ -271,9 +271,9 @@ class TestPipelineExecutionService:
         ):
             service.execute_all([step])
 
-        assert any(
-            running_states
-        ), "is_pipeline_running() was never True during execution"
+        assert any(running_states), (
+            "is_pipeline_running() was never True during execution"
+        )
         # After completion the pipeline must be stopped.
         assert is_pipeline_running() is False
 

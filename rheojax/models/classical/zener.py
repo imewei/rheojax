@@ -43,7 +43,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.FLOW_CURVE,
-    ])
+    ],
+)
 class Zener(BaseModel):
     """Zener (Standard Linear Solid) viscoelastic model.
 
@@ -80,6 +81,7 @@ class Zener(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Zener model with default parameters."""
         super().__init__()

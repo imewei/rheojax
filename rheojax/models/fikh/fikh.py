@@ -55,7 +55,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class FIKH(FIKHBase):
     r"""Fractional Isotropic-Kinematic Hardening (FIKH) Model.
 
@@ -124,6 +125,7 @@ class FIKH(FIKHBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         include_thermal: bool = True,

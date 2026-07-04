@@ -203,7 +203,8 @@ For more information, visit: https://github.com/imewei/rheojax
     )
 
     parser.add_argument(
-        "--legacy", action="store_true",
+        "--legacy",
+        action="store_true",
         help="Launch the legacy main window instead of the (now default) workspace shell",
     )
 
@@ -407,7 +408,9 @@ def main(argv: list[str] | None = None) -> int:
         try:
             workspace_window = _create_workspace_window()
         except Exception as e:
-            logger.error("Failed to create workspace window", error=str(e), exc_info=True)
+            logger.error(
+                "Failed to create workspace window", error=str(e), exc_info=True
+            )
             print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
             return 1
 
@@ -421,7 +424,9 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 loaded_state = load_project_v2(args.project)
             except (ValueError, FileNotFoundError) as e:
-                logger.error("Failed to load project", path=str(args.project), error=str(e))
+                logger.error(
+                    "Failed to load project", path=str(args.project), error=str(e)
+                )
                 print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
                 return 1
             workspace_window._rebuild(loaded_state)
@@ -433,7 +438,9 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 ref, data = import_dataset(args.import_file, args.protocol)
             except (ValueError, FileNotFoundError) as e:
-                logger.error("Failed to import data", path=str(args.import_file), error=str(e))
+                logger.error(
+                    "Failed to import data", path=str(args.import_file), error=str(e)
+                )
                 print(f"ERROR: Failed to import data: {e}", file=sys.stderr)
                 return 1
             workspace_window._commit_dataset(ref, data, overwrite=False)

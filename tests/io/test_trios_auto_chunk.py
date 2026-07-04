@@ -91,7 +91,7 @@ def trios_file_factory():
                 strain = 1.0  # 1% strain
 
                 temp_file.write(
-                    f"Data point {i+1}\t{omega:.6e}\t{G_prime:.6e}\t{G_double_prime:.6e}\t{strain:.6e}\n"
+                    f"Data point {i + 1}\t{omega:.6e}\t{G_prime:.6e}\t{G_double_prime:.6e}\t{strain:.6e}\n"
                 )
 
             temp_file.close()

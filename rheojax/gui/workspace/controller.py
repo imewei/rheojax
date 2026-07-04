@@ -40,7 +40,9 @@ class WorkflowController:
     def on_edit(self, step_index: int) -> None:
         """Editing a completed step bumps revision and re-locks everything downstream."""
         if not 0 <= step_index < len(self.steps):
-            raise ValueError(f"step_index {step_index} out of range [0, {len(self.steps)})")
+            raise ValueError(
+                f"step_index {step_index} out of range [0, {len(self.steps)})"
+            )
         self.revision += 1
         self.reached = {i for i in self.reached if i <= step_index}
         if self.current > step_index:

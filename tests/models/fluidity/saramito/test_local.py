@@ -202,7 +202,7 @@ class TestStartupFitting:
         # Require actual overshoot: max must exceed final by at least 5%
         assert sigma_max > sigma_final * 1.05, (
             f"No overshoot detected: sigma_max={sigma_max:.2f}, "
-            f"sigma_final={sigma_final:.2f}, ratio={sigma_max/sigma_final:.3f}"
+            f"sigma_final={sigma_final:.2f}, ratio={sigma_max / sigma_final:.3f}"
         )
 
     def test_startup_trajectory_stored(self, model_with_params):
@@ -598,7 +598,9 @@ class TestFitPredictRoundtrip:
         model_with_params.fitted_ = True
 
         # With explicit sigma_0: prediction must start at sigma_0
-        pred_explicit = model_with_params.predict(t, test_mode="relaxation", sigma_0=sigma_0)
+        pred_explicit = model_with_params.predict(
+            t, test_mode="relaxation", sigma_0=sigma_0
+        )
         assert np.isfinite(pred_explicit[0]), "Explicit sigma_0 path returned NaN"
         assert abs(pred_explicit[0] - sigma_0) < 0.01 * sigma_0, (
             f"With explicit sigma_0={sigma_0}, pred[0]={pred_explicit[0]:.2f} "
@@ -652,7 +654,6 @@ class TestBayesianSmoke:
 
         assert result is not None
         assert hasattr(result, "posterior_samples")
-
 
 
 class TestHelperMethods:

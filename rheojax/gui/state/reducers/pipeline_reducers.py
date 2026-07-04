@@ -157,9 +157,7 @@ def reduce_remove_pipeline_step(
 
     def _remove_step(state: AppState) -> AppState:
         vp = state.visual_pipeline.clone()
-        removed_idx = next(
-            (i for i, s in enumerate(vp.steps) if s.id == step_id), None
-        )
+        removed_idx = next((i for i, s in enumerate(vp.steps) if s.id == step_id), None)
         # Every step downstream of the removed one had its output computed
         # against a pipeline that no longer exists -- invalidate them the
         # same way reduce_update_step_config invalidates downstream steps.

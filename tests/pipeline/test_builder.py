@@ -54,7 +54,7 @@ def temp_csv_file():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         f.write("x,y\n")
         for i in range(10):
-            f.write(f"{i},{i*2}\n")
+            f.write(f"{i},{i * 2}\n")
         temp_path = f.name
 
     yield temp_path

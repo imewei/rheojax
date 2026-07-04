@@ -24,6 +24,7 @@ Usage::
 Exit code 0: clean; exit code 1: at least one notebook has the silent-skip
 signature.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -147,8 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         "--repo-root",
         type=Path,
         default=Path(__file__).resolve().parent.parent,
-        help="Repo root used to resolve allowlist paths "
-        "(default: parent of scripts/).",
+        help="Repo root used to resolve allowlist paths (default: parent of scripts/).",
     )
     args = parser.parse_args(argv)
 

@@ -68,7 +68,8 @@ logger = get_logger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.STARTUP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class GeneralizedMaxwell(BaseModel):
     """Generalized Maxwell Model with N exponential relaxation modes.
 
@@ -113,6 +114,7 @@ class GeneralizedMaxwell(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, n_modes: int = 3):
         """Initialize Generalized Maxwell Model.
 
@@ -303,9 +305,7 @@ class GeneralizedMaxwell(BaseModel):
         try:
             _final_res = np.asarray(objective(nlsq_result.x))
             if np.iscomplexobj(_final_res):
-                _final_res = np.concatenate(
-                    [np.real(_final_res), np.imag(_final_res)]
-                )
+                _final_res = np.concatenate([np.real(_final_res), np.imag(_final_res)])
             _final_res = _final_res.astype(np.float64)
         except Exception:  # pragma: no cover - defensive
             _final_res = None
@@ -575,10 +575,10 @@ class GeneralizedMaxwell(BaseModel):
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
         param_values.update(
-            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+            {f"{symbol}_{i + 1}": float(E_i_opt[i]) for i in range(self._n_modes)}
         )
         param_values.update(
-            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+            {f"tau_{i + 1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
         )
         self.parameters.set_values(param_values)
 
@@ -690,8 +690,8 @@ class GeneralizedMaxwell(BaseModel):
             current_params = np.asarray(self._nlsq_result.x)
         else:
             E_inf = self.parameters.get_value(f"{symbol}_inf")
-            E_i = [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(n_max)]
-            tau_i = [self.parameters.get_value(f"tau_{i+1}") for i in range(n_max)]
+            E_i = [self.parameters.get_value(f"{symbol}_{i + 1}") for i in range(n_max)]
+            tau_i = [self.parameters.get_value(f"tau_{i + 1}") for i in range(n_max)]
             current_params = np.array([E_inf] + E_i + tau_i)
 
         # Iterative N reduction with padded arrays
@@ -821,17 +821,15 @@ class GeneralizedMaxwell(BaseModel):
 
             # Rebuild ParameterSet with n_optimal modes
             self._n_modes = n_optimal
-            self.parameters = create_prony_parameter_set(
-                n_optimal
-            )
+            self.parameters = create_prony_parameter_set(n_optimal)
 
             # Set fitted parameter values
             param_values = {f"{symbol}_inf": float(E_inf_opt)}
             param_values.update(
-                {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(n_optimal)}
+                {f"{symbol}_{i + 1}": float(E_i_opt[i]) for i in range(n_optimal)}
             )
             param_values.update(
-                {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(n_optimal)}
+                {f"tau_{i + 1}": float(tau_i_opt[i]) for i in range(n_optimal)}
             )
             self.parameters.set_values(param_values)
 
@@ -1120,10 +1118,10 @@ class GeneralizedMaxwell(BaseModel):
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
         param_values.update(
-            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+            {f"{symbol}_{i + 1}": float(E_i_opt[i]) for i in range(self._n_modes)}
         )
         param_values.update(
-            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+            {f"tau_{i + 1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
         )
         self.parameters.set_values(param_values)
 
@@ -1209,7 +1207,7 @@ class GeneralizedMaxwell(BaseModel):
             ]
         )
         modulus_names = [f"{symbol}_inf"] + [
-            f"{symbol}_{i+1}" for i in range(self._n_modes)
+            f"{symbol}_{i + 1}" for i in range(self._n_modes)
         ]
         registered_modulus_upper_values = []
         for name in modulus_names:
@@ -1285,10 +1283,10 @@ class GeneralizedMaxwell(BaseModel):
 
         param_values = {f"{symbol}_inf": float(E_inf_opt)}
         param_values.update(
-            {f"{symbol}_{i+1}": float(E_i_opt[i]) for i in range(self._n_modes)}
+            {f"{symbol}_{i + 1}": float(E_i_opt[i]) for i in range(self._n_modes)}
         )
         param_values.update(
-            {f"tau_{i+1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
+            {f"tau_{i + 1}": float(tau_i_opt[i]) for i in range(self._n_modes)}
         )
         self.parameters.set_values(param_values)
 
@@ -1397,10 +1395,13 @@ class GeneralizedMaxwell(BaseModel):
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         # Convert input to JAX array
@@ -1461,10 +1462,13 @@ class GeneralizedMaxwell(BaseModel):
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         # Convert input to JAX array
@@ -1570,10 +1574,13 @@ class GeneralizedMaxwell(BaseModel):
         # Extract parameters
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         # Convert input to JAX array
@@ -1628,8 +1635,8 @@ class GeneralizedMaxwell(BaseModel):
 
                 # Map to parameter names
                 param_names = [f"{symbol}_inf"]
-                param_names += [f"{symbol}_{i+1}" for i in range(self._n_modes)]
-                param_names += [f"tau_{i+1}" for i in range(self._n_modes)]
+                param_names += [f"{symbol}_{i + 1}" for i in range(self._n_modes)]
+                param_names += [f"tau_{i + 1}" for i in range(self._n_modes)]
 
                 for i, name in enumerate(param_names):
                     if i < len(std_devs):
@@ -1838,10 +1845,13 @@ class GeneralizedMaxwell(BaseModel):
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = np.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = np.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         return {f"{symbol}_inf": E_inf, f"{symbol}_i": E_i, "tau_i": tau_i}
@@ -1952,8 +1962,8 @@ class GeneralizedMaxwell(BaseModel):
             f"{symbol}_inf", 0.0
         )  # No equilibrium modulus for flow
         for i in range(self._n_modes):
-            self.parameters.set_value(f"{symbol}_{i+1}", float(G_i_guess[i]))
-            self.parameters.set_value(f"tau_{i+1}", float(tau_i_guess[i]))
+            self.parameters.set_value(f"{symbol}_{i + 1}", float(G_i_guess[i]))
+            self.parameters.set_value(f"tau_{i + 1}", float(tau_i_guess[i]))
 
         logger.info(
             "GMM fitted to steady-shear mode",
@@ -1988,10 +1998,13 @@ class GeneralizedMaxwell(BaseModel):
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         eta_0 = self._predict_steady_shear_jit(E_inf, E_i, tau_i)
@@ -2090,11 +2103,14 @@ class GeneralizedMaxwell(BaseModel):
         params_opt = result.x
         param_values = {f"{symbol}_inf": float(params_opt[0])}
         param_values.update(
-            {f"{symbol}_{i+1}": float(params_opt[1 + i]) for i in range(self._n_modes)}
+            {
+                f"{symbol}_{i + 1}": float(params_opt[1 + i])
+                for i in range(self._n_modes)
+            }
         )
         param_values.update(
             {
-                f"tau_{i+1}": float(params_opt[1 + self._n_modes + i])
+                f"tau_{i + 1}": float(params_opt[1 + self._n_modes + i])
                 for i in range(self._n_modes)
             }
         )
@@ -2142,10 +2158,13 @@ class GeneralizedMaxwell(BaseModel):
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         eta_plus = self._predict_startup_jit(
@@ -2235,10 +2254,13 @@ class GeneralizedMaxwell(BaseModel):
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
         E_i = jnp.array(
-            [self.parameters.get_value(f"{symbol}_{i+1}") for i in range(self._n_modes)]
+            [
+                self.parameters.get_value(f"{symbol}_{i + 1}")
+                for i in range(self._n_modes)
+            ]
         )
         tau_i = jnp.array(
-            [self.parameters.get_value(f"tau_{i+1}") for i in range(self._n_modes)]
+            [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
 
         stress = self._predict_laos_jit(

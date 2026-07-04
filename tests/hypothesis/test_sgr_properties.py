@@ -153,9 +153,9 @@ class TestKernelProperties:
         G_prime, G_double_prime = Gp(x, omega_tau0)
 
         assert G_prime >= -1e-10, f"G'({x}, {omega_tau0}) = {G_prime} < 0"
-        assert (
-            G_double_prime >= -1e-10
-        ), f"G''({x}, {omega_tau0}) = {G_double_prime} < 0"
+        assert G_double_prime >= -1e-10, (
+            f"G''({x}, {omega_tau0}) = {G_double_prime} < 0"
+        )
 
     @given(
         x=x_any_valid,
@@ -167,9 +167,9 @@ class TestKernelProperties:
         G_prime, G_double_prime = Gp(x, omega_tau0)
 
         assert jnp.isfinite(G_prime), f"G'({x}, {omega_tau0}) = {G_prime} not finite"
-        assert jnp.isfinite(
-            G_double_prime
-        ), f"G''({x}, {omega_tau0}) = {G_double_prime} not finite"
+        assert jnp.isfinite(G_double_prime), (
+            f"G''({x}, {omega_tau0}) = {G_double_prime} not finite"
+        )
 
     @settings(deadline=None)
     @given(x=x_any_valid)
@@ -264,9 +264,9 @@ class TestPhysicalConstraints:
 
         # Check monotonic decrease (allow small numerical tolerance)
         for i in range(1, len(G_t)):
-            assert G_t[i] <= G_t[i - 1] * (
-                1 + 1e-6
-            ), f"G(t) not monotonically decreasing at index {i}: G[{i-1}]={G_t[i-1]}, G[{i}]={G_t[i]}"
+            assert G_t[i] <= G_t[i - 1] * (1 + 1e-6), (
+                f"G(t) not monotonically decreasing at index {i}: G[{i - 1}]={G_t[i - 1]}, G[{i}]={G_t[i]}"
+            )
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
     @settings(
@@ -306,9 +306,9 @@ class TestPhysicalConstraints:
 
         # Check monotonic increase
         for i in range(1, len(J_t)):
-            assert J_t[i] >= J_t[i - 1] * (
-                1 - 1e-6
-            ), f"J(t) not monotonically increasing at index {i}"
+            assert J_t[i] >= J_t[i - 1] * (1 - 1e-6), (
+                f"J(t) not monotonically increasing at index {i}"
+            )
 
     @given(x=x_power_law, G0_val=G0_param, tau0=tau0_param)
     @settings(
@@ -349,9 +349,9 @@ class TestPhysicalConstraints:
         # _predict_oscillation returns complex (N,), not (N,2)
         tan_delta = np.imag(G_star) / np.real(G_star)
 
-        assert np.all(
-            tan_delta > 0
-        ), f"tan(delta) contains non-positive values for x={x}"
+        assert np.all(tan_delta > 0), (
+            f"tan(delta) contains non-positive values for x={x}"
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -444,9 +444,9 @@ class TestNumericalStability:
         model._test_mode = "oscillation"
         G_star = model.predict(omega)
 
-        assert np.all(
-            np.isfinite(G_star)
-        ), f"Non-finite oscillation prediction for x={x}, G0={G0_val}, tau0={tau0}"
+        assert np.all(np.isfinite(G_star)), (
+            f"Non-finite oscillation prediction for x={x}, G0={G0_val}, tau0={tau0}"
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -485,9 +485,9 @@ class TestPowerLawScaling:
         # In the power-law regime, G' should increase with frequency
         # The exact exponent depends on the implementation details
         # Just verify it's positive and in a physically reasonable range
-        assert (
-            slope > -0.5
-        ), f"G' slope {slope} should be positive or near-zero for x={x}"
+        assert slope > -0.5, (
+            f"G' slope {slope} should be positive or near-zero for x={x}"
+        )
         assert slope < 3.0, f"G' slope {slope} unreasonably large for x={x}"
 
     @given(x=st.floats(min_value=1.2, max_value=1.8, allow_nan=False))
@@ -562,9 +562,9 @@ class TestGENERICThermodynamics:
         S_dot = model.compute_entropy_production(state)
 
         # At near-equilibrium, entropy production should be small
-        assert (
-            S_dot >= -1e-10
-        ), f"Entropy production {S_dot} < 0 at near-equilibrium for x={x}"
+        assert S_dot >= -1e-10, (
+            f"Entropy production {S_dot} < 0 at near-equilibrium for x={x}"
+        )
 
     @given(x=x_power_law)
     @settings(deadline=None, max_examples=30)

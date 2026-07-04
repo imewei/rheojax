@@ -16,7 +16,9 @@ from rheojax.gui.workspace.controller import WorkflowController
 class StepperCanvas(QWidget):
     step_clicked = Signal(int)
 
-    def __init__(self, controller: WorkflowController, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, controller: WorkflowController, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self._ctl = controller
         self._rail = QHBoxLayout()

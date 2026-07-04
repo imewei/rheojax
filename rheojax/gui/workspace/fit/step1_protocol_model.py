@@ -201,7 +201,9 @@ class ProtocolModelStep(QWidget):
         if not self._state.model_key:
             self._params.setText("")
             return
-        instance = ModelRegistry.create(self._state.model_key, **self._state.model_config)
+        instance = ModelRegistry.create(
+            self._state.model_key, **self._state.model_config
+        )
         self._params.setText(", ".join(instance.parameters.keys()))
 
     def is_ready(self) -> bool:

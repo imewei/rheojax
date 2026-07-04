@@ -836,9 +836,9 @@ class TestBellVariant:
         sigma_bell = model_bell.predict_flow_curve(gamma_dot)
 
         # Bell should give lower stress at high rates (enhanced thinning)
-        assert np.all(
-            sigma_bell < sigma_basic
-        ), f"Bell stress {sigma_bell} should be below constant {sigma_basic}"
+        assert np.all(sigma_bell < sigma_basic), (
+            f"Bell stress {sigma_bell} should be below constant {sigma_basic}"
+        )
 
     def test_bell_stress_overshoot(self):
         """Bell breakage should produce stress overshoot in startup flow.
@@ -1071,9 +1071,9 @@ class TestNonAffineVariant:
         sigma_gs = model_gs.predict_flow_curve(gamma_dot)
 
         # Should be very close (both reduce to UCM at xi=0)
-        assert np.allclose(
-            sigma_basic, sigma_gs, rtol=0.05
-        ), f"xi=0 should match basic: {sigma_basic} vs {sigma_gs}"
+        assert np.allclose(sigma_basic, sigma_gs, rtol=0.05), (
+            f"xi=0 should match basic: {sigma_basic} vs {sigma_gs}"
+        )
 
     def test_non_affine_all_protocols_run(self):
         """Verify non-affine variant can execute all 6 protocols."""

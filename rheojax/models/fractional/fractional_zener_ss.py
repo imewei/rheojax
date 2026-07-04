@@ -65,7 +65,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class FractionalZenerSolidSolid(BaseModel):
     """Fractional Zener Solid-Solid model.
 

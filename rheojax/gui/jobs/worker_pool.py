@@ -168,8 +168,7 @@ class WorkerPool(QObject):
         if not HAS_PYSIDE6:
             logger.error("PySide6 not available, cannot initialize WorkerPool")
             raise ImportError(
-                "PySide6 is required for WorkerPool. "
-                "Install with: pip install PySide6"
+                "PySide6 is required for WorkerPool. Install with: pip install PySide6"
             )
 
         super().__init__()

@@ -337,9 +337,7 @@ def _warn_stuck_parameters(
     return stuck
 
 
-def attach_y_data_to_result(
-    result: OptimizationResult, y_data: Any
-) -> None:
+def attach_y_data_to_result(result: OptimizationResult, y_data: Any) -> None:
     """Attach raw y_data and n_data to an OptimizationResult, if missing.
 
     Public helper for model fit methods that bypass ``create_least_squares_objective``
@@ -1687,8 +1685,7 @@ def nlsq_optimize(
                 objective, scipy_result.x, nlsq_bounds, max_iter
             )
             de_result.message = (
-                f"[DE fallback] {de_result.message} "
-                f"(SciPy TRF: {scipy_result.message})"
+                f"[DE fallback] {de_result.message} (SciPy TRF: {scipy_result.message})"
             )
             return de_result
         return scipy_result
@@ -2893,10 +2890,14 @@ def create_least_squares_objective(
                     # G' and G'' are physically positive; normalize is implicit
                     resid_real = jnp.log10(
                         jnp.maximum(jnp.abs(y_pred[:, 0]), _data_floor)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor))
+                    ) - jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor)
+                    )
                     resid_imag = jnp.log10(
                         jnp.maximum(jnp.abs(y_pred[:, 1]), _data_floor)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor))
+                    ) - jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor)
+                    )
                 else:
                     resid_real = y_pred[:, 0] - jnp.real(y_data_jax)
                     resid_imag = y_pred[:, 1] - jnp.imag(y_data_jax)
@@ -2918,10 +2919,14 @@ def create_least_squares_objective(
                         # G' and G'' are physically positive; normalize is implicit
                         resid_col0 = jnp.log10(
                             jnp.maximum(jnp.abs(y_pred[:, 0]), _data_floor)
-                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 0]), _data_floor))
+                        ) - jnp.log10(
+                            jnp.maximum(jnp.abs(y_data_jax[:, 0]), _data_floor)
+                        )
                         resid_col1 = jnp.log10(
                             jnp.maximum(jnp.abs(y_pred[:, 1]), _data_floor)
-                        ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax[:, 1]), _data_floor))
+                        ) - jnp.log10(
+                            jnp.maximum(jnp.abs(y_data_jax[:, 1]), _data_floor)
+                        )
                     else:
                         resid_col0 = y_pred[:, 0] - y_data_jax[:, 0]
                         resid_col1 = y_pred[:, 1] - y_data_jax[:, 1]
@@ -2957,10 +2962,14 @@ def create_least_squares_objective(
                     # Use magnitudes to avoid log of negative numbers
                     resid_real = jnp.log10(
                         jnp.maximum(jnp.abs(jnp.real(y_pred)), _data_floor)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor))
+                    ) - jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.real(y_data_jax)), _data_floor)
+                    )
                     resid_imag = jnp.log10(
                         jnp.maximum(jnp.abs(jnp.imag(y_pred)), _data_floor)
-                    ) - jnp.log10(jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor))
+                    ) - jnp.log10(
+                        jnp.maximum(jnp.abs(jnp.imag(y_data_jax)), _data_floor)
+                    )
                     # Note: normalize has no effect in log space (already relative)
                 else:
                     # Linear residuals (default)
@@ -2995,9 +3004,9 @@ def create_least_squares_objective(
 
                 if use_log_residuals:
                     # Log-space residuals
-                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), _data_floor)) - jnp.log10(
-                        jnp.maximum(y_data_magnitude, _data_floor)
-                    )
+                    _resid = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred), _data_floor)
+                    ) - jnp.log10(jnp.maximum(y_data_magnitude, _data_floor))
                 else:
                     _resid = y_pred - y_data_magnitude
                     if normalize:
@@ -3009,9 +3018,9 @@ def create_least_squares_objective(
                 if use_log_residuals:
                     # Log-space residuals for rheological data
                     # Handle both positive and negative values by using absolute value
-                    _resid = jnp.log10(jnp.maximum(jnp.abs(y_pred), _data_floor)) - jnp.log10(
-                        jnp.maximum(jnp.abs(y_data_jax), _data_floor)
-                    )
+                    _resid = jnp.log10(
+                        jnp.maximum(jnp.abs(y_pred), _data_floor)
+                    ) - jnp.log10(jnp.maximum(jnp.abs(y_data_jax), _data_floor))
                 else:
                     _resid = y_pred - y_data_jax
                     if normalize:

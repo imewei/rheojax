@@ -194,15 +194,15 @@ class TestSGRConventionalPredictions:
         log_omega_low = np.log10(omega_low[5:-5])
         slope_gp = np.polyfit(log_omega_low, np.log10(np.real(G_star_low[5:-5])), 1)[0]
         # G' slope should be in (0, 2) in this low-frequency regime
-        assert (
-            0 < slope_gp < 2
-        ), f"G' low-freq slope {slope_gp} out of expected range (0, 2)"
+        assert 0 < slope_gp < 2, (
+            f"G' low-freq slope {slope_gp} out of expected range (0, 2)"
+        )
 
         # G'/G'' ratio should be physically plausible at the G'' peak frequency
         ratio_at_peak = np.real(G_star[gpp_max_idx]) / np.imag(G_star[gpp_max_idx])
-        assert (
-            0.1 < ratio_at_peak < 50.0
-        ), f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
+        assert 0.1 < ratio_at_peak < 50.0, (
+            f"G'/G'' ratio at peak {ratio_at_peak} unreasonable"
+        )
 
     def test_relaxation_mode_power_law_decay(self):
         """Test G(t) shows power-law decay t^(1-x) at long times."""
@@ -298,7 +298,9 @@ class TestSGRConventionalPredictions:
             model.parameters.set_value("G0", 1.0)
             model.parameters.set_value("tau0", tau0)
             model._test_mode = "startup"
-            model._startup_gamma_dot = 1.0  # eta_plus is the LVE envelope (gamma_dot-independent)
+            model._startup_gamma_dot = (
+                1.0  # eta_plus is the LVE envelope (gamma_dot-independent)
+            )
             eta_plus = np.asarray(model.predict(t))
 
             slope = np.polyfit(np.log(t), np.log(eta_plus), 1)[0]
@@ -382,8 +384,7 @@ class TestSGRConventionalPredictions:
             expected = float(power_law_exponent(x_val))  # = x - 1
             assert expected == pytest.approx(x_val - 1.0, abs=1e-9)
             assert slope == pytest.approx(expected, abs=0.02), (
-                f"creep log-log slope {slope:.3f} != x-1 ({expected:.3f}) "
-                f"at x={x_val}"
+                f"creep log-log slope {slope:.3f} != x-1 ({expected:.3f}) at x={x_val}"
             )
 
     def test_steady_shear_flow_curve(self):
@@ -412,9 +413,9 @@ class TestSGRConventionalPredictions:
         assert np.all(eta > 0)
 
         # Check shear-thinning: eta decreases with gamma_dot
-        assert (
-            eta[0] > eta[-1]
-        ), "Viscosity should decrease with shear rate (shear-thinning)"
+        assert eta[0] > eta[-1], (
+            "Viscosity should decrease with shear rate (shear-thinning)"
+        )
 
         # Check power-law scaling: eta ~ gamma_dot^(x-2) = gamma_dot^(-0.5)
         mid_idx = slice(15, 35)
@@ -444,9 +445,9 @@ class TestSGRConventionalPredictions:
         # In glass phase at high frequencies, G' should dominate (approaches plateau)
         # while G'' decreases. Check high-frequency end.
         high_freq_idx = -5  # Near end of range
-        assert np.real(G_star[high_freq_idx]) > np.imag(
-            G_star[high_freq_idx]
-        ), "Glass phase should show G' > G'' at high frequencies"
+        assert np.real(G_star[high_freq_idx]) > np.imag(G_star[high_freq_idx]), (
+            "Glass phase should show G' > G'' at high frequencies"
+        )
 
         # Also check that phase regime detection works
         phase = model.get_phase_regime()
@@ -469,9 +470,9 @@ class TestSGRConventionalPredictions:
         # In Newtonian regime at low frequencies, G'' should dominate (viscous behavior)
         # and G' ~ omega^2, G'' ~ omega (different from power-law regime)
         low_freq_idx = slice(0, 10)
-        assert np.all(
-            np.imag(G_star[low_freq_idx]) > np.real(G_star[low_freq_idx])
-        ), "Newtonian phase should show G'' > G' at low frequencies"
+        assert np.all(np.imag(G_star[low_freq_idx]) > np.real(G_star[low_freq_idx])), (
+            "Newtonian phase should show G'' > G' at low frequencies"
+        )
 
         # Check phase regime detection
         phase = model.get_phase_regime()
@@ -524,9 +525,9 @@ class TestSGRConventionalPredictions:
         model._test_mode = "oscillation"
         omega_array = np.logspace(-2, 2, 20)
         G_star_array = model.predict(omega_array)
-        assert G_star_array.shape == (
-            20,
-        ), "Oscillation array output should be complex (M,)"
+        assert G_star_array.shape == (20,), (
+            "Oscillation array output should be complex (M,)"
+        )
 
         # Test relaxation mode with array
         model._test_mode = "relaxation"
@@ -641,9 +642,9 @@ class TestSGRConventionalDynamicX:
 
             # Check convergence to x_ss (within 10%)
             final_x = x_t[-1]
-            assert (
-                abs(final_x - x_ss) / x_ss < 0.15
-            ), f"x should converge to x_ss={x_ss:.3f}, got {final_x:.3f} at gamma_dot={gamma_dot_val}"
+            assert abs(final_x - x_ss) / x_ss < 0.15, (
+                f"x should converge to x_ss={x_ss:.3f}, got {final_x:.3f} at gamma_dot={gamma_dot_val}"
+            )
 
     def test_static_x_mode_constant_parameter(self):
         """Test static x mode: x is constant fitted parameter, no dynamics."""
@@ -667,9 +668,9 @@ class TestSGRConventionalDynamicX:
         assert x_current == x_value, "x should remain constant in static mode"
 
         # Verify no evolve_x method is called (or it doesn't exist in static mode)
-        assert (
-            not hasattr(model, "_x_trajectory") or model._x_trajectory is None
-        ), "Static mode should not store x trajectory"
+        assert not hasattr(model, "_x_trajectory") or model._x_trajectory is None, (
+            "Static mode should not store x trajectory"
+        )
 
     def test_ode_integration_stability_long_times(self):
         """Test ODE integration remains stable over long simulation times."""
@@ -784,9 +785,9 @@ class TestSGRConventionalDynamicX:
 
         # Since x changes, viscosity should change
         # The key test is that we CAN compute different viscosities with different x
-        assert (
-            eta_initial != eta_final
-        ), "Viscosity should change when x changes (coupling verified)"
+        assert eta_initial != eta_final, (
+            "Viscosity should change when x changes (coupling verified)"
+        )
 
         # Also test that we can predict at intermediate points
         eta_mid = model._predict_steady_shear_jit(
@@ -827,12 +828,12 @@ class TestSGRConventionalLAOS:
         )
 
         # Check outputs are arrays with correct shape
-        assert len(strain) == len(
-            stress
-        ), "Strain and stress arrays should have same length"
-        assert (
-            len(strain) == 2 * 256
-        ), "Should have n_cycles * n_points_per_cycle points"
+        assert len(strain) == len(stress), (
+            "Strain and stress arrays should have same length"
+        )
+        assert len(strain) == 2 * 256, (
+            "Should have n_cycles * n_points_per_cycle points"
+        )
 
         # Check strain oscillates between -gamma_0 and +gamma_0
         assert np.max(strain) <= gamma_0 * 1.01, "Strain max should be near gamma_0"
@@ -844,9 +845,9 @@ class TestSGRConventionalLAOS:
 
         # Check that the Lissajous curve forms a closed loop (approximately)
         # The end should be close to the start after full cycles
-        assert (
-            np.abs(strain[-1] - strain[0]) < gamma_0 * 0.1
-        ), "Strain loop should close"
+        assert np.abs(strain[-1] - strain[0]) < gamma_0 * 0.1, (
+            "Strain loop should close"
+        )
 
     def test_ellipse_shape_linear_regime(self):
         """Test ellipse shape for linear regime (small amplitude)."""
@@ -894,9 +895,9 @@ class TestSGRConventionalLAOS:
         if third_harmonic_idx < len(power_spectrum) // 2:
             third_harmonic_power = power_spectrum[third_harmonic_idx]
             # Third harmonic should be negligible (< 1% of fundamental) in linear regime
-            assert (
-                third_harmonic_power < 0.01 * fundamental_power
-            ), f"Third harmonic too strong for linear regime: {third_harmonic_power/fundamental_power:.4f}"
+            assert third_harmonic_power < 0.01 * fundamental_power, (
+                f"Third harmonic too strong for linear regime: {third_harmonic_power / fundamental_power:.4f}"
+            )
 
     def test_distorted_curves_nonlinear_regime(self):
         """Test distorted curves for nonlinear regime (large amplitude)."""
@@ -1057,9 +1058,9 @@ class TestSGRConventionalLAOS:
         I3_I1_values = np.array(I3_I1_values)
 
         # In linear regime (small gamma), I_3/I_1 should be very small
-        assert (
-            I3_I1_values[0] < 0.05
-        ), f"I_3/I_1 should be small in linear regime, got {I3_I1_values[0]:.4f}"
+        assert I3_I1_values[0] < 0.05, (
+            f"I_3/I_1 should be small in linear regime, got {I3_I1_values[0]:.4f}"
+        )
 
         # Check that all values are non-negative
         assert np.all(I3_I1_values >= 0), "I_3/I_1 should be non-negative"

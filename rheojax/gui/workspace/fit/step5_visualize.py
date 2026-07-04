@@ -125,7 +125,9 @@ class VisualizeStep(QWidget):
         y, y_fit = result.get("y"), result.get("y_fit")
         if y is None or y_fit is None:
             return
-        self._residuals.plot_residuals(np.asarray(y), np.asarray(y_fit), result.get("x"))
+        self._residuals.plot_residuals(
+            np.asarray(y), np.asarray(y_fit), result.get("x")
+        )
 
     def _add_diagnostics_tab(self) -> None:
         page = QWidget(self)

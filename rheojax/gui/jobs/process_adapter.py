@@ -578,7 +578,6 @@ def make_fit_worker(
 
     x_data, y_data, y2_data, test_mode, metadata = _extract_data(data)
 
-
     work_fn = partial(
         _fit_work_entry,
         model_name=model_name,

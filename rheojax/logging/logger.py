@@ -123,11 +123,7 @@ def get_logger(name: str, **context) -> RheoJAXLogger:
     try:
         cache_key = (
             name,
-            tuple(
-                sorted(
-                    (k, type(v).__name__, str(v)) for k, v in context.items()
-                )
-            ),
+            tuple(sorted((k, type(v).__name__, str(v)) for k, v in context.items())),
         )
     except Exception:
         # Unhashable context values — skip caching

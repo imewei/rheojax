@@ -408,7 +408,9 @@ def generate_synthetic_creep(
 
     if return_strain:
         if noise_level > 0:
-            strain = strain_clean * np.exp(rng.normal(0.0, noise_level, size=strain_clean.shape))
+            strain = strain_clean * np.exp(
+                rng.normal(0.0, noise_level, size=strain_clean.shape)
+            )
         else:
             strain = strain_clean
         return time, strain, sigma_applied
@@ -478,7 +480,8 @@ def generate_synthetic_saos(
     else:
         # Multi-mode MLIKH — use G_i, eta_i (if exists), else G_i and mu_p
         mode_indices = sorted(
-            int(k.split("_")[1]) for k in param_keys
+            int(k.split("_")[1])
+            for k in param_keys
             if k.startswith("G_") and k.split("_", 1)[1].isdigit()
         )
         if not mode_indices:
@@ -492,8 +495,7 @@ def generate_synthetic_saos(
         # calibrations — outside the SAOS measurement window — whereas
         # tau_thix_i is seconds, giving a meaningful Maxwell-like spectrum.
         tau_modes = [
-            float(model.parameters.get_value(f"tau_thix_{i}"))
-            for i in mode_indices
+            float(model.parameters.get_value(f"tau_thix_{i}")) for i in mode_indices
         ]
 
     # Sum of parallel Maxwell modes

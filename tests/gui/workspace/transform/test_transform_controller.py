@@ -191,8 +191,15 @@ def test_infer_output_protocol_returns_empty_string_not_none_for_domain_changing
     lib = DatasetLibrary()
     lib.add(
         DatasetRef(
-            id="rel1", name="rel1", protocol_type="relaxation", origin="imported",
-            units={}, row_count=3, hash="h", provenance={}, lineage=[],
+            id="rel1",
+            name="rel1",
+            protocol_type="relaxation",
+            origin="imported",
+            units={},
+            row_count=3,
+            hash="h",
+            provenance={},
+            lineage=[],
         )
     )
     ptype = infer_output_protocol(lib, "fft_analysis", {"input": "rel1"})
@@ -204,8 +211,15 @@ def test_infer_output_protocol_same_domain_still_resolves_real_type():
     lib = DatasetLibrary()
     lib.add(
         DatasetRef(
-            id="osc1", name="osc1", protocol_type="oscillation", origin="imported",
-            units={}, row_count=3, hash="h", provenance={}, lineage=[],
+            id="osc1",
+            name="osc1",
+            protocol_type="oscillation",
+            origin="imported",
+            units={},
+            row_count=3,
+            hash="h",
+            provenance={},
+            lineage=[],
         )
     )
     ptype = infer_output_protocol(lib, "smooth_derivative", {"input": "osc1"})

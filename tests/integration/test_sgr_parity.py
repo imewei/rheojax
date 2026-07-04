@@ -101,9 +101,9 @@ class TestShearBandingParity:
         )
 
         # Should agree on detection
-        assert (
-            is_banding_conv == is_banding_gen
-        ), f"Banding detection mismatch: conv={is_banding_conv}, gen={is_banding_gen}"
+        assert is_banding_conv == is_banding_gen, (
+            f"Banding detection mismatch: conv={is_banding_conv}, gen={is_banding_gen}"
+        )
 
         if is_banding_conv and is_banding_gen:
             # Check banding region agreement (5% tolerance)

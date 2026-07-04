@@ -81,17 +81,17 @@ class TestV032PerformanceIntegration:
 
         # Pipeline should complete in reasonable time
         # (relaxed threshold to account for machine variability and CI environment)
-        assert (
-            elapsed_total < 5.0
-        ), f"Pipeline took {elapsed_total:.3f}s, exceeds threshold"
+        assert elapsed_total < 5.0, (
+            f"Pipeline took {elapsed_total:.3f}s, exceeds threshold"
+        )
 
         # Verify fit quality (relaxed threshold for integration test)
         rmse = np.sqrt(np.mean((G_pred - G_true) ** 2))
         relative_rmse = rmse / np.mean(np.abs(G_true))
         # Allow up to 10% relative RMSE for integration test
-        assert (
-            relative_rmse < 0.1
-        ), f"Poor fit quality: relative RMSE={relative_rmse:.6f}"
+        assert relative_rmse < 0.1, (
+            f"Poor fit quality: relative RMSE={relative_rmse:.6f}"
+        )
 
         print(f"\nEnd-to-end pipeline: {elapsed_total:.3f}s")
         print(f"RMSE: {rmse:.3e}")
@@ -221,9 +221,9 @@ class TestV032PerformanceIntegration:
 
             # Should complete reasonably fast (< 5s for 4 datasets)
             max_elapsed = 5.0 if not fast_perf_mode else 2.0
-            assert (
-                elapsed < max_elapsed
-            ), f"Mastercurve took {elapsed:.3f}s, exceeds threshold"
+            assert elapsed < max_elapsed, (
+                f"Mastercurve took {elapsed:.3f}s, exceeds threshold"
+            )
 
             print(f"\nMastercurve multi-dataset: {elapsed:.3f}s")
             print(f"Shift factors: {shift_factors}")
@@ -271,9 +271,9 @@ class TestV032PerformanceIntegration:
         # Sequential processing should stay bounded even in fast mode
         # Higher threshold to account for parallel test execution (xdist)
         max_total = 15.0 if not fast_perf_mode else 8.0
-        assert (
-            total_time < max_total
-        ), f"Batch processing took {total_time:.3f}s, exceeds threshold"
+        assert total_time < max_total, (
+            f"Batch processing took {total_time:.3f}s, exceeds threshold"
+        )
 
         print(f"\nBatch processing {n_files} files: {total_time:.3f}s")
         print(f"Per-file average: {total_time / n_files:.3f}s")
@@ -321,9 +321,9 @@ class TestV032PerformanceIntegration:
         # Average fit + predict should be reasonably fast
         # Higher threshold to account for parallel test execution (xdist)
         max_avg = 6.0 if not fast_perf_mode else 4.0
-        assert (
-            avg_time < max_avg
-        ), f"Average iteration took {avg_time:.3f}s, exceeds threshold"
+        assert avg_time < max_avg, (
+            f"Average iteration took {avg_time:.3f}s, exceeds threshold"
+        )
 
         print(
             f"\nDevice efficiency (3 iterations): {elapsed_total:.3f}s avg: {avg_time:.3f}s"

@@ -84,12 +84,12 @@ def test_closure_captures_test_mode_not_global_state():
     eta_posterior = result.posterior_samples["eta"].mean()
 
     # For oscillation data, should recover true parameters within ~20%
-    assert (
-        abs(G0_posterior - G0_true) / G0_true < 0.2
-    ), f"G0 posterior {G0_posterior} too far from true {G0_true}"
-    assert (
-        abs(eta_posterior - eta_true) / eta_true < 0.2
-    ), f"eta posterior {eta_posterior} too far from true {eta_true}"
+    assert abs(G0_posterior - G0_true) / G0_true < 0.2, (
+        f"G0 posterior {G0_posterior} too far from true {G0_true}"
+    )
+    assert abs(eta_posterior - eta_true) / eta_true < 0.2, (
+        f"eta posterior {eta_posterior} too far from true {eta_true}"
+    )
 
 
 @pytest.mark.unit

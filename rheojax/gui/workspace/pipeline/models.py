@@ -5,6 +5,7 @@ holds a RAW result dict while a run is active/in-memory; PipelineBatchRunner._pr
 (batch_runner.py) is what converts it into a JobResultRef (foundation/state.py) for persistence
 into AppState.job_history -- see design spec §3.2.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

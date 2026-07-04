@@ -60,7 +60,6 @@ def reduce_set_workflow_mode(
     return updater
 
 
-
 def reduce_set_tab(
     action: dict[str, Any],
 ) -> Callable[[AppState], AppState]:

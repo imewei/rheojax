@@ -79,7 +79,8 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.FLOW_CURVE,
         Protocol.CREEP,
         Protocol.STARTUP,
-    ])
+    ],
+)
 class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     """Nonlocal (1D) Fluidity-Saramito Model with spatial diffusion.
 
@@ -130,6 +131,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         coupling: Literal["minimal", "full"] = "minimal",
@@ -439,8 +441,10 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
                 resids = np.asarray(objective(result.x))
                 y_arr = np.asarray(strain_jax)
                 ss_res = float(np.sum(resids**2))
-                ss_tot = float(np.sum((y_arr - np.mean(y_arr))**2))
-                self._last_fit_r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+                ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
+                self._last_fit_r_squared = (
+                    float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+                )
             except Exception:
                 pass
         if not result.success:

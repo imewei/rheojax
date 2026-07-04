@@ -101,8 +101,14 @@ def _run_on_thread(fn):
 def _make_fit_fn(library, fit_state):
     """Build the real fit_fn NlsqStep.run() calls."""
 
-    def _fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
-                multi_start=None):
+    def _fit_fn(
+        model_key,
+        model_config,
+        data_ref,
+        column_map,
+        initial_params=None,
+        multi_start=None,
+    ):
         rheo_data = library.load_payload(data_ref)
         # ponytail: Step 1's protocol combo uses the same vocabulary as
         # Protocol.value ("flow_curve"/"creep"/"relaxation"/"startup"/
@@ -127,7 +133,10 @@ def _make_fit_fn(library, fit_state):
                     name: (
                         cfg
                         if cfg.get("fixed") is True
-                        else {**cfg, "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2))}
+                        else {
+                            **cfg,
+                            "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2)),
+                        }
                     )
                     for name, cfg in initial_params.items()
                 }
@@ -214,8 +223,8 @@ def build_fit_controller(app_state: AppState):
         lambda b=bodies[1]: b.is_ready() and not b.validation_errors(),
         lambda b=bodies[2]: b.is_ready(),
         lambda b=bodies[3]: b.is_ready(),  # True if skipped, per NutsStep.is_ready()
-        lambda: True,   # Visualize is read-only
-        lambda: True,   # Export just saves/writes
+        lambda: True,  # Visualize is read-only
+        lambda: True,  # Export just saves/writes
     ]
     steps = [
         Step(
@@ -248,7 +257,9 @@ def build_fit_controller(app_state: AppState):
         # {} via invalidation.py's _CLEAR, silently discarding it before any
         # real NLSQ/NUTS run ever saw it).
         if hasattr(body, "config_edited"):
-            body.config_edited.connect(lambda idx=i: _cascade_and_relock(idx, "model_config"))
+            body.config_edited.connect(
+                lambda idx=i: _cascade_and_relock(idx, "model_config")
+            )
 
     # Wire Protocol/Model edits -> Data step refresh, so the contract/combo
     # rebuild after Step 1 completes (connected after the _cascade_and_relock
@@ -267,9 +278,13 @@ def build_fit_controller(app_state: AppState):
     # (e.g. n_modes) can also change the model's parameter set, so
     # config_edited needs the same reseed.
     nlsq_body = bodies[2]
-    if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "load_parameters_from_model"):
+    if hasattr(protocol_body, "edited") and hasattr(
+        nlsq_body, "load_parameters_from_model"
+    ):
         protocol_body.edited.connect(nlsq_body.load_parameters_from_model)
-    if hasattr(protocol_body, "config_edited") and hasattr(nlsq_body, "load_parameters_from_model"):
+    if hasattr(protocol_body, "config_edited") and hasattr(
+        nlsq_body, "load_parameters_from_model"
+    ):
         protocol_body.config_edited.connect(nlsq_body.load_parameters_from_model)
 
     # Wire every upstream edit that invalidates nlsq_result (protocol/model,
@@ -278,7 +293,9 @@ def build_fit_controller(app_state: AppState):
     # a fit that state.nlsq_result no longer reflects.
     if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "refresh_display"):
         protocol_body.edited.connect(nlsq_body.refresh_display)
-    if hasattr(protocol_body, "config_edited") and hasattr(nlsq_body, "refresh_display"):
+    if hasattr(protocol_body, "config_edited") and hasattr(
+        nlsq_body, "refresh_display"
+    ):
         protocol_body.config_edited.connect(nlsq_body.refresh_display)
     if hasattr(data_body, "edited") and hasattr(nlsq_body, "refresh_display"):
         data_body.edited.connect(nlsq_body.refresh_display)

@@ -402,9 +402,7 @@ class DiagnosticsPage(QWidget):
         # Render guard: skip if we already have this exact result displayed.
         # Includes the result's own timestamp so a re-run against the same
         # model/dataset (different priors/settings, same key) still renders.
-        _result_key = (
-            f"{model_name}_{resolved_dataset_id}_{getattr(bayesian_result, 'timestamp', None)}"
-        )
+        _result_key = f"{model_name}_{resolved_dataset_id}_{getattr(bayesian_result, 'timestamp', None)}"
         if _result_key == self._last_result_key:
             logger.debug(
                 "Skipping redundant re-render",

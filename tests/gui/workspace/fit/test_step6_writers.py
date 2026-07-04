@@ -17,9 +17,16 @@ class _RheoData:
 
 def test_export_bundle_writes_expected_files(qtbot, tmp_path, monkeypatch):
     st = FitState(
-        model_key="power_law", protocol="flow_curve", data_ref="d1",
-        nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9,
-                     "x": [1.0, 2.0], "y": [1.0, 2.0], "y_fit": [1.1, 1.9]},
+        model_key="power_law",
+        protocol="flow_curve",
+        data_ref="d1",
+        nlsq_result={
+            "params": {"a": 1.0},
+            "r_squared": 0.9,
+            "x": [1.0, 2.0],
+            "y": [1.0, 2.0],
+            "y_fit": [1.1, 1.9],
+        },
     )
     lib = DatasetLibrary()
     step = ExportStep(st, lib)
@@ -36,9 +43,16 @@ def test_export_bundle_includes_posterior_when_nuts_ran(qtbot, tmp_path):
     import numpy as np
 
     st = FitState(
-        model_key="power_law", protocol="flow_curve", data_ref="d1",
-        nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9,
-                     "x": [1.0, 2.0], "y": [1.0, 2.0], "y_fit": [1.1, 1.9]},
+        model_key="power_law",
+        protocol="flow_curve",
+        data_ref="d1",
+        nlsq_result={
+            "params": {"a": 1.0},
+            "r_squared": 0.9,
+            "x": [1.0, 2.0],
+            "y": [1.0, 2.0],
+            "y_fit": [1.1, 1.9],
+        },
         nuts_result={
             "posterior_samples": {"a": list(np.random.default_rng(0).normal(size=400))},
             "sample_stats": {"diverging": [False] * 400},
@@ -65,9 +79,16 @@ def test_export_bundle_includes_posterior_when_nuts_ran(qtbot, tmp_path):
 
 def test_bundle_manifest_and_export_bundle_no_diagnostics_without_nuts(qtbot, tmp_path):
     st = FitState(
-        model_key="power_law", protocol="flow_curve", data_ref="d1",
-        nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9,
-                     "x": [1.0, 2.0], "y": [1.0, 2.0], "y_fit": [1.1, 1.9]},
+        model_key="power_law",
+        protocol="flow_curve",
+        data_ref="d1",
+        nlsq_result={
+            "params": {"a": 1.0},
+            "r_squared": 0.9,
+            "x": [1.0, 2.0],
+            "y": [1.0, 2.0],
+            "y_fit": [1.1, 1.9],
+        },
     )
     lib = DatasetLibrary()
     step = ExportStep(st, lib)

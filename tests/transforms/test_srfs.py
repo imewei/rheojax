@@ -56,14 +56,14 @@ class TestSRFSShiftFactor:
 
             # At reference gamma_dot, shift should be 1.0
             if abs(gamma_dot - srfs.reference_gamma_dot) < 1e-10:
-                assert (
-                    abs(a_gamma_dot - 1.0) < 1e-6
-                ), f"Shift at reference should be 1.0, got {a_gamma_dot}"
+                assert abs(a_gamma_dot - 1.0) < 1e-6, (
+                    f"Shift at reference should be 1.0, got {a_gamma_dot}"
+                )
 
             # Shift factor should be positive
-            assert (
-                a_gamma_dot > 0
-            ), f"Shift factor should be positive, got {a_gamma_dot}"
+            assert a_gamma_dot > 0, (
+                f"Shift factor should be positive, got {a_gamma_dot}"
+            )
 
         # Check power-law scaling: a ~ gamma_dot^m where m depends on x
         # For x = 1.5, exponent m = 2 - x = 0.5
@@ -203,9 +203,9 @@ class TestThixotropyKinetics:
 
         # Check convergence to steady state
         lambda_ss = k_build / (k_build + k_break * gamma_dot[-1])
-        assert (
-            abs(lambda_t[-1] - lambda_ss) < 0.1
-        ), f"Lambda should converge to steady state {lambda_ss:.3f}, got {lambda_t[-1]:.3f}"
+        assert abs(lambda_t[-1] - lambda_ss) < 0.1, (
+            f"Lambda should converge to steady state {lambda_ss:.3f}, got {lambda_t[-1]:.3f}"
+        )
 
     def test_thixotropy_step_up_stress_overshoot(self):
         """Test thixotropy step-up protocol produces stress overshoot."""
@@ -266,9 +266,9 @@ class TestThixotropyKinetics:
         # then structure breaks down, reducing stress
         # So we expect overshoot behavior
         # Note: exact behavior depends on parameters; test for reasonableness
-        assert (
-            max_stress_after >= final_stress * 0.9
-        ), "Stress after step-up should not drop too far below peak"
+        assert max_stress_after >= final_stress * 0.9, (
+            "Stress after step-up should not drop too far below peak"
+        )
 
     def test_thixotropy_step_down_stress_undershoot(self):
         """Test thixotropy step-down protocol produces stress undershoot."""
@@ -329,9 +329,9 @@ class TestThixotropyKinetics:
         final_stress = sigma[-1]
 
         # Final stress should be higher than initial minimum (structure rebuilds)
-        assert (
-            final_stress >= min_stress_initial * 0.5
-        ), "Stress should recover as structure rebuilds after step-down"
+        assert final_stress >= min_stress_initial * 0.5, (
+            "Stress should recover as structure rebuilds after step-down"
+        )
 
 
 class TestShearBanding:
@@ -423,17 +423,17 @@ class TestShearBanding:
             # Lever rule: fractions should sum to 1
             f_low = coexistence["fraction_low"]
             f_high = coexistence["fraction_high"]
-            assert (
-                abs(f_low + f_high - 1.0) < 1e-6
-            ), f"Band fractions should sum to 1, got {f_low + f_high}"
+            assert abs(f_low + f_high - 1.0) < 1e-6, (
+                f"Band fractions should sum to 1, got {f_low + f_high}"
+            )
 
             # Average shear rate should equal applied shear rate
             gamma_low = coexistence["gamma_dot_low"]
             gamma_high = coexistence["gamma_dot_high"]
             gamma_avg = f_low * gamma_low + f_high * gamma_high
-            assert (
-                abs(gamma_avg - gamma_dot_applied) < 0.5
-            ), f"Average shear rate {gamma_avg} should equal applied {gamma_dot_applied}"
+            assert abs(gamma_avg - gamma_dot_applied) < 0.5, (
+                f"Average shear rate {gamma_avg} should equal applied {gamma_dot_applied}"
+            )
 
 
 class TestSRFSMastercurveIntegration:

@@ -87,7 +87,8 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_multi_species",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
+)
 class TNTMultiSpecies(TNTBase):
     """Multi-species Transient Network Theory model.
 
@@ -129,6 +130,7 @@ class TNTMultiSpecies(TNTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, n_species: int = 2):
         """Initialize multi-species TNT model.
 

@@ -443,7 +443,6 @@ class TestRegistryDiscovery:
             patch("os.listdir", return_value=["custom_model.py"]),
             patch("importlib.import_module") as mock_import,
         ):
-
             # Setup mock module
             mock_module = Mock()
             mock_module.CustomModel = type(
@@ -653,4 +652,3 @@ class TestRegistryCompatibility:
         # Should get the newer version
         model = registry.get("model", plugin_type=PluginType.MODEL)
         assert model is ModelV2
-

@@ -166,12 +166,12 @@ def test_jaxopt_power_law_fitting_accuracy():
     assert r_squared > 0.99, f"Power-law fit quality too low: R²={r_squared:.3f}"
 
     # Verify recovered parameters are close to true values (within 10%)
-    assert (
-        abs(a - a_true) / a_true < 0.1
-    ), f"Parameter 'a' far from true: {a} vs {a_true}"
-    assert (
-        abs(b - b_true) / abs(b_true) < 0.1
-    ), f"Parameter 'b' far from true: {b} vs {b_true}"
+    assert abs(a - a_true) / a_true < 0.1, (
+        f"Parameter 'a' far from true: {a} vs {a_true}"
+    )
+    assert abs(b - b_true) / abs(b_true) < 0.1, (
+        f"Parameter 'b' far from true: {b} vs {b_true}"
+    )
 
     # Verify parameter uncertainties are reasonable
     assert np.all(np.isfinite(perr)), "Parameter uncertainties contain NaN/Inf"
@@ -231,9 +231,9 @@ def test_multi_dataset_speedup_benchmark():
     print(f"    Per-iteration times: {[f'{t:.4f}s' for t in fit_times]}")
 
     # Verify reasonable performance (relaxed for CI/CD + parallel test load)
-    assert (
-        avg_time < 60.0
-    ), f"Transform too slow: {avg_time:.4f}s (target <60.0s for 4 datasets)"
+    assert avg_time < 60.0, (
+        f"Transform too slow: {avg_time:.4f}s (target <60.0s for 4 datasets)"
+    )
 
     # Verify consistency across iterations (variance should be <20%)
     variance = std_time / avg_time if avg_time > 0 else 0

@@ -4,52 +4,71 @@ from rheojax.gui.workspace.controller import Step, WorkflowController
 
 
 def _ctl(ready):
-    steps = [Step(id=str(i), title=str(i),
-                  is_ready=(lambda i=i: ready[i]), validate=(lambda: True))
-             for i in range(4)]
+    steps = [
+        Step(
+            id=str(i),
+            title=str(i),
+            is_ready=(lambda i=i: ready[i]),
+            validate=(lambda: True),
+        )
+        for i in range(4)
+    ]
     return WorkflowController(steps)
+
 
 def test_advance_gated_by_ready():
     # is_ready() means "this step's output is complete"; can_advance() checks CURRENT step
     ready = [False, False, False, False]
     c = _ctl(ready)
-    assert c.current == 0 and c.can_advance() is False   # step 0 not done yet
+    assert c.current == 0 and c.can_advance() is False  # step 0 not done yet
     ready[0] = True
-    assert c.can_advance() is True                        # step 0 done → can advance
-    c.advance(); assert c.current == 1 and 1 in c.reached
+    assert c.can_advance() is True  # step 0 done → can advance
+    c.advance()
+    assert c.current == 1 and 1 in c.reached
+
 
 def test_goto_only_reached():
     ready = [True, True, True, True]
     c = _ctl(ready)
-    c.advance(); c.advance()                 # reached 0,1,2
+    c.advance()
+    c.advance()  # reached 0,1,2
     assert c.goto(1) is True and c.current == 1
-    assert c.goto(3) is False                # 3 not reached yet
+    assert c.goto(3) is False  # 3 not reached yet
+
 
 def test_edit_relocks_downstream():
     ready = [True, True, True, True]
     c = _ctl(ready)
-    c.advance(); c.advance(); c.advance()     # reached {0,1,2,3}
-    c.on_edit(1)                              # editing step 1
-    assert c.reached == {0, 1}               # 2,3 re-locked
+    c.advance()
+    c.advance()
+    c.advance()  # reached {0,1,2,3}
+    c.on_edit(1)  # editing step 1
+    assert c.reached == {0, 1}  # 2,3 re-locked
+
 
 def test_can_advance_blocked_by_validate():
     # is_ready() true but validate() false must still block advancement
-    steps = [Step(id="0", title="0", is_ready=lambda: True, validate=lambda: False),
-             Step(id="1", title="1", is_ready=lambda: True, validate=lambda: True)]
+    steps = [
+        Step(id="0", title="0", is_ready=lambda: True, validate=lambda: False),
+        Step(id="1", title="1", is_ready=lambda: True, validate=lambda: True),
+    ]
     c = WorkflowController(steps)
     assert c.can_advance() is False
     c.advance()
-    assert c.current == 0 and c.reached == {0}   # advance() was a no-op
+    assert c.current == 0 and c.reached == {0}  # advance() was a no-op
+
 
 def test_on_edit_bumps_revision():
     ready = [True, True, True, True]
     c = _ctl(ready)
     assert c.revision == 0
-    c.advance(); c.advance()
+    c.advance()
+    c.advance()
     c.on_edit(1)
     assert c.revision == 1
     c.on_edit(0)
     assert c.revision == 2
+
 
 def test_on_edit_rejects_invalid_index():
     ready = [True, True, True, True]
@@ -58,5 +77,5 @@ def test_on_edit_rejects_invalid_index():
     with pytest.raises(ValueError):
         c.on_edit(-1)
     with pytest.raises(ValueError):
-        c.on_edit(4)                             # len(steps) == 4, valid range [0, 4)
+        c.on_edit(4)  # len(steps) == 4, valid range [0, 4)
     assert c.reached == {0, 1} and c.revision == 0  # rejected edits are no-ops

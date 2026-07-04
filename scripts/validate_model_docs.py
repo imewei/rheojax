@@ -290,7 +290,7 @@ def validate_model_doc(file_path: Path) -> ValidationResult:
 def print_result(result: ValidationResult, verbose: bool = False) -> None:
     """Print validation result."""
     status = "PASS" if result.is_valid else "FAIL"
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"File: {result.file_path.name}")
     print(f"Status: {status}")
 
@@ -347,9 +347,9 @@ def main(args: Sequence[str] | None = None) -> int:
         print_result(result, verbose=verbose)
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     passed = sum(1 for r in results if r.is_valid)
     failed = len(results) - passed

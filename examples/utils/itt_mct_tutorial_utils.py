@@ -784,7 +784,11 @@ def load_itt_mct_parameters(
         schematic_fluid = model_name == "schematic" and params.get("v2", 99) <= 4.0
         isotropic_fluid = model_name == "isotropic" and params.get("phi", 0) <= 0.516
         if schematic_fluid or isotropic_fluid:
-            bad = f"v2={params.get('v2')}" if schematic_fluid else f"phi={params.get('phi')}"
+            bad = (
+                f"v2={params.get('v2')}"
+                if schematic_fluid
+                else f"phi={params.get('phi')}"
+            )
             print(f"Warning: Loaded parameters are in the fluid state ({bad}).")
             print("Falling back to default glass-state parameters.")
             if model_name == "schematic":
@@ -941,9 +945,7 @@ def fit_isotropic_gamma_c(
 
     def _loss(gamma_c: float) -> float:
         model.parameters.set_value("gamma_c", float(gamma_c))
-        p = np.asarray(
-            model.predict(X, test_mode=test_mode, **predict_kwargs)
-        ).ravel()
+        p = np.asarray(model.predict(X, test_mode=test_mode, **predict_kwargs)).ravel()
         return float(np.mean(((p - y) / scale) ** 2))
 
     res = minimize_scalar(_loss, bounds=(lo, hi), method="bounded")

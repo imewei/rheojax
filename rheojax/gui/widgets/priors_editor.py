@@ -487,7 +487,9 @@ class PriorsEditor(QWidget):
             conc = self._param_spinboxes["concentration"].value()
             rate = self._param_spinboxes["rate"].value()
             if conc <= 0:
-                raise ValueError("concentration must be positive for gamma distribution")
+                raise ValueError(
+                    "concentration must be positive for gamma distribution"
+                )
             if rate <= 0:
                 raise ValueError("rate must be positive for gamma distribution")
             rv = stats.gamma(a=conc, scale=1 / rate)
@@ -496,9 +498,13 @@ class PriorsEditor(QWidget):
             a = self._param_spinboxes["concentration0"].value()
             b = self._param_spinboxes["concentration1"].value()
             if a <= 0:
-                raise ValueError("concentration0 must be positive for beta distribution")
+                raise ValueError(
+                    "concentration0 must be positive for beta distribution"
+                )
             if b <= 0:
-                raise ValueError("concentration1 must be positive for beta distribution")
+                raise ValueError(
+                    "concentration1 must be positive for beta distribution"
+                )
             rv = stats.beta(a=a, b=b)
             x = np.linspace(0.001, 0.999, 200)
         else:

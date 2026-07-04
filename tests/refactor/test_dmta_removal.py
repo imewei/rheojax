@@ -161,21 +161,29 @@ def test_no_tensile_modulus_type():
     from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
     from rheojax.utils.prony import create_prony_parameter_set
 
-    assert "modulus_type" not in inspect.signature(create_prony_parameter_set).parameters
-    assert "modulus_type" not in inspect.signature(GeneralizedMaxwell.__init__).parameters
+    assert (
+        "modulus_type" not in inspect.signature(create_prony_parameter_set).parameters
+    )
+    assert (
+        "modulus_type" not in inspect.signature(GeneralizedMaxwell.__init__).parameters
+    )
     with pytest.raises(TypeError):
         GeneralizedMaxwell(modulus_type="tensile")
 
 
 def test_registry_clean():
     from rheojax.core.registry import ModelRegistry, Registry
+
     assert "deformation_mode" not in inspect.signature(ModelRegistry.find).parameters
-    assert "deformation_mode" not in inspect.signature(Registry.find_compatible).parameters
+    assert (
+        "deformation_mode" not in inspect.signature(Registry.find_compatible).parameters
+    )
     assert not hasattr(ModelRegistry.get_info("maxwell"), "deformation_modes")
 
 
 def test_rheodata_clean():
     from rheojax.core.data import RheoData
+
     d = RheoData(x=np.array([1.0, 2, 3]), y=np.array([1.0, 2, 3]))
     assert not hasattr(d, "deformation_mode")
 
@@ -270,6 +278,7 @@ def test_pipeline_clean():
 
 def test_legacy_kwargs_raise():
     from rheojax.core.registry import ModelRegistry
+
     m = ModelRegistry.create("maxwell")
     x = np.logspace(-1, 1, 10)
     y = np.exp(-x)

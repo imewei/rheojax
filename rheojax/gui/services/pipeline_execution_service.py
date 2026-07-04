@@ -100,16 +100,18 @@ class PipelineExecutionService(QObject):
     pipeline_completed = Signal()
     pipeline_failed = Signal(str)
 
-    step_phase_started = Signal(str, str)      # step_id, phase ("nlsq" | "nuts")
+    step_phase_started = Signal(str, str)  # step_id, phase ("nlsq" | "nuts")
     step_phase_completed = Signal(str, str)
     step_phase_failed = Signal(str, str, str)  # step_id, phase, error
-    phase_worker_ready = Signal(str, str, str, object)  # dataset_id, step_id, phase, worker
-    dataset_run_started = Signal(str)               # dataset_id -- emitted once per dataset,
-                                                       # right before its execute() call, so
-                                                       # active_jobs is populated one dataset at
-                                                       # a time rather than for the whole batch
-                                                       # upfront
-    dataset_run_finished = Signal(str, object)      # dataset_id, PipelineRunResult
+    phase_worker_ready = Signal(
+        str, str, str, object
+    )  # dataset_id, step_id, phase, worker
+    dataset_run_started = Signal(str)  # dataset_id -- emitted once per dataset,
+    # right before its execute() call, so
+    # active_jobs is populated one dataset at
+    # a time rather than for the whole batch
+    # upfront
+    dataset_run_finished = Signal(str, object)  # dataset_id, PipelineRunResult
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -281,7 +283,11 @@ class PipelineExecutionService(QObject):
                     # requested and reached, else nlsq) -- a failed/cancelled phase must not
                     # be reported as an overall "completed" pipeline run just because the
                     # per-step call itself didn't raise.
-                    terminal_phase = fit_result.nuts if fit_result.nuts is not None else fit_result.nlsq
+                    terminal_phase = (
+                        fit_result.nuts
+                        if fit_result.nuts is not None
+                        else fit_result.nlsq
+                    )
                     if terminal_phase.status != "completed":
                         self.step_failed.emit(step.id, terminal_phase.error or "")
                         return PipelineRunResult(
@@ -299,12 +305,16 @@ class PipelineExecutionService(QObject):
                 raise
             except Exception as exc:
                 self.step_failed.emit(step.id, str(exc))
-                return PipelineRunResult(step_results=step_results, status="failed", error=str(exc))
+                return PipelineRunResult(
+                    step_results=step_results, status="failed", error=str(exc)
+                )
             self.step_completed.emit(step.id)
 
         return PipelineRunResult(step_results=step_results, status="completed")
 
-    def _execute_pipeline_transform(self, step, context: dict, library, persist: bool) -> dict:
+    def _execute_pipeline_transform(
+        self, step, context: dict, library, persist: bool
+    ) -> dict:
         """Run one Pipeline-mode transform step against its sole primary slot.
 
         Named distinctly from ``_execute_transform`` (the visual pipeline
@@ -327,6 +337,7 @@ class PipelineExecutionService(QObject):
 
         if self._transform_service is None:
             from rheojax.gui.services.transform_service import TransformService
+
             self._transform_service = TransformService()
 
         transform_key = step.config["name"]
@@ -335,20 +346,32 @@ class PipelineExecutionService(QObject):
         dataset_id = context["dataset_id"]
 
         result = self._transform_service.apply_transform(
-            transform_key, context["data"], {k: v for k, v in step.config.items() if k != "name"}
+            transform_key,
+            context["data"],
+            {k: v for k, v in step.config.items() if k != "name"},
         )
         transformed = result[0] if isinstance(result, tuple) else result
-        protocol_type = infer_output_protocol(library, transform_key, {primary_slot: dataset_id})
+        protocol_type = infer_output_protocol(
+            library, transform_key, {primary_slot: dataset_id}
+        )
 
         context["data"] = transformed
         new_dataset_id = None
         if persist:
             new_dataset_id = uuid.uuid4().hex
-            library.add(DatasetRef(
-                id=new_dataset_id, name=f"{transform_key}_{dataset_id}", protocol_type=protocol_type,
-                origin="derived", units={}, row_count=0, hash="", provenance={"pipeline_step": step.id},
-                lineage=[dataset_id],
-            ))
+            library.add(
+                DatasetRef(
+                    id=new_dataset_id,
+                    name=f"{transform_key}_{dataset_id}",
+                    protocol_type=protocol_type,
+                    origin="derived",
+                    units={},
+                    row_count=0,
+                    hash="",
+                    provenance={"pipeline_step": step.id},
+                    lineage=[dataset_id],
+                )
+            )
             library.store_payload(new_dataset_id, transformed)
             # A later step (another transform, or infer_output_protocol() on one further down
             # the chain) must see the NEWLY persisted dataset as the current one, not the
@@ -356,7 +379,11 @@ class PipelineExecutionService(QObject):
             # lineage=["d1"] instead of the immediately-preceding derived dataset's id.
             context["dataset_id"] = new_dataset_id
 
-        return {"output": transformed, "protocol_type": protocol_type, "dataset_id": new_dataset_id}
+        return {
+            "output": transformed,
+            "protocol_type": protocol_type,
+            "dataset_id": new_dataset_id,
+        }
 
     def _execute_pipeline_fit(self, step, context: dict) -> FitStepResult:
         """Run one Pipeline-mode fit step: synchronous NLSQ, then optional NUTS.
@@ -463,6 +490,7 @@ class PipelineExecutionService(QObject):
         """
         if self._export_service is None:
             from rheojax.gui.services.export_service import ExportService
+
             self._export_service = ExportService()
 
         path = step.config["path"]
@@ -655,7 +683,6 @@ class PipelineExecutionService(QObject):
             k: v for k, v in config.items() if k not in _RESERVED
         }
 
-
         logger.info(
             "Pipeline fit step",
             model=model_name,
@@ -744,7 +771,6 @@ class PipelineExecutionService(QObject):
         }
         if fitted_model_state is not None:
             extra_kwargs["fitted_model_state"] = fitted_model_state
-
 
         if "test_mode" not in extra_kwargs:
             _tm: str | None = None

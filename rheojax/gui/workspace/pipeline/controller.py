@@ -1,5 +1,6 @@
 """PipelineController: Pipeline mode's WorkflowController plus the sole GUI-thread commit path
 for a finished batch job (design spec §3.3)."""
+
 from __future__ import annotations
 
 import uuid
@@ -71,7 +72,9 @@ class PipelineController(WorkflowController):
             self._notify()
 
 
-def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None, notify=None):
+def build_pipeline_controller(
+    app_state, service, epoch: int = 0, guard=None, notify=None
+):
     from rheojax.gui.workspace.controller import Step
     from rheojax.gui.workspace.pipeline.step1_configure_run import (
         PipelineConfigureRunStep,
@@ -86,6 +89,13 @@ def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None, no
         guard=guard,
         notify=notify,
     )
-    ctl.steps = [Step(id="configure_run", title="Configure & Run", is_ready=body.is_ready, validate=lambda: True)]
+    ctl.steps = [
+        Step(
+            id="configure_run",
+            title="Configure & Run",
+            is_ready=body.is_ready,
+            validate=lambda: True,
+        )
+    ]
     ctl.reached = {0}
     return ctl, [body]

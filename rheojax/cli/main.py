@@ -263,7 +263,7 @@ def show_inventory(args: list[str] | None = None) -> int:
         proto_width = 40
 
         print(f"{'Name':<{name_width}} {'Protocols':<{proto_width}} {'Description'}")
-        print(f"{'-'*name_width} {'-'*proto_width} {'-'*30}")
+        print(f"{'-' * name_width} {'-' * proto_width} {'-' * 30}")
 
         for m in sorted(models, key=lambda x: x["name"]):
             name = m["name"]
@@ -293,7 +293,7 @@ def show_inventory(args: list[str] | None = None) -> int:
         type_width = 15
 
         print(f"{'Name':<{name_width}} {'Type':<{type_width}} {'Description'}")
-        print(f"{'-'*name_width} {'-'*type_width} {'-'*30}")
+        print(f"{'-' * name_width} {'-' * type_width} {'-' * 30}")
 
         for t in sorted(transforms, key=lambda x: x["name"]):
             name = t["name"]

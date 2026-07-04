@@ -72,7 +72,9 @@ def import_dataset(path: Path, protocol: str) -> tuple[DatasetRef, RheoData]:
     # off by a factor of 2*pi with no error.
     units: dict[str, str] = {}
     if data.x_units:
-        if contract.unit_conversions.get("x") == "Hz->rad/s" and data.x_units.strip().lower() in (
+        if contract.unit_conversions.get(
+            "x"
+        ) == "Hz->rad/s" and data.x_units.strip().lower() in (
             "hz",
             "hertz",
         ):

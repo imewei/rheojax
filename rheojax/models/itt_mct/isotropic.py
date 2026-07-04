@@ -67,7 +67,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class ITTMCTIsotropic(ITTMCTBase):
     """ITT-MCT Isotropically Sheared Model with k-resolved correlators.
 
@@ -118,6 +119,7 @@ class ITTMCTIsotropic(ITTMCTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         phi: float | None = None,
@@ -716,12 +718,8 @@ class ITTMCTIsotropic(ITTMCTBase):
                 if is_glass:
                     G_k_total = float(np.trapezoid(G_k_weights, q_grid))
                     if G_k_total > 0:
-                        weighted = float(
-                            np.trapezoid(G_k_weights * f_k_arr**2, q_grid)
-                        )
-                        sigma[i] = (
-                            G_prefactor * gamma_c * weighted / G_k_total * 0.1
-                        )
+                        weighted = float(np.trapezoid(G_k_weights * f_k_arr**2, q_grid))
+                        sigma[i] = G_prefactor * gamma_c * weighted / G_k_total * 0.1
                 else:
                     sigma[i] = 0.0
                 continue
@@ -939,7 +937,9 @@ class ITTMCTIsotropic(ITTMCTBase):
         tau = np.concatenate([tau_k, 0.5 * tau_k])
 
         # Drop negligible / non-positive amplitudes for a leaner ODE system.
-        keep = g > (g.max() * 1e-12) if g.size and g.max() > 0 else np.zeros_like(g, bool)
+        keep = (
+            g > (g.max() * 1e-12) if g.size and g.max() > 0 else np.zeros_like(g, bool)
+        )
         return g[keep], tau[keep], G_inf
 
     def _predict_creep(

@@ -71,14 +71,16 @@ logger = logging.getLogger(__name__)
         Protocol.FLOW_CURVE,
         Protocol.OSCILLATION,
         Protocol.STARTUP,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "giesekus_multimode",
     protocols=[
         Protocol.FLOW_CURVE,
         Protocol.OSCILLATION,
         Protocol.STARTUP,
-    ])
+    ],
+)
 class GiesekusMultiMode(BaseModel):
     """Multi-mode Giesekus nonlinear viscoelastic model.
 
@@ -122,6 +124,7 @@ class GiesekusMultiMode(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, n_modes: int = 3):
         """Initialize multi-mode Giesekus model.
 
@@ -438,11 +441,7 @@ class GiesekusMultiMode(BaseModel):
         )
 
         # Forward kwargs (gamma_dot, sigma_applied, etc.) to model_function
-        predict_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        predict_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = self.model_function(
             x_jax, params, test_mode=test_mode, **predict_kwargs
         )

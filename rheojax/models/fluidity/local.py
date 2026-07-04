@@ -63,7 +63,8 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class FluidityLocal(FluidityBase):
     """Local (0D) Fluidity Model for yield-stress fluids.
 
@@ -88,6 +89,7 @@ class FluidityLocal(FluidityBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Local Fluidity Model."""
         super().__init__()
