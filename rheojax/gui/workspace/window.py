@@ -125,6 +125,7 @@ class WorkspaceWindow(QMainWindow):
         # any commit path (interactive export or a Pipeline job) never appears until the
         # next full _rebuild() (Open/New/Close).
         self._notifier.changed.connect(self._rail.refresh)
+        self._rail.import_requested.connect(self._on_import_requested)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -168,6 +169,10 @@ class WorkspaceWindow(QMainWindow):
             body.deleteLater()
         try:
             self._notifier.changed.disconnect(self._rail.refresh)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._rail.import_requested.disconnect(self._on_import_requested)
         except (RuntimeError, TypeError):
             pass
         for widget in (self._canvas, self._rail, self._inspector, self._splitter):
@@ -404,6 +409,95 @@ class WorkspaceWindow(QMainWindow):
         if payload is not None:
             self._state.library.store_payload(ref.id, payload)
         self._notifier.changed.emit()
+
+    # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
+    # predates Protocol.FLOW_CURVE), which never equality-matches
+    # DatasetLibrary.datasets_of_type("flow_curve") -- normalize it here so
+    # imported flow-curve datasets actually show up in the Fit/Transform Data
+    # step instead of silently landing in no protocol bucket at all.
+    _IMPORT_TEST_MODE_ALIASES = {"flow": "flow_curve"}
+
+    def _on_import_requested(self) -> None:
+        """Handle LibraryRail's "+ Import data..." button."""
+        from PySide6.QtWidgets import QFileDialog
+
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Import Data",
+            "",
+            "All Supported (*.csv *.txt *.xlsx *.xls *.tri *.dat *.json);;All Files (*.*)",
+        )
+        if not paths:
+            return
+
+        from PySide6.QtCore import QThreadPool
+
+        from rheojax.gui.jobs.import_worker import ImportWorker
+        from rheojax.gui.services.data_service import DataService
+
+        file_paths = [Path(p) for p in paths]
+        worker = ImportWorker(
+            data_service=DataService(), file_path=file_paths[0], file_paths=file_paths
+        )
+        # QueuedConnection guarantees the callback runs on the main thread --
+        # ImportWorker emits its signals from a QThreadPool worker thread.
+        worker.signals.completed.connect(
+            self._on_import_completed, Qt.ConnectionType.QueuedConnection
+        )
+        worker.signals.failed.connect(
+            self._on_import_failed, Qt.ConnectionType.QueuedConnection
+        )
+        # Keep a reference alive for the worker's lifetime -- nothing else
+        # holds the ImportWorker/ImportWorkerSignals QObject, so it would
+        # otherwise be garbage-collected mid-run and drop the signal.
+        self._active_import_worker = worker
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_import_completed(self, datasets: list) -> None:
+        import hashlib
+        import uuid
+
+        from rheojax.gui.foundation.library import DatasetRef
+        from rheojax.gui.services.data_service import DataService
+
+        service = DataService()
+        hash_cache: dict[str, str] = {}
+        # ponytail: multiple segments from one source file all get that
+        # file's stem as their name -- add "_segment_N" suffixing if that
+        # proves confusing in practice.
+        for rheo_data in datasets:
+            meta = rheo_data.metadata
+            source_file = meta.pop("_source_file", None)
+            test_mode = meta.get("test_mode") or service.detect_test_mode(rheo_data)
+            test_mode = self._IMPORT_TEST_MODE_ALIASES.get(test_mode, test_mode)
+            meta["test_mode"] = test_mode
+
+            if source_file and source_file not in hash_cache:
+                hash_cache[source_file] = hashlib.sha256(
+                    Path(source_file).read_bytes()
+                ).hexdigest()
+
+            ref = DatasetRef(
+                id=uuid.uuid4().hex,
+                name=Path(source_file).stem if source_file else "imported",
+                protocol_type=test_mode,
+                origin="imported",
+                units={
+                    k: v
+                    for k, v in (("x", rheo_data.x_units), ("y", rheo_data.y_units))
+                    if v
+                },
+                row_count=len(rheo_data.x),
+                hash=hash_cache.get(source_file, ""),
+                provenance={"source": "gui_import", "path": source_file},
+                lineage=[],
+            )
+            self._commit_dataset(ref, rheo_data, overwrite=False)
+
+    def _on_import_failed(self, error_msg: str) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.critical(self, "Import Failed", error_msg)
 
     def _sync_mode_buttons(self) -> None:
         self._fit_btn.setChecked(self._mode == "fit")
