@@ -35,9 +35,7 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register(
-    "carreau",
-    protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("carreau", protocols=[Protocol.FLOW_CURVE])
 class Carreau(BaseModel):
     """Carreau model for non-Newtonian flow (ROTATION only).
 
@@ -65,6 +63,7 @@ class Carreau(BaseModel):
     """
 
     flow_quantity = "viscosity"
+
     def __init__(self):
         """Initialize Carreau model."""
         super().__init__()

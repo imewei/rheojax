@@ -1,4 +1,5 @@
 """Test model_config passthrough: service -> worker -> registry.create."""
+
 from __future__ import annotations
 
 import nlsq  # noqa: F401 — must precede rheojax.core imports (float64 init)

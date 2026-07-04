@@ -182,9 +182,9 @@ class HomePage(QWidget):
             QWidget {{
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {themed('PRIMARY_PRESSED')},
-                    stop:0.4 {themed('PRIMARY_PRESSED')},
-                    stop:1 {themed('ACCENT_PRESSED')}
+                    stop:0 {themed("PRIMARY_PRESSED")},
+                    stop:0.4 {themed("PRIMARY_PRESSED")},
+                    stop:1 {themed("ACCENT_PRESSED")}
                 );
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }}
@@ -400,8 +400,8 @@ class HomePage(QWidget):
 
         card.setStyleSheet(f"""
             QWidget {{
-                background-color: {themed('BG_ELEVATED')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_ELEVATED")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-left: 4px solid {accent};
                 border-radius: {BorderRadius.XL}px;
             }}
@@ -411,8 +411,8 @@ class HomePage(QWidget):
                 border-left: 4px solid {accent};
             }}
             QWidget:focus {{
-                border-color: {themed('BORDER_FOCUS')};
-                border-left: 4px solid {themed('BORDER_FOCUS')};
+                border-color: {themed("BORDER_FOCUS")};
+                border-left: 4px solid {themed("BORDER_FOCUS")};
             }}
             QLabel {{ background-color: transparent; border: none; }}
         """)
@@ -440,7 +440,7 @@ class HomePage(QWidget):
             font-family: {Typography.FONT_FAMILY};
             font-size: {Typography.SIZE_MD}pt;
             font-weight: {Typography.WEIGHT_SEMIBOLD};
-            color: {themed('TEXT_PRIMARY')};
+            color: {themed("TEXT_PRIMARY")};
         """)
         text_col.addWidget(title_label)
 
@@ -449,7 +449,7 @@ class HomePage(QWidget):
             font-family: {Typography.FONT_FAMILY};
             font-size: {Typography.SIZE_SM}pt;
             font-weight: {Typography.WEIGHT_NORMAL};
-            color: {themed('TEXT_MUTED')};
+            color: {themed("TEXT_MUTED")};
         """)
         desc_label.setWordWrap(True)
         text_col.addWidget(desc_label)
@@ -485,12 +485,12 @@ class HomePage(QWidget):
             empty.setAlignment(Qt.AlignCenter)
             empty.setMinimumHeight(120)
             empty.setStyleSheet(f"""
-                color: {themed('TEXT_MUTED')};
+                color: {themed("TEXT_MUTED")};
                 font-family: {Typography.FONT_FAMILY};
                 font-size: {Typography.SIZE_MD_SM}pt;
                 padding: {Spacing.XL}px {Spacing.LG}px;
-                background-color: {themed('BG_SURFACE')};
-                border: 2px dashed {themed('BORDER_DEFAULT')};
+                background-color: {themed("BG_SURFACE")};
+                border: 2px dashed {themed("BORDER_DEFAULT")};
                 border-radius: {BorderRadius.XL}px;
             """)
             empty.setWordWrap(True)
@@ -506,13 +506,13 @@ class HomePage(QWidget):
         widget = ClickableWidget()
         widget.setStyleSheet(f"""
             QWidget {{
-                background-color: {themed('BG_ELEVATED')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_ELEVATED")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-radius: {BorderRadius.XL}px;
             }}
             QWidget:hover {{
-                background-color: {themed('PRIMARY_SUBTLE')};
-                border-color: {themed('PRIMARY')};
+                background-color: {themed("PRIMARY_SUBTLE")};
+                border-color: {themed("PRIMARY")};
             }}
             QLabel {{ background-color: transparent; border: none; }}
         """)
@@ -529,13 +529,13 @@ class HomePage(QWidget):
         name.setStyleSheet(f"""
             font-weight: {Typography.WEIGHT_SEMIBOLD};
             font-size: {Typography.SIZE_MD_SM}pt;
-            color: {themed('TEXT_PRIMARY')};
+            color: {themed("TEXT_PRIMARY")};
         """)
         text_col.addWidget(name)
 
         path_label = QLabel(str(project_path.parent))
         path_label.setStyleSheet(f"""
-            color: {themed('TEXT_MUTED')};
+            color: {themed("TEXT_MUTED")};
             font-size: {Typography.SIZE_XS}pt;
             font-weight: {Typography.WEIGHT_NORMAL};
         """)
@@ -582,8 +582,8 @@ class HomePage(QWidget):
         card = QWidget()
         card.setStyleSheet(f"""
             QWidget {{
-                background-color: {themed('BG_ELEVATED')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_ELEVATED")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-radius: {BorderRadius.XL}px;
                 padding: {Spacing.MD}px;
             }}
@@ -660,20 +660,20 @@ class HomePage(QWidget):
 
         link_style = f"""
             QPushButton {{
-                background-color: {themed('BG_ELEVATED')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_ELEVATED")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-radius: {BorderRadius.LG}px;
                 padding: {Spacing.SM}px {Spacing.LG}px;
                 text-align: left;
                 font-family: {Typography.FONT_FAMILY};
                 font-size: {Typography.SIZE_MD_SM}pt;
                 font-weight: {Typography.WEIGHT_MEDIUM};
-                color: {themed('PRIMARY')};
+                color: {themed("PRIMARY")};
             }}
             QPushButton:hover {{
-                background-color: {themed('PRIMARY_SUBTLE')};
-                border-color: {themed('PRIMARY')};
-                color: {themed('PRIMARY_HOVER')};
+                background-color: {themed("PRIMARY_SUBTLE")};
+                border-color: {themed("PRIMARY")};
+                color: {themed("PRIMARY_HOVER")};
             }}
         """
 

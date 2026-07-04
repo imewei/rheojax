@@ -26,9 +26,9 @@ def test_tensorial_propagator_shape():
 
     # Shape should be (3, 3, L, L//2+1) for rfft2 convention
     expected_shape = (3, 3, L, L // 2 + 1)
-    assert (
-        propagator.shape == expected_shape
-    ), f"Expected {expected_shape}, got {propagator.shape}"
+    assert propagator.shape == expected_shape, (
+        f"Expected {expected_shape}, got {propagator.shape}"
+    )
 
     # Check dtype is float64
     assert propagator.dtype == jnp.float64
@@ -173,9 +173,9 @@ def test_flow_rule_direction_alignment():
     assert eps_dot_p.shape == (3,), f"Expected shape (3,), got {eps_dot_p.shape}"
 
     # For yielding state, plastic strain rate should be non-zero
-    assert jnp.any(
-        eps_dot_p != 0.0
-    ), "Plastic strain rate should be non-zero when yielding"
+    assert jnp.any(eps_dot_p != 0.0), (
+        "Plastic strain rate should be non-zero when yielding"
+    )
 
     # Check that shear component direction matches stress
     # ε̇ᵖ_xy should have same sign as σ_xy
@@ -260,9 +260,9 @@ def test_apply_tensorial_propagator():
     # Check that mean of each component is near zero (redistribution conserves)
     for i in range(3):
         mean_stress = jnp.mean(stress_dot[i])
-        assert (
-            jnp.abs(mean_stress) < 1e-6
-        ), f"Component {i} has non-zero mean: {mean_stress}"
+        assert jnp.abs(mean_stress) < 1e-6, (
+            f"Component {i} has non-zero mean: {mean_stress}"
+        )
 
 
 @pytest.mark.unit
@@ -405,9 +405,9 @@ def test_propagator_conservation_law():
     # (Eshelby propagator conserves total stress)
     for i in range(3):
         total_stress = jnp.sum(stress_dot[i])
-        assert (
-            jnp.abs(total_stress) < 1e-6
-        ), f"Component {i} violates conservation: {total_stress}"
+        assert jnp.abs(total_stress) < 1e-6, (
+            f"Component {i} violates conservation: {total_stress}"
+        )
 
 
 @pytest.mark.unit
@@ -430,9 +430,9 @@ def test_plastic_strain_rate_magnitude_bounds():
     max_expected = jnp.max(jnp.abs(stress_tensor)) / min(tau_pl_shear, tau_pl_normal)
     magnitude = jnp.linalg.norm(eps_dot_p)
 
-    assert (
-        magnitude <= max_expected * 2.0
-    ), f"Plastic strain rate {magnitude} exceeds bound {max_expected}"
+    assert magnitude <= max_expected * 2.0, (
+        f"Plastic strain rate {magnitude} exceeds bound {max_expected}"
+    )
 
 
 @pytest.mark.unit

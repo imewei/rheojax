@@ -325,9 +325,9 @@ class TestProtocolValidation:
 
         # ODE-based models may return internal grid sizes different from input
         # Only assert exact match for non-ODE models
-        assert (
-            actual_len >= 1
-        ), f"{model_name} returned empty result for {protocol.value}"
+        assert actual_len >= 1, (
+            f"{model_name} returned empty result for {protocol.value}"
+        )
 
     def test_all_models_have_protocols(self):
         """Verify that every registered model declares at least one protocol."""
@@ -351,19 +351,19 @@ class TestProtocolValidation:
             if not info or not info.protocols:
                 models_without_protocols.append(model_name)
 
-        assert (
-            not models_without_protocols
-        ), f"Models without declared protocols: {models_without_protocols}"
+        assert not models_without_protocols, (
+            f"Models without declared protocols: {models_without_protocols}"
+        )
 
     def test_protocol_pairs_not_empty(self):
         """Verify test parametrization found model/protocol pairs."""
-        assert (
-            len(_MODEL_PROTOCOL_PAIRS) > 0
-        ), "No model/protocol pairs found - check model registration"
+        assert len(_MODEL_PROTOCOL_PAIRS) > 0, (
+            "No model/protocol pairs found - check model registration"
+        )
         # Expect at least 30+ pairs given the model inventory
-        assert (
-            len(_MODEL_PROTOCOL_PAIRS) >= 30
-        ), f"Expected 30+ pairs, found {len(_MODEL_PROTOCOL_PAIRS)}"
+        assert len(_MODEL_PROTOCOL_PAIRS) >= 30, (
+            f"Expected 30+ pairs, found {len(_MODEL_PROTOCOL_PAIRS)}"
+        )
 
 
 @pytest.mark.smoke
@@ -380,9 +380,9 @@ class TestProtocolDataFactory:
 
         # kwargs should contain test_mode
         assert "test_mode" in kwargs, f"Missing test_mode for {protocol}"
-        assert (
-            kwargs["test_mode"] == protocol.value
-        ), f"test_mode mismatch: {kwargs['test_mode']} != {protocol.value}"
+        assert kwargs["test_mode"] == protocol.value, (
+            f"test_mode mismatch: {kwargs['test_mode']} != {protocol.value}"
+        )
 
     def test_factory_startup_shape(self):
         """Test STARTUP protocol generates (2, N) shaped data."""

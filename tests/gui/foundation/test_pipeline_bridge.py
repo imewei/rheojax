@@ -1,13 +1,20 @@
 import pytest
-from rheojax.gui.foundation.pipeline_bridge import pipeline_inputs_from_library
 
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
+from rheojax.gui.foundation.pipeline_bridge import pipeline_inputs_from_library
 
 
 def _ref(id: str) -> DatasetRef:
     return DatasetRef(
-        id=id, name=id, protocol_type="oscillation", origin="imported",
-        units={}, row_count=1, hash="h", provenance={}, lineage=[],
+        id=id,
+        name=id,
+        protocol_type="oscillation",
+        origin="imported",
+        units={},
+        row_count=1,
+        hash="h",
+        provenance={},
+        lineage=[],
     )
 
 

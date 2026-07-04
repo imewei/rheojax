@@ -24,7 +24,9 @@ class TransformPickStep(QWidget):
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
         lay.addWidget(self._list)
-        self._list.itemClicked.connect(lambda it: self._select(it.data(Qt.ItemDataRole.UserRole)))
+        self._list.itemClicked.connect(
+            lambda it: self._select(it.data(Qt.ItemDataRole.UserRole))
+        )
 
     def groups(self) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {}

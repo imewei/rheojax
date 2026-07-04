@@ -64,7 +64,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class FractionalZenerLiquidLiquid(BaseModel):
     """Fractional Zener Liquid-Liquid model.
 

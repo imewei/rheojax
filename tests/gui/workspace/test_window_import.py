@@ -84,9 +84,7 @@ def test_import_completed_maps_flow_test_mode_to_flow_curve_protocol(qtbot, tmp_
 
 def test_import_failed_shows_message_box(qtbot, monkeypatch):
     messages = []
-    monkeypatch.setattr(
-        QMessageBox, "critical", lambda *a, **k: messages.append(a[-1])
-    )
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))
 
     state = AppState()
     win = WorkspaceWindow(state)
@@ -154,9 +152,7 @@ def test_import_failed_undetected_columns_cancelled_shows_message_box(
         ColumnMapperDialog, "exec", lambda self: QDialog.DialogCode.Rejected
     )
     messages = []
-    monkeypatch.setattr(
-        QMessageBox, "critical", lambda *a, **k: messages.append(a[-1])
-    )
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))
 
     win._on_import_failed("Could not auto-detect x and y columns.", [source])
 
@@ -188,9 +184,7 @@ def test_import_failed_non_mappable_extension_skips_column_mapper(
         ColumnMapperDialog, "exec", lambda self: QDialog.DialogCode.Rejected
     )
     messages = []
-    monkeypatch.setattr(
-        QMessageBox, "critical", lambda *a, **k: messages.append(a[-1])
-    )
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))
 
     win._on_import_failed(
         "Could not parse file with any available reader:\n"

@@ -19,18 +19,44 @@ class _RheoData:
 def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot):
     calls = {}
 
-    def fake_run_fit_isolated(model_name, x_data, y_data, test_mode, initial_params,
-                               options, progress_queue, cancel_event, y2_data=None,
-                               metadata=None, dataset_id="", model_config=None):
+    def fake_run_fit_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        initial_params,
+        options,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        dataset_id="",
+        model_config=None,
+    ):
         calls["fit"] = (model_name, model_config)
         calls["fit_test_mode"] = test_mode
         return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
 
-    def fake_run_bayesian_isolated(model_name, x_data, y_data, test_mode, num_warmup,
-                                    num_samples, num_chains, warm_start, priors, seed,
-                                    progress_queue, cancel_event, y2_data=None,
-                                    metadata=None, fitted_model_state=None,
-                                    dataset_id="", target_accept=0.8, model_config=None):
+    def fake_run_bayesian_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        num_warmup,
+        num_samples,
+        num_chains,
+        warm_start,
+        priors,
+        seed,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        fitted_model_state=None,
+        dataset_id="",
+        target_accept=0.8,
+        model_config=None,
+    ):
         calls["sample"] = (model_name, target_accept, model_config)
         calls["sample_test_mode"] = test_mode
         return {"posterior_samples": {"a": [1.0, 1.1]}, "r_hat": {"a": 1.0}}
@@ -46,8 +72,17 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
 
     app = AppState()
     app.library.add(
-        DatasetRef(id="d1", name="d1", protocol_type="flow_curve", origin="imported",
-                   units={}, row_count=2, hash="h", provenance={}, lineage=[])
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
     )
     app.library.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
     app.fit.protocol = "flow_curve"
@@ -98,8 +133,17 @@ def test_make_fit_fn_normalizes_parameters_key_to_params(monkeypatch, qapp):
 
     lib = DatasetLibrary()
     lib.add(
-        DatasetRef(id="d1", name="d1", protocol_type="flow_curve", origin="imported",
-                   units={}, row_count=2, hash="h", provenance={}, lineage=[])
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
     )
     lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
 
@@ -121,8 +165,12 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
     # .parameters actually returns in production.
     class _FakeInstance:
         parameters = {
-            "a": SimpleNamespace(value=1.0, bounds=(0.0, 10.0), units="Pa", description=""),
-            "b": SimpleNamespace(value=2.0, bounds=(0.0, 5.0), units="s", description=""),
+            "a": SimpleNamespace(
+                value=1.0, bounds=(0.0, 10.0), units="Pa", description=""
+            ),
+            "b": SimpleNamespace(
+                value=2.0, bounds=(0.0, 5.0), units="s", description=""
+            ),
         }
 
     monkeypatch.setattr(
@@ -132,8 +180,14 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
 
     captured = {}
 
-    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
-                     multi_start=None):
+    def fake_fit_fn(
+        model_key,
+        model_config,
+        data_ref,
+        column_map,
+        initial_params=None,
+        multi_start=None,
+    ):
         captured["initial_params"] = initial_params
         return {"params": {"a": 1.0, "b": 2.0}, "r_squared": 0.5, "success": True}
 
@@ -165,8 +219,14 @@ def test_multistart_forwards_config_to_fit_fn():
 
     captured = {}
 
-    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
-                     multi_start=None):
+    def fake_fit_fn(
+        model_key,
+        model_config,
+        data_ref,
+        column_map,
+        initial_params=None,
+        multi_start=None,
+    ):
         captured["multi_start"] = multi_start
         return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
 
@@ -177,7 +237,9 @@ def test_multistart_forwards_config_to_fit_fn():
     assert captured["multi_start"] == {"enabled": True, "count": 5}
 
 
-def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypatch, qapp):
+def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(
+    monkeypatch, qapp
+):
     # Exercises _make_fit_fn's real restart loop (not just NlsqStep forwarding
     # the multi_start dict). Restart 2 (the 3rd call) returns the best
     # r_squared, so the winning result must come from that call. The "b"
@@ -186,9 +248,20 @@ def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypat
     # calls 2 and 3 would see a perturbed "value" for "b".
     calls = []
 
-    def fake_run_fit_isolated(model_name, x_data, y_data, test_mode, initial_params,
-                               options, progress_queue, cancel_event, y2_data=None,
-                               metadata=None, dataset_id="", model_config=None):
+    def fake_run_fit_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        initial_params,
+        options,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        dataset_id="",
+        model_config=None,
+    ):
         calls.append(initial_params)
         r_squared = [0.5, 0.7, 0.95][len(calls) - 1]
         return {"params": {"a": 1.0, "b": 2.0}, "r_squared": r_squared, "success": True}
@@ -200,8 +273,17 @@ def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypat
 
     lib = DatasetLibrary()
     lib.add(
-        DatasetRef(id="d1", name="d1", protocol_type="flow_curve", origin="imported",
-                   units={}, row_count=2, hash="h", provenance={}, lineage=[])
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
     )
     lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
 
@@ -211,7 +293,10 @@ def test_multistart_restart_loop_keeps_best_and_preserves_fixed_params(monkeypat
         "b": {"value": 2.0, "bounds": (0.0, 5.0), "fixed": True},
     }
     result = fit_fn(
-        "power_law", {}, "d1", {"x": 0, "y": 1},
+        "power_law",
+        {},
+        "d1",
+        {"x": 0, "y": 1},
         initial_params=initial_params,
         multi_start={"enabled": True, "count": 3},
     )
@@ -238,9 +323,20 @@ def test_multistart_restart_loop_recovers_from_nan_r_squared(monkeypatch, qapp):
     # ever replace it. NaN must sort as the worst possible result instead.
     calls = []
 
-    def fake_run_fit_isolated(model_name, x_data, y_data, test_mode, initial_params,
-                               options, progress_queue, cancel_event, y2_data=None,
-                               metadata=None, dataset_id="", model_config=None):
+    def fake_run_fit_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        initial_params,
+        options,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        dataset_id="",
+        model_config=None,
+    ):
         calls.append(initial_params)
         r_squared = [float("nan"), 0.85, 0.4][len(calls) - 1]
         return {"params": {"a": 1.0}, "r_squared": r_squared, "success": True}
@@ -252,14 +348,26 @@ def test_multistart_restart_loop_recovers_from_nan_r_squared(monkeypatch, qapp):
 
     lib = DatasetLibrary()
     lib.add(
-        DatasetRef(id="d1", name="d1", protocol_type="flow_curve", origin="imported",
-                   units={}, row_count=2, hash="h", provenance={}, lineage=[])
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
     )
     lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
 
     fit_fn = _make_fit_fn(lib, FitState(protocol="flow_curve"))
     result = fit_fn(
-        "power_law", {}, "d1", {"x": 0, "y": 1},
+        "power_law",
+        {},
+        "d1",
+        {"x": 0, "y": 1},
         initial_params={"a": {"value": 1.0, "bounds": (0.0, 10.0), "fixed": False}},
         multi_start={"enabled": True, "count": 3},
     )
@@ -274,8 +382,14 @@ def test_multistart_disabled_by_default():
 
     captured = {}
 
-    def fake_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
-                     multi_start=None):
+    def fake_fit_fn(
+        model_key,
+        model_config,
+        data_ref,
+        column_map,
+        initial_params=None,
+        multi_start=None,
+    ):
         captured["multi_start"] = multi_start
         return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
 

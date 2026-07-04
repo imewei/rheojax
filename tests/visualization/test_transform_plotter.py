@@ -141,7 +141,6 @@ class TestMastercurvePlot:
 
 
 class TestMutationNumberPlot:
-
     @pytest.mark.smoke
     def test_mutation_number(self, plotter):
         """Mutation number plot shows bar with value."""
@@ -164,7 +163,6 @@ class TestMutationNumberPlot:
 
 
 class TestDerivativePlot:
-
     @pytest.mark.smoke
     def test_derivative_with_input(self, plotter, time_data):
         """Derivative plot shows original + derivative."""
@@ -186,7 +184,6 @@ class TestDerivativePlot:
 
 
 class TestSPPPlot:
-
     @pytest.mark.smoke
     def test_spp_basic(self, plotter):
         """SPP plot with minimal metadata produces 3-panel layout."""
@@ -217,7 +214,6 @@ class TestSPPPlot:
 
 
 class TestPronyPlot:
-
     @pytest.mark.smoke
     def test_prony_with_input(self, plotter, time_data, complex_data):
         """Prony conversion shows input + converted domains."""
@@ -244,7 +240,6 @@ class TestPronyPlot:
 
 
 class TestSpectrumPlot:
-
     @pytest.mark.smoke
     def test_spectrum_with_input(self, plotter, complex_data):
         """Spectrum inversion shows G',G'' + H(τ)."""
@@ -263,7 +258,6 @@ class TestSpectrumPlot:
 
 
 class TestCoxMerzPlot:
-
     @pytest.mark.smoke
     def test_cox_merz(self, plotter):
         """Cox-Merz plot shows both viscosities."""
@@ -302,7 +296,6 @@ class TestCoxMerzPlot:
 
 
 class TestLVEEnvelopePlot:
-
     @pytest.mark.smoke
     def test_envelope_with_input(self, plotter, time_data):
         """LVE envelope shows envelope + startup overlay."""
@@ -326,7 +319,6 @@ class TestLVEEnvelopePlot:
 
 
 class TestGenericPlot:
-
     def test_generic_with_input(self, plotter, time_data, freq_data):
         """Generic plot shows before/after."""
         fig, axes = plotter.plot(
@@ -350,7 +342,6 @@ class TestGenericPlot:
 
 
 class TestUnpackResult:
-
     def test_unpack_rheodata(self, plotter, freq_data):
         """Bare RheoData unpacks to (data, None)."""
         data, meta = plotter._unpack_result(freq_data)
@@ -376,7 +367,6 @@ class TestUnpackResult:
 
 
 class TestTransformPlotterStyles:
-
     @pytest.mark.parametrize("style", ["default", "publication", "presentation"])
     def test_styles_work(self, plotter, freq_data, style):
         """All styles work without error."""

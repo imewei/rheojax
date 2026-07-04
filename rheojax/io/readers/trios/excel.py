@@ -108,7 +108,7 @@ def _check_excel_dependencies(filepath: Path) -> None:
 
     if suffix == ".xls" and not HAS_XLRD:
         raise ImportError(
-            "xlrd is required to read .xls files. " "Install it with: pip install xlrd"
+            "xlrd is required to read .xls files. Install it with: pip install xlrd"
         )
 
 
@@ -566,7 +566,7 @@ def parse_trios_excel(
                         available=sheet_names,
                     )
                     raise ValueError(
-                        f"Sheet '{sheet_name}' not found. " f"Available: {sheet_names}"
+                        f"Sheet '{sheet_name}' not found. Available: {sheet_names}"
                     )
                 sheets_to_parse = [sheet_names.index(sheet_name)]
             else:

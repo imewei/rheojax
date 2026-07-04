@@ -124,7 +124,8 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_sticky_rouse",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
+)
 class TNTStickyRouse(TNTBase):
     """Sticky Rouse model for associative polymers.
 
@@ -171,6 +172,7 @@ class TNTStickyRouse(TNTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, n_modes: int = 3):
         """Initialize Sticky Rouse model.
 
@@ -579,7 +581,7 @@ class TNTStickyRouse(TNTBase):
         self._nlsq_result = result
 
         logger.info(
-            f"Sticky Rouse fit complete: " f"n_modes={self._n_modes}, method={method}"
+            f"Sticky Rouse fit complete: n_modes={self._n_modes}, method={method}"
         )
         return self
 

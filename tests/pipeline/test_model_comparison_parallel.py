@@ -38,9 +38,9 @@ class TestModelComparisonParallel:
         for model in mc_seq.results:
             seq_r2 = mc_seq.results[model].get("r_squared", 0)
             par_r2 = mc_par.results[model].get("r_squared", 0)
-            assert (
-                abs(seq_r2 - par_r2) < 0.05
-            ), f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
+            assert abs(seq_r2 - par_r2) < 0.05, (
+                f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
+            )
 
     def test_parallel_single_model_fallback(self, relaxation_data):
         """With only 1 model, parallel=True should not use pool."""

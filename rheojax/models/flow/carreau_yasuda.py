@@ -36,9 +36,7 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register(
-    "carreau_yasuda",
-    protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("carreau_yasuda", protocols=[Protocol.FLOW_CURVE])
 class CarreauYasuda(BaseModel):
     """Carreau-Yasuda model for non-Newtonian flow (ROTATION only).
 
@@ -67,6 +65,7 @@ class CarreauYasuda(BaseModel):
     """
 
     flow_quantity = "viscosity"
+
     def __init__(self):
         """Initialize Carreau-Yasuda model."""
         super().__init__()

@@ -384,9 +384,9 @@ class TestTriosCsvNumericFirstColumn:
             # Check that first column is not all NaN
             if result.tables:
                 first_col = result.tables[0].df.iloc[:, 0]
-                assert (
-                    not first_col.isna().all()
-                ), "First column should not be all NaN when values are numeric"
+                assert not first_col.isna().all(), (
+                    "First column should not be all NaN when values are numeric"
+                )
         except (ValueError, KeyError):
             pass  # File may not be valid TRIOS format
 
@@ -494,9 +494,9 @@ class TestMonotonicDetectionWithNoise:
         data = RheoData(x=t, y=G_noisy)
         mode = service.detect_test_mode(data)
 
-        assert (
-            mode == "relaxation"
-        ), f"Noisy relaxation data was detected as '{mode}' instead of 'relaxation'"
+        assert mode == "relaxation", (
+            f"Noisy relaxation data was detected as '{mode}' instead of 'relaxation'"
+        )
 
     @pytest.mark.smoke
     def test_noisy_creep_detected(self):
@@ -523,9 +523,9 @@ class TestMonotonicDetectionWithNoise:
         data = RheoData(x=t, y=J_noisy)
         mode = service.detect_test_mode(data)
 
-        assert (
-            mode == "creep"
-        ), f"Mostly-monotonic creep data with 3 dips was detected as '{mode}'"
+        assert mode == "creep", (
+            f"Mostly-monotonic creep data with 3 dips was detected as '{mode}'"
+        )
 
     @pytest.mark.smoke
     def test_strictly_monotonic_still_works(self):
@@ -793,10 +793,7 @@ class TestY2ColTranslation:
 
         fpath = tmp_path / "complex_modulus.csv"
         fpath.write_text(
-            "x_val,storage,loss\n"
-            "1,100000,10000\n"
-            "10,200000,20000\n"
-            "100,300000,30000\n"
+            "x_val,storage,loss\n1,100000,10000\n10,200000,20000\n100,300000,30000\n"
         )
 
         # Simulate the GUI→auto_load→_try_csv chain
@@ -915,9 +912,9 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=gamma_dot, y=eta)
         mode = service.detect_test_mode(data)
 
-        assert (
-            mode == "flow"
-        ), f"Shear-thinning power-law detected as '{mode}' instead of 'flow'"
+        assert mode == "flow", (
+            f"Shear-thinning power-law detected as '{mode}' instead of 'flow'"
+        )
 
     @pytest.mark.smoke
     def test_exponential_relaxation_not_flow(self):
@@ -934,9 +931,9 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=t, y=G_t)
         mode = service.detect_test_mode(data)
 
-        assert (
-            mode == "relaxation"
-        ), f"Exponential relaxation detected as '{mode}' instead of 'relaxation'"
+        assert mode == "relaxation", (
+            f"Exponential relaxation detected as '{mode}' instead of 'relaxation'"
+        )
 
     @pytest.mark.smoke
     def test_narrow_range_not_flow(self):
@@ -1181,12 +1178,12 @@ class TestImportDispatchSplitsComplex:
         # The dispatch must use np.real for y_data when complex.
         # After GUI-009 fix, data is first converted via np.asarray then
         # split with np.real(y_np) / np.imag(y_np).
-        assert (
-            "np.real(" in code and "y_data" in code
-        ), "Import dispatch must store np.real(y) as y_data for complex data"
-        assert (
-            "np.imag(" in code and "y2_data" in code
-        ), "Import dispatch must store np.imag(y) as y2_data for complex data"
+        assert "np.real(" in code and "y_data" in code, (
+            "Import dispatch must store np.real(y) as y_data for complex data"
+        )
+        assert "np.imag(" in code and "y2_data" in code, (
+            "Import dispatch must store np.imag(y) as y2_data for complex data"
+        )
 
 
 class TestDetectTestModeFlow:
@@ -1542,9 +1539,9 @@ class TestDetectTestModeSubMillihertz:
 
         data = RheoData(x=omega, y=E_prime)
         mode = service.detect_test_mode(data)
-        assert (
-            mode == "oscillation"
-        ), f"Sub-mHz DMA data detected as '{mode}' instead of 'oscillation'"
+        assert mode == "oscillation", (
+            f"Sub-mHz DMA data detected as '{mode}' instead of 'oscillation'"
+        )
 
 
 class TestJsonFallbackError:

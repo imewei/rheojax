@@ -52,7 +52,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class FMLIKH(FIKHBase):
     r"""Fractional Multi-Layer Isotropic-Kinematic Hardening (FMLIKH) Model.
 
@@ -93,6 +94,7 @@ class FMLIKH(FIKHBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         n_modes: int = 3,

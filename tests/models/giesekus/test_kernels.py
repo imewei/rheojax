@@ -191,9 +191,9 @@ class TestNormalStresses:
             ratio = float(N2 / N1)
             expected = -alpha / 2
 
-            assert np.isclose(
-                ratio, expected, rtol=0.01
-            ), f"α={alpha}: {ratio} != {expected}"
+            assert np.isclose(ratio, expected, rtol=0.01), (
+                f"α={alpha}: {ratio} != {expected}"
+            )
 
     @pytest.mark.smoke
     def test_n2_n1_ratio_deviates_at_high_wi(self):

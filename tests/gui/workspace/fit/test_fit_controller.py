@@ -161,7 +161,10 @@ def test_export_step_unlocked_once_visualize_reached(qtbot):
         "r_squared": 0.99,
         "success": True,
     }
-    bodies[3]._sample_fn = lambda *a, **k: {"posterior_samples": {}, "sample_stats": None}
+    bodies[3]._sample_fn = lambda *a, **k: {
+        "posterior_samples": {},
+        "sample_stats": None,
+    }
 
     bodies[0].set_protocol("oscillation")
     bodies[0].set_model("maxwell")

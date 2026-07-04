@@ -117,6 +117,7 @@ def _make_run_fn(library):
             "result": tr.extras,
             "protocol_type": infer_output_protocol(library, transform_key, slots),
         }
+
     return _run
 
 
@@ -133,8 +134,8 @@ def build_transform_controller(app_state: AppState):
         lambda b=bodies[0]: b.is_ready(),
         lambda b=bodies[1]: b.is_ready(),
         lambda b=bodies[2]: b.is_ready(),
-        lambda: True,   # Visualize is read-only
-        lambda: True,   # Export just saves/writes
+        lambda: True,  # Visualize is read-only
+        lambda: True,  # Export just saves/writes
     ]
     steps = [
         Step(

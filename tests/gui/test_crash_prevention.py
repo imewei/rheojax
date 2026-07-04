@@ -66,9 +66,9 @@ class TestEmojiCrashPrevention:
         provider = IconProvider(allow_emoji=False)
 
         for category, icon in provider.CATEGORY_ICONS_ASCII.items():
-            assert ascii_checker(
-                icon
-            ), f"Category {category} has non-ASCII icon: {icon}"
+            assert ascii_checker(icon), (
+                f"Category {category} has non-ASCII icon: {icon}"
+            )
 
     def test_all_status_icons_are_ascii(self, ascii_checker):
         """Verify all status icons contain only ASCII characters."""
@@ -86,9 +86,9 @@ class TestEmojiCrashPrevention:
         provider = IconProvider(allow_emoji=False)
 
         for file_type, icon in provider.FILE_ICONS_ASCII.items():
-            assert ascii_checker(
-                icon
-            ), f"File type {file_type} has non-ASCII icon: {icon}"
+            assert ascii_checker(icon), (
+                f"File type {file_type} has non-ASCII icon: {icon}"
+            )
 
     def test_emoji_detection_works(self, emoji_checker):
         """Verify emoji detection function correctly identifies emoji."""
@@ -356,9 +356,9 @@ class TestRegressionCrashPrevention:
 
         result = subprocess_runner(code, timeout=10.0)
 
-        assert (
-            not result.crashed
-        ), f"Status bar regression crashed. stderr: {result.stderr}"
+        assert not result.crashed, (
+            f"Status bar regression crashed. stderr: {result.stderr}"
+        )
         assert "SUCCESS" in result.stdout
 
 

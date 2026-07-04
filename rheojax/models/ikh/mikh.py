@@ -54,7 +54,8 @@ _IKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class MIKH(IKHBase):
     r"""Maxwell-Isotropic-Kinematic Hardening (MIKH) Model.
 
@@ -98,6 +99,7 @@ class MIKH(IKHBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         super().__init__()
         self._test_mode = None  # Store test mode for Bayesian

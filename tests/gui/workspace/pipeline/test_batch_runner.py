@@ -13,8 +13,17 @@ from rheojax.gui.workspace.pipeline.batch_runner import PipelineBatchRunner
 
 
 def _ref(id_, ptype):
-    return DatasetRef(id=id_, name=id_, protocol_type=ptype, origin="imported",
-                      units={}, row_count=3, hash="h", provenance={}, lineage=[])
+    return DatasetRef(
+        id=id_,
+        name=id_,
+        protocol_type=ptype,
+        origin="imported",
+        units={},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_batch_runner_processes_each_selected_dataset(qtbot, tmp_path, monkeypatch):
@@ -22,13 +31,23 @@ def test_batch_runner_processes_each_selected_dataset(qtbot, tmp_path, monkeypat
     lib = DatasetLibrary()
     for id_ in ("d1", "d2"):
         lib.add(_ref(id_, "oscillation"))
-        lib.store_payload(id_, RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation"))
+        lib.store_payload(
+            id_, RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation")
+        )
 
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="export",
-                                 config={"path": str(tmp_path / "{id}.csv"), "format": "csv"})]
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="export",
+            config={"path": str(tmp_path / "{id}.csv"), "format": "csv"},
+        )
+    ]
     runner = PipelineBatchRunner(
-        service=svc, steps=steps, selected_dataset_ids=["d1", "d2"], library=lib,
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1", "d2"],
+        library=lib,
         stop_requested=threading.Event(),
     )
 
@@ -41,18 +60,32 @@ def test_batch_runner_processes_each_selected_dataset(qtbot, tmp_path, monkeypat
     assert set(finished) == {"d1", "d2"}
 
 
-def test_batch_runner_prepare_job_record_keeps_raw_result_uncompressed(qtbot, tmp_path, monkeypatch):
+def test_batch_runner_prepare_job_record_keeps_raw_result_uncompressed(
+    qtbot, tmp_path, monkeypatch
+):
     # _prepare_job_record() must NOT write any HDF5 file or split the result -- that's
     # save_project_v2()'s job at save time, not the batch runner's job at execution time.
     monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "subprocess")
     lib = DatasetLibrary()
     lib.add(_ref("d1", "relaxation"))
-    lib.store_payload("d1", RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation"))
+    lib.store_payload(
+        "d1", RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation")
+    )
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="fit",
-                                 config={"model_name": "maxwell", "run_nuts": False})]
-    runner = PipelineBatchRunner(service=svc, steps=steps, selected_dataset_ids=["d1"],
-                                  library=lib, stop_requested=threading.Event())
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="fit",
+            config={"model_name": "maxwell", "run_nuts": False},
+        )
+    ]
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1"],
+        library=lib,
+        stop_requested=threading.Event(),
+    )
     records = []
     svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
     with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
@@ -62,20 +95,33 @@ def test_batch_runner_prepare_job_record_keeps_raw_result_uncompressed(qtbot, tm
     assert isinstance(phase["result"], dict)  # still the raw, unpersisted result dict
 
 
-def test_batch_runner_processes_datasets_in_order_and_skips_after_stop(qtbot, tmp_path, monkeypatch):
+def test_batch_runner_processes_datasets_in_order_and_skips_after_stop(
+    qtbot, tmp_path, monkeypatch
+):
     monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "subprocess")
     lib = DatasetLibrary()
     for id_ in ("d1", "d2", "d3"):
         lib.add(_ref(id_, "oscillation"))
-        lib.store_payload(id_, RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation"))
+        lib.store_payload(
+            id_, RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation")
+        )
 
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="export",
-                                 config={"path": str(tmp_path / "{id}.csv"), "format": "csv"})]
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="export",
+            config={"path": str(tmp_path / "{id}.csv"), "format": "csv"},
+        )
+    ]
     stop_requested = threading.Event()
-    runner = PipelineBatchRunner(service=svc, steps=steps,
-                                  selected_dataset_ids=["d1", "d2", "d3"], library=lib,
-                                  stop_requested=stop_requested)
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1", "d2", "d3"],
+        library=lib,
+        stop_requested=stop_requested,
+    )
 
     started = []
 
@@ -89,7 +135,9 @@ def test_batch_runner_processes_datasets_in_order_and_skips_after_stop(qtbot, tm
     assert started == ["d1", "d2"]  # d3 never started once stop_requested was set
 
 
-def test_batch_runner_job_record_round_trips_through_save_project_v2(qtbot, tmp_path, monkeypatch):
+def test_batch_runner_job_record_round_trips_through_save_project_v2(
+    qtbot, tmp_path, monkeypatch
+):
     # Cross-plan integration: _prepare_job_record()'s output dict must slot directly into
     # AppState.job_history.by_id and survive Plan 1's save_project_v2/load_project_v2 round
     # trip -- the exact shape contract described in project_codec.py's job_history-walking
@@ -97,12 +145,24 @@ def test_batch_runner_job_record_round_trips_through_save_project_v2(qtbot, tmp_
     monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "subprocess")
     lib = DatasetLibrary()
     lib.add(_ref("d1", "relaxation"))
-    lib.store_payload("d1", RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation"))
+    lib.store_payload(
+        "d1", RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation")
+    )
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="fit",
-                                 config={"model_name": "maxwell", "run_nuts": False})]
-    runner = PipelineBatchRunner(service=svc, steps=steps, selected_dataset_ids=["d1"],
-                                  library=lib, stop_requested=threading.Event())
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="fit",
+            config={"model_name": "maxwell", "run_nuts": False},
+        )
+    ]
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1"],
+        library=lib,
+        stop_requested=threading.Event(),
+    )
     records = []
     svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
     with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
@@ -113,8 +173,10 @@ def test_batch_runner_job_record_round_trips_through_save_project_v2(qtbot, tmp_
     state = AppState()
     state.job_history.by_id["job1"] = record
     path = tmp_path / "project.rheojax"
-    save_project_v2(state, path)  # must not raise -- proves the shape matches project_codec's
-                                    # expectations (fit phase result_ref/result_meta split)
+    save_project_v2(
+        state, path
+    )  # must not raise -- proves the shape matches project_codec's
+    # expectations (fit phase result_ref/result_meta split)
     loaded = load_project_v2(path)
 
     loaded_phase = loaded.job_history.by_id["job1"]["step_results"]["s1"]["nlsq"]
@@ -136,36 +198,58 @@ def test_batch_runner_emits_finished_with_failed_record_on_fatal_precondition_er
     lib = DatasetLibrary()
     for id_ in ("d1", "d2"):
         lib.add(_ref(id_, "relaxation"))
-        lib.store_payload(id_, RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation"))
+        lib.store_payload(
+            id_, RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation")
+        )
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="fit",
-                                 config={"model_name": "maxwell", "run_nuts": False})]
-    runner = PipelineBatchRunner(service=svc, steps=steps, selected_dataset_ids=["d1", "d2"],
-                                  library=lib, stop_requested=threading.Event())
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="fit",
+            config={"model_name": "maxwell", "run_nuts": False},
+        )
+    ]
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1", "d2"],
+        library=lib,
+        stop_requested=threading.Event(),
+    )
     started, records = [], []
     svc.dataset_run_started.connect(lambda dsid: started.append(dsid))
     svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
     with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
         runner.run()
-    assert started == ["d1"]  # fatal precondition error stops the batch -- d2 never started
+    assert started == [
+        "d1"
+    ]  # fatal precondition error stops the batch -- d2 never started
     assert len(records) == 1
     assert records[0]["status"] == "failed"
     assert "subprocess" in records[0]["error"]
     assert records[0]["step_results"] == {}
 
 
-def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(qtbot, tmp_path, monkeypatch):
+def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(
+    qtbot, tmp_path, monkeypatch
+):
     # A "transform" step's record must carry its RheoData under literally "output" so
     # save_project_v2's `elif "output" in step_record` branch detects and persists it.
     monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "subprocess")
     lib = DatasetLibrary()
     lib.add(_ref("d1", "oscillation"))
-    lib.store_payload("d1", RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation"))
+    lib.store_payload(
+        "d1", RheoData(x=[0.1, 1.0], y=[1.0, 2.0], initial_test_mode="oscillation")
+    )
     svc = PipelineExecutionService()
-    steps = [PipelineStepConfig(id="s1", step_type="transform",
-                                 config={"name": "fft"})]
-    runner = PipelineBatchRunner(service=svc, steps=steps, selected_dataset_ids=["d1"],
-                                  library=lib, stop_requested=threading.Event())
+    steps = [PipelineStepConfig(id="s1", step_type="transform", config={"name": "fft"})]
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1"],
+        library=lib,
+        stop_requested=threading.Event(),
+    )
     records = []
     svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
     with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
@@ -178,10 +262,13 @@ def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(qtbot
     state = AppState()
     state.job_history.by_id["job1"] = record
     path = tmp_path / "project.rheojax"
-    save_project_v2(state, path)  # must not raise TypeError trying to json.dumps() a RheoData
+    save_project_v2(
+        state, path
+    )  # must not raise TypeError trying to json.dumps() a RheoData
     loaded = load_project_v2(path)
 
     loaded_step = loaded.job_history.by_id["job1"]["step_results"]["s1"]
     assert "output_ref" not in loaded_step
     import numpy as np
+
     np.testing.assert_array_equal(loaded_step["output"].x, step_record["output"].x)

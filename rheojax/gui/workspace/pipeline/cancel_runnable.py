@@ -5,6 +5,7 @@ SIGTERM/SIGKILL escalation with blocking process.join(timeout=...) calls (up to 
 combined by default). Calling it directly from the GUI thread would freeze the UI -- this
 QRunnable exists so callers submit it to QThreadPool.globalInstance() instead.
 """
+
 from __future__ import annotations
 
 from typing import Any

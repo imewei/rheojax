@@ -838,9 +838,7 @@ class BatchPipeline:
 
     def __repr__(self) -> str:
         """String representation."""
-        return (
-            f"BatchPipeline(results={len(self.results)}, " f"errors={len(self.errors)})"
-        )
+        return f"BatchPipeline(results={len(self.results)}, errors={len(self.errors)})"
 
 
 __all__ = ["BatchPipeline"]

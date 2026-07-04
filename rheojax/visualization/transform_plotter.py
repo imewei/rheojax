@@ -273,7 +273,7 @@ class TransformPlotter:
             # Left: unshifted multi-temperature overlay
             colors = plt.cm.viridis(np.linspace(0, 1, len(input_data)))  # type: ignore[arg-type]
             for i, data in enumerate(input_data):  # type: ignore[arg-type]
-                temp = (data.metadata or {}).get("temperature", f"#{i+1}")
+                temp = (data.metadata or {}).get("temperature", f"#{i + 1}")
                 x_d = _ensure_numpy(data.x)
                 y_d = _ensure_numpy(data.y)
                 if np.iscomplexobj(y_d):

@@ -12,6 +12,7 @@ Two responsibilities:
    STZ NB04/NB05 (2026-05-18 RCA — see memory file
    ``stz-notebook-rca-2026-05-18.md``).
 """
+
 from __future__ import annotations
 
 import json
@@ -59,10 +60,16 @@ def _code(source: str, execution_count: int | None, idx: int = 0) -> dict:
 def test_scanner_clean_notebook(tmp_path: Path) -> None:
     """Partial-execution notebook with no fit cells must pass."""
     p = tmp_path / "clean.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("import numpy as np", execution_count=1, idx=0),
-        _code("print('hi')", execution_count=2, idx=1),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("import numpy as np", execution_count=1, idx=0),
+                    _code("print('hi')", execution_count=2, idx=1),
+                ]
+            )
+        )
+    )
     assert check_notebook(p) == []
 
 
@@ -70,10 +77,18 @@ def test_scanner_clean_notebook(tmp_path: Path) -> None:
 def test_scanner_skips_fully_cleared(tmp_path: Path) -> None:
     """Fully-cleared notebooks (e.g. clean_notebook_outputs.py output) are intentional."""
     p = tmp_path / "cleared.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("model.fit(x, y)", execution_count=None, idx=0),
-        _code("compute_fit_quality(y, y_pred)", execution_count=None, idx=1),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("model.fit(x, y)", execution_count=None, idx=0),
+                    _code(
+                        "compute_fit_quality(y, y_pred)", execution_count=None, idx=1
+                    ),
+                ]
+            )
+        )
+    )
     assert check_notebook(p) == []
 
 
@@ -81,11 +96,21 @@ def test_scanner_skips_fully_cleared(tmp_path: Path) -> None:
 def test_scanner_flags_silent_skip_model_fit(tmp_path: Path) -> None:
     """Unexecuted ``.fit(`` cell alongside executed cells = silent-skip."""
     p = tmp_path / "skip.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("import numpy as np", execution_count=1, idx=0),
-        _code("model.fit(x, y, test_mode='creep')", execution_count=None, idx=1),
-        _code("model.predict(x)", execution_count=2, idx=2),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("import numpy as np", execution_count=1, idx=0),
+                    _code(
+                        "model.fit(x, y, test_mode='creep')",
+                        execution_count=None,
+                        idx=1,
+                    ),
+                    _code("model.predict(x)", execution_count=2, idx=2),
+                ]
+            )
+        )
+    )
     violations = check_notebook(p)
     assert len(violations) == 1
     assert "cell[1]" in violations[0]
@@ -96,11 +121,19 @@ def test_scanner_flags_silent_skip_model_fit(tmp_path: Path) -> None:
 def test_scanner_flags_silent_skip_fit_bayesian(tmp_path: Path) -> None:
     """The fit_bayesian marker is also caught."""
     p = tmp_path / "skip_bayes.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("model = STZConventional()", execution_count=1, idx=0),
-        _code("result = model.fit_bayesian(t, y)", execution_count=None, idx=1),
-        _code("print(result.posterior_samples)", execution_count=2, idx=2),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("model = STZConventional()", execution_count=1, idx=0),
+                    _code(
+                        "result = model.fit_bayesian(t, y)", execution_count=None, idx=1
+                    ),
+                    _code("print(result.posterior_samples)", execution_count=2, idx=2),
+                ]
+            )
+        )
+    )
     violations = check_notebook(p)
     assert len(violations) == 1
     assert "fit_bayesian" in violations[0]
@@ -110,10 +143,20 @@ def test_scanner_flags_silent_skip_fit_bayesian(tmp_path: Path) -> None:
 def test_scanner_flags_compute_fit_quality(tmp_path: Path) -> None:
     """compute_fit_quality is the second marker on the STZ tutorial cells."""
     p = tmp_path / "skip_quality.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("model.fit(x, y)", execution_count=1, idx=0),
-        _code("q = compute_fit_quality(y, y_pred)", execution_count=None, idx=1),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("model.fit(x, y)", execution_count=1, idx=0),
+                    _code(
+                        "q = compute_fit_quality(y, y_pred)",
+                        execution_count=None,
+                        idx=1,
+                    ),
+                ]
+            )
+        )
+    )
     violations = check_notebook(p)
     assert len(violations) == 1
     assert "compute_fit_quality" in violations[0]
@@ -123,10 +166,18 @@ def test_scanner_flags_compute_fit_quality(tmp_path: Path) -> None:
 def test_scanner_ignores_comments(tmp_path: Path) -> None:
     """A commented-out fit call must NOT be flagged."""
     p = tmp_path / "comment.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("import numpy as np", execution_count=1, idx=0),
-        _code("# model.fit(x, y) - example only", execution_count=None, idx=1),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("import numpy as np", execution_count=1, idx=0),
+                    _code(
+                        "# model.fit(x, y) - example only", execution_count=None, idx=1
+                    ),
+                ]
+            )
+        )
+    )
     assert check_notebook(p) == []
 
 
@@ -134,10 +185,16 @@ def test_scanner_ignores_comments(tmp_path: Path) -> None:
 def test_scanner_cli_returns_nonzero_on_violation(tmp_path: Path) -> None:
     """Driver returns exit code 1 when a violation is present."""
     p = tmp_path / "skip.ipynb"
-    p.write_text(json.dumps(_make_nb([
-        _code("x = 1", execution_count=1, idx=0),
-        _code("model.fit(x, y)", execution_count=None, idx=1),
-    ])))
+    p.write_text(
+        json.dumps(
+            _make_nb(
+                [
+                    _code("x = 1", execution_count=1, idx=0),
+                    _code("model.fit(x, y)", execution_count=None, idx=1),
+                ]
+            )
+        )
+    )
     assert scanner_main([str(p)]) == 1
 
 
@@ -156,7 +213,8 @@ def test_examples_notebooks_have_no_new_silent_skips() -> None:
         pytest.skip("examples/ directory not present")
     allowed = _load_allowlist(BASELINE_FILE)
     notebooks = [
-        p for p in sorted(examples_dir.rglob("*.ipynb"))
+        p
+        for p in sorted(examples_dir.rglob("*.ipynb"))
         if ".ipynb_checkpoints" not in p.parts
         and not _allowlist_matches(p, allowed, REPO_ROOT)
     ]

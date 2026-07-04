@@ -534,10 +534,10 @@ def format_compatibility_message(compatibility: dict) -> str:
 
     if compatibility["compatible"]:
         lines.append("✓ Model appears compatible with data")
-        lines.append(f"  Confidence: {compatibility['confidence']*100:.0f}%")
+        lines.append(f"  Confidence: {compatibility['confidence'] * 100:.0f}%")
     else:
         lines.append("⚠ Model may not be appropriate for this data")
-        lines.append(f"  Confidence: {compatibility['confidence']*100:.0f}%")
+        lines.append(f"  Confidence: {compatibility['confidence'] * 100:.0f}%")
 
     # Add detected characteristics
     decay = compatibility["decay_type"]

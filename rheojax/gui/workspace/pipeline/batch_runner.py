@@ -7,6 +7,7 @@ above this task's Interfaces section) but never mutates AppState directly -- tha
 in PipelineController._commit_job_result() (controller.py), the GUI-thread slot connected to
 dataset_run_finished.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,7 +19,9 @@ from rheojax.gui.workspace.pipeline.models import FitStepResult
 
 
 class PipelineBatchRunner(QRunnable):
-    def __init__(self, service, steps, selected_dataset_ids, library, stop_requested) -> None:
+    def __init__(
+        self, service, steps, selected_dataset_ids, library, stop_requested
+    ) -> None:
         super().__init__()
         self._service = service
         self._steps = steps
@@ -40,7 +43,9 @@ class PipelineBatchRunner(QRunnable):
             fatal = False
             try:
                 result = self._service.execute(
-                    steps=steps_for_dataset, initial_context=ctx, library=self._library,
+                    steps=steps_for_dataset,
+                    initial_context=ctx,
+                    library=self._library,
                     stop_requested=self._stop_requested,
                 )
                 record = self._prepare_job_record(dataset_id, result)
@@ -63,7 +68,12 @@ class PipelineBatchRunner(QRunnable):
 
     @staticmethod
     def _failed_record(dataset_id: str, error: str) -> dict:
-        return {"dataset_id": dataset_id, "status": "failed", "error": error, "step_results": {}}
+        return {
+            "dataset_id": dataset_id,
+            "status": "failed",
+            "error": error,
+            "step_results": {},
+        }
 
     @staticmethod
     def _substitute_dataset_id(steps, dataset_id: str) -> list:
@@ -72,7 +82,9 @@ class PipelineBatchRunner(QRunnable):
             new_config = dict(step.config)
             if "path" in new_config and "{id}" in new_config["path"]:
                 new_config["path"] = new_config["path"].format(id=dataset_id)
-            substituted.append(type(step)(id=step.id, step_type=step.step_type, config=new_config))
+            substituted.append(
+                type(step)(id=step.id, step_type=step.step_type, config=new_config)
+            )
         return substituted
 
     def _prepare_job_record(self, dataset_id: str, result) -> dict:
@@ -82,7 +94,9 @@ class PipelineBatchRunner(QRunnable):
                 step_results_out[step_id] = {
                     "step_type": "fit",
                     "nlsq": self._phase_to_dict(step_result.nlsq),
-                    "nuts": self._phase_to_dict(step_result.nuts) if step_result.nuts else None,
+                    "nuts": self._phase_to_dict(step_result.nuts)
+                    if step_result.nuts
+                    else None,
                 }
             else:
                 step_results_out[step_id] = {"step_type": "other", **step_result}

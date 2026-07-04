@@ -163,9 +163,9 @@ class TestSGRModelComparison:
         rel_diff = np.abs(G_prime_conv - G_prime_gen) / (G_prime_conv + 1e-10)
 
         # Allow up to 15% difference (GENERIC has additional thermodynamic terms)
-        assert (
-            np.mean(rel_diff) < 0.15
-        ), f"SGRConventional and SGRGeneric differ by {np.mean(rel_diff)*100:.1f}% on average"
+        assert np.mean(rel_diff) < 0.15, (
+            f"SGRConventional and SGRGeneric differ by {np.mean(rel_diff) * 100:.1f}% on average"
+        )
 
     def test_sgr_model_registry_comparison(self):
         """Test both SGR models are properly registered and can be instantiated."""
@@ -207,12 +207,12 @@ class TestSGRPublishedValidation:
 
         # Verify basic power-law trends (increasing with omega)
         # For x=1.5, exponent should be 0.5, so G' and G'' increase with omega
-        assert (
-            G_prime[-1] > G_prime[0]
-        ), "G' should increase with omega in power-law regime"
-        assert (
-            G_double_prime[-1] > G_double_prime[0]
-        ), "G'' should increase with omega in power-law regime"
+        assert G_prime[-1] > G_prime[0], (
+            "G' should increase with omega in power-law regime"
+        )
+        assert G_double_prime[-1] > G_double_prime[0], (
+            "G'' should increase with omega in power-law regime"
+        )
 
         # Verify log-log linearity (power-law behavior)
         log_omega = np.log10(omega[10:40])
@@ -220,9 +220,9 @@ class TestSGRPublishedValidation:
 
         # Linear correlation coefficient should be high for power-law
         correlation = np.corrcoef(log_omega, log_Gp)[0, 1]
-        assert (
-            correlation > 0.95
-        ), f"Power-law behavior should give linear log-log plot, got R={correlation:.3f}"
+        assert correlation > 0.95, (
+            f"Power-law behavior should give linear log-log plot, got R={correlation:.3f}"
+        )
 
     def test_sgr_phase_regime_detection(self):
         """Test SGR predictions change qualitatively across phase regimes."""
@@ -286,21 +286,21 @@ class TestSGRPublishedValidation:
             # Poisson bracket antisymmetry: L = -L^T
             L = model.poisson_bracket(state)
             antisymmetry_error = np.max(np.abs(L + L.T))
-            assert (
-                antisymmetry_error < 1e-10
-            ), f"Poisson bracket not antisymmetric: error={antisymmetry_error:.6e}"
+            assert antisymmetry_error < 1e-10, (
+                f"Poisson bracket not antisymmetric: error={antisymmetry_error:.6e}"
+            )
 
             # Friction matrix symmetry and positive semi-definite
             M = model.friction_matrix(state)
             symmetry_error = np.max(np.abs(M - M.T))
-            assert (
-                symmetry_error < 1e-10
-            ), f"Friction matrix not symmetric: error={symmetry_error:.6e}"
+            assert symmetry_error < 1e-10, (
+                f"Friction matrix not symmetric: error={symmetry_error:.6e}"
+            )
 
             eigenvalues = np.linalg.eigvalsh(M)
-            assert np.all(
-                eigenvalues >= -1e-10
-            ), f"Friction matrix not positive semi-definite: min eigenvalue={np.min(eigenvalues):.6e}"
+            assert np.all(eigenvalues >= -1e-10), (
+                f"Friction matrix not positive semi-definite: min eigenvalue={np.min(eigenvalues):.6e}"
+            )
 
         print("GENERIC thermodynamic consistency verified per Fuereder & Ilg 2013 ✓")
 

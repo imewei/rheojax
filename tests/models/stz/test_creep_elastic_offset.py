@@ -14,6 +14,7 @@ creep data (e.g. mucus) to collapse with R^2 < 0.
 
 These tests pin the invariant so the regression cannot recur.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -29,9 +30,9 @@ jax, jnp = safe_import_jax()
 @pytest.mark.parametrize(
     ("sigma_applied", "G0"),
     [
-        (1.0, 1.0),       # Soft material — gamma_e ~ O(1), dominant
-        (1.2e6, 1e9),     # Glassy material — gamma_e small but non-zero
-        (1e3, 5e3),       # Intermediate
+        (1.0, 1.0),  # Soft material — gamma_e ~ O(1), dominant
+        (1.2e6, 1e9),  # Glassy material — gamma_e small but non-zero
+        (1e3, 5e3),  # Intermediate
     ],
 )
 def test_creep_initial_strain_matches_elastic_response(sigma_applied, G0):
@@ -103,7 +104,9 @@ def test_creep_strain_monotone_increasing_above_yield():
     gamma_e = sigma_applied / 1000.0
     assert np.isclose(strain[0], gamma_e, rtol=1e-6)
     assert np.all(np.diff(strain) >= -1e-9), "strain must be monotonic non-decreasing"
-    assert strain[-1] > gamma_e * 2.0, "above-yield plastic flow must dominate at late time"
+    assert strain[-1] > gamma_e * 2.0, (
+        "above-yield plastic flow must dominate at late time"
+    )
 
 
 @pytest.mark.slow

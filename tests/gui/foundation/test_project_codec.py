@@ -30,8 +30,13 @@ from rheojax.gui.foundation.state import (
 
 def test_flat_scalar_and_array_roundtrip(tmp_path):
     path = tmp_path / "result.hdf5"
-    result = {"r_squared": 0.98, "success": True, "message": "ok", "note": None,
-              "x_fit": np.array([1.0, 2.0, 3.0])}
+    result = {
+        "r_squared": 0.98,
+        "success": True,
+        "message": "ok",
+        "note": None,
+        "x_fit": np.array([1.0, 2.0, 3.0]),
+    }
     json_shape = write_result_arrays(path, result)
     assert json_shape["r_squared"] == 0.98
     assert json_shape["x_fit"] == {"$hdf5_ref": "x_fit"}
@@ -51,11 +56,20 @@ def test_nested_dict_of_arrays_roundtrip(tmp_path):
         "r_hat": {"G_p": 1.01, "tau": 1.02},
     }
     json_shape = write_result_arrays(path, result)
-    assert json_shape["posterior_samples"]["G_p"] == {"$hdf5_ref": "posterior_samples/G_p"}
-    assert json_shape["r_hat"] == {"G_p": 1.01, "tau": 1.02}   # no arrays -- stays inline
+    assert json_shape["posterior_samples"]["G_p"] == {
+        "$hdf5_ref": "posterior_samples/G_p"
+    }
+    assert json_shape["r_hat"] == {
+        "G_p": 1.01,
+        "tau": 1.02,
+    }  # no arrays -- stays inline
     restored = read_result_arrays(path, json_shape)
-    np.testing.assert_array_equal(restored["posterior_samples"]["G_p"], result["posterior_samples"]["G_p"])
-    np.testing.assert_array_equal(restored["sample_stats"]["energy"], result["sample_stats"]["energy"])
+    np.testing.assert_array_equal(
+        restored["posterior_samples"]["G_p"], result["posterior_samples"]["G_p"]
+    )
+    np.testing.assert_array_equal(
+        restored["sample_stats"]["energy"], result["sample_stats"]["energy"]
+    )
     assert restored["r_hat"] == {"G_p": 1.01, "tau": 1.02}
 
 
@@ -97,15 +111,25 @@ def test_unsupported_leaf_type_raises_type_error(tmp_path):
 
 
 def _dataset_ref(id_):
-    return DatasetRef(id=id_, name=id_, protocol_type="oscillation", origin="imported",
-                      units={"x": "rad/s", "y": "Pa"}, row_count=3, hash="h", provenance={},
-                      lineage=[])
+    return DatasetRef(
+        id=id_,
+        name=id_,
+        protocol_type="oscillation",
+        origin="imported",
+        units={"x": "rad/s", "y": "Pa"},
+        row_count=3,
+        hash="h",
+        provenance={},
+        lineage=[],
+    )
 
 
 def test_save_project_v2_writes_expected_archive_members(tmp_path):
     state = AppState()
     ref = _dataset_ref("d1")
-    payload = RheoData(x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation")
+    payload = RheoData(
+        x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation"
+    )
     state.library.add(ref)
     state.library.store_payload("d1", payload)
     state.fit = FitState(protocol="oscillation", model_key="maxwell")
@@ -144,7 +168,10 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
     state.library.add(_dataset_ref("d1"))
     state.library.add(_dataset_ref("d2"))
     state.library.store_payload(
-        "d1", RheoData(x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation")
+        "d1",
+        RheoData(
+            x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation"
+        ),
     )
     # d2 intentionally left without a stored payload.
 
@@ -157,15 +184,21 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
     state.transform = TransformState(
         transform_key="smoothing",
         result={
-            "input": RheoData(x=[1.0, 2.0], y=[3.0, 4.0], initial_test_mode="oscillation"),
-            "output": RheoData(x=[1.0, 2.0], y=[5.0, 6.0], initial_test_mode="oscillation"),
+            "input": RheoData(
+                x=[1.0, 2.0], y=[3.0, 4.0], initial_test_mode="oscillation"
+            ),
+            "output": RheoData(
+                x=[1.0, 2.0], y=[5.0, 6.0], initial_test_mode="oscillation"
+            ),
             "warnings": ["clipped 2 points"],
         },
     )
 
     state.pipeline = PipelineState(
-        steps=[PipelineStepConfig(id="s1", step_type="transform"),
-               PipelineStepConfig(id="s2", step_type="fit")],
+        steps=[
+            PipelineStepConfig(id="s1", step_type="transform"),
+            PipelineStepConfig(id="s2", step_type="fit"),
+        ],
         selected_dataset_ids=["d1", "d2"],
         name="batch-a",
     )
@@ -175,13 +208,17 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
         "step_results": {
             "step-fit-1": {
                 "step_type": "fit",
-                "nlsq": {"result": {"r_squared": 0.9, "params": np.array([1.0, 2.0])},
-                         "duration_s": 1.2},
+                "nlsq": {
+                    "result": {"r_squared": 0.9, "params": np.array([1.0, 2.0])},
+                    "duration_s": 1.2,
+                },
                 "nuts": None,
             },
             "step-transform-1": {
                 "step_type": "other",
-                "output": RheoData(x=[1.0, 2.0], y=[7.0, 8.0], initial_test_mode="oscillation"),
+                "output": RheoData(
+                    x=[1.0, 2.0], y=[7.0, 8.0], initial_test_mode="oscillation"
+                ),
             },
         },
     }
@@ -227,11 +264,19 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
 
         # manifest.json hashes every archive member and matches the actual bytes.
         manifest = json.loads(zf.read("manifest.json"))
-        for rel_path in ("metadata.json", "library/manifest.json", "library/d1.hdf5",
-                          f"fit_results/{fit['nlsq_result_ref']}.hdf5"):
+        for rel_path in (
+            "metadata.json",
+            "library/manifest.json",
+            "library/d1.hdf5",
+            f"fit_results/{fit['nlsq_result_ref']}.hdf5",
+        ):
             assert rel_path in manifest["members"]
             import hashlib
-            assert manifest["members"][rel_path]["sha256"] == hashlib.sha256(zf.read(rel_path)).hexdigest()
+
+            assert (
+                manifest["members"][rel_path]["sha256"]
+                == hashlib.sha256(zf.read(rel_path)).hexdigest()
+            )
 
     # atomic write: no leftover temp files
     assert not list(tmp_path.glob(f"{out_path.name}.tmp-*"))
@@ -240,21 +285,31 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
 def test_round_trip_full_state(tmp_path):
     state = AppState()
     ref = _dataset_ref("d1")
-    payload = RheoData(x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation")
+    payload = RheoData(
+        x=[1.0, 2.0, 3.0], y=[10.0, 20.0, 30.0], initial_test_mode="oscillation"
+    )
     state.library.add(ref)
     state.library.store_payload("d1", payload)
     state.fit = FitState(
-        protocol="oscillation", model_key="maxwell",
-        nlsq_config=NlsqConfig(n_starts=5, parameters=[
-            ParameterConfig(name="G0", value=1.0, lower=0.0, upper=10.0, fixed=False)
-        ]),
+        protocol="oscillation",
+        model_key="maxwell",
+        nlsq_config=NlsqConfig(
+            n_starts=5,
+            parameters=[
+                ParameterConfig(
+                    name="G0", value=1.0, lower=0.0, upper=10.0, fixed=False
+                )
+            ],
+        ),
         nuts_config=NutsConfig(run_nuts=False),
         nlsq_result={"parameters": {"G0": 1.0}, "x_fit": np.array([1.0, 2.0])},
     )
     # transform.result holds real RheoData under "input"/"output" (transform_controller.py's
     # actual shape) plus non-array extras -- this must survive the round trip too (§6.1 fix).
     state.transform.result = {
-        "input": payload, "output": payload, "protocol_type": "oscillation",
+        "input": payload,
+        "output": payload,
+        "protocol_type": "oscillation",
     }
 
     path = tmp_path / "project.rheojax"
@@ -281,12 +336,20 @@ def test_round_trip_full_state(tmp_path):
 def test_round_trip_job_history_with_fit_phase_results(tmp_path):
     state = AppState()
     state.job_history.by_id["job1"] = {
-        "dataset_id": "d1", "status": "completed", "error": None,
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
         "step_results": {
             "s1": {
                 "step_type": "fit",
-                "nlsq": {"status": "completed", "error": None,
-                         "result": {"parameters": {"G0": 2.0}, "x_fit": np.array([3.0, 4.0])}},
+                "nlsq": {
+                    "status": "completed",
+                    "error": None,
+                    "result": {
+                        "parameters": {"G0": 2.0},
+                        "x_fit": np.array([3.0, 4.0]),
+                    },
+                },
                 "nuts": None,
             },
         },
@@ -299,7 +362,9 @@ def test_round_trip_job_history_with_fit_phase_results(tmp_path):
     assert phase["status"] == "completed"
     assert phase["result"]["parameters"] == {"G0": 2.0}
     np.testing.assert_array_equal(phase["result"]["x_fit"], np.array([3.0, 4.0]))
-    assert "result_ref" not in phase  # rehydrated back to a plain "result" dict, not left as a reference
+    assert (
+        "result_ref" not in phase
+    )  # rehydrated back to a plain "result" dict, not left as a reference
 
 
 def test_round_trip_job_history_with_transform_step_output(tmp_path):
@@ -308,12 +373,20 @@ def test_round_trip_job_history_with_transform_step_output(tmp_path):
     # round-trip via save_hdf5/load_hdf5 (transform_results/), not raise TypeError from
     # json.dumps() trying to serialize the RheoData directly.
     state = AppState()
-    output_payload = RheoData(x=[0.1, 1.0], y=[5.0, 6.0], initial_test_mode="oscillation")
+    output_payload = RheoData(
+        x=[0.1, 1.0], y=[5.0, 6.0], initial_test_mode="oscillation"
+    )
     state.job_history.by_id["job1"] = {
-        "dataset_id": "d1", "status": "completed", "error": None,
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
         "step_results": {
-            "s1": {"step_type": "other", "output": output_payload,
-                   "protocol_type": "oscillation", "dataset_id": None},
+            "s1": {
+                "step_type": "other",
+                "output": output_payload,
+                "protocol_type": "oscillation",
+                "dataset_id": None,
+            },
         },
     }
     path = tmp_path / "project.rheojax"
@@ -333,10 +406,16 @@ def test_job_history_transform_step_output_none_round_trips(tmp_path):
     # means no output" convention _restore_result_dict uses for fit/NUTS results).
     state = AppState()
     state.job_history.by_id["job1"] = {
-        "dataset_id": "d1", "status": "failed", "error": "transform raised",
+        "dataset_id": "d1",
+        "status": "failed",
+        "error": "transform raised",
         "step_results": {
-            "s1": {"step_type": "other", "output": None,
-                   "protocol_type": "oscillation", "dataset_id": None},
+            "s1": {
+                "step_type": "other",
+                "output": None,
+                "protocol_type": "oscillation",
+                "dataset_id": None,
+            },
         },
     }
     path = tmp_path / "project.rheojax"
@@ -380,6 +459,7 @@ def test_load_rejects_checksum_mismatch(tmp_path):
     save_project_v2(state, path)
 
     import shutil
+
     corrupted = tmp_path / "corrupted.rheojax"
     shutil.copy(path, corrupted)
     # Rewrite the zip with a tampered project.json (zipfile can't edit in place -- rebuild).
@@ -414,11 +494,21 @@ def test_load_rejects_ref_id_path_traversal_in_manifest(tmp_path):
     metadata_bytes = json.dumps({"version": "2.0", "timestamp": "x"}).encode()
     members = {
         "metadata.json": metadata_bytes,
-        "library/manifest.json": json.dumps([{
-            "id": "../../../evil", "name": "d1", "protocol_type": "oscillation",
-            "origin": "imported", "units": {}, "row_count": 1, "hash": "h",
-            "provenance": {}, "lineage": [],
-        }]).encode(),
+        "library/manifest.json": json.dumps(
+            [
+                {
+                    "id": "../../../evil",
+                    "name": "d1",
+                    "protocol_type": "oscillation",
+                    "origin": "imported",
+                    "units": {},
+                    "row_count": 1,
+                    "hash": "h",
+                    "provenance": {},
+                    "lineage": [],
+                }
+            ]
+        ).encode(),
         "fit.json": b"{}",
         "transform.json": json.dumps({"result_refs": {}, "result_extras": {}}).encode(),
         "pipeline.json": json.dumps({"steps": []}).encode(),
@@ -429,10 +519,12 @@ def test_load_rejects_ref_id_path_traversal_in_manifest(tmp_path):
     # manifest.json must declare every OTHER member exactly (load_project_v2 now
     # verifies membership, not just per-file hashes -- see test_load_rejects_
     # manifest_membership_mismatch below).
-    manifest = {"members": {
-        name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
-        for name, data in members.items()
-    }}
+    manifest = {
+        "members": {
+            name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+            for name, data in members.items()
+        }
+    }
     path = tmp_path / "evil_ref_id.rheojax"
     with zipfile.ZipFile(path, "w") as zf:
         for name, data in members.items():
@@ -447,10 +539,15 @@ def test_round_trip_job_history_empty_fit_result_dict_stays_empty_dict(tmp_path)
     # `{}` was silently indistinguishable from "no result" and restored as None.
     state = AppState()
     state.job_history.by_id["job1"] = {
-        "dataset_id": "d1", "status": "completed", "error": None,
+        "dataset_id": "d1",
+        "status": "completed",
+        "error": None,
         "step_results": {
-            "s1": {"step_type": "fit", "nlsq": {"status": "completed", "error": None,
-                                                 "result": {}}, "nuts": None},
+            "s1": {
+                "step_type": "fit",
+                "nlsq": {"status": "completed", "error": None, "result": {}},
+                "nuts": None,
+            },
         },
     }
     path = tmp_path / "project.rheojax"
@@ -498,7 +595,9 @@ def test_load_rejects_metadata_checksum_tampering(tmp_path):
             for item in src.infolist():
                 data = src.read(item.filename)
                 if item.filename == "metadata.json":
-                    data = json.dumps({"version": "2.0", "timestamp": "TAMPERED"}).encode()
+                    data = json.dumps(
+                        {"version": "2.0", "timestamp": "TAMPERED"}
+                    ).encode()
                 dst.writestr(item, data)
 
     with pytest.raises(ValueError, match="checksum"):

@@ -52,7 +52,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class FractionalKelvinVoigt(BaseModel):
     """Fractional Kelvin-Voigt model: Spring and SpringPot in parallel.
 

@@ -73,7 +73,7 @@ class JAXStatusWidget(QWidget):
             font-family: {Typography.FONT_FAMILY};
             font-weight: {Typography.WEIGHT_SEMIBOLD};
             font-size: {Typography.SIZE_XS}pt;
-            color: {themed('TEXT_MUTED')};
+            color: {themed("TEXT_MUTED")};
             text-transform: uppercase;
             letter-spacing: 0.5px;
         """
@@ -87,19 +87,19 @@ class JAXStatusWidget(QWidget):
         self._device_combo.setMinimumWidth(110)
         self._device_combo.setStyleSheet(f"""
             QComboBox {{
-                background-color: {themed('BG_SURFACE')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_SURFACE")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-radius: {BorderRadius.MD}px;
                 padding: {Spacing.XXS}px {Spacing.SM}px;
                 font-family: {Typography.FONT_FAMILY_MONO};
                 font-size: {Typography.SIZE_SM}pt;
-                color: {themed('TEXT_PRIMARY')};
+                color: {themed("TEXT_PRIMARY")};
             }}
             QComboBox:hover {{
-                border-color: {themed('BORDER_DEFAULT')};
+                border-color: {themed("BORDER_DEFAULT")};
             }}
             QComboBox:focus {{
-                border-color: {themed('BORDER_FOCUS')};
+                border-color: {themed("BORDER_FOCUS")};
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -222,13 +222,13 @@ class JAXStatusWidget(QWidget):
 
         self._memory_bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: {themed('BG_HOVER')};
-                border: 1px solid {themed('BORDER_SUBTLE')};
+                background-color: {themed("BG_HOVER")};
+                border: 1px solid {themed("BORDER_SUBTLE")};
                 border-radius: {BorderRadius.SM}px;
                 text-align: center;
                 font-family: {Typography.FONT_FAMILY_MONO};
                 font-size: {Typography.SIZE_XS}pt;
-                color: {themed('TEXT_SECONDARY')};
+                color: {themed("TEXT_SECONDARY")};
             }}
             QProgressBar::chunk {{
                 background-color: {chunk_color};

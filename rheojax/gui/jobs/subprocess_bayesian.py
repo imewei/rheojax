@@ -201,7 +201,9 @@ def run_bayesian_isolated(
     if energy_arr is not None:
         # energy_arr shape: (chains, draws); compute per-chain BFMI and average
         if energy_arr.ndim == 2:
-            bfmi_val = float(np.mean([_bfmi(energy_arr[c]) for c in range(energy_arr.shape[0])]))
+            bfmi_val = float(
+                np.mean([_bfmi(energy_arr[c]) for c in range(energy_arr.shape[0])])
+            )
         else:
             bfmi_val = _bfmi(energy_arr)
     else:

@@ -129,9 +129,7 @@ def validate_prony_parameters(
     return True, ""
 
 
-def create_prony_parameter_set(
-    n_modes: int
-) -> ParameterSet:
+def create_prony_parameter_set(n_modes: int) -> ParameterSet:
     """Create ParameterSet for N-mode Prony series.
 
     Dynamically generates parameters:
@@ -504,9 +502,7 @@ def softmax_penalty(E_i: ArrayLike, scale: float = 1.0):
     return penalty
 
 
-def warm_start_from_n_modes(
-    params_n: ArrayLike, n_target: int
-) -> ArrayLike:
+def warm_start_from_n_modes(params_n: ArrayLike, n_target: int) -> ArrayLike:
     """Extract warm-start parameters for reduced-mode fit from N-mode solution.
 
     Used in element minimization to initialize N-1 mode fit from N mode solution.

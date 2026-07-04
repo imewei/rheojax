@@ -911,9 +911,9 @@ class TestFitRelaxation:
             p = dmt_exponential.parameters[name]
             assert np.isfinite(p.value), f"Parameter {name} is not finite: {p.value}"
             lo, hi = p.bounds
-            assert (
-                lo <= p.value <= hi
-            ), f"Parameter {name}={p.value} outside bounds [{lo}, {hi}]"
+            assert lo <= p.value <= hi, (
+                f"Parameter {name}={p.value} outside bounds [{lo}, {hi}]"
+            )
 
 
 class TestFitCreep:

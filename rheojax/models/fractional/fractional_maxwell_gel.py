@@ -53,7 +53,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class FractionalMaxwellGel(BaseModel):
     """Fractional Maxwell Gel model: SpringPot in series with dashpot.
 

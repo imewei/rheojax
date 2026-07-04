@@ -186,14 +186,14 @@ def test_flow_curve_matches_scalar_epm():
     relative_error = jnp.abs(sigma_scalar - sigma_tensorial) / (sigma_scalar + 1e-10)
 
     # At least verify same order of magnitude
-    assert jnp.all(
-        relative_error < 0.6
-    ), f"Tensorial vs Scalar large mismatch: errors {relative_error}"
+    assert jnp.all(relative_error < 0.6), (
+        f"Tensorial vs Scalar large mismatch: errors {relative_error}"
+    )
 
     # Check correlation (both should increase with rate)
-    assert (
-        jnp.corrcoef(sigma_scalar, sigma_tensorial)[0, 1] > 0.5
-    ), "Scalar and tensorial flow curves should be positively correlated"
+    assert jnp.corrcoef(sigma_scalar, sigma_tensorial)[0, 1] > 0.5, (
+        "Scalar and tensorial flow curves should be positively correlated"
+    )
 
 
 @pytest.mark.slow

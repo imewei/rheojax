@@ -34,6 +34,7 @@ def test_legacy_keys_still_in_available():
 def test_apply_transform_unified_key_fft():
     """apply_transform accepts unified key 'fft_analysis' without raising."""
     import numpy as np
+
     from rheojax.core.data import RheoData
 
     svc = TransformService()
@@ -46,6 +47,7 @@ def test_apply_transform_unified_key_fft():
 def test_apply_transform_unified_key_derivative():
     """apply_transform accepts unified key 'smooth_derivative' without raising."""
     import numpy as np
+
     from rheojax.core.data import RheoData
 
     svc = TransformService()

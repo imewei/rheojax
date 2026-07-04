@@ -21,12 +21,12 @@ def test_numeric_params_have_range():
         params = service.get_transform_params(transform_key)
         for param_name, spec in params.items():
             if spec["type"] in ("float", "int"):
-                assert (
-                    "range" in spec
-                ), f"{transform_key}.{param_name} (type={spec['type']}) missing 'range'"
-                assert (
-                    len(spec["range"]) == 2
-                ), f"{transform_key}.{param_name} 'range' must be (min, max) tuple"
+                assert "range" in spec, (
+                    f"{transform_key}.{param_name} (type={spec['type']}) missing 'range'"
+                )
+                assert len(spec["range"]) == 2, (
+                    f"{transform_key}.{param_name} 'range' must be (min, max) tuple"
+                )
 
 
 def test_choice_params_have_choices():
@@ -36,12 +36,12 @@ def test_choice_params_have_choices():
         params = service.get_transform_params(transform_key)
         for param_name, spec in params.items():
             if spec["type"] == "choice":
-                assert (
-                    "choices" in spec
-                ), f"{transform_key}.{param_name} missing 'choices'"
-                assert (
-                    len(spec["choices"]) >= 2
-                ), f"{transform_key}.{param_name} must have at least 2 choices"
+                assert "choices" in spec, (
+                    f"{transform_key}.{param_name} missing 'choices'"
+                )
+                assert len(spec["choices"]) >= 2, (
+                    f"{transform_key}.{param_name} must have at least 2 choices"
+                )
 
 
 def test_mastercurve_has_shift_method():

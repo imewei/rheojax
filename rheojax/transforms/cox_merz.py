@@ -72,8 +72,7 @@ class CoxMerz(BaseTransform):
         """
         if not isinstance(data, (list, tuple)) or len(data) != 2:
             raise ValueError(
-                "CoxMerz requires exactly 2 RheoData inputs: "
-                "[oscillation, flow_curve]"
+                "CoxMerz requires exactly 2 RheoData inputs: [oscillation, flow_curve]"
             )
 
         osc_data, flow_data = data[0], data[1]

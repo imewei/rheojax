@@ -94,7 +94,8 @@ StressType = Literal["linear", "fene"]
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class VLBVariant(VLBBase):
     """VLB with Bell breakage, FENE-P stress, and/or temperature dependence.
 
@@ -115,6 +116,7 @@ class VLBVariant(VLBBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         breakage: BreakageType = "constant",
@@ -466,11 +468,7 @@ class VLBVariant(VLBBase):
         ]
         params = jnp.array(param_values)
 
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) [G', G''] for oscillation;
         # convert to complex G* for consistent API

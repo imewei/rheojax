@@ -301,7 +301,7 @@ def plot_mastercurve(
                 else:
                     label = f"{temp}C"
             else:
-                label = f"Dataset {i+1}"
+                label = f"Dataset {i + 1}"
 
             # Plot (handle complex data)
             if np.iscomplexobj(y_data):

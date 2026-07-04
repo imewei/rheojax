@@ -356,7 +356,6 @@ def detect_test_type(
         logger.debug("Detected test type: oscillation")
         return "oscillation"
 
-
     # Check for creep
     if has_column("time") and has_column("compliance"):
         logger.debug("Detected test type: creep")
@@ -510,7 +509,6 @@ def select_xy_columns(
         if storage_col and loss_col:
             y_col = storage_col
             y2_col = loss_col
-
 
         if y2_col is not None:
             logger.debug(
@@ -764,8 +762,6 @@ def segment_to_rheodata(
                 metadata["temperature"] = normalize_temperature(float(raw_temp), "C")
             except (TypeError, ValueError):
                 pass
-
-
 
     if segment.auxiliary_columns:
         metadata["auxiliary_columns"] = {

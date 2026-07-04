@@ -235,9 +235,9 @@ class TestOptimizationResult:
 
         # Check that parameters were updated
         final_values = params.get_values()
-        assert not np.allclose(
-            initial_values, final_values
-        ), "Parameters should be updated"
+        assert not np.allclose(initial_values, final_values), (
+            "Parameters should be updated"
+        )
         np.testing.assert_allclose(final_values, result.x, atol=1e-12)
 
 
@@ -602,9 +602,9 @@ class TestOptimizationResultStatistics:
 
         # Confidence intervals should contain the optimal values
         for i, x_opt in enumerate(result.x):
-            assert (
-                ci[i, 0] < x_opt < ci[i, 1]
-            ), f"CI should contain optimal value for param {i}"
+            assert ci[i, 0] < x_opt < ci[i, 1], (
+                f"CI should contain optimal value for param {i}"
+            )
 
     def test_get_parameter_uncertainties(self, simple_result_with_data):
         """Test parameter uncertainty (standard errors) computation."""

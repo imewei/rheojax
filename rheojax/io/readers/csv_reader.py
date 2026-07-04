@@ -589,7 +589,8 @@ def _detect_delimiter(filepath: Path) -> str:
             sample = f.read(8192)
             try:
                 dialect = csv.Sniffer().sniff(
-                    sample, delimiters=[",", "\t", ";", "|", " "]  # type: ignore[arg-type]
+                    sample,
+                    delimiters=[",", "\t", ";", "|", " "],  # type: ignore[arg-type]
                 )
                 return dialect.delimiter
             except csv.Error:

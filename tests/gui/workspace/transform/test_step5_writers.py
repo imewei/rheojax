@@ -19,8 +19,11 @@ def test_export_bundle_writes_output_result_and_provenance(qtbot, tmp_path):
     st = TransformState(
         transform_key="derivative",
         slots={"input": "d1"},
-        result={"output": _RheoData([1, 2], [3, 4]), "result": {"n": 2},
-                "protocol_type": "flow_curve"},
+        result={
+            "output": _RheoData([1, 2], [3, 4]),
+            "result": {"n": 2},
+            "protocol_type": "flow_curve",
+        },
     )
     lib = DatasetLibrary()
     step = TransformExportStep(st, lib)

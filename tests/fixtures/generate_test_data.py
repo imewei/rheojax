@@ -575,8 +575,7 @@ if __name__ == "__main__":
     for size_mb, path in files.items():
         actual_size = path.stat().st_size / 1e6
         logger.info(
-            f"  {size_mb:6.1f} MB target -> {actual_size:6.1f} MB actual "
-            f"({path.name})"
+            f"  {size_mb:6.1f} MB target -> {actual_size:6.1f} MB actual ({path.name})"
         )
 
     # Generate reference data fixtures

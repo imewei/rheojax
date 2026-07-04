@@ -11,7 +11,9 @@ from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
 
 def test_adapt_prior_passthrough():
     """Passthrough: lognormal params survive unchanged."""
-    out = adapt_prior({"distribution": "lognormal", "params": {"loc": 2.0, "scale": 1.0}})
+    out = adapt_prior(
+        {"distribution": "lognormal", "params": {"loc": 2.0, "scale": 1.0}}
+    )
     assert out["type"] == "lognormal"
     assert out["loc"] == 2.0
     assert out["scale"] == 1.0
@@ -39,7 +41,9 @@ def test_adapt_prior_uniform():
 
 def test_adapt_prior_case_insensitive():
     """Distribution name is normalised to lowercase."""
-    out = adapt_prior({"distribution": "LogNormal", "params": {"loc": 1.0, "scale": 0.5}})
+    out = adapt_prior(
+        {"distribution": "LogNormal", "params": {"loc": 1.0, "scale": 0.5}}
+    )
     assert out["type"] == "lognormal"
 
 

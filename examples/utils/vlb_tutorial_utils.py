@@ -298,6 +298,7 @@ def load_pnas_startup(
     fpath = data_dir / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
     if not fpath.exists():
         import warnings as _w
+
         _w.warn(
             f"PNAS data not found at: {fpath.resolve()}\n"
             "Falling back to synthetic Maxwell startup data (G0=100 Pa, k_d=0.5 1/s).",
@@ -355,6 +356,7 @@ def load_pnas_laos(
     fpath = data_dir / "PNAS_DigitalRheometerTwin_Dataset.xlsx"
     if not fpath.exists():
         import warnings as _w
+
         _w.warn(
             f"PNAS data not found at: {fpath.resolve()}\n"
             "Falling back to synthetic Maxwell LAOS data (G0=100 Pa, k_d=2.0 1/s).",
@@ -459,7 +461,9 @@ def check_nlsq_fit_quality(
             stacklevel=2,
         )
     else:
-        print(f"✓  NLSQ fit quality R²={r2:.4f} ≥ {r2_threshold} — safe to proceed with Bayesian")
+        print(
+            f"✓  NLSQ fit quality R²={r2:.4f} ≥ {r2_threshold} — safe to proceed with Bayesian"
+        )
 
     if noise_sigma is not None or noise_fraction is not None:
         n = len(y_ref)
@@ -473,7 +477,9 @@ def check_nlsq_fit_quality(
         chi2 = float(np.sum(((y_ref - y_pred_ref) / sigma_i) ** 2))
         chi2_red = chi2 / dof
         if 0.5 <= chi2_red <= 2.0:
-            print(f"✓  χ²_red = {chi2_red:.3f} ≈ 1.0 — fit consistent with {noise_label} noise")
+            print(
+                f"✓  χ²_red = {chi2_red:.3f} ≈ 1.0 — fit consistent with {noise_label} noise"
+            )
         elif chi2_red > 2.0:
             print(
                 f"⚠  χ²_red = {chi2_red:.3f} >> 1 — systematic deviations "

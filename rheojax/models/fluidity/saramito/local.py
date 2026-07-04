@@ -83,7 +83,8 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class FluiditySaramitoLocal(FluiditySaramitoBase):
     r"""Local (0D) Fluidity-Saramito Model for elastoviscoplastic fluids.
 
@@ -133,6 +134,7 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         coupling: Literal["minimal", "full"] = "minimal",
@@ -366,7 +368,13 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             result = self._simulate_transient(
-                x_data, p_map, mode, gamma_dot, sigma_applied, sigma_0, t_wait,
+                x_data,
+                p_map,
+                mode,
+                gamma_dot,
+                sigma_applied,
+                sigma_0,
+                t_wait,
                 gamma_0=gamma_0,
             )
             return result
@@ -394,8 +402,10 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
                 resids = np.asarray(objective(result.x))
                 y_arr = np.asarray(y_jax)
                 ss_res = float(np.sum(resids**2))
-                ss_tot = float(np.sum((y_arr - np.mean(y_arr))**2))
-                self._last_fit_r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+                ss_tot = float(np.sum((y_arr - np.mean(y_arr)) ** 2))
+                self._last_fit_r_squared = (
+                    float(1 - ss_res / ss_tot) if ss_tot > 0 else None
+                )
             except Exception:
                 pass
         if not result.success:

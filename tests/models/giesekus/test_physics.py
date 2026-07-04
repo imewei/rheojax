@@ -42,9 +42,9 @@ class TestDiagnosticRatios:
             ratio = N2[0] / N1[0]
             expected = -alpha / 2
 
-            assert np.isclose(
-                ratio, expected, rtol=0.01
-            ), f"α={alpha}: N₂/N₁={ratio:.6f} != expected {expected:.6f}"
+            assert np.isclose(ratio, expected, rtol=0.01), (
+                f"α={alpha}: N₂/N₁={ratio:.6f} != expected {expected:.6f}"
+            )
 
     @pytest.mark.smoke
     def test_n2_n1_ratio_varies_with_wi(self):
@@ -64,13 +64,13 @@ class TestDiagnosticRatios:
         # All ratios negative
         assert np.all(ratios < 0), "N₂/N₁ should always be negative"
         # At low Wi (first few points), close to -α/2
-        assert np.isclose(
-            ratios[0], -0.15, rtol=0.01
-        ), f"Low-Wi ratio should be ≈ -0.15, got {ratios[0]:.4f}"
+        assert np.isclose(ratios[0], -0.15, rtol=0.01), (
+            f"Low-Wi ratio should be ≈ -0.15, got {ratios[0]:.4f}"
+        )
         # At high Wi (last points), ratio deviates toward zero
-        assert (
-            ratios[-1] > -0.15
-        ), f"High-Wi ratio should be less negative than -0.15, got {ratios[-1]:.4f}"
+        assert ratios[-1] > -0.15, (
+            f"High-Wi ratio should be less negative than -0.15, got {ratios[-1]:.4f}"
+        )
 
 
 class TestUCMLimit:
@@ -89,9 +89,9 @@ class TestUCMLimit:
         N1, N2 = model.predict_normal_stresses(gamma_dot)
 
         # N₂ should be essentially zero
-        assert (
-            np.abs(N2[0]) < 1e-8 * N1[0]
-        ), f"UCM should have N₂=0, got N₂/N₁={N2[0]/N1[0]:.2e}"
+        assert np.abs(N2[0]) < 1e-8 * N1[0], (
+            f"UCM should have N₂=0, got N₂/N₁={N2[0] / N1[0]:.2e}"
+        )
 
     def test_ucm_saos_maxwell(self):
         """Test α=0 SAOS matches Maxwell model exactly.
@@ -127,9 +127,9 @@ class TestShearThinning:
 
         # Check monotonic decrease
         for i in range(len(eta) - 1):
-            assert (
-                eta[i] >= eta[i + 1] * 0.999
-            ), f"Viscosity not decreasing at index {i}: η[{i}]={eta[i]:.2f}, η[{i+1}]={eta[i+1]:.2f}"
+            assert eta[i] >= eta[i + 1] * 0.999, (
+                f"Viscosity not decreasing at index {i}: η[{i}]={eta[i]:.2f}, η[{i + 1}]={eta[i + 1]:.2f}"
+            )
 
     @pytest.mark.smoke
     def test_zero_shear_viscosity(self):
@@ -148,15 +148,15 @@ class TestShearThinning:
         _, eta, _ = model.predict_flow_curve(gamma_dots, return_components=True)
 
         # Viscosity should increase as shear rate decreases
-        assert (
-            eta[0] > eta[1] > eta[2]
-        ), f"Viscosity not increasing at lower rates: {eta}"
+        assert eta[0] > eta[1] > eta[2], (
+            f"Viscosity not increasing at lower rates: {eta}"
+        )
 
         # At lowest rate, should be reasonably close to η₀
         eta_0 = 100.0 + 10.0
-        assert (
-            eta[0] > 0.5 * eta_0
-        ), f"Viscosity at low rate too low: {eta[0]:.2f} vs η₀={eta_0}"
+        assert eta[0] > 0.5 * eta_0, (
+            f"Viscosity at low rate too low: {eta[0]:.2f} vs η₀={eta_0}"
+        )
 
     def test_thinning_exponent(self):
         """Test power-law thinning at high Wi.
@@ -195,9 +195,9 @@ class TestStressOvershoot:
         sigma_max = np.max(sigma)
         sigma_ss = sigma[-1]
 
-        assert (
-            sigma_max > sigma_ss * 1.1
-        ), f"No overshoot: max={sigma_max:.2f}, ss={sigma_ss:.2f}"
+        assert sigma_max > sigma_ss * 1.1, (
+            f"No overshoot: max={sigma_max:.2f}, ss={sigma_ss:.2f}"
+        )
 
     @pytest.mark.smoke
     def test_overshoot_increases_with_wi(self):
@@ -224,7 +224,7 @@ class TestStressOvershoot:
             # Allow some tolerance for numerical effects at very high Wi
             assert overshoot_ratios[i + 1] >= overshoot_ratios[i] * 0.95, (
                 f"Overshoot not increasing: Wi={wi_values[i]}: {overshoot_ratios[i]:.3f}, "
-                f"Wi={wi_values[i+1]}: {overshoot_ratios[i+1]:.3f}"
+                f"Wi={wi_values[i + 1]}: {overshoot_ratios[i + 1]:.3f}"
             )
 
     def test_overshoot_strain(self):
@@ -243,9 +243,9 @@ class TestStressOvershoot:
         strain_at_peak = gamma_dot * t[peak_idx]
 
         # Overshoot should occur at strain between 0.5 and 5
-        assert (
-            0.5 < strain_at_peak < 5.0
-        ), f"Peak strain = {strain_at_peak:.2f} (expected 0.5-5)"
+        assert 0.5 < strain_at_peak < 5.0, (
+            f"Peak strain = {strain_at_peak:.2f} (expected 0.5-5)"
+        )
 
 
 class TestRelaxation:
@@ -261,9 +261,9 @@ class TestRelaxation:
         sigma = model.simulate_relaxation(t, gamma_dot_preshear=1.0)  # Wi = 1
 
         # Final stress should be small
-        assert (
-            sigma[-1] < sigma[0] * 0.01
-        ), f"Stress not fully relaxed: final={sigma[-1]:.2e}, initial={sigma[0]:.2e}"
+        assert sigma[-1] < sigma[0] * 0.01, (
+            f"Stress not fully relaxed: final={sigma[-1]:.2e}, initial={sigma[0]:.2e}"
+        )
 
     def test_faster_than_exponential(self):
         """Test Giesekus relaxes faster than pure exponential.
@@ -285,9 +285,9 @@ class TestRelaxation:
         ratio_at_lambda = sigma[t_lambda_idx] / sigma[0]
 
         # Should decay faster than exponential
-        assert (
-            ratio_at_lambda < 0.37
-        ), f"At t=λ: σ/σ₀ = {ratio_at_lambda:.3f} (exponential would be 0.368)"
+        assert ratio_at_lambda < 0.37, (
+            f"At t=λ: σ/σ₀ = {ratio_at_lambda:.3f} (exponential would be 0.368)"
+        )
 
 
 class TestNormalStresses:
@@ -306,7 +306,7 @@ class TestNormalStresses:
         for i in range(len(N1) - 1):
             assert N1[i + 1] > N1[i], (
                 f"N₁ not increasing: N₁({gamma_dots[i]})={N1[i]:.2f}, "
-                f"N₁({gamma_dots[i+1]})={N1[i+1]:.2f}"
+                f"N₁({gamma_dots[i + 1]})={N1[i + 1]:.2f}"
             )
 
     @pytest.mark.smoke
@@ -343,9 +343,9 @@ class TestLiteratureComparison:
 
         # Viscosity should decrease from low to high shear rate
         # (checking monotonicity is enough to verify thinning)
-        assert (
-            eta[0] > eta[-1]
-        ), f"α=0.3 should show thinning: η(low)={eta[0]:.2f}, η(high)={eta[-1]:.2f}"
+        assert eta[0] > eta[-1], (
+            f"α=0.3 should show thinning: η(low)={eta[0]:.2f}, η(high)={eta[-1]:.2f}"
+        )
 
 
 class TestMultiModePhysics:

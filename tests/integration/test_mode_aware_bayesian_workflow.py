@@ -102,19 +102,19 @@ def test_bayesian_workflow_relaxation_mode_maxwell():
     # Verify divergences
     divergences = result.diagnostics["divergences"]
     max_acceptable_divergences = 2000 * 0.4  # 40% threshold
-    assert (
-        divergences < max_acceptable_divergences
-    ), f"Too many divergences: {divergences}"
+    assert divergences < max_acceptable_divergences, (
+        f"Too many divergences: {divergences}"
+    )
 
     # Verify posterior statistics are reasonable
     G0_mean = result.summary["G0"]["mean"]
     eta_mean = result.summary["eta"]["mean"]
-    assert (
-        abs(G0_mean - G0_true) / G0_true < 10.0
-    ), "Posterior G0 mean too far from true"
-    assert (
-        abs(eta_mean - eta_true) / eta_true < 10.0
-    ), "Posterior eta mean too far from true"
+    assert abs(G0_mean - G0_true) / G0_true < 10.0, (
+        "Posterior G0 mean too far from true"
+    )
+    assert abs(eta_mean - eta_true) / eta_true < 10.0, (
+        "Posterior eta mean too far from true"
+    )
 
 
 @pytest.mark.slow
@@ -381,16 +381,16 @@ def test_mode_aware_posterior_predictive_distributions():
     predictions = model.predict(t_test)
 
     # Verify predictions are reasonable (monotonic decay for relaxation)
-    assert np.all(
-        np.diff(predictions) <= 0
-    ), "Relaxation should be monotonically decreasing"
+    assert np.all(np.diff(predictions) <= 0), (
+        "Relaxation should be monotonically decreasing"
+    )
 
     # Verify predictions are in reasonable range (compare against observed data)
     assert np.all(predictions > 0), "Modulus should be positive"
     observed_peak = float(np.max(G_data))
-    assert (
-        np.max(predictions) > observed_peak * 0.8
-    ), "Predictions should match the observed magnitude"
+    assert np.max(predictions) > observed_peak * 0.8, (
+        "Predictions should match the observed magnitude"
+    )
 
     print(
         f"Posterior predictive validation passed. "

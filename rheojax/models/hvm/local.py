@@ -74,7 +74,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "hvm",
     protocols=[
@@ -84,7 +85,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class HVMLocal(HVMBase):
     """Local (0D) Hybrid Vitrimer Model.
 
@@ -119,6 +121,7 @@ class HVMLocal(HVMBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         kinetics: Literal["stress", "stretch"] = "stress",
@@ -803,11 +806,7 @@ class HVMLocal(HVMBase):
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
         )
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)
         )

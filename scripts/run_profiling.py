@@ -160,9 +160,9 @@ def profile_model(
     config = MODEL_CONFIGS[model_key]
     timings: list[TimingResult] = []
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  Profiling: {config['label']}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # -- Phase 0: Import -------------------------------------------------------
     with timed_phase("Import (safe_import_jax + model)") as t:
@@ -336,7 +336,7 @@ def profile_imports():
     print(f"  {'Package':<50} {'Cumul (ms)':>10} {'Self (ms)':>10}")
     print("  " + "-" * 72)
     for cum, self_t, pkg in imports[:20]:
-        print(f"  {pkg:<50} {cum/1000:>10.1f} {self_t/1000:>10.1f}")
+        print(f"  {pkg:<50} {cum / 1000:>10.1f} {self_t / 1000:>10.1f}")
 
     total_ms = imports[0][0] / 1000 if imports else 0
     print(f"\n  Total import time: {total_ms:.0f} ms")
@@ -428,7 +428,7 @@ def profile_io():
                 _x_jax = jnp.asarray(X)
                 _y_jax = jnp.asarray(y)
 
-        print(f"  {n:<15} {t_create.elapsed*10:>12.3f} {t_jax.elapsed*10:>12.3f}")
+        print(f"  {n:<15} {t_create.elapsed * 10:>12.3f} {t_jax.elapsed * 10:>12.3f}")
 
     # Test CSV reader if available
     try:
@@ -449,7 +449,7 @@ def profile_io():
                 _data = load_csv(fname, x_col="time", y_col="stress")
 
         print(
-            f"\n  CSV reader (1000 rows, 10 iterations): {t_csv.elapsed*100:.1f} ms/read"
+            f"\n  CSV reader (1000 rows, 10 iterations): {t_csv.elapsed * 100:.1f} ms/read"
         )
         os.unlink(fname)
     except Exception as e:

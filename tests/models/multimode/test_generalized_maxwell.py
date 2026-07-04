@@ -42,12 +42,12 @@ class TestGMMRelaxationMode:
         )
         tau1_fit = model.parameters.get_value("tau_1")
 
-        assert (
-            abs(G_total_fit - G0_true) / G0_true < 0.10
-        ), f"Total G mismatch: {G_total_fit} vs {G0_true}"
-        assert (
-            abs(tau1_fit - tau_true) / tau_true < 0.20
-        ), f"tau_1 mismatch: {tau1_fit} vs {tau_true}"
+        assert abs(G_total_fit - G0_true) / G0_true < 0.10, (
+            f"Total G mismatch: {G_total_fit} vs {G0_true}"
+        )
+        assert abs(tau1_fit - tau_true) / tau_true < 0.20, (
+            f"tau_1 mismatch: {tau1_fit} vs {tau_true}"
+        )
 
     def test_internal_variable_exponential_decay(self):
         """Internal-variable update should produce exponential decay."""
@@ -65,9 +65,9 @@ class TestGMMRelaxationMode:
         G_pred = model.predict(t)  # test_mode set via _test_mode
 
         # Check exponential decay behavior (monotonic decrease)
-        assert np.all(
-            np.diff(G_pred) <= 0
-        ), "Relaxation should be monotonically decreasing"
+        assert np.all(np.diff(G_pred) <= 0), (
+            "Relaxation should be monotonically decreasing"
+        )
 
         # Check initial modulus (t→0)
         G_initial = model.parameters.get_value("G_1") + model.parameters.get_value(
@@ -127,12 +127,12 @@ class TestGMMRelaxationMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert (
-            n_optimal <= n_initial
-        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
-        assert (
-            n_optimal >= 2
-        ), f"N_opt should be at least 2 for 2-mode data, got {n_optimal}"
+        assert n_optimal <= n_initial, (
+            f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        )
+        assert n_optimal >= 2, (
+            f"N_opt should be at least 2 for 2-mode data, got {n_optimal}"
+        )
 
     def test_relaxation_r2_quality(self):
         """Fit quality (R²) should be high for multi-mode relaxation data."""
@@ -227,12 +227,12 @@ class TestGMMOscillationMode:
             G_double_prime_analytical + 1e-10
         )
 
-        assert np.all(
-            rel_error_prime < 0.01
-        ), f"G' error too large: {np.max(rel_error_prime)}"
-        assert np.all(
-            rel_error_double_prime < 0.01
-        ), f"G'' error too large: {np.max(rel_error_double_prime)}"
+        assert np.all(rel_error_prime < 0.01), (
+            f"G' error too large: {np.max(rel_error_prime)}"
+        )
+        assert np.all(rel_error_double_prime < 0.01), (
+            f"G'' error too large: {np.max(rel_error_double_prime)}"
+        )
 
     def test_oscillation_combined_residual_fitting(self):
         """Fitting oscillation data should minimize combined G' + G'' residual."""
@@ -330,9 +330,9 @@ class TestGMMOscillationMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert (
-            n_optimal <= n_initial
-        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        assert n_optimal <= n_initial, (
+            f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        )
 
     def test_oscillation_output_shape(self):
         """Oscillation output should be a 1D complex array (N,) for G* = G' + iG''."""
@@ -387,9 +387,9 @@ class TestGMMCreepMode:
         J_pred = model.predict(t)  # test_mode set via _test_mode
 
         # Check monotonic increase (creep compliance increases over time)
-        assert np.all(
-            np.diff(J_pred) >= 0
-        ), "Creep compliance should be monotonically increasing"
+        assert np.all(np.diff(J_pred) >= 0), (
+            "Creep compliance should be monotonically increasing"
+        )
 
         # Check no oscillations (backward-Euler should be stable)
         # Relax tolerance for numerical precision of backward-Euler integration
@@ -397,9 +397,9 @@ class TestGMMCreepMode:
         # Allow for numerical precision in float64 - the values range from ~1e-8 to 3e-5
         # which is well within acceptable bounds for backward-Euler on logspaced data
         max_second_diff = np.max(np.abs(second_diff))
-        assert (
-            max_second_diff < 1e-4
-        ), f"Second derivative should be small (no oscillations), got max {max_second_diff:.3e}"
+        assert max_second_diff < 1e-4, (
+            f"Second derivative should be small (no oscillations), got max {max_second_diff:.3e}"
+        )
 
     def test_creep_compliance_calculation(self):
         """Creep compliance J(t) = ε(t)/σ₀ should be correctly calculated."""
@@ -428,9 +428,9 @@ class TestGMMCreepMode:
         # For Maxwell liquid, compliance grows unbounded, so final value should be larger
         # Check that compliance is growing as expected (qualitative test)
         # At long times (t >> tau), compliance should be significantly larger than 1/G0
-        assert (
-            J_pred[-1] > 10 * J_instant_estimate
-        ), f"Final compliance {J_pred[-1]:.3e} should be >> instant compliance {J_instant_estimate:.3e}"
+        assert J_pred[-1] > 10 * J_instant_estimate, (
+            f"Final compliance {J_pred[-1]:.3e} should be >> instant compliance {J_instant_estimate:.3e}"
+        )
 
     def test_n1_creep_mode_equivalence(self):
         """GMM with N=1 should match single Maxwell creep behavior."""
@@ -483,6 +483,6 @@ class TestGMMCreepMode:
         n_optimal = diagnostics["n_optimal"]
         n_initial = diagnostics["n_initial"]
 
-        assert (
-            n_optimal <= n_initial
-        ), f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        assert n_optimal <= n_initial, (
+            f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
+        )

@@ -401,9 +401,9 @@ def test_tensorial_epm_parameter_bounds():
 
         # Value should be within bounds
         value = param.value
-        assert (
-            lower <= value <= upper
-        ), f"Parameter {param_name} value {value} outside bounds [{lower}, {upper}]"
+        assert lower <= value <= upper, (
+            f"Parameter {param_name} value {value} outside bounds [{lower}, {upper}]"
+        )
 
 
 @pytest.mark.unit
@@ -604,7 +604,7 @@ def test_tensorial_epm_overstress_plateau_at_sigma_c_over_sqrt3():
     rel_err = abs(sigma_xy - expected_plateau) / expected_plateau
     assert rel_err < 0.05, (
         f"Tensorial overstress plateau should be sigma_c/sqrt(3) = "
-        f"{expected_plateau:.4f}, got {sigma_xy:.4f} (rel err {rel_err*100:.2f}%)"
+        f"{expected_plateau:.4f}, got {sigma_xy:.4f} (rel err {rel_err * 100:.2f}%)"
     )
 
 
@@ -656,9 +656,9 @@ def test_tensorial_epm_overstress_startup_runs_and_approaches_steady_state():
 
     # 1. finite and bounded
     assert _np.all(_np.isfinite(sigma_xy)), "Startup produced non-finite stresses"
-    assert (
-        sigma_xy.max() < 10.0 * sigma_c
-    ), f"Startup stress should remain bounded; max={sigma_xy.max():.2f}"
+    assert sigma_xy.max() < 10.0 * sigma_c, (
+        f"Startup stress should remain bounded; max={sigma_xy.max():.2f}"
+    )
 
     # 2. Stress should be loading: the second half of the trajectory has
     # higher mean stress than the first half (monotonic-ish loading).
@@ -672,9 +672,9 @@ def test_tensorial_epm_overstress_startup_runs_and_approaches_steady_state():
     # 3. Final stress should be in the physically sensible range
     # (below the HB high-rate limit σ_c/√3 + |γ̇|·τ ≈ 1.58 at γ̇=1, τ=1).
     final_stress = float(sigma_xy[-1])
-    assert (
-        0.0 <= final_stress < 5.0 * sigma_c
-    ), f"Final startup stress {final_stress:.3f} out of physical range"
+    assert 0.0 <= final_stress < 5.0 * sigma_c, (
+        f"Final startup stress {final_stress:.3f} out of physical range"
+    )
 
 
 @pytest.mark.unit
@@ -712,9 +712,9 @@ def test_tensorial_epm_overstress_relaxation_runs_and_decays():
     # Modulus should start positive (initial stress / strain > 0)
     assert g_t[0] > 0, f"Initial G(t=0) should be positive, got {g_t[0]:.3f}"
     # Modulus should generally decrease over time (allow small noise)
-    assert (
-        g_t[-1] < g_t[0] * 1.1
-    ), f"Relaxation G(t) should not grow: G(0)={g_t[0]:.3f}, G(final)={g_t[-1]:.3f}"
+    assert g_t[-1] < g_t[0] * 1.1, (
+        f"Relaxation G(t) should not grow: G(0)={g_t[0]:.3f}, G(final)={g_t[-1]:.3f}"
+    )
 
 
 @pytest.mark.unit
@@ -750,9 +750,9 @@ def test_tensorial_epm_overstress_creep_runs_and_strain_accumulates():
 
     assert _np.all(_np.isfinite(gamma_t)), "Creep produced non-finite strain"
     # Strain should not decrease (monotonic non-negative evolution — allow tiny noise)
-    assert (
-        gamma_t[-1] >= gamma_t[0] - 1e-6
-    ), f"Creep strain should not decrease: γ(0)={gamma_t[0]:.4f}, γ(final)={gamma_t[-1]:.4f}"
+    assert gamma_t[-1] >= gamma_t[0] - 1e-6, (
+        f"Creep strain should not decrease: γ(0)={gamma_t[0]:.4f}, γ(final)={gamma_t[-1]:.4f}"
+    )
 
 
 @pytest.mark.unit
@@ -790,6 +790,6 @@ def test_tensorial_epm_overstress_oscillation_runs_and_is_bounded():
 
     assert _np.all(_np.isfinite(stress_t)), "Oscillation produced non-finite stress"
     # For small γ0 below yield, stress should remain bounded near the plateau
-    assert (
-        _np.max(_np.abs(stress_t)) < 5.0
-    ), f"Oscillation stress should remain bounded: max|σ|={_np.max(_np.abs(stress_t)):.2f}"
+    assert _np.max(_np.abs(stress_t)) < 5.0, (
+        f"Oscillation stress should remain bounded: max|σ|={_np.max(_np.abs(stress_t)):.2f}"
+    )

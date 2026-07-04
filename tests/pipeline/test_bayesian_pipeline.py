@@ -379,9 +379,9 @@ class TestBayesianPipelineMultiChain:
         num_chains_param = sig.parameters.get("num_chains")
 
         assert num_chains_param is not None
-        assert (
-            num_chains_param.default == 4
-        ), f"Default num_chains should be 4, got {num_chains_param.default}"
+        assert num_chains_param.default == 4, (
+            f"Default num_chains should be 4, got {num_chains_param.default}"
+        )
 
     def test_multichain_improves_rhat(self, sample_data):
         """Test that multi-chain sampling provides better R-hat estimates."""

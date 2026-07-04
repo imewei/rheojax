@@ -404,9 +404,9 @@ class TestBayesianRelaxationMode:
         else:
             divergence_threshold = 0.05
 
-        assert check_divergences(
-            result.diagnostics, threshold=divergence_threshold
-        ), f"{model_class.__name__}: Divergences > {divergence_threshold:.0%} in relaxation mode"  # Relaxed for complex fractional models
+        assert check_divergences(result.diagnostics, threshold=divergence_threshold), (
+            f"{model_class.__name__}: Divergences > {divergence_threshold:.0%} in relaxation mode"
+        )  # Relaxed for complex fractional models
 
     def test_maxwell_relaxation_posterior_accuracy(self, relaxation_maxwell_data):
         """Test Maxwell posterior accuracy in relaxation mode.
@@ -511,9 +511,9 @@ class TestBayesianCreepMode:
             )
 
         # Check MCMC diagnostics
-        assert check_r_hat(
-            result.diagnostics, threshold=1.05
-        ), "Maxwell creep: R-hat > 1.05"
+        assert check_r_hat(result.diagnostics, threshold=1.05), (
+            "Maxwell creep: R-hat > 1.05"
+        )
         assert check_ess(result.diagnostics, threshold=200), "Maxwell creep: ESS < 200"
 
         # Check posterior accuracy (very important test)
@@ -526,9 +526,9 @@ class TestBayesianCreepMode:
 
         # This assertion should fail on v0.3.1 because the posterior will be
         # incorrect (model_function predicts using relaxation instead of creep)
-        assert check_posterior_accuracy(
-            G0_posterior, G0_true, tolerance=0.05
-        ), f"Maxwell creep posterior incorrect: {G0_posterior} vs true {G0_true}"
+        assert check_posterior_accuracy(G0_posterior, G0_true, tolerance=0.05), (
+            f"Maxwell creep posterior incorrect: {G0_posterior} vs true {G0_true}"
+        )
 
     @pytest.mark.parametrize(
         "model_class",
@@ -634,12 +634,12 @@ class TestBayesianOscillationMode:
             )
 
         # Diagnostics check
-        assert check_r_hat(
-            result.diagnostics, threshold=1.05
-        ), "Maxwell oscillation: Poor R-hat convergence"
-        assert check_ess(
-            result.diagnostics, threshold=200
-        ), "Maxwell oscillation: Low ESS"
+        assert check_r_hat(result.diagnostics, threshold=1.05), (
+            "Maxwell oscillation: Poor R-hat convergence"
+        )
+        assert check_ess(result.diagnostics, threshold=200), (
+            "Maxwell oscillation: Low ESS"
+        )
 
         # Accuracy check (very important)
         true_params = oscillation_maxwell_data.metadata["true_params"]
@@ -649,9 +649,9 @@ class TestBayesianOscillationMode:
         G0_true = true_params["G0"]
 
         # This fails on v0.3.1 because predictions are completely wrong
-        assert check_posterior_accuracy(
-            G0_posterior, G0_true, tolerance=0.05
-        ), f"Maxwell oscillation posterior incorrect: {G0_posterior} vs {G0_true}"
+        assert check_posterior_accuracy(G0_posterior, G0_true, tolerance=0.05), (
+            f"Maxwell oscillation posterior incorrect: {G0_posterior} vs {G0_true}"
+        )
 
     @pytest.mark.parametrize(
         "model_class",
@@ -756,12 +756,12 @@ class TestBayesianModeSwitch:
             )
 
         # Should produce valid creep posteriors
-        assert check_r_hat(
-            result.diagnostics, threshold=1.05
-        ), "Mode switch relaxation→creep: Poor R-hat"
-        assert check_ess(
-            result.diagnostics, threshold=200
-        ), "Mode switch relaxation→creep: Low ESS"
+        assert check_r_hat(result.diagnostics, threshold=1.05), (
+            "Mode switch relaxation→creep: Poor R-hat"
+        )
+        assert check_ess(result.diagnostics, threshold=200), (
+            "Mode switch relaxation→creep: Low ESS"
+        )
 
     def test_mode_switch_oscillation_to_relaxation(
         self, oscillation_maxwell_data, relaxation_maxwell_data
@@ -796,9 +796,9 @@ class TestBayesianModeSwitch:
             )
 
         # Should produce correct relaxation posteriors
-        assert check_r_hat(
-            result.diagnostics, threshold=1.05
-        ), "Mode switch oscillation→relaxation: Poor R-hat"
+        assert check_r_hat(result.diagnostics, threshold=1.05), (
+            "Mode switch oscillation→relaxation: Poor R-hat"
+        )
 
         # Check accuracy
         true_params = relaxation_maxwell_data.metadata["true_params"]
@@ -806,9 +806,9 @@ class TestBayesianModeSwitch:
         G0_posterior = summary["G0"]["mean"]
         G0_true = true_params["G0"]
 
-        assert check_posterior_accuracy(
-            G0_posterior, G0_true, tolerance=0.05
-        ), f"Mode switch oscillation→relaxation posterior error"
+        assert check_posterior_accuracy(G0_posterior, G0_true, tolerance=0.05), (
+            f"Mode switch oscillation→relaxation posterior error"
+        )
 
 
 # =============================================================================
@@ -865,16 +865,16 @@ class TestBayesianCredibleIntervals:
         if "G0" in intervals:
             lower, upper = intervals["G0"]
             G0_true = true_params["G0"]
-            assert (
-                lower <= G0_true <= upper
-            ), f"G0 true value {G0_true} outside interval [{lower}, {upper}]"
+            assert lower <= G0_true <= upper, (
+                f"G0 true value {G0_true} outside interval [{lower}, {upper}]"
+            )
 
         if "eta" in intervals:
             lower, upper = intervals["eta"]
             eta_true = true_params["eta"]
-            assert (
-                lower <= eta_true <= upper
-            ), f"eta true value {eta_true} outside interval [{lower}, {upper}]"
+            assert lower <= eta_true <= upper, (
+                f"eta true value {eta_true} outside interval [{lower}, {upper}]"
+            )
 
 
 # =============================================================================
@@ -956,12 +956,12 @@ class TestFractionalModelsRelaxation:
                 )
 
                 # Check that we got samples
-                assert (
-                    result.posterior_samples is not None
-                ), f"{model_class.__name__}: No posterior samples"
-                assert (
-                    len(result.posterior_samples) > 0
-                ), f"{model_class.__name__}: Empty posterior samples"
+                assert result.posterior_samples is not None, (
+                    f"{model_class.__name__}: No posterior samples"
+                )
+                assert len(result.posterior_samples) > 0, (
+                    f"{model_class.__name__}: Empty posterior samples"
+                )
 
             except Exception as e:
                 pytest.fail(

@@ -158,8 +158,7 @@ def apply_overrides(config: PipelineConfig, overrides: list[str]) -> PipelineCon
         match = _OVERRIDE_RE.match(override)
         if not match:
             raise ValueError(
-                f"Invalid override format: '{override}'. "
-                "Expected 'path.to.key=value'."
+                f"Invalid override format: '{override}'. Expected 'path.to.key=value'."
             )
 
         path_str, raw_value = match.group(1), match.group(2)
@@ -300,7 +299,7 @@ def _nested_set(target: dict[str, Any], keys: list[str], value: Any) -> None:
         allowed = _STEP_ALLOWED_KEYS.get(step_type)
         if allowed is not None and keys[0] not in allowed:
             logger.warning(
-                "Override injects unrecognised key into %s step: '%s'. " "Allowed: %s",
+                "Override injects unrecognised key into %s step: '%s'. Allowed: %s",
                 step_type,
                 keys[0],
                 sorted(allowed),

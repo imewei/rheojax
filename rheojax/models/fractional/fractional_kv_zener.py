@@ -64,7 +64,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class FractionalKelvinVoigtZener(BaseModel):
     """Fractional Kelvin-Voigt Zener model.
 
@@ -507,7 +508,6 @@ class FractionalKelvinVoigtZener(BaseModel):
         # Fall back to self._test_mode only for backward compatibility
 
         if test_mode is None:
-
             test_mode = getattr(self, "_test_mode", TestMode.CREEP)
 
         # Normalize test_mode to handle both string and TestMode enum

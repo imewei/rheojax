@@ -117,9 +117,7 @@ def test_yaml_validator_accepts_supported_passthrough_keys(
         kwargs for step_type, kwargs in builder.steps if step_type == step["type"]
     )
 
-    assert not any(
-        key in error for key in passthrough_keys for error in errors
-    )
+    assert not any(key in error for key in passthrough_keys for error in errors)
     assert all(builder_kwargs[key] == step[key] for key in passthrough_keys)
 
 

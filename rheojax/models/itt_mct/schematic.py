@@ -87,7 +87,8 @@ logger = get_logger(__name__)
         Protocol.CREEP,
         Protocol.RELAXATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class ITTMCTSchematic(ITTMCTBase):
     """ITT-MCT Schematic F₁₂ Model.
 
@@ -164,6 +165,7 @@ class ITTMCTSchematic(ITTMCTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         epsilon: float | None = None,

@@ -151,7 +151,7 @@ def bench_transfer_overhead():
         print(r)
 
     avg_to_jax = np.mean([r.wall_ms for r in results[0::2]])
-    print(f"\n  Average to_jax transfer overhead: {avg_to_jax*1000:.1f} microseconds")
+    print(f"\n  Average to_jax transfer overhead: {avg_to_jax * 1000:.1f} microseconds")
 
     return results
 

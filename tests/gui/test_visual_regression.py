@@ -479,9 +479,9 @@ class TestArvizCanvasVisual:
             save_golden_image(fig, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(
-            fig, golden_path, threshold=0.05
-        ), "ArviZ empty state visual mismatch"
+        assert compare_figures(fig, golden_path, threshold=0.05), (
+            "ArviZ empty state visual mismatch"
+        )
 
         canvas.close()
 

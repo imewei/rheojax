@@ -225,9 +225,9 @@ def test_initializer_map_coverage():
     ]
 
     for model_name in expected_models:
-        assert (
-            model_name in FractionalModelMixin._INITIALIZER_MAP
-        ), f"Missing initializer mapping for {model_name}"
+        assert model_name in FractionalModelMixin._INITIALIZER_MAP, (
+            f"Missing initializer mapping for {model_name}"
+        )
 
 
 def test_error_handling_missing_initializer():

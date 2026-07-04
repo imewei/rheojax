@@ -542,7 +542,7 @@ def plot_glass_probability_histogram(
 
     p_glass = compute_glass_probability(alpha_samples)
     ax.axvspan(0, 0.5, alpha=0.2, color="red", label=f"Glass (P={p_glass:.2%})")
-    ax.axvspan(0.5, 1.0, alpha=0.2, color="blue", label=f"Fluid (P={1-p_glass:.2%})")
+    ax.axvspan(0.5, 1.0, alpha=0.2, color="blue", label=f"Fluid (P={1 - p_glass:.2%})")
 
     ax.set_xlabel("α (coupling parameter)")
     ax.set_ylabel("Posterior density")

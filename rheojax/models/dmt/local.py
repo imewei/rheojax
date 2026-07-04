@@ -54,7 +54,8 @@ _MISSING = object()
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class DMTLocal(DMTBase):
     """Local (0D) DMT model for homogeneous thixotropic flow.
 
@@ -104,6 +105,7 @@ class DMTLocal(DMTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         closure: Literal["exponential", "herschel_bulkley"] = "exponential",

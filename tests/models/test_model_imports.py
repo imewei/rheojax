@@ -88,9 +88,9 @@ def test_model_predictions_maintain_float64_precision():
     G_t = model._predict_relaxation(t, G0=1e5, eta=1e3)
 
     # Verify output is float64
-    assert (
-        G_t.dtype == jnp.float64
-    ), f"Model predictions should be float64, got {G_t.dtype}"
+    assert G_t.dtype == jnp.float64, (
+        f"Model predictions should be float64, got {G_t.dtype}"
+    )
 
     # Verify input was processed as float64
     assert t.dtype == jnp.float64, f"Input should be float64, got {t.dtype}"
@@ -141,9 +141,9 @@ def test_maxwell_fit_and_predict_smoke_test():
 
     # Verify predictions are float64 (main goal of this test)
     predictions_np = np.array(predictions)
-    assert (
-        predictions_np.dtype == np.float64
-    ), f"Predictions should be float64, got {predictions_np.dtype}"
+    assert predictions_np.dtype == np.float64, (
+        f"Predictions should be float64, got {predictions_np.dtype}"
+    )
 
 
 def test_fractional_model_float64_precision():
@@ -168,9 +168,9 @@ def test_fractional_model_float64_precision():
 
     # Verify output is float64
     predictions_np = np.array(predictions)
-    assert (
-        predictions_np.dtype == np.float64
-    ), f"Fractional model predictions should be float64, got {predictions_np.dtype}"
+    assert predictions_np.dtype == np.float64, (
+        f"Fractional model predictions should be float64, got {predictions_np.dtype}"
+    )
 
 
 def test_flow_model_float64_precision():
@@ -193,9 +193,9 @@ def test_flow_model_float64_precision():
     eta = model._predict_viscosity(gamma_dot, K=100.0, n=0.5)
 
     # Verify output is float64
-    assert (
-        eta.dtype == jnp.float64
-    ), f"Flow model predictions should be float64, got {eta.dtype}"
+    assert eta.dtype == jnp.float64, (
+        f"Flow model predictions should be float64, got {eta.dtype}"
+    )
 
 
 def test_jax_operations_use_float64_in_models():
@@ -214,9 +214,9 @@ def test_jax_operations_use_float64_in_models():
     test_array = jnp.array([1.0, 2.0, 3.0])
 
     # Verify default is float64
-    assert (
-        test_array.dtype == jnp.float64
-    ), f"JAX arrays should default to float64, got {test_array.dtype}"
+    assert test_array.dtype == jnp.float64, (
+        f"JAX arrays should default to float64, got {test_array.dtype}"
+    )
 
 
 def test_model_registry_contains_all_models():
@@ -235,9 +235,9 @@ def test_model_registry_contains_all_models():
         )
 
     # Also verify we have exactly 20 models (or more if new ones added)
-    assert (
-        len(registered_models) >= 20
-    ), f"Expected at least 20 models, found {len(registered_models)}"
+    assert len(registered_models) >= 20, (
+        f"Expected at least 20 models, found {len(registered_models)}"
+    )
 
 
 def test_zener_fit_and_predict_smoke_test():
@@ -285,9 +285,9 @@ def test_zener_fit_and_predict_smoke_test():
 
     # Verify predictions are float64 (main goal of this test)
     predictions_np = np.array(predictions)
-    assert (
-        predictions_np.dtype == np.float64
-    ), f"Predictions should be float64, got {predictions_np.dtype}"
+    assert predictions_np.dtype == np.float64, (
+        f"Predictions should be float64, got {predictions_np.dtype}"
+    )
 
 
 if __name__ == "__main__":

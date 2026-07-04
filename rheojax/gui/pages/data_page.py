@@ -951,7 +951,6 @@ class DataPage(QWidget):
             ]:
                 combo.blockSignals(False)
 
-
     def _reset_mapping(self) -> None:
         """Reset column mapping to defaults."""
         if self._preview_data:

@@ -19,8 +19,9 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
-def _default_fit_fn(model_key, model_config, data_ref, column_map, initial_params=None,
-                     multi_start=None):
+def _default_fit_fn(
+    model_key, model_config, data_ref, column_map, initial_params=None, multi_start=None
+):
     # NOTE: `data_ref` is a str id — the real implementation must:
     # 1. Load RheoData: `library.load_payload(data_ref)` (pass library to NlsqStep at build time)
     # 2. Use real signature: ModelService().fit(model_key, rheodata, {}, model_config=model_config)
@@ -53,7 +54,13 @@ class NlsqStep(QWidget):
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
-        for w in (self._table, self._ms_enabled, self._ms_count, self._run_btn, self._result):
+        for w in (
+            self._table,
+            self._ms_enabled,
+            self._ms_count,
+            self._run_btn,
+            self._result,
+        ):
             lay.addWidget(w)
         self._run_btn.clicked.connect(self.run)
 
@@ -63,7 +70,9 @@ class NlsqStep(QWidget):
     def load_parameters_from_model(self) -> None:
         if not self._state.model_key:
             return
-        instance = ModelRegistry.create(self._state.model_key, **self._state.model_config)
+        instance = ModelRegistry.create(
+            self._state.model_key, **self._state.model_config
+        )
         # instance.parameters is a ParameterSet of core.parameters.Parameter
         # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs gui.state.store
         # .ParameterState (`.min_bound`/`.max_bound`/`.fixed`). Convert here,
@@ -90,7 +99,11 @@ class NlsqStep(QWidget):
         # Multi-start config is transient widget state — not stored in FitState
         table_params = self._table.get_parameters()
         initial_params = {
-            name: {"value": p.value, "bounds": (p.min_bound, p.max_bound), "fixed": p.fixed}
+            name: {
+                "value": p.value,
+                "bounds": (p.min_bound, p.max_bound),
+                "fixed": p.fixed,
+            }
             for name, p in table_params.items()
         } or None
         try:

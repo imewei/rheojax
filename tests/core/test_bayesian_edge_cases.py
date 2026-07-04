@@ -63,9 +63,9 @@ class TestBayesianEdgeCases:
             if name in result.posterior_samples:
                 samples = result.posterior_samples[name]
                 total = num_chains * num_samples
-                assert (
-                    samples.size == total
-                ), f"Expected {total} samples for {name}, got {samples.size}"
+                assert samples.size == total, (
+                    f"Expected {total} samples for {name}, got {samples.size}"
+                )
 
     def test_minimal_warmup(self):
         """Bayesian with very short warmup should complete."""

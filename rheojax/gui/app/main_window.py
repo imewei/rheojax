@@ -1436,7 +1436,6 @@ class RheoJAXMainWindow(QMainWindow):
                 if test_mode is not None:
                     config["test_mode"] = test_mode
 
-
             elif step.step_type == "bayesian":
                 state = self.store.get_state()
                 if state.active_model_name:

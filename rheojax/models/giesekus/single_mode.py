@@ -75,7 +75,8 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "giesekus_single",
     protocols=[
@@ -85,7 +86,8 @@ logger = logging.getLogger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class GiesekusSingleMode(GiesekusBase):
     """Single-mode Giesekus nonlinear viscoelastic model.
 
@@ -141,6 +143,7 @@ class GiesekusSingleMode(GiesekusBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize single-mode Giesekus model."""
         super().__init__()
@@ -304,11 +307,7 @@ class GiesekusSingleMode(GiesekusBase):
         beta_cc = float(self.parameters.get_value("beta_cc"))
         params = jnp.array([self.eta_p, self.lambda_1, self.alpha, self.eta_s, beta_cc])
         # Filter out BaseModel kwargs that model_function doesn't expect
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) real [G', G''] for oscillation;
         # convert to complex G* to match the established convention

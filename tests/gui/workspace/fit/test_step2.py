@@ -62,7 +62,10 @@ def test_data_step_refresh_rebuilds_after_protocol_set(qtbot):
 
     assert step.expected_columns() == ["omega", "G_prime", "G_double_prime"]
     assert step.available_datasets() == ["osc1"]
-    assert [step._source.itemText(i) for i in range(step._source.count())] == ["", "osc1"]
+    assert [step._source.itemText(i) for i in range(step._source.count())] == [
+        "",
+        "osc1",
+    ]
 
 
 def test_data_step_refresh_clears_stale_selection(qtbot):

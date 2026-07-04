@@ -14,7 +14,10 @@ def test_diagnostics_verdict_converged():
     result = {
         "r_hat": {"a": 1.0, "b": 1.01},
         "ess": {"a": 800, "b": 900},
-        "sample_stats": {"energy": [1.0, 1.05, 0.98, 1.02] * 25, "diverging": [False] * 100},
+        "sample_stats": {
+            "energy": [1.0, 1.05, 0.98, 1.02] * 25,
+            "diverging": [False] * 100,
+        },
     }
     v = _diagnostics_verdict(result)
     assert v["converged"] is True
@@ -159,11 +162,14 @@ def test_nuts_step_run_attaches_verdict(qtbot):
         # trips the "BFMI too low" reason and would make this fixture
         # not-converged regardless of r_hat/ess. Mirrors the fixture in
         # test_diagnostics_verdict_converged above.
-        return {"r_hat": {"a": 1.0}, "ess": {"a": 900},
-                "sample_stats": {
-                    "energy": [1.0, 1.05, 0.98, 1.02] * 25,
-                    "diverging": [False] * 100,
-                }}
+        return {
+            "r_hat": {"a": 1.0},
+            "ess": {"a": 900},
+            "sample_stats": {
+                "energy": [1.0, 1.05, 0.98, 1.02] * 25,
+                "diverging": [False] * 100,
+            },
+        }
 
     step = NutsStep(st, sample_fn=fake_sample_fn)
     qtbot.addWidget(step)
@@ -176,7 +182,8 @@ def test_visualize_diagnostics_badge_text(qtbot):
     st = FitState(
         nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9},
         nuts_result={
-            "r_hat": {"a": 1.2}, "ess": {"a": 800},
+            "r_hat": {"a": 1.2},
+            "ess": {"a": 800},
             "sample_stats": {"energy": [1.0] * 100, "diverging": [False] * 100},
             "verdict": {"converged": False, "reasons": ["r_hat too high for a"]},
         },

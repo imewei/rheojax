@@ -35,9 +35,7 @@ from rheojax.logging import get_logger, log_fit
 logger = get_logger(__name__)
 
 
-@ModelRegistry.register(
-    "herschel_bulkley",
-    protocols=[Protocol.FLOW_CURVE])
+@ModelRegistry.register("herschel_bulkley", protocols=[Protocol.FLOW_CURVE])
 class HerschelBulkley(BaseModel):
     """Herschel-Bulkley model for viscoplastic flow (ROTATION only).
 
@@ -64,6 +62,7 @@ class HerschelBulkley(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Herschel-Bulkley model."""
         super().__init__()
@@ -153,7 +152,9 @@ class HerschelBulkley(BaseModel):
 
                 finite_mask = np.isfinite(log_gamma) & np.isfinite(log_stress)
                 if finite_mask.sum() < 2:
-                    raise ValueError("Insufficient finite data points for power-law fit")
+                    raise ValueError(
+                        "Insufficient finite data points for power-law fit"
+                    )
                 coeffs = np.polyfit(log_gamma[finite_mask], log_stress[finite_mask], 1)
                 n_est = coeffs[0]
                 K_est = np.exp(coeffs[1])

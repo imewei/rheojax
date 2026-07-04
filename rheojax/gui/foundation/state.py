@@ -14,11 +14,13 @@ class ParameterConfig:
     upper: float
     fixed: bool
 
+
 @dataclass
 class NlsqConfig:
     multi_start: bool = False
     n_starts: int = 8
     parameters: list[ParameterConfig] = field(default_factory=list)
+
 
 @dataclass
 class NutsConfig:
@@ -30,6 +32,7 @@ class NutsConfig:
     seed: int = 0
     warm_start: bool = True
     priors: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class FitState:
@@ -49,10 +52,13 @@ class FitState:
     control_vars: dict[str, float] = field(default_factory=dict)
     nlsq_config: NlsqConfig = field(default_factory=NlsqConfig)
     nuts_config: NutsConfig = field(default_factory=NutsConfig)
-    nlsq_result: Any | None = None  # FitResult from ModelService.fit(); typed Any to avoid circular import
+    nlsq_result: Any | None = (
+        None  # FitResult from ModelService.fit(); typed Any to avoid circular import
+    )
     nuts_result: dict | None = None
     step: int = 0
     revision: int = 0
+
 
 @dataclass
 class TransformState:
@@ -63,23 +69,28 @@ class TransformState:
     step: int = 0
     revision: int = 0
 
+
 @dataclass
 class PipelineStepConfig:
     id: str
-    step_type: str            # "transform" | "fit" | "export"
+    step_type: str  # "transform" | "fit" | "export"
     config: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class JobResultRef:
     result_id: str
 
+
 @dataclass
 class ActiveJobsState:
     by_id: dict[str, dict] = field(default_factory=dict)
 
+
 @dataclass
 class JobHistoryState:
     by_id: dict[str, dict] = field(default_factory=dict)
+
 
 @dataclass
 class PipelineState:
@@ -88,17 +99,20 @@ class PipelineState:
     name: str | None = None
     job_id: str | None = None
 
+
 @dataclass
 class UiState:
     mode: str = "fit"
     theme: str = "system"
     inspector_tab: str = "log"
 
+
 @dataclass
 class ProjectState:
     path: str | None = None
     name: str | None = None
     dirty: bool = False
+
 
 @dataclass
 class AppState:
@@ -111,9 +125,21 @@ class AppState:
     project: ProjectState = field(default_factory=ProjectState)
     ui: UiState = field(default_factory=UiState)
 
+
 # re-export replace for invalidation.py
 __all__ = [
-    "ParameterConfig", "NlsqConfig", "NutsConfig", "FitState", "TransformState",
-    "PipelineStepConfig", "JobResultRef", "ActiveJobsState", "JobHistoryState",
-    "PipelineState", "UiState", "ProjectState", "AppState", "replace",
+    "ParameterConfig",
+    "NlsqConfig",
+    "NutsConfig",
+    "FitState",
+    "TransformState",
+    "PipelineStepConfig",
+    "JobResultRef",
+    "ActiveJobsState",
+    "JobHistoryState",
+    "PipelineState",
+    "UiState",
+    "ProjectState",
+    "AppState",
+    "replace",
 ]

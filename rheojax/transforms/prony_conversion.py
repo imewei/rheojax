@@ -307,7 +307,9 @@ def _fit_prony_oscillation(
     # Same n+2 / drop-edges approach as _fit_prony_relaxation: modes at exactly
     # 1/omega_max and 1/omega_min are at the boundary of the informative range
     # and pick up spurious weight that distorts G(t) predictions.
-    tau_all = np.logspace(np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes + 2)
+    tau_all = np.logspace(
+        np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes + 2
+    )
     tau_i = tau_all[1:-1]
 
     G_e = max(float(np.min(G_prime)), 0.0)

@@ -56,9 +56,9 @@ data point 5	0.5	1800	900
         np.testing.assert_array_almost_equal(chunk.x, [0.1, 0.2, 0.3, 0.4, 0.5])
 
         # With both Storage and Loss modulus columns, should return complex modulus
-        assert np.iscomplexobj(
-            chunk.y
-        ), "Should return complex modulus when both G' and G'' are available"
+        assert np.iscomplexobj(chunk.y), (
+            "Should return complex modulus when both G' and G'' are available"
+        )
         expected_complex = np.array(
             [1000 + 500j, 1200 + 600j, 1400 + 700j, 1600 + 800j, 1800 + 900j]
         )
@@ -77,7 +77,7 @@ data point 5	0.5	1800	900
             "\ts\tPa",
         ]
         for i in range(25):
-            lines.append(f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}")
+            lines.append(f"data point {i + 1}\t{i * 0.1:.1f}\t{(i + 1) * 100}")
 
         test_file = tmp_path / "test_chunks.txt"
         test_file.write_text("\n".join(lines))
@@ -198,7 +198,7 @@ class TestTriosChunkedAdvanced:
         ]
         # Generate 1000 data points
         for i in range(1000):
-            lines.append(f"data point {i+1}\t{i * 0.01:.2f}\t{(i + 1) * 10}")
+            lines.append(f"data point {i + 1}\t{i * 0.01:.2f}\t{(i + 1) * 10}")
 
         test_file = tmp_path / "large_file.txt"
         test_file.write_text("\n".join(lines))
@@ -228,7 +228,7 @@ Variables	Time	Stress
 """
         # Add 30 data points
         for i in range(30):
-            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i + 1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         test_file = tmp_path / "test_equiv.txt"
         test_file.write_text(trios_content)
@@ -257,7 +257,7 @@ Variables	Time	Stress
 """
         # First segment: 20 points
         for i in range(20):
-            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i + 1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         trios_content += """
 [step]
@@ -267,7 +267,7 @@ Variables	Time	Stress
 """
         # Second segment: 15 points
         for i in range(15):
-            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 50}\n"
+            trios_content += f"data point {i + 1}\t{i * 0.1:.1f}\t{(i + 1) * 50}\n"
 
         test_file = tmp_path / "test_multiseg.txt"
         test_file.write_text(trios_content)
@@ -300,7 +300,7 @@ Variables	Time	Stress
 """
         # First segment
         for i in range(10):
-            trios_content += f"data point {i+1}\t{i:.1f}\t100\n"
+            trios_content += f"data point {i + 1}\t{i:.1f}\t100\n"
 
         trios_content += """
 [step]
@@ -310,7 +310,7 @@ Variables	Time	Stress
 """
         # Second segment
         for i in range(10):
-            trios_content += f"data point {i+1}\t{i:.1f}\t200\n"
+            trios_content += f"data point {i + 1}\t{i:.1f}\t200\n"
 
         test_file = tmp_path / "test_seg_select.txt"
         test_file.write_text(trios_content)
@@ -506,7 +506,7 @@ Variables	Time	Stress
 	s	Pa
 """
         for i in range(20):
-            trios_content += f"data point {i+1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
+            trios_content += f"data point {i + 1}\t{i * 0.1:.1f}\t{(i + 1) * 100}\n"
 
         test_file = tmp_path / "test_compat.txt"
         test_file.write_text(trios_content)
@@ -531,7 +531,7 @@ Variables	Time	Stress
 	s	Pa
 """
         for i in range(100):
-            trios_content += f"data point {i+1}\t{i * 0.01:.2f}\t{(i + 1) * 10}\n"
+            trios_content += f"data point {i + 1}\t{i * 0.01:.2f}\t{(i + 1) * 10}\n"
 
         test_file = tmp_path / "test_cleanup.txt"
         test_file.write_text(trios_content)
@@ -571,7 +571,7 @@ class TestTriosChunkedMemoryProfile:
             "\ts\tPa",
         ]
         for i in range(10000):
-            lines.append(f"data point {i+1}\t{i * 0.001:.3f}\t{(i + 1) * 1.5:.1f}")
+            lines.append(f"data point {i + 1}\t{i * 0.001:.3f}\t{(i + 1) * 1.5:.1f}")
 
         test_file = tmp_path / "large_sim.txt"
         test_file.write_text("\n".join(lines))
@@ -608,7 +608,7 @@ class TestTriosChunkedMemoryProfile:
         for i in range(50):
             t = i * 0.1
             stress = 1000 * np.exp(-t / 1.0)  # Simple exponential decay
-            lines.append(f"data point {i+1}\t{t:.1f}\t{stress:.2f}")
+            lines.append(f"data point {i + 1}\t{t:.1f}\t{stress:.2f}")
 
         test_file = tmp_path / "relax.txt"
         test_file.write_text("\n".join(lines))

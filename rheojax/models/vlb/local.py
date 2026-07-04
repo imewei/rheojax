@@ -96,7 +96,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "vlb",
     protocols=[
@@ -106,7 +107,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class VLBLocal(VLBBase):
     """Single transient network VLB model (2 params: G0, k_d).
 
@@ -140,6 +142,7 @@ class VLBLocal(VLBBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize single-network VLB model."""
         super().__init__()
@@ -370,11 +373,7 @@ class VLBLocal(VLBBase):
         params = jnp.array(param_values)
 
         # Remove test_mode from kwargs to avoid duplicate
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) [G', G''] for oscillation;
         # convert to complex G* for consistent API

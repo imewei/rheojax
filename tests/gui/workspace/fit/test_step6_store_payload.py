@@ -11,9 +11,14 @@ from rheojax.gui.workspace.fit.step6_export import ExportStep
 
 def test_save_to_library_stores_fitted_curve_payload(qtbot):
     st = FitState(
-        model_key="power_law", protocol="flow_curve",
-        nlsq_result={"params": {"a": 1.0}, "r_squared": 0.9,
-                     "x": [1.0, 2.0], "y_fit": [1.1, 1.9]},
+        model_key="power_law",
+        protocol="flow_curve",
+        nlsq_result={
+            "params": {"a": 1.0},
+            "r_squared": 0.9,
+            "x": [1.0, 2.0],
+            "y_fit": [1.1, 1.9],
+        },
     )
     lib = DatasetLibrary()
     step = ExportStep(st, lib)

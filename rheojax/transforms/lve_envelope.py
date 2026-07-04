@@ -114,8 +114,7 @@ class LVEEnvelope(BaseTransform):
         # T-12: Guard against non-positive relaxation times
         if np.any(tau_i <= 0):
             raise ValueError(
-                f"All relaxation times tau_i must be positive, "
-                f"got min={np.min(tau_i)}"
+                f"All relaxation times tau_i must be positive, got min={np.min(tau_i)}"
             )
 
         # Time array

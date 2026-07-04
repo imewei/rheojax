@@ -445,10 +445,14 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
                 headers = list(df.columns)
                 # Also check values in first row if they might contain headers/metadata
                 for row_idx in range(min(len(df), 3)):
-                    headers.extend([str(val) for val in df.iloc[row_idx] if pd.notna(val)])
+                    headers.extend(
+                        [str(val) for val in df.iloc[row_idx] if pd.notna(val)]
+                    )
                 check_tensile_guard(headers, source=f"Excel sheet '{sheet}'")
         except Exception as e:
-            if type(e).__name__ == "UnsupportedDataError" or isinstance(e, UnsupportedDataError):
+            if type(e).__name__ == "UnsupportedDataError" or isinstance(
+                e, UnsupportedDataError
+            ):
                 raise
     else:
         # Text files (CSV, TSV, TXT, JSON)
@@ -484,8 +488,11 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
                     "RheoJAX only supports shear deformation mode."
                 )
         except Exception as e:
-            if type(e).__name__ == "UnsupportedDataError" or isinstance(e, UnsupportedDataError):
+            if type(e).__name__ == "UnsupportedDataError" or isinstance(
+                e, UnsupportedDataError
+            ):
                 raise
+
 
 # =============================================================================
 # Transform Validation

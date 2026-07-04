@@ -125,9 +125,9 @@ class TestFluidityRegistration:
             Protocol.OSCILLATION,
             Protocol.LAOS,
         ]:
-            assert (
-                protocol in info.protocols
-            ), f"{protocol} missing from FluidityNonlocal"
+            assert protocol in info.protocols, (
+                f"{protocol} missing from FluidityNonlocal"
+            )
 
 
 @pytest.mark.unit
@@ -356,7 +356,6 @@ class TestFluidityPredictBeforeFit:
         X = np.logspace(-1, 1, 10)
         with pytest.raises((ValueError, AttributeError)):
             model.predict(X)
-
 
 
 @pytest.mark.unit

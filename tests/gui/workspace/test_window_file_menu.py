@@ -44,7 +44,9 @@ def test_maybe_confirm_unsaved_save_success_proceeds(qtbot, monkeypatch):
     assert calls == [1]
 
 
-def test_maybe_confirm_unsaved_save_blocked_by_active_jobs_warns_and_aborts(qtbot, monkeypatch):
+def test_maybe_confirm_unsaved_save_blocked_by_active_jobs_warns_and_aborts(
+    qtbot, monkeypatch
+):
     # Reachable when _maybe_confirm_active_jobs gave up waiting (30s poll timeout) with
     # active_jobs still non-empty: Save is unconditionally blocked in that state, so
     # picking "Save" here must not silently no-op -- it must warn the user that the
@@ -64,8 +66,8 @@ def test_maybe_confirm_unsaved_save_blocked_by_active_jobs_warns_and_aborts(qtbo
     win._maybe_confirm_unsaved_changes(lambda: calls.append(1))
 
     assert warning_calls == [1]  # user told the action was aborted
-    assert save_calls == []      # _on_save (and its own separate dialog) never invoked
-    assert calls == []           # proceed() never called -- Close/New/Open did not happen
+    assert save_calls == []  # _on_save (and its own separate dialog) never invoked
+    assert calls == []  # proceed() never called -- Close/New/Open did not happen
 
 
 def test_maybe_confirm_unsaved_discard_still_proceeds(qtbot, monkeypatch):
@@ -100,9 +102,7 @@ def test_on_save_shows_critical_dialog_on_value_error(qtbot, monkeypatch):
     def _raise(*a, **k):
         raise ValueError("corrupt archive")
 
-    monkeypatch.setattr(
-        "rheojax.gui.foundation.project_codec.save_project_v2", _raise
-    )
+    monkeypatch.setattr("rheojax.gui.foundation.project_codec.save_project_v2", _raise)
     critical_calls = []
     monkeypatch.setattr(
         QMessageBox, "critical", lambda *a, **k: critical_calls.append(a)
@@ -120,9 +120,7 @@ def test_on_save_as_shows_critical_dialog_on_os_error(qtbot, monkeypatch):
     def _raise(*a, **k):
         raise OSError("disk full")
 
-    monkeypatch.setattr(
-        "rheojax.gui.foundation.project_codec.save_project_v2", _raise
-    )
+    monkeypatch.setattr("rheojax.gui.foundation.project_codec.save_project_v2", _raise)
     monkeypatch.setattr(
         QFileDialog,
         "getSaveFileName",
@@ -145,9 +143,7 @@ def test_on_open_shows_critical_dialog_on_value_error(qtbot, monkeypatch):
     def _raise(*a, **k):
         raise ValueError("unsupported project version")
 
-    monkeypatch.setattr(
-        "rheojax.gui.foundation.project_codec.load_project_v2", _raise
-    )
+    monkeypatch.setattr("rheojax.gui.foundation.project_codec.load_project_v2", _raise)
     monkeypatch.setattr(
         QFileDialog,
         "getOpenFileName",

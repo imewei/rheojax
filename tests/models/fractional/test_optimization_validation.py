@@ -145,14 +145,14 @@ class TestOptimizationFailureDetection:
 
         if raised:
             # If an error was raised, fitted_ should be False
-            assert (
-                not model.fitted_
-            ), f"{model_name}.fitted_ should be False after optimization error"
+            assert not model.fitted_, (
+                f"{model_name}.fitted_ should be False after optimization error"
+            )
         else:
             # If fit completed (partial convergence accepted), fitted_ should be True
-            assert (
-                model.fitted_
-            ), f"{model_name}.fitted_ should be True after accepted partial convergence"
+            assert model.fitted_, (
+                f"{model_name}.fitted_ should be True after accepted partial convergence"
+            )
 
 
 class TestErrorMessageQuality:

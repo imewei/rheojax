@@ -416,9 +416,7 @@ class VLBBase(BaseModel):
         if "G0" in self.parameters.keys():
             self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
 
-        logger.debug(
-            f"Creep initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
-        )
+        logger.debug(f"Creep initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s")
 
     # =========================================================================
     # Virtual Method for Phase 2 Extensions

@@ -52,7 +52,8 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class HebraudLequeux(BaseModel):
     """Hébraud–Lequeux (HL) Model for Soft Glassy Materials.
 
@@ -79,6 +80,7 @@ class HebraudLequeux(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Hébraud–Lequeux Model."""
         super().__init__()
@@ -354,12 +356,12 @@ class HebraudLequeux(BaseModel):
                     best_cost = res.fun
                     best_x = res.x.copy()
                     logger.info(
-                        f"Start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
-                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
+                        f"Start {i + 1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10 ** res.x[1]:.3e}, "
                         f"sigma_c={res.x[2]:.3f} ({res.nfev} evals)"
                     )
             except Exception as e:
-                logger.warning(f"Start {i+1} failed: {e}")
+                logger.warning(f"Start {i + 1} failed: {e}")
 
         elapsed = _time.time() - t0
         logger.info(f"HL fit: {elapsed:.1f}s, best cost={best_cost:.5f}")
@@ -519,25 +521,33 @@ class HebraudLequeux(BaseModel):
 
         def cost_fn(x):
             alpha_v, log_tau_v, log_sc_norm_v = x
-            tau_v = 10.0 ** log_tau_v
-            sc_norm_v = 10.0 ** log_sc_norm_v
+            tau_v = 10.0**log_tau_v
+            sc_norm_v = 10.0**log_sc_norm_v
             if not (0.01 <= alpha_v <= 0.99):
                 return 1e6
             if sc_norm_v <= 1e-6 or sc_norm_v > sigma_max_norm / 2:
                 return 1e6
             try:
                 time_hist, stress_hist = relaxation_kernel(
-                    n_steps, gamma0_float, alpha_v, tau_v, sc_norm_v,
-                    dt, sigma_max_norm, n_bins,
+                    n_steps,
+                    gamma0_float,
+                    alpha_v,
+                    tau_v,
+                    sc_norm_v,
+                    dt,
+                    sigma_max_norm,
+                    n_bins,
                 )
                 init_stress = gamma0_float
                 time_full = jnp.concatenate([jnp.array([0.0]), time_hist])
                 stress_full = jnp.concatenate([jnp.array([init_stress]), stress_hist])
-                sigma_interp = np.array(jnp.interp(jnp.asarray(t_np), time_full, stress_full))
+                sigma_interp = np.array(
+                    jnp.interp(jnp.asarray(t_np), time_full, stress_full)
+                )
                 G_norm_pred = sigma_interp / gamma0_float  # G in [0, 1] scale
                 log_pred = np.log10(np.maximum(np.abs(G_norm_pred), 1e-20))
                 resid = log_pred - G_norm_target
-                return float(np.mean(resid ** 2))
+                return float(np.mean(resid**2))
             except Exception as exc:
                 logger.debug("Relaxation cost_fn exception: %s", exc)
                 return 1e6
@@ -578,19 +588,21 @@ class HebraudLequeux(BaseModel):
                     best_cost = res.fun
                     best_x = res.x.copy()
                     logger.info(
-                        f"Relax start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
-                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
-                        f"sigma_c_norm={10**res.x[2]:.4f}"
+                        f"Relax start {i + 1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10 ** res.x[1]:.3e}, "
+                        f"sigma_c_norm={10 ** res.x[2]:.4f}"
                     )
             except Exception as e:
-                logger.warning(f"Relaxation start {i+1} failed: {e}")
+                logger.warning(f"Relaxation start {i + 1} failed: {e}")
 
         elapsed = _time.time() - t0_fit
         logger.info(f"HL relaxation fit: {elapsed:.1f}s, best cost={best_cost:.5f}")
 
         alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
         tau_fit = float(10.0 ** np.clip(best_x[1], -6, 4))
-        sc_norm_fit = float(10.0 ** np.clip(best_x[2], -6, np.log10(sigma_max_norm / 2)))
+        sc_norm_fit = float(
+            10.0 ** np.clip(best_x[2], -6, np.log10(sigma_max_norm / 2))
+        )
 
         # Un-normalise sigma_c back to physical Pa for storage in parameters
         self.parameters.set_value("alpha", alpha_fit)
@@ -836,12 +848,12 @@ class HebraudLequeux(BaseModel):
                     best_cost = res.fun
                     best_x = res.x.copy()
                     logger.info(
-                        f"SAOS start {i+1}/{len(starts)}: cost={res.fun:.5f}, "
-                        f"alpha={res.x[0]:.3f}, tau={10**res.x[1]:.3e}, "
+                        f"SAOS start {i + 1}/{len(starts)}: cost={res.fun:.5f}, "
+                        f"alpha={res.x[0]:.3f}, tau={10 ** res.x[1]:.3e}, "
                         f"sigma_c={res.x[2]:.3f}"
                     )
             except Exception as e:
-                logger.warning(f"SAOS start {i+1} failed: {e}")
+                logger.warning(f"SAOS start {i + 1} failed: {e}")
 
         # Set fitted parameters
         alpha_fit = float(np.clip(best_x[0], 0.01, 0.99))
@@ -940,18 +952,21 @@ class HebraudLequeux(BaseModel):
             sigma_c_norm = float(1.0 if sigma_c is None else sigma_c) / G0
             t_max = float(X_jax[-1])
             dt_pred, _ = self._adaptive_dt(t_max)
-            return np.array(
-                run_relaxation(
-                    X_jax,
-                    float(gamma0),
-                    float(0.5 if alpha is None else alpha),
-                    float(1.0 if tau is None else tau),
-                    sigma_c_norm,
-                    dt_pred,
-                    float(sigma_max_norm),
-                    int(n_bins_rel),
+            return (
+                np.array(
+                    run_relaxation(
+                        X_jax,
+                        float(gamma0),
+                        float(0.5 if alpha is None else alpha),
+                        float(1.0 if tau is None else tau),
+                        sigma_c_norm,
+                        dt_pred,
+                        float(sigma_max_norm),
+                        int(n_bins_rel),
+                    )
                 )
-            ) * G0
+                * G0
+            )
         elif self._test_mode == "startup":
             gdot = self._last_fit_kwargs.get("gdot", 1.0)
             t_max = float(X_jax[-1])

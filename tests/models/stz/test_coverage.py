@@ -46,7 +46,6 @@ class TestSTZCoverage:
             patch.object(self.model, "_fit_laos_mode") as mock_laos,
             patch.object(self.model, "_fit_saos_mode") as mock_saos,
         ):
-
             # Case 1: gamma_0 > 0.01 -> LAOS
             # We must pass omega as well for LAOS
             self.model.fit(

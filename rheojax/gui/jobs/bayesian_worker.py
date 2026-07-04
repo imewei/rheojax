@@ -342,7 +342,10 @@ class BayesianWorker(QRunnable):
             from rheojax.gui.services.bayesian_service import BayesianService
 
             svc = BayesianService()
-            mcmc_kwargs: dict[str, Any] = {"seed": self._seed, "target_accept_prob": self._target_accept}
+            mcmc_kwargs: dict[str, Any] = {
+                "seed": self._seed,
+                "target_accept_prob": self._target_accept,
+            }
 
             # F-HL-005 fix: Pass fitted model state for stateful models
             if self._fitted_model_state:

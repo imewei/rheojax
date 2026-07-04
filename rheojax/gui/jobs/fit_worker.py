@@ -145,8 +145,7 @@ class FitWorker(QRunnable):
         """
         if not HAS_PYSIDE6:
             raise ImportError(
-                "PySide6 is required for FitWorker. "
-                "Install with: pip install PySide6"
+                "PySide6 is required for FitWorker. Install with: pip install PySide6"
             )
 
         super().__init__()

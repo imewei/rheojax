@@ -84,7 +84,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class VLBMultiNetwork(VLBBase):
     """Multi-network VLB model: M transient + optional permanent + solvent.
 
@@ -119,6 +120,7 @@ class VLBMultiNetwork(VLBBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         n_modes: int = 2,
@@ -398,8 +400,7 @@ class VLBMultiNetwork(VLBBase):
         self._nlsq_result = result
 
         logger.info(
-            f"Fitted VLBMultiNetwork ({self._n_modes} modes): "
-            f"eta_0={self.eta_0:.2e}"
+            f"Fitted VLBMultiNetwork ({self._n_modes} modes): eta_0={self.eta_0:.2e}"
         )
 
         return self
@@ -449,11 +450,7 @@ class VLBMultiNetwork(VLBBase):
         params = jnp.array(param_values)
 
         # Remove test_mode from kwargs to avoid duplicate
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = self.model_function(x_jax, params, test_mode=test_mode, **fwd_kwargs)
         # model_function returns (N,2) [G', G''] for oscillation;
         # convert to complex G* for consistent API

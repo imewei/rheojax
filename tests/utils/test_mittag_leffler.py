@@ -55,9 +55,9 @@ class TestMittagLefflerBasicFunctionality:
             result = mittag_leffler_e2(0.0, alpha=alpha, beta=beta)
             expected = 1.0 / jax_gamma(beta)
             # Relaxed tolerance for float32
-            assert (
-                abs(result - expected) < 1e-6
-            ), f"E_{{{alpha},{beta}}}(0) should be 1/Γ({beta})={expected}, got {result}"
+            assert abs(result - expected) < 1e-6, (
+                f"E_{{{alpha},{beta}}}(0) should be 1/Γ({beta})={expected}, got {result}"
+            )
 
     def test_ml_e_scalar_input(self):
         """Test scalar input returns scalar output."""
@@ -324,9 +324,9 @@ class TestMittagLefflerPerformance:
         execution_time = min(times)
 
         # Should be fast (< 50ms for 100 points) - increased threshold for CI/different hardware
-        assert (
-            execution_time < 0.05
-        ), f"Execution took {execution_time:.3f}s (min of 5 runs)"
+        assert execution_time < 0.05, (
+            f"Execution took {execution_time:.3f}s (min of 5 runs)"
+        )
         assert jnp.all(jnp.isfinite(result))
 
     def test_ml_e_large_array_performance(self):
@@ -344,9 +344,9 @@ class TestMittagLefflerPerformance:
         execution_time = time.time() - start
 
         # Should be fast (< 50ms for 1000 points)
-        assert (
-            execution_time < 0.05
-        ), f"Large array execution took {execution_time:.3f}s"
+        assert execution_time < 0.05, (
+            f"Large array execution took {execution_time:.3f}s"
+        )
         assert jnp.all(jnp.isfinite(result))
 
 

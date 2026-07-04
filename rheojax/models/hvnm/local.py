@@ -81,7 +81,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 @ModelRegistry.register(
     "hvnm",
     protocols=[
@@ -91,7 +92,8 @@ _MISSING = object()
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.LAOS,
-    ])
+    ],
+)
 class HVNMLocal(HVNMBase):
     """Local (0D) Hybrid Vitrimer Nanocomposite Model.
 
@@ -128,6 +130,7 @@ class HVNMLocal(HVNMBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         kinetics: Literal["stress", "stretch"] = "stress",
@@ -982,11 +985,7 @@ class HVNMLocal(HVNMBase):
             [self.parameters.get_value(n) for n in self.parameters.keys()],
             dtype=jnp.float64,
         )
-        fwd_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k != "test_mode"
-        }
+        fwd_kwargs = {k: v for k, v in kwargs.items() if k != "test_mode"}
         result = np.asarray(
             self.model_function(X, param_values, test_mode=test_mode, **fwd_kwargs)
         )

@@ -66,6 +66,7 @@ def test_config_widgets_rebuild_and_apply(qtbot, monkeypatch):
     # exposed in the UI at all.
     assert "gap_width" in step._config_widgets
     from PySide6.QtWidgets import QDoubleSpinBox
+
     assert isinstance(step._config_widgets["gap_width"][0], QDoubleSpinBox)
 
     step.set_model_config(

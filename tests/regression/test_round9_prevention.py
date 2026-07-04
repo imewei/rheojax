@@ -69,9 +69,9 @@ class TestITTMCTOscillationShape:
         model = ITTMCTSchematic(epsilon=0.05)
         omega = np.logspace(-1, 1, 5)
         result = model.predict(omega, test_mode="oscillation")
-        assert (
-            result.ndim == 1
-        ), f"Default oscillation predict must return 1-D |G*|, got shape {result.shape}"
+        assert result.ndim == 1, (
+            f"Default oscillation predict must return 1-D |G*|, got shape {result.shape}"
+        )
         assert result.shape == (5,)
 
     @pytest.mark.slow
@@ -82,9 +82,9 @@ class TestITTMCTOscillationShape:
         model = ITTMCTSchematic(epsilon=0.05)
         omega = np.logspace(-1, 1, 5)
         result = model.predict(omega, test_mode="oscillation", return_components=True)
-        assert (
-            result.ndim == 2
-        ), f"return_components=True must return 2-D [G', G''], got shape {result.shape}"
+        assert result.ndim == 2, (
+            f"return_components=True must return 2-D [G', G''], got shape {result.shape}"
+        )
         assert result.shape == (5, 2)
 
     @pytest.mark.smoke
@@ -95,9 +95,9 @@ class TestITTMCTOscillationShape:
         model = ITTMCTIsotropic(phi=0.55, n_k=20)
         omega = np.logspace(-1, 1, 5)
         result = model.predict(omega, test_mode="oscillation")
-        assert (
-            result.ndim == 1
-        ), f"Default oscillation predict must return 1-D |G*|, got shape {result.shape}"
+        assert result.ndim == 1, (
+            f"Default oscillation predict must return 1-D |G*|, got shape {result.shape}"
+        )
 
     @pytest.mark.smoke
     def test_isotropic_components_returns_2d(self):
@@ -142,9 +142,9 @@ class TestBayesianTestModePersistence:
         assert result is not None
 
         # _test_mode must survive the finally block
-        assert hasattr(
-            model, "_test_mode"
-        ), "_test_mode was deleted by the finally block after a successful fit"
+        assert hasattr(model, "_test_mode"), (
+            "_test_mode was deleted by the finally block after a successful fit"
+        )
 
     @pytest.mark.smoke
     def test_test_mode_reverted_on_failure(self):
@@ -170,9 +170,9 @@ class TestBayesianTestModePersistence:
             )
 
         # Original state must be restored
-        assert (
-            model._test_mode == "oscillation"
-        ), "_test_mode was not reverted after failed fit_bayesian"
+        assert model._test_mode == "oscillation", (
+            "_test_mode was not reverted after failed fit_bayesian"
+        )
         assert model._last_fit_kwargs == saved_kwargs
 
 
@@ -209,9 +209,9 @@ class TestSGRLAOSTimeMonotonicity:
             t_query, test_mode="laos", gamma_0=0.1, omega_laos=1.0, n_cycles=2
         )
         assert result.shape == (n_pts,), f"Expected ({n_pts},), got {result.shape}"
-        assert np.all(
-            np.isfinite(result)
-        ), "LAOS predict returned NaN — likely using non-monotonic strain as interp x-axis"
+        assert np.all(np.isfinite(result)), (
+            "LAOS predict returned NaN — likely using non-monotonic strain as interp x-axis"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -248,9 +248,9 @@ class TestEqualBoundsDeterministic:
         a_samples = result.posterior_samples.get("a")
         if a_samples is not None:
             unique = np.unique(np.asarray(a_samples))
-            assert (
-                len(unique) == 1
-            ), f"Equal-bounds param 'a' should be deterministic, got {len(unique)} unique values"
+            assert len(unique) == 1, (
+                f"Equal-bounds param 'a' should be deterministic, got {len(unique)} unique values"
+            )
             assert np.isclose(unique[0], 5.0, atol=1e-6)
 
     @pytest.mark.smoke
@@ -280,9 +280,9 @@ class TestEqualBoundsDeterministic:
         a_samples = result.posterior_samples.get("a")
         if a_samples is not None:
             # Should have variation (not deterministic)
-            assert not np.all(
-                np.asarray(a_samples) == np.asarray(a_samples)[0]
-            ), "Param with bounds (0, 1e-6) should NOT be treated as deterministic"
+            assert not np.all(np.asarray(a_samples) == np.asarray(a_samples)[0]), (
+                "Param with bounds (0, 1e-6) should NOT be treated as deterministic"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

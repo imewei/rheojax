@@ -413,9 +413,9 @@ class TestTransformFallbackPath:
         # Every key should be discoverable via its display name
         for meta in metadata:
             resolved = display_to_key.get(meta["name"].lower())
-            assert (
-                resolved == meta["key"]
-            ), f"Display name '{meta['name']}' resolved to '{resolved}', expected '{meta['key']}'"
+            assert resolved == meta["key"], (
+                f"Display name '{meta['name']}' resolved to '{resolved}', expected '{meta['key']}'"
+            )
 
 
 # ---------------------------------------------------------------------------

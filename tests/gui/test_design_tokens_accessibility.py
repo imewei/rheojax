@@ -57,9 +57,9 @@ class TestDesignTokenUsage:
         source = inspect.getsource(HomePage)
 
         # The old hardcoded font-family string should be gone
-        assert (
-            "'Inter'" not in source
-        ), "Hardcoded 'Inter' font-family found — should use Typography.FONT_FAMILY"
+        assert "'Inter'" not in source, (
+            "Hardcoded 'Inter' font-family found — should use Typography.FONT_FAMILY"
+        )
 
     @pytest.mark.smoke
     def test_data_page_uses_typography_tokens(self) -> None:
@@ -71,9 +71,9 @@ class TestDesignTokenUsage:
         source = inspect.getsource(DataPage)
 
         # Check that bare font-size: 24pt was migrated
-        assert (
-            "font-size: 24pt" not in source
-        ), "Hardcoded 'font-size: 24pt' found — should use Typography.SIZE_HEADING"
+        assert "font-size: 24pt" not in source, (
+            "Hardcoded 'font-size: 24pt' found — should use Typography.SIZE_HEADING"
+        )
 
     @pytest.mark.smoke
     def test_transform_page_no_hardcoded_white(self) -> None:
@@ -84,9 +84,9 @@ class TestDesignTokenUsage:
 
         source = inspect.getsource(TransformPage)
         # The old "color: white; font-size: 13pt; font-weight: bold;"
-        assert (
-            "color: white;" not in source
-        ), "Hardcoded 'color: white' found — should use ColorPalette.TEXT_INVERSE"
+        assert "color: white;" not in source, (
+            "Hardcoded 'color: white' found — should use ColorPalette.TEXT_INVERSE"
+        )
 
     @pytest.mark.smoke
     def test_transform_page_configure_button_uses_button_style(self) -> None:
@@ -96,9 +96,9 @@ class TestDesignTokenUsage:
         from rheojax.gui.pages.transform_page import TransformPage
 
         source = inspect.getsource(TransformPage)
-        assert (
-            "background-color: white; color: black" not in source
-        ), "Hardcoded button style found — should use button_style()"
+        assert "background-color: white; color: black" not in source, (
+            "Hardcoded button style found — should use button_style()"
+        )
 
     @pytest.mark.smoke
     def test_export_page_uses_spacing_tokens(self) -> None:
@@ -109,9 +109,9 @@ class TestDesignTokenUsage:
 
         source = inspect.getsource(ExportPage)
         # The old hardcoded 'margin-top: 15px' should be gone
-        assert (
-            "margin-top: 15px" not in source
-        ), "Hardcoded 'margin-top: 15px' found — should use Spacing.LG"
+        assert "margin-top: 15px" not in source, (
+            "Hardcoded 'margin-top: 15px' found — should use Spacing.LG"
+        )
 
     @pytest.mark.smoke
     def test_diagnostics_page_no_direct_pyside6_import(self) -> None:
@@ -121,9 +121,9 @@ class TestDesignTokenUsage:
         from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
 
         source = inspect.getsource(DiagnosticsPage)
-        assert (
-            "from PySide6" not in source
-        ), "Direct PySide6 import found — should use rheojax.gui.compat"
+        assert "from PySide6" not in source, (
+            "Direct PySide6 import found — should use rheojax.gui.compat"
+        )
 
     @pytest.mark.smoke
     def test_home_page_chart_colors_use_tokens(self) -> None:
@@ -149,18 +149,18 @@ class TestDesignTokenUsage:
         source = inspect.getsource(PyQtGraphCanvas)
 
         # Verify no hardcoded hex strings remain for colors
-        assert (
-            'background="w"' not in source
-        ), 'Hardcoded background="w" found — should use themed("BG_BASE")'
-        assert (
-            'foreground="k"' not in source
-        ), 'Hardcoded foreground="k" found — should use themed("TEXT_PRIMARY")'
-        assert (
-            '"#1f77b4"' not in source
-        ), 'Hardcoded color "#1f77b4" found — should use themed("CHART_1")'
-        assert (
-            "themed(" in source
-        ), "PyQtGraphCanvas must use themed() for dynamic colors"
+        assert 'background="w"' not in source, (
+            'Hardcoded background="w" found — should use themed("BG_BASE")'
+        )
+        assert 'foreground="k"' not in source, (
+            'Hardcoded foreground="k" found — should use themed("TEXT_PRIMARY")'
+        )
+        assert '"#1f77b4"' not in source, (
+            'Hardcoded color "#1f77b4" found — should use themed("CHART_1")'
+        )
+        assert "themed(" in source, (
+            "PyQtGraphCanvas must use themed() for dynamic colors"
+        )
 
 
 # =============================================================================
@@ -200,18 +200,18 @@ class TestTokenQSSSync:
         """ColorPalette.PRIMARY should be indigo-700 (#4338CA) matching QSS."""
         from rheojax.gui.resources.styles.tokens import ColorPalette
 
-        assert (
-            ColorPalette.PRIMARY == "#4338CA"
-        ), f"PRIMARY should be #4338CA (indigo-700), got {ColorPalette.PRIMARY}"
+        assert ColorPalette.PRIMARY == "#4338CA", (
+            f"PRIMARY should be #4338CA (indigo-700), got {ColorPalette.PRIMARY}"
+        )
 
     @pytest.mark.smoke
     def test_font_family_starts_with_inter(self) -> None:
         """Typography.FONT_FAMILY should start with Inter matching QSS."""
         from rheojax.gui.resources.styles.tokens import Typography
 
-        assert Typography.FONT_FAMILY.startswith(
-            '"Inter"'
-        ), f"FONT_FAMILY should start with Inter, got: {Typography.FONT_FAMILY[:30]}"
+        assert Typography.FONT_FAMILY.startswith('"Inter"'), (
+            f"FONT_FAMILY should start with Inter, got: {Typography.FONT_FAMILY[:30]}"
+        )
 
     @pytest.mark.smoke
     def test_size_md_sm_exists(self) -> None:
@@ -320,9 +320,9 @@ class TestDarkColorPaletteParity:
         }
 
         missing = light_attrs - dark_attrs
-        assert (
-            not missing
-        ), f"DarkColorPalette is missing attributes present in ColorPalette: {missing}"
+        assert not missing, (
+            f"DarkColorPalette is missing attributes present in ColorPalette: {missing}"
+        )
 
     @pytest.mark.smoke
     def test_dark_palette_values_are_valid_hex(self) -> None:
@@ -335,9 +335,9 @@ class TestDarkColorPaletteParity:
                 continue
             val = getattr(DarkColorPalette, attr)
             if isinstance(val, str):
-                assert hex_pattern.match(
-                    val
-                ), f"DarkColorPalette.{attr} = '{val}' is not a valid hex color"
+                assert hex_pattern.match(val), (
+                    f"DarkColorPalette.{attr} = '{val}' is not a valid hex color"
+                )
 
     @pytest.mark.smoke
     def test_bright_variants_exist(self) -> None:
@@ -365,9 +365,9 @@ class TestNoSizeBaseArithmetic:
         from rheojax.gui.pages.data_page import DataPage
 
         source = inspect.getsource(DataPage)
-        assert (
-            "SIZE_BASE - 1" not in source
-        ), "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
+        assert "SIZE_BASE - 1" not in source, (
+            "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
+        )
 
     @pytest.mark.smoke
     def test_transform_page_no_size_base_minus_one(self) -> None:
@@ -377,9 +377,9 @@ class TestNoSizeBaseArithmetic:
         from rheojax.gui.pages.transform_page import TransformPage
 
         source = inspect.getsource(TransformPage)
-        assert (
-            "SIZE_BASE - 1" not in source
-        ), "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
+        assert "SIZE_BASE - 1" not in source, (
+            "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
+        )
 
 
 class TestHomePageGradientTokens:
@@ -401,9 +401,9 @@ class TestHomePageGradientTokens:
             "#8B5CF6",
         ]
         for color in banned_gradient_hex:
-            assert (
-                color not in source
-            ), f"Hardcoded gradient color {color} found — should use themed() token"
+            assert color not in source, (
+                f"Hardcoded gradient color {color} found — should use themed() token"
+            )
 
     @pytest.mark.smoke
     def test_no_hardcoded_px_font_sizes(self) -> None:
@@ -413,9 +413,9 @@ class TestHomePageGradientTokens:
         from rheojax.gui.pages.home_page import HomePage
 
         source = inspect.getsource(HomePage)
-        assert (
-            "font-size: 48px" not in source
-        ), "Hardcoded 48px font-size found — should use Typography.SIZE_HERO"
-        assert (
-            "font-size: 18px" not in source
-        ), "Hardcoded 18px font-size found — should use Typography token"
+        assert "font-size: 48px" not in source, (
+            "Hardcoded 48px font-size found — should use Typography.SIZE_HERO"
+        )
+        assert "font-size: 18px" not in source, (
+            "Hardcoded 18px font-size found — should use Typography token"
+        )

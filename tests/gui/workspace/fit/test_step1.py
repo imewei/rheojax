@@ -13,7 +13,9 @@ def test_model_list_filters_by_protocol(qtbot):
     assert step.is_ready() is False
     step.set_protocol("oscillation")
     keys = step.model_keys()
-    assert "generalized_maxwell" in keys and "power_law" not in keys  # power_law is flow-only
+    assert (
+        "generalized_maxwell" in keys and "power_law" not in keys
+    )  # power_law is flow-only
     with qtbot.waitSignal(step.edited, timeout=1000):
         step.set_model("generalized_maxwell")
     assert st.protocol == "oscillation" and st.model_key == "generalized_maxwell"

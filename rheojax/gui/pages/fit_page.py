@@ -363,7 +363,6 @@ class FitPage(QWidget):
 
         self._sync_quick_model_selection(model_name)
 
-
     def _update_test_mode_combo(self, model_name: str) -> None:
         """Filter test mode combo to show only modes supported by the model."""
         from rheojax.core.registry import ModelRegistry

@@ -54,9 +54,9 @@ class TestSGRGenericThermodynamics:
             W = model.compute_entropy_production(state)
 
             # Second law: W >= 0
-            assert (
-                W >= -1e-12
-            ), f"Entropy production W={W:.6e} < 0 violates second law for state={state}"
+            assert W >= -1e-12, (
+                f"Entropy production W={W:.6e} < 0 violates second law for state={state}"
+            )
 
             # Check for finite value
             assert np.isfinite(W), f"Entropy production not finite for state={state}"
@@ -85,15 +85,15 @@ class TestSGRGenericThermodynamics:
             L_T = L.T
             antisymmetry_error = np.max(np.abs(L + L_T))
 
-            assert (
-                antisymmetry_error < 1e-12
-            ), f"Poisson bracket not antisymmetric: max|L + L^T| = {antisymmetry_error:.6e} for state={state}"
+            assert antisymmetry_error < 1e-12, (
+                f"Poisson bracket not antisymmetric: max|L + L^T| = {antisymmetry_error:.6e} for state={state}"
+            )
 
             # Diagonal should be zero for antisymmetric matrix
             diag_error = np.max(np.abs(np.diag(L)))
-            assert (
-                diag_error < 1e-12
-            ), f"Poisson bracket diagonal not zero: max|diag(L)| = {diag_error:.6e}"
+            assert diag_error < 1e-12, (
+                f"Poisson bracket diagonal not zero: max|diag(L)| = {diag_error:.6e}"
+            )
 
     def test_friction_matrix_symmetry_and_positive_semidefinite(self):
         """Test friction matrix M is symmetric and positive semi-definite."""
@@ -119,18 +119,18 @@ class TestSGRGenericThermodynamics:
             # Check symmetry: M = M^T
             M_T = M.T
             symmetry_error = np.max(np.abs(M - M_T))
-            assert (
-                symmetry_error < 1e-12
-            ), f"Friction matrix not symmetric: max|M - M^T| = {symmetry_error:.6e} for state={state}"
+            assert symmetry_error < 1e-12, (
+                f"Friction matrix not symmetric: max|M - M^T| = {symmetry_error:.6e} for state={state}"
+            )
 
             # Check positive semi-definiteness via eigenvalues
             eigenvalues = np.linalg.eigvalsh(M)  # Real eigenvalues for symmetric matrix
 
             # All eigenvalues must be >= 0
             min_eigenvalue = np.min(eigenvalues)
-            assert (
-                min_eigenvalue >= -1e-12
-            ), f"Friction matrix not positive semi-definite: min eigenvalue = {min_eigenvalue:.6e} for state={state}"
+            assert min_eigenvalue >= -1e-12, (
+                f"Friction matrix not positive semi-definite: min eigenvalue = {min_eigenvalue:.6e} for state={state}"
+            )
 
     def test_energy_conservation_reversible_dynamics(self):
         """Test energy conservation: dE/dt = power input for reversible part."""
@@ -157,9 +157,9 @@ class TestSGRGenericThermodynamics:
 
         # Energy should be conserved (rate = 0) in reversible part
         # Allow small numerical tolerance (numerical precision limits)
-        assert (
-            np.abs(energy_rate_rev) < 1e-9
-        ), f"Reversible dynamics not energy-conserving: dF/dt = {energy_rate_rev:.6e}"
+        assert np.abs(energy_rate_rev) < 1e-9, (
+            f"Reversible dynamics not energy-conserving: dF/dt = {energy_rate_rev:.6e}"
+        )
 
     def test_entropy_balance_positive_production(self):
         """Test entropy balance: dS/dt >= 0 (entropy increases or stays constant)."""
@@ -182,9 +182,9 @@ class TestSGRGenericThermodynamics:
             dS_dt = model.entropy_production_rate(state)
 
             # Second law: dS/dt >= 0
-            assert (
-                dS_dt >= -1e-12
-            ), f"Entropy production rate dS/dt = {dS_dt:.6e} < 0 violates second law for state={state}"
+            assert dS_dt >= -1e-12, (
+                f"Entropy production rate dS/dt = {dS_dt:.6e} < 0 violates second law for state={state}"
+            )
 
 
 class TestSGRGenericModelComparison:
@@ -221,9 +221,9 @@ class TestSGRGenericModelComparison:
         G_star_conventional = conventional.predict(omega)
 
         # Check shapes match
-        assert (
-            G_star_generic.shape == G_star_conventional.shape
-        ), f"Shape mismatch: generic={G_star_generic.shape}, conventional={G_star_conventional.shape}"
+        assert G_star_generic.shape == G_star_conventional.shape, (
+            f"Shape mismatch: generic={G_star_generic.shape}, conventional={G_star_conventional.shape}"
+        )
 
         # Check predictions match within tolerance
         # GENERIC formulation should give same linear response as conventional
@@ -237,12 +237,12 @@ class TestSGRGenericModelComparison:
         )
 
         # Allow 10% tolerance for different numerical implementations
-        assert (
-            relative_error_G_prime < 0.1
-        ), f"G' mismatch: max relative error = {relative_error_G_prime:.4f}"
-        assert (
-            relative_error_G_double_prime < 0.1
-        ), f"G'' mismatch: max relative error = {relative_error_G_double_prime:.4f}"
+        assert relative_error_G_prime < 0.1, (
+            f"G' mismatch: max relative error = {relative_error_G_prime:.4f}"
+        )
+        assert relative_error_G_double_prime < 0.1, (
+            f"G'' mismatch: max relative error = {relative_error_G_double_prime:.4f}"
+        )
 
 
 class TestSGRGenericFreeEnergy:
@@ -285,9 +285,9 @@ class TestSGRGenericFreeEnergy:
         # Check decomposition
         F_expected = U - T * S
         decomposition_error = np.abs(F - F_expected)
-        assert (
-            decomposition_error < 1e-10
-        ), f"Free energy decomposition error: |F - (U - T*S)| = {decomposition_error:.6e}"
+        assert decomposition_error < 1e-10, (
+            f"Free energy decomposition error: |F - (U - T*S)| = {decomposition_error:.6e}"
+        )
 
 
 class TestSGRGenericModelInterface:
@@ -299,23 +299,23 @@ class TestSGRGenericModelInterface:
 
         # Check model is registered
         registered_models = ModelRegistry.list_models()
-        assert (
-            "sgr_generic" in registered_models
-        ), "SGRGeneric not registered in ModelRegistry"
+        assert "sgr_generic" in registered_models, (
+            "SGRGeneric not registered in ModelRegistry"
+        )
 
         # Check factory pattern works
         model = ModelRegistry.create("sgr_generic")
-        assert isinstance(
-            model, SGRGeneric
-        ), f"Factory created wrong type: {type(model)}"
+        assert isinstance(model, SGRGeneric), (
+            f"Factory created wrong type: {type(model)}"
+        )
 
         # Check BaseModel inheritance
         assert isinstance(model, BaseModel), "SGRGeneric should inherit from BaseModel"
 
         # Check ParameterSet creation
-        assert isinstance(
-            model.parameters, ParameterSet
-        ), "model.parameters should be ParameterSet"
+        assert isinstance(model.parameters, ParameterSet), (
+            "model.parameters should be ParameterSet"
+        )
 
         # Check required parameters exist
         assert "x" in model.parameters.keys(), "Missing parameter 'x'"

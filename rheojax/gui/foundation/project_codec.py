@@ -7,6 +7,7 @@ HDF5 file (array leaves) and a JSON-safe structure (everything else). This is th
 pattern ExportService.save_project() v1 already uses for posterior_samples -- not the
 RheoData-typed save_hdf5()/load_hdf5() helpers, which don't apply to this shape.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -42,9 +43,11 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
             for k, v in value.items()
         }
     if isinstance(value, tuple):
-        return {"$tuple": [
-            _write_walk(v, f"{key_path}/{i}", hf, out) for i, v in enumerate(value)
-        ]}
+        return {
+            "$tuple": [
+                _write_walk(v, f"{key_path}/{i}", hf, out) for i, v in enumerate(value)
+            ]
+        }
     if isinstance(value, list):
         return [_write_walk(v, f"{key_path}/{i}", hf, out) for i, v in enumerate(value)]
     raise TypeError(
@@ -106,10 +109,13 @@ def save_project_v2(state, path: Path) -> None:
                 "size": len(data),
             }
 
-        _write_json("metadata.json", {
-            "version": _ARCHIVE_VERSION,
-            "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        _write_json(
+            "metadata.json",
+            {
+                "version": _ARCHIVE_VERSION,
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        )
 
         library_manifest = [dataclasses.asdict(ref) for ref in state.library.all()]
         _write_json("library/manifest.json", library_manifest)
@@ -124,7 +130,9 @@ def save_project_v2(state, path: Path) -> None:
             save_hdf5(payload, str(full))
             _register_binary(rel)
 
-        def _persist_result_dict(raw: dict | None, result_dir: str) -> tuple[str | None, dict | None]:
+        def _persist_result_dict(
+            raw: dict | None, result_dir: str
+        ) -> tuple[str | None, dict | None]:
             """Splits a raw NLSQ/NUTS/phase result dict into an HDF5 array payload
             (result_dir/<uuid>.hdf5, via write_result_arrays) plus a JSON-safe metadata
             shape, returning (result_id, json_shape). Returns (None, None) for a falsy
@@ -153,7 +161,10 @@ def save_project_v2(state, path: Path) -> None:
         fit_dict = dataclasses.asdict(
             dataclasses.replace(state.fit, nlsq_result=None, nuts_result=None)
         )
-        for result_key, raw in (("nlsq_result", raw_nlsq_result), ("nuts_result", raw_nuts_result)):
+        for result_key, raw in (
+            ("nlsq_result", raw_nlsq_result),
+            ("nuts_result", raw_nuts_result),
+        ):
             fit_dict.pop(result_key, None)
             result_id, json_shape = _persist_result_dict(raw, "fit_results")
             fit_dict[f"{result_key}_ref"] = result_id
@@ -168,7 +179,9 @@ def save_project_v2(state, path: Path) -> None:
         # Same asdict-recursion hazard as above: source `result` from the live object and
         # strip it via replace() before asdict, rather than asdict-then-pop.
         raw_transform_result = state.transform.result
-        transform_dict = dataclasses.asdict(dataclasses.replace(state.transform, result=None))
+        transform_dict = dataclasses.asdict(
+            dataclasses.replace(state.transform, result=None)
+        )
         transform_dict.pop("result", None)
         transform_result_refs: dict[str, str | None] = {"input": None, "output": None}
         if raw_transform_result:
@@ -185,7 +198,9 @@ def save_project_v2(state, path: Path) -> None:
                 transform_result_refs[side] = result_id
         transform_dict["result_refs"] = transform_result_refs
         transform_dict["result_extras"] = {
-            k: v for k, v in (raw_transform_result or {}).items() if k not in ("input", "output")
+            k: v
+            for k, v in (raw_transform_result or {}).items()
+            if k not in ("input", "output")
         }
         _write_json("transform.json", transform_dict)
 
@@ -208,7 +223,9 @@ def save_project_v2(state, path: Path) -> None:
                         if phase is None:
                             continue
                         phase = dict(phase)
-                        result_id, json_shape = _persist_result_dict(phase.pop("result", None), "job_results")
+                        result_id, json_shape = _persist_result_dict(
+                            phase.pop("result", None), "job_results"
+                        )
                         phase["result_ref"] = result_id
                         phase["result_meta"] = json_shape
                         step_record[phase_key] = phase
@@ -238,7 +255,9 @@ def save_project_v2(state, path: Path) -> None:
             job_history_out[job_id] = record
         _write_json("job_history.json", job_history_out)
 
-        _write_json("project.json", {"path": state.project.path, "name": state.project.name})
+        _write_json(
+            "project.json", {"path": state.project.path, "name": state.project.name}
+        )
         _write_json("ui.json", dataclasses.asdict(state.ui))
 
         _write_json("manifest.json", {"members": member_hashes})
@@ -259,8 +278,15 @@ def save_project_v2(state, path: Path) -> None:
 
 
 _ALLOWED_TOP_LEVEL = {
-    "metadata.json", "manifest.json", "library/manifest.json", "fit.json",
-    "transform.json", "pipeline.json", "job_history.json", "project.json", "ui.json",
+    "metadata.json",
+    "manifest.json",
+    "library/manifest.json",
+    "fit.json",
+    "transform.json",
+    "pipeline.json",
+    "job_history.json",
+    "project.json",
+    "ui.json",
 }
 _ALLOWED_PREFIXES = ("library/", "fit_results/", "transform_results/", "job_results/")
 
@@ -270,11 +296,18 @@ _MAX_MEMBER_BYTES = 500 * 1024**2
 
 
 def _is_allowed_member(name: str) -> bool:
-    if "\\" in name or name.startswith("/") or any(part == ".." for part in name.split("/")):
+    if (
+        "\\" in name
+        or name.startswith("/")
+        or any(part == ".." for part in name.split("/"))
+    ):
         return False
     if name in _ALLOWED_TOP_LEVEL:
         return True
-    return any(name.startswith(p) and name.endswith((".hdf5", "/manifest.json")) for p in _ALLOWED_PREFIXES)
+    return any(
+        name.startswith(p) and name.endswith((".hdf5", "/manifest.json"))
+        for p in _ALLOWED_PREFIXES
+    )
 
 
 def _validate_ref_id(ref_id: str) -> str:
@@ -310,7 +343,9 @@ def load_project_v2(path: Path):
         infos = zf.infolist()
 
         if len(infos) > _MAX_MEMBERS:
-            raise ValueError(f"Archive has {len(infos)} members, exceeds limit of {_MAX_MEMBERS}")
+            raise ValueError(
+                f"Archive has {len(infos)} members, exceeds limit of {_MAX_MEMBERS}"
+            )
 
         seen_names: set[str] = set()
         total_bytes = 0
@@ -319,16 +354,26 @@ def load_project_v2(path: Path):
                 raise ValueError(f"Archive contains duplicate member: {info.filename}")
             seen_names.add(info.filename)
             if info.flag_bits & 0x1:
-                raise ValueError(f"Archive member {info.filename} is encrypted; rejected")
+                raise ValueError(
+                    f"Archive member {info.filename} is encrypted; rejected"
+                )
             if info.compress_type not in (0, 8):  # ZIP_STORED, ZIP_DEFLATED
-                raise ValueError(f"Archive member {info.filename} uses an unsupported compression type")
+                raise ValueError(
+                    f"Archive member {info.filename} uses an unsupported compression type"
+                )
             if info.file_size > _MAX_MEMBER_BYTES:
-                raise ValueError(f"Archive member {info.filename} exceeds the {_MAX_MEMBER_BYTES}-byte limit")
+                raise ValueError(
+                    f"Archive member {info.filename} exceeds the {_MAX_MEMBER_BYTES}-byte limit"
+                )
             total_bytes += info.file_size
             if not _is_allowed_member(info.filename):
-                raise ValueError(f"Archive contains a disallowed member: {info.filename}")
+                raise ValueError(
+                    f"Archive contains a disallowed member: {info.filename}"
+                )
         if total_bytes > _MAX_TOTAL_BYTES:
-            raise ValueError(f"Archive's total uncompressed size exceeds {_MAX_TOTAL_BYTES} bytes")
+            raise ValueError(
+                f"Archive's total uncompressed size exceeds {_MAX_TOTAL_BYTES} bytes"
+            )
 
         metadata = json.loads(zf.read("metadata.json"))
         if metadata.get("version") != _ARCHIVE_VERSION:
@@ -361,13 +406,17 @@ def load_project_v2(path: Path):
             for name in seen_names:
                 dest = tmp_root / name
                 if resolved_root not in dest.resolve().parents:
-                    raise ValueError(f"archive member resolves outside extraction root: {name}")
+                    raise ValueError(
+                        f"archive member resolves outside extraction root: {name}"
+                    )
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(zf.read(name))
 
             state = AppState()
 
-            library_manifest = json.loads((tmp_root / "library" / "manifest.json").read_text())
+            library_manifest = json.loads(
+                (tmp_root / "library" / "manifest.json").read_text()
+            )
             for ref_dict in library_manifest:
                 ref = DatasetRef(**ref_dict)
                 _validate_ref_id(ref.id)
@@ -376,7 +425,9 @@ def load_project_v2(path: Path):
                 if hdf5_path.exists():
                     state.library.store_payload(ref.id, load_hdf5(str(hdf5_path)))
 
-            def _restore_result_dict(ref_id: str | None, meta: dict | None, result_dir: str) -> dict | None:
+            def _restore_result_dict(
+                ref_id: str | None, meta: dict | None, result_dir: str
+            ) -> dict | None:
                 """Inverse of save_project_v2's _persist_result_dict -- the ONE restoration
                 path for any persisted fit/NUTS/phase result dict, used below for both
                 fit.json's nlsq_result/nuts_result and every job_history.json fit-step phase
@@ -396,9 +447,14 @@ def load_project_v2(path: Path):
             nuts_cfg = fit_dict.pop("nuts_config", {}) or {}
             raw_parameters = nlsq_cfg.pop("parameters", []) or []
             state.fit = FitState(
-                **{k: v for k, v in fit_dict.items() if k in FitState.__dataclass_fields__},
+                **{
+                    k: v
+                    for k, v in fit_dict.items()
+                    if k in FitState.__dataclass_fields__
+                },
                 nlsq_config=NlsqConfig(
-                    **nlsq_cfg, parameters=[ParameterConfig(**p) for p in raw_parameters]
+                    **nlsq_cfg,
+                    parameters=[ParameterConfig(**p) for p in raw_parameters],
                 ),
                 nuts_config=NutsConfig(**nuts_cfg),
             )
@@ -413,12 +469,16 @@ def load_project_v2(path: Path):
                     ref_id = result_refs.get(side)
                     if ref_id is not None:
                         _validate_ref_id(ref_id)
-                        restored_result[side] = load_hdf5(str(tmp_root / "transform_results" / f"{ref_id}.hdf5"))
+                        restored_result[side] = load_hdf5(
+                            str(tmp_root / "transform_results" / f"{ref_id}.hdf5")
+                        )
             transform_dict["result"] = restored_result
             state.transform = TransformState(**transform_dict)
 
             pipeline_dict = json.loads((tmp_root / "pipeline.json").read_text())
-            pipeline_dict["steps"] = [PipelineStepConfig(**s) for s in pipeline_dict.get("steps", [])]
+            pipeline_dict["steps"] = [
+                PipelineStepConfig(**s) for s in pipeline_dict.get("steps", [])
+            ]
             state.pipeline = PipelineState(**pipeline_dict)
 
             job_history_dict = json.loads((tmp_root / "job_history.json").read_text())
@@ -431,7 +491,9 @@ def load_project_v2(path: Path):
                                 continue
                             ref_id = phase.pop("result_ref", None)
                             meta = phase.pop("result_meta", None)
-                            phase["result"] = _restore_result_dict(ref_id, meta, "job_results")
+                            phase["result"] = _restore_result_dict(
+                                ref_id, meta, "job_results"
+                            )
                     elif "output_ref" in step_record:
                         # Inverse of save_project_v2's "output" -> "output_ref" persistence
                         # for a "transform" pipeline step's record (see the matching comment
@@ -449,7 +511,9 @@ def load_project_v2(path: Path):
             state.job_history = JobHistoryState(by_id=job_history_dict)
 
             project_dict = json.loads((tmp_root / "project.json").read_text())
-            state.project = ProjectState(path=project_dict.get("path"), name=project_dict.get("name"))
+            state.project = ProjectState(
+                path=project_dict.get("path"), name=project_dict.get("name")
+            )
 
             ui_dict = json.loads((tmp_root / "ui.json").read_text())
             state.ui = UiState(**ui_dict)

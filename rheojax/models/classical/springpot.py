@@ -44,7 +44,8 @@ logger = get_logger(__name__)
         Protocol.RELAXATION,
         Protocol.CREEP,
         Protocol.OSCILLATION,
-    ])
+    ],
+)
 class SpringPot(BaseModel):
     """SpringPot fractional viscoelastic element.
 

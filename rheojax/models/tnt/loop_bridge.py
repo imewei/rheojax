@@ -314,7 +314,8 @@ def _loop_bridge_relaxation_ode_rhs(
 
 @ModelRegistry.register(
     "tnt_loop_bridge",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
+)
 class TNTLoopBridge(TNTBase):
     """Loop-bridge kinetics model for telechelic polymer networks.
 
@@ -389,6 +390,7 @@ class TNTLoopBridge(TNTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize TNT loop-bridge model."""
         super().__init__()

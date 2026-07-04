@@ -872,7 +872,6 @@ def _detect_test_type(df: pd.DataFrame) -> str | None:
     if has_frequency and has_moduli:
         return "oscillation"
 
-
     # Priority 2: Creep (time domain, constant stress)
     has_time = "time" in columns
     has_compliance_data = "compliance" in columns or "shear_strain" in columns
@@ -1208,8 +1207,6 @@ def _interval_to_rheodata_oscillation(
                 "Oscillation data requires 'storage_modulus'/'loss_modulus' columns. "
                 f"Available columns: {list(mapped_df.columns)}"
             )
-
-
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa

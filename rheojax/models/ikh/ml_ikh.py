@@ -62,7 +62,8 @@ _MLIKH_RESERVED = {
         Protocol.CREEP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class MLIKH(IKHBase):
     """Multi-Lambda Isotropic-Kinematic Hardening (ML-IKH) Model.
 
@@ -118,6 +119,7 @@ class MLIKH(IKHBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(
         self,
         n_modes: int = 2,
@@ -696,7 +698,11 @@ class MLIKH(IKHBase):
         if test_mode == "creep" and kwargs.get("smart_init", True) and sigma_applied:
             sigma_a = float(sigma_applied)
             t_list = t.tolist() if hasattr(t, "tolist") else list(t)
-            t_span = max(float(t_list[-1]) - float(t_list[0]), 1.0) if len(t_list) > 1 else 1.0
+            t_span = (
+                max(float(t_list[-1]) - float(t_list[0]), 1.0)
+                if len(t_list) > 1
+                else 1.0
+            )
             mu_p_init = max(sigma_a * t_span, 0.1)  # large enough for non-stiff ODE
             sy_total = sigma_a * 0.9  # sigma_y = 90% of applied → small overstress
 
@@ -757,11 +763,7 @@ class MLIKH(IKHBase):
                 mikh.parameters.set_value("eta_inf", stress_ss / gamma_dot_val)
 
         # Fit single-mode MIKH (fast: 11 params, return-mapping scan)
-        fit_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k not in _MLIKH_RESERVED
-        }
+        fit_kwargs = {k: v for k, v in kwargs.items() if k not in _MLIKH_RESERVED}
         fit_kwargs.setdefault("max_iter", 500)
 
         try:

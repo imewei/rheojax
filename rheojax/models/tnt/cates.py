@@ -93,7 +93,8 @@ _MISSING = object()
 
 @ModelRegistry.register(
     "tnt_cates",
-    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"])
+    protocols=["flow_curve", "oscillation", "startup", "relaxation", "creep", "laos"],
+)
 class TNTCates(TNTBase):
     """Cates living polymer (wormlike micelle) model.
 
@@ -159,6 +160,7 @@ class TNTCates(TNTBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize Cates living polymer model."""
         super().__init__()
@@ -235,8 +237,8 @@ class TNTCates(TNTBase):
             # tau from shear-thinning onset, fallback to inverse high rate
             eta = sig / np.maximum(gd, 1e-10)
             thinning = np.where(eta < 0.9 * eta[0])[0]
-            tau_rep_est = float(1.0 / gd[thinning[0]]) if len(thinning) else float(
-                1.0 / gd[-1]
+            tau_rep_est = (
+                float(1.0 / gd[thinning[0]]) if len(thinning) else float(1.0 / gd[-1])
             )
             G0_est = float(np.clip(eta_0 / max(tau_rep_est, 1e-12), 1e0, 1e8))
         elif mode == "relaxation":
@@ -250,7 +252,11 @@ class TNTCates(TNTBase):
                 tau_rep_est = float(t[crossings[0]])
             else:
                 t_pos = t[t > 0]
-                tau_rep_est = float(np.sqrt(t_pos[0] * t_pos[-1])) if len(t_pos) >= 2 else float(t[-1] / 3.0)
+                tau_rep_est = (
+                    float(np.sqrt(t_pos[0] * t_pos[-1]))
+                    if len(t_pos) >= 2
+                    else float(t[-1] / 3.0)
+                )
         elif mode == "saos":
             omega = x
             G_p = np.real(np.asarray(y))
@@ -265,12 +271,16 @@ class TNTCates(TNTBase):
                 tau_rep_est = float(1.0 / np.sqrt(omega[0] * omega[-1]))
         else:  # startup, creep, laos
             t_pos = x[x > 0]
-            tau_rep_est = float(np.sqrt(t_pos[0] * t_pos[-1])) if len(t_pos) >= 2 else 1.0
+            tau_rep_est = (
+                float(np.sqrt(t_pos[0] * t_pos[-1])) if len(t_pos) >= 2 else 1.0
+            )
             if sigma_applied is not None and len(y_real) > 1:
                 strain_mid = float(np.abs(y_real[len(y_real) // 2]))
                 G0_est = float(sigma_applied) / max(strain_mid, 1e-12)
             elif gamma_dot is not None and gamma_dot > 0:
-                G0_est = float(np.max(np.abs(y_real))) / max(gamma_dot * tau_rep_est, 1e-12)
+                G0_est = float(np.max(np.abs(y_real))) / max(
+                    gamma_dot * tau_rep_est, 1e-12
+                )
             else:
                 G0_est = float(np.max(np.abs(y_real)))
 

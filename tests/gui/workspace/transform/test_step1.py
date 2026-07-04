@@ -8,7 +8,9 @@ from rheojax.gui.workspace.transform.step1_pick import TransformPickStep
 
 
 def test_groups_and_select(qtbot):
-    st = TransformState(); step = TransformPickStep(st); qtbot.addWidget(step)
+    st = TransformState()
+    step = TransformPickStep(st)
+    qtbot.addWidget(step)
     groups = step.groups()
     assert "cox_merz" in groups.get("analysis", [])
     assert "fft_analysis" in groups.get("spectral", [])

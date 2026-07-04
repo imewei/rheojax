@@ -118,9 +118,9 @@ def test_lattice_epm_creep_metadata_stress_respected():
     )
     pred = model.predict(data, smooth=True, seed=0).y
     # Above-yield creep must produce a clearly non-zero strain trajectory
-    assert (
-        float(jnp.max(jnp.abs(pred))) > 0.5
-    ), f"metadata['stress'] ignored: strain stayed near zero, max={float(jnp.max(pred)):.4f}"
+    assert float(jnp.max(jnp.abs(pred))) > 0.5, (
+        f"metadata['stress'] ignored: strain stayed near zero, max={float(jnp.max(pred)):.4f}"
+    )
 
 
 @pytest.mark.unit

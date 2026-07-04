@@ -81,7 +81,8 @@ logger = get_logger(__name__)
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class SGRConventional(BaseModel):
     """Soft Glassy Rheology (SGR) Conventional Model.
 
@@ -124,6 +125,7 @@ class SGRConventional(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, dynamic_x: bool = False):
         """Initialize SGR Conventional Model.
 

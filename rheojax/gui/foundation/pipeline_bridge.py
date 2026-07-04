@@ -5,7 +5,9 @@ from typing import Any
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 
 
-def pipeline_inputs_from_library(lib: DatasetLibrary, ids: list[str]) -> list[DatasetRef]:
+def pipeline_inputs_from_library(
+    lib: DatasetLibrary, ids: list[str]
+) -> list[DatasetRef]:
     """§11 boundary: feed the legacy pipeline from the new Dataset Library.
 
     Resolves *ids* to ``DatasetRef`` objects in the order given.
@@ -15,7 +17,9 @@ def pipeline_inputs_from_library(lib: DatasetLibrary, ids: list[str]) -> list[Da
     return [lib.get(i) for i in ids]
 
 
-def pipeline_context_from_library(lib: DatasetLibrary, ids: list[str]) -> dict[str, Any]:
+def pipeline_context_from_library(
+    lib: DatasetLibrary, ids: list[str]
+) -> dict[str, Any]:
     """Seed a PipelineExecutionService.execute_single_step context from a
     Workspace Dataset Library id, so a pipeline run can start from any
     non-load step (transform/fit/bayesian/export) against Workspace data

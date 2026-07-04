@@ -141,7 +141,9 @@ class NutsStep(QWidget):
     def suggested_priors(self) -> dict:
         # nlsq_result is a normalized dict (see NlsqStep.run()); key is "params"
         params = (self._state.nlsq_result or {}).get("params", {})
-        return map_centered_priors(params)  # safe: FitResult was normalized to dict in step 3
+        return map_centered_priors(
+            params
+        )  # safe: FitResult was normalized to dict in step 3
 
     def load_suggested_priors(self) -> None:
         """Seed the editable PriorsEditor from the NLSQ MAP estimate.

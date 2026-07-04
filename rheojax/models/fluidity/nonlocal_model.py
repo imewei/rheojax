@@ -64,7 +64,8 @@ _NLSQ_RESERVED_ODE = _NLSQ_RESERVED - {"method"}
         Protocol.STARTUP,
         Protocol.OSCILLATION,
         Protocol.LAOS,
-    ])
+    ],
+)
 class FluidityNonlocal(FluidityBase):
     """Non-Local (1D PDE) Fluidity Model for yield-stress fluids.
 
@@ -93,6 +94,7 @@ class FluidityNonlocal(FluidityBase):
     """
 
     flow_quantity = "stress"
+
     def __init__(self, N_y: int = 64, gap_width: float = 1e-3):
         """Initialize Non-Local Fluidity Model.
 
@@ -908,9 +910,7 @@ class FluidityNonlocal(FluidityBase):
                 f_field_init = jnp.asarray(
                     np.interp(x_dst, x_src, np.asarray(f_field_init))
                 )
-            y0 = jnp.concatenate(
-                [jnp.array([0.0]), jnp.maximum(f_field_init, 1e-20)]
-            )
+            y0 = jnp.concatenate([jnp.array([0.0]), jnp.maximum(f_field_init, 1e-20)])
         else:
             y0 = self._get_initial_state("laos", params, N_y=N_y_local)
 

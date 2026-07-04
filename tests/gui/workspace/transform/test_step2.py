@@ -33,4 +33,7 @@ def test_typed_slot_filtering_and_ready(qtbot):
     step.fill("oscillation", "o")
     assert step.is_ready() is False
     step.fill("flow_curve", "f")
-    assert step.is_ready() is True and st.slots == {"oscillation": "o", "flow_curve": "f"}
+    assert step.is_ready() is True and st.slots == {
+        "oscillation": "o",
+        "flow_curve": "f",
+    }

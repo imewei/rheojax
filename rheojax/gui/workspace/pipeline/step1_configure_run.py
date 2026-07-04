@@ -9,6 +9,7 @@ config for "transform" steps, so a user-added "fit" or "export" step had an empt
 failed with KeyError at execute() time. is_ready() now also validates that every configured
 step has the fields execute() actually requires, not just that the steps list is non-empty.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -66,7 +67,9 @@ class PipelineConfigureRunStep(QWidget):
         self._fit_run_nuts_checkbox = QCheckBox("Run NUTS after NLSQ", self)
 
         self._export_path_edit = QLineEdit(self)
-        self._export_path_edit.setPlaceholderText("/path/to/output_{id}.csv  ({id} = dataset id)")
+        self._export_path_edit.setPlaceholderText(
+            "/path/to/output_{id}.csv  ({id} = dataset id)"
+        )
         self._export_format_combo = QComboBox(self)
         self._export_format_combo.addItems(["csv", "json", "xlsx", "hdf5"])
 
@@ -77,9 +80,13 @@ class PipelineConfigureRunStep(QWidget):
         self._remove_step_btn.clicked.connect(self._on_remove_step_clicked)
 
         self._dataset_list = QListWidget(self)
-        self._dataset_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._dataset_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         self._refresh_dataset_list()
-        self._dataset_list.itemSelectionChanged.connect(self._on_dataset_selection_changed)
+        self._dataset_list.itemSelectionChanged.connect(
+            self._on_dataset_selection_changed
+        )
 
         self._run_all_btn = QPushButton("▶ Run All", self)
         self._run_all_btn.clicked.connect(self.run_requested.emit)
@@ -98,10 +105,16 @@ class PipelineConfigureRunStep(QWidget):
         layout.addWidget(self._run_all_btn)
 
     def available_transform_keys(self) -> list[str]:
-        return [k for k in TransformRegistry.list_transforms() if k not in _EXCLUDED_TRANSFORM_KEYS]
+        return [
+            k
+            for k in TransformRegistry.list_transforms()
+            if k not in _EXCLUDED_TRANSFORM_KEYS
+        ]
 
     def add_step(self, step_type: str, config: dict) -> None:
-        step = PipelineStepConfig(id=uuid.uuid4().hex, step_type=step_type, config=dict(config))
+        step = PipelineStepConfig(
+            id=uuid.uuid4().hex, step_type=step_type, config=dict(config)
+        )
         self._state.steps.append(step)
         self._step_list.addItem(QListWidgetItem(f"{step.step_type}: {step.config}"))
         self.edited.emit()
@@ -142,7 +155,9 @@ class PipelineConfigureRunStep(QWidget):
         self.edited.emit()
 
     def _on_dataset_selection_changed(self) -> None:
-        selected = [item.data(_DATASET_ID_ROLE) for item in self._dataset_list.selectedItems()]
+        selected = [
+            item.data(_DATASET_ID_ROLE) for item in self._dataset_list.selectedItems()
+        ]
         self.set_selected_dataset_ids(selected)
 
     def is_ready(self) -> bool:

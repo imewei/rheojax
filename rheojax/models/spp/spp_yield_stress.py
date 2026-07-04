@@ -56,7 +56,8 @@ if TYPE_CHECKING:
     protocols=[
         Protocol.FLOW_CURVE,
         Protocol.LAOS,
-    ])
+    ],
+)
 class SPPYieldStress(BaseModel):
     """SPP-based yield stress model for LAOS analysis.
 
@@ -126,6 +127,7 @@ class SPPYieldStress(BaseModel):
     """
 
     flow_quantity = "stress"
+
     def __init__(self):
         """Initialize SPP yield stress model."""
         super().__init__()
