@@ -430,22 +430,42 @@ class WorkspaceWindow(QMainWindow):
         if not paths:
             return
 
+        self._launch_import([Path(p) for p in paths])
+
+    def _launch_import(
+        self,
+        file_paths: list[Path],
+        x_col: str | None = None,
+        y_col: str | None = None,
+        y2_col: str | None = None,
+        temp_col: str | None = None,
+    ) -> None:
         from PySide6.QtCore import QThreadPool
 
         from rheojax.gui.jobs.import_worker import ImportWorker
         from rheojax.gui.services.data_service import DataService
 
-        file_paths = [Path(p) for p in paths]
         worker = ImportWorker(
-            data_service=DataService(), file_path=file_paths[0], file_paths=file_paths
+            data_service=DataService(),
+            file_path=file_paths[0],
+            file_paths=file_paths,
+            x_col=x_col,
+            y_col=y_col,
+            y2_col=y2_col,
+            temp_col=temp_col,
         )
         # QueuedConnection guarantees the callback runs on the main thread --
         # ImportWorker emits its signals from a QThreadPool worker thread.
         worker.signals.completed.connect(
             self._on_import_completed, Qt.ConnectionType.QueuedConnection
         )
+        # file_paths is bound per-connection (not read from shared instance
+        # state) so that a second import launched before this worker's
+        # "failed" signal is delivered can never make the failure handler
+        # act on the wrong file's paths.
         worker.signals.failed.connect(
-            self._on_import_failed, Qt.ConnectionType.QueuedConnection
+            lambda msg, fp=file_paths: self._on_import_failed(msg, fp),
+            Qt.ConnectionType.QueuedConnection,
         )
         # Keep a reference alive for the worker's lifetime -- nothing else
         # holds the ImportWorker/ImportWorkerSignals QObject, so it would
@@ -494,8 +514,46 @@ class WorkspaceWindow(QMainWindow):
             )
             self._commit_dataset(ref, rheo_data, overwrite=False)
 
-    def _on_import_failed(self, error_msg: str) -> None:
-        from PySide6.QtWidgets import QMessageBox
+    # Extensions ColumnMapperDialog can actually parse (see its _load_data) --
+    # anything else (.tri, .json, .dat, ...) falls back to a raw pd.read_csv
+    # attempt there too, so offering the dialog for those would just stack a
+    # second, more confusing failure on top of the original one.
+    _COLUMN_MAPPABLE_SUFFIXES = {".csv", ".txt", ".xlsx", ".xls"}
+
+    def _on_import_failed(
+        self, error_msg: str, file_paths: list[Path] | None = None
+    ) -> None:
+        from PySide6.QtWidgets import QDialog, QMessageBox
+
+        # Root cause: this import path has no column-mapping step, so a CSV
+        # whose headers don't match auto_load's heuristic name list (see
+        # rheojax/io/readers/auto.py::_try_csv) fails with no way for the
+        # user to specify columns. Give them one via the existing (until now
+        # unwired) ColumnMapperDialog, then retry with the chosen mapping.
+        # ponytail: matched on message text rather than a typed exception --
+        # auto_load raises plain ValueError for every failure mode. Upgrade
+        # to a dedicated exception type if more branches need to key off it.
+        paths = file_paths or []
+        offer_mapper = (
+            len(paths) == 1
+            and paths[0].suffix.lower() in self._COLUMN_MAPPABLE_SUFFIXES
+            and "auto-detect" in error_msg.lower()
+        )
+        if offer_mapper:
+            from rheojax.gui.dialogs.column_mapper import ColumnMapperDialog
+
+            dialog = ColumnMapperDialog(str(paths[0]), parent=self)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                mapping = dialog.get_mapping()
+                if mapping.get("x") and mapping.get("y"):
+                    self._launch_import(
+                        paths,
+                        x_col=mapping["x"],
+                        y_col=mapping["y"],
+                        y2_col=mapping.get("y2"),
+                        temp_col=mapping.get("temperature"),
+                    )
+                    return
 
         QMessageBox.critical(self, "Import Failed", error_msg)
 
