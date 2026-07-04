@@ -97,7 +97,7 @@ def test_scalar_output_not_saved(qtbot):
 
 
 def test_save_domain_changing_output_with_empty_protocol_type_still_stores(qtbot):
-    # Regression: transform_controller._infer_protocol_type() deliberately
+    # Regression: transform_controller.infer_output_protocol() deliberately
     # returns "" (not None) for domain-changing transforms (spectral/
     # decomposition) whose output has a real payload but no determinable
     # rheological protocol. save_to_library() used to no-op on ANY falsy
