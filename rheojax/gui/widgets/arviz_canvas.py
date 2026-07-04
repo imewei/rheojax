@@ -566,16 +566,22 @@ class ArvizCanvas(BaseArviZWidget):
                 and "diverging" in self._inference_data.sample_stats
             )
 
-            self._arviz_plot(
-                az.plot_pair,
-                self._inference_data,
-                **arviz_plot_kwargs(
-                    az,
-                    "plot_pair",
-                    var_names=var_names,
-                    divergences=has_divergences,
-                ),
-            )
+            # A full pair-plot matrix needs len(var_names)**2 subplots, which
+            # exceeds arviz's default plot.max_subplots=40 for any model with
+            # more than 6 parameters (e.g. GeneralizedMaxwell with 3+ modes).
+            # Scope the override to this call rather than mutating global
+            # rcParams for the process.
+            with az.rc_context({"plot.max_subplots": len(var_names) ** 2}):
+                self._arviz_plot(
+                    az.plot_pair,
+                    self._inference_data,
+                    **arviz_plot_kwargs(
+                        az,
+                        "plot_pair",
+                        var_names=var_names,
+                        divergences=has_divergences,
+                    ),
+                )
         except ImportError:
             logger.error(
                 "ArviZ import failed",

@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -65,3 +67,23 @@ def test_build_workspace_never_marks_dirty(qtbot):
     win = WorkspaceWindow(state)
     qtbot.addWidget(win)
     assert state.project.dirty is False
+
+
+def test_dispose_workspace_does_not_warn_on_cross_handler_disconnect(qtbot):
+    """Regression: _dispose_workspace used to iterate all bodies (fit +
+    transform + pipeline) combined and try disconnecting all three modes'
+    edited-handlers from every body, regardless of which mode it actually
+    belonged to. PySide6 emits a "Failed to disconnect" RuntimeWarning (not
+    a Python exception) for the handlers that were never connected, so the
+    surrounding try/except (RuntimeError, TypeError) never caught it."""
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        win._rebuild(AppState())
+
+    disconnect_warnings = [
+        w for w in caught if "Failed to disconnect" in str(w.message)
+    ]
+    assert disconnect_warnings == []

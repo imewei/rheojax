@@ -140,22 +140,16 @@ class WorkspaceWindow(QMainWindow):
         self.setCentralWidget(self._splitter)
 
     def _dispose_workspace(self) -> None:
-        for body in (
-            list(self._fit_bodies)
-            + list(self._transform_bodies)
-            + list(self._pipeline_bodies)
-        ):
+        # Disconnect only the handler each body list actually wired in
+        # __init__ -- attempting to disconnect a slot that was never
+        # connected to a given body (e.g. _on_transform_body_edited from a
+        # fit body's `edited`) makes PySide6 emit a "Failed to disconnect"
+        # RuntimeWarning at the libpyside level, which isn't a Python
+        # exception and so isn't caught by the try/except below.
+        for body in self._fit_bodies:
             if hasattr(body, "edited"):
                 try:
                     body.edited.disconnect(self._on_fit_body_edited)
-                except (RuntimeError, TypeError):
-                    pass
-                try:
-                    body.edited.disconnect(self._on_transform_body_edited)
-                except (RuntimeError, TypeError):
-                    pass
-                try:
-                    body.edited.disconnect(self._on_pipeline_body_edited)
                 except (RuntimeError, TypeError):
                     pass
             if hasattr(body, "config_edited"):
@@ -166,6 +160,25 @@ class WorkspaceWindow(QMainWindow):
             if hasattr(body, "dataset_commit_requested"):
                 try:
                     body.dataset_commit_requested.disconnect(self._commit_dataset)
+                except (RuntimeError, TypeError):
+                    pass
+            body.deleteLater()
+        for body in self._transform_bodies:
+            if hasattr(body, "edited"):
+                try:
+                    body.edited.disconnect(self._on_transform_body_edited)
+                except (RuntimeError, TypeError):
+                    pass
+            if hasattr(body, "dataset_commit_requested"):
+                try:
+                    body.dataset_commit_requested.disconnect(self._commit_dataset)
+                except (RuntimeError, TypeError):
+                    pass
+            body.deleteLater()
+        for body in self._pipeline_bodies:
+            if hasattr(body, "edited"):
+                try:
+                    body.edited.disconnect(self._on_pipeline_body_edited)
                 except (RuntimeError, TypeError):
                     pass
             if hasattr(body, "run_requested"):
@@ -561,7 +574,14 @@ class WorkspaceWindow(QMainWindow):
             from rheojax.gui.dialogs.column_mapper import ColumnMapperDialog
 
             dialog = ColumnMapperDialog(str(paths[0]), parent=self)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
+            # ColumnMapperDialog re-reads the file itself and can fail even
+            # for a "mappable" extension (e.g. malformed/mixed-delimiter
+            # content) -- its own failure path only shows a warning and
+            # leaves the dialog open with empty column lists. Detect that
+            # here (self.columns stays [] on load failure) and skip straight
+            # to the original error instead of showing a broken, unusable
+            # dialog on top of it.
+            if dialog.columns and dialog.exec() == QDialog.DialogCode.Accepted:
                 mapping = dialog.get_mapping()
                 if mapping.get("x") and mapping.get("y"):
                     self._launch_import(

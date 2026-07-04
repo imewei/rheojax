@@ -8,7 +8,10 @@ from typing import Any
 
 from rheojax.core.data import RheoData
 from rheojax.io._exceptions import UnsupportedDataError
-from rheojax.io.readers._utils import check_file_for_unsupported_data
+from rheojax.io.readers._utils import (
+    check_file_for_unsupported_data,
+    find_column_by_pattern,
+)
 from rheojax.io.readers.anton_paar import load_anton_paar
 from rheojax.io.readers.csv_reader import detect_csv_delimiter, load_csv
 from rheojax.io.readers.excel_reader import load_excel
@@ -468,6 +471,15 @@ def _try_trios_then_csv(filepath: Path, **kwargs) -> RheoData | list[RheoData]:
         raise ValueError(f"Could not parse CSV as TRIOS or generic CSV: {e}") from e
 
 
+def _looks_numeric(value: Any) -> bool:
+    """Check whether a value parses as a float (used to detect a missing header row)."""
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _try_csv(filepath: Path, **kwargs) -> RheoData:
     """Try CSV reader with auto-detection.
 
@@ -497,41 +509,46 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                 columns=list(df.columns),
             )
 
-            # Try to find time/frequency column
-            x_col = None
-            for col_name in [
-                "time",
-                "frequency",
-                "angular frequency",
-                "t",
-                "f",
-                "omega",
-            ]:
-                if col_name in columns_lower:
-                    x_col = df.columns[columns_lower.index(col_name)]
-                    break
-
-            # Try to find complex modulus pair (E'/E'' or G'/G'')
-            y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
-            if y_cols_pair is not None:
-                kwargs["y_cols"] = y_cols_pair
-                kwargs.pop("y_col", None)
-                y_col = "FOUND_PAIR"
+            # Headerless numeric data: pandas silently misreads the first
+            # data row as column names when there's no real header. For the
+            # unambiguous 2-column case, re-read positionally instead of
+            # failing (or worse, letting a manual column-mapping retry
+            # consume that first row as a header and silently drop it).
+            # ponytail: files with >2 columns and no header still fall
+            # through to "could not auto-detect" below rather than guessing
+            # which pair of columns the user wants — avoids silently
+            # discarding the other columns' data.
+            if len(df.columns) == 2 and all(_looks_numeric(c) for c in df.columns):
+                kwargs["x_col"] = 0
+                kwargs["y_col"] = 1
+                kwargs["header"] = None
+                logger.debug(
+                    "Headerless 2-column CSV detected — using positional columns",
+                    filepath=str(filepath),
+                )
+                x_col = 0
+                y_col = 1
             else:
-                y_col = None
+                # Try to find time/frequency column
+                x_col = find_column_by_pattern(
+                    df.columns,
+                    columns_lower,
+                    ["time", "frequency", "angular frequency", "t", "f", "omega"],
+                )
 
-            # Try to find stress/modulus column (single y)
-            if y_cols_pair is None:
-                for col_name in [
-                    "stress",
-                    "strain",
-                    "modulus",
-                    "storage modulus",
-                    "viscosity",
-                ]:
-                    if col_name in columns_lower:
-                        y_col = df.columns[columns_lower.index(col_name)]
-                        break
+                # Try to find complex modulus pair (E'/E'' or G'/G'')
+                y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
+                if y_cols_pair is not None:
+                    kwargs["y_cols"] = y_cols_pair
+                    kwargs.pop("y_col", None)
+                    y_col = "FOUND_PAIR"
+                else:
+                    # Try to find stress/modulus column (single y)
+                    y_col = find_column_by_pattern(
+                        df.columns,
+                        columns_lower,
+                        ["stress", "strain", "modulus", "viscosity"],
+                    )
 
             if x_col is None or y_col is None:
                 logger.error(
@@ -609,18 +626,11 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
                 columns=list(df.columns),
             )
 
-            x_col = None
-            for col_name in [
-                "time",
-                "frequency",
-                "angular frequency",
-                "t",
-                "f",
-                "omega",
-            ]:
-                if col_name in columns_lower:
-                    x_col = df.columns[columns_lower.index(col_name)]
-                    break
+            x_col = find_column_by_pattern(
+                df.columns,
+                columns_lower,
+                ["time", "frequency", "angular frequency", "t", "f", "omega"],
+            )
 
             y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
             if y_cols_pair is not None:
@@ -628,17 +638,11 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
                 kwargs.pop("y_col", None)
                 y_col = "FOUND_PAIR"
             else:
-                y_col = None
-                for col_name in [
-                    "stress",
-                    "strain",
-                    "modulus",
-                    "storage modulus",
-                    "viscosity",
-                ]:
-                    if col_name in columns_lower:
-                        y_col = df.columns[columns_lower.index(col_name)]
-                        break
+                y_col = find_column_by_pattern(
+                    df.columns,
+                    columns_lower,
+                    ["stress", "strain", "modulus", "viscosity"],
+                )
 
             if x_col is None or y_col is None:
                 raise ValueError(

@@ -39,6 +39,7 @@ __all__ = [
     "UNIFIED_UNIT_CONVERSIONS",
     "normalize_units",
     "normalize_temperature",
+    "find_column_by_pattern",
 ]
 
 # =============================================================================
@@ -171,6 +172,34 @@ _FREQUENCY_UNITS = {"rad/s", "hz", "1/s"}
 _TIME_UNITS = {"s", "sec", "min", "ms"}
 _FREQUENCY_KEYWORDS = {"omega", "frequency", "freq", "angular"}
 _TIME_KEYWORDS = {"time", "t"}
+
+
+def find_column_by_pattern(
+    columns: list[str], columns_lower: list[str], patterns: list[str]
+) -> str | None:
+    """Find the first column whose lowercased name contains one of *patterns*.
+
+    Checks patterns in priority order (not column order), matching the
+    precedence CSV/Excel auto-detection has always used. A pattern must match
+    as a whole token — bounded by non-alphanumeric characters rather than
+    ``\\b``, since ``\\b`` fails after symbolic suffixes like "g'"/"g''" whose
+    last character is already non-word (same approach as ColumnMapperDialog's
+    auto-detect).
+
+    Args:
+        columns: Original-case column names.
+        columns_lower: Same columns, lowercased (index-aligned with columns).
+        patterns: Substrings to search for, in priority order.
+
+    Returns:
+        The original-case column name of the first match, or None.
+    """
+    for pattern in patterns:
+        regex = re.compile(r"(?<![a-z0-9])" + re.escape(pattern) + r"(?![a-z0-9])")
+        for col, col_lower in zip(columns, columns_lower, strict=True):
+            if regex.search(col_lower):
+                return col
+    return None
 
 
 # =============================================================================
