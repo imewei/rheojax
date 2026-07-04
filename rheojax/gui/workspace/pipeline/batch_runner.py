@@ -27,18 +27,43 @@ class PipelineBatchRunner(QRunnable):
         self._stop_requested = stop_requested
 
     def run(self) -> None:
+        from rheojax.gui.services.pipeline_execution_service import (
+            WorkerIsolationRequiredError,
+        )
+
         for dataset_id in self._selected_dataset_ids:
             if self._stop_requested.is_set():
                 break
             self._service.dataset_run_started.emit(dataset_id)
             ctx = pipeline_context_from_library(self._library, [dataset_id])
             steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)
-            result = self._service.execute(
-                steps=steps_for_dataset, initial_context=ctx, library=self._library,
-                stop_requested=self._stop_requested,
-            )
-            record = self._prepare_job_record(dataset_id, result)
+            fatal = False
+            try:
+                result = self._service.execute(
+                    steps=steps_for_dataset, initial_context=ctx, library=self._library,
+                    stop_requested=self._stop_requested,
+                )
+                record = self._prepare_job_record(dataset_id, result)
+            except WorkerIsolationRequiredError as exc:
+                # Misconfigured environment -- would fail identically for every
+                # remaining dataset, so this is the batch's last iteration too.
+                record = self._failed_record(dataset_id, str(exc))
+                fatal = True
+            except Exception as exc:  # pragma: no cover - defensive backstop
+                # execute() already converts ordinary step failures into a
+                # status="failed" PipelineRunResult internally; this only catches an
+                # unexpected bug elsewhere in the call chain (e.g. context/record
+                # construction). Without this, such an exception would propagate out
+                # of run() with dataset_run_finished never emitted, leaving this
+                # dataset's active_jobs entry stuck forever (nothing else clears it).
+                record = self._failed_record(dataset_id, str(exc))
             self._service.dataset_run_finished.emit(dataset_id, record)
+            if fatal:
+                break
+
+    @staticmethod
+    def _failed_record(dataset_id: str, error: str) -> dict:
+        return {"dataset_id": dataset_id, "status": "failed", "error": error, "step_results": {}}
 
     @staticmethod
     def _substitute_dataset_id(steps, dataset_id: str) -> list:

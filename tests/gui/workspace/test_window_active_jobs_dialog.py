@@ -88,6 +88,33 @@ def test_on_new_and_close_do_not_rebuild_while_jobs_active(qtbot, monkeypatch, t
     assert rebuild_calls == []
 
 
+@pytest.mark.parametrize("trigger", ["_on_save", "_on_save_as"])
+def test_save_and_save_as_blocked_while_jobs_active(qtbot, monkeypatch, trigger, tmp_path):
+    # Spec §3.3: "Save snapshots job_history only; blocked while active_jobs is
+    # non-empty" -- a running Pipeline batch mutates the library/job_history from a
+    # worker thread, so a concurrent Save could serialize a torn snapshot.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win._state.project.path = str(tmp_path / "p.rheojax")
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+    info_calls = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: info_calls.append(1))
+    save_calls = []
+    monkeypatch.setattr(
+        "rheojax.gui.foundation.project_codec.save_project_v2",
+        lambda *a, **k: save_calls.append(1),
+    )
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(tmp_path / "x.rheojax"), ""))
+
+    getattr(win, trigger)()
+
+    assert info_calls == [1]  # blocked -- user was told, not silently ignored
+    assert save_calls == []  # save_project_v2 never invoked
+
+
 def test_on_open_does_not_rebuild_while_jobs_active(qtbot, monkeypatch):
     win = WorkspaceWindow(AppState())
     qtbot.addWidget(win)

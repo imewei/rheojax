@@ -132,7 +132,7 @@ def save_project_v2(state, path: Path) -> None:
             persisted -- fit.json's nlsq_result/nuts_result AND every job_history.json
             fit-step phase result both route through this helper, so there is exactly one
             persistence path for this value shape, not two independently-maintained ones."""
-            if not raw:
+            if raw is None:
                 return None, None
             result_id = uuid.uuid4().hex
             rel = f"{result_dir}/{result_id}.hdf5"
@@ -338,11 +338,19 @@ def load_project_v2(path: Path):
 
         manifest = json.loads(zf.read("manifest.json"))
         checksums = manifest["members"]
-        for name in seen_names:
-            if name in ("manifest.json", "metadata.json"):
-                continue
+        # manifest.json can't hash itself (chicken-and-egg -- its own content includes
+        # every OTHER member's hash), but metadata.json IS written and hashed before
+        # manifest.json at save time, so it belongs in this set, not skipped alongside it.
+        hashable_names = seen_names - {"manifest.json"}
+        if set(checksums) != hashable_names:
+            raise ValueError(
+                "Archive manifest does not exactly match its members "
+                f"(manifest-only: {sorted(set(checksums) - hashable_names)}, "
+                f"archive-only: {sorted(hashable_names - set(checksums))})"
+            )
+        for name in hashable_names:
             data = zf.read(name)
-            expected = checksums.get(name, {}).get("sha256")
+            expected = checksums[name].get("sha256")
             actual = hashlib.sha256(data).hexdigest()
             if expected != actual:
                 raise ValueError(f"checksum mismatch for archive member: {name}")

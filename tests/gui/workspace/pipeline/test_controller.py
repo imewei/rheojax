@@ -49,6 +49,55 @@ def test_dataset_run_started_registers_active_job(qtbot):
     assert state.active_jobs.by_id["d1"] == {"status": "running"}
 
 
+def test_commit_job_result_calls_notify_when_provided(qtbot):
+    # Pipeline transform steps add/store into the library directly on the worker thread
+    # (bypassing WorkspaceWindow._commit_dataset()'s notifier emission), so this GUI-
+    # thread commit slot is what tells the notifier (and therefore LibraryRail) that
+    # something changed, once the mutation has already safely happened.
+    state = AppState()
+    state.active_jobs.by_id["d1"] = {"status": "running"}
+    svc = PipelineExecutionService()
+    notify_calls = []
+    ctl = PipelineController(state, svc, on_dirty=lambda: None, notify=lambda: notify_calls.append(1))
+
+    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    ctl._commit_job_result("d1", record)
+
+    assert notify_calls == [1]
+
+
+def test_commit_job_result_tolerates_missing_notify(qtbot):
+    state = AppState()
+    state.active_jobs.by_id["d1"] = {"status": "running"}
+    svc = PipelineExecutionService()
+    ctl = PipelineController(state, svc, on_dirty=lambda: None)  # notify defaults to None
+
+    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    ctl._commit_job_result("d1", record)  # must not raise
+
+
+def test_pipeline_produced_dataset_visible_in_rail_after_job_commits(qtbot):
+    # End-to-end wiring check for WorkspaceWindow: a dataset added directly to the
+    # library (simulating what _execute_pipeline_transform does on the worker thread)
+    # must appear in LibraryRail once the job commit fires on the GUI thread.
+    from rheojax.gui.foundation.library import DatasetRef
+
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    assert win._rail.count() == 0
+
+    win._state.library.add(DatasetRef(
+        id="derived1", name="derived1", protocol_type="oscillation", origin="derived",
+        units={}, row_count=0, hash="", provenance={}, lineage=["d1"],
+    ))
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+    record = {"dataset_id": "d1", "status": "completed", "error": None, "step_results": {}}
+    with qtbot.waitSignal(win._pipeline_service.dataset_run_finished, timeout=1000):
+        win._pipeline_service.dataset_run_finished.emit("d1", record)
+
+    assert win._rail.count() == 1
+
+
 def test_stale_controller_guarded_after_rebuild_does_not_mutate_discarded_state(qtbot):
     """Reproduces the Plan 2 Task 11 gap: a PipelineController connected against the
     persistent PipelineExecutionService must stop mutating its AppState once

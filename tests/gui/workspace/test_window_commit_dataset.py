@@ -49,3 +49,34 @@ def test_fit_body_dataset_commit_requested_routes_to_commit_dataset(qtbot):
     fit_export_body = next(b for b in win._fit_bodies if hasattr(b, "dataset_commit_requested"))
     fit_export_body.dataset_commit_requested.emit(_ref("d2"), None, True)
     assert state.library.get("d2").id == "d2"
+
+
+def test_commit_dataset_refreshes_library_rail(qtbot):
+    # LibraryRail.refresh() is otherwise never called after construction -- without the
+    # notifier -> rail.refresh wiring, a newly committed dataset would render nowhere
+    # until the next full _rebuild() (Open/New/Close).
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    assert win._rail.count() == 0
+
+    win._commit_dataset(_ref("d1"), payload=None, overwrite=False)
+
+    assert win._rail.count() == 1
+
+
+@pytest.mark.parametrize("edited_signal", [
+    "_on_fit_body_edited", "_on_transform_body_edited", "_on_pipeline_body_edited",
+])
+def test_body_edited_marks_project_dirty(qtbot, edited_signal):
+    # Fit/Transform/Pipeline step config edits (nlsq_config, priors, pipeline steps) are
+    # all persisted into the project archive -- silently NOT dirtying on edit means a
+    # user can Close/New/Open without a save prompt and lose those changes.
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    assert state.project.dirty is False
+
+    getattr(win, edited_signal)()
+
+    assert state.project.dirty is True

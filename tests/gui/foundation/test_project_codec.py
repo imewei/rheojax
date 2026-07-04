@@ -411,7 +411,9 @@ def test_load_rejects_ref_id_path_traversal_in_manifest(tmp_path):
     never passes through the zip member allowlist -- it's just a string field -- so a
     '../'-containing id must be caught separately by _validate_ref_id when building the
     HDF5 path from it."""
+    metadata_bytes = json.dumps({"version": "2.0", "timestamp": "x"}).encode()
     members = {
+        "metadata.json": metadata_bytes,
         "library/manifest.json": json.dumps([{
             "id": "../../../evil", "name": "d1", "protocol_type": "oscillation",
             "origin": "imported", "units": {}, "row_count": 1, "hash": "h",
@@ -424,18 +426,83 @@ def test_load_rejects_ref_id_path_traversal_in_manifest(tmp_path):
         "project.json": json.dumps({"path": None, "name": None}).encode(),
         "ui.json": b"{}",
     }
+    # manifest.json must declare every OTHER member exactly (load_project_v2 now
+    # verifies membership, not just per-file hashes -- see test_load_rejects_
+    # manifest_membership_mismatch below).
     manifest = {"members": {
         name: {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
         for name, data in members.items()
     }}
     path = tmp_path / "evil_ref_id.rheojax"
     with zipfile.ZipFile(path, "w") as zf:
-        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
         for name, data in members.items():
             zf.writestr(name, data)
         zf.writestr("manifest.json", json.dumps(manifest))
     with pytest.raises(ValueError, match="invalid archive reference id"):
         load_project_v2(path)
+
+
+def test_round_trip_job_history_empty_fit_result_dict_stays_empty_dict(tmp_path):
+    # _persist_result_dict used `if not raw` (truthiness), so a legitimate empty dict
+    # `{}` was silently indistinguishable from "no result" and restored as None.
+    state = AppState()
+    state.job_history.by_id["job1"] = {
+        "dataset_id": "d1", "status": "completed", "error": None,
+        "step_results": {
+            "s1": {"step_type": "fit", "nlsq": {"status": "completed", "error": None,
+                                                 "result": {}}, "nuts": None},
+        },
+    }
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+    loaded = load_project_v2(path)
+    phase = loaded.job_history.by_id["job1"]["step_results"]["s1"]["nlsq"]
+    assert phase["result"] == {}
+    assert phase["result"] is not None
+
+
+def test_load_rejects_manifest_membership_mismatch(tmp_path):
+    # A manifest declaring an entry for a member that isn't actually in the archive
+    # (or vice versa) must be rejected -- not silently skipped -- even if every entry
+    # that IS present in both happens to hash-match.
+    state = AppState()
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+
+    with zipfile.ZipFile(path) as src:
+        manifest = json.loads(src.read("manifest.json"))
+        manifest["members"]["phantom/not_real.hdf5"] = {"sha256": "0" * 64, "size": 0}
+        tampered = tmp_path / "tampered.rheojax"
+        with zipfile.ZipFile(tampered, "w") as dst:
+            for item in src.infolist():
+                data = src.read(item.filename)
+                if item.filename == "manifest.json":
+                    data = json.dumps(manifest).encode()
+                dst.writestr(item, data)
+
+    with pytest.raises(ValueError, match="does not exactly match"):
+        load_project_v2(tampered)
+
+
+def test_load_rejects_metadata_checksum_tampering(tmp_path):
+    # metadata.json IS hashed at save time (registered via _write_json like every other
+    # JSON member) -- the loader must actually verify it, not exempt it the way it
+    # legitimately exempts manifest.json's own unhashable self-reference.
+    state = AppState()
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+
+    with zipfile.ZipFile(path) as src:
+        tampered = tmp_path / "tampered_meta.rheojax"
+        with zipfile.ZipFile(tampered, "w") as dst:
+            for item in src.infolist():
+                data = src.read(item.filename)
+                if item.filename == "metadata.json":
+                    data = json.dumps({"version": "2.0", "timestamp": "TAMPERED"}).encode()
+                dst.writestr(item, data)
+
+    with pytest.raises(ValueError, match="checksum"):
+        load_project_v2(tampered)
 
 
 def test_validate_ref_id_rejects_traversal_and_accepts_uuid():

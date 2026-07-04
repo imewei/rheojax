@@ -231,6 +231,40 @@ def test_second_transform_lineage_points_at_first_transforms_output_not_original
     assert second_ref.lineage == [first_new_id]  # not ["d1"]
 
 
+def test_execute_reports_failed_when_nlsq_phase_fails(qtbot, monkeypatch):
+    # A failed NLSQ phase must not be swallowed into an overall "completed" run just
+    # because _execute_pipeline_fit() itself didn't raise.
+    from PySide6.QtCore import QObject, Signal
+
+    class _FakeSignals(QObject):
+        completed = Signal(object)
+        failed = Signal(str)
+        cancelled = Signal()
+
+    class _FakeFailingWorker:
+        def __init__(self):
+            self.signals = _FakeSignals()
+
+        def run(self):
+            self.signals.failed.emit("boom: nlsq blew up")
+
+    import rheojax.gui.jobs.process_adapter as process_adapter
+
+    monkeypatch.setattr(process_adapter, "make_fit_worker", lambda **kwargs: _FakeFailingWorker())
+
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "relaxation"))
+    data = RheoData(x=[0.1, 1.0, 10.0], y=[100.0, 50.0, 10.0], initial_test_mode="relaxation")
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [PipelineStepConfig(id="s1", step_type="fit",
+                                 config={"model_name": "maxwell", "run_nuts": False})]
+    result = svc.execute(steps=steps, initial_context={"data": data, "dataset_id": "d1"},
+                          library=lib, stop_requested=threading.Event())
+    assert result.status == "failed"
+    assert "boom" in result.error
+
+
 def test_duplicate_step_ids_rejected(qtbot):
     lib = DatasetLibrary()
     svc = PipelineExecutionService()

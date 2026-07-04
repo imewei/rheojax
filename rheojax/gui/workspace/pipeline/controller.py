@@ -26,10 +26,12 @@ class PipelineController(WorkflowController):
         on_dirty: Callable[[], None],
         epoch: int = 0,
         guard: Callable[[int, Callable], Callable] | None = None,
+        notify: Callable[[], None] | None = None,
     ) -> None:
         self._state = app_state
         self._service = service
         self._on_dirty = on_dirty
+        self._notify = notify
         super().__init__(steps=[])
         on_started = self._on_dataset_run_started
         on_finished = self._commit_job_result
@@ -58,9 +60,18 @@ class PipelineController(WorkflowController):
         self._state.job_history.by_id[job_id] = record
         self._state.pipeline.job_id = job_id
         self._on_dirty()
+        if self._notify is not None:
+            # Pipeline transform steps add/store into the library directly on the
+            # worker thread (PipelineExecutionService._execute_pipeline_transform),
+            # bypassing WorkspaceWindow._commit_dataset()'s notifier emission. By the
+            # time this GUI-thread slot runs, that thread's execute() call has already
+            # returned (dataset_run_finished fires after it), so the library mutation
+            # has already happened -- reading/notifying about it here is safe and is
+            # what makes a pipeline-produced dataset show up in LibraryRail at all.
+            self._notify()
 
 
-def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None):
+def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None, notify=None):
     from rheojax.gui.workspace.controller import Step
     from rheojax.gui.workspace.pipeline.step1_configure_run import (
         PipelineConfigureRunStep,
@@ -73,6 +84,7 @@ def build_pipeline_controller(app_state, service, epoch: int = 0, guard=None):
         on_dirty=lambda: setattr(app_state.project, "dirty", True),
         epoch=epoch,
         guard=guard,
+        notify=notify,
     )
     ctl.steps = [Step(id="configure_run", title="Configure & Run", is_ready=body.is_ready, validate=lambda: True)]
     ctl.reached = {0}

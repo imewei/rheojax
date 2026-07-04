@@ -81,7 +81,8 @@ class WorkspaceWindow(QMainWindow):
         fit_ctl, self._fit_bodies = build_fit_controller(state)
         transform_ctl, self._transform_bodies = build_transform_controller(state)
         pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(
-            state, self._pipeline_service, epoch=self._epoch, guard=self._guard
+            state, self._pipeline_service, epoch=self._epoch, guard=self._guard,
+            notify=self._notifier.changed.emit,
         )
         self._controllers = {
             "fit": fit_ctl,
@@ -119,6 +120,11 @@ class WorkspaceWindow(QMainWindow):
         self._refresh_status_label()
 
         self._rail = LibraryRail(state.library, self)
+        # LibraryRail otherwise only ever renders the snapshot present at construction
+        # time -- nothing else calls .refresh() -- so without this, a dataset added by
+        # any commit path (interactive export or a Pipeline job) never appears until the
+        # next full _rebuild() (Open/New/Close).
+        self._notifier.changed.connect(self._rail.refresh)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -160,6 +166,10 @@ class WorkspaceWindow(QMainWindow):
                 except (RuntimeError, TypeError):
                     pass
             body.deleteLater()
+        try:
+            self._notifier.changed.disconnect(self._rail.refresh)
+        except (RuntimeError, TypeError):
+            pass
         for widget in (self._canvas, self._rail, self._inspector, self._splitter):
             widget.deleteLater()
         self._controllers = {}
@@ -211,7 +221,26 @@ class WorkspaceWindow(QMainWindow):
             lambda: self._maybe_confirm_unsaved_changes(_open)
         )
 
+    def _blocked_by_active_jobs(self, action: str) -> bool:
+        # Spec §3.3: "Save snapshots job_history only; blocked while active_jobs is
+        # non-empty" -- a running Pipeline batch mutates DatasetLibrary/job_history from
+        # a worker thread, so a concurrent Save could serialize a torn, inconsistent
+        # snapshot. Unlike Close/New/Open (which offer to cancel jobs and proceed), Save
+        # is a hard block: there is no safe "discard the running job" option here.
+        if not self._state.active_jobs.by_id:
+            return False
+        from PySide6.QtWidgets import QMessageBox
+
+        QMessageBox.information(
+            self, "Jobs Running",
+            f"Cannot {action} while {len(self._state.active_jobs.by_id)} job(s) are still "
+            "running. Wait for them to finish, or cancel them via Close/New/Open first.",
+        )
+        return True
+
     def _on_save(self) -> None:
+        if self._blocked_by_active_jobs("save"):
+            return
         if self._state.project.path is None:
             self._on_save_as()
             return
@@ -227,6 +256,8 @@ class WorkspaceWindow(QMainWindow):
         self._state.project.dirty = False
 
     def _on_save_as(self) -> None:
+        if self._blocked_by_active_jobs("save"):
+            return
         from PySide6.QtWidgets import QFileDialog, QMessageBox
 
         path, _ = QFileDialog.getSaveFileName(
@@ -315,6 +346,21 @@ class WorkspaceWindow(QMainWindow):
             | QMessageBox.StandardButton.Cancel,
         )
         if choice == QMessageBox.StandardButton.Save:
+            if self._state.active_jobs.by_id:
+                # Reachable when _maybe_confirm_active_jobs gave up waiting for jobs to
+                # finish cancelling (its 30s poll timeout) with active_jobs still
+                # non-empty -- Save is unconditionally blocked in that state
+                # (_blocked_by_active_jobs), so calling it here would silently leave
+                # `proceed()` never called with no indication that the Close/New/Open
+                # the user already confirmed was itself aborted. Tell them directly
+                # instead of showing only the generic "Cannot save" dialog.
+                QMessageBox.warning(
+                    self, "Cannot Save",
+                    "Some jobs are still finishing cancellation, so the project can't "
+                    "be saved yet. This action was cancelled -- try again shortly, or "
+                    "choose Discard to proceed without saving.",
+                )
+                return
             self._on_save()
             if not self._state.project.dirty:
                 proceed()
@@ -428,13 +474,19 @@ class WorkspaceWindow(QMainWindow):
             self._canvas.refresh()
 
     def _on_fit_body_edited(self) -> None:
+        # `edited`/`config_edited` fire on real content changes (model/protocol/prior/
+        # NLSQ-option edits) that persist into fit.json -- distinct from navigation,
+        # which spec §5.2 explicitly excludes from dirty tracking.
+        self._mark_dirty()
         self._advance_and_unlock("fit")
 
     def _on_transform_body_edited(self) -> None:
+        self._mark_dirty()
         self._advance_and_unlock("transform")
 
     def _on_pipeline_body_edited(self) -> None:
-        pass  # mirrors _on_fit_body_edited/_on_transform_body_edited's advance-eligibility recheck
+        # Pipeline step-list edits persist into pipeline.json, same rationale as above.
+        self._mark_dirty()
 
     def _on_pipeline_run_requested(self) -> None:
         if self._state.active_jobs.by_id:
