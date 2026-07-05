@@ -20,7 +20,13 @@ from rheojax.gui.workspace.pipeline.models import FitStepResult
 
 class PipelineBatchRunner(QRunnable):
     def __init__(
-        self, service, steps, selected_dataset_ids, library, stop_requested
+        self,
+        service,
+        steps,
+        selected_dataset_ids,
+        library,
+        stop_requested,
+        app_state=None,
     ) -> None:
         super().__init__()
         self._service = service
@@ -28,6 +34,7 @@ class PipelineBatchRunner(QRunnable):
         self._selected_dataset_ids = selected_dataset_ids
         self._library = library
         self._stop_requested = stop_requested
+        self._app_state = app_state
 
     def run(self) -> None:
         from rheojax.gui.services.pipeline_execution_service import (
@@ -37,6 +44,16 @@ class PipelineBatchRunner(QRunnable):
         for dataset_id in self._selected_dataset_ids:
             if self._stop_requested.is_set():
                 break
+            # Register synchronously (plain dict write, not via the Qt signal)
+            # before execute() can start mutating the library. dataset_run_started
+            # is Qt.AutoConnection, which resolves to a queued cross-thread
+            # connection when run() executes on a QThreadPool worker thread --
+            # relying on it alone leaves a window where Save can see an empty
+            # active_jobs and serialize the library while this thread is
+            # concurrently writing to it. `app_state` is optional so tests that
+            # construct this runner directly (with no AppState) are unaffected.
+            if self._app_state is not None:
+                self._app_state.active_jobs.by_id[dataset_id] = {"status": "running"}
             self._service.dataset_run_started.emit(dataset_id)
             ctx = pipeline_context_from_library(self._library, [dataset_id])
             steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)

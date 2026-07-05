@@ -159,17 +159,21 @@ class WorkerPool(QObject):
         max_threads : int, default=4
             Maximum number of concurrent worker threads
         """
-        # Skip re-initialization for singleton (under lock to prevent double-init race)
+        # Skip re-initialization for singleton (under lock to prevent double-init
+        # race). Held for the whole check-and-set so a failed HAS_PYSIDE6 guard
+        # never marks the singleton initialized — a retried construction must
+        # be able to try again instead of getting a half-built instance back.
         with WorkerPool._singleton_lock:
             if WorkerPool._initialized:
                 return
-            WorkerPool._initialized = True
 
-        if not HAS_PYSIDE6:
-            logger.error("PySide6 not available, cannot initialize WorkerPool")
-            raise ImportError(
-                "PySide6 is required for WorkerPool. Install with: pip install PySide6"
-            )
+            if not HAS_PYSIDE6:
+                logger.error("PySide6 not available, cannot initialize WorkerPool")
+                raise ImportError(
+                    "PySide6 is required for WorkerPool. Install with: pip install PySide6"
+                )
+
+            WorkerPool._initialized = True
 
         super().__init__()
         self._pool = QThreadPool()
@@ -473,6 +477,7 @@ class WorkerPool(QObject):
 
         # Wait for QThreadPool threads (adapter threads exit quickly
         # once the child process is dead).
+        success = True
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
@@ -495,14 +500,18 @@ class WorkerPool(QObject):
                     except Exception:
                         pass
 
-        # Clear active jobs
-        with self._job_lock:
-            self._active_jobs.clear()
-            self._active_workers.clear()
-            self._job_signals.clear()
-            self._job_start_times.clear()
+        # Clear active jobs — only if the wait actually completed. If it
+        # timed out, workers may still be running; leaving them tracked
+        # keeps is_busy() reporting True so callers (e.g. closeEvent) can
+        # still detect and react to a stuck shutdown.
+        if success:
+            with self._job_lock:
+                self._active_jobs.clear()
+                self._active_workers.clear()
+                self._job_signals.clear()
+                self._job_start_times.clear()
 
-        logger.info("Worker pool shut down")
+        logger.info("Worker pool shut down", clean=success)
 
     def _get_job_elapsed(self, job_id: str) -> float | None:
         """Get elapsed time for a job in seconds."""
@@ -531,7 +540,6 @@ class WorkerPool(QObject):
             job_id=job_id,
             error=error_message,
             elapsed=elapsed,
-            exc_info=True,
         )
 
     @Slot(str)
