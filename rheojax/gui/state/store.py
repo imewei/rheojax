@@ -26,6 +26,22 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _notify_subscribers_safe(subscribers: list, snapshot: Any) -> None:
+    """Call each subscriber with ``snapshot``, isolating failures per-callback.
+
+    Shared by the main-thread and deferred (worker-thread) notification
+    paths in ``StateStore.update_state()``/``batch_update()`` so a bad
+    subscriber never blocks or breaks notification of the others.
+    """
+    for subscriber in subscribers:
+        try:
+            subscriber(snapshot)
+        except Exception:
+            logger.error(
+                "Subscriber callback failed (main-thread relay)", exc_info=True
+            )
+
+
 class PipelineStep(Enum):
     """Pipeline execution steps."""
 
@@ -554,10 +570,12 @@ class StateStore:
                 # callback (and the signal emission) would silently never
                 # fire. QMetaObject.invokeMethod posts to self._signals' own
                 # (main-thread) event loop instead, guaranteeing delivery.
-                self._signals._pending_signal_emissions.append((signal_name, args))
+                self._signals._pending_main_thread_calls.append(
+                    lambda s=signal, a=args: s.emit(*a)
+                )
                 QMetaObject.invokeMethod(
                     self._signals,
-                    "_run_pending_signal_emissions",
+                    "_run_pending_main_thread_calls",
                     Qt.ConnectionType.QueuedConnection,
                 )
                 return
@@ -824,6 +842,20 @@ class StateStore:
                 name = action.get("name", "")
                 self.emit_signal("pipeline_name_changed", name)
 
+    def _push_undo_entry(self, state_to_save: AppState) -> None:
+        """Push a clone of ``state_to_save`` onto the undo stack.
+
+        Evicts the oldest entry first if already at ``_max_undo_size``, and
+        clears the redo stack (a new action invalidates any prior redo
+        history). Callers must hold ``self._lock`` and must only call this
+        when the update actually changed state -- no-op updates must not
+        waste undo-stack capacity or clear redo history.
+        """
+        if len(self._undo_stack) >= self._max_undo_size:
+            self._undo_stack.pop(0)
+        self._undo_stack.append(state_to_save.clone())
+        self._redo_stack.clear()
+
     def update_state(
         self,
         updater: Callable[[AppState], AppState],
@@ -855,12 +887,7 @@ class StateStore:
             # exist solely to drive a signal) must not waste undo-stack
             # capacity or clear redo history.
             if track_undo and changed_keys:
-                if len(self._undo_stack) >= self._max_undo_size:
-                    # Evict oldest entry instead of silently refusing to
-                    # record new ones once the cap is reached.
-                    self._undo_stack.pop(0)
-                self._undo_stack.append(old_state.clone())
-                self._redo_stack.clear()  # Clear redo on new action
+                self._push_undo_entry(old_state)
 
             if changed_keys:
                 logger.debug(
@@ -915,12 +942,14 @@ class StateStore:
                 from PySide6.QtCore import QMetaObject, Qt
 
                 # M2 fix: append to deque instead of overwriting single-slot buffer
-                self._signals._pending_notifications.append(
-                    (subscribers, state_snapshot)
+                self._signals._pending_main_thread_calls.append(
+                    lambda subs=subscribers, snap=state_snapshot: _notify_subscribers_safe(
+                        subs, snap
+                    )
                 )
                 QMetaObject.invokeMethod(
                     self._signals,
-                    "_run_subscriber_notifications",
+                    "_run_pending_main_thread_calls",
                     Qt.ConnectionType.QueuedConnection,
                 )
                 # Fall through to emit_signal block below.
@@ -1328,13 +1357,6 @@ class StateStore:
         )
         with self._lock:
             old_state = self._state
-            if track_undo:
-                if len(self._undo_stack) >= self._max_undo_size:
-                    # Evict oldest entry instead of silently refusing to
-                    # record new ones once the cap is reached.
-                    self._undo_stack.pop(0)
-                self._undo_stack.append(self._state.clone())
-                self._redo_stack.clear()
 
             # Apply all updates (rollback on failure)
             for updater in updaters:
@@ -1347,12 +1369,17 @@ class StateStore:
                         exc_info=True,
                     )
                     self._state = old_state
-                    if track_undo and self._undo_stack:
-                        self._undo_stack.pop()
                     raise
 
-            # Compute changed keys for logging
+            # Compute changed keys for logging and undo tracking
             changed_keys = self._get_changed_keys(old_state, self._state)
+
+            # Only record an undo entry if the batch actually changed state
+            # (mirrors update_state()'s no-op guard) -- a no-op batch must not
+            # evict a real undo entry or clear redo history.
+            if track_undo and changed_keys:
+                self._push_undo_entry(old_state)
+
             if changed_keys:
                 logger.debug(
                     "Batch update completed",
@@ -1383,12 +1410,14 @@ class StateStore:
             try:
                 from PySide6.QtCore import QMetaObject, Qt
 
-                self._signals._pending_notifications.append(
-                    (subscribers, state_snapshot)
+                self._signals._pending_main_thread_calls.append(
+                    lambda subs=subscribers, snap=state_snapshot: _notify_subscribers_safe(
+                        subs, snap
+                    )
                 )
                 QMetaObject.invokeMethod(
                     self._signals,
-                    "_run_subscriber_notifications",
+                    "_run_pending_main_thread_calls",
                     Qt.ConnectionType.QueuedConnection,
                 )
             except (ImportError, RuntimeError, AttributeError) as exc:

@@ -6,7 +6,7 @@ Handles: LOAD_PROJECT, NEW_PROJECT, SAVE_PROJECT, RECORD_PROVENANCE.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -39,31 +39,37 @@ def reduce_load_project(
     return updater
 
 
+# Global/persistent settings that must survive across project lifetimes.
+# Every other AppState field is project-scoped and gets reset by
+# reduce_new_project(). Inverting reset-list -> preserve-set means a newly
+# added AppState field defaults to being reset (safe) instead of silently
+# persisting across projects until someone remembers to add it here.
+_NEW_PROJECT_PRESERVE_FIELDS = frozenset(
+    {
+        "recent_projects",
+        "theme",
+        "os_theme",
+        "auto_save_enabled",
+        "current_seed",
+        "jax_device",
+        "jax_memory_used",
+        "jax_memory_total",
+        "last_export_dir",
+    }
+)
+
+
 def reduce_new_project(
     action: dict[str, Any],
 ) -> Callable[[AppState], AppState]:
     def updater(state: AppState) -> AppState:
-        # Reset only project-scoped fields; global/persistent settings
-        # (recent_projects, theme, os_theme, auto_save_enabled, current_seed,
-        # jax_device, ...) must survive across project lifetimes.
         defaults = _AppState()
-        return replace(
-            state,
-            project_path=defaults.project_path,
-            project_name=defaults.project_name,
-            is_modified=defaults.is_modified,
-            datasets=defaults.datasets,
-            active_dataset_id=defaults.active_dataset_id,
-            active_model_name=defaults.active_model_name,
-            model_params=defaults.model_params,
-            fit_results=defaults.fit_results,
-            bayesian_results=defaults.bayesian_results,
-            current_tab=defaults.current_tab,
-            pipeline_state=defaults.pipeline_state,
-            visual_pipeline=defaults.visual_pipeline,
-            transform_history=defaults.transform_history,
-            workflow_mode=defaults.workflow_mode,
-        )
+        reset_fields = {
+            f.name: getattr(defaults, f.name)
+            for f in fields(_AppState)
+            if f.name not in _NEW_PROJECT_PRESERVE_FIELDS
+        }
+        return replace(state, **reset_fields)
 
     return updater
 

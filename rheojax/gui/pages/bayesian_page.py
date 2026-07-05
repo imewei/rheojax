@@ -93,6 +93,7 @@ class BayesianPage(QWidget):
         self._model_service = ModelService()
         self._worker_pool = WorkerPool.instance()
         self._current_worker: Any = None  # BayesianWorker | ProcessWorkerAdapter
+        self._current_job_id: str | None = None
         self._closing = False
         self._is_running = False
         self._current_preset: str = "custom"
@@ -396,8 +397,13 @@ class BayesianPage(QWidget):
         delivered to a destroyed widget.
         """
         self._closing = True
-        if self._current_worker is not None:
-            self._current_worker.cancel()
+        if self._current_job_id is not None:
+            # Route through WorkerPool.cancel() rather than calling the worker
+            # directly: it dispatches on a background thread (subprocess-mode
+            # SIGTERM/SIGKILL escalation can block for seconds) and safely
+            # falls back to cancel_token.cancel() for workers (e.g. thread-mode
+            # BayesianWorker) that have no .cancel() method of their own.
+            self._worker_pool.cancel(self._current_job_id)
         self._disconnect_worker_signals()
         # Also disconnect store signals that target this page's slots
         if self._store.signals is not None:
@@ -895,7 +901,7 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
 
-        self._worker_pool.submit(self._current_worker)
+        self._current_job_id = self._worker_pool.submit(self._current_worker)
 
         self._is_running = True
         self._btn_run.setEnabled(False)
@@ -928,8 +934,10 @@ class BayesianPage(QWidget):
 
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
-        if self._current_worker:
-            self._current_worker.cancel()
+        if self._current_job_id is not None:
+            # See prepare_for_close() for why this goes through WorkerPool
+            # rather than self._current_worker.cancel() directly.
+            self._worker_pool.cancel(self._current_job_id)
             self._status_text.append("Cancelling...")
 
         self.cancel_requested.emit()
@@ -1028,6 +1036,7 @@ class BayesianPage(QWidget):
             return
         self._disconnect_worker_signals()
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
@@ -1166,6 +1175,7 @@ class BayesianPage(QWidget):
             return
         self._disconnect_worker_signals()
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
@@ -1230,6 +1240,7 @@ class BayesianPage(QWidget):
             return
 
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
