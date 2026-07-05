@@ -856,6 +856,82 @@ class StateStore:
         self._undo_stack.append(state_to_save.clone())
         self._redo_stack.clear()
 
+    def _dispatch_subscriber_notifications(
+        self, subscribers: list, state_snapshot: AppState
+    ) -> None:
+        """Run subscriber callbacks with cross-thread deferral and reentrancy
+        guarding. Shared by update_state()/undo()/redo() so all three defer to
+        the main thread the same way -- subscriber callbacks update Qt widgets
+        and MUST run on the main thread, and duplicating this by hand in each
+        caller is exactly how undo()/redo() previously ended up with the
+        reentrancy guard but not the actual cross-thread defer.
+        """
+        _on_main_thread = True
+        try:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication
+
+            _app = QApplication.instance()
+            if _app is not None and QThread.currentThread() != _app.thread():
+                _on_main_thread = False
+        except (ImportError, RuntimeError):
+            pass
+
+        if not _on_main_thread:
+            try:
+                from PySide6.QtCore import QMetaObject, Qt
+
+                self._signals._pending_main_thread_calls.append(
+                    lambda subs=subscribers,
+                    snap=state_snapshot: _notify_subscribers_safe(subs, snap)
+                )
+                QMetaObject.invokeMethod(
+                    self._signals,
+                    "_run_pending_main_thread_calls",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+                return
+            except (ImportError, RuntimeError, AttributeError) as exc:
+                logger.warning(
+                    "Failed to defer subscriber notifications to GUI thread; "
+                    "falling back to synchronous dispatch",
+                    error=str(exc),
+                )
+                # Fall through to the synchronous path below.
+
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            if not hasattr(tls, "pending"):
+                tls.pending = []
+            tls.pending.append((subscribers, state_snapshot))
+            return
+        tls.dispatching = True
+        try:
+            for subscriber in subscribers:
+                try:
+                    subscriber(state_snapshot)
+                except Exception:
+                    logger.error(
+                        "Subscriber callback failed",
+                        subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                        exc_info=True,
+                    )
+            while hasattr(tls, "pending") and tls.pending:
+                pending_subs, pending_snap = tls.pending.pop(0)
+                for subscriber in pending_subs:
+                    try:
+                        subscriber(pending_snap)
+                    except Exception:
+                        logger.error(
+                            "Subscriber callback failed (queued)",
+                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
+                            exc_info=True,
+                        )
+        finally:
+            tls.dispatching = False
+            if hasattr(tls, "pending"):
+                tls.pending.clear()
+
     def update_state(
         self,
         updater: Callable[[AppState], AppState],
@@ -910,94 +986,15 @@ class StateStore:
         # self._state.  Subscribers that need the latest state must call
         # self.get_state() rather than relying on the snapshot argument.
         #
-        # GUI-P1-002 fix: if update_state() is called from a worker thread,
-        # defer subscriber notifications to the main Qt thread via
-        # QMetaObject.invokeMethod(QueuedConnection).  Subscriber callbacks
-        # update Qt widgets and MUST run on the main thread.
-        #
         # R12-C-003: The subscriber list is captured once (above, inside the
         # lock); subscribe/unsubscribe calls during iteration take effect on
         # the next dispatch, not the current one.
         #
-        # R10-STO-004: per-thread reentrancy guard — if a subscriber triggers
-        # a nested dispatch (which calls update_state again on the SAME thread),
-        # we queue the nested snapshot for delivery after the outer loop finishes
-        # instead of silently dropping it.  Using threading.local ensures that
-        # a worker-thread dispatch does not interfere with a concurrent
-        # main-thread dispatch.
-        _on_main_thread = True
-        try:
-            from PySide6.QtCore import QThread
-            from PySide6.QtWidgets import QApplication
-
-            _app = QApplication.instance()
-            if _app is not None and QThread.currentThread() != _app.thread():
-                _on_main_thread = False
-        except (ImportError, RuntimeError):
-            pass
-
-        if not _on_main_thread:
-            # Worker thread: defer subscriber calls to GUI thread.
-            try:
-                from PySide6.QtCore import QMetaObject, Qt
-
-                # M2 fix: append to deque instead of overwriting single-slot buffer
-                self._signals._pending_main_thread_calls.append(
-                    lambda subs=subscribers, snap=state_snapshot: _notify_subscribers_safe(
-                        subs, snap
-                    )
-                )
-                QMetaObject.invokeMethod(
-                    self._signals,
-                    "_run_pending_main_thread_calls",
-                    Qt.ConnectionType.QueuedConnection,
-                )
-                # Fall through to emit_signal block below.
-            except (ImportError, RuntimeError, AttributeError) as exc:
-                logger.warning(
-                    "Failed to defer subscriber notifications to GUI thread; "
-                    "falling back to synchronous dispatch",
-                    error=str(exc),
-                )
-                _on_main_thread = True  # Fall back to synchronous path
-
-        if _on_main_thread:
-            tls = self._dispatch_tls
-            if getattr(tls, "dispatching", False):
-                # Queue nested state change for delivery after outer loop
-                if not hasattr(tls, "pending"):
-                    tls.pending = []
-                tls.pending.append((subscribers, state_snapshot))
-                return
-            tls.dispatching = True
-            try:
-                for subscriber in subscribers:
-                    try:
-                        subscriber(state_snapshot)
-                    except Exception:
-                        logger.error(
-                            "Subscriber callback failed",
-                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                            exc_info=True,
-                        )
-                # Drain any nested dispatches that were queued during this loop
-                while hasattr(tls, "pending") and tls.pending:
-                    pending_subs, pending_snap = tls.pending.pop(0)
-                    for subscriber in pending_subs:
-                        try:
-                            subscriber(pending_snap)
-                        except Exception:
-                            logger.error(
-                                "Subscriber callback failed (queued)",
-                                subscriber=getattr(
-                                    subscriber, "__name__", str(subscriber)
-                                ),
-                                exc_info=True,
-                            )
-            finally:
-                tls.dispatching = False
-                if hasattr(tls, "pending"):
-                    tls.pending.clear()
+        # GUI-P1-002/R10-STO-004: _dispatch_subscriber_notifications() handles
+        # both the worker-thread defer (subscriber callbacks update Qt widgets
+        # and MUST run on the main thread) and the per-thread reentrancy guard
+        # (queue a nested dispatch instead of recursing/dropping it).
+        self._dispatch_subscriber_notifications(subscribers, state_snapshot)
 
         # Emit Qt signal via QueuedConnection to ensure delivery on the main
         # thread regardless of which thread calls update_state() (GUI-005).
@@ -1178,41 +1175,9 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # R11-STO-001: Notify subscribers outside the lock using the same TLS
-        # reentrancy guard as update_state() to prevent recursive subscriber
-        # notification when a subscriber triggers a nested dispatch.
-        tls = self._dispatch_tls
-        if getattr(tls, "dispatching", False):
-            if not hasattr(tls, "pending"):
-                tls.pending = []
-            tls.pending.append((subscribers, state_snapshot))
-        else:
-            tls.dispatching = True
-            try:
-                for subscriber in subscribers:
-                    try:
-                        subscriber(state_snapshot)
-                    except Exception:
-                        logger.error(
-                            "Subscriber callback failed during undo",
-                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                            exc_info=True,
-                        )
-                while hasattr(tls, "pending") and tls.pending:
-                    pending_subs, pending_snap = tls.pending.pop(0)
-                    for sub in pending_subs:
-                        try:
-                            sub(pending_snap)
-                        except Exception:
-                            logger.error(
-                                "Subscriber callback failed (queued)",
-                                subscriber=getattr(sub, "__name__", str(sub)),
-                                exc_info=True,
-                            )
-            finally:
-                tls.dispatching = False
-                if hasattr(tls, "pending"):
-                    tls.pending.clear()
+        # R11-STO-001/GUI-P1-002: same cross-thread defer + reentrancy guard as
+        # update_state() -- see _dispatch_subscriber_notifications().
+        self._dispatch_subscriber_notifications(subscribers, state_snapshot)
 
         # Emit via QueuedConnection for thread safety (matches update_state path)
         try:
@@ -1243,7 +1208,11 @@ class StateStore:
                 logger.debug("Redo requested but stack is empty")
                 return False
 
-            # Push current state to undo
+            # Push current state to undo -- capped the same way _push_undo_entry()
+            # caps a normal update_state() push, so replaying a large redo
+            # history can't grow _undo_stack past _max_undo_size.
+            if len(self._undo_stack) >= self._max_undo_size:
+                self._undo_stack.pop(0)
             self._undo_stack.append(self._state.clone())
 
             # Restore next state
@@ -1259,39 +1228,9 @@ class StateStore:
             subscribers = list(self._subscribers)
             state_snapshot = self._state.clone()
 
-        # R11-STO-001: Same TLS reentrancy guard as undo() and update_state().
-        tls = self._dispatch_tls
-        if getattr(tls, "dispatching", False):
-            if not hasattr(tls, "pending"):
-                tls.pending = []
-            tls.pending.append((subscribers, state_snapshot))
-        else:
-            tls.dispatching = True
-            try:
-                for subscriber in subscribers:
-                    try:
-                        subscriber(state_snapshot)
-                    except Exception:
-                        logger.error(
-                            "Subscriber callback failed during redo",
-                            subscriber=getattr(subscriber, "__name__", str(subscriber)),
-                            exc_info=True,
-                        )
-                while hasattr(tls, "pending") and tls.pending:
-                    pending_subs, pending_snap = tls.pending.pop(0)
-                    for sub in pending_subs:
-                        try:
-                            sub(pending_snap)
-                        except Exception:
-                            logger.error(
-                                "Subscriber callback failed (queued)",
-                                subscriber=getattr(sub, "__name__", str(sub)),
-                                exc_info=True,
-                            )
-            finally:
-                tls.dispatching = False
-                if hasattr(tls, "pending"):
-                    tls.pending.clear()
+        # R11-STO-001/GUI-P1-002: same cross-thread defer + reentrancy guard as
+        # update_state() -- see _dispatch_subscriber_notifications().
+        self._dispatch_subscriber_notifications(subscribers, state_snapshot)
 
         # Emit via QueuedConnection for thread safety (matches update_state path)
         try:
@@ -1328,9 +1267,14 @@ class StateStore:
         """Set the maximum undo stack depth. Thread-safe."""
         with self._lock:
             self._max_undo_size = max(10, min(size, 500))
-            # Trim if current stack exceeds new limit
+            # Trim both stacks if they exceed the new limit -- redo() pushes
+            # onto _undo_stack and undo() pushes onto _redo_stack, so leaving
+            # _redo_stack untrimmed here let it hold onto stale entries past
+            # a newly-lowered limit indefinitely.
             while len(self._undo_stack) > self._max_undo_size:
                 self._undo_stack.pop(0)
+            while len(self._redo_stack) > self._max_undo_size:
+                self._redo_stack.pop(0)
             logger.debug("Max undo size updated", max_undo_size=self._max_undo_size)
 
     def batch_update(

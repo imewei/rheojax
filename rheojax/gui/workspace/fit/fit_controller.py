@@ -8,6 +8,7 @@ from PySide6.QtCore import QEventLoop, QObject, QRunnable, QThreadPool, Signal
 
 from rheojax.gui.foundation.invalidation import invalidate_downstream
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.jobs.cancellation import ProcessCancellationToken
 from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
 from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
 from rheojax.gui.workspace.controller import FitController, Step
@@ -98,7 +99,7 @@ def _run_on_thread(fn):
     return outcome["result"]
 
 
-def _make_fit_fn(library, fit_state):
+def _make_fit_fn(library, fit_state, active_jobs=None):
     """Build the real fit_fn NlsqStep.run() calls."""
 
     def _fit_fn(
@@ -109,101 +110,156 @@ def _make_fit_fn(library, fit_state):
         initial_params=None,
         multi_start=None,
     ):
-        rheo_data = library.load_payload(data_ref)
-        # ponytail: Step 1's protocol combo uses the same vocabulary as
-        # Protocol.value ("flow_curve"/"creep"/"relaxation"/"startup"/
-        # "oscillation"/"laos"), which is exactly what ModelService.fit()'s
-        # test_mode expects. Previously this was hardcoded to None, which
-        # fell through to data.metadata.get("test_mode", "oscillation") on
-        # an empty metadata dict (metadata was never forwarded either) --
-        # every real fit silently ran as "oscillation" no matter what
-        # protocol the user picked.
-        test_mode = fit_state.protocol
-        metadata = getattr(rheo_data, "metadata", None)
-        ms = multi_start or {}
-        count = ms.get("count", 1) if ms.get("enabled") else 1
-        rng = np.random.default_rng(0)
-        best = None
-        for i in range(max(count, 1)):
-            # First run uses the caller's initial_params as-is; restarts 2..N
-            # jitter each value by +/-20% (seeded, so runs are reproducible).
-            start_params = initial_params
-            if i > 0 and initial_params:
-                start_params = {
-                    name: (
-                        cfg
-                        if cfg.get("fixed") is True
-                        else {
-                            **cfg,
-                            "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2)),
-                        }
-                    )
-                    for name, cfg in initial_params.items()
-                }
-            result = _run_on_thread(
-                lambda start_params=start_params: run_fit_isolated(
-                    model_key,
-                    rheo_data.x,
-                    rheo_data.y,
-                    test_mode=test_mode,
-                    initial_params=start_params or {},
-                    options={},
-                    progress_queue=multiprocessing.Queue(),
-                    cancel_event=multiprocessing.Event(),
-                    dataset_id=data_ref,
-                    model_config=model_config,
-                    metadata=metadata,
-                )
+        # A real, cancellable token (not a throwaway per-restart mp.Event) so
+        # window.py's "Cancel them and continue?" dialog (_maybe_confirm_active_jobs)
+        # can actually stop this run via CancelWorkerRunnable(worker).run() ->
+        # worker.cancel() -> the same cancel_event run_fit_isolated already
+        # polls between restarts. Previously no "worker" key was registered at
+        # all, so Close/New/Open could only wait out the timeout, never cancel.
+        token = ProcessCancellationToken(job_id=data_ref)
+        # Register for the whole call (all multi-start restarts), not per
+        # _run_on_thread call -- _run_on_thread pumps a nested QEventLoop, so
+        # New/Open/Close (which only check active_jobs.by_id) would otherwise
+        # see it empty and rebuild the workspace out from under this step
+        # while the loop is still suspended waiting on the worker thread.
+        if active_jobs is not None:
+            active_jobs.by_id[data_ref] = {"status": "running", "worker": token}
+        try:
+            return _fit_fn_body(
+                library,
+                fit_state,
+                model_key,
+                model_config,
+                data_ref,
+                initial_params,
+                multi_start,
+                token.event,
             )
-            r2 = _r2_sort_key(result)
-            best_r2 = _r2_sort_key(best) if best else -1.0
-            if best is None or r2 > best_r2:
-                best = result
-        # ponytail: run_fit_isolated's real result dict key is "parameters"
-        # (see ModelService.fit()'s FitResult), but NlsqStep/NutsStep/tests
-        # are all written against a "params" key (step3_nlsq.py's own
-        # FitResult-normalization branch uses `res.params`). Alias it here
-        # so NUTS warm-start/priors don't silently see an empty dict. Only
-        # the winning restart needs this — comparisons above use r_squared,
-        # which is present under either key.
-        if isinstance(best, dict) and "params" not in best and "parameters" in best:
-            best = {**best, "params": best["parameters"]}
-        # run_fit_isolated never returns "x"/"y" (only "x_fit"/"y_fit") -- but
-        # step5_visualize.py and step6_export.py both key off "x"/"y" to plot
-        # the overlay/residuals and write fitted_curve.csv. Attach them from
-        # the already-loaded rheo_data so downstream consumers see real data.
-        if isinstance(best, dict):
-            best = {**best, "x": rheo_data.x, "y": rheo_data.y}
-        return best
+        finally:
+            if active_jobs is not None:
+                active_jobs.by_id.pop(data_ref, None)
 
     return _fit_fn
 
 
-def _make_sample_fn(library, fit_state):
+def _fit_fn_body(
+    library,
+    fit_state,
+    model_key,
+    model_config,
+    data_ref,
+    initial_params,
+    multi_start,
+    cancel_event,
+):
+    rheo_data = library.load_payload(data_ref)
+    # ponytail: Step 1's protocol combo uses the same vocabulary as
+    # Protocol.value ("flow_curve"/"creep"/"relaxation"/"startup"/
+    # "oscillation"/"laos"), which is exactly what ModelService.fit()'s
+    # test_mode expects. Previously this was hardcoded to None, which
+    # fell through to data.metadata.get("test_mode", "oscillation") on
+    # an empty metadata dict (metadata was never forwarded either) --
+    # every real fit silently ran as "oscillation" no matter what
+    # protocol the user picked.
+    test_mode = fit_state.protocol
+    metadata = getattr(rheo_data, "metadata", None)
+    ms = multi_start or {}
+    count = ms.get("count", 1) if ms.get("enabled") else 1
+    rng = np.random.default_rng(0)
+    best = None
+    for i in range(max(count, 1)):
+        # First run uses the caller's initial_params as-is; restarts 2..N
+        # jitter each value by +/-20% (seeded, so runs are reproducible).
+        start_params = initial_params
+        if i > 0 and initial_params:
+            start_params = {
+                name: (
+                    cfg
+                    if cfg.get("fixed") is True
+                    else {
+                        **cfg,
+                        "value": cfg["value"] * (1 + rng.uniform(-0.2, 0.2)),
+                    }
+                )
+                for name, cfg in initial_params.items()
+            }
+        result = _run_on_thread(
+            lambda start_params=start_params: run_fit_isolated(
+                model_key,
+                rheo_data.x,
+                rheo_data.y,
+                test_mode=test_mode,
+                initial_params=start_params or {},
+                options={},
+                progress_queue=multiprocessing.Queue(),
+                cancel_event=cancel_event,
+                dataset_id=data_ref,
+                model_config=model_config,
+                metadata=metadata,
+            )
+        )
+        r2 = _r2_sort_key(result)
+        best_r2 = _r2_sort_key(best) if best else -1.0
+        if best is None or r2 > best_r2:
+            best = result
+    # ponytail: run_fit_isolated's real result dict key is "parameters"
+    # (see ModelService.fit()'s FitResult), but NlsqStep/NutsStep/tests
+    # are all written against a "params" key (step3_nlsq.py's own
+    # FitResult-normalization branch uses `res.params`). Alias it here
+    # so NUTS warm-start/priors don't silently see an empty dict. Only
+    # the winning restart needs this — comparisons above use r_squared,
+    # which is present under either key.
+    if isinstance(best, dict) and "params" not in best and "parameters" in best:
+        best = {**best, "params": best["parameters"]}
+    # run_fit_isolated never returns "x"/"y" (only "x_fit"/"y_fit") -- but
+    # step5_visualize.py and step6_export.py both key off "x"/"y" to plot
+    # the overlay/residuals and write fitted_curve.csv. Attach them from
+    # the already-loaded rheo_data so downstream consumers see real data.
+    if isinstance(best, dict):
+        best = {**best, "x": rheo_data.x, "y": rheo_data.y}
+    return best
+
+
+def _make_sample_fn(library, fit_state, active_jobs=None):
     """Build the real sample_fn NutsStep.run() calls."""
 
     def _sample_fn(priors, warm_start, config):
         rheo_data = library.load_payload(fit_state.data_ref)
-        return _run_on_thread(
-            lambda: run_bayesian_isolated(
-                fit_state.model_key,
-                rheo_data.x,
-                rheo_data.y,
-                test_mode=fit_state.protocol,
-                num_warmup=500,
-                num_samples=1000,
-                num_chains=4,
-                warm_start=warm_start,
-                priors=priors,
-                seed=0,
-                progress_queue=multiprocessing.Queue(),
-                cancel_event=multiprocessing.Event(),
-                dataset_id=fit_state.data_ref,
-                target_accept=config.get("target_accept", 0.8),
-                model_config=fit_state.model_config,
-                metadata=getattr(rheo_data, "metadata", None),
+        # Same real, cancellable token as _fit_fn (see its comment) so
+        # "Cancel them and continue?" can actually stop a running NUTS sample.
+        token = ProcessCancellationToken(job_id=fit_state.data_ref)
+        # See _fit_fn's comment above: _run_on_thread pumps a nested
+        # QEventLoop, so New/Open/Close must see this NUTS run as active for
+        # its whole duration, not just while a signal happens to be in flight.
+        if active_jobs is not None:
+            active_jobs.by_id[fit_state.data_ref] = {
+                "status": "running",
+                "worker": token,
+            }
+        try:
+            return _run_on_thread(
+                lambda: run_bayesian_isolated(
+                    fit_state.model_key,
+                    rheo_data.x,
+                    rheo_data.y,
+                    test_mode=fit_state.protocol,
+                    num_warmup=500,
+                    num_samples=1000,
+                    num_chains=4,
+                    warm_start=warm_start,
+                    priors=priors,
+                    seed=0,
+                    progress_queue=multiprocessing.Queue(),
+                    cancel_event=token.event,
+                    dataset_id=fit_state.data_ref,
+                    target_accept=config.get("target_accept", 0.8),
+                    model_config=fit_state.model_config,
+                    metadata=getattr(rheo_data, "metadata", None),
+                )
             )
-        )
+        finally:
+            if active_jobs is not None:
+                active_jobs.by_id.pop(fit_state.data_ref, None)
 
     return _sample_fn
 
@@ -213,8 +269,12 @@ def build_fit_controller(app_state: AppState):
     bodies = [
         ProtocolModelStep(st),
         DataStep(st, app_state.library),
-        NlsqStep(st, fit_fn=_make_fit_fn(app_state.library, st)),
-        NutsStep(st, sample_fn=_make_sample_fn(app_state.library, st)),
+        NlsqStep(
+            st, fit_fn=_make_fit_fn(app_state.library, st, app_state.active_jobs)
+        ),
+        NutsStep(
+            st, sample_fn=_make_sample_fn(app_state.library, st, app_state.active_jobs)
+        ),
         VisualizeStep(st),
         ExportStep(st, app_state.library),
     ]

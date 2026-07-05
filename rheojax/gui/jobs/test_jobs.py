@@ -137,6 +137,7 @@ def test_fit_result_structure():
         timestamp=datetime.now(),
         num_iterations=100,
         success=True,
+        message="Converged",
     )
 
     assert result.model_name == "maxwell"

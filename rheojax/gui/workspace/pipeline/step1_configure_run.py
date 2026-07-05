@@ -76,6 +76,14 @@ class PipelineConfigureRunStep(QWidget):
         self._add_step_btn = QPushButton("+ Add Step", self)
         self._add_step_btn.clicked.connect(self._on_add_step_clicked)
         self._step_list = QListWidget(self)
+        # Reopening a saved project starts with state.steps already populated
+        # -- without seeding here, _step_list stays empty while state.steps
+        # isn't, so _on_remove_step_clicked's row-index lookup desyncs from
+        # the real list and deletes the wrong step.
+        for step in self._state.steps:
+            self._step_list.addItem(
+                QListWidgetItem(f"{step.step_type}: {step.config}")
+            )
         self._remove_step_btn = QPushButton("Remove Selected Step", self)
         self._remove_step_btn.clicked.connect(self._on_remove_step_clicked)
 
@@ -142,6 +150,10 @@ class PipelineConfigureRunStep(QWidget):
         self._step_list.takeItem(row)
         del self._state.steps[row]
         self.edited.emit()
+
+    def refresh(self) -> None:
+        """Rebuild the dataset list from the library (call on library changes)."""
+        self._refresh_dataset_list()
 
     def _refresh_dataset_list(self) -> None:
         self._dataset_list.clear()

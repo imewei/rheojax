@@ -655,6 +655,13 @@ class DataPage(QWidget):
 
     def _on_preview_loaded(self, preview_result: dict) -> None:
         """Handle successful preview load (called on main thread via signal)."""
+        # Guard against use-after-delete if this page was destroyed while
+        # PreviewWorker was running (mirrors bayesian_page.py's identical
+        # guard on its own QueuedConnection worker callbacks).
+        try:
+            self.isVisible()
+        except RuntimeError:
+            return
         self._preview_table.setEnabled(True)
 
         self._preview_data = preview_result.get("data", [])
@@ -744,6 +751,10 @@ class DataPage(QWidget):
 
     def _on_preview_failed(self, error_msg: str) -> None:
         """Handle failed preview load (called on main thread via signal)."""
+        try:
+            self.isVisible()
+        except RuntimeError:
+            return
         self._preview_table.setEnabled(True)
         logger.error(
             "Failed to load data preview",
@@ -1039,6 +1050,10 @@ class DataPage(QWidget):
 
     def _on_import_completed(self, datasets: list, test_mode: str | None) -> None:
         """Handle successful import (called on main thread via signal)."""
+        try:
+            self.isVisible()
+        except RuntimeError:
+            return
         import uuid
 
         _VALID_TEST_MODES = {
@@ -1180,6 +1195,10 @@ class DataPage(QWidget):
 
     def _on_import_failed(self, error_msg: str) -> None:
         """Handle failed import (called on main thread via signal)."""
+        try:
+            self.isVisible()
+        except RuntimeError:
+            return
         logger.error(
             "Failed to import data",
             filepath=str(self._current_file_path),

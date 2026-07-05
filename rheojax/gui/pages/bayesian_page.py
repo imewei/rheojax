@@ -50,6 +50,7 @@ from rheojax.gui.services.data_service import DataService
 from rheojax.gui.services.model_service import ModelService
 from rheojax.gui.services.plot_service import PlotService
 from rheojax.gui.state.actions import (
+    set_seed,
     start_bayesian,
     update_bayesian_progress,
 )
@@ -99,6 +100,13 @@ class BayesianPage(QWidget):
         self._current_preset: str = "custom"
         self._preset_priors: dict[str, dict[str, Any]] | None = None
         self._preset_dataset_path: str | None = None
+        # Advanced NUTS overrides collected from BayesianOptionsDialog (see
+        # _edit_priors) -- None means "use the preset/default computed in
+        # _on_run_clicked". dense_mass has no downstream consumer anywhere
+        # in the NUTS worker call chain, so it is intentionally not
+        # persisted here (nothing to wire it to yet).
+        self._advanced_target_accept_prob: float | None = None
+        self._advanced_max_tree_depth: int | None = None
         self._data_service = DataService()
 
         self._setup_ui()
@@ -627,8 +635,8 @@ class BayesianPage(QWidget):
             "num_chains": self._chains_spin.value(),
             "warm_start": self._warmstart_check.isChecked(),
             "hdi_prob": float(self._hdi_combo.currentText()),
-            "target_accept_prob": 0.9,
-            "max_tree_depth": 10,
+            "target_accept_prob": self._advanced_target_accept_prob or 0.9,
+            "max_tree_depth": self._advanced_max_tree_depth or 10,
         }
 
         # Preset-specific tweaks
@@ -1734,9 +1742,25 @@ class BayesianPage(QWidget):
         ):  # R10-BP-003: exec_() deprecated in PySide6
             options = dialog.get_options()
             self._preset_priors = options.get("priors", self._preset_priors)
+            # Apply every other setting the dialog collects -- previously
+            # only "priors" was read back, so warmup/samples/chains/warm
+            # start/seed/target-accept/max-tree-depth were silently
+            # discarded no matter what the user configured.
+            self._warmup_spin.setValue(options["num_warmup"])
+            self._samples_spin.setValue(options["num_samples"])
+            self._chains_spin.setValue(options["num_chains"])
+            self._warmstart_check.setChecked(options["warm_start"])
+            if options.get("seed") is not None:
+                set_seed(options["seed"])
+            self._advanced_target_accept_prob = options.get("target_accept_prob")
+            self._advanced_max_tree_depth = options.get("max_tree_depth")
             logger.debug(
-                "Priors updated from dialog",
+                "Bayesian options updated from dialog",
                 has_priors=self._preset_priors is not None,
+                num_warmup=options["num_warmup"],
+                num_samples=options["num_samples"],
+                num_chains=options["num_chains"],
+                warm_start=options["warm_start"],
             )
 
     def _apply_preset(self, name: str) -> None:

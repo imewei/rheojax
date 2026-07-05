@@ -277,7 +277,9 @@ class PipelineExecutionService(QObject):
                         step, context, library, persist=consumed_downstream
                     )
                 elif step.step_type == "fit":
-                    fit_result = self._execute_pipeline_fit(step, context)
+                    fit_result = self._execute_pipeline_fit(
+                        step, context, stop_requested=stop_requested
+                    )
                     step_results[step.id] = fit_result
                     # A fit step's outcome is its LAST phase that actually ran (nuts if
                     # requested and reached, else nlsq) -- a failed/cancelled phase must not
@@ -385,7 +387,9 @@ class PipelineExecutionService(QObject):
             "dataset_id": new_dataset_id,
         }
 
-    def _execute_pipeline_fit(self, step, context: dict) -> FitStepResult:
+    def _execute_pipeline_fit(
+        self, step, context: dict, stop_requested=None
+    ) -> FitStepResult:
         """Run one Pipeline-mode fit step: synchronous NLSQ, then optional NUTS.
 
         Named distinctly from ``_execute_fit`` (the visual pipeline builder's
@@ -396,7 +400,7 @@ class PipelineExecutionService(QObject):
             make_bayesian_worker,
             make_fit_worker,
         )
-        from rheojax.gui.workspace.pipeline.models import FitStepResult
+        from rheojax.gui.workspace.pipeline.models import FitStepResult, PhaseResult
 
         if get_worker_isolation_mode() != "subprocess":
             raise WorkerIsolationRequiredError(
@@ -425,6 +429,14 @@ class PipelineExecutionService(QObject):
 
         if not config.get("run_nuts", False) or nlsq_phase.status != "completed":
             return FitStepResult(nlsq=nlsq_phase, nuts=None)
+
+        if stop_requested is not None and stop_requested.is_set():
+            # A cancellation requested between NLSQ finishing and NUTS
+            # starting was previously never observed here -- the batch
+            # would still launch a full (potentially very long) NUTS run
+            # before the top-level per-step check in execute() got another
+            # chance to see stop_requested.
+            return FitStepResult(nlsq=nlsq_phase, nuts=PhaseResult(status="cancelled"))
 
         nuts_cfg = config.get("nuts_config", {})
         warm_start = (nlsq_phase.result or {}).get("parameters", {})
@@ -869,32 +881,28 @@ class PipelineExecutionService(QObject):
 
         if export_format == "directory":
             # Write each available artefact into the output directory using
-            # ExportService methods that accept individual objects.
+            # ExportService methods that accept individual objects. Let
+            # failures propagate (matching the single-format branch below,
+            # and _execute_step's general convention) instead of swallowing
+            # them into a warning log -- execute_all()/execute_single_step()
+            # would otherwise report this step (and the pipeline) as
+            # completed even though an artifact never got written.
             if data is not None:
-                try:
-                    self._export_service.export_data(
-                        data, output_path / "data.csv", format="csv"
-                    )
-                except Exception as exc:  # pragma: no cover
-                    logger.warning("Could not export data CSV", error=str(exc))
+                self._export_service.export_data(
+                    data, output_path / "data.csv", format="csv"
+                )
 
             if fit_result is not None:
-                try:
-                    self._export_service.export_parameters(
-                        fit_result, output_path / "parameters.csv", format="csv"
-                    )
-                except Exception as exc:  # pragma: no cover
-                    logger.warning("Could not export fit parameters", error=str(exc))
+                self._export_service.export_parameters(
+                    fit_result, output_path / "parameters.csv", format="csv"
+                )
 
             if bayesian_result is not None:
-                try:
-                    self._export_service.export_posterior(
-                        bayesian_result,
-                        output_path / "posterior.csv",
-                        format="csv",
-                    )
-                except Exception as exc:  # pragma: no cover
-                    logger.warning("Could not export posterior samples", error=str(exc))
+                self._export_service.export_posterior(
+                    bayesian_result,
+                    output_path / "posterior.csv",
+                    format="csv",
+                )
 
         else:
             # Single-format parameter export (csv / json / xlsx / hdf5).

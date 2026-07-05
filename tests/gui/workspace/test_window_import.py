@@ -221,7 +221,7 @@ def test_overlapping_imports_do_not_cross_wire_failure_paths(
     source_b.write_text("foo,bar\n1.0,2.0\n")
 
     win._launch_import([source_a])
-    worker_a = win._active_import_worker
+    (worker_a,) = win._active_import_workers.values()
     win._launch_import([source_b])
 
     calls = []

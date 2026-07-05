@@ -14,13 +14,7 @@ _DOMAIN_CHANGING = {"spectral", "decomposition"}
 
 
 def _plot_as_line(canvas: PyQtGraphCanvas, x: Any, y: Any, name: str) -> None:
-    # ponytail: PyQtGraphCanvas.plot_line() has a pre-existing bug (raw int
-    # passed to QPen.setStyle instead of Qt.PenStyle; see
-    # rheojax/gui/workspace/fit/step5_visualize.py's test_step5.py comment for
-    # the same finding) that crashes on any call. Use plot_data() with
-    # line_width>0 and no symbol instead — same visual result, working code
-    # path. Switch back to plot_line() once that bug is fixed upstream.
-    canvas.plot_data(x, y, name=name, symbol=None, line_width=2)
+    canvas.plot_line(x, y, name=name, line_width=2)
 
 
 def _xy(entry: Any) -> tuple[Any, Any] | None:

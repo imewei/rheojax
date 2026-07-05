@@ -790,8 +790,14 @@ class ExportPage(QWidget):
                         json_filepath = (
                             output_dir / f"credible_intervals_{result_id}.json"
                         )
+                        # BayesianService.get_credible_intervals() returns
+                        # (lower, median, upper) 3-tuples; the legacy
+                        # in-process BayesianWorker path returns plain
+                        # (lower, upper) 2-tuples. Take the last element as
+                        # "upper" so either shape exports the true upper
+                        # bound instead of the 3-tuple's median.
                         intervals_dict = {
-                            k: {"lower": v[0], "upper": v[1]}
+                            k: {"lower": v[0], "upper": v[-1]}
                             for k, v in intervals.items()
                         }
                         with open(json_filepath, "w") as f:

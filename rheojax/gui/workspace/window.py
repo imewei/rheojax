@@ -37,6 +37,12 @@ class WorkspaceWindow(QMainWindow):
         self._pipeline_service = PipelineExecutionService()
         self._pipeline_stop_event: threading.Event | None = None
         self._active_jobs_action_pending = False
+        # Keyed by job_id, not a single scalar -- a second concurrent import
+        # launched before the first one finishes must not drop the only
+        # Python reference to the first ImportWorker/ImportWorkerSignals
+        # QObject (which would otherwise risk it being garbage-collected
+        # mid-run and losing its queued signal).
+        self._active_import_workers: dict[str, object] = {}
         self._pipeline_service.phase_worker_ready.connect(
             self._on_phase_worker_ready, Qt.ConnectionType.QueuedConnection
         )
@@ -128,6 +134,14 @@ class WorkspaceWindow(QMainWindow):
         # any commit path (interactive export or a Pipeline job) never appears until the
         # next full _rebuild() (Open/New/Close).
         self._notifier.changed.connect(self._rail.refresh)
+        # LibraryRail isn't the only widget snapshotting the library at
+        # construction/last-edit time -- DataStep, SlotsStep, and
+        # PipelineConfigureRunStep each render their own dataset list/combo
+        # and were never told to rebuild when a new dataset is committed
+        # elsewhere (import, export-to-library, a Pipeline job).
+        self._notifier.changed.connect(self._fit_bodies[1].refresh)
+        self._notifier.changed.connect(self._transform_bodies[1].refresh)
+        self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
@@ -139,7 +153,42 @@ class WorkspaceWindow(QMainWindow):
         self._splitter.addWidget(self._inspector)
         self.setCentralWidget(self._splitter)
 
+        # A rebuild (fresh New, or Open loading a saved project) always starts
+        # every controller locked at reached={0}, regardless of how much
+        # progress its Fit/Transform/PipelineState already reflects -- e.g.
+        # reopening a project with a completed fit rendered a blank, locked
+        # wizard instead of the restored results. Reuse the same forward-unlock
+        # walk that live edits trigger (_advance_and_unlock), looped until each
+        # controller's `current` stops advancing, so already-completed steps
+        # come back unlocked instead of only the first one.
+        for m in self._controllers:
+            ctl = self._controllers[m]
+            prev_current = -1
+            while ctl.current != prev_current:
+                prev_current = ctl.current
+                self._advance_and_unlock(m)
+
     def _dispose_workspace(self) -> None:
+        # The pipeline controller connects to self._pipeline_service (created
+        # once in __init__ and never recreated) rather than anything owned by
+        # this workspace instance, so unlike the body-list signals below it
+        # survives a rebuild unless explicitly disconnected here -- otherwise
+        # every New/Open leaks the old PipelineController (and its AppState)
+        # for the life of the window.
+        pipeline_ctl = self._controllers.get("pipeline")
+        if pipeline_ctl is not None:
+            try:
+                self._pipeline_service.dataset_run_started.disconnect(
+                    pipeline_ctl._started_slot
+                )
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                self._pipeline_service.dataset_run_finished.disconnect(
+                    pipeline_ctl._finished_slot
+                )
+            except (RuntimeError, TypeError):
+                pass
         # Disconnect only the handler each body list actually wired in
         # __init__ -- attempting to disconnect a slot that was never
         # connected to a given body (e.g. _on_transform_body_edited from a
@@ -341,7 +390,12 @@ class WorkspaceWindow(QMainWindow):
         if self._pipeline_stop_event is not None:
             self._pipeline_stop_event.set()  # stops PipelineBatchRunner from advancing to
             # further queued datasets (Task 7's run() loop)
-        for job in self._state.active_jobs.by_id.values():
+        # Snapshot before iterating: PipelineBatchRunner writes directly into
+        # this same plain dict from a QThreadPool worker thread (see its
+        # comment), so iterating the live dict here risks
+        # "RuntimeError: dictionary changed size during iteration" if a new
+        # job is registered mid-loop.
+        for job in list(self._state.active_jobs.by_id.values()):
             worker = job.get("worker")
             if worker is not None:
                 QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))
@@ -349,9 +403,24 @@ class WorkspaceWindow(QMainWindow):
         self._poll_active_jobs_then(proceed, remaining_polls=120)  # 120 * 250ms = 30s
 
     def _poll_active_jobs_then(self, proceed, remaining_polls: int) -> None:
-        if not self._state.active_jobs.by_id or remaining_polls <= 0:
+        if not self._state.active_jobs.by_id:
             self._active_jobs_action_pending = False
             proceed()
+            return
+        if remaining_polls <= 0:
+            # Jobs are still running after the 30s cancellation budget --
+            # do NOT proceed(): that would rebuild/replace self._state while a
+            # worker is still mutating the project it belonged to. Tell the
+            # user and let them retry once cancellation actually finishes.
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(
+                self,
+                "Jobs Still Running",
+                "Some jobs did not finish cancelling in time. This action was "
+                "cancelled -- try again once they've stopped.",
+            )
+            self._active_jobs_action_pending = False
             return
         from PySide6.QtCore import QTimer
 
@@ -471,6 +540,8 @@ class WorkspaceWindow(QMainWindow):
         y2_col: str | None = None,
         temp_col: str | None = None,
     ) -> None:
+        import uuid
+
         from PySide6.QtCore import QThreadPool
 
         from rheojax.gui.jobs.import_worker import ImportWorker
@@ -485,26 +556,46 @@ class WorkspaceWindow(QMainWindow):
             y2_col=y2_col,
             temp_col=temp_col,
         )
+        # Register in active_jobs so New/Open/Close (_maybe_confirm_active_jobs)
+        # see this import as in-flight and wait/warn instead of racing _rebuild
+        # -- previously an unregistered import could still be running when the
+        # user opened a different project, and would then write its results
+        # into that new project's library once it completed.  No "worker" key:
+        # ImportWorker has no cancel() path, so CancelWorkerRunnable is skipped
+        # for this entry; the poll loop just waits for it to finish naturally.
+        job_id = f"import:{uuid.uuid4().hex}"
+        self._state.active_jobs.by_id[job_id] = {}
         # QueuedConnection guarantees the callback runs on the main thread --
         # ImportWorker emits its signals from a QThreadPool worker thread.
+        # job_id is bound per-connection so each launch's completion/failure
+        # pops its own registration, not whichever import happens to be
+        # current AppState by the time the signal is delivered.
         worker.signals.completed.connect(
-            self._on_import_completed, Qt.ConnectionType.QueuedConnection
+            lambda datasets, jid=job_id: self._on_import_completed(
+                datasets, job_id=jid
+            ),
+            Qt.ConnectionType.QueuedConnection,
         )
         # file_paths is bound per-connection (not read from shared instance
         # state) so that a second import launched before this worker's
         # "failed" signal is delivered can never make the failure handler
         # act on the wrong file's paths.
         worker.signals.failed.connect(
-            lambda msg, fp=file_paths: self._on_import_failed(msg, fp),
+            lambda msg, fp=file_paths, jid=job_id: self._on_import_failed(
+                msg, fp, job_id=jid
+            ),
             Qt.ConnectionType.QueuedConnection,
         )
         # Keep a reference alive for the worker's lifetime -- nothing else
         # holds the ImportWorker/ImportWorkerSignals QObject, so it would
-        # otherwise be garbage-collected mid-run and drop the signal.
-        self._active_import_worker = worker
+        # otherwise be garbage-collected mid-run and drop the signal. Keyed
+        # by job_id so a second concurrent import can't evict the first.
+        self._active_import_workers[job_id] = worker
         QThreadPool.globalInstance().start(worker)
 
-    def _on_import_completed(self, datasets: list) -> None:
+    def _on_import_completed(self, datasets: list, job_id: str | None = None) -> None:
+        self._state.active_jobs.by_id.pop(job_id, None)
+        self._active_import_workers.pop(job_id, None)
         import hashlib
         import uuid
 
@@ -552,8 +643,13 @@ class WorkspaceWindow(QMainWindow):
     _COLUMN_MAPPABLE_SUFFIXES = {".csv", ".txt", ".xlsx", ".xls"}
 
     def _on_import_failed(
-        self, error_msg: str, file_paths: list[Path] | None = None
+        self,
+        error_msg: str,
+        file_paths: list[Path] | None = None,
+        job_id: str | None = None,
     ) -> None:
+        self._state.active_jobs.by_id.pop(job_id, None)
+        self._active_import_workers.pop(job_id, None)
         from PySide6.QtWidgets import QDialog, QMessageBox
 
         # Root cause: this import path has no column-mapping step, so a CSV
@@ -697,5 +793,6 @@ class WorkspaceWindow(QMainWindow):
             selected_dataset_ids=pipeline_state.selected_dataset_ids,
             library=self._state.library,
             stop_requested=self._pipeline_stop_event,
+            app_state=self._state,
         )
         QThreadPool.globalInstance().start(runner)

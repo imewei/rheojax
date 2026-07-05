@@ -44,6 +44,12 @@ class PipelineController(WorkflowController):
             on_finished = guard(epoch, on_finished)
         self._service.dataset_run_started.connect(on_started)
         self._service.dataset_run_finished.connect(on_finished)
+        # Keep the exact connected callables so WorkspaceWindow._dispose_workspace
+        # can disconnect them from the persistent service on rebuild -- without
+        # this, every New/Open leaves the old controller (and the AppState it
+        # closed over) connected and reachable for the life of the window.
+        self._started_slot = on_started
+        self._finished_slot = on_finished
 
     def _on_dataset_run_started(self, dataset_id: str) -> None:
         # Registers ONE dataset's active_jobs entry right before it starts running -- not the
