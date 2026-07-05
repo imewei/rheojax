@@ -93,6 +93,7 @@ class BayesianPage(QWidget):
         self._model_service = ModelService()
         self._worker_pool = WorkerPool.instance()
         self._current_worker: Any = None  # BayesianWorker | ProcessWorkerAdapter
+        self._current_job_id: str | None = None
         self._closing = False
         self._is_running = False
         self._current_preset: str = "custom"
@@ -396,8 +397,13 @@ class BayesianPage(QWidget):
         delivered to a destroyed widget.
         """
         self._closing = True
-        if self._current_worker is not None:
-            self._current_worker.cancel_token.cancel()
+        if self._current_job_id is not None:
+            # Route through WorkerPool.cancel() rather than calling the worker
+            # directly: it dispatches on a background thread (subprocess-mode
+            # SIGTERM/SIGKILL escalation can block for seconds) and safely
+            # falls back to cancel_token.cancel() for workers (e.g. thread-mode
+            # BayesianWorker) that have no .cancel() method of their own.
+            self._worker_pool.cancel(self._current_job_id)
         self._disconnect_worker_signals()
         # Also disconnect store signals that target this page's slots
         if self._store.signals is not None:
@@ -895,7 +901,7 @@ class BayesianPage(QWidget):
             page="BayesianPage",
         )
 
-        self._worker_pool.submit(self._current_worker)
+        self._current_job_id = self._worker_pool.submit(self._current_worker)
 
         self._is_running = True
         self._btn_run.setEnabled(False)
@@ -928,8 +934,10 @@ class BayesianPage(QWidget):
 
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
-        if self._current_worker:
-            self._current_worker.cancel_token.cancel()
+        if self._current_job_id is not None:
+            # See prepare_for_close() for why this goes through WorkerPool
+            # rather than self._current_worker.cancel() directly.
+            self._worker_pool.cancel(self._current_job_id)
             self._status_text.append("Cancelling...")
 
         self.cancel_requested.emit()
@@ -1028,6 +1036,7 @@ class BayesianPage(QWidget):
             return
         self._disconnect_worker_signals()
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
@@ -1166,6 +1175,7 @@ class BayesianPage(QWidget):
             return
         self._disconnect_worker_signals()
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
@@ -1230,6 +1240,7 @@ class BayesianPage(QWidget):
             return
 
         self._current_worker = None
+        self._current_job_id = None
         self._is_running = False
         self._btn_run.setEnabled(True)
         self._btn_cancel.setEnabled(False)
@@ -1345,7 +1356,9 @@ class BayesianPage(QWidget):
             # Normalize tuple/list intervals to dict form
             if isinstance(values, (tuple, list)):
                 if len(values) == 3:
-                    mean, lower, upper = values
+                    # Subprocess mode (BayesianService.get_credible_intervals)
+                    # returns (lower, median, upper), not (mean, lower, upper).
+                    lower, mean, upper = values
                 elif len(values) == 2:
                     mean = summary.get(param_name, {}).get("mean", 0.0)
                     lower, upper = values
@@ -2000,7 +2013,11 @@ class BayesianPage(QWidget):
             summary += "Credible Intervals (95%):\n"
             for param, interval in target_result.credible_intervals.items():
                 if isinstance(interval, (list, tuple)) and len(interval) >= 2:
-                    summary += f"  {param}: [{interval[0]:.4f}, {interval[1]:.4f}]\n"
+                    # interval may be (lower, upper) or (lower, median, upper);
+                    # the bound is always first/last, never index 1.
+                    summary += (
+                        f"  {param}: [{interval[0]:.4f}, {interval[-1]:.4f}]\n"
+                    )
 
         QMessageBox.information(self, "Posterior Summary", summary)
 
