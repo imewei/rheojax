@@ -148,11 +148,15 @@ class StateSignals(QObject):
     def __init__(self) -> None:
         """Initialize signal emitters."""
         super().__init__()
-        # GUI-P1-002: thread-safe queue for subscriber notifications deferred
-        # to the GUI thread via QMetaObject.invokeMethod(QueuedConnection).
-        # Using a deque prevents buffer overwrite when multiple worker-thread
-        # updates are posted before the event loop processes them (M2 fix).
-        self._pending_notifications: deque[tuple[list, Any]] = deque()
+        # GUI-P1-002 / R10-STO-001: single thread-safe queue of zero-arg
+        # callables deferred to the GUI thread via
+        # QMetaObject.invokeMethod(QueuedConnection). Used both for subscriber
+        # notifications and for domain-signal emissions triggered from a
+        # worker thread (QRunnable worker threads never run a Qt event loop,
+        # so QTimer.singleShot from them would silently never fire). Using a
+        # deque prevents buffer overwrite when multiple worker-thread updates
+        # are posted before the event loop processes them (M2 fix).
+        self._pending_main_thread_calls: deque[Callable[[], None]] = deque()
 
     @Slot()
     def _emit_state_changed(self) -> None:
@@ -165,31 +169,28 @@ class StateSignals(QObject):
         self.state_changed.emit()
 
     @Slot()
-    def _run_subscriber_notifications(self) -> None:
-        """GUI-P1-002 fix: call subscriber callbacks on the GUI thread.
+    def _run_pending_main_thread_calls(self) -> None:
+        """Drain and run callables queued from a worker thread.
 
         Invoked exclusively via QMetaObject.invokeMethod(QueuedConnection)
-        from StateStore.update_state() when the state update originates on a
-        worker thread.  By routing through this slot, subscriber callbacks
-        (which update Qt widgets) always run on the main Qt thread.
+        from StateStore (subscriber notifications from update_state()/
+        batch_update(), and domain-signal emissions from emit_signal()) when
+        the call originates on a worker thread. By routing through this slot,
+        both kinds of callback always run on the main Qt thread.
 
-        M2 fix: drains all queued (subscribers, snapshot) pairs so rapid
-        worker-thread updates are never lost.
+        M2 fix: drains all queued callables so rapid worker-thread updates
+        are never lost. Each callable is responsible for its own error
+        handling; a failing entry does not block the rest of the queue.
         M3 fix: reentrancy guard mirrors the TLS guard in the synchronous
         path of update_state() — nested dispatches triggered by subscribers
         are properly ordered.
         """
-        # Drain all queued notifications (M2)
-        while self._pending_notifications:
-            subscribers, snapshot = self._pending_notifications.popleft()
-            for subscriber in subscribers:
-                try:
-                    subscriber(snapshot)
-                except Exception:
-                    logger.error(
-                        "Subscriber callback failed (main-thread relay)",
-                        exc_info=True,
-                    )
+        while self._pending_main_thread_calls:
+            call = self._pending_main_thread_calls.popleft()
+            try:
+                call()
+            except Exception:
+                logger.error("Queued main-thread call failed", exc_info=True)
 
     def emit_signal(self, signal_name: str, *args: Any) -> None:
         """Emit a signal by name with logging.
