@@ -42,6 +42,11 @@ class RunStep(QWidget):
         self._btn.clicked.connect(self.run)
 
     def run(self) -> None:
+        # _run_fn's real implementation (transform_controller.py's
+        # _make_run_fn) pumps a nested QEventLoop to stay non-blocking, which
+        # leaves this same button clickable for the run's whole duration --
+        # disable it so a second click can't start an overlapping run.
+        self._btn.setEnabled(False)
         try:
             result = self._run_fn(
                 self._state.transform_key, self._state.slots, self._state.config
@@ -54,10 +59,13 @@ class RunStep(QWidget):
         except Exception as exc:
             self._status.setText(f"Transform failed: {exc}")
             return
-        self._state.result = result
-        self._status.setText("✓ done")
-        self.edited.emit()
-        self.finished.emit()
+        else:
+            self._state.result = result
+            self._status.setText("✓ done")
+            self.edited.emit()
+            self.finished.emit()
+        finally:
+            self._btn.setEnabled(True)
 
     def is_ready(self) -> bool:
         return self._state.result is not None

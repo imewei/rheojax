@@ -361,8 +361,16 @@ class WorkerPool(QObject):
                 )
 
         if token is not None:
-            token.cancel()
-            logger.info("Cancellation requested for job", job_id=job_id)
+            try:
+                token.cancel()
+                logger.info("Cancellation requested for job", job_id=job_id)
+            except Exception:
+                # A cancel request can race the job's own natural completion
+                # (e.g. token torn down concurrently) -- this runs on a
+                # daemon thread, so an unguarded exception here would only
+                # surface as an unhandled-thread-exception traceback, never
+                # reaching the caller of cancel().
+                logger.debug("token.cancel() failed", job_id=job_id, exc_info=True)
 
     def cancel_all(self) -> None:
         """Cancel all active jobs.

@@ -576,12 +576,13 @@ class ModelService:
                 compat_kwargs = {"t": x, "G_t": y, "test_mode": "relaxation"}
             elif test_mode == "oscillation":
                 compat_kwargs = {"omega": x, "G_star": y, "test_mode": "oscillation"}
-            elif test_mode == "flow":
-                compat_kwargs = {
-                    "shear_rate": x,
-                    "viscosity": y,
-                    "test_mode": "flow",
-                }
+            elif test_mode is not None:
+                # check_model_compatibility() only accepts t/G_t (relaxation)
+                # and omega/G_star (oscillation) data kwargs; every other
+                # test_mode (flow, flow_curve, creep, startup, laos, ...) is
+                # handled by its own graceful low-confidence fallback branch
+                # and takes no data kwargs at all.
+                compat_kwargs = {"test_mode": test_mode}
 
             result = check_model_compatibility(model=model, **compat_kwargs)
 

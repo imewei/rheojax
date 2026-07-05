@@ -1187,6 +1187,7 @@ class RheoJAXMainWindow(QMainWindow):
                 y_col=config.get("y_column"),
                 y2_col=config.get("y2_column"),
                 test_mode=config.get("test_mode"),
+                temp_col=config.get("temp_column"),
             )
 
             # Auto-detect test mode if requested
@@ -2445,12 +2446,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.log(f"Selected model: {normalized}")
         logger.info("Model selection changed", model_name=normalized)
         self.status_bar.show_message(f"Model: {normalized}", 2000)
-
-    @Slot(str)
-    def _on_toolbar_model_selected(self, model_id: str) -> None:
-        """Handle model change from the quick-fit toolbar."""
-        if model_id:
-            self._on_select_model(model_id)
 
     @Slot(str)
     def _setup_shortcuts(self) -> None:

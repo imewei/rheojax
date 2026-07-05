@@ -580,8 +580,16 @@ class PlotCanvas(QWidget):
         y_val = np.log10(y) if log_y else y
 
         for data_x, data_y, label in self._plot_data:
-            dx_arr = np.asarray(data_x, dtype=float)
-            dy_arr = np.asarray(data_y, dtype=float)
+            # plot_data() deliberately preserves complex dtype for oscillation
+            # G* data (GUI-R6-001); casting straight to dtype=float here would
+            # discard the imaginary part with a ComplexWarning. Take .real
+            # explicitly instead, matching what matplotlib's Line2D actually
+            # renders for complex y-data, so hover distance/tooltip values
+            # stay consistent with what's on screen.
+            dx_raw = np.asarray(data_x)
+            dy_raw = np.asarray(data_y)
+            dx_arr = (dx_raw.real if np.iscomplexobj(dx_raw) else dx_raw).astype(float)
+            dy_arr = (dy_raw.real if np.iscomplexobj(dy_raw) else dy_raw).astype(float)
             if log_x:
                 with np.errstate(divide="ignore", invalid="ignore"):
                     pos_mask_x = dx_arr > 0

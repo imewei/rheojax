@@ -37,6 +37,12 @@ class WorkspaceWindow(QMainWindow):
         self._pipeline_service = PipelineExecutionService()
         self._pipeline_stop_event: threading.Event | None = None
         self._active_jobs_action_pending = False
+        # Keyed by job_id, not a single scalar -- a second concurrent import
+        # launched before the first one finishes must not drop the only
+        # Python reference to the first ImportWorker/ImportWorkerSignals
+        # QObject (which would otherwise risk it being garbage-collected
+        # mid-run and losing its queued signal).
+        self._active_import_workers: dict[str, object] = {}
         self._pipeline_service.phase_worker_ready.connect(
             self._on_phase_worker_ready, Qt.ConnectionType.QueuedConnection
         )
@@ -128,6 +134,14 @@ class WorkspaceWindow(QMainWindow):
         # any commit path (interactive export or a Pipeline job) never appears until the
         # next full _rebuild() (Open/New/Close).
         self._notifier.changed.connect(self._rail.refresh)
+        # LibraryRail isn't the only widget snapshotting the library at
+        # construction/last-edit time -- DataStep, SlotsStep, and
+        # PipelineConfigureRunStep each render their own dataset list/combo
+        # and were never told to rebuild when a new dataset is committed
+        # elsewhere (import, export-to-library, a Pipeline job).
+        self._notifier.changed.connect(self._fit_bodies[1].refresh)
+        self._notifier.changed.connect(self._transform_bodies[1].refresh)
+        self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
@@ -138,6 +152,21 @@ class WorkspaceWindow(QMainWindow):
         self._splitter.addWidget(self._canvas)
         self._splitter.addWidget(self._inspector)
         self.setCentralWidget(self._splitter)
+
+        # A rebuild (fresh New, or Open loading a saved project) always starts
+        # every controller locked at reached={0}, regardless of how much
+        # progress its Fit/Transform/PipelineState already reflects -- e.g.
+        # reopening a project with a completed fit rendered a blank, locked
+        # wizard instead of the restored results. Reuse the same forward-unlock
+        # walk that live edits trigger (_advance_and_unlock), looped until each
+        # controller's `current` stops advancing, so already-completed steps
+        # come back unlocked instead of only the first one.
+        for m in self._controllers:
+            ctl = self._controllers[m]
+            prev_current = -1
+            while ctl.current != prev_current:
+                prev_current = ctl.current
+                self._advance_and_unlock(m)
 
     def _dispose_workspace(self) -> None:
         # The pipeline controller connects to self._pipeline_service (created
@@ -361,7 +390,12 @@ class WorkspaceWindow(QMainWindow):
         if self._pipeline_stop_event is not None:
             self._pipeline_stop_event.set()  # stops PipelineBatchRunner from advancing to
             # further queued datasets (Task 7's run() loop)
-        for job in self._state.active_jobs.by_id.values():
+        # Snapshot before iterating: PipelineBatchRunner writes directly into
+        # this same plain dict from a QThreadPool worker thread (see its
+        # comment), so iterating the live dict here risks
+        # "RuntimeError: dictionary changed size during iteration" if a new
+        # job is registered mid-loop.
+        for job in list(self._state.active_jobs.by_id.values()):
             worker = job.get("worker")
             if worker is not None:
                 QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))
@@ -554,12 +588,14 @@ class WorkspaceWindow(QMainWindow):
         )
         # Keep a reference alive for the worker's lifetime -- nothing else
         # holds the ImportWorker/ImportWorkerSignals QObject, so it would
-        # otherwise be garbage-collected mid-run and drop the signal.
-        self._active_import_worker = worker
+        # otherwise be garbage-collected mid-run and drop the signal. Keyed
+        # by job_id so a second concurrent import can't evict the first.
+        self._active_import_workers[job_id] = worker
         QThreadPool.globalInstance().start(worker)
 
     def _on_import_completed(self, datasets: list, job_id: str | None = None) -> None:
         self._state.active_jobs.by_id.pop(job_id, None)
+        self._active_import_workers.pop(job_id, None)
         import hashlib
         import uuid
 
@@ -613,6 +649,7 @@ class WorkspaceWindow(QMainWindow):
         job_id: str | None = None,
     ) -> None:
         self._state.active_jobs.by_id.pop(job_id, None)
+        self._active_import_workers.pop(job_id, None)
         from PySide6.QtWidgets import QDialog, QMessageBox
 
         # Root cause: this import path has no column-mapping step, so a CSV

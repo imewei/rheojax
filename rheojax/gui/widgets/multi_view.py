@@ -12,6 +12,7 @@ from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
     QComboBox,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -244,6 +245,24 @@ class MultiView(QWidget):
         self._layout_combo.currentIndexChanged.connect(self._on_layout_changed)
         self._sync_btn.toggled.connect(self._on_sync_toggled)
         self._clear_btn.clicked.connect(self.clear_all)
+        self._export_btn.clicked.connect(self._on_export_clicked)
+
+    def _on_export_clicked(self) -> None:
+        """Prompt for a base path and export all panels (Export All button)."""
+        base_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export All Panels",
+            "",
+            "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)",
+        )
+        if not base_path:
+            return
+        fmt = "png"
+        if "pdf" in selected_filter.lower():
+            fmt = "pdf"
+        elif "svg" in selected_filter.lower():
+            fmt = "svg"
+        self.export_all(base_path, format=fmt)
 
     def _on_layout_changed(self, index: int) -> None:
         """Handle layout change.

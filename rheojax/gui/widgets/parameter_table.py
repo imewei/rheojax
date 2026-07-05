@@ -5,6 +5,7 @@ Parameter Table Widget
 Interactive table for model parameter editing.
 """
 
+import math
 from dataclasses import replace
 
 from rheojax.gui.compat import (
@@ -330,8 +331,9 @@ class ParameterTable(QTableWidget):
                 min_val = float(self.item(row, 2).text())
                 max_val = float(self.item(row, 3).text())
 
-                if value < min_val or value > max_val:
-                    # Out of bounds - red text
+                if not math.isfinite(value) or value < min_val or value > max_val:
+                    # Out of bounds (or nan/inf, which NaN comparisons would
+                    # otherwise silently pass as "in bounds") - red text
                     item.setForeground(QBrush(QColor(255, 0, 0)))
                 else:
                     # In bounds - check if modified
@@ -375,7 +377,13 @@ class ParameterTable(QTableWidget):
                 # Revalidate value
                 value_item = self.item(row, 1)
                 value = float(value_item.text())
-                if value < min_val or value > max_val:
+                if (
+                    not math.isfinite(min_val)
+                    or not math.isfinite(max_val)
+                    or not math.isfinite(value)
+                    or value < min_val
+                    or value > max_val
+                ):
                     value_item.setForeground(QBrush(QColor(255, 0, 0)))
                 else:
                     value_item.setForeground(

@@ -241,7 +241,15 @@ class FitWorker(QRunnable):
                 except ImportError:
                     _use_invoke = False
 
+                from rheojax.gui.compat import _is_qobject_alive
+
                 while not _fit_done.wait(timeout=5.0):
+                    # Mirrors bayesian_worker.py's identical timer guard: bail
+                    # out once self.signals' C++ counterpart is destroyed,
+                    # instead of risking a segfault delivering a queued signal
+                    # to a dead QObject.
+                    if not _is_qobject_alive(self.signals):
+                        break
                     # GUI-008 fix: Only emit elapsed time if the NLSQ callback
                     # hasn't reported progress in the last 4 seconds, to avoid
                     # both sources fighting over the progress bar.
