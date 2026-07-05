@@ -912,8 +912,8 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=gamma_dot, y=eta)
         mode = service.detect_test_mode(data)
 
-        assert mode == "flow", (
-            f"Shear-thinning power-law detected as '{mode}' instead of 'flow'"
+        assert mode == "flow_curve", (
+            f"Shear-thinning power-law detected as '{mode}' instead of 'flow_curve'"
         )
 
     @pytest.mark.smoke
@@ -950,7 +950,7 @@ class TestDetectTestModeFlowVsRelaxation:
         data = RheoData(x=x, y=y)
         mode = service.detect_test_mode(data)
 
-        assert mode != "flow", "Sub-decade data should not be classified as flow"
+        assert mode != "flow_curve", "Sub-decade data should not be classified as flow"
 
 
 class TestImportWizardCacheCleanup:
@@ -1202,7 +1202,7 @@ class TestDetectTestModeFlow:
         data = RheoData(x=gamma_dot, y=eta)
         svc = DataService()
         mode = svc.detect_test_mode(data)
-        assert mode == "flow"
+        assert mode == "flow_curve"
 
     @pytest.mark.smoke
     def test_exponential_relaxation_not_flow(self):

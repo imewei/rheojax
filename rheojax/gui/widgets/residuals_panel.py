@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
     QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -139,6 +140,19 @@ class ResidualsPanel(QWidget):
     def _connect_signals(self) -> None:
         """Connect internal signals."""
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
+        self._export_btn.clicked.connect(self._on_export_clicked)
+
+    def _on_export_clicked(self) -> None:
+        """Prompt for a file path and export the current figure (Export button)."""
+        filepath, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export Plot",
+            "",
+            "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)",
+        )
+        if not filepath:
+            return
+        self.export_figure(filepath)
 
     def _on_type_changed(self, index: int) -> None:
         """Handle plot type change.

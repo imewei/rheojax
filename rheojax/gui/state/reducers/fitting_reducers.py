@@ -112,12 +112,24 @@ def reduce_store_fit_result(
         key = f"{model_name}_{dataset_id}"
         fits[key] = fit_state
 
+        # A new NLSQ result for this model/dataset invalidates any Bayesian
+        # posterior warm-started from the fit it just replaced -- otherwise
+        # the old posterior keeps being shown/exported as if it matches the
+        # new fit, with the BAYESIAN chip still reporting COMPLETE.
+        bayes = state.bayesian_results
+        if key in bayes:
+            bayes = bayes.copy()
+            del bayes[key]
+
         pipeline = state.pipeline_state.clone()
         # Scope the chip to the currently active selection -- a fit
         # completing for a dataset/model the user has since switched away
         # from must not flip the chip green for whatever is active now.
         pipeline.sync_fit_chip(
             PipelineStep.FIT, fits, state.active_model_name, state.active_dataset_id
+        )
+        pipeline.sync_fit_chip(
+            PipelineStep.BAYESIAN, bayes, state.active_model_name, state.active_dataset_id
         )
         pipeline.current_step = PipelineStep.FIT
 
@@ -129,6 +141,7 @@ def reduce_store_fit_result(
         return replace(
             state,
             fit_results=fits,
+            bayesian_results=bayes,
             pipeline_state=pipeline,
             is_modified=True,
         )

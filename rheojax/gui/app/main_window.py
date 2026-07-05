@@ -355,11 +355,14 @@ class RheoJAXMainWindow(QMainWindow):
             return
 
         signals.theme_changed.connect(self._apply_theme)
-        signals.dataset_added.connect(
-            lambda dataset_id: self.status_bar.show_message(
-                f"Dataset added: {dataset_id}", 2000
-            )
+        # Named (not a bare lambda) so shutdown's _slot_map can disconnect it —
+        # an anonymous lambda can never be passed to .disconnect(), so it would
+        # stay connected to the singleton StateSignals for the process lifetime,
+        # keeping this closed window reachable and its status bar callable.
+        self._on_dataset_added_status = lambda dataset_id: self.status_bar.show_message(
+            f"Dataset added: {dataset_id}", 2000
         )
+        signals.dataset_added.connect(self._on_dataset_added_status)
         signals.dataset_added.connect(self._on_dataset_added)
         signals.dataset_added.connect(self.transform_page.refresh_dataset_checklist)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
@@ -964,7 +967,9 @@ class RheoJAXMainWindow(QMainWindow):
             if signals is not None:
                 _slot_map = [
                     ("theme_changed", self._apply_theme),
+                    ("dataset_added", self._on_dataset_added_status),
                     ("dataset_added", self._on_dataset_added),
+                    ("dataset_added", self.transform_page.refresh_dataset_checklist),
                     ("pipeline_step_changed", self._on_pipeline_step_changed),
                 ]
                 for signal_name, slot in _slot_map:
@@ -1182,6 +1187,7 @@ class RheoJAXMainWindow(QMainWindow):
                 y_col=config.get("y_column"),
                 y2_col=config.get("y2_column"),
                 test_mode=config.get("test_mode"),
+                temp_col=config.get("temp_column"),
             )
 
             # Auto-detect test mode if requested
@@ -1619,22 +1625,29 @@ class RheoJAXMainWindow(QMainWindow):
             error = Signal(str)
 
         relay = _Relay()
-        relay.finished.connect(
-            lambda: self.status_bar.show_message("Pipeline completed", 3000),
-            Qt.ConnectionType.QueuedConnection,
-        )
-        relay.error.connect(
-            self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection
-        )
+
+        def _on_finished() -> None:
+            self.status_bar.show_message("Pipeline completed", 3000)
+            self._active_relays.discard(relay)
+
+        def _on_error(message: str) -> None:
+            self._on_pipeline_run_error(message)
+            self._active_relays.discard(relay)
+
+        relay.finished.connect(_on_finished, Qt.ConnectionType.QueuedConnection)
+        relay.error.connect(_on_error, Qt.ConnectionType.QueuedConnection)
 
         # Keep relay alive until signals are delivered — prevent premature GC
         # when the QRunnable completes and releases its closure references.
         # Use a set so concurrent runs don't clobber each other's relay.
+        # Discard happens only inside the queued-connected slots above, on
+        # the GUI thread, once delivery has actually occurred — discarding
+        # from the worker thread's finally would race the queued delivery
+        # and could let the relay be GC'd before the signal is processed.
         self._active_relays.add(relay)
 
         _steps = steps
         _relay = relay
-        _self = self
 
         class _RunAllWorker(QRunnable):
             def run(self) -> None:  # type: ignore[override]
@@ -1654,8 +1667,6 @@ class RheoJAXMainWindow(QMainWindow):
                         "Pipeline execution failed", error=str(exc), exc_info=True
                     )
                     _relay.error.emit(str(exc))
-                finally:
-                    _self._active_relays.discard(_relay)
 
         worker = _RunAllWorker()
         worker.setAutoDelete(True)
@@ -1743,22 +1754,28 @@ class RheoJAXMainWindow(QMainWindow):
             error = Signal(str)
 
         relay = _Relay()
-        relay.finished.connect(
-            self._on_pipeline_step_done, Qt.ConnectionType.QueuedConnection
-        )
-        relay.error.connect(
-            self._on_pipeline_run_error, Qt.ConnectionType.QueuedConnection
-        )
+
+        def _on_step_finished(name: str) -> None:
+            self._on_pipeline_step_done(name)
+            self._active_relays.discard(relay)
+
+        def _on_step_error(message: str) -> None:
+            self._on_pipeline_run_error(message)
+            self._active_relays.discard(relay)
+
+        relay.finished.connect(_on_step_finished, Qt.ConnectionType.QueuedConnection)
+        relay.error.connect(_on_step_error, Qt.ConnectionType.QueuedConnection)
 
         # Keep relay alive until signals are delivered — prevent premature GC.
         # Use a set so concurrent step runs don't clobber each other's relay.
+        # Discard happens only inside the queued-connected slots above, on
+        # the GUI thread, once delivery has actually occurred — see _on_run_all.
         self._active_relays.add(relay)
 
         _target = target_step
         _context = context
         _step_id = step_id
         _relay = relay
-        _self = self
 
         class _RunStepWorker(QRunnable):
             def run(self) -> None:  # type: ignore[override]
@@ -1775,8 +1792,6 @@ class RheoJAXMainWindow(QMainWindow):
                         exc_info=True,
                     )
                     _relay.error.emit(str(exc))
-                finally:
-                    _self._active_relays.discard(_relay)
 
         worker = _RunStepWorker()
         worker.setAutoDelete(True)
@@ -2431,12 +2446,6 @@ class RheoJAXMainWindow(QMainWindow):
         self.log(f"Selected model: {normalized}")
         logger.info("Model selection changed", model_name=normalized)
         self.status_bar.show_message(f"Model: {normalized}", 2000)
-
-    @Slot(str)
-    def _on_toolbar_model_selected(self, model_id: str) -> None:
-        """Handle model change from the quick-fit toolbar."""
-        if model_id:
-            self._on_select_model(model_id)
 
     @Slot(str)
     def _setup_shortcuts(self) -> None:

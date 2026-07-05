@@ -64,6 +64,12 @@ class FitState:
 class TransformState:
     transform_key: str | None = None
     slots: dict[str, Any] = field(default_factory=dict)
+    # ponytail: no widget in the Transform workflow populates this -- RunStep
+    # (step3_run.py) is only a "Run" button + status label, so every real run
+    # currently executes with whatever this dict already holds (empty by
+    # default). A generic per-transform config editor is real UI design work
+    # (each transform_key has different param specs, see
+    # TransformService.get_transform_params), not a one-line wiring fix.
     config: dict[str, Any] = field(default_factory=dict)
     result: dict | None = None
     step: int = 0

@@ -112,6 +112,7 @@ class DataService:
         y_col: str | None = None,
         y2_col: str | None = None,
         test_mode: str | None = None,
+        temp_col: str | None = None,
         **kwargs: Any,
     ) -> RheoData:
         """Load data from file using rheojax.io.auto_load.
@@ -128,6 +129,10 @@ class DataService:
             Secondary Y-axis column name (e.g., G'' for oscillatory data)
         test_mode : str, optional
             Test mode ('relaxation', 'creep', 'oscillation', 'flow')
+        temp_col : str, optional
+            Column name holding a scalar temperature value, injected into
+            metadata["temperature"] if the reader didn't already populate it
+            (mirrors load_file_multi's identical handling).
         **kwargs
             Additional loader arguments
 
@@ -219,6 +224,31 @@ class DataService:
 
             # Light unit conversions for common CSV/Excel cases
             data = self._convert_units(data)
+
+            # Inject temperature from the user-selected column when the
+            # readers did not already populate metadata["temperature"]
+            # (mirrors load_file_multi's identical handling), else fall back
+            # to extracting it from the filename.
+            if temp_col is not None:
+                temp_value = self._extract_scalar_temperature(file_path, temp_col)
+                if temp_value is not None:
+                    if "temperature" not in (data.metadata or {}):
+                        data.metadata["temperature"] = temp_value
+                    logger.debug(
+                        "Temperature injected from column",
+                        temp_col=temp_col,
+                        temp_value=temp_value,
+                    )
+                else:
+                    logger.warning(
+                        "temp_col specified but no valid temperature found in file",
+                        temp_col=temp_col,
+                        file_path=str(file_path),
+                    )
+            elif "temperature" not in (data.metadata or {}):
+                temp_from_name = self._extract_temperature_from_filename(file_path)
+                if temp_from_name is not None:
+                    data.metadata["temperature"] = temp_from_name
 
             n_records = len(data.x)
             logger.info(
@@ -645,7 +675,7 @@ class DataService:
                             correlation=float(correlation),
                             x_decades=float(x_decades),
                         )
-                        return "flow"
+                        return "flow_curve"
 
                     # Secondary check: wide shear-rate range (≥3 decades)
                     # with log-spaced x and weakly negative correlation.
@@ -668,7 +698,7 @@ class DataService:
                             "Detected flow: wide shear-rate range (>=3 decades)",
                             x_decades=float(x_decades),
                         )
-                        return "flow"
+                        return "flow_curve"
             except Exception as exc:
                 logger.debug(
                     "Flow detection failed on log-log correlation",

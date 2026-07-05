@@ -623,14 +623,20 @@ class TransformService:
 
                 reference_temp = params.get("reference_temp", 25.0)
                 auto_shift = params.get("auto_shift", True)
+                shift_method = params.get("shift_method", "wlf")
 
                 logger.debug(
                     "Applying mastercurve",
                     reference_temp=reference_temp,
                     auto_shift=auto_shift,
+                    shift_method=shift_method,
                     n_datasets=len(data),
                 )
-                mc = Mastercurve(reference_temp=reference_temp, auto_shift=auto_shift)
+                mc = Mastercurve(
+                    reference_temp=reference_temp,
+                    auto_shift=auto_shift,
+                    method=shift_method,
+                )
                 mastercurve_data, shift_factors = mc.transform(data)
 
                 logger.info(

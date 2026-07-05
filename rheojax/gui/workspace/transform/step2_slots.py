@@ -83,7 +83,7 @@ class SlotsStep(QWidget):
         if current:
             combo.setCurrentText(current)
         combo.currentTextChanged.connect(
-            lambda text, name=spec.name: self.fill(name, text) if text else None
+            lambda text, name=spec.name: self._on_single_slot_changed(name, text)
         )
         self._combo_widgets[spec.name] = combo
         self._layout.addWidget(combo)
@@ -134,6 +134,18 @@ class SlotsStep(QWidget):
         self._list_remove_buttons[spec.name] = remove_btn
         for w in (list_widget, add_combo, add_btn, remove_btn):
             self._layout.addWidget(w)
+
+    def _on_single_slot_changed(self, slot_name: str, text: str) -> None:
+        if text:
+            self.fill(slot_name, text)
+            return
+        # Selecting the blank "" entry must clear the slot in state too --
+        # otherwise the combo shows no selection while state.slots still
+        # holds the previous value, and is_ready() (which checks key
+        # presence) keeps reporting this slot as filled.
+        if slot_name in self._state.slots:
+            del self._state.slots[slot_name]
+            self.edited.emit()
 
     def slot_specs(self) -> list[SlotSpec]:
         return list(self._specs)

@@ -42,6 +42,10 @@ class TransformPickStep(QWidget):
         self._select(key)
 
     def _select(self, key: str) -> None:
+        if key == self._state.transform_key:
+            # Re-clicking the already-selected transform must not wipe
+            # slots/config/result via the edited-cascade invalidation.
+            return
         self._state.transform_key = key
         self.edited.emit()
 
