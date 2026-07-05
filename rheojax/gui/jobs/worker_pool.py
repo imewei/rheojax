@@ -8,7 +8,7 @@ Thread pool for executing background jobs with progress tracking using PySide6.
 import time
 import uuid
 from collections.abc import Callable
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from typing import Any
 
 try:
@@ -340,12 +340,25 @@ class WorkerPool(QObject):
         """Cancel all active jobs.
 
         Requests cancellation for every currently running job.
+
+        Notes
+        -----
+        Each job's ``cancel()`` is dispatched on its own daemon thread rather
+        than called sequentially here. Callers (e.g. the GUI's "Stop" action)
+        invoke this synchronously on the GUI thread, and subprocess-backed
+        workers can block for several seconds during SIGTERM/SIGKILL
+        escalation (see ``ProcessWorkerAdapter.cancel``). Running them in
+        parallel keeps the UI thread from freezing for N times that duration
+        when multiple jobs are active.
         """
         with self._job_lock:
             job_ids = list(self._active_jobs.keys())
 
+        # ponytail: fire-and-forget daemon threads, upgrade to a bounded
+        # ThreadPoolExecutor if we ever need to cap concurrency or collect
+        # per-job cancel results.
         for job_id in job_ids:
-            self.cancel(job_id)
+            Thread(target=self.cancel, args=(job_id,), daemon=True).start()
 
         logger.info("Cancellation requested for all jobs", job_count=len(job_ids))
 

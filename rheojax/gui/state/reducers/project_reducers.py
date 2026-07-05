@@ -43,7 +43,27 @@ def reduce_new_project(
     action: dict[str, Any],
 ) -> Callable[[AppState], AppState]:
     def updater(state: AppState) -> AppState:
-        return _AppState()
+        # Reset only project-scoped fields; global/persistent settings
+        # (recent_projects, theme, os_theme, auto_save_enabled, current_seed,
+        # jax_device, ...) must survive across project lifetimes.
+        defaults = _AppState()
+        return replace(
+            state,
+            project_path=defaults.project_path,
+            project_name=defaults.project_name,
+            is_modified=defaults.is_modified,
+            datasets=defaults.datasets,
+            active_dataset_id=defaults.active_dataset_id,
+            active_model_name=defaults.active_model_name,
+            model_params=defaults.model_params,
+            fit_results=defaults.fit_results,
+            bayesian_results=defaults.bayesian_results,
+            current_tab=defaults.current_tab,
+            pipeline_state=defaults.pipeline_state,
+            visual_pipeline=defaults.visual_pipeline,
+            transform_history=defaults.transform_history,
+            workflow_mode=defaults.workflow_mode,
+        )
 
     return updater
 

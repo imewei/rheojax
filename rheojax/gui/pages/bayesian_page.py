@@ -397,7 +397,7 @@ class BayesianPage(QWidget):
         """
         self._closing = True
         if self._current_worker is not None:
-            self._current_worker.cancel_token.cancel()
+            self._current_worker.cancel()
         self._disconnect_worker_signals()
         # Also disconnect store signals that target this page's slots
         if self._store.signals is not None:
@@ -929,7 +929,7 @@ class BayesianPage(QWidget):
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
         if self._current_worker:
-            self._current_worker.cancel_token.cancel()
+            self._current_worker.cancel()
             self._status_text.append("Cancelling...")
 
         self.cancel_requested.emit()
@@ -1345,7 +1345,9 @@ class BayesianPage(QWidget):
             # Normalize tuple/list intervals to dict form
             if isinstance(values, (tuple, list)):
                 if len(values) == 3:
-                    mean, lower, upper = values
+                    # Subprocess mode (BayesianService.get_credible_intervals)
+                    # returns (lower, median, upper), not (mean, lower, upper).
+                    lower, mean, upper = values
                 elif len(values) == 2:
                     mean = summary.get(param_name, {}).get("mean", 0.0)
                     lower, upper = values
@@ -2000,7 +2002,11 @@ class BayesianPage(QWidget):
             summary += "Credible Intervals (95%):\n"
             for param, interval in target_result.credible_intervals.items():
                 if isinstance(interval, (list, tuple)) and len(interval) >= 2:
-                    summary += f"  {param}: [{interval[0]:.4f}, {interval[1]:.4f}]\n"
+                    # interval may be (lower, upper) or (lower, median, upper);
+                    # the bound is always first/last, never index 1.
+                    summary += (
+                        f"  {param}: [{interval[0]:.4f}, {interval[-1]:.4f}]\n"
+                    )
 
         QMessageBox.information(self, "Posterior Summary", summary)
 

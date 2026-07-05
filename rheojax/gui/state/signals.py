@@ -153,6 +153,13 @@ class StateSignals(QObject):
         # Using a deque prevents buffer overwrite when multiple worker-thread
         # updates are posted before the event loop processes them (M2 fix).
         self._pending_notifications: deque[tuple[list, Any]] = deque()
+        # R10-STO-001 fix: queue for domain signals emitted from a worker
+        # thread. QTimer.singleShot(0, ...) binds to the *calling* thread's
+        # event loop, which worker QRunnables never run, silently dropping
+        # the emission. Draining via QMetaObject.invokeMethod(QueuedConnection)
+        # (like _pending_notifications above) posts to this object's own
+        # (main-thread) event loop instead, so it is always delivered.
+        self._pending_signal_emissions: deque[tuple[str, tuple]] = deque()
 
     @Slot()
     def _emit_state_changed(self) -> None:
@@ -190,6 +197,22 @@ class StateSignals(QObject):
                         "Subscriber callback failed (main-thread relay)",
                         exc_info=True,
                     )
+
+    @Slot()
+    def _run_pending_signal_emissions(self) -> None:
+        """Drain and emit domain signals queued from a worker thread.
+
+        Invoked exclusively via QMetaObject.invokeMethod(QueuedConnection)
+        from StateStore.emit_signal() when called off the main Qt thread.
+        Mirrors _run_subscriber_notifications() so rapid worker-thread signal
+        emissions (e.g. pipeline_execution_started, pipeline_step_status_changed)
+        are queued and delivered on the main thread instead of silently lost.
+        """
+        while self._pending_signal_emissions:
+            signal_name, args = self._pending_signal_emissions.popleft()
+            signal = getattr(self, signal_name, None)
+            if signal is not None:
+                signal.emit(*args)
 
     def emit_signal(self, signal_name: str, *args: Any) -> None:
         """Emit a signal by name with logging.

@@ -264,6 +264,21 @@ def reduce_delete_selected_dataset(
             if tr.source_dataset_id != dataset_id and tr.target_dataset_id != dataset_id
         ]
 
+        # Rescope the Fit/Bayesian chips to the new active dataset -- otherwise
+        # a chip left COMPLETE from the just-deleted dataset keeps showing
+        # green for a dataset that has no result at all (see
+        # reduce_set_active_dataset for the same pattern).
+        pipeline = state.pipeline_state.clone()
+        pipeline.sync_fit_chip(
+            PipelineStep.FIT, new_fit_results, state.active_model_name, new_active
+        )
+        pipeline.sync_fit_chip(
+            PipelineStep.BAYESIAN,
+            new_bayesian_results,
+            state.active_model_name,
+            new_active,
+        )
+
         return replace(
             state,
             datasets=new_datasets,
@@ -271,6 +286,7 @@ def reduce_delete_selected_dataset(
             fit_results=new_fit_results,
             bayesian_results=new_bayesian_results,
             transform_history=new_transform_history,
+            pipeline_state=pipeline,
             is_modified=True,
         )
 

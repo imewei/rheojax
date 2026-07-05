@@ -525,8 +525,8 @@ class StateStore:
     def emit_signal(self, signal_name: str, *args) -> None:
         """Emit a named signal if available.
 
-        Thread-safe: if called from a non-main thread, defers emission to the
-        main-thread event loop via QTimer.singleShot to prevent cross-thread
+        Thread-safe: if called from a non-main thread, defers emission via
+        QMetaObject.invokeMethod(QueuedConnection) to prevent cross-thread
         signal delivery violations (R10-STO-001).
 
         Parameters
@@ -547,9 +547,19 @@ class StateStore:
 
             app = QApplication.instance()
             if app is not None and QThread.currentThread() != app.thread():
-                from PySide6.QtCore import QTimer
+                from PySide6.QtCore import QMetaObject, Qt
 
-                QTimer.singleShot(0, lambda s=signal, a=args: s.emit(*a))
+                # QTimer.singleShot(0, ...) binds to the *calling* thread's
+                # event loop; QRunnable worker threads never run one, so the
+                # callback (and the signal emission) would silently never
+                # fire. QMetaObject.invokeMethod posts to self._signals' own
+                # (main-thread) event loop instead, guaranteeing delivery.
+                self._signals._pending_signal_emissions.append((signal_name, args))
+                QMetaObject.invokeMethod(
+                    self._signals,
+                    "_run_pending_signal_emissions",
+                    Qt.ConnectionType.QueuedConnection,
+                )
                 return
         except (ImportError, RuntimeError):
             pass  # Qt unavailable (headless/test) — fall through to direct emit
@@ -835,14 +845,23 @@ class StateStore:
         """
         with self._lock:
             old_state = self._state
-            if track_undo and len(self._undo_stack) < self._max_undo_size:
-                self._undo_stack.append(self._state.clone())
-                self._redo_stack.clear()  # Clear redo on new action
-
             self._state = updater(self._state)
 
-            # Compute changed keys for logging
+            # Compute changed keys for logging and undo tracking
             changed_keys = self._get_changed_keys(old_state, self._state)
+
+            # Only record an undo entry if the updater actually changed state.
+            # No-op reducers (e.g. FITTING_COMPLETED, BAYESIAN_COMPLETED, which
+            # exist solely to drive a signal) must not waste undo-stack
+            # capacity or clear redo history.
+            if track_undo and changed_keys:
+                if len(self._undo_stack) >= self._max_undo_size:
+                    # Evict oldest entry instead of silently refusing to
+                    # record new ones once the cap is reached.
+                    self._undo_stack.pop(0)
+                self._undo_stack.append(old_state.clone())
+                self._redo_stack.clear()  # Clear redo on new action
+
             if changed_keys:
                 logger.debug(
                     "State updated",
@@ -1309,7 +1328,11 @@ class StateStore:
         )
         with self._lock:
             old_state = self._state
-            if track_undo and len(self._undo_stack) < self._max_undo_size:
+            if track_undo:
+                if len(self._undo_stack) >= self._max_undo_size:
+                    # Evict oldest entry instead of silently refusing to
+                    # record new ones once the cap is reached.
+                    self._undo_stack.pop(0)
                 self._undo_stack.append(self._state.clone())
                 self._redo_stack.clear()
 

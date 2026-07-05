@@ -18,6 +18,7 @@ import numpy as np
 
 try:
     import pyqtgraph as pg
+    import pyqtgraph.exporters  # noqa: F401 - registers pg.exporters namespace
     from pyqtgraph import PlotWidget, mkBrush, mkPen
 
     PYQTGRAPH_AVAILABLE = True
