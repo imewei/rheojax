@@ -254,8 +254,9 @@ class ProcessWorkerAdapter(QRunnable):
             except Empty:
                 # No message yet -- check if child is still running
                 if self._process is not None and not self._proc_is_alive(self._process):
-                    # Child died without sending a terminal message
-                    self._drain_queue(result_queue)
+                    # Child died -- drain any buffered terminal message first.
+                    if self._drain_queue(result_queue):
+                        return
                     exitcode = self._process.exitcode
                     if self._cancel_token.is_cancelled():
                         self.signals.cancelled.emit()
@@ -302,11 +303,12 @@ class ProcessWorkerAdapter(QRunnable):
             else:
                 logger.warning("Unknown IPC message type: %s", msg_type)
 
-    def _drain_queue(self, result_queue: mp.Queue) -> None:
+    def _drain_queue(self, result_queue: mp.Queue) -> bool:
         """Drain any remaining messages after the process has exited.
 
         If a terminal message is found while draining, emit the
-        corresponding signal.
+        corresponding signal and return True so the caller does not
+        also emit a terminal signal of its own.
         """
         while True:
             try:
@@ -317,14 +319,15 @@ class ProcessWorkerAdapter(QRunnable):
             msg_type = msg.get("type", "")
             if msg_type == "completed":
                 self.signals.completed.emit(msg.get("result"))
-                return
+                return True
             elif msg_type == "failed":
                 self.signals.failed.emit(msg.get("error", "Unknown error"))
-                return
+                return True
             elif msg_type == "cancelled":
                 self.signals.cancelled.emit()
-                return
+                return True
             # Ignore non-terminal messages during drain
+        return False
 
     @staticmethod
     def _proc_is_alive(proc: mp.Process) -> bool:

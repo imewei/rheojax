@@ -594,7 +594,19 @@ class BayesianService:
         """
         logger.debug("Entering get_posterior_means", model=result.model_name)
         means = {}
-        for param_name, samples in result.posterior_samples.items():
+
+        # BSVC-001: posterior_samples can be None when BayesianResult is
+        # constructed without samples (e.g. partial failure path).  Guard
+        # before iterating to avoid AttributeError on .items().
+        posterior_samples = result.posterior_samples
+        if not posterior_samples:
+            logger.warning(
+                "get_posterior_means: posterior_samples is empty or None",
+                model=result.model_name,
+            )
+            return means
+
+        for param_name, samples in posterior_samples.items():
             means[param_name] = float(np.mean(samples))
         logger.debug("Exiting get_posterior_means", num_parameters=len(means))
         return means

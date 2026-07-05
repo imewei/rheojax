@@ -8,7 +8,7 @@ Thread pool for executing background jobs with progress tracking using PySide6.
 import time
 import uuid
 from collections.abc import Callable
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from typing import Any
 
 try:
@@ -311,18 +311,46 @@ class WorkerPool(QObject):
         through ``worker.cancel()`` which triggers the SIGTERM → SIGKILL
         escalation chain.  For thread-based workers it falls back to
         ``token.cancel()``.
+
+        The actual cancel call is dispatched on a daemon thread because
+        subprocess escalation can block for several seconds and this method
+        is routinely called from the GUI thread (button clicks, shutdown).
+        ``worker``/``token`` are resolved under ``_job_lock`` *before*
+        dispatching, so the background thread operates on those direct
+        references rather than re-reading ``_active_jobs``/``_active_workers``
+        — it stays correct even if those dicts are cleared concurrently by
+        ``shutdown()``.
         """
         with self._job_lock:
             worker = self._active_workers.get(job_id)
             token = self._active_jobs.get(job_id)
 
+        if worker is None and token is None:
+            logger.warning("Job not found for cancellation", job_id=job_id)
+            return False
+
+        Thread(
+            target=self._cancel_resolved,
+            args=(job_id, worker, token),
+            daemon=True,
+        ).start()
+        return True
+
+    def _cancel_resolved(self, job_id: str, worker: Any, token: Any) -> None:
+        """Perform the (possibly blocking) cancel call for an already-resolved worker/token.
+
+        Runs on a background thread spawned by ``cancel()``. ``worker`` and
+        ``token`` are direct object references captured before dispatch, so
+        this is safe to run even after ``_active_jobs``/``_active_workers``
+        have been cleared (e.g. during ``shutdown()``).
+        """
         if worker is not None and hasattr(worker, "cancel") and callable(worker.cancel):
             try:
                 worker.cancel()
                 logger.info(
                     "Cancellation requested for job (via worker)", job_id=job_id
                 )
-                return True
+                return
             except Exception:
                 logger.debug(
                     "worker.cancel() failed, falling back to token", exc_info=True
@@ -331,15 +359,14 @@ class WorkerPool(QObject):
         if token is not None:
             token.cancel()
             logger.info("Cancellation requested for job", job_id=job_id)
-            return True
-
-        logger.warning("Job not found for cancellation", job_id=job_id)
-        return False
 
     def cancel_all(self) -> None:
         """Cancel all active jobs.
 
-        Requests cancellation for every currently running job.
+        Requests cancellation for every currently running job. Each job's
+        cancel is non-blocking (see ``cancel()``), so this is safe to call
+        synchronously from the GUI thread (e.g. the "Stop" action) even with
+        multiple subprocess-backed jobs active.
         """
         with self._job_lock:
             job_ids = list(self._active_jobs.keys())
