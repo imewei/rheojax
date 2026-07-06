@@ -653,9 +653,17 @@ class BayesianService:
                 idata = getattr(result, "inference_data", None)
                 if idata is None:
                     # Fallback: construct from posterior samples only
+                    posterior_samples = result.posterior_samples
+                    if not posterior_samples:
+                        logger.warning(
+                            "Skipping model comparison — no posterior_samples",
+                            model=model_name,
+                            criterion=criterion,
+                        )
+                        continue
                     idata_dict = {
                         k: v.reshape(1, -1) if v.ndim == 1 else v
-                        for k, v in result.posterior_samples.items()
+                        for k, v in posterior_samples.items()
                     }
                     idata = inference_data_from_dict({"posterior": idata_dict})
 

@@ -139,6 +139,10 @@ class RheoJAXMainWindow(QMainWindow):
         self._navigating: bool = False  # GUI-013: re-entry guard for navigate_to
         self._plot_style: str = "default"
         self._current_workflow_mode: WorkflowMode = WorkflowMode.FITTING
+        # GUI-P1-006: set True at the start of closeEvent so relay/worker
+        # callbacks that arrive during or after teardown become no-ops
+        # instead of touching torn-down widgets.
+        self._closing: bool = False
 
         # Setup UI components
         logger.debug("Setting up UI components")
@@ -898,6 +902,13 @@ class RheoJAXMainWindow(QMainWindow):
                 event.ignore()
                 return
 
+        # GUI-P1-006: flip the guard before any teardown so worker/relay
+        # callbacks queued for delivery during the drain loop below (or that
+        # arrive from still-running QThreadPool.globalInstance() workers
+        # after this method returns) become no-ops instead of touching
+        # widgets that are being torn down.
+        self._closing = True
+
         # Cleanup: stop workers and disconnect state signals to prevent
         # callbacks during teardown
         state = self.store.get_state()
@@ -971,6 +982,20 @@ class RheoJAXMainWindow(QMainWindow):
                     ("dataset_added", self._on_dataset_added),
                     ("dataset_added", self.transform_page.refresh_dataset_checklist),
                     ("pipeline_step_changed", self._on_pipeline_step_changed),
+                    # GUI-016 connections made in _connect_state_signals().
+                    ("model_selected", self._sync_fit_step_config),
+                    ("model_params_changed", self._sync_fit_step_config),
+                    # FitPage/DiagnosticsPage connect directly to this same
+                    # singleton in their own _connect_signals(); BayesianPage
+                    # already disconnects itself via prepare_for_close()
+                    # above, but these two pages have no such hook.
+                    ("dataset_selected", self.fit_page._on_dataset_changed),
+                    ("model_selected", self.fit_page._on_external_model_selected),
+                    ("model_params_changed", self.fit_page._on_model_params_changed),
+                    ("fit_started", self.fit_page._on_fitting_started),
+                    ("fit_completed", self.fit_page._on_fitting_completed),
+                    ("fit_failed", self.fit_page._on_fitting_failed),
+                    ("bayesian_completed", self.diagnostics_page._on_bayesian_completed),
                 ]
                 for signal_name, slot in _slot_map:
                     if hasattr(signals, signal_name):
@@ -1117,11 +1142,20 @@ class RheoJAXMainWindow(QMainWindow):
             "RheoJAX Project (*.rheojax);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
         )
         if file_path:
-            self.log(f"Saving project as: {file_path}")
-            logger.info("Project saved as", file_path=file_path)
-            self.store.dispatch("SAVE_PROJECT", {"file_path": file_path})
-            self.status_bar.show_message(f"Saved as: {file_path}", 3000)
-            self._has_unsaved_changes = False
+            # GUI-P1-004: SAVE_PROJECT has no serialization logic (project
+            # save is not yet implemented — see _on_save_file). Dispatching
+            # it and reporting "Saved as" here would tell the user their
+            # work was persisted when nothing was written to disk, clearing
+            # the dirty flag and risking silent data loss. Match the same
+            # not-implemented messaging as Save until real serialization
+            # exists.
+            logger.warning("Save as action: not yet implemented")
+            QMessageBox.information(
+                self,
+                "Save Not Yet Implemented",
+                "Project save is not yet implemented.\n"
+                "Use 'Export Results' from the Bayesian or Fit tabs to save individual results.",
+            )
 
     @Slot(Path)
     def _on_open_recent_project(self, project_path: Path) -> None:
@@ -1159,42 +1193,81 @@ class RheoJAXMainWindow(QMainWindow):
             )
             self.store.dispatch("IMPORT_DATA", config)
 
-            # Defer the blocking I/O to the next event loop iteration so the
-            # dialog close animation is not held up.
             # Guard prevents overlapping imports from rapid double-clicks.
             if getattr(self, "_import_in_progress", False):
                 logger.warning("Import already in progress, ignoring duplicate")
                 return
             self._import_in_progress = True
+            self._start_import_worker(config)
 
-            from rheojax.gui.compat import QTimer
+    def _start_import_worker(self, config: dict) -> None:
+        """Load the file on a background thread (R8-NEW-003).
 
-            QTimer.singleShot(0, lambda cfg=config: self._do_import(cfg))
+        The previous ``QTimer.singleShot(0, ...)`` deferral only delayed the
+        blocking ``DataService.load_file()`` call to the next event-loop
+        tick — it still ran synchronously on the GUI thread. This runs it on
+        a QRunnable pool thread instead, mirroring the relay pattern used by
+        ``_on_run_all``/``_on_run_step`` elsewhere in this file.
+        """
+        from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
 
-    def _do_import(self, config: dict) -> None:
-        """Perform the deferred file import (blocking I/O)."""
-        # R8-NEW-003: TODO — move blocking I/O into ImportWorker to avoid
-        # stalling the main thread on large files.
-        # Interim: yield to event loop at key checkpoints below.
+        class _ImportRelay(QObject):
+            completed = Signal(object, object)  # rheo_data, test_mode
+            failed = Signal(str)
+
+        relay = _ImportRelay()
+
+        def _on_completed(rheo_data: object, test_mode: object) -> None:
+            self._finish_import(config, rheo_data, test_mode)
+            self._active_relays.discard(relay)
+
+        def _on_failed(error: str) -> None:
+            self._fail_import(config, error)
+            self._active_relays.discard(relay)
+
+        relay.completed.connect(_on_completed, Qt.ConnectionType.QueuedConnection)
+        relay.failed.connect(_on_failed, Qt.ConnectionType.QueuedConnection)
+        # Keep relay alive until signals are delivered — same pattern as
+        # _on_run_all's _active_relays usage.
+        self._active_relays.add(relay)
+
+        _cfg = config
+        _relay = relay
+
+        class _ImportWorker(QRunnable):
+            def run(self) -> None:  # type: ignore[override]
+                try:
+                    from rheojax.gui.services.data_service import DataService
+
+                    service = DataService()
+                    rheo_data = service.load_file(
+                        file_path=_cfg["file_path"],
+                        x_col=_cfg.get("x_column"),
+                        y_col=_cfg.get("y_column"),
+                        y2_col=_cfg.get("y2_column"),
+                        test_mode=_cfg.get("test_mode"),
+                        temp_col=_cfg.get("temp_column"),
+                    )
+
+                    # Auto-detect test mode if requested
+                    test_mode = _cfg.get("test_mode")
+                    if _cfg.get("auto_detect_mode"):
+                        test_mode = service.detect_test_mode(rheo_data)
+
+                    _relay.completed.emit(rheo_data, test_mode)
+                except Exception as exc:
+                    logger.error("Import failed", error=str(exc), exc_info=True)
+                    _relay.failed.emit(str(exc))
+
+        worker = _ImportWorker()
+        worker.setAutoDelete(True)
+        QThreadPool.globalInstance().start(worker)
+
+    def _finish_import(self, config: dict, rheo_data: object, test_mode: object) -> None:
+        """Dispatch a successful import on the main thread (via relay)."""
+        if self._closing:
+            return
         try:
-            from rheojax.gui.services.data_service import DataService
-
-            service = DataService()
-            QApplication.processEvents()  # Keep UI responsive during service init
-            rheo_data = service.load_file(
-                file_path=config["file_path"],
-                x_col=config.get("x_column"),
-                y_col=config.get("y_column"),
-                y2_col=config.get("y2_column"),
-                test_mode=config.get("test_mode"),
-                temp_col=config.get("temp_column"),
-            )
-
-            # Auto-detect test mode if requested
-            test_mode = config.get("test_mode")
-            if config.get("auto_detect_mode"):
-                test_mode = service.detect_test_mode(rheo_data)
-
             self.store.dispatch(
                 "IMPORT_DATA_SUCCESS",
                 {
@@ -1215,13 +1288,17 @@ class RheoJAXMainWindow(QMainWindow):
                 test_mode=test_mode,
             )
             self.status_bar.show_message("Data imported successfully", 3000)
-        except Exception as exc:
-            logger.error("Import failed", error=str(exc), exc_info=True)
-            self.log(f"Import failed: {exc}")
-            self.store.dispatch("IMPORT_DATA_FAILED", {"error": str(exc), **config})
-            self.status_bar.show_message(f"Import failed: {exc}", 5000)
         finally:
             self._import_in_progress = False
+
+    def _fail_import(self, config: dict, error: str) -> None:
+        """Dispatch a failed import on the main thread (via relay)."""
+        self._import_in_progress = False
+        if self._closing:
+            return
+        self.log(f"Import failed: {error}")
+        self.store.dispatch("IMPORT_DATA_FAILED", {"error": error, **config})
+        self.status_bar.show_message(f"Import failed: {error}", 5000)
 
     @Slot()
     def _on_export(self) -> None:
@@ -1627,12 +1704,16 @@ class RheoJAXMainWindow(QMainWindow):
         relay = _Relay()
 
         def _on_finished() -> None:
-            self.status_bar.show_message("Pipeline completed", 3000)
             self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self.status_bar.show_message("Pipeline completed", 3000)
 
         def _on_error(message: str) -> None:
-            self._on_pipeline_run_error(message)
             self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self._on_pipeline_run_error(message)
 
         relay.finished.connect(_on_finished, Qt.ConnectionType.QueuedConnection)
         relay.error.connect(_on_error, Qt.ConnectionType.QueuedConnection)
@@ -1756,12 +1837,16 @@ class RheoJAXMainWindow(QMainWindow):
         relay = _Relay()
 
         def _on_step_finished(name: str) -> None:
-            self._on_pipeline_step_done(name)
             self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self._on_pipeline_step_done(name)
 
         def _on_step_error(message: str) -> None:
-            self._on_pipeline_run_error(message)
             self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self._on_pipeline_run_error(message)
 
         relay.finished.connect(_on_step_finished, Qt.ConnectionType.QueuedConnection)
         relay.error.connect(_on_step_error, Qt.ConnectionType.QueuedConnection)
@@ -2049,6 +2134,8 @@ class RheoJAXMainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_job_started(self, job_id: str) -> None:
+        if self._closing:
+            return
         logger.debug("Job started", job_id=job_id)
         job_type = self._job_types.get(job_id, "")
         # R6-MW-001: Map job_type directly to pipeline step name.
@@ -2066,6 +2153,8 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_job_progress(
         self, job_id: str, current: int, total: int, message: str
     ) -> None:
+        if self._closing:
+            return
         job_type = self._job_types.get(job_id, "")
         max_value = (
             int(total) if isinstance(total, (int, float)) and 0 < total <= 100 else 0
@@ -2082,6 +2171,8 @@ class RheoJAXMainWindow(QMainWindow):
             )
 
     def _on_job_completed(self, job_id: str, result: object) -> None:
+        if self._closing:
+            return
         job_type = self._job_types.pop(job_id, "")
         meta = self._job_metadata.pop(job_id, {})
         logger.info("Job completed", job_id=job_id, job_type=job_type)
@@ -2200,6 +2291,8 @@ class RheoJAXMainWindow(QMainWindow):
         self.log(f"Job {job_id} completed ({job_type})")
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
+        if self._closing:
+            return
         job_type = self._job_types.pop(job_id, "")
         # MW-FAIL-001: Pop metadata so identifiers accompany FITTING_FAILED /
         # BAYESIAN_FAILED.  Without model_name/dataset_id the store emits
@@ -2241,6 +2334,8 @@ class RheoJAXMainWindow(QMainWindow):
         self.status_bar.show_message(f"Job failed: {error}", 5000)
 
     def _on_job_cancelled(self, job_id: str) -> None:
+        if self._closing:
+            return
         job_type = self._job_types.pop(job_id, "")
         # MW-FAIL-002: Pop metadata so identifiers accompany FITTING_FAILED /
         # BAYESIAN_FAILED on cancellation (mirrors the fix in _on_job_failed).
@@ -2364,53 +2459,7 @@ class RheoJAXMainWindow(QMainWindow):
         if dataset_id and dataset_id in state.datasets:
             ds = state.datasets[dataset_id]
             if ds.x_data is not None and ds.y_data is not None:
-                # R6-GUI-006: Defer detect_test_mode to avoid blocking the main
-                # thread with statistical analysis on large datasets.
-                def _do_detect(ds_ref=ds, did=dataset_id):
-                    try:
-                        from rheojax.core.data import RheoData
-                        from rheojax.gui.services.data_service import DataService
-
-                        svc = DataService()
-                        mode = svc.detect_test_mode(
-                            RheoData(
-                                x=ds_ref.x_data,
-                                y=ds_ref.y_data,
-                                y_units=None,
-                                x_units=None,
-                                domain=ds_ref.metadata.get("domain", "time"),
-                                metadata=ds_ref.metadata,
-                                validate=False,
-                            )
-                        )
-                    except Exception as exc:
-                        logger.error(
-                            "Auto-detect test mode failed",
-                            error=str(exc),
-                            exc_info=True,
-                        )
-                        self.log(f"Auto-detect test mode failed: {exc}")
-                        self.status_bar.show_message(
-                            "Auto-detect test mode failed", 2500
-                        )
-                        return
-                    self.store.dispatch(
-                        "AUTO_DETECT_TEST_MODE",
-                        {"dataset_id": did, "inferred_mode": mode},
-                    )
-                    if did:
-                        try:
-                            self.data_page.show_dataset(did)
-                        except Exception:
-                            logger.debug(
-                                "Data page refresh after auto-detect failed",
-                                dataset_id=did,
-                                exc_info=True,
-                            )
-
-                from PySide6.QtCore import QTimer
-
-                QTimer.singleShot(0, _do_detect)
+                self._start_auto_detect_worker(ds, dataset_id)
                 return
         if dataset_id:
             try:
@@ -2430,6 +2479,89 @@ class RheoJAXMainWindow(QMainWindow):
                 self.status_bar.show_message("Auto-detect test mode failed", 2500)
         else:
             self.status_bar.show_message("No active dataset to auto-detect", 2000)
+
+    def _start_auto_detect_worker(self, ds: DatasetState, dataset_id: str) -> None:
+        """Run test-mode statistical detection on a background thread.
+
+        R6-GUI-006 / GUI-P1-007: ``QTimer.singleShot(0, ...)`` only defers a
+        call to the next Qt event-loop tick — it still executes on the GUI
+        thread. The statistical detection below runs numpy analysis over the
+        full dataset, so it must run on a QRunnable pool thread instead,
+        mirroring the relay pattern used by ``_on_run_all`` elsewhere.
+        """
+        from rheojax.gui.compat import QObject, QRunnable, QThreadPool, Signal
+
+        class _DetectRelay(QObject):
+            completed = Signal(str, str)  # dataset_id, mode
+            failed = Signal(str)
+
+        relay = _DetectRelay()
+
+        def _on_completed(did: str, mode: str) -> None:
+            self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self.store.dispatch(
+                "AUTO_DETECT_TEST_MODE",
+                {"dataset_id": did, "inferred_mode": mode},
+            )
+            try:
+                self.data_page.show_dataset(did)
+            except Exception:
+                logger.debug(
+                    "Data page refresh after auto-detect failed",
+                    dataset_id=did,
+                    exc_info=True,
+                )
+
+        def _on_failed(error: str) -> None:
+            self._active_relays.discard(relay)
+            if self._closing:
+                return
+            self.log(f"Auto-detect test mode failed: {error}")
+            self.status_bar.show_message("Auto-detect test mode failed", 2500)
+
+        relay.completed.connect(_on_completed, Qt.ConnectionType.QueuedConnection)
+        relay.failed.connect(_on_failed, Qt.ConnectionType.QueuedConnection)
+        self._active_relays.add(relay)
+
+        _x, _y, _domain, _metadata = (
+            ds.x_data,
+            ds.y_data,
+            ds.metadata.get("domain", "time"),
+            ds.metadata,
+        )
+        _did = dataset_id
+        _relay = relay
+
+        class _DetectWorker(QRunnable):
+            def run(self) -> None:  # type: ignore[override]
+                try:
+                    from rheojax.core.data import RheoData
+                    from rheojax.gui.services.data_service import DataService
+
+                    svc = DataService()
+                    mode = svc.detect_test_mode(
+                        RheoData(
+                            x=_x,
+                            y=_y,
+                            y_units=None,
+                            x_units=None,
+                            domain=_domain,
+                            metadata=_metadata,
+                            validate=False,
+                        )
+                    )
+                    _relay.completed.emit(_did, mode)
+                except Exception as exc:
+                    logger.error(
+                        "Auto-detect test mode failed", error=str(exc), exc_info=True
+                    )
+                    _relay.failed.emit(str(exc))
+
+        worker = _DetectWorker()
+        worker.setAutoDelete(True)
+        QThreadPool.globalInstance().start(worker)
 
     # -------------------------------------------------------------------------
     # Models Menu Handlers
@@ -3107,13 +3239,15 @@ class RheoJAXMainWindow(QMainWindow):
         )
 
         def _on_batch_finished(success: int, total: int) -> None:
+            self._active_relays.discard(relay)
+            if self._closing:
+                return
             batch_panel.finish_batch(success, total)
             self.status_bar.show_message(
                 f"Batch complete: {success}/{total} succeeded",
                 5000,
             )
             self.log(f"Batch complete: {success}/{total} files succeeded")
-            self._active_relays.discard(relay)
 
         relay.finished.connect(
             _on_batch_finished,

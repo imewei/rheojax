@@ -400,9 +400,10 @@ class PyQtGraphCanvas(QWidget):
 
             # Convert from log10 space back to data coordinates for display
             display_x, display_y = x, y
-            if self._plot_item.ctrl.logXCheck.isChecked():
+            log_x, log_y = self._plot_item.vb.state["log"]
+            if log_x:
                 display_x = 10**x
-            if self._plot_item.ctrl.logYCheck.isChecked():
+            if log_y:
                 display_y = 10**y
 
             # Update coordinate label

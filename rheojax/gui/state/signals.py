@@ -3,6 +3,7 @@
 This module provides Qt signals for reactive UI updates on state changes.
 """
 
+import threading
 from collections import deque
 from collections.abc import Callable
 from typing import Any
@@ -157,6 +158,10 @@ class StateSignals(QObject):
         # deque prevents buffer overwrite when multiple worker-thread updates
         # are posted before the event loop processes them (M2 fix).
         self._pending_main_thread_calls: deque[Callable[[], None]] = deque()
+        # M3 fix: TLS reentrancy guard for _run_pending_main_thread_calls,
+        # mirroring the tls.dispatching guard in StateStore's synchronous
+        # dispatch path.
+        self._dispatch_tls = threading.local()
 
     @Slot()
     def _emit_state_changed(self) -> None:
@@ -185,12 +190,21 @@ class StateSignals(QObject):
         path of update_state() — nested dispatches triggered by subscribers
         are properly ordered.
         """
-        while self._pending_main_thread_calls:
-            call = self._pending_main_thread_calls.popleft()
-            try:
-                call()
-            except Exception:
-                logger.error("Queued main-thread call failed", exc_info=True)
+        tls = self._dispatch_tls
+        if getattr(tls, "dispatching", False):
+            # Already draining on this thread; the active while-loop below
+            # will pick up anything appended to the deque in the meantime.
+            return
+        tls.dispatching = True
+        try:
+            while self._pending_main_thread_calls:
+                call = self._pending_main_thread_calls.popleft()
+                try:
+                    call()
+                except Exception:
+                    logger.error("Queued main-thread call failed", exc_info=True)
+        finally:
+            tls.dispatching = False
 
     def emit_signal(self, signal_name: str, *args: Any) -> None:
         """Emit a signal by name with logging.

@@ -5,7 +5,7 @@ Status Bar
 Application status bar with progress indicators, JAX device status, and memory monitoring.
 """
 
-from rheojax.gui.compat import QLabel, QProgressBar, QStatusBar, QWidget
+from rheojax.gui.compat import QLabel, QProgressBar, QStatusBar, QTimer, QWidget
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,6 +43,7 @@ class StatusBar(QStatusBar):
         # Left: Status message (permanent)
         self.message_label = QLabel("Ready")
         self.addWidget(self.message_label, 1)  # Stretch factor 1
+        self._message_token = 0
 
         # Center: Progress bar (initially hidden)
         self.progress_bar = QProgressBar(self)
@@ -83,9 +84,19 @@ class StatusBar(QStatusBar):
         """
         logger.debug("Status updated", message=message, timeout=timeout)
         self.message_label.setText(message)
+        self._message_token += 1
         if timeout > 0:
             # Also show in Qt status bar for timeout support
             super().showMessage(message, timeout)
+            token = self._message_token
+            QTimer.singleShot(
+                timeout, lambda: self._clear_timed_message(token, message)
+            )
+
+    def _clear_timed_message(self, token: int, message: str) -> None:
+        """Clear message_label if it still shows the message that timed out."""
+        if token == self._message_token and self.message_label.text() == message:
+            self.message_label.setText("")
 
     def show_progress(self, value: int, maximum: int, text: str = "") -> None:
         """Update and show progress bar.

@@ -1003,7 +1003,7 @@ class FitPage(QWidget):
         fit_results = {
             key: result
             for key, result in state.fit_results.items()
-            if active_dataset_id in key
+            if result.dataset_id == active_dataset_id
         }
 
         if not fit_results:

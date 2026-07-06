@@ -106,38 +106,46 @@ class NlsqStep(QWidget):
             }
             for name, p in table_params.items()
         } or None
+        # Guard against re-entrant clicks: _fit_fn pumps a nested event loop
+        # (see fit_controller._run_on_thread) while staying responsive, so the
+        # button must be disabled for the duration or a second click launches
+        # an overlapping fit that corrupts shared active_jobs tracking.
+        self._run_btn.setEnabled(False)
         try:
-            res = self._fit_fn(
-                self._state.model_key,
-                self._state.model_config,
-                self._state.data_ref,
-                self._state.column_map,
-                initial_params=initial_params,
-                multi_start={
-                    "enabled": self._ms_enabled.isChecked(),
-                    "count": self._ms_count.value(),
-                },
-            )
-        except NotImplementedError:
-            # ponytail: real solver wiring is out of scope here (tracked separately);
-            # this guard only keeps an unwired Run button from crashing the Qt slot.
-            self._result.setText("NLSQ solver is not wired up yet.")
-            return
-        except Exception as exc:
-            self._result.setText(f"NLSQ failed: {exc}")
-            return
-        # Normalize to dict: ModelService.fit() returns FitResult (dataclass), fakes return dict
-        if isinstance(res, dict):
-            self._state.nlsq_result = res
-        else:
-            self._state.nlsq_result = {
-                "params": res.params,
-                "r_squared": res.r_squared,
-                "success": getattr(res, "success", True),
-            }
-        self.refresh_display()
-        self.edited.emit()
-        self.finished.emit()
+            try:
+                res = self._fit_fn(
+                    self._state.model_key,
+                    self._state.model_config,
+                    self._state.data_ref,
+                    self._state.column_map,
+                    initial_params=initial_params,
+                    multi_start={
+                        "enabled": self._ms_enabled.isChecked(),
+                        "count": self._ms_count.value(),
+                    },
+                )
+            except NotImplementedError:
+                # ponytail: real solver wiring is out of scope here (tracked separately);
+                # this guard only keeps an unwired Run button from crashing the Qt slot.
+                self._result.setText("NLSQ solver is not wired up yet.")
+                return
+            except Exception as exc:
+                self._result.setText(f"NLSQ failed: {exc}")
+                return
+            # Normalize to dict: ModelService.fit() returns FitResult (dataclass), fakes return dict
+            if isinstance(res, dict):
+                self._state.nlsq_result = res
+            else:
+                self._state.nlsq_result = {
+                    "params": res.params,
+                    "r_squared": res.r_squared,
+                    "success": getattr(res, "success", True),
+                }
+            self.refresh_display()
+            self.edited.emit()
+            self.finished.emit()
+        finally:
+            self._run_btn.setEnabled(True)
 
     def refresh_display(self) -> None:
         """Sync the result label to current state.

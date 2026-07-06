@@ -579,11 +579,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.project:
         logger.info("Loading project", path=str(args.project))
         try:
-            # Project loading will be implemented via file dialog in GUI
-            # For now, just log the request
-            window.log(f"Project file specified: {args.project}")
-            window.log("Note: Project loading from command line not yet implemented")
-            logger.debug("Project loading action logged", path=str(args.project))
+            window.log(f"Opening project: {args.project}")
+            window.store.dispatch("LOAD_PROJECT", {"file_path": str(args.project)})
+            window.navigate_to("data")
+            logger.debug("Project loaded", path=str(args.project))
         except Exception as e:
             logger.error(
                 "Failed to load project",
@@ -596,11 +595,26 @@ def main(argv: list[str] | None = None) -> int:
     if args.import_file:
         logger.info("Importing data file", path=str(args.import_file))
         try:
-            # This will be implemented when the data loading service is ready
-            # For now, just log it
-            window.log(f"Data import requested: {args.import_file}")
-            window.log("Note: Data import from command line not yet implemented")
-            logger.debug("Data import action logged", path=str(args.import_file))
+            from rheojax.gui.foundation.import_service import import_dataset
+
+            ref, data = import_dataset(args.import_file, args.protocol)
+            window.log(f"Importing data from: {args.import_file}")
+            window.store.dispatch(
+                "IMPORT_DATA_SUCCESS",
+                {
+                    "dataset_id": ref.id,
+                    "file_path": str(args.import_file),
+                    "name": ref.name,
+                    "test_mode": args.protocol,
+                    "x_data": data.x,
+                    "y_data": data.y,
+                    "y2_data": getattr(data, "y2", None),
+                    "metadata": getattr(data, "metadata", {}),
+                },
+            )
+            window.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": ref.id})
+            window.navigate_to("data")
+            logger.debug("Data import successful", path=str(args.import_file))
         except Exception as e:
             logger.error(
                 "Failed to import data",

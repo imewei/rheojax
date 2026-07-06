@@ -124,6 +124,7 @@ class FitWorker(QRunnable):
         options: dict[str, Any] | None = None,
         cancel_token: CancellationToken | None = None,
         dataset_id: str = "",
+        model_config: dict | None = None,
     ):
         """Initialize fit worker.
 
@@ -142,6 +143,9 @@ class FitWorker(QRunnable):
         dataset_id : str, optional
             Dataset identifier for warm-start correlation across multi-dataset
             workflows. Propagated into FitResult for downstream consumers.
+        model_config : dict, optional
+            Model construction overrides (e.g. ``n_modes``), forwarded to
+            ``ModelService.fit()``.
         """
         if not HAS_PYSIDE6:
             raise ImportError(
@@ -157,6 +161,7 @@ class FitWorker(QRunnable):
         self._initial_params = initial_params or {}
         self._options = options or {}
         self._dataset_id = dataset_id
+        self._model_config = model_config
 
         # Track progress
         self._last_iteration = 0
@@ -295,6 +300,7 @@ class FitWorker(QRunnable):
                     self._data,
                     params=self._initial_params,
                     progress_callback=progress_callback,
+                    model_config=self._model_config,
                     **fit_kwargs,
                 )
             finally:

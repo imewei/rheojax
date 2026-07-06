@@ -27,6 +27,13 @@ import numpy as np
 from rheojax.io import load_hdf5, save_hdf5
 
 
+def _escape_hdf5_key(key: Any) -> str:
+    """Escapes '/' (and the escape char itself) in a dict key before it is joined into
+    an HDF5 dataset path, so a flat key containing '/' (e.g. "a/b") can never alias the
+    path produced by a nested dict (e.g. {"a": {"b": ...}})."""
+    return str(key).replace("\\", "\\\\").replace("/", "\\/")
+
+
 def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> Any:
     if isinstance(value, np.ndarray):
         hf.create_dataset(key_path, data=value)
@@ -39,7 +46,12 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
         return value
     if isinstance(value, dict):
         return {
-            k: _write_walk(v, f"{key_path}/{k}" if key_path else str(k), hf, out)
+            k: _write_walk(
+                v,
+                f"{key_path}/{_escape_hdf5_key(k)}" if key_path else _escape_hdf5_key(k),
+                hf,
+                out,
+            )
             for k, v in value.items()
         }
     if isinstance(value, tuple):
@@ -59,7 +71,7 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
 def write_result_arrays(path: Path, result: dict[str, Any]) -> dict[str, Any]:
     path = Path(path)
     with h5py.File(path, "w") as hf:
-        return {k: _write_walk(v, str(k), hf, {}) for k, v in result.items()}
+        return {k: _write_walk(v, _escape_hdf5_key(k), hf, {}) for k, v in result.items()}
 
 
 def _read_walk(node: Any, hf: h5py.File) -> Any:

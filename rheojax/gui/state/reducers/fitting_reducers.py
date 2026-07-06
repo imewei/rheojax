@@ -76,7 +76,7 @@ def reduce_store_fit_result(
             return state
 
         fit_state = (
-            result
+            replace(result, dataset_id=str(dataset_id))
             if isinstance(result, FitResult)
             else FitResult(
                 model_name=model_name,

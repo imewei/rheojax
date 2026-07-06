@@ -29,17 +29,24 @@ def reduced_chi_squared(
         by setting sigma2=rss/dof would be trivially circular and misleading.
         When the true noise variance is unknown, callers should pass
         ``sigma2=1.0`` to obtain ``rss/dof`` — a meaningful unnormalized
-        residual per degree of freedom.
+        residual per degree of freedom. Must be finite and strictly positive.
 
     Returns
     -------
     float
         rss / (sigma2 * dof), where dof = max(n - k, 1).
         Returns float('nan') when sigma2 is None.
+
+    Raises
+    ------
+    ValueError
+        If sigma2 is not None and is not finite and strictly positive.
     """
     dof = max(n - k, 1)
     if sigma2 is None:
         return float("nan")
+    if not np.isfinite(sigma2) or sigma2 <= 0.0:
+        raise ValueError(f"sigma2 must be finite and > 0, got {sigma2!r}")
     return float(rss / (sigma2 * dof))
 
 
