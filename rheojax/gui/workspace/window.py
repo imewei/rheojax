@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
+from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
@@ -70,6 +72,11 @@ class WorkspaceWindow(QMainWindow):
         bar.addWidget(self._status_label)
         self._build_file_menu()
 
+        self.log_dock = LogDockWidget(self)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
+        self.log_dock.setVisible(False)
+        self._build_view_menu()
+
         self._build_workspace(app_state)
 
     def _build_file_menu(self) -> None:
@@ -79,6 +86,20 @@ class WorkspaceWindow(QMainWindow):
         menu.addAction("&Save", self._on_save, "Ctrl+S")
         menu.addAction("Save &As...", self._on_save_as, "Ctrl+Shift+S")
         menu.addAction("&Close", self._on_close)
+
+    def _build_view_menu(self) -> None:
+        menu = self.menuBar().addMenu("&View")
+        action = QAction("&Log Panel", self)
+        action.setCheckable(True)
+        action.setChecked(False)
+        action.setStatusTip("Toggle log panel visibility")
+        action.triggered.connect(lambda: self.log_dock.setVisible(action.isChecked()))
+        menu.addAction(action)
+        self.view_log_dock_action = action
+
+    def log(self, message: str) -> None:
+        """Append message to the log dock at INFO level."""
+        self.log_dock.append_record(logging.INFO, message)
 
     def _build_workspace(self, state: AppState) -> None:
         self._state = state
