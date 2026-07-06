@@ -115,3 +115,69 @@ def test_legacy_flag_constructs_main_window(monkeypatch):
     with pytest.raises(SystemExit):
         main_module.main(["--legacy"])
     assert created.get("legacy") is True
+
+
+class _FakeLogDock:
+    def append_record(self, levelno, message):
+        pass
+
+
+class _FakeDestroyed:
+    def connect(self, fn):
+        # Short-circuits before app.exec() would otherwise block, same as the
+        # existing tests above but one step later (after handler install).
+        raise SystemExit(0)
+
+
+class _FakeWorkspaceWindow:
+    def __init__(self):
+        self.log_dock = _FakeLogDock()
+        self.destroyed = _FakeDestroyed()
+
+
+def test_workspace_branch_installs_gui_log_handler(monkeypatch):
+    import rheojax.gui.main as main_module
+
+    _reuse_qapplication_singleton(monkeypatch)
+    fake_window = _FakeWorkspaceWindow()
+    monkeypatch.setattr(main_module, "_create_workspace_window", lambda: fake_window)
+
+    captured = {}
+
+    def _fake_install(append_fn, **kwargs):
+        captured["append_fn"] = append_fn
+        return object()
+
+    monkeypatch.setattr(main_module, "install_gui_log_handler", _fake_install)
+
+    with pytest.raises(SystemExit):
+        main_module.main([])
+
+    assert captured.get("append_fn") == fake_window.log_dock.append_record
+
+
+def test_uncaught_exception_is_logged_via_global_excepthook(monkeypatch):
+    import sys
+
+    import rheojax.gui.main as main_module
+
+    monkeypatch.setattr(sys, "excepthook", sys.excepthook)  # arm restoration
+
+    monkeypatch.setattr(
+        main_module, "check_dependencies", lambda: (False, ["fake-missing-dep"])
+    )
+
+    result = main_module.main([])
+    assert result == 1
+    assert sys.excepthook is not sys.__excepthook__
+
+    captured = []
+    monkeypatch.setattr(
+        main_module.logger, "critical", lambda *a, **k: captured.append((a, k))
+    )
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        sys.excepthook(*sys.exc_info())
+
+    assert captured

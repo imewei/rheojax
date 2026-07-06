@@ -7,6 +7,7 @@ Central window coordinating pages, state, and services with dock-based layout.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -22,7 +23,6 @@ from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
     QApplication,
     QCloseEvent,
-    QDockWidget,
     QFileDialog,
     QInputDialog,
     QKeySequence,
@@ -31,7 +31,6 @@ from rheojax.gui.compat import (
     QShortcut,
     QSplitter,
     Qt,
-    QTextEdit,
     QToolBar,
     QWidget,
     Signal,
@@ -65,6 +64,7 @@ from rheojax.gui.state.store import (
     WorkflowMode,
 )
 from rheojax.gui.widgets.dataset_tree import DatasetTree
+from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.widgets.pipeline_chips import PipelineChips
 from rheojax.gui.widgets.pipeline_sidebar import PipelineSidebar
 from rheojax.gui.widgets.workspace_container import WorkspaceContainer
@@ -208,13 +208,7 @@ class RheoJAXMainWindow(QMainWindow):
         self.data_dock = None
 
         # Bottom dock: Log panel (collapsible)
-        self.log_dock = QDockWidget("Log", self)
-        self.log_dock.setObjectName("LogDock")
-        self.log_panel = QTextEdit(self)
-        self.log_panel.setReadOnly(True)
-        self.log_panel.setMaximumHeight(200)
-        self.log_panel.setPlaceholderText("Application logs will appear here...")
-        self.log_dock.setWidget(self.log_panel)
+        self.log_dock = LogDockWidget(self)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
 
         # Start with log panel hidden
@@ -839,14 +833,14 @@ class RheoJAXMainWindow(QMainWindow):
             self._navigating = False
 
     def log(self, message: str) -> None:
-        """Append message to log panel.
+        """Append message to log panel at INFO level.
 
         Parameters
         ----------
         message : str
             Log message
         """
-        self.log_panel.append(message)
+        self.log_dock.append_record(logging.INFO, message)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event with cleanup.

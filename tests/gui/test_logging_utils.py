@@ -10,9 +10,12 @@ pytestmark = pytest.mark.gui
 
 
 def test_install_gui_log_handler_forwards_records() -> None:
-    """Log records should reach the GUI append callback."""
-    captured: list[str] = []
-    handler = install_gui_log_handler(captured.append, level=logging.DEBUG)
+    """Log records should reach the GUI append callback with their level."""
+    captured: list[tuple[int, str]] = []
+    handler = install_gui_log_handler(
+        lambda levelno, message: captured.append((levelno, message)),
+        level=logging.DEBUG,
+    )
 
     root_logger = logging.getLogger()
     original_level = root_logger.level
@@ -26,4 +29,7 @@ def test_install_gui_log_handler_forwards_records() -> None:
         root_logger.removeHandler(handler)
         root_logger.setLevel(original_level)
 
-    assert any("hello gui logger" in line for line in captured)
+    assert any(
+        levelno == logging.INFO and "hello gui logger" in message
+        for levelno, message in captured
+    )
