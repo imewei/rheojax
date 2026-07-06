@@ -568,9 +568,13 @@ class WorkspaceWindow(QMainWindow):
         self._state.project.dirty = True
 
     def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
-        self._state.library.add(ref, overwrite=overwrite)
-        if payload is not None:
-            self._state.library.store_payload(ref.id, payload)
+        # Hold the library's lock across both calls so a concurrent reader never
+        # observes a DatasetRef registered by add() before store_payload() has
+        # written its payload (see DatasetLibrary.lock's docstring in library.py).
+        with self._state.library.lock:
+            self._state.library.add(ref, overwrite=overwrite)
+            if payload is not None:
+                self._state.library.store_payload(ref.id, payload)
         self._notifier.changed.emit()
 
     # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
