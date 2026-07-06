@@ -28,6 +28,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
     Slot,
+    _is_qobject_alive,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, Typography, button_style
 from rheojax.gui.services.export_service import ExportService
@@ -64,6 +65,11 @@ class ExportPage(QWidget):
         # concurrently); each worker is discarded from this set on its own
         # completion/failure so it never clobbers a sibling worker's lifetime.
         self._active_export_workers: set[Any] = set()
+        # Cancellation events for in-flight exports, so prepare_for_close()
+        # can stop them (they run on QThreadPool.globalInstance(), which
+        # MainWindow's WorkerPool.shutdown() does not manage).
+        self._active_cancel_events: set[Any] = set()
+        self._closing = False
         self.setup_ui()
         # R6-GUI-001: Use QueuedConnection so _perform_export runs after the
         # current event handler returns, preventing button-click blocking.
@@ -753,6 +759,11 @@ class ExportPage(QWidget):
         import threading as _threading
 
         _cancelled = _threading.Event()
+        self._active_cancel_events.add(_cancelled)
+
+        # Names of figures that failed to render/export, so the completion
+        # message doesn't claim full success when some were silently skipped.
+        skipped_figures: list[str] = []
 
         def _run_export(progress_emit: Any) -> list[str]:
             """All blocking work runs here — called from ExportWorker thread."""
@@ -891,6 +902,7 @@ class ExportPage(QWidget):
                             logger.warning(
                                 f"Failed to export fit plots for {result_id}: {exc}"
                             )
+                            skipped_figures.append(f"fit/residual plot ({result_id})")
 
                 for result_id, bayes_result in state.bayesian_results.items():
                     if _maybe_cancel():
@@ -915,6 +927,7 @@ class ExportPage(QWidget):
                         logger.warning(
                             f"Failed to export Bayesian plots for {result_id}: {exc}"
                         )
+                        skipped_figures.append(f"Bayesian plots ({result_id})")
 
             if _maybe_cancel():
                 return exported_files
@@ -1021,10 +1034,13 @@ class ExportPage(QWidget):
 
         # ---- Wire up completion/failure callbacks (run on GUI thread) -------
         def _on_completed(exported_files: list[str]) -> None:
-            progress.close()
             # Release only this worker's reference; siblings from a batch
             # export may still be running.
             self._active_export_workers.discard(worker)
+            self._active_cancel_events.discard(_cancelled)
+            if self._closing or not _is_qobject_alive(self):
+                return
+            progress.close()
             if export_btn is not None and not self._active_export_workers:
                 export_btn.setEnabled(True)
             if _cancelled.is_set():
@@ -1043,22 +1059,28 @@ class ExportPage(QWidget):
             total_size = sum(
                 Path(f).stat().st_size for f in exported_files if Path(f).exists()
             )
-            QMessageBox.information(
-                self,
-                "Export Complete",
-                f"Successfully exported {len(exported_files)} files to:\n{output_dir}",
-            )
+            message = f"Successfully exported {len(exported_files)} files to:\n{output_dir}"
+            if skipped_figures:
+                message += (
+                    f"\n\n{len(skipped_figures)} figure(s) could not be generated "
+                    f"and were skipped:\n" + "\n".join(skipped_figures)
+                )
+            QMessageBox.information(self, "Export Complete", message)
             self.export_completed.emit(str(output_dir))
             logger.info(
                 "Export completed",
                 file_count=len(exported_files),
                 total_size_bytes=total_size,
+                skipped_figure_count=len(skipped_figures),
                 output_dir=str(output_dir),
             )
 
         def _on_failed(error_msg: str) -> None:
-            progress.close()
             self._active_export_workers.discard(worker)
+            self._active_cancel_events.discard(_cancelled)
+            if self._closing or not _is_qobject_alive(self):
+                return
+            progress.close()
             if export_btn is not None and not self._active_export_workers:
                 export_btn.setEnabled(True)
             full_msg = f"Export failed: {error_msg}"
@@ -1090,6 +1112,19 @@ class ExportPage(QWidget):
         # batch-export workers each keep their own reference alive.
         self._active_export_workers.add(worker)
         QThreadPool.globalInstance().start(worker)
+
+    def prepare_for_close(self) -> None:
+        """Prepare this page for parent window close.
+
+        Called by MainWindow.closeEvent *before* worker_pool.shutdown().
+        Exports run via QThreadPool.globalInstance(), which WorkerPool does
+        not manage, so this signals in-flight exports to stop and flips a
+        guard so their queued completed/failed callbacks become no-ops
+        instead of touching widgets mid-teardown.
+        """
+        self._closing = True
+        for cancel_event in self._active_cancel_events:
+            cancel_event.set()
 
     def export_results(
         self,

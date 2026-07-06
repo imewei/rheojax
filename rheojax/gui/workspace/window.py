@@ -4,6 +4,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
@@ -37,6 +38,7 @@ class WorkspaceWindow(QMainWindow):
         self._pipeline_service = PipelineExecutionService()
         self._pipeline_stop_event: threading.Event | None = None
         self._active_jobs_action_pending = False
+        self._close_confirmed = False
         # Keyed by job_id, not a single scalar -- a second concurrent import
         # launched before the first one finishes must not drop the only
         # Python reference to the first ImportWorker/ImportWorkerSignals
@@ -241,6 +243,18 @@ class WorkspaceWindow(QMainWindow):
         except (RuntimeError, TypeError):
             pass
         try:
+            self._notifier.changed.disconnect(self._fit_bodies[1].refresh)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._notifier.changed.disconnect(self._transform_bodies[1].refresh)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._notifier.changed.disconnect(self._pipeline_bodies[0].refresh)
+        except (RuntimeError, TypeError):
+            pass
+        try:
             self._rail.import_requested.disconnect(self._on_import_requested)
         except (RuntimeError, TypeError):
             pass
@@ -303,14 +317,16 @@ class WorkspaceWindow(QMainWindow):
         # a worker thread, so a concurrent Save could serialize a torn, inconsistent
         # snapshot. Unlike Close/New/Open (which offer to cancel jobs and proceed), Save
         # is a hard block: there is no safe "discard the running job" option here.
-        if not self._state.active_jobs.by_id:
+        with self._state.active_jobs.lock:
+            job_count = len(self._state.active_jobs.by_id)
+        if job_count == 0:
             return False
         from PySide6.QtWidgets import QMessageBox
 
         QMessageBox.information(
             self,
             "Jobs Running",
-            f"Cannot {action} while {len(self._state.active_jobs.by_id)} job(s) are still "
+            f"Cannot {action} while {job_count} job(s) are still "
             "running. Wait for them to finish, or cancel them via Close/New/Open first.",
         )
         return True
@@ -359,8 +375,32 @@ class WorkspaceWindow(QMainWindow):
             )
         )
 
+    def closeEvent(self, event: QCloseEvent) -> None:
+        # Closing via the OS window controls (X button, Alt+F4, Cmd+Q) hits
+        # this instead of the File>Close menu action, which is wired to
+        # _on_close. Without this override Qt's default closeEvent just
+        # accepts and closes immediately, skipping the active-jobs
+        # cancel/confirm chain and orphaning running QThreadPool workers.
+        # Reuse that same chain here; only accept once it has actually run
+        # to completion (job cancellation may finish asynchronously via
+        # _poll_active_jobs_then), then re-issue close() to get a second,
+        # now-trivial closeEvent that accepts.
+        if self._close_confirmed:
+            event.accept()
+            return
+        event.ignore()
+        self._maybe_confirm_active_jobs(
+            lambda: self._maybe_confirm_unsaved_changes(self._confirmed_close)
+        )
+
+    def _confirmed_close(self) -> None:
+        self._close_confirmed = True
+        self.close()
+
     def _maybe_confirm_active_jobs(self, proceed) -> None:
-        if not self._state.active_jobs.by_id:
+        with self._state.active_jobs.lock:
+            job_count = len(self._state.active_jobs.by_id)
+        if job_count == 0:
             proceed()
             return
         if self._active_jobs_action_pending:
@@ -375,7 +415,7 @@ class WorkspaceWindow(QMainWindow):
         choice = QMessageBox.question(
             self,
             "Jobs Running",
-            f"{len(self._state.active_jobs.by_id)} job(s) still running. Cancel them and continue?",
+            f"{job_count} job(s) still running. Cancel them and continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -390,12 +430,14 @@ class WorkspaceWindow(QMainWindow):
         if self._pipeline_stop_event is not None:
             self._pipeline_stop_event.set()  # stops PipelineBatchRunner from advancing to
             # further queued datasets (Task 7's run() loop)
-        # Snapshot before iterating: PipelineBatchRunner writes directly into
+        # Snapshot under the lock: PipelineBatchRunner writes directly into
         # this same plain dict from a QThreadPool worker thread (see its
         # comment), so iterating the live dict here risks
         # "RuntimeError: dictionary changed size during iteration" if a new
         # job is registered mid-loop.
-        for job in list(self._state.active_jobs.by_id.values()):
+        with self._state.active_jobs.lock:
+            jobs_snapshot = list(self._state.active_jobs.by_id.values())
+        for job in jobs_snapshot:
             worker = job.get("worker")
             if worker is not None:
                 QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))

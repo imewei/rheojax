@@ -186,7 +186,7 @@ def _fit_fn_body(
         progress_queue = multiprocessing.Queue()
         try:
             result = _run_on_thread(
-                lambda start_params=start_params: run_fit_isolated(
+                lambda start_params=start_params, progress_queue=progress_queue: run_fit_isolated(
                     model_key,
                     rheo_data.x,
                     rheo_data.y,

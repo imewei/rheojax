@@ -353,6 +353,14 @@ class ProcessWorkerAdapter(QRunnable):
             # Process was already .close()'d — it's dead.
             return False
 
+    @staticmethod
+    def _safe_join(proc: mp.Process, timeout: float | None = None) -> None:
+        """Join *proc*, tolerating a concurrent .close() from another thread."""
+        try:
+            proc.join(timeout=timeout)
+        except ValueError:
+            pass  # Already closed by a concurrent _ensure_process_dead()
+
     def _escalate_kill(self) -> None:
         """Escalation chain: cancel event -> SIGTERM -> SIGKILL."""
         proc = self._process
@@ -361,19 +369,22 @@ class ProcessWorkerAdapter(QRunnable):
 
         # Step 1: cooperative cancellation already set via _cancel_token.cancel()
         # Wait for the process to exit on its own.
-        proc.join(timeout=self._process_timeout)
+        self._safe_join(proc, self._process_timeout)
         if not self._proc_is_alive(proc):
             return
 
         # Step 2: SIGTERM
         logger.debug("Subprocess did not exit cooperatively; sending SIGTERM")
-        pid = proc.pid
+        try:
+            pid = proc.pid
+        except ValueError:
+            return  # Already closed by a concurrent _ensure_process_dead()
         if pid is not None:
             try:
                 os.kill(pid, signal.SIGTERM)
             except OSError:
                 return  # Process already gone
-        proc.join(timeout=self._kill_timeout)
+        self._safe_join(proc, self._kill_timeout)
         if not self._proc_is_alive(proc):
             return
 
@@ -381,9 +392,9 @@ class ProcessWorkerAdapter(QRunnable):
         logger.debug("Subprocess did not respond to SIGTERM; sending SIGKILL")
         try:
             proc.kill()  # SIGKILL on Unix, TerminateProcess on Windows
-        except OSError:
-            pass  # Already dead
-        proc.join(timeout=2.0)
+        except (OSError, ValueError):
+            pass  # Already dead or already closed
+        self._safe_join(proc, 2.0)
 
     def _ensure_process_dead(self) -> None:
         """Best-effort cleanup called in the finally block of run().
@@ -397,9 +408,9 @@ class ProcessWorkerAdapter(QRunnable):
                 logger.warning("Process still alive in cleanup; killing")
                 try:
                     proc.kill()
-                except OSError:
+                except (OSError, ValueError):
                     pass
-                proc.join(timeout=2.0)
+                self._safe_join(proc, 2.0)
             # Close the process handle to free resources
             try:
                 proc.close()

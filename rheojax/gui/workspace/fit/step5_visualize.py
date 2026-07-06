@@ -116,9 +116,21 @@ class VisualizeStep(QWidget):
             lo = np.asarray(lo)
             hi = np.asarray(hi)
             if np.iscomplexobj(lo) or np.iscomplexobj(hi):
-                lo, hi = np.abs(lo), np.abs(hi)
-            self._overlay.plot_line(x, lo, name="Posterior lo", line_style="dash")
-            self._overlay.plot_line(x, hi, name="Posterior hi", line_style="dash")
+                self._overlay.plot_line(
+                    x, lo.real, name="Posterior lo (G')", line_style="dash"
+                )
+                self._overlay.plot_line(
+                    x, hi.real, name="Posterior hi (G')", line_style="dash"
+                )
+                self._overlay.plot_line(
+                    x, lo.imag, name="Posterior lo (G'')", line_style="dash"
+                )
+                self._overlay.plot_line(
+                    x, hi.imag, name="Posterior hi (G'')", line_style="dash"
+                )
+            else:
+                self._overlay.plot_line(x, lo, name="Posterior lo", line_style="dash")
+                self._overlay.plot_line(x, hi, name="Posterior hi", line_style="dash")
 
     def _refresh_residuals(self) -> None:
         result = self._state.nlsq_result or {}
