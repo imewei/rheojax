@@ -1096,7 +1096,11 @@ class ExportPage(QWidget):
         # before the main-thread event loop can deliver it.
         worker.setAutoDelete(False)
         worker.signals.progress.connect(
-            lambda pct, label: progress.setLabelText(label),
+            lambda pct, label: (
+                None
+                if self._closing or not _is_qobject_alive(self)
+                else progress.setLabelText(label)
+            ),
             Qt.ConnectionType.QueuedConnection,
         )
         worker.signals.completed.connect(
