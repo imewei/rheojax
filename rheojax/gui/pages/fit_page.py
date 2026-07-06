@@ -25,7 +25,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
-from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, themed
 from rheojax.gui.services.model_service import ModelService, normalize_model_name
 from rheojax.gui.state.actions import (
     set_active_model,
@@ -210,7 +210,7 @@ class FitPage(QWidget):
         compat_layout = QVBoxLayout(compat_group)
         self._compat_label = QLabel("Select a model and dataset")
         self._compat_label.setWordWrap(True)
-        self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
+        self._compat_label.setStyleSheet(f"color: {themed('TEXT_MUTED')};")
         compat_layout.addWidget(self._compat_label)
         layout.addWidget(compat_group)
 
@@ -228,7 +228,7 @@ class FitPage(QWidget):
         self._empty_params = QLabel(self._empty_params_default_text)
         self._empty_params.setAlignment(Qt.AlignCenter)
         self._empty_params.setStyleSheet(
-            f"color: {ColorPalette.TEXT_SECONDARY}; padding: {Spacing.SM}px;"
+            f"color: {themed('TEXT_SECONDARY')}; padding: {Spacing.SM}px;"
         )
         params_layout.addWidget(self._empty_params)
         layout.addWidget(params_group, 2)
@@ -598,7 +598,7 @@ class FitPage(QWidget):
                 self._check_compatibility(model_name)
         else:
             self._compat_label.setText("Select a dataset to enable fitting")
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
+            self._compat_label.setStyleSheet(f"color: {themed('TEXT_MUTED')};")
 
         # The Fit Results panel/residuals plot show whatever the *previous*
         # dataset's fit produced -- refresh them for the new dataset instead
@@ -631,7 +631,7 @@ class FitPage(QWidget):
         if mode:
             self._store.dispatch("SET_TEST_MODE", {"test_mode": mode})
             self._compat_label.setText(f"Mode set to {mode}")
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_SECONDARY};")
+            self._compat_label.setStyleSheet(f"color: {themed('TEXT_SECONDARY')};")
 
     def _on_quick_model_changed(self, index: int) -> None:
         """Handle quick model combo changes."""
@@ -688,7 +688,7 @@ class FitPage(QWidget):
         dataset = self._store.get_active_dataset()
         if dataset is None:
             self._compat_label.setText("No dataset loaded")
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.TEXT_MUTED};")
+            self._compat_label.setStyleSheet(f"color: {themed('TEXT_MUTED')};")
             self._is_compatible = False
             return
 
@@ -710,7 +710,7 @@ class FitPage(QWidget):
             self._compat_label.setText(
                 f"Mode '{test_mode}': compatibility check not available, assuming OK"
             )
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.SUCCESS};")
+            self._compat_label.setStyleSheet(f"color: {themed('SUCCESS')};")
             self._is_compatible = True
             logger.debug(
                 "Compatibility check skipped for unsupported mode",
@@ -724,7 +724,7 @@ class FitPage(QWidget):
         if result.get("compatible", True):
             text = f"Compatible\nDecay: {result.get('decay_type', 'unknown')}"
             self._compat_label.setText(text)
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.SUCCESS};")
+            self._compat_label.setStyleSheet(f"color: {themed('SUCCESS')};")
             self._is_compatible = True
             logger.debug(
                 "Compatibility check passed",
@@ -736,7 +736,7 @@ class FitPage(QWidget):
             warnings = result.get("warnings", [])
             text = "Compatibility issues:\n" + "\n".join(f"- {w}" for w in warnings[:3])
             self._compat_label.setText(text)
-            self._compat_label.setStyleSheet(f"color: {ColorPalette.WARNING};")
+            self._compat_label.setStyleSheet(f"color: {themed('WARNING')};")
             self._is_compatible = False
             logger.debug(
                 "Compatibility check failed",
@@ -980,7 +980,7 @@ class FitPage(QWidget):
         lines.append("Check model-data compatibility and parameter bounds.")
         self._status_text.setText("\n".join(lines))
         self._status_text.setStyleSheet(
-            f"color: {ColorPalette.ERROR if hasattr(ColorPalette, 'ERROR') else '#e74c3c'};"
+            f"color: {themed('ERROR')};"
         )
         if hasattr(self, "_empty_results"):
             self._empty_results.hide()

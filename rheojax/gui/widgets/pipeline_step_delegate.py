@@ -17,7 +17,7 @@ from rheojax.gui.compat import (
     QtWidgets,
     QWidget,
 )
-from rheojax.gui.resources.styles.tokens import Typography
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
@@ -33,13 +33,16 @@ ROLE_STEP_ID = Qt.ItemDataRole.UserRole
 ROLE_STEP_TYPE = Qt.ItemDataRole.UserRole + 1
 ROLE_STATUS = Qt.ItemDataRole.UserRole + 2
 
-# Status color map
-_STATUS_COLORS: dict[StepStatus, str] = {
-    StepStatus.PENDING: "#9CA3AF",  # gray-400
-    StepStatus.ACTIVE: "#3B82F6",  # blue-500
-    StepStatus.COMPLETE: "#22C55E",  # green-500
-    StepStatus.WARNING: "#F97316",  # orange-500
-    StepStatus.ERROR: "#EF4444",  # red-500
+# Shared pipeline-step status -> semantic color token mapping.
+# Values are ColorPalette / DarkColorPalette attribute names, resolved via
+# themed() at paint/style time so they track the active (light/dark) theme.
+# Used by both PipelineStepDelegate and PipelineChips for a consistent palette.
+STATUS_TOKENS: dict[StepStatus, str] = {
+    StepStatus.PENDING: "TEXT_MUTED",
+    StepStatus.ACTIVE: "PRIMARY",
+    StepStatus.COMPLETE: "SUCCESS",
+    StepStatus.WARNING: "WARNING",
+    StepStatus.ERROR: "ERROR",
 }
 
 _CIRCLE_SIZE = 10
@@ -115,7 +118,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         # Highlight selected items
         is_selected = bool(option.state & QtWidgets.QStyle.StateFlag.State_Selected)
         if is_selected:
-            painter.fillRect(rect, QColor("#EEF2FF"))
+            painter.fillRect(rect, QColor(themed("PRIMARY_SUBTLE")))
         else:
             painter.fillRect(rect, QColor("transparent"))
 
@@ -134,8 +137,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
             except (ValueError, KeyError):
                 pass
 
-        color_hex = _STATUS_COLORS.get(status, "#9CA3AF")
-        status_color = QColor(color_hex)
+        status_color = QColor(themed(STATUS_TOKENS.get(status, "TEXT_MUTED")))
 
         x = rect.left() + _PADDING_H
         cy = rect.top() + rect.height() // 2
@@ -154,7 +156,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
         pos_font.setBold(True)
         pos_font.setPointSize(Typography.SIZE_XS)
         painter.setFont(pos_font)
-        painter.setPen(QColor("#374151"))  # gray-700
+        painter.setPen(QColor(themed("TEXT_SECONDARY")))
 
         pos_rect = QRect(x, rect.top() + _PADDING_V, 20, rect.height() - 2 * _PADDING_V)
         painter.drawText(
@@ -168,7 +170,9 @@ class PipelineStepDelegate(QStyledItemDelegate):
         name_font = QFont()
         name_font.setPointSize(Typography.SIZE_XS)
         painter.setFont(name_font)
-        painter.setPen(QColor("#111827") if not is_selected else QColor("#1E1B4B"))
+        painter.setPen(
+            QColor(themed("PRIMARY")) if is_selected else QColor(themed("TEXT_PRIMARY"))
+        )
 
         # Reserve right side for step_type label
         type_label_width = 58
@@ -190,7 +194,7 @@ class PipelineStepDelegate(QStyledItemDelegate):
             type_font = QFont()
             type_font.setPointSize(Typography.SIZE_XS)
             painter.setFont(type_font)
-            painter.setPen(QColor("#9CA3AF"))  # gray-400
+            painter.setPen(QColor(themed("TEXT_MUTED")))
 
             type_rect = QRect(
                 rect.right() - type_label_width - _PADDING_H,

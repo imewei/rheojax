@@ -40,10 +40,10 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.jobs.worker_pool import WorkerPool
 from rheojax.gui.resources.styles.tokens import (
-    ColorPalette,
     Spacing,
     Typography,
     button_style,
+    themed,
 )
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.services.data_service import DataService
@@ -154,7 +154,7 @@ class BayesianPage(QWidget):
 
         # Model info
         self._model_label = QLabel("Model: (select in Fit tab)")
-        self._model_label.setStyleSheet("font-weight: bold;")
+        self._model_label.setStyleSheet(f"font-weight: {Typography.WEIGHT_BOLD};")
         layout.addWidget(self._model_label)
 
         # Sampler selection
@@ -277,7 +277,7 @@ class BayesianPage(QWidget):
         self._eta_label = QLabel("ETA: --:--")
         self._divergence_label = QLabel("Divergences: 0")
         self._divergence_label.setStyleSheet(
-            f"color: {ColorPalette.ERROR}; font-weight: bold;"
+            f"color: {themed('ERROR')}; font-weight: bold;"
         )
         info_layout.addWidget(self._eta_label)
         info_layout.addStretch()
@@ -302,7 +302,7 @@ class BayesianPage(QWidget):
         )
         self._fit_plot_placeholder.setAlignment(Qt.AlignCenter)
         self._fit_plot_placeholder.setStyleSheet(
-            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+            f"color: {themed('TEXT_MUTED')}; padding: {Spacing.SM}px;"
         )
         layout.addWidget(self._fit_plot_placeholder)
 
@@ -321,7 +321,7 @@ class BayesianPage(QWidget):
         self._ess_label = QLabel("ESS: --")
         warning_label = QLabel("Diagnostics: awaiting run")
         warning_label.setStyleSheet(
-            f"color: {ColorPalette.WARNING}; padding: {Spacing.XXS}px;"
+            f"color: {themed('WARNING')}; padding: {Spacing.XXS}px;"
         )
         self._diag_warning = warning_label
         # Use design token monospace font
@@ -1026,7 +1026,7 @@ class BayesianPage(QWidget):
                 page="BayesianPage",
             )
             self._divergence_label.setStyleSheet(
-                f"color: {ColorPalette.ERROR}; font-weight: bold;"
+                f"color: {themed('ERROR')}; font-weight: bold;"
             )
             self._status_text.append(f"WARNING: {count} divergent transitions detected")
 
@@ -1298,7 +1298,7 @@ class BayesianPage(QWidget):
         if rhat:
             max_rhat = max(rhat.values()) if rhat else 0
             status = "OK" if max_rhat < 1.01 else "WARNING"
-            color = ColorPalette.SUCCESS if max_rhat < 1.01 else ColorPalette.WARNING
+            color = themed('SUCCESS') if max_rhat < 1.01 else themed('WARNING')
             self._rhat_label.setText(f"R-hat (max): {max_rhat:.4f} [{status}]")
             self._rhat_label.setStyleSheet(
                 f"color: {color}; font-family: {Typography.FONT_FAMILY_MONO};"
@@ -1311,7 +1311,7 @@ class BayesianPage(QWidget):
         if ess:
             min_ess = min(ess.values()) if ess else 0
             status = "OK" if min_ess > 400 else "LOW"
-            color = ColorPalette.SUCCESS if min_ess > 400 else ColorPalette.WARNING
+            color = themed('SUCCESS') if min_ess > 400 else themed('WARNING')
             self._ess_label.setText(f"ESS (min): {min_ess:.0f} [{status}]")
             self._ess_label.setStyleSheet(
                 f"color: {color}; font-family: {Typography.FONT_FAMILY_MONO};"
@@ -1324,12 +1324,12 @@ class BayesianPage(QWidget):
         if divergences == -1:
             self._divergence_label.setText("Divergences: unknown")
             self._divergence_label.setStyleSheet(
-                f"color: {ColorPalette.WARNING}; font-weight: bold;"
+                f"color: {themed('WARNING')}; font-weight: bold;"
             )
         elif divergences > 0:
             self._divergence_label.setText(f"Divergences: {divergences}")
             self._divergence_label.setStyleSheet(
-                f"color: {ColorPalette.ERROR}; font-weight: bold;"
+                f"color: {themed('ERROR')}; font-weight: bold;"
             )
             self._diag_warning.setText(
                 "Warning: Divergences detected; consider higher target_accept"
@@ -1337,7 +1337,7 @@ class BayesianPage(QWidget):
         else:
             self._divergence_label.setText("Divergences: 0")
             self._divergence_label.setStyleSheet(
-                f"color: {ColorPalette.SUCCESS}; font-weight: bold;"
+                f"color: {themed('SUCCESS')}; font-weight: bold;"
             )
             if "OK" in self._rhat_label.text() and "OK" in self._ess_label.text():
                 self._diag_warning.setText("Diagnostics look good")

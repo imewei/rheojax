@@ -21,7 +21,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, themed
 from rheojax.gui.utils.layout_helpers import set_toolbar_margins
 from rheojax.logging import get_logger
 
@@ -108,7 +108,7 @@ class ResidualsPanel(QWidget):
 
         # Statistics label
         self._stats_label = QLabel("")
-        self._stats_label.setStyleSheet("color: gray;")
+        self._stats_label.setStyleSheet(f"color: {themed('TEXT_SECONDARY')};")
         toolbar_layout.addWidget(self._stats_label)
 
         # Export button
@@ -134,7 +134,9 @@ class ResidualsPanel(QWidget):
 
         self._empty_label = QLabel("No residuals yet. Run a fit to view diagnostics.")
         self._empty_label.setAlignment(Qt.AlignCenter)
-        self._empty_label.setStyleSheet("color: #94A3B8; padding: 6px;")
+        self._empty_label.setStyleSheet(
+            f"color: {themed('TEXT_SECONDARY')}; padding: 6px;"
+        )
         layout.addWidget(self._empty_label)
 
     def _connect_signals(self) -> None:

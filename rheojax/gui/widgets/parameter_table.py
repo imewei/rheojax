@@ -21,6 +21,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.state.store import ParameterState
 from rheojax.logging import get_logger
 
@@ -78,9 +79,10 @@ class ParameterTable(QTableWidget):
         # Configure table
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max", "Fixed"])
+        _table_font = f"{Typography.SIZE_MD_SM}pt"
         self.setStyleSheet(
-            "QTableWidget { font-size: 11pt; } "
-            "QHeaderView::section { font-size: 11pt; }"
+            f"QTableWidget {{ font-size: {_table_font}; }} "
+            f"QHeaderView::section {{ font-size: {_table_font}; }}"
         )
 
         # Column sizing: stretch to fill available width
@@ -335,7 +337,7 @@ class ParameterTable(QTableWidget):
                     # Out of bounds (or nan/inf, which NaN comparisons would
                     # otherwise silently pass as "in bounds") - red text.
                     # Do not emit: invalid values must never reach the state store.
-                    item.setForeground(QBrush(QColor(255, 0, 0)))
+                    item.setForeground(QBrush(QColor(themed("ERROR"))))
                     return
 
                 # In bounds - check if modified
@@ -376,7 +378,7 @@ class ParameterTable(QTableWidget):
                 if not math.isfinite(min_val) or not math.isfinite(max_val) or min_val > max_val:
                     # Invalid bounds (non-finite or inverted) - red text.
                     # Do not emit: invalid bounds must never reach the state store.
-                    item.setForeground(QBrush(QColor(255, 0, 0)))
+                    item.setForeground(QBrush(QColor(themed("ERROR"))))
                     return
 
                 item.setForeground(
@@ -390,7 +392,7 @@ class ParameterTable(QTableWidget):
                 value_item = self.item(row, 1)
                 value = float(value_item.text())
                 if not math.isfinite(value) or value < min_val or value > max_val:
-                    value_item.setForeground(QBrush(QColor(255, 0, 0)))
+                    value_item.setForeground(QBrush(QColor(themed("ERROR"))))
                 else:
                     value_item.setForeground(
                         QBrush(self.palette().color(QPalette.ColorRole.Text))
@@ -478,15 +480,15 @@ class ParameterTable(QTableWidget):
             Parameter state
         """
         if param_state.fixed:
-            # Gray background for fixed parameters
-            gray_brush = QBrush(QColor(240, 240, 240))
+            # Muted surface for fixed (locked) parameters
+            gray_brush = QBrush(QColor(themed("BG_HOVER")))
             for col in range(4):  # All columns except checkbox
                 item = self.item(row, col)
                 if item:
                     item.setBackground(gray_brush)
         else:
-            # White background for active parameters
-            white_brush = QBrush(QColor(255, 255, 255))
+            # Normal surface for active (editable) parameters
+            white_brush = QBrush(QColor(themed("BG_SURFACE")))
             for col in range(4):
                 item = self.item(row, col)
                 if item:

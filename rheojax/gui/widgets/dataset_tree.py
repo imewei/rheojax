@@ -18,6 +18,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.state.store import DatasetState
 from rheojax.logging import get_logger
 
@@ -69,8 +70,10 @@ class DatasetTree(QTreeWidget):
 
         # Configure tree
         self.setHeaderLabels(["Name", "Type", "Status"])
+        _tree_font = f"{Typography.SIZE_MD_SM}pt"
         self.setStyleSheet(
-            "QTreeWidget { font-size: 11pt; } QHeaderView::section { font-size: 11pt; }"
+            f"QTreeWidget {{ font-size: {_tree_font}; }} "
+            f"QHeaderView::section {{ font-size: {_tree_font}; }}"
         )
         self.setColumnWidth(0, 250)
         self.setColumnWidth(1, 100)
@@ -108,7 +111,7 @@ class DatasetTree(QTreeWidget):
         self._project_item = QTreeWidgetItem(self, ["Project", "Folder", ""])
         self._project_item.setExpanded(True)
         # Set icon (placeholder - would use actual icon file)
-        self._project_item.setForeground(0, QBrush(QColor(100, 100, 100)))
+        self._project_item.setForeground(0, QBrush(QColor(themed("TEXT_SECONDARY"))))
 
         logger.debug("Rendering", widget=self.__class__.__name__)
 
@@ -230,7 +233,7 @@ class DatasetTree(QTreeWidget):
         # Create file item
         file_item = QTreeWidgetItem(dataset_item, [file_path.name, "File", ""])
         file_item.setData(0, Qt.UserRole, str(file_path))
-        file_item.setForeground(0, QBrush(QColor(120, 120, 120)))
+        file_item.setForeground(0, QBrush(QColor(themed("TEXT_MUTED"))))
 
         logger.debug("Rendering", widget=self.__class__.__name__)
 
@@ -272,12 +275,12 @@ class DatasetTree(QTreeWidget):
             Status string
         """
         color_map = {
-            "loaded": QColor(100, 150, 255),  # Blue
-            "fitted": QColor(100, 200, 100),  # Green
-            "bayesian": QColor(150, 100, 255),  # Purple
+            "loaded": QColor(themed("INFO")),  # Blue
+            "fitted": QColor(themed("SUCCESS")),  # Green
+            "bayesian": QColor(themed("ACCENT")),  # Purple
         }
 
-        color = color_map.get(status, QColor(150, 150, 150))
+        color = color_map.get(status, QColor(themed("TEXT_MUTED")))
         item.setForeground(2, QBrush(color))
 
     def get_selected_dataset_id(self) -> str | None:

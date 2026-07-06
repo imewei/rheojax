@@ -23,7 +23,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, themed
 from rheojax.gui.utils.layout_helpers import set_compact_margins, set_toolbar_margins
 from rheojax.logging import get_logger
 
@@ -79,7 +79,7 @@ class PlotPanel(QWidget):
         # Title
         self._title_label = QLabel(f"Panel {self._index + 1}")
         self._title_label.setStyleSheet(
-            "font-weight: bold; padding: 2px; background: #f0f0f0;"
+            f"font-weight: bold; padding: 2px; background: {themed('BG_SURFACE')};"
         )
         self._title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._title_label)

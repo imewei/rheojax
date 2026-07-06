@@ -143,10 +143,10 @@ class PyQtGraphCanvas(QWidget):
 
         # Setup crosshair
         self._crosshair_v = pg.InfiniteLine(
-            angle=90, movable=False, pen=pg.mkPen("g", width=1)
+            angle=90, movable=False, pen=pg.mkPen(themed("SUCCESS"), width=1)
         )
         self._crosshair_h = pg.InfiniteLine(
-            angle=0, movable=False, pen=pg.mkPen("g", width=1)
+            angle=0, movable=False, pen=pg.mkPen(themed("SUCCESS"), width=1)
         )
         self._plot_item.addItem(self._crosshair_v, ignoreBounds=True)
         self._plot_item.addItem(self._crosshair_h, ignoreBounds=True)
