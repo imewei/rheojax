@@ -247,6 +247,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # Setup logging
     setup_logging(args.verbose)
+
+    def _log_uncaught_exception(exc_type, exc_value, exc_tb) -> None:
+        logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _log_uncaught_exception
+
     logger.info("RheoJAX GUI starting", version=__version__)
 
     # Check dependencies
@@ -414,6 +421,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
             return 1
 
+        gui_handler = install_gui_log_handler(
+            workspace_window.log_dock.append_record,
+            level=logging.DEBUG if args.verbose else logging.INFO,
+        )
+        workspace_window.destroyed.connect(
+            lambda *_: logging.getLogger().removeHandler(gui_handler)
+        )
+
         app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
         _show_main_window(workspace_window, args.maximized)
         logger.info("RheoJAX GUI workspace shell ready", version=__version__)
@@ -474,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.debug("Creating main window", maximized=args.maximized)
         window = RheoJAXMainWindow(start_maximized=args.maximized)
         gui_handler = install_gui_log_handler(
-            window.log,
+            window.log_dock.append_record,
             level=logging.DEBUG if args.verbose else logging.INFO,
         )
         logger.debug("GUI log handler attached")
