@@ -29,7 +29,7 @@ from rheojax.gui.compat import (
     Signal,
     Slot,
 )
-from rheojax.gui.resources.styles.tokens import ColorPalette
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.services.bayesian_service import BayesianService
 from rheojax.gui.state.store import BayesianResult, FitResult, StateStore
 from rheojax.gui.utils.layout_helpers import apply_group_box_style, set_compact_margins
@@ -144,9 +144,9 @@ class DiagnosticsPage(QWidget):
                 # NaN (degenerate/non-converging chain) -- NaN comparisons are
                 # always False in Python, so they must be checked explicitly.
                 if rhat_val >= 1.01 or np.isnan(rhat_val):
-                    rhat_item.setForeground(QBrush(QColor("#c62828")))
+                    rhat_item.setForeground(QBrush(QColor(themed("ERROR"))))
                 if ess_val < 400 or np.isnan(ess_val):
-                    ess_item.setForeground(QBrush(QColor("#c62828")))
+                    ess_item.setForeground(QBrush(QColor(themed("ERROR"))))
 
                 self._rhat_ess_table.setItem(row, 0, QTableWidgetItem(param))
                 self._rhat_ess_table.setItem(row, 1, rhat_item)
@@ -252,7 +252,7 @@ class DiagnosticsPage(QWidget):
         bottom_row = QHBoxLayout()
         empty_label = QLabel("Run Bayesian inference to populate.")
         empty_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_SECONDARY}; font-size: 11px;"
+            f"color: {themed('TEXT_SECONDARY')}; font-size: {Typography.SIZE_SM}pt;"
         )
         bottom_row.addWidget(empty_label)
         self._empty_label = empty_label
@@ -602,11 +602,11 @@ class DiagnosticsPage(QWidget):
             if r2 is not None:
                 values["R²"] = f"{float(r2):.6f}"
                 if r2 >= 0.99:
-                    self._color_metric("R²", ColorPalette.SUCCESS)
+                    self._color_metric("R²", themed("SUCCESS"))
                 elif r2 >= 0.95:
-                    self._color_metric("R²", ColorPalette.WARNING)
+                    self._color_metric("R²", themed("WARNING"))
                 else:
-                    self._color_metric("R²", ColorPalette.ERROR)
+                    self._color_metric("R²", themed("ERROR"))
 
             chi2 = getattr(fit_result, "chi_squared", None)
             if chi2 is not None:
@@ -616,11 +616,11 @@ class DiagnosticsPage(QWidget):
             if mpe is not None:
                 values["MPE (%)"] = f"{float(mpe):.2f}"
                 if abs(mpe) <= 5.0:
-                    self._color_metric("MPE (%)", ColorPalette.SUCCESS)
+                    self._color_metric("MPE (%)", themed("SUCCESS"))
                 elif abs(mpe) <= 15.0:
-                    self._color_metric("MPE (%)", ColorPalette.WARNING)
+                    self._color_metric("MPE (%)", themed("WARNING"))
                 else:
-                    self._color_metric("MPE (%)", ColorPalette.ERROR)
+                    self._color_metric("MPE (%)", themed("ERROR"))
 
         # --- WAIC / LOO from InferenceData ---
         idata = self._current_inference_data
@@ -647,30 +647,30 @@ class DiagnosticsPage(QWidget):
             max_rhat = max(result.r_hat.values())
             values["R-hat (max)"] = f"{max_rhat:.4f}"
             if max_rhat > 1.1:
-                self._color_metric("R-hat (max)", ColorPalette.ERROR)
+                self._color_metric("R-hat (max)", themed("ERROR"))
             elif max_rhat > 1.01:
-                self._color_metric("R-hat (max)", ColorPalette.WARNING)
+                self._color_metric("R-hat (max)", themed("WARNING"))
             else:
-                self._color_metric("R-hat (max)", ColorPalette.SUCCESS)
+                self._color_metric("R-hat (max)", themed("SUCCESS"))
 
         if result.ess:
             min_ess = min(result.ess.values())
             values["ESS (min)"] = f"{min_ess:.0f}"
             if min_ess < 100:
-                self._color_metric("ESS (min)", ColorPalette.ERROR)
+                self._color_metric("ESS (min)", themed("ERROR"))
             elif min_ess < 400:
-                self._color_metric("ESS (min)", ColorPalette.WARNING)
+                self._color_metric("ESS (min)", themed("WARNING"))
             else:
-                self._color_metric("ESS (min)", ColorPalette.SUCCESS)
+                self._color_metric("ESS (min)", themed("SUCCESS"))
 
         display_divergences = max(result.divergences, 0)
         values["Divergences"] = (
             "unknown" if result.divergences == -1 else str(display_divergences)
         )
         if display_divergences > 0:
-            self._color_metric("Divergences", ColorPalette.ERROR)
+            self._color_metric("Divergences", themed("ERROR"))
         else:
-            self._color_metric("Divergences", ColorPalette.SUCCESS)
+            self._color_metric("Divergences", themed("SUCCESS"))
 
         # Update table cells via the name → (row, col) map
         for metric, val in values.items():

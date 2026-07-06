@@ -17,8 +17,9 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing, Typography
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.gui.state.store import PipelineStep, StepStatus
+from rheojax.gui.widgets.pipeline_step_delegate import STATUS_TOKENS
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -159,7 +160,7 @@ class PipelineChips(QWidget):
         font.setBold(True)
         arrow.setFont(font)
         arrow.setAlignment(Qt.AlignCenter)
-        arrow.setStyleSheet("color: #cccccc;")
+        arrow.setStyleSheet(f"color: {themed('BORDER_DEFAULT')};")
         return arrow
 
     def set_step_status(self, step: PipelineStep, status: StepStatus) -> None:
@@ -214,31 +215,11 @@ class PipelineChips(QWidget):
         status : StepStatus
             Status to apply
         """
-        # Status-based colors
-        if status == StepStatus.PENDING:
-            bg_color = "#e0e0e0"
-            text_color = "#666666"
-            border_color = "#cccccc"
-        elif status == StepStatus.ACTIVE:
-            bg_color = "#2196F3"
-            text_color = "#ffffff"
-            border_color = "#1976D2"
-        elif status == StepStatus.COMPLETE:
-            bg_color = "#4CAF50"
-            text_color = "#ffffff"
-            border_color = "#388E3C"
-        elif status == StepStatus.WARNING:
-            bg_color = "#FF9800"
-            text_color = "#ffffff"
-            border_color = "#F57C00"
-        elif status == StepStatus.ERROR:
-            bg_color = "#F44336"
-            text_color = "#ffffff"
-            border_color = "#D32F2F"
-        else:
-            bg_color = "#e0e0e0"
-            text_color = "#666666"
-            border_color = "#cccccc"
+        # Status-based colors — shared token mapping, resolved for active theme.
+        # bg is the strong semantic color; the border is its darkened variant.
+        bg_color = themed(STATUS_TOKENS.get(status, "TEXT_MUTED"))
+        text_color = themed("TEXT_INVERSE")
+        border_color = self._darken_color(bg_color)
 
         # Apply stylesheet
         chip.setStyleSheet(f"""

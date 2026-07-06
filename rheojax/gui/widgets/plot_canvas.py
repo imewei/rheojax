@@ -10,6 +10,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolb
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import QVBoxLayout, QWidget
+from rheojax.gui.resources.styles.tokens import themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -621,7 +622,11 @@ class PlotCanvas(QWidget):
                     xy=(0, 0),
                     xytext=(10, 10),
                     textcoords="offset points",
-                    bbox={"boxstyle": "round,pad=0.5", "fc": "yellow", "alpha": 0.9},
+                    bbox={
+                        "boxstyle": "round,pad=0.5",
+                        "fc": themed("WARNING_LIGHT"),
+                        "alpha": 0.9,
+                    },
                     arrowprops={"arrowstyle": "->", "connectionstyle": "arc3,rad=0"},
                 )
 

@@ -22,7 +22,12 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
+from rheojax.gui.resources.styles.tokens import (
+    Spacing,
+    Typography,
+    button_style,
+    themed,
+)
 from rheojax.gui.state import actions as pipeline_actions
 from rheojax.gui.state.selectors import (
     get_pipeline_name,
@@ -108,21 +113,17 @@ class PipelineSidebar(QWidget):
         self._name_edit.setPlaceholderText("Untitled Pipeline")
         self._name_edit.setText(get_pipeline_name())
         self._name_edit.setStyleSheet(
-            "QLineEdit { border: 1px solid #D1D5DB;"
+            f"QLineEdit {{ border: 1px solid {themed('BORDER_DEFAULT')};"
             " border-radius: 4px; padding: 3px 6px; }"
-            "QLineEdit:focus { border-color: #4338CA; }"
+            f"QLineEdit:focus {{ border-color: {themed('BORDER_FOCUS')}; }}"
         )
         self._name_edit.editingFinished.connect(self._on_name_changed)
         root.addWidget(self._name_edit)
 
         # --- Add Step button ---
         self._add_btn = QPushButton("+ Add Step")
-        self._add_btn.setStyleSheet(
-            "QPushButton { background-color: #4338CA; color: white; border: none;"
-            "border-radius: 4px; padding: 5px 10px; font-size: 9pt; }"
-            "QPushButton:hover { background-color: #4F46E5; }"
-            "QPushButton:pressed { background-color: #3730A3; }"
-        )
+        self._add_btn.setMinimumHeight(32)
+        self._add_btn.setStyleSheet(button_style("primary"))
         self._add_btn.clicked.connect(self._show_add_menu)
         root.addWidget(self._add_btn)
 
@@ -137,10 +138,10 @@ class PipelineSidebar(QWidget):
         self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self._list.setAlternatingRowColors(False)
         self._list.setStyleSheet(
-            "QListWidget { border: 1px solid #E5E7EB;"
-            " border-radius: 4px; background: #F9FAFB; }"
-            "QListWidget::item { border-bottom: 1px solid #F3F4F6; }"
-            "QListWidget::item:selected { background: #EEF2FF; }"
+            f"QListWidget {{ border: 1px solid {themed('BORDER_DEFAULT')};"
+            f" border-radius: 4px; background: {themed('BG_SURFACE')}; }}"
+            f"QListWidget::item {{ border-bottom: 1px solid {themed('BORDER_SUBTLE')}; }}"
+            f"QListWidget::item:selected {{ background: {themed('PRIMARY_SUBTLE')}; }}"
         )
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._show_context_menu)
@@ -155,22 +156,14 @@ class PipelineSidebar(QWidget):
         run_row.setSpacing(6)
 
         self._run_all_btn = QPushButton("Run All")
-        self._run_all_btn.setStyleSheet(
-            "QPushButton { background-color: #22C55E; color: white; border: none;"
-            "border-radius: 4px; padding: 5px 10px; font-size: 9pt; }"
-            "QPushButton:hover { background-color: #16A34A; }"
-            "QPushButton:disabled { background-color: #D1D5DB; color: #9CA3AF; }"
-        )
+        self._run_all_btn.setMinimumHeight(32)
+        self._run_all_btn.setStyleSheet(button_style("success"))
         self._run_all_btn.clicked.connect(self._on_run_all)
         run_row.addWidget(self._run_all_btn)
 
         self._run_step_btn = QPushButton("Run Step")
-        self._run_step_btn.setStyleSheet(
-            "QPushButton { background-color: #3B82F6; color: white; border: none;"
-            "border-radius: 4px; padding: 5px 10px; font-size: 9pt; }"
-            "QPushButton:hover { background-color: #2563EB; }"
-            "QPushButton:disabled { background-color: #D1D5DB; color: #9CA3AF; }"
-        )
+        self._run_step_btn.setMinimumHeight(32)
+        self._run_step_btn.setStyleSheet(button_style("primary"))
         self._run_step_btn.clicked.connect(self._on_run_step)
         run_row.addWidget(self._run_step_btn)
 
@@ -186,8 +179,9 @@ class PipelineSidebar(QWidget):
 
         datasets_placeholder = QLabel("(Dataset tree goes here)")
         datasets_placeholder.setStyleSheet(
-            "color: #9CA3AF; font-size: 8pt; padding: 6px;"
-            "border: 1px dashed #D1D5DB; border-radius: 4px;"
+            f"color: {themed('TEXT_MUTED')}; font-size: {Typography.SIZE_XS}pt;"
+            f" padding: 6px; border: 1px dashed {themed('BORDER_DEFAULT')};"
+            " border-radius: 4px;"
         )
         datasets_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(datasets_placeholder, stretch=3)

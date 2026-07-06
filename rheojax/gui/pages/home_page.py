@@ -26,7 +26,6 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.resources.styles import (
     BorderRadius,
-    ColorPalette,
     Spacing,
     Typography,
     section_header_style,
@@ -209,7 +208,7 @@ class HomePage(QWidget):
         # Title
         title = QLabel("RheoJAX")
         title.setStyleSheet(f"""
-            color: {ColorPalette.TEXT_INVERSE};
+            color: {themed("TEXT_INVERSE")};
             font-family: {Typography.FONT_FAMILY};
             font-size: {Typography.SIZE_HEADING + 4}pt;
             font-weight: {Typography.WEIGHT_BOLD};
@@ -228,7 +227,7 @@ class HomePage(QWidget):
         version_badge = QLabel(version_text)
         version_badge.setStyleSheet(f"""
             QLabel {{
-                color: {ColorPalette.TEXT_INVERSE};
+                color: {themed("TEXT_INVERSE")};
                 background-color: rgba(255, 255, 255, 0.15);
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 border-radius: {BorderRadius.SM}px;

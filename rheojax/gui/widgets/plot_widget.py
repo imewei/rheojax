@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from rheojax.gui.compat import QVBoxLayout, QWidget
+from rheojax.gui.resources.styles.tokens import ColorPalette, DarkColorPalette
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -168,11 +169,12 @@ class PlotWidget(QWidget):
         theme : str
             ``"light"`` or ``"dark"``.
         """
+        palette = DarkColorPalette if theme == "dark" else ColorPalette
         if self._backend == "matplotlib":
             # PlotCanvas does not have a set_theme — update the figure background
-            # colour to match the requested theme.
-            bg = "#1e1e1e" if theme == "dark" else "#ffffff"
-            fg = "#e8eaed" if theme == "dark" else "#1a1a1a"
+            # colour to match the app chrome (tokens.py canvas/text tokens).
+            bg = palette.BG_CANVAS
+            fg = palette.TEXT_PRIMARY
             try:
                 self.canvas.figure.set_facecolor(bg)
                 ax = self.canvas.axes
@@ -189,8 +191,7 @@ class PlotWidget(QWidget):
             if hasattr(self.canvas, "set_theme"):
                 self.canvas.set_theme(theme)
             elif hasattr(self.canvas, "setBackground"):
-                bg = "#1e1e1e" if theme == "dark" else "#ffffff"
-                self.canvas.setBackground(bg)
+                self.canvas.setBackground(palette.BG_CANVAS)
 
         logger.debug(
             "Theme applied",

@@ -33,7 +33,7 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.jobs.import_worker import ImportWorker
 from rheojax.gui.jobs.preview_worker import PreviewWorker
-from rheojax.gui.resources.styles.tokens import ColorPalette, Spacing, Typography
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.gui.services.data_service import DataService
 from rheojax.gui.state.store import StateStore
 from rheojax.logging import get_logger
@@ -280,7 +280,7 @@ class DataPage(QWidget):
 
         self._file_size_label = QLabel("")
         self._file_size_label.setStyleSheet(
-            f"font-size: 10pt; color: {ColorPalette.TEXT_SECONDARY};"
+            f"font-size: 10pt; color: {themed('TEXT_SECONDARY')};"
         )
         info_layout.addWidget(self._file_size_label)
 
@@ -331,7 +331,7 @@ class DataPage(QWidget):
         empty_label = QLabel("No dataset loaded. Use Browse or Load Example to begin.")
         empty_label.setAlignment(Qt.AlignCenter)
         empty_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_SECONDARY}; padding: {Spacing.SM}px;"
+            f"color: {themed('TEXT_SECONDARY')}; padding: {Spacing.SM}px;"
         )
         layout.addWidget(empty_label)
         self._empty_label = empty_label
@@ -468,7 +468,7 @@ class DataPage(QWidget):
         self._empty_state = QLabel("Drop a file or browse to import data")
         self._empty_state.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_state.setStyleSheet(
-            f"color: {ColorPalette.TEXT_MUTED}; padding: {Spacing.SM}px;"
+            f"color: {themed('TEXT_MUTED')}; padding: {Spacing.SM}px;"
         )
         layout.addWidget(self._empty_state)
 
@@ -681,6 +681,8 @@ class DataPage(QWidget):
             self._metadata_text.clear()
             if hasattr(self, "_empty_state"):
                 self._empty_state.show()
+            if hasattr(self, "_empty_label"):
+                self._empty_label.show()
             return
 
         # Restore file name label
@@ -746,6 +748,8 @@ class DataPage(QWidget):
 
         if hasattr(self, "_empty_state"):
             self._empty_state.hide()
+        if hasattr(self, "_empty_label"):
+            self._empty_label.hide()
 
         # Log successful data load with record count
         logger.info(
@@ -1452,13 +1456,13 @@ class DropZone(QFrame):
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self.setStyleSheet(f"""
             QFrame {{
-                background-color: {ColorPalette.BG_SURFACE};
-                border: 2px dashed {ColorPalette.BORDER_DEFAULT};
+                background-color: {themed('BG_SURFACE')};
+                border: 2px dashed {themed('BORDER_DEFAULT')};
                 border-radius: 10px;
             }}
             QFrame:hover {{
-                border-color: {ColorPalette.PRIMARY};
-                background-color: {ColorPalette.PRIMARY_SUBTLE};
+                border-color: {themed('PRIMARY')};
+                background-color: {themed('PRIMARY_SUBTLE')};
             }}
         """)
 
@@ -1469,14 +1473,14 @@ class DropZone(QFrame):
         icon_label.setAlignment(Qt.AlignCenter)
         icon_label.setStyleSheet(
             f"font-size: {Typography.SIZE_HEADING}pt; font-weight: {Typography.WEIGHT_BOLD};"
-            f" color: {ColorPalette.TEXT_MUTED};"
+            f" color: {themed('TEXT_MUTED')};"
         )
         layout.addWidget(icon_label)
 
         text_label = QLabel("Drag and drop data file here\n\nor click Browse to select")
         text_label.setAlignment(Qt.AlignCenter)
         text_label.setStyleSheet(
-            f"color: {ColorPalette.TEXT_SECONDARY}; font-size: 12pt;"
+            f"color: {themed('TEXT_SECONDARY')}; font-size: 12pt;"
         )
         layout.addWidget(text_label)
 
