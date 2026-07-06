@@ -9,6 +9,7 @@ Fed by `rheojax.gui.utils.logging.install_gui_log_handler`.
 
 from __future__ import annotations
 
+import html
 import logging
 from collections import deque
 
@@ -82,10 +83,11 @@ class LogDockWidget(QDockWidget):
 
     def _append_line(self, levelno: int, message: str) -> None:
         color = _LEVEL_COLORS.get(levelno)
+        escaped = html.escape(message)
         if color:
-            self.text_edit.append(f'<span style="color:{color};">{message}</span>')
+            self.text_edit.append(f'<span style="color:{color};">{escaped}</span>')
         else:
-            self.text_edit.append(message)
+            self.text_edit.append(escaped)
 
     def _rerender(self) -> None:
         self.text_edit.clear()
@@ -100,5 +102,7 @@ class LogDockWidget(QDockWidget):
         )
         if not path:
             return
+        # Save the full buffer, not just the currently filtered view -- the
+        # level filter controls what's on screen, not what gets exported.
         with open(path, "w", encoding="utf-8") as fh:
-            fh.write(self.text_edit.toPlainText())
+            fh.write("\n".join(message for _, message in self._records))
