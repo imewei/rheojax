@@ -53,7 +53,8 @@ class PipelineBatchRunner(QRunnable):
             # concurrently writing to it. `app_state` is optional so tests that
             # construct this runner directly (with no AppState) are unaffected.
             if self._app_state is not None:
-                self._app_state.active_jobs.by_id[dataset_id] = {"status": "running"}
+                with self._app_state.active_jobs.lock:
+                    self._app_state.active_jobs.by_id[dataset_id] = {"status": "running"}
             self._service.dataset_run_started.emit(dataset_id)
             ctx = pipeline_context_from_library(self._library, [dataset_id])
             steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)

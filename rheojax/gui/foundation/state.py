@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -91,6 +92,14 @@ class JobResultRef:
 @dataclass
 class ActiveJobsState:
     by_id: dict[str, dict] = field(default_factory=dict)
+    # PipelineBatchRunner.run() writes into `by_id` from a QThreadPool worker
+    # thread (see batch_runner.py) while GUI-thread code reads/iterates it --
+    # this lock is the one piece of real cross-thread synchronization for that
+    # shared dict; GUI-thread-only mutators (fit_controller.py, controller.py)
+    # don't need it since the Qt event loop already serializes them.
+    lock: threading.Lock = field(
+        default_factory=threading.Lock, repr=False, compare=False
+    )
 
 
 @dataclass

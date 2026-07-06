@@ -203,11 +203,12 @@ class ResidualsPanel(QWidget):
         self._y_pred = np.asarray(y_pred).flatten()
         self._x_values = np.asarray(x).flatten() if x is not None else None
 
-        # Handle complex data
-        if np.iscomplexobj(self._y_true) or np.iscomplexobj(self._y_pred):
-            self._residuals = np.abs(self._y_true - self._y_pred)
-        else:
-            self._residuals = self._y_true - self._y_pred
+        # Keep the signed (complex) residual. Oscillation-mode fits carry
+        # y = G' + i*G'' as a genuine complex array; collapsing to
+        # np.abs() here would lose directionality and make the mean/std,
+        # Q-Q, and histogram diagnostics meaningless. _residual_parts()
+        # splits complex residuals into real/imag components for display.
+        self._residuals = self._y_true - self._y_pred
 
         self._update_statistics()
         self._refresh_plot()
@@ -237,17 +238,41 @@ class ResidualsPanel(QWidget):
         self._refresh_plot()
         self._empty_label.hide()
 
+    def _residual_parts(self) -> list[tuple[str, np.ndarray]]:
+        """Split residuals into labeled, real-valued parts.
+
+        Returns ``[("", residuals)]`` for real-valued residuals, or
+        ``[("Re", real_part), ("Im", imag_part)]`` for complex (e.g.
+        oscillation-mode G'+iG'') residuals, so every diagnostic operates
+        on signed values instead of a collapsed magnitude.
+        """
+        if self._residuals is None:
+            return []
+        if np.iscomplexobj(self._residuals):
+            return [("Re", self._residuals.real), ("Im", self._residuals.imag)]
+        return [("", self._residuals)]
+
+    def _fitted_part(self, label: str) -> np.ndarray | None:
+        """Return the fitted-value array matching a residual part's label."""
+        if self._y_pred is None:
+            return None
+        if np.iscomplexobj(self._y_pred):
+            return self._y_pred.imag if label == "Im" else self._y_pred.real
+        return self._y_pred
+
     def _update_statistics(self) -> None:
         """Update statistics display."""
         if self._residuals is None or len(self._residuals) == 0:
             self._stats_label.setText("")
             return
 
-        mean = np.mean(self._residuals)
-        std = np.std(self._residuals)
         n = len(self._residuals)
-
-        self._stats_label.setText(f"n={n} | mean={mean:.3g} | std={std:.3g}")
+        stats = " | ".join(
+            f"mean{f'({label})' if label else ''}={np.mean(r):.3g} "
+            f"std{f'({label})' if label else ''}={np.std(r):.3g}"
+            for label, r in self._residual_parts()
+        )
+        self._stats_label.setText(f"n={n} | {stats}")
 
     def _refresh_plot(self) -> None:
         """Refresh the current plot."""
@@ -300,32 +325,45 @@ class ResidualsPanel(QWidget):
     def _plot_residuals_vs_fitted(self) -> None:
         """Plot residuals vs fitted values."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
-        if self._y_pred is not None:
-            fitted = self._y_pred
-        else:
-            fitted = np.arange(len(self._residuals))
+        for label, residuals in parts:
+            fitted = self._fitted_part(label)
+            if fitted is None:
+                fitted = np.arange(len(residuals))
 
-        ax.scatter(fitted, self._residuals, alpha=0.6, edgecolors="none")
+            sc = ax.scatter(
+                fitted, residuals, alpha=0.6, edgecolors="none",
+                label=label if multi else None,
+            )
+
+            # Add smoothed trend line
+            if len(residuals) > 10:
+                try:
+                    from scipy.ndimage import uniform_filter1d
+
+                    sorted_idx = np.argsort(fitted)
+                    smoothed = uniform_filter1d(
+                        residuals[sorted_idx], size=max(5, len(residuals) // 20)
+                    )
+                    ax.plot(
+                        fitted[sorted_idx],
+                        smoothed,
+                        color=sc.get_facecolor()[0],
+                        alpha=0.5,
+                        linewidth=2,
+                    )
+                except ImportError as exc:
+                    logger.debug(
+                        "uniform_filter1d unavailable",
+                        widget=self.__class__.__name__,
+                        error=str(exc),
+                    )
+
         ax.axhline(y=0, color="r", linestyle="--", linewidth=1)
-
-        # Add smoothed trend line
-        if len(self._residuals) > 10:
-            try:
-                from scipy.ndimage import uniform_filter1d
-
-                sorted_idx = np.argsort(fitted)
-                smoothed = uniform_filter1d(
-                    self._residuals[sorted_idx], size=max(5, len(self._residuals) // 20)
-                )
-                ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
-            except ImportError as exc:
-                logger.debug(
-                    "uniform_filter1d unavailable",
-                    widget=self.__class__.__name__,
-                    error=str(exc),
-                )
-
+        if multi:
+            ax.legend()
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("Residuals")
         ax.set_title("Residuals vs Fitted")
@@ -333,72 +371,97 @@ class ResidualsPanel(QWidget):
     def _plot_qq(self) -> None:
         """Generate Q-Q plot."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
         try:
             from scipy import stats
-
-            # VIS-017: Guard against zero std (perfect fit)
-            std = np.std(self._residuals)
-            if std < 1e-15:
-                ax.text(
-                    0.5,
-                    0.5,
-                    "Perfect fit\n(zero residuals)",
-                    ha="center",
-                    va="center",
-                    transform=ax.transAxes,
-                )
-                ax.set_title("Normal Q-Q Plot")
-                return
-            # Standardize residuals
-            standardized = (self._residuals - np.mean(self._residuals)) / std
-
-            # Q-Q plot
-            stats.probplot(standardized, dist="norm", plot=ax)
-            ax.set_title("Normal Q-Q Plot")
         except ImportError as exc:
+            stats = None
             logger.debug(
                 "scipy.stats unavailable for QQ plot",
                 widget=self.__class__.__name__,
                 error=str(exc),
             )
-            # Fallback without scipy
-            sorted_res = np.sort(self._residuals)
-            n = len(sorted_res)
-            theoretical = np.linspace(-2, 2, n)
 
-            ax.scatter(theoretical, sorted_res, alpha=0.6)
-            ax.plot([-3, 3], [-3, 3], "r--", linewidth=1)
-            ax.set_xlabel("Theoretical Quantiles")
-            ax.set_ylabel("Sample Quantiles")
-            ax.set_title("Q-Q Plot (simplified)")
+        # VIS-017: Guard against zero std (perfect fit) across all parts
+        if all(np.std(r) < 1e-15 for _, r in parts):
+            ax.text(
+                0.5,
+                0.5,
+                "Perfect fit\n(zero residuals)",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
+            ax.set_title("Normal Q-Q Plot")
+            return
+
+        for label, residuals in parts:
+            std = np.std(residuals)
+            if std < 1e-15:
+                continue
+            if stats is not None:
+                standardized = (residuals - np.mean(residuals)) / std
+                stats.probplot(standardized, dist="norm", plot=ax)
+                if multi:
+                    ax.lines[-2].set_label(label)
+            else:
+                # Fallback without scipy
+                sorted_res = np.sort(residuals)
+                n = len(sorted_res)
+                theoretical = np.linspace(-2, 2, n)
+
+                ax.scatter(
+                    theoretical, sorted_res, alpha=0.6, label=label if multi else None
+                )
+                ax.plot([-3, 3], [-3, 3], "r--", linewidth=1)
+                ax.set_xlabel("Theoretical Quantiles")
+                ax.set_ylabel("Sample Quantiles")
+
+        if multi:
+            ax.legend()
+        ax.set_title("Normal Q-Q Plot" if stats is not None else "Q-Q Plot (simplified)")
 
     def _plot_histogram(self) -> None:
         """Plot histogram of residuals."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
-        # Histogram
-        n, bins, patches = ax.hist(
-            self._residuals, bins="auto", density=True, alpha=0.7, edgecolor="black"
-        )
-
-        # Fit normal distribution
         try:
             from scipy import stats
-
-            mu, std = np.mean(self._residuals), np.std(self._residuals)
-            x = np.linspace(bins[0], bins[-1], 100)
-            ax.plot(
-                x, stats.norm.pdf(x, mu, std), "r-", linewidth=2, label="Normal fit"
-            )
-            ax.legend()
         except ImportError as exc:
+            stats = None
             logger.debug(
                 "scipy.stats unavailable for histogram fit",
                 widget=self.__class__.__name__,
                 error=str(exc),
             )
 
+        for label, residuals in parts:
+            _n, bins, _patches = ax.hist(
+                residuals,
+                bins="auto",
+                density=True,
+                alpha=0.5 if multi else 0.7,
+                edgecolor="black",
+                label=f"Residuals ({label})" if multi else None,
+            )
+
+            # Fit normal distribution
+            if stats is not None:
+                mu, std = np.mean(residuals), np.std(residuals)
+                x = np.linspace(bins[0], bins[-1], 100)
+                ax.plot(
+                    x,
+                    stats.norm.pdf(x, mu, std),
+                    linewidth=2,
+                    label=f"Normal fit ({label})" if multi else "Normal fit",
+                )
+
+        if multi or stats is not None:
+            ax.legend()
         ax.set_xlabel("Residual Value")
         ax.set_ylabel("Density")
         ax.set_title("Residual Distribution")
@@ -406,33 +469,46 @@ class ResidualsPanel(QWidget):
     def _plot_scale_location(self) -> None:
         """Plot scale-location (sqrt |residuals| vs fitted)."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
-        if self._y_pred is not None:
-            fitted = self._y_pred
-        else:
-            fitted = np.arange(len(self._residuals))
+        for label, residuals in parts:
+            fitted = self._fitted_part(label)
+            if fitted is None:
+                fitted = np.arange(len(residuals))
 
-        sqrt_abs_res = np.sqrt(np.abs(self._residuals))
+            sqrt_abs_res = np.sqrt(np.abs(residuals))
 
-        ax.scatter(fitted, sqrt_abs_res, alpha=0.6, edgecolors="none")
+            sc = ax.scatter(
+                fitted, sqrt_abs_res, alpha=0.6, edgecolors="none",
+                label=label if multi else None,
+            )
 
-        # Add smoothed trend line
-        if len(self._residuals) > 10:
-            try:
-                from scipy.ndimage import uniform_filter1d
+            # Add smoothed trend line
+            if len(residuals) > 10:
+                try:
+                    from scipy.ndimage import uniform_filter1d
 
-                sorted_idx = np.argsort(fitted)
-                smoothed = uniform_filter1d(
-                    sqrt_abs_res[sorted_idx], size=max(5, len(self._residuals) // 20)
-                )
-                ax.plot(fitted[sorted_idx], smoothed, "r-", alpha=0.5, linewidth=2)
-            except ImportError as exc:
-                logger.debug(
-                    "uniform_filter1d unavailable",
-                    widget=self.__class__.__name__,
-                    error=str(exc),
-                )
+                    sorted_idx = np.argsort(fitted)
+                    smoothed = uniform_filter1d(
+                        sqrt_abs_res[sorted_idx], size=max(5, len(residuals) // 20)
+                    )
+                    ax.plot(
+                        fitted[sorted_idx],
+                        smoothed,
+                        color=sc.get_facecolor()[0],
+                        alpha=0.5,
+                        linewidth=2,
+                    )
+                except ImportError as exc:
+                    logger.debug(
+                        "uniform_filter1d unavailable",
+                        widget=self.__class__.__name__,
+                        error=str(exc),
+                    )
 
+        if multi:
+            ax.legend()
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel("√|Residuals|")
         ax.set_title("Scale-Location Plot")
@@ -440,15 +516,23 @@ class ResidualsPanel(QWidget):
     def _plot_residuals_vs_x(self) -> None:
         """Plot residuals vs X values."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
-        if self._x_values is not None:
-            x = self._x_values
-        else:
-            x = np.arange(len(self._residuals))
+        for label, residuals in parts:
+            x = (
+                self._x_values
+                if self._x_values is not None
+                else np.arange(len(residuals))
+            )
+            ax.scatter(
+                x, residuals, alpha=0.6, edgecolors="none",
+                label=label if multi else None,
+            )
 
-        ax.scatter(x, self._residuals, alpha=0.6, edgecolors="none")
         ax.axhline(y=0, color="r", linestyle="--", linewidth=1)
-
+        if multi:
+            ax.legend()
         ax.set_xlabel("X Values")
         ax.set_ylabel("Residuals")
         ax.set_title("Residuals vs X")
@@ -456,6 +540,8 @@ class ResidualsPanel(QWidget):
     def _plot_autocorr(self) -> None:
         """Plot residual autocorrelation."""
         ax = self._figure.add_subplot(111)
+        parts = self._residual_parts()
+        multi = len(parts) > 1
 
         n = len(self._residuals)
         if n < 10:
@@ -471,20 +557,21 @@ class ResidualsPanel(QWidget):
 
         # Compute autocorrelation
         max_lag = min(40, n // 4)
-        autocorr = np.correlate(
-            self._residuals - np.mean(self._residuals),
-            self._residuals - np.mean(self._residuals),
-            mode="full",
-        )
-        autocorr = autocorr[n - 1 : n - 1 + max_lag]
-        # VIS-018: Guard against zero normalization (perfect fit / constant residuals)
-        if autocorr[0] < 1e-15:
-            autocorr = np.zeros_like(autocorr)
-        else:
-            autocorr = autocorr / autocorr[0]  # Normalize
+        width = 0.8 / len(parts)
+        for i, (label, residuals) in enumerate(parts):
+            centered = residuals - np.mean(residuals)
+            autocorr = np.correlate(centered, centered, mode="full")
+            autocorr = autocorr[n - 1 : n - 1 + max_lag]
+            # VIS-018: Guard against zero normalization (perfect fit / constant residuals)
+            if autocorr[0] < 1e-15:
+                autocorr = np.zeros_like(autocorr)
+            else:
+                autocorr = autocorr / autocorr[0]  # Normalize
 
-        lags = np.arange(max_lag)
-        ax.bar(lags, autocorr, width=0.8, alpha=0.7)
+            lags = np.arange(max_lag) + i * width
+            ax.bar(
+                lags, autocorr, width=width, alpha=0.7, label=label if multi else None
+            )
 
         # Confidence bounds (approximate)
         conf_bound = 1.96 / np.sqrt(n)
@@ -492,6 +579,8 @@ class ResidualsPanel(QWidget):
         ax.axhline(y=-conf_bound, color="r", linestyle="--", linewidth=1)
         ax.axhline(y=0, color="k", linestyle="-", linewidth=0.5)
 
+        if multi:
+            ax.legend()
         ax.set_xlabel("Lag")
         ax.set_ylabel("Autocorrelation")
         ax.set_title("Residual Autocorrelation")
@@ -540,18 +629,33 @@ class ResidualsPanel(QWidget):
         Returns
         -------
         dict
-            Statistics dictionary with keys: mean, std, n, min, max
+            Statistics dictionary with keys: mean, std, n, min, max. For
+            complex (e.g. oscillation-mode G'+iG'') residuals, real/imaginary
+            components are reported separately as ``mean_re``/``mean_im``, etc.
         """
         if self._residuals is None:
             return {}
 
-        return {
-            "n": len(self._residuals),
-            "mean": float(np.mean(self._residuals)),
-            "std": float(np.std(self._residuals)),
-            "min": float(np.min(self._residuals)),
-            "max": float(np.max(self._residuals)),
-        }
+        n = len(self._residuals)
+        parts = self._residual_parts()
+        if len(parts) == 1:
+            _, r = parts[0]
+            return {
+                "n": n,
+                "mean": float(np.mean(r)),
+                "std": float(np.std(r)),
+                "min": float(np.min(r)),
+                "max": float(np.max(r)),
+            }
+
+        stats: dict[str, float] = {"n": n}
+        for label, r in parts:
+            suffix = label.lower()
+            stats[f"mean_{suffix}"] = float(np.mean(r))
+            stats[f"std_{suffix}"] = float(np.std(r))
+            stats[f"min_{suffix}"] = float(np.min(r))
+            stats[f"max_{suffix}"] = float(np.max(r))
+        return stats
 
     def export_figure(self, filepath: str, dpi: int = 150) -> None:
         """Export figure to file.

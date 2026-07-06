@@ -442,6 +442,34 @@ def reset_state_store():
 
 
 @pytest.fixture(autouse=True)
+def _no_blocking_message_boxes(monkeypatch):
+    """Stub QMessageBox statics so a stray modal never hangs the suite.
+
+    WorkspaceWindow.closeEvent pops a real QMessageBox.question when
+    project.dirty is True. qtbot.addWidget() calls .close() on teardown --
+    with no user present to click a button, an unstubbed exec() there
+    blocks past pytest's 120s signal-based timeout (Qt's native event loop
+    swallows SIGALRM), hanging every test after it in the same file.
+    Default to a safe, non-destructive answer; tests that need a specific
+    choice can still monkeypatch these themselves (their patch simply runs
+    later and wins).
+    """
+    if not HAS_PYSIDE6:
+        return
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(lambda *a, **k: QMessageBox.StandardButton.Discard),
+    )
+    for name in ("information", "warning", "critical"):
+        monkeypatch.setattr(
+            QMessageBox, name, staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
+        )
+
+
+@pytest.fixture(autouse=True)
 def reset_plot_metrics():
     """Reset PlotMetrics and close matplotlib figures between tests.
 

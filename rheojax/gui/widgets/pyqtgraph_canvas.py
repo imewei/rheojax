@@ -400,7 +400,7 @@ class PyQtGraphCanvas(QWidget):
 
             # Convert from log10 space back to data coordinates for display
             display_x, display_y = x, y
-            log_x, log_y = self._plot_item.vb.state["log"]
+            log_x, log_y = self._plot_item.vb.state["logMode"]
             if log_x:
                 display_x = 10**x
             if log_y:

@@ -938,6 +938,14 @@ class RheoJAXMainWindow(QMainWindow):
         except Exception:
             logger.debug("BayesianPage close prep failed", exc_info=True)
 
+        try:
+            if hasattr(self, "export_page") and hasattr(
+                self.export_page, "prepare_for_close"
+            ):
+                self.export_page.prepare_for_close()
+        except Exception:
+            logger.debug("ExportPage close prep failed", exc_info=True)
+
         # Attempt graceful worker shutdown with a generous timeout.
         # If workers are still running after the timeout (e.g. NUTS sampling
         # stuck in JIT-compiled XLA code that cannot be interrupted), schedule

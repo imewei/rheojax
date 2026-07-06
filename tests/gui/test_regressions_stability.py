@@ -104,6 +104,22 @@ def test_export_raw_data_converts_dataset(qtbot, tmp_path):
     assert out.exists()
 
 
+def test_export_page_prepare_for_close_cancels_and_guards_callbacks(qtbot):
+    import threading
+
+    page = ExportPage()
+    qtbot.addWidget(page)
+
+    cancel_event = threading.Event()
+    page._active_cancel_events.add(cancel_event)
+    assert page._closing is False
+
+    page.prepare_for_close()
+
+    assert page._closing is True
+    assert cancel_event.is_set()
+
+
 def test_bayesian_warm_start_picks_matching_fit(qtbot):
     store = StateStore()
     ds = DatasetState(id="d1", name="ds", file_path=None, test_mode="oscillation")

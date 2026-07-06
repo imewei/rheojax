@@ -82,8 +82,15 @@ class Config:
     def save(self) -> None:
         """Save configuration to file."""
         logger.debug("Saving configuration to file")
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        self.config_path.write_text(json.dumps(self._data, indent=2))
+        try:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            self.config_path.write_text(json.dumps(self._data, indent=2))
+        except (OSError, TypeError, ValueError) as exc:
+            logger.warning(
+                "Failed to save config",
+                config_path=str(self.config_path),
+                error=str(exc),
+            )
 
     def load(self) -> None:
         """Load configuration from file."""
@@ -92,8 +99,13 @@ class Config:
             self._data = {}
             return
         try:
-            self._data = json.loads(self.config_path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
+            loaded = json.loads(self.config_path.read_text())
+            if not isinstance(loaded, dict):
+                raise ValueError(
+                    f"Config root must be an object, got {type(loaded).__name__}"
+                )
+            self._data = loaded
+        except (OSError, ValueError) as exc:
             logger.warning(
                 "Failed to load config, using empty config",
                 config_path=str(self.config_path),
