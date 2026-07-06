@@ -136,6 +136,8 @@ class DatasetPreviewDialog(QDialog):
         # sections (i.e. before the first set_dataset() call). Force one
         # placeholder section into existence so the mode sticks immediately;
         # set_dataset()/the no-data path reset it back to empty as normal.
+        # Until then, columnCount()==1 with headerData(0)=="" (not the true
+        # 0-column x=None state) — required for the workaround, not a bug.
         self._model.set_data(np.array([]), np.array([]), "", [])
 
         layout = QVBoxLayout(self)
