@@ -10,18 +10,19 @@ invoking it from a worker thread, not the GUI thread.
 Thread Safety
 -------------
 All state mutations are routed through ``rheojax.gui.state.actions``
-(GUI-001 through GUI-005).  Each action function calls
-``StateStore.dispatch()``, which internally uses
-``QMetaObject.invokeMethod(QueuedConnection)`` for both subscriber
-notifications and ``state_changed`` emission, making them safe to call
-from worker threads (GUI-006).  The per-action signals (e.g.
-``pipeline_step_status_changed``) are emitted via
-``StateStore.emit_signal()``, which defers cross-thread delivery using
-``QTimer.singleShot(0, ...)``.
+(GUI-001 through GUI-005), whose functions call ``StateStore.dispatch()``
+directly and synchronously.  ``StateStore.dispatch()`` itself hard-fails
+(``RuntimeError``) when called off the GUI thread under
+``RHEOJAX_DEBUG`` (store.py), so ``execute_all()``/``execute_single_step()``
+never call ``pipeline_actions.*`` directly -- they go through
+``self._dispatch_action()``, which marshals the call onto this
+``QObject``'s own thread via a private Qt signal/slot (queued when called
+from a worker thread, direct when already on that thread).
 """
 
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -113,6 +114,10 @@ class PipelineExecutionService(QObject):
     # upfront
     dataset_run_finished = Signal(str, object)  # dataset_id, PipelineRunResult
 
+    # Not part of the public signal API -- internal plumbing for
+    # _dispatch_action() (see class docstring's Thread Safety note).
+    _invoke_action = Signal(object)
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         # Lazy service creation — instantiated on first use per step type.
@@ -121,6 +126,20 @@ class PipelineExecutionService(QObject):
         self._model_service = None
         self._bayesian_service = None
         self._export_service = None
+        self._invoke_action.connect(self._run_action)
+
+    def _run_action(self, fn) -> None:
+        fn()
+
+    def _dispatch_action(self, fn, *args) -> None:
+        """Run a ``pipeline_actions.*`` call on this object's own (GUI) thread.
+
+        Qt's AutoConnection delivers the signal directly when the caller is
+        already on this object's thread, and via a queued event when called
+        from a worker thread -- avoiding StateStore.dispatch()'s off-thread
+        RuntimeError guard under RHEOJAX_DEBUG.
+        """
+        self._invoke_action.emit(functools.partial(fn, *args))
 
     # ------------------------------------------------------------------
     # Public API
@@ -141,13 +160,15 @@ class PipelineExecutionService(QObject):
         # observers always see the started signal before completed.
         if not steps:
             self.pipeline_started.emit()
-            pipeline_actions.set_pipeline_running(False)
+            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
             return
 
         # GUI-001 / GUI-002: use public action function — goes through
         # dispatch() → reducer → pipeline_execution_started signal.
-        pipeline_actions.set_pipeline_running(True, steps[0].id)
+        self._dispatch_action(
+            pipeline_actions.set_pipeline_running, True, steps[0].id
+        )
         self.pipeline_started.emit()
 
         # Accumulates results shared across steps (data, fit_result, etc.)
@@ -156,31 +177,48 @@ class PipelineExecutionService(QObject):
         try:
             for step in steps:
                 # GUI-002: dispatch via actions, not direct store mutation.
-                pipeline_actions.set_pipeline_running(True, step.id)
+                self._dispatch_action(
+                    pipeline_actions.set_pipeline_running, True, step.id
+                )
                 # GUI-001: dispatch via actions — emits pipeline_step_status_changed.
-                pipeline_actions.update_step_status(step.id, StepStatus.ACTIVE)
+                self._dispatch_action(
+                    pipeline_actions.update_step_status, step.id, StepStatus.ACTIVE
+                )
                 self.step_started.emit(step.id)
 
                 try:
                     result = self._execute_step(step, context)
                     # GUI-004: dispatch via actions — immutable reducer path.
-                    pipeline_actions.cache_step_result(step.id, result)
-                    pipeline_actions.update_step_status(step.id, StepStatus.COMPLETE)
+                    self._dispatch_action(
+                        pipeline_actions.cache_step_result, step.id, result
+                    )
+                    self._dispatch_action(
+                        pipeline_actions.update_step_status,
+                        step.id,
+                        StepStatus.COMPLETE,
+                    )
                     self.step_completed.emit(step.id)
                 except Exception as exc:
                     error_msg = str(exc)
-                    pipeline_actions.update_step_status(
-                        step.id, StepStatus.ERROR, error_msg
+                    self._dispatch_action(
+                        pipeline_actions.update_step_status,
+                        step.id,
+                        StepStatus.ERROR,
+                        error_msg,
                     )
                     self.step_failed.emit(step.id, error_msg)
                     raise
 
-            pipeline_actions.set_pipeline_running(False)
+            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
 
         except Exception as exc:
-            pipeline_actions.set_pipeline_running(False)
+            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_failed.emit(str(exc))
+            # Re-raise so callers (main_window's _RunAllWorker/_BatchWorker)
+            # can detect the failure instead of treating this as a normal
+            # return and reporting the pipeline/file as successful.
+            raise
 
     def execute_single_step(self, step, context: dict) -> Any:
         """Execute a single step with the given context.
@@ -207,24 +245,33 @@ class PipelineExecutionService(QObject):
             Re-raises any exception from the underlying service after
             dispatching ERROR status.
         """
-        pipeline_actions.set_pipeline_running(True, step.id)
+        self._dispatch_action(pipeline_actions.set_pipeline_running, True, step.id)
         self.pipeline_started.emit()
-        pipeline_actions.update_step_status(step.id, StepStatus.ACTIVE)
+        self._dispatch_action(
+            pipeline_actions.update_step_status, step.id, StepStatus.ACTIVE
+        )
         self.step_started.emit(step.id)
 
         try:
             result = self._execute_step(step, context)
-            pipeline_actions.cache_step_result(step.id, result)
-            pipeline_actions.update_step_status(step.id, StepStatus.COMPLETE)
+            self._dispatch_action(pipeline_actions.cache_step_result, step.id, result)
+            self._dispatch_action(
+                pipeline_actions.update_step_status, step.id, StepStatus.COMPLETE
+            )
             self.step_completed.emit(step.id)
-            pipeline_actions.set_pipeline_running(False)
+            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
             return result
         except Exception as exc:
             error_msg = str(exc)
-            pipeline_actions.update_step_status(step.id, StepStatus.ERROR, error_msg)
+            self._dispatch_action(
+                pipeline_actions.update_step_status,
+                step.id,
+                StepStatus.ERROR,
+                error_msg,
+            )
             self.step_failed.emit(step.id, error_msg)
-            pipeline_actions.set_pipeline_running(False)
+            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_failed.emit(error_msg)
             raise
 
@@ -361,20 +408,24 @@ class PipelineExecutionService(QObject):
         new_dataset_id = None
         if persist:
             new_dataset_id = uuid.uuid4().hex
-            library.add(
-                DatasetRef(
-                    id=new_dataset_id,
-                    name=f"{transform_key}_{dataset_id}",
-                    protocol_type=protocol_type,
-                    origin="derived",
-                    units={},
-                    row_count=0,
-                    hash="",
-                    provenance={"pipeline_step": step.id},
-                    lineage=[dataset_id],
+            # Hold the library's lock across add()+store_payload() so a concurrent
+            # GUI-thread get()/load_payload() (e.g. library rail refresh, Save) can
+            # never observe a DatasetRef whose payload hasn't been written yet.
+            with library.lock:
+                library.add(
+                    DatasetRef(
+                        id=new_dataset_id,
+                        name=f"{transform_key}_{dataset_id}",
+                        protocol_type=protocol_type,
+                        origin="derived",
+                        units={},
+                        row_count=0,
+                        hash="",
+                        provenance={"pipeline_step": step.id},
+                        lineage=[dataset_id],
+                    )
                 )
-            )
-            library.store_payload(new_dataset_id, transformed)
+                library.store_payload(new_dataset_id, transformed)
             # A later step (another transform, or infer_output_protocol() on one further down
             # the chain) must see the NEWLY persisted dataset as the current one, not the
             # original input -- otherwise a 3-transform chain's third step would still report

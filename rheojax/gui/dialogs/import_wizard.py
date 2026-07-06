@@ -19,18 +19,57 @@ from rheojax.gui.compat import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QObject,
     QPushButton,
+    QRunnable,
     Qt,
     QTableWidget,
     QTableWidgetItem,
+    QThreadPool,
     QVBoxLayout,
     QWidget,
     QWizard,
     QWizardPage,
+    Signal,
 )
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class _FileReadWorker(QRunnable):
+    """Background worker that reads a data file off the Qt GUI thread.
+
+    Runs delimiter detection and the pandas read (CSV/Excel) in a
+    QThreadPool worker thread so the wizard UI never blocks on file I/O.
+    """
+
+    class Signals(QObject):
+        completed = Signal(object)  # pandas.DataFrame
+        failed = Signal(str)  # error message
+
+    def __init__(self, file_path: str, nrows: int) -> None:
+        super().__init__()
+        self.signals = self.Signals()
+        self._file_path = file_path
+        self._nrows = nrows
+
+    def run(self) -> None:
+        """Execute the file read in the worker thread."""
+        try:
+            path = Path(self._file_path)
+            if path.suffix.lower() in [".xlsx", ".xls"]:
+                df = pd.read_excel(self._file_path, nrows=self._nrows)
+            else:
+                # CSV/TXT and unknown formats (e.g. TRIOS) are tried as CSV.
+                from rheojax.io.readers.csv_reader import detect_csv_delimiter
+
+                delimiter = detect_csv_delimiter(self._file_path)
+                df = pd.read_csv(self._file_path, sep=delimiter, nrows=self._nrows)
+        except Exception as e:
+            self.signals.failed.emit(str(e))
+            return
+        self.signals.completed.emit(df)
 
 
 class FileSelectionPage(QWizardPage):
@@ -268,70 +307,66 @@ class ColumnMappingPage(QWizardPage):
             file_path=file_path,
         )
         self._load_columns(file_path)
-        self._auto_detect()
 
     def _load_columns(self, file_path: str) -> None:
-        """Load columns from file."""
-        try:
-            # Read file to get columns (cache on wizard to avoid duplicate reads)
-            wizard = self.wizard()
-            cache_key = str(file_path)
-            if (
-                hasattr(wizard, "_cached_df")
-                and getattr(wizard, "_cached_file_path", None) == cache_key
-            ):
-                df = wizard._cached_df
-            else:
-                path = Path(file_path)
-                if path.suffix.lower() in [".csv", ".txt"]:
-                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
+        """Load columns from file (off the GUI thread; cached on the wizard)."""
+        wizard = self.wizard()
+        cache_key = str(file_path)
+        if (
+            hasattr(wizard, "_cached_df")
+            and getattr(wizard, "_cached_file_path", None) == cache_key
+        ):
+            self._on_columns_loaded(wizard._cached_df, cache_key)
+            return
 
-                    delimiter = detect_csv_delimiter(file_path)
-                    df = pd.read_csv(file_path, sep=delimiter, nrows=5)
-                elif path.suffix.lower() in [".xlsx", ".xls"]:
-                    df = pd.read_excel(file_path, nrows=5)
-                else:
-                    # For TRIOS or other formats, try CSV first
-                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
+        worker = _FileReadWorker(file_path, nrows=5)
+        worker.signals.completed.connect(self._on_columns_loaded)
+        worker.signals.failed.connect(self._on_columns_load_failed)
+        QThreadPool.globalInstance().start(worker)
 
-                    delimiter = detect_csv_delimiter(file_path)
-                    df = pd.read_csv(file_path, sep=delimiter, nrows=5)
-                wizard._cached_df = df
-                wizard._cached_file_path = cache_key
+    def _on_columns_loaded(
+        self, df: pd.DataFrame, file_path: str | None = None
+    ) -> None:
+        """Populate combo boxes/preview once the background read completes."""
+        wizard = self.wizard()
+        wizard._cached_df = df
+        wizard._cached_file_path = file_path or str(self.field("file_path"))
 
-            columns = list(df.columns)
-            logger.debug(
-                "Columns loaded",
-                page=self.__class__.__name__,
-                num_columns=len(columns),
-            )
+        columns = list(df.columns)
+        logger.debug(
+            "Columns loaded",
+            page=self.__class__.__name__,
+            num_columns=len(columns),
+        )
 
-            # Populate combo boxes
-            self.x_combo.clear()
-            self.y_combo.clear()
-            self.y2_combo.clear()
-            self.temp_combo.clear()
+        # Populate combo boxes
+        self.x_combo.clear()
+        self.y_combo.clear()
+        self.y2_combo.clear()
+        self.temp_combo.clear()
 
-            self.x_combo.addItems(columns)
-            self.y_combo.addItems(columns)
+        self.x_combo.addItems(columns)
+        self.y_combo.addItems(columns)
 
-            self.y2_combo.addItem("(None)")
-            self.y2_combo.addItems(columns)
+        self.y2_combo.addItem("(None)")
+        self.y2_combo.addItems(columns)
 
-            self.temp_combo.addItem("(None)")
-            self.temp_combo.addItems(columns)
+        self.temp_combo.addItem("(None)")
+        self.temp_combo.addItems(columns)
 
-            # Update preview
-            self._update_preview(df)
+        # Update preview
+        self._update_preview(df)
 
-        except Exception as e:
-            logger.error(
-                "Failed to load columns",
-                page=self.__class__.__name__,
-                error=str(e),
-                exc_info=True,
-            )
-            QMessageBox.warning(self, "Error", f"Failed to load columns: {e}")
+        self._auto_detect()
+
+    def _on_columns_load_failed(self, error: str) -> None:
+        """Handle a failed background column read."""
+        logger.error(
+            "Failed to load columns",
+            page=self.__class__.__name__,
+            error=error,
+        )
+        QMessageBox.warning(self, "Error", f"Failed to load columns: {error}")
 
     def _update_preview(self, df: pd.DataFrame) -> None:
         """Update preview table."""
@@ -563,34 +598,36 @@ class PreviewConfirmPage(QWizardPage):
     def _load_preview(
         self, file_path: str, x_col: str, y_col: str, y2_col: str | None = None
     ) -> None:
-        """Load preview data."""
+        """Load preview data (off the GUI thread; cached on the wizard)."""
+        # Column selection is needed once the read completes; stash it since
+        # the background worker only reports back the DataFrame.
+        self._pending_preview_cols = (x_col, y_col, y2_col)
+
+        wizard = self.wizard()
+        cache_key = str(file_path)
+        if (
+            hasattr(wizard, "_cached_preview_df")
+            and getattr(wizard, "_cached_preview_path", None) == cache_key
+        ):
+            self._on_preview_loaded(wizard._cached_preview_df, cache_key)
+            return
+
+        worker = _FileReadWorker(file_path, nrows=10)
+        worker.signals.completed.connect(self._on_preview_loaded)
+        worker.signals.failed.connect(self._on_preview_load_failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_preview_loaded(
+        self, df: pd.DataFrame, file_path: str | None = None
+    ) -> None:
+        """Populate the preview table once the background read completes."""
+        wizard = self.wizard()
+        wizard._cached_preview_df = df
+        wizard._cached_preview_path = file_path or str(self.field("file_path"))
+
+        x_col, y_col, y2_col = self._pending_preview_cols
+
         try:
-            # Use cached DataFrame from wizard if available (same file, but
-            # we need more rows for preview so re-read with nrows=10)
-            wizard = self.wizard()
-            cache_key = str(file_path)
-            if (
-                hasattr(wizard, "_cached_preview_df")
-                and getattr(wizard, "_cached_preview_path", None) == cache_key
-            ):
-                df = wizard._cached_preview_df
-            else:
-                path = Path(file_path)
-                if path.suffix.lower() in [".csv", ".txt"]:
-                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
-
-                    delimiter = detect_csv_delimiter(file_path)
-                    df = pd.read_csv(file_path, sep=delimiter, nrows=10)
-                elif path.suffix.lower() in [".xlsx", ".xls"]:
-                    df = pd.read_excel(file_path, nrows=10)
-                else:
-                    from rheojax.io.readers.csv_reader import detect_csv_delimiter
-
-                    delimiter = detect_csv_delimiter(file_path)
-                    df = pd.read_csv(file_path, sep=delimiter, nrows=10)
-                wizard._cached_preview_df = df
-                wizard._cached_preview_path = cache_key
-
             # Select relevant columns
             cols = [x_col, y_col]
             if y2_col and y2_col != "(None)":
@@ -625,6 +662,15 @@ class PreviewConfirmPage(QWizardPage):
                 exc_info=True,
             )
             QMessageBox.warning(self, "Error", f"Failed to load preview: {e}")
+
+    def _on_preview_load_failed(self, error: str) -> None:
+        """Handle a failed background preview read."""
+        logger.error(
+            "Failed to load preview",
+            page=self.__class__.__name__,
+            error=error,
+        )
+        QMessageBox.warning(self, "Error", f"Failed to load preview: {error}")
 
 
 class ImportWizard(QWizard):

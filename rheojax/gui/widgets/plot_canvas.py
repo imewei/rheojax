@@ -547,6 +547,8 @@ class PlotCanvas(QWidget):
             return
 
         # Show tooltip for nearby data points
+        if event.xdata is None or event.ydata is None:
+            return
         self._show_tooltip(event.xdata, event.ydata)
 
     def _show_tooltip(self, x: float, y: float) -> None:

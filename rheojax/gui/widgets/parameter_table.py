@@ -333,28 +333,30 @@ class ParameterTable(QTableWidget):
 
                 if not math.isfinite(value) or value < min_val or value > max_val:
                     # Out of bounds (or nan/inf, which NaN comparisons would
-                    # otherwise silently pass as "in bounds") - red text
+                    # otherwise silently pass as "in bounds") - red text.
+                    # Do not emit: invalid values must never reach the state store.
                     item.setForeground(QBrush(QColor(255, 0, 0)))
-                else:
-                    # In bounds - check if modified
-                    if param_name in self._original_values:
-                        is_modified = (
-                            abs(value - self._original_values[param_name]) > 1e-10
-                        )
-                        if is_modified:
-                            # Modified - bold
-                            font = item.font()
-                            font.setBold(True)
-                            item.setFont(font)
-                        else:
-                            # Unmodified - normal
-                            font = item.font()
-                            font.setBold(False)
-                            item.setFont(font)
+                    return
 
-                    item.setForeground(
-                        QBrush(self.palette().color(QPalette.ColorRole.Text))
+                # In bounds - check if modified
+                if param_name in self._original_values:
+                    is_modified = (
+                        abs(value - self._original_values[param_name]) > 1e-10
                     )
+                    if is_modified:
+                        # Modified - bold
+                        font = item.font()
+                        font.setBold(True)
+                        item.setFont(font)
+                    else:
+                        # Unmodified - normal
+                        font = item.font()
+                        font.setBold(False)
+                        item.setFont(font)
+
+                item.setForeground(
+                    QBrush(self.palette().color(QPalette.ColorRole.Text))
+                )
 
                 # Emit signal
                 self.parameter_changed.emit(param_name, value)
@@ -371,19 +373,23 @@ class ParameterTable(QTableWidget):
                     max_val=max_val,
                 )
 
+                if not math.isfinite(min_val) or not math.isfinite(max_val) or min_val > max_val:
+                    # Invalid bounds (non-finite or inverted) - red text.
+                    # Do not emit: invalid bounds must never reach the state store.
+                    item.setForeground(QBrush(QColor(255, 0, 0)))
+                    return
+
+                item.setForeground(
+                    QBrush(self.palette().color(QPalette.ColorRole.Text))
+                )
+
                 # Emit bounds changed
                 self.bounds_changed.emit(param_name, min_val, max_val)
 
                 # Revalidate value
                 value_item = self.item(row, 1)
                 value = float(value_item.text())
-                if (
-                    not math.isfinite(min_val)
-                    or not math.isfinite(max_val)
-                    or not math.isfinite(value)
-                    or value < min_val
-                    or value > max_val
-                ):
+                if not math.isfinite(value) or value < min_val or value > max_val:
                     value_item.setForeground(QBrush(QColor(255, 0, 0)))
                 else:
                     value_item.setForeground(

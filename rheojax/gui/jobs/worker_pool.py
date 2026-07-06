@@ -485,7 +485,14 @@ class WorkerPool(QObject):
 
         # Wait for QThreadPool threads (adapter threads exit quickly
         # once the child process is dead).
-        success = True
+        #
+        # `success` also gates the token.close() loop below: closing a
+        # ProcessCancellationToken's mp.Event while its adapter thread may
+        # still be polling it is a race (close() nulls the event out from
+        # under a concurrent is_cancelled() call). Closing is only safe once
+        # waitForDone() has confirmed every QThreadPool thread has exited —
+        # which requires wait=True *and* no timeout.
+        success = False
         if wait:
             success = self._pool.waitForDone(timeout_ms)
             if not success:
@@ -498,15 +505,17 @@ class WorkerPool(QObject):
         # Explicitly close ProcessCancellationToken mp.Events so their
         # POSIX semaphores are released before resource_tracker's atexit
         # handler runs.  (Thread-based CancellationTokens have no .close()
-        # and are harmless — guarded by hasattr.)
-        with self._job_lock:
-            for worker in self._active_workers.values():
-                token = getattr(worker, "_cancel_token", None)
-                if token is not None and hasattr(token, "close"):
-                    try:
-                        token.close()
-                    except Exception:
-                        pass
+        # and are harmless — guarded by hasattr.) Only safe once `success`
+        # confirms no adapter thread is still running.
+        if success:
+            with self._job_lock:
+                for worker in self._active_workers.values():
+                    token = getattr(worker, "_cancel_token", None)
+                    if token is not None and hasattr(token, "close"):
+                        try:
+                            token.close()
+                        except Exception:
+                            pass
 
         # Clear active jobs — only if the wait actually completed. If it
         # timed out, workers may still be running; leaving them tracked

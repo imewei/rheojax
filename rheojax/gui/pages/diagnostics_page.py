@@ -140,10 +140,12 @@ class DiagnosticsPage(QWidget):
                 rhat_item = QTableWidgetItem(f"{rhat_val:.4f}")
                 ess_item = QTableWidgetItem(f"{ess_val:.0f}")
 
-                # Colour-code: red if R-hat >= 1.01 or ESS < 400
-                if rhat_val >= 1.01:
+                # Colour-code: red if R-hat >= 1.01, ESS < 400, or the value is
+                # NaN (degenerate/non-converging chain) -- NaN comparisons are
+                # always False in Python, so they must be checked explicitly.
+                if rhat_val >= 1.01 or np.isnan(rhat_val):
                     rhat_item.setForeground(QBrush(QColor("#c62828")))
-                if ess_val < 400:
+                if ess_val < 400 or np.isnan(ess_val):
                     ess_item.setForeground(QBrush(QColor("#c62828")))
 
                 self._rhat_ess_table.setItem(row, 0, QTableWidgetItem(param))

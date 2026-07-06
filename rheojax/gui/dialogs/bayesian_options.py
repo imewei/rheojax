@@ -19,6 +19,7 @@ from rheojax.gui.compat import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSlider,
@@ -371,6 +372,24 @@ class BayesianOptionsDialog(QDialog):
 
     def _on_accepted(self) -> None:
         """Handle dialog accepted."""
+        priors_text = self.priors_edit.toPlainText().strip()
+        if priors_text:
+            try:
+                json.loads(priors_text)
+            except Exception as exc:
+                logger.error(
+                    "Failed to parse priors JSON",
+                    dialog=self.__class__.__name__,
+                    exc_info=True,
+                )
+                QMessageBox.warning(
+                    self,
+                    "Invalid Priors JSON",
+                    f"The priors field contains invalid JSON and could not be "
+                    f"applied:\n\n{exc}\n\nPlease fix it or clear the field.",
+                )
+                return
+
         logger.debug("Options applied", dialog=self.__class__.__name__)
         self.accept()
 

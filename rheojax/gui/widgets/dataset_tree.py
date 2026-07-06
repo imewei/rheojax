@@ -146,11 +146,11 @@ class DatasetTree(QTreeWidget):
         # Set status color
         self._set_status_color(dataset_item, "loaded")
 
+        self._dataset_items[dataset_state.id] = dataset_item
+
         # Add file sub-item if file_path exists
         if dataset_state.file_path:
             self.add_file(dataset_state.id, dataset_state.file_path)
-
-        self._dataset_items[dataset_state.id] = dataset_item
 
         logger.debug("Rendering", widget=self.__class__.__name__)
 

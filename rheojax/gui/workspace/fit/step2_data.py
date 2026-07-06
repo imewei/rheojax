@@ -24,13 +24,19 @@ def _validate_shape_and_values(rheo_data) -> list[str]:
     x_has_nan = bool(np.isnan(x).any())
     if x_has_nan:
         errors.append("x contains NaN values")
+    x_has_inf = bool(np.isinf(x).any())
+    if x_has_inf:
+        errors.append("x contains infinite values")
     if np.isnan(y).any():
         errors.append("y contains NaN values")
-    # Monotonicity is undefined in the presence of NaNs (diff/comparisons
-    # against NaN are always False, which would spuriously flag "not
-    # monotonic" on top of the NaN error already reported above).
+    if np.isinf(y).any():
+        errors.append("y contains infinite values")
+    # Monotonicity is undefined in the presence of NaN/inf (diff/comparisons
+    # against them are always False or unreliable, which would spuriously
+    # flag "not monotonic" on top of the error already reported above).
     if (
         not x_has_nan
+        and not x_has_inf
         and x.shape[0] > 1
         and not (np.all(np.diff(x) > 0) or np.all(np.diff(x) < 0))
     ):

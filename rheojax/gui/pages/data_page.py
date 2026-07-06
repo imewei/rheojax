@@ -51,21 +51,11 @@ class DataPage(QWidget):
         - Data quality validation
         - Preprocessing controls
 
-    Signals
-    -------
-    file_dropped : Signal(str)
-    import_requested : Signal()
-    apply_mapping : Signal()
-
     Example
     -------
     >>> page = DataPage()  # doctest: +SKIP
     >>> page.load_dataset('data.csv')  # doctest: +SKIP
     """
-
-    file_dropped = Signal(str)
-    import_requested = Signal()
-    apply_mapping = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize data page.
@@ -122,9 +112,9 @@ class DataPage(QWidget):
         layout.addWidget(self._drop_zone, 1)
 
         # Browse button
-        btn_browse = QPushButton("Browse Files...")
-        btn_browse.clicked.connect(self._browse_files)
-        layout.addWidget(btn_browse)
+        self._btn_browse = QPushButton("Browse Files...")
+        self._btn_browse.clicked.connect(self._browse_files)
+        layout.addWidget(self._btn_browse)
 
         # Example datasets dropdown
         example_group = QGroupBox("Load Example Dataset")
@@ -267,9 +257,9 @@ class DataPage(QWidget):
                 self._example_combo.addItem(label)
         example_layout.addWidget(self._example_combo, 1)
 
-        btn_example = QPushButton("Load")
-        btn_example.clicked.connect(self._load_example_dataset)
-        example_layout.addWidget(btn_example)
+        self._btn_load_example = QPushButton("Load")
+        self._btn_load_example.clicked.connect(self._load_example_dataset)
+        example_layout.addWidget(self._btn_load_example)
         layout.addWidget(example_group)
 
         # File info
@@ -467,10 +457,10 @@ class DataPage(QWidget):
         btn_reset.clicked.connect(self._reset_mapping)
         btn_layout.addWidget(btn_reset)
 
-        btn_apply = QPushButton("Apply & Import")
-        btn_apply.setProperty("variant", "primary")
-        btn_apply.clicked.connect(self._apply_import)
-        btn_layout.addWidget(btn_apply)
+        self._btn_apply = QPushButton("Apply & Import")
+        self._btn_apply.setProperty("variant", "primary")
+        self._btn_apply.clicked.connect(self._apply_import)
+        btn_layout.addWidget(self._btn_apply)
 
         layout.addLayout(btn_layout)
 
@@ -514,8 +504,28 @@ class DataPage(QWidget):
             # Preview/validate with the first file
             self._on_file_dropped(file_paths[0])
 
+    def _set_import_controls_enabled(self, enabled: bool) -> None:
+        """Enable/disable file-selection and import controls.
+
+        Blocks changing files or starting a second import while an
+        ImportWorker is in flight, so a stale worker's callback can never
+        race a newer selection (see ``_apply_import``).
+        """
+        self._btn_apply.setEnabled(enabled)
+        self._btn_browse.setEnabled(enabled)
+        self._btn_load_example.setEnabled(enabled)
+        self._example_combo.setEnabled(enabled)
+        self._drop_zone.setEnabled(enabled)
+
     def _on_file_dropped(self, file_path: str) -> None:
         """Handle file drop or selection."""
+        if self._active_import_worker is not None:
+            QMessageBox.warning(
+                self,
+                "Import in Progress",
+                "Please wait for the current import to finish before selecting a new file.",
+            )
+            return
         path_obj = Path(file_path)
         suffix = path_obj.suffix.lower() if path_obj.suffix else "unknown"
         logger.info(
@@ -573,9 +583,6 @@ class DataPage(QWidget):
 
         # Load and preview data
         self._load_preview()
-
-        # Emit signal
-        self.file_dropped.emit(file_path)
 
     def _load_preview(self) -> None:
         """Load and display data preview asynchronously.
@@ -975,6 +982,8 @@ class DataPage(QWidget):
         """Apply column mapping and import data via background worker."""
         if not self._current_file_path:
             return
+        if self._active_import_worker is not None:
+            return
 
         # Get mapping
         x_col = self._x_combo.currentText()
@@ -1015,20 +1024,28 @@ class DataPage(QWidget):
             )
             return
 
+        # Capture the file(s) this worker is importing now — read at callback
+        # time these would reflect whatever file is *currently* selected,
+        # mislabeling results if the user picks a new file (or re-imports)
+        # before this worker's signal is delivered.
+        current_file_path = self._current_file_path
+        current_file_paths = list(self._all_file_paths)
+
         # Show loading state
-        n_files = len(self._all_file_paths)
+        n_files = len(current_file_paths)
         if n_files > 1:
             self._file_name_label.setText(f"Importing {n_files} files...")
         else:
-            self._file_name_label.setText(
-                f"Importing: {self._current_file_path.name}..."
-            )
+            self._file_name_label.setText(f"Importing: {current_file_path.name}...")
+
+        # Block file selection and re-import until this worker finishes.
+        self._set_import_controls_enabled(False)
 
         # Launch background worker
         worker = ImportWorker(
             data_service=self._data_service,
-            file_path=self._current_file_path,
-            file_paths=self._all_file_paths,
+            file_path=current_file_path,
+            file_paths=current_file_paths,
             x_col=x_col or None,
             y_col=y_col or None,
             y2_col=y2_col,
@@ -1038,22 +1055,32 @@ class DataPage(QWidget):
         # R10-STO-002: Use QueuedConnection to guarantee the callback runs on
         # the main thread — ImportWorker emits signals from a worker thread.
         worker.signals.completed.connect(
-            lambda datasets: self._on_import_completed(datasets, test_mode),
+            lambda datasets: self._on_import_completed(
+                datasets, test_mode, current_file_path, current_file_paths
+            ),
             Qt.ConnectionType.QueuedConnection,
         )
         worker.signals.failed.connect(
-            self._on_import_failed,
+            lambda error_msg: self._on_import_failed(error_msg, current_file_path),
             Qt.ConnectionType.QueuedConnection,
         )
         self._active_import_worker = worker
         QThreadPool.globalInstance().start(worker)
 
-    def _on_import_completed(self, datasets: list, test_mode: str | None) -> None:
+    def _on_import_completed(
+        self,
+        datasets: list,
+        test_mode: str | None,
+        current_file_path: Path,
+        current_file_paths: list[Path],
+    ) -> None:
         """Handle successful import (called on main thread via signal)."""
+        self._active_import_worker = None
         try:
             self.isVisible()
         except RuntimeError:
             return
+        self._set_import_controls_enabled(True)
         import uuid
 
         _VALID_TEST_MODES = {
@@ -1118,7 +1145,7 @@ class DataPage(QWidget):
             # Dataset name: use source file stem
             source_file = source_files[idx]
             source_stem = (
-                Path(source_file).stem if source_file else self._current_file_path.stem
+                Path(source_file).stem if source_file else current_file_path.stem
             )
 
             # For multi-segment files from the same source, add segment suffix
@@ -1138,7 +1165,7 @@ class DataPage(QWidget):
             # to avoid per-element device sync in show_dataset() / str(x[i]).
             x_np = np.asarray(rheo_data.x)
             y_np = np.asarray(rheo_data.y)
-            file_path_str = source_file or str(self._current_file_path)
+            file_path_str = source_file or str(current_file_path)
             ds_meta = getattr(rheo_data, "metadata", None) or {}
             store.dispatch(
                 "IMPORT_DATA_SUCCESS",
@@ -1165,7 +1192,7 @@ class DataPage(QWidget):
         # Log successful import
         logger.info(
             "Data import completed",
-            filepath=str(self._current_file_path),
+            filepath=str(current_file_path),
             dataset_count=len(datasets),
             record_count=sum(
                 getattr(ds.x, "shape", (0,))[0] if ds.x is not None else 0
@@ -1175,33 +1202,34 @@ class DataPage(QWidget):
         )
 
         # Notify user about import results
-        n_files = len(self._all_file_paths)
+        n_files = len(current_file_paths)
         if n_files > 1:
             self._file_name_label.setText(
                 f"Imported {len(datasets)} datasets from {n_files} files"
             )
         elif len(datasets) > 1:
             self._file_name_label.setText(
-                f"Imported {len(datasets)} segments from {self._current_file_path.name}"
+                f"Imported {len(datasets)} segments from {current_file_path.name}"
             )
         else:
-            self._file_name_label.setText(f"File: {self._current_file_path.name}")
+            self._file_name_label.setText(f"File: {current_file_path.name}")
 
-        self.apply_mapping.emit()
         try:
             self._store.dispatch("SET_TAB", {"tab": "transform"})
         except Exception as tab_err:
             logger.warning("Failed to switch tab", error=str(tab_err))
 
-    def _on_import_failed(self, error_msg: str) -> None:
+    def _on_import_failed(self, error_msg: str, current_file_path: Path) -> None:
         """Handle failed import (called on main thread via signal)."""
+        self._active_import_worker = None
         try:
             self.isVisible()
         except RuntimeError:
             return
+        self._set_import_controls_enabled(True)
         logger.error(
             "Failed to import data",
-            filepath=str(self._current_file_path),
+            filepath=str(current_file_path),
             error=error_msg,
             page="DataPage",
         )
@@ -1214,7 +1242,7 @@ class DataPage(QWidget):
         store.dispatch(
             "IMPORT_DATA_FAILED",
             {
-                "file_path": str(self._current_file_path),
+                "file_path": str(current_file_path),
                 "error": error_msg,
             },
         )

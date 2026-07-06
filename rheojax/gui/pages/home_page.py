@@ -99,6 +99,7 @@ class HomePage(QWidget):
         logger.debug("Initializing", class_name=self.__class__.__name__)
         self._store = StateStore()
         self.setup_ui()
+        self._store.subscribe(self._on_store_state_changed)
 
     def setup_ui(self) -> None:
         """Setup user interface."""
@@ -475,6 +476,24 @@ class HomePage(QWidget):
         label.setStyleSheet(section_header_style())
         outer.addWidget(label)
 
+        # Retained so _on_store_state_changed can rebuild this section
+        # in place when recent_projects changes (import/open/save).
+        self._recent_projects_layout = outer
+        self._populate_recent_projects()
+
+        return container
+
+    def _populate_recent_projects(self) -> None:
+        """(Re)build the recent projects list from current store state."""
+        outer = self._recent_projects_layout
+
+        # Remove everything but the section label (index 0)
+        while outer.count() > 1:
+            item = outer.takeAt(1)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
         # Get recent projects from state
         recent_projects = self._store.get_state().recent_projects
 
@@ -499,7 +518,9 @@ class HomePage(QWidget):
             for project_path in recent_projects[:5]:
                 outer.addWidget(self._create_recent_project_item(project_path))
 
-        return container
+    def _on_store_state_changed(self, state) -> None:
+        """Refresh recent projects list when the store notifies of a state change."""
+        self._populate_recent_projects()
 
     def _create_recent_project_item(self, project_path: Path) -> QWidget:
         """Create a recent project item."""

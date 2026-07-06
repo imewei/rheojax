@@ -60,6 +60,10 @@ class ExportPage(QWidget):
         self._store = StateStore()
         self._export_service = ExportService()
         self._plot_service = PlotService()
+        # Tracks all in-flight ExportWorkers (batch_export submits several
+        # concurrently); each worker is discarded from this set on its own
+        # completion/failure so it never clobbers a sibling worker's lifetime.
+        self._active_export_workers: set[Any] = set()
         self.setup_ui()
         # R6-GUI-001: Use QueuedConnection so _perform_export runs after the
         # current event handler returns, preventing button-click blocking.
@@ -1018,9 +1022,24 @@ class ExportPage(QWidget):
         # ---- Wire up completion/failure callbacks (run on GUI thread) -------
         def _on_completed(exported_files: list[str]) -> None:
             progress.close()
-            self._active_export_worker = None  # Release worker reference
-            if export_btn is not None:
+            # Release only this worker's reference; siblings from a batch
+            # export may still be running.
+            self._active_export_workers.discard(worker)
+            if export_btn is not None and not self._active_export_workers:
                 export_btn.setEnabled(True)
+            if _cancelled.is_set():
+                logger.info(
+                    "Export cancelled",
+                    file_count=len(exported_files),
+                    output_dir=str(output_dir),
+                )
+                QMessageBox.information(
+                    self,
+                    "Export Cancelled",
+                    f"Export cancelled after {len(exported_files)} file(s) "
+                    f"written to:\n{output_dir}",
+                )
+                return
             total_size = sum(
                 Path(f).stat().st_size for f in exported_files if Path(f).exists()
             )
@@ -1039,8 +1058,8 @@ class ExportPage(QWidget):
 
         def _on_failed(error_msg: str) -> None:
             progress.close()
-            self._active_export_worker = None  # Release worker reference
-            if export_btn is not None:
+            self._active_export_workers.discard(worker)
+            if export_btn is not None and not self._active_export_workers:
                 export_btn.setEnabled(True)
             full_msg = f"Export failed: {error_msg}"
             QMessageBox.critical(self, "Export Error", full_msg)
@@ -1066,8 +1085,10 @@ class ExportPage(QWidget):
         # the ExportWorker actually stops between stages (not just visually).
         progress.canceled.connect(lambda: (_cancelled.set(), progress.close()))
         # Store a reference so Python GC doesn't collect the worker (and its
-        # signals QObject) before the queued completed/failed event is delivered.
-        self._active_export_worker = worker
+        # signals QObject) before the queued completed/failed event is
+        # delivered. Added to a set (not a single slot) so concurrent
+        # batch-export workers each keep their own reference alive.
+        self._active_export_workers.add(worker)
         QThreadPool.globalInstance().start(worker)
 
     def export_results(

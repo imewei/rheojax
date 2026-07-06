@@ -792,8 +792,8 @@ class DataService:
         if np.any(~np.isfinite(x)):
             warnings.append("X-axis contains NaN or Inf values")
         if is_complex:
-            if np.any(np.isnan(y_real)) or np.any(np.isnan(np.imag(y))):
-                warnings.append("Y-axis contains NaN values")
+            if np.any(~np.isfinite(y_real)) or np.any(~np.isfinite(np.imag(y))):
+                warnings.append("Y-axis contains NaN or Inf values")
         else:
             if np.any(~np.isfinite(y)):
                 warnings.append("Y-axis contains NaN or Inf values")

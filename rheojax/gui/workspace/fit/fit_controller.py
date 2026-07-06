@@ -183,21 +183,31 @@ def _fit_fn_body(
                 )
                 for name, cfg in initial_params.items()
             }
-        result = _run_on_thread(
-            lambda start_params=start_params: run_fit_isolated(
-                model_key,
-                rheo_data.x,
-                rheo_data.y,
-                test_mode=test_mode,
-                initial_params=start_params or {},
-                options={},
-                progress_queue=multiprocessing.Queue(),
-                cancel_event=cancel_event,
-                dataset_id=data_ref,
-                model_config=model_config,
-                metadata=metadata,
+        progress_queue = multiprocessing.Queue()
+        try:
+            result = _run_on_thread(
+                lambda start_params=start_params: run_fit_isolated(
+                    model_key,
+                    rheo_data.x,
+                    rheo_data.y,
+                    test_mode=test_mode,
+                    initial_params=start_params or {},
+                    options={},
+                    progress_queue=progress_queue,
+                    cancel_event=cancel_event,
+                    dataset_id=data_ref,
+                    model_config=model_config,
+                    metadata=metadata,
+                )
             )
-        )
+        finally:
+            # Release the queue's feeder thread/fds/semaphore -- mirrors
+            # ProcessWorkerAdapter._ensure_process_dead()'s queue cleanup.
+            try:
+                progress_queue.close()
+                progress_queue.join_thread()
+            except (OSError, ValueError, BrokenPipeError):
+                pass
         r2 = _r2_sort_key(result)
         best_r2 = _r2_sort_key(best) if best else -1.0
         if best is None or r2 > best_r2:
@@ -236,6 +246,7 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                 "status": "running",
                 "worker": token,
             }
+        progress_queue = multiprocessing.Queue()
         try:
             return _run_on_thread(
                 lambda: run_bayesian_isolated(
@@ -249,7 +260,7 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                     warm_start=warm_start,
                     priors=priors,
                     seed=0,
-                    progress_queue=multiprocessing.Queue(),
+                    progress_queue=progress_queue,
                     cancel_event=token.event,
                     dataset_id=fit_state.data_ref,
                     target_accept=config.get("target_accept", 0.8),
@@ -258,6 +269,13 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                 )
             )
         finally:
+            # Release the queue's feeder thread/fds/semaphore -- mirrors
+            # ProcessWorkerAdapter._ensure_process_dead()'s queue cleanup.
+            try:
+                progress_queue.close()
+                progress_queue.join_thread()
+            except (OSError, ValueError, BrokenPipeError):
+                pass
             if active_jobs is not None:
                 active_jobs.by_id.pop(fit_state.data_ref, None)
 

@@ -156,11 +156,19 @@ class PipelineConfigureRunStep(QWidget):
         self._refresh_dataset_list()
 
     def _refresh_dataset_list(self) -> None:
-        self._dataset_list.clear()
-        for ref in self._library.all():
-            item = QListWidgetItem(ref.name)
-            item.setData(_DATASET_ID_ROLE, ref.id)
-            self._dataset_list.addItem(item)
+        # clear() deselects all items and fires itemSelectionChanged, which would
+        # otherwise overwrite state.selected_dataset_ids with []; block signals
+        # while rebuilding, then restore the persisted selection explicitly.
+        self._dataset_list.blockSignals(True)
+        try:
+            self._dataset_list.clear()
+            for ref in self._library.all():
+                item = QListWidgetItem(ref.name)
+                item.setData(_DATASET_ID_ROLE, ref.id)
+                item.setSelected(ref.id in self._state.selected_dataset_ids)
+                self._dataset_list.addItem(item)
+        finally:
+            self._dataset_list.blockSignals(False)
 
     def set_selected_dataset_ids(self, ids: list[str]) -> None:
         self._state.selected_dataset_ids = list(ids)

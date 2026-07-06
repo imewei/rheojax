@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -28,34 +29,56 @@ class DatasetLibrary:
         self._payloads: dict[
             str, Any
         ] = {}  # id -> RheoData; needed to resolve data_ref strings
+        # Pipeline batch runs mutate this library from a QThreadPool worker thread
+        # while the GUI thread reads it concurrently (library rail, fit/transform
+        # controllers). Without this lock, add()'s pop-then-set is not atomic
+        # (KeyError on a torn get()/load_payload() read) and all()/datasets_of_type()
+        # can raise "dictionary changed size during iteration" mid-add()/remove().
+        self._lock = threading.RLock()
+        # Exposed publicly (same RLock instance) so a caller can hold it across a
+        # multi-call sequence -- e.g. add() immediately followed by store_payload()
+        # for the same id -- so a concurrent get()/load_payload() never observes a
+        # DatasetRef whose payload hasn't been written yet. RLock: safe to reacquire
+        # from within a `with library.lock:` block since add()/store_payload()
+        # themselves also acquire it.
+        self.lock = self._lock
 
     def add(self, ref: DatasetRef, overwrite: bool = False) -> None:
-        if not overwrite and ref.id in self._by_id:
-            raise ValueError(
-                f"Dataset id {ref.id!r} already exists (pass overwrite=True to replace)"
-            )
-        # An overwrite replaces the reference AND clears any stale payload under the old
-        # reference -- without this, a caller that overwrites a ref but doesn't also call
-        # store_payload() (e.g. a fit export whose result has no derived RheoData) would leave
-        # the PREVIOUS ref's payload silently reachable under the new ref's id/metadata.
-        self._payloads.pop(ref.id, None)
-        self._by_id[ref.id] = ref
+        with self._lock:
+            if not overwrite and ref.id in self._by_id:
+                raise ValueError(
+                    f"Dataset id {ref.id!r} already exists (pass overwrite=True to replace)"
+                )
+            # An overwrite replaces the reference AND clears any stale payload under the old
+            # reference -- without this, a caller that overwrites a ref but doesn't also call
+            # store_payload() (e.g. a fit export whose result has no derived RheoData) would leave
+            # the PREVIOUS ref's payload silently reachable under the new ref's id/metadata.
+            self._payloads.pop(ref.id, None)
+            self._by_id[ref.id] = ref
 
     def get(self, id: str) -> DatasetRef:
-        return self._by_id[id]
+        with self._lock:
+            return self._by_id[id]
 
     def remove(self, id: str) -> None:
-        self._by_id.pop(id, None)
-        self._payloads.pop(id, None)
+        with self._lock:
+            self._by_id.pop(id, None)
+            self._payloads.pop(id, None)
 
     def all(self) -> list[DatasetRef]:
-        return list(self._by_id.values())
+        with self._lock:
+            return list(self._by_id.values())
 
     def datasets_of_type(self, protocol_type: str) -> list[DatasetRef]:
-        return [r for r in self._by_id.values() if r.protocol_type == protocol_type]
+        with self._lock:
+            return [
+                r for r in self._by_id.values() if r.protocol_type == protocol_type
+            ]
 
     def store_payload(self, id: str, data: Any) -> None:
-        self._payloads[id] = data
+        with self._lock:
+            self._payloads[id] = data
 
     def load_payload(self, id: str) -> Any:
-        return self._payloads[id]
+        with self._lock:
+            return self._payloads[id]

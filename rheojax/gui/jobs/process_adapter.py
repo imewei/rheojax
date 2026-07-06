@@ -95,7 +95,16 @@ def _subprocess_entry(
     """
     try:
         result = work_fn(result_queue, cancel_event)
-        result_queue.put({"type": "completed", "result": result})
+        if isinstance(result, dict) and result.get("success") is False:
+            result_queue.put(
+                {
+                    "type": "failed",
+                    "error": result.get("error") or result.get("message") or "Work failed",
+                    "traceback": "",
+                }
+            )
+        else:
+            result_queue.put({"type": "completed", "result": result})
     except CancellationError:
         result_queue.put({"type": "cancelled"})
     except Exception as exc:
@@ -217,6 +226,12 @@ class ProcessWorkerAdapter(QRunnable):
         Called by QThreadPool.  Blocks the pool thread until the child
         process finishes (or is killed).
         """
+        if self._cancel_token.is_cancelled():
+            logger.debug("Worker cancelled before subprocess start; skipping launch")
+            self.signals.cancelled.emit()
+            self._ensure_process_dead()
+            return
+
         self._result_queue = self._mp_context.Queue()
         self._process = self._mp_context.Process(
             target=_subprocess_entry,
@@ -573,6 +588,7 @@ def make_fit_worker(
             options=options,
             cancel_token=cancel_token,
             dataset_id=dataset_id,
+            model_config=model_config,
         )
 
     # Subprocess mode — use functools.partial with module-level entry
