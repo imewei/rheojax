@@ -166,6 +166,7 @@ class WorkspaceWindow(QMainWindow):
         self._notifier.changed.connect(self._transform_bodies[1].refresh)
         self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
+        self._rail.dataset_selected.connect(self._on_rail_dataset_selected)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -277,6 +278,10 @@ class WorkspaceWindow(QMainWindow):
             pass
         try:
             self._rail.import_requested.disconnect(self._on_import_requested)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._rail.dataset_selected.disconnect(self._on_rail_dataset_selected)
         except (RuntimeError, TypeError):
             pass
         for widget in (self._canvas, self._rail, self._inspector, self._splitter):
@@ -598,6 +603,18 @@ class WorkspaceWindow(QMainWindow):
             return
 
         self._launch_import([Path(p) for p in paths])
+
+    def _on_rail_dataset_selected(self, dataset_id: str) -> None:
+        """Forward a LibraryRail click to the Fit workflow's dataset selector.
+
+        Transform's SlotsStep manages multiple per-slot combos and Pipeline's
+        PipelineConfigureRunStep selects datasets for batch execution --
+        neither has a single "make this the active dataset" concept to
+        forward to, so only Fit mode's DataStep (which has exactly that) is
+        wired here.
+        """
+        if self._mode == "fit":
+            self._fit_bodies[1].select_dataset(dataset_id)
 
     def _launch_import(
         self,
