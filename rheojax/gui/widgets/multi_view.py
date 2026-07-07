@@ -71,6 +71,28 @@ class PlotPanel(QWidget):
             "Initialization complete", class_name=self.__class__.__name__, index=index
         )
 
+    def cleanup(self) -> None:
+        """Explicitly release matplotlib resources before Qt widget deletion.
+
+        Must be called before the widget is deleted to prevent segfaults from
+        deferred ``draw_idle()`` callbacks firing on a freed C++ object.
+        """
+        import matplotlib.pyplot as plt
+
+        try:
+            if self._canvas is not None:
+                self._canvas.callbacks.callbacks.clear()
+                self._canvas.draw_idle = lambda: None
+            if self._figure is not None:
+                plt.close(self._figure)
+        except RuntimeError:
+            pass  # C++ object already deleted
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws before the widget is closed."""
+        self.cleanup()
+        super().closeEvent(event)
+
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
@@ -193,6 +215,16 @@ class MultiView(QWidget):
         self._set_layout(layout)
         logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
+    def cleanup(self) -> None:
+        """Release matplotlib resources for every panel before Qt widget deletion."""
+        for panel in self._panels:
+            panel.cleanup()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws in all panels before closing."""
+        self.cleanup()
+        super().closeEvent(event)
+
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         main_layout = QVBoxLayout(self)
@@ -313,6 +345,7 @@ class MultiView(QWidget):
         # Clear existing panels
         for panel in self._panels:
             self._grid_layout.removeWidget(panel)
+            panel.cleanup()
             panel.deleteLater()
         self._panels.clear()
 
