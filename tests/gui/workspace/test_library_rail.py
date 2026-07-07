@@ -51,6 +51,29 @@ def test_context_menu_on_item_emits_dataset_preview_requested(qtbot, monkeypatch
     assert blocker.args == ["d1"]
 
 
+def test_context_menu_signal_wiring_reaches_handler_through_real_emission(
+    qtbot, monkeypatch
+):
+    # Every other context-menu test calls rail._on_context_menu_requested(pos)
+    # directly. A missing or broken setContextMenuPolicy()/
+    # customContextMenuRequested.connect(...) in __init__ would leave those
+    # tests passing while a real right-click did nothing -- this test goes
+    # through the real Qt signal instead of calling the handler.
+    from PySide6.QtWidgets import QMenu
+
+    library = DatasetLibrary()
+    library.add(_ref("d1"))
+    rail = LibraryRail(library)
+    qtbot.addWidget(rail)
+    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[0])
+    pos = rail._list.visualItemRect(rail._list.item(0)).center()
+
+    with qtbot.waitSignal(rail.dataset_preview_requested, timeout=1000) as blocker:
+        rail._list.customContextMenuRequested.emit(pos)
+
+    assert blocker.args == ["d1"]
+
+
 def test_context_menu_on_empty_space_does_nothing(qtbot):
     library = DatasetLibrary()
     rail = LibraryRail(library)
