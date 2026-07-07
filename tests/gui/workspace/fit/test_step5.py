@@ -226,3 +226,139 @@ def test_diagnostics_summary_updates_on_second_nuts_run(qtbot):
     st.nuts_result = {"r_hat": {"a": 1.0}, "ess": {"a": 800.0}, "divergences": 3}
     v.refresh()
     assert v._divergence_label.text() == "Divergences: 3"
+
+
+def test_diagnostics_intervals_table_three_tuple(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {"credible_intervals": {"G0": (900.0, 1000.0, 1100.0)}}
+    v.refresh()
+    assert v._intervals_table.rowCount() == 1
+    assert v._intervals_table.item(0, 0).text() == "G0"
+    assert v._intervals_table.item(0, 1).text() == "1000"
+    assert v._intervals_table.item(0, 2).text() == "900"
+    assert v._intervals_table.item(0, 3).text() == "1100"
+
+
+def test_diagnostics_intervals_table_dict_shape(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "credible_intervals": {"eta": {"lower": 45.0, "median": 50.0, "upper": 55.0}}
+    }
+    v.refresh()
+    assert v._intervals_table.item(0, 1).text() == "50"
+    assert v._intervals_table.item(0, 2).text() == "45"
+    assert v._intervals_table.item(0, 3).text() == "55"
+
+
+def test_diagnostics_intervals_table_dict_shape_missing_fields_default_zero(qtbot):
+    # Spec requires dict-shape entries to default absent fields to 0.0
+    # (not skip the row) -- distinct from "malformed" (wrong type/length).
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {"credible_intervals": {"eta": {"lower": 45.0}}}
+    v.refresh()
+    assert v._intervals_table.rowCount() == 1
+    assert v._intervals_table.item(0, 1).text() == "0"
+    assert v._intervals_table.item(0, 2).text() == "45"
+    assert v._intervals_table.item(0, 3).text() == "0"
+
+
+def test_diagnostics_intervals_table_malformed_entry_skipped(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "credible_intervals": {"good": (1.0, 2.0, 3.0), "bad": "not-a-valid-shape"}
+    }
+    v.refresh()  # must not raise
+    assert v._intervals_table.rowCount() == 1
+    assert v._intervals_table.item(0, 0).text() == "good"
+
+
+def test_diagnostics_intervals_table_two_tuple_uses_summary_mean(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "credible_intervals": {"eta": (45.0, 55.0)},
+        "summary": {"eta": {"mean": 50.0}},
+    }
+    v.refresh()
+    assert v._intervals_table.item(0, 1).text() == "50"
+    assert v._intervals_table.item(0, 2).text() == "45"
+    assert v._intervals_table.item(0, 3).text() == "55"
+
+
+def test_diagnostics_intervals_table_two_tuple_summary_entry_is_none(qtbot):
+    # Regression: summary.get(param_name) can return an explicit None (key
+    # present, value None) rather than merely absent -- `(x or {}).get(...)`
+    # must guard this, or `None.get("mean", 0.0)` raises AttributeError.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "credible_intervals": {"eta": (45.0, 55.0)},
+        "summary": {"eta": None},
+    }
+    v.refresh()  # must not raise AttributeError
+    assert v._intervals_table.item(0, 1).text() == "0"
+    assert v._intervals_table.item(0, 2).text() == "45"
+    assert v._intervals_table.item(0, 3).text() == "55"
+
+
+def test_diagnostics_summary_and_table_both_update_on_second_nuts_run(qtbot):
+    # Fuller version of Task 2's test_diagnostics_summary_updates_on_second_
+    # nuts_run, now that the credible-intervals table exists too -- the spec
+    # requires a refresh() cycle replacing one non-None nuts_result with
+    # another to update BOTH the labels and the table, not just labels.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "r_hat": {"a": 1.0},
+        "ess": {"a": 800.0},
+        "divergences": 0,
+        "credible_intervals": {"a": (0.9, 1.0, 1.1)},
+    }
+    v.refresh()
+    assert v._divergence_label.text() == "Divergences: 0"
+    assert v._intervals_table.item(0, 1).text() == "1"
+
+    st.nuts_result = {
+        "r_hat": {"a": 1.2},
+        "ess": {"a": 100.0},
+        "divergences": 3,
+        "credible_intervals": {"a": (1.9, 2.0, 2.1)},
+    }
+    v.refresh()
+    assert v._divergence_label.text() == "Divergences: 3"
+    assert "[WARNING]" in v._rhat_label.text()
+    assert "[LOW]" in v._ess_label.text()
+    assert v._intervals_table.item(0, 1).text() == "2"
+
+
+def test_diagnostics_tab_cleanup_no_dangling_refs_on_removal(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result={"r_hat": {"a": 1.0}})
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    assert hasattr(v, "_rhat_label")
+    assert hasattr(v, "_intervals_table")
+
+    st.nuts_result = None
+    v.refresh()  # removes the Diagnostics tab
+
+    assert not hasattr(v, "_rhat_label")
+    assert not hasattr(v, "_ess_label")
+    assert not hasattr(v, "_divergence_label")
+    assert not hasattr(v, "_intervals_table")
+
+    # Regression: a later refresh() must not touch a widget whose tab was
+    # already removed, before deleteLater()'s deferred cleanup runs.
+    st.nuts_result = {"r_hat": {"a": 1.0}}
+    v.refresh()
+    assert hasattr(v, "_rhat_label")

@@ -8,7 +8,11 @@ import numpy as np
 from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.gui.compat import (
     QGridLayout,
+    QHeaderView,
     QLabel,
+    Qt,
+    QTableWidget,
+    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -20,6 +24,9 @@ from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from rheojax.gui.workspace.fit.step4_nuts import _ESS_MIN, _R_HAT_THRESHOLD
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 _ARVIZ_PLOTS = [
     "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
@@ -167,6 +174,17 @@ class VisualizeStep(QWidget):
         outer.addWidget(self._ess_label)
         outer.addWidget(self._divergence_label)
 
+        self._intervals_table = QTableWidget(page)
+        self._intervals_table.setColumnCount(4)
+        self._intervals_table.setHorizontalHeaderLabels(
+            ["Parameter", "Median", "Lower", "Upper"]
+        )
+        self._intervals_table.setAlternatingRowColors(True)
+        self._intervals_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        outer.addWidget(self._intervals_table)
+
         grid_widget = QWidget(page)
         grid = QGridLayout(grid_widget)
         for i, plot_name in enumerate(_ARVIZ_PLOTS):
@@ -244,6 +262,65 @@ class VisualizeStep(QWidget):
                 f"color: {themed('SUCCESS')}; font-weight: bold;"
             )
 
+        self._refresh_intervals_table()
+
+    def _refresh_intervals_table(self) -> None:
+        """Populate the credible-intervals table from nuts_result.
+
+        credible_intervals in the workspace shell's actual code path is
+        always a dict[str, tuple[lower, median, upper]] (see
+        BayesianService.get_credible_intervals() -- the median value there
+        is a real percentile-50, not a mean, hence the "Median" column
+        label). The dict-value and 2-tuple branches below only exist for
+        robustness against a future caller; they are not exercised by the
+        current subprocess_bayesian.py -> NutsStep.run() path.
+        """
+        result = self._state.nuts_result or {}
+        intervals = result.get("credible_intervals") or {}
+        summary = result.get("summary") or {}
+
+        self._intervals_table.setRowCount(0)
+        row = 0
+        for param_name, values in intervals.items():
+            if isinstance(values, dict):
+                lower = values.get("lower", 0.0)
+                median = values.get("median", values.get("mean", 0.0))
+                upper = values.get("upper", 0.0)
+            elif isinstance(values, (tuple, list)) and len(values) == 3:
+                lower, median, upper = values
+            elif isinstance(values, (tuple, list)) and len(values) == 2:
+                lower, upper = values
+                # summary.get(param_name) can be an explicit None (key
+                # present, value None) rather than merely absent -- `or {}`
+                # guards against AttributeError from None.get(...).
+                median = (summary.get(param_name) or {}).get("mean", 0.0)
+            else:
+                logger.warning(
+                    "Skipping malformed credible_intervals entry",
+                    param_name=param_name,
+                    shape=type(values).__name__,
+                )
+                continue
+
+            try:
+                lower_f, median_f, upper_f = float(lower), float(median), float(upper)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Skipping non-numeric credible_intervals entry",
+                    param_name=param_name,
+                )
+                continue
+
+            self._intervals_table.insertRow(row)
+            name_item = QTableWidgetItem(param_name)
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self._intervals_table.setItem(row, 0, name_item)
+            for col, val in ((1, median_f), (2, lower_f), (3, upper_f)):
+                item = QTableWidgetItem(f"{val:.4g}")
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._intervals_table.setItem(row, col, item)
+            row += 1
+
     def _remove_diagnostics_tab(self) -> None:
         idx = self._names.index("Diagnostics")
         page = self._tabs.widget(idx)
@@ -252,11 +329,18 @@ class VisualizeStep(QWidget):
             page.deleteLater()
         self._arviz_canvases.clear()
         self._names.remove("Diagnostics")
-        # ponytail: drop the dangling reference so a later refresh() (before
+        # ponytail: drop dangling references so a later refresh() (before
         # deleteLater's deferred Qt cleanup actually runs) can't touch a
         # widget whose parent tab no longer exists.
-        if hasattr(self, "_badge_label"):
-            del self._badge_label
+        for attr in (
+            "_badge_label",
+            "_rhat_label",
+            "_ess_label",
+            "_divergence_label",
+            "_intervals_table",
+        ):
+            if hasattr(self, attr):
+                delattr(self, attr)
 
     def _refresh_diagnostics(self) -> None:
         if hasattr(self, "_badge_label"):
