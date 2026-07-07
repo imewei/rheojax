@@ -12,7 +12,9 @@ from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 
-_ARVIZ_PLOTS = ["pair", "forest", "energy", "autocorr", "rank", "ess"]
+_ARVIZ_PLOTS = [
+    "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+]
 
 
 class VisualizeStep(QWidget):

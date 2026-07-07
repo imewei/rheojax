@@ -22,7 +22,9 @@ def test_diagnostics_tab_added_by_refresh(qtbot):
     st.nuts_result = {"rhat": 1.0}  # NUTS worker sets this
     v.refresh()  # controller calls this on NutsStep.finished
     assert "Diagnostics" in v.tab_names()
-    assert v.arviz_plots() == ["pair", "forest", "energy", "autocorr", "rank", "ess"]
+    assert v.arviz_plots() == [
+        "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+    ]
 
 
 def test_diagnostics_builds_with_real_nuts_result(qtbot):
@@ -52,10 +54,12 @@ def test_diagnostics_builds_with_real_nuts_result(qtbot):
     qtbot.addWidget(v)
 
     st.nuts_result = nuts_result
-    v.refresh()  # must build 6 ArvizCanvas widgets without raising
+    v.refresh()  # must build 8 ArvizCanvas widgets without raising
 
     assert "Diagnostics" in v.tab_names()
-    assert v.arviz_plots() == ["pair", "forest", "energy", "autocorr", "rank", "ess"]
+    assert v.arviz_plots() == [
+        "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+    ]
 
 
 def test_diagnostics_tab_removed_when_nuts_result_invalidated(qtbot):
