@@ -41,6 +41,7 @@ class WorkspaceWindow(QMainWindow):
         self._pipeline_stop_event: threading.Event | None = None
         self._active_jobs_action_pending = False
         self._close_confirmed = False
+        self._preview_dialog = None
         # Keyed by job_id, not a single scalar -- a second concurrent import
         # launched before the first one finishes must not drop the only
         # Python reference to the first ImportWorker/ImportWorkerSignals
@@ -166,6 +167,9 @@ class WorkspaceWindow(QMainWindow):
         self._notifier.changed.connect(self._transform_bodies[1].refresh)
         self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
+        self._rail.dataset_preview_requested.connect(
+            self._on_dataset_preview_requested
+        )
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -279,6 +283,19 @@ class WorkspaceWindow(QMainWindow):
             self._rail.import_requested.disconnect(self._on_import_requested)
         except (RuntimeError, TypeError):
             pass
+        try:
+            self._rail.dataset_preview_requested.disconnect(
+                self._on_dataset_preview_requested
+            )
+        except (RuntimeError, TypeError):
+            pass
+        from rheojax.gui.compat import _is_qobject_alive
+
+        if self._preview_dialog is not None:
+            if _is_qobject_alive(self._preview_dialog):
+                self._preview_dialog.close()
+                self._preview_dialog.deleteLater()
+            self._preview_dialog = None
         for widget in (self._canvas, self._rail, self._inspector, self._splitter):
             widget.deleteLater()
         self._controllers = {}
@@ -566,6 +583,56 @@ class WorkspaceWindow(QMainWindow):
 
     def _mark_dirty(self) -> None:
         self._state.project.dirty = True
+
+    def _on_dataset_preview_requested(self, dataset_id: str) -> None:
+        from rheojax.gui.compat import _is_qobject_alive
+        from rheojax.gui.dialogs.dataset_preview import DatasetPreviewDialog
+        from rheojax.gui.services.data_service import DataService
+        from rheojax.gui.utils.rheodata import rheodata_from_any
+
+        with self._state.library.lock:
+            try:
+                ref = self._state.library.get(dataset_id)
+            except KeyError:
+                self.log_dock.append_record(
+                    logging.WARNING,
+                    f"Preview requested for unknown dataset id: {dataset_id}",
+                )
+                return
+            try:
+                payload = self._state.library.load_payload(dataset_id)
+            except KeyError:
+                payload = None
+
+        data = None
+        if payload is not None:
+            try:
+                candidate = rheodata_from_any(payload).to_numpy()
+                if candidate.x.ndim == 1 and candidate.y.ndim == 1:
+                    data = candidate
+            except (TypeError, ValueError, IndexError):
+                data = None
+
+        warnings: list[str] = []
+        if data is not None:
+            if len(data.x) == 0:
+                warnings = ["Dataset contains no rows"]
+            else:
+                try:
+                    warnings = DataService().validate_data(data)
+                except Exception as exc:
+                    # Object-dtype/non-numeric values can pass the shape checks
+                    # above but still trip validate_data()'s numeric operations
+                    # (np.isfinite, np.ptp, percentiles) -- surface that as a
+                    # warning instead of crashing the preview.
+                    warnings = [f"Validation check failed: {exc}"]
+
+        if self._preview_dialog is None or not _is_qobject_alive(self._preview_dialog):
+            self._preview_dialog = DatasetPreviewDialog(self)
+        self._preview_dialog.set_dataset(ref, data, warnings)
+        self._preview_dialog.show()
+        self._preview_dialog.raise_()
+        self._preview_dialog.activateWindow()
 
     def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
         self._state.library.add(ref, overwrite=overwrite)
