@@ -8,6 +8,7 @@ Modal dialogs for wizards and configuration.
 from rheojax.gui.dialogs.about import About, AboutDialog
 from rheojax.gui.dialogs.bayesian_options import BayesianOptions, BayesianOptionsDialog
 from rheojax.gui.dialogs.column_mapper import ColumnMapper, ColumnMapperDialog
+from rheojax.gui.dialogs.dataset_preview import DatasetPreviewDialog
 from rheojax.gui.dialogs.export_options import ExportOptions, ExportOptionsDialog
 from rheojax.gui.dialogs.fitting_options import FittingOptions, FittingOptionsDialog
 from rheojax.gui.dialogs.import_wizard import ImportWizard
@@ -19,6 +20,7 @@ __all__ = [
     "PipelineTemplateDialog",
     "ColumnMapper",
     "ColumnMapperDialog",
+    "DatasetPreviewDialog",
     "FittingOptions",
     "FittingOptionsDialog",
     "BayesianOptions",
