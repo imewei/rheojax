@@ -101,6 +101,27 @@ def test_on_new_and_close_do_not_rebuild_while_jobs_active(qtbot, monkeypatch, t
     assert rebuild_calls == []
 
 
+def test_on_close_actually_closes_window_not_reset(qtbot, monkeypatch):
+    # Regression: _on_close used to call self._rebuild(AppState()) (copy-pasted from
+    # _on_new), which just blanked the project instead of closing the window -- File>Close
+    # appeared to do nothing. It must route through the same _confirmed_close chain
+    # closeEvent uses for the OS window controls.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+
+    confirmed_close_calls = []
+    monkeypatch.setattr(
+        win, "_confirmed_close", lambda: confirmed_close_calls.append(1)
+    )
+    rebuild_calls = []
+    monkeypatch.setattr(win, "_rebuild", lambda *a, **k: rebuild_calls.append(1))
+
+    win._on_close()
+
+    assert confirmed_close_calls == [1]
+    assert rebuild_calls == []
+
+
 @pytest.mark.parametrize("trigger", ["_on_save", "_on_save_as"])
 def test_save_and_save_as_blocked_while_jobs_active(
     qtbot, monkeypatch, trigger, tmp_path

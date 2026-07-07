@@ -412,10 +412,12 @@ class WorkspaceWindow(QMainWindow):
             self._state.project.dirty = False
 
     def _on_close(self) -> None:
+        # Actually close the window (same chain closeEvent uses for the OS ✕
+        # button), not a workspace reset -- this used to call
+        # self._rebuild(AppState()), copy-pasted from _on_new, which just
+        # blanked the project instead of closing anything.
         self._maybe_confirm_active_jobs(
-            lambda: self._maybe_confirm_unsaved_changes(
-                lambda: self._rebuild(AppState())
-            )
+            lambda: self._maybe_confirm_unsaved_changes(self._confirmed_close)
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:
