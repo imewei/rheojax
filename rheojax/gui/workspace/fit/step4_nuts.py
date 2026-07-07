@@ -5,7 +5,15 @@ from collections.abc import Callable
 
 import numpy as np
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QDoubleSpinBox,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from rheojax.gui.foundation.metrics import bfmi
 from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
@@ -115,22 +123,46 @@ class NutsStep(QWidget):
         self._skipped = False
         self._banner = QLabel("⚡ warm-started from NLSQ MAP", self)
         self._priors_editor = PriorsEditor(self)
+
+        # Sampler settings (previously hardcoded in fit_controller.py's
+        # _make_sample_fn with no UI to change them).
+        self._warmup = QSpinBox(self)
+        self._warmup.setRange(50, 100_000)
+        self._warmup.setValue(500)
+        self._samples = QSpinBox(self)
+        self._samples.setRange(50, 100_000)
+        self._samples.setValue(1000)
+        self._chains = QSpinBox(self)
+        self._chains.setRange(1, 16)
+        self._chains.setValue(4)
+        self._seed = QSpinBox(self)
+        self._seed.setRange(0, 2**31 - 1)
+        self._seed.setValue(0)
         self._target = QDoubleSpinBox(self)
         self._target.setRange(0.5, 0.999)
         self._target.setValue(0.8)
+        self._max_tree_depth = QSpinBox(self)
+        # 0 means "unset" -- library default (10) applies; see run()/_make_sample_fn.
+        self._max_tree_depth.setRange(0, 20)
+        self._max_tree_depth.setValue(0)
+        self._max_tree_depth.setSpecialValueText("default")
+        settings_form = QFormLayout()
+        settings_form.addRow("Warmup:", self._warmup)
+        settings_form.addRow("Samples:", self._samples)
+        settings_form.addRow("Chains:", self._chains)
+        settings_form.addRow("Seed:", self._seed)
+        settings_form.addRow("Target accept:", self._target)
+        settings_form.addRow("Max tree depth:", self._max_tree_depth)
+
         self._skip_btn = QPushButton("Skip NUTS", self)
         self._run_btn = QPushButton("▶ Sample", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
-        for w in (
-            self._banner,
-            self._priors_editor,
-            self._target,
-            self._skip_btn,
-            self._run_btn,
-            self._result,
-        ):
+        lay.addWidget(self._banner)
+        lay.addWidget(self._priors_editor)
+        lay.addLayout(settings_form)
+        for w in (self._skip_btn, self._run_btn, self._result):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
@@ -169,7 +201,14 @@ class NutsStep(QWidget):
 
     def run(self) -> None:
         self._skipped = False
-        cfg = {"target_accept": self._target.value()}
+        cfg = {
+            "target_accept": self._target.value(),
+            "num_warmup": self._warmup.value(),
+            "num_samples": self._samples.value(),
+            "num_chains": self._chains.value(),
+            "seed": self._seed.value(),
+            "max_tree_depth": self._max_tree_depth.value() or None,
+        }
         warm_start = (self._state.nlsq_result or {}).get("params", {})
         # Build priors from the (possibly user-edited) PriorsEditor; if the editor
         # was never seeded via load_suggested_priors(), it's empty and we fall back

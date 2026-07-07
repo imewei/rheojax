@@ -56,9 +56,12 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
         dataset_id="",
         target_accept=0.8,
         model_config=None,
+        max_tree_depth=None,
     ):
         calls["sample"] = (model_name, target_accept, model_config)
         calls["sample_test_mode"] = test_mode
+        calls["sample_settings"] = (num_warmup, num_samples, num_chains, seed)
+        calls["sample_max_tree_depth"] = max_tree_depth
         return {"posterior_samples": {"a": [1.0, 1.1]}, "r_hat": {"a": 1.0}}
 
     monkeypatch.setattr(
@@ -105,8 +108,18 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
 
     nuts_step = bodies[3]
     nuts_step._target.setValue(0.85)
+    # Regression: sampler settings were hardcoded in fit_controller.py's
+    # _make_sample_fn with no UI to change them -- these must now flow
+    # through from the step's own spinboxes.
+    nuts_step._warmup.setValue(50)
+    nuts_step._samples.setValue(60)
+    nuts_step._chains.setValue(2)
+    nuts_step._seed.setValue(7)
+    nuts_step._max_tree_depth.setValue(11)
     nuts_step.run()
     assert calls["sample"][1] == 0.85
+    assert calls["sample_settings"] == (50, 60, 2, 7)
+    assert calls["sample_max_tree_depth"] == 11
     # Regression: NUTS must forward the user's Step 1 model_config through to
     # run_bayesian_isolated (see _make_sample_fn in fit_controller.py), same
     # as NLSQ's fit_fn does above -- otherwise the model is silently
