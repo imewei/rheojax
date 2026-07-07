@@ -699,6 +699,7 @@ def make_bayesian_worker(
     fitted_model_state: dict[str, Any] | None = None,
     dataset_id: str = "",
     target_accept: float = 0.8,
+    max_tree_depth: int | None = None,
 ) -> Any:
     """Create a Bayesian worker (subprocess or thread mode).
 
@@ -751,6 +752,7 @@ def make_bayesian_worker(
             fitted_model_state=fitted_model_state,
             dataset_id=dataset_id,
             target_accept=target_accept,
+            max_tree_depth=max_tree_depth,
         )
 
     # Subprocess mode — use functools.partial with module-level entry
@@ -790,6 +792,7 @@ def make_bayesian_worker(
         fitted_model_state=safe_model_state,
         dataset_id=dataset_id,
         target_accept=target_accept,
+        max_tree_depth=max_tree_depth,
     )
 
     return ProcessWorkerAdapter(work_fn)

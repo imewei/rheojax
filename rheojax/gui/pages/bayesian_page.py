@@ -879,6 +879,11 @@ class BayesianPage(QWidget):
             seed=config.get("seed", state.current_seed),
             fitted_model_state=fitted_model_state,
             dataset_id=self._submitted_dataset_id,
+            # F-BP-ADV-001 fix: config["target_accept_prob"]/["max_tree_depth"]
+            # were computed from the Advanced Options dialog (lines ~637-650)
+            # but never reached the sampler -- silently dropped here.
+            target_accept=config.get("target_accept_prob", 0.8),
+            max_tree_depth=config.get("max_tree_depth"),
         )
 
         self._current_worker.signals.progress.connect(

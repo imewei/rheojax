@@ -152,6 +152,7 @@ def run_bayesian_isolated(
     dataset_id: str = "",
     target_accept: float = 0.8,
     model_config: dict[str, Any] | None = None,
+    max_tree_depth: int | None = None,
 ) -> dict[str, Any]:
     """Run NUTS Bayesian sampling in an isolated subprocess.
 
@@ -263,6 +264,8 @@ def run_bayesian_isolated(
         mcmc_kwargs["fitted_model_state"] = fitted_model_state
     if model_config:
         mcmc_kwargs["model_config"] = model_config
+    if max_tree_depth is not None:
+        mcmc_kwargs["max_tree_depth"] = max_tree_depth
 
     service = BayesianService()
     bayesian_result = service.run_mcmc(
