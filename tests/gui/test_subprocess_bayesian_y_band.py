@@ -61,3 +61,25 @@ def test_compute_y_band_shape_and_ordering(monkeypatch):
     assert lo.shape == x.shape
     assert hi.shape == x.shape
     assert np.all(lo <= hi)
+
+
+def test_predict_does_not_mutate_caller_model_kwargs():
+    """Regression: ModelService.predict() used to .pop("fitted_model_state")
+    in place on the caller's model_kwargs dict. _compute_y_band's posterior-draw
+    loop (and bayesian_page.py's equivalent) build model_kwargs once and reuse
+    it across many predict() calls, so only the first draw ever saw
+    fitted_model_state -- every later draw for stateful models (HL/DMT/HVM/VLB)
+    silently lost it.
+    """
+    from rheojax.gui.services.model_service import ModelService
+
+    svc = ModelService()
+    model_kwargs = {"fitted_model_state": {"_last_fit_kwargs": {}}}
+    x = np.linspace(0.1, 1.0, 5)
+
+    svc.predict("maxwell", {}, x, test_mode="relaxation", model_kwargs=model_kwargs)
+    assert "fitted_model_state" in model_kwargs
+
+    # Second call with the same dict must still see it too.
+    svc.predict("maxwell", {}, x, test_mode="relaxation", model_kwargs=model_kwargs)
+    assert "fitted_model_state" in model_kwargs

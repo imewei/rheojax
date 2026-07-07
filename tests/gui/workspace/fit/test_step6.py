@@ -2,6 +2,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from rheojax.gui.compat import QFileDialog
 from rheojax.gui.foundation.library import DatasetLibrary
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.workspace.fit.step6_export import ExportStep
@@ -86,3 +87,34 @@ def test_save_to_library_reruns_at_same_revision_overwrite(qtbot):
     id2 = step.save_to_library()
     assert id1 == id2
     assert lib.get(id2).origin == "derived"
+
+
+def test_on_export_clicked_reports_failure_instead_of_raising(qtbot, monkeypatch, tmp_path):
+    """Regression: _on_export_clicked called export_bundle() unguarded, so an
+    unwritable directory or export failure propagated uncaught out of the Qt
+    slot instead of updating the status label with an error."""
+    st = FitState(
+        protocol="oscillation",
+        model_key="maxwell",
+        model_config={},
+        data_ref="d",
+        nlsq_result={"params": {"G0": 1.0}},
+        nuts_result=None,
+        revision=2,
+    )
+    lib = DatasetLibrary()
+    step = ExportStep(st, lib)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *a, **k: str(tmp_path)
+    )
+
+    def _raise(_directory):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(step, "export_bundle", _raise)
+
+    step._on_export_clicked()  # must not raise
+    assert "failed" in step._export_status.text().lower()
+    assert "disk full" in step._export_status.text()

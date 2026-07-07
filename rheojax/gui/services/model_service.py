@@ -1136,7 +1136,11 @@ class ModelService:
 
         try:
             # Create model instance with optional configuration
-            model_kwargs = model_kwargs or {}
+            # Copy before pop(): callers (e.g. subprocess_bayesian._compute_y_band,
+            # bayesian_page._update_fit_plot_from_posterior) reuse the same
+            # model_kwargs dict across many predict() calls in a loop -- mutating
+            # it in place silently dropped fitted_model_state after the first draw.
+            model_kwargs = dict(model_kwargs) if model_kwargs else {}
             # Extract fitted_model_state before passing to constructor
             fitted_model_state = model_kwargs.pop("fitted_model_state", None)
             model = self._registry.create_instance(

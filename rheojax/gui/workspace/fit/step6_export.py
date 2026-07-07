@@ -49,7 +49,11 @@ class ExportStep(QWidget):
         )
         if not chosen:
             return
-        written = self.export_bundle(Path(chosen))
+        try:
+            written = self.export_bundle(Path(chosen))
+        except OSError as exc:
+            self._export_status.setText(f"Export failed: {exc}")
+            return
         self._export_status.setText(f"Exported to {Path(chosen)}")
         return written
 

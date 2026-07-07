@@ -150,6 +150,24 @@ class PlotPanel(QWidget):
         """
         return self._canvas
 
+    def _draw(self) -> None:
+        """Force an immediate redraw, degrading gracefully on failure.
+
+        Agg/FreeType rendering can fail for host-environment reasons outside
+        this widget's control (e.g. a "raster overflow" from a font-cache/DPI
+        quirk) -- log and continue instead of propagating a crash.
+        """
+        try:
+            self._canvas.draw()
+        except Exception as e:
+            logger.error(
+                "Error rendering canvas",
+                widget=self.__class__.__name__,
+                index=self._index,
+                error=str(e),
+                exc_info=True,
+            )
+
     def clear(self) -> None:
         """Clear the figure."""
         logger.debug(
@@ -159,11 +177,11 @@ class PlotPanel(QWidget):
             index=self._index,
         )
         self._figure.clear()
-        self._canvas.draw()
+        self._draw()
 
     def refresh(self) -> None:
         """Refresh the canvas."""
-        self._canvas.draw()
+        self._draw()
 
 
 class MultiView(QWidget):
@@ -213,6 +231,11 @@ class MultiView(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._set_layout(layout)
+        # closeEvent() only fires for top-level widgets; when MultiView is
+        # embedded (e.g. inside the Compare Models QDialog) it's destroyed via
+        # Qt's parent cascade instead, which closeEvent never sees. destroyed
+        # fires on every teardown path, so wiring cleanup() to it covers both.
+        self.destroyed.connect(lambda: self.cleanup())
         logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def cleanup(self) -> None:
@@ -221,16 +244,7 @@ class MultiView(QWidget):
             panel.cleanup()
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        """Cancel pending matplotlib draws in all panels before closing.
-
-        Only fires on an explicit .close() (including qtbot.addWidget()'s
-        teardown). If MultiView is embedded inside a dialog that gets torn
-        down via deleteLater() cascade instead of its own .close(),
-        closeEvent never reaches this widget -- same limitation
-        base_arviz_widget.py/plot_canvas.py already have; call cleanup()
-        directly at any such parent-cascade teardown site if that path
-        needs covering too.
-        """
+        """Cancel pending matplotlib draws in all panels before closing."""
         self.cleanup()
         super().closeEvent(event)
 

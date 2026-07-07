@@ -118,6 +118,66 @@ def test_execute_runs_nlsq_then_nuts_fit_step(qtbot):
     # independently of nlsq
 
 
+def test_execute_forwards_max_tree_depth_to_bayesian_worker(qtbot, monkeypatch):
+    """Regression: _execute_pipeline_fit built the NUTS worker call without
+    max_tree_depth, so batch/pipeline fits always used the sampler default
+    even when the user configured a custom value in nuts_config."""
+    from PySide6.QtCore import QObject, Signal
+
+    from rheojax.gui.jobs import process_adapter
+
+    captured: dict = {}
+
+    class _FakeSignals(QObject):
+        completed = Signal(object)
+        failed = Signal(object)
+        cancelled = Signal()
+
+    class _FakeWorker:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.signals = _FakeSignals()
+
+        def run(self):
+            self.signals.completed.emit({"posterior_samples": {}})
+
+    monkeypatch.setattr(
+        process_adapter, "make_bayesian_worker", lambda **kw: _FakeWorker(**kw)
+    )
+
+    lib = DatasetLibrary()
+    lib.add(_ref("d1", "relaxation"))
+    data = RheoData(
+        x=[0.1, 1.0, 10.0], y=[100.0, 50.0, 10.0], initial_test_mode="relaxation"
+    )
+    lib.store_payload("d1", data)
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="fit",
+            config={
+                "model_name": "maxwell",
+                "run_nuts": True,
+                "nuts_config": {
+                    "num_warmup": 50,
+                    "num_samples": 50,
+                    "num_chains": 1,
+                    "max_tree_depth": 7,
+                },
+            },
+        )
+    ]
+    result = svc.execute(
+        steps=steps,
+        initial_context={"data": data, "dataset_id": "d1"},
+        library=lib,
+        stop_requested=threading.Event(),
+    )
+    assert result.step_results["s1"].nuts.status == "completed"
+    assert captured["max_tree_depth"] == 7
+
+
 def test_execute_runs_transform_step(qtbot):
     lib = DatasetLibrary()
     lib.add(_ref("d1", "oscillation"))

@@ -148,10 +148,8 @@ class NutsStep(QWidget):
         self._target.setValue(nuts_cfg.target_accept)
         self._max_tree_depth = QSpinBox(self)
         # 0 means "unset" -- library default (10) applies; see run()/_make_sample_fn.
-        # No FitState.nuts_config field exists for this one (added later than
-        # NutsConfig itself), so it stays widget-only state.
         self._max_tree_depth.setRange(0, 20)
-        self._max_tree_depth.setValue(0)
+        self._max_tree_depth.setValue(nuts_cfg.max_tree_depth or 0)
         self._max_tree_depth.setSpecialValueText("default")
         settings_form = QFormLayout()
         settings_form.addRow("Warmup:", self._warmup)
@@ -173,7 +171,13 @@ class NutsStep(QWidget):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
-        for spin in (self._warmup, self._samples, self._chains, self._seed):
+        for spin in (
+            self._warmup,
+            self._samples,
+            self._chains,
+            self._seed,
+            self._max_tree_depth,
+        ):
             spin.valueChanged.connect(self._on_settings_changed)
         self._target.valueChanged.connect(self._on_settings_changed)
 
@@ -184,6 +188,7 @@ class NutsStep(QWidget):
         cfg.num_chains = self._chains.value()
         cfg.seed = self._seed.value()
         cfg.target_accept = self._target.value()
+        cfg.max_tree_depth = self._max_tree_depth.value() or None
 
     def priors_editor(self) -> PriorsEditor:
         return self._priors_editor

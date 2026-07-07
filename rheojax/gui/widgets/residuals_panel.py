@@ -80,6 +80,11 @@ class ResidualsPanel(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        # closeEvent() only fires for top-level widgets; when embedded as a
+        # child (e.g. inside VisualizeStep) it's destroyed via Qt's parent
+        # cascade instead, which closeEvent never sees. destroyed fires on
+        # every teardown path, so wiring cleanup() to it covers both.
+        self.destroyed.connect(lambda: self.cleanup())
         logger.debug("Initialization complete", class_name=self.__class__.__name__)
 
     def cleanup(self) -> None:
@@ -353,7 +358,23 @@ class ResidualsPanel(QWidget):
             self._empty_label.setText("Unsupported residual plot")
             self._empty_label.show()
 
-        self._canvas.draw()
+        try:
+            self._canvas.draw()
+        except Exception as e:
+            # Agg/FreeType rendering can fail for reasons outside this
+            # widget's control (host DPI/font-cache quirks triggering a
+            # "raster overflow", degenerate tight-layout margins, etc.) --
+            # same rationale as the plot-generation try/except above, just
+            # covering the draw() call it currently doesn't reach.
+            logger.error(
+                "Error rendering canvas",
+                widget=self.__class__.__name__,
+                plot_type=self._current_plot_type,
+                error=str(e),
+                exc_info=True,
+            )
+            self._empty_label.setText(f"Render error: {e}")
+            self._empty_label.show()
 
     def _plot_residuals_vs_fitted(self) -> None:
         """Plot residuals vs fitted values."""

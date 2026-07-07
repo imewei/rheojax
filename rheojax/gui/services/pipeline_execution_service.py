@@ -503,6 +503,7 @@ class PipelineExecutionService(QObject):
             seed=nuts_cfg.get("seed", 0),
             dataset_id=dataset_id,
             target_accept=nuts_cfg.get("target_accept", 0.8),
+            max_tree_depth=nuts_cfg.get("max_tree_depth"),
         )
         self.phase_worker_ready.emit(dataset_id, step.id, "nuts", nuts_worker)
         nuts_phase = self._run_worker_phase(nuts_worker)
