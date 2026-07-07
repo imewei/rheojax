@@ -106,3 +106,123 @@ def test_refresh_overlay_handles_ndarray_y_band_without_raising(qtbot, monkeypat
     v = VisualizeStep(st)
     qtbot.addWidget(v)
     v._refresh_overlay()  # must not raise ValueError on ambiguous truth value
+
+
+def test_diagnostics_summary_labels_ok_status(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "r_hat": {"a": 1.0, "b": 1.02},
+        "ess": {"a": 800.0, "b": 900.0},
+        "divergences": 0,
+    }
+    v.refresh()
+    assert v._rhat_label.text() == "R-hat (max): 1.0200 [OK]"
+    assert v._ess_label.text() == "ESS (min): 800 [OK]"
+    assert v._divergence_label.text() == "Divergences: 0"
+
+
+def test_diagnostics_summary_labels_warning_status(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "r_hat": {"a": 1.2},
+        "ess": {"a": 100.0},
+        "divergences": 5,
+    }
+    v.refresh()
+    assert v._rhat_label.text() == "R-hat (max): 1.2000 [WARNING]"
+    assert v._ess_label.text() == "ESS (min): 100 [LOW]"
+    assert v._divergence_label.text() == "Divergences: 5"
+
+
+def test_diagnostics_summary_labels_mixed_finite_and_nan_is_failing(qtbot):
+    # Regression: max()/min() are order-dependent with NaN present -- a NaN
+    # never compares >/< a finite value, so `max([1.0, nan])` silently
+    # returns 1.0 (the finite value), not nan. Checking isnan() only on the
+    # aggregate result (rather than on every dict entry, like
+    # step4_nuts.py::_diagnostics_verdict() already does) would let a
+    # genuinely unverifiable diagnostic read as "OK". An all-NaN dict can't
+    # catch this bug -- it must be a MIX of finite and NaN values.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "r_hat": {"finite": 1.0, "nan": float("nan")},
+        "ess": {"finite": 800.0, "nan": float("nan")},
+    }
+    v.refresh()
+    assert "[WARNING]" in v._rhat_label.text()
+    assert "[LOW]" in v._ess_label.text()
+
+
+def test_diagnostics_summary_labels_none_entry_excluded(qtbot):
+    # Regression: individual r_hat/ess dict VALUES can be None (not just
+    # NaN) -- step4_nuts.py::_diagnostics_verdict() already guards this
+    # exact case (`if r_hat is None: continue`), confirming it's a real,
+    # reachable shape from the NumPyro/ArviZ pipeline. max()/min() raise
+    # TypeError comparing None to a float, so None entries must be
+    # filtered out before aggregating, not just checked for NaN.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {
+        "r_hat": {"a": 1.0, "b": None},
+        "ess": {"a": 800.0, "b": None},
+    }
+    v.refresh()  # must not raise TypeError
+    assert v._rhat_label.text() == "R-hat (max): 1.0000 [OK]"
+    assert v._ess_label.text() == "ESS (min): 800 [OK]"
+
+
+def test_diagnostics_summary_labels_missing_fallback(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {}  # populated dict with no r_hat/ess/divergences keys
+    v.refresh()
+    assert v._rhat_label.text() == "R-hat: --"
+    assert v._ess_label.text() == "ESS: --"
+    assert v._divergence_label.text() == "Divergences: 0"
+
+
+def test_diagnostics_summary_labels_style_reset_after_warning_clears(qtbot):
+    # Regression: transitioning from a WARNING-colored label back to the
+    # "--" placeholder must not leave the stale warning color behind.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {"r_hat": {"a": 1.2}}  # over threshold -> WARNING color
+    v.refresh()
+    assert "color:" in v._rhat_label.styleSheet()
+
+    st.nuts_result = {}  # r_hat now missing -> falls back to "--"
+    v.refresh()
+    assert v._rhat_label.text() == "R-hat: --"
+    assert "color:" not in v._rhat_label.styleSheet()
+
+
+def test_diagnostics_summary_divergences_unknown_sentinel(qtbot):
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {"divergences": -1}
+    v.refresh()
+    assert v._divergence_label.text() == "Divergences: unknown"
+
+
+def test_diagnostics_summary_updates_on_second_nuts_run(qtbot):
+    # A refresh() cycle that replaces one non-None nuts_result with another
+    # (re-running NUTS with different settings), not just None -> result.
+    st = FitState(nlsq_result={"params": {}}, nuts_result=None)
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    st.nuts_result = {"r_hat": {"a": 1.0}, "ess": {"a": 800.0}, "divergences": 0}
+    v.refresh()
+    assert v._divergence_label.text() == "Divergences: 0"
+
+    st.nuts_result = {"r_hat": {"a": 1.0}, "ess": {"a": 800.0}, "divergences": 3}
+    v.refresh()
+    assert v._divergence_label.text() == "Divergences: 3"

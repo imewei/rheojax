@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
-from PySide6.QtWidgets import QGridLayout, QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from rheojax.core.arviz_utils import inference_data_from_dict
+from rheojax.gui.compat import (
+    QGridLayout,
+    QLabel,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
+from rheojax.gui.workspace.fit.step4_nuts import _ESS_MIN, _R_HAT_THRESHOLD
 
 _ARVIZ_PLOTS = [
     "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
@@ -148,6 +157,16 @@ class VisualizeStep(QWidget):
         outer = QVBoxLayout(page)
         badge = QLabel(self.diagnostics_badge_text(), page)
         outer.addWidget(badge)
+
+        self._rhat_label = QLabel("R-hat: --", page)
+        self._ess_label = QLabel("ESS: --", page)
+        self._divergence_label = QLabel("Divergences: 0", page)
+        for label in (self._rhat_label, self._ess_label):
+            label.setStyleSheet(f"font-family: {Typography.FONT_FAMILY_MONO};")
+        outer.addWidget(self._rhat_label)
+        outer.addWidget(self._ess_label)
+        outer.addWidget(self._divergence_label)
+
         grid_widget = QWidget(page)
         grid = QGridLayout(grid_widget)
         for i, plot_name in enumerate(_ARVIZ_PLOTS):
@@ -158,6 +177,72 @@ class VisualizeStep(QWidget):
         outer.addWidget(grid_widget)
         self._badge_label = badge
         self._add("Diagnostics", page)
+
+    def _refresh_diagnostics_summary(self) -> None:
+        """Populate the R-hat/ESS/Divergences labels from nuts_result.
+
+        No new computation -- state.nuts_result already carries r_hat, ess,
+        and divergences (see run_bayesian_isolated() in subprocess_bayesian.py).
+        Thresholds are imported from step4_nuts.py so these labels can never
+        disagree with the convergence-verdict badge on the same screen.
+        """
+        result = self._state.nuts_result or {}
+        mono_style = f"font-family: {Typography.FONT_FAMILY_MONO};"
+
+        r_hat = result.get("r_hat") or {}
+        # Individual dict values can be None (step4_nuts.py::_diagnostics_
+        # verdict() already guards this exact case), so filter those before
+        # aggregating -- max() raises TypeError comparing None to a float.
+        r_hat_vals = [v for v in r_hat.values() if v is not None]
+        if r_hat_vals:
+            max_rhat = max(r_hat_vals)
+            # Check every value for NaN individually rather than only the
+            # aggregate: max()/min() are order-dependent with NaN present
+            # (a NaN never compares >/< a finite value, so it can silently
+            # lose to a finite value depending on dict iteration order and
+            # never surface in the aggregate at all).
+            has_nan = any(isinstance(v, float) and math.isnan(v) for v in r_hat_vals)
+            failing = has_nan or max_rhat > _R_HAT_THRESHOLD
+            status = "WARNING" if failing else "OK"
+            color = themed("WARNING") if failing else themed("SUCCESS")
+            self._rhat_label.setText(f"R-hat (max): {max_rhat:.4f} [{status}]")
+            self._rhat_label.setStyleSheet(f"color: {color}; {mono_style}")
+        else:
+            self._rhat_label.setText("R-hat: --")
+            self._rhat_label.setStyleSheet(mono_style)
+
+        ess = result.get("ess") or {}
+        ess_vals = [v for v in ess.values() if v is not None]
+        if ess_vals:
+            min_ess = min(ess_vals)
+            has_nan = any(isinstance(v, float) and math.isnan(v) for v in ess_vals)
+            failing = has_nan or min_ess < _ESS_MIN
+            status = "LOW" if failing else "OK"
+            color = themed("WARNING") if failing else themed("SUCCESS")
+            self._ess_label.setText(f"ESS (min): {min_ess:.0f} [{status}]")
+            self._ess_label.setStyleSheet(f"color: {color}; {mono_style}")
+        else:
+            self._ess_label.setText("ESS: --")
+            self._ess_label.setStyleSheet(mono_style)
+
+        divergences = result.get("divergences", 0)
+        if divergences is None:
+            divergences = 0
+        if divergences == -1:
+            self._divergence_label.setText("Divergences: unknown")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('WARNING')}; font-weight: bold;"
+            )
+        elif divergences > 0:
+            self._divergence_label.setText(f"Divergences: {divergences}")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('ERROR')}; font-weight: bold;"
+            )
+        else:
+            self._divergence_label.setText("Divergences: 0")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('SUCCESS')}; font-weight: bold;"
+            )
 
     def _remove_diagnostics_tab(self) -> None:
         idx = self._names.index("Diagnostics")
@@ -176,6 +261,8 @@ class VisualizeStep(QWidget):
     def _refresh_diagnostics(self) -> None:
         if hasattr(self, "_badge_label"):
             self._badge_label.setText(self.diagnostics_badge_text())
+        if hasattr(self, "_rhat_label"):
+            self._refresh_diagnostics_summary()
         if not self._arviz_canvases:
             return
         idata = self._inference_data()
