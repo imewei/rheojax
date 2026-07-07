@@ -194,9 +194,10 @@ def test_options_dialog_cancelled_keeps_previous_options(qtbot, monkeypatch):
         FittingOptionsDialog, "exec", lambda self: QDialog.DialogCode.Rejected
     )
 
+    step._fit_options = {"ftol": 1e-9}
     step._options_btn.click()
 
-    assert step.fit_options() == {}
+    assert step.fit_options() == {"ftol": 1e-9}
 
 
 def test_run_forwards_fit_options_to_fit_fn(qtbot):
@@ -217,3 +218,35 @@ def test_run_forwards_fit_options_to_fit_fn(qtbot):
         step.run()
 
     assert calls["options"] == {"ftol": 1e-10}
+
+
+def test_run_strips_dialog_multistart_keys_from_options(qtbot):
+    """FittingOptionsDialog can set "multistart"/"num_starts" in _fit_options,
+    which ModelService.fit() would translate into its own backend-level
+    multi-start -- nesting with this step's own _ms_enabled/_ms_count outer
+    restart loop. run() must strip those two keys (and only those two) from
+    the dict passed as options=, without mutating self._fit_options itself.
+    """
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._fit_options = {"multistart": True, "num_starts": 10, "ftol": 1e-10}
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+
+    assert calls["options"] == {"ftol": 1e-10}
+    # self._fit_options (the dialog's stored state) must be untouched.
+    assert step._fit_options == {
+        "multistart": True,
+        "num_starts": 10,
+        "ftol": 1e-10,
+    }

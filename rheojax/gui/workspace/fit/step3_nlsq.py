@@ -134,6 +134,22 @@ class NlsqStep(QWidget):
         # an overlapping fit that corrupts shared active_jobs tracking.
         self._run_btn.setEnabled(False)
         try:
+            # This step's own _ms_enabled/_ms_count widgets are the single
+            # source of truth for multi-start (outer restart loop in
+            # fit_controller). FittingOptionsDialog can also set
+            # "multistart"/"num_starts" in self._fit_options, which
+            # ModelService.fit() would translate into its OWN, separate
+            # backend-level multi-start. Passing both through would nest
+            # them: the outer loop's `count` restarts each triggering the
+            # backend's `n_starts` restarts, silently multiplying fit time.
+            # Strip a copy here (never mutate self._fit_options) so the
+            # dialog's stored state is preserved for the user to see if
+            # they reopen it, but never reaches the backend.
+            fit_options = {
+                k: v
+                for k, v in self._fit_options.items()
+                if k not in ("multistart", "num_starts")
+            }
             try:
                 res = self._fit_fn(
                     self._state.model_key,
@@ -145,7 +161,7 @@ class NlsqStep(QWidget):
                         "enabled": self._ms_enabled.isChecked(),
                         "count": self._ms_count.value(),
                     },
-                    options=self._fit_options,
+                    options=fit_options,
                 )
             except NotImplementedError:
                 # ponytail: real solver wiring is out of scope here (tracked separately);
@@ -216,7 +232,7 @@ class NlsqStep(QWidget):
                     ]
                     if sigma_parts:
                         lines.append("  ".join(sigma_parts))
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, IndexError):
                 pass
 
         self._result.setText("  ".join(lines))
