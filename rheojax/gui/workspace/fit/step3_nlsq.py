@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -157,10 +158,46 @@ class NlsqStep(QWidget):
         if self._state.nlsq_result is None:
             self._result.setText("")
             return
-        r2 = self._state.nlsq_result.get("r_squared", float("nan"))
+        result = self._state.nlsq_result
+        r2 = result.get("r_squared", float("nan"))
         if r2 is None:
             r2 = float("nan")
-        self._result.setText(f"R²={r2:.3f}")
+        lines = [f"R²={r2:.3f}"]
+
+        chi2 = result.get("chi_squared")
+        if chi2 is not None:
+            lines.append(f"chi²={float(chi2):.6g}")
+
+        mpe = result.get("mpe")
+        if mpe is not None:
+            lines.append(f"MPE={float(mpe):.2f}%")
+
+        fit_time = result.get("fit_time")
+        if fit_time is not None:
+            lines.append(f"time={float(fit_time):.2f}s")
+
+        # Recompute locally from pcov (sorted param names + shape-checked
+        # sqrt(diag)) rather than trusting a precomputed uncertainties list's
+        # ordering against params -- mirrors the legacy shell's existing,
+        # working pattern (rheojax/gui/pages/fit_page.py:1095-1122).
+        params = result.get("params") or {}
+        pcov = result.get("pcov")
+        if pcov is not None and params:
+            param_names = sorted(params.keys())
+            try:
+                pcov_arr = np.asarray(pcov)
+                if pcov_arr.ndim == 2 and pcov_arr.shape[0] == len(param_names):
+                    sigma_parts = [
+                        f"{name}=±{np.sqrt(pcov_arr[i, i]):.3g}"
+                        for i, name in enumerate(param_names)
+                        if pcov_arr[i, i] > 0
+                    ]
+                    if sigma_parts:
+                        lines.append("  ".join(sigma_parts))
+            except (ValueError, TypeError):
+                pass
+
+        self._result.setText("  ".join(lines))
 
     def is_ready(self) -> bool:
         return bool(

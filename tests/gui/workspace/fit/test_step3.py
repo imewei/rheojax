@@ -94,3 +94,61 @@ def test_nlsq_solver_failure_is_reported_without_escaping_qt_slot(qtbot):
     step.run()
     assert st.nlsq_result is None
     assert "optimizer failed" in step._result.text()
+
+
+def test_refresh_display_shows_chi2_mpe_and_fit_time_when_present(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {
+        "params": {"G0": 1000.0},
+        "r_squared": 0.95,
+        "chi_squared": 12.3,
+        "mpe": 4.5,
+        "fit_time": 1.23,
+    }
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    text = step._result.text()
+    assert "R²=0.950" in text
+    assert "chi²=12.3" in text
+    assert "MPE=4.50%" in text
+    assert "time=1.23s" in text
+
+
+def test_refresh_display_shows_parameter_uncertainties_from_pcov(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {
+        "params": {"G0": 1000.0, "eta": 50.0},
+        "r_squared": 0.95,
+        "pcov": [[4.0, 0.0], [0.0, 9.0]],
+    }
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    text = step._result.text()
+    assert "G0=±2" in text
+    assert "eta=±3" in text
+
+
+def test_refresh_display_omits_optional_fields_when_absent(qtbot):
+    # Regression: a result dict without chi_squared/mpe/fit_time/pcov (e.g.
+    # a bare test fake, as used throughout this test file) must not crash
+    # and must not show placeholder/garbage text for the missing fields.
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {"params": {"G0": 1000.0}, "r_squared": 0.9}
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    assert step._result.text() == "R²=0.900"
