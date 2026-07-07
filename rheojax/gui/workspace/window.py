@@ -170,6 +170,7 @@ class WorkspaceWindow(QMainWindow):
         self._rail.dataset_preview_requested.connect(
             self._on_dataset_preview_requested
         )
+        self._rail.dataset_selected.connect(self._on_rail_dataset_selected)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -287,6 +288,10 @@ class WorkspaceWindow(QMainWindow):
             self._rail.dataset_preview_requested.disconnect(
                 self._on_dataset_preview_requested
             )
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._rail.dataset_selected.disconnect(self._on_rail_dataset_selected)
         except (RuntimeError, TypeError):
             pass
         from rheojax.gui.compat import _is_qobject_alive
@@ -635,9 +640,13 @@ class WorkspaceWindow(QMainWindow):
         self._preview_dialog.activateWindow()
 
     def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
-        self._state.library.add(ref, overwrite=overwrite)
-        if payload is not None:
-            self._state.library.store_payload(ref.id, payload)
+        # Hold the library's lock across both calls so a concurrent reader never
+        # observes a DatasetRef registered by add() before store_payload() has
+        # written its payload (see DatasetLibrary.lock's docstring in library.py).
+        with self._state.library.lock:
+            self._state.library.add(ref, overwrite=overwrite)
+            if payload is not None:
+                self._state.library.store_payload(ref.id, payload)
         self._notifier.changed.emit()
 
     # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
@@ -661,6 +670,18 @@ class WorkspaceWindow(QMainWindow):
             return
 
         self._launch_import([Path(p) for p in paths])
+
+    def _on_rail_dataset_selected(self, dataset_id: str) -> None:
+        """Forward a LibraryRail click to the Fit workflow's dataset selector.
+
+        Transform's SlotsStep manages multiple per-slot combos and Pipeline's
+        PipelineConfigureRunStep selects datasets for batch execution --
+        neither has a single "make this the active dataset" concept to
+        forward to, so only Fit mode's DataStep (which has exactly that) is
+        wired here.
+        """
+        if self._mode == "fit":
+            self._fit_bodies[1].select_dataset(dataset_id)
 
     def _launch_import(
         self,
@@ -728,15 +749,25 @@ class WorkspaceWindow(QMainWindow):
         self._active_import_workers.pop(job_id, None)
         import hashlib
         import uuid
+        from collections import Counter
 
         from rheojax.gui.foundation.library import DatasetRef
         from rheojax.gui.services.data_service import DataService
 
         service = DataService()
         hash_cache: dict[str, str] = {}
-        # ponytail: multiple segments from one source file all get that
-        # file's stem as their name -- add "_segment_N" suffixing if that
-        # proves confusing in practice.
+        # Multiple segments from one source file get "<stem>_segment_N"
+        # suffixing (N starting at 1) instead of all sharing the bare stem --
+        # otherwise the rail/combo shows indistinguishable duplicate entries
+        # for e.g. a multi-frequency-segment TRIOS file. Counted up front
+        # (non-destructive .get, before the pop below) so a file that turns
+        # out to have exactly one segment keeps its plain stem name.
+        source_file_counts = Counter(
+            sf
+            for rheo_data in datasets
+            if (sf := rheo_data.metadata.get("_source_file"))
+        )
+        segment_index: dict[str, int] = {}
         for rheo_data in datasets:
             meta = rheo_data.metadata
             source_file = meta.pop("_source_file", None)
@@ -749,9 +780,19 @@ class WorkspaceWindow(QMainWindow):
                     Path(source_file).read_bytes()
                 ).hexdigest()
 
+            if source_file:
+                stem = Path(source_file).stem
+                if source_file_counts[source_file] > 1:
+                    segment_index[source_file] = segment_index.get(source_file, 0) + 1
+                    name = f"{stem}_segment_{segment_index[source_file]}"
+                else:
+                    name = stem
+            else:
+                name = "imported"
+
             ref = DatasetRef(
                 id=uuid.uuid4().hex,
-                name=Path(source_file).stem if source_file else "imported",
+                name=name,
                 protocol_type=test_mode,
                 origin="imported",
                 units={

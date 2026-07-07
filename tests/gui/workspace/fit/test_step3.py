@@ -94,3 +94,159 @@ def test_nlsq_solver_failure_is_reported_without_escaping_qt_slot(qtbot):
     step.run()
     assert st.nlsq_result is None
     assert "optimizer failed" in step._result.text()
+
+
+def test_refresh_display_shows_chi2_mpe_and_fit_time_when_present(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {
+        "params": {"G0": 1000.0},
+        "r_squared": 0.95,
+        "chi_squared": 12.3,
+        "mpe": 4.5,
+        "fit_time": 1.23,
+    }
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    text = step._result.text()
+    assert "R²=0.950" in text
+    assert "chi²=12.3" in text
+    assert "MPE=4.50%" in text
+    assert "time=1.23s" in text
+
+
+def test_refresh_display_shows_parameter_uncertainties_from_pcov(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {
+        "params": {"G0": 1000.0, "eta": 50.0},
+        "r_squared": 0.95,
+        "pcov": [[4.0, 0.0], [0.0, 9.0]],
+    }
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    text = step._result.text()
+    assert "G0=±2" in text
+    assert "eta=±3" in text
+
+
+def test_refresh_display_omits_optional_fields_when_absent(qtbot):
+    # Regression: a result dict without chi_squared/mpe/fit_time/pcov (e.g.
+    # a bare test fake, as used throughout this test file) must not crash
+    # and must not show placeholder/garbage text for the missing fields.
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_result = {"params": {"G0": 1000.0}, "r_squared": 0.9}
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step.refresh_display()
+
+    assert step._result.text() == "R²=0.900"
+
+
+def test_options_button_opens_dialog_and_stores_result(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        FittingOptionsDialog, "exec", lambda self: QDialog.DialogCode.Accepted
+    )
+    monkeypatch.setattr(
+        FittingOptionsDialog,
+        "get_options",
+        lambda self: {"algorithm": "L-BFGS-B", "ftol": 1e-10},
+    )
+
+    step._options_btn.click()
+
+    assert step.fit_options() == {"algorithm": "L-BFGS-B", "ftol": 1e-10}
+
+
+def test_options_dialog_cancelled_keeps_previous_options(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        FittingOptionsDialog, "exec", lambda self: QDialog.DialogCode.Rejected
+    )
+
+    step._fit_options = {"ftol": 1e-9}
+    step._options_btn.click()
+
+    assert step.fit_options() == {"ftol": 1e-9}
+
+
+def test_run_forwards_fit_options_to_fit_fn(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._fit_options = {"ftol": 1e-10}
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+
+    assert calls["options"] == {"ftol": 1e-10}
+
+
+def test_run_strips_dialog_multistart_keys_from_options(qtbot):
+    """FittingOptionsDialog can set "multistart"/"num_starts" in _fit_options,
+    which ModelService.fit() would translate into its own backend-level
+    multi-start -- nesting with this step's own _ms_enabled/_ms_count outer
+    restart loop. run() must strip those two keys (and only those two) from
+    the dict passed as options=, without mutating self._fit_options itself.
+    """
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._fit_options = {"multistart": True, "num_starts": 10, "ftol": 1e-10}
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+
+    assert calls["options"] == {"ftol": 1e-10}
+    # self._fit_options (the dialog's stored state) must be untouched.
+    assert step._fit_options == {
+        "multistart": True,
+        "num_starts": 10,
+        "ftol": 1e-10,
+    }

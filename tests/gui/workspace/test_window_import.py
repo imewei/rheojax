@@ -274,3 +274,67 @@ def test_import_failed_unparseable_file_skips_broken_column_mapper(
     assert exec_calls == []
     assert len(warnings_shown) == 1  # ColumnMapperDialog's own load-failure warning
     assert len(messages) == 1
+
+
+def test_import_completed_dedupes_multi_segment_same_file_names(qtbot, tmp_path):
+    # Regression: multiple segments from one source file all got that file's
+    # bare stem as their name, producing indistinguishable duplicate entries
+    # in the rail/combo for a multi-segment import (e.g. a TRIOS file with
+    # more than one frequency-sweep segment).
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+
+    source = tmp_path / "multi.csv"
+    source.write_text("omega,g_prime\n1.0,2.0\n")
+    data_a = RheoData(
+        x=np.array([1.0, 2.0]),
+        y=np.array([2.0, 3.0]),
+        domain="frequency",
+        metadata={"_source_file": str(source)},
+    )
+    data_b = RheoData(
+        x=np.array([3.0, 4.0]),
+        y=np.array([4.0, 5.0]),
+        domain="frequency",
+        metadata={"_source_file": str(source)},
+    )
+
+    win._on_import_completed([data_a, data_b])
+
+    names = sorted(ref.name for ref in state.library.all())
+    assert names == ["multi_segment_1", "multi_segment_2"]
+
+
+def test_rail_dataset_selected_forwards_to_fit_data_step_when_in_fit_mode(
+    qtbot, monkeypatch
+):
+    # Regression: LibraryRail.dataset_selected was defined and emitted but
+    # never connected to anything in WorkspaceWindow, so clicking a dataset
+    # in the rail had no effect on the Fit workflow's data selection.
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    assert win._mode == "fit"
+
+    calls = []
+    monkeypatch.setattr(
+        win._fit_bodies[1], "select_dataset", lambda ds_id: calls.append(ds_id)
+    )
+
+    win._rail.dataset_selected.emit("abc123")
+
+    assert calls == ["abc123"]
+
+
+def test_rail_dataset_selected_ignored_outside_fit_mode(qtbot):
+    # Transform's SlotsStep manages multiple per-slot combos and Pipeline's
+    # PipelineConfigureRunStep selects datasets for batch execution -- neither
+    # has a single "make this the active dataset" concept to forward to.
+    # Verify the handler no-ops instead of raising in those modes.
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win.set_mode("transform")
+
+    win._rail.dataset_selected.emit("abc123")  # must not raise

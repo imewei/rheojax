@@ -109,6 +109,7 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
         column_map,
         initial_params=None,
         multi_start=None,
+        options=None,
     ):
         # A real, cancellable token (not a throwaway per-restart mp.Event) so
         # window.py's "Cancel them and continue?" dialog (_maybe_confirm_active_jobs)
@@ -133,6 +134,7 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
                 data_ref,
                 initial_params,
                 multi_start,
+                options,
                 token.event,
             )
         finally:
@@ -150,6 +152,7 @@ def _fit_fn_body(
     data_ref,
     initial_params,
     multi_start,
+    options,
     cancel_event,
 ):
     rheo_data = library.load_payload(data_ref)
@@ -192,7 +195,7 @@ def _fit_fn_body(
                     rheo_data.y,
                     test_mode=test_mode,
                     initial_params=start_params or {},
-                    options={},
+                    options=options or {},
                     progress_queue=progress_queue,
                     cancel_event=cancel_event,
                     dataset_id=data_ref,

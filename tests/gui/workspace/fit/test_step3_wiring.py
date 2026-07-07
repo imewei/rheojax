@@ -187,6 +187,7 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
         column_map,
         initial_params=None,
         multi_start=None,
+        options=None,
     ):
         captured["initial_params"] = initial_params
         return {"params": {"a": 1.0, "b": 2.0}, "r_squared": 0.5, "success": True}
@@ -226,6 +227,7 @@ def test_multistart_forwards_config_to_fit_fn():
         column_map,
         initial_params=None,
         multi_start=None,
+        options=None,
     ):
         captured["multi_start"] = multi_start
         return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
@@ -389,6 +391,7 @@ def test_multistart_disabled_by_default():
         column_map,
         initial_params=None,
         multi_start=None,
+        options=None,
     ):
         captured["multi_start"] = multi_start
         return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
@@ -397,3 +400,71 @@ def test_multistart_disabled_by_default():
     step = NlsqStep(st, fit_fn=fake_fit_fn)
     step.run()
     assert captured["multi_start"] == {"enabled": False, "count": 8}
+
+
+def test_make_fit_fn_threads_options_through_to_run_fit_isolated(monkeypatch):
+    calls = {}
+
+    def fake_run_fit_isolated(*args, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.fit_controller.run_fit_isolated",
+        fake_run_fit_isolated,
+    )
+
+    lib = DatasetLibrary()
+    lib.add(
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
+
+    fit_fn = _make_fit_fn(lib, FitState(protocol="flow_curve"))
+    fit_fn("power_law", {}, "d1", {"x": 0, "y": 1}, options={"ftol": 1e-10})
+    assert calls["options"] == {"ftol": 1e-10}
+
+
+def test_make_fit_fn_defaults_missing_options_to_empty_dict(monkeypatch):
+    # Regression-guard: options=None (the default when nothing is passed)
+    # must reach run_fit_isolated as {}, not None.
+    calls = {}
+
+    def fake_run_fit_isolated(*args, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.fit_controller.run_fit_isolated",
+        fake_run_fit_isolated,
+    )
+
+    lib = DatasetLibrary()
+    lib.add(
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    lib.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
+
+    fit_fn = _make_fit_fn(lib, FitState(protocol="flow_curve"))
+    fit_fn("power_law", {}, "d1", {"x": 0, "y": 1})
+    assert calls["options"] == {}
