@@ -152,3 +152,68 @@ def test_refresh_display_omits_optional_fields_when_absent(qtbot):
     step.refresh_display()
 
     assert step._result.text() == "R²=0.900"
+
+
+def test_options_button_opens_dialog_and_stores_result(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        FittingOptionsDialog, "exec", lambda self: QDialog.DialogCode.Accepted
+    )
+    monkeypatch.setattr(
+        FittingOptionsDialog,
+        "get_options",
+        lambda self: {"algorithm": "L-BFGS-B", "ftol": 1e-10},
+    )
+
+    step._options_btn.click()
+
+    assert step.fit_options() == {"algorithm": "L-BFGS-B", "ftol": 1e-10}
+
+
+def test_options_dialog_cancelled_keeps_previous_options(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        FittingOptionsDialog, "exec", lambda self: QDialog.DialogCode.Rejected
+    )
+
+    step._options_btn.click()
+
+    assert step.fit_options() == {}
+
+
+def test_run_forwards_fit_options_to_fit_fn(qtbot):
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["options"] = kwargs.get("options")
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._fit_options = {"ftol": 1e-10}
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step.run()
+
+    assert calls["options"] == {"ftol": 1e-10}

@@ -6,6 +6,7 @@ import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDialog,
     QLabel,
     QPushButton,
     QSpinBox,
@@ -21,7 +22,13 @@ from rheojax.gui.widgets.parameter_table import ParameterTable
 
 
 def _default_fit_fn(
-    model_key, model_config, data_ref, column_map, initial_params=None, multi_start=None
+    model_key,
+    model_config,
+    data_ref,
+    column_map,
+    initial_params=None,
+    multi_start=None,
+    options=None,
 ):
     # NOTE: `data_ref` is a str id — the real implementation must:
     # 1. Load RheoData: `library.load_payload(data_ref)` (pass library to NlsqStep at build time)
@@ -51,6 +58,9 @@ class NlsqStep(QWidget):
         self._ms_count = QSpinBox(self)
         self._ms_count.setRange(1, 64)
         self._ms_count.setValue(8)
+        self._fit_options: dict = {}
+        self._options_btn = QPushButton("⚙ Fit Options", self)
+        self._options_btn.clicked.connect(self._on_options_clicked)
         self._run_btn = QPushButton("▶ Run NLSQ", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
@@ -59,6 +69,7 @@ class NlsqStep(QWidget):
             self._table,
             self._ms_enabled,
             self._ms_count,
+            self._options_btn,
             self._run_btn,
             self._result,
         ):
@@ -96,6 +107,16 @@ class NlsqStep(QWidget):
         self._ms_enabled.setChecked(enabled)
         self._ms_count.setValue(count)
 
+    def fit_options(self) -> dict:
+        return dict(self._fit_options)
+
+    def _on_options_clicked(self) -> None:
+        from rheojax.gui.dialogs.fitting_options import FittingOptionsDialog
+
+        dialog = FittingOptionsDialog(current_options=self._fit_options, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._fit_options = dialog.get_options()
+
     def run(self) -> None:
         # Multi-start config is transient widget state — not stored in FitState
         table_params = self._table.get_parameters()
@@ -124,6 +145,7 @@ class NlsqStep(QWidget):
                         "enabled": self._ms_enabled.isChecked(),
                         "count": self._ms_count.value(),
                     },
+                    options=self._fit_options,
                 )
             except NotImplementedError:
                 # ponytail: real solver wiring is out of scope here (tracked separately);
