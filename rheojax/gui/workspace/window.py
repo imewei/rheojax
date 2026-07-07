@@ -439,6 +439,9 @@ class WorkspaceWindow(QMainWindow):
         )
 
     def _confirmed_close(self) -> None:
+        # ponytail: assumes WorkspaceWindow is top-level (its only construction site is
+        # _create_workspace_window() in rheojax/gui/main.py); self.close() semantics
+        # would need reconsidering if it's ever embedded as a child widget instead.
         self._close_confirmed = True
         self.close()
 

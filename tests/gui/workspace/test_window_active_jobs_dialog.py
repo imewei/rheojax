@@ -122,6 +122,30 @@ def test_on_close_actually_closes_window_not_reset(qtbot, monkeypatch):
     assert rebuild_calls == []
 
 
+def test_on_close_declines_active_jobs_cancel_does_not_close(qtbot, monkeypatch):
+    # Coverage gap flagged in review: the test above only exercises _on_close's
+    # trivial fast path (no jobs, not dirty). This exercises the active-jobs branch
+    # specifically -- user declines to cancel running jobs, so _confirmed_close must
+    # never fire and the window must stay open.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Cancel
+    )
+    confirmed_close_calls = []
+    monkeypatch.setattr(
+        win, "_confirmed_close", lambda: confirmed_close_calls.append(1)
+    )
+
+    win._on_close()
+
+    assert confirmed_close_calls == []
+
+
 @pytest.mark.parametrize("trigger", ["_on_save", "_on_save_as"])
 def test_save_and_save_as_blocked_while_jobs_active(
     qtbot, monkeypatch, trigger, tmp_path
