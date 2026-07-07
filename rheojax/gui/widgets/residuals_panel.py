@@ -100,7 +100,16 @@ class ResidualsPanel(QWidget):
             pass  # C++ object already deleted
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        """Cancel pending matplotlib draws before the widget is closed."""
+        """Cancel pending matplotlib draws before the widget is closed.
+
+        Only fires on an explicit .close() (including qtbot.addWidget()'s
+        teardown, which is what this actually needs to fix). When this panel
+        is embedded as a child of fit_page.py/step5_visualize.py and the
+        parent is torn down via deleteLater() cascade instead, closeEvent
+        never reaches this widget -- same limitation base_arviz_widget.py/
+        plot_canvas.py already have; call cleanup() directly at any such
+        parent-cascade teardown site if that path needs covering too.
+        """
         self.cleanup()
         super().closeEvent(event)
 

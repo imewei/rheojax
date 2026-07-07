@@ -221,7 +221,16 @@ class MultiView(QWidget):
             panel.cleanup()
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        """Cancel pending matplotlib draws in all panels before closing."""
+        """Cancel pending matplotlib draws in all panels before closing.
+
+        Only fires on an explicit .close() (including qtbot.addWidget()'s
+        teardown). If MultiView is embedded inside a dialog that gets torn
+        down via deleteLater() cascade instead of its own .close(),
+        closeEvent never reaches this widget -- same limitation
+        base_arviz_widget.py/plot_canvas.py already have; call cleanup()
+        directly at any such parent-cascade teardown site if that path
+        needs covering too.
+        """
         self.cleanup()
         super().closeEvent(event)
 

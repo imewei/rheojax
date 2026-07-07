@@ -125,24 +125,31 @@ class NutsStep(QWidget):
         self._priors_editor = PriorsEditor(self)
 
         # Sampler settings (previously hardcoded in fit_controller.py's
-        # _make_sample_fn with no UI to change them).
+        # _make_sample_fn with no UI to change them). Initial values and
+        # live edits both go through state.nuts_config -- previously a
+        # fully-unused FitState field with its own copy of these same
+        # defaults (num_warmup=500/num_samples=1000/num_chains=4/seed=0/
+        # target_accept=0.8) that nothing ever read or wrote.
+        nuts_cfg = self._state.nuts_config
         self._warmup = QSpinBox(self)
         self._warmup.setRange(50, 100_000)
-        self._warmup.setValue(500)
+        self._warmup.setValue(nuts_cfg.num_warmup)
         self._samples = QSpinBox(self)
         self._samples.setRange(50, 100_000)
-        self._samples.setValue(1000)
+        self._samples.setValue(nuts_cfg.num_samples)
         self._chains = QSpinBox(self)
         self._chains.setRange(1, 16)
-        self._chains.setValue(4)
+        self._chains.setValue(nuts_cfg.num_chains)
         self._seed = QSpinBox(self)
         self._seed.setRange(0, 2**31 - 1)
-        self._seed.setValue(0)
+        self._seed.setValue(nuts_cfg.seed)
         self._target = QDoubleSpinBox(self)
         self._target.setRange(0.5, 0.999)
-        self._target.setValue(0.8)
+        self._target.setValue(nuts_cfg.target_accept)
         self._max_tree_depth = QSpinBox(self)
         # 0 means "unset" -- library default (10) applies; see run()/_make_sample_fn.
+        # No FitState.nuts_config field exists for this one (added later than
+        # NutsConfig itself), so it stays widget-only state.
         self._max_tree_depth.setRange(0, 20)
         self._max_tree_depth.setValue(0)
         self._max_tree_depth.setSpecialValueText("default")
@@ -166,6 +173,17 @@ class NutsStep(QWidget):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
+        for spin in (self._warmup, self._samples, self._chains, self._seed):
+            spin.valueChanged.connect(self._on_settings_changed)
+        self._target.valueChanged.connect(self._on_settings_changed)
+
+    def _on_settings_changed(self, *_args: object) -> None:
+        cfg = self._state.nuts_config
+        cfg.num_warmup = self._warmup.value()
+        cfg.num_samples = self._samples.value()
+        cfg.num_chains = self._chains.value()
+        cfg.seed = self._seed.value()
+        cfg.target_accept = self._target.value()
 
     def priors_editor(self) -> PriorsEditor:
         return self._priors_editor

@@ -40,3 +40,22 @@ def test_no_param_form_for_transform_without_configurable_params(qtbot):
 
     assert step._param_form is None
     assert st.config == {}
+
+
+def test_edited_param_value_survives_a_refresh_triggered_by_list_slot_edit(qtbot):
+    # Regression: refresh() (called by _add_list_slot_widgets' add/remove
+    # closures whenever mastercurve/srfs's list slot changes) used to
+    # rebuild ParameterFormBuilder from the spec defaults unconditionally,
+    # silently resetting the visible widget value even though state.config
+    # (via setdefault) still held the edited one -- UI and state disagreed.
+    st = TransformState(transform_key="mastercurve")
+    step = SlotsStep(st, DatasetLibrary())
+    qtbot.addWidget(step)
+
+    step._param_form._widgets["reference_temp"].setValue(40.0)
+    assert st.config["reference_temp"] == 40.0
+
+    step.refresh()
+
+    assert st.config["reference_temp"] == 40.0
+    assert step._param_form._widgets["reference_temp"].value() == 40.0

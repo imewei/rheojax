@@ -325,6 +325,12 @@ def run_bayesian_isolated(
     else:
         bfmi_val = float("nan")
 
+    # Computed eagerly (up to 50 extra model.predict() calls) rather than
+    # lazily from step5_visualize.py on first view: this already runs in the
+    # isolated subprocess (off the GUI thread), and NutsStep.finished ->
+    # VisualizeStep.refresh() means the Fit overlay tab -- where this band
+    # renders -- is shown immediately after every run anyway, so the eager
+    # cost is rarely wasted work in practice.
     y_band = None
     try:
         y_band = _compute_y_band(

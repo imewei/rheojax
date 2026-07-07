@@ -98,7 +98,21 @@ class SlotsStep(QWidget):
         caption = QLabel("Parameters:")
         caption.setStyleSheet(field_label_style())
         self._layout.addWidget(caption)
-        self._param_form = ParameterFormBuilder(params, self)
+        # Preserve an already-edited value across a rebuild (e.g. triggered by
+        # adding/removing a list slot, which calls refresh()) instead of
+        # resetting the widget to the transform's spec default while
+        # state.config silently keeps the edited value -- that mismatch left
+        # the UI showing a stale default even though a different value was
+        # actually in effect.
+        specs_with_current_values = {
+            name: (
+                {**spec, "default": self._state.config[name]}
+                if name in self._state.config
+                else spec
+            )
+            for name, spec in params.items()
+        }
+        self._param_form = ParameterFormBuilder(specs_with_current_values, self)
         for name, spec in params.items():
             self._state.config.setdefault(name, spec["default"])
         self._param_form.values_changed.connect(self._on_params_changed)

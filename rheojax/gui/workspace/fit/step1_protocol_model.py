@@ -18,9 +18,8 @@ from PySide6.QtWidgets import (
 
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
-from rheojax.gui.pages.fit_page import _FAMILY_LABELS
 from rheojax.gui.resources.styles.tokens import field_label_style
-from rheojax.gui.services.model_service import ModelService
+from rheojax.gui.services.model_service import FAMILY_LABELS, ModelService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
@@ -163,7 +162,7 @@ class ProtocolModelStep(QWidget):
             for family, names in _grouped_models(p).items():
                 if not names:
                     continue
-                label = _FAMILY_LABELS.get(family, family.replace("_", " ").title())
+                label = FAMILY_LABELS.get(family, family.replace("_", " ").title())
                 self._model.addItem(f"── {label} ──", None)
                 header_idx = self._model.count() - 1
                 item_model = self._model.model()

@@ -26,7 +26,11 @@ from rheojax.gui.compat import (
     Slot,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, themed
-from rheojax.gui.services.model_service import ModelService, normalize_model_name
+from rheojax.gui.services.model_service import (
+    FAMILY_LABELS,
+    ModelService,
+    normalize_model_name,
+)
 from rheojax.gui.state.actions import (
     set_active_model,
     toggle_parameter_fixed,
@@ -42,32 +46,6 @@ from rheojax.gui.widgets.residuals_panel import ResidualsPanel
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
-
-# Human-readable family labels for the grouped model dropdown
-_FAMILY_LABELS: dict[str, str] = {
-    "classical": "Classical",
-    "flow": "Flow",
-    "fractional_maxwell": "Fractional Maxwell",
-    "fractional_zener": "Fractional Zener",
-    "fractional_advanced": "Fractional Advanced",
-    "multi_mode": "Multi-Mode",
-    "sgr": "SGR",
-    "stz": "STZ",
-    "epm": "EPM",
-    "fluidity": "Fluidity",
-    "fluidity_saramito": "Fluidity-Saramito",
-    "ikh": "IKH",
-    "fikh": "FIKH",
-    "hl": "Hebraud-Lequeux",
-    "spp_laos": "SPP/LAOS",
-    "giesekus": "Giesekus",
-    "dmt": "DMT",
-    "itt_mct": "ITT-MCT",
-    "tnt": "TNT",
-    "vlb": "VLB",
-    "hvm": "HVM",
-    "hvnm": "HVNM",
-}
 
 
 class FitPage(QWidget):
@@ -309,7 +287,7 @@ class FitPage(QWidget):
             if not model_names:
                 continue
             # Add a non-selectable category header
-            label = _FAMILY_LABELS.get(family_key, family_key.replace("_", " ").title())
+            label = FAMILY_LABELS.get(family_key, family_key.replace("_", " ").title())
             header_text = f"── {label} ──"
             self._quick_model_combo.addItem(header_text, None)
             idx = self._quick_model_combo.count() - 1
