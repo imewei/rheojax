@@ -682,15 +682,25 @@ class WorkspaceWindow(QMainWindow):
         self._active_import_workers.pop(job_id, None)
         import hashlib
         import uuid
+        from collections import Counter
 
         from rheojax.gui.foundation.library import DatasetRef
         from rheojax.gui.services.data_service import DataService
 
         service = DataService()
         hash_cache: dict[str, str] = {}
-        # ponytail: multiple segments from one source file all get that
-        # file's stem as their name -- add "_segment_N" suffixing if that
-        # proves confusing in practice.
+        # Multiple segments from one source file get "<stem>_segment_N"
+        # suffixing (N starting at 1) instead of all sharing the bare stem --
+        # otherwise the rail/combo shows indistinguishable duplicate entries
+        # for e.g. a multi-frequency-segment TRIOS file. Counted up front
+        # (non-destructive .get, before the pop below) so a file that turns
+        # out to have exactly one segment keeps its plain stem name.
+        source_file_counts = Counter(
+            sf
+            for rheo_data in datasets
+            if (sf := rheo_data.metadata.get("_source_file"))
+        )
+        segment_index: dict[str, int] = {}
         for rheo_data in datasets:
             meta = rheo_data.metadata
             source_file = meta.pop("_source_file", None)
@@ -703,9 +713,19 @@ class WorkspaceWindow(QMainWindow):
                     Path(source_file).read_bytes()
                 ).hexdigest()
 
+            if source_file:
+                stem = Path(source_file).stem
+                if source_file_counts[source_file] > 1:
+                    segment_index[source_file] = segment_index.get(source_file, 0) + 1
+                    name = f"{stem}_segment_{segment_index[source_file]}"
+                else:
+                    name = stem
+            else:
+                name = "imported"
+
             ref = DatasetRef(
                 id=uuid.uuid4().hex,
-                name=Path(source_file).stem if source_file else "imported",
+                name=name,
                 protocol_type=test_mode,
                 origin="imported",
                 units={
