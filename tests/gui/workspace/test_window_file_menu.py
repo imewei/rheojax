@@ -94,6 +94,28 @@ def test_maybe_confirm_unsaved_clean_state_proceeds_without_dialog(qtbot, monkey
     assert calls == [1]
 
 
+def test_on_close_reaches_confirmed_close_after_discarding_unsaved_changes(
+    qtbot, monkeypatch
+):
+    # Coverage gap flagged in review: the _on_close regression test in
+    # test_window_active_jobs_dialog.py only covers the clean-state fast path. This
+    # exercises _on_close's unsaved-changes branch specifically -- user discards
+    # pending edits, so _confirmed_close must still fire.
+    win = _win(qtbot)
+    win._state.project.dirty = True
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Discard
+    )
+    confirmed_close_calls = []
+    monkeypatch.setattr(
+        win, "_confirmed_close", lambda: confirmed_close_calls.append(1)
+    )
+
+    win._on_close()
+
+    assert confirmed_close_calls == [1]
+
+
 def test_on_save_shows_critical_dialog_on_value_error(qtbot, monkeypatch):
     win = _win(qtbot)
     win._state.project.path = "/tmp/whatever.rheojax"
