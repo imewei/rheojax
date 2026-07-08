@@ -1399,21 +1399,23 @@ class DMTLocal(DMTBase):
             sigma_prime.append(sp)
             sigma_double_prime.append(spp)
 
-        sigma_prime = np.array(sigma_prime)
-        sigma_double_prime = np.array(sigma_double_prime)
+        sigma_prime_arr = np.array(sigma_prime)
+        sigma_double_prime_arr = np.array(sigma_double_prime)
 
         # Normalized intensities I_n/I_1
-        I_1 = np.sqrt(sigma_prime[0] ** 2 + sigma_double_prime[0] ** 2)
+        I_1 = np.sqrt(sigma_prime_arr[0] ** 2 + sigma_double_prime_arr[0] ** 2)
         I_n_1 = np.array(
             [
                 np.sqrt(sp**2 + spp**2) / I_1
-                for sp, spp in zip(sigma_prime, sigma_double_prime, strict=True)
+                for sp, spp in zip(
+                    sigma_prime_arr, sigma_double_prime_arr, strict=True
+                )
             ]
         )
 
         return {
-            "sigma_prime": sigma_prime,
-            "sigma_double_prime": sigma_double_prime,
+            "sigma_prime": sigma_prime_arr,
+            "sigma_double_prime": sigma_double_prime_arr,
             "I_n_1": I_n_1,
         }
 
@@ -1580,8 +1582,16 @@ class DMTLocal(DMTBase):
         """Get parameter array and bounds for optimization."""
         param_names = list(self.parameters.keys())
         params = jnp.array([self.parameters.get_value(n) for n in param_names])
-        bounds_lower = jnp.array([self.parameters[n].bounds[0] for n in param_names])
-        bounds_upper = jnp.array([self.parameters[n].bounds[1] for n in param_names])
+        bounds_list: list[tuple[float, float]] = []
+        for n in param_names:
+            b = self.parameters[n].bounds
+            if b is None:
+                raise ValueError(
+                    f"Parameter '{n}' has no bounds set; required for optimization."
+                )
+            bounds_list.append(b)
+        bounds_lower = jnp.array([b[0] for b in bounds_list])
+        bounds_upper = jnp.array([b[1] for b in bounds_list])
         return params, (bounds_lower, bounds_upper)
 
     def _params_array_to_dict(self, params_array: jnp.ndarray) -> dict:

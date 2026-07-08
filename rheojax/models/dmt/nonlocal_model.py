@@ -164,6 +164,10 @@ class DMTNonlocal(DMTBase):
         """
         D_lambda = self.parameters.get_value("D_lambda")
         t_eq = self.parameters.get_value("t_eq")
+        if D_lambda is None or t_eq is None:
+            raise ValueError(
+                "D_lambda and t_eq must be set before computing cooperativity length."
+            )
         return np.sqrt(D_lambda * t_eq)
 
     # =========================================================================
@@ -492,7 +496,8 @@ class DMTNonlocal(DMTBase):
         # Copy parameters
         for name in local_model.parameters.keys():
             if name in self.parameters.keys():
-                self.parameters.set_value(name, local_model.parameters.get_value(name))
+                if (v := local_model.parameters.get_value(name)) is not None:
+                    self.parameters.set_value(name, v)
 
         self._fitted = True
         return self
@@ -516,9 +521,8 @@ class DMTNonlocal(DMTBase):
             # Copy parameters
             for name in self.parameters.keys():
                 if name in local_model.parameters.keys():
-                    local_model.parameters.set_value(
-                        name, self.parameters.get_value(name)
-                    )
+                    if (v := self.parameters.get_value(name)) is not None:
+                        local_model.parameters.set_value(name, v)
             return local_model._predict_flow_curve(gamma_dot)
         else:
             # Full nonlocal simulation
