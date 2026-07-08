@@ -1,8 +1,20 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from rheojax.gui.main import parse_args
+
+# Tests below that call the real main() construct a genuine QApplication and
+# render real widgets. Running many of them back-to-back in the same
+# interpreter as the rest of tests/gui/ (500+ tests, each rendering
+# matplotlib/Qt canvases) risks tripping an upstream FreeType raster-overflow
+# bug (matplotlib/ft2font) that corrupts the process heap without crashing
+# immediately -- the segfault then surfaces later at an unrelated allocation
+# inside this file. Running each in its own subprocess gives it a clean heap,
+# regardless of what ran earlier in the suite.
+_SUBPROCESS_TIMEOUT = 60
 
 
 def test_protocol_required_with_import():
@@ -57,103 +69,94 @@ def test_workspace_flag_still_parses_for_back_compat():
     assert args.workspace is True
 
 
-def _reuse_qapplication_singleton(monkeypatch):
-    """Qt allows only one QApplication per process; main() unconditionally
-    constructs one, so back-to-back main() calls in the same test session
-    must reuse the existing singleton instead of each trying to create one.
-    Delegates attribute access (e.g. the static QApplication.setAttribute(...)
-    call in main()) to the real class; only the constructor call is intercepted.
+def _run_isolated(script: str) -> subprocess.CompletedProcess:
+    """Run a main()-invoking scenario in a fresh subprocess.
+
+    Each of these tests exercises the real main() (real QApplication, real
+    widget construction). Running them in-process alongside the other 500+
+    widget tests in tests/gui/ risks tripping an upstream FreeType
+    raster-overflow bug that corrupts the process heap without crashing
+    immediately -- the segfault then surfaces later at an unrelated
+    allocation. A subprocess gets a clean heap regardless of what else ran.
     """
-    import rheojax.gui.compat as compat
-
-    real_qapplication_cls = compat.QApplication
-
-    class _QApplicationProxy:
-        def __getattr__(self, name):
-            return getattr(real_qapplication_cls, name)
-
-        def __call__(self, *args, **kwargs):
-            return real_qapplication_cls.instance() or real_qapplication_cls(
-                *args, **kwargs
-            )
-
-    monkeypatch.setattr(compat, "QApplication", _QApplicationProxy())
-
-
-def test_default_launch_constructs_workspace_window(monkeypatch, tmp_path):
-    import rheojax.gui.main as main_module
-
-    _reuse_qapplication_singleton(monkeypatch)
-    created = {}
-
-    def _fake_create_workspace_window():
-        created["workspace"] = True
-        raise SystemExit(0)  # short-circuit before app.exec() actually blocks
-
-    monkeypatch.setattr(
-        main_module, "_create_workspace_window", _fake_create_workspace_window
+    return subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=_SUBPROCESS_TIMEOUT,
     )
-    with pytest.raises(SystemExit):
-        main_module.main([])
-    assert created.get("workspace") is True
 
 
-def test_legacy_flag_constructs_main_window(monkeypatch):
-    import rheojax.gui.main as main_module
-
-    _reuse_qapplication_singleton(monkeypatch)
-    created = {}
-
-    class _FakeMainWindow:
-        def __init__(self, *a, **k):
-            created["legacy"] = True
-            raise SystemExit(0)
-
-    monkeypatch.setattr(
-        "rheojax.gui.app.main_window.RheoJAXMainWindow", _FakeMainWindow
+def test_default_launch_constructs_workspace_window():
+    script = (
+        "import rheojax.gui.main as main_module\n"
+        "created = {}\n"
+        "def _fake_create_workspace_window():\n"
+        "    created['workspace'] = True\n"
+        "    raise SystemExit(0)\n"
+        "main_module._create_workspace_window = _fake_create_workspace_window\n"
+        "try:\n"
+        "    main_module.main([])\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        "print('OK' if created.get('workspace') else 'FAIL')\n"
     )
-    with pytest.raises(SystemExit):
-        main_module.main(["--legacy"])
-    assert created.get("legacy") is True
+    result = _run_isolated(script)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout, result.stdout + result.stderr
 
 
-class _FakeLogDock:
-    def append_record(self, levelno, message):
-        pass
+def test_legacy_flag_constructs_main_window():
+    script = (
+        "import rheojax.gui.app.main_window as mw_module\n"
+        "created = {}\n"
+        "class _FakeMainWindow:\n"
+        "    def __init__(self, *a, **k):\n"
+        "        created['legacy'] = True\n"
+        "        raise SystemExit(0)\n"
+        "mw_module.RheoJAXMainWindow = _FakeMainWindow\n"
+        "import rheojax.gui.main as main_module\n"
+        "try:\n"
+        "    main_module.main(['--legacy'])\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        "print('OK' if created.get('legacy') else 'FAIL')\n"
+    )
+    result = _run_isolated(script)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout, result.stdout + result.stderr
 
 
-class _FakeDestroyed:
-    def connect(self, fn):
-        # Short-circuits before app.exec() would otherwise block, same as the
-        # existing tests above but one step later (after handler install).
-        raise SystemExit(0)
-
-
-class _FakeWorkspaceWindow:
-    def __init__(self):
-        self.log_dock = _FakeLogDock()
-        self.destroyed = _FakeDestroyed()
-
-
-def test_workspace_branch_installs_gui_log_handler(monkeypatch):
-    import rheojax.gui.main as main_module
-
-    _reuse_qapplication_singleton(monkeypatch)
-    fake_window = _FakeWorkspaceWindow()
-    monkeypatch.setattr(main_module, "_create_workspace_window", lambda: fake_window)
-
-    captured = {}
-
-    def _fake_install(append_fn, **kwargs):
-        captured["append_fn"] = append_fn
-        return object()
-
-    monkeypatch.setattr(main_module, "install_gui_log_handler", _fake_install)
-
-    with pytest.raises(SystemExit):
-        main_module.main([])
-
-    assert captured.get("append_fn") == fake_window.log_dock.append_record
+def test_workspace_branch_installs_gui_log_handler():
+    script = (
+        "import rheojax.gui.main as main_module\n"
+        "class _FakeLogDock:\n"
+        "    def append_record(self, levelno, message):\n"
+        "        pass\n"
+        "class _FakeDestroyed:\n"
+        "    def connect(self, fn):\n"
+        "        raise SystemExit(0)\n"
+        "class _FakeWorkspaceWindow:\n"
+        "    def __init__(self):\n"
+        "        self.log_dock = _FakeLogDock()\n"
+        "        self.destroyed = _FakeDestroyed()\n"
+        "fake_window = _FakeWorkspaceWindow()\n"
+        "main_module._create_workspace_window = lambda: fake_window\n"
+        "captured = {}\n"
+        "def _fake_install(append_fn, **kwargs):\n"
+        "    captured['append_fn'] = append_fn\n"
+        "    return object()\n"
+        "main_module.install_gui_log_handler = _fake_install\n"
+        "try:\n"
+        "    main_module.main([])\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        "ok = captured.get('append_fn') == fake_window.log_dock.append_record\n"
+        "print('OK' if ok else 'FAIL')\n"
+    )
+    result = _run_isolated(script)
+    assert result.returncode == 0, result.stderr
+    assert "OK" in result.stdout, result.stdout + result.stderr
 
 
 def test_uncaught_exception_is_logged_via_global_excepthook(monkeypatch):

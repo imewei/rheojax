@@ -5,7 +5,15 @@ from collections.abc import Callable
 
 import numpy as np
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QDoubleSpinBox,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from rheojax.gui.foundation.metrics import bfmi
 from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
@@ -115,25 +123,72 @@ class NutsStep(QWidget):
         self._skipped = False
         self._banner = QLabel("⚡ warm-started from NLSQ MAP", self)
         self._priors_editor = PriorsEditor(self)
+
+        # Sampler settings (previously hardcoded in fit_controller.py's
+        # _make_sample_fn with no UI to change them). Initial values and
+        # live edits both go through state.nuts_config -- previously a
+        # fully-unused FitState field with its own copy of these same
+        # defaults (num_warmup=500/num_samples=1000/num_chains=4/seed=0/
+        # target_accept=0.8) that nothing ever read or wrote.
+        nuts_cfg = self._state.nuts_config
+        self._warmup = QSpinBox(self)
+        self._warmup.setRange(50, 100_000)
+        self._warmup.setValue(nuts_cfg.num_warmup)
+        self._samples = QSpinBox(self)
+        self._samples.setRange(50, 100_000)
+        self._samples.setValue(nuts_cfg.num_samples)
+        self._chains = QSpinBox(self)
+        self._chains.setRange(1, 16)
+        self._chains.setValue(nuts_cfg.num_chains)
+        self._seed = QSpinBox(self)
+        self._seed.setRange(0, 2**31 - 1)
+        self._seed.setValue(nuts_cfg.seed)
         self._target = QDoubleSpinBox(self)
         self._target.setRange(0.5, 0.999)
-        self._target.setValue(0.8)
+        self._target.setValue(nuts_cfg.target_accept)
+        self._max_tree_depth = QSpinBox(self)
+        # 0 means "unset" -- library default (10) applies; see run()/_make_sample_fn.
+        self._max_tree_depth.setRange(0, 20)
+        self._max_tree_depth.setValue(nuts_cfg.max_tree_depth or 0)
+        self._max_tree_depth.setSpecialValueText("default")
+        settings_form = QFormLayout()
+        settings_form.addRow("Warmup:", self._warmup)
+        settings_form.addRow("Samples:", self._samples)
+        settings_form.addRow("Chains:", self._chains)
+        settings_form.addRow("Seed:", self._seed)
+        settings_form.addRow("Target accept:", self._target)
+        settings_form.addRow("Max tree depth:", self._max_tree_depth)
+
         self._skip_btn = QPushButton("Skip NUTS", self)
         self._run_btn = QPushButton("▶ Sample", self)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
-        for w in (
-            self._banner,
-            self._priors_editor,
-            self._target,
-            self._skip_btn,
-            self._run_btn,
-            self._result,
-        ):
+        lay.addWidget(self._banner)
+        lay.addWidget(self._priors_editor)
+        lay.addLayout(settings_form)
+        for w in (self._skip_btn, self._run_btn, self._result):
             lay.addWidget(w)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
+        for spin in (
+            self._warmup,
+            self._samples,
+            self._chains,
+            self._seed,
+            self._max_tree_depth,
+        ):
+            spin.valueChanged.connect(self._on_settings_changed)
+        self._target.valueChanged.connect(self._on_settings_changed)
+
+    def _on_settings_changed(self, *_args: object) -> None:
+        cfg = self._state.nuts_config
+        cfg.num_warmup = self._warmup.value()
+        cfg.num_samples = self._samples.value()
+        cfg.num_chains = self._chains.value()
+        cfg.seed = self._seed.value()
+        cfg.target_accept = self._target.value()
+        cfg.max_tree_depth = self._max_tree_depth.value() or None
 
     def priors_editor(self) -> PriorsEditor:
         return self._priors_editor
@@ -169,7 +224,14 @@ class NutsStep(QWidget):
 
     def run(self) -> None:
         self._skipped = False
-        cfg = {"target_accept": self._target.value()}
+        cfg = {
+            "target_accept": self._target.value(),
+            "num_warmup": self._warmup.value(),
+            "num_samples": self._samples.value(),
+            "num_chains": self._chains.value(),
+            "seed": self._seed.value(),
+            "max_tree_depth": self._max_tree_depth.value() or None,
+        }
         warm_start = (self._state.nlsq_result or {}).get("params", {})
         # Build priors from the (possibly user-edited) PriorsEditor; if the editor
         # was never seeded via load_suggested_priors(), it's empty and we fall back

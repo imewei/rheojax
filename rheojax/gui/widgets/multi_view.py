@@ -71,6 +71,28 @@ class PlotPanel(QWidget):
             "Initialization complete", class_name=self.__class__.__name__, index=index
         )
 
+    def cleanup(self) -> None:
+        """Explicitly release matplotlib resources before Qt widget deletion.
+
+        Must be called before the widget is deleted to prevent segfaults from
+        deferred ``draw_idle()`` callbacks firing on a freed C++ object.
+        """
+        import matplotlib.pyplot as plt
+
+        try:
+            if self._canvas is not None:
+                self._canvas.callbacks.callbacks.clear()
+                self._canvas.draw_idle = lambda: None
+            if self._figure is not None:
+                plt.close(self._figure)
+        except RuntimeError:
+            pass  # C++ object already deleted
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws before the widget is closed."""
+        self.cleanup()
+        super().closeEvent(event)
+
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
@@ -128,6 +150,24 @@ class PlotPanel(QWidget):
         """
         return self._canvas
 
+    def _draw(self) -> None:
+        """Force an immediate redraw, degrading gracefully on failure.
+
+        Agg/FreeType rendering can fail for host-environment reasons outside
+        this widget's control (e.g. a "raster overflow" from a font-cache/DPI
+        quirk) -- log and continue instead of propagating a crash.
+        """
+        try:
+            self._canvas.draw()
+        except Exception as e:
+            logger.error(
+                "Error rendering canvas",
+                widget=self.__class__.__name__,
+                index=self._index,
+                error=str(e),
+                exc_info=True,
+            )
+
     def clear(self) -> None:
         """Clear the figure."""
         logger.debug(
@@ -137,11 +177,11 @@ class PlotPanel(QWidget):
             index=self._index,
         )
         self._figure.clear()
-        self._canvas.draw()
+        self._draw()
 
     def refresh(self) -> None:
         """Refresh the canvas."""
-        self._canvas.draw()
+        self._draw()
 
 
 class MultiView(QWidget):
@@ -191,7 +231,22 @@ class MultiView(QWidget):
         self._setup_ui()
         self._connect_signals()
         self._set_layout(layout)
+        # closeEvent() only fires for top-level widgets; when MultiView is
+        # embedded (e.g. inside the Compare Models QDialog) it's destroyed via
+        # Qt's parent cascade instead, which closeEvent never sees. destroyed
+        # fires on every teardown path, so wiring cleanup() to it covers both.
+        self.destroyed.connect(lambda: self.cleanup())
         logger.debug("Initialization complete", class_name=self.__class__.__name__)
+
+    def cleanup(self) -> None:
+        """Release matplotlib resources for every panel before Qt widget deletion."""
+        for panel in self._panels:
+            panel.cleanup()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        """Cancel pending matplotlib draws in all panels before closing."""
+        self.cleanup()
+        super().closeEvent(event)
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -313,6 +368,7 @@ class MultiView(QWidget):
         # Clear existing panels
         for panel in self._panels:
             self._grid_layout.removeWidget(panel)
+            panel.cleanup()
             panel.deleteLater()
         self._panels.clear()
 

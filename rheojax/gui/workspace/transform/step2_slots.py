@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
 from rheojax.gui.foundation.library import DatasetLibrary
 from rheojax.gui.foundation.state import TransformState
 from rheojax.gui.resources.styles.tokens import field_label_style
+from rheojax.gui.services.transform_service import TransformService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
+from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.workspace.transform.slots_spec import SlotSpec, transform_slots
 
 
@@ -25,16 +27,19 @@ class SlotsStep(QWidget):
         state: TransformState,
         library: DatasetLibrary,
         parent: QWidget | None = None,
+        transform_service: TransformService | None = None,
     ) -> None:
         super().__init__(parent)
         self._state = state
         self._library = library
+        self._transform_service = transform_service or TransformService()
         self._specs: list[SlotSpec] = []
         self._combo_widgets: dict[str, QComboBox] = {}
         self._list_widgets: dict[str, QListWidget] = {}
         self._list_add_combos: dict[str, QComboBox] = {}
         self._list_add_buttons: dict[str, QPushButton] = {}
         self._list_remove_buttons: dict[str, QPushButton] = {}
+        self._param_form: ParameterFormBuilder | None = None
         self._layout = QVBoxLayout(self)
         set_panel_margins(self._layout)
         self.refresh()
@@ -59,6 +64,7 @@ class SlotsStep(QWidget):
         self._list_add_combos.clear()
         self._list_add_buttons.clear()
         self._list_remove_buttons.clear()
+        self._param_form = None
 
         for s in self._specs:
             caption = QLabel(
@@ -71,6 +77,52 @@ class SlotsStep(QWidget):
                 self._add_list_slot_widgets(s)
             else:
                 self._add_single_slot_widget(s)
+
+        self._add_param_form()
+
+    def _add_param_form(self) -> None:
+        """Auto-generated parameter form for the current transform.
+
+        state.config previously stayed {} for every run (no UI ever wrote to
+        it) -- transforms always ran with library defaults and the user had
+        no way to see or change them. Seed state.config from the spec
+        defaults so RunStep always passes an explicit config, not a silent {}.
+        """
+        params = (
+            self._transform_service.get_transform_params(self._state.transform_key)
+            if self._state.transform_key
+            else {}
+        )
+        if not params:
+            return
+        caption = QLabel("Parameters:")
+        caption.setStyleSheet(field_label_style())
+        self._layout.addWidget(caption)
+        # Preserve an already-edited value across a rebuild (e.g. triggered by
+        # adding/removing a list slot, which calls refresh()) instead of
+        # resetting the widget to the transform's spec default while
+        # state.config silently keeps the edited value -- that mismatch left
+        # the UI showing a stale default even though a different value was
+        # actually in effect.
+        specs_with_current_values = {
+            name: (
+                {**spec, "default": self._state.config[name]}
+                if name in self._state.config
+                else spec
+            )
+            for name, spec in params.items()
+        }
+        self._param_form = ParameterFormBuilder(specs_with_current_values, self)
+        for name, spec in params.items():
+            self._state.config.setdefault(name, spec["default"])
+        self._param_form.values_changed.connect(self._on_params_changed)
+        self._layout.addWidget(self._param_form)
+
+    def _on_params_changed(self) -> None:
+        if self._param_form is None:
+            return
+        self._state.config.update(self._param_form.get_values())
+        self.edited.emit()
 
     def _add_single_slot_widget(self, spec: SlotSpec) -> None:
         candidates = self.candidates(spec.name)

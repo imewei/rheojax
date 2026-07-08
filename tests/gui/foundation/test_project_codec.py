@@ -301,7 +301,7 @@ def test_round_trip_full_state(tmp_path):
                 )
             ],
         ),
-        nuts_config=NutsConfig(run_nuts=False),
+        nuts_config=NutsConfig(run_nuts=False, max_tree_depth=7),
         nlsq_result={"parameters": {"G0": 1.0}, "x_fit": np.array([1.0, 2.0])},
     )
     # transform.result holds real RheoData under "input"/"output" (transform_controller.py's
@@ -323,6 +323,10 @@ def test_round_trip_full_state(tmp_path):
         ParameterConfig(name="G0", value=1.0, lower=0.0, upper=10.0, fixed=False)
     ]
     assert loaded.fit.nuts_config.run_nuts is False
+    # Regression: max_tree_depth was missing from NutsConfig entirely, so it
+    # was silently dropped on every project save/reload even though the live
+    # single-run flow forwarded it to the sampler correctly.
+    assert loaded.fit.nuts_config.max_tree_depth == 7
     assert loaded.fit.nlsq_result["parameters"] == {"G0": 1.0}
     np.testing.assert_array_equal(loaded.fit.nlsq_result["x_fit"], np.array([1.0, 2.0]))
     assert loaded.library.get("d1").protocol_type == "oscillation"

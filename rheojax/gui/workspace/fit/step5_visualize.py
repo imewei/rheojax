@@ -1,18 +1,36 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
-from PySide6.QtWidgets import QGridLayout, QLabel, QTabWidget, QVBoxLayout, QWidget
 
 from rheojax.core.arviz_utils import inference_data_from_dict
+from rheojax.gui.compat import (
+    QGridLayout,
+    QHeaderView,
+    QLabel,
+    Qt,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
 from rheojax.gui.widgets.pyqtgraph_canvas import PyQtGraphCanvas
 from rheojax.gui.widgets.residuals_panel import ResidualsPanel
+from rheojax.gui.workspace.fit.step4_nuts import _ESS_MIN, _R_HAT_THRESHOLD
+from rheojax.logging import get_logger
 
-_ARVIZ_PLOTS = ["pair", "forest", "energy", "autocorr", "rank", "ess"]
+logger = get_logger(__name__)
+
+_ARVIZ_PLOTS = [
+    "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+]
 
 
 class VisualizeStep(QWidget):
@@ -146,6 +164,27 @@ class VisualizeStep(QWidget):
         outer = QVBoxLayout(page)
         badge = QLabel(self.diagnostics_badge_text(), page)
         outer.addWidget(badge)
+
+        self._rhat_label = QLabel("R-hat: --", page)
+        self._ess_label = QLabel("ESS: --", page)
+        self._divergence_label = QLabel("Divergences: 0", page)
+        for label in (self._rhat_label, self._ess_label):
+            label.setStyleSheet(f"font-family: {Typography.FONT_FAMILY_MONO};")
+        outer.addWidget(self._rhat_label)
+        outer.addWidget(self._ess_label)
+        outer.addWidget(self._divergence_label)
+
+        self._intervals_table = QTableWidget(page)
+        self._intervals_table.setColumnCount(4)
+        self._intervals_table.setHorizontalHeaderLabels(
+            ["Parameter", "Median", "Lower", "Upper"]
+        )
+        self._intervals_table.setAlternatingRowColors(True)
+        self._intervals_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        outer.addWidget(self._intervals_table)
+
         grid_widget = QWidget(page)
         grid = QGridLayout(grid_widget)
         for i, plot_name in enumerate(_ARVIZ_PLOTS):
@@ -157,6 +196,131 @@ class VisualizeStep(QWidget):
         self._badge_label = badge
         self._add("Diagnostics", page)
 
+    def _refresh_diagnostics_summary(self) -> None:
+        """Populate the R-hat/ESS/Divergences labels from nuts_result.
+
+        No new computation -- state.nuts_result already carries r_hat, ess,
+        and divergences (see run_bayesian_isolated() in subprocess_bayesian.py).
+        Thresholds are imported from step4_nuts.py so these labels can never
+        disagree with the convergence-verdict badge on the same screen.
+        """
+        result = self._state.nuts_result or {}
+        mono_style = f"font-family: {Typography.FONT_FAMILY_MONO};"
+
+        r_hat = result.get("r_hat") or {}
+        # Individual dict values can be None (step4_nuts.py::_diagnostics_
+        # verdict() already guards this exact case), so filter those before
+        # aggregating -- max() raises TypeError comparing None to a float.
+        r_hat_vals = [v for v in r_hat.values() if v is not None]
+        if r_hat_vals:
+            max_rhat = max(r_hat_vals)
+            # Check every value for NaN individually rather than only the
+            # aggregate: max()/min() are order-dependent with NaN present
+            # (a NaN never compares >/< a finite value, so it can silently
+            # lose to a finite value depending on dict iteration order and
+            # never surface in the aggregate at all).
+            has_nan = any(isinstance(v, float) and math.isnan(v) for v in r_hat_vals)
+            failing = has_nan or max_rhat > _R_HAT_THRESHOLD
+            status = "WARNING" if failing else "OK"
+            color = themed("WARNING") if failing else themed("SUCCESS")
+            self._rhat_label.setText(f"R-hat (max): {max_rhat:.4f} [{status}]")
+            self._rhat_label.setStyleSheet(f"color: {color}; {mono_style}")
+        else:
+            self._rhat_label.setText("R-hat: --")
+            self._rhat_label.setStyleSheet(mono_style)
+
+        ess = result.get("ess") or {}
+        ess_vals = [v for v in ess.values() if v is not None]
+        if ess_vals:
+            min_ess = min(ess_vals)
+            has_nan = any(isinstance(v, float) and math.isnan(v) for v in ess_vals)
+            failing = has_nan or min_ess < _ESS_MIN
+            status = "LOW" if failing else "OK"
+            color = themed("WARNING") if failing else themed("SUCCESS")
+            self._ess_label.setText(f"ESS (min): {min_ess:.0f} [{status}]")
+            self._ess_label.setStyleSheet(f"color: {color}; {mono_style}")
+        else:
+            self._ess_label.setText("ESS: --")
+            self._ess_label.setStyleSheet(mono_style)
+
+        divergences = result.get("divergences", 0)
+        if divergences is None:
+            divergences = 0
+        if divergences == -1:
+            self._divergence_label.setText("Divergences: unknown")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('WARNING')}; font-weight: bold;"
+            )
+        elif divergences > 0:
+            self._divergence_label.setText(f"Divergences: {divergences}")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('ERROR')}; font-weight: bold;"
+            )
+        else:
+            self._divergence_label.setText("Divergences: 0")
+            self._divergence_label.setStyleSheet(
+                f"color: {themed('SUCCESS')}; font-weight: bold;"
+            )
+
+        self._refresh_intervals_table()
+
+    def _refresh_intervals_table(self) -> None:
+        """Populate the credible-intervals table from nuts_result.
+
+        credible_intervals in the workspace shell's actual code path is
+        always a dict[str, tuple[lower, median, upper]] (see
+        BayesianService.get_credible_intervals() -- the median value there
+        is a real percentile-50, not a mean, hence the "Median" column
+        label). The dict-value and 2-tuple branches below only exist for
+        robustness against a future caller; they are not exercised by the
+        current subprocess_bayesian.py -> NutsStep.run() path.
+        """
+        result = self._state.nuts_result or {}
+        intervals = result.get("credible_intervals") or {}
+        summary = result.get("summary") or {}
+
+        self._intervals_table.setRowCount(0)
+        row = 0
+        for param_name, values in intervals.items():
+            if isinstance(values, dict):
+                lower = values.get("lower", 0.0)
+                median = values.get("median", values.get("mean", 0.0))
+                upper = values.get("upper", 0.0)
+            elif isinstance(values, (tuple, list)) and len(values) == 3:
+                lower, median, upper = values
+            elif isinstance(values, (tuple, list)) and len(values) == 2:
+                lower, upper = values
+                # summary.get(param_name) can be an explicit None (key
+                # present, value None) rather than merely absent -- `or {}`
+                # guards against AttributeError from None.get(...).
+                median = (summary.get(param_name) or {}).get("mean", 0.0)
+            else:
+                logger.warning(
+                    "Skipping malformed credible_intervals entry",
+                    param_name=param_name,
+                    shape=type(values).__name__,
+                )
+                continue
+
+            try:
+                lower_f, median_f, upper_f = float(lower), float(median), float(upper)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Skipping non-numeric credible_intervals entry",
+                    param_name=param_name,
+                )
+                continue
+
+            self._intervals_table.insertRow(row)
+            name_item = QTableWidgetItem(param_name)
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self._intervals_table.setItem(row, 0, name_item)
+            for col, val in ((1, median_f), (2, lower_f), (3, upper_f)):
+                item = QTableWidgetItem(f"{val:.4g}")
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._intervals_table.setItem(row, col, item)
+            row += 1
+
     def _remove_diagnostics_tab(self) -> None:
         idx = self._names.index("Diagnostics")
         page = self._tabs.widget(idx)
@@ -165,15 +329,24 @@ class VisualizeStep(QWidget):
             page.deleteLater()
         self._arviz_canvases.clear()
         self._names.remove("Diagnostics")
-        # ponytail: drop the dangling reference so a later refresh() (before
+        # ponytail: drop dangling references so a later refresh() (before
         # deleteLater's deferred Qt cleanup actually runs) can't touch a
         # widget whose parent tab no longer exists.
-        if hasattr(self, "_badge_label"):
-            del self._badge_label
+        for attr in (
+            "_badge_label",
+            "_rhat_label",
+            "_ess_label",
+            "_divergence_label",
+            "_intervals_table",
+        ):
+            if hasattr(self, attr):
+                delattr(self, attr)
 
     def _refresh_diagnostics(self) -> None:
         if hasattr(self, "_badge_label"):
             self._badge_label.setText(self.diagnostics_badge_text())
+        if hasattr(self, "_rhat_label"):
+            self._refresh_diagnostics_summary()
         if not self._arviz_canvases:
             return
         idata = self._inference_data()

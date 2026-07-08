@@ -154,8 +154,19 @@ class PlotCanvas(QWidget):
         self._plot_data.clear()
         self._annotation = None
 
-        # Force immediate full redraw (not deferred draw_idle)
-        self.canvas.draw()
+        # Force immediate full redraw (not deferred draw_idle). Agg/FreeType
+        # rendering can fail for host-environment reasons outside this
+        # widget's control (e.g. a "raster overflow" from a font-cache/DPI
+        # quirk) -- degrade gracefully instead of propagating a crash.
+        try:
+            self.canvas.draw()
+        except Exception as e:
+            logger.error(
+                "Error rendering canvas",
+                widget=self.__class__.__name__,
+                error=str(e),
+                exc_info=True,
+            )
 
         logger.debug(
             "Figure replaced",

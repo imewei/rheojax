@@ -19,9 +19,32 @@ from PySide6.QtWidgets import (
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.resources.styles.tokens import field_label_style
+from rheojax.gui.services.model_service import FAMILY_LABELS, ModelService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
+
+
+def _grouped_models(protocol: str) -> dict[str, list[str]]:
+    """Models compatible with `protocol`, grouped by family (same grouping
+    fit_page.py's model selector already uses) instead of one flat list.
+
+    ModelRegistry.find(protocol=...) and ModelService.get_available_models()
+    are two independent registry queries -- a name present in the former but
+    absent from the latter's categorization (e.g. a name it doesn't
+    recognize) must still surface, under "other", rather than silently
+    disappear from the picker.
+    """
+    allowed = set(ModelRegistry.find(protocol=protocol))
+    grouped = {
+        family: [name for name in names if name in allowed]
+        for family, names in ModelService().get_available_models().items()
+    }
+    categorized = {name for names in grouped.values() for name in names}
+    leftover = sorted(allowed - categorized)
+    if leftover:
+        grouped.setdefault("other", []).extend(leftover)
+    return grouped
 
 
 def _constructor_params(model_key: str) -> list[tuple[str, Any, Any]]:
@@ -115,7 +138,9 @@ class ProtocolModelStep(QWidget):
         lay.addWidget(params_caption)
         lay.addWidget(self._params)
         self._protocol.currentTextChanged.connect(self._on_protocol)
-        self._model.currentTextChanged.connect(self._on_model)
+        self._model.currentIndexChanged.connect(
+            lambda _idx: self._on_model(self._model.currentData())
+        )
 
     def set_protocol(self, p: str) -> None:
         self._protocol.setCurrentText(p)
@@ -132,22 +157,34 @@ class ProtocolModelStep(QWidget):
         # protocol change and the resulting model reset.
         self._model.blockSignals(True)
         self._model.clear()
+        self._model.addItem("", None)
         if p:
-            self._model.addItems([""] + sorted(ModelRegistry.find(protocol=p)))
+            for family, names in _grouped_models(p).items():
+                if not names:
+                    continue
+                label = FAMILY_LABELS.get(family, family.replace("_", " ").title())
+                self._model.addItem(f"── {label} ──", None)
+                header_idx = self._model.count() - 1
+                item_model = self._model.model()
+                if item_model is not None:
+                    item = item_model.item(header_idx)
+                    if item is not None:
+                        item.setEnabled(False)
+                for name in names:
+                    self._model.addItem(f"  {name}", name)
         self._model.blockSignals(False)
-        self._on_model(self._model.currentText())
+        self._on_model(self._model.currentData())
 
     def model_keys(self) -> list[str]:
-        return [
-            self._model.itemText(i)
-            for i in range(self._model.count())
-            if self._model.itemText(i)
-        ]
+        data = (self._model.itemData(i) for i in range(self._model.count()))
+        return [key for key in data if key]
 
     def set_model(self, key: str) -> None:
-        self._model.setCurrentText(key)
+        idx = self._model.findData(key)
+        if idx >= 0:
+            self._model.setCurrentIndex(idx)
 
-    def _on_model(self, key: str) -> None:
+    def _on_model(self, key: str | None) -> None:
         self._state.model_key = key or None
         self._state.model_config = {}
         self._rebuild_config_widgets(key)

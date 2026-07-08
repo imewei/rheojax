@@ -2,21 +2,32 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent
-from PySide6.QtWidgets import (
-    QLabel,
+from rheojax.gui.app.status_bar import StatusBar
+from rheojax.gui.compat import (
+    QAction,
+    QApplication,
+    QCloseEvent,
+    QDialog,
+    QInputDialog,
+    QKeySequence,
     QMainWindow,
     QPushButton,
+    QShortcut,
     QSplitter,
+    Qt,
     QToolBar,
     QWidget,
+    Signal,
 )
-
+from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.resources import load_stylesheet
+from rheojax.gui.resources.styles.tokens import ThemeManager
 from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
 from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
@@ -26,6 +37,9 @@ from rheojax.gui.workspace.stepper_canvas import StepperCanvas
 from rheojax.gui.workspace.transform.transform_controller import (
     build_transform_controller,
 )
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class WorkspaceWindow(QMainWindow):
@@ -69,8 +83,7 @@ class WorkspaceWindow(QMainWindow):
         bar.addWidget(self._fit_btn)
         bar.addWidget(self._tx_btn)
         bar.addWidget(self._pipeline_btn)
-        self._status_label = QLabel(self)
-        bar.addWidget(self._status_label)
+        self.setStatusBar(StatusBar(self))
         self._build_file_menu()
 
         self.log_dock = LogDockWidget(self)
@@ -79,6 +92,8 @@ class WorkspaceWindow(QMainWindow):
         self._build_view_menu()
 
         self._build_workspace(app_state)
+        self._setup_os_theme_watcher()
+        QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
 
     def _build_file_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
@@ -87,6 +102,63 @@ class WorkspaceWindow(QMainWindow):
         menu.addAction("&Save", self._on_save, "Ctrl+S")
         menu.addAction("Save &As...", self._on_save_as, "Ctrl+Shift+S")
         menu.addAction("&Close", self._on_close)
+        menu.addSeparator()
+        menu.addAction("&Preferences...", self._on_preferences)
+
+    def _on_preferences(self) -> None:
+        dialog = PreferencesDialog(
+            current_preferences={"theme": self._state.ui.theme}, parent=self
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.apply_preferences(dialog.get_preferences())
+
+    def apply_preferences(self, prefs: dict[str, Any]) -> None:
+        """Apply preferences from PreferencesDialog.get_preferences().
+
+        Only the "theme" key is acted on today -- the dialog exposes 15
+        other settings (autosave, JAX device, visualization style, ...)
+        this shell has no existing mechanism to honor yet; they are
+        accepted here and ignored, not silently dropped by omission.
+        """
+        theme = prefs.get("theme")
+        if theme is not None:
+            self._apply_theme(theme)
+
+    def _command_palette_actions(self) -> dict[str, Callable[[], None]]:
+        """Build the command palette's action dict fresh on every open.
+
+        Rebuilt (not cached) so "Cycle Theme" always closes over the
+        *current* self._state.ui.theme rather than a stale value captured
+        the first time the palette was opened.
+        """
+        theme_order = ["light", "dark", "system"]
+
+        def _cycle_theme() -> None:
+            current = self._state.ui.theme
+            idx = theme_order.index(current) if current in theme_order else 0
+            self._apply_theme(theme_order[(idx + 1) % len(theme_order)])
+
+        return {
+            "New Project": self._on_new,
+            "Open Project...": self._on_open,
+            "Save Project": self._on_save,
+            "Save Project As...": self._on_save_as,
+            "Switch to Fit Mode": lambda: self.set_mode("fit"),
+            "Switch to Transform Mode": lambda: self.set_mode("transform"),
+            "Switch to Pipeline Mode": lambda: self.set_mode("pipeline"),
+            "Toggle Log Panel": self.view_log_dock_action.trigger,
+            "Preferences...": self._on_preferences,
+            "Cycle Theme": _cycle_theme,
+        }
+
+    def _open_command_palette(self) -> None:
+        actions = self._command_palette_actions()
+        labels = sorted(actions.keys())
+        label, ok = QInputDialog.getItem(
+            self, "Command Palette", "Action:", labels, 0, False
+        )
+        if ok and label:
+            actions[label]()
 
     def _build_view_menu(self) -> None:
         menu = self.menuBar().addMenu("&View")
@@ -98,12 +170,136 @@ class WorkspaceWindow(QMainWindow):
         menu.addAction(action)
         self.view_log_dock_action = action
 
+        theme_menu = menu.addMenu("&Theme")
+        self._theme_light_action = QAction("&Light", self)
+        self._theme_dark_action = QAction("&Dark", self)
+        self._theme_system_action = QAction("&System", self)
+        for theme_action in (
+            self._theme_light_action,
+            self._theme_dark_action,
+            self._theme_system_action,
+        ):
+            theme_action.setCheckable(True)
+        self._theme_light_action.triggered.connect(lambda: self._apply_theme("light"))
+        self._theme_dark_action.triggered.connect(lambda: self._apply_theme("dark"))
+        self._theme_system_action.triggered.connect(
+            lambda: self._apply_theme("system")
+        )
+        theme_menu.addAction(self._theme_light_action)
+        theme_menu.addAction(self._theme_dark_action)
+        theme_menu.addAction(self._theme_system_action)
+
+    def _apply_theme(self, theme: str) -> None:
+        """Apply a QSS theme to the QApplication and sync UI/state.
+
+        ``theme`` is normalized to lowercase on entry -- ``PreferencesDialog``
+        (Task 3) round-trips theme as "Light"/"Dark"/"System" (its combo
+        box's exact item text via ``currentText()``), while every other
+        caller in this file already passes lowercase. Normalizing here, once,
+        in the function every caller routes through, means no caller needs
+        to know or care which convention the *other* callers use --
+        ``load_stylesheet()`` only ever accepts lowercase "light"/"dark" and
+        raises ``ValueError`` on anything else, so this must happen before
+        ``chosen`` is computed. The stored preference is the lowercased
+        *requested* value (not the resolved one), so a saved "system"
+        preference round-trips as "system", not as whatever the OS scheme
+        happened to be at the time it was applied.
+        """
+        theme = theme.lower()
+        app = QApplication.instance()
+        if app is None:
+            return
+        chosen = self._detect_os_color_scheme() if theme == "system" else theme
+        try:
+            stylesheet = load_stylesheet(chosen)
+            # main.py sets an adaptive base font size at startup and appends
+            # a matching "* { font-size: ...pt; }" rule to the stylesheet
+            # (see main.py's app.setFont(base_font) + stylesheet +=
+            # f"\n* {{ font-size: {base_font_size:.1f}pt; }}\n"). A bare
+            # app.setStyleSheet(load_stylesheet(chosen)) here would replace
+            # the whole stylesheet and silently drop that rule on every
+            # theme switch, including the first one (_build_workspace calls
+            # _apply_theme almost immediately after main.py's initial
+            # setStyleSheet). Recover the already-applied base font size
+            # from the app's current QFont and re-append the same rule.
+            font_size = app.font().pointSizeF()
+            stylesheet += f"\n* {{ font-size: {font_size:.1f}pt; }}\n"
+            app.setStyleSheet(stylesheet)
+            ThemeManager.set_theme(chosen)
+        except Exception as exc:
+            logger.error(
+                "Failed to apply theme", theme=theme, error=str(exc), exc_info=True
+            )
+            return
+        self._state.ui.theme = theme
+        self._theme_light_action.setChecked(theme == "light")
+        self._theme_dark_action.setChecked(theme == "dark")
+        self._theme_system_action.setChecked(theme == "system")
+        self.statusBar().show_message(f"Theme: {theme.capitalize()}", 2000)
+
+    @staticmethod
+    def _detect_os_color_scheme() -> str:
+        """Detect the current OS color scheme.
+
+        Tries ``QStyleHints.colorScheme()`` (Qt 6.5+) first, then falls back
+        to measuring the ``QPalette.Window`` luminance.
+
+        Returns
+        -------
+        str
+            ``"dark"`` or ``"light"``.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return "light"
+        try:
+            hints = app.styleHints()
+            if hasattr(hints, "colorScheme"):
+                from rheojax.gui.compat import Qt as _Qt
+
+                scheme = hints.colorScheme()
+                if scheme == _Qt.ColorScheme.Dark:
+                    return "dark"
+                if scheme == _Qt.ColorScheme.Light:
+                    return "light"
+        except Exception:
+            pass
+        palette = app.palette()
+        window_color = palette.color(palette.ColorRole.Window)
+        luminance = (
+            0.299 * window_color.red()
+            + 0.587 * window_color.green()
+            + 0.114 * window_color.blue()
+        )
+        return "dark" if luminance < 128 else "light"
+
+    def _setup_os_theme_watcher(self) -> None:
+        """Hook ``QStyleHints.colorSchemeChanged`` (Qt 6.5+) to re-apply "system" theme.
+
+        Call once during window init. Silently no-ops on Qt < 6.5.
+        """
+        try:
+            app = QApplication.instance()
+            if app is None:
+                return
+            hints = app.styleHints()
+            if hasattr(hints, "colorSchemeChanged"):
+                hints.colorSchemeChanged.connect(self._on_os_color_scheme_changed)
+        except Exception:
+            logger.debug("QStyleHints.colorSchemeChanged not available")
+
+    def _on_os_color_scheme_changed(self) -> None:
+        """Re-apply the theme only when the user preference is "system"."""
+        if self._state.ui.theme == "system":
+            self._apply_theme("system")
+
     def log(self, message: str) -> None:
         """Append message to the log dock at INFO level."""
         self.log_dock.append_record(logging.INFO, message)
 
     def _build_workspace(self, state: AppState) -> None:
         self._state = state
+        self._apply_theme(state.ui.theme)
         initial_mode = state.ui.mode
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
         from rheojax.gui.workspace.pipeline.controller import build_pipeline_controller
@@ -150,7 +346,7 @@ class WorkspaceWindow(QMainWindow):
                 body.run_requested.connect(self._on_pipeline_run_requested)
 
         self._sync_mode_buttons()
-        self._refresh_status_label()
+        self._refresh_status_bar()
 
         self._rail = LibraryRail(state.library, self)
         # LibraryRail otherwise only ever renders the snapshot present at construction
@@ -323,14 +519,16 @@ class WorkspaceWindow(QMainWindow):
         return wrapped
 
     def _on_new(self) -> None:
+        def _new():
+            self._rebuild(AppState())
+            self.statusBar().show_message("New project created", 2000)
+
         self._maybe_confirm_active_jobs(
-            lambda: self._maybe_confirm_unsaved_changes(
-                lambda: self._rebuild(AppState())
-            )
+            lambda: self._maybe_confirm_unsaved_changes(_new)
         )
 
     def _on_open(self) -> None:
-        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from rheojax.gui.compat import QFileDialog, QMessageBox
 
         def _open():
             path, _ = QFileDialog.getOpenFileName(
@@ -349,6 +547,7 @@ class WorkspaceWindow(QMainWindow):
                 self._rebuild(new_state)
                 self._state.project.dirty = False
                 self._state.project.path = path
+                self.statusBar().show_message("Project opened", 2000)
 
         self._maybe_confirm_active_jobs(
             lambda: self._maybe_confirm_unsaved_changes(_open)
@@ -380,8 +579,7 @@ class WorkspaceWindow(QMainWindow):
         if self._state.project.path is None:
             self._on_save_as()
             return
-        from PySide6.QtWidgets import QMessageBox
-
+        from rheojax.gui.compat import QMessageBox
         from rheojax.gui.foundation.project_codec import save_project_v2
 
         try:
@@ -390,11 +588,12 @@ class WorkspaceWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", str(exc))
             return
         self._state.project.dirty = False
+        self.statusBar().show_message("Project saved", 2000)
 
     def _on_save_as(self) -> None:
         if self._blocked_by_active_jobs("save"):
             return
-        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from rheojax.gui.compat import QFileDialog, QMessageBox
 
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Project As", "", "RheoJAX Project (*.rheojax)"
@@ -410,6 +609,7 @@ class WorkspaceWindow(QMainWindow):
             self._state.project.path = path
             self._state.project.name = Path(path).stem
             self._state.project.dirty = False
+            self.statusBar().show_message("Project saved", 2000)
 
     def _on_close(self) -> None:
         # Actually close the window (same chain closeEvent uses for the OS ✕
@@ -872,18 +1072,21 @@ class WorkspaceWindow(QMainWindow):
         self._tx_btn.setChecked(self._mode == "transform")
         self._pipeline_btn.setChecked(self._mode == "pipeline")
 
-    def _refresh_status_label(self) -> None:
+    def _refresh_status_bar(self) -> None:
         # ponytail: "active project" status deferred — needs the Plan 3/4
         # AppState.project slice, which doesn't exist yet (spec §4.3).
         try:
             from rheojax.gui.utils.jax_utils import get_jax_info
 
             info = get_jax_info()
-            fp = "float64 ✓" if info.get("float64_enabled") else "float64 ✗"
-            device = info.get("default_device", "?")
-            self._status_label.setText(f"{fp}  |  {device}")
+            self.statusBar().update_jax_status(
+                device=info.get("default_device", "?"),
+                memory_used=info.get("memory_used_mb", 0),
+                memory_total=info.get("memory_total_mb", 0),
+                float64_enabled=info.get("float64_enabled", False),
+            )
         except Exception:
-            self._status_label.setText("")
+            pass
 
     def fit_bodies(self) -> list[QWidget]:
         return self._fit_bodies

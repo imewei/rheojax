@@ -142,6 +142,7 @@ class BayesianWorker(QRunnable):
         fitted_model_state: dict[str, Any] | None = None,
         dataset_id: str = "",
         target_accept: float = 0.8,
+        max_tree_depth: int | None = None,
     ):
         """Initialize Bayesian worker.
 
@@ -190,6 +191,7 @@ class BayesianWorker(QRunnable):
         self._fitted_model_state = fitted_model_state
         self._dataset_id = dataset_id
         self._target_accept = target_accept
+        self._max_tree_depth = max_tree_depth
 
         # Track progress
         self._current_stage = "warmup"
@@ -346,6 +348,8 @@ class BayesianWorker(QRunnable):
                 "seed": self._seed,
                 "target_accept_prob": self._target_accept,
             }
+            if self._max_tree_depth is not None:
+                mcmc_kwargs["max_tree_depth"] = self._max_tree_depth
 
             # F-HL-005 fix: Pass fitted model state for stateful models
             if self._fitted_model_state:

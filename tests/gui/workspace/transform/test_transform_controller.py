@@ -46,7 +46,10 @@ def test_picking_transform_invalidates_downstream_state(qtbot):
     bodies[0].set_transform("mastercurve")  # re-pick -> invalidation
 
     assert app.transform.slots == {}
-    assert app.transform.config == {}
+    # The stale "k" from cox_merz must be gone; mastercurve's own param form
+    # re-seeds config with ITS defaults (SlotsStep._add_param_form), so the
+    # invalidation guard is "k" not in config, not "config == {}".
+    assert "k" not in app.transform.config
     assert app.transform.result is None
     assert ctl.reached == {0}
     # step bodies must observe the cleared state through their existing

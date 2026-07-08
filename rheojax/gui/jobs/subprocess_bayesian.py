@@ -20,6 +20,119 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _posterior_draw_indices(
+    posterior_samples: dict[str, Any], max_draws: int
+) -> np.ndarray:
+    """Select evenly spaced draw indices, consistent across parameters."""
+    lengths = []
+    for samples in (posterior_samples or {}).values():
+        arr = np.asarray(samples).reshape(-1)
+        if arr.size:
+            lengths.append(int(arr.size))
+    if not lengths:
+        return np.array([], dtype=int)
+    total = int(min(lengths))
+    if total <= 0:
+        return np.array([], dtype=int)
+    n = int(min(max_draws, total))
+    if n <= 1:
+        return np.array([0], dtype=int)
+    idx = np.linspace(0, total - 1, num=n)
+    return np.unique(idx.astype(int))
+
+
+def _posterior_params_at_index(
+    posterior_samples: dict[str, Any], index: int
+) -> dict[str, float]:
+    """Extract a single posterior draw as a parameter dict."""
+    params: dict[str, float] = {}
+    for name, samples in (posterior_samples or {}).items():
+        arr = np.asarray(samples).reshape(-1)
+        if arr.size == 0 or index >= arr.size:
+            continue
+        value = float(arr[index])
+        if np.isfinite(value):
+            params[name] = value
+    return params
+
+
+def _compute_y_band(
+    model_name: str,
+    posterior_samples_np: dict[str, np.ndarray],
+    x_data: np.ndarray,
+    test_mode: str,
+    model_config: dict[str, Any] | None,
+    fitted_model_state: dict[str, Any] | None,
+    hdi_prob: float = 0.94,
+    max_draws: int = 50,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Posterior-predictive credible band (lo, hi) at each x, or None on failure.
+
+    Mirrors bayesian_page.py's _update_fit_plot_from_posterior band math
+    (same draw-sampling/quantile logic), minus the Qt-specific plotting so
+    the workspace wizard's step5_visualize.py can render the same band the
+    legacy page already computes.
+    """
+    from rheojax.gui.services.model_service import ModelService, infer_model_kwargs
+
+    draw_indices = _posterior_draw_indices(posterior_samples_np, max_draws=max_draws)
+    if draw_indices.size == 0:
+        return None
+
+    model_kwargs = dict(model_config or {}) or infer_model_kwargs(
+        model_name, list(posterior_samples_np.keys())
+    )
+    if fitted_model_state:
+        model_kwargs = dict(model_kwargs)
+        model_kwargs["fitted_model_state"] = fitted_model_state
+
+    model_service = ModelService()
+    x = np.asarray(x_data)
+    y_draws: list[np.ndarray] = []
+    for idx in draw_indices:
+        params = _posterior_params_at_index(posterior_samples_np, int(idx))
+        if not params:
+            continue
+        try:
+            y_pred = np.asarray(
+                model_service.predict(
+                    model_name, params, x, test_mode=test_mode, model_kwargs=model_kwargs
+                )
+            )
+        except Exception:
+            continue
+        if (
+            y_pred.ndim == 2
+            and y_pred.shape[1] == 2
+            and y_pred.shape[0] == len(x)
+        ):
+            y_pred = y_pred[:, 0] + 1j * y_pred[:, 1]
+        if y_pred.shape == x.shape:
+            y_draws.append(y_pred)
+
+    if not y_draws:
+        return None
+
+    y_stack = np.stack(y_draws, axis=0)
+    alpha = (1.0 - float(hdi_prob)) / 2.0
+    q_lo, q_hi = float(alpha), float(1.0 - alpha)
+
+    is_oscillation = (test_mode or "") == "oscillation"
+    if is_oscillation and np.iscomplexobj(y_stack):
+        y_re, y_im = np.real(y_stack), np.imag(y_stack)
+        lo = np.nanquantile(y_re, q_lo, axis=0) + 1j * np.nanquantile(
+            y_im, q_lo, axis=0
+        )
+        hi = np.nanquantile(y_re, q_hi, axis=0) + 1j * np.nanquantile(
+            y_im, q_hi, axis=0
+        )
+    else:
+        y_scalar = np.abs(y_stack) if np.iscomplexobj(y_stack) else y_stack
+        lo = np.nanquantile(y_scalar, q_lo, axis=0)
+        hi = np.nanquantile(y_scalar, q_hi, axis=0)
+    return lo, hi
+
+
 def run_bayesian_isolated(
     model_name: str,
     x_data: np.ndarray,
@@ -39,6 +152,7 @@ def run_bayesian_isolated(
     dataset_id: str = "",
     target_accept: float = 0.8,
     model_config: dict[str, Any] | None = None,
+    max_tree_depth: int | None = None,
 ) -> dict[str, Any]:
     """Run NUTS Bayesian sampling in an isolated subprocess.
 
@@ -150,6 +264,8 @@ def run_bayesian_isolated(
         mcmc_kwargs["fitted_model_state"] = fitted_model_state
     if model_config:
         mcmc_kwargs["model_config"] = model_config
+    if max_tree_depth is not None:
+        mcmc_kwargs["max_tree_depth"] = max_tree_depth
 
     service = BayesianService()
     bayesian_result = service.run_mcmc(
@@ -209,6 +325,30 @@ def run_bayesian_isolated(
     else:
         bfmi_val = float("nan")
 
+    # Computed eagerly (up to 50 extra model.predict() calls) rather than
+    # lazily from step5_visualize.py on first view: this already runs in the
+    # isolated subprocess (off the GUI thread), and NutsStep.finished ->
+    # VisualizeStep.refresh() means the Fit overlay tab -- where this band
+    # renders -- is shown immediately after every run anyway, so the eager
+    # cost is rarely wasted work in practice.
+    y_band = None
+    try:
+        y_band = _compute_y_band(
+            model_name,
+            posterior_samples_np,
+            x_data,
+            test_mode,
+            model_config,
+            fitted_model_state,
+        )
+    except Exception as exc:
+        logger.error(
+            "Posterior-predictive band computation failed; overlay will skip it",
+            model_name=model_name,
+            error=str(exc),
+            exc_info=True,
+        )
+
     return {
         "model_name": model_name,
         "dataset_id": dataset_id,
@@ -227,4 +367,5 @@ def run_bayesian_isolated(
         "sample_stats": sample_stats_np,  # Raw arrays for energy plot
         "bfmi": bfmi_val,
         "diagnostics_valid": bayesian_result.diagnostics_valid,
+        "y_band": y_band,
     }

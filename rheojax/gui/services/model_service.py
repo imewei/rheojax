@@ -24,6 +24,35 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Display labels for ModelService.get_available_models()'s category keys.
+# Public (not fit_page.py-private) since both the legacy FitPage and the
+# workspace shell's ProtocolModelStep group their model pickers by these
+# same categories.
+FAMILY_LABELS: dict[str, str] = {
+    "classical": "Classical",
+    "flow": "Flow",
+    "fractional_maxwell": "Fractional Maxwell",
+    "fractional_zener": "Fractional Zener",
+    "fractional_advanced": "Fractional Advanced",
+    "multi_mode": "Multi-Mode",
+    "sgr": "SGR",
+    "stz": "STZ",
+    "epm": "EPM",
+    "fluidity": "Fluidity",
+    "fluidity_saramito": "Fluidity-Saramito",
+    "ikh": "IKH",
+    "fikh": "FIKH",
+    "hl": "Hebraud-Lequeux",
+    "spp_laos": "SPP/LAOS",
+    "giesekus": "Giesekus",
+    "dmt": "DMT",
+    "itt_mct": "ITT-MCT",
+    "tnt": "TNT",
+    "vlb": "VLB",
+    "hvm": "HVM",
+    "hvnm": "HVNM",
+}
+
 
 def infer_model_kwargs(model_name: str, param_names: list[str]) -> dict[str, Any]:
     """Infer model constructor kwargs from parameter names.
@@ -1107,7 +1136,11 @@ class ModelService:
 
         try:
             # Create model instance with optional configuration
-            model_kwargs = model_kwargs or {}
+            # Copy before pop(): callers (e.g. subprocess_bayesian._compute_y_band,
+            # bayesian_page._update_fit_plot_from_posterior) reuse the same
+            # model_kwargs dict across many predict() calls in a loop -- mutating
+            # it in place silently dropped fitted_model_state after the first draw.
+            model_kwargs = dict(model_kwargs) if model_kwargs else {}
             # Extract fitted_model_state before passing to constructor
             fitted_model_state = model_kwargs.pop("fitted_model_state", None)
             model = self._registry.create_instance(

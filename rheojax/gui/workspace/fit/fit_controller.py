@@ -257,18 +257,19 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                     rheo_data.x,
                     rheo_data.y,
                     test_mode=fit_state.protocol,
-                    num_warmup=500,
-                    num_samples=1000,
-                    num_chains=4,
+                    num_warmup=config.get("num_warmup", 500),
+                    num_samples=config.get("num_samples", 1000),
+                    num_chains=config.get("num_chains", 4),
                     warm_start=warm_start,
                     priors=priors,
-                    seed=0,
+                    seed=config.get("seed", 0),
                     progress_queue=progress_queue,
                     cancel_event=token.event,
                     dataset_id=fit_state.data_ref,
                     target_accept=config.get("target_accept", 0.8),
                     model_config=fit_state.model_config,
                     metadata=getattr(rheo_data, "metadata", None),
+                    max_tree_depth=config.get("max_tree_depth"),
                 )
             )
         finally:
