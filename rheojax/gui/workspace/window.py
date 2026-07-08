@@ -9,6 +9,7 @@ from rheojax.gui.compat import (
     QAction,
     QApplication,
     QCloseEvent,
+    QDialog,
     QMainWindow,
     QPushButton,
     QSplitter,
@@ -17,6 +18,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.dialogs.preferences import PreferencesDialog
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.resources import load_stylesheet
@@ -94,6 +96,27 @@ class WorkspaceWindow(QMainWindow):
         menu.addAction("&Save", self._on_save, "Ctrl+S")
         menu.addAction("Save &As...", self._on_save_as, "Ctrl+Shift+S")
         menu.addAction("&Close", self._on_close)
+        menu.addSeparator()
+        menu.addAction("&Preferences...", self._on_preferences)
+
+    def _on_preferences(self) -> None:
+        dialog = PreferencesDialog(
+            current_preferences={"theme": self._state.ui.theme}, parent=self
+        )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.apply_preferences(dialog.get_preferences())
+
+    def apply_preferences(self, prefs: dict) -> None:
+        """Apply preferences from PreferencesDialog.get_preferences().
+
+        Only the "theme" key is acted on today -- the dialog exposes 15
+        other settings (autosave, JAX device, visualization style, ...)
+        this shell has no existing mechanism to honor yet; they are
+        accepted here and ignored, not silently dropped by omission.
+        """
+        theme = prefs.get("theme")
+        if theme is not None:
+            self._apply_theme(theme)
 
     def _build_view_menu(self) -> None:
         menu = self.menuBar().addMenu("&View")

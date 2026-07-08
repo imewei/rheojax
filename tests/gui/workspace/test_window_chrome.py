@@ -157,3 +157,73 @@ def test_build_workspace_applies_saved_theme_on_rebuild(qtbot):
     win._apply_theme("light")
     win._rebuild(AppState(ui=UiState(theme="dark")))
     assert ThemeManager.is_dark() is True
+
+
+def test_apply_preferences_applies_theme(qtbot):
+    win = _win(qtbot)
+    win.apply_preferences({"theme": "dark"})
+    assert win._state.ui.theme == "dark"
+
+
+def test_apply_preferences_without_theme_key_is_noop(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("light")
+    win.apply_preferences({"worker_isolation_mode": "subprocess"})
+    assert win._state.ui.theme == "light"
+
+
+def test_on_preferences_applies_dialog_result(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.preferences import PreferencesDialog
+
+    win = _win(qtbot)
+    monkeypatch.setattr(
+        PreferencesDialog, "exec", lambda self: QDialog.DialogCode.Accepted
+    )
+    # PreferencesDialog.get_preferences() actually returns self.theme_combo.
+    # currentText() -- "Light"/"Dark"/"System", the combo's exact item text
+    # (preferences.py: self.theme_combo.addItems(["Light", "Dark", "System"])).
+    # A lowercase "dark" mock here would not exercise the real integration
+    # shape and would have hidden the case-mismatch bug this plan's
+    # adversarial review round caught (_apply_theme now normalizes case
+    # itself, but the test must still reflect what the dialog really sends).
+    monkeypatch.setattr(
+        PreferencesDialog, "get_preferences", lambda self: {"theme": "Dark"}
+    )
+    win._on_preferences()  # must not raise ValueError from load_stylesheet
+    assert win._state.ui.theme == "dark"
+
+
+def test_on_preferences_cancelled_does_not_apply(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    from rheojax.gui.dialogs.preferences import PreferencesDialog
+
+    win = _win(qtbot)
+    win._apply_theme("light")
+    monkeypatch.setattr(
+        PreferencesDialog, "exec", lambda self: QDialog.DialogCode.Rejected
+    )
+    win._on_preferences()
+    assert win._state.ui.theme == "light"
+
+
+def test_preferences_dialog_restores_current_theme_selection(qtbot):
+    # Regression guard for the same case-mismatch bug class from the other
+    # direction: self._state.ui.theme is always lowercase ("dark"), but the
+    # dialog's combo box items are title-case ("Dark"). QComboBox.findText's
+    # MatchFixedString flag is case-insensitive by default (verified
+    # directly against this PySide6 version, not assumed from general Qt
+    # knowledge), so passing the lowercase value through unmodified already
+    # restores the correct selection -- this test pins that behavior so a
+    # future PySide6/qtpy version change would be caught here.
+    from rheojax.gui.dialogs.preferences import PreferencesDialog
+
+    win = _win(qtbot)
+    win._apply_theme("dark")
+    dialog = PreferencesDialog(
+        current_preferences={"theme": win._state.ui.theme}, parent=win
+    )
+    qtbot.addWidget(dialog)
+    assert dialog.theme_combo.currentText() == "Dark"
