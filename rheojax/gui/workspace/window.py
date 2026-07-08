@@ -4,17 +4,18 @@ import logging
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent
-from PySide6.QtWidgets import (
-    QLabel,
+from rheojax.gui.app.status_bar import StatusBar
+from rheojax.gui.compat import (
+    QAction,
+    QCloseEvent,
     QMainWindow,
     QPushButton,
     QSplitter,
+    Qt,
     QToolBar,
     QWidget,
+    Signal,
 )
-
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
@@ -69,8 +70,7 @@ class WorkspaceWindow(QMainWindow):
         bar.addWidget(self._fit_btn)
         bar.addWidget(self._tx_btn)
         bar.addWidget(self._pipeline_btn)
-        self._status_label = QLabel(self)
-        bar.addWidget(self._status_label)
+        self.setStatusBar(StatusBar(self))
         self._build_file_menu()
 
         self.log_dock = LogDockWidget(self)
@@ -150,7 +150,7 @@ class WorkspaceWindow(QMainWindow):
                 body.run_requested.connect(self._on_pipeline_run_requested)
 
         self._sync_mode_buttons()
-        self._refresh_status_label()
+        self._refresh_status_bar()
 
         self._rail = LibraryRail(state.library, self)
         # LibraryRail otherwise only ever renders the snapshot present at construction
@@ -323,14 +323,16 @@ class WorkspaceWindow(QMainWindow):
         return wrapped
 
     def _on_new(self) -> None:
+        def _new():
+            self._rebuild(AppState())
+            self.statusBar().show_message("New project created", 2000)
+
         self._maybe_confirm_active_jobs(
-            lambda: self._maybe_confirm_unsaved_changes(
-                lambda: self._rebuild(AppState())
-            )
+            lambda: self._maybe_confirm_unsaved_changes(_new)
         )
 
     def _on_open(self) -> None:
-        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from rheojax.gui.compat import QFileDialog, QMessageBox
 
         def _open():
             path, _ = QFileDialog.getOpenFileName(
@@ -349,6 +351,7 @@ class WorkspaceWindow(QMainWindow):
                 self._rebuild(new_state)
                 self._state.project.dirty = False
                 self._state.project.path = path
+                self.statusBar().show_message("Project opened", 2000)
 
         self._maybe_confirm_active_jobs(
             lambda: self._maybe_confirm_unsaved_changes(_open)
@@ -380,8 +383,7 @@ class WorkspaceWindow(QMainWindow):
         if self._state.project.path is None:
             self._on_save_as()
             return
-        from PySide6.QtWidgets import QMessageBox
-
+        from rheojax.gui.compat import QMessageBox
         from rheojax.gui.foundation.project_codec import save_project_v2
 
         try:
@@ -390,11 +392,12 @@ class WorkspaceWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", str(exc))
             return
         self._state.project.dirty = False
+        self.statusBar().show_message("Project saved", 2000)
 
     def _on_save_as(self) -> None:
         if self._blocked_by_active_jobs("save"):
             return
-        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from rheojax.gui.compat import QFileDialog, QMessageBox
 
         path, _ = QFileDialog.getSaveFileName(
             self, "Save Project As", "", "RheoJAX Project (*.rheojax)"
@@ -410,6 +413,7 @@ class WorkspaceWindow(QMainWindow):
             self._state.project.path = path
             self._state.project.name = Path(path).stem
             self._state.project.dirty = False
+            self.statusBar().show_message("Project saved", 2000)
 
     def _on_close(self) -> None:
         self._maybe_confirm_active_jobs(
@@ -867,18 +871,21 @@ class WorkspaceWindow(QMainWindow):
         self._tx_btn.setChecked(self._mode == "transform")
         self._pipeline_btn.setChecked(self._mode == "pipeline")
 
-    def _refresh_status_label(self) -> None:
+    def _refresh_status_bar(self) -> None:
         # ponytail: "active project" status deferred — needs the Plan 3/4
         # AppState.project slice, which doesn't exist yet (spec §4.3).
         try:
             from rheojax.gui.utils.jax_utils import get_jax_info
 
             info = get_jax_info()
-            fp = "float64 ✓" if info.get("float64_enabled") else "float64 ✗"
-            device = info.get("default_device", "?")
-            self._status_label.setText(f"{fp}  |  {device}")
+            self.statusBar().update_jax_status(
+                device=info.get("default_device", "?"),
+                memory_used=info.get("memory_used_mb", 0),
+                memory_total=info.get("memory_total_mb", 0),
+                float64_enabled=info.get("float64_enabled", False),
+            )
         except Exception:
-            self._status_label.setText("")
+            pass
 
     def fit_bodies(self) -> list[QWidget]:
         return self._fit_bodies
