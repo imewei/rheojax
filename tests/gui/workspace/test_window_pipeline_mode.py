@@ -95,3 +95,31 @@ def test_run_all_ignored_while_batch_already_running(qtbot, monkeypatch):
     win._on_pipeline_run_requested()
 
     assert start_calls == []
+
+
+def test_run_all_double_click_starts_only_one_runner(qtbot, monkeypatch):
+    # Regression test: PipelineBatchRunner.run() only writes its first per-dataset
+    # active_jobs entry once it actually executes on a worker thread -- QThreadPool.start()
+    # doesn't guarantee that happens before it returns. Mocking start() as a no-op
+    # (like test_run_all_ignored_while_batch_already_running above) simulates exactly
+    # that gap: active_jobs stays whatever _on_pipeline_run_requested itself wrote,
+    # since the runner body never runs. A second call in that gap must still be
+    # ignored, not start a second runner.
+    from PySide6.QtCore import QThreadPool
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win.set_mode("pipeline")
+
+    start_calls = []
+    monkeypatch.setattr(
+        QThreadPool.globalInstance(),
+        "start",
+        lambda *a, **kw: start_calls.append((a, kw)),
+    )
+
+    win._on_pipeline_run_requested()
+    win._on_pipeline_run_requested()
+
+    assert len(start_calls) == 1

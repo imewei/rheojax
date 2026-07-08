@@ -112,6 +112,13 @@ class PlotCanvas(QWidget):
                 self.canvas.callbacks.callbacks.clear()
                 # Neuter the timer-based draw_idle so it becomes a no-op.
                 self.canvas.draw_idle = lambda: None
+        except RuntimeError:
+            pass  # C++ object already deleted
+
+        # Independent try/except: a RuntimeError above (deleted C++ canvas)
+        # must not skip figure cleanup, or the Figure leaks (matplotlib
+        # keeps every unclosed Figure alive in its global registry).
+        try:
             if hasattr(self, "figure") and self.figure is not None:
                 plt.close(self.figure)
         except RuntimeError:

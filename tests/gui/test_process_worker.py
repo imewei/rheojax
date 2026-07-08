@@ -679,6 +679,54 @@ class TestResultReconstruction:
 # ===========================================================================
 
 
+class TestFitWorkerSignalsElapsedMsgLock:
+    """GUI-P1-001 regression: _pending_elapsed_msg must be lock-guarded.
+
+    Written from the elapsed-timer thread, read/cleared on the GUI thread
+    inside _emit_progress_elapsed. Without a lock this is a data race
+    (unlike BayesianWorkerSignals, which already uses _elapsed_lock).
+    """
+
+    def test_has_elapsed_lock(self):
+        import threading
+
+        from rheojax.gui.jobs.fit_worker import FitWorkerSignals
+
+        signals = FitWorkerSignals()
+        assert isinstance(signals._elapsed_lock, type(threading.Lock()))
+
+    def test_concurrent_writes_and_reads_are_race_free(self):
+        import threading
+
+        from rheojax.gui.jobs.fit_worker import FitWorkerSignals
+
+        signals = FitWorkerSignals()
+        errors = []
+        stop = threading.Event()
+
+        def writer():
+            i = 0
+            while not stop.is_set():
+                with signals._elapsed_lock:
+                    signals._pending_elapsed_msg = f"elapsed {i}s"
+                i += 1
+
+        def reader():
+            try:
+                for _ in range(2000):
+                    with signals._elapsed_lock:
+                        _ = signals._pending_elapsed_msg
+            except Exception as exc:  # pragma: no cover - defensive
+                errors.append(exc)
+
+        t = threading.Thread(target=writer, daemon=True)
+        t.start()
+        reader()
+        stop.set()
+        t.join(timeout=1.0)
+        assert errors == []
+
+
 class TestMakeFitWorker:
     """make_fit_worker returns FitWorker in thread mode, ProcessWorkerAdapter otherwise."""
 

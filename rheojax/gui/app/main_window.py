@@ -363,6 +363,11 @@ class RheoJAXMainWindow(QMainWindow):
         signals.dataset_added.connect(self._on_dataset_added_status)
         signals.dataset_added.connect(self._on_dataset_added)
         signals.dataset_added.connect(self.transform_page.refresh_dataset_checklist)
+        # store.py emits dataset_removed on delete, and DatasetTree.remove_dataset()
+        # exists to consume it, but nothing connected them: the tree kept a
+        # stale, still-clickable row after Remove/Delete Dataset, and clicking
+        # it fired dataset_selected(dead_id) for an id no longer in state.datasets.
+        signals.dataset_removed.connect(self.data_tree.remove_dataset)
         signals.pipeline_step_changed.connect(self._on_pipeline_step_changed)
 
         # GUI-016: keep selected pipeline step config in sync with page changes
@@ -842,6 +847,59 @@ class RheoJAXMainWindow(QMainWindow):
         """
         self.log_dock.append_record(logging.INFO, message)
 
+    def _confirm_unsaved_changes(self, action_desc: str) -> bool:
+        """Prompt to save/discard/cancel when there are unsaved changes.
+
+        Shared by every work-losing action (Exit/closeEvent, File>New,
+        File>Open, Open Recent) so each one gets the same GUI-P1-003
+        save-failure handling instead of re-implementing (and drifting
+        from) it independently. Previously only closeEvent checked
+        `_on_save_file()`'s return value; File>New ignored it (silently
+        wiping the project when "Save" failed since save isn't implemented
+        yet), and File>Open / Open Recent skipped the unsaved-changes
+        prompt entirely.
+
+        Returns
+        -------
+        bool
+            True if the caller should proceed (changes were saved,
+            discarded, or there were none). False if the action should be
+            aborted.
+        """
+        if not self._has_unsaved_changes:
+            return True
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            f"You have unsaved changes. Do you want to save before {action_desc}?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if reply == QMessageBox.StandardButton.Save:
+            # _on_save_file() returns True when the save completes (or no
+            # changes needed) and False when the save is not implemented /
+            # failed.
+            if self._on_save_file():
+                return True
+            # Save failed or not implemented — give the user a second
+            # chance to explicitly discard or cancel, so data is never
+            # silently lost.
+            discard_reply = QMessageBox.question(
+                self,
+                "Save Failed",
+                "Save could not be completed.\n\n"
+                f"Discard unsaved changes and proceed with {action_desc}?",
+                QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            return discard_reply == QMessageBox.StandardButton.Discard
+        if reply == QMessageBox.StandardButton.Discard:
+            return True
+        return False
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event with cleanup.
 
@@ -851,50 +909,10 @@ class RheoJAXMainWindow(QMainWindow):
             Close event
         """
         logger.debug("Application shutting down")
-        # Check for unsaved changes
-        if self._has_unsaved_changes:
-            reply = QMessageBox.question(
-                self,
-                "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before exiting?",
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
-            )
-
-            if reply == QMessageBox.StandardButton.Save:
-                # GUI-P1-003 fix: only accept if save succeeds.  _on_save_file
-                # returns True when the save completes (or no changes needed)
-                # and False when the save is not implemented / failed.
-                saved = self._on_save_file()
-                if saved:
-                    event.accept()
-                else:
-                    # Save failed or not implemented — give the user a second
-                    # chance to explicitly discard or cancel, so data is never
-                    # silently lost.
-                    discard_reply = QMessageBox.question(
-                        self,
-                        "Save Failed",
-                        "Save could not be completed.\n\n"
-                        "Discard unsaved changes and close anyway?",
-                        QMessageBox.StandardButton.Discard
-                        | QMessageBox.StandardButton.Cancel,
-                        QMessageBox.StandardButton.Cancel,
-                    )
-                    if discard_reply == QMessageBox.StandardButton.Discard:
-                        event.accept()
-                    else:
-                        logger.debug("Shutdown cancelled after failed save")
-                        event.ignore()
-                        return
-            elif reply == QMessageBox.StandardButton.Discard:
-                event.accept()
-            else:
-                logger.debug("Shutdown cancelled by user")
-                event.ignore()
-                return
+        if not self._confirm_unsaved_changes("exiting"):
+            logger.debug("Shutdown cancelled")
+            event.ignore()
+            return
 
         # GUI-P1-006: flip the guard before any teardown so worker/relay
         # callbacks queued for delivery during the drain loop below (or that
@@ -983,6 +1001,7 @@ class RheoJAXMainWindow(QMainWindow):
                     ("dataset_added", self._on_dataset_added_status),
                     ("dataset_added", self._on_dataset_added),
                     ("dataset_added", self.transform_page.refresh_dataset_checklist),
+                    ("dataset_removed", self.data_tree.remove_dataset),
                     ("pipeline_step_changed", self._on_pipeline_step_changed),
                     # GUI-016 connections made in _connect_state_signals().
                     ("model_selected", self._sync_fit_step_config),
@@ -1045,6 +1064,16 @@ class RheoJAXMainWindow(QMainWindow):
         # Sync pipeline chips
         self._update_pipeline_chips_from_state(state)
 
+        # Sync Undo/Redo menu enablement -- both actions were set disabled at
+        # construction and nothing was re-enabling them (store.py fully
+        # supports undo/redo and can_undo()/can_redo() already existed as
+        # selectors), so a working feature was completely unreachable from
+        # the menu or its Ctrl+Z/Ctrl+Y shortcuts.
+        from rheojax.gui.state import selectors
+
+        self.menu_bar.undo_action.setEnabled(selectors.can_undo())
+        self.menu_bar.redo_action.setEnabled(selectors.can_redo())
+
         # Update workflow mode
         if state.workflow_mode != self._current_workflow_mode:
             previous_mode = self._current_workflow_mode
@@ -1065,19 +1094,8 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_new_file(self) -> None:
         """Handle new file action."""
         logger.debug("New file action triggered")
-        if self._has_unsaved_changes:
-            reply = QMessageBox.question(
-                self,
-                "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before creating a new project?",
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-            )
-            if reply == QMessageBox.StandardButton.Save:
-                self._on_save_file()
-            elif reply == QMessageBox.StandardButton.Cancel:
-                return
+        if not self._confirm_unsaved_changes("creating a new project"):
+            return
 
         self.store.dispatch("NEW_PROJECT")
         self.log("Created new project")
@@ -1088,6 +1106,8 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_open_file(self) -> None:
         """Handle open file action."""
         logger.debug("Open file action triggered")
+        if not self._confirm_unsaved_changes("opening another project"):
+            return
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Project",
@@ -1095,10 +1115,24 @@ class RheoJAXMainWindow(QMainWindow):
             "RheoJAX Project (*.rheojax);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
         )
         if file_path:
-            self.log(f"Opening project: {file_path}")
-            logger.info("Opening project", file_path=file_path)
-            self.store.dispatch("LOAD_PROJECT", {"file_path": file_path})
-            self.status_bar.show_message(f"Opened: {file_path}", 3000)
+            # GUI-P1: LOAD_PROJECT's reducer only updates project_path/
+            # project_name/recents -- it never restores datasets/results
+            # (there is no codec bridging this legacy StateStore AppState to
+            # the versioned .rheojax v2 archive; that codec targets the
+            # workspace shell's foundation.state.AppState only). Dispatching
+            # it and reporting "Opened" would tell the user their project
+            # was restored when the previous/empty state is still active.
+            # Match the same not-implemented messaging as Save (see
+            # _on_save_file) until legacy project loading exists.
+            logger.warning("Open file action: not yet implemented", file_path=file_path)
+            QMessageBox.information(
+                self,
+                "Open Not Yet Implemented",
+                "Project open is not yet implemented in this legacy window.\n"
+                "Use 'Import Data' to load a dataset, or launch without "
+                "--legacy to use the workspace shell, which supports "
+                "opening .rheojax projects.",
+            )
 
     @Slot()
     def _on_save_file(self) -> bool:
@@ -1171,12 +1205,20 @@ class RheoJAXMainWindow(QMainWindow):
                 f"Recent project is missing:\n{path}",
             )
             return
+        if not self._confirm_unsaved_changes("opening another project"):
+            return
 
-        self.log(f"Opening recent project: {path}")
-        logger.info("Opening recent project", file_path=str(path))
-        self.store.dispatch("LOAD_PROJECT", {"file_path": str(path)})
-        self.navigate_to("data")
-        self.status_bar.show_message(f"Opened: {path.name}", 3000)
+        # GUI-P1: same not-yet-implemented gap as _on_open_file -- LOAD_PROJECT
+        # does not actually restore project contents in this legacy window.
+        logger.warning("Open recent project: not yet implemented", file_path=str(path))
+        QMessageBox.information(
+            self,
+            "Open Not Yet Implemented",
+            "Project open is not yet implemented in this legacy window.\n"
+            "Use 'Import Data' to load a dataset, or launch without "
+            "--legacy to use the workspace shell, which supports "
+            "opening .rheojax projects.",
+        )
 
     @Slot()
     def _on_import(self) -> None:
@@ -1382,7 +1424,15 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_preferences(self) -> None:
         """Handle preferences action."""
         logger.debug("Preferences action triggered")
-        dialog = PreferencesDialog(parent=self)
+        from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+        state = self.store.get_state()
+        current_preferences = {
+            "theme": state.theme,
+            "autosave_enabled": state.auto_save_enabled,
+            "worker_isolation_mode": get_worker_isolation_mode(),
+        }
+        dialog = PreferencesDialog(current_preferences=current_preferences, parent=self)
         if dialog.exec():
             prefs = dialog.get_preferences()
             self.store.dispatch("UPDATE_PREFERENCES", prefs)
@@ -2640,20 +2690,35 @@ class RheoJAXMainWindow(QMainWindow):
             from rheojax.gui.services.transform_service import TransformService
             from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 
-            # Mastercurve / SRFS need all loaded datasets, not just the active one.
+            # Mastercurve / SRFS need multiple datasets -- exactly the ones the
+            # user checked in TransformPage's "Datasets (select 2+)" checklist,
+            # not every loaded dataset. The checklist previously had no effect
+            # at all (checking only 2 of 3 still ran the transform on all 3);
+            # falling back to "all loaded datasets" only when the checklist
+            # itself isn't available (e.g. non-GUI callers / tests) preserves
+            # prior behavior for those callers.
             if transform_id in self._MULTI_DATASET_TRANSFORMS:
                 state = self.store.get_state()
                 all_datasets = state.datasets or {}
-                if len(all_datasets) < 2:
+                checked_ids = self.transform_page.get_checked_dataset_ids()
+                if checked_ids:
+                    selected_datasets = {
+                        ds_id: all_datasets[ds_id]
+                        for ds_id in checked_ids
+                        if ds_id in all_datasets
+                    }
+                else:
+                    selected_datasets = all_datasets
+                if len(selected_datasets) < 2:
                     self.status_bar.show_message(
                         f"{transform_id} requires at least 2 datasets "
-                        f"(loaded {len(all_datasets)})",
+                        f"(selected {len(selected_datasets)})",
                         5000,
                     )
                     return
                 rheo_data = [
                     rheodata_from_dataset_state(ds)
-                    for ds in all_datasets.values()
+                    for ds in selected_datasets.values()
                     if ds.x_data is not None and ds.y_data is not None
                 ]
             else:
@@ -3461,8 +3526,17 @@ class RheoJAXMainWindow(QMainWindow):
             state = self.store.get_state()
             if state.auto_save_enabled and state.project_path:
                 project_path = state.project_path
-                logger.debug("Auto-saving project", path=str(project_path))
-                self.store.dispatch("SAVE_PROJECT", {"file_path": str(project_path)})
+                # GUI-P1: SAVE_PROJECT's reducer only clears is_modified -- it
+                # performs no serialization (project save is not yet
+                # implemented in this legacy window; see _on_save_file).
+                # Dispatching it here would mark unsaved work as "saved"
+                # without writing the project to disk. Skip it; the artifact
+                # exports below are real files but are not a project save.
+                logger.debug(
+                    "Auto-save: project serialization not yet implemented, "
+                    "exporting artifacts only",
+                    path=str(project_path),
+                )
 
                 # Export artifacts: parameters, plot, and Bayesian posterior if available
                 fit_result = self.store.get_active_fit_result()

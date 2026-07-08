@@ -419,6 +419,34 @@ class TestDialogIntegration:
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
+    def test_preferences_dialog_seeded_with_current_state(self, qtbot, qapp) -> None:
+        """_on_preferences must pass the StateStore's current settings into
+        PreferencesDialog -- an empty current_preferences dict makes the
+        dialog fall back to hardcoded defaults (e.g. Light theme), and
+        saving it then overwrites the user's real settings (GUI-P1)."""
+        from dataclasses import replace
+        from unittest.mock import patch
+
+        from rheojax.gui.app.main_window import RheoJAXMainWindow
+
+        window = RheoJAXMainWindow()
+        qtbot.addWidget(window)
+        dark_state = replace(window.store.get_state(), theme="dark")
+
+        with (
+            patch.object(window.store, "get_state", return_value=dark_state),
+            patch(
+                "rheojax.gui.app.main_window.PreferencesDialog"
+            ) as mock_dialog_cls,
+        ):
+            mock_dialog_cls.return_value.exec.return_value = False
+            window._on_preferences()
+
+        _, kwargs = mock_dialog_cls.call_args
+        assert kwargs.get("current_preferences", {}).get("theme") == "dark"
+
+    @pytest.mark.smoke
+    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
     def test_about_dialog_accessible(self, qtbot, qapp) -> None:
         """Verify AboutDialog can be imported and instantiated."""
         from rheojax.gui.dialogs.about import AboutDialog
@@ -470,3 +498,52 @@ class TestActionCountConsistency:
         assert len(unconnected) == 0, (
             f"Found {len(unconnected)} unconnected menu actions: {unconnected}"
         )
+
+
+class TestUndoRedoEnablement:
+    """Regression: Undo/Redo were permanently disabled despite full store support.
+
+    Both QActions were constructed with setEnabled(False) and nothing ever
+    re-enabled them, so a working undo/redo feature (store.py's undo()/redo()
+    plus the can_undo()/can_redo() selectors) was completely unreachable from
+    the Edit menu or its Ctrl+Z/Ctrl+Y shortcuts.
+    """
+
+    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
+    def test_undo_redo_disabled_with_empty_history(self, qtbot, qapp) -> None:
+        from rheojax.gui.app.main_window import RheoJAXMainWindow
+
+        window = RheoJAXMainWindow()
+        qtbot.addWidget(window)
+
+        assert window.menu_bar.undo_action.isEnabled() is False
+        assert window.menu_bar.redo_action.isEnabled() is False
+
+    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
+    def test_undo_action_enables_after_undoable_dispatch(self, qtbot, qapp) -> None:
+        # Exercises _on_state_changed's enable-state sync directly rather
+        # than via a real dispatch: SET_THEME (or any theme-changing action)
+        # also fires signals.theme_changed -> _apply_theme, which applies a
+        # real app-wide stylesheet and triggers a full relayout -- harmless
+        # alone, but when this file's earlier tests have left matplotlib
+        # canvas widgets (bayesian_page/diagnostics_page) alive, that
+        # relayout can drive a pre-existing matplotlib Qt-backend
+        # sizeHint/minimumSizeHint mutual-recursion bug into a 120s hang.
+        # can_undo()/can_redo() are unrelated to theme state, so a direct
+        # call is both a tighter unit test and side-effect-free.
+        from unittest.mock import patch
+
+        from rheojax.gui.app.main_window import RheoJAXMainWindow
+
+        window = RheoJAXMainWindow()
+        qtbot.addWidget(window)
+
+        assert window.menu_bar.undo_action.isEnabled() is False
+
+        with (
+            patch("rheojax.gui.state.selectors.can_undo", return_value=True),
+            patch("rheojax.gui.state.selectors.can_redo", return_value=False),
+        ):
+            window._on_state_changed(window.store.get_state())
+
+        assert window.menu_bar.undo_action.isEnabled() is True

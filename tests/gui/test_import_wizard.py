@@ -4,6 +4,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pandas as pd
 import pytest
 
 pytest.importorskip("PySide6")
@@ -46,5 +47,30 @@ def test_column_mapping_populates_after_background_worker_completes(qapp, tmp_pa
     assert page.x_combo.count() == 3
     assert page.x_combo.itemText(0) == "freq"
     assert wizard._cached_df is not None
+
+    wizard.deleteLater()
+
+
+def test_stale_column_load_result_is_discarded_after_path_change(qapp, tmp_path):
+    """A `_on_columns_loaded` callback carrying a file_path that no longer
+    matches the current `file_path` field (because the user picked a
+    different file before the background read finished) must not populate
+    the combos or overwrite the wizard's cache.
+    """
+    csv_path = tmp_path / "data.csv"
+    csv_path.write_text("freq,G_prime\n1.0,100.0\n")
+
+    wizard = ImportWizard()
+    wizard.file_page.file_path_edit.setText(str(csv_path))
+
+    page = wizard.column_page
+    stale_df = pd.DataFrame({"old_col": [1, 2]})
+
+    # Simulate a worker for a *previous* path completing after the field
+    # already moved on to csv_path.
+    page._on_columns_loaded(stale_df, str(tmp_path / "other.csv"))
+
+    assert page.x_combo.count() == 0
+    assert not hasattr(wizard, "_cached_df")
 
     wizard.deleteLater()

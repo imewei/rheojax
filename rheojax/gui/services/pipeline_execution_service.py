@@ -762,6 +762,16 @@ class PipelineExecutionService(QObject):
             **fit_kwargs,
         )
 
+        # ModelService.fit() catches its own exceptions and returns
+        # FitResult(success=False, ...) rather than raising -- execute_all()/
+        # execute_single_step() only mark a step ERROR when _execute_step()
+        # raises, so an unraised failed fit was previously dispatched as
+        # StepStatus.COMPLETE and the pipeline reported success on a
+        # diverged/failed fit. Raise here so failure propagates the same way
+        # every other step type's failure already does.
+        if not fit_result.success:
+            raise RuntimeError(fit_result.message or "Fit failed")
+
         context["fit_result"] = fit_result
         context["model_name"] = model_name
         return fit_result

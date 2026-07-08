@@ -426,7 +426,10 @@ class PyQtGraphCanvas(QWidget):
             "PNG Image (*.png);;SVG Vector (*.svg);;All Files (*)",
         )
         if file_path:
-            exporter = pg.exporters.ImageExporter(self._plot_item)
+            if file_path.lower().endswith(".svg"):
+                exporter = pg.exporters.SVGExporter(self._plot_item)
+            else:
+                exporter = pg.exporters.ImageExporter(self._plot_item)
             exporter.export(file_path)
             logger.info("Plot exported", path=file_path)
 

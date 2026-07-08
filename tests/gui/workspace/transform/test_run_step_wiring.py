@@ -62,6 +62,43 @@ def test_build_transform_controller_injects_real_run_fn(qapp, monkeypatch):
     assert app.transform.result["input"].x[0] == 0.0
 
 
+def test_run_fn_registers_active_job_during_run(qapp, monkeypatch):
+    # Regression: _make_run_fn never registered the in-flight TransformWorker
+    # in app_state.active_jobs, unlike fit_controller.py's _make_fit_fn/
+    # _make_sample_fn -- so window.py's Close/New/Open active-jobs guard
+    # never saw a running Transform and would rebuild the workspace (discard
+    # `library`/TransformState) out from under it. Assert the job is visible
+    # while the (synchronous, from this thread's perspective) worker signal
+    # fires, and cleared once run() returns.
+    seen_during_run = {}
+
+    def fake_apply_transform(self, name, data, params):
+        seen_during_run["job_count"] = len(app.active_jobs.by_id)
+        seen_during_run["has_worker"] = "worker" in next(
+            iter(app.active_jobs.by_id.values()), {}
+        )
+        return _RheoData([1.0], [2.0])
+
+    monkeypatch.setattr(
+        "rheojax.gui.services.transform_service.TransformService.apply_transform",
+        fake_apply_transform,
+    )
+
+    app = AppState()
+    app.library.add(_ref("d1", "flow_curve"))
+    app.library.store_payload("d1", _RheoData([0.0], [0.0]))
+    app.transform.transform_key = "smooth_derivative"
+    app.transform.slots = {"input": "d1"}
+
+    ctl, bodies = build_transform_controller(app)
+    run_step = bodies[2]
+    run_step.run()
+
+    assert seen_during_run["job_count"] == 1
+    assert seen_during_run["has_worker"] is True
+    assert app.active_jobs.by_id == {}
+
+
 def test_run_fn_raises_on_worker_failure(qapp, monkeypatch):
     def fake_apply_transform(self, name, data, params):
         raise ValueError("bad params")

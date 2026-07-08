@@ -68,6 +68,12 @@ class LogDockWidget(QDockWidget):
         self.text_edit.setReadOnly(True)
         self.text_edit.setMaximumHeight(200)
         self.text_edit.setPlaceholderText("Application logs will appear here...")
+        # Without this, the document grows unboundedly (memory) even though
+        # `_records` is capped at _MAX_RECORDS -- and _rerender() (level-filter
+        # change) clears then replays only the capped deque, so a long session
+        # would visibly "shrink" on the next filter change. Qt trims oldest
+        # blocks automatically once the cap is hit, keeping the two in sync.
+        self.text_edit.document().setMaximumBlockCount(_MAX_RECORDS)
         layout.addWidget(self.text_edit)
 
         self.setWidget(container)

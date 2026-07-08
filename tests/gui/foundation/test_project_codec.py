@@ -337,6 +337,34 @@ def test_round_trip_full_state(tmp_path):
     np.testing.assert_array_equal(loaded.transform.result["output"].x, payload.x)
 
 
+def test_save_project_with_list_valued_transform_input_does_not_crash(tmp_path):
+    # Multi-slot/list-slot transforms (e.g. cox_merz, or any is_list slot) store a
+    # list[RheoData] under transform.result["input"] (transform_controller.py's
+    # _run()/_resolve_slot_data()), not a single RheoData. save_hdf5() only accepts a
+    # single RheoData-like object and raised AttributeError: 'list' object has no
+    # attribute 'x' here, blocking Save entirely after any such transform. The fix
+    # skips persisting a list-valued side instead of crashing -- "output" (always a
+    # single RheoData) still round-trips normally.
+    state = AppState()
+    payload_a = RheoData(x=[1.0, 2.0], y=[1.0, 2.0], initial_test_mode="oscillation")
+    payload_b = RheoData(x=[3.0, 4.0], y=[3.0, 4.0], initial_test_mode="flow_curve")
+    output_payload = RheoData(
+        x=[5.0, 6.0], y=[5.0, 6.0], initial_test_mode="oscillation"
+    )
+    state.transform.result = {
+        "input": [payload_a, payload_b],
+        "output": output_payload,
+        "protocol_type": "oscillation",
+    }
+
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)  # must not raise
+    loaded = load_project_v2(path)
+
+    assert loaded.transform.result.get("input") is None
+    np.testing.assert_array_equal(loaded.transform.result["output"].x, output_payload.x)
+
+
 def test_round_trip_job_history_with_fit_phase_results(tmp_path):
     state = AppState()
     state.job_history.by_id["job1"] = {

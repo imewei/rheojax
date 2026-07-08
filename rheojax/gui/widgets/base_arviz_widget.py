@@ -154,13 +154,21 @@ class BaseArviZWidget(QWidget):
             if self._canvas is not None:
                 self._canvas.callbacks.callbacks.clear()
                 self._canvas.draw_idle = lambda: None
-            for fig in self._pending_cleanup:
-                plt.close(fig)
-            self._pending_cleanup.clear()
-            if self._figure is not None:
-                plt.close(self._figure)
         except RuntimeError:
-            pass  # C++ object already deleted
+            pass  # C++ canvas object already deleted
+
+        for fig in self._pending_cleanup:
+            try:
+                plt.close(fig)
+            except RuntimeError:
+                pass  # C++ object already deleted
+        self._pending_cleanup.clear()
+
+        if self._figure is not None:
+            try:
+                plt.close(self._figure)
+            except RuntimeError:
+                pass  # C++ object already deleted
 
     def closeEvent(self, event) -> None:  # noqa: N802
         """Cancel pending matplotlib draws before the widget is closed."""

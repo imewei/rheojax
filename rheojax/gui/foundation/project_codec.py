@@ -199,7 +199,16 @@ def save_project_v2(state, path: Path) -> None:
         if raw_transform_result:
             for side in ("input", "output"):
                 payload = raw_transform_result.get(side)
-                if payload is None:
+                # "input" is a list[RheoData], not a single RheoData, for
+                # multi-slot/list-slot transforms (transform_controller.py's
+                # _run() -- see _resolve_slot_data()); save_hdf5() only
+                # accepts a single RheoData-like object and raises
+                # AttributeError on a list, which blocked Save entirely.
+                # Nothing is lost by skipping it here: transform_dict already
+                # persists `slots` (the source dataset ids/lineage), and
+                # step4_visualize.py's Input-vs-output overlay already
+                # tolerates a missing/list "input" the same way (no trace).
+                if payload is None or isinstance(payload, list):
                     continue
                 result_id = uuid.uuid4().hex
                 rel = f"transform_results/{result_id}.hdf5"

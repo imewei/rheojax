@@ -6,6 +6,7 @@ from PySide6.QtCore import QEventLoop, QThreadPool
 
 from rheojax.core.registry import TransformRegistry
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.jobs.cancellation import CancellationToken
 from rheojax.gui.jobs.transform_worker import TransformWorker
 from rheojax.gui.workspace.controller import Step, TransformController
 from rheojax.gui.workspace.transform.slots_spec import transform_slots
@@ -68,7 +69,10 @@ def infer_output_protocol(library, transform_key, slots) -> str:
     return library.get(first).protocol_type
 
 
-def _make_run_fn(library):
+_TRANSFORM_JOB_KEY = "transform"
+
+
+def _make_run_fn(library, active_jobs=None):
     def _run(transform_key, slots, config):
         # Snapshot slots up front: the caller's dict is the live, mutable
         # FitState/TransformState.slots object, and loop.exec() below pumps
@@ -78,7 +82,24 @@ def _make_run_fn(library):
         # one `data` was actually resolved from.
         slots = dict(slots)
         data = _resolve_slot_data(library, transform_key, slots)
-        worker = TransformWorker(transform_key, data, params=config)
+        # A real, cancellable token registered in active_jobs -- mirrors
+        # fit_controller.py's _make_fit_fn/_make_sample_fn. Without this,
+        # window.py's _maybe_confirm_active_jobs (Close/New/Open) and
+        # _blocked_by_active_jobs (Save) never see a Transform run as
+        # "active" (active_jobs.by_id stayed empty for this mode), so they
+        # would rebuild/replace the workspace's AppState -- discarding the
+        # very `library`/TransformState this closure still writes into --
+        # while the run is still in flight, or let Save race a torn
+        # snapshot against it.
+        cancel_token = CancellationToken(job_id=_TRANSFORM_JOB_KEY)
+        worker = TransformWorker(
+            transform_key, data, params=config, cancel_token=cancel_token
+        )
+        if active_jobs is not None:
+            active_jobs.by_id[_TRANSFORM_JOB_KEY] = {
+                "status": "running",
+                "worker": cancel_token,
+            }
         loop = QEventLoop()
         outcome: dict = {}
 
@@ -98,7 +119,11 @@ def _make_run_fn(library):
         worker.signals.failed.connect(_on_failed)
         worker.signals.cancelled.connect(_on_cancelled)
         QThreadPool.globalInstance().start(worker)
-        loop.exec()
+        try:
+            loop.exec()
+        finally:
+            if active_jobs is not None:
+                active_jobs.by_id.pop(_TRANSFORM_JOB_KEY, None)
 
         if "error" in outcome:
             raise RuntimeError(outcome["error"])
@@ -126,7 +151,7 @@ def build_transform_controller(app_state: AppState):
     bodies = [
         TransformPickStep(st),
         SlotsStep(st, app_state.library),
-        RunStep(st, run_fn=_make_run_fn(app_state.library)),
+        RunStep(st, run_fn=_make_run_fn(app_state.library, app_state.active_jobs)),
         TransformVisualizeStep(st),
         TransformExportStep(st, app_state.library),
     ]

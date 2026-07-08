@@ -77,7 +77,10 @@ class FitWorkerSignals(QObject):
         # GUI-P1-001: staging buffer for elapsed-timer messages posted via
         # QMetaObject.invokeMethod from a raw threading.Thread.  The buffer is
         # written by the timer thread before invokeMethod is called so the slot
-        # sees the latest message when it runs on the GUI thread.
+        # sees the latest message when it runs on the GUI thread. Guarded by a
+        # lock since the write happens on the timer thread while the read/clear
+        # happens on the GUI thread (mirrors BayesianWorkerSignals).
+        self._elapsed_lock = threading.Lock()
         self._pending_elapsed_msg: str = ""
 
     @Slot()
@@ -88,7 +91,8 @@ class FitWorkerSignals(QObject):
         from _elapsed_timer so that the progress signal is always emitted
         from the main Qt thread, regardless of which OS thread triggered it.
         """
-        msg = self._pending_elapsed_msg
+        with self._elapsed_lock:
+            msg = self._pending_elapsed_msg
         if msg:
             self.progress.emit(0, 0, msg)
 
@@ -266,7 +270,8 @@ class FitWorker(QRunnable):
                         if _use_invoke:
                             # Write buffer BEFORE invokeMethod to avoid race where
                             # the slot runs before the buffer is populated.
-                            self.signals._pending_elapsed_msg = msg
+                            with self.signals._elapsed_lock:
+                                self.signals._pending_elapsed_msg = msg
                             QMetaObject.invokeMethod(
                                 self.signals,
                                 "_emit_progress_elapsed",

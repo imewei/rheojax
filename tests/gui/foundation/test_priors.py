@@ -100,9 +100,18 @@ def test_map_centered_priors_zero_value_fallback():
 
 
 def test_map_centered_priors_negative_value():
-    """Negative MAP value uses abs() so loc = log(|val|)."""
+    """Negative MAP value gets a Normal prior, not LogNormal.
+
+    Regression: LogNormal's support is (0, inf), so a LogNormal prior with
+    loc=log(|val|) places zero density at the true negative MAP value
+    (dropping the sign didn't just get `loc` wrong -- the whole distribution
+    family can't represent a negative value). A Normal prior centered on the
+    actual value can.
+    """
     pri = map_centered_priors({"x": -50.0})
-    assert abs(pri["x"]["loc"] - math.log(50.0)) < 1e-12
+    assert pri["x"]["type"] == "normal"
+    assert pri["x"]["loc"] == -50.0
+    assert pri["x"]["scale"] == 50.0
 
 
 def test_map_centered_priors_empty():

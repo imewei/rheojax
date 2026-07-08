@@ -1160,12 +1160,25 @@ class WorkspaceWindow(QMainWindow):
             # stop event and race active_jobs/DatasetLibrary from two worker threads.
             return
 
+        import uuid
+
         from PySide6.QtCore import QThreadPool
 
         from rheojax.gui.workspace.pipeline.batch_runner import PipelineBatchRunner
 
         pipeline_state = self._state.pipeline
         self._pipeline_stop_event = threading.Event()
+        # Register a batch sentinel synchronously on the GUI thread, under the same
+        # lock the above guard reads, before QThreadPool.start() can even schedule the
+        # runner -- PipelineBatchRunner.run() only writes its first per-dataset
+        # active_jobs entry once it actually starts executing on a worker thread,
+        # which QThreadPool.start() does not guarantee happens before it returns. Without
+        # this, a second "Run All" click landing in that gap would see an empty
+        # active_jobs and start a second runner. PipelineBatchRunner pops this key
+        # itself once the batch reaches a terminal state (batch_runner.py's run()).
+        batch_job_id = f"pipeline_batch:{uuid.uuid4().hex}"
+        with self._state.active_jobs.lock:
+            self._state.active_jobs.by_id[batch_job_id] = {"status": "starting"}
         runner = PipelineBatchRunner(
             service=self._pipeline_service,
             steps=pipeline_state.steps,
@@ -1173,5 +1186,6 @@ class WorkspaceWindow(QMainWindow):
             library=self._state.library,
             stop_requested=self._pipeline_stop_event,
             app_state=self._state,
+            batch_job_id=batch_job_id,
         )
         QThreadPool.globalInstance().start(runner)
