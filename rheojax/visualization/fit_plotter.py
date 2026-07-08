@@ -11,6 +11,7 @@ visualizations of model fitting results, including:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -187,7 +188,7 @@ def generate_diagnostic_suite(
     prefix: str = "mcmc",
     formats: tuple[str, ...] = ("pdf", "png"),
     dpi: int = 300,
-) -> dict[str, Figure | Path]:
+) -> Mapping[str, Figure | Path]:
     """Generate complete ArviZ MCMC diagnostic suite (6 plots).
 
     Produces the standard set of MCMC diagnostics:
@@ -679,6 +680,8 @@ class FitPlotter:
         band_label = f"{int(credible_level * 100)}% CI"
         model_name = getattr(model, "__class__", type(model)).__name__
 
+        fig: Figure
+        axes: Axes | np.ndarray
         if is_complex:
             fig, axes = self._plot_complex_fit(
                 x_data,
@@ -767,7 +770,7 @@ class FitPlotter:
                             pcov,
                             confidence=nlsq_confidence,
                         )
-                        if nlsq_lower is not None:
+                        if nlsq_lower is not None and nlsq_upper is not None:
                             ax_main.fill_between(
                                 x_pred,
                                 nlsq_lower,
@@ -917,7 +920,7 @@ class FitPlotter:
                 pcov,
                 confidence=confidence,
             )
-            if nlsq_lower is not None:
+            if nlsq_lower is not None and nlsq_upper is not None:
                 axes[0].fill_between(
                     x_pred,
                     nlsq_lower,
@@ -990,7 +993,7 @@ class FitPlotter:
         prefix: str = "mcmc",
         formats: tuple[str, ...] = ("pdf", "png"),
         dpi: int = 300,
-    ) -> dict[str, Figure | Path]:
+    ) -> Mapping[str, Figure | Path]:
         """Generate ArviZ diagnostic suite. Delegates to generate_diagnostic_suite()."""
         return generate_diagnostic_suite(
             bayesian_result=bayesian_result,
@@ -1050,6 +1053,10 @@ class FitPlotter:
             if fit_result is not None:
                 param_names = list(fit_result.params.keys())
             else:
+                # fit_result is None here, and the guard above already raised
+                # unless at least one of fit_result/bayesian_result is set —
+                # so bayesian_result must be non-None.
+                assert bayesian_result is not None
                 param_names = [
                     k
                     for k in bayesian_result.posterior_samples

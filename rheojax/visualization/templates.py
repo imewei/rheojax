@@ -600,6 +600,9 @@ def plot_model_fit(
                     x_units=data.x_units,
                     style=style,
                 )
+                # plot_residuals() returns an ndarray of 2 axes whenever both
+                # y_true and y_pred are given (as above), never a single Axes.
+                assert isinstance(axes, np.ndarray)
 
                 if model_name:
                     axes[0].set_title(f"Model Fit: {model_name}")

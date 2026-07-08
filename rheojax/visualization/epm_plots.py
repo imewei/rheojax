@@ -19,6 +19,18 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
+def _get_figure(ax: plt.Axes) -> plt.Figure:
+    """Return ax's parent Figure, narrowed from matplotlib's Figure|SubFigure|None stub.
+
+    Axes in this module are always created directly on a top-level Figure
+    (never as a child of a SubFigure), so the narrower type always holds here.
+    """
+    fig = ax.get_figure()
+    if not isinstance(fig, plt.Figure):
+        raise RuntimeError("Axes is not attached to a top-level Figure")
+    return fig
+
+
 def _plot_scalar_lattice(
     stress: np.ndarray,
     thresholds: np.ndarray,
@@ -351,7 +363,7 @@ def plot_normal_stress_field(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()
+        fig = _get_figure(ax)
 
     # Plot with symmetric colormap centered at 0
     # VIZ-R6-008: Guard against all-zero N1 (degenerate vmin=vmax=0)
@@ -426,7 +438,7 @@ def plot_von_mises_field(
         if not isinstance(ax, (list, tuple, np.ndarray)) or len(ax) != 2:
             raise ValueError("If ax provided, must be list/tuple/array of 2 axes")
         axes = ax
-        fig = axes[0].get_figure()
+        fig = _get_figure(axes[0])
 
     # Left panel: σ_eff with viridis (sequential)
     im1 = axes[0].imshow(sigma_eff, cmap="viridis", origin="lower", **kwargs)
@@ -490,7 +502,7 @@ def plot_normal_stress_ratio(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.get_figure()
+        fig = _get_figure(ax)
 
     # VIZ-017: warn about negative ratio values that loglog will silently drop
     negative_count = np.sum(ratio < 0)
