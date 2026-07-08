@@ -95,9 +95,10 @@ class RheoData:
             validate=self.validate,
         )
 
-        # Normalize metadata container (defensive — callers may pass None explicitly)
+        # Normalize metadata container (defensive — callers may pass None explicitly,
+        # bypassing the type checker since dataclasses do not validate at runtime).
         if self.metadata is None:
-            self.metadata = {}
+            self.metadata = {}  # type: ignore[unreachable]
 
         # Persist explicitly provided test mode into metadata and internal cache
         if initial_test_mode is not None:
@@ -259,10 +260,13 @@ class RheoData:
         logger.debug(
             "Converting RheoData to JAX arrays", from_type="numpy", to_type="jax"
         )
-        y_dtype = jnp.complex128 if np.iscomplexobj(self.y) else jnp.float64
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.to_jax() requires non-None x and y data")
+        x, y = self.x, self.y
+        y_dtype = jnp.complex128 if np.iscomplexobj(y) else jnp.float64
         result = RheoData(
-            x=jnp.array(self.x, dtype=jnp.float64),
-            y=jnp.array(self.y, dtype=y_dtype),
+            x=jnp.array(x, dtype=jnp.float64),
+            y=jnp.array(y, dtype=y_dtype),
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
@@ -308,9 +312,12 @@ class RheoData:
             Copy of the RheoData instance
         """
         logger.debug("Creating copy of RheoData")
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.copy() requires non-None x and y data")
+        x, y = self.x, self.y
         return RheoData(
-            x=self.x.copy() if hasattr(self.x, "copy") else self.x,
-            y=self.y.copy() if hasattr(self.y, "copy") else self.y,
+            x=x.copy() if hasattr(x, "copy") else x,
+            y=y.copy() if hasattr(y, "copy") else y,
             x_units=self.x_units,
             y_units=self.y_units,
             domain=self.domain,
@@ -345,8 +352,11 @@ class RheoData:
             Dictionary with data and metadata
         """
         logger.debug("Converting RheoData to dictionary")
-        x_data = self.x.tolist() if hasattr(self.x, "tolist") else list(self.x)
-        y_arr = np.asarray(self.y)
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.to_dict() requires non-None x and y data")
+        x, y = self.x, self.y
+        x_data = x.tolist() if hasattr(x, "tolist") else list(x)
+        y_arr = np.asarray(y)
 
         data_dict: dict[str, Any] = {
             "x": x_data,
@@ -427,6 +437,8 @@ class RheoData:
     def modulus(self) -> np.ndarray | None:
         """Get modulus of complex data."""
         if self.is_complex:
+            if self.y is None:
+                raise ValueError("RheoData.modulus requires non-None y data")
             return np.abs(self.y)
         return None
 
@@ -434,6 +446,8 @@ class RheoData:
     def phase(self) -> np.ndarray | None:
         """Get phase of complex data."""
         if self.is_complex:
+            if self.y is None:
+                raise ValueError("RheoData.phase requires non-None y data")
             return np.angle(self.y)
         return None
 
@@ -452,11 +466,20 @@ class RheoData:
             >>> G_prime = data[0].y_real  # Storage modulus (G')
             >>> plt.loglog(data[0].x, G_prime, label="G'")
         """
+        if self.y is None:
+            raise ValueError("RheoData.y_real requires non-None y data")
+        y = self.y
         if self.is_complex:
-            if isinstance(self.y, jnp.ndarray):
-                return jnp.real(self.y)
-            return np.real(self.y)
-        return self.y
+            if isinstance(y, jnp.ndarray):
+                return jnp.real(y)
+            return np.real(y)
+        # Invariant: __post_init__ always converts x/y via _ensure_array, so y is
+        # never a bare list/tuple here — narrow for mypy, raise loudly if violated.
+        if not isinstance(y, (np.ndarray, jnp.ndarray)):
+            raise TypeError(
+                f"RheoData.y_real: expected a converted ndarray, got {type(y).__name__}"
+            )
+        return y
 
     @property
     def y_imag(self) -> np.ndarray | jnp_typing.ndarray:
@@ -473,16 +496,19 @@ class RheoData:
             >>> G_double_prime = data[0].y_imag  # Loss modulus (G'')
             >>> plt.loglog(data[0].x, G_double_prime, label='G"')
         """
+        if self.y is None:
+            raise ValueError("RheoData.y_imag requires non-None y data")
+        y = self.y
         if self.is_complex:
-            if isinstance(self.y, jnp.ndarray):
-                return jnp.imag(self.y)
-            return np.imag(self.y)
-        if isinstance(self.y, jnp.ndarray):
-            return jnp.zeros_like(self.y)
-        return np.zeros_like(self.y)
+            if isinstance(y, jnp.ndarray):
+                return jnp.imag(y)
+            return np.imag(y)
+        if isinstance(y, jnp.ndarray):
+            return jnp.zeros_like(y)
+        return np.zeros_like(y)
 
     @property
-    def storage_modulus(self) -> np.ndarray | None:
+    def storage_modulus(self) -> np.ndarray | jnp_typing.ndarray | None:
         """Get storage modulus (G') from complex modulus data.
 
         Alias for y_real that makes rheological intent explicit.
@@ -499,7 +525,7 @@ class RheoData:
         return None
 
     @property
-    def loss_modulus(self) -> np.ndarray | None:
+    def loss_modulus(self) -> np.ndarray | jnp_typing.ndarray | None:
         """Get loss modulus (G'') from complex modulus data.
 
         Alias for y_imag that makes rheological intent explicit.
@@ -720,10 +746,13 @@ class RheoData:
         )
         new_x = self._ensure_array(new_x)
 
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.interpolate() requires non-None x and y data")
+
         # Sort data into ascending x order for np.interp/jnp.interp compatibility
         # (both functions assume strictly increasing x)
-        x_for_interp = self.x
-        y_for_interp = self.y
+        x_for_interp: ArrayLike = self.x
+        y_for_interp: ArrayLike = self.y
         if len(x_for_interp) > 1:
             x_np = _coerce_ndarray(x_for_interp)
             diffs = np.diff(x_np)
@@ -811,22 +840,26 @@ class RheoData:
         # Simple moving average
         kernel = np.ones(window_size) / window_size
 
-        if np.iscomplexobj(self.y):
+        if self.y is None:
+            raise ValueError("RheoData.smooth() requires non-None y data")
+        y = self.y
+
+        if np.iscomplexobj(y):
             # Complex data: convolve real and imaginary parts separately.
             # jnp.convolve and np.convolve may not handle complex arrays correctly.
-            if isinstance(self.y, jnp.ndarray):
-                smoothed_real = jnp.convolve(jnp.real(self.y), kernel, mode="same")
-                smoothed_imag = jnp.convolve(jnp.imag(self.y), kernel, mode="same")
+            if isinstance(y, jnp.ndarray):
+                smoothed_real = jnp.convolve(jnp.real(y), kernel, mode="same")
+                smoothed_imag = jnp.convolve(jnp.imag(y), kernel, mode="same")
             else:
-                smoothed_real = np.convolve(np.real(self.y), kernel, mode="same")
-                smoothed_imag = np.convolve(np.imag(self.y), kernel, mode="same")
+                smoothed_real = np.convolve(np.real(y), kernel, mode="same")
+                smoothed_imag = np.convolve(np.imag(y), kernel, mode="same")
             smoothed_y = smoothed_real + 1j * smoothed_imag
-        elif isinstance(self.y, jnp.ndarray):
+        elif isinstance(y, jnp.ndarray):
             # Use JAX convolution
-            smoothed_y = jnp.convolve(self.y, kernel, mode="same")
+            smoothed_y = jnp.convolve(y, kernel, mode="same")
         else:
             # Use NumPy convolution
-            smoothed_y = np.convolve(self.y, kernel, mode="same")
+            smoothed_y = np.convolve(y, kernel, mode="same")
 
         return RheoData(
             x=self.x,
@@ -846,19 +879,22 @@ class RheoData:
             RheoData with derivative values
         """
         logger.debug("Computing numerical derivative")
-        if np.iscomplexobj(self.y):
-            if isinstance(self.y, jnp.ndarray):
-                dy_dx = jnp.gradient(jnp.real(self.y), self.x) + 1j * jnp.gradient(
-                    jnp.imag(self.y), self.x
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.derivative() requires non-None x and y data")
+        x, y = self.x, self.y
+        if np.iscomplexobj(y):
+            if isinstance(y, jnp.ndarray):
+                dy_dx = jnp.gradient(jnp.real(y), x) + 1j * jnp.gradient(
+                    jnp.imag(y), x
                 )
             else:
-                dy_dx = np.gradient(np.real(self.y), self.x) + 1j * np.gradient(
-                    np.imag(self.y), self.x
+                dy_dx = np.gradient(np.real(y), x) + 1j * np.gradient(
+                    np.imag(y), x
                 )
-        elif isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
-            dy_dx = jnp.gradient(self.y, self.x)
+        elif isinstance(x, jnp.ndarray) or isinstance(y, jnp.ndarray):
+            dy_dx = jnp.gradient(y, x)
         else:
-            dy_dx = np.gradient(self.y, self.x)
+            dy_dx = np.gradient(y, x)
 
         return RheoData(
             x=self.x,
@@ -882,19 +918,22 @@ class RheoData:
             RheoData with integrated values
         """
         logger.debug("Computing numerical integral")
-        if isinstance(self.x, jnp.ndarray) or isinstance(self.y, jnp.ndarray):
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.integral() requires non-None x and y data")
+        x, y = self.x, self.y
+        if isinstance(x, jnp.ndarray) or isinstance(y, jnp.ndarray):
             # JAX has no cumulative_trapezoid; compute manually via
             # trapezoidal rule: I[0]=0, I[k] = I[k-1] + (y[k-1]+y[k])/2 * dx[k]
-            dx = jnp.diff(self.x)
-            avg_y = (self.y[:-1] + self.y[1:]) / 2.0  # type: ignore[operator]
+            dx = jnp.diff(x)
+            avg_y = (y[:-1] + y[1:]) / 2.0  # type: ignore[operator]
             integrated = jnp.concatenate(
-                [jnp.zeros(1, dtype=self.y.dtype), jnp.cumsum(avg_y * dx)]  # type: ignore[union-attr]
+                [jnp.zeros(1, dtype=y.dtype), jnp.cumsum(avg_y * dx)]  # type: ignore[union-attr]
             )
         else:
             # Use NumPy/SciPy cumulative trapezoid
             from scipy.integrate import cumulative_trapezoid
 
-            integrated = cumulative_trapezoid(self.y, self.x, initial=0)
+            integrated = cumulative_trapezoid(y, x, initial=0)
 
         return RheoData(
             x=self.x,
@@ -960,8 +999,11 @@ class RheoData:
             Sliced RheoData
         """
         logger.debug("Slicing data by x range", start=start, end=end)
+        if self.x is None or self.y is None:
+            raise ValueError("RheoData.slice() requires non-None x and y data")
+        x, y = self.x, self.y
         # Use np.asarray only for mask computation — preserves JAX or NumPy array type
-        x_np = np.asarray(self.x)
+        x_np = np.asarray(x)
 
         mask = np.ones_like(x_np, dtype=bool)
 
@@ -970,8 +1012,8 @@ class RheoData:
         if end is not None:
             mask &= x_np <= end
 
-        sliced_x = self.x[mask]
-        sliced_y = self.y[mask]
+        sliced_x = x[mask]
+        sliced_y = y[mask]
 
         logger.debug("Sliced data", original_size=len(x_np), new_size=len(sliced_x))
 
@@ -986,7 +1028,7 @@ class RheoData:
             validate=False,
         )
 
-        if len(result.x) == 0:
+        if len(_coerce_ndarray(result.x)) == 0:
             import warnings as _warnings
 
             _warnings.warn(
