@@ -533,7 +533,8 @@ class GeneralizedMaxwell(BaseModel):
                 x_retry = jnp.concatenate([jnp.array([E_inf_guess]), E_init, tau_init])
                 try:
                     result_retry = _run_fit_relax(x_retry)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Multi-start relaxation retry attempt failed: %s", e)
                     continue
                 if float(result_retry.cost) < float(best_result.cost):
                     best_result = result_retry
@@ -1076,7 +1077,8 @@ class GeneralizedMaxwell(BaseModel):
                 x_retry = jnp.concatenate([jnp.array([E_inf_guess]), E_init, tau_init])
                 try:
                     result_retry = _run_fit(x_retry)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Multi-start Prony retry attempt failed: %s", e)
                     continue
                 if float(result_retry.cost) < float(best_result.cost):
                     best_result = result_retry

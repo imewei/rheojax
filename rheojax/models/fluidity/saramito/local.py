@@ -406,8 +406,8 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
                 self._last_fit_r_squared = (
                     float(1 - ss_res / ss_tot) if ss_tot > 0 else None
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Fallback R² computation failed for Saramito transient fit: %s", e)
         if not result.success:
             logger.warning(f"Saramito transient fit warning: {result.message}")
 
