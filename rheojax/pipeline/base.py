@@ -1062,7 +1062,8 @@ class Pipeline:
         self._diagnostic_results = result
 
         # Expose the first diagnostic figure for save_figure() chaining.
-        # generate_diagnostic_suite returns dict[str, Figure | Path].
+        # generate_diagnostic_suite returns Mapping[str, Figure | Path]
+        # (a real dict at runtime).
         if isinstance(result, dict):
             for fig_or_path in result.values():
                 if hasattr(fig_or_path, "savefig"):

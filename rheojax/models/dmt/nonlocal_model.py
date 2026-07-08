@@ -498,6 +498,11 @@ class DMTNonlocal(DMTBase):
             if name in self.parameters.keys():
                 if (v := local_model.parameters.get_value(name)) is not None:
                     self.parameters.set_value(name, v)
+                else:
+                    logger.debug(
+                        "Skipped copying unset local-model parameter",
+                        parameter=name,
+                    )
 
         self._fitted = True
         return self
@@ -523,6 +528,11 @@ class DMTNonlocal(DMTBase):
                 if name in local_model.parameters.keys():
                     if (v := self.parameters.get_value(name)) is not None:
                         local_model.parameters.set_value(name, v)
+                    else:
+                        logger.debug(
+                            "Skipped copying unset parameter to local model",
+                            parameter=name,
+                        )
             return local_model._predict_flow_curve(gamma_dot)
         else:
             # Full nonlocal simulation
