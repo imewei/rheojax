@@ -167,7 +167,11 @@ class Pipeline:
                     self.data = result
 
                 self._apply_test_mode_metadata(self.data, explicit_mode)
-                ctx["n_points"] = len(self.data.x) if self.data else 0
+                ctx["n_points"] = (
+                    len(self.data.x)
+                    if self.data is not None and self.data.x is not None
+                    else 0
+                )
                 ctx["test_mode"] = explicit_mode
 
             except Exception as e:
@@ -226,6 +230,8 @@ class Pipeline:
             try:
                 # Apply transform to full RheoData (not raw y array)
                 # Transforms expect RheoData with x, y, metadata, domain
+                if self.data.x is None:
+                    raise ValueError("Loaded data has no x values.")
                 ctx["input_shape"] = len(self.data.x)
                 pre_transform_data = self.data
                 result = transform_obj.transform(self.data)
@@ -261,8 +267,12 @@ class Pipeline:
         if data is None or mode is None:
             return
 
+        # RheoData.metadata is typed as always-a-dict (never None) and
+        # __post_init__ normalizes any None passed at construction, so this
+        # is genuinely unreachable per the type checker. Kept as
+        # defense-in-depth in case that invariant is ever relaxed.
         if data.metadata is None:
-            data.metadata = {}
+            data.metadata = {}  # type: ignore[unreachable]
 
         data.metadata["test_mode"] = mode
         data.metadata.setdefault("detected_test_mode", mode)
@@ -393,7 +403,9 @@ class Pipeline:
         if X is None:
             if self.data is None:
                 raise ValueError("No data available for prediction.")
-            X = self.data.x
+            if self.data.x is None:
+                raise ValueError("No data available for prediction.")
+            X = np.asarray(self.data.x)
 
         # Convert to numpy for prediction — np.asarray is zero-copy for CPU arrays
         if _is_jax_array(X):
@@ -518,8 +530,11 @@ class Pipeline:
             if _last_fit_steps:
                 _fit_model = _last_fit_steps[-1][1]
                 if hasattr(_fit_model, "parameters"):
+                    # See _apply_test_mode_metadata: RheoData.metadata is
+                    # never None post-construction, so this is unreachable
+                    # per the type checker; kept as defense-in-depth.
                     if self.data.metadata is None:
-                        self.data.metadata = {}
+                        self.data.metadata = {}  # type: ignore[unreachable]
                     for _pname in _fit_model.parameters.keys():
                         try:
                             self.data.metadata[f"fitted_{_pname}"] = float(
@@ -608,7 +623,9 @@ class Pipeline:
                 else:
                     raise ValueError(f"Unknown format: {format}")
 
-                ctx["n_points"] = len(self.data.x)
+                ctx["n_points"] = (
+                    len(self.data.x) if self.data.x is not None else 0
+                )
             except Exception as e:
                 logger.error(
                     "Failed to save data",
@@ -1187,11 +1204,20 @@ class Pipeline:
         if self._last_model is None:
             raise ValueError("No model fitted. Call fit() first.")
 
-        # Extract all parameter values from the model's ParameterSet
-        return {
-            name: self._last_model.parameters.get_value(name)
-            for name in self._last_model.parameters.keys()
-        }
+        # Extract all parameter values from the model's ParameterSet.
+        # get_value() can return None for a declared-but-unset parameter;
+        # surface that as an error rather than silently returning a dict
+        # with a None value where a float is promised.
+        result: dict[str, float] = {}
+        for name in self._last_model.parameters.keys():
+            value = self._last_model.parameters.get_value(name)
+            if value is None:
+                raise ValueError(
+                    f"Parameter '{name}' has no fitted value. "
+                    "Call fit() before get_fitted_parameters()."
+                )
+            result[name] = value
+        return result
 
     def compare_models(
         self,

@@ -231,7 +231,7 @@ class MastercurvePipeline(Pipeline):
         all_y = np.concatenate([np.array(d.y) for d in datasets])
         all_temps = np.concatenate(
             [
-                np.full(len(d.x), temp)
+                np.full(len(np.array(d.x)), temp)
                 for d, temp in zip(datasets, temperatures, strict=True)
             ]
         )
@@ -734,7 +734,7 @@ class CreepToRelaxationPipeline(Pipeline):
         logger.info(
             "Starting creep to relaxation conversion",
             method=method,
-            data_points=len(creep_data.x),
+            data_points=len(np.array(creep_data.x)),
         )
         start_time = time.perf_counter()
 
@@ -857,7 +857,7 @@ class FrequencyToTimePipeline(Pipeline):
         logger.info(
             "Starting frequency to time conversion",
             n_points=n_points,
-            input_points=len(frequency_data.x),
+            input_points=len(np.array(frequency_data.x)),
         )
         start_time = time.perf_counter()
 
@@ -1077,9 +1077,13 @@ class SPPAmplitudeSweepPipeline(Pipeline):
         ):
             amplitude_start = time.perf_counter()
 
-            # Ensure required metadata is present for downstream transforms/models
+            # Ensure required metadata is present for downstream transforms/models.
+            # RheoData.metadata is typed as always-a-dict (never None) and
+            # __post_init__ normalizes any None passed at construction, so this
+            # is genuinely unreachable per the type checker; kept as
+            # defense-in-depth in case that invariant is ever relaxed.
             if data.metadata is None:
-                data.metadata = {}
+                data.metadata = {}  # type: ignore[unreachable]
             data.metadata.setdefault("test_mode", "oscillation")
             data.metadata.setdefault("gamma_0", gamma_0)
             data.metadata.setdefault("omega", self.omega)
