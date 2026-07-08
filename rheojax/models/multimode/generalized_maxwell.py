@@ -148,7 +148,7 @@ class GeneralizedMaxwell(BaseModel):
         test_mode: str | None = None,
         optimization_factor: float | None = 1.5,
         **kwargs,
-    ) -> None:
+    ) -> GeneralizedMaxwell:
         """Fit GMM to data using NLSQ optimization.
 
         Args:
@@ -231,6 +231,8 @@ class GeneralizedMaxwell(BaseModel):
                 modulus_inf=self.parameters.get_value(f"{symbol}_inf"),
             )
 
+        return self
+
     def _nlsq_fit(
         self,
         objective,
@@ -271,16 +273,22 @@ class GeneralizedMaxwell(BaseModel):
         ls = nlsq.LeastSquares()
 
         try:
-            nlsq_result = ls.least_squares(
-                objective,
-                x0=np.asarray(x0),
-                bounds=bounds,
-                method="trf",
-                ftol=ftol,
-                xtol=xtol,
-                gtol=gtol,
-                max_nfev=max_nfev,
-                verbose=0,
+            # nlsq.LeastSquares.least_squares is annotated -> dict[str, Any] but
+            # actually returns nlsq.OptimizeResult (a dict subclass with attribute
+            # access) per its own docstring; narrow the local type accordingly.
+            nlsq_result = cast(
+                nlsq.OptimizeResult,
+                ls.least_squares(
+                    objective,
+                    x0=np.asarray(x0),
+                    bounds=bounds,
+                    method="trf",
+                    ftol=ftol,
+                    xtol=xtol,
+                    gtol=gtol,
+                    max_nfev=max_nfev,
+                    verbose=0,
+                ),
             )
         except ValueError as e:
             # Handle infeasible initial guess
