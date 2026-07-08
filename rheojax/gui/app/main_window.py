@@ -1115,10 +1115,24 @@ class RheoJAXMainWindow(QMainWindow):
             "RheoJAX Project (*.rheojax);;HDF5 Files (*.h5 *.hdf5);;All Files (*.*)",
         )
         if file_path:
-            self.log(f"Opening project: {file_path}")
-            logger.info("Opening project", file_path=file_path)
-            self.store.dispatch("LOAD_PROJECT", {"file_path": file_path})
-            self.status_bar.show_message(f"Opened: {file_path}", 3000)
+            # GUI-P1: LOAD_PROJECT's reducer only updates project_path/
+            # project_name/recents -- it never restores datasets/results
+            # (there is no codec bridging this legacy StateStore AppState to
+            # the versioned .rheojax v2 archive; that codec targets the
+            # workspace shell's foundation.state.AppState only). Dispatching
+            # it and reporting "Opened" would tell the user their project
+            # was restored when the previous/empty state is still active.
+            # Match the same not-implemented messaging as Save (see
+            # _on_save_file) until legacy project loading exists.
+            logger.warning("Open file action: not yet implemented", file_path=file_path)
+            QMessageBox.information(
+                self,
+                "Open Not Yet Implemented",
+                "Project open is not yet implemented in this legacy window.\n"
+                "Use 'Import Data' to load a dataset, or launch without "
+                "--legacy to use the workspace shell, which supports "
+                "opening .rheojax projects.",
+            )
 
     @Slot()
     def _on_save_file(self) -> bool:
@@ -1194,11 +1208,17 @@ class RheoJAXMainWindow(QMainWindow):
         if not self._confirm_unsaved_changes("opening another project"):
             return
 
-        self.log(f"Opening recent project: {path}")
-        logger.info("Opening recent project", file_path=str(path))
-        self.store.dispatch("LOAD_PROJECT", {"file_path": str(path)})
-        self.navigate_to("data")
-        self.status_bar.show_message(f"Opened: {path.name}", 3000)
+        # GUI-P1: same not-yet-implemented gap as _on_open_file -- LOAD_PROJECT
+        # does not actually restore project contents in this legacy window.
+        logger.warning("Open recent project: not yet implemented", file_path=str(path))
+        QMessageBox.information(
+            self,
+            "Open Not Yet Implemented",
+            "Project open is not yet implemented in this legacy window.\n"
+            "Use 'Import Data' to load a dataset, or launch without "
+            "--legacy to use the workspace shell, which supports "
+            "opening .rheojax projects.",
+        )
 
     @Slot()
     def _on_import(self) -> None:
@@ -1404,7 +1424,15 @@ class RheoJAXMainWindow(QMainWindow):
     def _on_preferences(self) -> None:
         """Handle preferences action."""
         logger.debug("Preferences action triggered")
-        dialog = PreferencesDialog(parent=self)
+        from rheojax.gui.jobs.process_adapter import get_worker_isolation_mode
+
+        state = self.store.get_state()
+        current_preferences = {
+            "theme": state.theme,
+            "autosave_enabled": state.auto_save_enabled,
+            "worker_isolation_mode": get_worker_isolation_mode(),
+        }
+        dialog = PreferencesDialog(current_preferences=current_preferences, parent=self)
         if dialog.exec():
             prefs = dialog.get_preferences()
             self.store.dispatch("UPDATE_PREFERENCES", prefs)
@@ -3498,8 +3526,17 @@ class RheoJAXMainWindow(QMainWindow):
             state = self.store.get_state()
             if state.auto_save_enabled and state.project_path:
                 project_path = state.project_path
-                logger.debug("Auto-saving project", path=str(project_path))
-                self.store.dispatch("SAVE_PROJECT", {"file_path": str(project_path)})
+                # GUI-P1: SAVE_PROJECT's reducer only clears is_modified -- it
+                # performs no serialization (project save is not yet
+                # implemented in this legacy window; see _on_save_file).
+                # Dispatching it here would mark unsaved work as "saved"
+                # without writing the project to disk. Skip it; the artifact
+                # exports below are real files but are not a project save.
+                logger.debug(
+                    "Auto-save: project serialization not yet implemented, "
+                    "exporting artifacts only",
+                    path=str(project_path),
+                )
 
                 # Export artifacts: parameters, plot, and Bayesian posterior if available
                 fit_result = self.store.get_active_fit_result()

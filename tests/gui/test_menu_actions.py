@@ -419,6 +419,34 @@ class TestDialogIntegration:
 
     @pytest.mark.smoke
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
+    def test_preferences_dialog_seeded_with_current_state(self, qtbot, qapp) -> None:
+        """_on_preferences must pass the StateStore's current settings into
+        PreferencesDialog -- an empty current_preferences dict makes the
+        dialog fall back to hardcoded defaults (e.g. Light theme), and
+        saving it then overwrites the user's real settings (GUI-P1)."""
+        from dataclasses import replace
+        from unittest.mock import patch
+
+        from rheojax.gui.app.main_window import RheoJAXMainWindow
+
+        window = RheoJAXMainWindow()
+        qtbot.addWidget(window)
+        dark_state = replace(window.store.get_state(), theme="dark")
+
+        with (
+            patch.object(window.store, "get_state", return_value=dark_state),
+            patch(
+                "rheojax.gui.app.main_window.PreferencesDialog"
+            ) as mock_dialog_cls,
+        ):
+            mock_dialog_cls.return_value.exec.return_value = False
+            window._on_preferences()
+
+        _, kwargs = mock_dialog_cls.call_args
+        assert kwargs.get("current_preferences", {}).get("theme") == "dark"
+
+    @pytest.mark.smoke
+    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
     def test_about_dialog_accessible(self, qtbot, qapp) -> None:
         """Verify AboutDialog can be imported and instantiated."""
         from rheojax.gui.dialogs.about import AboutDialog

@@ -203,6 +203,39 @@ class TestPlotCanvasVisual:
 
         canvas.close()
 
+    def test_plot_canvas_cleanup_closes_figure_despite_dead_canvas(
+        self,
+        qapp: QApplication,
+        qtbot: Any,
+        monkeypatch: Any,
+    ) -> None:
+        """cleanup() must still close the Figure when the C++ canvas widget
+        is already gone (RuntimeError from accessing canvas.callbacks) —
+        otherwise the Figure leaks via matplotlib's global registry."""
+        import matplotlib.pyplot as plt
+
+        from rheojax.gui.widgets.plot_canvas import PlotCanvas
+
+        canvas = PlotCanvas()
+        qtbot.addWidget(canvas)
+        fig = canvas.figure
+
+        closed_figs = []
+        monkeypatch.setattr(plt, "close", lambda f: closed_figs.append(f))
+
+        # Simulate the real failure: accessing .callbacks on a deleted C++
+        # canvas widget raises RuntimeError (Qt/PySide6 wrapped-object error).
+        def _dead_callbacks(self: Any) -> None:
+            raise RuntimeError("wrapped C/C++ object has been deleted")
+
+        monkeypatch.setattr(
+            type(canvas.canvas), "callbacks", property(_dead_callbacks)
+        )
+
+        canvas.cleanup()
+
+        assert closed_figs == [fig], "plt.close(figure) was skipped after RuntimeError"
+
     def test_plot_canvas_scatter_plot(
         self,
         qapp: QApplication,

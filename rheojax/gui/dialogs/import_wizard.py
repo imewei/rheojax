@@ -45,7 +45,7 @@ class _FileReadWorker(QRunnable):
     """
 
     class Signals(QObject):
-        completed = Signal(object)  # pandas.DataFrame
+        completed = Signal(object, str)  # pandas.DataFrame, source file path
         failed = Signal(str)  # error message
 
     def __init__(self, file_path: str, nrows: int) -> None:
@@ -69,7 +69,7 @@ class _FileReadWorker(QRunnable):
         except Exception as e:
             self.signals.failed.emit(str(e))
             return
-        self.signals.completed.emit(df)
+        self.signals.completed.emit(df, self._file_path)
 
 
 class FileSelectionPage(QWizardPage):
@@ -328,9 +328,15 @@ class ColumnMappingPage(QWizardPage):
         self, df: pd.DataFrame, file_path: str | None = None
     ) -> None:
         """Populate combo boxes/preview once the background read completes."""
+        current_path = str(self.field("file_path"))
+        if file_path is not None and file_path != current_path:
+            # The selected file changed while this worker was still reading;
+            # discard the stale result instead of caching it under the new path.
+            return
+
         wizard = self.wizard()
         wizard._cached_df = df
-        wizard._cached_file_path = file_path or str(self.field("file_path"))
+        wizard._cached_file_path = file_path or current_path
 
         columns = list(df.columns)
         logger.debug(
@@ -621,9 +627,15 @@ class PreviewConfirmPage(QWizardPage):
         self, df: pd.DataFrame, file_path: str | None = None
     ) -> None:
         """Populate the preview table once the background read completes."""
+        current_path = str(self.field("file_path"))
+        if file_path is not None and file_path != current_path:
+            # The selected file changed while this worker was still reading;
+            # discard the stale result instead of caching it under the new path.
+            return
+
         wizard = self.wizard()
         wizard._cached_preview_df = df
-        wizard._cached_preview_path = file_path or str(self.field("file_path"))
+        wizard._cached_preview_path = file_path or current_path
 
         x_col, y_col, y2_col = self._pending_preview_cols
 

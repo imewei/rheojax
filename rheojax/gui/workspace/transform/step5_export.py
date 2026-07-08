@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
+from rheojax.gui.compat import QFileDialog
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import TransformState
 from rheojax.gui.resources.styles.tokens import field_label_style
@@ -30,14 +31,31 @@ class TransformExportStep(QWidget):
         self._export_service = ExportService()
         self._save_btn = QPushButton("＋ Save output → library", self)
         self._export_btn = QPushButton("⤓ Export", self)
+        self._export_status = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
         caption = QLabel("Export")
         caption.setStyleSheet(field_label_style())
-        for w in (caption, self._save_btn, self._export_btn):
+        for w in (caption, self._save_btn, self._export_btn, self._export_status):
             lay.addWidget(w)
         self._save_btn.clicked.connect(self.save_to_library)
-        self._export_btn.clicked.connect(lambda: self.export_bundle(Path.cwd()))
+        self._export_btn.clicked.connect(self._on_export_clicked)
+
+    def _on_export_clicked(self) -> None:
+        """Prompt for a destination directory rather than silently writing
+        to Path.cwd() -- the user previously had no way to know or choose
+        where the bundle landed."""
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Export bundle to...", str(Path.cwd())
+        )
+        if not chosen:
+            return
+        try:
+            self.export_bundle(Path(chosen))
+        except OSError as exc:
+            self._export_status.setText(f"Export failed: {exc}")
+            return
+        self._export_status.setText(f"Exported to {Path(chosen)}")
 
     def bundle_manifest(self) -> list[str]:
         return ["output", "result", "provenance"]

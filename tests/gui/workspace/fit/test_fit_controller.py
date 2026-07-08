@@ -1,3 +1,6 @@
+import queue
+import time
+
 import numpy as np
 import pytest
 
@@ -5,7 +8,7 @@ pytest.importorskip("PySide6")
 import rheojax.models  # noqa
 from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.state import AppState
-from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
+from rheojax.gui.workspace.fit.fit_controller import _run_on_thread, build_fit_controller
 from rheojax.gui.workspace.window import WorkspaceWindow
 
 
@@ -13,6 +16,31 @@ class _RheoData:
     def __init__(self, x, y):
         self.x = np.asarray(x)
         self.y = np.asarray(y)
+
+
+def test_run_on_thread_drains_progress_queue(qtbot):
+    # Regression: progress_queue was created in _fit_fn_body/_sample_fn and
+    # handed to run_fit_isolated/run_bayesian_isolated, but _run_on_thread
+    # never read from it -- every progress_callback() message piled up
+    # unread and never reached the UI. _run_on_thread must poll and forward
+    # messages (via on_progress) while the worker runs, not just discard
+    # them.
+    q = queue.Queue()
+    seen = []
+
+    def fn():
+        q.put({"type": "progress", "percent": 1})
+        time.sleep(0.05)
+        q.put({"type": "progress", "percent": 50})
+        time.sleep(0.25)  # spans multiple QTimer drain ticks (100ms each)
+        q.put({"type": "progress", "percent": 100})
+        return "done"
+
+    result = _run_on_thread(fn, progress_queue=q, on_progress=seen.append)
+
+    assert result == "done"
+    assert [m["percent"] for m in seen] == [1, 50, 100]
+    assert q.empty()
 
 
 def test_controller_gating_and_invalidation(qtbot):

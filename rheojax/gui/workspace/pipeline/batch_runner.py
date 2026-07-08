@@ -27,6 +27,7 @@ class PipelineBatchRunner(QRunnable):
         library,
         stop_requested,
         app_state=None,
+        batch_job_id: str | None = None,
     ) -> None:
         super().__init__()
         self._service = service
@@ -35,54 +36,70 @@ class PipelineBatchRunner(QRunnable):
         self._library = library
         self._stop_requested = stop_requested
         self._app_state = app_state
+        # Caller (WorkspaceWindow._on_pipeline_run_requested) pre-registers this key in
+        # active_jobs synchronously on the GUI thread, before QThreadPool.start()
+        # returns, so a double-click "Run All" sees a non-empty active_jobs even before
+        # this thread reaches its first per-dataset registration below. We own clearing
+        # it once the batch reaches a terminal state.
+        self._batch_job_id = batch_job_id
 
     def run(self) -> None:
         from rheojax.gui.services.pipeline_execution_service import (
             WorkerIsolationRequiredError,
         )
 
-        for dataset_id in self._selected_dataset_ids:
-            if self._stop_requested.is_set():
-                break
-            # Register synchronously (plain dict write, not via the Qt signal)
-            # before execute() can start mutating the library. dataset_run_started
-            # is Qt.AutoConnection, which resolves to a queued cross-thread
-            # connection when run() executes on a QThreadPool worker thread --
-            # relying on it alone leaves a window where Save can see an empty
-            # active_jobs and serialize the library while this thread is
-            # concurrently writing to it. `app_state` is optional so tests that
-            # construct this runner directly (with no AppState) are unaffected.
-            if self._app_state is not None:
+        try:
+            for dataset_id in self._selected_dataset_ids:
+                if self._stop_requested.is_set():
+                    break
+                # Register synchronously (plain dict write, not via the Qt signal)
+                # before execute() can start mutating the library. dataset_run_started
+                # is Qt.AutoConnection, which resolves to a queued cross-thread
+                # connection when run() executes on a QThreadPool worker thread --
+                # relying on it alone leaves a window where Save can see an empty
+                # active_jobs and serialize the library while this thread is
+                # concurrently writing to it. `app_state` is optional so tests that
+                # construct this runner directly (with no AppState) are unaffected.
+                if self._app_state is not None:
+                    with self._app_state.active_jobs.lock:
+                        self._app_state.active_jobs.by_id[dataset_id] = {
+                            "status": "running"
+                        }
+                self._service.dataset_run_started.emit(dataset_id)
+                ctx = pipeline_context_from_library(self._library, [dataset_id])
+                steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)
+                fatal = False
+                try:
+                    result = self._service.execute(
+                        steps=steps_for_dataset,
+                        initial_context=ctx,
+                        library=self._library,
+                        stop_requested=self._stop_requested,
+                    )
+                    record = self._prepare_job_record(dataset_id, result)
+                except WorkerIsolationRequiredError as exc:
+                    # Misconfigured environment -- would fail identically for every
+                    # remaining dataset, so this is the batch's last iteration too.
+                    record = self._failed_record(dataset_id, str(exc))
+                    fatal = True
+                except Exception as exc:  # pragma: no cover - defensive backstop
+                    # execute() already converts ordinary step failures into a
+                    # status="failed" PipelineRunResult internally; this only catches an
+                    # unexpected bug elsewhere in the call chain (e.g. context/record
+                    # construction). Without this, such an exception would propagate out
+                    # of run() with dataset_run_finished never emitted, leaving this
+                    # dataset's active_jobs entry stuck forever (nothing else clears it).
+                    record = self._failed_record(dataset_id, str(exc))
+                self._service.dataset_run_finished.emit(dataset_id, record)
+                if fatal:
+                    break
+        finally:
+            # Runs on every exit path (normal completion, stop_requested break, fatal
+            # break, empty selected_dataset_ids) so the pre-registered sentinel never
+            # outlives the batch, regardless of how it ends.
+            if self._app_state is not None and self._batch_job_id is not None:
                 with self._app_state.active_jobs.lock:
-                    self._app_state.active_jobs.by_id[dataset_id] = {"status": "running"}
-            self._service.dataset_run_started.emit(dataset_id)
-            ctx = pipeline_context_from_library(self._library, [dataset_id])
-            steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)
-            fatal = False
-            try:
-                result = self._service.execute(
-                    steps=steps_for_dataset,
-                    initial_context=ctx,
-                    library=self._library,
-                    stop_requested=self._stop_requested,
-                )
-                record = self._prepare_job_record(dataset_id, result)
-            except WorkerIsolationRequiredError as exc:
-                # Misconfigured environment -- would fail identically for every
-                # remaining dataset, so this is the batch's last iteration too.
-                record = self._failed_record(dataset_id, str(exc))
-                fatal = True
-            except Exception as exc:  # pragma: no cover - defensive backstop
-                # execute() already converts ordinary step failures into a
-                # status="failed" PipelineRunResult internally; this only catches an
-                # unexpected bug elsewhere in the call chain (e.g. context/record
-                # construction). Without this, such an exception would propagate out
-                # of run() with dataset_run_finished never emitted, leaving this
-                # dataset's active_jobs entry stuck forever (nothing else clears it).
-                record = self._failed_record(dataset_id, str(exc))
-            self._service.dataset_run_finished.emit(dataset_id, record)
-            if fatal:
-                break
+                    self._app_state.active_jobs.by_id.pop(self._batch_job_id, None)
 
     @staticmethod
     def _failed_record(dataset_id: str, error: str) -> dict:

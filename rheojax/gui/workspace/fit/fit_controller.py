@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 import multiprocessing
+import queue
 
 import numpy as np
-from PySide6.QtCore import QEventLoop, QObject, QRunnable, QThreadPool, Signal
+from PySide6.QtCore import QEventLoop, QObject, QRunnable, QThreadPool, QTimer, Signal
 
 from rheojax.gui.foundation.invalidation import invalidate_downstream
 from rheojax.gui.foundation.state import AppState
@@ -68,7 +69,7 @@ class _CallableWorker(QRunnable):
             self.signals.completed.emit(result)
 
 
-def _run_on_thread(fn):
+def _run_on_thread(fn, *, progress_queue=None, on_progress=None):
     """Run *fn* on a QThreadPool thread while pumping a local QEventLoop, so
     the GUI stays responsive -- mirrors transform_controller.py's
     _make_run_fn. The calling function still returns synchronously (or
@@ -76,6 +77,14 @@ def _run_on_thread(fn):
     NLSQ/NUTS computation no longer blocks the GUI thread directly, which
     used to freeze the entire app (repaints, Cancel, everything) for the
     full duration of every real fit/sample run.
+
+    If *progress_queue* is given, it is drained on a QTimer (on the GUI
+    thread, alongside the nested QEventLoop above) and each message is
+    forwarded to *on_progress*. Without this, messages that
+    subprocess_fit.py/subprocess_bayesian.py put on the queue during the
+    run just accumulate unread until the caller closes the queue after
+    the run finishes -- intermediate fit/sample progress never reaches
+    the UI.
     """
     worker = _CallableWorker(fn)
     loop = QEventLoop()
@@ -91,12 +100,50 @@ def _run_on_thread(fn):
 
     worker.signals.completed.connect(_on_completed)
     worker.signals.failed.connect(_on_failed)
+
+    drain_timer = None
+    if progress_queue is not None:
+
+        def _drain() -> None:
+            while True:
+                try:
+                    msg = progress_queue.get_nowait()
+                except queue.Empty:
+                    return
+                if on_progress is not None:
+                    on_progress(msg)
+
+        drain_timer = QTimer()
+        drain_timer.timeout.connect(_drain)
+        drain_timer.start(100)
+
     QThreadPool.globalInstance().start(worker)
     loop.exec()
+
+    if drain_timer is not None:
+        drain_timer.stop()
+        _drain()  # final drain: catch messages put right before completion
 
     if "error" in outcome:
         raise outcome["error"]
     return outcome["result"]
+
+
+def _make_progress_reporter(active_jobs, job_id):
+    """Build an on_progress callback that stashes the latest progress
+    message on the job's active_jobs.by_id entry, so anything reading
+    active_jobs (e.g. a future status-bar/progress widget) can see it.
+    GUI-thread only -- no lock needed, see ActiveJobsState.lock's docstring.
+    """
+
+    def _on_progress(msg) -> None:
+        if active_jobs is None:
+            return
+        job = active_jobs.by_id.get(job_id)
+        if job is not None:
+            job["progress"] = msg
+
+    return _on_progress
 
 
 def _make_fit_fn(library, fit_state, active_jobs=None):
@@ -136,6 +183,7 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
                 multi_start,
                 options,
                 token.event,
+                active_jobs,
             )
         finally:
             if active_jobs is not None:
@@ -154,6 +202,7 @@ def _fit_fn_body(
     multi_start,
     options,
     cancel_event,
+    active_jobs=None,
 ):
     rheo_data = library.load_payload(data_ref)
     # ponytail: Step 1's protocol combo uses the same vocabulary as
@@ -201,7 +250,9 @@ def _fit_fn_body(
                     dataset_id=data_ref,
                     model_config=model_config,
                     metadata=metadata,
-                )
+                ),
+                progress_queue=progress_queue,
+                on_progress=_make_progress_reporter(active_jobs, data_ref),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
@@ -270,7 +321,9 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                     model_config=fit_state.model_config,
                     metadata=getattr(rheo_data, "metadata", None),
                     max_tree_depth=config.get("max_tree_depth"),
-                )
+                ),
+                progress_queue=progress_queue,
+                on_progress=_make_progress_reporter(active_jobs, fit_state.data_ref),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
