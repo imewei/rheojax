@@ -125,8 +125,12 @@ class PreviewWorker(QRunnable):
                     or "rheocompass" in first_lines.lower()
                 ):
                     return "Anton Paar RheoCompass"
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug(
+                    "Header sniff failed during format detection",
+                    path=self._file_path.name,
+                    error=str(e),
+                )
             return "Text/CSV"
 
         if suffix == ".csv":
@@ -139,8 +143,12 @@ class PreviewWorker(QRunnable):
                     return "Anton Paar RheoCompass"
                 if "trios" in first_lines.lower():
                     return "TA Instruments TRIOS CSV"
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug(
+                    "Header sniff failed during format detection",
+                    path=self._file_path.name,
+                    error=str(e),
+                )
             return "CSV"
 
         if suffix in {".xlsx", ".xls"}:

@@ -72,9 +72,15 @@ def _param_names(model: BaseModel) -> list[str]:
 def _param_values(model: BaseModel) -> np.ndarray:
     """Return current optimal parameter values as a float64 numpy array."""
     names = list(model.parameters.keys())
-    return np.array(
-        [float(model.parameters.get_value(n)) for n in names], dtype=np.float64
-    )
+    values: list[float] = []
+    for n in names:
+        v = model.parameters.get_value(n)
+        if v is None:
+            raise RuntimeError(
+                f"Parameter {n!r} has no value set; call model.fit() first."
+            )
+        values.append(v)
+    return np.array(values, dtype=np.float64)
 
 
 def _n_obs(y: np.ndarray) -> int:

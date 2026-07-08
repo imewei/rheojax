@@ -59,7 +59,7 @@ def test_reset_skip_clears_stale_skip_decision(qtbot):
 def test_reset_skip_wired_to_nlsq_edited_in_fit_controller(qtbot):
     # Behavioral check of the cross-widget wiring: NlsqStep's `edited` (fired
     # whenever a new NLSQ result lands) must reset NutsStep's skip flag.
-    import rheojax.models  # noqa: ensure model registry is populated
+    import rheojax.models  # noqa: F401 - ensure model registry is populated
     from rheojax.gui.foundation.state import AppState
     from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 

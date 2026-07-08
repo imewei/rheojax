@@ -814,8 +814,8 @@ class DataPage(QWidget):
                     or "rheocompass" in first_lines.lower()
                 ):
                     return "Anton Paar RheoCompass"
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug("format sniff (txt) failed: %s", e)
             return "Text/CSV"
 
         if suffix == ".csv":
@@ -842,8 +842,8 @@ class DataPage(QWidget):
                     return "Anton Paar RheoCompass"
                 if "trios" in first_lines.lower():
                     return "TA Instruments TRIOS CSV"
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug("format sniff (csv) failed: %s", e)
             return "CSV"
 
         if suffix in {".xlsx", ".xls"}:
@@ -894,8 +894,8 @@ class DataPage(QWidget):
                     suggestions = self._data_service.get_column_suggestions(
                         self._current_file_path
                     )
-                except Exception:
-                    pass  # Fall back to simple matching
+                except Exception as e:
+                    logger.debug("column suggestions failed, using simple matching: %s", e)
 
             # Apply suggestions or fallback to simple matching
             x_suggestions = suggestions.get("x_suggestions", [])

@@ -99,7 +99,13 @@ def _compute_y_band(
                     model_name, params, x, test_mode=test_mode, model_kwargs=model_kwargs
                 )
             )
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "Posterior-predictive draw dropped from HDI band",
+                model=model_name,
+                draw_index=int(idx),
+                error=str(exc),
+            )
             continue
         if (
             y_pred.ndim == 2

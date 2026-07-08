@@ -633,7 +633,8 @@ class ModelInfo:
         name: Registry name (e.g. ``"maxwell"``).
         class_name: Python class name (e.g. ``"Maxwell"``).
         param_names: List of parameter names.
-        param_bounds: Mapping of name → (lower, upper).
+        param_bounds: Mapping of name → (lower, upper); either side may be
+            ``None`` for an unbounded parameter.
         param_units: Mapping of name → unit string.
         n_params: Number of parameters.
         protocols: List of supported Protocol enum values.
@@ -645,7 +646,7 @@ class ModelInfo:
     class_name: str
     model_class: type | None
     param_names: list[str]
-    param_bounds: dict[str, tuple[float, float]]
+    param_bounds: dict[str, tuple[float | None, float | None]]
     param_units: dict[str, str]
     n_params: int
     protocols: list[Any]

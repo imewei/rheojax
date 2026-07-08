@@ -589,7 +589,7 @@ def _prony_multistart(
             logger.debug(f"Multi-start iteration {i_start} failed: {e}")
             continue
 
-    if best_g is None:
+    if best_g is None or best_tau is None:
         raise RuntimeError("All multi-start iterations failed")
 
     logger.debug(f"Multi-start Prony fit: best cost = {best_cost:.2e}")

@@ -490,7 +490,13 @@ class GiesekusSingleMode(GiesekusBase):
             (G', G'') if return_components=True, else |G*|
         """
         w = jnp.asarray(omega, dtype=jnp.float64)
-        beta_cc = float(self.parameters.get_value("beta_cc"))
+        beta_cc_value = self.parameters.get_value("beta_cc")
+        if beta_cc_value is None:
+            raise ValueError(
+                "Parameter 'beta_cc' is not set — fit the model or set "
+                "parameters before calling predict_saos()."
+            )
+        beta_cc = float(beta_cc_value)
         G_prime, G_double_prime = giesekus_saos_moduli_vec(
             w, self.eta_p, self.lambda_1, self.eta_s, beta_cc
         )

@@ -465,8 +465,8 @@ class FitPage(QWidget):
         try:
             if self._parameter_table.state() == QAbstractItemView.State.EditingState:
                 return
-        except Exception:
-            pass
+        except RuntimeError:
+            pass  # Qt widget may be deleted mid-refresh; safe to proceed
 
         params = self._store.get_state().model_params
         if not params:
@@ -1077,13 +1077,21 @@ class FitPage(QWidget):
         if pcov is not None and params:
             try:
                 pcov_arr = np.asarray(pcov)
-                if pcov_arr.ndim == 2 and pcov_arr.shape[0] == len(params):
+                n = len(params)
+                if pcov_arr.shape == (n, n):
                     for i, name in enumerate(param_names_sorted):
                         var = pcov_arr[i, i]
                         if var > 0:
                             param_uncertainties[name] = float(np.sqrt(var))
-            except Exception:
-                pass
+                else:
+                    logger.debug(
+                        "parameter uncertainty extraction skipped: pcov shape "
+                        "%s is not square (n_params=%d)",
+                        pcov_arr.shape,
+                        n,
+                    )
+            except (ValueError, TypeError) as e:
+                logger.debug("parameter uncertainty extraction failed: %s", e)
 
         if params:
             lines.append("")

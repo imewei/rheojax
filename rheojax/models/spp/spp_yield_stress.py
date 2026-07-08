@@ -733,6 +733,9 @@ class SPPYieldStress(BaseModel):
             test_mode = detect_test_mode(rheo_data)
 
         X = rheo_data.x
+        if X is None:
+            raise ValueError("rheo_data.x is required for prediction")
+        X = np.asarray(X)
         predictions = self._predict(X)
 
         return RheoData(

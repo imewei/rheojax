@@ -282,8 +282,8 @@ def run_show(args: argparse.Namespace) -> int:
             print("Validation warnings:")
             for err in errors:
                 print(f"  - {err}")
-    except Exception:
-        pass  # Validation is best-effort in show mode
+    except Exception as e:
+        logger.debug("Pipeline show-mode validation skipped: %s", e)
 
     return 0
 

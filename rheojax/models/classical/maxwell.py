@@ -313,8 +313,13 @@ class Maxwell(BaseModel):
             baseline = float(np.median(g_sorted[-tail:]))
             transient = g_sorted - baseline
 
-            g0_bounds = self.parameters.get("G0").bounds or (1e-3, 1e9)
-            eta_bounds = self.parameters.get("eta").bounds or (1e-6, 1e12)
+            g0_param = self.parameters.get("G0")
+            eta_param = self.parameters.get("eta")
+            assert g0_param is not None and eta_param is not None, (
+                "Maxwell model must define 'G0' and 'eta' parameters"
+            )
+            g0_bounds = g0_param.bounds or (1e-3, 1e9)
+            eta_bounds = eta_param.bounds or (1e-6, 1e12)
 
             # Attempt to estimate parameters from the first two signal-dominant points
             positive_mask = transient > 0
@@ -565,6 +570,10 @@ class Maxwell(BaseModel):
         """
         G0 = self.parameters.get_value("G0")
         eta = self.parameters.get_value("eta")
+        if G0 is None or eta is None:
+            raise ValueError(
+                "Maxwell relaxation time requires 'G0' and 'eta' parameter values to be set"
+            )
         return eta / G0
 
     def __repr__(self) -> str:

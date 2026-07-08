@@ -536,8 +536,14 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                     "Headerless 2-column CSV detected — using positional columns",
                     filepath=str(filepath),
                 )
-                x_col = 0
-                y_col = 1
+                # Explicit union annotation: this local can hold either a
+                # positional int (headerless case, this branch) or a str
+                # column name / "FOUND_PAIR" sentinel (else branch below).
+                # Without it, mypy infers the type from this first
+                # assignment (`int`) and flags the else-branch's str
+                # assignments as incompatible.
+                x_col: int | str | None = 0
+                y_col: int | str | None = 1
             else:
                 # Try to find time/frequency column
                 x_col = find_column_by_pattern(
@@ -643,6 +649,10 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
             )
 
             y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
+            # Explicit annotation (see _try_csv for why): otherwise mypy
+            # locks the type to the non-Optional "FOUND_PAIR" literal from
+            # this branch and flags the else-branch's `str | None` result.
+            y_col: str | None
             if y_cols_pair is not None:
                 kwargs["y_cols"] = y_cols_pair
                 kwargs.pop("y_col", None)

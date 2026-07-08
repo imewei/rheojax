@@ -427,7 +427,7 @@ class Parameter:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
-        d = {
+        d: dict[str, Any] = {
             "name": self.name,
             "value": self.value,
             "bounds": self.bounds,

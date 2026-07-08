@@ -296,8 +296,14 @@ class FitWorker(QRunnable):
                         if hasattr(tmp_model, "precompile"):
                             tmp_model.precompile()
                         del tmp_model
-                except Exception:
-                    pass  # Don't block fitting if precompile fails
+                except Exception as e:
+                    # Precompile is a latency optimization only; on failure we
+                    # fall through and JIT lazily on first predict.
+                    logger.debug(
+                        "JIT precompile failed; continuing without it",
+                        model=self._model_name,
+                        error=str(e),
+                    )
 
             try:
                 service_result = service.fit(

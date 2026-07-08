@@ -121,7 +121,7 @@ def build_numpyro_model(
     # _closure_cache is eagerly initialized in BaseModel.__init__; the
     # guard below is a safety net for non-BaseModel users of BayesianMixin.
     if not hasattr(model_self, "_closure_cache"):
-        model_self._closure_cache: OrderedDict = OrderedDict()
+        model_self._closure_cache = OrderedDict()
 
     prior_factory = getattr(model_self, "bayesian_prior_factory", None)
     # Check if any Parameter has a .prior dict set (from GUI PriorsEditor)

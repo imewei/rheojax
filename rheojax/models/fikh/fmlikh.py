@@ -644,7 +644,7 @@ class FMLIKH(FIKHBase):
             omega_arr, params, gamma_0, n_cycles
         )
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
+    def _predict(self, X: ArrayLike, **kwargs) -> np.ndarray:
         """Predict based on test_mode."""
         _kw_mode = kwargs.get("test_mode")
         test_mode = (
@@ -734,7 +734,7 @@ class FMLIKH(FIKHBase):
     def model_function(
         self,
         X: ArrayLike,
-        params: ArrayLike | dict[str, Any],
+        params: np.ndarray | dict[str, Any],
         test_mode: str | None = None,
         **kwargs,
     ) -> jnp.ndarray:

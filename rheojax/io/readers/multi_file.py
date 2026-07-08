@@ -32,7 +32,7 @@ def _validate_path_no_traversal(path: Path, *, label: str = "path") -> Path:
     if any(part == ".." for part in parts):
         logger.warning(
             "Path rejected: '..' traversal component detected",
-            **{label: raw},
+            extra={label: raw},
         )
         raise ValueError(
             f"{label.capitalize()} '{raw}' rejected: '..' path traversal "

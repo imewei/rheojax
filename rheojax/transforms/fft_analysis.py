@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import interpax
 import numpy as np
 
 from rheojax.core.base import BaseTransform
@@ -254,9 +255,12 @@ class FFTAnalysis(BaseTransform):
                 t_np = np.asarray(t)
                 y_np = np.asarray(y)
                 t_uniform = np.linspace(float(t_np[0]), float(t_np[-1]), n)
-                # R9-FFT-001: TODO — Replace np.interp with interpax.interp1d for JIT compatibility.
-                # Currently safe since this runs before jnp.fft.rfft (outside JIT).
-                y = jnp.array(np.interp(t_uniform, t_np, y_np))
+                # R9-FFT-001: interpax.Interpolator1D (JIT-safe) replaces np.interp.
+                # extrap defaults to False (out-of-bounds -> nan, unlike np.interp's
+                # clamping), but np.linspace(start, stop, n) guarantees t_uniform[0]
+                # and t_uniform[-1] are bit-exact to t_np[0]/t_np[-1], so the strict
+                # </> bounds check in interpax never trips here.
+                y = interpax.Interpolator1D(t_np, y_np, method="linear")(t_uniform)
                 t = jnp.array(t_uniform)
                 dt = float(t_uniform[1] - t_uniform[0])
             # R9-FFT-002: recompute n after resampling so rfftfreq and window

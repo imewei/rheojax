@@ -356,8 +356,8 @@ def attach_y_data_to_result(result: OptimizationResult, y_data: Any) -> None:
     if getattr(result, "n_data", None) is None:
         try:
             result.n_data = int(arr.shape[0])
-        except Exception:  # pragma: no cover — defensive
-            pass
+        except (IndexError, TypeError, ValueError) as e:  # pragma: no cover — defensive
+            logger.debug("Could not derive n_data from y_data shape: %s", e)
 
 
 def _attach_y_data_from_objective(

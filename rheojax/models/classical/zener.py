@@ -324,6 +324,10 @@ class Zener(BaseModel):
         """
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
+        if Gm is None or eta is None:
+            raise ValueError(
+                "Zener relaxation time requires 'Gm' and 'eta' parameter values to be set"
+            )
         return eta / Gm
 
     def get_retardation_time(self) -> float:
@@ -337,6 +341,10 @@ class Zener(BaseModel):
         Ge = self.parameters.get_value("Ge")
         Gm = self.parameters.get_value("Gm")
         eta = self.parameters.get_value("eta")
+        if Ge is None or Gm is None or eta is None:
+            raise ValueError(
+                "Zener retardation time requires 'Ge', 'Gm', and 'eta' parameter values to be set"
+            )
         return eta * (Ge + Gm) / (Ge * Gm)
 
     def __repr__(self) -> str:

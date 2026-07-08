@@ -301,7 +301,16 @@ class DiagnosticsPage(QWidget):
                     import arviz as az
 
                     idata = self._get_inference_data(result)
-                    if idata is not None:
+                    if idata is not None and not hasattr(idata, "log_likelihood"):
+                        # WAIC/LOO require the log_likelihood group, which
+                        # to_inference_data() only attaches when explicitly
+                        # requested (log_likelihood=True). Absence here is
+                        # the normal/expected case, not a failure — skip
+                        # quietly rather than warning on every refresh.
+                        logger.debug(
+                            "Skipping WAIC/LOO — no log_likelihood group available"
+                        )
+                    elif idata is not None:
                         try:
                             waic_res = az.waic(idata, scale="deviance")
                             waic_val = f"{float(waic_res.waic):.2f}"
@@ -310,19 +319,19 @@ class DiagnosticsPage(QWidget):
                                 elpd_val = f"{float(waic_res.elpd_waic):.2f}"
                             elif hasattr(waic_res, "elpd"):
                                 elpd_val = f"{float(waic_res.elpd):.2f}"
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("WAIC computation failed: %s", e)
 
                         try:
                             loo_res = az.loo(idata, scale="deviance")
                             loo_val = f"{float(loo_res.loo):.2f}"
                             if hasattr(loo_res, "elpd_loo"):
                                 elpd_val = f"{float(loo_res.elpd_loo):.2f}"
-                        except Exception:
-                            pass
-            except Exception:
+                        except Exception as e:
+                            logger.warning("LOO computation failed: %s", e)
+            except Exception as e:
                 # Leave display as graceful '--'
-                pass
+                logger.debug("model comparison metrics unavailable: %s", e)
 
             self._comparison_table.setItem(i, 1, QTableWidgetItem(waic_val))
             self._comparison_table.setItem(i, 2, QTableWidgetItem(loo_val))
@@ -624,21 +633,28 @@ class DiagnosticsPage(QWidget):
 
         # --- WAIC / LOO from InferenceData ---
         idata = self._current_inference_data
-        if idata is not None:
+        if idata is not None and not hasattr(idata, "log_likelihood"):
+            # WAIC/LOO require the log_likelihood group, which
+            # to_inference_data() only attaches when explicitly requested
+            # (log_likelihood=True). Absence here is the normal/expected
+            # case, not a failure — skip quietly rather than warning on
+            # every refresh.
+            logger.debug("Skipping WAIC/LOO — no log_likelihood group available")
+        elif idata is not None:
             try:
                 import arviz as az
 
                 try:
                     waic_res = az.waic(idata, scale="deviance")
                     values["WAIC"] = f"{float(waic_res.waic):.2f}"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("WAIC computation failed: %s", e)
 
                 try:
                     loo_res = az.loo(idata, scale="deviance")
                     values["LOO"] = f"{float(loo_res.loo):.2f}"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("LOO computation failed: %s", e)
             except ImportError:
                 pass
 

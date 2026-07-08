@@ -92,17 +92,17 @@ class HVNMBase(HVMBase):
         """Whether interfacial damage is active."""
         return self._include_interfacial_damage
 
-    @property
-    def include_diffusion(self) -> bool:
-        """Whether diffusion mode is active."""
-        return self._include_diffusion
-
     @include_interfacial_damage.setter
     def include_interfacial_damage(self, value):
         raise AttributeError(
             "include_interfacial_damage is immutable after construction. "
             "Create a new HVNMLocal instance instead."
         )
+
+    @property
+    def include_diffusion(self) -> bool:
+        """Whether diffusion mode is active."""
+        return self._include_diffusion
 
     @include_diffusion.setter
     def include_diffusion(self, value):
@@ -439,7 +439,7 @@ class HVNMBase(HVMBase):
         k0_int = self.compute_ber_rate_interphase_equilibrium()
         return 1.0 / (2.0 * max(k0_int, 1e-30))
 
-    def check_saos_validity(self, gamma_0: float = 0.01) -> dict[str, object]:
+    def check_saos_validity(self, gamma_0: float = 0.01) -> dict[str, float | bool]:
         """Check whether analytical SAOS is valid at a given strain amplitude.
 
         For HVNM, both matrix (E) and interphase (I) networks have TST

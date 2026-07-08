@@ -53,6 +53,12 @@ from rheojax.models import (
 
 jax, jnp = safe_import_jax()
 
+# NUTS sampling is CPU/memory-heavy; keep this module's tests in a single
+# xdist worker (requires --dist=loadgroup) instead of scattering them across
+# workers, where concurrent NUTS runs compete for the same cores and can
+# stall well past the per-test timeout.
+pytestmark = pytest.mark.xdist_group(name="bayesian_nuts")
+
 # =============================================================================
 # SYNTHETIC DATA FIXTURES
 # =============================================================================

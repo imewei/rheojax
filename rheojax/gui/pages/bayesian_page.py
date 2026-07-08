@@ -1429,7 +1429,8 @@ class BayesianPage(QWidget):
                 if arr.size == 0:
                     continue
                 means[name] = float(np.nanmean(arr.reshape(-1)))
-            except Exception:
+            except (ValueError, TypeError) as e:
+                logger.debug("posterior mean skipped for %s: %s", name, e)
                 continue
         return means
 
@@ -1455,7 +1456,8 @@ class BayesianPage(QWidget):
                 arr = np.asarray(samples).reshape(-1)
                 if arr.size:
                     lengths.append(int(arr.size))
-            except Exception:
+            except (ValueError, TypeError) as e:
+                logger.debug("posterior draw length skipped: %s", e)
                 continue
 
         if not lengths:
@@ -1488,7 +1490,8 @@ class BayesianPage(QWidget):
                 value = float(arr[index])
                 if np.isfinite(value):
                     params[name] = value
-            except Exception:
+            except (ValueError, TypeError) as e:
+                logger.debug("posterior param skipped for %s: %s", name, e)
                 continue
         return params
 
@@ -1585,7 +1588,8 @@ class BayesianPage(QWidget):
                     y_pred_arr = y_pred_arr[:, 0] + 1j * y_pred_arr[:, 1]
                 if y_pred_arr.shape == x.shape:
                     y_draws.append(y_pred_arr)
-            except Exception:
+            except Exception as e:
+                logger.debug("posterior draw %d predict failed: %s", draw_num, e)
                 continue
             # R13-GUI-004: Process events every 10 iterations to keep UI responsive
             if draw_num % 10 == 9:

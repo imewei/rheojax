@@ -519,7 +519,7 @@ class FIKH(FIKHBase):
             return sigma_dense[::n_sub]
         return sigma_dense
 
-    def _predict(self, X: ArrayLike, **kwargs) -> ArrayLike:
+    def _predict(self, X: ArrayLike, **kwargs) -> np.ndarray:
         """Predict based on test_mode.
 
         Args:
@@ -768,7 +768,7 @@ class FIKH(FIKHBase):
     def model_function(
         self,
         X: ArrayLike,
-        params: ArrayLike | dict[str, Any],
+        params: np.ndarray | dict[str, Any],
         test_mode: str | None = None,
         **kwargs,
     ) -> jnp.ndarray:
@@ -852,6 +852,10 @@ class FIKH(FIKHBase):
         """
         alpha = self.parameters.get_value("alpha_structure")
         E_a = self.parameters.get_value("E_a") if self.include_thermal else 0.0
+        # alpha_structure always has a default (see __init__); E_a is only
+        # read when include_thermal is set, at which point it is also set.
+        assert alpha is not None
+        assert E_a is not None
 
         return {
             "fractional_order": alpha,

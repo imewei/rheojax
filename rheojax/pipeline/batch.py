@@ -235,7 +235,7 @@ class BatchPipeline:
                     logger.debug(
                         "File processed successfully",
                         filepath=str(file_path),
-                        n_points=len(result.x) if result else 0,
+                        n_points=len(result.x) if result.x is not None else 0,
                     )
                 except Exception as e:
                     self.errors.append((file_path, e))
@@ -353,7 +353,12 @@ class BatchPipeline:
                                 filepath=str(fp),
                                 n_segments=len(data),
                             )
-                        loaded[fp] = data[0] if data else None
+                        # Skip empty segment lists rather than storing None —
+                        # preloaded.get(file_path) already returns None for a
+                        # missing key, so _process_file falls back to a real
+                        # load() either way.
+                        if data:
+                            loaded[fp] = data[0]
                     else:
                         loaded[fp] = data
                 elif err is not None:
@@ -388,6 +393,13 @@ class BatchPipeline:
         Returns:
             Tuple of (result_data, metrics)
         """
+        # _process_file is only ever called from process_files() (both the
+        # sequential and threaded branches), which already validates
+        # self.template_pipeline is set. Guard here too so the invariant is
+        # enforced even if this private method is ever called directly.
+        if self.template_pipeline is None:
+            raise ValueError("No template pipeline set. Call set_template() first.")
+
         # Clone template pipeline
         pipeline = self._clone_pipeline(self.template_pipeline)
         path = Path(file_path)
@@ -404,6 +416,9 @@ class BatchPipeline:
         else:
             with log_pipeline_stage(logger, "load", filepath=str(path)):
                 pipeline.load(path, format=format, **load_kwargs)
+
+        if pipeline.data is None:
+            raise ValueError(f"Failed to load data for {path}")
 
         # R12-E-006: pre-initialize metrics so transform replay errors can be
         # recorded inside the loop below before fit metrics are appended.

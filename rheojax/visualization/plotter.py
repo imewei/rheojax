@@ -212,7 +212,8 @@ def plot_rheo_data(
             "frequency_sweep",
         )
 
-        if is_freq_domain or np.iscomplexobj(data.y):
+        result: tuple[Figure, Axes | np.ndarray]
+        if is_freq_domain or np.iscomplexobj(_ensure_numpy(data.y)):
             result = plot_frequency_domain(
                 _ensure_numpy(data.x),
                 _ensure_numpy(data.y),
@@ -723,7 +724,7 @@ def compute_uncertainty_band(
     popt: np.ndarray,
     pcov: np.ndarray,
     confidence: float = 0.95,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
     """Compute prediction uncertainty band via error propagation.
 
     Uses the formula: sigma_y(x) = sqrt(diag(J @ pcov @ J.T))

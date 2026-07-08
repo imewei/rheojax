@@ -21,7 +21,7 @@ References
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from rheojax.logging import get_logger
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d import Axes3D
 else:
     # Import Axes at runtime for isinstance checks
     try:
@@ -52,6 +53,20 @@ def _ensure_matplotlib():
             "Matplotlib is required for SPP visualization. "
             "Install with: pip install matplotlib"
         ) from e
+
+
+def _get_figure(ax: Axes) -> Figure:
+    """Return ax's parent Figure, narrowed from matplotlib's Figure|SubFigure|None stub.
+
+    Axes in this module are always created directly on a top-level Figure
+    (never as a child of a SubFigure), so the narrower type always holds here.
+    """
+    from matplotlib.figure import Figure as _Figure
+
+    fig = ax.get_figure()
+    if not isinstance(fig, _Figure):
+        raise RuntimeError("Axes is not attached to a top-level Figure")
+    return fig
 
 
 def plot_lissajous(
@@ -112,10 +127,10 @@ def plot_lissajous(
         if ax is None:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
         elif isinstance(ax, tuple):
-            fig = ax[0].get_figure()
+            fig = _get_figure(ax[0])
             ax1, ax2 = ax
         else:
-            fig = ax.get_figure()
+            fig = _get_figure(ax)
             ax1 = ax2 = ax
 
         # Normalize if amplitudes provided
@@ -191,7 +206,7 @@ def plot_cole_cole(
     ax: Axes | None = None,
     colormap: str = "viridis",
     show_trajectory: bool = True,
-    aspect: str | None = "equal",
+    aspect: Literal["auto", "equal"] | float | None = "equal",
     **kwargs,
 ) -> Figure:
     """
@@ -211,7 +226,7 @@ def plot_cole_cole(
         Colormap name for trajectory coloring
     show_trajectory : bool
         If True, show as colored trajectory. If False, show as scatter.
-    aspect : str or None
+    aspect : {'auto', 'equal'}, float, or None
         Aspect ratio for the axes. Defaults to 'equal' for a square Cole-Cole plot.
         Pass None to let matplotlib choose automatically.
     **kwargs
@@ -237,7 +252,7 @@ def plot_cole_cole(
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
         else:
-            fig = ax.get_figure()
+            fig = _get_figure(ax)
 
         # F-023: Validate that G'(t) and G''(t) have matching lengths
         if len(Gp_t) != len(Gpp_t):
@@ -268,7 +283,9 @@ def plot_cole_cole(
 
             points = np.array([Gp_t, Gpp_t]).T.reshape(-1, 1, 2)
             segments = np.concatenate([points[:-1], points[1:]], axis=1)
-            lc = LineCollection(segments, cmap=colormap, linewidth=2)
+            # matplotlib's stub wants Sequence[ArrayLike]; an (N,1,2) ndarray of
+            # line segments is the documented usage but doesn't structurally match.
+            lc = LineCollection(segments, cmap=colormap, linewidth=2)  # type: ignore[arg-type]
             lc.set_array(time[:-1])
             line = ax.add_collection(lc)
             fig.colorbar(line, ax=ax, label="Time (s)")
@@ -475,7 +492,7 @@ def plot_harmonic_spectrum(
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 4))
         else:
-            fig = ax.get_figure()
+            fig = _get_figure(ax)
 
         # VIZ-020: guard against negative n_harmonics
         if n_harmonics is not None and n_harmonics < 0:
@@ -568,7 +585,7 @@ def plot_3d_trajectory(
     T_vec: np.ndarray | None = None,
     N_vec: np.ndarray | None = None,
     B_vec: np.ndarray | None = None,
-    ax: Axes | None = None,
+    ax: Axes3D | None = None,
     show_frame: bool = False,
     frame_scale: float = 0.1,
     **kwargs,
@@ -740,7 +757,7 @@ def plot_pipkin_diagram(
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 6))
         else:
-            fig = ax.get_figure()
+            fig = _get_figure(ax)
 
         # Create meshgrid
         Omega, Gamma = np.meshgrid(omega_values, gamma_0_values)

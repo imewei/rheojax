@@ -45,7 +45,7 @@ class FitOrchestrator:
         self,
         model: Any,
         X: ArrayLike,
-        y: ArrayLike,
+        y: ArrayLike | None,
         *,
         method: str = "nlsq",
         check_compatibility: bool = False,
@@ -85,6 +85,11 @@ class FitOrchestrator:
 
         # --- RheoData unpacking ---
         X, y, kwargs = self._unpack_rheodata(X, y, kwargs)
+        if y is None:
+            raise ValueError(
+                "fit() requires y data: pass y explicitly, or pass a RheoData "
+                "for X with a non-None y."
+            )
 
         # --- store data for Bayesian warm-start ---
         model.X_data = X
@@ -182,8 +187,12 @@ class FitOrchestrator:
             if "test_mode" in _metadata and "test_mode" not in kwargs:
                 kwargs["test_mode"] = _metadata["test_mode"]
             if y is None:
-                y = X.y
-            X = X.x
+                if X.y is None:
+                    raise ValueError("RheoData.y is None; cannot use as fit target")
+                y = np.asarray(X.y)
+            if X.x is None:
+                raise ValueError("RheoData.x is None; cannot use as fit input")
+            X = np.asarray(X.x)
         return X, y, kwargs
 
     @staticmethod

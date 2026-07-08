@@ -163,8 +163,12 @@ class BayesianPipeline(Pipeline):
             ctx["n_parameters"] = len(model_obj.parameters)
 
         # R12-E-005 (part): ensure metadata dict exists before writing test_mode.
+        # RheoData.metadata is typed as always-a-dict (never None) and
+        # __post_init__ normalizes any None passed at construction, so this
+        # is genuinely unreachable per the type checker; kept as
+        # defense-in-depth in case that invariant is ever relaxed.
         if self.data is not None and self.data.metadata is None:
-            self.data.metadata = {}
+            self.data.metadata = {}  # type: ignore[unreachable]
         if self.data is not None and self.data.metadata is not None:
             # R12-E-005: write resolved test_mode back to metadata so
             # fit_bayesian() reads the correct mode without the caller
@@ -250,15 +254,12 @@ class BayesianPipeline(Pipeline):
 
         reject_removed_options(nuts_kwargs)
 
-        # Get data
-        X = self.data.x
-        y = self.data.y
+        if self.data.x is None:
+            raise ValueError("No data loaded. Call load() first.")
 
-        # Convert to numpy
-        if _is_jax_array(X):
-            X = np.asarray(X)
-        if _is_jax_array(y):
-            y = np.asarray(y)
+        # Get data — np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        X = np.asarray(self.data.x)
+        y = np.asarray(self.data.y) if self.data.y is not None else None
 
         # Extract initial values from NLSQ fit for warm-start
         initial_values = None

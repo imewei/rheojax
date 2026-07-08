@@ -96,17 +96,17 @@ class HVMBase(VLBBase):
         """Whether damage is active."""
         return self._include_damage
 
-    @property
-    def include_dissociative(self) -> bool:
-        """Whether D-network is present."""
-        return self._include_dissociative
-
     @include_damage.setter
     def include_damage(self, value):
         raise AttributeError(
             "include_damage is immutable after construction. "
             "Create a new HVMLocal instance instead."
         )
+
+    @property
+    def include_dissociative(self) -> bool:
+        """Whether D-network is present."""
+        return self._include_dissociative
 
     @include_dissociative.setter
     def include_dissociative(self, value):

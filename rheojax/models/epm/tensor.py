@@ -488,7 +488,7 @@ class TensorialEPM(EPMBase):
             metadata=result_metadata,
         )
 
-    def _predict(self, X, **kwargs) -> RheoData:
+    def _predict(self, X, **kwargs) -> RheoData:  # type: ignore[override]
         """Simulate the model for the given protocol.
 
         Args:
@@ -696,7 +696,7 @@ class TensorialEPM(EPMBase):
         # scalar fix in rheojax/models/epm/base.py::_run_creep.
         target_stress = data.metadata.get("stress") if data.metadata else None
         if target_stress is None:
-            if data.y is not None and data.y.size > 0:
+            if data.y is not None and jnp.asarray(data.y).size > 0:
                 y_mean = float(jnp.mean(data.y))
                 target_stress = y_mean if abs(y_mean) > 1e-12 else 1.0
             else:

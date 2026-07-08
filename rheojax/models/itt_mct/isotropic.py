@@ -1176,7 +1176,7 @@ class ITTMCTIsotropic(ITTMCTBase):
         self,
         X: np.ndarray,
         params: np.ndarray,
-        test_mode: str = None,
+        test_mode: str | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Static model function for Bayesian inference.

@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -19,6 +19,9 @@ from rheojax.core.fit_orchestrator import FitOrchestrator
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
 from rheojax.logging import get_logger
+
+if TYPE_CHECKING:
+    from rheojax.core.data import RheoData
 
 # Module-level logger
 logger = get_logger(__name__)
@@ -269,7 +272,9 @@ class BaseModel(BayesianMixin, ABC):
             from rheojax.utils.data_quality import detect_data_range_decades
 
             x_array = X.x if isinstance(X, RheoData) else X
-            decades = detect_data_range_decades(x_array)
+            if x_array is None:
+                raise ValueError("RheoData.x is None; cannot detect data range")
+            decades = detect_data_range_decades(np.asarray(x_array))
 
             if use_log_residuals is None:
                 if decades > 8.0:
@@ -351,7 +356,10 @@ class BaseModel(BayesianMixin, ABC):
             model_class_name=self.__class__.__name__,
             protocol=test_mode,
             params={
-                name: self.parameters.get_value(name) for name in self.parameters.keys()
+                name: (
+                    v if (v := self.parameters.get_value(name)) is not None else float("nan")
+                )
+                for name in self.parameters.keys()
             },
             params_units={
                 name: getattr(self.parameters[name], "units", "") or ""
@@ -545,7 +553,7 @@ class BaseModel(BayesianMixin, ABC):
         _had_test_mode = hasattr(self, "_test_mode")  # BASE-003: track if attr existed
         saved_test_mode = getattr(self, "_test_mode", None)
         _raw = getattr(self, "_last_fit_kwargs", None)
-        saved_last_fit_kwargs = copy.deepcopy(_raw) if _raw is not None else None
+        saved_last_fit_kwargs: dict = copy.deepcopy(_raw) if _raw is not None else {}
 
         # Generate dummy data if not provided
         if X is None:
@@ -578,7 +586,7 @@ class BaseModel(BayesianMixin, ABC):
             self._test_mode = saved_test_mode
         elif hasattr(self, "_test_mode"):
             del self._test_mode
-        # Restore original _last_fit_kwargs (may be None or empty dict {})
+        # Restore original _last_fit_kwargs (empty dict if it didn't exist before)
         self._last_fit_kwargs = saved_last_fit_kwargs
 
         logger.info(
@@ -591,7 +599,7 @@ class BaseModel(BayesianMixin, ABC):
 
     def fit_bayesian(  # extends BayesianMixin signature
         self,
-        X: ArrayLike,
+        X: ArrayLike | RheoData,
         y: ArrayLike | None = None,
         num_warmup: int = 1000,
         num_samples: int = 2000,
@@ -676,9 +684,13 @@ class BaseModel(BayesianMixin, ABC):
 
         if isinstance(X, RheoData):
             if y is None:
-                y = X.y
+                if X.y is None:
+                    raise ValueError("RheoData.y is None; cannot use as fit target")
+                y = np.asarray(X.y)
             if test_mode is None:
                 test_mode = X.test_mode
+            if X.x is None:
+                raise ValueError("RheoData.x is None; cannot use as fit input")
             X = jnp.array(X.x)
 
         # Store data for model_function access
@@ -824,7 +836,9 @@ class BaseModel(BayesianMixin, ABC):
                 # container.  Models that need inputs such as step strain or
                 # target stress can consume this internal mapping in _predict.
                 kwargs["_rheo_metadata"] = dict(X.metadata)
-                X = X.x
+                if X.x is None:
+                    raise ValueError("RheoData.x is None; cannot use as predict input")
+                X = np.asarray(X.x)
 
             # ADR-004: All _predict() signatures now accept **kwargs,
             # so we can call directly without try/except/retry.
