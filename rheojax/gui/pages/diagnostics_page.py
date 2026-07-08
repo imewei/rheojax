@@ -301,7 +301,16 @@ class DiagnosticsPage(QWidget):
                     import arviz as az
 
                     idata = self._get_inference_data(result)
-                    if idata is not None:
+                    if idata is not None and not hasattr(idata, "log_likelihood"):
+                        # WAIC/LOO require the log_likelihood group, which
+                        # to_inference_data() only attaches when explicitly
+                        # requested (log_likelihood=True). Absence here is
+                        # the normal/expected case, not a failure — skip
+                        # quietly rather than warning on every refresh.
+                        logger.debug(
+                            "Skipping WAIC/LOO — no log_likelihood group available"
+                        )
+                    elif idata is not None:
                         try:
                             waic_res = az.waic(idata, scale="deviance")
                             waic_val = f"{float(waic_res.waic):.2f}"
@@ -624,7 +633,14 @@ class DiagnosticsPage(QWidget):
 
         # --- WAIC / LOO from InferenceData ---
         idata = self._current_inference_data
-        if idata is not None:
+        if idata is not None and not hasattr(idata, "log_likelihood"):
+            # WAIC/LOO require the log_likelihood group, which
+            # to_inference_data() only attaches when explicitly requested
+            # (log_likelihood=True). Absence here is the normal/expected
+            # case, not a failure — skip quietly rather than warning on
+            # every refresh.
+            logger.debug("Skipping WAIC/LOO — no log_likelihood group available")
+        elif idata is not None:
             try:
                 import arviz as az
 

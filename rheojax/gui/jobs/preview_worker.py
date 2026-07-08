@@ -128,7 +128,7 @@ class PreviewWorker(QRunnable):
             except OSError as e:
                 logger.debug(
                     "Header sniff failed during format detection",
-                    path=str(self._file_path),
+                    path=self._file_path.name,
                     error=str(e),
                 )
             return "Text/CSV"
@@ -146,7 +146,7 @@ class PreviewWorker(QRunnable):
             except OSError as e:
                 logger.debug(
                     "Header sniff failed during format detection",
-                    path=str(self._file_path),
+                    path=self._file_path.name,
                     error=str(e),
                 )
             return "CSV"

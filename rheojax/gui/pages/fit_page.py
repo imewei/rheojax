@@ -1077,11 +1077,19 @@ class FitPage(QWidget):
         if pcov is not None and params:
             try:
                 pcov_arr = np.asarray(pcov)
-                if pcov_arr.ndim == 2 and pcov_arr.shape[0] == len(params):
+                n = len(params)
+                if pcov_arr.shape == (n, n):
                     for i, name in enumerate(param_names_sorted):
                         var = pcov_arr[i, i]
                         if var > 0:
                             param_uncertainties[name] = float(np.sqrt(var))
+                else:
+                    logger.debug(
+                        "parameter uncertainty extraction skipped: pcov shape "
+                        "%s is not square (n_params=%d)",
+                        pcov_arr.shape,
+                        n,
+                    )
             except (ValueError, TypeError) as e:
                 logger.debug("parameter uncertainty extraction failed: %s", e)
 

@@ -778,6 +778,9 @@ class ModelRegistry:
         Returns:
             List of matching model names
         """
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         return registry.find_compatible(protocol=protocol, **criteria)
 
@@ -815,6 +818,9 @@ class ModelRegistry:
         Returns:
             List of PluginInfo objects for matching models.
         """
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         names = registry.find_compatible(protocol=protocol)
         result: list[PluginInfo] = []
@@ -836,6 +842,9 @@ class ModelRegistry:
         Returns:
             List of PluginInfo objects for compatible models.
         """
+        from rheojax.models import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         # Extract protocol from test_mode
         test_mode = getattr(data, "test_mode", None)
@@ -1000,6 +1009,9 @@ class TransformRegistry:
         Returns:
             List of matching transform names
         """
+        from rheojax.transforms import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         return registry.find_compatible(transform_type=type, **criteria)
 
@@ -1019,7 +1031,13 @@ class TransformRegistry:
             TransformType.SPECTRAL
         """
         registry = cls._get_registry()
-        return registry.get_info(name, PluginType.TRANSFORM)
+        info = registry.get_info(name, PluginType.TRANSFORM)
+        if info is None:
+            from rheojax.transforms import _ensure_all_registered
+
+            _ensure_all_registered()
+            info = registry.get_info(name, PluginType.TRANSFORM)
+        return info
 
     @classmethod
     def unregister(cls, name: str):

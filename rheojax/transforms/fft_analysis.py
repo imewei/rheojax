@@ -256,6 +256,10 @@ class FFTAnalysis(BaseTransform):
                 y_np = np.asarray(y)
                 t_uniform = np.linspace(float(t_np[0]), float(t_np[-1]), n)
                 # R9-FFT-001: interpax.Interpolator1D (JIT-safe) replaces np.interp.
+                # extrap defaults to False (out-of-bounds -> nan, unlike np.interp's
+                # clamping), but np.linspace(start, stop, n) guarantees t_uniform[0]
+                # and t_uniform[-1] are bit-exact to t_np[0]/t_np[-1], so the strict
+                # </> bounds check in interpax never trips here.
                 y = interpax.Interpolator1D(t_np, y_np, method="linear")(t_uniform)
                 t = jnp.array(t_uniform)
                 dt = float(t_uniform[1] - t_uniform[0])

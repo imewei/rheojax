@@ -1582,7 +1582,10 @@ class RheoJAXMainWindow(QMainWindow):
                         config["num_warmup"] = 1000
                         config["num_samples"] = 2000
                         config["num_chains"] = 4
-                except AttributeError as exc:
+                except (AttributeError, RuntimeError) as exc:
+                    # RuntimeError: PySide6 raises this (not AttributeError) when
+                    # accessing a widget whose underlying C++ object has already
+                    # been deleted (e.g. during workspace teardown/rebuild).
                     logger.debug(
                         "Bayesian page unavailable; step config omits sampler settings",
                         error=str(exc),
