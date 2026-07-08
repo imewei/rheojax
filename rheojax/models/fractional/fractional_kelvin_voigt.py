@@ -429,9 +429,11 @@ class FractionalKelvinVoigt(BaseModel):
         Returns:
             Predicted values
         """
-        # Handle RheoData input
+        # Handle RheoData input (defensive: predict() intercepts RheoData
+        # before reaching _predict(), so this branch is normally unreachable —
+        # kept to honor the ndarray-only contract from BaseModel._predict).
         if isinstance(X, RheoData):
-            return self.predict_rheodata(X)
+            return np.asarray(self.predict_rheodata(X).y)
 
         # Handle raw array input with test_mode dispatch
         _kw_mode = kwargs.get("test_mode")
@@ -549,7 +551,7 @@ class FractionalKelvinVoigt(BaseModel):
 
         return result
 
-    def predict(self, X, test_mode: str | None = None, **kwargs):  # type: ignore[override]
+    def predict(self, X, test_mode: str | None = None, **kwargs):
         """Predict response.
 
         R13-FKV-002: Delegates to BaseModel.predict() for plain-array inputs so
