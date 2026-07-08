@@ -120,7 +120,7 @@ class LatticeEPM(EPMBase):
             fluidity_form=self.fluidity_form,
         )
 
-    def _predict(self, X, **kwargs) -> RheoData:
+    def _predict(self, X, **kwargs) -> RheoData:  # type: ignore[override]
         """Simulate the model for the given protocol.
 
         Args:

@@ -454,8 +454,12 @@ class STZConventional(STZBase):
         self._omega_laos = omega
 
         if gamma_0 is not None and gamma_0 > 0.01:
+            if omega is None:
+                raise ValueError(
+                    "LAOS mode (gamma_0 > 0.01) requires 'omega' to be specified"
+                )
             # LAOS mode - full ODE integration
-            self._fit_laos_mode(X, y, gamma_0, omega, **kwargs)
+            self._fit_laos_mode(X, y, float(gamma_0), float(omega), **kwargs)
         else:
             # SAOS mode - linear viscoelastic approximation
             self._fit_saos_mode(X, y, **kwargs)

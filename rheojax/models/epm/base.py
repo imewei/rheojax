@@ -1130,7 +1130,7 @@ class EPMBase(BaseModel):
         # legacy test pattern that passes y=full_like(t, target_stress).
         target_stress = data.metadata.get("stress") if data.metadata else None
         if target_stress is None:
-            if data.y is not None and data.y.size > 0:
+            if data.y is not None and jnp.asarray(data.y).size > 0:
                 y_mean = float(jnp.mean(data.y))
                 target_stress = y_mean if abs(y_mean) > 1e-12 else 1.0
             else:

@@ -382,13 +382,13 @@ class TNTStickyRouse(TNTBase):
             G_star = self._predict_oscillation_vec(X_jax, G_modes, tau_eff, eta_s)
             return jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
         elif mode == "relaxation":
-            # Need initial stress per mode (from fitting context)
-            if not hasattr(self, "_sigma_0_modes") or self._sigma_0_modes is None:
-                # Default: equal stress per mode
-                sigma_0 = 1e3  # Pa
-                sigma_0_modes = jnp.ones(N) * (sigma_0 / N)
-            else:
-                sigma_0_modes = self._sigma_0_modes
+            # Per-mode initial stress: `_sigma_0_modes` is only ever set to
+            # None (see _fit, where the prior cached-array design was
+            # reverted as a bug — it froze G_k at fit entry, decoupling the
+            # optimizer from the current parameters). Always use the
+            # equal-stress-per-mode default.
+            sigma_0 = 1e3  # Pa
+            sigma_0_modes = jnp.ones(N) * (sigma_0 / N)
             return self._predict_relaxation_vec(X_jax, sigma_0_modes, tau_eff)
         elif mode == "startup":
             if gamma_dot is None:
