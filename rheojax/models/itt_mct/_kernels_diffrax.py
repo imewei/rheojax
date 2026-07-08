@@ -29,6 +29,7 @@ References
 - Patrick Kidger (2021) "On Neural Differential Equations", arXiv:2202.02435
 """
 
+from collections.abc import Callable
 from typing import NamedTuple
 
 from rheojax.core.jax_config import lazy_import, safe_import_jax
@@ -522,7 +523,7 @@ def _make_batched_solver(
 
 
 # Cache for batched solvers (keyed by (n_modes, use_lorentzian, memory_form))
-_BATCHED_SOLVER_CACHE = {}
+_BATCHED_SOLVER_CACHE: dict[tuple[int, bool, str], Callable] = {}
 
 
 def solve_flow_curve_batch(

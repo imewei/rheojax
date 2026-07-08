@@ -254,8 +254,11 @@ class ITTMCTSchematic(ITTMCTBase):
             n_prony_modes=n_prony_modes,
         )
 
-        # Track physics params for Prony cache invalidation
-        self._prony_param_hash: tuple[float, ...] | None = None
+        # Track physics params for Prony cache invalidation. Elements are
+        # Optional because ParameterSet.get_value() can return None for an
+        # unset parameter; the tuple is only ever equality-compared as a
+        # cache key, so None entries are harmless.
+        self._prony_param_hash: tuple[float | None, ...] | None = None
 
         # Set v2 from epsilon or direct value
         if epsilon is not None and v2 is not None:
@@ -1229,7 +1232,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         X: np.ndarray,
         params: np.ndarray,
-        test_mode: str = None,
+        test_mode: str | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Static model function for Bayesian inference.
