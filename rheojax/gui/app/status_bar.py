@@ -93,8 +93,12 @@ class StatusBar(QStatusBar):
         self.message_label.setText(message)
         self._message_token += 1
         if timeout > 0:
-            # Also show in Qt status bar for timeout support
-            super().showMessage(message, timeout)
+            # NOTE: deliberately NOT calling super().showMessage(message, timeout) --
+            # QStatusBar.showMessage() hides every non-permanent addWidget() item
+            # (message_label above, and progress_bar) for the whole timeout, which
+            # blanked the label we just set and hid an in-progress progress bar for
+            # the duration. message_label + this timer already provide the same
+            # "temporary message" behavior without that side effect.
             token = self._message_token
             QTimer.singleShot(
                 timeout, lambda: self._clear_timed_message(token, message)

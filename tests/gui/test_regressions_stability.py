@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 import pytest
 
@@ -7,6 +9,7 @@ from rheojax.gui.state.actions import update_dataset
 from rheojax.gui.state.store import (
     AppState,
     DatasetState,
+    FitResult,
     PipelineState,
     PipelineStep,
     StateStore,
@@ -102,6 +105,39 @@ def test_export_raw_data_converts_dataset(qtbot, tmp_path):
     out = tmp_path / "data.csv"
     page._export_service.export_data(rheojax, out, "csv")
     assert out.exists()
+
+
+def test_export_all_fit_results_writes_real_files(qtbot, tmp_path, monkeypatch):
+    """Regression: ExportPage called a nonexistent ExportService.export_fit_result,
+    so every export raised AttributeError (swallowed per-result) and "Export All
+    Fit Results" always reported "0 exported" with no file ever written.
+    """
+    from rheojax.gui.compat import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+
+    page = ExportPage()
+    qtbot.addWidget(page)
+
+    fit_result = FitResult(
+        model_name="maxwell",
+        parameters={"G0": 1000.0, "eta": 50.0},
+        chi_squared=0.01,
+        success=True,
+        message="ok",
+        timestamp=datetime.now(),
+        dataset_id="d1",
+    )
+    store = page._store
+    store._state = AppState(fit_results={"maxwell:d1": fit_result})
+
+    page._output_dir_edit.setText(str(tmp_path))
+    page._data_format_combo.setCurrentText("CSV")
+
+    page._export_all_fit_results()
+
+    written = list(tmp_path.glob("fit_*.csv"))
+    assert len(written) == 1
 
 
 def test_export_page_prepare_for_close_cancels_and_guards_callbacks(qtbot):

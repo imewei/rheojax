@@ -534,6 +534,25 @@ class TransformPage(QWidget):
         """Return list of available transforms with metadata."""
         return self._service.get_transform_metadata()
 
+    def get_checked_dataset_ids(self) -> list[str]:
+        """Return dataset ids checked in the multi-dataset checklist.
+
+        Regression: the "Datasets (select 2+)" checklist (shown for
+        requires_multiple transforms like Mastercurve/SRFS) had real
+        checkboxes, but nothing ever read their check state -- MainWindow
+        ran the transform over every loaded dataset regardless of which
+        ones were checked. Returns [] when the checklist isn't shown
+        (single-dataset transform, or nothing built yet).
+        """
+        if self._dataset_checklist is None:
+            return []
+        checked: list[str] = []
+        for i in range(self._dataset_checklist.count()):
+            item = self._dataset_checklist.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                checked.append(item.data(Qt.UserRole))
+        return checked
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

@@ -557,7 +557,11 @@ class ExportPage(QWidget):
             )
             file_path = output_dir / f"fit_{safe_name}.{data_ext}"
             try:
-                self._export_service.export_fit_result(fit_result, file_path, data_ext)
+                # ExportService has no export_fit_result method -- export_parameters()
+                # is the real API for writing a FitResult's parameters to disk. Every
+                # call here previously raised AttributeError (swallowed by the except
+                # below), so "Export All Fit Results" always reported "0 exported".
+                self._export_service.export_parameters(fit_result, file_path, data_ext)
                 exported.append(str(file_path))
             except Exception as exc:
                 logger.error(

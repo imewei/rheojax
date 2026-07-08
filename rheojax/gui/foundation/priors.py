@@ -49,18 +49,25 @@ def map_centered_priors(map_estimate: dict[str, float]) -> dict[str, dict]:
     Returns
     -------
     dict
-        ``{param_name: {"type": "lognormal", "loc": log(|val|), "scale": 1.0}, ...,
-        "sigma": {"type": "halfnormal", "scale": 1.0}}``.
+        ``{param_name: {"type": "lognormal", "loc": log(val), "scale": 1.0}, ...,
+        "sigma": {"type": "halfnormal", "scale": 1.0}}`` for non-negative MAP
+        values. A strictly negative MAP value instead gets
+        ``{"type": "normal", "loc": val, "scale": max(|val|, 1.0)}``, since
+        LogNormal's support is ``(0, inf)`` and cannot represent a negative
+        value at all -- not even with the "wrong" ``loc``.
 
     Notes
     -----
-    ``loc = log(|val|)`` so the LogNormal median equals the MAP value.
+    ``loc = log(val)`` so the LogNormal median equals the MAP value.
     ``scale = 1.0`` is a broad default; callers may tighten it.
     Zero or None values fall back to ``loc = 0.0``.
     """
     priors: dict[str, dict] = {}
     for name, val in map_estimate.items():
-        loc = math.log(abs(val)) if val not in (0.0, None) else 0.0
-        priors[name] = {"type": "lognormal", "loc": loc, "scale": 1.0}
+        if val not in (0.0, None) and val < 0:
+            priors[name] = {"type": "normal", "loc": val, "scale": max(abs(val), 1.0)}
+        else:
+            loc = math.log(val) if val not in (0.0, None) else 0.0
+            priors[name] = {"type": "lognormal", "loc": loc, "scale": 1.0}
     priors["sigma"] = {"type": "halfnormal", "scale": 1.0}
     return priors

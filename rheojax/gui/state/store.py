@@ -783,11 +783,29 @@ class StateStore:
                     self.emit_signal("dataset_added", dataset_id)
                     self.emit_signal("dataset_selected", dataset_id)
 
+            elif action_type == "SET_ACTIVE_DATASET":
+                # Regression: this branch was missing entirely, so switching
+                # datasets via the tree (which dispatches SET_ACTIVE_DATASET)
+                # never emitted dataset_selected. FitPage subscribes only to
+                # that signal (no state_changed fallback), so it silently
+                # went stale on every dataset switch.
+                dataset_id = action.get("dataset_id") or (
+                    action.get("payload") or {}
+                ).get("dataset_id")
+                if dataset_id:
+                    self.emit_signal("dataset_selected", dataset_id)
+
             elif action_type == "DELETE_SELECTED_DATASET":
                 # STORE-001: Emit dataset_removed with the id that was active
                 # *before* the reducer ran (captured above).  Subscribers such
                 # as the data tree use this to purge the deleted entry.
                 self.emit_signal("dataset_removed", _pre_delete_dataset_id)
+                # The reducer auto-selects the next remaining dataset (or
+                # None) as active -- emit dataset_selected for it too, for
+                # the same reason as the SET_ACTIVE_DATASET branch above.
+                new_active = self._state.active_dataset_id
+                if new_active:
+                    self.emit_signal("dataset_selected", new_active)
 
             elif action_type == "IMPORT_DATA_FAILED":
                 error = action.get("error", "")

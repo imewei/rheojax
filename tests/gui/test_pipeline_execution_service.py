@@ -209,6 +209,41 @@ class TestPipelineExecutionService:
         with pytest.raises(ValueError, match="'model'"):
             service._execute_fit(config={}, context={"data": mock_data})
 
+    def test_execute_fit_raises_on_unsuccessful_fit_result(self, service):
+        """_execute_fit must raise when ModelService.fit() reports success=False.
+
+        Regression: ModelService.fit() catches its own exceptions and returns
+        FitResult(success=False, ...) instead of raising. execute_all()/
+        execute_single_step() only mark a step ERROR when the handler raises,
+        so a diverged/failed fit was silently dispatched as StepStatus.COMPLETE
+        and the pipeline reported success.
+        """
+        mock_data = MagicMock()
+        failed_result = MagicMock(success=False, message="Fit diverged")
+        service._model_service = MagicMock()
+        service._model_service.fit.return_value = failed_result
+
+        with pytest.raises(RuntimeError, match="Fit diverged"):
+            service._execute_fit(
+                config={"model": "Maxwell"}, context={"data": mock_data}
+            )
+
+    def test_execute_single_step_marks_error_on_failed_fit(self, service):
+        """A failed fit step must land on StepStatus.ERROR, not COMPLETE."""
+        step_id = _add_fit_step()
+        step = get_pipeline_step_by_id(step_id)
+
+        mock_data = MagicMock()
+        failed_result = MagicMock(success=False, message="Fit diverged")
+        service._model_service = MagicMock()
+        service._model_service.fit.return_value = failed_result
+
+        with pytest.raises(RuntimeError, match="Fit diverged"):
+            service.execute_single_step(step, {"data": mock_data})
+
+        final_step = get_pipeline_step_by_id(step_id)
+        assert final_step.status == StepStatus.ERROR
+
     def test_execute_bayesian_requires_data_in_context(self, service):
         """_execute_bayesian must raise ValueError when context has no 'data'."""
         with pytest.raises(ValueError, match="prior load step"):
