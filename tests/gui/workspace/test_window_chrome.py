@@ -227,3 +227,75 @@ def test_preferences_dialog_restores_current_theme_selection(qtbot):
     )
     qtbot.addWidget(dialog)
     assert dialog.theme_combo.currentText() == "Dark"
+
+
+def test_command_palette_action_list_has_expected_labels(qtbot):
+    win = _win(qtbot)
+    actions = win._command_palette_actions()
+    assert set(actions.keys()) == {
+        "New Project",
+        "Open Project...",
+        "Save Project",
+        "Save Project As...",
+        "Switch to Fit Mode",
+        "Switch to Transform Mode",
+        "Switch to Pipeline Mode",
+        "Toggle Log Panel",
+        "Preferences...",
+        "Cycle Theme",
+    }
+
+
+def test_command_palette_switch_mode_action_calls_set_mode(qtbot):
+    win = _win(qtbot)
+    actions = win._command_palette_actions()
+    actions["Switch to Transform Mode"]()
+    assert win._mode == "transform"
+
+
+def test_command_palette_cycle_theme_action_advances_theme(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("light")
+    actions = win._command_palette_actions()
+    actions["Cycle Theme"]()
+    assert win._state.ui.theme == "dark"
+    actions = win._command_palette_actions()
+    actions["Cycle Theme"]()
+    assert win._state.ui.theme == "system"
+    actions = win._command_palette_actions()
+    actions["Cycle Theme"]()
+    assert win._state.ui.theme == "light"
+
+
+def test_command_palette_toggle_log_panel_action_triggers_action(qtbot):
+    win = _win(qtbot)
+    assert win.view_log_dock_action.isChecked() is False
+    actions = win._command_palette_actions()
+    actions["Toggle Log Panel"]()
+    assert win.view_log_dock_action.isChecked() is True
+
+
+def test_open_command_palette_invokes_selected_action(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog
+
+    win = _win(qtbot)
+    monkeypatch.setattr(
+        QInputDialog,
+        "getItem",
+        lambda *a, **k: ("Save Project", True),
+    )
+    calls = []
+    monkeypatch.setattr(win, "_on_save", lambda: calls.append(1))
+    win._open_command_palette()
+    assert calls == [1]
+
+
+def test_open_command_palette_cancelled_invokes_nothing(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog
+
+    win = _win(qtbot)
+    monkeypatch.setattr(QInputDialog, "getItem", lambda *a, **k: ("", False))
+    calls = []
+    monkeypatch.setattr(win, "_on_save", lambda: calls.append(1))
+    win._open_command_palette()
+    assert calls == []

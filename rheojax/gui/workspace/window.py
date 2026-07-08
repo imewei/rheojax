@@ -10,8 +10,11 @@ from rheojax.gui.compat import (
     QApplication,
     QCloseEvent,
     QDialog,
+    QInputDialog,
+    QKeySequence,
     QMainWindow,
     QPushButton,
+    QShortcut,
     QSplitter,
     Qt,
     QToolBar,
@@ -88,6 +91,7 @@ class WorkspaceWindow(QMainWindow):
 
         self._build_workspace(app_state)
         self._setup_os_theme_watcher()
+        QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
 
     def _build_file_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
@@ -117,6 +121,42 @@ class WorkspaceWindow(QMainWindow):
         theme = prefs.get("theme")
         if theme is not None:
             self._apply_theme(theme)
+
+    def _command_palette_actions(self) -> dict:
+        """Build the command palette's action dict fresh on every open.
+
+        Rebuilt (not cached) so "Cycle Theme" always closes over the
+        *current* self._state.ui.theme rather than a stale value captured
+        the first time the palette was opened.
+        """
+        theme_order = ["light", "dark", "system"]
+
+        def _cycle_theme() -> None:
+            current = self._state.ui.theme
+            idx = theme_order.index(current) if current in theme_order else 0
+            self._apply_theme(theme_order[(idx + 1) % len(theme_order)])
+
+        return {
+            "New Project": self._on_new,
+            "Open Project...": self._on_open,
+            "Save Project": self._on_save,
+            "Save Project As...": self._on_save_as,
+            "Switch to Fit Mode": lambda: self.set_mode("fit"),
+            "Switch to Transform Mode": lambda: self.set_mode("transform"),
+            "Switch to Pipeline Mode": lambda: self.set_mode("pipeline"),
+            "Toggle Log Panel": self.view_log_dock_action.trigger,
+            "Preferences...": self._on_preferences,
+            "Cycle Theme": _cycle_theme,
+        }
+
+    def _open_command_palette(self) -> None:
+        actions = self._command_palette_actions()
+        labels = sorted(actions.keys())
+        label, ok = QInputDialog.getItem(
+            self, "Command Palette", "Action:", labels, 0, False
+        )
+        if ok and label:
+            actions[label]()
 
     def _build_view_menu(self) -> None:
         menu = self.menuBar().addMenu("&View")
