@@ -817,11 +817,12 @@ class ModelRegistry:
         """
         registry = cls._get_registry()
         names = registry.find_compatible(protocol=protocol)
-        return [
-            registry.get_info(n, PluginType.MODEL)
-            for n in names
-            if registry.get_info(n, PluginType.MODEL) is not None
-        ]
+        result: list[PluginInfo] = []
+        for n in names:
+            info = registry.get_info(n, PluginType.MODEL)
+            if info is not None:
+                result.append(info)
+        return result
 
     @classmethod
     def compatible_models(cls, data: Any) -> list[PluginInfo]:
@@ -849,11 +850,12 @@ class ModelRegistry:
         names = registry.find_compatible(
             protocol=protocol,
         )
-        return [
-            registry.get_info(n, PluginType.MODEL)
-            for n in names
-            if registry.get_info(n, PluginType.MODEL) is not None
-        ]
+        result: list[PluginInfo] = []
+        for n in names:
+            info = registry.get_info(n, PluginType.MODEL)
+            if info is not None:
+                result.append(info)
+        return result
 
     @classmethod
     def model_info(cls, name: str) -> Any:
