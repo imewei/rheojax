@@ -890,7 +890,7 @@ class RheoJAXMainWindow(QMainWindow):
                 self,
                 "Save Failed",
                 "Save could not be completed.\n\n"
-                "Discard unsaved changes and continue anyway?",
+                f"Discard unsaved changes and proceed with {action_desc}?",
                 QMessageBox.StandardButton.Discard
                 | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,

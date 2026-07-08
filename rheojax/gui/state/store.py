@@ -789,9 +789,7 @@ class StateStore:
                 # never emitted dataset_selected. FitPage subscribes only to
                 # that signal (no state_changed fallback), so it silently
                 # went stale on every dataset switch.
-                dataset_id = action.get("dataset_id") or (
-                    action.get("payload") or {}
-                ).get("dataset_id")
+                dataset_id = action.get("dataset_id")
                 if dataset_id:
                     self.emit_signal("dataset_selected", dataset_id)
 
