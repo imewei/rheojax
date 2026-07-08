@@ -30,6 +30,8 @@ class DiagnosticsDict(TypedDict, total=False):
     num_chains: int
     num_samples_per_chain: int
     error: str
+    init_strategy: str
+    warm_start_failed: bool
 
 
 @dataclass
@@ -266,7 +268,9 @@ class BayesianResult:
         stats_dict: dict[str, xr.DataArray] = {}
         try:
             try:
-                extra_fields = self.mcmc.get_extra_fields(group_by_chain=True)
+                extra_fields: dict[str, Any] = self.mcmc.get_extra_fields(
+                    group_by_chain=True
+                )
             except TypeError:
                 extra_fields = self.mcmc.get_extra_fields()
 

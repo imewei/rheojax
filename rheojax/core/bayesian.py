@@ -27,7 +27,7 @@ import numpy as np
 
 from rheojax.core.bayesian_diagnostics import compute_diagnostics
 from rheojax.core.bayesian_result import BayesianResult, DiagnosticsDict
-from rheojax.core.data import RheoData
+from rheojax.core.data import ArrayLike, RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.numpyro_model_builder import build_numpyro_model, prior_dict_to_dist
 from rheojax.core.test_modes import TestMode, detect_test_mode
@@ -252,7 +252,7 @@ class BayesianMixin:
         return X_array, y_array, test_mode  # type: ignore[return-value]
 
     def _prepare_jax_data(
-        self, X_array: np.ndarray, y_array: np.ndarray
+        self, X_array: np.ndarray, y_array: ArrayLike
     ) -> dict[str, Any]:
         """Prepare JAX arrays and scale information for Bayesian inference.
 
@@ -1150,8 +1150,8 @@ class BayesianMixin:
         # R12-B-005: deepcopy is intentional safety — _last_fit_kwargs may contain
         # mutable objects (arrays, sub-dicts) that get mutated during sampling.
         _raw_lfk = getattr(self, "_last_fit_kwargs", None)
-        _saved_last_fit_kwargs = (
-            copy.deepcopy(_raw_lfk) if _raw_lfk is not None else None
+        _saved_last_fit_kwargs: dict = (
+            copy.deepcopy(_raw_lfk) if _raw_lfk is not None else {}
         )
 
         _fit_bayesian_succeeded = False
@@ -1171,6 +1171,11 @@ class BayesianMixin:
                 # Phase 2: Resolve test_mode and extract data
                 X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
                 y_array = y_from_rheo if y_from_rheo is not None else y
+                if y_array is None:
+                    raise ValueError(
+                        "fit_bayesian() requires `y` when `X` is not a RheoData "
+                        "instance (no observations to fit)."
+                    )
 
                 # R12-B-004: On success, _test_mode is permanently updated.
                 self._test_mode = test_mode
