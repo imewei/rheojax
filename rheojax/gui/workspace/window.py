@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
+from typing import Any
 
 from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
@@ -110,7 +111,7 @@ class WorkspaceWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.apply_preferences(dialog.get_preferences())
 
-    def apply_preferences(self, prefs: dict) -> None:
+    def apply_preferences(self, prefs: dict[str, Any]) -> None:
         """Apply preferences from PreferencesDialog.get_preferences().
 
         Only the "theme" key is acted on today -- the dialog exposes 15
