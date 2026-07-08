@@ -1582,8 +1582,11 @@ class RheoJAXMainWindow(QMainWindow):
                         config["num_warmup"] = 1000
                         config["num_samples"] = 2000
                         config["num_chains"] = 4
-                except Exception:
-                    pass
+                except AttributeError as exc:
+                    logger.debug(
+                        "Bayesian page unavailable; step config omits sampler settings",
+                        error=str(exc),
+                    )
 
             elif step.step_type == "export":
                 config["format"] = "directory"
@@ -2913,8 +2916,12 @@ class RheoJAXMainWindow(QMainWindow):
             try:
                 for meta in self.transform_page.get_available_transforms():
                     _display_to_key[meta["name"].lower()] = meta["key"]
-            except Exception:
-                pass
+            except (AttributeError, KeyError, TypeError) as exc:
+                logger.warning(
+                    "Failed to build transform display→key map; "
+                    "falling back to name-based id",
+                    error=str(exc),
+                )
             transform_id = _display_to_key.get(
                 transform_name.lower(), transform_name.lower()
             )
