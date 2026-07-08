@@ -328,6 +328,11 @@ class SpringPot(BaseModel):
         """
         c_alpha = self.parameters.get_value("c_alpha")
         alpha = self.parameters.get_value("alpha")
+        if c_alpha is None or alpha is None:
+            raise ValueError(
+                "SpringPot characteristic time requires 'c_alpha' and 'alpha' "
+                "parameter values to be set"
+            )
 
         # Avoid division by zero for alpha=0
         if alpha < 1e-10:
