@@ -879,6 +879,8 @@ def _clamp_to_bounds(value: float, name: str, model: BaseModel) -> float:
 
     try:
         bounds = model.parameters[name].bounds
+        if bounds is None:
+            raise ValueError(f"No bounds defined for parameter {name!r}")
         lo, hi = float(bounds[0]), float(bounds[1])
         if lo >= hi:
             # P2-Fit-5: When bounds are degenerate (lo == hi), the parameter
@@ -893,6 +895,8 @@ def _bounds_midpoint(name: str, model: BaseModel) -> float:
     """Return the geometric or arithmetic midpoint of a parameter's bounds."""
     try:
         bounds = model.parameters[name].bounds
+        if bounds is None:
+            raise ValueError(f"No bounds defined for parameter {name!r}")
         lo, hi = float(bounds[0]), float(bounds[1])
         if lo <= 0 or hi <= 0:
             # Arithmetic midpoint for non-positive bounds

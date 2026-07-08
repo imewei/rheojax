@@ -301,7 +301,9 @@ def compute_r_squared(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     return float(r2)
 
 
-def iterative_n_reduction(fit_results_dict: dict[int, float]) -> dict[str, ArrayLike]:
+def iterative_n_reduction(
+    fit_results_dict: dict[int, float],
+) -> dict[str, ArrayLike | float]:
     """Track R² vs N for element minimization visualization.
 
     Args:
