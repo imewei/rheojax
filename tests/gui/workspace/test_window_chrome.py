@@ -4,6 +4,7 @@ pytest.importorskip("PySide6")
 
 from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.resources.styles.tokens import ThemeManager
 from rheojax.gui.workspace.window import WorkspaceWindow
 
 
@@ -94,9 +95,6 @@ def test_on_open_shows_status_message(qtbot, monkeypatch, tmp_path):
     )
     win._on_open()
     assert win.statusBar().message_label.text() == "Project opened"
-
-
-from rheojax.gui.resources.styles.tokens import ThemeManager
 
 
 def test_apply_theme_light_sets_state_and_theme_manager(qtbot):
@@ -273,6 +271,33 @@ def test_command_palette_toggle_log_panel_action_triggers_action(qtbot):
     actions = win._command_palette_actions()
     actions["Toggle Log Panel"]()
     assert win.view_log_dock_action.isChecked() is True
+
+
+def test_command_palette_new_project_action_calls_on_new(qtbot, monkeypatch):
+    win = _win(qtbot)
+    calls = []
+    monkeypatch.setattr(win, "_on_new", lambda: calls.append(1))
+    actions = win._command_palette_actions()
+    actions["New Project"]()
+    assert calls == [1]
+
+
+def test_command_palette_open_project_action_calls_on_open(qtbot, monkeypatch):
+    win = _win(qtbot)
+    calls = []
+    monkeypatch.setattr(win, "_on_open", lambda: calls.append(1))
+    actions = win._command_palette_actions()
+    actions["Open Project..."]()
+    assert calls == [1]
+
+
+def test_command_palette_save_as_action_calls_on_save_as(qtbot, monkeypatch):
+    win = _win(qtbot)
+    calls = []
+    monkeypatch.setattr(win, "_on_save_as", lambda: calls.append(1))
+    actions = win._command_palette_actions()
+    actions["Save Project As..."]()
+    assert calls == [1]
 
 
 def test_open_command_palette_invokes_selected_action(qtbot, monkeypatch):

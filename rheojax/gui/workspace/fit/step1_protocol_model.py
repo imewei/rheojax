@@ -176,11 +176,8 @@ class ProtocolModelStep(QWidget):
         self._on_model(self._model.currentData())
 
     def model_keys(self) -> list[str]:
-        return [
-            self._model.itemData(i)
-            for i in range(self._model.count())
-            if self._model.itemData(i)
-        ]
+        data = (self._model.itemData(i) for i in range(self._model.count()))
+        return [key for key in data if key]
 
     def set_model(self, key: str) -> None:
         idx = self._model.findData(key)

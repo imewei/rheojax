@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -123,7 +124,7 @@ class WorkspaceWindow(QMainWindow):
         if theme is not None:
             self._apply_theme(theme)
 
-    def _command_palette_actions(self) -> dict:
+    def _command_palette_actions(self) -> dict[str, Callable[[], None]]:
         """Build the command palette's action dict fresh on every open.
 
         Rebuilt (not cached) so "Cycle Theme" always closes over the

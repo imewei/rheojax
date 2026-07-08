@@ -50,12 +50,11 @@ class ExportStep(QWidget):
         if not chosen:
             return
         try:
-            written = self.export_bundle(Path(chosen))
+            self.export_bundle(Path(chosen))
         except OSError as exc:
             self._export_status.setText(f"Export failed: {exc}")
             return
         self._export_status.setText(f"Exported to {Path(chosen)}")
-        return written
 
     def bundle_manifest(self) -> list[str]:
         # ponytail: "figures" isn't listed -- export_bundle() has no figure
