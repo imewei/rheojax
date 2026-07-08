@@ -465,8 +465,8 @@ class FitPage(QWidget):
         try:
             if self._parameter_table.state() == QAbstractItemView.State.EditingState:
                 return
-        except Exception:
-            pass
+        except RuntimeError:
+            pass  # Qt widget may be deleted mid-refresh; safe to proceed
 
         params = self._store.get_state().model_params
         if not params:
@@ -1082,8 +1082,8 @@ class FitPage(QWidget):
                         var = pcov_arr[i, i]
                         if var > 0:
                             param_uncertainties[name] = float(np.sqrt(var))
-            except Exception:
-                pass
+            except (ValueError, TypeError) as e:
+                logger.debug("parameter uncertainty extraction failed: %s", e)
 
         if params:
             lines.append("")

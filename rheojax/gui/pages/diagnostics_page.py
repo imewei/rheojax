@@ -310,19 +310,19 @@ class DiagnosticsPage(QWidget):
                                 elpd_val = f"{float(waic_res.elpd_waic):.2f}"
                             elif hasattr(waic_res, "elpd"):
                                 elpd_val = f"{float(waic_res.elpd):.2f}"
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("WAIC computation failed: %s", e)
 
                         try:
                             loo_res = az.loo(idata, scale="deviance")
                             loo_val = f"{float(loo_res.loo):.2f}"
                             if hasattr(loo_res, "elpd_loo"):
                                 elpd_val = f"{float(loo_res.elpd_loo):.2f}"
-                        except Exception:
-                            pass
-            except Exception:
+                        except Exception as e:
+                            logger.warning("LOO computation failed: %s", e)
+            except Exception as e:
                 # Leave display as graceful '--'
-                pass
+                logger.debug("model comparison metrics unavailable: %s", e)
 
             self._comparison_table.setItem(i, 1, QTableWidgetItem(waic_val))
             self._comparison_table.setItem(i, 2, QTableWidgetItem(loo_val))
@@ -631,14 +631,14 @@ class DiagnosticsPage(QWidget):
                 try:
                     waic_res = az.waic(idata, scale="deviance")
                     values["WAIC"] = f"{float(waic_res.waic):.2f}"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("WAIC computation failed: %s", e)
 
                 try:
                     loo_res = az.loo(idata, scale="deviance")
                     values["LOO"] = f"{float(loo_res.loo):.2f}"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("LOO computation failed: %s", e)
             except ImportError:
                 pass
 
