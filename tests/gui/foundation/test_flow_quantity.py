@@ -1,6 +1,6 @@
 import pytest
 
-import rheojax.models  # noqa: ensure registration
+import rheojax.models  # noqa: F401 - ensure registration
 from rheojax.core.registry import ModelRegistry
 
 

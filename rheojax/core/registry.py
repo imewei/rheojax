@@ -960,6 +960,13 @@ class TransformRegistry:
             >>> transform = TransformRegistry.create('fft_analysis')
         """
         registry = cls._get_registry()
+        # If the transform isn't registered yet, eagerly import the transforms
+        # package to trigger @TransformRegistry.register decorators (lazy-import
+        # fallback), mirroring ModelRegistry.create()'s self-bootstrap contract.
+        if registry.get(name, PluginType.TRANSFORM) is None:
+            from rheojax.transforms import _ensure_all_registered
+
+            _ensure_all_registered()
         return registry.create_instance(name, PluginType.TRANSFORM, *args, **kwargs)
 
     @classmethod
@@ -974,6 +981,9 @@ class TransformRegistry:
             >>> print(transforms)
             ['fft_analysis', 'mastercurve', 'owchirp', ...]
         """
+        from rheojax.transforms import _ensure_all_registered
+
+        _ensure_all_registered()
         registry = cls._get_registry()
         return registry.get_all_transforms()
 
