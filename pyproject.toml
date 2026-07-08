@@ -190,7 +190,8 @@ addopts = [
     "--color=yes",
     "--cov=rheojax",
     "--cov-report=term-missing",  # html/xml: pass --cov-report=html|xml in CI
-    "--dist=loadscope",  # Distribute tests by scope for better load balancing
+    "--dist=loadgroup",  # loadscope + honors @pytest.mark.xdist_group (keeps
+                          # CPU-heavy NUTS tests off separate concurrent workers)
     "--maxfail=10",      # Stop after 10 failures to save time
     "--timeout=120",     # Kill hung tests after 120s to prevent OOM
 ]

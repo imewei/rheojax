@@ -14,6 +14,12 @@ from rheojax.core.parameters import ParameterSet
 from rheojax.core.test_modes import TestMode
 from rheojax.models import Zener
 
+# NUTS sampling is CPU/memory-heavy; keep this module's tests in a single
+# xdist worker (requires --dist=loadgroup) instead of scattering them across
+# workers, where concurrent NUTS runs compete for the same cores and can
+# stall well past the per-test timeout.
+pytestmark = pytest.mark.xdist_group(name="bayesian_nuts")
+
 
 class SimpleBayesianModel(BayesianMixin):
     """Simple model for testing BayesianMixin functionality."""
