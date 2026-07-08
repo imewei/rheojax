@@ -7,6 +7,7 @@ from pathlib import Path
 from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
     QAction,
+    QApplication,
     QCloseEvent,
     QMainWindow,
     QPushButton,
@@ -18,6 +19,8 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.foundation.notifier import DatasetLibraryNotifier
 from rheojax.gui.foundation.state import AppState
+from rheojax.gui.resources import load_stylesheet
+from rheojax.gui.resources.styles.tokens import ThemeManager
 from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
 from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
@@ -27,6 +30,9 @@ from rheojax.gui.workspace.stepper_canvas import StepperCanvas
 from rheojax.gui.workspace.transform.transform_controller import (
     build_transform_controller,
 )
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class WorkspaceWindow(QMainWindow):
@@ -79,6 +85,7 @@ class WorkspaceWindow(QMainWindow):
         self._build_view_menu()
 
         self._build_workspace(app_state)
+        self._setup_os_theme_watcher()
 
     def _build_file_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
@@ -98,12 +105,136 @@ class WorkspaceWindow(QMainWindow):
         menu.addAction(action)
         self.view_log_dock_action = action
 
+        theme_menu = menu.addMenu("&Theme")
+        self._theme_light_action = QAction("&Light", self)
+        self._theme_dark_action = QAction("&Dark", self)
+        self._theme_system_action = QAction("&System", self)
+        for theme_action in (
+            self._theme_light_action,
+            self._theme_dark_action,
+            self._theme_system_action,
+        ):
+            theme_action.setCheckable(True)
+        self._theme_light_action.triggered.connect(lambda: self._apply_theme("light"))
+        self._theme_dark_action.triggered.connect(lambda: self._apply_theme("dark"))
+        self._theme_system_action.triggered.connect(
+            lambda: self._apply_theme("system")
+        )
+        theme_menu.addAction(self._theme_light_action)
+        theme_menu.addAction(self._theme_dark_action)
+        theme_menu.addAction(self._theme_system_action)
+
+    def _apply_theme(self, theme: str) -> None:
+        """Apply a QSS theme to the QApplication and sync UI/state.
+
+        ``theme`` is normalized to lowercase on entry -- ``PreferencesDialog``
+        (Task 3) round-trips theme as "Light"/"Dark"/"System" (its combo
+        box's exact item text via ``currentText()``), while every other
+        caller in this file already passes lowercase. Normalizing here, once,
+        in the function every caller routes through, means no caller needs
+        to know or care which convention the *other* callers use --
+        ``load_stylesheet()`` only ever accepts lowercase "light"/"dark" and
+        raises ``ValueError`` on anything else, so this must happen before
+        ``chosen`` is computed. The stored preference is the lowercased
+        *requested* value (not the resolved one), so a saved "system"
+        preference round-trips as "system", not as whatever the OS scheme
+        happened to be at the time it was applied.
+        """
+        theme = theme.lower()
+        app = QApplication.instance()
+        if app is None:
+            return
+        chosen = self._detect_os_color_scheme() if theme == "system" else theme
+        try:
+            stylesheet = load_stylesheet(chosen)
+            # main.py sets an adaptive base font size at startup and appends
+            # a matching "* { font-size: ...pt; }" rule to the stylesheet
+            # (see main.py's app.setFont(base_font) + stylesheet +=
+            # f"\n* {{ font-size: {base_font_size:.1f}pt; }}\n"). A bare
+            # app.setStyleSheet(load_stylesheet(chosen)) here would replace
+            # the whole stylesheet and silently drop that rule on every
+            # theme switch, including the first one (_build_workspace calls
+            # _apply_theme almost immediately after main.py's initial
+            # setStyleSheet). Recover the already-applied base font size
+            # from the app's current QFont and re-append the same rule.
+            font_size = app.font().pointSizeF()
+            stylesheet += f"\n* {{ font-size: {font_size:.1f}pt; }}\n"
+            app.setStyleSheet(stylesheet)
+            ThemeManager.set_theme(chosen)
+        except Exception as exc:
+            logger.error(
+                "Failed to apply theme", theme=theme, error=str(exc), exc_info=True
+            )
+            return
+        self._state.ui.theme = theme
+        self._theme_light_action.setChecked(theme == "light")
+        self._theme_dark_action.setChecked(theme == "dark")
+        self._theme_system_action.setChecked(theme == "system")
+        self.statusBar().show_message(f"Theme: {theme.capitalize()}", 2000)
+
+    @staticmethod
+    def _detect_os_color_scheme() -> str:
+        """Detect the current OS color scheme.
+
+        Tries ``QStyleHints.colorScheme()`` (Qt 6.5+) first, then falls back
+        to measuring the ``QPalette.Window`` luminance.
+
+        Returns
+        -------
+        str
+            ``"dark"`` or ``"light"``.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return "light"
+        try:
+            hints = app.styleHints()
+            if hasattr(hints, "colorScheme"):
+                from rheojax.gui.compat import Qt as _Qt
+
+                scheme = hints.colorScheme()
+                if scheme == _Qt.ColorScheme.Dark:
+                    return "dark"
+                if scheme == _Qt.ColorScheme.Light:
+                    return "light"
+        except Exception:
+            pass
+        palette = app.palette()
+        window_color = palette.color(palette.ColorRole.Window)
+        luminance = (
+            0.299 * window_color.red()
+            + 0.587 * window_color.green()
+            + 0.114 * window_color.blue()
+        )
+        return "dark" if luminance < 128 else "light"
+
+    def _setup_os_theme_watcher(self) -> None:
+        """Hook ``QStyleHints.colorSchemeChanged`` (Qt 6.5+) to re-apply "system" theme.
+
+        Call once during window init. Silently no-ops on Qt < 6.5.
+        """
+        try:
+            app = QApplication.instance()
+            if app is None:
+                return
+            hints = app.styleHints()
+            if hasattr(hints, "colorSchemeChanged"):
+                hints.colorSchemeChanged.connect(self._on_os_color_scheme_changed)
+        except Exception:
+            logger.debug("QStyleHints.colorSchemeChanged not available")
+
+    def _on_os_color_scheme_changed(self) -> None:
+        """Re-apply the theme only when the user preference is "system"."""
+        if self._state.ui.theme == "system":
+            self._apply_theme("system")
+
     def log(self, message: str) -> None:
         """Append message to the log dock at INFO level."""
         self.log_dock.append_record(logging.INFO, message)
 
     def _build_workspace(self, state: AppState) -> None:
         self._state = state
+        self._apply_theme(state.ui.theme)
         initial_mode = state.ui.mode
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
         from rheojax.gui.workspace.pipeline.controller import build_pipeline_controller

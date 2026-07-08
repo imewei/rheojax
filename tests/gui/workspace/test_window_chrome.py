@@ -94,3 +94,66 @@ def test_on_open_shows_status_message(qtbot, monkeypatch, tmp_path):
     )
     win._on_open()
     assert win.statusBar().message_label.text() == "Project opened"
+
+
+from rheojax.gui.resources.styles.tokens import ThemeManager
+
+
+def test_apply_theme_light_sets_state_and_theme_manager(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("light")
+    assert win._state.ui.theme == "light"
+    assert ThemeManager.is_dark() is False
+    assert win._theme_light_action.isChecked() is True
+    assert win._theme_dark_action.isChecked() is False
+    assert win._theme_system_action.isChecked() is False
+
+
+def test_apply_theme_dark_sets_state_and_theme_manager(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("dark")
+    assert win._state.ui.theme == "dark"
+    assert ThemeManager.is_dark() is True
+    assert win._theme_dark_action.isChecked() is True
+
+
+def test_apply_theme_system_stores_system_not_resolved_value(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("system")
+    # The stored preference must stay "system" even though ThemeManager
+    # ends up holding whatever concrete light/dark value was resolved --
+    # otherwise reloading a saved "system" preference would incorrectly
+    # freeze at whatever the OS scheme happened to be at save time.
+    assert win._state.ui.theme == "system"
+    assert win._theme_system_action.isChecked() is True
+    assert ThemeManager.is_dark() in (True, False)
+
+
+def test_apply_theme_shows_status_message(qtbot):
+    win = _win(qtbot)
+    win._apply_theme("dark")
+    assert win.statusBar().message_label.text() == "Theme: Dark"
+
+
+def test_theme_menu_actions_call_apply_theme(qtbot):
+    win = _win(qtbot)
+    win._theme_dark_action.trigger()
+    assert win._state.ui.theme == "dark"
+
+
+def test_build_workspace_applies_saved_theme_on_construction(qtbot):
+    from rheojax.gui.foundation.state import UiState
+
+    win = WorkspaceWindow(AppState(ui=UiState(theme="dark")))
+    qtbot.addWidget(win)
+    assert ThemeManager.is_dark() is True
+    assert win._theme_dark_action.isChecked() is True
+
+
+def test_build_workspace_applies_saved_theme_on_rebuild(qtbot):
+    from rheojax.gui.foundation.state import UiState
+
+    win = _win(qtbot)
+    win._apply_theme("light")
+    win._rebuild(AppState(ui=UiState(theme="dark")))
+    assert ThemeManager.is_dark() is True
