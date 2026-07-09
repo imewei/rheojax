@@ -306,7 +306,7 @@ class TestSAOSModuli:
         omega = jnp.logspace(-2, 2, 20)
 
         G_prime, G_double_prime = giesekus_saos_moduli_vec(
-            omega, eta_p, lambda_1, eta_s
+            omega, eta_p, lambda_1, eta_s, 1.0
         )
 
         assert G_prime.shape == (20,)

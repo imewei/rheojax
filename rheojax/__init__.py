@@ -67,11 +67,12 @@ try:
 except ImportError:
     __jax_version__ = "not installed"
 
-# Version information
+# Version information (derived from __version__ so the two cannot drift)
+_major, _minor, _patch = (int(part) for part in __version__.split("."))
 VERSION_INFO = {
-    "major": 0,
-    "minor": 6,
-    "patch": 0,
+    "major": _major,
+    "minor": _minor,
+    "patch": _patch,
     "release": "stable",
     "python_requires": ">=3.12",
 }

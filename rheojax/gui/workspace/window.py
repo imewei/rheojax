@@ -693,6 +693,13 @@ class WorkspaceWindow(QMainWindow):
         self._poll_active_jobs_then(proceed, remaining_polls=120)  # 120 * 250ms = 30s
 
     def _poll_active_jobs_then(self, proceed, remaining_polls: int) -> None:
+        from rheojax.gui.compat import _is_qobject_alive
+
+        if not _is_qobject_alive(self):
+            # Window was destroyed (e.g. test teardown) while this poll chain
+            # was still in flight -- the QTimer.singleShot below already fired
+            # into a dangling `self`. Bail out before touching any Qt API.
+            return
         if not self._state.active_jobs.by_id:
             self._active_jobs_action_pending = False
             proceed()
