@@ -533,18 +533,15 @@ class TestSGRGenericFitValidation:
 
 
 class TestSGRGenericLAOSFitBugs:
-    """LAOS fitting via the public fit() API is currently broken (bug report).
+    """LAOS fitting via the public fit() API.
 
-    Both branches of _fit_laos_mode forward **kwargs that still contain the
-    positional argument names (omega / gamma_0 / n_particles), so the inner
-    call raises TypeError('got multiple values for argument ...').
+    Regression coverage for a bug where both branches of _fit_laos_mode
+    forwarded **kwargs that still contained the positional argument names
+    (omega / gamma_0 / n_particles), so the inner call raised
+    TypeError('got multiple values for argument ...'). Fixed by filtering
+    the already-consumed keys out of kwargs before re-forwarding.
     """
 
-    @pytest.mark.xfail(
-        reason="_fit_laos_mode passes omega in **kwargs to _fit_oscillation_mode "
-        "(positional collision); small-amplitude LAOS fit is broken.",
-        strict=True,
-    )
     def test_laos_saos_branch_small_amplitude(self):
         model = _make_model()
         model._test_mode = "oscillation"
@@ -556,11 +553,6 @@ class TestSGRGenericLAOSFitBugs:
         model.fit(t, stress, test_mode="laos", gamma_0=gamma_0, omega=omega)
         assert model.fitted_ is True
 
-    @pytest.mark.xfail(
-        reason="_fit_laos_mode passes gamma_0/omega/n_particles in **kwargs to "
-        "_fit_laos_mc (positional collision); MC LAOS fit is broken.",
-        strict=True,
-    )
     def test_laos_mc_branch_large_amplitude(self):
         model = _make_model()
         omega = 2.0

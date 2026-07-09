@@ -997,6 +997,17 @@ class SGRGeneric(BaseModel):
         n_particles = kwargs.get("n_particles", 5000)
         use_pde = kwargs.get("use_pde", False)
 
+        # gamma_0/omega/n_particles/use_pde are consumed above and re-forwarded
+        # as explicit positional/keyword args below -- leaving them in kwargs
+        # would collide with the same-named positional parameters on
+        # _fit_oscillation_mode (omega) and _fit_laos_mc (gamma_0, omega,
+        # n_particles), raising "got multiple values for argument".
+        remaining_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in ("gamma_0", "omega", "n_particles", "use_pde")
+        }
+
         logger.info(
             f"SGR GENERIC LAOS fitting: gamma_0={gamma_0}, omega={omega}, "
             f"{'PDE' if use_pde else 'MC'} solver with {n_particles if not use_pde else 'grid'}"
@@ -1031,10 +1042,12 @@ class SGRGeneric(BaseModel):
             omega_single = np.array([omega])
             G_star_single = np.array([[G_prime, G_double_prime]])
 
-            self._fit_oscillation_mode(omega_single, G_star_single, **kwargs)
+            self._fit_oscillation_mode(omega_single, G_star_single, **remaining_kwargs)
         else:
             # Large amplitude - full MC-based LAOS fitting
-            self._fit_laos_mc(t, sigma, gamma_0, omega, n_particles, **kwargs)
+            self._fit_laos_mc(
+                t, sigma, gamma_0, omega, n_particles, **remaining_kwargs
+            )
 
     def _fit_laos_mc(
         self,
