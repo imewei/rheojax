@@ -702,6 +702,15 @@ class SGRConventional(BaseModel):
 
         n_particles = kwargs.get("n_particles", 5000)
 
+        # gamma_0/omega/n_particles are consumed above and re-forwarded as explicit
+        # positional args below -- leaving them in kwargs would collide with the
+        # same-named positional parameters on _fit_oscillation_mode (omega) and
+        # _fit_laos_mc (gamma_0, omega, n_particles), raising "got multiple values
+        # for argument".
+        remaining_kwargs = {
+            k: v for k, v in kwargs.items() if k not in ("gamma_0", "omega", "n_particles")
+        }
+
         # Use SAOS approximation for small amplitude
         if gamma_0 < 0.1:
             logger.info(
@@ -726,10 +735,10 @@ class SGRConventional(BaseModel):
             omega_single = np.array([omega])
             G_star_single = np.array([[G_prime, G_double_prime]])
 
-            self._fit_oscillation_mode(omega_single, G_star_single, **kwargs)
+            self._fit_oscillation_mode(omega_single, G_star_single, **remaining_kwargs)
         else:
             # Full MC-based LAOS fitting
-            self._fit_laos_mc(X, y, gamma_0, omega, n_particles, **kwargs)
+            self._fit_laos_mc(X, y, gamma_0, omega, n_particles, **remaining_kwargs)
 
     def _fit_laos_mc(
         self,

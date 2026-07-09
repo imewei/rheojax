@@ -67,8 +67,15 @@ try:
 except ImportError:
     __jax_version__ = "not installed"
 
-# Version information (derived from __version__ so the two cannot drift)
-_major, _minor, _patch = (int(part) for part in __version__.split("."))
+# Version information (derived from __version__ so the two cannot drift).
+# Uses a tolerant regex (not a plain int(part) split) so a future pre-release/dev/local
+# suffix (e.g. "0.8.0rc1", "0.8.0.dev1") can't crash `import rheojax` itself.
+import re as _re
+
+_version_match = _re.match(r"(\d+)\.(\d+)\.(\d+)", __version__)
+if _version_match is None:
+    raise ValueError(f"Cannot parse __version__={__version__!r} into major.minor.patch")
+_major, _minor, _patch = (int(g) for g in _version_match.groups())
 VERSION_INFO = {
     "major": _major,
     "minor": _minor,

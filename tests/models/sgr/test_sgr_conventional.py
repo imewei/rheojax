@@ -1308,12 +1308,13 @@ class TestSGRConventionalLAOSFitting:
             model.fit(t, sigma, test_mode="laos", gamma_0=-0.1, omega=1.0)
 
     def test_laos_saos_approximation_small_amplitude(self):
-        """Small gamma_0 (<0.1) routes through SAOS-approx branch (lines 706-729).
+        """Small gamma_0 (<0.1) routes through the SAOS-approx branch (lines 706-729).
 
-        NOTE: the SAOS branch forwards **kwargs (which still contain omega) to
-        _fit_oscillation_mode, causing a TypeError collision on 'omega' — a real
-        bug (see module docstring in this test). Lines 706-729 still execute
-        before the collision, so parameter caching is verified here.
+        Regression coverage for a kwargs-collision bug: _fit_laos_mode read
+        gamma_0/omega/n_particles via kwargs.get (not pop), so they remained in
+        **kwargs and collided with the same-named positional parameter on
+        _fit_oscillation_mode (omega). Fixed by filtering the already-consumed
+        keys out of kwargs before re-forwarding.
         """
         model = SGRConventional()
         model.parameters.set_value("x", 1.5)
@@ -1326,39 +1327,35 @@ class TestSGRConventionalLAOSFitting:
         strain = 0.05 * np.sin(omega * t)
         sigma = 1e3 * strain
 
-        # SAOS branch executes lines 706-729 regardless of the downstream
-        # kwargs-collision bug (or a possible convergence RuntimeError).
-        try:
-            model._fit_laos_mode(t, sigma, gamma_0=0.05, omega=omega)
-        except (RuntimeError, TypeError):
-            pass
+        model._fit_laos_mode(t, sigma, gamma_0=0.05, omega=omega)
 
+        assert model.fitted_ is True
         # LAOS parameters are cached (lines 698-701) before the branch.
         assert model._gamma_0 == 0.05
         assert model._omega_laos == omega
 
-    def test_laos_mc_dispatch_kwargs_collision_bug(self):
-        """Public LAOS fit with gamma_0>=0.1 hits a real kwargs-collision bug.
+    def test_laos_mc_dispatch_kwargs_no_collision(self):
+        """Public LAOS fit with gamma_0>=0.1 routes to the MC branch cleanly.
 
-        _fit_laos_mode reads gamma_0/omega via kwargs.get (not pop), so they
-        remain in **kwargs and collide when forwarded positionally to
-        _fit_laos_mc. This documents the defect and covers routing lines
-        690-704 and 730-732.
+        Regression coverage for the same kwargs-collision bug as above, but for
+        the MC dispatch (_fit_laos_mc's gamma_0/omega/n_particles positional
+        parameters). Covers routing lines 690-704 and 730-732.
         """
         model = SGRConventional()
         t = np.linspace(0, 4 * np.pi, 40)
         sigma = 1e3 * 0.5 * np.sin(t)
 
-        with pytest.raises(TypeError, match="multiple values for argument 'gamma_0'"):
-            model.fit(
-                t,
-                sigma,
-                test_mode="laos",
-                gamma_0=0.5,
-                omega=1.0,
-                n_particles=64,
-                max_iter=2,
-            )
+        model.fit(
+            t,
+            sigma,
+            test_mode="laos",
+            gamma_0=0.5,
+            omega=1.0,
+            n_particles=64,
+            max_iter=2,
+        )
+
+        assert model.fitted_ is True
 
     def test_laos_mc_fitting_direct(self):
         """Exercise the Monte Carlo fit body directly (lines 761-862).
