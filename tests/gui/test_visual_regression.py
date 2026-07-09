@@ -14,6 +14,7 @@ Run with:
 Golden images stored in: tests/gui/golden_images/
 """
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,34 @@ import pytest
 
 # Mark all tests as GUI and visual tests
 pytestmark = [pytest.mark.gui, pytest.mark.visual]
+
+# Belt-and-suspenders for the host FreeType/Agg bug (see save_golden_image /
+# compare_figures below): a corrupted bbox_inches='tight' pass can request a
+# figure many GB-TB in size. The RuntimeError/ValueError/MemoryError catches
+# there only stop the *test* from failing -- the dangerous allocation (which
+# has been observed to transiently spike a worker's RSS by 30+GB and get it
+# OOM-killed under the full parallel suite) already happened by the time
+# those exceptions fire. Cap the process's address space for the duration of
+# the risky call so any runaway allocation attempt fails fast and cleanly
+# (a normal MemoryError, already handled) instead of actually being granted.
+@contextlib.contextmanager
+def _capped_address_space(limit_bytes: int = 4 * 1024**3):
+    try:
+        import resource
+    except ImportError:
+        yield  # not available on this platform (e.g. Windows) -- no-op
+        return
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    new_limit = limit_bytes if hard == resource.RLIM_INFINITY else min(limit_bytes, hard)
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (new_limit, hard))
+    except (ValueError, OSError):
+        yield  # some environments (containers, restricted setrlimit) refuse this
+        return
+    try:
+        yield
+    finally:
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
 
 # Check if PySide6 is available
 try:
@@ -109,7 +138,8 @@ def save_golden_image(figure: Any, path: Path) -> None:
         Output file path
     """
     try:
-        figure.savefig(path, dpi=100, bbox_inches="tight")
+        with _capped_address_space():
+            figure.savefig(path, dpi=100, bbox_inches="tight")
     except (RuntimeError, MemoryError) as e:
         pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
     except ValueError as e:
@@ -145,7 +175,8 @@ def compare_figures(actual: Any, expected_path: Path, threshold: float = 0.01) -
         actual_path = Path(f.name)
 
     try:
-        actual.savefig(actual_path, dpi=100, bbox_inches="tight")
+        with _capped_address_space():
+            actual.savefig(actual_path, dpi=100, bbox_inches="tight")
     except (RuntimeError, MemoryError) as e:
         # Known host-environment FreeType/Agg rendering bug (glyph "raster
         # overflow", sometimes cascading to a std::bad_alloc) -- not a
