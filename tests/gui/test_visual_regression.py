@@ -14,43 +14,16 @@ Run with:
 Golden images stored in: tests/gui/golden_images/
 """
 
-import contextlib
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
 
+from tests.gui.conftest import run_gui_code_subprocess
+
 # Mark all tests as GUI and visual tests
 pytestmark = [pytest.mark.gui, pytest.mark.visual]
-
-# Belt-and-suspenders for the host FreeType/Agg bug (see save_golden_image /
-# compare_figures below): a corrupted bbox_inches='tight' pass can request a
-# figure many GB-TB in size. The RuntimeError/ValueError/MemoryError catches
-# there only stop the *test* from failing -- the dangerous allocation (which
-# has been observed to transiently spike a worker's RSS by 30+GB and get it
-# OOM-killed under the full parallel suite) already happened by the time
-# those exceptions fire. Cap the process's address space for the duration of
-# the risky call so any runaway allocation attempt fails fast and cleanly
-# (a normal MemoryError, already handled) instead of actually being granted.
-@contextlib.contextmanager
-def _capped_address_space(limit_bytes: int = 4 * 1024**3):
-    try:
-        import resource
-    except ImportError:
-        yield  # not available on this platform (e.g. Windows) -- no-op
-        return
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-    new_limit = limit_bytes if hard == resource.RLIM_INFINITY else min(limit_bytes, hard)
-    try:
-        resource.setrlimit(resource.RLIMIT_AS, (new_limit, hard))
-    except (ValueError, OSError):
-        yield  # some environments (containers, restricted setrlimit) refuse this
-        return
-    try:
-        yield
-    finally:
-        resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
 
 # Check if PySide6 is available
 try:
@@ -127,72 +100,56 @@ def figure_to_array(figure: Any) -> np.ndarray:
     return np.asarray(buf)
 
 
-def save_golden_image(figure: Any, path: Path) -> None:
-    """Save figure as golden reference image.
+# Rendering runs in a fresh, isolated subprocess rather than the pytest
+# worker process. Root cause (confirmed empirically): this host's
+# matplotlib/FreeType text-metrics state reliably becomes corrupted after
+# enough Figure/FigureCanvasQTAgg churn within a single process -- the exact
+# same widget-creation code produces a correct ~7x5 inch tight bbox in a
+# fresh interpreter, but a corrupted ~1447x1946 inch bbox (-> MemoryError:
+# std::bad_alloc trying to allocate the resulting ~28-billion-pixel buffer)
+# after running inside a pytest session with other GUI tests, and a raw
+# `FT_Render_Glyph ... raster overflow` even with bbox_inches=None (so the
+# corruption is in glyph rasterization itself, not just tight-bbox
+# measurement). No savefig argument or memory cap avoids it -- only a fresh
+# process does. `widget_code` must define a variable named `fig` bound to
+# the Figure to save.
+def _render_widget_figure(widget_code: str, save_path: Path, timeout: float = 15.0) -> None:
+    preamble = (
+        "from PySide6.QtWidgets import QApplication\n"
+        "app = QApplication.instance() or QApplication([])\n"
+    )
+    full_code = (
+        preamble
+        + widget_code
+        + f'\nfig.savefig({str(save_path)!r}, dpi=100, bbox_inches="tight")\n'
+        + 'print("RENDER_OK")\n'
+    )
+    result = run_gui_code_subprocess(full_code, timeout=timeout)
+    assert not result.crashed and "RENDER_OK" in result.stdout, (
+        f"Widget render failed in subprocess (rc={result.return_code}, "
+        f"signal={result.signal_name}):\nSTDOUT:\n{result.stdout}\n"
+        f"STDERR:\n{result.stderr}"
+    )
 
-    Parameters
-    ----------
-    figure : matplotlib.Figure
-        Matplotlib figure object
-    path : Path
-        Output file path
-    """
-    try:
-        with _capped_address_space():
-            figure.savefig(path, dpi=100, bbox_inches="tight")
-    except (RuntimeError, MemoryError) as e:
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    except ValueError as e:
-        if "too large" not in str(e):
-            raise
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
+
+def save_golden_image(widget_code: str, path: Path) -> None:
+    """Render widget_code's figure in an isolated subprocess and save it as
+    the golden reference image."""
+    _render_widget_figure(widget_code, path)
 
 
-def compare_figures(actual: Any, expected_path: Path, threshold: float = 0.01) -> bool:
-    """Compare figure against golden image.
-
-    Parameters
-    ----------
-    actual : matplotlib.Figure
-        Actual figure to compare
-    expected_path : Path
-        Path to golden reference image
-    threshold : float
-        Maximum allowed difference ratio (0-1)
-
-    Returns
-    -------
-    bool
-        True if images match within threshold
-    """
-    # Save actual to temp file
+def compare_figures(widget_code: str, expected_path: Path, threshold: float = 0.01) -> bool:
+    """Render widget_code's figure in an isolated subprocess and compare it
+    against the golden image."""
     import tempfile
 
-    import matplotlib.pyplot as plt
     from matplotlib.testing.compare import compare_images
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         actual_path = Path(f.name)
 
     try:
-        with _capped_address_space():
-            actual.savefig(actual_path, dpi=100, bbox_inches="tight")
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real visual regressions.
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    except ValueError as e:
-        # Same bug can also surface as matplotlib's own "image size ... too
-        # large" guard when the corrupted bbox_inches='tight' pass computes
-        # an absurd bounding box. Any other ValueError still fails loudly.
-        if "too large" not in str(e):
-            raise
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-
-    # Compare
-    try:
+        _render_widget_figure(widget_code, actual_path)
         result = compare_images(
             str(expected_path), str(actual_path), tol=threshold * 100
         )
@@ -226,27 +183,25 @@ class TestPlotCanvasVisual:
         golden_dir: Path,
     ) -> None:
         """Test basic line plot rendering."""
-        from rheojax.gui.widgets.plot_canvas import PlotCanvas
-
-        canvas = PlotCanvas()
-        qtbot.addWidget(canvas)
-
         x, y = sample_sine_data
-        canvas.plot_data(x, y, label="sin(x)")
-
-        # Get figure for comparison (PlotCanvas uses .figure not get_figure())
-        fig = canvas.figure
+        widget_code = f"""
+import numpy as np
+from rheojax.gui.widgets.plot_canvas import PlotCanvas
+canvas = PlotCanvas()
+x = np.array({x.tolist()!r})
+y = np.array({y.tolist()!r})
+canvas.plot_data(x, y, label="sin(x)")
+fig = canvas.figure
+"""
         golden_path = golden_dir / "plot_canvas_line.png"
 
         # Generate golden if doesn't exist
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
         # Compare against golden
-        assert compare_figures(fig, golden_path), "Line plot visual mismatch"
-
-        canvas.close()
+        assert compare_figures(widget_code, golden_path), "Line plot visual mismatch"
 
     def test_plot_canvas_cleanup_closes_figure_despite_dead_canvas(
         self,
@@ -297,22 +252,25 @@ class TestPlotCanvasVisual:
         x = rng.uniform(0, 10, 50)
         y = rng.uniform(0, 10, 50)
 
-        # PlotCanvas uses .axes for the subplot
-        canvas.axes.scatter(x, y, alpha=0.6)
-        canvas.axes.set_xlabel("X")
-        canvas.axes.set_ylabel("Y")
-        canvas.canvas.draw()
-
-        fig = canvas.figure
+        widget_code = f"""
+import numpy as np
+from rheojax.gui.widgets.plot_canvas import PlotCanvas
+canvas = PlotCanvas()
+x = np.array({x.tolist()!r})
+y = np.array({y.tolist()!r})
+canvas.axes.scatter(x, y, alpha=0.6)
+canvas.axes.set_xlabel("X")
+canvas.axes.set_ylabel("Y")
+canvas.canvas.draw()
+fig = canvas.figure
+"""
         golden_path = golden_dir / "plot_canvas_scatter.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "Scatter plot visual mismatch"
-
-        canvas.close()
+        assert compare_figures(widget_code, golden_path), "Scatter plot visual mismatch"
 
     def test_plot_canvas_loglog_plot(
         self,
@@ -322,33 +280,32 @@ class TestPlotCanvasVisual:
         golden_dir: Path,
     ) -> None:
         """Test log-log rheology plot rendering."""
-        from rheojax.gui.widgets.plot_canvas import PlotCanvas
-
-        canvas = PlotCanvas()
-        qtbot.addWidget(canvas)
-
         omega = sample_maxwell_data["omega"]
         G_prime = sample_maxwell_data["G_prime"]
         G_double_prime = sample_maxwell_data["G_double_prime"]
 
-        # Use PlotCanvas's axes and set scale
-        canvas.axes.loglog(omega, G_prime, "o-", label="G'")
-        canvas.axes.loglog(omega, G_double_prime, "s-", label="G''")
-        canvas.axes.set_xlabel("ω (rad/s)")
-        canvas.axes.set_ylabel("G', G'' (Pa)")
-        canvas.axes.legend()
-        canvas.canvas.draw()
-
-        fig = canvas.figure
+        widget_code = f"""
+import numpy as np
+from rheojax.gui.widgets.plot_canvas import PlotCanvas
+canvas = PlotCanvas()
+omega = np.array({omega.tolist()!r})
+G_prime = np.array({G_prime.tolist()!r})
+G_double_prime = np.array({G_double_prime.tolist()!r})
+canvas.axes.loglog(omega, G_prime, "o-", label="G'")
+canvas.axes.loglog(omega, G_double_prime, "s-", label="G''")
+canvas.axes.set_xlabel("\\u03c9 (rad/s)")
+canvas.axes.set_ylabel("G', G'' (Pa)")
+canvas.axes.legend()
+canvas.canvas.draw()
+fig = canvas.figure
+"""
         golden_path = golden_dir / "plot_canvas_loglog.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "Log-log plot visual mismatch"
-
-        canvas.close()
+        assert compare_figures(widget_code, golden_path), "Log-log plot visual mismatch"
 
 
 # =============================================================================
@@ -368,6 +325,21 @@ class TestResidualsPanelVisual:
             app = QApplication([])
         return app
 
+    @staticmethod
+    def _residuals_widget_code(
+        y_true: np.ndarray, y_pred: np.ndarray, plot_type: str
+    ) -> str:
+        return f"""
+import numpy as np
+from rheojax.gui.widgets.residuals_panel import ResidualsPanel
+panel = ResidualsPanel()
+y_true = np.array({y_true.tolist()!r})
+y_pred = np.array({y_pred.tolist()!r})
+panel.plot_residuals(y_true, y_pred)
+panel.set_plot_type({plot_type!r})
+fig = panel.get_figure()
+"""
+
     def test_residuals_vs_fitted(
         self,
         qapp: QApplication,
@@ -376,29 +348,16 @@ class TestResidualsPanelVisual:
         golden_dir: Path,
     ) -> None:
         """Test residuals vs fitted plot."""
-        from rheojax.gui.widgets.residuals_panel import ResidualsPanel
-
-        panel = ResidualsPanel()
-        qtbot.addWidget(panel)
-
         fitted = sample_residuals["fitted"]
         residuals = sample_residuals["residuals"]
-        y_true = fitted + residuals
-        y_pred = fitted
-
-        panel.plot_residuals(y_true, y_pred)
-        panel.set_plot_type("residuals")
-
-        fig = panel.get_figure()
+        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "residuals")
         golden_path = golden_dir / "residuals_vs_fitted.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "Residuals plot visual mismatch"
-
-        panel.close()
+        assert compare_figures(widget_code, golden_path), "Residuals plot visual mismatch"
 
     def test_qq_plot(
         self,
@@ -408,29 +367,16 @@ class TestResidualsPanelVisual:
         golden_dir: Path,
     ) -> None:
         """Test Q-Q plot."""
-        from rheojax.gui.widgets.residuals_panel import ResidualsPanel
-
-        panel = ResidualsPanel()
-        qtbot.addWidget(panel)
-
         fitted = sample_residuals["fitted"]
         residuals = sample_residuals["residuals"]
-        y_true = fitted + residuals
-        y_pred = fitted
-
-        panel.plot_residuals(y_true, y_pred)
-        panel.set_plot_type("qq")
-
-        fig = panel.get_figure()
+        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "qq")
         golden_path = golden_dir / "residuals_qq.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "Q-Q plot visual mismatch"
-
-        panel.close()
+        assert compare_figures(widget_code, golden_path), "Q-Q plot visual mismatch"
 
     def test_histogram(
         self,
@@ -440,29 +386,16 @@ class TestResidualsPanelVisual:
         golden_dir: Path,
     ) -> None:
         """Test residuals histogram."""
-        from rheojax.gui.widgets.residuals_panel import ResidualsPanel
-
-        panel = ResidualsPanel()
-        qtbot.addWidget(panel)
-
         fitted = sample_residuals["fitted"]
         residuals = sample_residuals["residuals"]
-        y_true = fitted + residuals
-        y_pred = fitted
-
-        panel.plot_residuals(y_true, y_pred)
-        panel.set_plot_type("histogram")
-
-        fig = panel.get_figure()
+        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "histogram")
         golden_path = golden_dir / "residuals_histogram.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "Histogram visual mismatch"
-
-        panel.close()
+        assert compare_figures(widget_code, golden_path), "Histogram visual mismatch"
 
 
 # =============================================================================
@@ -489,38 +422,31 @@ class TestMultiViewVisual:
         golden_dir: Path,
     ) -> None:
         """Test 2x2 multi-view layout."""
-        from rheojax.gui.widgets.multi_view import MultiView
-
-        view = MultiView(layout="2x2")
-        qtbot.addWidget(view)
-
-        # Add different plots to each panel
-        rng = np.random.default_rng(42)
-
-        for i in range(4):
-            panel = view.get_panel(i)
-            if panel:
-                fig = panel.get_figure()
-                ax = fig.add_subplot(111)
-                x = np.linspace(0, 10, 50)
-                y = np.sin(x + i * np.pi / 4) + rng.standard_normal(50) * 0.1
-                ax.plot(x, y)
-                ax.set_title(f"Panel {i + 1}")
-                panel.refresh()
-
-        # Export combined view - use first panel's figure for comparison
-        panel0 = view.get_panel(0)
-        assert panel0 is not None
-        fig = panel0.get_figure()
+        widget_code = """
+import numpy as np
+from rheojax.gui.widgets.multi_view import MultiView
+view = MultiView(layout="2x2")
+rng = np.random.default_rng(42)
+for i in range(4):
+    panel = view.get_panel(i)
+    if panel:
+        panel_fig = panel.get_figure()
+        ax = panel_fig.add_subplot(111)
+        x = np.linspace(0, 10, 50)
+        y = np.sin(x + i * np.pi / 4) + rng.standard_normal(50) * 0.1
+        ax.plot(x, y)
+        ax.set_title(f"Panel {i + 1}")
+        panel.refresh()
+panel0 = view.get_panel(0)
+fig = panel0.get_figure()
+"""
         golden_path = golden_dir / "multiview_panel0.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path), "MultiView panel visual mismatch"
-
-        view.close()
+        assert compare_figures(widget_code, golden_path), "MultiView panel visual mismatch"
 
 
 # =============================================================================
@@ -551,24 +477,20 @@ class TestArvizCanvasVisual:
         golden_dir: Path,
     ) -> None:
         """Test ArviZ canvas empty state."""
-        from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
-
-        canvas = ArvizCanvas()
-        qtbot.addWidget(canvas)
-
-        # Canvas should show "No data loaded" message
-        fig = canvas.get_figure()
+        widget_code = """
+from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+canvas = ArvizCanvas()
+fig = canvas.get_figure()
+"""
         golden_path = golden_dir / "arviz_canvas_empty.png"
 
         if not golden_path.exists():
-            save_golden_image(fig, golden_path)
+            save_golden_image(widget_code, golden_path)
             pytest.skip("Generated golden image - rerun test to validate")
 
-        assert compare_figures(fig, golden_path, threshold=0.05), (
+        assert compare_figures(widget_code, golden_path, threshold=0.05), (
             "ArviZ empty state visual mismatch"
         )
-
-        canvas.close()
 
 
 if __name__ == "__main__":
