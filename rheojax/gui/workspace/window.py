@@ -721,9 +721,17 @@ class WorkspaceWindow(QMainWindow):
             return
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(
-            250, lambda: self._poll_active_jobs_then(proceed, remaining_polls - 1)
+        # Parented to self (not the static QTimer.singleShot(), which is a
+        # free-floating timer nothing owns): when self is destroyed mid-chain
+        # (e.g. test teardown), Qt's parent-child ownership stops and deletes
+        # this timer automatically, instead of it firing 250ms-1120x30s later
+        # into whatever unrelated widget/test happens to be running then.
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(
+            lambda: self._poll_active_jobs_then(proceed, remaining_polls - 1)
         )
+        timer.start(250)
 
     def _on_phase_worker_ready(
         self, dataset_id: str, step_id: str, phase: str, worker
