@@ -13,7 +13,7 @@ from rheojax.core.jax_config import safe_import_jax
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
-from rheojax.core.data import RheoData
+from rheojax.core.data import RheoData, _coerce_ndarray
 
 
 class TestRheoDataCreation:
@@ -477,3 +477,618 @@ class TestRheoDataOperations:
 
         # Check approximate equality
         assert np.allclose(integral.y, x, rtol=0.1)
+
+
+class TestCoerceNdarray:
+    """Test the module-level _coerce_ndarray helper."""
+
+    def test_none_raises(self):
+        """None must raise rather than silently produce an empty array."""
+        with pytest.raises(ValueError, match="must be initialized"):
+            _coerce_ndarray(None)
+
+    def test_list_input_converts(self):
+        """List/tuple falls through to np.asarray."""
+        out = _coerce_ndarray([1, 2, 3])
+        assert isinstance(out, np.ndarray)
+        np.testing.assert_allclose(out, [1, 2, 3])
+
+    def test_jax_array_converts(self):
+        """JAX array is converted to NumPy for scalar ops."""
+        out = _coerce_ndarray(jnp.array([1.0, 2.0, 3.0]))
+        assert isinstance(out, np.ndarray)
+        np.testing.assert_allclose(out, [1.0, 2.0, 3.0])
+
+
+class TestRheoDataConstructorEdges:
+    """Constructor branches: metadata normalization, scalar coercion, test mode."""
+
+    def test_metadata_none_normalized(self):
+        """metadata=None is coerced to an empty dict (defensive path)."""
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]), metadata=None)
+        assert data.metadata == {}
+
+    def test_ensure_array_scalar_input(self):
+        """_ensure_array wraps a non-list/tuple/array input via np.array."""
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        out = data._ensure_array(5)
+        assert isinstance(out, np.ndarray)
+        assert out.item() == 5
+
+    def test_explicit_test_mode_populates_metadata(self):
+        """initial_test_mode is mirrored into both metadata keys."""
+        data = RheoData(
+            x=np.array([1, 2, 3]),
+            y=np.array([4, 5, 6]),
+            initial_test_mode="relaxation",
+        )
+        assert data.metadata["test_mode"] == "relaxation"
+        assert data.metadata["detected_test_mode"] == "relaxation"
+        assert data.test_mode == "relaxation"
+
+    def test_test_mode_from_metadata_prepopulated(self):
+        """test_mode pre-set in metadata populates detected_test_mode."""
+        data = RheoData(
+            x=np.array([1, 2, 3]),
+            y=np.array([4, 5, 6]),
+            metadata={"test_mode": "creep"},
+        )
+        assert data.metadata["detected_test_mode"] == "creep"
+
+    def test_single_point_array(self):
+        """A single-point array is valid (monotonic check is skipped)."""
+        data = RheoData(x=np.array([1.0]), y=np.array([2.0]))
+        assert data.size == 1
+
+    def test_list_input_converted(self):
+        """Plain Python lists are converted to arrays via _ensure_array."""
+        data = RheoData(x=[1, 2, 3], y=[4, 5, 6])
+        assert isinstance(data.x, np.ndarray)
+        assert isinstance(data.y, np.ndarray)
+        np.testing.assert_allclose(data.y, [4, 5, 6])
+
+    def test_update_metadata_test_mode_invalidates_detection(self):
+        """Setting test_mode via update_metadata syncs explicit mode and clears cache."""
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        data.update_metadata({"test_mode": "creep"})
+        assert data._explicit_test_mode == "creep"
+        assert "detected_test_mode" not in data.metadata
+        assert data.test_mode == "creep"
+
+
+class TestRheoDataValidationJAXPaths:
+    """Validation branches exercised with JAX arrays."""
+
+    def test_jax_x_nan_raises(self):
+        with pytest.raises(ValueError, match="x data contains NaN"):
+            RheoData(x=jnp.array([1.0, jnp.nan, 3.0]), y=jnp.array([1.0, 2.0, 3.0]))
+
+    def test_jax_x_inf_raises(self):
+        with pytest.raises(ValueError, match="x data contains non-finite"):
+            RheoData(x=jnp.array([1.0, jnp.inf, 3.0]), y=jnp.array([1.0, 2.0, 3.0]))
+
+    def test_jax_y_nan_raises(self):
+        with pytest.raises(ValueError, match="y data contains NaN"):
+            RheoData(x=jnp.array([1.0, 2.0, 3.0]), y=jnp.array([1.0, jnp.nan, 3.0]))
+
+    def test_jax_y_inf_raises(self):
+        with pytest.raises(ValueError, match="y data contains non-finite"):
+            RheoData(x=jnp.array([1.0, 2.0, 3.0]), y=jnp.array([1.0, jnp.inf, 3.0]))
+
+    def test_jax_non_monotonic_warns(self):
+        with pytest.warns(UserWarning, match="not monotonic"):
+            RheoData(x=jnp.array([1.0, 3.0, 2.0]), y=jnp.array([1.0, 2.0, 3.0]))
+
+    def test_jax_negative_frequency_warns(self):
+        with pytest.warns(UserWarning, match="negative values"):
+            RheoData(
+                x=jnp.array([0.1, 1.0, 10.0]),
+                y=jnp.array([1.0, 2.0, -3.0]),
+                domain="frequency",
+            )
+
+    def test_numpy_x_nan_raises(self):
+        """x NaN on the NumPy path (distinct from the existing y-NaN test)."""
+        with pytest.raises(ValueError, match="x data contains NaN"):
+            RheoData(x=np.array([1.0, np.nan, 3.0]), y=np.array([1.0, 2.0, 3.0]))
+
+    def test_numpy_y_inf_raises(self):
+        """y non-finite (inf, not NaN) on the NumPy path."""
+        with pytest.raises(ValueError, match="y data contains non-finite"):
+            RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([1.0, np.inf, 3.0]))
+
+
+class TestRheoDataConversionCaching:
+    """to_jax caching and to_dict/from_dict complex handling."""
+
+    def test_to_jax_cached(self):
+        """Second to_jax() call returns the same cached object."""
+        data = RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([4.0, 5.0, 6.0]))
+        first = data.to_jax()
+        second = data.to_jax()
+        assert first is second
+
+    def test_to_jax_cache_invalidated_on_reassign(self):
+        """Reassigning x invalidates the JAX cache."""
+        data = RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([4.0, 5.0, 6.0]))
+        first = data.to_jax()
+        data.x = np.array([10.0, 20.0, 30.0])
+        second = data.to_jax()
+        assert first is not second
+        np.testing.assert_allclose(np.asarray(second.x), [10.0, 20.0, 30.0])
+
+    def test_to_jax_complex_preserves_dtype(self):
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([1 + 2j, 3 + 4j]),
+            domain="frequency",
+        )
+        jax_data = data.to_jax()
+        assert jnp.iscomplexobj(jax_data.y)
+
+    def test_to_dict_complex_splits_real_imag(self):
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([1 + 2j, 3 + 4j]),
+            domain="frequency",
+            initial_test_mode="oscillation",
+        )
+        d = data.to_dict()
+        assert "y_real" in d and "y_imag" in d
+        assert "y" not in d
+        np.testing.assert_allclose(d["y_real"], [1.0, 3.0])
+        np.testing.assert_allclose(d["y_imag"], [2.0, 4.0])
+        assert d["test_mode"] == "oscillation"
+
+    def test_from_dict_complex_reconstructs(self):
+        d = {
+            "x": [1.0, 2.0],
+            "y_real": [1.0, 3.0],
+            "y_imag": [2.0, 4.0],
+            "domain": "frequency",
+        }
+        data = RheoData.from_dict(d)
+        assert data.is_complex
+        np.testing.assert_allclose(np.asarray(data.y), [1 + 2j, 3 + 4j])
+
+    def test_complex_round_trip(self):
+        original = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([1 + 1j, 2 + 2j, 3 + 3j]),
+            domain="frequency",
+        )
+        restored = RheoData.from_dict(original.to_dict())
+        np.testing.assert_allclose(np.asarray(restored.y), np.asarray(original.y))
+
+
+class TestRheoDataComplexProperties:
+    """Complex-modulus derived properties on both NumPy and JAX arrays."""
+
+    def _complex_np(self):
+        return RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([3 + 4j, 6 + 8j, 1 + 0j]),
+            domain="frequency",
+        )
+
+    def _complex_jax(self):
+        return RheoData(
+            x=jnp.array([1.0, 2.0, 3.0]),
+            y=jnp.array([3 + 4j, 6 + 8j, 1 + 0j]),
+            domain="frequency",
+        )
+
+    def test_modulus_numpy(self):
+        np.testing.assert_allclose(self._complex_np().modulus, [5.0, 10.0, 1.0])
+
+    def test_phase_numpy(self):
+        data = self._complex_np()
+        np.testing.assert_allclose(data.phase, np.angle(np.asarray(data.y)))
+
+    def test_real_data_modulus_phase_none(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        assert data.modulus is None
+        assert data.phase is None
+
+    def test_y_real_imag_numpy(self):
+        data = self._complex_np()
+        np.testing.assert_allclose(data.y_real, [3.0, 6.0, 1.0])
+        np.testing.assert_allclose(data.y_imag, [4.0, 8.0, 0.0])
+
+    def test_y_real_imag_jax(self):
+        data = self._complex_jax()
+        assert isinstance(data.y_real, jnp.ndarray)
+        assert isinstance(data.y_imag, jnp.ndarray)
+        np.testing.assert_allclose(np.asarray(data.y_real), [3.0, 6.0, 1.0])
+        np.testing.assert_allclose(np.asarray(data.y_imag), [4.0, 8.0, 0.0])
+
+    def test_y_real_returns_real_data_unchanged(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        np.testing.assert_allclose(data.y_real, [4, 5, 6])
+
+    def test_y_imag_real_data_zeros_numpy(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4.0, 5.0, 6.0]))
+        np.testing.assert_allclose(data.y_imag, [0.0, 0.0, 0.0])
+
+    def test_y_imag_real_data_zeros_jax(self):
+        data = RheoData(x=jnp.array([1.0, 2.0, 3.0]), y=jnp.array([4.0, 5.0, 6.0]))
+        assert isinstance(data.y_imag, jnp.ndarray)
+        np.testing.assert_allclose(np.asarray(data.y_imag), [0.0, 0.0, 0.0])
+
+    def test_storage_loss_modulus_complex(self):
+        data = self._complex_np()
+        np.testing.assert_allclose(data.storage_modulus, [3.0, 6.0, 1.0])
+        np.testing.assert_allclose(data.loss_modulus, [4.0, 8.0, 0.0])
+
+    def test_storage_loss_modulus_real_none(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        assert data.storage_modulus is None
+        assert data.loss_modulus is None
+
+    def test_tan_delta_numpy(self):
+        data = self._complex_np()
+        # G''/G' where G' > 0; last point G'=1 -> 0/1 = 0
+        np.testing.assert_allclose(data.tan_delta, [4.0 / 3.0, 8.0 / 6.0, 0.0])
+
+    def test_tan_delta_jax(self):
+        data = self._complex_jax()
+        np.testing.assert_allclose(
+            np.asarray(data.tan_delta), [4.0 / 3.0, 8.0 / 6.0, 0.0]
+        )
+
+    def test_tan_delta_real_none(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        assert data.tan_delta is None
+
+    def test_tan_delta_zero_gprime_is_nan(self):
+        data = RheoData(
+            x=np.array([1.0, 2.0]),
+            y=np.array([0 + 1j, 2 + 1j]),
+            domain="frequency",
+        )
+        td = np.asarray(data.tan_delta)
+        assert np.isnan(td[0])
+        np.testing.assert_allclose(td[1], 0.5)
+
+
+class TestRheoDataTestModeDetection:
+    """test_mode caching and metadata resolution."""
+
+    def test_detected_mode_cached(self):
+        data = RheoData(x=np.linspace(0, 10, 50), y=np.exp(-np.linspace(0, 10, 50)))
+        first = data.test_mode
+        # Second call must hit the private cache, returning the same value
+        assert data.test_mode == first
+
+    def test_metadata_string_mode_normalized(self):
+        data = RheoData(
+            x=np.array([1, 2, 3]),
+            y=np.array([4, 5, 6]),
+            metadata={"test_mode": "RELAXATION"},
+        )
+        # Clear explicit mode to force the metadata-resolution branch
+        data._explicit_test_mode = None
+        assert data.test_mode == "relaxation"
+
+    def test_metadata_unknown_mode_returned_verbatim(self):
+        """An unrecognized test_mode string falls through and is returned as-is."""
+        data = RheoData(
+            x=np.array([1, 2, 3]),
+            y=np.array([4, 5, 6]),
+            metadata={"test_mode": "not_a_real_mode"},
+        )
+        data._explicit_test_mode = None
+        assert data.test_mode == "not_a_real_mode"
+
+
+class TestRheoDataArithmeticEdges:
+    """Arithmetic operator branches: scalars, mismatched axes, RheoData*RheoData."""
+
+    def test_add_scalar(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        np.testing.assert_allclose((data + 10).y, [14, 15, 16])
+
+    def test_sub_scalar(self):
+        data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        np.testing.assert_allclose((data - 1).y, [3, 4, 5])
+
+    def test_mul_rheodata(self):
+        d1 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        d2 = RheoData(x=np.array([1, 2, 3]), y=np.array([2, 2, 2]))
+        np.testing.assert_allclose((d1 * d2).y, [8, 10, 12])
+
+    def test_add_mismatched_axes_raises(self):
+        d1 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        d2 = RheoData(x=np.array([9, 8, 7]), y=np.array([4, 5, 6]))
+        with pytest.raises(ValueError, match="x-axes must match for addition"):
+            _ = d1 + d2
+
+    def test_sub_mismatched_axes_raises(self):
+        d1 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        d2 = RheoData(x=np.array([9, 8, 7]), y=np.array([4, 5, 6]))
+        with pytest.raises(ValueError, match="x-axes must match for subtraction"):
+            _ = d1 - d2
+
+    def test_mul_mismatched_axes_raises(self):
+        d1 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
+        d2 = RheoData(x=np.array([9, 8, 7]), y=np.array([4, 5, 6]))
+        with pytest.raises(ValueError, match="x-axes must match for multiplication"):
+            _ = d1 * d2
+
+
+class TestRheoDataOperationBranches:
+    """Interpolate/resample/smooth/derivative/integral branch coverage."""
+
+    def test_interpolate_decreasing_numpy(self):
+        # Strictly decreasing x is flipped internally for np.interp
+        x = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        y = np.array([50.0, 40.0, 30.0, 20.0, 10.0])
+        data = RheoData(x=x, y=y, validate=False)
+        out = data.interpolate(np.array([1.5, 2.5, 3.5]))
+        np.testing.assert_allclose(out.y, [15.0, 25.0, 35.0])
+
+    def test_interpolate_decreasing_jax(self):
+        x = jnp.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        y = jnp.array([50.0, 40.0, 30.0, 20.0, 10.0])
+        data = RheoData(x=x, y=y, validate=False)
+        out = data.interpolate(jnp.array([1.5, 2.5, 3.5]))
+        np.testing.assert_allclose(np.asarray(out.y), [15.0, 25.0, 35.0])
+
+    def test_interpolate_complex_numpy(self):
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([1 + 1j, 2 + 2j, 3 + 3j])
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.interpolate(np.array([1.5, 2.5]))
+        np.testing.assert_allclose(out.y, [1.5 + 1.5j, 2.5 + 2.5j])
+
+    def test_interpolate_complex_jax(self):
+        x = jnp.array([1.0, 2.0, 3.0])
+        y = jnp.array([1 + 1j, 2 + 2j, 3 + 3j])
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.interpolate(jnp.array([1.5, 2.5]))
+        np.testing.assert_allclose(np.asarray(out.y), [1.5 + 1.5j, 2.5 + 2.5j])
+
+    def test_interpolate_jax_real(self):
+        x = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = jnp.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        data = RheoData(x=x, y=y)
+        out = data.interpolate(jnp.array([1.5, 2.5]))
+        np.testing.assert_allclose(np.asarray(out.y), [15.0, 25.0])
+
+    def test_resample_frequency_logspace(self):
+        x = np.logspace(-1, 1, 20)
+        y = x**2
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.resample(10)
+        assert len(out.x) == 10
+        # log-spaced grid spans the original range
+        np.testing.assert_allclose(out.x[0], x.min())
+        np.testing.assert_allclose(out.x[-1], x.max())
+
+    def test_resample_frequency_nonpositive_raises(self):
+        x = np.array([0.0, 1.0, 2.0])
+        y = np.array([1.0, 2.0, 3.0])
+        data = RheoData(x=x, y=y, domain="frequency", validate=False)
+        with pytest.raises(ValueError, match="non-positive values"):
+            data.resample(5)
+
+    def test_smooth_even_window_made_odd(self):
+        x = np.linspace(0, 10, 50)
+        y = np.sin(x)
+        data = RheoData(x=x, y=y)
+        out = data.smooth(window_size=4)
+        assert len(out.y) == len(y)
+
+    def test_smooth_complex_numpy(self):
+        x = np.linspace(1, 10, 20)
+        y = (np.arange(20) + 1j * np.arange(20)).astype(complex)
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.smooth(window_size=3)
+        assert np.iscomplexobj(np.asarray(out.y))
+        assert len(out.y) == 20
+
+    def test_smooth_complex_jax(self):
+        x = jnp.linspace(1, 10, 20)
+        y = jnp.array(np.arange(20) + 1j * np.arange(20))
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.smooth(window_size=3)
+        assert jnp.iscomplexobj(out.y)
+
+    def test_smooth_jax_real(self):
+        x = jnp.linspace(0, 10, 30)
+        y = jnp.sin(x)
+        data = RheoData(x=x, y=y)
+        out = data.smooth(window_size=3)
+        assert isinstance(out.y, jnp.ndarray)
+
+    def test_derivative_complex_numpy(self):
+        x = np.linspace(0, 10, 50)
+        y = (x + 1j * x).astype(complex)
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.derivative()
+        # d/dx (x + ix) = 1 + i
+        np.testing.assert_allclose(out.y[1:-1], (1 + 1j), rtol=1e-6)
+
+    def test_derivative_complex_jax(self):
+        x = jnp.linspace(0, 10, 50)
+        y = jnp.array(np.linspace(0, 10, 50) + 1j * np.linspace(0, 10, 50))
+        data = RheoData(x=x, y=y, domain="frequency")
+        out = data.derivative()
+        np.testing.assert_allclose(np.asarray(out.y)[1:-1], (1 + 1j), rtol=1e-6)
+
+    def test_derivative_jax_real(self):
+        x = jnp.linspace(0, 10, 50)
+        y = x**2
+        data = RheoData(x=x, y=y)
+        out = data.derivative()
+        np.testing.assert_allclose(
+            np.asarray(out.y)[1:-1], 2 * np.asarray(x)[1:-1], rtol=0.1
+        )
+
+    def test_derivative_units_label(self):
+        x = np.linspace(0, 10, 20)
+        y = x**2
+        data = RheoData(x=x, y=y, x_units="s", y_units="Pa")
+        out = data.derivative()
+        assert out.y_units == "d(Pa)/d(s)"
+
+    def test_integral_jax(self):
+        x = jnp.linspace(0, 10, 100)
+        y = jnp.ones_like(x)
+        data = RheoData(x=x, y=y)
+        out = data.integral()
+        np.testing.assert_allclose(np.asarray(out.y), np.asarray(x), rtol=0.1)
+
+    def test_integral_units_label(self):
+        x = np.linspace(0, 10, 20)
+        y = np.ones_like(x)
+        data = RheoData(x=x, y=y, x_units="s", y_units="Pa")
+        out = data.integral()
+        assert out.y_units == "∫Pa·ds"
+
+
+class TestRheoDataDomainConversion:
+    """Domain-conversion stubs: warn-and-copy vs NotImplementedError."""
+
+    def test_to_frequency_already_frequency_warns(self):
+        data = RheoData(
+            x=np.array([0.1, 1.0, 10.0]), y=np.array([1.0, 2.0, 3.0]),
+            domain="frequency",
+        )
+        with pytest.warns(UserWarning, match="already in frequency"):
+            out = data.to_frequency_domain()
+        np.testing.assert_allclose(out.y, [1.0, 2.0, 3.0])
+
+    def test_to_frequency_from_time_not_implemented(self):
+        data = RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([1.0, 2.0, 3.0]))
+        with pytest.raises(NotImplementedError):
+            data.to_frequency_domain()
+
+    def test_to_time_already_time_warns(self):
+        data = RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([1.0, 2.0, 3.0]))
+        with pytest.warns(UserWarning, match="already in time"):
+            out = data.to_time_domain()
+        np.testing.assert_allclose(out.y, [1.0, 2.0, 3.0])
+
+    def test_to_time_from_frequency_not_implemented(self):
+        data = RheoData(
+            x=np.array([0.1, 1.0, 10.0]), y=np.array([1.0, 2.0, 3.0]),
+            domain="frequency",
+        )
+        with pytest.raises(NotImplementedError):
+            data.to_time_domain()
+
+
+class TestRheoDataSlice:
+    """Slice-by-x-value coverage including the empty-result guard."""
+
+    def test_slice_both_bounds(self):
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        data = RheoData(x=x, y=y)
+        out = data.slice(start=2.0, end=4.0)
+        np.testing.assert_allclose(out.x, [2.0, 3.0, 4.0])
+        np.testing.assert_allclose(out.y, [20.0, 30.0, 40.0])
+
+    def test_slice_start_only(self):
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        data = RheoData(x=x, y=y)
+        out = data.slice(start=3.0)
+        np.testing.assert_allclose(out.x, [3.0, 4.0, 5.0])
+
+    def test_slice_end_only(self):
+        x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        data = RheoData(x=x, y=y)
+        out = data.slice(end=2.0)
+        np.testing.assert_allclose(out.x, [1.0, 2.0])
+
+    def test_slice_no_bounds_returns_all(self):
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([10.0, 20.0, 30.0])
+        data = RheoData(x=x, y=y)
+        out = data.slice()
+        np.testing.assert_allclose(out.x, x)
+
+    def test_slice_empty_result_warns(self):
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([10.0, 20.0, 30.0])
+        data = RheoData(x=x, y=y)
+        with pytest.warns(UserWarning, match="empty result"):
+            out = data.slice(start=100.0)
+        assert len(out.x) == 0
+
+    def test_slice_jax(self):
+        x = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        y = jnp.array([10.0, 20.0, 30.0, 40.0, 50.0])
+        data = RheoData(x=x, y=y)
+        out = data.slice(start=2.0, end=4.0)
+        np.testing.assert_allclose(np.asarray(out.x), [2.0, 3.0, 4.0])
+
+
+class TestRheoDataNoneGuards:
+    """Integrity guards raise (not silently corrupt) when x/y are nulled out."""
+
+    def _valid(self):
+        return RheoData(x=np.array([1.0, 2.0, 3.0]), y=np.array([4.0, 5.0, 6.0]))
+
+    def test_to_jax_none_raises(self):
+        data = self._valid()
+        data.x = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.to_jax()
+
+    def test_copy_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.copy()
+
+    def test_to_dict_none_raises(self):
+        data = self._valid()
+        data.x = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.to_dict()
+
+    def test_interpolate_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.interpolate(np.array([1.5]))
+
+    def test_derivative_none_raises(self):
+        data = self._valid()
+        data.x = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.derivative()
+
+    def test_integral_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.integral()
+
+    def test_slice_none_raises(self):
+        data = self._valid()
+        data.x = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.slice(start=1.0)
+
+    def test_smooth_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            data.smooth()
+
+    def test_y_real_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            _ = data.y_real
+
+    def test_y_imag_none_raises(self):
+        data = self._valid()
+        data.y = None
+        with pytest.raises(ValueError, match="requires non-None"):
+            _ = data.y_imag
