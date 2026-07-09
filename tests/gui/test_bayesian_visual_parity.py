@@ -7,69 +7,87 @@ pixel-level rendering (which varies across OS font rasterizers).
 """
 
 import csv
-import io
+import tempfile
+from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")  # Force non-interactive backend before pyplot import
-
-import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np
 import pytest
 
+from tests.gui.conftest import run_gui_code_subprocess
+
 pytestmark = [pytest.mark.smoke]
+
+_FIXTURE = "tests/fixtures/bayesian_owchirp_tts.csv"
 
 
 def test_bayesian_ppd_plot_hash():
-    plt.rcdefaults()
+    # Rendering runs in a fresh subprocess rather than the pytest worker. This
+    # host's matplotlib/FreeType text-metrics state reliably becomes corrupted
+    # after enough Figure churn within a single process, so savefig() here
+    # raised `FT_Render_Glyph ... raster overflow` / std::bad_alloc when the
+    # figure was built in-process (see test_visual_regression.py). A fresh
+    # process renders correctly every time.
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        png_path = Path(f.name)
 
-    with open("tests/fixtures/bayesian_owchirp_tts.csv", newline="") as f:
+    render_code = f'''
+import csv
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+plt.rcdefaults()
+with open({_FIXTURE!r}, newline="") as fh:
+    rows = list(csv.DictReader(fh))
+freq = np.array([float(r["freq"]) for r in rows])
+gp = np.array([float(r["Gprime"]) for r in rows])
+
+mean_gp = gp * 0.97
+std_gp = np.full_like(mean_gp, 50.0)
+
+fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
+ax.plot(freq, gp, "k.", label="data")
+ax.plot(freq, mean_gp, "b-", label="posterior mean")
+ax.fill_between(
+    freq, mean_gp - 2 * std_gp, mean_gp + 2 * std_gp,
+    color="blue", alpha=0.2, label="95% band",
+)
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.set_xlabel("freq (rad/s)")
+ax.set_ylabel('G" (Pa)')
+ax.legend(loc="lower right")
+fig.tight_layout()
+
+# Structure checks: 2 line artists (scatter, mean) + >=1 fill_between collection
+assert len(ax.get_lines()) == 2, f"Expected 2 line artists, got {{len(ax.get_lines())}}"
+assert len(ax.collections) >= 1, "Expected at least 1 fill_between collection"
+
+fig.savefig({str(png_path)!r}, format="png")
+plt.close(fig)
+print("RENDER_OK")
+'''
+
+    try:
+        result = run_gui_code_subprocess(render_code, timeout=30.0)
+        assert not result.crashed and "RENDER_OK" in result.stdout, (
+            f"PPD plot render failed in subprocess (rc={result.return_code}, "
+            f"signal={result.signal_name}):\nSTDOUT:\n{result.stdout}\n"
+            f"STDERR:\n{result.stderr}"
+        )
+        assert png_path.stat().st_size > 1000, "PNG output too small — plot likely empty"
+    finally:
+        png_path.unlink(missing_ok=True)
+
+    # Verify data integrity (platform-independent, main process)
+    with open(_FIXTURE, newline="") as f:
         rows = list(csv.DictReader(f))
     freq = np.array([float(r["freq"]) for r in rows])
     gp = np.array([float(r["Gprime"]) for r in rows])
-
-    # Posterior predictive surrogate: scaled data with fixed band
     mean_gp = gp * 0.97
     std_gp = np.full_like(mean_gp, 50.0)
 
-    fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
-    ax.plot(freq, gp, "k.", label="data")
-    ax.plot(freq, mean_gp, "b-", label="posterior mean")
-    ax.fill_between(
-        freq,
-        mean_gp - 2 * std_gp,
-        mean_gp + 2 * std_gp,
-        color="blue",
-        alpha=0.2,
-        label="95% band",
-    )
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlabel("freq (rad/s)")
-    ax.set_ylabel('G" (Pa)')
-    ax.legend(loc="lower right")
-    fig.tight_layout()
-
-    # Verify plot renders to a non-trivial PNG
-    buf = io.BytesIO()
-    try:
-        fig.savefig(buf, format="png")
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real numerical regressions.
-        plt.close(fig)
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    plt.close(fig)
-    assert buf.tell() > 1000, "PNG output too small — plot likely empty"
-
-    # Verify data integrity (platform-independent)
     assert len(freq) >= 10, "Fixture should have sufficient data points"
     np.testing.assert_allclose(mean_gp, gp * 0.97, rtol=1e-12)
     np.testing.assert_array_equal(std_gp, np.full_like(mean_gp, 50.0))
-
-    # Verify plot structure: 3 artists (scatter, line, fill_between)
-    lines = ax.get_lines()
-    assert len(lines) == 2, f"Expected 2 line artists, got {len(lines)}"
-    assert len(ax.collections) >= 1, "Expected at least 1 fill_between collection"

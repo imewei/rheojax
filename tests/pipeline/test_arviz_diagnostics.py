@@ -5,6 +5,8 @@ including all 6 plotting functions and InferenceData conversion.
 """
 
 import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -511,36 +513,70 @@ class TestArviZIntegration:
         # Should return pipeline for chaining
         assert result is fitted_pipeline
 
-    def test_plots_can_be_saved_to_file(self, fitted_pipeline):
-        """Test that ArviZ plots can be saved to files."""
+    def test_plots_can_be_saved_to_file(self):
+        """Test that ArviZ plots can be saved to files.
+
+        The figure render + savefig runs in a fresh subprocess. Root cause
+        (confirmed empirically, see tests/gui/test_visual_regression.py):
+        this host's matplotlib/FreeType text-metrics state reliably becomes
+        corrupted after enough Figure churn within a single process --
+        producing a raw `FT_Render_Glyph ... raster overflow` (or a corrupted
+        "tight" bbox -> MemoryError: std::bad_alloc) once run inside a pytest
+        session with other figure-creating tests. Only a fresh process avoids
+        it, so we drive the whole pipeline + plot there instead of skipping.
+        """
         try:
-            import arviz as az
+            import arviz as az  # noqa: F401
         except ImportError:
             pytest.skip("ArviZ not installed")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Generate a plot
-            fitted_pipeline.plot_pair()
+        repo_root = Path(__file__).resolve().parents[2]
 
-            # Get current figure and save
-            fig = plt.gcf()
+        with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test_plot.png"
-            try:
-                fig.savefig(output_path)
-            except (RuntimeError, MemoryError) as e:
-                # Known host-environment FreeType/Agg rendering bug (glyph
-                # "raster overflow", sometimes cascading to a std::bad_alloc)
-                # -- not a regression in the code under test. Skip rather
-                # than fail so a flaky font/DPI environment doesn't mask
-                # real numerical regressions.
-                plt.close(fig)
-                pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
+            code = f"""
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+from rheojax.core.data import RheoData
+from rheojax.pipeline.bayesian import BayesianPipeline
+from tests.pipeline.test_arviz_diagnostics import MockBayesianModel
+
+t = np.linspace(0.1, 5, 30)
+np.random.seed(42)
+y = 5.0 * np.exp(-0.5 * t) + np.random.normal(0, 0.1, size=t.shape)
+data = RheoData(
+    x=t, y=y, x_units="s", y_units="Pa",
+    domain="time", initial_test_mode="relaxation", validate=False,
+)
+
+pipeline = BayesianPipeline(data=data)
+pipeline.fit_nlsq(MockBayesianModel())
+pipeline.fit_bayesian(num_samples=100, num_warmup=50)
+
+pipeline.plot_pair()
+fig = plt.gcf()
+fig.savefig({str(output_path)!r})
+print("SAVE_OK")
+"""
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=str(repo_root),
+            )
+
+            assert result.returncode == 0 and "SAVE_OK" in result.stdout, (
+                f"Plot save failed in subprocess (rc={result.returncode}):\n"
+                f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            )
 
             # Verify file was created
             assert output_path.exists()
             assert output_path.stat().st_size > 0
-
-            plt.close(fig)
 
     def test_arviz_optional_parameters_validation(self, fitted_pipeline):
         """Test that optional parameters are validated correctly."""
