@@ -486,3 +486,452 @@ class TestGMMCreepMode:
         assert n_optimal <= n_initial, (
             f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
         )
+
+
+class TestGMMSteadyShearMode:
+    """Test GMM steady-shear (flow curve) protocol."""
+
+    def test_steady_shear_fit_predicts_constant_zero_shear_viscosity(self):
+        """Linear GMM steady-shear fit yields constant η = η₀ = ΣGᵢτᵢ."""
+        gamma_dot = np.logspace(-2, 2, 30)
+        eta_avg = 5e3
+        eta_data = np.full_like(gamma_dot, eta_avg)
+
+        model = GeneralizedMaxwell(n_modes=3)
+        model.fit(gamma_dot, eta_data, test_mode="steady_shear")
+
+        eta_pred = np.asarray(model.predict(gamma_dot))
+
+        # Linear model: viscosity independent of shear rate (all equal)
+        np.testing.assert_allclose(eta_pred, eta_pred[0], rtol=1e-10)
+        assert np.all(np.isfinite(eta_pred)), "Viscosity must be finite"
+        assert np.all(eta_pred > 0), "Viscosity must be positive"
+
+        # η₀ = Σ Gᵢτᵢ should equal the average of the input viscosity
+        spectrum = model.get_relaxation_spectrum()
+        eta_0 = float(np.sum(spectrum["G_i"] * spectrum["tau_i"]))
+        np.testing.assert_allclose(eta_0, eta_avg, rtol=1e-6)
+        np.testing.assert_allclose(eta_pred[0], eta_avg, rtol=1e-6)
+
+    def test_flow_curve_alias_routes_to_steady_shear(self):
+        """Predicting with test_mode='flow_curve' uses the steady-shear path."""
+        gamma_dot = np.logspace(-1, 1, 10)
+        model = GeneralizedMaxwell(n_modes=2)
+        model.parameters.set_value("G_inf", 0.0)
+        model.parameters.set_value("G_1", 1e4)
+        model.parameters.set_value("G_2", 1e3)
+        model.parameters.set_value("tau_1", 0.1)
+        model.parameters.set_value("tau_2", 1.0)
+
+        eta_pred = np.asarray(model.predict(gamma_dot, test_mode="flow_curve"))
+        eta_0_expected = 1e4 * 0.1 + 1e3 * 1.0
+        np.testing.assert_allclose(eta_pred, eta_0_expected, rtol=1e-6)
+
+
+class TestGMMStartupMode:
+    """Test GMM startup flow (stress growth) protocol."""
+
+    @staticmethod
+    def _eta_plus(t, G_i, tau_i):
+        return sum(
+            G * tau * (1.0 - np.exp(-t / tau)) for G, tau in zip(G_i, tau_i)
+        )
+
+    def test_startup_predict_matches_analytical(self):
+        """η⁺(t) prediction matches Σ Gᵢτᵢ(1-exp(-t/τᵢ)) closed form."""
+        G_i = np.array([1e4, 1e3])
+        tau_i = np.array([0.1, 1.0])
+
+        model = GeneralizedMaxwell(n_modes=2)
+        model.parameters.set_value("G_inf", 0.0)
+        model.parameters.set_value("G_1", float(G_i[0]))
+        model.parameters.set_value("G_2", float(G_i[1]))
+        model.parameters.set_value("tau_1", float(tau_i[0]))
+        model.parameters.set_value("tau_2", float(tau_i[1]))
+        model._test_mode = "startup"
+
+        t = np.logspace(-3, 2, 60)
+        eta_plus_pred = np.asarray(model.predict(t))
+        eta_plus_analytical = self._eta_plus(t, G_i, tau_i)
+
+        np.testing.assert_allclose(eta_plus_pred, eta_plus_analytical, rtol=1e-6)
+        # Stress growth is monotonically increasing toward η₀ = ΣGᵢτᵢ
+        assert np.all(np.diff(eta_plus_pred) >= -1e-9), "η⁺(t) must be non-decreasing"
+        eta_0 = float(np.sum(G_i * tau_i))
+        assert eta_plus_pred[-1] <= eta_0 + 1e-6, "η⁺ must not exceed η₀"
+        np.testing.assert_allclose(eta_plus_pred[-1], eta_0, rtol=1e-3)
+
+    def test_startup_fit_runs_and_predicts_physically(self):
+        """Fitting startup data runs and yields a physical η⁺(t) response.
+
+        The linear-model startup objective uses absolute residuals on a
+        plateau-dominated signal, so a tight R² is not guaranteed; this test
+        exercises the fit path and asserts the prediction stays physical
+        (finite, non-negative, monotonically increasing toward a finite η₀).
+        """
+        G_i = np.array([1e4, 1e3])
+        tau_i = np.array([0.05, 0.8])
+        t = np.logspace(-3, 2, 60)
+        eta_plus_data = self._eta_plus(t, G_i, tau_i)
+
+        model = GeneralizedMaxwell(n_modes=2)
+        model.fit(t, eta_plus_data, test_mode="startup", optimization_factor=None)
+
+        eta_plus_pred = np.asarray(model.predict(t))
+        assert np.all(np.isfinite(eta_plus_pred)), "Prediction must be finite"
+        assert np.all(eta_plus_pred >= -1e-9), "η⁺(t) must be non-negative"
+        assert np.all(np.diff(eta_plus_pred) >= -1e-6), "η⁺(t) must be non-decreasing"
+
+        # η₀ = Σ Gᵢτᵢ from the fitted spectrum must be finite and positive
+        spectrum = model.get_relaxation_spectrum()
+        eta_0_fit = float(np.sum(spectrum["G_i"] * spectrum["tau_i"]))
+        assert np.isfinite(eta_0_fit) and eta_0_fit > 0
+
+    def test_startup_element_minimization(self):
+        """Element minimization runs for over-parameterized startup fit."""
+        G_i = np.array([1e4, 1e3])
+        tau_i = np.array([0.05, 0.8])
+        t = np.logspace(-3, 2, 60)
+        eta_plus_data = self._eta_plus(t, G_i, tau_i)
+
+        model = GeneralizedMaxwell(n_modes=4)
+        model.fit(t, eta_plus_data, test_mode="startup", optimization_factor=1.5)
+
+        diagnostics = model._element_minimization_diagnostics
+        assert diagnostics is not None, "Element minimization diagnostics recorded"
+        assert diagnostics["n_optimal"] <= diagnostics["n_initial"]
+
+
+class TestGMMLaosMode:
+    """Test GMM LAOS protocol (linear model = SAOS response)."""
+
+    def test_laos_fit_delegates_to_oscillation(self):
+        """LAOS fit on linear model reproduces the oscillation fit."""
+        omega = np.logspace(-2, 2, 40)
+        G_inf, G1, G2 = 1e3, 1e5, 1e4
+        tau1, tau2 = 0.01, 1.0
+        wt1, wt2 = omega * tau1, omega * tau2
+        G_prime = (
+            G_inf
+            + G1 * wt1**2 / (1 + wt1**2)
+            + G2 * wt2**2 / (1 + wt2**2)
+        )
+        G_dprime = G1 * wt1 / (1 + wt1**2) + G2 * wt2 / (1 + wt2**2)
+        G_star = np.column_stack([G_prime, G_dprime])
+
+        model = GeneralizedMaxwell(n_modes=2)
+        model.fit(omega, G_star, test_mode="laos", gamma_0=0.02)
+
+        # LAOS parameters stashed for prediction
+        assert model._laos_gamma_0 == 0.02
+        assert model._laos_omega == omega[0]
+        # Fit succeeded and stored a converged NLSQ result
+        assert model._nlsq_result is not None
+
+    def test_simulate_laos_shapes_and_strain(self):
+        """simulate_laos returns consistent t, strain, stress arrays."""
+        model = GeneralizedMaxwell(n_modes=2)
+        model.parameters.set_value("G_inf", 1e3)
+        model.parameters.set_value("G_1", 1e5)
+        model.parameters.set_value("G_2", 1e4)
+        model.parameters.set_value("tau_1", 0.01)
+        model.parameters.set_value("tau_2", 1.0)
+
+        omega, gamma_0 = 10.0, 0.05
+        n_cycles, n_ppc = 4, 64
+        t, strain, stress = model.simulate_laos(
+            omega, gamma_0, n_cycles=n_cycles, n_points_per_cycle=n_ppc
+        )
+
+        n = n_cycles * n_ppc
+        assert t.shape == (n,) and strain.shape == (n,) and stress.shape == (n,)
+        np.testing.assert_allclose(strain, gamma_0 * np.sin(omega * t), rtol=1e-10)
+        assert np.all(np.isfinite(stress)), "LAOS stress must be finite"
+
+    def test_extract_harmonics_linear_has_no_third_harmonic(self):
+        """Linear GMM LAOS response has negligible I_3/I_1 (no nonlinearity)."""
+        model = GeneralizedMaxwell(n_modes=2)
+        model.parameters.set_value("G_inf", 1e3)
+        model.parameters.set_value("G_1", 1e5)
+        model.parameters.set_value("G_2", 1e4)
+        model.parameters.set_value("tau_1", 0.01)
+        model.parameters.set_value("tau_2", 1.0)
+
+        omega, gamma_0 = 10.0, 0.05
+        n_ppc = 64
+        _, _, stress = model.simulate_laos(
+            omega, gamma_0, n_cycles=5, n_points_per_cycle=n_ppc
+        )
+
+        harmonics = model.extract_harmonics(stress, n_ppc)
+        assert harmonics["I_1"] > 0, "Fundamental harmonic must be present"
+        # Analytically zero; residual is FFT leakage/discretization only.
+        assert harmonics["I_3_I_1"] < 1e-2, (
+            f"Linear model 3rd harmonic must be negligible, got {harmonics['I_3_I_1']:.3e}"
+        )
+
+
+class TestGMMModelFunction:
+    """Test model_function() routing used by Bayesian inference."""
+
+    def _params(self):
+        # [E_inf, E_1..E_N, tau_1..tau_N] for n_modes=2
+        return np.array([1e3, 1e5, 1e4, 0.01, 1.0])
+
+    def test_model_function_relaxation(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.logspace(-3, 2, 20)
+        out = np.asarray(model.model_function(t, self._params(), test_mode="relaxation"))
+        assert out.shape == (20,) and np.all(np.isfinite(out))
+
+    def test_model_function_oscillation_returns_M_by_2(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        omega = np.logspace(-2, 2, 20)
+        out = np.asarray(
+            model.model_function(omega, self._params(), test_mode="oscillation")
+        )
+        assert out.shape == (20, 2), f"Oscillation model_function shape {out.shape}"
+        assert np.all(np.isfinite(out))
+
+    def test_model_function_creep(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.logspace(-3, 2, 20)
+        out = np.asarray(model.model_function(t, self._params(), test_mode="creep"))
+        assert out.shape == (20,) and np.all(np.isfinite(out))
+
+    def test_model_function_steady_shear_returns_scalar_viscosity(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        gamma_dot = np.logspace(-1, 1, 20)
+        eta_0 = np.asarray(
+            model.model_function(gamma_dot, self._params(), test_mode="steady_shear")
+        )
+        expected = 1e5 * 0.01 + 1e4 * 1.0
+        np.testing.assert_allclose(float(eta_0), expected, rtol=1e-6)
+
+    def test_model_function_startup(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.logspace(-3, 2, 20)
+        out = np.asarray(
+            model.model_function(t, self._params(), test_mode="startup", gamma_dot=1.0)
+        )
+        assert out.shape == (20,) and np.all(np.isfinite(out))
+
+    def test_model_function_laos(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.linspace(0, 1.0, 20)
+        out = np.asarray(
+            model.model_function(
+                t, self._params(), test_mode="laos", omega=10.0, gamma_0=0.01
+            )
+        )
+        assert out.shape == (20,) and np.all(np.isfinite(out))
+
+    def test_model_function_unknown_mode_raises(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        with pytest.raises(ValueError, match="Unsupported test mode"):
+            model.model_function(np.array([1.0]), self._params(), test_mode="bogus")
+
+
+class TestGMMDiagnosticsAndPriors:
+    """Test NLSQ diagnostics extraction, convergence classification, priors."""
+
+    def _fitted_model(self, n_modes=1):
+        t = np.logspace(-3, 2, 50)
+        G0, tau = 1e5, 0.1
+        G_data = G0 * np.exp(-t / tau)
+        model = GeneralizedMaxwell(n_modes=n_modes)
+        model.fit(t, G_data, test_mode="relaxation", optimization_factor=None)
+        return model
+
+    def test_extract_nlsq_diagnostics_keys(self):
+        model = self._fitted_model(n_modes=1)
+        diag = model._extract_nlsq_diagnostics(model._nlsq_result)
+        for key in (
+            "convergence_flag",
+            "gradient_norm",
+            "hessian_condition",
+            "param_uncertainties",
+            "params_near_bounds",
+        ):
+            assert key in diag, f"Missing diagnostic key: {key}"
+        assert isinstance(diag["param_uncertainties"], dict)
+        assert isinstance(diag["params_near_bounds"], dict)
+        assert np.isfinite(diag["gradient_norm"]) or diag["gradient_norm"] == np.inf
+
+    def test_classify_convergence_good(self):
+        model = self._fitted_model(n_modes=1)
+        diag = model._extract_nlsq_diagnostics(model._nlsq_result)
+        classification = model._classify_nlsq_convergence(diag)
+        assert classification in ("good", "suspicious"), classification
+
+    def test_classify_convergence_hard_failure(self):
+        model = self._fitted_model(n_modes=1)
+        diag = {
+            "convergence_flag": False,
+            "gradient_norm": np.inf,
+            "hessian_condition": np.inf,
+            "param_uncertainties": {},
+            "params_near_bounds": {},
+        }
+        assert model._classify_nlsq_convergence(diag) == "hard_failure"
+
+    def test_classify_convergence_suspicious(self):
+        model = self._fitted_model(n_modes=1)
+        # High uncertainty on every parameter + high Hessian condition => suspicious
+        uncertainties = {}
+        for name in model.parameters.keys():
+            value = model.parameters.get_value(name)
+            uncertainties[name] = abs(value) * 10 + 1.0  # > 100% relative
+        diag = {
+            "convergence_flag": True,
+            "gradient_norm": 1.0,
+            "hessian_condition": 1e12,
+            "param_uncertainties": uncertainties,
+            "params_near_bounds": {},
+        }
+        assert model._classify_nlsq_convergence(diag) == "suspicious"
+
+    def test_construct_priors_good(self):
+        model = self._fitted_model(n_modes=1)
+        priors = model._construct_bayesian_priors("good")
+        assert set(priors.keys()) == set(model.parameters.keys())
+        for name, prior in priors.items():
+            assert prior["std"] > 0, f"Prior std must be positive for {name}"
+            assert np.isfinite(prior["mean"]) and np.isfinite(prior["std"])
+
+    def test_construct_priors_suspicious_auto_widen(self):
+        model = self._fitted_model(n_modes=1)
+        with pytest.warns(UserWarning):
+            priors = model._construct_bayesian_priors(
+                "suspicious", prior_mode="auto_widen"
+            )
+        assert set(priors.keys()) == set(model.parameters.keys())
+        assert all(p["std"] > 0 for p in priors.values())
+
+    def test_construct_priors_suspicious_warn(self):
+        model = self._fitted_model(n_modes=1)
+        priors = model._construct_bayesian_priors("suspicious", prior_mode="warn")
+        assert set(priors.keys()) == set(model.parameters.keys())
+        assert all(p["std"] > 0 for p in priors.values())
+
+    def test_construct_priors_hard_failure_strict_raises(self):
+        model = self._fitted_model(n_modes=1)
+        with pytest.raises(ValueError, match="Cannot construct reliable priors"):
+            model._construct_bayesian_priors("hard_failure", prior_mode="strict")
+
+    def test_construct_priors_hard_failure_fallback(self):
+        model = self._fitted_model(n_modes=1)
+        with pytest.warns(UserWarning):
+            priors = model._construct_bayesian_priors(
+                "hard_failure", allow_fallback_priors=True
+            )
+        assert set(priors.keys()) == set(model.parameters.keys())
+        assert all(p["std"] > 0 for p in priors.values())
+
+
+class TestGMMGettersAndValidation:
+    """Test spectrum/diagnostic getters and input validation error paths."""
+
+    def test_invalid_n_modes_raises(self):
+        with pytest.raises(ValueError, match="n_modes must be"):
+            GeneralizedMaxwell(n_modes=0)
+
+    def test_predict_before_fit_raises(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        with pytest.raises(ValueError, match="Model not fitted"):
+            model.predict(np.logspace(-2, 2, 10))
+
+    def test_predict_unknown_test_mode_raises(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        model._test_mode = "bogus"
+        with pytest.raises(ValueError, match="Unknown test_mode"):
+            model.predict(np.logspace(-2, 2, 10))
+
+    def test_fit_without_test_mode_raises(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.logspace(-3, 2, 20)
+        G_data = 1e5 * np.exp(-t / 0.1)
+        with pytest.raises(ValueError, match="test_mode must be specified"):
+            model._fit(t, G_data, test_mode=None)
+
+    def test_fit_unknown_test_mode_raises(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        t = np.logspace(-3, 2, 20)
+        G_data = 1e5 * np.exp(-t / 0.1)
+        with pytest.raises(ValueError, match="Unknown test_mode"):
+            model._fit(t, G_data, test_mode="bogus")
+
+    def test_get_relaxation_spectrum(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        model.parameters.set_value("G_inf", 1e3)
+        model.parameters.set_value("G_1", 1e5)
+        model.parameters.set_value("G_2", 1e4)
+        model.parameters.set_value("tau_1", 0.01)
+        model.parameters.set_value("tau_2", 1.0)
+
+        spectrum = model.get_relaxation_spectrum()
+        assert set(spectrum.keys()) == {"G_inf", "G_i", "tau_i"}
+        assert spectrum["G_inf"] == 1e3
+        np.testing.assert_allclose(spectrum["G_i"], [1e5, 1e4])
+        np.testing.assert_allclose(spectrum["tau_i"], [0.01, 1.0])
+
+    def test_get_element_minimization_diagnostics_none_before_fit(self):
+        model = GeneralizedMaxwell(n_modes=2)
+        assert model.get_element_minimization_diagnostics() is None
+
+
+class TestGMMResidualModes:
+    """Test log-residual and warm-start (initial_params) fitting branches."""
+
+    def test_relaxation_fit_log_residuals(self):
+        t = np.logspace(-3, 2, 50)
+        G_data = 1e3 + 1e5 * np.exp(-t / 0.01) + 1e4 * np.exp(-t / 1.0)
+        model = GeneralizedMaxwell(n_modes=2)
+        model.fit(
+            t,
+            G_data,
+            test_mode="relaxation",
+            optimization_factor=None,
+            use_log_residuals=True,
+        )
+        pred = model.predict(t)
+        assert np.all(np.isfinite(pred))
+        ss_res = np.sum((G_data - pred) ** 2)
+        ss_tot = np.sum((G_data - np.mean(G_data)) ** 2)
+        assert 1 - ss_res / ss_tot > 0.95
+
+    def test_relaxation_fit_with_initial_params(self):
+        t = np.logspace(-3, 2, 50)
+        G_data = 1e3 + 1e5 * np.exp(-t / 0.01) + 1e4 * np.exp(-t / 1.0)
+        model = GeneralizedMaxwell(n_modes=2)
+        # [E_inf, E_1, E_2, tau_1, tau_2]
+        x0 = np.array([1e3, 1e5, 1e4, 0.01, 1.0])
+        model.fit(
+            t,
+            G_data,
+            test_mode="relaxation",
+            optimization_factor=None,
+            initial_params=x0,
+        )
+        pred = model.predict(t)
+        ss_res = np.sum((G_data - pred) ** 2)
+        ss_tot = np.sum((G_data - np.mean(G_data)) ** 2)
+        assert 1 - ss_res / ss_tot > 0.95
+
+    def test_oscillation_fit_log_residuals(self):
+        omega = np.logspace(-2, 2, 50)
+        wt1, wt2 = omega * 0.01, omega * 1.0
+        G_prime = 1e3 + 1e5 * wt1**2 / (1 + wt1**2) + 1e4 * wt2**2 / (1 + wt2**2)
+        G_dprime = 1e5 * wt1 / (1 + wt1**2) + 1e4 * wt2 / (1 + wt2**2)
+        G_star = np.column_stack([G_prime, G_dprime])
+
+        model = GeneralizedMaxwell(n_modes=2)
+        model.fit(
+            omega,
+            G_star,
+            test_mode="oscillation",
+            optimization_factor=None,
+            use_log_residuals=True,
+        )
+        pred = model.predict(omega)
+        assert np.all(np.isfinite(pred))
