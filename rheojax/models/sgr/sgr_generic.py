@@ -1474,7 +1474,7 @@ class SGRGeneric(BaseModel):
         elif test_mode == "creep":
             return self._predict_creep(X)
         elif test_mode == "startup":
-            return self._predict_startup(X)
+            return self._predict_startup(X, gamma_dot=kwargs.get("gamma_dot"))
         elif test_mode in ("laos", "oscillation_laos"):
             # R8-SGR-001: wire LAOS protocol to simulate_laos()
             gamma_0 = kwargs.get("gamma_0", getattr(self, "_gamma_0", 0.1))
@@ -1569,12 +1569,20 @@ class SGRGeneric(BaseModel):
         J_t_jax = self._predict_creep_jit(t_jax, x, G0_scale, tau0)
         return np.array(J_t_jax)
 
-    def _predict_startup(self, t: np.ndarray) -> np.ndarray:
-        """Predict startup stress growth coefficient eta_plus(t)."""
+    def _predict_startup(
+        self, t: np.ndarray, gamma_dot: float | None = None
+    ) -> np.ndarray:
+        """Predict startup stress growth coefficient eta_plus(t).
+
+        Priority for gamma_dot: explicit arg > cached value from a prior
+        ``fit(test_mode="startup")`` call.
+        """
         x = self.parameters.get_value("x")
         G0_scale = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
-        gamma_dot = getattr(self, "_startup_gamma_dot", None)
+        # None sentinel (not `or`) avoids swallowing gamma_dot=0.0.
+        if gamma_dot is None:
+            gamma_dot = getattr(self, "_startup_gamma_dot", None)
         if gamma_dot is None:
             raise RuntimeError(
                 "SGRGeneric._predict_startup requires _startup_gamma_dot. "

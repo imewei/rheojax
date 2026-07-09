@@ -1197,7 +1197,7 @@ class SGRConventional(BaseModel):
         elif test_mode == "laos":
             return self._predict_laos(X)
         elif test_mode == "startup":
-            return self._predict_startup(X)
+            return self._predict_startup(X, gamma_dot=kwargs.get("gamma_dot"))
         else:
             raise ValueError(f"Unknown test_mode: {test_mode}")
 
@@ -1390,11 +1390,15 @@ class SGRConventional(BaseModel):
 
         return eta_plus
 
-    def _predict_startup(self, t: np.ndarray) -> np.ndarray:
+    def _predict_startup(
+        self, t: np.ndarray, gamma_dot: float | None = None
+    ) -> np.ndarray:
         """Predict stress growth coefficient in startup flow mode.
 
         Args:
             t: Time array (s)
+            gamma_dot: Applied shear rate. Priority: explicit arg > cached
+                value from a prior ``fit(test_mode="startup")`` call.
 
         Returns:
             Stress growth coefficient η⁺(t) array (Pa·s)
@@ -1405,8 +1409,10 @@ class SGRConventional(BaseModel):
         G0_scale = self.parameters.get_value("G0")
         tau0 = self.parameters.get_value("tau0")
 
-        # Get stored shear rate (set during fit)
-        gamma_dot = getattr(self, "_startup_gamma_dot", None)
+        # Priority: explicit arg > cached shear rate (set during fit).
+        # None sentinel (not `or`) avoids swallowing gamma_dot=0.0.
+        if gamma_dot is None:
+            gamma_dot = getattr(self, "_startup_gamma_dot", None)
         if gamma_dot is None:
             raise RuntimeError(
                 "SGRConventional._predict_startup: gamma_dot not provided and "
