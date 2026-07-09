@@ -318,13 +318,59 @@ _SLOW_MODELS_DENYLIST: set[str] = {
 }
 
 
+# (model_name, protocol) combinations that the generic canary can only ever
+# gracefully skip under its one-size-fits-all kwargs contract, but which are
+# now exercised for real by a dedicated test above with model-appropriate
+# kwargs/parameters. Excluded here rather than left to skip: the real
+# behaviour IS tested (just not via this generic sweep), so a skip here
+# would just be redundant noise, not missing coverage. See the dedicated
+# test docstrings for exactly why each one doesn't fit the generic contract.
+_COVERED_BY_DEDICATED_TESTS: set[tuple[str, str]] = {
+    # test_vlb_nonlocal_predict_not_implemented
+    ("vlb_nonlocal", "startup"),
+    ("vlb_nonlocal", "creep"),
+    # test_epm_predict_without_fit
+    ("lattice_epm", "startup"),
+    ("lattice_epm", "relaxation"),
+    ("lattice_epm", "creep"),
+    ("tensorial_epm", "startup"),
+    ("tensorial_epm", "relaxation"),
+    ("tensorial_epm", "creep"),
+    # test_fikh_startup_predict_without_fit
+    ("fikh", "startup"),
+    ("fmlikh", "startup"),
+    # test_tnt_relaxation_predict_without_fit
+    ("tnt", "relaxation"),
+    ("tnt_single_mode", "relaxation"),
+    ("tnt_cates", "relaxation"),
+    ("tnt_loop_bridge", "relaxation"),
+    ("tnt_multi_species", "relaxation"),
+    # test_creep_predict_without_fit_finite_viscosity
+    ("giesekus", "creep"),
+    ("giesekus_single", "creep"),
+    ("vlb_multi_network", "creep"),
+    ("tnt", "creep"),
+    ("tnt_single_mode", "creep"),
+    ("tnt_cates", "creep"),
+    # test_ikh_creep_predict_without_fit_scaled
+    ("mikh", "creep"),
+    ("ml_ikh", "creep"),
+    # test_stz_conventional_{startup,relaxation}_predict_without_fit
+    ("stz_conventional", "startup"),
+    ("stz_conventional", "relaxation"),
+}
+
+
 def _transient_model_cases() -> list[tuple[str, str]]:
     """Return (model_name, protocol_value) for every registered model
-    supporting any transient protocol."""
+    supporting any transient protocol, excluding models already covered
+    by a dedicated test."""
     cases: list[tuple[str, str]] = []
     for proto in _TRANSIENT_KWARGS:
         for info in ModelRegistry.for_protocol(proto):
             if info.name in _SLOW_MODELS_DENYLIST:
+                continue
+            if (info.name, proto.value) in _COVERED_BY_DEDICATED_TESTS:
                 continue
             cases.append((info.name, proto.value))
     return cases
