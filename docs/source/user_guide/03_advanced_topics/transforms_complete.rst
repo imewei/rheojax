@@ -846,8 +846,9 @@ them within a tolerance (default 10% mean relative deviation).
    from rheojax.transforms import CoxMerz
 
    cm = CoxMerz(tolerance=0.1, n_points=50)
-   result = cm.transform(oscillation_data, flow_curve_data)
-   print(f"Cox-Merz holds: {result.holds}, mean deviation: {result.mean_deviation:.3f}")
+   result_data, meta = cm.transform([oscillation_data, flow_curve_data])
+   cmr = meta["cox_merz_result"]
+   print(f"Cox-Merz holds: {cmr.passes}, mean deviation: {cmr.mean_deviation:.3f}")
 
 See :doc:`../../transforms/cox_merz` for the full parameter reference and theory.
 
@@ -867,7 +868,8 @@ other domain, using the fitting utilities in ``rheojax.utils.prony``.
    from rheojax.transforms import PronyConversion
 
    pc = PronyConversion(direction="time_to_freq", omega_out=omega_grid)
-   freq_data = pc.transform(relaxation_data)
+   freq_data, meta = pc.transform(relaxation_data)
+   prony_result = meta["prony_result"]
 
 See :doc:`../../transforms/prony_conversion` for the full parameter reference and theory.
 
@@ -887,7 +889,8 @@ inversion (Tikhonov with L-curve/GCV selection, or maximum entropy).
    from rheojax.transforms import SpectrumInversion
 
    si = SpectrumInversion(method="tikhonov", n_tau=100, source="oscillation")
-   spectrum = si.transform(data)
+   spectrum_data, meta = si.transform(data)
+   spectrum_result = meta["spectrum_result"]
 
 See :doc:`../../transforms/spectrum_inversion` for the full parameter reference and theory.
 
@@ -906,8 +909,10 @@ against this envelope reveals nonlinear effects such as strain hardening or soft
 
    from rheojax.transforms import LVEEnvelope
 
+   # G_i/tau_i supplied directly, so no input data is required
    env = LVEEnvelope(shear_rate=1.0, G_i=G_i, tau_i=tau_i)
-   envelope = env.transform(startup_data)
+   envelope_data, meta = env.transform(None)
+   lve_result = meta["lve_result"]
 
 See :doc:`../../transforms/lve_envelope` for the full parameter reference and theory.
 
