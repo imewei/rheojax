@@ -1341,7 +1341,7 @@ Additional Resources
 
 **Example Data**
    - ``examples/data/README.md`` - Dataset catalog and loading instructions
-   - ``examples/README.md`` - Overview of all 240+ notebooks
+   - ``examples/README.md`` - Overview of all 218 notebooks
 
 **External Resources**
    - JAX Documentation: https://jax.readthedocs.io/
