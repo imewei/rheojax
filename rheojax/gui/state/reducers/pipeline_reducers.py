@@ -268,6 +268,11 @@ def reduce_update_step_status(
                 step.status = status
                 step.error_message = error_message
                 break
+        # A non-COMPLETE status means the cached result (if any) no longer
+        # corresponds to a valid run of this step -- same invalidation rule
+        # as reduce_update_step_config / reduce_remove_pipeline_step.
+        if status != StepStatus.COMPLETE:
+            vp.step_results.pop(step_id, None)
         return replace(state, visual_pipeline=vp)
 
     return _update_status

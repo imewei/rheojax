@@ -18,6 +18,7 @@ from typing import Any
 
 from rheojax.cli._output import create_progress, get_console, print_error, print_success
 from rheojax.cli._yaml_schema import PipelineConfig, load_config, validate_config
+from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger
 from rheojax.pipeline.builder import PipelineBuilder
 
@@ -101,7 +102,17 @@ def config_to_builder(config: PipelineConfig) -> PipelineBuilder:
 
         elif step_type == "fit":
             model_name = merged.pop("model")
-            builder.add_fit_step(model_name, **merged)
+            params = merged.pop("params", None)
+            if params:
+                # Seed initial parameter values the same way the GUI's
+                # ModelService.fit() does, since Pipeline.fit() has no
+                # "params" kwarg — build the model here and pass the
+                # instance through instead of the bare name.
+                model_obj = ModelRegistry.create(model_name)
+                model_obj.parameters.set_values(params)
+                builder.add_fit_step(model_obj, **merged)
+            else:
+                builder.add_fit_step(model_name, **merged)
 
         elif step_type == "bayesian":
             builder.add_bayesian_step(**merged)

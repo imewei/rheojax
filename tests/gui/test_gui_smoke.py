@@ -183,7 +183,7 @@ class TestStateManagement:
         assert state.current_tab == "home", "Default tab should be 'home'"
         assert state.theme == "light", "Default theme should be 'light'"
         assert state.auto_save_enabled is True, "Auto-save should be enabled by default"
-        assert state.current_seed == 42, "Default seed should be 42"
+        assert state.current_seed == 0, "Default seed should match CLI default (0)"
 
     @pytest.mark.smoke
     @pytest.mark.skipif(

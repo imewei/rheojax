@@ -228,13 +228,6 @@ def validate_config(config: PipelineConfig) -> list[str]:
         errors.append("Pipeline must have at least one step.")
         return errors  # Nothing more to validate
 
-    # First step must be a load step
-    first_type = config.steps[0].get("type", "")
-    if first_type != "load":
-        errors.append(
-            f"The first pipeline step must be of type 'load', got '{first_type}'."
-        )
-
     has_fit = False
     for idx, step in enumerate(config.steps):
         step_label = f"Step {idx + 1}"
@@ -242,6 +235,14 @@ def validate_config(config: PipelineConfig) -> list[str]:
         if not isinstance(step, dict):
             errors.append(f"{step_label}: Each step must be a YAML mapping.")
             continue
+
+        # First step must be a load step
+        if idx == 0:
+            first_type = step.get("type", "")
+            if first_type != "load":
+                errors.append(
+                    f"The first pipeline step must be of type 'load', got '{first_type}'."
+                )
 
         step_type = step.get("type")
         if step_type is None:

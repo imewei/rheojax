@@ -377,7 +377,7 @@ class AppState:
 
     # Settings
     workflow_mode: WorkflowMode = WorkflowMode.FITTING
-    current_seed: int = 42
+    current_seed: int = 0  # matches CLI default (rheojax/cli/bayesian.py --seed)
     auto_save_enabled: bool = True
     theme: str = "light"
     os_theme: str = "light"  # Resolved OS color scheme ("light" or "dark")

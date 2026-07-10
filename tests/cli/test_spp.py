@@ -26,6 +26,19 @@ def _write_laos_csv(path, omega: float = 1.0, gamma_0: float = 0.5, n: int = 500
     return path
 
 
+def _write_laos_csv_with_strain(
+    path, omega: float = 1.0, gamma_0: float = 0.5, n: int = 500
+):
+    """Write a synthetic LAOS dataset with an explicit, non-sinusoidal strain column."""
+    t = np.linspace(0.0, 2.0 * np.pi / omega, n)
+    strain = gamma_0 * np.sin(omega * t) + 0.05 * gamma_0 * np.sin(3.0 * omega * t)
+    stress = 80.0 * strain + 5.0 * np.sin(3.0 * omega * t)
+    pd.DataFrame({"time": t, "stress": stress, "strain_measured": strain}).to_csv(
+        path, index=False
+    )
+    return path
+
+
 def _analyze_ns(**overrides) -> argparse.Namespace:
     """Build a fully-populated Namespace for run_analyze with sane defaults."""
     defaults = dict(
@@ -78,8 +91,10 @@ class TestCreateParser:
     @pytest.mark.unit
     def test_analyze_flags(self):
         parser = create_parser()
+        # Global flags (-v) go before the subcommand name; see create_parser().
         ns = parser.parse_args(
             [
+                "-v",
                 "analyze",
                 "d.csv",
                 "--omega",
@@ -93,7 +108,6 @@ class TestCreateParser:
                 "7",
                 "-o",
                 "out.csv",
-                "-v",
             ]
         )
         assert ns.numerical is True
@@ -101,7 +115,7 @@ class TestCreateParser:
         assert ns.export_matlab is True
         assert ns.n_harmonics == 7
         assert str(ns.output) == "out.csv"
-        assert ns.verbose is True
+        assert ns.verbose == 1
 
     @pytest.mark.unit
     def test_analyze_missing_required_omega_exits(self):
@@ -195,6 +209,27 @@ class TestRunAnalyze:
         out = capsys.readouterr().out
         assert "Loading data from" in out
         assert "Running SPP analysis" in out
+
+    @pytest.mark.unit
+    def test_strain_col_is_wired_into_analysis(self, tmp_path):
+        """--strain-col must actually feed the named column into the SPP
+        transform (previously accepted by argparse but never read)."""
+        csv = _write_laos_csv_with_strain(tmp_path / "laos_strain.csv")
+        out_with = tmp_path / "with_strain.csv"
+        out_without = tmp_path / "without_strain.csv"
+
+        rc_with = run_analyze(
+            _analyze_ns(
+                input_file=csv, output=out_with, strain_col="strain_measured"
+            )
+        )
+        rc_without = run_analyze(_analyze_ns(input_file=csv, output=out_without))
+
+        assert rc_with == 0
+        assert rc_without == 0
+        sigma_sy_with = pd.read_csv(out_with)["sigma_sy"].iloc[0]
+        sigma_sy_without = pd.read_csv(out_without)["sigma_sy"].iloc[0]
+        assert sigma_sy_with != pytest.approx(sigma_sy_without)
 
     @pytest.mark.unit
     def test_numerical_method(self, tmp_path):

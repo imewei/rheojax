@@ -562,9 +562,10 @@ class ExportService:
                 if "fit_result" in state and state["fit_result"] is not None:
                     fit_meta_path = tmpdir_path / "fit_result.json"
                     fr = state["fit_result"]
+                    fr_metadata = getattr(fr, "metadata", None) or {}
                     fit_meta = {
                         "model_name": getattr(fr, "model_name", None),
-                        "test_mode": getattr(fr, "test_mode", None),
+                        "test_mode": fr_metadata.get("test_mode"),
                         "r_squared": float(getattr(fr, "r_squared", 0.0)),
                         "success": getattr(fr, "success", False),
                     }

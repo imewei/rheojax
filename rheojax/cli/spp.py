@@ -46,6 +46,13 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="SPP commands")
 
     # Analyze command
+    # Do not redeclare -v/--verbose on the subparsers: argparse's subparser
+    # dispatch parses subcommand args in a fresh namespace and then copies
+    # every key back into the parent namespace (Python 3.13+), so a
+    # subparser-local verbose action would unconditionally clobber whatever
+    # count the global -vv/-vvv (passed before the subcommand) produced.
+    # Global flags must be passed before the subcommand name, e.g.
+    # `rheojax spp -vv analyze ...`.
     analyze_parser = subparsers.add_parser(
         "analyze",
         help="Analyze single LAOS dataset with SPP",
@@ -143,12 +150,6 @@ def _add_analyze_args(parser: argparse.ArgumentParser) -> None:
         type=str,
         help="Column name for strain data (optional)",
     )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Verbose output",
-    )
 
 
 def _add_batch_args(parser: argparse.ArgumentParser) -> None:
@@ -187,12 +188,6 @@ def _add_batch_args(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=8,
         help="Differentiation step size (default: 8)",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Verbose output",
     )
 
 
@@ -250,6 +245,15 @@ def run_analyze(args: Namespace) -> int:
         else:
             rheo_data = loaded
         logger.debug("Data loaded successfully", data_points=len(rheo_data.x))
+
+        if args.strain_col is not None:
+            strain_kwargs = dict(load_kwargs)
+            strain_kwargs["y_col"] = args.strain_col
+            strain_loaded = load_data(str(args.input_file), **strain_kwargs)
+            strain_data = (
+                strain_loaded[0] if isinstance(strain_loaded, list) else strain_loaded
+            )
+            rheo_data.metadata["strain"] = np.asarray(strain_data.y)
     except Exception as e:
         logger.error("Failed to load data", file=str(args.input_file), exc_info=True)
         print(f"Error loading data: {e}", file=sys.stderr)

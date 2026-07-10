@@ -396,18 +396,25 @@ class ColumnMappingPage(QWizardPage):
         y2_patterns = ["g''", "gpp", "loss"]
         temp_patterns = ["temp", "temperature"]
 
+        claimed: set[str] = set()
+
         def find_match(combo: QComboBox, patterns: list[str]) -> None:
-            """Find best match for column."""
+            """Find best match for column, skipping columns already claimed
+            by another field (e.g. "g'" is a substring of "g''", so G''
+            must be claimed by y2 before y is matched against it)."""
             for i in range(combo.count()):
                 text = combo.itemText(i).lower()
+                if text in claimed:
+                    continue
                 for pattern in patterns:
                     if pattern in text:
                         combo.setCurrentIndex(i)
+                        claimed.add(text)
                         return
 
         find_match(self.x_combo, x_patterns)
-        find_match(self.y_combo, y_patterns)
         find_match(self.y2_combo, y2_patterns)
+        find_match(self.y_combo, y_patterns)
         find_match(self.temp_combo, temp_patterns)
 
     def isComplete(self) -> bool:
@@ -596,7 +603,9 @@ class PreviewConfirmPage(QWizardPage):
         if any(kw in cols_lower for kw in ["creep", "compliance", "j(t)"]):
             return "creep"
         if any(kw in cols_lower for kw in ["shear rate", "flow", "viscosity", "eta"]):
-            return "rotation"
+            # Match DataService.detect_test_mode's label so the confirm-screen
+            # preview agrees with what auto-detect actually assigns on import.
+            return "flow_curve"
         # Fall back to the value stored by TestModeSelectionPage
         stored = self.field("test_mode")
         return stored if stored else "oscillation"

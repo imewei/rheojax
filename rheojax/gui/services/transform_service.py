@@ -129,14 +129,14 @@ class TransformService:
             "mastercurve": {
                 "reference_temp": {
                     "type": "float",
-                    "default": 25.0,
+                    "default": 298.15,
                     "label": "Reference Temperature",
-                    "range": (-100, 300),
-                    "description": "Reference temperature (C)",
+                    "range": (173.15, 573.15),
+                    "description": "Reference temperature (K)",
                 },
                 "auto_shift": {
                     "type": "bool",
-                    "default": True,
+                    "default": False,
                     "label": "Auto Shift",
                     "description": "Automatically calculate shift factors",
                 },
@@ -198,7 +198,7 @@ class TransformService:
                 },
                 "auto_shift": {
                     "type": "bool",
-                    "default": True,
+                    "default": False,
                     "label": "Auto Shift",
                     "description": "Auto-calculate shift factors",
                 },
@@ -621,8 +621,8 @@ class TransformService:
                     )
                     raise ValueError("Mastercurve requires list of datasets")
 
-                reference_temp = params.get("reference_temp", 25.0)
-                auto_shift = params.get("auto_shift", True)
+                reference_temp = params.get("reference_temp", 298.15)
+                auto_shift = params.get("auto_shift", False)
                 shift_method = params.get("shift_method", "wlf")
 
                 logger.debug(
@@ -695,7 +695,7 @@ class TransformService:
                     raise ValueError("SRFS requires list of datasets")
 
                 reference_gamma_dot = params.get("reference_gamma_dot", 1.0)
-                auto_shift = params.get("auto_shift", True)
+                auto_shift = params.get("auto_shift", False)
 
                 logger.debug(
                     "Applying SRFS transform",

@@ -1027,6 +1027,25 @@ class DataPage(QWidget):
                 "X and Y columns must be different.",
             )
             return
+        other_cols = {"X": x_col, "Y": y_col}
+        if y2_col is not None:
+            for label, col in other_cols.items():
+                if y2_col == col:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Selection",
+                        f"Y2 column must be different from the {label} column.",
+                    )
+                    return
+        if temp_col is not None:
+            for label, col in {**other_cols, "Y2": y2_col}.items():
+                if temp_col == col:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Selection",
+                        f"Temperature column must be different from the {label} column.",
+                    )
+                    return
 
         # Capture the file(s) this worker is importing now — read at callback
         # time these would reflect whatever file is *currently* selected,

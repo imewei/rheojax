@@ -78,9 +78,9 @@ class FitPage(QWidget):
         # Persist user-selected fitting options; start with dialog defaults
         self._fit_options: dict[str, Any] = {
             "algorithm": "NLSQ",
-            "max_iter": 5000,
-            "ftol": 1e-8,
-            "xtol": 1e-8,
+            "max_iter": 1000,
+            "ftol": 1e-6,
+            "xtol": 1e-6,
             "multistart": False,
             "num_starts": 5,
             "use_bounds": True,
@@ -1006,8 +1006,8 @@ class FitPage(QWidget):
             dlg_layout.addWidget(multi_view)
 
             dataset = state.datasets.get(active_dataset_id)
-            if dataset is not None and hasattr(multi_view, "load_dataset"):
-                multi_view.load_dataset(dataset, fit_results=fit_results)
+            if dataset is not None:
+                self._populate_compare_view(multi_view, dataset, fit_results)
 
             dialog.exec()
         except Exception as exc:
@@ -1017,6 +1017,47 @@ class FitPage(QWidget):
                 error=str(exc),
                 exc_info=True,
             )
+
+    def _populate_compare_view(
+        self, multi_view: Any, dataset: Any, fit_results: dict[str, Any]
+    ) -> None:
+        """Overlay observed data and each fit's predicted curve, one panel per fit."""
+        x = getattr(dataset, "x", None)
+        y = getattr(dataset, "y", None)
+        if x is None or y is None:
+            x = getattr(dataset, "x_data", None)
+            y = getattr(dataset, "y_data", None)
+        if x is None or y is None:
+            return
+
+        x = np.asarray(x)
+        y = np.real(np.asarray(y)) if np.iscomplexobj(y) else np.asarray(y)
+
+        n_results = len(fit_results)
+        if n_results <= 1:
+            layout_id = "1x1"
+        elif n_results == 2:
+            layout_id = "1x2"
+        elif n_results <= 4:
+            layout_id = "2x2"
+        else:
+            layout_id = "3x2"
+        multi_view.set_layout_preset(layout_id)
+
+        for index, (key, result) in enumerate(fit_results.items()):
+            if index >= multi_view.get_num_panels():
+                break
+
+            def plot_fn(ax, _x=x, _y=y, _result=result) -> None:
+                ax.loglog(_x, _y, "o", label="Data")
+                x_fit = getattr(_result, "x_fit", None)
+                y_fit = getattr(_result, "y_fit", None)
+                if x_fit is not None and y_fit is not None:
+                    ax.loglog(x_fit, y_fit, "-", label="Fit")
+                ax.legend()
+
+            multi_view.add_plot(index, plot_fn)
+            multi_view.set_panel_title(index, result.model_name or key)
 
     def _show_fit_options(self) -> None:
         """Show fitting options dialog."""

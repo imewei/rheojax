@@ -30,8 +30,14 @@ class TestCreateParser:
     @pytest.mark.unit
     def test_has_format_flag(self):
         parser = create_parser()
-        ns = parser.parse_args(["results/", "--output", "out/", "--format", "hdf5"])
-        assert ns.export_format == "hdf5"
+        ns = parser.parse_args(["results/", "--output", "out/", "--format", "excel"])
+        assert ns.export_format == "excel"
+
+    @pytest.mark.unit
+    def test_hdf5_format_not_a_valid_choice(self):
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["results/", "--output", "out/", "--format", "hdf5"])
 
     @pytest.mark.unit
     def test_has_json_output_flag(self):
