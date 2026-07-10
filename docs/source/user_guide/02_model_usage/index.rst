@@ -135,7 +135,7 @@ Key Skills You'll Develop
 .. code-block:: python
 
    # Smart initialization for fractional models in oscillation mode
-   from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+   from rheojax.models import FractionalZenerSolidSolid
 
    omega = np.logspace(-2, 2, 50)
    G_star = ...  # Complex modulus [G', G"]
@@ -227,7 +227,7 @@ Common Pitfalls and How to Avoid Them
 .. code-block:: python
 
    # WRONG: Using complex model for simple data
-   from rheojax.models.fractional_burgers import FractionalBurgers  # 7 parameters
+   from rheojax.models import FractionalBurgersModel  # 7 parameters
    model.fit(omega, G_star)  # Data only has 10 points → overfitting!
 
    # CORRECT: Start with simplest model

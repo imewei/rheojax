@@ -7,7 +7,7 @@
 
 > **Disclaimer:** RheoJAX is pre-release software under active development and testing. APIs, model implementations, and numerical results may change without notice. Outputs have not been independently validated for all use cases. Use at your own risk and verify critical results against established reference data before relying on them in research or industrial applications.
 
-JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 45 oscillation-capable models), and 218 tutorial notebooks across 20 categories.
+JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, and 218 tutorial notebooks across 20 categories.
 
 ## Features
 
@@ -20,7 +20,6 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Bayesian Inference**: All 53 models support NumPyro NUTS sampling with NLSQ warm-start
 - **Pipeline API**: Fluent interface for load → fit → plot → save workflows
 - **Automatic Initialization**: Parameter initialization for fractional models in oscillation mode
-- **DMTA/DMA Support**: All 45 oscillation-capable models support tensile modulus (E*) via automatic E* ↔ G* conversion
 - **JAX-First Architecture**: 5-270x performance improvement with automatic differentiation and GPU support
 
 ### Model Protocol Support Matrix
@@ -273,7 +272,7 @@ plt.show()
 ### Basic Model Fitting
 
 ```python
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import Maxwell
 import numpy as np
 
 # Generate or load data
@@ -291,7 +290,7 @@ print(f"eta = {model.parameters.get_value('eta'):.3e} Pa·s")
 ### Bayesian Inference Workflow
 
 ```python
-from rheojax.models.maxwell import Maxwell
+from rheojax.models import Maxwell
 import numpy as np
 
 # Create model and data
@@ -359,7 +358,7 @@ pipeline = BayesianPipeline()
 RheoJAX detects when models are inappropriate for data based on physics:
 
 ```python
-from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+from rheojax.models import FractionalZenerSolidSolid
 from rheojax.utils.compatibility import check_model_compatibility, format_compatibility_message
 import numpy as np
 

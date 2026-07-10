@@ -19,7 +19,7 @@ are complete and you have produced the audit summary described below.
    - `rheojax/pipeline/base.py` — `Pipeline` fluent API
    - `rheojax/pipeline/bayesian.py` — `BayesianPipeline`
    - Every model class across `rheojax/models/` (53 models, 20 families)
-   - Every transform class in `rheojax/transforms/` (7 transforms)
+   - Every transform class in `rheojax/transforms/` (11 transforms)
    - All existing tests in `tests/`
 
 Once all reads are complete, produce an **audit summary block** (as a top-level
@@ -36,8 +36,9 @@ code comment in a new file `rheojax/fitting/_audit.py`) containing:
 #   LAOS        : [...]
 #
 # Transform registry (current state):
-#   [list all 7 transforms: FFTAnalysis, Mastercurve, SRFS,
-#    MutationNumber, OWChirp, SmoothDerivative, SPPDecomposer]
+#   [list all 11 transforms: FFTAnalysis, Mastercurve, SRFS,
+#    MutationNumber, OWChirp, SmoothDerivative, SPPDecomposer,
+#    CoxMerz, LVEEnvelope, PronyConversion, SpectrumInversion]
 #   — their inputs, outputs, and any protocol dependencies
 #
 # Objective function interfaces (current):
@@ -343,19 +344,13 @@ replacing the fit API. New module: `rheojax/utils/protocol_preprocessing.py`:
 - LAOS classification per Ewoldt (2008): strain-stiffening/softening/thickening/thinning
 - Q₀ nonlinearity coefficient extraction
 
-### F7 — New Convenience Transforms
+### F7 — New Convenience Transforms (COMPLETE)
 
-Add to `rheojax/transforms/` (register via existing `TransformRegistry`):
-
-| Transform | File | Input → Output |
-|---|---|---|
-| `SpectrumInversion` | `spectrum_inversion.py` | G'(ω)/G''(ω) or G(t) → H(τ) or L(τ) |
-| `CoxMerz` | `cox_merz.py` | η*(ω) + η(γ̇) → overlay + validation |
-| `LVEEnvelope` | `lve_envelope.py` | G(t) Prony series → σ_LVE⁺(t) for startup |
-| `PronyConversion` | `prony_conversion.py` | G(t) ↔ G'(ω)/G''(ω) interconversion |
-
-These supplement the existing 7 transforms (FFT, Mastercurve, SRFS, MutationNumber,
-OWChirp, SmoothDerivative, SPP). All must:
+`SpectrumInversion`, `CoxMerz`, `LVEEnvelope`, and `PronyConversion` have been
+implemented and registered in `rheojax/transforms/`, bringing the transform count
+to 11 total (FFT, Mastercurve, SRFS, MutationNumber, OWChirp, SmoothDerivative, SPP,
+SpectrumInversion, CoxMerz, LVEEnvelope, PronyConversion). Any future transform work
+must:
 - Inherit `BaseTransform` from `rheojax/core/base.py`
 - Register via `@TransformRegistry.register("name")`
 - Use `safe_import_jax()` for float64

@@ -235,11 +235,11 @@ Element Minimization with Warm-Start
 
 .. code-block:: python
 
-    from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+    from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
     import numpy as np
 
     # Create model with maximum modes
-    model = GeneralizedMaxwell(n_modes=10, modulus_type='shear')
+    model = GeneralizedMaxwell(n_modes=10)
 
     # Generate relaxation data
     t = np.logspace(-3, 2, 100)
@@ -661,7 +661,7 @@ Basic Compatibility Check
 
 .. code-block:: python
 
-    from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+    from rheojax.models import FractionalZenerSolidSolid
     from rheojax.utils.compatibility import (
         check_model_compatibility,
         format_compatibility_message
@@ -762,7 +762,7 @@ Oscillation Data Analysis
         check_model_compatibility,
         detect_material_type
     )
-    from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+    from rheojax.models import FractionalMaxwellLiquid
     import numpy as np
 
     # Oscillation data (G', G")
@@ -796,7 +796,7 @@ Enhanced Error Messages
 .. code-block:: python
 
     import numpy as np
-    from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+    from rheojax.models import FractionalZenerSolidSolid
 
     # Generate exponential data (incompatible with FZSS)
     np.random.seed(42)
@@ -1035,7 +1035,7 @@ Get Complete Strategy
     )
 
     # Use strategy with BaseModel
-    from rheojax.models.fractional_maxwell_liquid import FractionalMaxwellLiquid
+    from rheojax.models import FractionalMaxwellLiquid
 
     model = FractionalMaxwellLiquid()
     model.fit(
@@ -1225,7 +1225,7 @@ Functions
 .. autofunction:: rheojax.utils.metrics.r2_complex
    :noindex:
 
-   Computes R² for complex-valued modulus data (G*, E*) using magnitude comparison.
+   Computes R² for complex-valued modulus data (G*) using magnitude comparison.
    Useful for oscillation fits where predictions are complex.
 
 Examples

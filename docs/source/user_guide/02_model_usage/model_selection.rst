@@ -761,7 +761,7 @@ RheoJAX provides automatic compatibility checking to help identify inappropriate
 
 .. code-block:: python
 
-   from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+   from rheojax.models import FractionalZenerSolidSolid
    from rheojax.utils.compatibility import check_model_compatibility, format_compatibility_message
 
    # Check before fitting

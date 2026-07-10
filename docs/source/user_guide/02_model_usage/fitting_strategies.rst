@@ -38,7 +38,7 @@ For SAOS frequency sweep data, RheoJAX automatically estimates:
 
 .. code-block:: python
 
-   from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+   from rheojax.models import FractionalZenerSolidSolid
 
    # Smart initialization happens automatically
    model = FractionalZenerSolidSolid()
