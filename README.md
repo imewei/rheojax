@@ -1003,10 +1003,10 @@ uv sync
 # Install pre-commit hooks
 pre-commit install
 
-# Run smoke tests (CI gate, ~1838 tests)
+# Run smoke tests (CI gate, ~2051 tests)
 uv run pytest -n 4 -m "smoke"
 
-# Run full test suite (~4963 tests)
+# Run full test suite (~6415 tests)
 uv run pytest -n 4
 
 # Format and lint

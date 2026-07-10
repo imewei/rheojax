@@ -31,7 +31,7 @@ Quick Links
 **Phase 2 (Models and Transforms)**:
 
 - :doc:`api/models` - All 53 rheological models (classical, fractional, flow, multi-mode, SGR, STZ, EPM, fluidity, Saramito, DMT, IKH, FIKH, HL, Giesekus, ITT-MCT, TNT, VLB, HVM, HVNM, SPP)
-- :doc:`api/transforms` - All 7 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing, SRFS, SPP)
+- :doc:`api/transforms` - All 11 data transforms (FFT, mastercurve, mutation, OWChirp, smoothing, SRFS, SPP, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope)
 - :doc:`api/pipeline` - Pipeline API for high-level workflows
 
 **Phase 4 (Complete)**: Performance & Correctness [done - v0.3.0-v0.4.0]
@@ -204,8 +204,8 @@ Models (53 total)
 
 - :class:`rheojax.models.HVNMLocal` - Hybrid vitrimer nanocomposite (4 sub-networks)
 
-Transforms (7 total)
-~~~~~~~~~~~~~~~~~~~~
+Transforms (11 total)
+~~~~~~~~~~~~~~~~~~~~~
 
 - :class:`rheojax.transforms.FFTAnalysis` - Time -> frequency domain (FFT)
 - :class:`rheojax.transforms.Mastercurve` - Time-temperature superposition (WLF/Arrhenius)
@@ -214,6 +214,10 @@ Transforms (7 total)
 - :class:`rheojax.transforms.SmoothDerivative` - Noise-robust differentiation
 - :class:`rheojax.transforms.SRFS` - Strain-rate frequency superposition
 - :class:`rheojax.transforms.SPPDecomposer` - Sequence of Physical Processes decomposition
+- :class:`rheojax.transforms.CoxMerz` - Cox-Merz rule validation (|η*| vs η)
+- :class:`rheojax.transforms.PronyConversion` - Prony series time<->frequency conversion
+- :class:`rheojax.transforms.SpectrumInversion` - Relaxation spectrum H(τ) recovery
+- :class:`rheojax.transforms.LVEEnvelope` - Linear viscoelastic startup envelope
 
 Pipeline API
 ~~~~~~~~~~~~

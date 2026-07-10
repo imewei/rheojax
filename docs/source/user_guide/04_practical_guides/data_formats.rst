@@ -10,7 +10,7 @@ Data Format Reference
    fitting analyses and transforms. Use this as a technical specification when
    preparing data for analysis.
 
-   **Version**: v0.6.0 — 53 models | 7 transforms | 5 readers | 3 writers
+   **Version**: v0.7.0 — 53 models | 11 transforms | 5 readers | 3 writers
 
 .. contents:: On this page
    :local:

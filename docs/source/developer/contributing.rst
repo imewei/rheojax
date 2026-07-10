@@ -49,13 +49,13 @@ Development Setup
 
    .. code-block:: bash
 
-       # Run smoke tests (~1838 tests, ~2-6 min)
+       # Run smoke tests (~2051 tests, ~2-6 min)
        uv run pytest -n 4 -m "smoke"
 
        # Run standard tests (~4714 tests, ~10-20 min)
        uv run pytest -n 4 -m "not slow"
 
-       # Run full suite (~4963 tests, includes slow Bayesian)
+       # Run full suite (~6415 tests, includes slow Bayesian)
        uv run pytest -n 4
 
        # Quick format + lint + smoke
@@ -304,13 +304,13 @@ RheoJAX uses a **tiered testing strategy** with pytest markers:
 
 .. code-block:: bash
 
-    # Tier 1: Smoke tests (~1838 tests, ~2-6 min) — CI gate
+    # Tier 1: Smoke tests (~2051 tests, ~2-6 min) — CI gate
     uv run pytest -n 4 -m "smoke"
 
     # Tier 2: Standard tests (~4714 tests, ~10-20 min)
     uv run pytest -n 4 -m "not slow"
 
-    # Tier 3: Full suite (~4963 tests, includes slow Bayesian)
+    # Tier 3: Full suite (~6415 tests, includes slow Bayesian)
     uv run pytest -n 4
 
     # Quick format + lint + smoke

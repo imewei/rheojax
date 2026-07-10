@@ -28,7 +28,7 @@ By completing this section, you will be able to:
 10. Apply transient polymer network models (TNT, VLB)
 11. Model vitrimer and nanocomposite rheology (HVM, HVNM)
 12. Understand dense suspension dynamics via mode-coupling theory (ITT-MCT)
-13. Apply all 7 data transforms to experimental data
+13. Apply all 11 data transforms to experimental data
 
 ----
 

@@ -88,7 +88,7 @@ docs/
 │   │   │  # LAOS Analysis
 │   │   └── spp/                      # 1 model: SPPYieldStress + SPPDecomposer (3 rst)
 │   │
-│   ├── transforms/                   # Transform Reference — 7 transforms (9 rst)
+│   ├── transforms/                   # Transform Reference — 11 transforms (13 rst)
 │   │   ├── index.rst
 │   │   ├── summary.rst               # Application guide
 │   │   ├── fft.rst                   # FFT analysis
@@ -97,7 +97,11 @@ docs/
 │   │   ├── owchirp.rst              # Fast rheometry
 │   │   ├── smooth_derivative.rst     # Noise-robust differentiation
 │   │   ├── spp.rst                   # SPP decomposition transform
-│   │   └── srfs.rst                  # Strain-rate frequency superposition
+│   │   ├── srfs.rst                  # Strain-rate frequency superposition
+│   │   ├── cox_merz.rst              # Cox-Merz rule validation
+│   │   ├── prony_conversion.rst      # Prony series time<->frequency conversion
+│   │   ├── spectrum_inversion.rst    # Relaxation spectrum H(tau) recovery
+│   │   └── lve_envelope.rst          # Linear viscoelastic startup envelope
 │   │
 │   ├── api/                          # API Reference (auto-generated, 9 files)
 │   ├── developer/                    # Contributing guides (2 files)
@@ -129,8 +133,9 @@ docs/
 ### Tier 3: Transform Reference (Preprocessing Math)
 - **Purpose:** Data preprocessing theory
 - **Audience:** Advanced practitioners
-- **Content:** FFT, WLF/TTS, SRFS, SPP, mutation number, OWChirp, derivatives
-- **Size:** 9 rst files covering 7 transforms
+- **Content:** FFT, WLF/TTS, SRFS, SPP, mutation number, OWChirp, derivatives, Cox-Merz,
+  Prony conversion, spectrum inversion, LVE envelope
+- **Size:** 13 rst files covering 11 transforms
 
 ## Building Documentation
 
@@ -155,7 +160,7 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 
 - **53 models** across 20 families with full Bayesian inference support
 - **86 rst files** in the Model Handbook (equations, protocols, troubleshooting)
-- **7 transforms** with mathematical derivations
+- **11 transforms** with mathematical derivations
 - **6-section User Guide** structured as a 16-week graduate course
 - **9 learning pathways** for different user backgrounds
 - **240+ example notebooks** across all model families
