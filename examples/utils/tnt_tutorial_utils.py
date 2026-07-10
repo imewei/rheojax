@@ -1497,7 +1497,7 @@ def save_tnt_results(
     model_name: str,
     protocol: str,
     param_names: list[str] | None = None,
-) -> None:
+) -> Path:
     """Save NLSQ and Bayesian results for reuse in other notebooks.
 
     Args:
@@ -1506,6 +1506,10 @@ def save_tnt_results(
         model_name: Model identifier for directory naming.
         protocol: Protocol name for labeling files.
         param_names: List of parameter names to save. If None, saves all.
+
+    Returns:
+        The output directory the results were written to (several notebooks
+        capture this via ``output_path = save_tnt_results(...)`` and print it).
     """
     output_dir = get_output_dir(model_name, protocol)
     os.makedirs(output_dir, exist_ok=True)
@@ -1533,6 +1537,8 @@ def save_tnt_results(
     print(f"Results saved to {output_dir}/")
     print(f"  nlsq_params_{protocol}.json: {len(nlsq_params)} parameters")
     print(f"  posterior_{protocol}.json: {len(list(posterior.values())[0])} draws")
+
+    return output_dir
 
 
 def load_tnt_parameters(

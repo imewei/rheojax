@@ -265,6 +265,8 @@ def prony_decompose_memory(
     method: str = "leastsq",
     n_starts: int = 5,
     seed: int = 42,
+    g_init: np.ndarray | None = None,
+    tau_init: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Decompose memory kernel into Prony series.
 
@@ -341,7 +343,9 @@ def prony_decompose_memory(
 
     else:  # Default: leastsq with smart initialization and fallback
         try:
-            return _prony_leastsq_robust(t_valid, m_valid, n_modes)
+            return _prony_leastsq_robust(
+                t_valid, m_valid, n_modes, g_init=g_init, tau_init=tau_init
+            )
         except RuntimeError:
             logger.info("Robust leastsq failed, trying multi-start")
             try:
@@ -442,22 +446,48 @@ def _prony_leastsq_robust(
     t_valid: np.ndarray,
     m_valid: np.ndarray,
     n_modes: int,
+    g_init: np.ndarray | None = None,
+    tau_init: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Robust Prony fit using scipy.optimize.least_squares with TRF method.
 
     Uses smart initialization, log-space τ parameterization, and increased
     iteration limits for better convergence on ill-conditioned problems.
+
+    Perf note: when ``g_init``/``tau_init`` are supplied (the previous
+    solution for a nearby memory kernel — e.g. NLSQ finite-difference
+    Jacobian probing perturbs v1/v2/Gamma by ~1e-8 relative steps), they are
+    used as the optimizer's starting point instead of ``_prony_smart_init``.
+    This is a warm start, not an approximation: the same ``least_squares``
+    call with the same tight tolerances still runs, it just converges in a
+    handful of iterations instead of hundreds because it starts next to the
+    true minimum. Without this, every residual/Jacobian evaluation during a
+    ``model.fit()`` call re-solves this 2*n_modes-parameter ill-conditioned
+    nonlinear fit from a generic cold-start guess (~5000 residual evals
+    each), which is the dominant cost of ITT-MCT Schematic NLSQ fits.
     """
-    # Smart initialization
-    g_init, tau_init = _prony_smart_init(t_valid, m_valid, n_modes)
+    # Bounds: g >= 0, log_tau unconstrained but reasonable
+    tau_min = t_valid.min() / 100
+    tau_max = t_valid.max() * 100
+
+    if (
+        g_init is not None
+        and tau_init is not None
+        and len(g_init) == n_modes
+        and len(tau_init) == n_modes
+    ):
+        # Warm start from a previous (nearby) solution — clip into this call's
+        # bounds since t_valid (and therefore tau_min/tau_max) can shift
+        # slightly between calls.
+        g_init = np.clip(np.asarray(g_init, dtype=float), 0.0, None)
+        tau_init = np.clip(np.asarray(tau_init, dtype=float), tau_min, tau_max)
+    else:
+        # Smart initialization
+        g_init, tau_init = _prony_smart_init(t_valid, m_valid, n_modes)
 
     # Work in log-space for τ (better conditioning)
     log_tau_init = np.log(tau_init)
     p0 = np.concatenate([g_init, log_tau_init])
-
-    # Bounds: g >= 0, log_tau unconstrained but reasonable
-    tau_min = t_valid.min() / 100
-    tau_max = t_valid.max() * 100
     lower = np.concatenate(
         [
             np.zeros(n_modes),

@@ -86,9 +86,32 @@ data/
 │   ├── time_master/          # Time-domain master curves + Prony series
 │   └── examples/             # Additional example datasets
 │
-└── multi_technique/          # Combined measurement files
-    └── multi_technique.txt   # Relaxation + oscillation + flow
+├── multi_technique/          # Combined measurement files
+│   └── multi_technique.txt   # Relaxation + oscillation + flow
+│
+└── ikh/                      # IKH/FIKH/HVM/HVNM/TNT/VLB startup+LAOS tutorials
+    ├── ML-IKH Experimental data.xlsx      # Wei et al. 2018 J. Rheol (flow curves) — committed
+    └── PNAS_DigitalRheometerTwin_Dataset.xlsx  # NOT in this repo — see note below
 ```
+
+## Missing Proprietary Dataset: `PNAS_DigitalRheometerTwin_Dataset.xlsx`
+
+`examples/utils/ikh_tutorial_utils.py`'s `load_pnas_startup()`/`load_pnas_laos()` (and the
+copies of the same loaders in `fikh_tutorial_utils.py`, `hvm_data.py`, `hvnm_tutorial_utils.py`,
+`tnt_tutorial_utils.py`, `vlb_tutorial_utils.py`) read
+`examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx`. Unlike the OWChirp files above,
+this dataset was **excluded from git entirely** (`.gitignore`, commit `ac5b589`) rather than
+tracked via Git LFS, so it is not retrievable by `git lfs pull` and is not present in any fresh
+clone. Notebooks that call these loaders (`ikh/02,06,08,12`, `fikh/02,06,08,12`, `hvm/06`,
+`hvnm/03,06,08`, `tnt/02,06`, `vlb/14,16`) can only be freshly re-executed on a machine that has
+this file locally outside git.
+
+`vlb_tutorial_utils.py`'s loaders already handle this gracefully: when the file is absent they
+warn and fall back to clearly-labeled (`[SYNTHETIC]`) generated Maxwell data instead of raising.
+The other five copies still raise `FileNotFoundError`. Porting the same fallback to those files
+(using each family's own model instead of Maxwell) would make the rest of these notebooks
+reproducible from a fresh clone too — tracked as follow-up work, not done here because it
+requires per-family physics judgment on what synthetic ground truth to generate.
 
 ## Privacy and Anonymization
 
