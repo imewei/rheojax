@@ -12,39 +12,21 @@
 #
 # Lines starting with '#' and blank lines are ignored. Paths are relative
 # to the repo root.
+#
+# Updated 2026-07-10: root-caused and fixed 33 of the 34 previously-listed
+# notebooks (itt_mct Prony-decomposition cold-start perf bug, dmt/sgr/vlb/tnt/
+# hvm/bayesian/verification stale-baseline prunes, ikh 04/10 stale-baseline
+# prunes). One entry remains genuinely blocked, see below.
 
-examples/bayesian/09-spp-rheojax-workflow.ipynb
-examples/dmt/01_dmt_flow_curve.ipynb
-examples/dmt/02_dmt_startup_shear.ipynb
-examples/dmt/03_dmt_stress_relaxation.ipynb
-examples/dmt/04_dmt_creep.ipynb
+# Blocked by a missing proprietary dataset, not a code bug: the FAST_MODE
+# guard around fit_bayesian() was added (matching the sibling single-mode
+# FIKH notebook's convention -- the unguarded NUTS call took ~28.6h in the
+# analogous single-mode case per NB02's committed timing), but cell 5's
+# load_pnas_startup() call fails before ever reaching it, because
+# examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx is intentionally
+# .gitignore'd (commit ac5b589) and absent from every checkout. See
+# examples/data/README.md "Missing Proprietary Dataset" for the full list of
+# notebooks this affects and the VLB synthetic-fallback precedent that could
+# resolve it. Cannot be re-executed/verified until that data-availability gap
+# is closed.
 examples/fikh/08_fmlikh_startup_shear.ipynb
-
-examples/hvm/07_hvm_overview.ipynb
-examples/ikh/02_mikh_startup_shear.ipynb
-examples/ikh/04_mikh_creep.ipynb
-examples/ikh/08_mlikh_startup_shear.ipynb
-examples/ikh/10_mlikh_creep.ipynb
-examples/ikh/12_mlikh_laos.ipynb
-examples/itt_mct/01_schematic_flow_curve.ipynb
-examples/itt_mct/02_schematic_startup_shear.ipynb
-examples/itt_mct/04_schematic_creep.ipynb
-examples/itt_mct/05_schematic_saos.ipynb
-examples/itt_mct/06_schematic_laos.ipynb
-examples/itt_mct/07_isotropic_flow_curve.ipynb
-examples/itt_mct/08_isotropic_startup_shear.ipynb
-examples/itt_mct/09_isotropic_stress_relaxation.ipynb
-examples/itt_mct/10_isotropic_creep.ipynb
-examples/itt_mct/11_isotropic_saos.ipynb
-examples/itt_mct/12_isotropic_laos.ipynb
-examples/sgr/01_sgr_flow_curve.ipynb
-examples/sgr/02_sgr_stress_relaxation.ipynb
-examples/sgr/03_sgr_saos.ipynb
-examples/sgr/04_sgr_creep.ipynb
-examples/tnt/14_tnt_loop_bridge_startup.ipynb
-examples/tnt/27_tnt_sticky_rouse_relaxation.ipynb
-examples/verification/creep/creep_mucus.ipynb
-examples/verification/creep/creep_polystyrene.ipynb
-examples/vlb/12_vlb_creep_nlsq_to_nuts.ipynb
-examples/vlb/14_vlb_startup_shear_nlsq_to_nuts.ipynb
-examples/vlb/16_vlb_laos_nlsq_to_nuts.ipynb

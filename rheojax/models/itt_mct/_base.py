@@ -122,6 +122,11 @@ class ITTMCTBase(BaseModel):
         self._prony_amplitudes: np.ndarray | None = None
         self._prony_times: np.ndarray | None = None
         self._history_buffer: np.ndarray | None = None
+        # Warm-start hint for the next Prony re-decomposition: the last
+        # successful (g, tau), kept even after _check_prony_cache() clears
+        # _prony_amplitudes/_prony_times for a parameter change. See
+        # initialize_prony_modes() below.
+        self._prony_warm_start: tuple[np.ndarray, np.ndarray] | None = None
 
         # Protocol-specific storage
         self._last_protocol: ProtocolType | None = None
@@ -882,10 +887,20 @@ class ITTMCTBase(BaseModel):
         # Compute memory kernel from correlator
         m_t = np.array(self._compute_memory_kernel(jnp.array(phi_eq)))
 
-        # Fit Prony series
-        self._prony_amplitudes, self._prony_times = prony_decompose_memory(
-            t, m_t, n_modes=self.n_prony_modes
+        # Fit Prony series. Warm-start from the previous decomposition when
+        # available: during an NLSQ fit, _check_prony_cache() invalidates
+        # _prony_amplitudes/_prony_times on every v1/v2/Gamma change —
+        # including the ~1e-8 relative finite-difference steps scipy uses to
+        # estimate the Jacobian — which otherwise forces this ill-conditioned
+        # nonlinear fit to re-converge from a cold start on every residual
+        # evaluation (the dominant cost of a Schematic model.fit() call).
+        warm_g, warm_tau = (
+            self._prony_warm_start if self._prony_warm_start is not None else (None, None)
         )
+        self._prony_amplitudes, self._prony_times = prony_decompose_memory(
+            t, m_t, n_modes=self.n_prony_modes, g_init=warm_g, tau_init=warm_tau
+        )
+        self._prony_warm_start = (self._prony_amplitudes, self._prony_times)
 
         # Store equilibrium correlator
         self._equilibrium_correlator = phi_eq
