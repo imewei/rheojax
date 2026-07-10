@@ -93,14 +93,18 @@ Module Structure
     |   |--- vlb/            # Local, MultiNetwork, Variant, Nonlocal
     |   |--- hvm/            # HVMLocal (vitrimer, 3 subnetworks)
     |   \--- hvnm/           # HVNMLocal (nanocomposite, 4 subnetworks)
-    |--- transforms/         # 7 data transforms
-    |   |--- fft.py          # FFT spectral analysis
-    |   |--- mastercurve.py  # TTS + auto shift factors
-    |   |--- owchirp.py      # OWChirp LAOS analysis
-    |   |--- srfs.py         # Strain-Rate Frequency Superposition
-    |   |--- spp.py          # SPP decomposition
+    |--- transforms/         # 11 data transforms
+    |   |--- fft_analysis.py     # FFT spectral analysis
+    |   |--- mastercurve.py      # TTS + auto shift factors
+    |   |--- owchirp.py          # OWChirp LAOS analysis
+    |   |--- srfs.py             # Strain-Rate Frequency Superposition
+    |   |--- spp_decomposer.py   # SPP decomposition
     |   |--- mutation_number.py  # Mutation number
-    |   \--- smooth_derivative.py  # Savitzky-Golay derivatives
+    |   |--- smooth_derivative.py  # Savitzky-Golay derivatives
+    |   |--- cox_merz.py         # Cox-Merz rule validation
+    |   |--- prony_conversion.py # Prony series time<->frequency conversion
+    |   |--- spectrum_inversion.py  # Relaxation spectrum H(tau) recovery
+    |   \--- lve_envelope.py     # Linear viscoelastic startup envelope
     |--- utils/              # Utilities
     |   |--- optimization.py     # NLSQ interface (5-270x vs scipy)
     |   |--- prony.py            # Prony series decomposition

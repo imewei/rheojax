@@ -185,3 +185,113 @@ and nonlinearity metrics using the Sequence of Physical Processes framework.
    :members:
    :undoc-members:
    :show-inheritance:
+
+CoxMerz
+~~~~~~~
+
+:class:`rheojax.transforms.cox_merz.CoxMerz` | Handbook: :doc:`/transforms/cox_merz`
+Validates the Cox-Merz rule by comparing complex viscosity |η*(ω)| from oscillation data
+with steady-shear viscosity η(γ̇) from flow curve data on a common grid.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Parameter (default)
+     - Description
+   * - ``tolerance`` (``0.1``)
+     - Maximum mean relative deviation for the rule to "pass" (10%).
+   * - ``n_points`` (``50``)
+     - Number of interpolation points on the common grid.
+
+.. autoclass:: rheojax.transforms.cox_merz.CoxMerz
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+PronyConversion
+~~~~~~~~~~~~~~~
+
+:class:`rheojax.transforms.prony_conversion.PronyConversion` | Handbook: :doc:`/transforms/prony_conversion`
+Converts between time-domain and frequency-domain viscoelastic representations via a
+Prony series, using the fitting utilities in ``rheojax.utils.prony``.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Parameter (default)
+     - Description
+   * - ``n_modes`` (``None``)
+     - Number of Prony modes; auto-selected when ``None``.
+   * - ``direction`` (``'time_to_freq'``)
+     - Conversion direction: ``'time_to_freq'`` or ``'freq_to_time'``.
+   * - ``omega_out`` (``None``)
+     - Target frequency array for time→freq conversion.
+   * - ``t_out`` (``None``)
+     - Target time array for freq→time conversion.
+
+.. autoclass:: rheojax.transforms.prony_conversion.PronyConversion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+SpectrumInversion
+~~~~~~~~~~~~~~~~~
+
+:class:`rheojax.transforms.spectrum_inversion.SpectrumInversion` | Handbook: :doc:`/transforms/spectrum_inversion`
+Recovers the continuous relaxation spectrum H(τ) from oscillation or relaxation data via
+regularized inversion (Tikhonov with L-curve/GCV selection, or maximum entropy).
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Parameter (default)
+     - Description
+   * - ``method`` (``'tikhonov'``)
+     - Inversion method: ``'tikhonov'`` or ``'max_entropy'``.
+   * - ``n_tau`` (``100``)
+     - Number of τ points in the recovered spectrum.
+   * - ``tau_range`` (``None``)
+     - ``(tau_min, tau_max)``; auto-detected from data when ``None``.
+   * - ``regularization`` (``None``)
+     - Manual regularization parameter λ; auto-selected when ``None``.
+   * - ``source`` (``'oscillation'``)
+     - Input data type: ``'oscillation'`` or ``'relaxation'``.
+   * - ``G_e`` (``0.0``)
+     - Equilibrium modulus (Pa); estimated from data when ``None``.
+
+.. autoclass:: rheojax.transforms.spectrum_inversion.SpectrumInversion
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+LVEEnvelope
+~~~~~~~~~~~
+
+:class:`rheojax.transforms.lve_envelope.LVEEnvelope` | Handbook: :doc:`/transforms/lve_envelope`
+Computes the theoretical linear-viscoelastic startup stress envelope from Prony modes, for
+comparison against experimental startup data to reveal nonlinear strain hardening/softening.
+
+.. list-table:: Parameters
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Parameter (default)
+     - Description
+   * - ``shear_rate`` (``1.0``)
+     - Applied shear rate γ̇₀ (s⁻¹).
+   * - ``G_i`` (``None``)
+     - Prony mode strengths (Pa); read from data metadata when ``None``.
+   * - ``tau_i`` (``None``)
+     - Prony relaxation times (s); read from data metadata when ``None``.
+   * - ``G_e`` (``0.0``)
+     - Equilibrium modulus (Pa).
+   * - ``t_out`` (``None``)
+     - Output time array; auto-generated when ``None``.
+
+.. autoclass:: rheojax.transforms.lve_envelope.LVEEnvelope
+   :members:
+   :undoc-members:
+   :show-inheritance:

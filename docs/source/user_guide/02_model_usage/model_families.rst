@@ -997,7 +997,7 @@ Further Reading
 - :doc:`../03_advanced_topics/dense_suspensions_glasses` — ITT-MCT
 - :doc:`../03_advanced_topics/polymer_network_models` — TNT and VLB
 - :doc:`../03_advanced_topics/vitrimer_models` — HVM and HVNM
-- :doc:`../03_advanced_topics/transforms_complete` — All 7 data transforms
+- :doc:`../03_advanced_topics/transforms_complete` — All 11 data transforms
 
 Summary
 -------

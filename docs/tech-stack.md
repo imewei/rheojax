@@ -150,8 +150,8 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 | `make install` | `uv sync` | Editable install |
 | `make install-dev` | `uv sync --all-extras` | + development deps |
 | `make install-jax-gpu` | Auto-detect CUDA | GPU JAX backend |
-| `make test` | `pytest` | Full test suite (~4963 tests) |
-| `make test-smoke` | `pytest -m smoke` | Critical tests (~1838, CI gate) |
+| `make test` | `pytest` | Full test suite (~6415 tests) |
+| `make test-smoke` | `pytest -m smoke` | Critical tests (~2051, CI gate) |
 | `make test-fast` | `pytest -m "not slow..."` | Exclude slow Bayesian (~4714) |
 | `make test-parallel` | `pytest -n $XDIST_WORKERS` | Parallel (default 4 workers) |
 | `make test-ci` | `pytest -m smoke` | CI gate (matches GitHub Actions) |
@@ -178,7 +178,7 @@ addopts = [
 ```
 
 **Test Markers:**
-- **Tiers:** `smoke` (~1838 tests, <6 min), `unit`, `integration`, `validation`, `benchmark`
+- **Tiers:** `smoke` (~2051 tests, <6 min), `unit`, `integration`, `validation`, `benchmark`
 - **Execution:** `slow` (>30s), `gpu`, `macos_only`, `crash_test`
 - **Content:** `notebook_smoke`, `notebook_comprehensive`, `io`, `visual`, `sgr`, `spp`, `gui`
 
@@ -215,7 +215,7 @@ Overrides: `rheojax.models.*` (relaxed name-defined/any-return), `rheojax.gui.*`
   - `release.yml` — tag-triggered PyPI publish with build provenance attestation, SBOM, GitHub Release (reuses CI via `workflow_call`)
   - `security.yml` — CodeQL, Semgrep SAST, Gitleaks, Trivy (push/PR + weekly schedule)
   - `dependabot-auto-merge.yml` — auto-squash-merge minor/patch dependency updates
-- **CI gate:** Smoke tests (~1838 tests) on 3 OS × 2 Python versions
+- **CI gate:** Smoke tests (~2051 tests) on 3 OS × 2 Python versions
 - **Local CI:** `make quick` (format + lint + smoke)
 
 ---

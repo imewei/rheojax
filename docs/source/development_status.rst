@@ -6,6 +6,11 @@ Development Status & Performance
 This page tracks the development history of RheoJAX across 11 completed phases
 and provides performance benchmarks.
 
+.. note::
+   As of 2026-07-10, the test suite has grown to 6,415 tests (2,051 smoke tests)
+   through a dedicated coverage sprint (Phase 11), and the GUI/test infrastructure
+   has been hardened against FreeType rendering crashes and pytest-xdist hangs.
+
 Development Phases
 ------------------
 

@@ -145,7 +145,7 @@ Complete API documentation with autodoc:
 
 - **[Core](source/api/core.rst)** - BaseModel, RheoData, ParameterSet, BayesianMixin
 - **[Models](source/api/models.rst)** - All 53 rheological models
-- **[Transforms](source/api/transforms.rst)** - All 7 data transforms
+- **[Transforms](source/api/transforms.rst)** - All 11 data transforms
 - **[Pipeline](source/api/pipeline.rst)** - Pipeline, BayesianPipeline, BatchPipeline
 - **[Visualization](source/api/visualization.rst)** - Plotter, BayesianPlotter, templates
 - **[Utilities](source/api/utils.rst)** - Optimization, initialization, compatibility

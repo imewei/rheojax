@@ -9,7 +9,7 @@ Complete Guide to Data Transforms
 Overview
 ========
 
-RheoJAX provides **7 specialized data transforms** that process raw rheological measurements
+RheoJAX provides **11 specialized data transforms** that process raw rheological measurements
 into derived quantities. These transforms operate on ``RheoData`` objects or raw NumPy/JAX
 arrays and extract physically meaningful information for material characterization, nonlinearity
 quantification, and data quality assessment.
@@ -61,6 +61,18 @@ When to Use Transforms
    * - Chirp oscillatory data
      - :math:`G'(\omega)`, :math:`G''(\omega)` from single test
      - :ref:`OWChirp <owchirp_transform>`
+   * - Oscillation + flow curve data
+     - Check if Cox-Merz rule holds (|η*| vs η)
+     - :doc:`CoxMerz <../../transforms/cox_merz>`
+   * - Modulus data in one domain
+     - Convert time <-> frequency domain via Prony series
+     - :doc:`PronyConversion <../../transforms/prony_conversion>`
+   * - Oscillation or relaxation data
+     - Continuous relaxation spectrum :math:`H(\tau)`
+     - :doc:`SpectrumInversion <../../transforms/spectrum_inversion>`
+   * - Startup data + Prony modes
+     - Theoretical LVE startup envelope for nonlinearity check
+     - :doc:`LVEEnvelope <../../transforms/lve_envelope>`
 
 .. _fft_transform:
 
@@ -817,6 +829,93 @@ Usage
    **Nonlinearity**: Chirp data analysis assumes **linear viscoelasticity** (SAOS regime).
    For LAOS, use discrete frequency sweeps with FFT/SPP instead.
 
+.. _cox_merz_transform:
+
+8. Cox-Merz (Rule Validation)
+==============================
+
+**Comparing Oscillatory and Steady-Shear Viscosity**
+
+:class:`CoxMerz <rheojax.transforms.CoxMerz>` checks whether the empirical Cox-Merz rule,
+:math:`|\eta^*(\omega)| \approx \eta(\dot{\gamma})` at :math:`\omega = \dot{\gamma}`, holds for
+a material by interpolating oscillation and flow-curve data onto a common grid and comparing
+them within a tolerance (default 10% mean relative deviation).
+
+.. code-block:: python
+
+   from rheojax.transforms import CoxMerz
+
+   cm = CoxMerz(tolerance=0.1, n_points=50)
+   result_data, meta = cm.transform([oscillation_data, flow_curve_data])
+   cmr = meta["cox_merz_result"]
+   print(f"Cox-Merz holds: {cmr.passes}, mean deviation: {cmr.mean_deviation:.3f}")
+
+See :doc:`../../transforms/cox_merz` for the full parameter reference and theory.
+
+.. _prony_conversion_transform:
+
+9. Prony Conversion (Time <-> Frequency Domain)
+==================================================
+
+**Converting Between Relaxation and Oscillation Representations**
+
+:class:`PronyConversion <rheojax.transforms.PronyConversion>` fits a Prony series to
+time-domain or frequency-domain viscoelastic data and evaluates it on a target grid in the
+other domain, using the fitting utilities in ``rheojax.utils.prony``.
+
+.. code-block:: python
+
+   from rheojax.transforms import PronyConversion
+
+   pc = PronyConversion(direction="time_to_freq", omega_out=omega_grid)
+   freq_data, meta = pc.transform(relaxation_data)
+   prony_result = meta["prony_result"]
+
+See :doc:`../../transforms/prony_conversion` for the full parameter reference and theory.
+
+.. _spectrum_inversion_transform:
+
+10. Spectrum Inversion (Relaxation Spectrum Recovery)
+========================================================
+
+**Recovering the Continuous Relaxation Spectrum**
+
+:class:`SpectrumInversion <rheojax.transforms.SpectrumInversion>` recovers the continuous
+relaxation spectrum :math:`H(\tau)` from oscillation or relaxation data via regularized
+inversion (Tikhonov with L-curve/GCV selection, or maximum entropy).
+
+.. code-block:: python
+
+   from rheojax.transforms import SpectrumInversion
+
+   si = SpectrumInversion(method="tikhonov", n_tau=100, source="oscillation")
+   spectrum_data, meta = si.transform(data)
+   spectrum_result = meta["spectrum_result"]
+
+See :doc:`../../transforms/spectrum_inversion` for the full parameter reference and theory.
+
+.. _lve_envelope_transform:
+
+11. LVE Envelope (Startup Nonlinearity Check)
+================================================
+
+**Theoretical Linear-Viscoelastic Startup Envelope**
+
+:class:`LVEEnvelope <rheojax.transforms.LVEEnvelope>` computes the theoretical stress growth
+response assuming linear viscoelasticity from Prony modes. Comparing experimental startup data
+against this envelope reveals nonlinear effects such as strain hardening or softening.
+
+.. code-block:: python
+
+   from rheojax.transforms import LVEEnvelope
+
+   # G_i/tau_i supplied directly, so no input data is required
+   env = LVEEnvelope(shear_rate=1.0, G_i=G_i, tau_i=tau_i)
+   envelope_data, meta = env.transform(None)
+   lve_result = meta["lve_result"]
+
+See :doc:`../../transforms/lve_envelope` for the full parameter reference and theory.
+
 Combining Transforms
 ====================
 
@@ -1053,13 +1152,18 @@ See Also
 
 **Transform API Reference:**
 
-- :doc:`../../api_reference/transforms/fft_analysis` — FFTAnalysis class
-- :doc:`../../api_reference/transforms/mastercurve` — Mastercurve class
-- :doc:`../../api_reference/transforms/srfs` — SRFS class
-- :doc:`../../api_reference/transforms/spp_decomposer` — SPPDecomposer class
-- :doc:`../../api_reference/transforms/smooth_derivative` — SmoothDerivative class
-- :doc:`../../api_reference/transforms/mutation_number` — MutationNumber class
-- :doc:`../../api_reference/transforms/owchirp` — OWChirp class
+- :doc:`../../api/transforms` — Full API reference for all 11 transforms
+- :doc:`../../transforms/fft` — FFTAnalysis handbook page
+- :doc:`../../transforms/mastercurve` — Mastercurve handbook page
+- :doc:`../../transforms/srfs` — SRFS handbook page
+- :doc:`../../transforms/spp` — SPPDecomposer handbook page
+- :doc:`../../transforms/smooth_derivative` — SmoothDerivative handbook page
+- :doc:`../../transforms/mutation_number` — MutationNumber handbook page
+- :doc:`../../transforms/owchirp` — OWChirp handbook page
+- :doc:`../../transforms/cox_merz` — CoxMerz handbook page
+- :doc:`../../transforms/prony_conversion` — PronyConversion handbook page
+- :doc:`../../transforms/spectrum_inversion` — SpectrumInversion handbook page
+- :doc:`../../transforms/lve_envelope` — LVEEnvelope handbook page
 
 **Example Notebooks:**
 
