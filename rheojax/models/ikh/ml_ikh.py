@@ -422,6 +422,49 @@ class MLIKH(IKHBase):
 
         return args
 
+    def _cached_solver(self, ode_fn, key):
+        """Return a jitted Diffrax solve for this (yield_mode, kind), built once.
+
+        Caching the compiled solve is essential for fit performance: an
+        un-jitted ``diffeqsolve`` recompiles on *every* call, so an NLSQ fit
+        (hundreds of objective + finite-difference Jacobian evaluations) became
+        a multi-minute XLA recompilation storm. The ``ode_fn`` passed on later
+        calls is functionally identical to the first for a given key, so the
+        first-built compiled solver is reused. Caching alone removed the
+        timeout (an ML-IKH creep fit went from >120s to ~1s); ``max_steps`` is
+        kept at the original value so stiff modes (e.g. startup with the
+        default eta=1e6) still integrate to completion.
+        """
+        cache = self.__dict__.setdefault("_ode_solver_cache", {})
+        solve = cache.get(key)
+        if solve is None:
+            term = diffrax.ODETerm(ode_fn)
+            solver = diffrax.Tsit5()
+            controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
+
+            @jax.jit
+            def _solve(t, y0, args):
+                t0 = t[0]
+                t1 = t[-1]
+                dt0 = (t1 - t0) / max(t.shape[0], 1000)
+                return diffrax.diffeqsolve(
+                    term,
+                    solver,
+                    t0,
+                    t1,
+                    dt0,
+                    y0,
+                    args=args,
+                    saveat=diffrax.SaveAt(ts=t),
+                    stepsize_controller=controller,
+                    max_steps=1_000_000,
+                    throw=False,
+                )
+
+            solve = _solve
+            cache[key] = solve
+        return solve
+
     def _simulate_transient(
         self,
         t: jnp.ndarray,
@@ -529,30 +572,12 @@ class MLIKH(IKHBase):
                     ]
                 )
 
-        # Diffrax setup
-        term = diffrax.ODETerm(lambda ti, yi, args_i: ode_fn(ti, yi, args_i))
-        solver = diffrax.Tsit5()
-        stepsize_controller = diffrax.PIDController(rtol=1e-5, atol=1e-7)
-
-        t0 = t[0]
-        t1 = t[-1]
-        dt0 = (t1 - t0) / max(len(t), 1000)
-
-        saveat = diffrax.SaveAt(ts=t)
-
-        sol = diffrax.diffeqsolve(
-            term,
-            solver,
-            t0,
-            t1,
-            dt0,
-            y0,
-            args=args,
-            saveat=saveat,
-            stepsize_controller=stepsize_controller,
-            max_steps=1_000_000,
-            throw=False,
-        )
+        # Solve via a cached, jitted Diffrax integrator. Startup and relaxation
+        # share the Maxwell RHS (and state shape), so they key together as
+        # "maxwell"; creep uses its own RHS.
+        kind = "creep" if mode == "creep" else "maxwell"
+        solve = self._cached_solver(ode_fn, (self._yield_mode, kind))
+        sol = solve(jnp.asarray(t), y0, args)
 
         # Extract primary variable
         if mode == "creep":

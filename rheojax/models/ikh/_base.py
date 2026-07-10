@@ -1,8 +1,26 @@
+import re
+
 from rheojax.core.base import ArrayLike, BaseModel
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.utils.optimization import nlsq_optimize
 
 jax, jnp = safe_import_jax()
+
+# Positive scale/stress/viscosity parameters that carry very wide bounds
+# (e.g. (0, 1e9), (1e-6, 1e12)). Base names shared by MIKH and the per-mode /
+# weighted-sum ML-IKH parameter families (e.g. "delta_sigma_y_2" -> base
+# "delta_sigma_y"). Value = LogNormal scale (in log-units, i.e. ~factor e**scale
+# per std). Anything not listed keeps the default Uniform-over-bounds prior.
+_IKH_LOGNORMAL_PRIOR_SCALES = {
+    "G": 1.0,
+    "eta": 1.5,
+    "C": 1.0,
+    "sigma_y0": 1.0,
+    "delta_sigma_y": 1.0,
+    "eta_inf": 1.5,
+    "tau_thix": 1.5,
+    "k3": 1.0,
+}
 
 
 class IKHBase(BaseModel):
@@ -15,6 +33,47 @@ class IKHBase(BaseModel):
 
     def __init__(self):
         super().__init__()
+
+    def bayesian_prior_factory(self, name, lower, upper):
+        """Weakly-informative priors for wide-bound positive scale parameters.
+
+        The default Bayesian prior is Uniform over each parameter's bounds. For
+        the stress/viscosity/timescale parameters those bounds span up to 9-18
+        decades (e.g. delta_sigma_y in (0, 1e9)), which is effectively improper.
+        The IKH flow curve has a collinear/flat likelihood direction (tau_thix
+        can grow so lambda_ss -> 0, leaving delta_sigma_y unconstrained), so a
+        near-flat Uniform lets NUTS drift to ~1e8 and produces divergences.
+
+        Replacing that with a LogNormal centered on the NLSQ warm-start value
+        (the same warm start already used to initialize NUTS) keeps these
+        parameters within a couple decades of the point estimate while staying
+        broad. Mirrors the SPP yield-stress model's prior factory. Returns None
+        (default Uniform) for exponent/unit parameters and the noise sigma.
+        """
+        base = re.sub(r"_\d+$", "", name)
+        scale = _IKH_LOGNORMAL_PRIOR_SCALES.get(base)
+        if scale is None:
+            return None
+
+        import math
+
+        import numpyro.distributions as dist
+
+        # Center on the current (NLSQ-fitted, or __init__ default) value.
+        # NOTE: use Python math (not jnp) — this runs inside NUTS's jitted trace,
+        # where any jnp op on a concrete float still yields a tracer and would
+        # break float()/LogNormal's concrete-loc requirement.
+        p = self.parameters.get(name)
+        center = float(p.value) if (p is not None and p.value is not None) else None
+        if center is None or not (center > 0):
+            # Fall back to the geometric midpoint of positive bounds.
+            lo = float(lower) if lower is not None else None
+            hi = float(upper) if upper is not None else None
+            if lo is not None and hi is not None and lo > 0 and hi > 0:
+                center = math.sqrt(lo * hi)
+            else:
+                center = 1.0
+        return dist.LogNormal(loc=math.log(center), scale=scale)
 
     def _extract_time_strain(self, X, **kwargs):
         """Helper to extract time and strain from inputs.
