@@ -11,7 +11,7 @@ Commands:
     spp       - SPP (Sequence of Physical Processes) analysis
     load      - Load data and output summary or JSON envelope
     transform - Apply a registered transform to data
-    export    - Export pipeline results to directory/Excel/HDF5
+    export    - Export pipeline results to directory/Excel
     run       - Execute a YAML pipeline configuration
     pipeline  - Pipeline management (init, validate, show)
     batch     - Batch fit a model across multiple files
@@ -46,7 +46,7 @@ Commands:
   spp        SPP (Sequence of Physical Processes) analysis for LAOS data
   load       Load data and output summary or JSON envelope
   transform  Apply a registered transform to data
-  export     Export pipeline results to directory/Excel/HDF5
+  export     Export pipeline results to directory/Excel
   run        Execute a YAML pipeline configuration
   pipeline   Pipeline management (init, validate, show)
   batch      Batch fit a model across multiple files
@@ -60,7 +60,7 @@ Examples:
   rheojax spp batch data_dir/ --omega 1.0
   rheojax load data.csv --json | rheojax transform fft_analysis --input -
   rheojax transform fft_analysis --input data.csv
-  rheojax export results/ --output bundle.h5 --format hdf5
+  rheojax export analysis.h5 --output bundle.xlsx --format excel
   rheojax pipeline init --template basic --output pipeline.yaml
   rheojax run pipeline.yaml
   rheojax batch "data/*.csv" --model maxwell --test-mode relaxation
@@ -119,7 +119,7 @@ For command-specific help:
     # Export subcommand
     subparsers.add_parser(
         "export",
-        help="Export pipeline results to directory/Excel/HDF5",
+        help="Export pipeline results to directory/Excel",
         add_help=False,
     )
 
