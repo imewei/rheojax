@@ -16,8 +16,8 @@ def test_param_form_seeds_config_with_defaults(qtbot):
     qtbot.addWidget(step)
 
     assert st.config == {
-        "reference_temp": 25.0,
-        "auto_shift": True,
+        "reference_temp": 298.15,
+        "auto_shift": False,
         "shift_method": "wlf",
     }
 
@@ -28,9 +28,9 @@ def test_param_form_edit_updates_config_and_emits_edited(qtbot):
     qtbot.addWidget(step)
 
     with qtbot.waitSignal(step.edited, timeout=1000):
-        step._param_form._widgets["reference_temp"].setValue(40.0)
+        step._param_form._widgets["reference_temp"].setValue(310.0)
 
-    assert st.config["reference_temp"] == 40.0
+    assert st.config["reference_temp"] == 310.0
 
 
 def test_no_param_form_for_transform_without_configurable_params(qtbot):
@@ -52,10 +52,10 @@ def test_edited_param_value_survives_a_refresh_triggered_by_list_slot_edit(qtbot
     step = SlotsStep(st, DatasetLibrary())
     qtbot.addWidget(step)
 
-    step._param_form._widgets["reference_temp"].setValue(40.0)
-    assert st.config["reference_temp"] == 40.0
+    step._param_form._widgets["reference_temp"].setValue(310.0)
+    assert st.config["reference_temp"] == 310.0
 
     step.refresh()
 
-    assert st.config["reference_temp"] == 40.0
-    assert step._param_form._widgets["reference_temp"].value() == 40.0
+    assert st.config["reference_temp"] == 310.0
+    assert step._param_form._widgets["reference_temp"].value() == 310.0

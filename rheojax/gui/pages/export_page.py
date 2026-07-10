@@ -855,6 +855,7 @@ class ExportPage(QWidget):
                 fig_format = config.get("figure_format", "png")
                 fig_dpi = config.get("dpi", 300)
                 fig_style = config.get("style", "default")
+                fig_size = config.get("figure_size")
 
                 for result_id, fit_result in state.fit_results.items():
                     if _maybe_cancel():
@@ -878,6 +879,7 @@ class ExportPage(QWidget):
                                 fit_result,
                                 style=fig_style,
                                 test_mode=dataset.test_mode,
+                                figsize=fig_size,
                             )
                             fit_path = (
                                 figures_dir / f"fit_plot_{result_id}.{fig_format}"
@@ -891,7 +893,7 @@ class ExportPage(QWidget):
                                 return exported_files
 
                             residuals_fig = plot_service.create_residual_plot(
-                                rheo_data, fit_result, style=fig_style
+                                rheo_data, fit_result, style=fig_style, figsize=fig_size
                             )
                             residuals_path = (
                                 figures_dir / f"residuals_{result_id}.{fig_format}"
@@ -918,7 +920,10 @@ class ExportPage(QWidget):
                             if _maybe_cancel():
                                 return exported_files
                             fig = plot_service.create_arviz_plot(
-                                bayes_result, plot_type=plot_type, style=fig_style
+                                bayes_result,
+                                plot_type=plot_type,
+                                style=fig_style,
+                                figsize=fig_size,
                             )
                             fig_path = (
                                 figures_dir / f"{plot_type}_{result_id}.{fig_format}"

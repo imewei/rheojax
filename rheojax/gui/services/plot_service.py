@@ -207,6 +207,7 @@ class PlotService:
         fit_result: Any,
         style: str = "default",
         test_mode: str | None = None,
+        figsize: tuple[float, float] | None = None,
     ) -> Figure:
         """Create publication-quality fit plot with optional uncertainty bands.
 
@@ -220,6 +221,8 @@ class PlotService:
             Plot style
         test_mode : str, optional
             Test mode for appropriate plot type
+        figsize : tuple[float, float], optional
+            Figure size in inches, defaults to (8, 6)
 
         Returns
         -------
@@ -232,7 +235,7 @@ class PlotService:
         try:
             rc = self._get_rc_params(style)
             with plt.rc_context(rc):
-                fig = Figure(figsize=(8, 6))
+                fig = Figure(figsize=figsize or (8, 6))
                 ax = fig.add_subplot(111)
                 palette = (
                     self._get_palette(style)
@@ -300,10 +303,12 @@ class PlotService:
                 if test_mode == "oscillation":
                     # Plot G' and G" for oscillation
                     if np.iscomplexobj(y):
-                        G_prime = np.real(y)
-                        # Some datasets/models may use sign conventions; ensure log-safe positivity.
+                        # Mirror negative components via abs(), matching create_data_plot's
+                        # convention, so the same data point renders at the same magnitude
+                        # on both the Data and Fit pages.
+                        G_prime = np.abs(np.real(y))
                         G_double_prime = np.abs(np.imag(y))
-                        G_prime_fit = np.real(y_fit)
+                        G_prime_fit = np.abs(np.real(y_fit))
                         G_double_prime_fit = np.abs(np.imag(y_fit))
 
                         # Avoid log-scale issues with zeros.
@@ -520,6 +525,7 @@ class PlotService:
         data: RheoData,
         fit_result: Any,
         style: str = "default",
+        figsize: tuple[float, float] | None = None,
     ) -> Figure:
         """Create residual plot.
 
@@ -529,6 +535,8 @@ class PlotService:
             Experimental data
         fit_result : FitResult
             Fitting result with residuals
+        figsize : tuple[float, float], optional
+            Figure size in inches, defaults to (8, 8)
 
         Returns
         -------
@@ -542,7 +550,7 @@ class PlotService:
             rc = self._get_rc_params(style)
             with plt.rc_context(rc):
                 palette = self._get_palette(style)
-                fig = Figure(figsize=(8, 8))
+                fig = Figure(figsize=figsize or (8, 8))
                 ax1 = fig.add_subplot(2, 1, 1)
                 ax2 = fig.add_subplot(2, 1, 2, sharex=ax1)
 

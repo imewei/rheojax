@@ -123,8 +123,10 @@ Examples:
     )
     parser.add_argument(
         "--continue-on-error",
-        action="store_true",
-        help="Continue processing remaining files after a failure (default: True)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Continue processing remaining files after a failure (default: True); "
+        "use --no-continue-on-error to stop at the first failure",
     )
 
     return parser
@@ -345,6 +347,9 @@ def main(args: list[str] | None = None) -> int:
                 logger.warning(
                     "Could not save result file", file=str(out_file), error=str(e)
                 )
+
+        if result["status"] != "success" and not parsed.continue_on_error:
+            break
 
     print()
 

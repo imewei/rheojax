@@ -592,20 +592,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # Handle startup arguments
     if args.project:
-        logger.info("Loading project", path=str(args.project))
-        try:
-            window.log(f"Opening project: {args.project}")
-            window.store.dispatch("LOAD_PROJECT", {"file_path": str(args.project)})
-            window.navigate_to("data")
-            logger.debug("Project loaded", path=str(args.project))
-        except Exception as e:
-            logger.error(
-                "Failed to load project",
-                path=str(args.project),
-                error=str(e),
-                exc_info=True,
-            )
-            window.log(f"ERROR: Failed to load project: {e}")
+        # GUI-P1: LOAD_PROJECT's reducer never restores datasets/results in
+        # this legacy window (see main_window._on_open_file). Don't dispatch
+        # it or claim success here either -- match the GUI's own messaging.
+        logger.warning("--project is not yet implemented in --legacy mode", path=str(args.project))
+        window.log(
+            f"ERROR: Project open is not yet implemented in this legacy window: {args.project}"
+        )
 
     if args.import_file:
         logger.info("Importing data file", path=str(args.import_file))

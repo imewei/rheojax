@@ -1046,6 +1046,8 @@ class DataService:
         )
         x = np.asarray(data.x)
         y = np.asarray(data.y)
+        new_x_units = data.x_units
+        new_y_units = data.y_units
 
         # Simple conversion factors (extend as needed)
         time_conversions = {"s": 1.0, "ms": 1e-3, "min": 60.0, "h": 3600.0}
@@ -1057,8 +1059,15 @@ class DataService:
             if data.x_units in time_conversions and x_units in time_conversions:
                 factor = time_conversions[data.x_units] / time_conversions[x_units]
                 x = x * factor
+                new_x_units = x_units
                 logger.info(
                     "Converted x-axis units",
+                    from_units=data.x_units,
+                    to_units=x_units,
+                )
+            else:
+                logger.warning(
+                    "Unsupported x-axis unit conversion, leaving data unconverted",
                     from_units=data.x_units,
                     to_units=x_units,
                 )
@@ -1070,8 +1079,15 @@ class DataService:
                     pressure_conversions[data.y_units] / pressure_conversions[y_units]
                 )
                 y = y * factor
+                new_y_units = y_units
                 logger.info(
                     "Converted y-axis units",
+                    from_units=data.y_units,
+                    to_units=y_units,
+                )
+            else:
+                logger.warning(
+                    "Unsupported y-axis unit conversion, leaving data unconverted",
                     from_units=data.y_units,
                     to_units=y_units,
                 )
@@ -1081,8 +1097,8 @@ class DataService:
         return RheoData(
             x=x,
             y=y,
-            x_units=x_units or data.x_units,
-            y_units=y_units or data.y_units,
+            x_units=new_x_units,
+            y_units=new_y_units,
             domain=data.domain,
             metadata=data.metadata.copy(),
             initial_test_mode=data.metadata.get("test_mode"),

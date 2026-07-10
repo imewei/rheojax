@@ -1,11 +1,11 @@
 """CLI subcommand for exporting pipeline analysis results.
 
-Wraps AnalysisExporter to write structured output (directory, Excel, or HDF5)
-from a previous pipeline run's results directory or HDF5 archive, or from a
-JSON envelope piped via stdin.
+Wraps AnalysisExporter to write structured output (directory or Excel) from a
+previous pipeline run's HDF5 archive, or from a JSON envelope piped via
+stdin.
 
 Usage:
-    rheojax export results/ --output export/ --format directory
+    rheojax export analysis.h5 --output export/ --format directory
     rheojax export analysis.h5 --output bundle.xlsx --format excel
     rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
 """
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_VALID_FORMATS = ("directory", "excel", "hdf5")
+_VALID_FORMATS = ("directory", "excel")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -38,14 +38,11 @@ def create_parser() -> argparse.ArgumentParser:
         parents=[create_global_parser()],
         epilog="""
 Examples:
-  # Export a previous results directory to HDF5
-  rheojax export results/ --output bundle.h5 --format hdf5
-
-  # Export to Excel workbook
-  rheojax export results/ --output summary.xlsx --format excel
-
   # Export in directory layout (default)
   rheojax export analysis.h5 --output ./export_dir --format directory
+
+  # Export to Excel workbook
+  rheojax export analysis.h5 --output summary.xlsx --format excel
 
   # Pipe fit results directly into export
   rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
@@ -56,7 +53,7 @@ Examples:
         "input",
         type=str,
         help=(
-            "Results directory, HDF5 file from a previous run, "
+            "HDF5 file from a previous run, "
             "or '-' to read a JSON envelope from stdin"
         ),
     )
@@ -65,7 +62,7 @@ Examples:
         "-o",
         type=Path,
         required=True,
-        help="Output path (directory, .xlsx, or .h5 depending on --format)",
+        help="Output path (directory or .xlsx depending on --format)",
     )
     parser.add_argument(
         "--format",
@@ -74,7 +71,7 @@ Examples:
         type=str,
         default="directory",
         choices=_VALID_FORMATS,
-        help="Export format: directory (default), excel, or hdf5",
+        help="Export format: directory (default) or excel",
     )
     parser.add_argument(
         "--figure-formats",
@@ -133,7 +130,7 @@ def _build_pipeline_from_envelope(envelope: dict):
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
             "Could not construct a Pipeline from the stdin envelope. "
-            "Pipe from 'rheojax fit --json' or provide a results directory."
+            "Pipe from 'rheojax fit --json' or provide an HDF5 file."
         ) from exc
 
 
@@ -191,35 +188,27 @@ def main(args: list[str] | None = None) -> int:
             return 1
 
         if input_path.is_dir():
-            # Treat as a results directory — load the pipeline state from it
-            try:
-                from rheojax.pipeline import Pipeline
-
-                pipeline = Pipeline.load(str(input_path))  # type: ignore[attr-defined]
-                logger.debug(
-                    "Pipeline loaded from results directory", path=str(input_path)
-                )
-            except (ImportError, AttributeError):
-                # Pipeline.load() may not exist; fall back to passing path to exporter
-                pipeline = None
-            except Exception as e:
-                print(f"Error loading pipeline from directory: {e}", file=sys.stderr)
-                return 1
+            # No API reconstructs a Pipeline from an exported results
+            # directory; only HDF5 input and stdin envelopes are supported.
+            print(
+                f"Error: Directory input is not supported: '{input_path}'. "
+                "Provide an HDF5 file (.h5/.hdf5) or pipe a JSON envelope via stdin.",
+                file=sys.stderr,
+            )
+            return 1
         elif input_path.suffix in (".h5", ".hdf5"):
             try:
                 from rheojax.pipeline import Pipeline
 
-                pipeline = Pipeline.load_hdf5(str(input_path))  # type: ignore[attr-defined]
+                pipeline = Pipeline().load(str(input_path), format="hdf5")
                 logger.debug("Pipeline loaded from HDF5", path=str(input_path))
-            except (ImportError, AttributeError):
-                pipeline = None
             except Exception as e:
                 print(f"Error loading pipeline from HDF5: {e}", file=sys.stderr)
                 return 1
         else:
             print(
                 f"Error: Unsupported input type '{input_path}'. "
-                "Expected a results directory, HDF5 file, or '-' for stdin.",
+                "Expected an HDF5 file or '-' for stdin.",
                 file=sys.stderr,
             )
             return 1
@@ -241,9 +230,7 @@ def main(args: list[str] | None = None) -> int:
         if parsed.export_format == "directory":
             exporter.export_directory(pipeline, output_dir=str(output_path))
         elif parsed.export_format == "excel":
-            exporter.export_excel(pipeline, output_path=str(output_path))
-        elif parsed.export_format == "hdf5":
-            exporter.export_hdf5(pipeline, output_path=str(output_path))
+            exporter.export_excel(pipeline, filepath=str(output_path))
 
         logger.info(
             "Export complete", output=str(output_path), format=parsed.export_format

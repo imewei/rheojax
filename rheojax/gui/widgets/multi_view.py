@@ -227,6 +227,7 @@ class MultiView(QWidget):
         self._current_layout = layout
         self._panels: list[PlotPanel] = []
         self._sync_axes = False
+        self._syncing = False  # reentrancy guard for _sync_panel_axes
 
         self._setup_ui()
         self._connect_signals()
@@ -415,8 +416,29 @@ class MultiView(QWidget):
             widget=self.__class__.__name__,
             sync_enabled=checked,
         )
-        # Note: Full axis sync implementation would require
-        # connecting xlim/ylim change callbacks across all panels
+
+    def _sync_panel_axes(self, source_ax) -> None:
+        """Propagate xlim/ylim from one panel's axes to all others.
+
+        Connected to every axes' xlim_changed/ylim_changed callbacks; no-ops
+        unless sync is enabled. Guarded against reentrancy since applying the
+        limits to other axes re-triggers this callback on them.
+        """
+        if not self._sync_axes or self._syncing:
+            return
+        self._syncing = True
+        try:
+            xlim = source_ax.get_xlim()
+            ylim = source_ax.get_ylim()
+            for panel in self._panels:
+                for ax in panel.get_figure().axes:
+                    if ax is source_ax:
+                        continue
+                    ax.set_xlim(xlim)
+                    ax.set_ylim(ylim)
+                panel.refresh()
+        finally:
+            self._syncing = False
 
     def add_plot(self, index: int, figure: Any) -> None:
         """Add or replace figure in a panel.
@@ -454,6 +476,8 @@ class MultiView(QWidget):
         if callable(figure):
             # Call function with axes
             ax = panel_fig.add_subplot(111)
+            ax.callbacks.connect("xlim_changed", self._sync_panel_axes)
+            ax.callbacks.connect("ylim_changed", self._sync_panel_axes)
             try:
                 figure(ax)
             except Exception as e:
@@ -470,6 +494,8 @@ class MultiView(QWidget):
             # This is a simplified approach - full copying is complex
             for src_ax in figure.axes:
                 ax = panel_fig.add_subplot(111)
+                ax.callbacks.connect("xlim_changed", self._sync_panel_axes)
+                ax.callbacks.connect("ylim_changed", self._sync_panel_axes)
                 # Copy lines
                 for line in src_ax.get_lines():
                     ax.plot(

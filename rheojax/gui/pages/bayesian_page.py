@@ -338,7 +338,7 @@ class BayesianPage(QWidget):
         self._intervals_table = QTableWidget()
         self._intervals_table.setColumnCount(4)
         self._intervals_table.setHorizontalHeaderLabels(
-            ["Parameter", "Mean", "Lower", "Upper"]
+            ["Parameter", "Mean/Median", "Lower", "Upper"]
         )
         self._intervals_table.setAlternatingRowColors(True)
         self._intervals_table.horizontalHeader().setSectionResizeMode(
@@ -1370,7 +1370,9 @@ class BayesianPage(QWidget):
             if isinstance(values, (tuple, list)):
                 if len(values) == 3:
                     # Subprocess mode (BayesianService.get_credible_intervals)
-                    # returns (lower, median, upper), not (mean, lower, upper).
+                    # returns (lower, median, upper), not (mean, lower, upper) --
+                    # displayed under the "Mean/Median" column since it is a
+                    # true percentile-50, not a mean.
                     lower, mean, upper = values
                 elif len(values) == 2:
                     mean = summary.get(param_name, {}).get("mean", 0.0)
@@ -1745,6 +1747,13 @@ class BayesianPage(QWidget):
             },
             nlsq_result_available=has_nlsq,
             parent=self,
+        )
+        # dense_mass has no downstream consumer anywhere in the NUTS worker
+        # call chain (make_bayesian_worker has no such parameter), so leave
+        # the checkbox visibly disabled rather than silently discarding it.
+        dialog.dense_mass_check.setEnabled(False)
+        dialog.dense_mass_check.setToolTip(
+            "Not yet wired to the NUTS sampler; has no effect."
         )
         if (
             dialog.exec() == dialog.DialogCode.Accepted

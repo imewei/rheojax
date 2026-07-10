@@ -82,12 +82,16 @@ def reduce_update_preferences(
         updates: dict[str, Any] = {}
         for key in (
             "theme",
-            "auto_save_enabled",
             "last_export_dir",
             "current_seed",
         ):
             if key in prefs:
                 updates[key] = prefs[key]
+        # PreferencesDialog.get_preferences() emits "autosave_enabled";
+        # AppState's field is "auto_save_enabled" -- map explicitly rather
+        # than relying on the key names matching.
+        if "autosave_enabled" in prefs:
+            updates["auto_save_enabled"] = prefs["autosave_enabled"]
         return replace(state, **updates) if updates else state
 
     # Apply runtime settings that live outside AppState
@@ -97,6 +101,21 @@ def reduce_update_preferences(
         import os
 
         os.environ["RHEOJAX_WORKER_ISOLATION"] = prefs["worker_isolation_mode"]
+
+    handled_keys = {
+        "type",
+        "theme",
+        "last_export_dir",
+        "current_seed",
+        "autosave_enabled",
+        "max_undo_steps",
+        "worker_isolation_mode",
+    }
+    unhandled = set(prefs) - handled_keys
+    if unhandled:
+        # Keys PreferencesDialog exposes (device, plot_style, etc.) that this
+        # reducer does not yet apply -- log instead of dropping silently.
+        logger.warning("Unhandled preference keys", keys=sorted(unhandled))
 
     return updater
 

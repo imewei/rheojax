@@ -58,7 +58,7 @@ Examples:
   rheojax bayesian data.csv --model maxwell --x-col time --y-col G_t --warm-start
   rheojax spp analyze data.csv --omega 1.0 --gamma-0 0.5
   rheojax spp batch data_dir/ --omega 1.0
-  rheojax load data.csv --json | rheojax fit --model maxwell
+  rheojax load data.csv --json | rheojax transform fft_analysis --input -
   rheojax transform fft_analysis --input data.csv
   rheojax export results/ --output bundle.h5 --format hdf5
   rheojax pipeline init --template basic --output pipeline.yaml

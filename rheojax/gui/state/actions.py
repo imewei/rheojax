@@ -150,12 +150,27 @@ def remove_dataset(dataset_id: str) -> None:
             if v.dataset_id != dataset_id
         }
 
+        # Rescope Fit/Bayesian chips to the new active dataset -- a chip left
+        # COMPLETE from the just-removed dataset would otherwise keep showing
+        # green for a dataset that has no result at all.
+        pipeline = state.pipeline_state.clone()
+        pipeline.sync_fit_chip(
+            PipelineStep.FIT, new_fit_results, state.active_model_name, new_active
+        )
+        pipeline.sync_fit_chip(
+            PipelineStep.BAYESIAN,
+            new_bayesian_results,
+            state.active_model_name,
+            new_active,
+        )
+
         return replace(
             state,
             datasets=new_datasets,
             active_dataset_id=new_active,
             fit_results=new_fit_results,
             bayesian_results=new_bayesian_results,
+            pipeline_state=pipeline,
             is_modified=True,
         )
 
@@ -222,11 +237,24 @@ def update_dataset(dataset_id: str, **updates) -> None:
             if result.dataset_id != dataset_id
         }
 
+        pipeline = state.pipeline_state.clone()
+        if dataset_id == state.active_dataset_id:
+            pipeline.sync_fit_chip(
+                PipelineStep.FIT, new_fit_results, state.active_model_name, dataset_id
+            )
+            pipeline.sync_fit_chip(
+                PipelineStep.BAYESIAN,
+                new_bayesian_results,
+                state.active_model_name,
+                dataset_id,
+            )
+
         return replace(
             state,
             datasets=new_datasets,
             fit_results=new_fit_results,
             bayesian_results=new_bayesian_results,
+            pipeline_state=pipeline,
             is_modified=True,
         )
 
