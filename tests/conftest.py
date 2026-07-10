@@ -21,6 +21,17 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
 from rheojax.core.test_modes import TestMode
 
+# Force deterministic, display-independent Qt rendering *before* any test
+# creates a QApplication (only one can exist per process, so whichever test
+# runs first in an xdist worker otherwise decides the platform for the rest
+# of that worker's lifetime). Without this, running the suite on a real X11
+# session with a fractional HiDPI scale factor (observed: 2.3958333...)
+# makes FigureCanvasQTAgg report a non-integer devicePixelRatio, which
+# reproducibly crashes matplotlib's FreeType glyph rasterizer
+# (`FT_Render_Glyph ... error 0x62: raster overflow`) in golden-image /
+# visual-regression tests. setdefault() so an explicit override still wins.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
 

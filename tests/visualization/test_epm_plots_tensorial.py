@@ -215,32 +215,6 @@ class TestTensorialAnimation:
     """Test animation of tensorial stress evolution."""
 
     @pytest.mark.smoke
-    @pytest.mark.xfail(
-        reason=(
-            "Environment-specific matplotlib/FreeType bug, not a rheojax code "
-            "issue. FT_Render_Glyph raises 'raster overflow' while drawing a "
-            "trivial numeric colorbar tick label ('0') at a garbage screen "
-            "position, with figure.dpi/width/height all normal (100/1500/400). "
-            "Root-cause isolation performed: identical to reproduce/not "
-            "reproduce across (a) this exact test code byte-for-byte matching "
-            "the pre-existing baseline (git diff against the original commit "
-            "is empty for both this test and animate_tensorial_evolution()), "
-            "(b) the Agg vs qtagg backend (both crash, both confirmed active "
-            "via matplotlib.get_backend()), (c) text.hinting=none, (d) a fully "
-            "rebuilt matplotlib font cache + `fc-cache -f`, (e) blit=True vs "
-            "blit=False, (f) every default and third-party pytest plugin "
-            "toggled off individually (capture, logging, warnings, "
-            "faulthandler, hypothesis, qt, timeout, xdist, cacheprovider, "
-            "rerunfailures, unraisableexception, threadexception). The crash "
-            "reproduces 100% deterministically under any pytest invocation "
-            "(including a bare `pytest.main()` call) and 0% under an "
-            "otherwise-identical bare `python -c` script — isolating the "
-            "trigger to matplotlib/FreeType's interaction with the pytest "
-            "process model itself, outside what this library's code controls."
-        ),
-        raises=RuntimeError,
-        strict=False,
-    )
     def test_animate_tensorial_all_components(self):
         """Test animation with all components."""
         np.random.seed(42)

@@ -55,6 +55,48 @@ def test_second_action_while_first_is_pending_does_not_double_dialog(
     assert call_count == [1]  # only one dialog shown, not two
 
 
+def test_stale_poll_chain_timer_is_parented_to_window(qtbot):
+    # Regression: this test's active_jobs never empties, so _poll_active_jobs_then's
+    # QTimer chain never naturally resolves within a single test. If that timer
+    # isn't parented to win, Qt won't cancel it when win is destroyed -- it
+    # keeps re-arming on the (process-wide, shared) QApplication event loop and
+    # can eventually fire the real QMessageBox.warning() during a LATER,
+    # unrelated test's teardown, crashing the whole xdist worker with a fatal
+    # Qt/shiboken abort. This is exactly what happened under the full suite
+    # (see PR history). Rather than racing the real 30s chain or Qt's/CPython's
+    # GC timing to reproduce the crash, assert the architectural property that
+    # prevents it: the scheduled QTimer must be a child of win, so Qt's
+    # parent-child ownership destroys it (and stops it firing) the moment win
+    # is destroyed, regardless of exactly when that happens.
+    from PySide6.QtCore import QTimer
+
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+    win._active_jobs_action_pending = True
+
+    created_timers = []
+    real_init = QTimer.__init__
+
+    def _capturing_init(self, *a, **k):
+        real_init(self, *a, **k)
+        created_timers.append(self)
+
+    QTimer.__init__ = _capturing_init
+    try:
+        win._poll_active_jobs_then(lambda: None, remaining_polls=1)
+    finally:
+        QTimer.__init__ = real_init
+
+    assert created_timers, "_poll_active_jobs_then did not create a QTimer"
+    assert created_timers[-1].parent() is win, (
+        "The active-jobs poll QTimer is not parented to the window, so Qt "
+        "cannot cancel it when the window is destroyed -- it will keep "
+        "firing (and can call the real QMessageBox.warning()) into whatever "
+        "unrelated test happens to be running when its 250ms tick lands."
+    )
+
+
 def test_phase_worker_ready_updates_only_its_own_dataset(qtbot):
     win = WorkspaceWindow(AppState())
     qtbot.addWidget(win)

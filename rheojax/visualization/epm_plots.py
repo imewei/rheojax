@@ -247,8 +247,12 @@ def animate_stress_evolution(
         ax.set_title(f"Time Step: {frame}")
         return (im,)
 
+    # blit=False: blitting's initial background capture draws before this
+    # figure's colorbar layout has settled, corrupting tick-label glyph
+    # positions (matplotlib/Agg raster-overflow crash). Full-redraw is
+    # slightly slower but reliable with a colorbar present.
     anim = animation.FuncAnimation(
-        fig, update, frames=n_frames, interval=interval, blit=True
+        fig, update, frames=n_frames, interval=interval, blit=False
     )
 
     if save_path:
@@ -569,6 +573,8 @@ def animate_tensorial_evolution(
         "xy": 2,
     }
 
+    # All branches below use blit=False: see the comment in
+    # animate_stress_evolution for why blitting corrupts colorbar tick labels.
     if component == "all":
         # 3-panel animation
         fig, axes = plt.subplots(1, 3, figsize=(15, 4))
@@ -604,7 +610,7 @@ def animate_tensorial_evolution(
             return tuple(images)
 
         anim = animation.FuncAnimation(
-            fig, update, frames=T, interval=interval, blit=True
+            fig, update, frames=T, interval=interval, blit=False
         )
 
     elif component in component_map:
@@ -633,7 +639,7 @@ def animate_tensorial_evolution(
             return (im,)
 
         anim = animation.FuncAnimation(
-            fig, update, frames=T, interval=interval, blit=True
+            fig, update, frames=T, interval=interval, blit=False
         )
 
     elif component == "N1":
@@ -664,7 +670,7 @@ def animate_tensorial_evolution(
             return (im,)
 
         anim = animation.FuncAnimation(
-            fig, update, frames=T, interval=interval, blit=True
+            fig, update, frames=T, interval=interval, blit=False
         )
 
     elif component == "vm":
@@ -718,7 +724,7 @@ def animate_tensorial_evolution(
             return (im,)
 
         anim = animation.FuncAnimation(
-            fig, update, frames=T, interval=interval, blit=True
+            fig, update, frames=T, interval=interval, blit=False
         )
 
     else:

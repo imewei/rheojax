@@ -1237,3 +1237,456 @@ class TestSGRConventionalFitting:
 
         with pytest.raises(ValueError, match="Unsupported test_mode"):
             model.fit(omega, G_star, test_mode="invalid_mode")
+
+
+class TestSGRConventionalStartupFitting:
+    """Startup-flow fitting (_fit_startup_mode, routing lines 308-309, 886-951)."""
+
+    def _make_startup_data(self, gamma_dot=1.0):
+        model_true = SGRConventional()
+        model_true.parameters.set_value("x", 1.5)
+        model_true.parameters.set_value("G0", 1000.0)
+        model_true.parameters.set_value("tau0", 0.001)
+        model_true._test_mode = "startup"
+        model_true._startup_gamma_dot = gamma_dot
+        t = np.logspace(-3, 1, 40)
+        eta_plus = np.asarray(model_true.predict(t))
+        return t, eta_plus
+
+    def test_startup_mode_fitting_basic(self):
+        """Fit eta_plus(t) startup data; routes through _fit_startup_mode."""
+        t, eta_plus = self._make_startup_data(gamma_dot=1.0)
+
+        model_fit = SGRConventional()
+        model_fit.fit(t, eta_plus, test_mode="startup", gamma_dot=1.0)
+
+        assert model_fit.fitted_ is True
+        assert model_fit._test_mode == "startup"
+        assert model_fit._startup_gamma_dot == 1.0
+
+        # Fitted prediction should reproduce the data within tolerance
+        pred = np.asarray(model_fit.predict(t))
+        assert not np.any(np.isnan(pred))
+        rel = np.abs(pred - eta_plus) / (np.abs(eta_plus) + 1e-12)
+        np.testing.assert_allclose(np.max(rel), 0.0, atol=0.2)
+
+    def test_startup_fitting_is_stress_conversion(self):
+        """is_stress=True divides stress by gamma_dot before fitting (line 895-897)."""
+        gamma_dot = 2.0
+        t, eta_plus = self._make_startup_data(gamma_dot=gamma_dot)
+        sigma = eta_plus * gamma_dot  # stress = gamma_dot * eta_plus
+
+        model_fit = SGRConventional()
+        model_fit.fit(
+            t, sigma, test_mode="startup", gamma_dot=gamma_dot, is_stress=True
+        )
+
+        assert model_fit.fitted_ is True
+        # Internally converts sigma -> eta_plus, so recovered response matches eta_plus
+        pred = np.asarray(model_fit.predict(t))
+        rel = np.abs(pred - eta_plus) / (np.abs(eta_plus) + 1e-12)
+        np.testing.assert_allclose(np.max(rel), 0.0, atol=0.2)
+
+
+class TestSGRConventionalLAOSFitting:
+    """LAOS fitting paths (_fit_laos_mode/_fit_laos_mc, routing line 307, 690-862)."""
+
+    def test_laos_fit_requires_gamma0_and_omega(self):
+        """Missing gamma_0/omega raises ValueError (lines 693-694)."""
+        model = SGRConventional()
+        t = np.linspace(0, 2 * np.pi, 40)
+        sigma = np.sin(t)
+        with pytest.raises(ValueError, match="requires gamma_0 and omega"):
+            model.fit(t, sigma, test_mode="laos", omega=1.0)
+
+    def test_laos_fit_negative_gamma0_raises(self):
+        """Non-positive gamma_0 raises ValueError (lines 695-696)."""
+        model = SGRConventional()
+        t = np.linspace(0, 2 * np.pi, 40)
+        sigma = np.sin(t)
+        with pytest.raises(ValueError, match="gamma_0 must be positive"):
+            model.fit(t, sigma, test_mode="laos", gamma_0=-0.1, omega=1.0)
+
+    def test_laos_saos_approximation_small_amplitude(self):
+        """Small gamma_0 (<0.1) routes through the SAOS-approx branch (lines 706-729).
+
+        Regression coverage for a kwargs-collision bug: _fit_laos_mode read
+        gamma_0/omega/n_particles via kwargs.get (not pop), so they remained in
+        **kwargs and collided with the same-named positional parameter on
+        _fit_oscillation_mode (omega). Fixed by filtering the already-consumed
+        keys out of kwargs before re-forwarding.
+        """
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        omega = 1.0
+        t = np.linspace(0, 4 * np.pi, 60)
+        # Linear-regime sinusoidal stress response
+        strain = 0.05 * np.sin(omega * t)
+        sigma = 1e3 * strain
+
+        model._fit_laos_mode(t, sigma, gamma_0=0.05, omega=omega)
+
+        assert model.fitted_ is True
+        # LAOS parameters are cached (lines 698-701) before the branch.
+        assert model._gamma_0 == 0.05
+        assert model._omega_laos == omega
+
+    def test_laos_mc_dispatch_kwargs_no_collision(self):
+        """Public LAOS fit with gamma_0>=0.1 routes to the MC branch cleanly.
+
+        Regression coverage for the same kwargs-collision bug as above, but for
+        the MC dispatch (_fit_laos_mc's gamma_0/omega/n_particles positional
+        parameters). Covers routing lines 690-704 and 730-732.
+        """
+        model = SGRConventional()
+        t = np.linspace(0, 4 * np.pi, 40)
+        sigma = 1e3 * 0.5 * np.sin(t)
+
+        model.fit(
+            t,
+            sigma,
+            test_mode="laos",
+            gamma_0=0.5,
+            omega=1.0,
+            n_particles=64,
+            max_iter=2,
+        )
+
+        assert model.fitted_ is True
+
+    def test_laos_mc_fitting_direct(self):
+        """Exercise the Monte Carlo fit body directly (lines 761-862).
+
+        Bypasses the buggy _fit_laos_mode forwarding by calling _fit_laos_mc
+        with clean positional args and no colliding kwargs.
+        """
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        omega = 1.0
+        gamma_0 = 0.5
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0, 2 * period, 40)
+        strain = gamma_0 * np.sin(omega * t)
+        sigma = 1e3 * strain
+
+        # Keep the MC fit cheap: few particles, few iterations
+        model._fit_laos_mc(
+            t, sigma, gamma_0, omega, n_particles=64, max_iter=2, seed=0
+        )
+
+        assert model.fitted_ is True
+        # Parameters remain within physical bounds after MC optimization
+        x_fit = model.parameters.get_value("x")
+        assert 0.5 <= x_fit <= 2.5
+        assert np.isfinite(model.parameters.get_value("G0"))
+        assert np.isfinite(model.parameters.get_value("tau0"))
+
+
+class TestSGRConventionalOscillationInputFormats:
+    """Oscillation fitting input-format handling (lines 388-394)."""
+
+    def _target_data(self, omega):
+        m = SGRConventional()
+        m.parameters.set_value("x", 1.5)
+        m.parameters.set_value("G0", 1e3)
+        m.parameters.set_value("tau0", 1e-3)
+        m._test_mode = "oscillation"
+        G_star = np.asarray(m.predict(omega))
+        return G_star
+
+    def test_fit_accepts_2d_real_format(self):
+        """(M, 2) real [G', G''] input format (line 388-389)."""
+        omega = np.logspace(-2, 2, 30)
+        G_star = self._target_data(omega)
+        G_2d = np.column_stack([np.real(G_star), np.imag(G_star)])
+
+        model = SGRConventional()
+        model.fit(omega, G_2d, test_mode="oscillation")
+        assert model.fitted_ is True
+
+    def test_fit_accepts_transposed_format(self):
+        """(2, M) transposed input format (lines 390-392)."""
+        omega = np.logspace(-2, 2, 30)
+        G_star = self._target_data(omega)
+        G_2xM = np.vstack([np.real(G_star), np.imag(G_star)])
+
+        model = SGRConventional()
+        model.fit(omega, G_2xM, test_mode="oscillation")
+        assert model.fitted_ is True
+
+    def test_fit_invalid_shape_raises(self):
+        """Wrong-shape modulus raises ValueError (lines 393-396)."""
+        omega = np.logspace(-2, 2, 30)
+        bad = np.ones((30, 3))  # neither complex, (M,2), nor (2,M)
+
+        model = SGRConventional()
+        with pytest.raises(ValueError, match=r"G_star must be complex"):
+            model.fit(omega, bad, test_mode="oscillation")
+
+
+class TestSGRConventionalPredictRouting:
+    """Prediction routing and error paths (_predict, _predict_laos)."""
+
+    def test_predict_without_test_mode_raises(self):
+        """No test_mode set raises ValueError (lines 1176-1177)."""
+        model = SGRConventional()
+        t = np.logspace(-2, 2, 10)
+        with pytest.raises(ValueError, match="test_mode must be specified"):
+            model._predict(t)
+
+    def test_predict_unknown_mode_raises(self):
+        """Unknown test_mode override raises ValueError (line 1202)."""
+        model = SGRConventional()
+        t = np.logspace(-2, 2, 10)
+        with pytest.raises(ValueError, match="Unknown test_mode"):
+            model._predict(t, test_mode="bogus")
+
+    def test_predict_laos_missing_params_raises(self):
+        """LAOS predict without cached gamma_0/omega raises (lines 1306-1310)."""
+        model = SGRConventional()
+        t = np.linspace(0, 2 * np.pi, 32)
+        with pytest.raises(ValueError, match="requires gamma_0 and omega"):
+            model._predict(t, test_mode="laos")
+
+    def test_predict_laos_with_kwargs(self):
+        """LAOS predict extracts gamma_0/omega from kwargs (lines 1181-1186, 1312-1315)."""
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        t = np.linspace(0, 2 * np.pi, 64)
+        stress = model._predict(t, test_mode="laos", gamma_0=0.1, omega=1.0)
+
+        assert model._gamma_0 == 0.1
+        assert model._omega_laos == 1.0
+        assert stress.shape == (64,)
+        assert not np.any(np.isnan(stress))
+
+
+class TestSGRConventionalModelFunction:
+    """Bayesian model_function routing across all modes (lines 1698-1738)."""
+
+    PARAMS = np.array([1.5, 1e3, 1e-3])
+
+    def test_model_function_oscillation(self):
+        model = SGRConventional()
+        omega = np.logspace(-2, 2, 20)
+        out = np.asarray(model.model_function(omega, self.PARAMS, test_mode="oscillation"))
+        assert out.shape == (20, 2)
+        assert not np.any(np.isnan(out))
+
+    def test_model_function_time_domain_modes(self):
+        model = SGRConventional()
+        t = np.logspace(-3, 2, 25)
+        for mode in ("relaxation", "creep", "steady_shear"):
+            out = np.asarray(model.model_function(t, self.PARAMS, test_mode=mode))
+            assert out.shape == (25,), f"mode {mode} wrong shape"
+            assert np.all(out > 0), f"mode {mode} must be positive"
+
+    def test_model_function_flow_curve_alias(self):
+        """flow_curve maps to steady_shear (line 1718)."""
+        model = SGRConventional()
+        gamma_dot = np.logspace(-2, 2, 15)
+        out = np.asarray(model.model_function(gamma_dot, self.PARAMS, test_mode="flow_curve"))
+        assert out.shape == (15,)
+
+    def test_model_function_laos_uses_oscillation(self):
+        """LAOS mode falls back to oscillation response (lines 1720-1722)."""
+        model = SGRConventional()
+        omega = np.logspace(-2, 2, 12)
+        out = np.asarray(model.model_function(omega, self.PARAMS, test_mode="laos"))
+        assert out.shape == (12, 2)
+
+    def test_model_function_startup_with_kwarg_gamma_dot(self):
+        """Startup mode uses explicit gamma_dot kwarg (lines 1723-1736)."""
+        model = SGRConventional()
+        t = np.logspace(-3, 1, 20)
+        out = np.asarray(
+            model.model_function(t, self.PARAMS, test_mode="startup", gamma_dot=2.0)
+        )
+        assert out.shape == (20,)
+        assert np.all(out > 0)
+
+    def test_model_function_startup_uses_cached_gamma_dot(self):
+        """Startup mode falls back to cached _startup_gamma_dot."""
+        model = SGRConventional()
+        model._startup_gamma_dot = 1.5
+        t = np.logspace(-3, 1, 10)
+        out = np.asarray(model.model_function(t, self.PARAMS, test_mode="startup"))
+        assert out.shape == (10,)
+
+    def test_model_function_startup_missing_gamma_dot_raises(self):
+        """Startup with no gamma_dot anywhere raises RuntimeError (lines 1730-1735)."""
+        model = SGRConventional()
+        t = np.logspace(-3, 1, 10)
+        with pytest.raises(RuntimeError, match="gamma_dot not provided"):
+            model.model_function(t, self.PARAMS, test_mode="startup")
+
+    def test_model_function_unsupported_mode_raises(self):
+        """Unsupported mode raises ValueError (line 1738)."""
+        model = SGRConventional()
+        t = np.logspace(-3, 1, 10)
+        with pytest.raises(ValueError, match="Unsupported test mode"):
+            model.model_function(t, self.PARAMS, test_mode="nonsense")
+
+    def test_model_function_default_mode_fallback(self):
+        """None mode (unfitted) defaults to oscillation (lines 1705-1706)."""
+        model = SGRConventional()
+        assert model._test_mode is None
+        omega = np.logspace(-2, 2, 8)
+        out = np.asarray(model.model_function(omega, self.PARAMS))
+        assert out.shape == (8, 2)
+
+
+class TestSGRConventionalDynamicXGuards:
+    """Guard clauses for dynamic-x-only methods (lines 1472, 1561, 1564)."""
+
+    def test_compute_x_ss_requires_dynamic_x(self):
+        model = SGRConventional(dynamic_x=False)
+        with pytest.raises(ValueError, match="requires dynamic_x=True"):
+            model._compute_x_ss(1.0, 1e-3)
+
+    def test_evolve_x_requires_dynamic_x(self):
+        model = SGRConventional(dynamic_x=False)
+        t = np.linspace(0, 1, 10)
+        gamma_dot = np.zeros_like(t)
+        with pytest.raises(ValueError, match="requires dynamic_x=True"):
+            model.evolve_x(t, gamma_dot, x_initial=1.0)
+
+    def test_evolve_x_shape_mismatch_raises(self):
+        model = SGRConventional(dynamic_x=True)
+        t = np.linspace(0, 1, 10)
+        gamma_dot = np.zeros(5)  # wrong shape
+        with pytest.raises(ValueError, match="same shape"):
+            model.evolve_x(t, gamma_dot, x_initial=1.0)
+
+
+class TestSGRConventionalHarmonicEdgeCases:
+    """Harmonic/Chebyshev truncation and degenerate branches."""
+
+    def test_harmonics_truncated_when_window_too_small(self):
+        """Short window zeroes higher harmonics (lines 1872-1873, 1883-1884, 1894-1895)."""
+        model = SGRConventional()
+        # n_points_per_cycle=4 -> n//2=2, so idx_3=3, idx_5=5, idx_7=7 all >= 2
+        stress = np.array([0.0, 1.0, 0.0, -1.0])
+        harmonics = model.extract_laos_harmonics(stress, n_points_per_cycle=4)
+
+        assert harmonics["I_3"] == 0.0
+        assert harmonics["phi_3"] == 0.0
+        assert harmonics["I_5"] == 0.0
+        assert harmonics["I_7"] == 0.0
+
+    def test_harmonics_zero_fundamental(self):
+        """Zero stress -> zero fundamental -> relative intensities 0 (lines 1905-1907)."""
+        model = SGRConventional()
+        stress = np.zeros(256)
+        harmonics = model.extract_laos_harmonics(stress, n_points_per_cycle=256)
+
+        assert harmonics["I_1"] == 0.0
+        assert harmonics["I_3_I_1"] == 0.0
+        assert harmonics["I_5_I_1"] == 0.0
+        assert harmonics["I_7_I_1"] == 0.0
+
+    def test_chebyshev_zero_coefficients_branch(self):
+        """Zero stress -> e_1=v_1=0 -> normalized ratios 0 (lines 2023-2024, 2030-2031)."""
+        model = SGRConventional()
+        n = 256
+        omega = 1.0
+        gamma_0 = 0.5
+        t = np.linspace(0, 2 * np.pi / omega, n)
+        strain = gamma_0 * np.sin(omega * t)
+        stress = np.zeros(n)
+
+        chebyshev = model.compute_chebyshev_coefficients(
+            strain, stress, gamma_0, omega, n_points_per_cycle=n
+        )
+
+        assert chebyshev["e_1"] == 0.0
+        assert chebyshev["v_1"] == 0.0
+        assert chebyshev["e_3_e_1"] == 0.0
+        assert chebyshev["e_5_e_1"] == 0.0
+        assert chebyshev["v_3_v_1"] == 0.0
+        assert chebyshev["v_5_v_1"] == 0.0
+
+
+class TestSGRConventionalLissajous:
+    """get_lissajous_curve (lines 2059-2073)."""
+
+    def test_lissajous_curve_unnormalized(self):
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        strain, stress = model.get_lissajous_curve(gamma_0=0.1, omega=1.0, n_points=128)
+
+        assert strain.shape == (128,)
+        assert stress.shape == (128,)
+        assert np.max(np.abs(strain)) <= 0.1 * 1.01
+        assert not np.any(np.isnan(stress))
+
+    def test_lissajous_curve_normalized(self):
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        strain, stress = model.get_lissajous_curve(
+            gamma_0=0.2, omega=1.0, n_points=128, normalized=True
+        )
+
+        # Normalized strain in [-1, 1], normalized stress in [-1, 1]
+        assert np.max(np.abs(strain)) <= 1.0 + 1e-9
+        assert np.max(np.abs(stress)) == pytest.approx(1.0, abs=1e-9)
+
+
+class TestSGRConventionalThixotropyGuards:
+    """Thixotropy guard clauses and basic stress path (lines 2174, 2177, 2254, 2258)."""
+
+    def test_evolve_lambda_requires_thixotropy(self):
+        model = SGRConventional()
+        t = np.linspace(0, 1, 10)
+        gamma_dot = np.ones_like(t)
+        with pytest.raises(ValueError, match="Thixotropy not enabled"):
+            model.evolve_lambda(t, gamma_dot)
+
+    def test_evolve_lambda_shape_mismatch(self):
+        model = SGRConventional()
+        model.enable_thixotropy()
+        t = np.linspace(0, 1, 10)
+        gamma_dot = np.ones(5)
+        with pytest.raises(ValueError, match="same shape"):
+            model.evolve_lambda(t, gamma_dot)
+
+    def test_predict_thixotropic_stress_requires_thixotropy(self):
+        model = SGRConventional()
+        t = np.linspace(0, 1, 10)
+        gamma_dot = np.ones_like(t)
+        with pytest.raises(ValueError, match="Thixotropy not enabled"):
+            model.predict_thixotropic_stress(t, gamma_dot)
+
+    def test_predict_thixotropic_stress_basic(self):
+        """Stress transient computes lambda internally (line 2258 onward)."""
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+        model.enable_thixotropy(k_build=0.1, k_break=0.5, n_struct=2.0)
+
+        t = np.linspace(0, 10, 100)
+        gamma_dot = np.ones_like(t) * 5.0
+
+        sigma = model.predict_thixotropic_stress(t, gamma_dot)
+
+        assert sigma.shape == (100,)
+        assert not np.any(np.isnan(sigma))
+        assert not np.any(np.isinf(sigma))
+        # Structure breaks down under constant shear -> lambda cached
+        assert model._lambda_trajectory is not None

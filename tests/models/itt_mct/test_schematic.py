@@ -405,3 +405,294 @@ class TestRepr:
 
         assert "ITTMCTSchematic" in repr_str
         assert "glass" in repr_str
+
+
+# =============================================================================
+# Fast coverage tests for the prediction / fitting machinery.
+#
+# The tests above are marked @pytest.mark.slow and are deselected from the
+# coverage run, leaving nearly all of schematic.py's predict/fit code
+# unexercised. The tests below drive every protocol path with small arrays and
+# scipy (not diffrax, except where explicitly noted) so they stay fast while
+# still exercising the numerical machinery and checking physical invariants.
+# =============================================================================
+
+
+class TestConstructionValidation:
+    """Constructor option validation and derived-attribute wiring."""
+
+    def test_invalid_decorrelation_form_raises(self):
+        with pytest.raises(ValueError, match="decorrelation_form must be"):
+            ITTMCTSchematic(decorrelation_form="bogus")  # type: ignore[arg-type]
+
+    def test_invalid_memory_form_raises(self):
+        with pytest.raises(ValueError, match="memory_form must be"):
+            ITTMCTSchematic(memory_form="bogus")  # type: ignore[arg-type]
+
+    def test_invalid_stress_form_raises(self):
+        with pytest.raises(ValueError, match="stress_form must be"):
+            ITTMCTSchematic(stress_form="bogus")  # type: ignore[arg-type]
+
+    def test_microscopic_requires_phi_volume(self):
+        with pytest.raises(ValueError, match="phi_volume is required"):
+            ITTMCTSchematic(stress_form="microscopic")
+
+    def test_lorentzian_form_wired(self):
+        model = ITTMCTSchematic(epsilon=0.05, decorrelation_form="lorentzian")
+        assert model.decorrelation_form == "lorentzian"
+        assert model._use_lorentzian is True
+
+    def test_full_memory_form_wired(self):
+        model = ITTMCTSchematic(epsilon=0.05, memory_form="full")
+        assert model.memory_form == "full"
+
+    def test_microscopic_stress_form_wired(self):
+        model = ITTMCTSchematic(epsilon=0.05, stress_form="microscopic", phi_volume=0.5)
+        assert model.stress_form == "microscopic"
+        # Prefactor is precomputed at construction for the microscopic path.
+        assert model._microscopic_stress_prefactor is not None
+
+    def test_v2_critical_nonzero_v1(self):
+        """_get_v2_critical uses the v1 != 0 branch when v1 is nonzero."""
+        model = ITTMCTSchematic()
+        model.parameters.set_value("v1", 1.0)
+        # epsilon property routes through _get_v2_critical(v1) with v1 != 0.
+        v2_c = model._get_v2_critical(1.0)
+        assert v2_c == pytest.approx((4.0 - 2.0 * 1.0) / (1.0 - 1.0 / 4.0))
+        # And the epsilon getter stays finite with the modified v1.
+        assert np.isfinite(model.epsilon)
+
+
+class TestEquilibriumCorrelator:
+    """Direct exercise of the quiescent correlator Φ_eq(t)."""
+
+    def test_correlator_bounds_and_ic_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        t = np.logspace(-3, 1, 40)
+        phi = np.asarray(model._compute_equilibrium_correlator(t))
+
+        assert phi.shape == t.shape
+        assert np.all(np.isfinite(phi))
+        # Physical bounds enforced by the model (clip to [0, 1]).
+        assert np.all(phi >= 0.0) and np.all(phi <= 1.0)
+        # Φ starts near 1 (first grid point is t≈1e-3, already slightly relaxed).
+        assert 0.99 < phi[0] <= 1.0
+        # Fluid correlator relaxes: late time below early time.
+        assert phi[-1] < phi[0]
+
+    def test_correlator_glass_plateau(self):
+        """Glass correlator retains a non-ergodic plateau (Φ_∞ > Φ_fluid_∞)."""
+        glass = np.asarray(
+            ITTMCTSchematic(epsilon=0.1)._compute_equilibrium_correlator(
+                np.logspace(-3, 1, 40)
+            )
+        )
+        fluid = np.asarray(
+            ITTMCTSchematic(epsilon=-0.1)._compute_equilibrium_correlator(
+                np.logspace(-3, 1, 40)
+            )
+        )
+        assert glass[-1] >= fluid[-1]
+
+
+class TestFlowCurveScipy:
+    """Scipy (non-diffrax) flow-curve path and single-rate steady stress."""
+
+    def test_flow_curve_scipy_fluid_monotonic(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=False)
+
+        assert sigma.shape == gamma_dot.shape
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0.0)
+        # Fluid: no yield stress at γ̇ = 0.
+        assert sigma[0] == pytest.approx(0.0, abs=1e-9)
+        # Stress increases with shear rate.
+        assert np.all(np.diff(sigma[1:]) > 0)
+
+    def test_flow_curve_scipy_glass_yield_stress(self):
+        model = ITTMCTSchematic(epsilon=0.1)
+        gamma_dot = np.array([0.0, 1.0, 10.0])
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=False)
+
+        assert np.all(np.isfinite(sigma))
+        # Glass: finite yield stress persists as γ̇ → 0.
+        assert sigma[0] > 0.0
+        info = model.get_glass_transition_info()
+        G_inf = model.parameters.get_value("G_inf")
+        gamma_c = model.parameters.get_value("gamma_c")
+        expected = G_inf * gamma_c * info["f_neq"] ** 2
+        np.testing.assert_allclose(sigma[0], expected, rtol=1e-6)
+
+    def test_flow_curve_microscopic_stress_form(self):
+        model = ITTMCTSchematic(epsilon=0.05, stress_form="microscopic", phi_volume=0.4)
+        sigma = model.predict(
+            np.array([0.0, 1.0, 10.0]), test_mode="flow_curve", use_diffrax=False
+        )
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0.0)
+
+    def test_steady_state_stress_lorentzian_full_memory(self):
+        """Exercise the lorentzian + full-memory branches of steady-state stress."""
+        model = ITTMCTSchematic(
+            epsilon=0.05, decorrelation_form="lorentzian", memory_form="full"
+        )
+        sigma = model._compute_steady_state_stress(5.0)
+        assert np.isfinite(sigma)
+        assert sigma > 0.0
+
+    def test_prony_cache_invalidated_on_param_change(self):
+        """Changing physics params invalidates the cached Prony modes."""
+        model = ITTMCTSchematic(epsilon=-0.05)
+        model.predict(np.array([1.0, 10.0]), test_mode="flow_curve", use_diffrax=False)
+        assert model._prony_amplitudes is not None
+
+        model.parameters.set_value("v2", 5.0)  # fluid → glass
+        model._check_prony_cache()
+        assert model._prony_amplitudes is None
+
+
+@pytest.mark.slow
+class TestFlowCurveDiffrax:
+    """Diffrax flow-curve path (first call triggers JIT compilation)."""
+
+    def test_flow_curve_diffrax_glass(self):
+        model = ITTMCTSchematic(epsilon=0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=True)
+
+        assert sigma.shape == gamma_dot.shape
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0.0)
+        # Zero-rate yield stress branch of the diffrax path.
+        assert sigma[0] > 0.0
+
+
+class TestOscillationDetailed:
+    """SAOS moduli: magnitude/component consistency and positivity."""
+
+    def test_oscillation_magnitude_matches_components(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        omega = np.logspace(-1, 1, 8)
+
+        G_star = model.predict(omega, test_mode="oscillation")
+        comps = model.predict(omega, test_mode="oscillation", return_components=True)
+
+        assert comps.shape == (len(omega), 2)
+        assert np.all(np.isfinite(comps))
+        # |G*| returned as complex; its magnitude equals sqrt(G'^2 + G''^2).
+        mag = np.abs(G_star)
+        np.testing.assert_allclose(
+            mag, np.hypot(comps[:, 0], comps[:, 1]), rtol=1e-6
+        )
+        # Loss modulus is non-negative for a passive material.
+        assert np.all(comps[:, 1] >= -1e-6)
+
+
+class TestStartupDetailed:
+    """Startup flow: initial condition and finiteness."""
+
+    def test_startup_initial_condition_and_finite(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        t = np.linspace(0.0, 5.0, 20)
+        sigma = model.predict(t, test_mode="startup", gamma_dot=2.0)
+
+        assert sigma.shape == t.shape
+        assert np.all(np.isfinite(sigma))
+        # σ(0) = 0 startup initial condition.
+        np.testing.assert_allclose(sigma[0], 0.0, atol=1e-6)
+        assert np.all(sigma >= -1e-9)
+
+    def test_startup_lorentzian_full_memory(self):
+        model = ITTMCTSchematic(
+            epsilon=0.05, decorrelation_form="lorentzian", memory_form="full"
+        )
+        sigma = model.predict(np.linspace(0.0, 3.0, 15), test_mode="startup", gamma_dot=1.0)
+        assert np.all(np.isfinite(sigma))
+
+
+class TestCreepDetailed:
+    """Creep compliance: elastic-jump IC and monotonicity."""
+
+    def test_creep_elastic_jump_ic(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        t = np.linspace(0.0, 10.0, 20)
+        sigma_applied = 100.0
+        J = model.predict(t, test_mode="creep", sigma_applied=sigma_applied)
+
+        assert J.shape == t.shape
+        assert np.all(np.isfinite(J))
+        # J(0) = γ(0)/σ₀ = (σ₀/G_inf)/σ₀ = 1/G_inf (instantaneous elastic jump).
+        G_inf = model.parameters.get_value("G_inf")
+        np.testing.assert_allclose(J[0], 1.0 / G_inf, rtol=1e-6)
+        # Fluid compliance grows with time.
+        assert J[-1] > J[0]
+
+
+class TestRelaxationDetailed:
+    """Stress relaxation: step-strain IC and glass residual."""
+
+    def test_relaxation_initial_condition(self):
+        model = ITTMCTSchematic(epsilon=-0.05)
+        t = np.linspace(0.0, 20.0, 20)
+        gamma_pre = 0.05
+        sigma = model.predict(t, test_mode="relaxation", gamma_pre=gamma_pre)
+
+        assert np.all(np.isfinite(sigma))
+        # σ(0) = G_inf γ_pre h(γ_pre)² with gaussian decorrelation.
+        G_inf = model.parameters.get_value("G_inf")
+        gamma_c = model.parameters.get_value("gamma_c")
+        h = np.exp(-((gamma_pre / gamma_c) ** 2))
+        np.testing.assert_allclose(sigma[0], G_inf * gamma_pre * h * h, rtol=1e-6)
+        # Fluid stress relaxes.
+        assert sigma[-1] <= sigma[0] + 1e-9
+
+    def test_relaxation_lorentzian_initial_condition(self):
+        """Lorentzian decorrelation changes the step-strain IC."""
+        model = ITTMCTSchematic(epsilon=0.05, decorrelation_form="lorentzian")
+        t = np.linspace(0.0, 20.0, 20)
+        gamma_pre = 0.05
+        sigma = model.predict(t, test_mode="relaxation", gamma_pre=gamma_pre)
+
+        G_inf = model.parameters.get_value("G_inf")
+        gamma_c = model.parameters.get_value("gamma_c")
+        h = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
+        np.testing.assert_allclose(sigma[0], G_inf * gamma_pre * h * h, rtol=1e-6)
+        # Glass retains residual stress.
+        assert sigma[-1] > 0.0
+
+
+class TestLAOSDetailed:
+    """LAOS response and harmonic extraction."""
+
+    def test_laos_initial_condition_and_range(self):
+        model = ITTMCTSchematic(epsilon=0.05)
+        t = np.linspace(0.0, 2 * np.pi, 40)
+        sigma = model.predict(t, test_mode="laos", gamma_0=0.1, omega=1.0)
+
+        assert sigma.shape == t.shape
+        assert np.all(np.isfinite(sigma))
+        np.testing.assert_allclose(sigma[0], 0.0, atol=1e-6)
+        assert sigma.max() - sigma.min() > 0.0
+
+    def test_laos_harmonics_fundamental_dominates(self):
+        model = ITTMCTSchematic(epsilon=0.05)
+        t = np.linspace(0.0, 4 * np.pi, 200)
+        sp, sdp = model.get_laos_harmonics(t, gamma_0=0.1, omega=1.0, n_harmonics=3)
+
+        assert len(sp) == 3 and len(sdp) == 3
+        assert np.all(np.isfinite(sp)) and np.all(np.isfinite(sdp))
+        # Fundamental harmonic dominates the higher odd harmonics.
+        assert np.abs(sp[0]) >= np.abs(sp[1])
+
+
+@pytest.mark.slow
+class TestPrecompile:
+    """Diffrax solver precompilation entry point."""
+
+    def test_precompile_returns_time(self):
+        model = ITTMCTSchematic(epsilon=0.05)
+        compile_time = model.precompile()
+        assert isinstance(compile_time, float)
+        assert compile_time >= 0.0

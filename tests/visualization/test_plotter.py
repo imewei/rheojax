@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import subprocess
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -20,6 +22,32 @@ from rheojax.visualization.plotter import (
     plot_rheo_data,
     plot_time_domain,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _run_save_subprocess(body: str, timeout: float = 60.0) -> None:
+    """Render and save a matplotlib figure in a fresh interpreter.
+
+    This host's matplotlib 3.11 / FreeType 2.14 text-metrics state becomes
+    corrupted after enough Figure churn within one process, producing either a
+    bogus huge tight-bbox (-> MemoryError / "image too large") or a raw
+    FT_Render_Glyph raster overflow. A fresh process renders correctly; see
+    tests/gui/test_visual_regression.py for the full root-cause writeup. `body`
+    must save the figure and print "SAVE_OK".
+    """
+    code = "import matplotlib\nmatplotlib.use('Agg')\nimport numpy as np\n" + body
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=str(_REPO_ROOT),
+    )
+    assert result.returncode == 0 and "SAVE_OK" in result.stdout, (
+        f"Figure save failed in subprocess (rc={result.returncode}):\n"
+        f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    )
 
 
 class TestPlotRheoData:
@@ -257,17 +285,18 @@ class TestExportFormats:
 
     def test_export_to_png(self, tmp_path):
         """Test export to PNG format."""
-        time = np.linspace(0, 10, 100)
-        stress = 1000 * np.exp(-time / 2)
-
-        fig, ax = plot_time_domain(time, stress)
-
         output_path = tmp_path / "test_plot.png"
-        fig.savefig(output_path, dpi=150)
+        _run_save_subprocess(
+            "from rheojax.visualization.plotter import plot_time_domain\n"
+            "time = np.linspace(0, 10, 100)\n"
+            "stress = 1000 * np.exp(-time / 2)\n"
+            "fig, ax = plot_time_domain(time, stress)\n"
+            f"fig.savefig({str(output_path)!r}, dpi=150)\n"
+            "print('SAVE_OK')\n"
+        )
 
         assert output_path.exists()
         assert output_path.stat().st_size > 0
-        plt.close(fig)
 
     def test_export_to_pdf(self, tmp_path):
         """Test export to PDF format."""
@@ -377,12 +406,15 @@ class TestSaveFigure:
 
     def test_save_png(self, tmp_path):
         """Test saving a figure to PNG format."""
-        from rheojax.visualization.plotter import save_figure
+        output_path = tmp_path / "out.png"
+        _run_save_subprocess(
+            "from rheojax.visualization.plotter import plot_time_domain, save_figure\n"
+            "fig, _ = plot_time_domain(np.linspace(0, 1, 10), np.ones(10))\n"
+            f"save_figure(fig, {str(output_path)!r})\n"
+            "print('SAVE_OK')\n"
+        )
 
-        fig, _ = plot_time_domain(np.linspace(0, 1, 10), np.ones(10))
-        path = save_figure(fig, tmp_path / "out.png")
-        assert path.exists()
-        plt.close(fig)
+        assert output_path.exists()
 
 
 def test_plot_frequency_domain_uses_shear_modulus_labels():

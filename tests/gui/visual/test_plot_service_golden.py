@@ -19,9 +19,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from rheojax.core.data import RheoData
-from rheojax.gui.services.plot_service import PlotService
-from rheojax.gui.state.store import FitResult
+from tests.gui.conftest import run_gui_code_subprocess
 
 GOLDEN_DIR = Path(__file__).parent / "golden_images"
 GOLDEN_FIT = GOLDEN_DIR / "fit_plot.png"
@@ -70,43 +68,65 @@ def _images_similar(img1_path: Path, img2_path: Path) -> tuple[bool, str]:
     return True, f"Images match (diff: {diff_percentage:.2f}%, max_diff: {max_diff})"
 
 
+# Figure creation + savefig runs in a fresh, isolated subprocess rather than
+# the pytest worker process. Root cause (confirmed empirically): this host's
+# matplotlib/FreeType text-metrics state reliably becomes corrupted after
+# enough Figure/FigureCanvasQTAgg churn within a single process -- identical
+# code produces a correct tight bbox in a fresh interpreter but a corrupted
+# multi-thousand-inch bbox (-> a std::bad_alloc on the resulting huge buffer,
+# or a raw `FT_Render_Glyph ... raster overflow`) once run inside a pytest
+# session with other GUI tests. No savefig argument or memory cap avoids it;
+# only a fresh process does. See commit 290a5123 for the same fix applied to
+# tests/gui/test_visual_regression.py.
+_FIT_PLOT_CODE = """
+import numpy as np
+from PySide6.QtWidgets import QApplication
+app = QApplication.instance() or QApplication([])
+from rheojax.core.data import RheoData
+from rheojax.gui.services.plot_service import PlotService
+from rheojax.gui.state.store import FitResult
+
+plot_service = PlotService()
+x = np.logspace(-1, 2, 20)
+y = 1e4 * (x / (1 + x**2))
+y_fit = y * 0.98
+data = RheoData(x=x, y=y, metadata={"test_mode": "oscillation"})
+fit_result = FitResult(
+    model_name="test_model",
+    parameters={},
+    chi_squared=0.1,
+    success=True,
+    message="converged",
+    timestamp=None,
+    dataset_id="dummy",
+    r_squared=0.99,
+    mpe=1.0,
+    fit_time=0.5,
+    num_iterations=10,
+    convergence_message="",
+    x_fit=x,
+    y_fit=y_fit,
+    residuals=y - y_fit,
+)
+fig = plot_service.create_fit_plot(
+    data, fit_result, style="default", test_mode="oscillation"
+)
+"""
+
+
 def _generate_fit_plot(path: Path) -> None:
-    """Generate a fit plot for testing."""
-    plot_service = PlotService()
-    x = np.logspace(-1, 2, 20)
-    y = 1e4 * (x / (1 + x**2))
-    y_fit = y * 0.98
-    data = RheoData(x=x, y=y, metadata={"test_mode": "oscillation"})
-    fit_result = FitResult(
-        model_name="test_model",
-        parameters={},
-        chi_squared=0.1,
-        success=True,
-        message="converged",
-        timestamp=None,
-        dataset_id="dummy",
-        r_squared=0.99,
-        mpe=1.0,
-        fit_time=0.5,
-        num_iterations=10,
-        convergence_message="",
-        x_fit=x,
-        y_fit=y_fit,
-        residuals=y - y_fit,
+    """Render the fit plot in an isolated subprocess and save it to ``path``."""
+    full_code = (
+        _FIT_PLOT_CODE
+        + f'\nfig.savefig({str(path)!r}, dpi=150)\n'
+        + 'print("RENDER_OK")\n'
     )
-    fig = plot_service.create_fit_plot(
-        data, fit_result, style="default", test_mode="oscillation"
+    result = run_gui_code_subprocess(full_code, timeout=30.0)
+    assert not result.crashed and "RENDER_OK" in result.stdout, (
+        f"Fit plot render failed in subprocess (rc={result.return_code}, "
+        f"signal={result.signal_name}):\nSTDOUT:\n{result.stdout}\n"
+        f"STDERR:\n{result.stderr}"
     )
-    try:
-        fig.savefig(path, dpi=150)
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real visual regressions.
-        matplotlib.pyplot.close(fig)
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    matplotlib.pyplot.close(fig)
 
 
 @pytest.mark.gui

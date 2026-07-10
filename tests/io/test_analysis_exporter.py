@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -173,15 +175,97 @@ class TestAnalysisExporter:
         transform_names = [e["transform_name"] for e in index["transforms"]]
         assert "_ExportTestTransform" in transform_names
 
-    def test_export_directory_with_figures(self, full_pipeline, tmp_path):
-        """Directory export saves figures."""
-        exporter = AnalysisExporter(figure_formats=("png",))
-        out = exporter.export_directory(full_pipeline, tmp_path / "export")
+    def test_export_directory_with_figures(self, tmp_path):
+        """Directory export saves figures.
 
-        fig_dir = out / "figures"
+        The figure creation + save runs in an isolated subprocess. This host's
+        matplotlib 3.11.0 / FreeType 2.14.3 glyph-rendering state reliably
+        corrupts after enough Figure churn in a single process (raster
+        overflow / std::bad_alloc on savefig's tight-bbox pass); a fresh
+        interpreter renders the identical figure correctly. _save_fig() swallows
+        the failure and only logs it, so an in-process run would silently
+        produce no PNG. Rendering in a subprocess makes the export real and the
+        assertions below meaningful.
+        """
+        export_dir = tmp_path / "export"
+        code = f"""
+import matplotlib
+matplotlib.use("Agg")
+import numpy as np
+
+from rheojax.core.base import BaseModel, BaseTransform
+from rheojax.core.data import RheoData
+from rheojax.core.jax_config import safe_import_jax
+from rheojax.io.analysis_exporter import AnalysisExporter
+from rheojax.pipeline import Pipeline
+
+_jax, jnp = safe_import_jax()
+
+
+class _ExportTestModel(BaseModel):
+    def __init__(self):
+        super().__init__()
+        self.parameters.add(name="amplitude", value=100.0, bounds=(0.1, 1e5))
+        self.parameters.add(name="decay", value=0.5, bounds=(0.01, 10))
+
+    def _fit(self, X, y, **kwargs):
+        self.parameters.set_value("amplitude", float(np.mean(np.abs(y))))
+        self.parameters.set_value("decay", 0.5)
+        return self
+
+    def _predict(self, X):
+        a = self.parameters.get_value("amplitude")
+        b = self.parameters.get_value("decay")
+        return a * np.exp(-b * X)
+
+    def model_function(self, X, params, test_mode=None, **kwargs):
+        return params[0] * jnp.exp(-params[1] * X)
+
+
+class _ExportTestTransform(BaseTransform):
+    def _transform(self, data):
+        return RheoData(
+            x=data.x,
+            y=data.y * 2.0,
+            x_units=data.x_units,
+            y_units=data.y_units,
+            domain=data.domain,
+            metadata={{**(data.metadata or {{}}), "transform": "export_test"}},
+        )
+
+
+np.random.seed(42)
+t = np.linspace(0.1, 10, 50)
+y = 100 * np.exp(-0.5 * t) + np.random.normal(0, 2, 50)
+data = RheoData(
+    x=t, y=y, x_units="s", y_units="Pa", domain="time",
+    metadata={{"test_mode": "relaxation"}},
+)
+
+p = Pipeline(data=data)
+p.transform(_ExportTestTransform())
+p.fit(_ExportTestModel())
+p.plot_fit(show_residuals=False, show_uncertainty=False)
+
+exporter = AnalysisExporter(figure_formats=("png",))
+exporter.export_directory(p, {str(export_dir)!r})
+print("EXPORT_OK")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            cwd=str(Path(__file__).parent.parent.parent),
+        )
+        assert result.returncode == 0 and "EXPORT_OK" in result.stdout, (
+            f"Figure export subprocess failed (rc={result.returncode}):\n"
+            f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+        fig_dir = export_dir / "figures"
         assert fig_dir.exists()
         assert (fig_dir / "last_plot.png").exists()
-        plt.close("all")
 
     def test_export_directory_npz_format(self, fitted_pipeline, tmp_path):
         """Directory export works with npz data format."""

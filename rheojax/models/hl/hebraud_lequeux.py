@@ -331,6 +331,17 @@ class HebraudLequeux(BaseModel):
             [0.40, -1.5, 1.5],  # alpha=0.40, tau=0.03, sigma_c=1.5
         ]
 
+        # Honor max_iter (like SGR's Nelder-Mead path): each PDE cost_fn eval
+        # runs len(gdot) scans of >=5000 steps, so the eval budget dominates
+        # runtime. A small max_iter (warm/quick fit) uses one start with a
+        # tight maxfev; the default full fit keeps 5 starts x 200 evals.
+        max_iter_kw = kwargs.get("max_iter")
+        if max_iter_kw is not None:
+            maxfev = max(int(max_iter_kw), 1)
+            starts = starts if maxfev >= 200 else starts[:1]
+        else:
+            maxfev = 200
+
         best_x = starts[0]
         best_cost = np.inf
         t0 = _time.time()
@@ -346,7 +357,7 @@ class HebraudLequeux(BaseModel):
                     method="Nelder-Mead",
                     callback=_callback,
                     options={
-                        "maxfev": 200,
+                        "maxfev": maxfev,
                         "xatol": 0.01,
                         "fatol": 0.002,
                         "adaptive": True,

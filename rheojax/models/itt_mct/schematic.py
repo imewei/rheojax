@@ -1087,17 +1087,25 @@ class ITTMCTSchematic(ITTMCTBase):
             atol=1e-8,
         )
 
-        # Extract stress
-        sigma = sol.y[-1, :]
-
-        # R10-SCH-002: remove the np.maximum clamp for the glass state.
-        # The ODE already captures the non-ergodic plateau through the initial
-        # condition state0[0] = h(γ_pre) and the Volterra memory kernel. Applying
-        # sigma = np.maximum(sigma, sigma_residual) was double-applying the glass
-        # contribution AND suppressing the physical β-relaxation dip (the transient
-        # below the long-time plateau) which is a key MCT signature in glass states.
-        # The ODE naturally converges to the correct long-time plateau via the
-        # non-ergodic correlator.
+        # Stress relaxation modulus: σ(t) = G_∞ γ_pre Φ(t)²  (Fuchs & Cates 2002).
+        # Compute σ algebraically from the integrated correlator Φ = sol.y[0]
+        # rather than reading the separately-integrated stress state sol.y[-1].
+        #
+        # Carrying σ as its own ODE state via dσ/dt = G_∞ γ_pre · 2Φ Φ̇ lets the
+        # stress accumulate round-off independently of Φ, so it drifts to small
+        # *negative* values once Φ → 0 at long times (observed σ(1000) ≈ -9e-3
+        # for the fluid). That is unphysical: σ = G_∞ γ_pre Φ² ≥ 0 by
+        # construction. The algebraic form is exact, strictly non-negative and
+        # drift-free, and still recovers the IC σ(0) = G_∞ γ_pre h(γ_pre)²
+        # because Φ(0) = h(γ_pre).
+        #
+        # Note: this schematic (finite-τ Prony) correlator does not sustain a
+        # hard non-ergodic plateau — Φ decays slowly rather than freezing at
+        # f_neq — so the glass "residual" is a slow decay, not a true plateau.
+        # That is the model's accepted design (cf. test_glass_plateau_modulus,
+        # which relaxes its plateau tolerance for the same reason).
+        phi = np.clip(sol.y[0, :], 0.0, 1.0)
+        sigma = G_inf * gamma_pre * phi * phi
 
         return sigma
 

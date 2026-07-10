@@ -7,6 +7,10 @@ and JAX array compatibility.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import matplotlib
 
 matplotlib.use("Agg")  # Non-interactive backend for testing
@@ -24,6 +28,32 @@ from rheojax.visualization.spp_plots import (
     plot_moduli_evolution,
     plot_pipkin_diagram,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _run_save_subprocess(body: str, timeout: float = 60.0) -> None:
+    """Render and save a matplotlib figure in a fresh interpreter.
+
+    This host's matplotlib 3.11 / FreeType 2.14 text-metrics state becomes
+    corrupted after enough Figure churn within one process, producing either a
+    bogus huge tight-bbox (-> MemoryError / "image too large") or a raw
+    FT_Render_Glyph raster overflow. A fresh process renders correctly; see
+    tests/gui/test_visual_regression.py for the full root-cause writeup. `body`
+    must save the figure and print "SAVE_OK".
+    """
+    code = "import matplotlib\nmatplotlib.use('Agg')\nimport numpy as np\n" + body
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=str(_REPO_ROOT),
+    )
+    assert result.returncode == 0 and "SAVE_OK" in result.stdout, (
+        f"Figure save failed in subprocess (rc={result.returncode}):\n"
+        f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    )
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -521,19 +551,23 @@ class TestCreateSPPReport:
 
     def test_save_to_file(self, laos_signals, spp_results, tmp_path):
         """Report can be saved to disk."""
-        save_path = str(tmp_path / "spp_report.png")
-        fig = create_spp_report(
-            spp_results,
-            laos_signals["strain"],
-            laos_signals["stress"],
-            omega=laos_signals["omega"],
-            gamma_0=laos_signals["gamma_0"],
-            save_path=save_path,
+        save_path = tmp_path / "spp_report.png"
+        results_literal = {k: np.asarray(v).tolist() for k, v in spp_results.items()}
+        _run_save_subprocess(
+            "from rheojax.visualization.spp_plots import create_spp_report\n"
+            f"spp_results = {{k: np.array(v) for k, v in {results_literal!r}.items()}}\n"
+            f"strain = np.array({laos_signals['strain'].tolist()!r})\n"
+            f"stress = np.array({laos_signals['stress'].tolist()!r})\n"
+            "create_spp_report(\n"
+            "    spp_results, strain, stress,\n"
+            f"    omega={laos_signals['omega']!r}, gamma_0={laos_signals['gamma_0']!r},\n"
+            f"    save_path={str(save_path)!r},\n"
+            ")\n"
+            "print('SAVE_OK')\n"
         )
-        assert fig is not None
-        assert (tmp_path / "spp_report.png").exists()
-        assert (tmp_path / "spp_report.png").stat().st_size > 0
-        plt.close(fig)
+
+        assert save_path.exists()
+        assert save_path.stat().st_size > 0
 
 
 # ---------------------------------------------------------------------------

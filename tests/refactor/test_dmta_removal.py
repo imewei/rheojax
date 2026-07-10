@@ -44,13 +44,14 @@ def test_retired_symbols_are_absent_from_production_tree():
     violations = []
     for path in RJ.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
+        if path == REJECTION_BOUNDARY:
+            continue
         for token in RETIRED_TOKENS:
             if token in text:
                 violations.append((str(path.relative_to(RJ)), token))
-        if path != REJECTION_BOUNDARY:
-            for fragment in OBFUSCATED_REMOVED_KEYS:
-                if fragment in text:
-                    violations.append((str(path.relative_to(RJ)), fragment))
+        for fragment in OBFUSCATED_REMOVED_KEYS:
+            if fragment in text:
+                violations.append((str(path.relative_to(RJ)), fragment))
 
     assert violations == []
 

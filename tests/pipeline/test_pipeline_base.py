@@ -432,3 +432,456 @@ class TestPipelineFitBayesian:
         mock_model.fit_bayesian.assert_called_once()
         _, kwargs = mock_model.fit_bayesian.call_args
         assert "warm_start" not in kwargs
+
+
+# ---------------------------------------------------------------------------
+# Helper models/transforms for the extended coverage tests below
+# ---------------------------------------------------------------------------
+
+
+class ScoreRaisingModel(MockModel):
+    """Fits fine, but score() raises to exercise the NaN fallback."""
+
+    def score(self, X, y):
+        raise RuntimeError("score boom")
+
+
+class FitRaisingModel(MockModel):
+    """_fit raises to exercise fit()'s error-handling branch."""
+
+    def _fit(self, X, y, **kwargs):
+        raise RuntimeError("fit boom")
+
+
+class TupleTransform(BaseTransform):
+    """Returns a (data, extra) tuple so Pipeline unwraps result[0]."""
+
+    def _transform(self, data):
+        return (data * 2.0, {"note": "extra"})
+
+
+class RaisingTransform(BaseTransform):
+    """_transform raises to exercise transform()'s error branch."""
+
+    def _transform(self, data):
+        raise RuntimeError("transform boom")
+
+
+class TestPipelineLoadFormats:
+    """Exercise the format-specific loading branches."""
+
+    def test_load_unknown_format_raises(self, temp_csv_file):
+        pipeline = Pipeline()
+        with pytest.raises(ValueError, match="Unknown format"):
+            pipeline.load(temp_csv_file, format="bogus")
+
+    def test_load_excel_branch(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline()
+        with patch("rheojax.io.load_excel", return_value=sample_data) as m:
+            pipeline.load("dummy.xlsx", format="excel")
+        m.assert_called_once()
+        assert pipeline.data is sample_data
+
+    def test_load_hdf5_branch(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline()
+        with patch("rheojax.io.load_hdf5", return_value=sample_data) as m:
+            pipeline.load("dummy.hdf5", format="hdf5")
+        m.assert_called_once()
+
+    def test_load_npz_branch(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline()
+        with patch(
+            "rheojax.io.writers.npz_writer.load_npz", return_value=sample_data
+        ) as m:
+            pipeline.load("dummy.npz", format="npz")
+        m.assert_called_once()
+
+    def test_load_trios_single_segment(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline()
+        with patch("rheojax.io.load_trios", return_value=[sample_data]):
+            pipeline.load("dummy.txt", format="trios")
+        assert pipeline.data is sample_data
+
+    def test_load_trios_multiple_segments_warns(self, sample_data):
+        from unittest.mock import patch
+
+        seg2 = RheoData(
+            x=sample_data.x, y=sample_data.y * 2, domain="time", validate=False
+        )
+        pipeline = Pipeline()
+        with patch("rheojax.io.load_trios", return_value=[sample_data, seg2]):
+            with pytest.warns(UserWarning, match="Using first segment"):
+                pipeline.load("dummy.txt", format="trios")
+        assert pipeline.data is sample_data
+
+    def test_load_attaches_test_mode(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline()
+        with patch("rheojax.io.load_excel", return_value=sample_data):
+            pipeline.load("dummy.xlsx", format="excel", test_mode="relaxation")
+        assert pipeline.data.metadata["test_mode"] == "relaxation"
+
+
+class TestPipelineTransformBranches:
+    """Cover transform edge cases and error handling."""
+
+    def test_transform_no_x_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.data.x = None
+        with pytest.raises(ValueError, match="no x values"):
+            pipeline.transform("mock_transform")
+
+    def test_transform_tuple_result_unwrapped(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        original_y = sample_data.y.copy()
+        pipeline.transform(TupleTransform())
+        assert np.allclose(pipeline.data.y, original_y * 2.0)
+
+    def test_transform_error_propagates(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(RuntimeError, match="transform boom"):
+            pipeline.transform(RaisingTransform())
+
+
+class TestPipelineFitBranches:
+    """Cover fit() score-fallback and error branches."""
+
+    def test_fit_score_failure_records_nan(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit(ScoreRaisingModel())
+        # History stores (op, name, score); score should be NaN
+        assert np.isnan(pipeline.history[-1][2])
+
+    def test_fit_error_propagates(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(RuntimeError, match="fit boom"):
+            pipeline.fit(FitRaisingModel())
+
+
+class TestPipelinePredictBranches:
+    """Cover predict() guard clauses and jax conversion."""
+
+    def test_predict_no_data_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        pipeline.data = None
+        with pytest.raises(ValueError, match="No data available"):
+            pipeline.predict()
+
+    def test_predict_no_x_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        pipeline.data.x = None
+        with pytest.raises(ValueError, match="No data available"):
+            pipeline.predict()
+
+    def test_predict_jax_array_input(self, sample_data):
+        import jax.numpy as jnp
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        preds = pipeline.predict(X=jnp.asarray(sample_data.x))
+        assert len(preds.x) == len(sample_data.x)
+
+
+class TestPipelineSaveBranches:
+    """Cover save() Excel/CSV branches and error handling."""
+
+    def test_save_excel_with_fitted_model(self, sample_data):
+        from unittest.mock import patch
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        with patch("rheojax.io.save_excel") as m:
+            pipeline.save("out.xlsx", format="excel")
+        m.assert_called_once()
+        payload = m.call_args[0][0]
+        assert "parameters" in payload
+        assert payload["parameters"]["model"] == "MockModel"
+        # Fitted params were also stamped into data metadata (hdf5 path)
+        assert pipeline.data.metadata["fitted_model"] == "MockModel"
+
+    def test_save_csv_real(self, sample_data):
+        import tempfile
+
+        pipeline = Pipeline(data=sample_data)
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            path = f.name
+        try:
+            pipeline.save(path, format="csv")
+            import pandas as pd
+
+            df = pd.read_csv(path)
+            assert list(df.columns) == ["x", "y"]
+            assert len(df) == len(sample_data.x)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_save_csv_complex_y(self, sample_data):
+        import tempfile
+
+        cdata = RheoData(
+            x=sample_data.x,
+            y=sample_data.y + 1j * sample_data.y,
+            domain="time",
+            validate=False,
+        )
+        pipeline = Pipeline(data=cdata)
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            path = f.name
+        try:
+            pipeline.save(path, format="csv")
+            import pandas as pd
+
+            df = pd.read_csv(path)
+            assert set(df.columns) == {"x", "y_real", "y_imag"}
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_save_csv_2d_y(self, sample_data):
+        import tempfile
+
+        y2d = np.column_stack([sample_data.y, sample_data.y * 2])
+        data2d = RheoData(x=sample_data.x, y=y2d, domain="time", validate=False)
+        pipeline = Pipeline(data=data2d)
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            path = f.name
+        try:
+            pipeline.save(path, format="csv")
+            import pandas as pd
+
+            df = pd.read_csv(path)
+            assert set(df.columns) == {"x", "y_0", "y_1"}
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_save_unknown_format_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(ValueError, match="Unknown format"):
+            pipeline.save("out.bogus", format="bogus")
+
+
+class TestPipelineSaveFigure:
+    """Cover save_figure()."""
+
+    def test_save_figure_without_plot_raises(self):
+        pipeline = Pipeline()
+        with pytest.raises(ValueError, match="No figure to save"):
+            pipeline.save_figure("out.pdf")
+
+    def test_save_figure_delegates(self, sample_data):
+        from unittest.mock import MagicMock, patch
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline._current_figure = MagicMock()
+        with patch("rheojax.visualization.plotter.save_figure") as m:
+            pipeline.save_figure("out.pdf")
+        m.assert_called_once()
+        assert pipeline.history[-1][0] == "save_figure"
+
+
+class TestPipelineFitBayesianBranches:
+    """Cover fit_bayesian model resolution, warm-start, and errors."""
+
+    def test_no_model_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(ValueError, match="No model available"):
+            pipeline.fit_bayesian()
+
+    def test_model_string_resolution(self, sample_data):
+        from unittest.mock import MagicMock, patch
+
+        fake = MockModel()
+        fake.fit_bayesian = MagicMock(return_value=MagicMock())
+        pipeline = Pipeline(data=sample_data)
+        with patch.object(ModelRegistry, "create", return_value=fake) as create:
+            pipeline.fit_bayesian(model="mock_model", seed=1)
+        create.assert_called_once_with("mock_model")
+        fake.fit_bayesian.assert_called_once()
+
+    def test_warm_start_false_builds_midpoints_and_jax(self):
+        from unittest.mock import MagicMock
+
+        import jax.numpy as jnp
+
+        data = RheoData(
+            x=jnp.asarray(np.linspace(0.1, 5, 20)),
+            y=jnp.asarray(np.linspace(1.0, 2.0, 20)),
+            domain="time",
+            validate=False,
+        )
+        pipeline = Pipeline(data=data)
+        model = MockModel()
+        model.fit_bayesian = MagicMock(return_value=MagicMock())
+        pipeline._last_model = model
+
+        pipeline.fit_bayesian(warm_start=False, seed=3)
+
+        _, kwargs = model.fit_bayesian.call_args
+        assert "initial_values" in kwargs
+        # MockModel bounds are (0, 10) → arithmetic midpoint 5.0
+        assert kwargs["initial_values"]["a"] == pytest.approx(5.0)
+
+    def test_fit_bayesian_error_propagates(self, sample_data):
+        from unittest.mock import MagicMock
+
+        pipeline = Pipeline(data=sample_data)
+        model = MockModel()
+        model.fit_bayesian = MagicMock(side_effect=RuntimeError("nuts boom"))
+        pipeline._last_model = model
+        with pytest.raises(RuntimeError, match="nuts boom"):
+            pipeline.fit_bayesian(seed=1)
+
+
+class TestPipelineBayesianPlots:
+    """Cover plot_bayesian / plot_diagnostics with the plotter mocked out."""
+
+    def test_plot_bayesian_no_result_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(ValueError, match="No Bayesian result"):
+            pipeline.plot_bayesian(show=False)
+
+    def test_plot_bayesian_delegates(self, sample_data):
+        from unittest.mock import MagicMock, patch
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        pipeline._last_bayesian_result = MagicMock()
+
+        fake_plotter = MagicMock()
+        fake_plotter.plot_bayesian.return_value = (MagicMock(), None)
+        with patch(
+            "rheojax.visualization.fit_plotter.FitPlotter",
+            return_value=fake_plotter,
+        ):
+            pipeline.plot_bayesian(show=False, show_nlsq_overlay=True)
+        fake_plotter.plot_bayesian.assert_called_once()
+        assert pipeline.history[-1][0] == "plot_bayesian"
+
+    def test_plot_diagnostics_no_result_raises(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        with pytest.raises(ValueError, match="No Bayesian result"):
+            pipeline.plot_diagnostics()
+
+    def test_plot_diagnostics_delegates(self, sample_data):
+        from unittest.mock import MagicMock, patch
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline._last_bayesian_result = MagicMock()
+
+        fake_fig = MagicMock()  # has savefig -> becomes _current_figure
+        with patch(
+            "rheojax.visualization.fit_plotter.generate_diagnostic_suite",
+            return_value={"trace": fake_fig},
+        ) as gen:
+            pipeline.plot_diagnostics(output_dir=None)
+        gen.assert_called_once()
+        assert pipeline._current_figure is fake_fig
+        assert pipeline.history[-1][0] == "plot_diagnostics"
+
+
+class TestPipelineGetFittedParameters:
+    """Cover get_fitted_parameters."""
+
+    def test_no_model_raises(self):
+        pipeline = Pipeline()
+        with pytest.raises(ValueError, match="No model fitted"):
+            pipeline.get_fitted_parameters()
+
+    def test_returns_param_dict(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        params = pipeline.get_fitted_parameters()
+        assert set(params.keys()) == {"a", "b"}
+        assert all(isinstance(v, float) for v in params.values())
+
+    def test_none_value_raises(self):
+        from unittest.mock import MagicMock
+
+        pipeline = Pipeline()
+        fake = MagicMock()
+        fake.parameters.keys.return_value = ["a"]
+        fake.parameters.get_value.return_value = None
+        pipeline._last_model = fake
+        with pytest.raises(ValueError, match="has no fitted value"):
+            pipeline.get_fitted_parameters()
+
+
+class TestPipelineCompareModels:
+    """Cover compare_models."""
+
+    def test_no_data_raises(self):
+        pipeline = Pipeline()
+        with pytest.raises(ValueError, match="No data loaded"):
+            pipeline.compare_models(["mock_model"])
+
+    def test_best_model_attached(self, sample_data):
+        from unittest.mock import patch
+
+        best = MockModel()
+
+        class _R:
+            model_name = "mock_model"
+            _fitted_model = best
+
+        class _Cmp:
+            best_model = "mock_model"
+            results = [_R()]
+
+        pipeline = Pipeline(data=sample_data)
+        pipeline.data.metadata["test_mode"] = "relaxation"
+        with patch(
+            "rheojax.utils.model_selection.compare_models", return_value=_Cmp()
+        ) as cmp:
+            pipeline.compare_models(["mock_model", "mock_model"])
+        cmp.assert_called_once()
+        # test_mode propagated from metadata into the call
+        assert cmp.call_args.kwargs["test_mode"] == "relaxation"
+        assert pipeline._last_model is best
+        assert pipeline.steps[-1][0] == "compare_models"
+
+    def test_best_model_missing_fitted_warns(self, sample_data):
+        from unittest.mock import patch
+
+        class _R:
+            model_name = "mock_model"
+            _fitted_model = None
+
+        class _Cmp:
+            best_model = "mock_model"
+            results = [_R()]
+
+        pipeline = Pipeline(data=sample_data)
+        with patch(
+            "rheojax.utils.model_selection.compare_models", return_value=_Cmp()
+        ):
+            pipeline.compare_models(["mock_model"])
+        # No fitted model attached → _last_model stays None
+        assert pipeline._last_model is None
+        assert pipeline._last_comparison is not None
+
+
+class TestPipelinePlotPrediction:
+    """Cover plot() with prediction overlay (renders a real figure)."""
+
+    def test_plot_with_prediction_overlay(self, sample_data):
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+        try:
+            pipeline.plot(show=False, include_prediction=True)
+        except (RuntimeError, MemoryError) as exc:
+            pytest.skip(f"matplotlib render unavailable: {exc}")
+        assert pipeline._current_figure is not None
+        assert pipeline.history[-1][0] == "plot"

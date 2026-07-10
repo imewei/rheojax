@@ -495,3 +495,339 @@ class TestFluidityNonlocalFitting:
 
         # Grid should be restored after fitting
         assert model.N_y == original_N_y
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalConstruction:
+    """Construction guards and error paths."""
+
+    def test_invalid_grid_size_raises(self):
+        """FL-011: N_y < 2 must raise (ZeroDivisionError guard on dy)."""
+        with pytest.raises(ValueError, match="N_y must be >= 2"):
+            FluidityNonlocal(N_y=1)
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalFitDispatch:
+    """Cover the _fit() test_mode dispatch and its error branches.
+
+    These call _fit directly (bypassing the orchestrator) to exercise the
+    dispatch table and the individual _fit_* method bodies with minimal grids.
+    """
+
+    def test_fit_requires_test_mode(self):
+        """_fit with no test_mode kwarg and no _test_mode attribute raises."""
+        model = FluidityNonlocal(N_y=6)
+        # Ensure no lingering canonical mode
+        if hasattr(model, "_test_mode"):
+            del model._test_mode
+        gamma_dot = np.logspace(-1, 1, 6)
+        sigma = 500.0 + 100.0 * gamma_dot**0.5
+        with pytest.raises(ValueError, match="test_mode must be specified"):
+            model._fit(gamma_dot, sigma)
+
+    def test_fit_uses_instance_test_mode(self):
+        """_fit falls back to self._test_mode when kwarg omitted (line 205)."""
+        model = FluidityNonlocal(N_y=6)
+        model._test_mode = "flow_curve"
+        gamma_dot = np.logspace(-1, 1, 6)
+        sigma = 500.0 + 100.0 * gamma_dot**0.5
+        model._fit(gamma_dot, sigma, max_iter=1)
+        assert model.fitted_
+
+    def test_fit_saos_alias_normalized(self):
+        """test_mode='saos' is normalized to 'oscillation' (line 211)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 12)
+        G_star = model._predict_saos_jit(
+            jnp.asarray(omega), 1000.0, 1e-3
+        )
+        G_star = np.array(G_star)
+        complex_gstar = G_star[:, 0] + 1j * G_star[:, 1]
+        model._fit(omega, complex_gstar, test_mode="saos", max_iter=3)
+        assert model._test_mode == "oscillation"
+        assert model.fitted_
+
+    def test_fit_unsupported_mode_raises(self):
+        """Unknown test_mode raises in the dispatch (line 231)."""
+        model = FluidityNonlocal(N_y=6)
+        X = np.linspace(0.01, 1, 6)
+        y = np.linspace(1, 10, 6)
+        with pytest.raises(ValueError, match="Unsupported test_mode"):
+            model._fit(X, y, test_mode="not_a_mode")
+
+    def test_fit_startup_requires_gamma_dot(self):
+        """startup mode without gamma_dot raises (line 410)."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.01, 1, 6)
+        sigma = np.linspace(1, 100, 6)
+        with pytest.raises(ValueError, match="startup mode requires gamma_dot"):
+            model._fit(t, sigma, test_mode="startup", max_iter=1)
+
+    def test_fit_creep_requires_sigma_applied(self):
+        """creep mode without sigma_applied raises (line 412)."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.01, 1, 6)
+        gamma = np.linspace(0, 1, 6)
+        with pytest.raises(ValueError, match="creep mode requires sigma_applied"):
+            model._fit(t, gamma, test_mode="creep", max_iter=1)
+
+    def test_fit_startup_runs(self):
+        """Startup transient fit executes end-to-end on a tiny grid."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.01, 1.0, 6)
+        sigma = np.linspace(5.0, 200.0, 6)
+        model._fit(t, sigma, test_mode="startup", gamma_dot=1.0, max_iter=1)
+        assert model.fitted_
+
+    def test_fit_relaxation_runs(self):
+        """Relaxation transient fit executes end-to-end on a tiny grid."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.01, 5.0, 6)
+        sigma = np.linspace(500.0, 100.0, 6)
+        model._fit(t, sigma, test_mode="relaxation", sigma_0=800.0, max_iter=1)
+        assert model.fitted_
+
+    def test_fit_creep_runs(self):
+        """Creep transient fit executes end-to-end on a tiny grid."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.01, 2.0, 6)
+        gamma = np.linspace(0.0, 0.5, 6)
+        model._fit(t, gamma, test_mode="creep", sigma_applied=1000.0, max_iter=1)
+        assert model.fitted_
+
+    def test_fit_laos_runs(self):
+        """LAOS PDE fit executes end-to-end on a tiny grid."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.0, 4.0, 8)
+        sigma = np.sin(t)
+        model._fit(t, sigma, test_mode="laos", gamma_0=0.1, omega=1.0, max_iter=1)
+        assert model.fitted_
+
+    def test_fit_laos_requires_gamma_0_omega(self):
+        """LAOS fit without gamma_0/omega raises (line 821)."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.0, 4.0, 8)
+        sigma = np.sin(t)
+        with pytest.raises(ValueError, match="LAOS fitting requires"):
+            model._fit(t, sigma, test_mode="laos", max_iter=1)
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalOscillationFit:
+    """Direct tests for SAOS fitting and the data-driven seed."""
+
+    def test_fit_oscillation_2d_input(self):
+        """SAOS fit accepts a real (M, 2) [G', G''] array (lines 682-685)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 12)
+        G_star = np.array(model._predict_saos_jit(jnp.asarray(omega), 1000.0, 1e-3))
+        model._fit_oscillation(omega, G_star, max_iter=3)
+        assert model.parameters.get_value("G") > 0
+        assert model.parameters.get_value("f_eq") > 0
+
+    def test_fit_oscillation_bad_shape_raises(self):
+        """SAOS fit rejects malformed G_star (line 687)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 12)
+        bad = np.ones((12, 3))
+        with pytest.raises(ValueError, match="G_star must be complex or"):
+            model._fit_oscillation(omega, bad)
+
+    def test_seed_saos_short_data_returns(self):
+        """_seed_saos_from_data early-returns for <2 points (line 747)."""
+        model = FluidityNonlocal()
+        g_before = model.parameters.get_value("G")
+        model._seed_saos_from_data(
+            np.array([1.0]), np.array([10.0]), np.array([1.0])
+        )
+        # No mutation on the early-return path
+        assert model.parameters.get_value("G") == g_before
+
+    def test_seed_saos_crossover_path(self):
+        """Crossover in G'/G'' drives the interpolated tau seed (lines 758-766)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 30)
+        # Maxwell G*, crossover at omega*tau=1 (tau=1 here) inside the range
+        G_star = np.array(model._predict_saos_jit(jnp.asarray(omega), 1000.0, 1e-3))
+        model._seed_saos_from_data(omega, G_star[:, 0], G_star[:, 1])
+        # Seeds must land inside their bounds and be finite
+        assert np.isfinite(model.parameters.get_value("G"))
+        assert np.isfinite(model.parameters.get_value("f_eq"))
+
+    def test_seed_saos_peak_fallback_path(self):
+        """No crossover falls back to the G'' peak location (lines 767-769)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 20)
+        # G' always dominates G'' -> no sign change in log(G')-log(G'')
+        G_prime = np.full_like(omega, 100.0)
+        G_dp = 1.0 + np.exp(-((np.log(omega)) ** 2))  # single peak, always < G'
+        model._seed_saos_from_data(omega, G_prime, G_dp)
+        assert np.isfinite(model.parameters.get_value("G"))
+        assert np.isfinite(model.parameters.get_value("f_eq"))
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalPredictErrors:
+    """Prediction-path error branches and mode routing."""
+
+    def test_predict_transient_no_mode_raises(self):
+        """_predict_transient with no mode raises (line 573)."""
+        model = FluidityNonlocal(N_y=6)
+        model._test_mode = None
+        with pytest.raises(ValueError, match="Test mode not specified"):
+            model._predict_transient(np.linspace(0.01, 1, 5))
+
+    def test_predict_no_mode_raises(self):
+        """_predict without any test_mode raises (line 1087)."""
+        model = FluidityNonlocal(N_y=6)
+        if hasattr(model, "_test_mode"):
+            del model._test_mode
+        with pytest.raises(ValueError, match="test_mode must be specified"):
+            model._predict(np.linspace(0.01, 1, 5))
+
+    def test_predict_saos_alias(self):
+        """_predict normalizes 'saos' to oscillation and returns complex (line 1091)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 10)
+        result = model._predict(omega, test_mode="saos")
+        assert np.iscomplexobj(result)
+        assert result.shape == omega.shape
+
+    def test_predict_laos_runs(self):
+        """_predict routes LAOS through the PDE and returns stress (lines 1132-1135)."""
+        model = FluidityNonlocal(N_y=6)
+        period = 2.0 * np.pi
+        t = np.linspace(0.0, 2 * period, 12)
+        result = model._predict(t, test_mode="laos", gamma_0=0.1, omega=1.0)
+        assert result.shape == t.shape
+        assert np.all(np.isfinite(result))
+
+    def test_predict_laos_requires_gamma_0_omega(self):
+        """_predict LAOS without gamma_0/omega raises (line 1131)."""
+        model = FluidityNonlocal(N_y=6)
+        model._gamma_0 = None
+        model._omega_laos = None
+        t = np.linspace(0.0, 1.0, 6)
+        with pytest.raises(ValueError, match="LAOS prediction requires"):
+            model._predict(t, test_mode="laos")
+
+    def test_predict_unknown_mode_returns_zeros(self):
+        """_predict fallthrough returns zeros for an unhandled mode (line 1137)."""
+        model = FluidityNonlocal(N_y=6)
+        X = np.linspace(0.01, 1, 6)
+        result = model._predict(X, test_mode="totally_unknown")
+        np.testing.assert_array_equal(result, np.zeros_like(X))
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalModelFunctionDefaults:
+    """model_function mode-default and fallthrough branches."""
+
+    def test_model_function_defaults_to_oscillation(self):
+        """mode=None defaults to oscillation (lines 1012-1013)."""
+        model = FluidityNonlocal()
+        model._test_mode = None
+        omega = np.logspace(-1, 2, 8)
+        params = list(model.parameters.get_values())
+        result = model.model_function(omega, params)
+        assert result.shape == (len(omega), 2)
+
+    def test_model_function_saos_alias(self):
+        """model_function normalizes 'saos' (lines 1016-1017)."""
+        model = FluidityNonlocal()
+        omega = np.logspace(-1, 2, 8)
+        params = list(model.parameters.get_values())
+        result = model.model_function(omega, params, test_mode="saos")
+        assert result.shape == (len(omega), 2)
+
+    def test_model_function_unknown_mode_returns_zeros(self):
+        """Unhandled mode falls through to zeros (line 1070)."""
+        model = FluidityNonlocal()
+        X = np.logspace(-1, 2, 8)
+        params = list(model.parameters.get_values())
+        result = model.model_function(X, params, test_mode="mystery")
+        np.testing.assert_array_equal(np.array(result), np.zeros_like(X))
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalShearBandingDefaults:
+    """Shear-banding accessors using the stored trajectory (default f_field)."""
+
+    def _run_sim(self, model):
+        t = np.linspace(0.0, 1.0, 10)
+        model._simulate_pde(
+            jnp.asarray(t),
+            model.get_parameter_dict(),
+            mode="startup",
+            gamma_dot=1.0,
+            sigma_applied=None,
+            sigma_0=None,
+        )
+
+    def test_get_fluidity_profile_no_trajectory_raises(self):
+        """Accessing a profile before any sim raises (line 606)."""
+        model = FluidityNonlocal(N_y=8)
+        with pytest.raises(ValueError, match="No trajectory available"):
+            model.get_fluidity_profile()
+
+    def test_shear_banding_metric_default_field(self):
+        """CV metric uses the stored final field when f_field is None (line 622)."""
+        model = FluidityNonlocal(N_y=8)
+        self._run_sim(model)
+        cv = model.get_shear_banding_metric()
+        assert np.isfinite(cv)
+        assert cv >= 0.0
+
+    def test_banding_ratio_default_field(self):
+        """Banding ratio uses the stored final field when f_field is None (line 638)."""
+        model = FluidityNonlocal(N_y=8)
+        self._run_sim(model)
+        ratio = model.get_banding_ratio()
+        assert np.isfinite(ratio)
+        assert ratio >= 1.0
+
+
+@pytest.mark.unit
+class TestFluidityNonlocalLaosInternals:
+    """LAOS internal init-condition handling and tracing-store branch."""
+
+    def test_laos_f_init_interpolation(self):
+        """f_init of a different length is interpolated onto the grid (lines 906-912)."""
+        model = FluidityNonlocal(N_y=16)
+        # Provide a coarse seed profile that must be resampled to N_y=16
+        f_init = np.linspace(1e-5, 1e-3, 8)
+        strain, stress = model.simulate_laos(
+            gamma_0=0.1, omega=1.0, n_cycles=1, n_points_per_cycle=32, f_init=f_init
+        )
+        assert np.all(np.isfinite(stress))
+        assert model._f_field_trajectory.shape[1] == 16
+
+    def test_laos_f_init_matching_length(self):
+        """f_init matching N_y is used directly, no interpolation (line 913)."""
+        model = FluidityNonlocal(N_y=16)
+        f_init = np.full(16, 1e-4)
+        strain, stress = model.simulate_laos(
+            gamma_0=0.1, omega=1.0, n_cycles=1, n_points_per_cycle=32, f_init=f_init
+        )
+        assert np.all(np.isfinite(stress))
+
+    def test_laos_trajectory_store_skipped_under_trace(self):
+        """FL-008: storing the field is skipped under JIT tracing (lines 959-961)."""
+        model = FluidityNonlocal(N_y=6)
+        t = np.linspace(0.0, 2.0, 8)
+        t_jax = jnp.asarray(t)
+        p = model.get_parameter_dict()
+
+        def run(scale):
+            # Route a tracer through the params so sol.ys is a tracer,
+            # forcing the np.asarray(...) store to raise and be caught.
+            p2 = {**p, "G": p["G"] * scale}
+            _, stress = model._simulate_laos_internal(
+                t_jax, p2, 0.1, 1.0, N_y=6, dy=model.gap_width / 5
+            )
+            return jnp.sum(stress)
+
+        # Should complete without raising; the trajectory-store is swallowed.
+        out = jax.jit(run)(1.0)
+        assert np.isfinite(float(out))
