@@ -336,6 +336,11 @@ class FluidityNonlocal(FluidityBase):
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         stress_jax = jnp.asarray(stress, dtype=jnp.float64)
 
+        # Data-driven initialization for the HB parameters.
+        # Without this, the optimizer terminates after one step from
+        # generic defaults that are orders-of-magnitude away from data.
+        self._init_hb_from_data(gamma_dot, stress)
+
         def model_fn(x_data, params):
             p_map = dict(zip(self.parameters.keys(), params, strict=True))
             return fluidity_nonlocal_steady_state(

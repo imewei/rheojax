@@ -537,6 +537,30 @@ class SPPYieldStress(BaseModel):
         sigma = sigma_dy + eta_inf * jnp.power(abs_rate, n_power_law)
         return sigma
 
+    def fit_bayesian(self, X, y=None, **kwargs):
+        """Perform Bayesian inference, honoring the documented ``yield_type`` kwarg.
+
+        ``yield_type`` selects which branch ``model_function`` predicts
+        ('static' vs 'dynamic') but is not a NUTS sampler argument, so it is
+        intercepted here (mirroring how ``_fit`` consumes it) instead of being
+        forwarded to ``NUTS(...)`` where it would raise a ``TypeError``.
+
+        Parameters
+        ----------
+        X, y : see ``BaseModel.fit_bayesian``
+        **kwargs : dict
+            Forwarded to ``BaseModel.fit_bayesian``; ``yield_type`` ('static'
+            or 'dynamic'), if present, is consumed here instead.
+        """
+        yield_type = kwargs.pop("yield_type", None)
+        if yield_type is not None:
+            if yield_type not in ("static", "dynamic"):
+                raise ValueError(
+                    f"yield_type must be 'static' or 'dynamic', got '{yield_type}'"
+                )
+            self._yield_type = yield_type
+        return super().fit_bayesian(X, y, **kwargs)
+
     def bayesian_prior_factory(
         self, name: str, lower: float | None, upper: float | None
     ) -> dist.Distribution | None:
@@ -650,6 +674,7 @@ class SPPYieldStress(BaseModel):
             - gamma_0: strain amplitudes
             - sigma_sy: static yield stresses (if requested)
             - sigma_dy: dynamic yield stresses (if requested)
+            - sigma_max: cage-breaking stress, G_cage * gamma_0 + eta_inf * omega * gamma_0
         """
         gamma_0_jax = jnp.asarray(gamma_0_array, dtype=jnp.float64)
 
@@ -657,6 +682,8 @@ class SPPYieldStress(BaseModel):
         sigma_sy_exp = self.parameters.get_value("sigma_sy_exp")
         sigma_dy_scale = self.parameters.get_value("sigma_dy_scale")
         sigma_dy_exp = self.parameters.get_value("sigma_dy_exp")
+        G_cage = self.parameters.get_value("G_cage")
+        eta_inf = self.parameters.get_value("eta_inf")
 
         result = {"gamma_0": gamma_0_array}
 
@@ -667,6 +694,11 @@ class SPPYieldStress(BaseModel):
         if yield_type in ("dynamic", "both"):
             sigma_dy = sigma_dy_scale * jnp.power(jnp.abs(gamma_0_jax), sigma_dy_exp)
             result["sigma_dy"] = np.array(sigma_dy)
+
+        # Cage-breaking stress (class docstring's Constitutive Equations, OSCILLATION):
+        # sigma_max(gamma_0) = G_cage * gamma_0 + eta_inf * omega * gamma_0
+        sigma_max = G_cage * gamma_0_jax + eta_inf * omega * gamma_0_jax
+        result["sigma_max"] = np.array(sigma_max)
 
         return result
 

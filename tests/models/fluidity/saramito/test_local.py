@@ -499,6 +499,37 @@ class TestNormalStressPredictions:
         # N2 should be zero for UCM
         assert np.all(N2 == 0)
 
+    def test_predict_normal_stresses_respects_full_coupling(self):
+        """Regression: predict_normal_stresses must forward coupling_mode /
+        tau_y_coupling / m_yield, not silently fall back to 'minimal' (FS bug).
+        """
+        shared = dict(
+            G=1e4,
+            tau_y0=100.0,
+            K_HB=50.0,
+            n_HB=0.5,
+            f_age=1e-5,
+            f_flow=1e-2,
+            t_a=10.0,
+            b=1.0,
+            n_rej=1.0,
+        )
+        gamma_dot = np.array([0.01, 0.1, 1.0])
+
+        model_minimal = FluiditySaramitoLocal(coupling="minimal")
+        for name, value in shared.items():
+            model_minimal.parameters.set_value(name, value)
+        N1_minimal, _ = model_minimal.predict_normal_stresses(gamma_dot)
+
+        model_full = FluiditySaramitoLocal(coupling="full")
+        for name, value in shared.items():
+            model_full.parameters.set_value(name, value)
+        model_full.parameters.set_value("tau_y_coupling", 1e-2)
+        model_full.parameters.set_value("m_yield", 0.5)
+        N1_full, _ = model_full.predict_normal_stresses(gamma_dot)
+
+        assert not np.allclose(N1_full, N1_minimal)
+
 
 class TestFitPredictRoundtrip:
     """Test fit->predict roundtrip for transient protocols (TC-005)."""

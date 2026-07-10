@@ -109,6 +109,11 @@ class CarreauYasuda(BaseModel):
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> CarreauYasuda:
         """Fit Carreau-Yasuda parameters to data.
 
+        Computes a heuristic initial guess (with the transition parameter
+        'a' seeded at 2.0, i.e. plain Carreau), then refines all five
+        parameters -- including 'a' -- against the actual Carreau-Yasuda
+        equation via NLSQ (see BaseModel._standard_nlsq_fit).
+
         Args:
             X: Shear rate data (γ̇)
             y: Viscosity data
@@ -203,15 +208,13 @@ class CarreauYasuda(BaseModel):
                 ctx["a"] = float(a_est)
 
                 logger.info(
-                    "Carreau-Yasuda model fit completed",
+                    "Heuristic initial guess computed, refining with NLSQ",
                     eta0=float(eta0_est),
                     eta_inf=float(eta_inf_est),
                     lambda_=float(lambda_est),
                     n=float(n_est),
                     a=float(a_est),
                 )
-
-                return self
 
             except Exception as e:
                 logger.error(
@@ -220,6 +223,13 @@ class CarreauYasuda(BaseModel):
                     exc_info=True,
                 )
                 raise
+
+        # Refine the heuristic initial guess (including 'a', previously
+        # hardcoded to 2.0 and never optimized) against the actual
+        # Carreau-Yasuda equation via NLSQ (see P1-FLOW-CARREAU-YASUDA).
+        return self._standard_nlsq_fit(
+            X, y, self.model_function, default_test_mode="rotation", **kwargs
+        )
 
     def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict viscosity for given shear rates.

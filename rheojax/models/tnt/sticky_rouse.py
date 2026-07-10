@@ -382,13 +382,22 @@ class TNTStickyRouse(TNTBase):
             G_star = self._predict_oscillation_vec(X_jax, G_modes, tau_eff, eta_s)
             return jnp.column_stack([jnp.real(G_star), jnp.imag(G_star)])
         elif mode == "relaxation":
-            # Per-mode initial stress: `_sigma_0_modes` is only ever set to
-            # None (see _fit, where the prior cached-array design was
-            # reverted as a bug — it froze G_k at fit entry, decoupling the
-            # optimizer from the current parameters). Always use the
-            # equal-stress-per-mode default.
-            sigma_0 = 1e3  # Pa
-            sigma_0_modes = jnp.ones(N) * (sigma_0 / N)
+            # Per-mode initial stress distributed proportionally to the
+            # CURRENT G_modes (params being optimized), scaled to the
+            # measured sigma(t=0) cached at fit entry. Mirrors _predict's
+            # relaxation branch so model_function (what NLSQ actually
+            # optimizes) and _predict agree, and so G_k receives nonzero
+            # gradient (previously hardcoded to a constant, decoupling the
+            # optimizer from G_k entirely).
+            sigma_0 = getattr(self, "_relaxation_sigma_0", None)
+            if sigma_0 is None:
+                sigma_0 = 1e3
+            G_sum = jnp.sum(G_modes)
+            sigma_0_modes = jnp.where(
+                G_sum > 0,
+                float(sigma_0) * G_modes / jnp.maximum(G_sum, 1e-12),
+                jnp.zeros_like(G_modes),
+            )
             return self._predict_relaxation_vec(X_jax, sigma_0_modes, tau_eff)
         elif mode == "startup":
             if gamma_dot is None:
@@ -1056,7 +1065,9 @@ class TNTStickyRouse(TNTBase):
     ) -> np.ndarray:
         """Predict first normal stress difference N₁(γ̇).
 
-        N₁ = Σ 2·G_k·τ_eff_k²·γ̇² / (1 + (τ_eff_k·γ̇)²)
+        For UCM conformation tensor (consistent with this model's own
+        Newtonian/non-shear-thinning flow curve, σ = η₀·γ̇):
+            N₁ = Σ 2·G_k·(τ_eff_k·γ̇)²
 
         Parameters
         ----------
@@ -1075,7 +1086,7 @@ class TNTStickyRouse(TNTBase):
         def compute_n1(gd):
             wi = tau_eff * gd
             wi2 = wi * wi
-            return jnp.sum(2.0 * G_modes * wi2 / (1.0 + wi2))
+            return jnp.sum(2.0 * G_modes * wi2)
 
         if np.ndim(gamma_dot) == 0:
             result = compute_n1(gamma_dot)

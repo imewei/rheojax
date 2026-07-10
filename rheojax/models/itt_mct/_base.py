@@ -305,8 +305,15 @@ class ITTMCTBase(BaseModel):
         str
             Detected protocol name
         """
-        # Check for explicit hints in kwargs
-        if "gamma_dot" in kwargs or "shear_rate" in kwargs:
+        # Check for explicit hints in kwargs.
+        # NOTE: "gamma_dot" identifies _fit_startup's applied-shear-rate
+        # kwarg (startup's X is time). flow_curve's shear rate is the
+        # positional X array, not a kwarg, so it cannot collide here.
+        if "gamma_dot" in kwargs:
+            return "startup"
+        if "gamma_pre" in kwargs:
+            return "relaxation"
+        if "shear_rate" in kwargs:
             return "flow_curve"
         # LAOS requires BOTH gamma_0 AND omega — check before oscillation
         if "gamma_0" in kwargs and ("omega" in kwargs or "frequency" in kwargs):

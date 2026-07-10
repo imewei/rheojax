@@ -175,14 +175,28 @@ class TestShearBandingDetection:
             assert "sigma_range" in info  # Not sigma_plateau
 
     def test_detect_shear_banding_glass_regime(self, glass_model):
-        """Test shear banding detection in glass regime (x < 1)."""
+        """Glass regime (x < 1) has a finite yield stress, not a divergence.
+
+        Previously the glass-phase flow curve had no yield-stress term, so
+        stress diverged as gamma_dot -> 0 (monotonically *decreasing* sigma
+        over the whole range), which this detector misread as "shear
+        banding". With the yield-stress term restored, sigma(gamma_dot) is
+        finite and non-decreasing everywhere, so no banding is detected.
+        """
         is_banding, info = glass_model.detect_shear_banding()
 
-        # Glass regime should exhibit shear banding
-        assert is_banding, "Glass regime (x=0.8) should show shear banding"
-        assert info is not None
-        assert info["gamma_dot_low"] < info["gamma_dot_high"]
-        assert info["sigma_low"] > 0 or info["sigma_high"] > 0
+        assert not is_banding, (
+            "Glass regime with a proper finite yield stress should not "
+            "register spurious negative-slope 'banding' from divergence"
+        )
+        assert info is None
+
+        gamma_dot = np.logspace(-2, 2, 100)
+        sigma = glass_model.predict(gamma_dot)
+        assert np.all(np.isfinite(sigma))
+        assert np.all(np.diff(sigma) >= 0), (
+            "sigma(gamma_dot) should plateau, not diverge"
+        )
 
     def test_no_shear_banding_fluid_regime(self, fluid_model):
         """Test no shear banding in fluid regime (x > 1)."""

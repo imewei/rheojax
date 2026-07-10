@@ -218,9 +218,13 @@ class FractionalZenerSolidSolid(BaseModel):
         # Clip alpha using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         tau_alpha_safe = tau_alpha + epsilon
+        # Floor omega before the negative fractional power: omega=0 with
+        # alpha_safe>0 would otherwise give 0**(-alpha_safe) = inf (matches
+        # the omega_safe guard used in the FMM/FML sibling models).
+        omega_safe = jnp.maximum(omega, epsilon)
 
         # Compute (iω)^(-α) = ω^(-α) * exp(-i*π*α/2)
-        omega_neg_alpha = jnp.power(omega, -alpha_safe)
+        omega_neg_alpha = jnp.power(omega_safe, -alpha_safe)
         phase = -jnp.pi * alpha_safe / 2.0
 
         # (iω)^(-α) in complex form

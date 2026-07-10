@@ -43,11 +43,8 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.models.hvm._base import HVMBase
 from rheojax.models.hvm._kernels import (
     hvm_ber_rate_constant,
-    hvm_creep_compliance_linear_vec,
     hvm_normal_stress_1,
-    hvm_relaxation_modulus_vec,
     hvm_saos_moduli_vec,
-    hvm_startup_stress_linear_vec,
     hvm_steady_shear_stress_vec,
     hvm_total_stress_shear,
 )
@@ -142,6 +139,7 @@ class HVMLocal(HVMBase):
         self._sigma_applied: float | None = None
         self._gamma_0: float | None = None
         self._omega_laos: float | None = None
+        self._gamma_step_applied: float | None = None
         logger.info(
             "HVMLocal initialized",
             extra={
@@ -733,6 +731,7 @@ class HVMLocal(HVMBase):
         self._sigma_applied = kwargs.get("sigma_applied")
         self._gamma_0 = kwargs.get("gamma_0")
         self._omega_laos = kwargs.get("omega")
+        self._gamma_step_applied = kwargs.get("gamma_step")
 
         # Filter out fitting-specific and BaseModel kwargs
         fwd_kwargs = {
@@ -765,7 +764,7 @@ class HVMLocal(HVMBase):
 
         # ODE-based protocols use diffrax with custom_vjp, incompatible with
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
-        _ode_protocols = {"laos"}
+        _ode_protocols = {"laos", "startup", "relaxation", "creep"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
 
         result = nlsq_optimize(
@@ -872,8 +871,28 @@ class HVMLocal(HVMBase):
         gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
         _om = kwargs.get("omega", _MISSING)
         omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
+        _gs = kwargs.get("gamma_step", _MISSING)
+        gamma_step = (
+            _gs if _gs is not _MISSING else getattr(self, "_gamma_step_applied", None)
+        )
+        if gamma_step is None:
+            gamma_step = 1.0
 
         k_ber_0 = hvm_ber_rate_constant(nu_0, E_a, T)
+        # TST params for the nonlinear ODE-based protocols (startup/relaxation/
+        # creep/laos); default to no-damage when include_damage=False.
+        ode_params_dict = {
+            "G_P": G_P,
+            "G_E": G_E,
+            "G_D": G_D,
+            "k_d_D": k_d_D,
+            "nu_0": nu_0,
+            "E_a": E_a,
+            "V_act": V_act,
+            "T": T,
+            "Gamma_0": p_dict.get("Gamma_0", 0.0),
+            "lambda_crit": p_dict.get("lambda_crit", 10.0),
+        }
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
             return hvm_steady_shear_stress_vec(X_jax, G_P, G_D, k_d_D)
@@ -887,21 +906,54 @@ class HVMLocal(HVMBase):
         elif mode == "startup":
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
-            return hvm_startup_stress_linear_vec(
-                X_jax, gamma_dot, G_P, G_E, G_D, k_ber_0, k_d_D
+            # Use ODE solver with TST feedback (matches simulate_startup)
+            sol = hvm_solve_startup(
+                X_jax,
+                gamma_dot,
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
             )
+            ys = _mask_failed_solution_ys(sol)
+            return jax.vmap(
+                lambda y: hvm_total_stress_shear(
+                    y[9], y[2], y[5], y[8], G_P, G_E, G_D, y[10]
+                )
+            )(ys)
 
         elif mode == "relaxation":
-            D_val = 0.0  # No damage in linear model_function
-            return hvm_relaxation_modulus_vec(
-                X_jax, G_P, G_E, G_D, k_ber_0, k_d_D, D_val
+            # Use ODE solver with TST feedback (matches simulate_relaxation)
+            sol = hvm_solve_relaxation(
+                X_jax,
+                gamma_step,
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
             )
+            ys = _mask_failed_solution_ys(sol)
+            stress = jax.vmap(
+                lambda y: hvm_total_stress_shear(
+                    y[9], y[2], y[5], y[8], G_P, G_E, G_D, y[10]
+                )
+            )(ys)
+            return stress / jnp.maximum(jnp.abs(gamma_step), 1e-30)
 
         elif mode == "creep":
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
-            J = hvm_creep_compliance_linear_vec(X_jax, G_P, G_E, G_D, k_ber_0, k_d_D)
-            return sigma_applied * J
+            # Use ODE solver with TST feedback (matches simulate_creep)
+            sol = hvm_solve_creep(
+                X_jax,
+                sigma_applied,
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
+            )
+            ys = _mask_failed_solution_ys(sol)
+            return ys[:, 9]
 
         elif mode == "laos":
             if gamma_0 is None or omega is None:
@@ -909,25 +961,13 @@ class HVMLocal(HVMBase):
             # Extract time from (2, N) stacked [time, strain] input
             t_arr = X_jax[0] if X_jax.ndim == 2 else X_jax
             # Use ODE solver for LAOS (cannot use analytical)
-            params_dict = {
-                "G_P": G_P,
-                "G_E": G_E,
-                "G_D": G_D,
-                "k_d_D": k_d_D,
-                "nu_0": nu_0,
-                "E_a": E_a,
-                "V_act": V_act,
-                "T": T,
-                "Gamma_0": 0.0,
-                "lambda_crit": 10.0,
-            }
             sol = hvm_solve_laos(
                 t_arr,
                 gamma_0,
                 omega,
-                params_dict,
+                ode_params_dict,
                 kinetics=self._kinetics,
-                include_damage=False,
+                include_damage=self._include_damage,
                 include_dissociative=self._include_dissociative,
             )
             # Mask failed ODE solutions with NaN so Bayesian NaN guard rejects them

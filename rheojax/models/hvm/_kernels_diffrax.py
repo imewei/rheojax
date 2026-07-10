@@ -452,11 +452,10 @@ def _make_creep_vector_field(
             eta_D = G_D / k_d_D_safe
         else:
             eta_D = 0.0
-        # Regularization: use a fixed small viscosity floor (1 Pa·s)
-        # independent of G_P to avoid decade-spanning corruption
-        eta_eff = (
-            eta_E + eta_D + 1.0
-        )  # 1 Pa·s floor prevents unbounded gamma_dot at t=0
+        # Numerical floor only (not a physical viscosity contribution) to
+        # avoid divide-by-zero when eta_E == eta_D == 0; matches the
+        # k_BER_safe/k_d_D_safe clamp pattern above.
+        eta_eff = eta_E + eta_D
 
         gamma_dot = sigma_residual / jnp.maximum(eta_eff, 1e-30)
 
@@ -667,10 +666,11 @@ def hvm_solve_relaxation(
     """Solve stress relaxation ODE after step strain.
 
     The initial condition is set by applying an instantaneous step strain
-    gamma_step to the equilibrium state. For small gamma_step (linear regime),
-    the distribution tensors are:
-    mu^E_xy(0) = gamma_step, mu^E_xx(0) ≈ 1 + 2*gamma_step^2
-    mu^D_xy(0) = gamma_step, mu^D_xx(0) ≈ 1 + 2*gamma_step^2
+    gamma_step to the equilibrium state. For affine/neo-Hookean kinematics
+    (consistent with dmu_xx/dt = 2*gamma_dot*mu_xy in this module's own
+    vector fields), the distribution tensors are:
+    mu^E_xy(0) = gamma_step, mu^E_xx(0) = 1 + gamma_step^2
+    mu^D_xy(0) = gamma_step, mu^D_xx(0) = 1 + gamma_step^2
 
     Parameters
     ----------
@@ -696,8 +696,9 @@ def hvm_solve_relaxation(
 
     # Initial state: step strain applied to E and D networks
     # mu_xy = gamma_step (from affine deformation)
-    # mu_xx ≈ 1 + 2*gamma_step^2 (from shear coupling)
-    mu_xx_init = 1.0 + 2.0 * gamma_step**2
+    # mu_xx = 1 + gamma_step^2 (affine/neo-Hookean kinematics; matches
+    # N1 = G*gamma_step^2 and this module's own dmu_xx/dt = 2*gamma_dot*mu_xy)
+    mu_xx_init = 1.0 + gamma_step**2
     mu_yy_init = 1.0
     mu_xy_init = gamma_step
 

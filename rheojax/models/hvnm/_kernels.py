@@ -411,12 +411,16 @@ def hvnm_interphase_stress(
     X_I: float,
     D_int: float,
 ) -> float:
-    """Interphase network (I) shear stress with damage and amplification.
+    """Interphase network (I) shear stress with damage.
 
-    sigma_I = (1 - D_int) * G_I_eff * X_I * (mu^I_xy - mu^I_nat_xy)
+    sigma_I = (1 - D_int) * G_I_eff * (mu^I_xy - mu^I_nat_xy)
 
-    Note: X_I appears in the stress because the interphase modulus is
-    volume-fraction weighted and amplified by the local strain field.
+    Note: X_I is NOT applied here. The Guth-Gold amplification already
+    enters through the affine (upper-convected) term of mu^I's own
+    evolution equation (see hvnm_interphase_rhs_shear), so mu^I_xy is
+    already an amplified-strain quantity. Multiplying by X_I again here
+    would double-count it (see Karim, Vernerey, Sain 2025, Eq. 7, which
+    has no X_I multiplying G_I).
 
     Parameters
     ----------
@@ -427,7 +431,8 @@ def hvnm_interphase_stress(
     G_I_eff : float
         Effective interphase modulus (Pa)
     X_I : float
-        Interphase strain amplification factor
+        Interphase strain amplification factor (unused; kept for API
+        signature compatibility with callers)
     D_int : float
         Interfacial damage variable [0, 1]
 
@@ -436,7 +441,8 @@ def hvnm_interphase_stress(
     float
         Interphase network shear stress (Pa)
     """
-    return (1.0 - D_int) * G_I_eff * X_I * (mu_I_xy - mu_I_nat_xy)
+    del X_I  # ponytail: kept in signature, see docstring Note
+    return (1.0 - D_int) * G_I_eff * (mu_I_xy - mu_I_nat_xy)
 
 
 @jax.jit
@@ -459,7 +465,10 @@ def hvnm_total_stress_shear(
     """Total shear stress from all four subnetworks.
 
     sigma = (1-D)*G_P*X*gamma + G_E*(mu^E_xy - mu^E_nat_xy)
-            + G_D*mu^D_xy + (1-D_int)*G_I_eff*X_I*(mu^I_xy - mu^I_nat_xy)
+            + G_D*mu^D_xy + (1-D_int)*G_I_eff*(mu^I_xy - mu^I_nat_xy)
+
+    Note: X_I is NOT applied to sigma_I -- see hvnm_interphase_stress's
+    docstring. It already enters mu^I_xy through the ODE dynamics.
 
     Parameters
     ----------
@@ -487,10 +496,11 @@ def hvnm_total_stress_shear(
     float
         Total shear stress (Pa)
     """
+    del X_I  # ponytail: kept in signature, see docstring Note
     sigma_P = (1.0 - D) * G_P * X_phi * gamma
     sigma_E = G_E * (mu_E_xy - mu_E_nat_xy)
     sigma_D = G_D * mu_D_xy
-    sigma_I = (1.0 - D_int) * G_I_eff * X_I * (mu_I_xy - mu_I_nat_xy)
+    sigma_I = (1.0 - D_int) * G_I_eff * (mu_I_xy - mu_I_nat_xy)
     return sigma_P + sigma_E + sigma_D + sigma_I
 
 

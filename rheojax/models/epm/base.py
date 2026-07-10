@@ -707,6 +707,7 @@ class EPMBase(BaseModel):
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
         n_fluid: float = 1.0,
+        smoothing_width: float = 0.1,
         n_bayesian_steps: int = 200,
         fluidity_form: str = "overstress",
     ):
@@ -783,7 +784,7 @@ class EPMBase(BaseModel):
         )
         self.parameters.add(
             "smoothing_width",
-            0.1,
+            smoothing_width,
             bounds=(0.01, 100.0),
             units="Pa",
             description="Smooth yielding transition width",
@@ -1122,7 +1123,7 @@ class EPMBase(BaseModel):
 
         # Outer cadence from data; substep the controller at self.dt inside.
         dt_data = float(time[1] - time[0]) if len(time) > 1 else self.dt
-        dt_sub = min(self.dt, dt_data)
+        dt_sub = min(self.dt, dt_data) if dt_data > 0 else self.dt
         n_sub = max(1, int(round(dt_data / dt_sub))) if dt_sub > 0 else 1
 
         # Target stress: metadata is canonical (predict-time shape uses
@@ -2050,10 +2051,17 @@ class EPMBase(BaseModel):
         params: dict,
         target_stress: float,
     ) -> jax.Array:
-        """JAX-pure creep simulation with P-controller."""
-        dt = self.dt
-        if len(time) > 1:
-            dt = time[1] - time[0]
+        """JAX-pure creep simulation with P-controller.
+
+        Called only from ``_model_function_general`` (the non-JIT path used
+        by TensorialEPM), so ``time`` here is a concrete array and it is safe
+        to substep the controller at ``self.dt`` the same way the scalar/
+        Lattice fit path does in ``_model_creep_jit`` — see that method's
+        docstring for the coarse-cadence regression this avoids.
+        """
+        dt_data = float(time[1] - time[0]) if len(time) > 1 else self.dt
+        dt_sub = min(self.dt, dt_data) if dt_data > 0 else self.dt
+        n_sub = max(1, int(round(dt_data / dt_sub))) if dt_sub > 0 else 1
 
         Kp_base = 0.01
         alpha = 10.0
@@ -2063,7 +2071,7 @@ class EPMBase(BaseModel):
         initial_strain = state[2]
         n_steps = max(0, len(time) - 1)  # static int for lax.scan length
 
-        def body(carrier, _):
+        def sub_body(carrier, _):
             curr_epm, gdot = carrier
             curr_stress = self._mean_shear_stress(curr_epm[0])
 
@@ -2075,12 +2083,16 @@ class EPMBase(BaseModel):
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
             new_epm = self._epm_step(
-                curr_epm, propagator_q, gdot_new, dt, params, smooth=True
+                curr_epm, propagator_q, gdot_new, dt_sub, params, smooth=True
             )
-            return (new_epm, gdot_new), new_epm[2]
+            return (new_epm, gdot_new), None
+
+        def outer_body(carrier, _):
+            carrier_next, _ = jax.lax.scan(sub_body, carrier, None, length=n_sub)
+            return carrier_next, carrier_next[0][2]  # sampled strain
 
         if n_steps > 0:
-            _, strains_scan = jax.lax.scan(body, aug_state, None, length=n_steps)
+            _, strains_scan = jax.lax.scan(outer_body, aug_state, None, length=n_steps)
             strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
         else:
             strains = jnp.array([initial_strain])

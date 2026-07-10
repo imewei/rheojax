@@ -775,7 +775,12 @@ def giesekus_creep_ode_rhs(
         γ̇ = (σ - τ_xy) / η_s
 
     For η_s = 0, creep is not well-defined (instantaneous jump to
-    steady state), so a small regularization is applied.
+    steady state), so a regularization is applied. The floor must be
+    large enough relative to η_p that γ̇ stays numerically integrable
+    (too small a floor makes the initial transient stiffer than the
+    adaptive solver can resolve within its step budget, and the solve
+    silently fails); 1e-4·η_p keeps τ_xy within ~0.1% of σ_applied
+    after the transient while remaining solvable in practice.
 
     Parameters
     ----------
@@ -803,8 +808,8 @@ def giesekus_creep_ode_rhs(
 
     # Compute shear rate from stress constraint
     # σ = τ_xy + η_s·γ̇  =>  γ̇ = (σ - τ_xy) / η_s
-    # Regularize for small η_s
-    eta_s_reg = jnp.maximum(eta_s, 1e-10 * eta_p)
+    # Regularize for small η_s (see docstring: floor must stay solvable)
+    eta_s_reg = jnp.maximum(eta_s, 1e-4 * eta_p)
     gamma_dot = (sigma_applied - tau_xy) / eta_s_reg
 
     # Stress evolution (same as rate-controlled)

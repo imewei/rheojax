@@ -12,6 +12,32 @@ import pytest
 from rheojax.models.itt_mct import ITTMCTIsotropic, ITTMCTSchematic
 
 
+class TestProtocolDetection:
+    """Regression tests for _detect_protocol's kwarg-based auto-detection.
+
+    Covers the gamma_dot collision between flow_curve and _fit_startup's
+    own gamma_dot kwarg, and the missing startup/relaxation branches.
+    """
+
+    def test_detect_protocol_gamma_dot_routes_to_startup(self):
+        """'gamma_dot' identifies _fit_startup's kwarg, not flow_curve
+        (whose shear rate is the positional X array). Misrouting to
+        flow_curve crashes _fit_flow_curve with a duplicate-argument
+        TypeError since X binds positionally to its 'gamma_dot' parameter."""
+        model = ITTMCTSchematic(epsilon=0.05)
+        t = np.array([0.0, 1.0])
+        sigma = np.array([0.0, 1.0])
+        assert model._detect_protocol(t, sigma, gamma_dot=2.0) == "startup"
+
+    def test_detect_protocol_gamma_pre_routes_to_relaxation(self):
+        """'gamma_pre' must route to relaxation instead of silently
+        falling through to the flow_curve default with nonsense data."""
+        model = ITTMCTSchematic(epsilon=0.05)
+        t = np.array([0.01, 1.0])
+        sigma = np.array([5.0, 100.0])
+        assert model._detect_protocol(t, sigma, gamma_pre=0.05) == "relaxation"
+
+
 class TestCrossProtocolConsistency:
     """Tests for consistency across protocols."""
 

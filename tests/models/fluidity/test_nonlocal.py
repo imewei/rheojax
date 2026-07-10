@@ -477,6 +477,36 @@ class TestFluidityNonlocalFitting:
         # Model should have been updated (tau_y should change from default)
         # The fit may not converge perfectly with limited iterations
 
+    def test_fit_flow_curve_recovers_hb_params_from_seeded_start(self):
+        """FL: _fit_flow_curve must data-seed tau_y/K/n_flow via
+        _init_hb_from_data (same as FluidityLocal), not fit from the
+        generic hardcoded defaults (tau_y=10, K=10, n_flow=0.5).
+
+        Without the data-driven warm start, NLSQ terminates near the
+        defaults and recovers wildly inaccurate parameters even though
+        `fitted_` is True. This checks parameter accuracy, not just
+        convergence status.
+        """
+        tau_y, K, n = 500.0, 100.0, 0.5
+
+        gamma_dot = np.logspace(-2, 2, 30)
+        sigma_true = tau_y + K * np.power(gamma_dot, n)
+
+        np.random.seed(42)
+        sigma_noisy = sigma_true * (1 + 0.05 * np.random.randn(len(sigma_true)))
+
+        model = FluidityNonlocal()
+        model.fit(gamma_dot, sigma_noisy, test_mode="flow_curve", max_iter=200)
+
+        assert model.fitted_
+        tau_y_fit = model.parameters["tau_y"].value
+        K_fit = model.parameters["K"].value
+        n_fit = model.parameters["n_flow"].value
+
+        assert abs(tau_y_fit - tau_y) / tau_y < 0.15
+        assert abs(K_fit - K) / K < 0.5
+        assert abs(n_fit - n) / n < 0.5
+
     def test_fit_uses_coarse_grid_for_transient(self):
         """Test fitting uses coarse grid for performance.
 
@@ -539,9 +569,7 @@ class TestFluidityNonlocalFitDispatch:
         """test_mode='saos' is normalized to 'oscillation' (line 211)."""
         model = FluidityNonlocal()
         omega = np.logspace(-1, 2, 12)
-        G_star = model._predict_saos_jit(
-            jnp.asarray(omega), 1000.0, 1e-3
-        )
+        G_star = model._predict_saos_jit(jnp.asarray(omega), 1000.0, 1e-3)
         G_star = np.array(G_star)
         complex_gstar = G_star[:, 0] + 1j * G_star[:, 1]
         model._fit(omega, complex_gstar, test_mode="saos", max_iter=3)
@@ -638,9 +666,7 @@ class TestFluidityNonlocalOscillationFit:
         """_seed_saos_from_data early-returns for <2 points (line 747)."""
         model = FluidityNonlocal()
         g_before = model.parameters.get_value("G")
-        model._seed_saos_from_data(
-            np.array([1.0]), np.array([10.0]), np.array([1.0])
-        )
+        model._seed_saos_from_data(np.array([1.0]), np.array([10.0]), np.array([1.0]))
         # No mutation on the early-return path
         assert model.parameters.get_value("G") == g_before
 

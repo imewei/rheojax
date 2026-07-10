@@ -87,6 +87,37 @@ class TestNonlocalCreep:
             f"got gamma[0]={gamma[0]:.4g}"
         )
 
+    def test_creep_full_coupling_uses_dynamic_yield_stress(self):
+        """Regression: creep's post-hoc plasticity factor must use the same
+        dynamic (full-coupling) yield stress the PDE's fluidity evolution
+        applies, not a hardcoded tau_y0 (FS bug).
+
+        With a large tau_y_coupling and tiny f_age, the true aged yield
+        stress is far above sigma_applied, so the material must stay
+        elastically arrested (gamma == sigma/G), not creep.
+        """
+        m = FluiditySaramitoNonlocal(coupling="full", N_y=16, H=1e-3, xi=5e-5)
+        m.parameters.set_value("G", 1e4)
+        m.parameters.set_value("tau_y0", 100.0)
+        m.parameters.set_value("K_HB", 50.0)
+        m.parameters.set_value("n_HB", 0.5)
+        m.parameters.set_value("f_age", 1e-6)
+        m.parameters.set_value("f_flow", 1e-2)
+        m.parameters.set_value("t_a", 10.0)
+        m.parameters.set_value("b", 1.0)
+        m.parameters.set_value("n_rej", 1.0)
+        m.parameters.set_value("tau_y_coupling", 5000.0)
+        m.parameters.set_value("m_yield", 0.5)
+
+        t = np.linspace(0, 50, 50)
+        sigma_applied = 120.0  # above tau_y0=100 but far below the true aged yield
+        gamma, _ = m.simulate_creep(t, sigma_applied)
+
+        elastic = sigma_applied / m.parameters.get_value("G")
+        assert gamma[-1] < elastic * 1.1, (
+            f"expected near-elastic arrest ({elastic:.4g}), got gamma[-1]={gamma[-1]:.4g}"
+        )
+
     def test_creep_returns_fluidity_field(self, model):
         """Test creep returns spatial fluidity field."""
         t = np.linspace(0, 50, 50)

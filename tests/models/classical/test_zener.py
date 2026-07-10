@@ -506,6 +506,32 @@ class TestZenerRotation:
         # sigma = eta * gamma_dot for Newtonian flow
         assert_allclose(sigma, eta * np.array(gamma_dot), rtol=1e-6)
 
+    def test_fit_flow_curve_data(self):
+        """Test fitting Zener model to flow_curve data does not crash.
+
+        Regression test: Zener._fit's inner model_fn previously omitted
+        TestMode.FLOW_CURVE from its dispatch, raising
+        "Unsupported test mode: flow_curve" even though FLOW_CURVE is one of
+        Zener's registered protocols and _predict/model_function support it.
+        """
+        eta_true = 1e3
+        gamma_dot = jnp.logspace(-2, 2, 30)
+        sigma = eta_true * np.array(gamma_dot)
+
+        model = Zener()
+        model.parameters.set_value("eta", 5e2)  # Initial guess
+
+        data = RheoData(
+            x=gamma_dot,
+            y=sigma,
+            x_units="1/s",
+            metadata={"test_mode": "flow_curve"},
+        )
+        model.fit(data, sigma)  # Must not raise ValueError("Unsupported test mode")
+
+        eta_fit = model.parameters.get_value("eta")
+        assert_allclose(eta_fit, eta_true, rtol=0.1)
+
 
 class TestZenerOptimization:
     """Test Zener model fitting and optimization."""

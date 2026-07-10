@@ -281,6 +281,25 @@ class TestFlowCurve:
         # All viscosities should be constant (multi-mode UCM is Newtonian for constant breakage)
         assert np.allclose(eta, expected_eta_0, rtol=1e-6)
 
+    def test_flow_curve_n1_matches_predict_normal_stresses(self):
+        """N1 from predict_flow_curve(return_components=True) must agree with
+        predict_normal_stresses() for the same UCM steady-state derivation
+        (regression: predict_flow_curve previously divided by an extra
+        (1+(tau*gamma_dot)^2)^2 term absent from the model's own UCM solution).
+        """
+        model = TNTMultiSpecies(n_species=1)
+        model.parameters.set_value("G_0", 1000.0)
+        model.parameters.set_value("tau_b_0", 1.0)
+        model.parameters.set_value("eta_s", 0.0)
+
+        gamma_dot = np.array([10.0])
+        _, _, N1_flow = model.predict_flow_curve(gamma_dot, return_components=True)
+        N1_direct, _ = model.predict_normal_stresses(gamma_dot)
+
+        assert np.allclose(N1_flow, N1_direct, rtol=1e-8)
+        # Sanity: UCM N1 = 2*G*(tau*gamma_dot)^2 = 2*1000*100 = 2e5 Pa
+        assert np.isclose(N1_flow[0], 2.0e5, rtol=1e-6)
+
 
 # =============================================================================
 # SAOS Tests

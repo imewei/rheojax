@@ -859,10 +859,20 @@ def build_tnt_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
             beta = 1.0 / tau_b
             tr_S = S_xx + S_yy + S_zz
             stretch = jnp.sqrt(jnp.maximum(tr_S / 3.0, 1e-30))
-            g0 = (1.0 + kappa * (stretch - 1.0)) / tau_b
+            g0 = jnp.maximum((1.0 + kappa * (stretch - 1.0)) / tau_b, 0.0)
         else:
             beta = 1.0 / tau_b
             g0 = beta
+
+        # --- FENE-P finite extensibility: scale destruction by the Peterlin
+        # factor f(trS) = L_max^2/(L_max^2 - trS). As trS -> L_max^2, f -> inf
+        # so -beta*f*S diverges and overwhelms any finite convective growth,
+        # capping trS strictly below L_max^2 (standard FENE-P closure). ---
+        if use_fene:
+            tr_S = S_xx + S_yy + S_zz
+            L2 = L_max * L_max
+            f_peterlin = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+            beta = beta * f_peterlin
 
         # --- Convective derivative ---
         if use_gs:

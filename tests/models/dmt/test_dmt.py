@@ -1063,6 +1063,28 @@ class TestPublicAPIRoundTrip:
         assert stress_pred.shape == stress_data.shape
         assert np.all(np.isfinite(stress_pred))
 
+    @pytest.mark.smoke
+    def test_fit_predict_startup_uses_cached_gamma_dot(self, dmt_exponential):
+        """Public predict() must recover the fitted gamma_dot, not a hardcoded default.
+
+        Regression test for the bug where _predict_startup() ignored
+        self._gamma_dot_applied (cached by fit) and always fell back to 1.0.
+        """
+        t = np.linspace(0.01, 5, 50)
+        stress_true = np.array(
+            dmt_exponential._predict_startup(t, gamma_dot=10.0, lam_init=1.0)
+        )
+
+        dmt_exponential.fit(t, stress_true, test_mode="startup", gamma_dot=10.0)
+
+        # predict() without re-passing gamma_dot must use the cached value (10),
+        # not silently fall back to the hardcoded default of 1.0.
+        stress_pred = dmt_exponential.predict(t, test_mode="startup")
+        stress_wrong = dmt_exponential._predict_startup(t, gamma_dot=1.0)
+
+        assert np.allclose(stress_pred, stress_true, rtol=0.05)
+        assert not np.allclose(stress_pred, stress_wrong, rtol=0.05)
+
 
 class TestDMTRegistry:
     """Test model registry integration."""
@@ -1089,3 +1111,46 @@ class TestDMTRegistry:
 
         model = ModelRegistry.create("dmt_local")
         assert isinstance(model, DMTLocal)
+
+
+class TestInvertStressForGammaDotHB:
+    """Regression tests for the HB creep fixed-point inversion clip bound."""
+
+    def test_large_stress_does_not_silently_truncate_root(self):
+        """The returned gamma_dot must forward-substitute back to sigma_0.
+
+        Previously the fixed-point iteration clipped gamma_dot to a hardcoded
+        1e8 ceiling, so for large enough sigma_0 (with eta_inf near its lower
+        bound) the true root exceeded 1e8 and was silently truncated, giving
+        >89% relative error in the forward stress with no NaN/warning.
+        """
+        from rheojax.models.dmt._kernels import (
+            consistency,
+            invert_stress_for_gamma_dot_hb,
+            yield_stress,
+        )
+
+        params = dict(lam=1.0, tau_y0=10.0, K0=5.0, n_flow=0.5, eta_inf=0.1)
+        for sigma_0 in (1e8, 5e8):
+            gamma_dot = invert_stress_for_gamma_dot_hb(
+                sigma_0,
+                params["lam"],
+                params["tau_y0"],
+                params["K0"],
+                params["n_flow"],
+                params["eta_inf"],
+                m1=1.0,
+                m2=1.0,
+            )
+            tau_y = yield_stress(params["lam"], params["tau_y0"], 1.0)
+            K = consistency(params["lam"], params["K0"], 1.0)
+            sigma_pred = (
+                tau_y
+                + K * jnp.power(gamma_dot, params["n_flow"])
+                + params["eta_inf"] * gamma_dot
+            )
+            rel_error = abs(float(sigma_pred) - sigma_0) / sigma_0
+            assert rel_error < 0.01, (
+                f"sigma_0={sigma_0}: gamma_dot={float(gamma_dot)} forward-substitutes "
+                f"to {float(sigma_pred)}, {rel_error:.1%} relative error"
+            )

@@ -270,6 +270,28 @@ class TestHerschelBulkleyFitting:
         assert abs(K_fit - K_true) / K_true < 0.3
         assert abs(n_fit - n_true) / n_true < 0.3
 
+    def test_fit_actually_refines_with_nlsq(self):
+        """Regression test: fit() must run NLSQ, not just the heuristic guess.
+
+        The two-stage closed-form estimator alone leaves a systematic bias
+        even on noiseless data (see P2-FLOW-HERSCHEL-BULKLEY). With NLSQ
+        refinement, fitting noiseless synthetic data should reproduce the
+        curve to near machine precision.
+        """
+        sigma_y_true = 15.0
+        K_true = 2.0
+        n_true = 0.6
+
+        gamma_dot = np.logspace(-1, 2, 50)
+        stress_true = sigma_y_true + K_true * np.power(gamma_dot, n_true)
+
+        model = HerschelBulkley()
+        model.fit(gamma_dot, stress_true, method="nlsq")
+
+        predictions = model.predict(gamma_dot)
+        rel_err = np.abs(predictions - stress_true) / stress_true
+        assert rel_err.max() < 1e-3
+
 
 class TestHerschelBulkleyNumericalStability:
     """Test numerical stability of Herschel-Bulkley model."""

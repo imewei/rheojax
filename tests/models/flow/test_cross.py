@@ -206,6 +206,28 @@ class TestCrossFitting:
         assert np.all(np.isfinite(predictions))
         assert np.all(predictions > 0)
 
+    def test_fit_actually_refines_with_nlsq(self):
+        """Regression test: fit() must run NLSQ, not just the heuristic guess.
+
+        The heuristic ("min of last decile") alone lands far from the true
+        curve even on noiseless data (see P1-FLOW-CROSS). With NLSQ
+        refinement, fitting noiseless synthetic data should reproduce the
+        curve to near machine precision.
+        """
+        eta0_true, eta_inf_true, lambda_true, m_true = 100.0, 1.0, 1.0, 1.0
+        gamma_dot = np.logspace(-2, 2, 50)
+        lambda_gamma = lambda_true * gamma_dot
+        viscosity_true = eta_inf_true + (eta0_true - eta_inf_true) / (
+            1.0 + np.power(lambda_gamma, m_true)
+        )
+
+        model = Cross()
+        model.fit(gamma_dot, viscosity_true)
+
+        predictions = model.predict(gamma_dot)
+        rel_err = np.abs(predictions - viscosity_true) / viscosity_true
+        assert rel_err.max() < 1e-3
+
 
 class TestCrossModelFunction:
     """Test model_function for Bayesian inference compatibility."""

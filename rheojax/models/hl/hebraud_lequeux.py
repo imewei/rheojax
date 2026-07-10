@@ -258,7 +258,7 @@ class HebraudLequeux(BaseModel):
 
         # --- Normalize by low-rate stress ---
         idx_low = int(np.argmin(np.abs(gdot)))
-        stress_scale = max(float(stress[idx_low]), 1e-12)
+        stress_scale = max(abs(float(stress[idx_low])), 1e-12)
         stress_norm = stress / stress_scale
 
         gdot_jax = jnp.asarray(gdot, dtype=jnp.float64)
@@ -439,6 +439,15 @@ class HebraudLequeux(BaseModel):
         t_max = float(t[-1])
         dt = max(self._min_dt, t_max / self._max_scan_steps_creep)
         n_steps = int(t_max / dt) + 1
+
+        # Warm-start sigma_c from stress_target before grid sizing — same
+        # fix as _fit_startup/_fit_laos/_fit_oscillation. The default
+        # sigma_c=1.0 leaves sigma_max~5.0 (via _get_grid_params), far below
+        # a physical stress_target, so mask_yield=|sigma|>sigma_c can never
+        # represent yielding near the true stress scale.
+        _current_sc = self.parameters.get_value("sigma_c")
+        if stress_target > 0 and (_current_sc is None or _current_sc <= 1.0):
+            self.parameters.set_value("sigma_c", stress_target)
 
         # Grid sizing — use coarser grid for fitting speed.
         # Coarser grid → larger ds → larger dt_stable → fewer CFL sub-steps

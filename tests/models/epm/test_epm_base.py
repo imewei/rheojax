@@ -60,6 +60,18 @@ def test_epm_base_common_parameters():
 
 
 @pytest.mark.unit
+def test_smoothing_width_constructor_kwarg():
+    """smoothing_width is documented as configurable; both variants must
+    accept it as a constructor kwarg instead of only the hardcoded 0.1.
+    """
+    lattice = LatticeEPM(smoothing_width=0.05)
+    tensorial = TensorialEPM(smoothing_width=0.2)
+
+    assert lattice.parameters.get_value("smoothing_width") == 0.05
+    assert tensorial.parameters.get_value("smoothing_width") == 0.2
+
+
+@pytest.mark.unit
 def test_epm_base_init_thresholds_shape():
     """Test _init_thresholds returns correct shape."""
     model = LatticeEPM(L=16)
@@ -426,6 +438,34 @@ def test_general_model_functions_single_point_branches():
 
 
 @pytest.mark.unit
+def test_model_creep_coarse_dt_matches_fine_dt():
+    """_model_creep (fit-path; TensorialEPM routes creep NLSQ/Bayesian calls
+    here via _model_function_general) must substep the P-controller like
+    _model_creep_jit/_run_creep, so results stop depending on the caller's
+    data cadence. Mirrors
+    test_lattice_epm.py::test_lattice_epm_creep_coarse_dt_matches_fine_dt.
+    """
+    model = LatticeEPM(L=8, dt=0.01, sigma_c_mean=0.5, sigma_c_std=0.1)
+    key = jax.random.PRNGKey(0)
+    propagator_q = model._propagator_q_norm * model.parameters.get_value("mu")
+    params = model._get_param_dict()
+    target = 1.0  # above yield
+
+    def run(n):
+        t = jnp.linspace(0.5, 10.0, n)
+        model._creep_dt_data = float(t[1] - t[0])
+        return float(model._model_creep(t, key, propagator_q, params, target)[-1])
+
+    coarse = run(20)  # dt_data=0.5
+    fine = run(951)  # dt_data=0.01 (== self.dt, ground truth)
+    rel_err = abs(coarse - fine) / max(abs(fine), 1e-6)
+    assert rel_err < 0.15, (
+        f"coarse strain[-1]={coarse:.4f} diverges from fine={fine:.4f} "
+        f"(rel err {rel_err:.2%}) — controller substep missing in _model_creep"
+    )
+
+
+@pytest.mark.unit
 def test_mean_shear_stress_scalar_and_tensorial():
     """_mean_shear_stress reduces scalar fields and picks sigma_xy for tensors."""
     scalar_field = jnp.ones((4, 4)) * 2.0
@@ -502,6 +542,29 @@ def test_run_creep_target_stress_fallbacks():
     data_zero = RheoData(x=time, y=jnp.zeros_like(time), metadata={})
     res_zero = model._run_creep(data_zero, key, propagator_q, params, False)
     assert res_zero.y.shape == time.shape and _finite(res_zero.y)
+
+
+@pytest.mark.unit
+def test_run_creep_guards_nonpositive_dt_data():
+    """A duplicated leading timestamp (dt_data<=0) must fall back to self.dt
+    rather than collapsing the P-controller substep to dt_sub=0.
+
+    Regression: without the ``dt_data > 0`` guard (present in the matching
+    fit-path helper ``_model_creep_jit``), dt_sub == 0 for the whole
+    trajectory and strain never accumulates despite a nonzero shear rate.
+    """
+    model = _small_lattice()
+    key = jax.random.PRNGKey(0)
+    propagator_q = model._propagator_q_norm * model.parameters.get_value("mu")
+    params = model._get_param_dict()
+    # Duplicated leading timestamps -> dt_data = time[1] - time[0] == 0.
+    time = jnp.array([0.0, 0.0, 0.5, 1.0, 1.5, 2.0])
+    data = RheoData(x=time, y=jnp.full_like(time, 2.0), metadata={"stress": 2.0})
+
+    result = model._run_creep(data, key, propagator_q, params, True)
+
+    assert _finite(result.y)
+    assert float(result.y[-1]) > float(result.y[0])
 
 
 # =============================================================================

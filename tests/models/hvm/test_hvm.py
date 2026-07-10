@@ -482,6 +482,23 @@ class TestHVMRelaxation:
         assert "stress" in result
         assert "mu_E_xy" in result
 
+    def test_relaxation_initial_mu_xx_step_strain_kinematics(self, hvm_default):
+        """mu_xx(0) after a step strain must follow mu_xx(0) = 1 + gamma_step^2
+        (affine/neo-Hookean kinematics matching N1 = G*gamma_step^2), not the
+        1 + 2*gamma_step^2 off-by-factor-of-2 formula (P0 correctness fix)."""
+        from rheojax.models.hvm._kernels_diffrax import hvm_solve_relaxation
+
+        gamma_step = 1.0
+        t = np.array([0.0, 1.0])
+        params = hvm_default._get_params_dict()
+        sol = hvm_solve_relaxation(
+            jnp.asarray(t), gamma_step, params, kinetics=hvm_default._kinetics
+        )
+        mu_E_xx_0 = float(sol.ys[0, 0])
+        mu_D_xx_0 = float(sol.ys[0, 6])
+        assert mu_E_xx_0 == pytest.approx(1.0 + gamma_step**2)
+        assert mu_D_xx_0 == pytest.approx(1.0 + gamma_step**2)
+
 
 # =============================================================================
 # TestHVMCreep
@@ -524,6 +541,36 @@ class TestHVMCreep:
         gamma_low = hvm_default.simulate_creep(t, sigma_0=50.0)
         gamma_high = hvm_default.simulate_creep(t, sigma_0=200.0)
         assert gamma_high[-1] > gamma_low[-1]
+
+    def test_creep_initial_rate_uses_physical_viscosity(self):
+        """Initial gamma_dot must use the network's own eta_E (no hardcoded
+        +1 Pa*s floor dominating in the flow regime, P2 numerical fix).
+
+        G_E=100, k_BER_0~100 gives eta_E = G_E/(2*k_BER_0) = 0.5 Pa*s.
+        With no D-network, gamma_dot(0) = sigma_0/eta_E = 2*sigma_0. The
+        old hardcoded "+1.0" floor gave eta_eff=1.5, i.e. gamma_dot(0) =
+        sigma_0/1.5, a 3x-low bias.
+        """
+        from rheojax.models.hvm._kernels_diffrax import hvm_solve_creep
+
+        params = {
+            "G_P": 0.0,
+            "G_E": 100.0,
+            "G_D": 0.0,
+            "k_d_D": 1.0,
+            "nu_0": 1e6,
+            "E_a": 22977.8,  # tuned so k_BER_0 ~= 100 at T=300
+            "V_act": 1e-8,
+            "T": 300.0,
+        }
+        sigma_0 = 1.0
+        t = jnp.array([0.0, 1e-4])
+        sol = hvm_solve_creep(
+            t, sigma_0, params, kinetics="stress", include_dissociative=False
+        )
+        gamma = np.asarray(sol.ys[:, 9])
+        initial_rate = gamma[1] / 1e-4
+        assert initial_rate == pytest.approx(2.0, rel=0.05)
 
 
 # =============================================================================
@@ -704,6 +751,53 @@ class TestHVMBayesian:
         result = hvm_default.model_function(t, params, test_mode="relaxation")
         assert result.shape == (20,)
         assert jnp.all(result >= 0)
+
+    def test_model_function_relaxation_matches_simulate(self, hvm_default):
+        """model_function relaxation must route through the same nonlinear
+        TST ODE as simulate_relaxation(), not a constant-k_BER_0 closed form
+        that ignores V_act (P1 completeness fix)."""
+        t = np.linspace(0.01, 10, 20)
+        params = jnp.array(
+            [
+                hvm_default.parameters.get_value(n)
+                for n in hvm_default.parameters.keys()
+            ],
+            dtype=jnp.float64,
+        )
+        result = hvm_default.model_function(
+            t, params, test_mode="relaxation", gamma_step=0.01
+        )
+        expected = hvm_default.simulate_relaxation(t, gamma_step=0.01)
+        np.testing.assert_allclose(np.asarray(result), expected, rtol=1e-6)
+
+    def test_model_function_startup_uses_v_act(self, hvm_default):
+        """model_function startup must be sensitive to V_act, proving the
+        nonlinear TST-coupled ODE (not the constant-k_BER_0 linear closed
+        form) drives the fit/NUTS likelihood (P1 completeness fix). Uses a
+        fast nu_0 so the BER timescale is comparable to the simulated
+        window, otherwise TST feedback is invisible within t<=5s."""
+        from rheojax.models import HVMLocal
+
+        t = np.linspace(0.01, 5, 30)
+        gamma_dot = 5.0
+
+        def stress_for(v_act):
+            m = HVMLocal()
+            for name in ["G_P", "G_E", "G_D", "k_d_D"]:
+                m.parameters.set_value(name, hvm_default.parameters.get_value(name))
+            m.parameters.set_value("nu_0", 1e14)
+            m.parameters.set_value("V_act", v_act)
+            params = jnp.array(
+                [m.parameters.get_value(n) for n in m.parameters.keys()],
+                dtype=jnp.float64,
+            )
+            return np.asarray(
+                m.model_function(t, params, test_mode="startup", gamma_dot=gamma_dot)
+            )
+
+        stress_small_v = stress_for(1e-8)
+        stress_large_v = stress_for(1e-2)
+        assert not np.allclose(stress_small_v, stress_large_v, rtol=1e-4)
 
 
 # =============================================================================

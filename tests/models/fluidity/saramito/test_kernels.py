@@ -326,6 +326,78 @@ class TestSteadyStateFlowCurve:
         # Full coupling should give higher stress at low rates
         assert np.array(sigma_full)[0] > np.array(sigma_minimal)[0]
 
+    def test_solvent_viscosity_contribution(self):
+        """Test eta_s adds eta_s*|gamma_dot| to the flow curve (both coupling modes)."""
+        gamma_dot = jnp.array([0.1, 1.0, 10.0])
+        eta_s = 500.0
+
+        kwargs = dict(
+            tau_y0=100.0,
+            K_HB=50.0,
+            n_HB=0.5,
+            f_age=1e-6,
+            f_flow=1e-2,
+            t_a=10.0,
+            b=1.0,
+            n_rej=1.0,
+        )
+
+        sigma_without = saramito_flow_curve_steady(gamma_dot, **kwargs, eta_s=0.0)
+        sigma_with = saramito_flow_curve_steady(gamma_dot, **kwargs, eta_s=eta_s)
+
+        assert np.allclose(
+            np.array(sigma_with) - np.array(sigma_without),
+            eta_s * np.array(gamma_dot),
+            rtol=1e-6,
+        )
+
+        # Same check under full coupling
+        sigma_full_without = saramito_flow_curve_steady(
+            gamma_dot,
+            **kwargs,
+            coupling_mode="full",
+            tau_y_coupling=1e-3,
+            m_yield=0.5,
+            eta_s=0.0,
+        )
+        sigma_full_with = saramito_flow_curve_steady(
+            gamma_dot,
+            **kwargs,
+            coupling_mode="full",
+            tau_y_coupling=1e-3,
+            m_yield=0.5,
+            eta_s=eta_s,
+        )
+        assert np.allclose(
+            np.array(sigma_full_with) - np.array(sigma_full_without),
+            eta_s * np.array(gamma_dot),
+            rtol=1e-6,
+        )
+
+    def test_steady_state_full_accepts_coupling_mode_full(self):
+        """Regression: saramito_steady_state_full(coupling_mode='full', ...) must not
+        raise TypeError from tracing a static str under @jax.jit (FS bug)."""
+        gamma_dot = jnp.array([0.1, 1.0, 10.0])
+
+        tau_xy, tau_xx, N1 = saramito_steady_state_full(
+            gamma_dot,
+            G=1e4,
+            tau_y0=100.0,
+            K_HB=50.0,
+            n_HB=0.5,
+            f_age=1e-6,
+            f_flow=1e-2,
+            t_a=10.0,
+            b=1.0,
+            n_rej=1.0,
+            coupling_mode="full",
+            tau_y_coupling=1e-3,
+            m_yield=0.5,
+        )
+
+        assert np.all(np.isfinite(np.array(tau_xy)))
+        assert np.all(np.isfinite(np.array(N1)))
+
 
 class TestNormalStresses:
     """Tests for normal stress predictions."""

@@ -186,6 +186,7 @@ def ikh_creep_ode_rhs(t, y, args):
 
     # Extract parameters
     eta = args.get("eta", 1e12)
+    eta_inf = args.get("eta_inf", 0.0)
     C = args["C"]
     gamma_dyn = args.get("gamma_dyn", args.get("q", 1.0))
     m = args.get("m", 1.0)
@@ -216,10 +217,11 @@ def ikh_creep_ode_rhs(t, y, args):
     gamma_dot_p_abs = jnp.abs(gamma_dot_p)
 
     # Total strain rate
-    # In creep: γ̇ = γ̇ᵖ + (σ/η)  (viscous + plastic contributions)
+    # In creep: γ̇ = γ̇ᵖ + (σ/η) + (σ/η_∞)  (viscous + plastic + high-shear contributions)
     # The elastic part doesn't contribute rate since σ is constant
     gamma_dot_viscous = sigma_applied / jnp.maximum(eta, 1e-12)
-    d_gamma = gamma_dot_p + gamma_dot_viscous
+    gamma_dot_viscous_inf = sigma_applied / jnp.maximum(eta_inf, 1e-30)
+    d_gamma = gamma_dot_p + gamma_dot_viscous + gamma_dot_viscous_inf
 
     # Backstress evolution
     alpha_abs = jnp.abs(alpha)
@@ -749,7 +751,7 @@ def radial_return_step_corrected(state, inputs, params):
     # For AF: dα = C·dγ_p·sign(ξ) - γ_dyn·|α|^(m-1)·α·|dγ_p|
     # The second term modifies the effective hardening
     alpha_abs = jnp.abs(alpha_n)
-    af_correction = gamma_dyn * jnp.power(alpha_abs + 1e-6, m - 1) * alpha_n
+    af_correction = gamma_dyn * jnp.power(alpha_abs + 1e-6, m - 1) * sign_xi * alpha_n
 
     # Denominator with regularization to prevent singularity
     # denom = G + C - γ_dyn·|α|^(m-1)·sign(ξ)·α
@@ -1067,9 +1069,9 @@ def ikh_flow_curve_steady_state(gamma_dot, **params):
     """Compute steady-state flow curve for IKH model.
 
     At steady state (Dimitriou & McKinley 2014, Eq. 28):
-    - λ_ss = k1/(k1 + k2·|γ̇|)  [structure balance]
-    - α_sat = C/γ_dyn            [backstress saturation, m=1]
-    - σ_y = σ_y0 + Δσ_y·λ_ss    [yield stress]
+    - λ_ss = k1/(k1 + k2·|γ̇|)      [structure balance]
+    - α_sat = (C/γ_dyn)^(1/m)       [backstress saturation]
+    - σ_y = σ_y0 + Δσ_y·λ_ss        [yield stress]
     - σ = α_sat + σ_y + η_inf·|γ̇|  [total stress above yield]
 
     Args:
@@ -1085,6 +1087,7 @@ def ikh_flow_curve_steady_state(gamma_dot, **params):
     eta_inf = params.get("eta_inf", 0.0)
     C = params.get("C", 0.0)
     gamma_dyn = params.get("gamma_dyn", params.get("q", 1.0))
+    m = params.get("m", 1.0)
 
     # Structure kinetics — canonicalize to k1/k2
     tau_thix = params.get("tau_thix", 1.0 / params["k1"] if "k1" in params else 1.0)
@@ -1100,8 +1103,11 @@ def ikh_flow_curve_steady_state(gamma_dot, **params):
     # Steady-state yield stress
     sigma_y_ss = sigma_y0 + delta_sigma_y * lambda_ss
 
-    # Backstress saturation: α_sat = C/γ_dyn (for m=1, Armstrong-Frederick)
-    alpha_sat = C / jnp.maximum(gamma_dyn, 1e-12)
+    # Backstress saturation: solve C - γ_dyn·α^m = 0 => α_sat = (C/γ_dyn)^(1/m)
+    # (reduces to C/γ_dyn for m=1, Armstrong-Frederick)
+    alpha_sat = jnp.power(
+        C / jnp.maximum(gamma_dyn, 1e-12), 1.0 / jnp.maximum(m, 1e-12)
+    )
 
     # Total stress (backstress + yield + viscous)
     sigma = alpha_sat + sigma_y_ss + eta_inf * gamma_dot_abs
@@ -1180,9 +1186,9 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     """Multi-mode steady-state flow curve (weighted-sum yield surface).
 
     At steady state (Dimitriou & McKinley 2014, Eq. 28):
-    - λ_ss_i = k1_i/(k1_i + k2_i·|γ̇|)  [structure balance per mode]
-    - α_sat = C/γ_dyn                     [backstress saturation]
-    - σ_y = σ_y0 + k3·Σᵢ(w_i·λ_ss_i)    [global yield stress]
+    - λ_ss_i = k1_i/(k1_i + k2_i·|γ̇|)   [structure balance per mode]
+    - α_sat = (C/γ_dyn)^(1/m)             [backstress saturation]
+    - σ_y = σ_y0 + k3·Σᵢ(w_i·λ_ss_i)     [global yield stress]
 
     Total: σ = α_sat + σ_y + η_inf·|γ̇|
 
@@ -1201,6 +1207,7 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     eta_inf = params.get("eta_inf", 0.0)
     C = params.get("C", 0.0)
     gamma_dyn = params.get("gamma_dyn", 1.0)
+    m = params.get("m", 1.0)
 
     # Build mode parameter arrays at trace time, then vectorize over modes.
     w_arr = jnp.stack(
@@ -1227,8 +1234,10 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     )  # (n_modes, N)
     weighted_lambda_sum = jnp.sum(w_arr[:, None] * lambda_ss, axis=0)  # (N,)
 
-    # Backstress saturation: α_sat = C/γ_dyn
-    alpha_sat = C / jnp.maximum(gamma_dyn, 1e-12)
+    # Backstress saturation: solve C - γ_dyn·α^m = 0 => α_sat = (C/γ_dyn)^(1/m)
+    alpha_sat = jnp.power(
+        C / jnp.maximum(gamma_dyn, 1e-12), 1.0 / jnp.maximum(m, 1e-12)
+    )
 
     # Global yield stress
     sigma_y = sigma_y0 + k3 * weighted_lambda_sum

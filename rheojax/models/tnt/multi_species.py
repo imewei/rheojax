@@ -684,11 +684,10 @@ class TNTMultiSpecies(TNTBase):
 
         if return_components:
             eta = sigma / jnp.maximum(gd, 1e-20)
-            # N1 = Σ 2·G_i·(τ_b_i·γ̇)² / (1 + (τ_b_i·γ̇)²)²
+            # N1 = Σ 2·G_i·(τ_b_i·γ̇)² (UCM, matches predict_normal_stresses)
             wi = tau_modes[:, None] * gd[None, :]  # (N, M)
             wi2 = wi * wi
-            denom2 = (1.0 + wi2) ** 2
-            N1 = jnp.sum(2.0 * G_modes[:, None] * wi2 / denom2, axis=0)
+            N1 = jnp.sum(2.0 * G_modes[:, None] * wi2, axis=0)
             return np.asarray(sigma), np.asarray(eta), np.asarray(N1)
 
         return np.asarray(sigma)

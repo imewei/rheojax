@@ -347,6 +347,8 @@ class STZConventional(STZBase):
 
             if mode == "startup":
                 # Strain-controlled: apply constant gamma_dot, measure stress
+                if gamma_dot is None:
+                    raise ValueError("startup mode requires gamma_dot")
                 args["gamma_dot"] = gamma_dot
                 sigma_init = 0.0
             else:  # relaxation
@@ -936,4 +938,6 @@ class STZConventional(STZBase):
             )
             return np.array(stress)
 
-        return np.zeros_like(X)
+        raise ValueError(
+            f"Unsupported or unset test_mode for prediction: {self._test_mode}"
+        )

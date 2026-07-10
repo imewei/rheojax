@@ -347,6 +347,24 @@ class TestCreepSimulation:
         assert gamma.shape == t.shape
         assert gamma_dot.shape == t.shape
 
+    @pytest.mark.smoke
+    def test_creep_default_eta_s_zero_no_nan(self):
+        """Test creep with default eta_s=0.0 does not silently return NaN.
+
+        eta_s=0.0 is the model's default (in-bounds) parameter value, so
+        a fresh model's creep simulation must produce finite results
+        rather than the solver quietly exhausting max_steps and the
+        NaN-conversion pattern masking the failure.
+        """
+        model = GiesekusSingleMode()
+        assert model.eta_s == 0.0
+
+        t = np.linspace(0, 10, 100)
+        gamma = model.simulate_creep(t, sigma_applied=50.0)
+
+        assert np.all(np.isfinite(gamma)), "Creep with default eta_s=0 returned NaN"
+        assert gamma[-1] > gamma[0]
+
 
 class TestLAOSSimulation:
     """Tests for LAOS simulation."""

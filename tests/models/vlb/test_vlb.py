@@ -530,6 +530,20 @@ class TestVLBMultiNetworkAnalytical:
         gamma_inf = 100.0 * J_inf
         assert float(gamma[-1]) == pytest.approx(gamma_inf, rel=0.02)
 
+    def test_creep_ode_zero_solvent_no_permanent(self, vlb_multi_2):
+        """Creep ODE path (no permanent network, eta_s=0) must not blow up.
+
+        Regression for a hardcoded eta_eff=1e-10 regularization that created
+        an unresolvable fast timescale and made the adaptive solver fail,
+        silently masked to all-NaN output.
+        """
+        t = np.linspace(0.01, 10, 50)
+        gamma = vlb_multi_2.predict(t, test_mode="creep", sigma_applied=100.0)
+        gamma = np.asarray(gamma)
+        assert np.all(np.isfinite(gamma))
+        # Creep strain should be monotonically non-decreasing under constant stress
+        assert np.all(np.diff(gamma) >= -1e-8)
+
     def test_permanent_equilibrium(self, vlb_multi_perm):
         """G(inf) should equal G_e for network with permanent component."""
         t = np.array([100.0])  # Very long time
@@ -794,6 +808,45 @@ class TestVLBUtilities:
 
         De = vlb_local.deborah_number(3.0)
         assert De == pytest.approx(3.0, rel=1e-10)  # t_R * omega = 1 * 3
+
+    def test_weissenberg_deborah_uses_k_d_0(self, vlb_multi_2):
+        """VLBMultiNetwork names its rate 'k_d_0', not 'k_d' (regression).
+
+        Previously the base-class hardcoded lookup of "k_d" silently fell
+        back to k_d=1.0 for any model using the "k_d_0" convention, giving a
+        numerically wrong Wi/De regardless of the model's real rate.
+        """
+        t_R = 1.0 / vlb_multi_2.parameters.get_value("k_d_0")  # = 10.0
+        Wi = vlb_multi_2.weissenberg_number(2.0)
+        assert Wi == pytest.approx(t_R * 2.0, rel=1e-10)
+        assert Wi != pytest.approx(2.0, rel=1e-3)  # would be the k_d=1.0 fallback
+
+        De = vlb_multi_2.deborah_number(3.0)
+        assert De == pytest.approx(t_R * 3.0, rel=1e-10)
+
+    def test_initialize_from_saos_updates_multi_network_mode0(self):
+        """VLBMultiNetwork's initialize_from_saos must update G_0/k_d_0 (regression).
+
+        Previously the "G0"/"k_d" literal-name checks never matched
+        VLBMultiNetwork's "G_0"/"k_d_0" parameters, making the warm-start a
+        silent no-op.
+        """
+        model = VLBMultiNetwork(n_modes=2)
+        g0_before = model.parameters.get_value("G_0")
+        kd0_before = model.parameters.get_value("k_d_0")
+
+        # Bracket the crossover tightly: at very low x=omega/k_d, |G'-G''| -> 0
+        # trivially (both moduli vanish), which would fool the argmin-based
+        # crossover finder into picking the wrong point.
+        k_d_true, G0_true = 5.0, 800.0
+        omega = k_d_true * np.logspace(-0.7, 0.7, 30)
+        Gp = G0_true * (omega / k_d_true) ** 2 / (1 + (omega / k_d_true) ** 2)
+        Gpp = G0_true * (omega / k_d_true) / (1 + (omega / k_d_true) ** 2)
+        model.initialize_from_saos(omega, Gp, Gpp)
+
+        assert model.parameters.get_value("G_0") != pytest.approx(g0_before)
+        assert model.parameters.get_value("k_d_0") != pytest.approx(kd0_before)
+        assert model.parameters.get_value("k_d_0") == pytest.approx(k_d_true, rel=0.2)
 
     def test_equilibrium_distribution(self):
         """Test equilibrium distribution tensor."""

@@ -57,7 +57,10 @@ def test_module_name_conversion():
         mixin._class_to_module_name("FractionalZenerSolidLiquid")
         == "fractional_zener_sl"
     )
-    assert mixin._class_to_module_name("FractionalKVZener") == "fractional_kv_zener"
+    assert (
+        mixin._class_to_module_name("FractionalKelvinVoigtZener")
+        == "fractional_kv_zener"
+    )
 
 
 def test_smart_initialization_skips_non_oscillation_mode():
@@ -217,7 +220,7 @@ def test_initializer_map_coverage():
         "FractionalZenerLiquidLiquid",
         "FractionalZenerSolidLiquid",
         "FractionalKelvinVoigt",
-        "FractionalKVZener",
+        "FractionalKelvinVoigtZener",
         "FractionalMaxwellModel",
         "FractionalPoyntingThomson",
         "FractionalJeffreysModel",
@@ -228,6 +231,20 @@ def test_initializer_map_coverage():
         assert model_name in FractionalModelMixin._INITIALIZER_MAP, (
             f"Missing initializer mapping for {model_name}"
         )
+
+
+def test_initializer_map_key_matches_real_class_name():
+    """_INITIALIZER_MAP must be keyed by the actual class name, not a stale alias.
+
+    Regression test: the map used to have "FractionalKVZener" as a key, which
+    does not match FractionalKelvinVoigtZener.__name__, so lookups for the real
+    class would silently miss and skip smart initialization.
+    """
+    from rheojax.models.fractional.fractional_kv_zener import (
+        FractionalKelvinVoigtZener,
+    )
+
+    assert FractionalKelvinVoigtZener.__name__ in FractionalModelMixin._INITIALIZER_MAP
 
 
 def test_error_handling_missing_initializer():

@@ -15,6 +15,7 @@ import pytest
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.ikh._kernels import (
     evolution_lambda,
+    ikh_creep_ode_rhs,
     ikh_flow_curve_steady_state,
     radial_return_step_corrected,
 )
@@ -764,3 +765,75 @@ class TestIKHKernels:
         sigma_expected = alpha_sat + 10.0 + 40.0 * lam_ss + 0.1 * gamma_dot
 
         np.testing.assert_allclose(sigma, sigma_expected, rtol=1e-5)
+
+    def test_flow_curve_steady_state_m_exponent(self):
+        """Backstress saturation must use alpha_sat = (C/gamma_dyn)**(1/m), not
+        the m=1 shortcut, once m != 1 (bounds 0.5-3.0, fittable)."""
+        params = {
+            "sigma_y0": 0.0,
+            "delta_sigma_y": 0.0,
+            "tau_thix": 1.0,
+            "Gamma": 0.5,
+            "eta_inf": 0.0,
+            "C": 100.0,
+            "gamma_dyn": 1.0,
+            "m": 2.0,
+        }
+
+        gamma_dot = jnp.array([1.0])
+        sigma = ikh_flow_curve_steady_state(gamma_dot, **params)
+
+        # C - gamma_dyn * alpha_sat**m = 0 => alpha_sat = sqrt(C/gamma_dyn) = 10.0
+        np.testing.assert_allclose(sigma, 10.0, rtol=1e-5)
+
+    def test_radial_return_reversal_yield_consistency(self):
+        """On a load reversal, the sign(xi) factor in the plastic-multiplier
+        denominator must be present so the backward-Euler yield-surface
+        consistency |sigma_next - alpha_next| == sigma_y_current holds."""
+        state = (600.0, 480.0, 0.6)  # (sigma, alpha, lambda) - prior forward yield
+        params = {
+            "G": 1e3,
+            "C": 5e2,
+            "gamma_dyn": 1.0,
+            "m": 1.0,
+            "sigma_y0": 10.0,
+            "delta_sigma_y": 50.0,
+            "tau_thix": 1.0,
+            "Gamma": 0.5,
+            "eta_inf": 0.0,
+        }
+
+        dt = 1.0
+        d_gamma = -0.5  # reversal: xi_trial flips sign vs. prior yielded alpha
+
+        (sigma_new, alpha_new, _), (_, d_gamma_p) = radial_return_step_corrected(
+            state, (dt, d_gamma), params
+        )
+
+        assert d_gamma_p > 0, "Reversal should still be plastic"
+        xi_next = sigma_new - alpha_new
+        sigma_y_current = params["sigma_y0"] + params["delta_sigma_y"] * state[2]
+        np.testing.assert_allclose(jnp.abs(xi_next), sigma_y_current, rtol=1e-3)
+
+    def test_creep_ode_uses_eta_inf(self):
+        """MIKH's creep RHS must add the eta_inf (high-shear-viscosity) term,
+        not silently drop it in favor of the Maxwell relaxation viscosity."""
+        y = jnp.array([0.0, 0.0, 1.0])  # gamma, alpha, lambda
+        args = {
+            "eta": 1e6,
+            "eta_inf": 0.1,
+            "C": 5e2,
+            "gamma_dyn": 1.0,
+            "m": 1.0,
+            "sigma_y0": 1e6,  # effectively elastic (no plastic flow)
+            "delta_sigma_y": 0.0,
+            "mu_p": 1e-3,
+            "sigma_applied": 50.0,
+        }
+
+        dy = ikh_creep_ode_rhs(0.0, y, args)
+
+        expected_gamma_dot = 50.0 / 1e6 + 50.0 / 0.1  # eta term + eta_inf term
+        np.testing.assert_allclose(dy[0], expected_gamma_dot, rtol=1e-6)
+        # eta_inf's contribution dominates the (near-negligible) eta term
+        assert dy[0] > 400.0

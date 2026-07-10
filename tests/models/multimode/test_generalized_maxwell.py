@@ -487,6 +487,36 @@ class TestGMMCreepMode:
             f"N_opt ({n_optimal}) should be <= N_init ({n_initial})"
         )
 
+    def test_creep_matches_sls_closed_form_with_finite_g_inf(self):
+        """Creep prediction must include the E_inf*eps_prev term.
+
+        Regression test for a backward-Euler bug that dropped the
+        equilibrium-modulus contribution, causing ~34x error in J(t) for
+        any GMM with G_inf > 0 (the standard solid case).
+        """
+        G_inf = 1e3
+        G_1 = 1e5
+        tau_1 = 1.0
+
+        model = GeneralizedMaxwell(n_modes=1)
+        model.parameters.set_value("G_inf", G_inf)
+        model.parameters.set_value("G_1", G_1)
+        model.parameters.set_value("tau_1", tau_1)
+        model._test_mode = "creep"
+
+        t = np.logspace(-3, 4, 200)
+        J_pred = np.asarray(model.predict(t))
+
+        # Closed-form Standard Linear Solid creep compliance
+        tau_eps = tau_1 * (G_inf + G_1) / G_inf
+        J_exact = 1.0 / G_inf + (1.0 / (G_inf + G_1) - 1.0 / G_inf) * np.exp(
+            -t / tau_eps
+        )
+
+        np.testing.assert_allclose(J_pred, J_exact, rtol=2e-2)
+        # Long-time compliance must approach 1/G_inf, not ~34x smaller
+        np.testing.assert_allclose(J_pred[-1], 1.0 / G_inf, rtol=1e-6)
+
 
 class TestGMMSteadyShearMode:
     """Test GMM steady-shear (flow curve) protocol."""
@@ -533,9 +563,7 @@ class TestGMMStartupMode:
 
     @staticmethod
     def _eta_plus(t, G_i, tau_i):
-        return sum(
-            G * tau * (1.0 - np.exp(-t / tau)) for G, tau in zip(G_i, tau_i)
-        )
+        return sum(G * tau * (1.0 - np.exp(-t / tau)) for G, tau in zip(G_i, tau_i))
 
     def test_startup_predict_matches_analytical(self):
         """η⁺(t) prediction matches Σ Gᵢτᵢ(1-exp(-t/τᵢ)) closed form."""
@@ -601,6 +629,29 @@ class TestGMMStartupMode:
         assert diagnostics is not None, "Element minimization diagnostics recorded"
         assert diagnostics["n_optimal"] <= diagnostics["n_initial"]
 
+    def test_startup_matches_analytical_with_finite_g_inf(self):
+        """η⁺(t) must include the E_inf*t elastic-solid term.
+
+        Regression test for a bug where G_inf never entered the startup
+        formula, so the equilibrium spring's contribution to stress growth
+        (which must diverge linearly instead of plateauing) was dropped.
+        """
+        G_inf = 1e3
+        G_1 = 1e5
+        tau_1 = 1.0
+
+        model = GeneralizedMaxwell(n_modes=1)
+        model.parameters.set_value("G_inf", G_inf)
+        model.parameters.set_value("G_1", G_1)
+        model.parameters.set_value("tau_1", tau_1)
+        model._test_mode = "startup"
+
+        t = np.array([0.1, 1.0, 10.0, 50.0])
+        eta_plus_pred = np.asarray(model.predict(t))
+        eta_plus_exact = G_inf * t + G_1 * tau_1 * (1.0 - np.exp(-t / tau_1))
+
+        np.testing.assert_allclose(eta_plus_pred, eta_plus_exact, rtol=1e-6)
+
 
 class TestGMMLaosMode:
     """Test GMM LAOS protocol (linear model = SAOS response)."""
@@ -611,11 +662,7 @@ class TestGMMLaosMode:
         G_inf, G1, G2 = 1e3, 1e5, 1e4
         tau1, tau2 = 0.01, 1.0
         wt1, wt2 = omega * tau1, omega * tau2
-        G_prime = (
-            G_inf
-            + G1 * wt1**2 / (1 + wt1**2)
-            + G2 * wt2**2 / (1 + wt2**2)
-        )
+        G_prime = G_inf + G1 * wt1**2 / (1 + wt1**2) + G2 * wt2**2 / (1 + wt2**2)
         G_dprime = G1 * wt1 / (1 + wt1**2) + G2 * wt2 / (1 + wt2**2)
         G_star = np.column_stack([G_prime, G_dprime])
 
@@ -681,7 +728,9 @@ class TestGMMModelFunction:
     def test_model_function_relaxation(self):
         model = GeneralizedMaxwell(n_modes=2)
         t = np.logspace(-3, 2, 20)
-        out = np.asarray(model.model_function(t, self._params(), test_mode="relaxation"))
+        out = np.asarray(
+            model.model_function(t, self._params(), test_mode="relaxation")
+        )
         assert out.shape == (20,) and np.all(np.isfinite(out))
 
     def test_model_function_oscillation_returns_M_by_2(self):

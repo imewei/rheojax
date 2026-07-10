@@ -323,6 +323,32 @@ class TestFractionalZenerSolidLiquid:
         assert jnp.all(jnp.isfinite(G_noisy))
         assert jnp.corrcoef(G_true, G_noisy)[0, 1] > 0.95
 
+    def test_relaxation_matches_ml_beta_one_minus_alpha(self, model, standard_params):
+        """Regression: relaxation modulus must use beta=1-alpha, not beta=1.
+
+        FZSL = spring (Ge) parallel with FMG (springpot+dashpot in series), so
+        its fractional term must use the same E_{1-alpha,1-alpha} Mittag-Leffler
+        pair as fractional_maxwell_gel.py, not E_{1-alpha,1}.
+        """
+        t = jnp.array([0.05, 0.2, 1.0, 5.0, 20.0])
+        G_t = model._predict_relaxation(t, **standard_params)
+
+        expected = jnp.array(
+            [1866.37724205, 1308.88852262, 1068.30237906, 1009.98910088, 1001.47142207]
+        )
+        assert jnp.allclose(G_t, expected, rtol=1e-4)
+
+    def test_oscillation_loss_modulus_stays_positive_low_alpha(self, model):
+        """Regression: G'' must stay positive (Kramers-Kronig) for low alpha.
+
+        The complex modulus numerator needs the (iωτ)^(1-alpha) factor;
+        omitting it produced negative G'' for alpha below ~0.35.
+        """
+        params = {"Ge": 1000.0, "c_alpha": 500.0, "alpha": 0.3, "tau": 1.0}
+        omega = jnp.logspace(1, 6, 50)
+        G_star = model._predict_oscillation(omega, **params)
+        assert jnp.all(G_star[:, 1] > 0)
+
     def test_consistency_across_modes(self, model, standard_params):
         """Test consistency between relaxation and oscillation modes."""
         model.set_params(**standard_params)

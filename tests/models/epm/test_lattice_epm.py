@@ -28,6 +28,18 @@ def test_lattice_epm_initialization():
 
 
 @pytest.mark.unit
+def test_lattice_epm_smoothing_width_constructor_kwarg():
+    """smoothing_width must be settable at construction, like every other
+    documented Parameter (mu, tau_pl, sigma_c_mean, sigma_c_std, ...).
+
+    Regression: it was hardcoded to 0.1 inside EPMBase.__init__ even though
+    the class docstring documents it as a configurable Parameter.
+    """
+    model = LatticeEPM(L=16, dt=0.01, smoothing_width=0.05)
+    assert model.parameters.get_value("smoothing_width") == pytest.approx(0.05)
+
+
+@pytest.mark.unit
 def test_lattice_epm_fit_requires_test_mode():
     """Test that _fit requires test_mode parameter."""
     model = LatticeEPM(L=8, dt=0.1)

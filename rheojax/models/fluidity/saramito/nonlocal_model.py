@@ -43,6 +43,7 @@ from rheojax.models.fluidity.saramito._kernels import (
     detect_shear_bands,
     saramito_nonlocal_pde_rhs,
     shear_banding_cv,
+    yield_stress_from_fluidity,
 )
 
 # Safe import ensures float64
@@ -315,6 +316,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             self.coupling,
             tau_y_coupling,
             m_yield,
+            params.get("eta_s", 0.0),
         )
 
     def _predict_flow_curve(self, gamma_dot: np.ndarray) -> np.ndarray:
@@ -446,7 +448,9 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
                     float(1 - ss_res / ss_tot) if ss_tot > 0 else None
                 )
             except Exception as e:
-                logger.debug("Fallback R² computation failed for nonlocal creep fit: %s", e)
+                logger.debug(
+                    "Fallback R² computation failed for nonlocal creep fit: %s", e
+                )
         if not result.success:
             logger.warning(f"Nonlocal creep fit warning: {result.message}")
 
@@ -603,8 +607,20 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
         # Compute strain from average fluidity and stress
         f_avg = jnp.mean(sol_ys[:, 1:], axis=1)
 
-        # For stress-controlled, compute plasticity
-        tau_y = params["tau_y0"]
+        # For stress-controlled, compute plasticity using the same dynamic
+        # yield stress the PDE's own fluidity evolution applies for this
+        # coupling mode (previously this always used tau_y0, ignoring "full"
+        # coupling even though saramito_nonlocal_pde_rhs correctly applies it).
+        tau_y0 = params["tau_y0"]
+        if self.coupling == "full":
+            tau_y = yield_stress_from_fluidity(
+                f_avg,
+                tau_y0,
+                params.get("tau_y_coupling", 0.0),
+                params.get("m_yield", 1.0),
+            )
+        else:
+            tau_y = tau_y0
         alpha = jnp.clip(1.0 - tau_y / (jnp.abs(sigma_applied) + 1e-20), 0.0, 1.0)
 
         # Elastic jump: γ_e(0) = σ₀/G — always present in Maxwell-Saramito creep.

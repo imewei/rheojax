@@ -302,6 +302,23 @@ class TestVLBBellPhysics:
         sigma, eta = vlb_bell.predict_flow_curve(np.array([1e-3]))
         assert eta[0] == pytest.approx(1000.0, rel=0.01)
 
+    def test_laos_harmonics_uses_actual_omega(self, vlb_bell):
+        """extract_laos_harmonics must use the omega simulate_laos was called
+        with, not a stale/default self._omega_laos.
+
+        Regression: simulate_laos() never updated self._omega_laos, so the
+        FFT window used the wrong fundamental frequency, producing a grossly
+        wrong I3/I1 ratio (~287x error empirically).
+        """
+        omega = 2.0
+        t = np.linspace(0.001, 20 * 2 * np.pi / omega, 2000)
+        vlb_bell.simulate_laos(t, gamma_0=0.5, omega=omega)
+        assert vlb_bell._omega_laos == pytest.approx(omega)
+        harmonics = vlb_bell.extract_laos_harmonics(n_harmonics=3)
+        # Correct omega gives a small I3/I1 for this weak-nonlinearity case;
+        # the stale-omega bug produced ~1.2 (287x too large).
+        assert harmonics["I3_I1"] < 0.1
+
     def test_extension_softening(self, vlb_bell):
         """Bell gives softer extensional response than constant k_d."""
         eps_dot = np.array([0.01, 0.1, 0.3])
@@ -379,6 +396,40 @@ class TestVLBFenePhysics:
         # N1 should increase with shear rate
         assert float(n1[-1]) > float(n1[0])
 
+    def test_fene_creep_holds_constant_stress(self):
+        """FENE creep ODE must satisfy d(sigma_elastic)/dt = 0 (regression).
+
+        sigma_elastic = G0*f(tr(mu))*mu_xy for FENE, so the constant-applied
+        -stress condition requires an extra df/dt(tr(mu)) term beyond the
+        linear-stress k_d*mu_xy/mu_yy shear-rate formula. This checks the
+        gamma_dot solved by build_vlb_creep_ode_rhs actually zeroes the
+        stress derivative for a state away from equilibrium.
+        """
+        from rheojax.models.vlb._kernels import (
+            build_vlb_creep_ode_rhs,
+            vlb_fene_factor,
+        )
+
+        ode_rhs = build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="fene")
+        G0, k_d_0, eta_s, nu, L_max = 1000.0, 1.0, 0.0, 0.0, 3.0
+        sigma_applied = 500.0
+
+        # A state stretched away from equilibrium (tr(mu) != 3), consistent
+        # with sigma_elastic == sigma_applied (as mid-creep trajectories are).
+        mu_xx, mu_yy, mu_zz = 3.0, 0.8, 1.0
+        f0 = float(vlb_fene_factor(mu_xx, mu_yy, mu_zz, L_max))
+        mu_xy = sigma_applied / (G0 * f0)
+        state = jnp.array([mu_xx, mu_yy, mu_zz, mu_xy, 0.0])
+
+        dstate = ode_rhs(0.0, state, sigma_applied, G0, k_d_0, eta_s, nu, L_max)
+        dmu_xx, dmu_yy, dmu_zz, dmu_xy, _ = dstate
+
+        dtr_dt = float(dmu_xx + dmu_yy + dmu_zz)
+        df_dtr = f0 * f0 / (L_max * L_max)
+        dsigma_dt = G0 * (df_dtr * dtr_dt * mu_xy + f0 * float(dmu_xy))
+
+        assert dsigma_dt == pytest.approx(0.0, abs=1e-6)
+
 
 # =============================================================================
 # Bell + FENE Combined Tests
@@ -401,6 +452,33 @@ class TestVLBBellFeneCombined:
         eps_dot = np.array([0.01, 0.1, 0.3, 0.45])
         sigma = vlb_bell_fene.predict_uniaxial_extension(eps_dot)
         assert np.all(np.isfinite(sigma))
+
+
+class TestVLBExtensionSolvent:
+    """Test that solvent viscosity contributes to uniaxial extension."""
+
+    def test_solvent_adds_trouton_contribution(self):
+        """predict_uniaxial_extension must include 3*eta_s*eps_dot (Trouton).
+
+        Regression: eta_s was never read in predict_uniaxial_extension, so
+        results were identical for eta_s=0 and eta_s>0.
+        """
+        eps_dot = np.array([0.01, 0.05])
+
+        model = VLBVariant()
+        model.parameters.set_value("G0", 1000.0)
+        model.parameters.set_value("k_d_0", 1.0)
+        model.parameters.set_value("eta_s", 0.0)
+        sigma_no_solvent = model.predict_uniaxial_extension(eps_dot)
+
+        eta_s = 50.0
+        model.parameters.set_value("eta_s", eta_s)
+        sigma_with_solvent = model.predict_uniaxial_extension(eps_dot)
+
+        expected_diff = 3.0 * eta_s * eps_dot
+        np.testing.assert_allclose(
+            sigma_with_solvent - sigma_no_solvent, expected_diff, rtol=1e-8
+        )
 
     def test_combined_laos_harmonics(self, vlb_bell_fene):
         """Bell+FENE LAOS produces higher harmonics."""
