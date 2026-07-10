@@ -490,6 +490,22 @@ def f12_volterra_creep_rhs(
     G_current = G_inf * jnp.maximum(phi_advected, 1e-10) ** 2
     gamma_dot_target = sigma_applied / G_current
 
+    # Cap at the bare (fully-decorrelated) Newtonian rate σ₀/η₀ with
+    # η₀ = G_inf/Γ: Γ is this model's "bare relaxation rate" and G_inf its
+    # high-frequency modulus (see f12_volterra_flow_curve_rhs's docstring
+    # above), so G_inf/Γ is the Maxwell-type modulus×relaxation-time bare
+    # viscosity scale of the fully cage-broken (Φ→0) fluid — the same Γ used
+    # a few lines below for tau_adjust = 1/Γ. Without this cap,
+    # gamma_dot_target is unbounded as phi_advected -> 0: once accumulated
+    # strain crosses gamma_c, h(γ) drives
+    # phi_advected toward the 1e-10 floor, G_current toward its square, and
+    # gamma_dot_target toward ~1e17-1e19 within a 20s window regardless of how
+    # small sigma_applied is (there is no restoring force once cage-breaking
+    # starts). A fully decorrelated material is just a Newtonian fluid, so the
+    # rate must saturate at σ₀/η₀ rather than diverge.
+    gamma_dot_fluid = sigma_applied * Gamma / G_inf
+    gamma_dot_target = jnp.minimum(gamma_dot_target, gamma_dot_fluid)
+
     # Smooth adjustment toward target rate
     tau_adjust = 1.0 / Gamma  # Adjustment timescale
     dgamma_dot_dt = (gamma_dot_target - gamma_dot_current) / tau_adjust
