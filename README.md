@@ -7,7 +7,7 @@
 
 > **Disclaimer:** RheoJAX is pre-release software under active development and testing. APIs, model implementations, and numerical results may change without notice. Outputs have not been independently validated for all use cases. Use at your own risk and verify critical results against established reference data before relying on them in research or industrial applications.
 
-JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 45 oscillation-capable models), and 249 tutorial notebooks across 21 categories.
+JAX-accelerated package for rheological data analysis. Provides 53 rheological models across 22 families (including TNT, VLB, HVM, HVNM, Giesekus, DMT, ITT-MCT, EPM, SGR, STZ, Fluidity-Saramito, IKH, FIKH, and SPP), 11 data transforms (FFT, Mastercurve/TTS, SRFS, SPP, OWChirp, Cox-Merz, Prony conversion, spectrum inversion, LVE envelope, mutation number, smooth derivative), Bayesian inference via NumPyro, DMTA/DMA support (E* ↔ G* conversion for 45 oscillation-capable models), and 218 tutorial notebooks across 20 categories.
 
 ## Features
 
@@ -82,14 +82,13 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
 - **Plugin System**: Support for custom models and transforms
 
 ### Tutorial Notebooks & Examples
-- **249 Tutorial Notebooks**: Organized in 21 categories
+- **218 Tutorial Notebooks**: Organized in 20 categories
   - `examples/basic/` - 5 notebooks covering fundamental models
   - `examples/transforms/` - 13 notebooks for data transforms and analysis (FFT, TTS, SRFS, OWChirp, Cox-Merz, Prony, Spectrum Inversion, LVE Envelope, SPP)
   - `examples/bayesian/` - 9 notebooks for Bayesian inference workflows (including SPP LAOS)
   - `examples/advanced/` - 10 notebooks for production patterns (including SGR and SPP)
   - `examples/io/` - 1 notebook for TRIOS complex modulus handling
   - `examples/dmt/` - 6 notebooks: DMT thixotropic model (6 protocols)
-  - `examples/dmta/` - 8 notebooks: DMTA/DMA analysis (modulus conversion, GMM fitting, real data workflows)
   - `examples/epm/` - 6 notebooks: Elasto-plastic models (5 protocols + visualization)
   - `examples/fikh/` - 12 notebooks: FIKH + FMLIKH models (6 protocols each)
   - `examples/fluidity/` - 24 notebooks: Fluidity local/nonlocal + Saramito local/nonlocal (6 protocols each)
@@ -103,7 +102,7 @@ Rheological analysis toolkit with Bayesian inference and parameter optimization:
   - `examples/stz/` - 6 notebooks: Shear Transformation Zone (6 protocols)
   - `examples/tnt/` - 30 notebooks: 5 TNT sub-models (6 protocols each)
   - `examples/vlb/` - 16 notebooks: 6 protocols + Bayesian + Bell + FENE + Nonlocal + 6 NLSQ-to-NUTS
-  - `examples/verification/` - 31 notebooks: Cross-model validation (6 protocol validators + 25 material-specific)
+  - `examples/verification/` - 20 notebooks: Cross-model validation (index + 6 protocol validators + 13 material-specific case studies)
 
 ## Installation
 
@@ -679,7 +678,7 @@ unfilled = HVNMLocal.unfilled_vitrimer(G_P=5000, G_E=3000, G_D=1000)
 
 ## Tutorial Notebooks
 
-240+ tutorial notebooks organized by topic:
+218 tutorial notebooks organized by topic:
 
 ```
 examples/
@@ -689,7 +688,7 @@ examples/
 │   ├── 03-springpot-fitting.ipynb
 │   ├── 04-bingham-fitting.ipynb
 │   └── 05-power-law-fitting.ipynb
-├── transforms/                  # 8 notebooks: Data analysis workflows
+├── transforms/                  # 13 notebooks: Data analysis workflows
 │   ├── 01-fft-analysis.ipynb
 │   ├── 02-mastercurve-tts.ipynb
 │   ├── 02b-mastercurve-wlf-validation.ipynb
@@ -697,7 +696,12 @@ examples/
 │   ├── 04-owchirp-laos-analysis.ipynb
 │   ├── 05-smooth-derivative.ipynb
 │   ├── 06-mastercurve_auto_shift.ipynb
-│   └── 07-srfs-strain-rate-superposition.ipynb
+│   ├── 07-srfs-strain-rate-superposition.ipynb
+│   ├── 08-cox-merz-validation.ipynb
+│   ├── 09-prony-conversion.ipynb
+│   ├── 10-spectrum-inversion.ipynb
+│   ├── 11-lve-envelope.ipynb
+│   └── 12-spp-decomposition.ipynb
 ├── bayesian/                    # 9 notebooks: Bayesian inference (including SPP)
 │   ├── 01-bayesian-basics.ipynb
 │   ├── 02-prior-selection.ipynb
@@ -728,15 +732,6 @@ examples/
 │   ├── 04_dmt_creep.ipynb
 │   ├── 05_dmt_saos.ipynb
 │   └── 06_dmt_laos.ipynb
-├── dmta/                        # 8 notebooks: DMTA/DMA analysis
-│   ├── 01_dmta_basics.ipynb
-│   ├── 02_dmta_master_curve.ipynb
-│   ├── 03_dmta_fractional_models.ipynb
-│   ├── 04_dmta_relaxation.ipynb
-│   ├── 05_dmta_vitrimer.ipynb
-│   ├── 06_dmta_model_selection.ipynb
-│   ├── 07_dmta_tts_pipeline.ipynb
-│   └── 08_dmta_cross_domain.ipynb
 ├── epm/                         # 6 notebooks: Elasto-plastic models
 │   ├── 01_epm_flow_curve.ipynb
 │   ├── 02_epm_saos.ipynb
@@ -879,13 +874,13 @@ examples/
 │   ├── 14_vlb_startup_shear_nlsq_to_nuts.ipynb
 │   ├── 15_vlb_saos_nlsq_to_nuts.ipynb
 │   └── 16_vlb_laos_nlsq_to_nuts.ipynb
-└── verification/                # 31 notebooks: Cross-model validation
+└── verification/                # 20 notebooks: Cross-model validation
     ├── 00_verification_index.ipynb
-    ├── 01-06: Protocol validators (flow, creep, relaxation, startup, SAOS, LAOS)
+    ├── 01-06: Protocol validators (flow curve, creep, stress relaxation, startup shear, SAOS, LAOS)
     ├── creep/                   # 3 notebooks (mucus, perihepatic abscess, polystyrene)
-    ├── oscillation/             # 13 notebooks (mastercurves, model evaluation, material-specific)
-    ├── relaxation/              # 7 notebooks (fish muscle, laponite, foams, polyethylene, etc.)
-    └── rotation/                # 1 notebook (emulsion)
+    ├── flow_curve/              # 1 notebook (emulsion)
+    ├── saos/                    # 3 notebooks (chia pudding, metal network, model evaluator)
+    └── stress_relaxation/       # 6 notebooks (fish muscle, laponite, liquid foam, polyethylene, polypropylene, polystyrene)
 ```
 
 See `examples/README.md` for learning path guide.
