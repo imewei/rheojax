@@ -49,6 +49,13 @@ class HLGrid(NamedTuple):
     n_bins: int
 
 
+def _minmod(a: Array, b: Array) -> Array:
+    """Minmod slope limiter: 0 unless a, b agree in sign, else the smaller magnitude."""
+    return jnp.where(
+        a * b <= 0.0, 0.0, jnp.sign(a) * jnp.minimum(jnp.abs(a), jnp.abs(b))
+    )
+
+
 class HLState(NamedTuple):
     """State container for HL simulation.
 
@@ -114,23 +121,42 @@ def _physics_step(
     Gamma = yield_pop / tau
 
     # 2. Calculate Diffusion (Closure)
-    D = alpha * Gamma
+    # D must have units stress^2/time. sigma_c is the model's single stress
+    # scale (it plays the role of both the yield threshold and, per the HL
+    # 1998 non-dimensionalization, the local elastic modulus), so the
+    # mechanical-noise amplitude scales as sigma_c^2. Without this factor,
+    # stress/sigma_c is not scale invariant under a change of sigma_c.
+    D = alpha * sigma_c**2 * Gamma
 
     # 3. Evolution Operator (Operator Splitting)
 
-    # A. Advection (Upwind - drift due to shear)
-    # Flux J = v*P = gdot*P
-    # First order upwind scheme with zero-padded ghost cells (no periodic wrap)
-    # Ref: LeVeque, "Finite Volume Methods for Hyperbolic Problems", Ch. 4
+    # A. Advection (drift due to shear)
+    # Elastic loading: dsigma/dt = sigma_c * gdot (same single-stress-scale
+    # convention as the diffusion term above), so the drift velocity is
+    # v = sigma_c * gdot, not gdot alone.
+    v = sigma_c * gdot
+
     P_left = jnp.concatenate([jnp.zeros(1), P[:-1]])
     P_right = jnp.concatenate([P[1:], jnp.zeros(1)])
 
-    # Rightward flow (gdot > 0): -v * (P[i] - P[i-1])/dx
-    grad_upwind_pos = (P - P_left) / ds
-    # Leftward flow (gdot < 0): -v * (P[i+1] - P[i])/dx
-    grad_upwind_neg = (P_right - P) / ds
+    # Second-order TVD (minmod-limited) finite-volume advection, replacing
+    # plain first-order upwind. First-order upwind's O(ds) numerical
+    # diffusion/dispersion produces a spurious G'' in SAOS even for a
+    # purely-elastic (never-yielding) system; the minmod-limited slope
+    # keeps the scheme TVD (no new oscillations near extrema) while
+    # recovering second-order accuracy elsewhere, reducing that artifact.
+    # Ref: LeVeque, "Finite Volume Methods for Hyperbolic Problems", Ch. 6.
+    diff_b = P - P_left
+    diff_f = P_right - P
+    slope = _minmod(diff_b, diff_f) / ds
+    slope_right = jnp.concatenate([slope[1:], jnp.zeros(1)])
 
-    dP_adv = -gdot * jnp.where(gdot > 0, grad_upwind_pos, grad_upwind_neg)
+    nu = v * dt / ds
+    flux_pos = v * (P + 0.5 * ds * (1.0 - nu) * slope)
+    flux_neg = v * (P_right - 0.5 * ds * (1.0 + nu) * slope_right)
+    flux = jnp.where(v > 0, flux_pos, flux_neg)
+    flux_left = jnp.concatenate([jnp.zeros(1), flux[:-1]])
+    dP_adv = -(flux - flux_left) / ds
 
     # B. Diffusion (Central Difference) with zero-padded ghost cells
     # D * d2P/dsigma2
@@ -152,13 +178,22 @@ def _physics_step(
     # Update P with Forward Euler
     P_new = P + dt * (dP_adv + dP_diff + dP_yield + dP_source)
 
+    # Mass reaching the domain edges (undersized sigma_max, or high shear
+    # rate) would otherwise be silently discarded by the boundary zeroing
+    # below and then implicitly re-injected everywhere via the blanket
+    # renormalization. Instead, route it through the same physical sigma=0
+    # reinjection channel used for yielded mass, so it isn't smeared across
+    # bins that never yielded.
+    boundary_loss = jnp.maximum(P_new[0], 0.0) + jnp.maximum(P_new[-1], 0.0)
+
     # Boundary condition: Zero at edges
     P_new = P_new.at[0].set(0.0).at[-1].set(0.0)
 
     # Enforce positivity
     P_new = jnp.maximum(P_new, 0.0)
+    P_new = P_new.at[center_idx].add(boundary_loss)
 
-    # Renormalize
+    # Renormalize (safety net for residual explicit-Euler mass drift)
     norm = jnp.sum(P_new) * ds
     P_new = P_new / (norm + 1e-12)
 
@@ -178,11 +213,20 @@ def step_hl(
     sigma_c: float,
     dt: float,
 ) -> HLState:
-    """Advance HL model by one time step with adaptive sub-stepping.
+    """Advance HL model by one time step with fixed conservative sub-stepping.
 
     Implements the Fokker-Planck equation with operator splitting.
-    Automatically calculates stable sub-steps based on CFL conditions
-    for advection and diffusion.
+
+    Uses a fixed number of sub-steps (not a dynamically computed CFL bound —
+    see KRN-002 below) chosen to satisfy the advection CFL condition
+    ``dt_sub * |sigma_c * gdot| / ds < 1`` for typical (alpha, tau, sigma_c,
+    gdot) combinations. Callers that derive dt from a CFL estimate (e.g.
+    ``_compute_dt_and_steps_for_rate``) must use the effective advection
+    velocity ``sigma_c * gdot``, not ``gdot`` alone. This function does not
+    separately verify the diffusion stability limit
+    ``D * dt_sub / ds**2 <= 0.5``; for very small tau (near its 1e-6 s lower
+    bound) combined with large sigma_c/alpha, callers should reduce the
+    outer dt.
 
     Args:
         state: Current HLState
@@ -199,8 +243,9 @@ def step_hl(
     # KRN-002: Use fixed conservative sub-stepping instead of dynamic
     # fori_loop bound. Dynamic n_sub from traced dt/dt_stable is invalid
     # inside lax.scan — the bound must be static. Use 25 sub-steps which
-    # satisfies CFL (dt_sub * |gdot| / ds < 1) up to ~2.5x higher shear
-    # rates than n_sub=10. For extreme shear rates, callers should reduce dt.
+    # satisfies CFL (dt_sub * |sigma_c * gdot| / ds < 1) up to ~2.5x higher
+    # effective rates than n_sub=10. For extreme sigma_c*gdot, callers
+    # should reduce dt.
     n_sub_fixed = 25
     dt_sub = dt / n_sub_fixed
 
@@ -233,8 +278,11 @@ def flow_curve_kernel(
     grid = make_grid(sigma_max, n_bins)
     sigma, ds, _ = grid
 
-    # Initialize Gaussian centered at 0
-    P0 = jnp.exp(-(sigma**2) / 0.1)
+    # Initialize Gaussian centered at 0. Width scales with sigma_c (clipped
+    # to the grid) so a small yield threshold still starts from a genuinely
+    # quiescent state (little initial mass already beyond |sigma| > sigma_c).
+    ic_scale = jnp.clip(sigma_c, 1e-6, sigma_max) ** 2
+    P0 = jnp.exp(-(sigma**2) / (0.1 * ic_scale))
     P0 = P0 / (jnp.sum(P0) * ds)
     init_state = HLState(P0, 0.0, 0.0, 0.0, 0.0)
 
@@ -260,8 +308,11 @@ def startup_kernel(
     grid = make_grid(sigma_max, n_bins)
     sigma, ds, _ = grid
 
-    # Initialize relaxed state (approximate)
-    P0 = jnp.exp(-(sigma**2) / 0.05)
+    # Initialize relaxed state (approximate). Width scales with sigma_c
+    # (clipped to the grid) so the "relaxed" P0 doesn't already have
+    # substantial mass beyond the yield threshold at t=0.
+    ic_scale = jnp.clip(sigma_c, 1e-6, sigma_max) ** 2
+    P0 = jnp.exp(-(sigma**2) / (0.05 * ic_scale))
     P0 = P0 / (jnp.sum(P0) * ds)
     init_state = HLState(P0, 0.0, 0.0, 0.0, 0.0)
 
@@ -290,8 +341,11 @@ def relaxation_kernel(
     grid = make_grid(sigma_max, n_bins)
     sigma, ds, _ = grid
 
-    # Initial state: Relaxed P0 shifted by gamma0
-    P0 = jnp.exp(-((sigma - gamma0) ** 2) / 0.05)
+    # Initial state: Relaxed P0 shifted by gamma0. Width scales with sigma_c
+    # (clipped to the grid) so the "relaxed" P0 doesn't already have
+    # substantial mass beyond the yield threshold at t=0.
+    ic_scale = jnp.clip(sigma_c, 1e-6, sigma_max) ** 2
+    P0 = jnp.exp(-((sigma - gamma0) ** 2) / (0.05 * ic_scale))
     P0 = P0 / (jnp.sum(P0) * ds)
     init_stress = jnp.sum(P0 * sigma) * ds
     init_state = HLState(P0, init_stress, 0.0, 0.0, 0.0)
@@ -323,8 +377,11 @@ def creep_kernel(
     grid = make_grid(sigma_max, n_bins)
     sigma, ds, _ = grid
 
-    # Initialize relaxed
-    P0 = jnp.exp(-(sigma**2) / 0.05)
+    # Initialize relaxed. Width scales with sigma_c (clipped to the grid) so
+    # the "relaxed" P0 doesn't already have substantial mass beyond the
+    # yield threshold at t=0.
+    ic_scale = jnp.clip(sigma_c, 1e-6, sigma_max) ** 2
+    P0 = jnp.exp(-(sigma**2) / (0.05 * ic_scale))
     P0 = P0 / (jnp.sum(P0) * ds)
     init_state = HLState(P0, 0.0, 0.0, 0.0, 0.0)
 
@@ -368,8 +425,11 @@ def laos_kernel(
     grid = make_grid(sigma_max, n_bins)
     sigma, ds, _ = grid
 
-    # Initialize relaxed
-    P0 = jnp.exp(-(sigma**2) / 0.05)
+    # Initialize relaxed. Width scales with sigma_c (clipped to the grid) so
+    # the "relaxed" P0 doesn't already have substantial mass beyond the
+    # yield threshold at t=0.
+    ic_scale = jnp.clip(sigma_c, 1e-6, sigma_max) ** 2
+    P0 = jnp.exp(-(sigma**2) / (0.05 * ic_scale))
     P0 = P0 / (jnp.sum(P0) * ds)
     init_state = HLState(P0, 0.0, 0.0, 0.0, 0.0)
 
@@ -411,8 +471,13 @@ def _compute_dt_and_steps_for_rate(
     gdot_abs = abs(gdot_val) if not hasattr(gdot_val, "item") else abs(float(gdot_val))
     gdot_abs = max(gdot_abs, 1e-9)
 
-    # Target simulation time for steady state
-    strain_target = 10.0 * max(1.0, sigma_c)
+    # Target simulation time for steady state.
+    # With the fixed advection velocity sigma_c * gdot (see _physics_step),
+    # the strain needed to reach the yield boundary is O(1) regardless of
+    # sigma_c (previously this scaled strain_target with sigma_c, which
+    # assumed the old unscaled velocity=gdot convention; left in place it
+    # now forces an unnecessarily coarse dt at large sigma_c).
+    strain_target = 10.0
     time_strain = strain_target / gdot_abs
     time_relax = 10.0 * tau
     t_total = max(time_strain, time_relax)
@@ -420,8 +485,13 @@ def _compute_dt_and_steps_for_rate(
     # Adaptive dt: scale up to fit t_total in max_steps.
     # Constraint: keep CFL sub-steps per outer step <= 50
     # so that fori_loop overhead stays manageable.
+    # The CFL bound must use the *effective* advection velocity
+    # sigma_c * gdot (step_hl's advection speed is sigma_c * gdot, not
+    # gdot alone -- see the scale-invariance fix in _physics_step),
+    # otherwise this cap under-restricts dt whenever sigma_c > 1.
+    effective_velocity = abs(sigma_c) * gdot_abs
     dt_desired = t_total / max_steps
-    dt_max_cfl = 50 * 0.5 * ds / (gdot_abs + 1e-12)
+    dt_max_cfl = 50 * 0.5 * ds / (effective_velocity + 1e-12)
 
     dt = max(dt_desired, 0.001)  # minimum dt = 1ms
     dt = min(dt, dt_max_cfl)  # cap to avoid excessive sub-stepping
@@ -613,6 +683,16 @@ def saos_kernel(
 
     Runs laos_kernel at small gamma0 (linear regime), then FFTs the last
     cycle to extract the first harmonic.
+
+    Known limitation: the explicit-Euler time stepping and finite-volume
+    advection discretization (now a minmod-limited TVD scheme, previously
+    plain first-order upwind) leave a small residual numerical G'' bias
+    (a few percent of G' or less, growing mildly with omega) even in the
+    purely-elastic, never-yielding limit where the true G'' is exactly
+    zero. Do not mistake a small negative or otherwise inconsistent G''
+    near/above the glass transition (where the physical G'' is itself
+    small) for a physical effect without checking this bound, e.g. by
+    increasing n_bins/n_cycles and confirming G'' magnitude shrinks.
 
     Phase convention:
         gamma(t) = gamma0 * sin(omega*t)

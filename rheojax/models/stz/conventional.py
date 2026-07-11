@@ -159,7 +159,7 @@ class STZConventional(STZBase):
             epsilon0 = p_map["epsilon0"]
             ez = p_map["ez"]
 
-            return self._predict_steady_shear_jit(
+            return self._predict_steady_shear(
                 x_data,
                 sigma_y,
                 chi_inf,
@@ -185,18 +185,45 @@ class STZConventional(STZBase):
     def _predict_steady_shear_jit(gamma_dot, sigma_y, chi_inf, tau0, epsilon0, ez):
         """Analytical steady-state flow curve prediction.
 
-        At steady state (Langer 2008):
+        At steady state (Langer 2008), assuming zero orientational bias (m=0,
+        i.e. Minimal/Standard variants):
         - chi -> chi_inf
         - Lambda_ss = exp(-ez / chi_inf)
         - gamma_dot = (2*epsilon0/tau0) * Lambda_ss * cosh(s/sy) * tanh(s/sy)
                     = (2*epsilon0/tau0) * Lambda_ss * sinh(s/sy)
         - Inverting: sigma = sigma_y * arcsinh(gamma_dot * tau0 / (2*epsilon0*Lambda_ss))
+
+        Not valid for variant='full' (m != 0 breaks the cosh*tanh=sinh identity
+        this inversion relies on) — callers must route through
+        ``_predict_steady_shear`` which guards that case.
         """
         Lambda_ss = jnp.exp(-ez / chi_inf)
         prefactor = 2.0 * epsilon0 * Lambda_ss + 1e-30
         arg = (gamma_dot * tau0) / prefactor
         sigma = sigma_y * jnp.arcsinh(arg)
         return sigma
+
+    def _predict_steady_shear(self, gamma_dot, sigma_y, chi_inf, tau0, epsilon0, ez):
+        """Guarded entry point for the analytic steady-state flow curve.
+
+        The closed-form inversion in ``_predict_steady_shear_jit`` assumes
+        m=0. For variant='full', m_inf/rate_m would otherwise be silently
+        ignored (zero gradient, identical prediction to 'standard') instead
+        of raising. There is no closed-form inversion once m != 0, so 'full'
+        is unsupported here rather than faked.
+        """
+        if self.variant == "full":
+            raise ValueError(
+                "Analytic steady-state flow curve prediction is not supported "
+                "for variant='full': the sinh inversion assumes zero "
+                "orientational bias (m=0), so m_inf/rate_m would be silently "
+                "ignored. Use variant='minimal'/'standard' for flow-curve "
+                "fitting, or use the 'startup' (transient ODE) protocol for "
+                "variant='full', which correctly accounts for m."
+            )
+        return self._predict_steady_shear_jit(
+            gamma_dot, sigma_y, chi_inf, tau0, epsilon0, ez
+        )
 
     # =========================================================================
     # Transient (ODE) - Startup, Relaxation, Creep
@@ -507,7 +534,7 @@ class STZConventional(STZBase):
             epsilon0 = p_map["epsilon0"]
             ez = p_map.get("ez", 1.0)
 
-            return self._predict_saos_jit(
+            return self._predict_saos(
                 x_data,
                 G0,
                 sigma_y,
@@ -540,6 +567,11 @@ class STZConventional(STZBase):
         Combined with ds/dt = G0*(gamma_dot - gamma_dot_pl), this gives a
         Maxwell model with effective relaxation time:
             tau_M = tau0 * sigma_y / (2 * epsilon0 * Lambda_ss * G0)
+
+        This linearization drops the orientational bias m (Full variant): m
+        saturates toward +/-m_inf (an O(1) quantity, not O(strain)), so it is
+        not a valid higher-order correction to drop for 'full' — callers must
+        route through ``_predict_saos`` which guards that case.
         """
         # At steady state chi -> chi_inf
         Lambda_ss = jnp.exp(-ez / chi_inf)
@@ -555,6 +587,27 @@ class STZConventional(STZBase):
         G_double_prime = G0 * omega_tau / denom
 
         return jnp.stack([G_prime, G_double_prime], axis=1)
+
+    def _predict_saos(self, omega, G0, sigma_y, chi_inf, tau0, epsilon0, ez):
+        """Guarded entry point for the linear-viscoelastic SAOS prediction.
+
+        The linearization in ``_predict_saos_jit`` drops the orientational
+        bias m entirely. For variant='full' this makes m_inf/rate_m silently
+        inert (identical prediction/zero gradient vs. 'minimal'/'standard').
+        Unlike a true small-parameter expansion, m does not vanish in the
+        small-amplitude limit (it saturates to +/-m_inf), so 'full' is
+        unsupported here rather than faked.
+        """
+        if self.variant == "full":
+            raise ValueError(
+                "Linear-viscoelastic SAOS prediction is not supported for "
+                "variant='full': the linearization assumes zero orientational "
+                "bias (m=0), so m_inf/rate_m would be silently ignored. Use "
+                "variant='minimal'/'standard' for SAOS fitting, or use the "
+                "'laos' protocol for variant='full', which correctly accounts "
+                "for m."
+            )
+        return self._predict_saos_jit(omega, G0, sigma_y, chi_inf, tau0, epsilon0, ez)
 
     def _fit_laos_mode(
         self,
@@ -814,7 +867,7 @@ class STZConventional(STZBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["steady_shear", "rotation", "flow_curve"]:
-            return self._predict_steady_shear_jit(
+            return self._predict_steady_shear(
                 X_jax,
                 p_values["sigma_y"],
                 p_values["chi_inf"],
@@ -823,7 +876,7 @@ class STZConventional(STZBase):
                 p_values["ez"],
             )
         elif mode == "oscillation":
-            return self._predict_saos_jit(
+            return self._predict_saos(
                 X_jax,
                 p_values["G0"],
                 p_values["sigma_y"],
@@ -897,7 +950,7 @@ class STZConventional(STZBase):
                 self._sigma_0 = kwargs.get("sigma_0")
 
         if self._test_mode in ["steady_shear", "rotation", "flow_curve"]:
-            result = self._predict_steady_shear_jit(
+            result = self._predict_steady_shear(
                 X_jax,
                 p_values["sigma_y"],
                 p_values["chi_inf"],
@@ -908,7 +961,7 @@ class STZConventional(STZBase):
             return np.array(result)
 
         elif self._test_mode == "oscillation":
-            result = self._predict_saos_jit(
+            result = self._predict_saos(
                 X_jax,
                 p_values["G0"],
                 p_values["sigma_y"],

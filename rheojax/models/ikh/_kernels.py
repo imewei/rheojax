@@ -220,7 +220,11 @@ def ikh_creep_ode_rhs(t, y, args):
     # In creep: γ̇ = γ̇ᵖ + (σ/η) + (σ/η_∞)  (viscous + plastic + high-shear contributions)
     # The elastic part doesn't contribute rate since σ is constant
     gamma_dot_viscous = sigma_applied / jnp.maximum(eta, 1e-12)
-    gamma_dot_viscous_inf = sigma_applied / jnp.maximum(eta_inf, 1e-30)
+    # eta_inf=0 is a valid "no solvent" choice (bounds allow 0); guard the
+    # divide so it yields zero contribution instead of ~1/1e-30 blowup.
+    gamma_dot_viscous_inf = jnp.where(
+        eta_inf > 0, sigma_applied / jnp.maximum(eta_inf, 1e-30), 0.0
+    )
     d_gamma = gamma_dot_p + gamma_dot_viscous + gamma_dot_viscous_inf
 
     # Backstress evolution
@@ -471,13 +475,22 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
 
     This avoids JAX tracing issues with dynamic slicing (y[1:1+n_modes])
     by closing over n_modes as a Python int.
+
+    Modes are connected in PARALLEL (per the class docstring: "Total stress
+    = Sum(sigma_i)"), so under stress-controlled creep they must share a
+    common strain rate; the externally applied stress is distributed across
+    modes according to each mode's own stress state, not re-applied in full
+    to every mode. State now tracks per-mode stress sigma_i explicitly so the
+    shared strain rate can be solved for algebraically at each step:
+    sigma_applied = sum_i(sigma_i) + eta_inf*gamma_dot.
     """
 
     def _ode_rhs(t, y, args):
         # Extract state using static n_modes
         # y[0] is gamma (total strain) - not needed for derivative computation
-        alphas = y[1 : 1 + n_modes]
-        lambdas = y[1 + n_modes : 1 + 2 * n_modes]
+        sigmas = y[1 : 1 + n_modes]
+        alphas = y[1 + n_modes : 1 + 2 * n_modes]
+        lambdas = y[1 + 2 * n_modes : 1 + 3 * n_modes]
 
         # Applied stress (constant in creep)
         sigma_applied = args["sigma_applied"]
@@ -495,7 +508,8 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
         mu_p_arr = args.get("mu_p", jnp.full(n_modes, 1e-3))
         m_arr = args.get("m", jnp.ones(n_modes))
 
-        def mode_creep(
+        def mode_terms(
+            sigma_i,
             alpha_i,
             lam_i,
             G_i,
@@ -509,12 +523,14 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
             mu_p_i,
             m_i,
         ):
-            """Compute creep derivatives for a single mode."""
+            """Compute per-mode plastic rate, viscous term, and internal-state
+            derivatives, given the mode's OWN stress sigma_i (not the full
+            external stress)."""
             # Mode yield stress
             sigma_y_i = sigma_y0_i + delta_sigma_y_i * lam_i
 
-            # Relative stress (stress distributed across modes)
-            xi_i = sigma_applied - alpha_i
+            # Relative stress uses this mode's own stress state
+            xi_i = sigma_i - alpha_i
             xi_abs = jnp.abs(xi_i)
             sign_xi = jnp.sign(xi_i + 1e-20)
 
@@ -522,8 +538,8 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
             f_yield = xi_abs - sigma_y_i
 
             # Plastic strain rate
-            gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p_i, 1e-12) * sign_xi
-            gamma_dot_p_abs = jnp.abs(gamma_dot_p)
+            gamma_dot_p_i = macaulay(f_yield) / jnp.maximum(mu_p_i, 1e-12) * sign_xi
+            gamma_dot_p_abs = jnp.abs(gamma_dot_p_i)
 
             # Backstress evolution
             alpha_abs = jnp.abs(alpha_i)
@@ -533,20 +549,24 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
                 * alpha_i
                 * gamma_dot_p_abs
             )
-            d_alpha = C_i * gamma_dot_p - recovery
+            d_alpha = C_i * gamma_dot_p_i - recovery
 
             # Lambda evolution
             k1_i = 1.0 / jnp.maximum(tau_thix_i, 1e-12)
             k2_i = Gamma_i
             d_lambda = k1_i * (1.0 - lam_i) - k2_i * lam_i * gamma_dot_p_abs
 
-            # Viscous contribution from mode
-            gamma_dot_viscous_i = sigma_applied / jnp.maximum(eta_i, 1e-12)
+            # Mode's own Maxwell dashpot term: (G_i/eta_i)*sigma_i
+            G_safe = jnp.maximum(G_i, 1e-30)
+            visc_i = G_safe / jnp.maximum(eta_i, 1e-12) * sigma_i
 
-            return gamma_dot_p + gamma_dot_viscous_i, d_alpha, d_lambda
+            return G_safe, gamma_dot_p_i, visc_i, d_alpha, d_lambda
 
         # Vectorize over modes
-        gamma_dot_modes, d_alphas, d_lambdas = jax.vmap(mode_creep)(
+        G_safe_arr, gamma_dot_p_arr, visc_arr, d_alphas, d_lambdas = jax.vmap(
+            mode_terms
+        )(
+            sigmas,
             alphas,
             lambdas,
             G_arr,
@@ -561,13 +581,29 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
             m_arr,
         )
 
-        # Total strain rate (sum of mode contributions + global viscous)
-        # Each mode contributes plastic + viscous rate; sum over all modes.
-        d_gamma = jnp.sum(gamma_dot_modes)
-        # Add global viscous contribution (safe for eta_inf=0)
-        d_gamma = d_gamma + sigma_applied / jnp.maximum(eta_inf, 1e-30)
+        # Shared strain rate (parallel topology: all modes see the same
+        # gamma_dot). Solve the stress-balance constraint
+        # sigma_applied = sum(sigma_i) + eta_inf*gamma_dot for gamma_dot:
+        #   eta_inf > 0: gamma_dot = (sigma_applied - sum(sigma_i)) / eta_inf
+        #   eta_inf == 0: sum(sigma_i) must stay constant, so
+        #                 d/dt[sum(sigma_i)] = 0 gives
+        #                 gamma_dot = sum(G_i*gdot_p_i + visc_i) / sum(G_i)
+        sum_sigma = jnp.sum(sigmas)
+        sum_G = jnp.sum(G_safe_arr)
+        gamma_dot_no_solvent = jnp.sum(
+            G_safe_arr * gamma_dot_p_arr + visc_arr
+        ) / jnp.maximum(sum_G, 1e-30)
+        gamma_dot_with_solvent = (sigma_applied - sum_sigma) / jnp.maximum(
+            eta_inf, 1e-30
+        )
+        d_gamma = jnp.where(eta_inf > 0, gamma_dot_with_solvent, gamma_dot_no_solvent)
 
-        return jnp.concatenate([jnp.array([d_gamma]), d_alphas, d_lambdas])
+        # Per-mode stress evolution under the shared strain rate
+        d_sigmas = G_safe_arr * (d_gamma - gamma_dot_p_arr) - visc_arr
+
+        return jnp.concatenate(
+            [jnp.array([d_gamma]), d_sigmas, d_alphas, d_lambdas]
+        )
 
     return _ode_rhs
 
@@ -575,13 +611,15 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
 def ml_ikh_creep_ode_rhs_per_mode(t, y, args):
     """ODE RHS for multi-mode creep (per-mode yield surfaces).
 
-    State: y = [γ, α_1, ..., α_N, λ_1, ..., λ_N]  (1+2N states)
-    - γ: Total strain (shared, since material is in series for stress)
+    State: y = [γ, σ_1, ..., σ_N, α_1, ..., α_N, λ_1, ..., λ_N]  (1+3N states)
+    - γ: Total strain (shared across modes: PARALLEL connection)
+    - σ_i: Stress carried by mode i (Σσ_i + η_inf·γ̇ = σ_applied)
     - α_i: Backstress for mode i
     - λ_i: Structural parameter for mode i
 
-    For creep, stress is constant. Each mode contributes plastic strain rate.
-    Total strain rate = Σᵢ γ̇ᵖ_i + σ/η_total
+    For creep, total stress is constant but is distributed across modes;
+    modes share a common strain rate solved from the stress-balance
+    constraint (see make_ml_ikh_creep_ode_rhs_per_mode).
 
     NOTE: This legacy wrapper reads n_modes from args at runtime.
     For JIT-traced contexts (e.g. diffrax), use make_ml_ikh_creep_ode_rhs_per_mode(n_modes)
@@ -645,8 +683,10 @@ def make_ml_ikh_creep_ode_rhs_weighted_sum(n_modes):
         # Strain rate
         gamma_dot_viscous = sigma_applied / jnp.maximum(eta, 1e-12)
         d_gamma = gamma_dot_p + gamma_dot_viscous
-        # Add global viscous contribution (safe for eta_inf=0)
-        d_gamma = d_gamma + sigma_applied / jnp.maximum(eta_inf, 1e-30)
+        # Add global viscous contribution (eta_inf=0 => no solvent, zero rate)
+        d_gamma = d_gamma + jnp.where(
+            eta_inf > 0, sigma_applied / jnp.maximum(eta_inf, 1e-30), 0.0
+        )
 
         # Backstress evolution
         alpha_abs = jnp.abs(alpha)
@@ -707,6 +747,16 @@ def radial_return_step_corrected(state, inputs, params):
     1. Lambda updated AFTER stress (timing fix)
     2. AF dynamic recovery in plastic multiplier denominator
     3. Proper plastic strain rate computation
+
+    .. note::
+        This is a rate-independent elastoplastic formulation used for
+        startup/LAOS (and flow_curve/oscillation time-domain routes through
+        it). It does NOT read ``eta`` or ``mu_p`` — those only parameterize
+        the separate rate-dependent Perzyna-viscoplastic Maxwell ODE used
+        for creep/relaxation (see ``ikh_maxwell_ode_rhs`` /
+        ``ikh_creep_ode_rhs``). The two solvers are intentionally different
+        constitutive laws sharing a parameter namespace; ``eta``/``mu_p``
+        have no effect on results from this function.
 
     Args:
         state: Tuple (sigma, alpha, lam)
@@ -1074,6 +1124,16 @@ def ikh_flow_curve_steady_state(gamma_dot, **params):
     - σ_y = σ_y0 + Δσ_y·λ_ss        [yield stress]
     - σ = α_sat + σ_y + η_inf·|γ̇|  [total stress above yield]
 
+    .. note::
+        This closed form is the steady state of the rate-independent
+        return-mapping formulation (``radial_return_step_corrected``, used
+        for startup/LAOS), which does not depend on ``eta``/``mu_p``. It is
+        NOT the steady state of the separate rate-dependent Perzyna
+        Maxwell ODE (``ikh_maxwell_ode_rhs``, used for creep/relaxation),
+        whose long-time limit depends on ``eta`` and ``mu_p`` as well.
+        ``eta``/``mu_p`` are intentionally absent here for the same reason
+        they are absent from the return-mapping step.
+
     Args:
         gamma_dot: Array of shear rates
         **params: Model parameters
@@ -1125,6 +1185,12 @@ def ml_ikh_flow_curve_steady_state_per_mode(gamma_dot, n_modes, **params):
     - σ_y_i = σ_y0_i + Δσ_y_i·λ_ss_i    [mode yield stress]
 
     Total: σ = Σᵢ (α_sat_i + σ_y_i) + η_inf·|γ̇|
+
+    .. note::
+        Steady state of the rate-independent return-mapping formulation
+        (see ``ikh_flow_curve_steady_state``'s note); does not depend on
+        ``eta``/``mu_p``, which only parameterize the separate ODE
+        (creep/relaxation) path.
 
     Args:
         gamma_dot: Array of shear rates
@@ -1191,6 +1257,12 @@ def ml_ikh_flow_curve_steady_state_weighted_sum(gamma_dot, n_modes, **params):
     - σ_y = σ_y0 + k3·Σᵢ(w_i·λ_ss_i)     [global yield stress]
 
     Total: σ = α_sat + σ_y + η_inf·|γ̇|
+
+    .. note::
+        Steady state of the rate-independent return-mapping formulation
+        (see ``ikh_flow_curve_steady_state``'s note); does not depend on
+        ``eta``/``mu_p``, which only parameterize the separate ODE
+        (creep/relaxation) path.
 
     Args:
         gamma_dot: Array of shear rates

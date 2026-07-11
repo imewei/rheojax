@@ -349,8 +349,18 @@ class TestVLBFenePhysics:
         # All should be finite
         assert np.all(np.isfinite(sigma))
 
-    def test_strain_hardening(self, vlb_fene):
-        """FENE-P gives strain hardening relative to linear at moderate rates."""
+    def test_shear_stress_bounded_below_linear_at_high_rate(self, vlb_fene):
+        """FENE-P shear stress stays below the unbounded (linear) UCM stress
+        at high shear rates, and coincides with it near equilibrium.
+
+        Finite extensibility feeds back into the mu relaxation term itself
+        (k_d*(I - f*mu), Bird et al. 1987), so mu resists stretching as
+        tr(mu) approaches the FENE limit. In simple shear (unlike uniaxial
+        extension) this manifests as shear-thinning of the elastic
+        contribution relative to the unbounded UCM/linear model, not
+        hardening -- hardening is a uniaxial-extension phenomenon (see
+        test_bounded_extensional_stress).
+        """
         gdot = np.logspace(-1, 0.5, 10)
         sigma_fene, _ = vlb_fene.predict_flow_curve(gdot)
 
@@ -359,8 +369,11 @@ class TestVLBFenePhysics:
         linear.parameters.set_value("k_d_0", 1.0)
         sigma_lin, _ = linear.predict_flow_curve(gdot)
 
-        # FENE stress should exceed linear at high rates
-        assert float(sigma_fene[-1]) > float(sigma_lin[-1])
+        # Near equilibrium (lowest rate), FENE ~ linear (f ~ 1)
+        assert float(sigma_fene[0]) == pytest.approx(float(sigma_lin[0]), rel=0.01)
+        # At the highest rate, bounded extensibility keeps FENE stress
+        # below the unbounded linear stress
+        assert float(sigma_fene[-1]) < float(sigma_lin[-1])
 
     def test_large_L_max_recovers_linear(self):
         """Large L_max makes FENE-P approach linear stress."""

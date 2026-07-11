@@ -261,6 +261,10 @@ class VLBNonlocal(VLBBase):
             # Local shear rate from stress balance
             # Sigma = sigma_elastic + eta_s * gamma_dot
             # For eta_s = 0, regularize with small fraction of network viscosity
+            # so the fast eta_eff/G0 timescale stays resolvable by the adaptive
+            # solver. ponytail: this floors eta_s at ~1% of G0/k_d_0, inducing
+            # a ~1e-2 relative bias vs the exact eta_s=0 analytical limit;
+            # tighten the 1e-2 constant if validating against that limit.
             eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
             gamma_dot = (Sigma - sigma_elastic) / eta_eff
 
@@ -363,6 +367,8 @@ class VLBNonlocal(VLBBase):
         else:
             sigma_elastic = G0 * mu_xy
 
+        # ponytail: eta_s=0 regularization (see _build_pde_rhs) induces a
+        # ~1e-2 relative bias vs the exact eta_s=0 limit; tighten if needed.
         eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
         return (Sigma - sigma_elastic) / eta_eff
 
@@ -457,6 +463,8 @@ class VLBNonlocal(VLBBase):
         k_d_0 = self.k_d_0
         _eta_s = self.parameters.get_value("eta_s")
         eta_s = float(_eta_s if _eta_s is not None else 0.0)
+        # ponytail: eta_s=0 regularization (see _build_pde_rhs) induces a
+        # ~1e-2 relative bias vs the exact eta_s=0 limit; tighten if needed.
         eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
 
         if self._stress_type == "fene":
@@ -582,6 +590,8 @@ class VLBNonlocal(VLBBase):
             else:
                 sigma_elastic = G0 * mu_xy
 
+            # ponytail: eta_s=0 regularization (see _build_pde_rhs) induces a
+            # ~1e-2 relative bias vs the exact eta_s=0 limit; tighten if needed.
             eta_eff = jnp.maximum(eta_s, 1e-2 * G0 / jnp.maximum(k_d_0, 1e-30))
             gamma_dot = (Sigma - sigma_elastic) / eta_eff
 
@@ -649,6 +659,8 @@ class VLBNonlocal(VLBBase):
         G0_val = params["G0"]
         eta_s_val = params["eta_s"]
         k_d_0_val = params["k_d_0"]
+        # ponytail: eta_s=0 regularization (see _build_pde_rhs) induces a
+        # ~1e-2 relative bias vs the exact eta_s=0 limit; tighten if needed.
         eta_eff = jnp.maximum(eta_s_val, 1e-2 * G0_val / jnp.maximum(k_d_0_val, 1e-30))
         dy = self.dy
 

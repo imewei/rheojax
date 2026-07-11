@@ -17,7 +17,9 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.models.epm.base import EPMBase
+from rheojax.utils.epm_kernels import update_yield_thresholds
 from rheojax.utils.epm_kernels_tensorial import (
+    get_yield_criterion,
     make_tensorial_propagator_q,
     tensorial_epm_step,
 )
@@ -127,6 +129,26 @@ class TensorialEPM(EPMBase):
             fluidity_form=fluidity_form,
         )
 
+        # `tau_pl` is registered by EPMBase.__init__ above for base-class
+        # compatibility, but the tensorial kernel (epm_kernels_tensorial) only
+        # ever reads `tau_pl_shear`/`tau_pl_normal` — `tau_pl` itself has no
+        # effect on TensorialEPM's dynamics. Re-documenting it (rather than
+        # removing it, which would break the positional parameter-array
+        # assumptions in EPMBase.precompile()/model_function) so fitting code
+        # that iterates over all registered parameters isn't misled.
+        self.parameters.add(
+            "tau_pl",
+            tau_pl,
+            bounds=(0.01, 100.0),
+            units="s",
+            description=(
+                "[Unused by TensorialEPM's kernel; see tau_pl_shear/"
+                "tau_pl_normal] Base plastic relaxation timescale, kept for "
+                "EPMBase compatibility only."
+            ),
+            overwrite=True,
+        )
+
         # Add tensorial-specific parameters
         self.parameters.add(
             "nu",
@@ -179,9 +201,38 @@ class TensorialEPM(EPMBase):
             )
         self.yield_criterion = yield_criterion
 
-        # Precompute tensorial propagator (cached)
-        # Using mu=1.0 as normalization, will scale by actual mu during execution
-        self._propagator_q_norm = make_tensorial_propagator_q(L, nu=nu, mu=1.0)
+        # Precompute tensorial propagator (cached), normalized by mu=1.0 —
+        # actual mu is applied on top wherever `_propagator_q_norm` is read.
+        # `nu` is cached alongside it so the `_propagator_q_norm` property
+        # below can detect when a live parameter update (e.g. after NLSQ/
+        # Bayesian fitting changes `nu`) has made the cached propagator stale
+        # and recompute it — see the property docstring.
+        self._propagator_nu_cache = nu
+        self._propagator_q_norm_cache = make_tensorial_propagator_q(
+            L, nu=nu, mu=1.0
+        )
+
+    @property
+    def _propagator_q_norm(self) -> jax.Array:
+        """Tensorial elastic propagator (mu=1 normalized), recomputed if `nu` changed.
+
+        `nu` is a live, fittable parameter (see `self.parameters`), but the
+        propagator's elastic constants are only cheap to recompute, not free —
+        so instead of rebuilding it on every access we cache it and rebuild
+        only when the current `self.parameters` value of `nu` no longer
+        matches the value it was built from. Without this, `nu` updated by
+        NLSQ/Bayesian fitting after construction would leave the propagator
+        (used in `_predict`, `precompile`, and the base class's
+        `model_function`) silently inconsistent with the yield criterion,
+        which always reads the live `nu`.
+        """
+        nu = float(self.parameters.get_value("nu") or 0.3)
+        if nu != self._propagator_nu_cache:
+            self._propagator_q_norm_cache = make_tensorial_propagator_q(
+                self.L, nu=nu, mu=1.0
+            )
+            self._propagator_nu_cache = nu
+        return self._propagator_q_norm_cache
 
     def _init_stress(self, key: jax.Array) -> jax.Array:
         """Initialize tensorial stress field.
@@ -283,7 +334,39 @@ class TensorialEPM(EPMBase):
         # Update accumulated strain
         new_strain = strain + shear_rate * dt
 
-        return (new_stress, thresholds, new_strain, key)
+        # Structural renewal (hard mode only): renew yield thresholds at
+        # sites whose *pre-step* effective stress exceeded their local
+        # threshold, matching LatticeEPM's disorder-renewal dynamics (see
+        # `rheojax.utils.epm_kernels.epm_step` / `update_yield_thresholds`).
+        # `tensorial_epm_step` itself never renews thresholds, so without
+        # this the tensorial model's disorder is quenched-forever instead of
+        # quenched-then-renewed.
+        if not smooth:
+            nu = params.get("nu", 0.3)
+            stress_reshaped = jnp.moveaxis(stress, 0, -1)
+            criterion_fn = get_yield_criterion(self.yield_criterion)
+            if self.yield_criterion == "hill":
+                sigma_eff = criterion_fn(
+                    stress_reshaped,
+                    params.get("hill_H", 0.5),
+                    params.get("hill_N", 1.5),
+                    nu,
+                )
+            else:
+                sigma_eff = criterion_fn(stress_reshaped, nu)
+            active_mask = sigma_eff > thresholds
+            key, subkey = jax.random.split(key)
+            new_thresholds = update_yield_thresholds(
+                subkey,
+                active_mask,
+                thresholds,
+                mean=params.get("sigma_c_mean", 1.0),
+                std=params.get("sigma_c_std", 0.1),
+            )
+        else:
+            new_thresholds = thresholds
+
+        return (new_stress, new_thresholds, new_strain, key)
 
     def get_shear_stress(self, stress: jax.Array) -> jax.Array:
         """Extract shear stress component from stress tensor.
@@ -392,21 +475,20 @@ class TensorialEPM(EPMBase):
             # Warm-start sigma_xy at the analytical overstress steady state
             # for pure shear with von Mises yielding.
             #
-            # The tensorial stress update is dσ_xy/dt = μγ̇ − 2μ·ε̇^p_xy (see the
-            # Budrikis & Zapperi 2013 reference at the top of
-            # epm_kernels_tensorial.py), so at steady state ε̇^p_xy = γ̇/2 in the
-            # tensor convention. Solving the overstress Prandtl-Reuss rule for
-            # pure shear gives:
+            # The tensorial stress update is dσ_xy/dt = μγ̇ − μ·ε̇^p_xy (scalar-
+            # EPM-consistent convention — see epm_kernels_tensorial.py's
+            # tensorial_epm_step), so at steady state ε̇^p_xy = γ̇. Solving the
+            # overstress Prandtl-Reuss rule for pure shear gives:
             #
             #   σ_xy = σ_c_mean/√3
-            #        + (1/√3) · (√3 / 2)^(1/n_fluid)
+            #        + (1/√3) · (√3)^(1/n_fluid)
             #        · σ_c_mean^((n_fluid − 1)/n_fluid)
             #        · (|γ̇|·τ_pl_shear)^(1/n_fluid)
             #
             # Special cases:
-            #   n_fluid = 1 → σ_xy = σ_c_mean/√3 + |γ̇|·τ_pl_shear / 2
+            #   n_fluid = 1 → σ_xy = σ_c_mean/√3 + |γ̇|·τ_pl_shear
             #   n_fluid = 2 → σ_xy = σ_c_mean/√3
-            #                     + √( σ_c_mean · |γ̇| · τ_pl_shear / (2·√3) )
+            #                     + √( σ_c_mean · √3 · |γ̇| · τ_pl_shear )
             #
             # Starting near this target avoids long transient loading times at
             # low shear rates and destabilising FFT redistribution at high
@@ -426,7 +508,7 @@ class TensorialEPM(EPMBase):
             excess_base = jnp.maximum(gdot_abs * tau_safe, 0.0)
             warm_excess = (
                 (1.0 / sqrt3)
-                * (sqrt3 / 2.0) ** inv_n
+                * sqrt3**inv_n
                 * scm_safe ** ((n_safe - 1.0) * inv_n)
                 * excess_base**inv_n
             )
@@ -588,28 +670,26 @@ class TensorialEPM(EPMBase):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data if possible
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Constant shear rate from metadata
         gdot = data.metadata.get("gamma_dot", 0.1)
 
-        # Scan for N-1 steps
+        # Scan for N-1 steps, using the actual per-step dt (time[i+1]-time[i])
+        # rather than a single dt=time[1]-time[0] applied uniformly — matters
+        # when the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
         state = self._init_state(key)
 
-        def body(carrier, _):
+        def body(carrier, dt_step):
             curr_state = carrier
             new_state = self._epm_step(
-                curr_state, propagator_q, gdot, dt, params, smooth
+                curr_state, propagator_q, gdot, dt_step, params, smooth
             )
             # Extract shear stress component (index 2)
             return new_state, jnp.mean(new_state[0][2])
 
         if n_steps > 0:
-            _, stresses_scan = jax.lax.scan(body, state, None, length=n_steps)
+            dt_steps = jnp.diff(jnp.asarray(time))
+            _, stresses_scan = jax.lax.scan(body, state, dt_steps, length=n_steps)
             # Prepend initial stress
             initial_stress = jnp.mean(state[0][2])
             stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
@@ -634,11 +714,6 @@ class TensorialEPM(EPMBase):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Step strain magnitude from metadata
         strain_step = data.metadata.get("gamma", 0.1)
 
@@ -653,19 +728,22 @@ class TensorialEPM(EPMBase):
         # Initial G(0)
         g_0 = jnp.mean(stress[2]) / strain_step
 
-        # Relax (gdot = 0) for N-1 steps
+        # Relax (gdot = 0) for N-1 steps, using the actual per-step dt rather
+        # than a single dt=time[1]-time[0] applied uniformly — matters when
+        # the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
 
-        def body(carrier, _):
+        def body(carrier, dt_step):
             curr_state = carrier
             new_state = self._epm_step(
-                curr_state, propagator_q, 0.0, dt, params, smooth
+                curr_state, propagator_q, 0.0, dt_step, params, smooth
             )
             # Return G(t) = Shear Stress / gamma_0
             return new_state, jnp.mean(new_state[0][2]) / strain_step
 
         if n_steps > 0:
-            _, moduli_scan = jax.lax.scan(body, state, None, length=n_steps)
+            dt_steps = jnp.diff(jnp.asarray(time))
+            _, moduli_scan = jax.lax.scan(body, state, dt_steps, length=n_steps)
             moduli = jnp.concatenate([jnp.array([g_0]), moduli_scan])
         else:
             moduli = jnp.array([g_0])
@@ -735,8 +813,11 @@ class TensorialEPM(EPMBase):
 
             # Update shear rate (P-control on rate)
             gdot_new = gdot + Kp * error
-            # Prevent negative shear rate
-            gdot_new = jnp.maximum(gdot_new, 0.0)
+            # Clamp by sign of target_stress so a negative target creep stress
+            # can still drive a negative shear rate toward it (mirroring the
+            # positive-target case) instead of freezing at gdot=0 forever.
+            target_sign = jnp.sign(target_stress)
+            gdot_new = target_sign * jnp.maximum(target_sign * gdot_new, 0.0)
 
             # Step EPM at the stable substep
             new_epm = self._epm_step(
@@ -772,11 +853,6 @@ class TensorialEPM(EPMBase):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Params
         gamma0 = data.metadata.get("gamma0", 1.0)
         omega = data.metadata.get("omega", 1.0)
@@ -786,23 +862,29 @@ class TensorialEPM(EPMBase):
         # Initial stress
         initial_stress = jnp.mean(state[0][2])
 
-        # Run for N-1 steps
+        # Run for N-1 steps, using the actual per-step dt (time[i+1]-time[i])
+        # rather than a single dt=time[1]-time[0] applied uniformly — matters
+        # when the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
         scan_time = time[:-1] if n_steps > 0 else jnp.array([])
+        dt_steps = jnp.diff(jnp.asarray(time)) if n_steps > 0 else jnp.array([])
 
-        def body(carrier, t):
+        def body(carrier, xs):
             curr_state = carrier
+            t, dt_step = xs
             # Time varying shear rate at current time t
             gdot = gamma0 * omega * jnp.cos(omega * t)
 
             new_state = self._epm_step(
-                curr_state, propagator_q, gdot, dt, params, smooth
+                curr_state, propagator_q, gdot, dt_step, params, smooth
             )
             # Extract shear stress component
             return new_state, jnp.mean(new_state[0][2])
 
         if n_steps > 0:
-            _, stresses_scan = jax.lax.scan(body, state, scan_time, length=n_steps)
+            _, stresses_scan = jax.lax.scan(
+                body, state, (scan_time, dt_steps), length=n_steps
+            )
             stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
         else:
             stresses = jnp.array([initial_stress])

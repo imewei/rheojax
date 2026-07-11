@@ -14,8 +14,8 @@ Model Variants
 
 Coupling Modes
 --------------
-- "minimal": Relaxation time λ = 1/f only
-- "full": λ = 1/f + τ_y(f) aging yield stress
+- "minimal": Relaxation time λ = 1/(G*f) only
+- "full": λ = 1/(G*f) + τ_y(f) aging yield stress
 
 Supported Protocols
 -------------------

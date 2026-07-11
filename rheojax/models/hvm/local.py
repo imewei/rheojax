@@ -194,8 +194,10 @@ class HVMLocal(HVMBase):
     ) -> np.ndarray | dict[str, np.ndarray]:
         """Predict steady-state flow curve.
 
-        At steady state, mu^E → mu^E_nat, so sigma_E → 0.
-        Only the D-network contributes viscous stress.
+        At steady state under constant shear rate, mu^E does not fully
+        relax to mu^E_nat: the E-network retains a genuine Maxwell-like
+        viscous contribution sigma_E = G_E*gamma_dot/(2*k_BER_0) (see
+        hvm_steady_shear_stress). Both E and D contribute viscous stress.
 
         Parameters
         ----------
@@ -210,17 +212,20 @@ class HVMLocal(HVMBase):
             Steady-state stress (Pa) or component dict
         """
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
+        k_ber_0 = self._get_k_ber_0()
         sigma = hvm_steady_shear_stress_vec(
-            gamma_dot_jax, self.G_P, self.G_D, self.k_d_D
+            gamma_dot_jax, self.G_P, self.G_E, self.G_D, k_ber_0, self.k_d_D
         )
 
         if return_components:
+            eta_E = self.G_E / jnp.maximum(2.0 * k_ber_0, 1e-30)
             eta_D = self.G_D / jnp.maximum(self.k_d_D, 1e-30)
+            sigma_E = eta_E * gamma_dot_jax
             sigma_D = eta_D * gamma_dot_jax
             return {
                 "stress": np.asarray(sigma),
                 "sigma_P": np.zeros_like(np.asarray(gamma_dot)),  # Elastic, not viscous
-                "sigma_E": np.zeros_like(np.asarray(gamma_dot)),  # Relaxed at SS
+                "sigma_E": np.asarray(sigma_E),
                 "sigma_D": np.asarray(sigma_D),
                 "eta_eff": np.asarray(sigma / jnp.maximum(gamma_dot_jax, 1e-30)),
             }
@@ -354,8 +359,11 @@ class HVMLocal(HVMBase):
                             y[4],
                             y[6],
                             y[7],
+                            y[9],
+                            params["G_P"],
                             params["G_E"],
                             params.get("G_D", 0.0),
+                            y[10],
                         )
                     )(ys)
                 ),
@@ -574,8 +582,11 @@ class HVMLocal(HVMBase):
                 y[4],
                 y[6],
                 y[7],
+                y[9],
+                params["G_P"],
                 params["G_E"],
                 params.get("G_D", 0.0),
+                y[10],
             )
         )(ys)
 
@@ -895,7 +906,7 @@ class HVMLocal(HVMBase):
         }
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
-            return hvm_steady_shear_stress_vec(X_jax, G_P, G_D, k_d_D)
+            return hvm_steady_shear_stress_vec(X_jax, G_P, G_E, G_D, k_ber_0, k_d_D)
 
         elif mode == "oscillation":
             G_prime, G_double_prime = hvm_saos_moduli_vec(
@@ -988,7 +999,7 @@ class HVMLocal(HVMBase):
 
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
-            return hvm_steady_shear_stress_vec(X_jax, G_P, G_D, k_d_D)
+            return hvm_steady_shear_stress_vec(X_jax, G_P, G_E, G_D, k_ber_0, k_d_D)
 
     # =========================================================================
     # Factory Methods (Limiting Cases)

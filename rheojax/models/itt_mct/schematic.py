@@ -128,6 +128,10 @@ class ITTMCTSchematic(ITTMCTBase):
         Volume fraction for Percus-Yevick S(k). Required if stress_form="microscopic".
     k_BT : float, default 1.0
         Thermal energy k_B × T in Joules. Default 1.0 gives dimensionless stress.
+    sigma_particle : float, default 1.0
+        Particle diameter (m), used only when stress_form="microscopic" to make
+        the k_BT-weighted stress prefactor dimensionally consistent with k_BT.
+        Default 1.0 matches the dimensionless (k_BT=1.0) convention.
 
     Attributes
     ----------
@@ -161,6 +165,7 @@ class ITTMCTSchematic(ITTMCTBase):
     ...     stress_form="microscopic",
     ...     phi_volume=0.5,
     ...     k_BT=4.11e-21,  # Room temperature
+    ...     sigma_particle=1e-6,  # 1 micron particle diameter (m)
     ... )
     """
 
@@ -177,6 +182,7 @@ class ITTMCTSchematic(ITTMCTBase):
         stress_form: Literal["schematic", "microscopic"] = "schematic",
         phi_volume: float | None = None,
         k_BT: float = 1.0,
+        sigma_particle: float = 1.0,
     ):
         """Initialize F₁₂ Schematic Model.
 
@@ -208,6 +214,10 @@ class ITTMCTSchematic(ITTMCTBase):
         k_BT : float, default 1.0
             Thermal energy k_B × T in Joules. Default 1.0 gives dimensionless stress.
             Use 4.11e-21 J for T=298K with real units.
+        sigma_particle : float, default 1.0
+            Particle diameter (m), used only when stress_form="microscopic" to
+            make the k_BT-weighted stress prefactor dimensionally consistent
+            with a real k_BT (default 1.0 matches the dimensionless convention).
         """
         # Store initialization parameters before parent __init__
         self._init_epsilon = epsilon
@@ -238,6 +248,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self._stress_form = stress_form
         self._phi_volume = phi_volume
         self._k_BT = k_BT
+        self._sigma_particle = sigma_particle
 
         # Pre-compute microscopic stress prefactor if needed
         self._microscopic_stress_prefactor = None
@@ -245,8 +256,18 @@ class ITTMCTSchematic(ITTMCTBase):
             from rheojax.utils.mct_kernels import get_microscopic_stress_prefactor
 
             assert phi_volume is not None
+            # Pass sigma_particle so the k_BT-weighted prefactor is
+            # dimensionally consistent with a real k_BT (previously sigma
+            # silently defaulted to 1.0 regardless of k_BT). k_min/k_max are
+            # scaled by 1/sigma_particle to keep the same dimensionless
+            # k*sigma integration range (default [1, 30]) as sigma_particle
+            # changes from the dimensionless default of 1.0.
             self._microscopic_stress_prefactor = get_microscopic_stress_prefactor(
-                phi_volume, k_BT=k_BT
+                phi_volume,
+                k_min=1.0 / sigma_particle,
+                k_max=30.0 / sigma_particle,
+                k_BT=k_BT,
+                sigma=sigma_particle,
             )
 
         super().__init__(
@@ -570,12 +591,25 @@ class ITTMCTSchematic(ITTMCTBase):
 
         sigma = np.zeros_like(gamma_dot)
 
-        # Zero shear rate: yield stress if glass
+        # Zero shear rate: yield stress if glass. This is the gamma_dot->0+
+        # limit of sigma = G_eff*gamma_dot*int_0^inf Phi_adv(t)^2 dt with
+        # Phi_adv ~ f_neq*h(gamma_dot*t): substituting x = gamma_dot*t gives
+        # sigma -> G_eff*f_neq^2*int_0^inf h(x)^2 dx, i.e. G_eff*gamma_c*f_neq^2
+        # times sqrt(pi)/(2*sqrt(2)) (Gaussian h) or pi/4 (Lorentzian h) --
+        # not a bare gamma_c*f_neq^2 (which would be discontinuous with the
+        # finite-rate branch as gamma_dot -> 0).
         if np.any(mask_zero):
             info = self.get_glass_transition_info()
             if info["is_glass"]:
                 f_neq = info["f_neq"]
-                sigma[mask_zero] = G_eff * gamma_c * f_neq * f_neq
+                decorrelation_prefactor = (
+                    np.pi / 4.0
+                    if self._use_lorentzian
+                    else np.sqrt(np.pi) / (2.0 * np.sqrt(2.0))
+                )
+                sigma[mask_zero] = (
+                    G_eff * gamma_c * f_neq * f_neq * decorrelation_prefactor
+                )
             # else: sigma stays 0
 
         # Non-zero shear rates: batched diffrax solve
@@ -646,12 +680,19 @@ class ITTMCTSchematic(ITTMCTBase):
 
         for i, gd in enumerate(gamma_dot):
             if gd < 1e-15:
-                # Zero shear rate: yield stress if glass, zero if fluid
+                # Zero shear rate: yield stress if glass, zero if fluid.
+                # This is the gamma_dot->0+ limit of the finite-rate branch's
+                # integral (see _predict_flow_curve_diffrax for the derivation).
                 info = self.get_glass_transition_info()
                 if info["is_glass"]:
-                    # Approximate yield stress
+                    # Yield stress
                     f_neq = info["f_neq"]
-                    sigma[i] = G_eff * gamma_c * f_neq * f_neq
+                    decorrelation_prefactor = (
+                        np.pi / 4.0
+                        if self._use_lorentzian
+                        else np.sqrt(np.pi) / (2.0 * np.sqrt(2.0))
+                    )
+                    sigma[i] = G_eff * gamma_c * f_neq * f_neq * decorrelation_prefactor
                 else:
                     sigma[i] = 0.0
             else:
@@ -739,10 +780,10 @@ class ITTMCTSchematic(ITTMCTBase):
                 h_gamma = np.exp(-((gamma_acc / gamma_c) ** 2))
             phi_advected = phi * h_gamma
 
-            # Memory kernel
-            m_phi = v1 * phi_advected + v2 * phi_advected * phi_advected
-
-            # Memory integral from Prony modes
+            # Memory integral from Prony modes: g, tau are Prony-fit to the
+            # m(t) time series itself (prony_decompose_memory), so the
+            # standard/fixed-kernel Prony form applies below (no extra m(Φ)
+            # factor -- matches the f12_volterra_flow_curve_rhs fix).
             memory_integral = np.sum(K)
 
             # MCT equation
@@ -756,9 +797,9 @@ class ITTMCTSchematic(ITTMCTBase):
                     h_mode = 1.0 / (1.0 + (gamma_mode / gamma_c) ** 2)
                 else:
                     h_mode = np.exp(-((gamma_mode / gamma_c) ** 2))
-                dK_dt = -K / np.asarray(tau) + np.asarray(g) * m_phi * h_mode * dphi_dt
+                dK_dt = -K / np.asarray(tau) + np.asarray(g) * h_mode * dphi_dt
             else:
-                dK_dt = -K / np.asarray(tau) + np.asarray(g) * m_phi * dphi_dt
+                dK_dt = -K / np.asarray(tau) + np.asarray(g) * dphi_dt
 
             # Strain accumulation
             dgamma_dt = gamma_dot

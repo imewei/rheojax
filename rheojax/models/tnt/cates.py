@@ -28,7 +28,7 @@ Key Predictions
 
 Supported Protocols
 -------------------
-- FLOW_CURVE: Steady shear stress σ = G₀·τ_d·γ̇ / (1 + (τ_d·γ̇)²) + η_s·γ̇
+- FLOW_CURVE: Steady shear stress σ = G₀·τ_d·γ̇ + η_s·γ̇ (UCM, no shear thinning)
 - OSCILLATION: SAOS moduli with effective τ_d
 - STARTUP: Transient stress growth (ODE)
 - RELAXATION: Exponential decay σ(t) = σ₀·exp(-t/τ_d)
@@ -327,7 +327,17 @@ class TNTCates(TNTBase):
 
     @property
     def tau_d(self) -> float:
-        """Get effective relaxation time τ_d = √(τ_rep · τ_break) (s)."""
+        """Get effective relaxation time τ_d = √(τ_rep · τ_break) (s).
+
+        This is the Cates (1987) fast-breaking-limit approximation, valid
+        only for τ_break << τ_rep. It is applied here unconditionally for
+        any (tau_rep, tau_break) within the declared parameter bounds, which
+        permit tau_break >= tau_rep. Outside the fast-breaking regime this
+        formula is not the physically correct interpolation (e.g. it diverges
+        as tau_break -> large instead of saturating at the finite tau_rep
+        slow-breaking limit); do not over-interpret tau_d from unconstrained
+        fits where tau_break is comparable to or exceeds tau_rep.
+        """
         return float(jnp.sqrt(jnp.maximum(self.tau_rep * self.tau_break, 1e-30)))
 
     @property

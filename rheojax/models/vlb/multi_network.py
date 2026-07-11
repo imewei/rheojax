@@ -511,6 +511,16 @@ class VLBMultiNetwork(VLBBase):
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
+            if float(G_e) > 0.0:
+                logger.warning(
+                    "VLBMultiNetwork: %s prediction requested with G_e=%.6g > 0. "
+                    "A permanent network has no finite steady-state stress under "
+                    "continued shear (it grows as G_e*gamma_dot*t, see "
+                    "vlb_multi_startup_stress); the returned eta_0*gamma_dot "
+                    "omits this divergent contribution.",
+                    mode,
+                    float(G_e),
+                )
             return self._predict_flow_curve_internal(X_jax, G_modes, kd_modes, eta_s)
 
         elif mode == "oscillation":
@@ -540,7 +550,7 @@ class VLBMultiNetwork(VLBBase):
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             _, stress = self._simulate_laos_internal(
-                X_jax, G_modes, kd_modes, eta_s, gamma_0, omega
+                X_jax, G_modes, kd_modes, eta_s, G_e, gamma_0, omega
             )
             return stress
 
@@ -635,6 +645,9 @@ class VLBMultiNetwork(VLBBase):
         # viscosity (G_total / fastest relaxation rate) so the fast timescale
         # eta_eff/G_total stays resolvable by the adaptive Tsit5 solver,
         # matching the eta_eff pattern used in nonlocal_model.py.
+        # ponytail: this floors eta_s at ~1% of G_total/kd_max, inducing a
+        # ~1e-2 relative bias vs the exact eta_s=0 analytical limit; tighten
+        # the 1e-2 constant if validating against that limit.
         G_total = jnp.sum(G_modes) + G_e
         kd_max = jnp.max(kd_modes)
         eta_eff = jnp.maximum(eta_s, 1e-2 * G_total / jnp.maximum(kd_max, 1e-30))
@@ -690,6 +703,7 @@ class VLBMultiNetwork(VLBBase):
         G_modes: jnp.ndarray,
         kd_modes: jnp.ndarray,
         eta_s: float,
+        G_e: float,
         gamma_0: float,
         omega: float,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -697,6 +711,10 @@ class VLBMultiNetwork(VLBBase):
 
         State vector: [mu_xy_0, ..., mu_xy_{N-1}, mu_xx_0, ..., mu_xx_{N-1}]
         (mu_yy stays at 1 for each mode since yy decouples)
+
+        A permanent network (G_e > 0) contributes a purely elastic,
+        in-phase term G_e * gamma(t) = G_e * gamma_0 * sin(omega*t); unlike
+        continuous shear flow this stays bounded under oscillatory strain.
 
         Returns (strain, stress) arrays.
         """
@@ -756,7 +774,11 @@ class VLBMultiNetwork(VLBBase):
         gamma_dot_t = gamma_0 * omega * jnp.cos(omega * t)
 
         strain = gamma_0 * jnp.sin(omega * t)
-        stress = jnp.sum(G_modes[None, :] * mu_xy_all, axis=1) + eta_s * gamma_dot_t
+        stress = (
+            jnp.sum(G_modes[None, :] * mu_xy_all, axis=1)
+            + eta_s * gamma_dot_t
+            + G_e * strain
+        )
         stress = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             stress,

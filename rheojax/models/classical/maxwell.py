@@ -170,16 +170,36 @@ class Maxwell(BaseModel):
 
             if test_mode == TestMode.RELAXATION:
                 tail = max(3, y_np.size // 6)
-                offset = float(np.median(y_np[-tail:]))
-                y_np = y_np - offset
-                self._relaxation_offset = offset
-                # Store in _last_fit_kwargs for Bayesian pipeline forwarding
-                self._last_fit_kwargs["_relaxation_offset"] = offset
-                logger.debug(
-                    "Applied relaxation offset correction",
-                    offset=offset,
-                    tail_points=tail,
-                )
+                tail_vals = y_np[-tail:]
+                offset = float(np.median(tail_vals))
+                tail_noise = float(np.std(tail_vals))
+                # ponytail: only treat the tail median as an instrument baseline
+                # (and subtract it) when it is statistically indistinguishable
+                # from zero relative to the tail's own noise floor. If the tail
+                # carries a real, noise-exceeding offset, the observation window
+                # simply hasn't fully relaxed (G(t)->0 is the documented model);
+                # subtracting it would silently bias G0/eta, so leave the data
+                # untouched and warn instead.
+                noise_scale = tail_noise / np.sqrt(tail) if tail_noise > 0 else 0.0
+                offset_is_noise = abs(offset) <= 3.0 * noise_scale
+                if offset_is_noise:
+                    y_np = y_np - offset
+                    self._relaxation_offset = offset
+                    # Store in _last_fit_kwargs for Bayesian pipeline forwarding
+                    self._last_fit_kwargs["_relaxation_offset"] = offset
+                    logger.debug(
+                        "Applied relaxation offset correction",
+                        offset=offset,
+                        tail_points=tail,
+                    )
+                else:
+                    logger.warning(
+                        "Relaxation data tail has not decayed to zero within "
+                        "noise; fitting G0*exp(-t/tau) without baseline "
+                        "subtraction (data may not span the full decay).",
+                        tail_median=offset,
+                        tail_noise=tail_noise,
+                    )
 
             x_data = jnp.array(x_np)
             y_data = jnp.array(y_np)

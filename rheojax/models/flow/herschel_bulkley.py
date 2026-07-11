@@ -320,9 +320,14 @@ class HerschelBulkley(BaseModel):
         # η_app(γ̇) = σ(γ̇) / γ̇ = σ_y/|γ̇| + K |γ̇|^(n-1)
         abs_gamma_dot = jnp.abs(gamma_dot)
 
-        # Compute viscosity above yield
-        # R5-GRAD-001: epsilon guards infinite gradient at abs_gamma_dot=0 for n < 1
-        viscosity_above_yield = sigma_y / (abs_gamma_dot + threshold) + K * jnp.power(
+        # Compute viscosity above yield.
+        # Use a jnp.where-based safe divisor (matches the documented σ_y/|γ̇|
+        # exactly for γ̇ > 0) instead of an additive-epsilon shift, which
+        # biased results for shear rates near the threshold. Substituting a
+        # finite placeholder (1.0) in the unselected branch keeps the
+        # gradient finite at abs_gamma_dot=0 (R5-GRAD-001).
+        safe_abs_gamma_dot = jnp.where(abs_gamma_dot > 0, abs_gamma_dot, 1.0)
+        viscosity_above_yield = sigma_y / safe_abs_gamma_dot + K * jnp.power(
             abs_gamma_dot + 1e-30, n - 1.0
         )
 

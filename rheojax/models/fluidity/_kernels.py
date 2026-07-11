@@ -39,12 +39,15 @@ def f_loc_herschel_bulkley(
 ) -> float:
     """Compute local equilibrium fluidity from Herschel-Bulkley flow curve.
 
-    f_loc = ((max(0, |σ| - τ_y)) / K)^(1/n)
+    γ̇ = ((max(0, |σ| - τ_y)) / K)^(1/n)
+    f_loc = γ̇ / |σ|
 
-    This is the inverse of the HB flow curve σ = τ_y + K*γ̇^n.
+    This is the inverse of the HB flow curve σ = τ_y + K*γ̇^n, divided by
+    |σ| to convert shear rate into fluidity (f = γ̇/σ).
 
     Uses smooth approximation to avoid discontinuity at yield stress:
-    f_loc = softplus((|σ| - τ_y) / σ_scale)^n / K
+    γ̇ = (softplus((|σ| - τ_y) / σ_scale) * σ_scale / K)^(1/n)
+    f_loc = γ̇ / |σ|
 
     Args:
         sigma: Deviatoric stress (Pa)
@@ -198,10 +201,20 @@ def fluidity_local_ode_rhs(
     aging_rate = (f_eq - f_safe) / theta
 
     # Rejuvenation term: flow-induced increase toward f_inf
-    # Floor at 1e-6 (not 1e-20) to prevent gradient explosion for n_rejuv < 1:
-    # d/dx(x^n) = n*x^(n-1) diverges as x→0 when n<1; 1e-6 keeps gradients O(1e6)
+    # Gate to exactly zero at rest (gamma_dot == 0): a naive floor like
+    # max(|gamma_dot|, 1e-6) would leave a spurious rejuvenation contribution
+    # a*(1e-6)^n_rejuv*(f_inf-f) even at rest (e.g. (1e-6)^0.1 ~ 0.25, ~25%
+    # of a full rejuvenation term), contradicting "aging at rest, f -> f_eq".
+    # A safe base of 1.0 in the discarded branch keeps d/dx(x^n_rejuv) finite
+    # (avoids the gradient blow-up at x=0 for n_rejuv<1) while jnp.where
+    # zeroes out the term exactly when gamma_dot == 0.
     gamma_dot_abs = jnp.abs(gamma_dot)
-    rejuv_rate = a * jnp.power(gamma_dot_abs + 1e-6, n_rejuv) * (f_inf - f_safe)
+    gamma_dot_safe = jnp.where(gamma_dot_abs > 0.0, gamma_dot_abs, 1.0)
+    rejuv_rate = jnp.where(
+        gamma_dot_abs > 0.0,
+        a * jnp.power(gamma_dot_safe, n_rejuv) * (f_inf - f_safe),
+        0.0,
+    )
 
     d_f = aging_rate + rejuv_rate
 
@@ -259,8 +272,15 @@ def fluidity_local_creep_ode_rhs(
 
     # 2. Fluidity evolution
     aging_rate = (f_eq - f_safe) / theta
-    # Floor at 1e-6 to prevent gradient explosion for n_rejuv < 1
-    rejuv_rate = a * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_rejuv) * (f_inf - f_safe)
+    # Gate to exactly zero at rest (gamma_dot == 0) — see fluidity_local_ode_rhs
+    # for why a naive floor is not negligible for n_rejuv < 1.
+    gamma_dot_abs = jnp.abs(gamma_dot)
+    gamma_dot_safe = jnp.where(gamma_dot_abs > 0.0, gamma_dot_abs, 1.0)
+    rejuv_rate = jnp.where(
+        gamma_dot_abs > 0.0,
+        a * jnp.power(gamma_dot_safe, n_rejuv) * (f_inf - f_safe),
+        0.0,
+    )
     d_f = aging_rate + rejuv_rate
 
     return jnp.array([d_gamma, d_f])
@@ -350,9 +370,12 @@ def fluidity_nonlocal_pde_rhs(
     # 2. Relaxation toward local equilibrium
     relax_rate = (f_loc - f_field_safe) / theta
 
-    # 3. Non-local diffusion: ξ²∂²f/∂y²
+    # 3. Non-local diffusion: D_f * ∂²f/∂y² where D_f = ξ²/θ
+    # (must carry units of 1/time to match relax_rate; xi**2 alone cancels
+    # the Laplacian's 1/length² leaving no time factor)
+    D_f = xi**2 / theta
     lap_f = laplacian_1d_neumann(f_field_safe, dy)
-    diffusion_rate = xi**2 * lap_f
+    diffusion_rate = D_f * lap_f
 
     # Total fluidity evolution
     d_f_field = relax_rate + diffusion_rate
@@ -420,8 +443,11 @@ def fluidity_nonlocal_creep_pde_rhs(
     # 2. Fluidity field evolution
     f_loc = f_loc_herschel_bulkley(sigma_applied, tau_y, K, n_flow)
     relax_rate = (f_loc - f_field_safe) / theta
+    # D_f = xi**2/theta keeps diffusion_rate in units of 1/time, matching
+    # relax_rate (see fluidity_nonlocal_pde_rhs for the same convention)
+    D_f = xi**2 / theta
     lap_f = laplacian_1d_neumann(f_field_safe, dy)
-    diffusion_rate = xi**2 * lap_f
+    diffusion_rate = D_f * lap_f
     d_f_field = relax_rate + diffusion_rate
 
     # Assemble output
@@ -483,8 +509,17 @@ def fluidity_local_steady_state(
         at their initial values.
     """
     # HB flow curve: σ = τ_y + K*|γ̇|^n_flow * sign(γ̇)
-    # Floor at 1e-6 to prevent gradient explosion for n_flow < 1
-    sigma_ss = tau_y + K * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_flow)
+    # Gate the power-law term to exactly zero at γ̇=0 so σ(0)=τ_y exactly;
+    # a naive floor like (|γ̇|+1e-6)^n_flow is not negligible for small
+    # n_flow (shear-thinning), e.g. (1e-6)^0.1 ~ 0.25 -> ~25% of K spuriously
+    # added at rest.
+    gamma_dot_abs = jnp.abs(gamma_dot)
+    gamma_dot_is_flowing = gamma_dot_abs > 0.0
+    gamma_dot_safe = jnp.where(gamma_dot_is_flowing, gamma_dot_abs, 1.0)
+    flow_term = jnp.where(
+        gamma_dot_is_flowing, K * jnp.power(gamma_dot_safe, n_flow), 0.0
+    )
+    sigma_ss = tau_y + flow_term
     sigma_ss = sigma_ss * jnp.sign(gamma_dot + 1e-20)
 
     return sigma_ss
@@ -523,8 +558,15 @@ def fluidity_nonlocal_steady_state(
         Steady-state stress array (Pa)
     """
     # HB flow curve: σ = τ_y + K*|γ̇|^n * sign(γ̇)
-    # Floor at 1e-6 to prevent gradient explosion for n_flow < 1
-    sigma_ss = tau_y + K * jnp.power(jnp.abs(gamma_dot) + 1e-6, n_flow)
+    # Gate the power-law term to exactly zero at γ̇=0 — see
+    # fluidity_local_steady_state for why a naive floor is not negligible.
+    gamma_dot_abs = jnp.abs(gamma_dot)
+    gamma_dot_is_flowing = gamma_dot_abs > 0.0
+    gamma_dot_safe = jnp.where(gamma_dot_is_flowing, gamma_dot_abs, 1.0)
+    flow_term = jnp.where(
+        gamma_dot_is_flowing, K * jnp.power(gamma_dot_safe, n_flow), 0.0
+    )
+    sigma_ss = tau_y + flow_term
     sigma_ss = sigma_ss * jnp.sign(gamma_dot + 1e-20)
 
     return sigma_ss

@@ -98,25 +98,38 @@ def _hvnm_initial_state() -> jnp.ndarray:
 
 def _hvnm_relaxation_initial_state(
     gamma_step: float,
+    X_I: float = 1.0,
 ) -> jnp.ndarray:
     """Create initial state after instantaneous step strain.
 
-    Both E, D, and I networks are affinely deformed by gamma_step.
-    Natural states remain at equilibrium (no exchange during step).
+    The E and D networks are affinely deformed by the macroscopic gamma_step.
+    The I-network sees the amplified strain X_I * gamma_step (matching the
+    affine term in hvnm_interphase_rhs_shear and the analytical relaxation
+    kernel hvnm_relaxation_modulus, which uses G_I_eff*X_I*gamma_step for
+    G(0+)). Natural states remain at equilibrium (no exchange during step).
 
     Parameters
     ----------
     gamma_step : float
         Applied step strain
+    X_I : float
+        Interphase strain amplification factor
 
     Returns
     -------
     jnp.ndarray
         Deformed initial state vector (always 18 components)
     """
-    mu_xx = 1.0 + 2.0 * gamma_step**2
+    # For simple shear F=[[1, gamma], [0, 1]], B = F F^T gives
+    # B_xx = 1 + gamma^2, B_yy = 1, B_xy = gamma (matches hvm's convention).
+    mu_xx = 1.0 + gamma_step**2
     mu_yy = 1.0
     mu_xy = gamma_step
+
+    gamma_I = X_I * gamma_step
+    mu_I_xx = 1.0 + gamma_I**2
+    mu_I_yy = 1.0
+    mu_I_xy = gamma_I
 
     components = [
         mu_xx,
@@ -130,9 +143,9 @@ def _hvnm_relaxation_initial_state(
         mu_xy,  # D-network (deformed)
         gamma_step,  # gamma
         0.0,  # D
-        mu_xx,
-        mu_yy,
-        mu_xy,  # I-network (deformed, with amplification applied)
+        mu_I_xx,
+        mu_I_yy,
+        mu_I_xy,  # I-network (deformed, with X_I amplification applied)
         1.0,
         1.0,
         0.0,  # I-network natural state (equilibrium)
@@ -196,10 +209,12 @@ def _compute_k_ber_interphase(
     mu_I_nat_xx, mu_I_nat_yy, mu_I_nat_xy = y[14], y[15], y[16]
 
     if kinetics == "stress":
-        # I-network stress components
-        sigma_I_xx = G_I_eff * X_I * (mu_I_xx - mu_I_nat_xx)
-        sigma_I_yy = G_I_eff * X_I * (mu_I_yy - mu_I_nat_yy)
-        sigma_I_xy = G_I_eff * X_I * (mu_I_xy - mu_I_nat_xy)
+        # I-network stress components (matches the physical interphase
+        # stress used in hvnm_interphase_stress/hvnm_total_stress_shear;
+        # X_I is deliberately excluded -- see that function's docstring).
+        sigma_I_xx = G_I_eff * (mu_I_xx - mu_I_nat_xx)
+        sigma_I_yy = G_I_eff * (mu_I_yy - mu_I_nat_yy)
+        sigma_I_xy = G_I_eff * (mu_I_xy - mu_I_nat_xy)
         return hvnm_ber_rate_interphase_stress(
             sigma_I_xx,
             sigma_I_yy,
@@ -1133,8 +1148,8 @@ def hvnm_solve_relaxation(
     vf = _make_hvnm_relaxation_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_relaxation_initial_state(gamma_step)
     args = _default_hvnm_args(params)
+    y0 = _hvnm_relaxation_initial_state(gamma_step, args["X_I"])
     return _solve_hvnm_ode(t, vf, y0, args)
 
 
@@ -1167,9 +1182,20 @@ def hvnm_solve_creep(
     vf = _make_hvnm_creep_vector_field(
         kinetics, include_damage, include_dissociative, include_interfacial_damage
     )
-    y0 = _hvnm_initial_state()
     args = _default_hvnm_args(params)
     args["sigma_0"] = sigma_0
+
+    # Instantaneous elastic jump: gamma(0+) = sigma_0 / G_tot, matching the
+    # documented J(0+) = 1/G_tot^NC (see hvnm_creep_compliance_linear) instead
+    # of relaxing smoothly from gamma=0 through an artificial viscosity floor.
+    G_tot = (
+        args["G_P"] * args["X_phi"]
+        + args["G_E"]
+        + args["G_D"]
+        + args["G_I_eff"] * args["X_I"]
+    )
+    gamma_0_plus = sigma_0 / jnp.maximum(G_tot, 1e-30)
+    y0 = _hvnm_relaxation_initial_state(gamma_0_plus, args["X_I"])
     return _solve_hvnm_ode(t, vf, y0, args)
 
 

@@ -1,8 +1,13 @@
 """Fractional Maxwell Model (FMM).
 
-This is the most general fractional Maxwell model with two SpringPots in series,
-each with independent fractional orders. It provides maximum flexibility in
-describing viscoelastic materials with fractional dynamics.
+This is the most general fractional Maxwell model, governed by the fractional
+differential equation sigma + tau^beta D^beta sigma = c1 tau^alpha D^alpha gamma
+(Schiessel & Blumen 1993; Heymans & Bauwens 1994), with two independent
+fractional orders alpha and beta. Note this is NOT literally two independent
+SpringPots (c1, alpha) and (c2, beta) in series -- that configuration would
+require a second material coefficient c2 and a denominator exponent of
+(beta - alpha), not beta. It provides maximum flexibility in describing
+viscoelastic materials with fractional dynamics.
 
 Mathematical Description:
     Relaxation Modulus: G(t) = (c_1/τ^β) t^(β-α) E_{β, β-α+1}(-(t/τ)^β)
@@ -56,10 +61,12 @@ logger = get_logger(__name__)
     ],
 )
 class FractionalMaxwellModel(BaseModel):
-    """Fractional Maxwell Model: Two SpringPots in series with independent orders.
+    """Fractional Maxwell Model: fractional differential equation with two orders.
 
     This is the most general fractional Maxwell model, allowing for complex
-    viscoelastic behavior with two independent fractional orders.
+    viscoelastic behavior with two independent fractional orders alpha and
+    beta (see module docstring for the governing FDE; not a literal
+    two-independent-SpringPot series).
 
     Attributes:
         parameters: ParameterSet with c1, alpha, beta, tau

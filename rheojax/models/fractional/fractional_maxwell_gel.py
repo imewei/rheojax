@@ -6,7 +6,7 @@ viscoelastic behavior to terminal flow.
 
 Mathematical Description:
     Relaxation Modulus: G(t) = c_α t^(-α) E_{1-α,1-α}(-t^(1-α)/τ)
-    Complex Modulus: G*(ω) = c_α (iω)^α · (iωτ) / (1 + iωτ)
+    Complex Modulus: G*(ω) = c_α (iω)^α (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
     Creep Compliance: J(t) = (1/c_α) t^α E_{1+α,1+α}(-(t/τ)^(1-α))
 
 where τ = η / c_α^(1/(1-α)) is a characteristic relaxation time.
@@ -234,7 +234,7 @@ class FractionalMaxwellGel(BaseModel):
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω) using JAX.
 
-        G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
+        G*(ω) = c_α (iω)^α (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
         """
         # Add small epsilon
         epsilon = 1e-12
@@ -261,7 +261,7 @@ class FractionalMaxwellGel(BaseModel):
         i_omega_beta = omega_beta * (jnp.cos(phase_beta) + 1j * jnp.sin(phase_beta))
         denominator_term = i_omega_beta * (eta / c_alpha)
 
-        # Complex modulus: G*(ω) = c_α (iω)^α / (1 + (iωτ)^(1-α))
+        # Complex modulus: G*(ω) = c_α (iω)^α (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
         # G* = c_alpha * i_omega_alpha / (1 + i_omega_beta * eta/c_alpha)
         #    = i_omega_alpha / (1/c_alpha + i_omega_beta * eta/c_alpha^2) ? No.
 

@@ -852,7 +852,9 @@ class TNTMultiSpecies(TNTBase):
 
         Analytical multi-mode relaxation:
             σ(t) = Σ σ₀_i·exp(-t/τ_b_i)
-        where σ₀_i = G_i·τ_b_i·γ̇ / (1 + (τ_b_i·γ̇)²)
+        where σ₀_i = G_i·τ_b_i·γ̇ (linear UCM steady-state stress per mode,
+        matching this model's own constant-breakage steady conformation
+        S_xy_i = Wi_i with no saturating denominator)
 
         Parameters
         ----------
@@ -872,9 +874,10 @@ class TNTMultiSpecies(TNTBase):
         jnp.ndarray
             Relaxing stress σ(t) (Pa)
         """
-        # Initial stress per mode at steady state
+        # Initial stress per mode at steady state (linear, unbounded UCM;
+        # matches _predict_flow_curve_internal's eta_0 = sum(G_i*tau_i))
         wi = tau_modes * gamma_dot_preshear
-        sigma_0_modes = G_modes * wi / (1.0 + wi * wi)
+        sigma_0_modes = G_modes * wi
 
         return tnt_multimode_relaxation_vec(t, sigma_0_modes, tau_modes)
 
@@ -1218,9 +1221,10 @@ class TNTMultiSpecies(TNTBase):
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         G_modes, tau_modes = self._get_mode_arrays()
 
-        # Initial stress per mode from steady-state
+        # Initial stress per mode from steady-state (linear, unbounded UCM;
+        # matches predict_flow_curve's eta_0 = sum(G_i*tau_i))
         wi = tau_modes * gamma_dot_preshear
-        sigma_0_modes = G_modes * wi / (1.0 + wi * wi)
+        sigma_0_modes = G_modes * wi
 
         sigma = tnt_multimode_relaxation_vec(t_jax, sigma_0_modes, tau_modes)
 

@@ -1200,8 +1200,10 @@ def build_vlb_ode_rhs(breakage_type="constant", stress_type="linear"):
     breakage_type : str
         "constant" or "bell"
     stress_type : str
-        "linear" or "fene" (FENE-P only affects stress, not the mu ODE,
-        but we include it here for consistency)
+        "linear" or "fene". For "fene", the Peterlin factor f(tr(mu))
+        also enters the relaxation term (Bird et al. 1987: relaxation
+        term is f*A - I, not A - I), so mu itself saturates and never
+        crosses the FENE-P singularity.
 
     Returns
     -------
@@ -1220,11 +1222,18 @@ def build_vlb_ode_rhs(breakage_type="constant", stress_type="linear"):
         else:
             k_d = k_d_0
 
+        # FENE-P Peterlin factor feeds back into the relaxation term
+        # (k_d*(I - f*mu)), which is what bounds tr(mu) below L_max^2+3.
+        if stress_type == "fene":
+            f = vlb_fene_factor(mu_xx, mu_yy, mu_zz, L_max)
+        else:
+            f = 1.0
+
         # Distribution tensor evolution (upper-convected derivative)
-        dmu_xx = k_d * (1.0 - mu_xx) + 2.0 * gamma_dot * mu_xy
-        dmu_yy = k_d * (1.0 - mu_yy)
-        dmu_zz = k_d * (1.0 - mu_zz)
-        dmu_xy = -k_d * mu_xy + gamma_dot * mu_yy
+        dmu_xx = k_d * (1.0 - f * mu_xx) + 2.0 * gamma_dot * mu_xy
+        dmu_yy = k_d * (1.0 - f * mu_yy)
+        dmu_zz = k_d * (1.0 - f * mu_zz)
+        dmu_xy = -k_d * f * mu_xy + gamma_dot * mu_yy
 
         return jnp.array([dmu_xx, dmu_yy, dmu_zz, dmu_xy])
 
@@ -1301,27 +1310,35 @@ def build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="linear"):
             tr_mu = mu_xx + mu_yy + mu_zz
             f = vlb_fene_factor(mu_xx, mu_yy, mu_zz, L_max)
             df_dtr = f * f / (L_max * L_max)
-            numerator = k_d * mu_xy * (f - df_dtr * (3.0 - tr_mu))
+            # Derived from d(sigma_elastic)/dt = d(G0*f*mu_xy)/dt = 0 using
+            # the FENE-corrected mu ODE below (relaxation term k_d*(f*A-I),
+            # so d(tr_mu)/dt = k_d*(3 - f*tr_mu) + 2*gamma_dot*mu_xy and
+            # d(mu_xy)/dt = -k_d*f*mu_xy + gamma_dot*mu_yy). Reduces to the
+            # linear formula k_d*mu_xy/mu_yy when f=1, df_dtr=0.
+            numerator = k_d * mu_xy * (f * f - df_dtr * (3.0 - f * tr_mu))
             denominator = jnp.maximum(
                 f * mu_yy_safe + 2.0 * df_dtr * mu_xy * mu_xy, 1e-20
             )
             gamma_dot_maxwell = numerator / denominator
         else:
+            f = 1.0
             gamma_dot_maxwell = k_d * mu_xy / mu_yy_safe
         gamma_dot_jeffreys = (sigma_applied - sigma_elastic) / jnp.maximum(eta_s, 1e-20)
-        # Use Jeffreys when eta_s is appreciable, Maxwell otherwise
-        eta_threshold = 1e-6 * G0 / k_d_0
-        gamma_dot = jnp.where(
-            eta_s > eta_threshold,
-            gamma_dot_jeffreys,
-            gamma_dot_maxwell,
-        )
+        # Continuous blend Maxwell -> Jeffreys as eta_s grows, instead of a
+        # hard jnp.where cutoff (which silently zeroed out any user-set
+        # eta_s below the threshold, producing a discontinuous jump in
+        # predicted creep strain at the threshold). blend(0)=0 exactly, so
+        # eta_s=0 still reduces to the pure-Maxwell closure unchanged.
+        eta_scale = 1e-6 * G0 / k_d_0
+        blend = eta_s / (eta_s + eta_scale)
+        gamma_dot = gamma_dot_maxwell + blend * (gamma_dot_jeffreys - gamma_dot_maxwell)
 
-        # Distribution tensor evolution (upper-convected)
-        dmu_xx = k_d * (1.0 - mu_xx) + 2.0 * gamma_dot * mu_xy
-        dmu_yy = k_d * (1.0 - mu_yy)
-        dmu_zz = k_d * (1.0 - mu_zz)
-        dmu_xy = -k_d * mu_xy + gamma_dot * mu_yy
+        # Distribution tensor evolution (upper-convected), FENE-corrected
+        # relaxation term k_d*(I - f*mu) so mu itself saturates.
+        dmu_xx = k_d * (1.0 - f * mu_xx) + 2.0 * gamma_dot * mu_xy
+        dmu_yy = k_d * (1.0 - f * mu_yy)
+        dmu_zz = k_d * (1.0 - f * mu_zz)
+        dmu_xy = -k_d * f * mu_xy + gamma_dot * mu_yy
 
         return jnp.array([dmu_xx, dmu_yy, dmu_zz, dmu_xy, gamma_dot])
 
@@ -1405,8 +1422,10 @@ def laplacian_1d_neumann_vlb(field: jnp.ndarray, dy: float) -> jnp.ndarray:
     jnp.ndarray
         Laplacian of field, shape (N_y,)
     """
-    # Pad with ghost points for Neumann BC
-    padded = jnp.concatenate([field[0:1], field, field[-1:]])
+    # Pad with mirrored ghost points for Neumann BC: f_{-1}=f_1, f_N=f_{N-2}
+    # (duplicating the boundary value itself, i.e. f_{-1}=f_0, halves the
+    # Laplacian magnitude at both edges).
+    padded = jnp.concatenate([field[1:2], field, field[-2:-1]])
     return (padded[2:] - 2.0 * padded[1:-1] + padded[:-2]) / (dy * dy)
 
 

@@ -22,6 +22,8 @@ from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger
 from rheojax.models.dmt._base import DMTBase
 from rheojax.models.dmt._kernels import (
+    invert_stress_for_gamma_dot_exponential,
+    invert_stress_for_gamma_dot_hb,
     structure_evolution,
     viscosity_exponential,
     viscosity_herschel_bulkley_regularized,
@@ -332,7 +334,8 @@ class DMTNonlocal(DMTBase):
             gd = gd.at[-1].set((v_prof[-1] - v_prof[-2]) / dy)
             return gd
 
-        # Build viscosity function based on closure type (branch outside scan)
+        # Build viscosity function based on closure type (branch outside scan).
+        # Used only to size the stress bisection bracket below.
         if self.closure == "exponential":
             eta_0 = params["eta_0"]
             eta_inf = params["eta_inf"]
@@ -341,6 +344,14 @@ class DMTNonlocal(DMTBase):
                 return jax.vmap(
                     lambda li, gi: viscosity_exponential(li, eta_0, eta_inf)
                 )(lam_arr, gd_arr)
+
+            def _gamma_dot_of_stress(stress, lam_arr):
+                """gamma_dot(y) satisfying stress = eta(lambda(y)) * gamma_dot(y)."""
+                return jax.vmap(
+                    lambda li: invert_stress_for_gamma_dot_exponential(
+                        stress, li, eta_0, eta_inf
+                    )
+                )(lam_arr)
 
         else:
             tau_y0 = params["tau_y0"]
@@ -357,37 +368,76 @@ class DMTNonlocal(DMTBase):
                     )
                 )(lam_arr, gd_arr)
 
+            def _gamma_dot_of_stress(stress, lam_arr):
+                """gamma_dot(y) satisfying the HB constitutive law at `stress`.
+
+                invert_stress_for_gamma_dot_hb assumes stress >= 0, so the
+                sign is restored explicitly to keep the solve odd-symmetric.
+                """
+                sign = jnp.sign(stress)
+                stress_abs = jnp.abs(stress)
+                return sign * jax.vmap(
+                    lambda li: invert_stress_for_gamma_dot_hb(
+                        stress_abs, li, tau_y0, K0, n_flow, eta_inf_hb, m1, m2
+                    )
+                )(lam_arr)
+
+        _N_BISECT = 40  # ~2^-40 relative bracket resolution
+
         def scan_step(carry, _):
             """Single time step (pure JAX, no host transfers)."""
             lam_c, v_c = carry
 
-            # Shear rate from velocity
+            # Shear rate from velocity (prior step's profile; only used to
+            # size the bisection bracket for the uniform stress solve below)
             gamma_dot_c = _shear_rate_pure(v_c)
-
-            # Viscosity
             eta = _viscosity_fn(lam_c, gamma_dot_c)
+            bracket = jnp.maximum(jnp.abs(jnp.mean(eta * gamma_dot_c)), 1e-6) * 50.0
 
-            # Stress (uniform for low Re)
-            stress = jnp.mean(eta * gamma_dot_c)
+            def _velocity_of_stress(stress):
+                """Wall velocity implied by a uniform trial stress Sigma.
 
-            # Structure evolution + diffusion
+                Integrates gamma_dot(y) = constitutive_inverse(Sigma, lambda(y))
+                across the gap (trapezoid rule) instead of the old mean-stress
+                + linear-rescale heuristic, so the result actually satisfies
+                the uniform-stress momentum balance at convergence.
+                """
+                gd = _gamma_dot_of_stress(stress, lam_c)
+                return jnp.sum(0.5 * (gd[:-1] + gd[1:])) * dy
+
+            def _bisect_body(_i, bounds):
+                lo, hi = bounds
+                mid = 0.5 * (lo + hi)
+                go_up = _velocity_of_stress(mid) < V_wall
+                lo = jnp.where(go_up, mid, lo)
+                hi = jnp.where(go_up, hi, mid)
+                return (lo, hi)
+
+            lo_f, hi_f = jax.lax.fori_loop(
+                0, _N_BISECT, _bisect_body, (-bracket, bracket)
+            )
+            stress = 0.5 * (lo_f + hi_f)
+
+            # Momentum-consistent local shear rate at the solved uniform stress
+            gamma_dot_solved = _gamma_dot_of_stress(stress, lam_c)
+
+            # Structure evolution + diffusion (driven by the solved shear rate)
             local_rate = jax.vmap(
                 lambda li, gi: structure_evolution(li, gi, t_eq, a_param, c_param)
-            )(lam_c, gamma_dot_c)
+            )(lam_c, gamma_dot_solved)
             diffusion = D_lambda * _laplacian_pure(lam_c)
             lam_new = jnp.clip(lam_c + dt * (local_rate + diffusion), 0.0, 1.0)
 
-            # Velocity reconstruction from uniform stress
-            gamma_dot_target = stress / jnp.maximum(eta, 1e-10)
-            v_raw = jnp.concatenate(
-                [jnp.array([0.0]), jnp.cumsum(gamma_dot_target[:-1]) * dy]
+            # Velocity profile integrated from the momentum-consistent shear rate
+            v_new = jnp.concatenate(
+                [
+                    jnp.array([0.0]),
+                    jnp.cumsum(0.5 * (gamma_dot_solved[:-1] + gamma_dot_solved[1:]))
+                    * dy,
+                ]
             )
-            # Guard: if v_raw[-1] is near-zero, scaling would amplify noise;
-            # fall back to V_wall denominator (linear profile) instead.
-            v_denom = jnp.where(v_raw[-1] > 1e-6 * V_wall, v_raw[-1], V_wall)
-            v_new = v_raw * V_wall / v_denom
 
-            outputs = (stress, lam_c, v_c, gamma_dot_c)
+            outputs = (stress, lam_c, v_c, gamma_dot_solved)
             return (lam_new, v_new), outputs
 
         # Run scan — single JIT-compiled loop, no host transfers

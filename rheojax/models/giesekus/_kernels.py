@@ -187,9 +187,14 @@ def _solve_giesekus_f_quartic(
     # Guard against division by zero in the α > 0 branch
     alpha_safe = jnp.maximum(alpha, 1e-30)
 
-    # Physical upper bound: disc_yy ≥ 0 requires |2α·Wi·f| ≤ 1
+    # Physical upper bound: disc_yy ≥ 0 requires |2α·Wi·f| ≤ 1.
+    # Keep the cap as close to the exact boundary (disc_yy = 0) as
+    # numerically safe, rather than an arbitrary 0.999 fudge factor —
+    # a looser cap biases the converged root away from the true
+    # solution for all Wi large enough that the root sits near this
+    # boundary (e.g. α=0.5 at high Wi).
     f_max = jnp.minimum(
-        0.999 / (2.0 * alpha_safe * jnp.maximum(wi, 1e-10)),
+        (1.0 - 1e-10) / (2.0 * alpha_safe * jnp.maximum(wi, 1e-10)),
         1.0 - 1e-10,
     )
 
@@ -621,7 +626,13 @@ def giesekus_complex_viscosity(
 
     # |η*| = |G*|/ω = sqrt(G'² + G''²)/ω
     G_star_mag = jnp.sqrt(G_prime * G_prime + G_double_prime * G_double_prime + 1e-30)
-    eta_star_mag = G_star_mag / omega
+    # G*(0) = 0 too (Maxwell limit), so G_star_mag/omega is 0/0 at ω=0.
+    # The correct zero-shear limit is |η*(0)| = η_p + η_s.
+    eta_star_mag = jnp.where(
+        jnp.abs(omega) < 1e-30, eta_p + eta_s, G_star_mag / jnp.where(
+            jnp.abs(omega) < 1e-30, 1.0, omega
+        )
+    )
 
     # Phase angle: tan(δ) = G''/G'
     delta = jnp.arctan2(G_double_prime, G_prime)
@@ -774,13 +785,16 @@ def giesekus_creep_ode_rhs(
 
         γ̇ = (σ - τ_xy) / η_s
 
-    For η_s = 0, creep is not well-defined (instantaneous jump to
-    steady state), so a regularization is applied. The floor must be
-    large enough relative to η_p that γ̇ stays numerically integrable
-    (too small a floor makes the initial transient stiffer than the
-    adaptive solver can resolve within its step budget, and the solve
-    silently fails); 1e-4·η_p keeps τ_xy within ~0.1% of σ_applied
-    after the transient while remaining solvable in practice.
+    For η_s = 0 (exactly, e.g. Maxwell-like fits), creep is not
+    well-defined (instantaneous jump to steady state), so a
+    regularization floor of 1e-4·η_p is substituted only in that
+    degenerate case. The floor must be large enough relative to η_p
+    that γ̇ stays numerically integrable (too small a floor makes the
+    initial transient stiffer than the adaptive solver can resolve
+    within its step budget, and the solve silently fails); 1e-4·η_p
+    keeps τ_xy within ~0.1% of σ_applied after the transient while
+    remaining solvable in practice. Any nonzero user/fitted η_s,
+    however small, is used as-is and is never clamped up.
 
     Parameters
     ----------
@@ -808,8 +822,10 @@ def giesekus_creep_ode_rhs(
 
     # Compute shear rate from stress constraint
     # σ = τ_xy + η_s·γ̇  =>  γ̇ = (σ - τ_xy) / η_s
-    # Regularize for small η_s (see docstring: floor must stay solvable)
-    eta_s_reg = jnp.maximum(eta_s, 1e-4 * eta_p)
+    # Only substitute the regularization floor when η_s is (numerically)
+    # exactly zero; a deliberately small but nonzero η_s must be honored
+    # as-is (see docstring: floor only applies in the degenerate case).
+    eta_s_reg = jnp.where(eta_s < 1e-12, 1e-4 * eta_p, eta_s)
     gamma_dot = (sigma_applied - tau_xy) / eta_s_reg
 
     # Stress evolution (same as rate-controlled)

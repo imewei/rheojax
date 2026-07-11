@@ -225,12 +225,17 @@ class DMTBase(BaseModel):
         )
 
         # a: Breakdown rate coefficient
+        # Note: for a*|gamma_dot|^c to be dimensionless (as required in the
+        # structure kinetics dlambda/dt = ... - a*lambda*|gamma_dot|^c/t_eq),
+        # 'a' must carry units of s^c, not "dimensionless" in general -- only
+        # at c=1 does 'a' reduce to units of s. Since c is a free fitted
+        # exponent (bounds below), 'a' is only truly dimensionless when c=1.
         self.parameters.add(
             name="a",
             value=1.0,
             bounds=(1e-3, 1e2),
-            units="dimensionless",
-            description="Breakdown rate coefficient",
+            units="s^c",
+            description="Breakdown rate coefficient (units s^c; dimensionless only if c=1)",
         )
 
         # c: Breakdown rate exponent

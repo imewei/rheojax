@@ -55,8 +55,15 @@ class Cross(BaseModel):
 
     Special Cases:
         λ → 0: Newtonian fluid with η = η_0
-        m → 0: Newtonian fluid for all shear rates
+        m → 0: η approaches the average plateau η_∞ + (η_0 - η_∞)/2 for any
+            γ̇ ≠ 0 (the γ̇ = 0 point is still exactly η_0 by definition,
+            so this limit is discontinuous at γ̇ = 0)
         λ → ∞: η approaches η_∞
+        m > 1: the high-shear asymptote σ ≈ (η_0 - η_∞) λ^(-m) γ̇^(1-m) has a
+            *negative* exponent on γ̇, i.e. shear stress decreases with
+            increasing shear rate in that regime (non-monotonic flow curve).
+            Use m > 1 with care; m ∈ (0, 1] matches the physically
+            monotonic Cross-model range reported in the literature.
 
     Test Mode:
         ROTATION (steady shear) only

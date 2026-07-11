@@ -95,6 +95,7 @@ def compute_plastic_strain_rate(
     n_fluid: float = 1.0,
     sigma_c_mean: float = 1.0,
     fluidity_form: str = "overstress",
+    mu: float = 1.0,
 ) -> jax.Array:
     r"""Compute the local plastic strain rate.
 
@@ -104,21 +105,29 @@ def compute_plastic_strain_rate(
     1. Hard activation: gamma_dot_p = f(sigma) * Theta(|sigma| - sigma_c)
     2. Smooth activation: gamma_dot_p = f(sigma) * 0.5 * (1 + tanh((|sigma| - sigma_c)/w))
 
-    The constitutive law f(sigma) depends on `fluidity_form`:
+    The constitutive law f(sigma) depends on `fluidity_form`. Each form below is
+    written in *stress* units first (as in the classic EPM literature), then
+    divided by `mu` so the function returns a true strain rate (units 1/s) —
+    consistent with `mu * gamma_dot_p` recovering a stress rate (Pa/s) in the
+    stress-evolution ODE (see `epm_step`):
 
     - **"linear"** (classical Bingham):
-        f(sigma) = sigma / tau_pl
+        f(sigma) = (sigma / tau_pl) / mu
       High-rate asymptote: stress ~ gamma_dot * tau_pl. No yield-stress baseline in the
       asymptote.
 
     - **"power"** (power-law fluidity, soft-glassy rheology):
-        f(sigma) = sign(sigma) * |sigma / sigma_c_mean|^n_fluid * sigma_c_mean / tau_pl
+        f(sigma) = sign(sigma) * |sigma / sigma_c_mean|^n_fluid * sigma_c_mean / (tau_pl * mu)
       High-rate asymptote: stress ~ sigma_c_mean * (gamma_dot * tau_pl)^(1/n_fluid).
       Shear-thinning but no additive yield-stress baseline.
 
     - **"overstress"** (Herschel-Bulkley, DEFAULT):
-        f(sigma) = sign(sigma) * (|sigma| - sigma_c_mean)_+^n_fluid / (sigma_c_mean^(n_fluid-1) * tau_pl)
-      Only stress *above* the threshold contributes to plastic flow. High-rate asymptote:
+        f(sigma) = sign(sigma) * (|sigma| - yield_thresholds)_+^n_fluid
+                   / (sigma_c_mean^(n_fluid-1) * tau_pl * mu)
+      Only stress *above* the local yield threshold contributes to plastic flow
+      (matching the per-site `yield_thresholds` used for the activation mask, so a
+      site with a below-mean disordered threshold is not floored to zero flow until
+      the *global* mean is reached). High-rate asymptote:
       stress ~ sigma_c_mean + sigma_c_mean * (gamma_dot * tau_pl / sigma_c_mean)^(1/n_fluid).
       This is the full Herschel-Bulkley form sigma = sigma_y + K * gamma_dot^n_HB with
       sigma_y = sigma_c_mean and n_HB = 1/n_fluid. Recommended for HB-like flow curves
@@ -136,9 +145,12 @@ def compute_plastic_strain_rate(
         n_fluid: Power-law / HB exponent. The implied HB flow exponent is n_HB = 1/n_fluid.
         sigma_c_mean: Mean yield threshold, used as the scale for the power-law forms.
         fluidity_form: One of "linear", "power", or "overstress". Default "overstress".
+        mu: Shear modulus, used to non-dimensionalize the stress-based flow laws so
+            the returned rate has units 1/s (matching `mu * gamma_dot_p` = Pa/s in
+            `epm_step`'s stress-rate ODE). Default 1.0.
 
     Returns:
-        Plastic strain rate field.
+        Plastic strain rate field (units 1/s).
     """
     stress_mag = jnp.abs(stress)
 
@@ -151,9 +163,15 @@ def compute_plastic_strain_rate(
         # Hard threshold
         activation = (stress_mag > yield_thresholds).astype(stress.dtype)
 
+    # Non-dimensionalize by mu so every branch returns a true strain rate
+    # (1/s): the raw stress-scale formulas below are Pa/s once multiplied by
+    # `fluidity` (1/tau_pl); dividing by `mu` (Pa) converts to 1/s, matching
+    # the `mu * gamma_dot_p` = Pa/s convention used in `epm_step`.
+    inv_mu = 1.0 / jnp.maximum(mu, 1e-12)
+
     if fluidity_form == "linear":
         # Classical Bingham form: plastic_rate = activation * sigma * fluidity
-        return activation * stress * fluidity
+        return activation * stress * fluidity * inv_mu
 
     if fluidity_form == "power":
         # Power-law fluidity (soft-glassy rheology): no additive yield-stress baseline
@@ -162,18 +180,25 @@ def compute_plastic_strain_rate(
         power_term = (
             jnp.sign(stress) * (stress_mag_safe * inv_scm) ** n_fluid * sigma_c_mean
         )
-        return activation * power_term * fluidity
+        return activation * power_term * fluidity * inv_mu
 
     if fluidity_form == "overstress":
-        # Herschel-Bulkley overstress law: only stress above threshold drives plastic flow.
+        # Herschel-Bulkley overstress law: only stress above the *local* yield
+        # threshold drives plastic flow. Using the same per-site
+        # `yield_thresholds` here as in the activation mask (rather than the
+        # global `sigma_c_mean`) avoids two artifacts under disorder
+        # (sigma_c_std != 0): a site with a below-mean threshold no longer
+        # gets floored to the eps flow rate until stress reaches the global
+        # mean, and a site with an above-mean threshold no longer starts with
+        # an artificially large overstress the instant it activates.
         # Use a small epsilon softening so the derivative at threshold is well-behaved
-        # (the expression is continuous but has zero derivative at sigma = sigma_c_mean
+        # (the expression is continuous but has zero derivative at sigma = threshold
         # when n_fluid > 1; the softening avoids numerical dead zones).
         eps = 1e-6
-        overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+        overstress = jnp.maximum(stress_mag - yield_thresholds, eps)
         # Equivalent to (overstress)^n_fluid / sigma_c_mean^(n_fluid - 1)
         overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
-        return activation * jnp.sign(stress) * overstress_power * fluidity
+        return activation * jnp.sign(stress) * overstress_power * fluidity * inv_mu
 
     raise ValueError(
         f"Unknown fluidity_form={fluidity_form!r}; "
@@ -256,6 +281,7 @@ def epm_step(
         n_fluid=params.get("n_fluid", 1.0),
         sigma_c_mean=params.get("sigma_c_mean", 1.0),
         fluidity_form=fluidity_form,
+        mu=mu,
     )
 
     # 2. Compute Stress Rates

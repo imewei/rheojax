@@ -26,7 +26,7 @@ Gm : float
 alpha : float
     Fractional order, bounds [0.0, 1.0]
 tau_alpha : float
-    Relaxation time (s^α), bounds [1e-6, 1e6]
+    Relaxation time (s), bounds [1e-6, 1e6]
 
 Limit Cases
 -----------
@@ -53,7 +53,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.compatibility import format_compatibility_message
-from rheojax.utils.mittag_leffler import mittag_leffler_e
+from rheojax.utils.mittag_leffler import mittag_leffler_e, mittag_leffler_e2
 
 # Module logger
 logger = get_logger(__name__)
@@ -104,7 +104,7 @@ class FractionalZenerSolidSolid(BaseModel):
         self.parameters = ParameterSet()
         # Upper bounds widened to 1e11 Pa so glassy polymers (E_g ~ 1-10 GPa,
         # G_g ~ 0.4-4 GPa) and DMTA posterior samples do not violate the Ge/Gm
-        # constraints during set_value().  tau_alpha span widened to ±10^10 s^α
+        # constraints during set_value().  tau_alpha span widened to ±10^10 s
         # to cover master curves spanning ~20 decades after TTS shifting.
         self.parameters.add(
             name="Ge",
@@ -131,7 +131,7 @@ class FractionalZenerSolidSolid(BaseModel):
             name="tau_alpha",
             value=1.0,
             bounds=(1e-10, 1e10),
-            units="s^α",
+            units="s",
             description="Relaxation time",
         )
 
@@ -174,27 +174,32 @@ class FractionalZenerSolidSolid(BaseModel):
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
-        For FZSS, creep compliance is:
-        J(t) = 1/(G_e + G_m) + (1/G_e - 1/(G_e + G_m)) * (1 - E_α(-(t/τ_α)^α))
+        Exact Laplace inverse of the model's own relaxation/oscillation
+        modulus G*(s) = Ge + Gm*(s*tau)^alpha/(1+(s*tau)^alpha), obtained via
+        s^2*G(s)*J(s) = 1. This requires the two-parameter Mittag-Leffler
+        function E_{alpha,alpha+1} with its argument rescaled by
+        q = Ge/(Ge+Gm) -- NOT the bare E_alpha(-(t/tau)^alpha) used by the
+        relaxation modulus:
+
+        J(t) = 1/(Ge+Gm) + [Gm/(Ge+Gm)^2] * (t/tau_alpha)^alpha
+               * E_{alpha,alpha+1}(-(Ge/(Ge+Gm)) * (t/tau_alpha)^alpha)
         """
         epsilon = 1e-12
         # Clip alpha using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
         tau_alpha_safe = tau_alpha + epsilon
 
-        # Instantaneous and equilibrium compliances
         G_total = Ge + Gm + epsilon
-        J_inst = 1.0 / G_total
-        J_eq = 1.0 / (Ge + epsilon)
+        q = Ge / G_total
 
-        # Compute argument: z = -(t/τ_α)^α
-        z = -jnp.power(t / tau_alpha_safe, alpha_safe)
+        # u = (t/tau_alpha)^alpha
+        u = jnp.power(t / tau_alpha_safe, alpha_safe)
 
-        # Mittag-Leffler function
-        ml_term = mittag_leffler_e(z, alpha_safe)
+        # E_{alpha, alpha+1}(-q*u)
+        ml_term = mittag_leffler_e2(-q * u, alpha=alpha_safe, beta=alpha_safe + 1.0)
 
-        # J(t) = J_inst + (J_eq - J_inst) * (1 - E_α(-t^α/τ_α))
-        return J_inst + (J_eq - J_inst) * (1.0 - ml_term)
+        # J(t) = 1/G_total + (Gm/G_total^2) * u * E_{alpha,alpha+1}(-q*u)
+        return 1.0 / G_total + (Gm / (G_total**2)) * u * ml_term
 
     def _predict_creep(
         self, t: jnp.ndarray, Ge: float, Gm: float, alpha: float, tau_alpha: float

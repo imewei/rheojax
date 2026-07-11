@@ -2183,7 +2183,13 @@ class SGRGeneric(BaseModel):
         # nonlinear and produces a non-zero third harmonic even for gamma_0 <= 0.1.
         # The old gamma_0 > 0.1 gate suppressed nonlinearity entirely in the small-
         # amplitude regime, yielding zero third harmonic (physically wrong for SGR).
-        softening = 1.0 - 0.1 * (np.abs(strain) / max(gamma_0, 1e-10)) ** 2
+        # Softening is proportional to strain^2 (not strain^2/gamma_0^2 =
+        # sin^2(omega*t), which was independent of amplitude and so gave the
+        # same I3/I1 at gamma_0=0.001 as at gamma_0=1.0 -- a violation of the
+        # basic small-amplitude linear-response requirement I3/I1 -> 0 as
+        # gamma_0 -> 0). Using strain directly makes softening ~ gamma_0^2,
+        # so the induced third harmonic correctly vanishes as gamma_0 -> 0.
+        softening = 1.0 - 0.1 * strain**2
         stress = stress * softening
 
         return strain, stress

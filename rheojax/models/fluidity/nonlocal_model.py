@@ -72,7 +72,7 @@ class FluidityNonlocal(FluidityBase):
     Implements the Coussot-Ovarlez non-local fluidity model where the
     fluidity field f(y,t) evolves across the gap (y-direction) via:
 
-    ∂f/∂t = (f_loc(σ) - f)/θ + ξ²∂²f/∂y²
+    ∂f/∂t = (f_loc(σ) - f)/θ + (ξ²/θ)∂²f/∂y²
 
     where:
     - f_loc(σ) is the local equilibrium fluidity from HB flow curve

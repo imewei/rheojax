@@ -10,7 +10,7 @@ Quick Reference
 - **Use when:** Extracting yield stress from LAOS amplitude sweeps, characterizing
 cage-based yield stress fluids, connecting oscillatory to steady-shear behavior
 
-- **Parameters:** 8 (:math:`G_{\text{cage}}`, :math:`\sigma_{\text{sy,scale}}`, :math:`\sigma_{\text{sy,exp}}`, :math:`\sigma_{\text{dy,scale}}`, :math:`\sigma_{\text{dy,exp}}`, :math:`\eta_\infty`, :math:`n_{\text{power-law}}`, noise)
+- **Parameters:** 7 (:math:`G_{\text{cage}}`, :math:`\sigma_{\text{sy,scale}}`, :math:`\sigma_{\text{sy,exp}}`, :math:`\sigma_{\text{dy,scale}}`, :math:`\sigma_{\text{dy,exp}}`, :math:`K_{\text{flow}}`, :math:`n_{\text{power-law}}`)
 
 - **Key equation:** :math:`\sigma_{sy}(\gamma_0) = \sigma_{sy,0} \cdot |\gamma_0|^{n_{sy}}` and :math:`\sigma_{dy}(\gamma_0) = \sigma_{dy,0} \cdot |\gamma_0|^{n_{dy}}`
 
@@ -70,7 +70,7 @@ Quick Reference (continued)
    * - **Test Modes**
      - ``oscillation`` (amplitude sweep), ``rotation`` (flow curve)
    * - **Parameters**
-     - 8 (G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale, sigma_dy_exp, eta_inf, n_power_law, noise)
+     - 7 (G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale, sigma_dy_exp, K_flow, n_power_law)
    * - **Typical Materials**
      - Yield stress fluids, colloidal gels, emulsions, foams, soft glasses
    * - **Key Reference**
@@ -619,18 +619,15 @@ Parameters
      - —
      - [0.0, 2.0]
      - Dynamic yield stress amplitude exponent
-   * - ``eta_inf``
-     - Pa·s
+   * - ``K_flow``
+     - Pa·s^n
      - [1e-9, 1e6]
-     - Infinite-shear viscosity (for flow curve)
+     - Flow consistency index (Herschel-Bulkley-like); equals viscosity
+       only when n_power_law = 1
    * - ``n_power_law``
      - —
      - [0.01, 2.0]
      - Flow power-law index
-   * - ``noise``
-     - Pa
-     - [1e-10, 1e6]
-     - Observation noise scale (Bayesian inference)
 
 ----
 
@@ -906,9 +903,9 @@ Prior Sensitivity
 
 The model uses physically-motivated priors:
 
-- **LogNormal** for scale parameters (``G_cage``, stress scales, viscosity)
+- **LogNormal** for scale parameters (``G_cage``, stress scales, ``K_flow``)
 - **Beta** for bounded exponents [0, 2]
-- **HalfCauchy** for noise scale
+- **HalfNormal** for noise scale
 
 If priors are too informative:
 

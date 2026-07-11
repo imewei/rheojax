@@ -83,9 +83,13 @@ class PowerLaw(BaseModel):
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> PowerLaw:
         """Fit Power Law parameters to data.
 
+        Computes a log-log regression initial guess (viscosity convention),
+        then refines it against the actual Power Law equation via NLSQ (see
+        BaseModel._standard_nlsq_fit).
+
         Args:
             X: Shear rate data (γ̇)
-            y: Viscosity or stress data
+            y: Viscosity data
             **kwargs: Additional fitting options
 
         Returns:
@@ -106,11 +110,9 @@ class PowerLaw(BaseModel):
             )
 
             try:
-                # Use log-log linear regression for initial guess
-                # log(η) = log(K) + (n-1)*log(γ̇) for viscosity
-                # log(σ) = log(K) + n*log(γ̇) for stress
-
-                # Assume viscosity data by default
+                # Use log-log linear regression for initial guess.
+                # flow_quantity = "viscosity", so y is always viscosity data:
+                # log(η) = log(K) + (n-1)*log(γ̇)
                 log_gamma_dot = np.log(np.maximum(np.abs(X), 1e-30))
                 log_y = np.log(np.maximum(np.abs(y), 1e-30))
 
@@ -120,7 +122,6 @@ class PowerLaw(BaseModel):
                 coeffs = np.polyfit(log_gamma_dot, log_y, 1)
 
                 # For viscosity: b = n-1, a = log(K)
-                # Assume viscosity data (can be refined with metadata)
                 n_fit = coeffs[0] + 1.0
                 K_fit = np.exp(coeffs[1])
 
@@ -162,7 +163,12 @@ class PowerLaw(BaseModel):
                 )
                 raise
 
-        return self
+        # Refine the heuristic initial guess against the actual Power Law
+        # equation via NLSQ, matching the Cross/Carreau/Herschel-Bulkley
+        # sibling models (was previously never done for PowerLaw).
+        return self._standard_nlsq_fit(
+            X, y, self.model_function, default_test_mode="rotation", **kwargs
+        )
 
     def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict viscosity for given shear rates.

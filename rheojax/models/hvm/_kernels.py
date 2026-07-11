@@ -181,10 +181,12 @@ def hvm_ber_rate_stretch(
         Stretch-enhanced BER rate (1/s)
     """
     # mu_zz = mu_nat_zz for simple shear (both equal to their respective values)
-    # In simple shear, mu_E_zz ≈ mu_E_nat_zz, so we use the 2D trace difference
+    # In simple shear, mu_E_zz ≈ mu_E_nat_zz, so the 2D trace difference already
+    # equals the full 3D trace difference tr(mu^E - mu^E_nat); divide by 3 (not 2)
+    # to match the documented tr(...)/3 formula.
     delta_trace = (mu_E_xx - mu_E_nat_xx) + (mu_E_yy - mu_E_nat_yy)
     # Use eps=1e-12 instead of max(x, 1e-30) to tame sqrt gradient for NUTS AD
-    delta_stretch = jnp.sqrt(jnp.abs(delta_trace) / 2.0 + 1e-12)
+    delta_stretch = jnp.sqrt(jnp.abs(delta_trace) / 3.0 + 1e-12)
 
     T_safe = jnp.maximum(T, 1.0)  # Guard: T=0 causes div-by-zero
     RT = _R_GAS * T_safe
@@ -298,16 +300,22 @@ def hvm_normal_stress_1(
     mu_E_nat_yy: float,
     mu_D_xx: float,
     mu_D_yy: float,
+    gamma: float,
+    G_P: float,
     G_E: float,
     G_D: float,
+    D: float = 0.0,
 ) -> float:
-    """First normal stress difference N1 from E and D networks.
+    """First normal stress difference N1 from P, E, and D networks.
 
-    N1 = G_E*[(mu^E_xx - mu^E_nat_xx) - (mu^E_yy - mu^E_nat_yy)]
+    N1 = (1-D)*G_P*gamma^2
+         + G_E*[(mu^E_xx - mu^E_nat_xx) - (mu^E_yy - mu^E_nat_yy)]
          + G_D*(mu^D_xx - mu^D_yy)
 
-    Note: P-network contributes no normal stress in simple shear
-    (neo-Hookean with gamma only in xy-component).
+    Note: for a neo-Hookean permanent network under simple shear, the
+    Finger tensor gives B_xx - B_yy = gamma^2, so the P-network *does*
+    contribute a nonzero, strain-growing N1 = (1-D)*G_P*gamma^2 — it is
+    not silently zero as in a purely-shear-stress neo-Hookean model.
 
     Parameters
     ----------
@@ -317,17 +325,22 @@ def hvm_normal_stress_1(
         E-network diagonal natural state components
     mu_D_xx, mu_D_yy : float
         D-network diagonal distribution components
-    G_E, G_D : float
-        Exchangeable and dissociative network moduli (Pa)
+    gamma : float
+        Accumulated shear strain
+    G_P, G_E, G_D : float
+        Permanent, exchangeable, and dissociative network moduli (Pa)
+    D : float, default 0.0
+        Damage variable [0, 1]
 
     Returns
     -------
     float
         First normal stress difference N1 (Pa)
     """
+    N1_P = (1.0 - D) * G_P * gamma**2
     N1_E = G_E * ((mu_E_xx - mu_E_nat_xx) - (mu_E_yy - mu_E_nat_yy))
     N1_D = G_D * (mu_D_xx - mu_D_yy)
-    return N1_E + N1_D
+    return N1_P + N1_E + N1_D
 
 
 # =============================================================================
@@ -661,15 +674,25 @@ hvm_startup_stress_linear_vec = jax.jit(
 def hvm_steady_shear_stress(
     gamma_dot: float,
     G_P: float,
+    G_E: float,
     G_D: float,
+    k_BER_0: float,
     k_d_D: float,
 ) -> float:
-    """Steady-state shear stress (E-network contributes zero).
+    """Steady-state (viscous) shear stress, linear regime (constant k_BER).
 
-    At steady state, mu^E -> mu^E_nat (bond exchange fully relaxes
-    the exchangeable network), so sigma_E -> 0. Only P and D contribute:
+    At steady state under constant shear rate, mu^E does *not* relax all
+    the way to mu^E_nat: from dmu^E_xy/dt = gamma_dot*mu^E_yy + k_BER*(...)
+    and dmu^E_nat_xy/dt = k_BER*(...), with mu^E_yy -> 1 at steady state
+    (its own convective term vanishes), the difference
+    d_xy = mu^E_xy - mu^E_nat_xy obeys d(d_xy)/dt = gamma_dot - 2*k_BER*d_xy,
+    giving d_xy_ss = gamma_dot / (2*k_BER_0) -- a genuine nonzero
+    Maxwell-like viscous contribution, matching the t->infinity limit of
+    hvm_startup_stress_linear. Only D relaxes fully to equilibrium in the
+    usual VLB sense; E and D both contribute:
 
-    sigma_ss = sigma_D = G_D * gamma_dot / k_d_D
+    sigma_ss = sigma_E + sigma_D
+             = G_E*gamma_dot/(2*k_BER_0) + G_D*gamma_dot/k_d_D
 
     Note: sigma_P = G_P * gamma grows unbounded at steady state under
     constant shear rate. For flow curve prediction, we report only the
@@ -682,8 +705,12 @@ def hvm_steady_shear_stress(
         Shear rate (1/s)
     G_P : float
         Permanent network modulus (Pa, unused for steady viscous stress)
+    G_E : float
+        Exchangeable network modulus (Pa)
     G_D : float
         Dissociative network modulus (Pa)
+    k_BER_0 : float
+        Zero-stress BER rate (1/s)
     k_d_D : float
         Dissociative rate (1/s)
 
@@ -692,12 +719,13 @@ def hvm_steady_shear_stress(
     float
         Steady-state viscous shear stress (Pa)
     """
+    eta_E = G_E / jnp.maximum(2.0 * k_BER_0, 1e-30)
     eta_D = G_D / jnp.maximum(k_d_D, 1e-30)
-    return eta_D * gamma_dot
+    return (eta_E + eta_D) * gamma_dot
 
 
 hvm_steady_shear_stress_vec = jax.jit(
-    jax.vmap(hvm_steady_shear_stress, in_axes=(0, None, None, None))
+    jax.vmap(hvm_steady_shear_stress, in_axes=(0, None, None, None, None, None))
 )
 
 
@@ -725,6 +753,13 @@ def hvm_creep_compliance_linear(
     Simplified form valid when G_P >> G_E, G_D:
     J(t) ≈ 1/G_tot + (G_E/(G_P*G_tot)) * (1 - exp(-t/tau_ret_E))
             + (G_D/(G_P*G_tot)) * (1 - exp(-t/tau_ret_D))
+
+    Note: this closed-form includes the instantaneous elastic jump
+    J(0) = 1/G_tot, unlike the ODE-based ``hvm_solve_creep`` (in
+    ``_kernels_diffrax.py``), which starts from gamma(0)=0 and only
+    approaches sigma_0 asymptotically via a quasi-static feedback law
+    (see that module's docstring for the reconciliation rationale).
+    This function is not currently wired into any model prediction path.
 
     Parameters
     ----------

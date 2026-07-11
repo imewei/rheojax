@@ -350,12 +350,14 @@ class MIKH(IKHBase):
 
             G = p_dict["G"]
             eta = p_dict["eta"]
+            eta_inf = p_dict.get("eta_inf", 0.0)
             tau = eta / jnp.maximum(G, 1e-30)  # Maxwell relaxation time
 
-            # Maxwell moduli
+            # Maxwell moduli (+ eta_inf solvent contribution to loss modulus,
+            # matching sigma_total = sigma_Maxwell + eta_inf*gamma_dot)
             wt = omega * tau
             G_prime = G * wt**2 / (1 + wt**2)
-            G_double_prime = G * wt / (1 + wt**2)
+            G_double_prime = G * wt / (1 + wt**2) + eta_inf * omega
 
             if fit_components:
                 # Fit G' and G'' independently (preserves phase information)
@@ -407,8 +409,14 @@ class MIKH(IKHBase):
             args["sigma_applied"] = (
                 sigma_applied if sigma_applied is not None else 100.0
             )
+            # Instantaneous elastic strain jump at t=0+ under a stress step:
+            # gamma_e(0) = sigma_applied / G. ikh_creep_ode_rhs only tracks
+            # the plastic+viscous strain rate (the elastic part is constant
+            # since sigma is fixed), so the jump must be the initial state.
+            G_val = jnp.maximum(params.get("G", 1e3), 1e-30)
+            gamma_elastic0 = args["sigma_applied"] / G_val
             # State: [strain, alpha, lambda]
-            y0 = jnp.array([0.0, 0.0, lambda_init])
+            y0 = jnp.array([gamma_elastic0, 0.0, lambda_init])
         elif mode == "startup":
             # Startup: constant rate, track stress
             ode_fn = ikh_maxwell_ode_rhs
@@ -646,12 +654,14 @@ class MIKH(IKHBase):
             omega = jnp.asarray(X)
             G = param_dict["G"]
             eta = param_dict["eta"]
+            eta_inf = param_dict.get("eta_inf", 0.0)
             tau = eta / jnp.maximum(G, 1e-30)  # Maxwell relaxation time
 
-            # Maxwell moduli
+            # Maxwell moduli (+ eta_inf solvent contribution to loss modulus,
+            # matching sigma_total = sigma_Maxwell + eta_inf*gamma_dot)
             wt = omega * tau
             G_prime = G * wt**2 / (1 + wt**2)
-            G_double_prime = G * wt / (1 + wt**2)
+            G_double_prime = G * wt / (1 + wt**2) + eta_inf * omega
 
             return jnp.column_stack([G_prime, G_double_prime])
 

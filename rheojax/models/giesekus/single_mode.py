@@ -99,7 +99,9 @@ class GiesekusSingleMode(GiesekusBase):
     This captures:
 
     1. **Shear-thinning**: Viscosity decreases with increasing shear rate
-    2. **Normal stresses**: Both N₁ > 0 and N₂ < 0 (with N₂/N₁ = -α/2)
+    2. **Normal stresses**: Both N₁ > 0 and N₂ < 0 (with N₂/N₁ → -α/2
+       only in the zero-shear limit; the ratio moves toward zero as
+       Wi increases)
     3. **Stress overshoot**: Peak stress in startup flow
     4. **Nonlinear LAOS**: Higher harmonics in large-amplitude oscillation
 
@@ -518,7 +520,10 @@ class GiesekusSingleMode(GiesekusBase):
             N₁ = τ_xx - τ_yy > 0  (first normal stress difference)
             N₂ = τ_yy - τ_zz < 0  (second normal stress difference)
 
-        with the diagnostic ratio N₂/N₁ = -α/2.
+        computed exactly (Wi-dependent) via
+        ``giesekus_steady_normal_stresses``; the ratio N₂/N₁ only
+        approaches -α/2 in the zero-shear limit and deviates strongly
+        toward zero at finite/high Wi.
 
         Parameters
         ----------
@@ -539,6 +544,26 @@ class GiesekusSingleMode(GiesekusBase):
     # =========================================================================
     # ODE-Based Simulations
     # =========================================================================
+
+    def _warn_beta_cc_inert(self, protocol: str) -> None:
+        """Warn once if beta_cc != 1 is set when running an ODE-based
+        (nonlinear) protocol, since beta_cc only affects the analytic
+        SAOS moduli and is not propagated into the Giesekus ODE
+        right-hand side (see beta_cc parameter docstring in _base.py).
+        """
+        beta_cc_value = self.parameters.get_value("beta_cc")
+        if beta_cc_value is not None and float(beta_cc_value) != 1.0:
+            if not getattr(self, "_beta_cc_warned", False):
+                logger.warning(
+                    f"beta_cc={float(beta_cc_value)} is set but has no effect on "
+                    f"the '{protocol}' protocol: Cole-Cole broadening only "
+                    "modifies the analytic SAOS moduli, not the ODE integrated "
+                    "here, which reduces to standard Maxwell/Giesekus in its "
+                    "linear limit. Fitting SAOS with beta_cc != 1 and then "
+                    "simulating this protocol with the same eta_p/lambda_1 "
+                    "will NOT reproduce the fitted SAOS curve in the linear limit."
+                )
+                self._beta_cc_warned = True
 
     def _simulate_startup_internal(
         self,
@@ -631,6 +656,7 @@ class GiesekusSingleMode(GiesekusBase):
         np.ndarray or tuple
             Shear stress τ_xy(t), or (τ_xx, τ_yy, τ_xy, τ_zz) if return_full=True
         """
+        self._warn_beta_cc_inert("startup")
         t_jax = jnp.asarray(t, dtype=jnp.float64)
 
         def ode_fn(ti, yi, args):
@@ -801,6 +827,7 @@ class GiesekusSingleMode(GiesekusBase):
         np.ndarray or tuple
             Relaxing stress τ_xy(t), or (τ_xx, τ_yy, τ_xy, τ_zz) if return_full
         """
+        self._warn_beta_cc_inert("relaxation")
         t_jax = jnp.asarray(t, dtype=jnp.float64)
 
         # Initial condition: steady state (polymer-only; the solvent
@@ -968,6 +995,7 @@ class GiesekusSingleMode(GiesekusBase):
         np.ndarray or tuple
             Strain γ(t), or (γ, γ̇) if return_rate=True
         """
+        self._warn_beta_cc_inert("creep")
         t_jax = jnp.asarray(t, dtype=jnp.float64)
 
         # State: [τ_xx, τ_yy, τ_xy, τ_zz, γ]
@@ -1039,9 +1067,10 @@ class GiesekusSingleMode(GiesekusBase):
 
         if return_rate:
             # Compute γ̇ = (σ - τ_xy) / η_s using the same regularization
-            # floor as giesekus_creep_ode_rhs, so the reported rate matches
-            # the dynamics actually integrated.
-            eta_s_reg = max(self.eta_s, 1e-4 * self.eta_p)
+            # as giesekus_creep_ode_rhs (floor only substituted when η_s
+            # is exactly zero), so the reported rate matches the dynamics
+            # actually integrated.
+            eta_s_reg = self.eta_s if self.eta_s >= 1e-12 else 1e-4 * self.eta_p
             gamma_dot = (sigma_applied - tau_xy) / eta_s_reg
             return gamma, gamma_dot
 
@@ -1147,6 +1176,7 @@ class GiesekusSingleMode(GiesekusBase):
             - 'stress': τ_xy(t)
             - 'strain_rate': γ̇(t) = γ₀·ω·cos(ωt)
         """
+        self._warn_beta_cc_inert("laos")
         if n_cycles is not None:
             T = 2 * np.pi / omega
             t = np.linspace(0, n_cycles * T, n_cycles * 200)

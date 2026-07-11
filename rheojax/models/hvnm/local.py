@@ -45,15 +45,11 @@ from rheojax.models.hvnm._base import HVNMBase
 from rheojax.models.hvnm._kernels import (
     hvnm_ber_rate_constant_interphase,
     hvnm_ber_rate_constant_matrix,
-    hvnm_creep_compliance_linear_vec,
     hvnm_effective_phi,
     hvnm_guth_gold,
     hvnm_interphase_fraction,
     hvnm_interphase_modulus,
-    hvnm_relaxation_modulus_vec,
-    hvnm_relaxation_modulus_with_diffusion_vec,
     hvnm_saos_moduli_vec,
-    hvnm_startup_stress_linear_vec,
     hvnm_steady_shear_stress_vec,
     hvnm_total_normal_stress_1,
     hvnm_total_stress_shear,
@@ -152,6 +148,7 @@ class HVNMLocal(HVNMBase):
         self._sigma_applied = None
         self._gamma_0 = None
         self._omega_laos = None
+        self._gamma_step_applied: float | None = None
         logger.info(
             "HVNMLocal initialized",
             extra={
@@ -490,6 +487,7 @@ class HVNMLocal(HVNMBase):
         if G_P is None or G_E is None or G_D is None:
             raise ValueError("G_P, G_E, G_D must not be None")
 
+        self._gamma_step_applied = gamma_step
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         args = self._get_ode_args()
 
@@ -532,7 +530,10 @@ class HVNMLocal(HVNMBase):
             )
         )((ys, D_int_col))
 
-        G_t = stress / jnp.maximum(jnp.abs(gamma_step), 1e-30)
+        # Divide by the signed value (floored in magnitude only) so a negative
+        # step strain doesn't flip the sign of the physically-positive G(t).
+        gamma_step_sign = jnp.where(gamma_step < 0, -1.0, 1.0)
+        G_t = stress / (gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30))
         G_t = jnp.where(
             sol.result == diffrax.RESULTS.successful,
             G_t,
@@ -607,7 +608,11 @@ class HVNMLocal(HVNMBase):
         )
 
         if return_full:
-            J_t = gamma / jnp.maximum(jnp.abs(sigma_0), 1e-30)
+            # Divide by the signed value (floored in magnitude only) so a
+            # negative applied stress doesn't flip the sign of the
+            # physically-positive J(t).
+            sigma_0_sign = jnp.where(sigma_0 < 0, -1.0, 1.0)
+            J_t = gamma / (sigma_0_sign * jnp.maximum(jnp.abs(sigma_0), 1e-30))
             D_int_col = ys[
                 :, 17
             ]  # Always 18-component state; zero when damage not included
@@ -916,6 +921,7 @@ class HVNMLocal(HVNMBase):
         self._sigma_applied = kwargs.get("sigma_applied")
         self._gamma_0 = kwargs.get("gamma_0")
         self._omega_laos = kwargs.get("omega")
+        self._gamma_step_applied = kwargs.get("gamma_step")
 
         # Filter out fitting-specific and BaseModel kwargs
         fwd_kwargs = {
@@ -948,7 +954,7 @@ class HVNMLocal(HVNMBase):
 
         # ODE-based protocols use diffrax with custom_vjp, incompatible with
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
-        _ode_protocols = {"laos"}
+        _ode_protocols = {"laos", "startup", "relaxation", "creep"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
 
         result = nlsq_optimize(
@@ -1067,6 +1073,12 @@ class HVNMLocal(HVNMBase):
         gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", None)
         _om = kwargs.get("omega", _MISSING)
         omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", None)
+        _gs = kwargs.get("gamma_step", _MISSING)
+        gamma_step = (
+            _gs if _gs is not _MISSING else getattr(self, "_gamma_step_applied", None)
+        )
+        if gamma_step is None:
+            gamma_step = 1.0
 
         # Compute derived quantities (JAX-traceable)
         delta_g = 1e-9
@@ -1078,6 +1090,35 @@ class HVNMLocal(HVNMBase):
         X_I = hvnm_guth_gold(phi_eff)
         k_BER_mat_0 = hvnm_ber_rate_constant_matrix(nu_0, E_a, T)
         k_BER_int_0 = hvnm_ber_rate_constant_interphase(nu_0_int, E_a_int, T)
+
+        # TST params for the nonlinear ODE-based protocols (startup/relaxation/
+        # creep/laos); default to no-damage/no-healing when the corresponding
+        # include_* flag is False.
+        ode_params_dict = {
+            "G_P": G_P,
+            "G_E": G_E,
+            "G_D": G_D,
+            "k_d_D": k_d_D,
+            "nu_0": nu_0,
+            "E_a": E_a,
+            "V_act": V_act,
+            "T": T,
+            "G_I_eff": G_I_eff,
+            "X_phi": X_phi,
+            "X_I": X_I,
+            "nu_0_int": nu_0_int,
+            "E_a_int": E_a_int,
+            "V_act_int": V_act_int,
+            "Gamma_0": p_dict.get("Gamma_0", 0.0),
+            "lambda_crit": p_dict.get("lambda_crit", 10.0),
+            "Gamma_0_int": p_dict.get("Gamma_0_int", 0.0),
+            "lambda_crit_int": p_dict.get("lambda_crit_int", 10.0),
+            "h_0": p_dict.get("h_0", 0.0),
+            "E_a_heal": p_dict.get("E_a_heal", 100e3),
+            "n_h": p_dict.get("n_h", 1.0),
+            "k_diff_0_mat": p_dict.get("k_diff_0_mat", 0.0),
+            "k_diff_0_int": p_dict.get("k_diff_0_int", 0.0),
+        }
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
             return hvnm_steady_shear_stress_vec(X_jax, G_D, k_d_D)
@@ -1102,106 +1143,97 @@ class HVNMLocal(HVNMBase):
         elif mode == "startup":
             if gamma_dot is None:
                 raise ValueError("startup mode requires gamma_dot")
-            return hvnm_startup_stress_linear_vec(
+            # Use ODE solver with dual TST feedback (matches simulate_startup)
+            sol = hvnm_solve_startup(
                 X_jax,
                 gamma_dot,
-                G_P,
-                G_E,
-                G_D,
-                G_I_eff,
-                X_phi,
-                X_I,
-                k_BER_mat_0,
-                k_d_D,
-                k_BER_int_0,
-                0.0,  # D_int=0
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
+                include_interfacial_damage=self._include_interfacial_damage,
             )
-
-        elif mode == "relaxation":
-            if self._include_diffusion:
-                k_diff_mat = p_dict.get("k_diff_0_mat", 0.0)
-                k_diff_int = p_dict.get("k_diff_0_int", 0.0)
-                return hvnm_relaxation_modulus_with_diffusion_vec(
-                    X_jax,
+            ys = _mask_failed_solution_ys(sol)
+            return jax.vmap(
+                lambda y: hvnm_total_stress_shear(
+                    y[9],
+                    y[2],
+                    y[5],
+                    y[8],
+                    y[13],
+                    y[16],
                     G_P,
                     G_E,
                     G_D,
                     G_I_eff,
                     X_phi,
                     X_I,
-                    k_BER_mat_0,
-                    k_d_D,
-                    k_BER_int_0,
-                    k_diff_mat,
-                    k_diff_int,
-                    0.0,
-                    0.0,  # D=0, D_int=0
+                    y[10],
+                    y[17],
                 )
-            return hvnm_relaxation_modulus_vec(
+            )(ys)
+
+        elif mode == "relaxation":
+            # Use ODE solver with dual TST feedback (matches simulate_relaxation)
+            sol = hvnm_solve_relaxation(
                 X_jax,
-                G_P,
-                G_E,
-                G_D,
-                G_I_eff,
-                X_phi,
-                X_I,
-                k_BER_mat_0,
-                k_d_D,
-                k_BER_int_0,
-                0.0,
-                0.0,  # D=0, D_int=0
+                gamma_step,
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
+                include_interfacial_damage=self._include_interfacial_damage,
+            )
+            ys = _mask_failed_solution_ys(sol)
+            stress = jax.vmap(
+                lambda y: hvnm_total_stress_shear(
+                    y[9],
+                    y[2],
+                    y[5],
+                    y[8],
+                    y[13],
+                    y[16],
+                    G_P,
+                    G_E,
+                    G_D,
+                    G_I_eff,
+                    X_phi,
+                    X_I,
+                    y[10],
+                    y[17],
+                )
+            )(ys)
+            gamma_step_sign = jnp.where(gamma_step < 0, -1.0, 1.0)
+            return stress / (
+                gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30)
             )
 
         elif mode == "creep":
             if sigma_applied is None:
                 raise ValueError("creep mode requires sigma_applied")
-            J = hvnm_creep_compliance_linear_vec(
+            # Use ODE solver with dual TST feedback (matches simulate_creep)
+            sol = hvnm_solve_creep(
                 X_jax,
-                G_P,
-                G_E,
-                G_D,
-                G_I_eff,
-                X_phi,
-                X_I,
-                k_BER_mat_0,
-                k_d_D,
-                k_BER_int_0,
+                sigma_applied,
+                ode_params_dict,
+                kinetics=self._kinetics,
+                include_damage=self._include_damage,
+                include_dissociative=self._include_dissociative,
+                include_interfacial_damage=self._include_interfacial_damage,
             )
-            return sigma_applied * J
+            ys = _mask_failed_solution_ys(sol)
+            return ys[:, 9]
 
         elif mode == "laos":
             if gamma_0 is None or omega is None:
                 raise ValueError("LAOS mode requires gamma_0 and omega")
             # Extract time from (2, N) stacked [time, strain] input
             t_arr = X_jax[0] if X_jax.ndim == 2 else X_jax
-            params_dict = {
-                "G_P": G_P,
-                "G_E": G_E,
-                "G_D": G_D,
-                "k_d_D": k_d_D,
-                "nu_0": nu_0,
-                "E_a": E_a,
-                "V_act": V_act,
-                "T": T,
-                "G_I_eff": G_I_eff,
-                "X_phi": X_phi,
-                "X_I": X_I,
-                "nu_0_int": nu_0_int,
-                "E_a_int": E_a_int,
-                "V_act_int": V_act_int,
-                "Gamma_0": p_dict.get("Gamma_0", 0.0),
-                "lambda_crit": p_dict.get("lambda_crit", 10.0),
-                "Gamma_0_int": p_dict.get("Gamma_0_int", 0.0),
-                "lambda_crit_int": p_dict.get("lambda_crit_int", 10.0),
-                "h_0": p_dict.get("h_0", 0.0),
-                "E_a_heal": p_dict.get("E_a_heal", 100e3),
-                "n_h": p_dict.get("n_h", 1.0),
-            }
             sol = hvnm_solve_laos(
                 t_arr,
                 gamma_0,
                 omega,
-                params_dict,
+                ode_params_dict,
                 kinetics=self._kinetics,
                 include_damage=self._include_damage,
                 include_dissociative=self._include_dissociative,

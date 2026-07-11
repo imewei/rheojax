@@ -1,8 +1,8 @@
 """SpringPot fractional viscoelastic element.
 
 The SpringPot (also called fractional element or Scott-Blair element) is a
-power-law viscoelastic element that interpolates between pure elastic (alpha=1)
-and pure viscous (alpha=0) behavior.
+power-law viscoelastic element that interpolates between pure elastic (alpha=0)
+and pure viscous (alpha=1) behavior.
 
 Theory:
     - Relaxation modulus: G(t) = c_alpha * t^(-alpha) / Gamma(1-alpha)
@@ -50,7 +50,7 @@ class SpringPot(BaseModel):
     """SpringPot fractional viscoelastic element.
 
     The SpringPot represents a power-law viscoelastic material that exhibits
-    fractional behavior between pure solid (alpha=1) and pure fluid (alpha=0).
+    fractional behavior between pure solid (alpha=0) and pure fluid (alpha=1).
 
     Parameters:
         c_alpha (float): Material constant in Pa·s^alpha, range [1e-3, 1e9], default 1e5

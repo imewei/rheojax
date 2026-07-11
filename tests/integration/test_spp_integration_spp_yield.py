@@ -53,9 +53,13 @@ def test_pipeline_fit_model_bayesian_static():
     # NLSQ warm-start
     pipeline.fit_model(bayesian=False, yield_type="static")
 
-    # Increase noise to ease NUTS initialization on tiny synthetic data
+    # Widen the data-informed "sigma" likelihood-noise prior to ease NUTS
+    # initialization on tiny, near-noiseless synthetic data. (The removed
+    # "noise" ParameterSet entry was never wired into the likelihood; the
+    # prior actually used by bayesian_prior_factory's "sigma" branch is
+    # derived from _nlsq_residual_std.)
     model = pipeline.get_model()
-    model.parameters.set_value("noise", 10.0)
+    model._nlsq_residual_std = 10.0
 
     # Bayesian refinement with NLSQ warm-start (model reused, not recreated)
     pipeline.fit_model(

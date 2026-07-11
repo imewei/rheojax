@@ -109,7 +109,7 @@ def _jit_flow_curve_single(
             # Steady-state high-rate asymptote: sigma = sigma_c_mean + sigma_c_mean *
             # (gamma_dot * tau_pl / sigma_c_mean)^(1 / n_fluid) — full HB form.
             eps = 1e-6
-            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress = jnp.maximum(stress_mag - thresholds_curr, eps)
             overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
@@ -121,6 +121,7 @@ def _jit_flow_curve_single(
             )
 
         # Stress evolution
+        plastic_strain_rate = plastic_strain_rate / mu
         loading_rate = mu * gdot
         relaxation_rate = -mu * plastic_strain_rate
 
@@ -265,7 +266,7 @@ def _jit_startup_kernel(
             plastic_strain_rate = activation * power_term * fluidity
         elif fluidity_form == "overstress":
             eps = 1e-6
-            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress = jnp.maximum(stress_mag - thresholds_curr, eps)
             overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
@@ -277,6 +278,7 @@ def _jit_startup_kernel(
             )
 
         # Stress evolution
+        plastic_strain_rate = plastic_strain_rate / mu
         loading_rate = mu * gamma_dot
         relaxation_rate = -mu * plastic_strain_rate
 
@@ -390,7 +392,7 @@ def _jit_relaxation_kernel(
             plastic_strain_rate = activation * power_term * fluidity
         elif fluidity_form == "overstress":
             eps = 1e-6
-            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress = jnp.maximum(stress_mag - thresholds_curr, eps)
             overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
@@ -402,6 +404,7 @@ def _jit_relaxation_kernel(
             )
 
         # Stress evolution (no loading - relaxation only)
+        plastic_strain_rate = plastic_strain_rate / mu
         relaxation_rate = -mu * plastic_strain_rate
 
         # FFT-based redistribution
@@ -497,7 +500,12 @@ def _jit_creep_kernel(
         error = target_stress - curr_stress
         rel_error = jnp.abs(error) / (jnp.abs(target_stress) + 1e-6)
         Kp = Kp_base * (1.0 + alpha * rel_error)
-        gdot_new = jnp.maximum(gdot + Kp * error, 0.0)
+        gdot_raw = gdot + Kp * error
+        # Clamp by sign of target_stress (not unconditionally >= 0) so creep at
+        # a negative target stress can still drive a negative shear rate toward
+        # it, mirroring the positive-target case instead of freezing at gdot=0.
+        target_sign = jnp.sign(target_stress)
+        gdot_new = target_sign * jnp.maximum(target_sign * gdot_raw, 0.0)
 
         # Smooth activation (matches epm_kernels.plastic_strain_rate)
         stress_mag = jnp.abs(stress_curr)
@@ -520,7 +528,7 @@ def _jit_creep_kernel(
             plastic_strain_rate = activation * power_term * fluidity
         elif fluidity_form == "overstress":
             eps = 1e-6
-            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress = jnp.maximum(stress_mag - thresholds_curr, eps)
             overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
@@ -532,6 +540,7 @@ def _jit_creep_kernel(
             )
 
         # Stress evolution at dt_sub
+        plastic_strain_rate = plastic_strain_rate / mu
         loading_rate = mu * gdot_new
         relaxation_rate = -mu * plastic_strain_rate
         plastic_strain_q = jnp.fft.rfft2(plastic_strain_rate)
@@ -638,7 +647,7 @@ def _jit_oscillation_kernel(
             plastic_strain_rate = activation * power_term * fluidity
         elif fluidity_form == "overstress":
             eps = 1e-6
-            overstress = jnp.maximum(stress_mag - sigma_c_mean, eps)
+            overstress = jnp.maximum(stress_mag - thresholds_curr, eps)
             overstress_power = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
             plastic_strain_rate = (
                 activation * jnp.sign(stress_curr) * overstress_power * fluidity
@@ -650,6 +659,7 @@ def _jit_oscillation_kernel(
             )
 
         # Stress evolution
+        plastic_strain_rate = plastic_strain_rate / mu
         loading_rate = mu * gdot
         relaxation_rate = -mu * plastic_strain_rate
 
@@ -765,7 +775,13 @@ class EPMBase(BaseModel):
         self.parameters.add(
             "sigma_c_std",
             sigma_c_std,
-            bounds=(0.0, 100.0),
+            # Upper bound tightened from 100.0: since the overstress flow law now
+            # uses the per-site threshold (sigma_c_mean + sigma_c_std * N(0,1))
+            # for both activation and flow magnitude, std >> mean drives most
+            # site thresholds negative (unphysical disorder regime) and makes
+            # NLSQ ill-conditioned/unstable. 2.0 comfortably covers the
+            # realistic disorder range (tests exercise up to 1.0).
+            bounds=(0.0, 2.0),
             units="Pa",
             description="Yield threshold standard deviation (disorder)",
         )
@@ -999,27 +1015,25 @@ class EPMBase(BaseModel):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data if possible
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Constant shear rate from metadata
         gdot = data.metadata.get("gamma_dot", 0.1)
 
-        # Scan for N-1 steps
+        # Scan for N-1 steps, using the actual per-step dt (time[i+1]-time[i])
+        # rather than a single dt=time[1]-time[0] applied uniformly — matters
+        # when the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
         state = self._init_state(key)
 
-        def body(carrier, _):
+        def body(carrier, dt_step):
             curr_state = carrier
             new_state = self._epm_step(
-                curr_state, propagator_q, gdot, dt, params, smooth
+                curr_state, propagator_q, gdot, dt_step, params, smooth
             )
             return new_state, jnp.mean(new_state[0])
 
         if n_steps > 0:
-            _, stresses_scan = jax.lax.scan(body, state, None, length=n_steps)
+            dt_steps = jnp.diff(jnp.asarray(time))
+            _, stresses_scan = jax.lax.scan(body, state, dt_steps, length=n_steps)
             # Prepend initial stress
             initial_stress = jnp.mean(state[0])
             stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
@@ -1052,11 +1066,6 @@ class EPMBase(BaseModel):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Step strain magnitude from metadata
         strain_step = data.metadata.get("gamma", 0.1)
 
@@ -1071,19 +1080,22 @@ class EPMBase(BaseModel):
         # Initial G(0)
         g_0 = jnp.mean(stress) / strain_step
 
-        # Relax (gdot = 0) for N-1 steps
+        # Relax (gdot = 0) for N-1 steps, using the actual per-step dt rather
+        # than a single dt=time[1]-time[0] applied uniformly — matters when
+        # the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
 
-        def body(carrier, _):
+        def body(carrier, dt_step):
             curr_state = carrier
             new_state = self._epm_step(
-                curr_state, propagator_q, 0.0, dt, params, smooth
+                curr_state, propagator_q, 0.0, dt_step, params, smooth
             )
             # Return G(t) = Stress / gamma_0
             return new_state, jnp.mean(new_state[0]) / strain_step
 
         if n_steps > 0:
-            _, moduli_scan = jax.lax.scan(body, state, None, length=n_steps)
+            dt_steps = jnp.diff(jnp.asarray(time))
+            _, moduli_scan = jax.lax.scan(body, state, dt_steps, length=n_steps)
             moduli = jnp.concatenate([jnp.array([g_0]), moduli_scan])
         else:
             moduli = jnp.array([g_0])
@@ -1162,7 +1174,11 @@ class EPMBase(BaseModel):
             Kp = Kp_base * (1.0 + alpha * rel_error)
 
             gdot_new = gdot + Kp * error
-            gdot_new = jnp.maximum(gdot_new, 0.0)
+            # Clamp by sign of target_stress so a negative target creep stress
+            # can still drive a negative shear rate toward it (mirroring the
+            # positive-target case) instead of freezing at gdot=0 forever.
+            target_sign = jnp.sign(target_stress)
+            gdot_new = target_sign * jnp.maximum(target_sign * gdot_new, 0.0)
 
             # Step EPM at the stable substep
             new_epm = self._epm_step(
@@ -1206,11 +1222,6 @@ class EPMBase(BaseModel):
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
-
         # Params
         gamma0 = data.metadata.get("gamma0", 1.0)
         omega = data.metadata.get("omega", 1.0)
@@ -1220,22 +1231,28 @@ class EPMBase(BaseModel):
         # Initial stress
         initial_stress = jnp.mean(state[0])
 
-        # Run for N-1 steps
+        # Run for N-1 steps, using the actual per-step dt (time[i+1]-time[i])
+        # rather than a single dt=time[1]-time[0] applied uniformly — matters
+        # when the caller supplies a non-uniformly-spaced time array.
         n_steps = max(0, len(time) - 1)
         scan_time = time[:-1] if n_steps > 0 else jnp.array([])
+        dt_steps = jnp.diff(jnp.asarray(time)) if n_steps > 0 else jnp.array([])
 
-        def body(carrier, t):
+        def body(carrier, xs):
             curr_state = carrier
+            t, dt_step = xs
             # Time varying shear rate at current time t
             gdot = gamma0 * omega * jnp.cos(omega * t)
 
             new_state = self._epm_step(
-                curr_state, propagator_q, gdot, dt, params, smooth
+                curr_state, propagator_q, gdot, dt_step, params, smooth
             )
             return new_state, jnp.mean(new_state[0])
 
         if n_steps > 0:
-            _, stresses_scan = jax.lax.scan(body, state, scan_time, length=n_steps)
+            _, stresses_scan = jax.lax.scan(
+                body, state, (scan_time, dt_steps), length=n_steps
+            )
             stresses = jnp.concatenate([jnp.array([initial_stress]), stresses_scan])
         else:
             stresses = jnp.array([initial_stress])
@@ -1874,16 +1891,17 @@ class EPMBase(BaseModel):
             # EPM has stress shape (L, L) and uses the scalar warm-start;
             # tensorial EPM has stress shape (3, L, L) with index [2] = σ_xy,
             # and the pure-shear steady state picks up a factor of √3 from
-            # von Mises and a factor of 2 from the dσ/dt = 2μ·ε̇ convention:
+            # von Mises (the loading/relaxation convention now matches the
+            # scalar model exactly, see epm_kernels_tensorial.py):
             #
             #   scalar    :  σ_warm = σ_c_mean + σ_c_mean·(|γ̇|·τ_pl/σ_c_mean)^(1/n_fluid)
             #   tensorial :  σ_xy_warm = σ_c_mean/√3
-            #              + (1/√3)·(√3/2)^(1/n_fluid)·σ_c_mean^((n_fluid-1)/n_fluid)
+            #              + (1/√3)·√3^(1/n_fluid)·σ_c_mean^((n_fluid-1)/n_fluid)
             #              · (|γ̇|·τ_pl_shear)^(1/n_fluid)
             #
             # The scalar warm-start is exact for the overstress form there;
             # the tensorial one is the analytical Bingham/HB solution with
-            # the von Mises + factor-of-2 corrections.
+            # the von Mises pure-shear correction.
             # Safety clamps for NLSQ-exploration regions where parameters
             # can transiently go near zero or negative. Without these guards,
             # the analytical warm-start can produce NaN/inf for certain
@@ -1909,7 +1927,7 @@ class EPMBase(BaseModel):
                 sqrt3 = jnp.sqrt(3.0)
                 warm_excess = (
                     (1.0 / sqrt3)
-                    * (sqrt3 / 2.0) ** inv_n
+                    * sqrt3**inv_n
                     * scm_safe ** ((n_safe - 1.0) * inv_n)
                     * (gdot_abs * tau_shear_safe) ** inv_n
                 )
@@ -2080,7 +2098,11 @@ class EPMBase(BaseModel):
             Kp = Kp_base * (1.0 + alpha * rel_error)
 
             gdot_new = gdot + Kp * error
-            gdot_new = jnp.maximum(gdot_new, 0.0)
+            # Clamp by sign of target_stress (see EPMBase._run_creep for the
+            # matching predict-path fix) so negative-target creep can drive a
+            # negative shear rate instead of freezing at gdot=0.
+            target_sign = jnp.sign(target_stress)
+            gdot_new = target_sign * jnp.maximum(target_sign * gdot_new, 0.0)
 
             new_epm = self._epm_step(
                 curr_epm, propagator_q, gdot_new, dt_sub, params, smooth=True

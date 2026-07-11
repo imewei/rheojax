@@ -160,8 +160,9 @@ def stress_fene_xy(
 ) -> float:
     """FENE-P stress: σ_xy = G · f(tr(S)) · S_xy.
 
-    f = L²/(L² - tr(S)) is the Peterlin spring factor.
-    Diverges as tr(S) → L² (full extension).
+    f = (L² - 3)/(L² - tr(S)) is the Peterlin spring factor, normalized so
+    that f(tr(S)=3) = 1 at equilibrium (S = I). Diverges as tr(S) → L²
+    (full extension).
 
     Parameters
     ----------
@@ -181,7 +182,7 @@ def stress_fene_xy(
     """
     tr_S = S_xx + S_yy + S_zz
     L2 = L_max * L_max
-    f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+    f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
     return G * f * S_xy
 
 
@@ -207,7 +208,7 @@ def stress_fene_n1(
     """
     tr_S = S_xx + S_yy + S_zz
     L2 = L_max * L_max
-    f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+    f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
     return G * f * (S_xx - S_yy)
 
 
@@ -865,13 +866,15 @@ def build_tnt_ode_rhs(breakage_type="constant", use_fene=False, use_gs=False):
             g0 = beta
 
         # --- FENE-P finite extensibility: scale destruction by the Peterlin
-        # factor f(trS) = L_max^2/(L_max^2 - trS). As trS -> L_max^2, f -> inf
-        # so -beta*f*S diverges and overwhelms any finite convective growth,
-        # capping trS strictly below L_max^2 (standard FENE-P closure). ---
+        # factor f(trS) = (L_max^2 - 3)/(L_max^2 - trS), normalized so that
+        # f(trS=3) = 1 at equilibrium (S=I), preserving beta*f = beta = g0
+        # there. As trS -> L_max^2, f -> inf so -beta*f*S diverges and
+        # overwhelms any finite convective growth, capping trS strictly
+        # below L_max^2 (standard FENE-P closure). ---
         if use_fene:
             tr_S = S_xx + S_yy + S_zz
             L2 = L_max * L_max
-            f_peterlin = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+            f_peterlin = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
             beta = beta * f_peterlin
 
         # --- Convective derivative ---

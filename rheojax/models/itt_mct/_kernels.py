@@ -221,21 +221,16 @@ def f12_volterra_flow_curve_rhs(
     jnp.ndarray
         Time derivatives [dΦ/dt, dK₁/dt, ..., dK_n/dt, dγ/dt]
     """
-    # Unpack state
+    # Unpack state (gamma_accumulated not needed in this RHS: the
+    # memory-kernel double-count fix removed its only consumer, the
+    # strain-decorrelated advected correlator used for m(Phi))
     phi = state[0]
     K = state[1 : 1 + n_modes]
-    gamma_acc = state[1 + n_modes]
-
-    # Strain decorrelation for advected correlator (always applied)
-    h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
-
-    # Advected correlator
-    phi_advected = phi * h_gamma
-
-    # Memory kernel from correlator
-    m_phi = f12_memory(phi_advected, v1, v2)
 
     # Memory integral from Prony modes: ∫ m(t-s) dΦ/ds ds ≈ Σ Kᵢ
+    # g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies (no extra m(Φ) factor here — see the dK_dt update below).
     memory_integral = jnp.sum(K)
 
     # MCT equation: dΦ/dt = -Γ(Φ + memory_integral)
@@ -247,11 +242,16 @@ def f12_volterra_flow_curve_rhs(
         # Each Prony mode sees strain accumulated over its characteristic time
         gamma_mode = gamma_dot * tau  # Effective strain age per mode
         h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-        # Mode evolution with mode-specific memory decorrelation
-        dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+        # Mode evolution with mode-specific memory decorrelation. g, tau are
+        # Prony-fit to the m(t) time series itself (prony_decompose_memory),
+        # so the standard/fixed-kernel Prony form applies here — no extra
+        # m(Φ) factor (see module docstring "For a FIXED kernel ... standard
+        # Prony"); multiplying by m_phi again would double-count the
+        # state-dependence already baked into g, tau.
+        dK_dt = -K / tau + g * h_mode * dphi_dt
     else:
         # Simplified: single decorrelation (standard schematic behavior)
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
 
     # Strain accumulation
     dgamma_dt = gamma_dot
@@ -301,10 +301,9 @@ def f12_volterra_startup_rhs(
     h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
     phi_advected = phi * h_gamma
 
-    # Memory kernel
-    m_phi = f12_memory(phi_advected, v1, v2)
-
-    # Memory integral
+    # Memory integral: g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies below (no extra m(Φ) factor).
     memory_integral = jnp.sum(K)
 
     # Correlator evolution
@@ -314,9 +313,9 @@ def f12_volterra_startup_rhs(
     if memory_form == "full":
         gamma_mode = gamma_dot * tau
         h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-        dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+        dK_dt = -K / tau + g * h_mode * dphi_dt
     else:
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
 
     # Strain accumulation
     dgamma_dt = gamma_dot
@@ -354,17 +353,18 @@ def f12_equilibrium_correlator_rhs(
     phi = state[0]
     K = state[1 : 1 + n_modes]
 
-    # Memory kernel (no strain decorrelation)
-    m_phi = f12_memory(phi, v1, v2)
-
-    # Memory integral
+    # Memory integral: g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies (no extra m(Φ) factor — see module docstring). v1, v2 are kept
+    # in the signature for call-site/API compatibility with the other
+    # Volterra RHS functions.
     memory_integral = jnp.sum(K)
 
     # Correlator decay
     dphi_dt = -Gamma * (phi + memory_integral)
 
     # Prony modes
-    dK_dt = -K / tau + g * m_phi * dphi_dt
+    dK_dt = -K / tau + g * dphi_dt
 
     return jnp.concatenate([jnp.array([dphi_dt]), dK_dt])
 
@@ -467,10 +467,9 @@ def f12_volterra_creep_rhs(
     h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
     phi_advected = phi * h_gamma
 
-    # Memory kernel
-    m_phi = f12_memory(phi_advected, v1, v2)
-
-    # Memory integral
+    # Memory integral: g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies below (no extra m(Φ) factor).
     memory_integral = jnp.sum(K)
 
     # Correlator evolution
@@ -480,9 +479,9 @@ def f12_volterra_creep_rhs(
     if memory_form == "full":
         gamma_mode = gamma_dot_current * tau
         h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-        dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+        dK_dt = -K / tau + g * h_mode * dphi_dt
     else:
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
 
     # Strain rate from stress constraint (simplified)
     # σ = G(t) × γ̇ → γ̇ ≈ σ / G(t) where G(t) = G_inf × Φ²
@@ -556,14 +555,14 @@ def f12_volterra_relaxation_rhs(
     K = state[1 : 1 + n_modes]
     # state[1 + n_modes] is sigma (stress) - computed separately
 
-    # For relaxation, strain is fixed at pre-shear value
-    h_gamma = strain_decorrelation(gamma_pre, gamma_c, use_lorentzian)
-    phi_advected = phi * h_gamma
+    # Strain decorrelation is encoded entirely in the initial condition
+    # Φ(0) = h(γ_pre) (see docstring below); gamma_c/use_lorentzian remain
+    # in the signature for call-site/API compatibility with the other
+    # Volterra RHS functions.
 
-    # Memory kernel
-    m_phi = f12_memory(phi_advected, v1, v2)
-
-    # Memory integral
+    # Memory integral: g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies below (no extra m(Φ) factor).
     memory_integral = jnp.sum(K)
 
     # Correlator evolution (toward equilibrium, modulated by pre-strain)
@@ -575,9 +574,9 @@ def f12_volterra_relaxation_rhs(
     if memory_form == "full":
         # During relaxation, γ̇=0, so h_mode → 1 (no additional decorrelation)
         # This is physically correct: no strain accumulation during relaxation
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
     else:
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
 
     # Stress relaxation: σ(t) = G_∞ γ_pre Φ(t)²  (Fuchs & Cates 2002)
     # where Φ(0) = h(γ_pre) encodes step-strain decorrelation via the IC.
@@ -638,10 +637,9 @@ def f12_volterra_laos_rhs(
     h_gamma = strain_decorrelation(gamma_inst, gamma_c, use_lorentzian)
     phi_advected = phi * h_gamma
 
-    # Memory kernel
-    m_phi = f12_memory(phi_advected, v1, v2)
-
-    # Memory integral
+    # Memory integral: g, tau are Prony-fit to the m(t) time series itself
+    # (prony_decompose_memory), so the standard/fixed-kernel Prony form
+    # applies below (no extra m(Φ) factor).
     memory_integral = jnp.sum(K)
 
     # Correlator evolution with oscillatory driving
@@ -652,9 +650,9 @@ def f12_volterra_laos_rhs(
         # Use absolute value since LAOS has oscillating γ̇
         gamma_mode = jnp.abs(gamma_dot_current) * tau
         h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-        dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+        dK_dt = -K / tau + g * h_mode * dphi_dt
     else:
-        dK_dt = -K / tau + g * m_phi * dphi_dt
+        dK_dt = -K / tau + g * dphi_dt
 
     # Track instantaneous strain magnitude (for diagnostics/output)
     dgamma_inst_dt = gamma_0 * omega * jnp.cos(omega * t)
@@ -701,7 +699,14 @@ def extract_laos_harmonics(
     sigma_double_prime_n : jnp.ndarray
         Out-of-phase (viscous) coefficients [σ''₁, σ''₃, σ''₅, ...]
     """
-    T_period = 2 * jnp.pi / omega
+    # Normalize by the ACTUAL integration span, not a single period: t may
+    # (and by the docstring's own contract, often should, to let transients
+    # decay) cover several periods, and ∫ over N periods of a periodic
+    # signal is N times the single-period integral. Dividing by the true
+    # span t[-1]-t[0] reduces to the standard 2/T single-period formula when
+    # t spans exactly one period, and stays correct for N periods (avoiding
+    # an ~N-fold inflation of every harmonic amplitude).
+    t_span = t[-1] - t[0]
 
     # Build odd harmonic indices (1, 3, 5, ...) as a static array at trace time.
     # n_harmonics is static (static_argnames), so this list is resolved at compile
@@ -724,7 +729,7 @@ def extract_laos_harmonics(
     integrals_sin = jnp.trapezoid(sigma_sin, t, axis=1)
     integrals_cos = jnp.trapezoid(sigma_cos, t, axis=1)
 
-    sigma_primes = 2.0 * integrals_sin / T_period
-    sigma_double_primes = 2.0 * integrals_cos / T_period
+    sigma_primes = 2.0 * integrals_sin / t_span
+    sigma_double_primes = 2.0 * integrals_cos / t_span
 
     return sigma_primes, sigma_double_primes

@@ -104,7 +104,12 @@ def make_tensorial_propagator_q(L: int, nu: float, mu: float = 1.0) -> jax.Array
 
     # G_xyxy: Shear-shear coupling (quadrupolar)
     # For shear: 2 * (qx * qy)² / q⁴ pattern
-    G_xyxy = -4.0 * mu * (QX**2 * QY**2) / (safe_Q2**2)
+    # Uses the same -2*mu prefactor as the normal-normal/cross couplings above
+    # (and as the scalar EPM's quadrupolar propagator, see epm_kernels.py) so
+    # that a pure-shear reduction of the tensorial model matches the scalar
+    # model exactly. Was previously -4.0*mu, which made the tensorial model's
+    # elastic feedback exactly 2x the scalar model's for identical parameters.
+    G_xyxy = -2.0 * mu * (QX**2 * QY**2) / (safe_Q2**2)
 
     # G_xxxy: Normal-shear coupling (σ_xx ↔ ε_xy)
     # From Eshelby tensor G_ijkl with i=x, j=x, k=x, l=y:
@@ -252,6 +257,7 @@ def compute_plastic_strain_rate(
     n_fluid: float = 1.0,
     nu: float = 0.5,
     fluidity_form: str = "overstress",
+    local_threshold: jax.Array | float | None = None,
 ) -> jax.Array:
     r"""Compute component-wise plastic strain rate using Prandtl-Reuss flow rule.
 
@@ -293,6 +299,14 @@ def compute_plastic_strain_rate(
         nu: Poisson's ratio for plane-strain σ_zz = ν(σ_xx + σ_yy). Default 0.5
             (incompressible).
         fluidity_form: One of "linear", "power", or "overstress". Default "overstress".
+        local_threshold: Optional per-site yield threshold (same shape as
+            ``sigma_eff``), used instead of the global ``sigma_c_mean`` for the
+            "overstress" form's overstress subtraction. When ``None`` (default),
+            falls back to ``sigma_c_mean`` (legacy behavior, exact when disorder
+            is absent). Callers with a spatially disordered threshold field
+            (``sigma_c_std != 0``) should pass it here so a site's overstress is
+            measured relative to its own threshold rather than the mean —
+            matching the corresponding fix in ``rheojax.utils.epm_kernels``.
 
     Returns:
         Plastic strain rate [ε̇ᵖ_xx, ε̇ᵖ_yy, ε̇ᵖ_xy], shape (..., 3).
@@ -301,7 +315,16 @@ def compute_plastic_strain_rate(
     sigma_yy = stress_tensor[..., 1]
     sigma_xy = stress_tensor[..., 2]
 
-    # Plane-strain: sigma_zz = nu * (sigma_xx + sigma_yy)
+    # Plane-strain: sigma_zz = nu * (sigma_xx + sigma_yy). This is a purely
+    # elastic constraint re-derived from the current (sigma_xx, sigma_yy) at
+    # every call; it is NOT integrated as its own plastic state. The
+    # Prandtl-Reuss flow direction below is J2 (trace-free), which formally
+    # implies a companion eps_dot_p_zz = -(eps_dot_p_xx + eps_dot_p_yy) that is
+    # never fed back into sigma_zz. This is a deliberate plane-stress-like
+    # simplification (decoupling the zz constraint from the in-plane plastic
+    # flow) rather than a fully self-consistent 3D plane-strain plasticity —
+    # acceptable because sigma_zz only enters this module as a scalar used to
+    # compute sigma_eff/the deviatoric direction, not as a tracked state.
     sigma_zz = nu * (sigma_xx + sigma_yy)
     mean_stress = (sigma_xx + sigma_yy + sigma_zz) / 3.0
     dev_xx = sigma_xx - mean_stress
@@ -325,8 +348,12 @@ def compute_plastic_strain_rate(
         # Herschel-Bulkley: only sigma_eff ABOVE threshold drives plastic flow.
         # Matches scalar kernel's overstress branch; eps softening keeps the derivative
         # well-behaved at the yield surface for gradient-based fitting.
+        # Use the local per-site threshold when provided (matches the activation
+        # mask, which is itself computed from the local threshold field in
+        # `tensorial_epm_step`), falling back to the global sigma_c_mean otherwise.
+        threshold = sigma_c_mean if local_threshold is None else local_threshold
         eps = 1e-6
-        overstress = jnp.maximum(sigma_eff - sigma_c_mean, eps)
+        overstress = jnp.maximum(sigma_eff - threshold, eps)
         g_eff = overstress**n_fluid * (sigma_c_mean ** (1.0 - n_fluid))
     else:
         raise ValueError(
@@ -401,8 +428,10 @@ def tensorial_epm_step(
 ) -> jax.Array:
     """Perform one full tensorial EPM time step.
 
-    Dynamics:
-    σ̇_ij = 2μ ε̇_ij - 2μ ε̇ᵖ_ij + G_ij * ε̇ᵖ_j
+    Dynamics (scalar-EPM-consistent convention — see epm_kernels.epm_step):
+    σ̇_ij = μ γ̇_ij - μ ε̇ᵖ_ij + G_ij * ε̇ᵖ_j
+    where γ̇_ij is the imposed macroscopic strain-rate tensor (nonzero only for
+    the shear component under simple shear, so σ̇_xy = μγ̇ for the loading term).
 
     Args:
         stress: Current stress tensor field [σ_xx, σ_yy, σ_xy], shape (3, L, L).
@@ -468,6 +497,7 @@ def tensorial_epm_step(
         n_fluid=n_fluid,
         nu=nu,
         fluidity_form=fluidity_form,
+        local_threshold=thresholds,
     )  # (L, L, 3)
 
     # Reshape back to (3, L, L) for propagator application
@@ -479,8 +509,12 @@ def tensorial_epm_step(
     loading_rate = jnp.zeros_like(stress)
     loading_rate = loading_rate.at[2].set(mu * strain_rate)  # Only shear component
 
-    # Plastic relaxation: -2μ ε̇ᵖ_ij
-    relaxation_rate = -2.0 * mu * eps_dot_p
+    # Plastic relaxation: -μ ε̇ᵖ_ij
+    # (Was -2.0*mu; combined with the G_xyxy propagator fix above, this makes
+    # a pure-shear reduction of the tensorial model match the scalar EPM's
+    # loading_rate - mu*gamma_dot_p convention exactly instead of being 2x
+    # stronger. See make_tensorial_propagator_q's G_xyxy for the paired fix.)
+    relaxation_rate = -mu * eps_dot_p
 
     # Elastic redistribution: G_ij * ε̇ᵖ_j
     redistribution_rate = apply_tensorial_propagator(propagator, eps_dot_p)
