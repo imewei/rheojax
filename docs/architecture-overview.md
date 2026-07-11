@@ -5,10 +5,10 @@
 ## Package Structure
 
 ```
-rheojax/                          # v0.6.0, Python 3.12+
+rheojax/                          # v0.7.0, Python 3.12+
 ├── core/           # Foundation: BaseModel, RheoData, Parameter, BayesianMixin, Registry
-├── models/         # 53 models across 20 families (see Model Inventory)
-├── transforms/     # 12 transforms (FFT, mastercurve, OWChirp, SPP, Prony, etc.)
+├── models/         # 53 models across 22 families (see Model Inventory)
+├── transforms/     # 11 transforms (FFT, mastercurve, OWChirp, SPP, Prony, etc.)
 ├── pipeline/       # Fluent API: Pipeline, BayesianPipeline, BatchPipeline
 ├── io/             # TRIOS, CSV, Excel, Anton Paar readers; HDF5/Excel/NPZ writers
 ├── visualization/  # Auto plot selection, 3 styles (seaborn, matplotlib, ggplot)

@@ -18,7 +18,7 @@ are complete and you have produced the audit summary described below.
      `nlsq_optimize()`, `OptimizationResult`
    - `rheojax/pipeline/base.py` — `Pipeline` fluent API
    - `rheojax/pipeline/bayesian.py` — `BayesianPipeline`
-   - Every model class across `rheojax/models/` (53 models, 20 families)
+   - Every model class across `rheojax/models/` (53 models, 22 families)
    - Every transform class in `rheojax/transforms/` (11 transforms)
    - All existing tests in `tests/`
 

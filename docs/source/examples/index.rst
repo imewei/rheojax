@@ -2,9 +2,9 @@
 Tutorial Notebooks
 ==================
 
-RheoJAX includes 249 comprehensive tutorial notebooks organized into 21 categories:
+RheoJAX includes 218 comprehensive tutorial notebooks organized into 20 categories:
 **Basic** (5), **Transforms** (13), **Bayesian** (9), **Advanced** (10), **I/O** (1),
-plus 14 model family tutorial suites and a 31-notebook verification suite.
+plus 14 model family tutorial suites and a 20-notebook verification suite.
 
 All notebooks are located in the ``examples/`` directory and demonstrate best practices with
 real-world datasets and synthetic data generation patterns.
@@ -95,7 +95,7 @@ Quick Navigation
      - Notebooks
    * - **Verification**
      - Cross-model protocol validation + material-specific benchmarks
-     - 31 notebooks
+     - 20 notebooks
 
 Basic Model Fitting
 ===================
@@ -1125,7 +1125,7 @@ VLB — Transient Network Models (16 notebooks)
 **Notebooks** (NLSQ→NUTS workflows, 11–16):
    11–16. ``11–16_vlb_*_nlsq_to_nuts.ipynb`` — NLSQ → NUTS for 6 protocols
 
-Verification Suite (31 notebooks)
+Verification Suite (20 notebooks)
 =================================
 
 **Directory**: ``examples/verification/``
@@ -1135,13 +1135,13 @@ solutions and experimental data.
 
 **Protocol validators** (7 notebooks):
    - ``00_verification_index.ipynb`` — Verification suite overview
-   - ``01–06_validate_*.ipynb`` — Flow curve, creep, relaxation, startup, SAOS, LAOS
+   - ``01–06_validate_*.ipynb`` — Flow curve, creep, stress relaxation, startup shear, SAOS, LAOS
 
-**Material-specific benchmarks** (24 notebooks):
+**Material-specific benchmarks** (13 notebooks):
    - ``creep/`` — 3 notebooks (mucus, perihepatic abscess, polystyrene)
-   - ``oscillation/`` — 13 notebooks (mastercurves, model evaluation, 11 material-specific)
-   - ``relaxation/`` — 7 notebooks (fish muscle, laponite, foams, polyethylene, polypropylene, polystyrene, time master)
-   - ``rotation/`` — 1 notebook (emulsion flow curve)
+   - ``flow_curve/`` — 1 notebook (emulsion)
+   - ``saos/`` — 3 notebooks (chia pudding, metal network, model evaluator)
+   - ``stress_relaxation/`` — 6 notebooks (fish muscle, laponite, liquid foam, polyethylene, polypropylene, polystyrene)
 
 Running the Notebooks
 =====================
