@@ -10,7 +10,12 @@ Theory:
     - Complex modulus: G*(omega) = G_e + G_m*(omega*tau)^2/(1+(omega*tau)^2) + i*G_m*omega*tau/(1+(omega*tau)^2)
     - Creep compliance: J(t) = 1/(G_e+G_m) + (G_m/(G_e*(G_e+G_m))) * (1 - exp(-t/tau_c))
       where tau_c = eta * (G_e + G_m) / (G_e * G_m)
-    - Steady shear viscosity: eta(gamma_dot) = eta (constant)
+    - Steady shear viscosity: eta(gamma_dot) = eta (constant); this is the
+      exact result only in the Maxwell limit (Ge=0). For Ge>0 the parallel
+      equilibrium spring accumulates stress Ge*gamma(t) without bound under
+      continued flow, so no finite steady-state stress exists -- the
+      constant-viscosity prediction below reflects only the Maxwell
+      (dashpot) branch's asymptotic contribution, not the full SLS response.
 
 References:
     - Ferry, J. D. (1980). Viscoelastic properties of polymers.
@@ -137,7 +142,7 @@ class Zener(BaseModel):
                 return self._predict_creep(x, Ge, Gm, eta)
             elif tm == TestMode.OSCILLATION:
                 return self._predict_oscillation(x, Ge, Gm, eta)
-            elif tm == TestMode.ROTATION:
+            elif tm in (TestMode.ROTATION, TestMode.FLOW_CURVE):
                 return self._predict_rotation(x, Ge, Gm, eta)
             else:
                 raise ValueError(f"Unsupported test mode: {tm}")
@@ -303,11 +308,16 @@ class Zener(BaseModel):
     ) -> jnp.ndarray:
         """Predict steady shear stress sigma(gamma_dot).
 
-        Theory: sigma = eta * gamma_dot (Newtonian flow)
+        Theory: sigma = eta * gamma_dot (Newtonian flow), i.e. the asymptotic
+        Maxwell-branch contribution. Exact only when Ge=0 (pure Maxwell): for
+        Ge>0 the equilibrium spring's stress Ge*gamma(t) grows without bound
+        under continued flow, so the Zener/SLS model has no finite
+        steady-state stress and this is a viscous-branch approximation, not
+        the total response.
 
         Args:
             gamma_dot: Shear rate array (1/s)
-            Ge: Equilibrium modulus (Pa) - not used but kept for interface consistency
+            Ge: Equilibrium modulus (Pa) - not used; see docstring above
             Gm: Maxwell modulus (Pa) - not used but kept for interface consistency
             eta: Viscosity (Pa·s)
 

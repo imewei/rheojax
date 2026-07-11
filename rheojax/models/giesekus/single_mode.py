@@ -727,9 +727,13 @@ class GiesekusSingleMode(GiesekusBase):
         gamma_dot_preshear: float,
     ) -> jnp.ndarray:
         """Internal relaxation simulation for model_function."""
-        # Initial condition: steady state at pre-shear rate
+        # Initial condition: steady state at pre-shear rate.
+        # Use eta_s=0 here: giesekus_relaxation_ode_rhs evolves polymer
+        # stress only (no solvent term), so the IC must be the polymer-only
+        # tau_xy, not the total (solvent + polymer) steady stress. The
+        # solvent contribution vanishes instantly at cessation of flow.
         tau_xx, tau_yy, tau_xy, tau_zz = giesekus_steady_stress_components(
-            gamma_dot_preshear, eta_p, lambda_1, alpha, eta_s
+            gamma_dot_preshear, eta_p, lambda_1, alpha, 0.0
         )
         y0 = jnp.array([tau_xx, tau_yy, tau_xy, tau_zz], dtype=jnp.float64)
 
@@ -799,9 +803,11 @@ class GiesekusSingleMode(GiesekusBase):
         """
         t_jax = jnp.asarray(t, dtype=jnp.float64)
 
-        # Initial condition: steady state
+        # Initial condition: steady state (polymer-only; the solvent
+        # contribution eta_s*gamma_dot vanishes instantly at cessation of
+        # flow and is not part of the relaxation ODE's state).
         tau_xx, tau_yy, tau_xy, tau_zz = giesekus_steady_stress_components(
-            gamma_dot_preshear, self.eta_p, self.lambda_1, self.alpha, self.eta_s
+            gamma_dot_preshear, self.eta_p, self.lambda_1, self.alpha, 0.0
         )
         y0 = jnp.array([tau_xx, tau_yy, tau_xy, tau_zz], dtype=jnp.float64)
 
@@ -1032,8 +1038,10 @@ class GiesekusSingleMode(GiesekusBase):
         }
 
         if return_rate:
-            # Compute γ̇ = (σ - τ_xy) / η_s
-            eta_s_reg = max(self.eta_s, 1e-10 * self.eta_p)
+            # Compute γ̇ = (σ - τ_xy) / η_s using the same regularization
+            # floor as giesekus_creep_ode_rhs, so the reported rate matches
+            # the dynamics actually integrated.
+            eta_s_reg = max(self.eta_s, 1e-4 * self.eta_p)
             gamma_dot = (sigma_applied - tau_xy) / eta_s_reg
             return gamma, gamma_dot
 

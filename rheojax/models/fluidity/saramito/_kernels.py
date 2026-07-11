@@ -24,6 +24,8 @@ References:
 
 from __future__ import annotations
 
+from functools import partial
+
 from rheojax.core.jax_config import safe_import_jax
 
 # Safe import ensures float64
@@ -613,6 +615,7 @@ def _saramito_flow_curve_steady_minimal(
     t_a: float,
     b: float,
     n_rej: float,
+    eta_s: float = 0.0,
 ) -> jnp.ndarray:
     """Compute steady-state flow curve with minimal coupling (constant τ_y)."""
     gamma_dot_abs = jnp.abs(gamma_dot) + 1e-20
@@ -626,8 +629,8 @@ def _saramito_flow_curve_steady_minimal(
     # Constant yield stress
     tau_y = tau_y0
 
-    # Herschel-Bulkley flow curve
-    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB)
+    # Herschel-Bulkley flow curve + Newtonian solvent contribution
+    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB) + eta_s * gamma_dot_abs
     sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
@@ -646,6 +649,7 @@ def _saramito_flow_curve_steady_full(
     n_rej: float,
     tau_y_coupling: float,
     m_yield: float,
+    eta_s: float = 0.0,
 ) -> jnp.ndarray:
     """Compute steady-state flow curve with full coupling (τ_y depends on f)."""
     gamma_dot_abs = jnp.abs(gamma_dot) + 1e-20
@@ -659,8 +663,8 @@ def _saramito_flow_curve_steady_full(
     # Full coupling: yield stress depends on fluidity
     tau_y = tau_y0 + tau_y_coupling / jnp.power(f_ss + 1e-20, m_yield)
 
-    # Herschel-Bulkley flow curve
-    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB)
+    # Herschel-Bulkley flow curve + Newtonian solvent contribution
+    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB) + eta_s * gamma_dot_abs
     sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
@@ -679,6 +683,7 @@ def saramito_flow_curve_steady(
     coupling_mode: str = "minimal",
     tau_y_coupling: float = 0.0,
     m_yield: float = 1.0,
+    eta_s: float = 0.0,
 ) -> jnp.ndarray:
     """Compute steady-state flow curve for Saramito model.
 
@@ -705,6 +710,7 @@ def saramito_flow_curve_steady(
         coupling_mode: "minimal" or "full"
         tau_y_coupling: Yield stress coupling coefficient
         m_yield: Yield stress fluidity exponent
+        eta_s: Solvent viscosity (Pa·s), adds η_s·|γ̇| to the flow curve
 
     Returns:
         Steady-state stress array (Pa)
@@ -723,14 +729,15 @@ def saramito_flow_curve_steady(
             n_rej,
             tau_y_coupling,
             m_yield,
+            eta_s,
         )
     else:
         return _saramito_flow_curve_steady_minimal(
-            gamma_dot, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej
+            gamma_dot, tau_y0, K_HB, n_HB, f_age, f_flow, t_a, b, n_rej, eta_s
         )
 
 
-@jax.jit
+@partial(jax.jit, static_argnames=("coupling_mode",))
 def saramito_steady_state_full(
     gamma_dot: jnp.ndarray,
     G: float,
@@ -745,6 +752,7 @@ def saramito_steady_state_full(
     coupling_mode: str = "minimal",
     tau_y_coupling: float = 0.0,
     m_yield: float = 1.0,
+    eta_s: float = 0.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Compute steady-state stress tensor components.
 
@@ -773,6 +781,7 @@ def saramito_steady_state_full(
         coupling_mode: "minimal" or "full"
         tau_y_coupling: Yield stress coupling coefficient
         m_yield: Yield stress fluidity exponent
+        eta_s: Solvent viscosity (Pa·s), adds η_s·|γ̇| to the flow curve
 
     Returns:
         (tau_xy, tau_xx, N1) arrays
@@ -793,6 +802,7 @@ def saramito_steady_state_full(
         coupling_mode,
         tau_y_coupling,
         m_yield,
+        eta_s,
     )
     tau_xy = sigma_ss
 

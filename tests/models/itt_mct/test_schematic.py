@@ -453,14 +453,63 @@ class TestConstructionValidation:
         assert model._microscopic_stress_prefactor is not None
 
     def test_v2_critical_nonzero_v1(self):
-        """_get_v2_critical uses the v1 != 0 branch when v1 is nonzero."""
+        """_get_v2_critical(v1) must agree with glass_transition_criterion's
+        exact v2_critical, since get_glass_transition_info() is the
+        independent source of truth for the same quantity."""
         model = ITTMCTSchematic()
-        model.parameters.set_value("v1", 1.0)
-        # epsilon property routes through _get_v2_critical(v1) with v1 != 0.
-        v2_c = model._get_v2_critical(1.0)
-        assert v2_c == pytest.approx((4.0 - 2.0 * 1.0) / (1.0 - 1.0 / 4.0))
-        # And the epsilon getter stays finite with the modified v1.
-        assert np.isfinite(model.epsilon)
+        model.parameters.set_value("v1", 0.5)
+        v2_c = model._get_v2_critical(0.5)
+
+        # Exact closed form: v2_c = (1 + sqrt(1 - v1))^2 (Gotze 2009 Sec 4.3).
+        expected = (1.0 + 0.5**0.5) ** 2
+        assert v2_c == pytest.approx(expected, rel=1e-12)
+
+        # And it must match what get_glass_transition_info() independently
+        # computes via glass_transition_criterion for the same v1.
+        model.parameters.set_value("v2", v2_c * 1.1)
+        info = model.get_glass_transition_info()
+        assert v2_c == pytest.approx(info["v2_critical"], rel=1e-12)
+
+    def test_epsilon_roundtrip_nonzero_v1(self):
+        """Setting model.epsilon with v1 != 0 must read back the same
+        epsilon that get_glass_transition_info() independently reports,
+        not a value derived from a different v2_critical formula."""
+        model = ITTMCTSchematic()
+        model.parameters.set_value("v1", 0.5)
+        model.epsilon = 0.1
+
+        assert model.epsilon == pytest.approx(0.1, rel=1e-9)
+        assert model.get_glass_transition_info()["epsilon"] == pytest.approx(
+            0.1, rel=1e-9
+        )
+
+
+class TestSteadyStateStressConvergence:
+    """_compute_steady_state_stress must not silently trust a non-converged solve_ivp."""
+
+    def test_raises_when_solver_never_converges(self, monkeypatch):
+        """If solve_ivp reports success=False on every attempt (LSODA and the
+        Radau retry), the method must raise instead of silently returning
+        sol.y[..., -1] from an integration that never reached t_max."""
+        model = ITTMCTSchematic(epsilon=0.05)
+        # Pre-warm the Prony-mode cache with a real (unpatched) solve so the
+        # mock below only intercepts the steady-state ODE under test, not
+        # the unrelated solve_ivp call inside initialize_prony_modes().
+        model._compute_steady_state_stress(0.5)
+
+        class _FailedSol:
+            success = False
+            message = "mock non-convergence"
+            y = np.zeros((3 + model.n_prony_modes, 1))
+            t = np.array([0.0])
+
+        monkeypatch.setattr(
+            "rheojax.models.itt_mct.schematic.solve_ivp",
+            lambda *args, **kwargs: _FailedSol(),
+        )
+
+        with pytest.raises(RuntimeError, match="failed to converge"):
+            model._compute_steady_state_stress(1.0)
 
 
 class TestEquilibriumCorrelator:
@@ -583,9 +632,7 @@ class TestOscillationDetailed:
         assert np.all(np.isfinite(comps))
         # |G*| returned as complex; its magnitude equals sqrt(G'^2 + G''^2).
         mag = np.abs(G_star)
-        np.testing.assert_allclose(
-            mag, np.hypot(comps[:, 0], comps[:, 1]), rtol=1e-6
-        )
+        np.testing.assert_allclose(mag, np.hypot(comps[:, 0], comps[:, 1]), rtol=1e-6)
         # Loss modulus is non-negative for a passive material.
         assert np.all(comps[:, 1] >= -1e-6)
 
@@ -608,7 +655,9 @@ class TestStartupDetailed:
         model = ITTMCTSchematic(
             epsilon=0.05, decorrelation_form="lorentzian", memory_form="full"
         )
-        sigma = model.predict(np.linspace(0.0, 3.0, 15), test_mode="startup", gamma_dot=1.0)
+        sigma = model.predict(
+            np.linspace(0.0, 3.0, 15), test_mode="startup", gamma_dot=1.0
+        )
         assert np.all(np.isfinite(sigma))
 
 

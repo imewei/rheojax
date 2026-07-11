@@ -18,6 +18,8 @@ from rheojax.models.hvnm._kernels import (
     hvnm_guth_gold,
     hvnm_interphase_fraction,
     hvnm_interphase_modulus,
+    hvnm_interphase_stress,
+    hvnm_total_stress_shear,
 )
 
 jax, jnp = safe_import_jax()
@@ -494,6 +496,31 @@ class TestHVNMRelaxation:
         assert "mu_I_xy" in result
         assert "mu_I_nat_xy" in result
 
+    def test_simulate_relaxation_respects_include_diffusion(self):
+        """simulate_relaxation's ODE must apply diffusion-limited tails.
+
+        Regression: the ODE vector fields never referenced
+        k_diff_0_mat/k_diff_0_int, so simulate_relaxation() silently
+        ignored include_diffusion=True even though model_function's
+        (closed-form) relaxation branch applied it.
+        """
+        t = np.logspace(-2, 3, 60)
+
+        m_diff = HVNMLocal(include_diffusion=True)
+        m_diff.parameters.set_value("k_diff_0_mat", 0.5)
+        m_diff.parameters.set_value("k_diff_0_int", 0.05)
+        G_t_diff = m_diff.simulate_relaxation(t, gamma_step=0.01)
+
+        m_nodiff = HVNMLocal(include_diffusion=True)
+        m_nodiff.parameters.set_value("k_diff_0_mat", 0.0)
+        m_nodiff.parameters.set_value("k_diff_0_int", 0.0)
+        G_t_nodiff = m_nodiff.simulate_relaxation(t, gamma_step=0.01)
+
+        assert np.all(np.isfinite(G_t_diff))
+        assert not np.allclose(G_t_diff, G_t_nodiff, rtol=1e-6)
+        # Diffusion adds a decay channel, so it should relax faster (lower G).
+        assert G_t_diff[-1] < G_t_nodiff[-1]
+
 
 # =============================================================================
 # Test Creep
@@ -600,6 +627,45 @@ class TestHVNMLAOS:
         assert h["harmonic_index"][0] == 1
         assert h["harmonic_index"][1] == 3
 
+    def test_model_function_laos_respects_damage_flags(self):
+        """model_function's laos branch must forward damage, not hardcode it off.
+
+        Regression: the laos branch of model_function used to hardcode
+        include_damage=False, include_interfacial_damage=False and zero
+        damage rate parameters regardless of the model's actual flags/fit
+        parameters, silently disabling damage physics for any LAOS fit.
+        """
+        t = jnp.linspace(0.0, 10.0, 100)
+
+        m_damage = HVNMLocal(include_damage=True, include_interfacial_damage=True)
+        m_damage.parameters.set_value("Gamma_0", 0.05)
+        m_damage.parameters.set_value("Gamma_0_int", 0.05)
+        m_damage.parameters.set_value("lambda_crit", 1.01)
+        m_damage.parameters.set_value("lambda_crit_int", 1.01)
+        params_damage = jnp.array(
+            [m_damage.parameters.get_value(n) for n in m_damage.parameters.keys()],
+            dtype=jnp.float64,
+        )
+        stress_damage = m_damage.model_function(
+            t, params_damage, test_mode="laos", gamma_0=1.0, omega=1.0
+        )
+
+        m_nodamage = HVNMLocal(include_damage=True, include_interfacial_damage=True)
+        m_nodamage.parameters.set_value("Gamma_0", 0.0)
+        m_nodamage.parameters.set_value("Gamma_0_int", 0.0)
+        params_nodamage = jnp.array(
+            [m_nodamage.parameters.get_value(n) for n in m_nodamage.parameters.keys()],
+            dtype=jnp.float64,
+        )
+        stress_nodamage = m_nodamage.model_function(
+            t, params_nodamage, test_mode="laos", gamma_0=1.0, omega=1.0
+        )
+
+        assert np.all(np.isfinite(np.asarray(stress_damage)))
+        assert not np.allclose(
+            np.asarray(stress_damage), np.asarray(stress_nodamage), rtol=1e-6
+        )
+
 
 # =============================================================================
 # Test Damage
@@ -704,6 +770,48 @@ class TestHVNMInterphase:
         assert payne["G_0"] > payne["G_inf"]
         assert payne["gamma_c"] > 0
         assert payne["gamma_c"] < 1.0  # Amplified critical strain
+
+    def test_interphase_stress_not_double_amplified(self):
+        """hvnm_interphase_stress must not scale with X_I.
+
+        Regression for the X_I double-count bug: the Guth-Gold
+        amplification already enters mu_I through the ODE dynamics
+        (hvnm_interphase_rhs_shear uses X_I*gamma_dot), so the stress
+        formula must use a single, unamplified G_I_eff*(mu_I - mu_I_nat)
+        -- changing X_I must not change the returned stress.
+        """
+        mu_I_xy, mu_I_nat_xy, G_I_eff, D_int = 1.2, 1.0, 500.0, 0.0
+        s_unit = float(
+            hvnm_interphase_stress(mu_I_xy, mu_I_nat_xy, G_I_eff, 1.0, D_int)
+        )
+        s_amplified = float(
+            hvnm_interphase_stress(mu_I_xy, mu_I_nat_xy, G_I_eff, 3.0, D_int)
+        )
+        expected = G_I_eff * (mu_I_xy - mu_I_nat_xy)
+        np.testing.assert_allclose(s_unit, expected)
+        np.testing.assert_allclose(s_amplified, expected)
+
+    def test_total_stress_shear_interphase_not_double_amplified(self):
+        """hvnm_total_stress_shear's I-network term must also skip X_I."""
+        args = dict(
+            gamma=0.0,
+            mu_E_xy=1.0,
+            mu_E_nat_xy=1.0,
+            mu_D_xy=0.0,
+            mu_I_xy=1.2,
+            mu_I_nat_xy=1.0,
+            G_P=0.0,
+            G_E=0.0,
+            G_D=0.0,
+            G_I_eff=500.0,
+            X_phi=1.0,
+            D=0.0,
+            D_int=0.0,
+        )
+        sigma_unit = float(hvnm_total_stress_shear(X_I=1.0, **args))
+        sigma_amplified = float(hvnm_total_stress_shear(X_I=3.0, **args))
+        np.testing.assert_allclose(sigma_unit, 500.0 * (1.2 - 1.0))
+        np.testing.assert_allclose(sigma_amplified, sigma_unit)
 
 
 # =============================================================================

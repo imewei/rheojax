@@ -10,10 +10,10 @@ The FZSL model consists of:
 - Fractional Maxwell element (SpringPot c_alpha + dashpot eta in series)
 
 Relaxation modulus:
-    G(t) = G_e + c_α * t^(-α) * E_{1-α,1}(-(t/τ)^(1-α))
+    G(t) = G_e + c_α * t^(-α) * E_{1-α,1-α}(-(t/τ)^(1-α))
 
 Complex modulus:
-    G*(ω) = G_e + c_α * (iω)^α / (1 + iωτ)
+    G*(ω) = G_e + c_α * (iω)^α * (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
 
 where E_{α,β} is the two-parameter Mittag-Leffler function.
 
@@ -145,7 +145,7 @@ class FractionalZenerSolidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        G(t) = G_e + c_α * t^(-α) * E_{1-α,1}(-(t/τ)^(1-α))
+        G(t) = G_e + c_α * t^(-α) * E_{1-α,1-α}(-(t/τ)^(1-α))
 
         Parameters
         ----------
@@ -171,15 +171,17 @@ class FractionalZenerSolidLiquid(BaseModel):
         # Clip alpha to safe range (works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        # Parameters for two-parameter Mittag-Leffler: E_{1-α,1}
+        # Parameters for two-parameter Mittag-Leffler: E_{1-α,1-α}
+        # (matches fractional_maxwell_gel.py's springpot+dashpot-in-series branch,
+        # which is the fractional element FZSL puts in parallel with the spring)
         ml_alpha = 1.0 - alpha_safe
-        ml_beta = 1.0
+        ml_beta = ml_alpha
 
         tau_safe = tau + epsilon
         # P2-FRAC-002: Guard t=0 — power(0, -alpha_safe) = +inf when alpha>0.
         t_safe = jnp.maximum(t, 1e-30)
         # Compute fractional relaxation term
-        # E_{1-α,1}(-(t/τ)^(1-α))
+        # E_{1-α,1-α}(-(t/τ)^(1-α))
         z = -jnp.power(t_safe / tau_safe, ml_alpha)
         # Mittag-Leffler function with concrete alpha/beta
         ml_term = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
@@ -256,7 +258,7 @@ class FractionalZenerSolidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict complex modulus G*(ω).
 
-        G*(ω) = G_e + c_α * (iω)^α / (1 + (iωτ)^(1-α))
+        G*(ω) = G_e + c_α * (iω)^α * (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
 
         This is the correct formula for FZSL (spring + FMG in parallel).
 
@@ -302,8 +304,8 @@ class FractionalZenerSolidLiquid(BaseModel):
         )
         # Denominator: 1 + (iωτ)^(1-α)
         denominator = 1.0 + i_omega_tau_beta
-        # Fractional term: c_α * (iω)^α / (1 + (iωτ)^(1-α))
-        fractional_term = c_alpha * i_omega_alpha / denominator
+        # Fractional term: c_α * (iω)^α * (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
+        fractional_term = c_alpha * i_omega_alpha * i_omega_tau_beta / denominator
         # Total complex modulus
         G_star = Ge + fractional_term
         # Extract storage and loss moduli

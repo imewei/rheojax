@@ -703,6 +703,13 @@ def invert_stress_for_gamma_dot_hb(
     sigma_excess = jnp.maximum(sigma_0 - tau_y, 1e-12)
     gamma_dot_init = jnp.power(sigma_excess / K, 1.0 / n_flow)
 
+    # Physical upper bound on the root: since tau_y >= 0 and K*gd^n >= 0,
+    # sigma_0 = tau_y + K*gd^n + eta_inf*gd implies eta_inf*gd <= sigma_0, so
+    # gd <= sigma_0/eta_inf. Deriving the clip from this (instead of a fixed
+    # 1e8 ceiling) prevents silently truncating the root at large stress/small
+    # eta_inf, where the true gamma_dot can exceed 1e8.
+    gamma_dot_max = sigma_0 / jnp.maximum(eta_inf, 1e-12)
+
     # Fixed-point iteration
     def iterate(gamma_dot):
         sigma_pred = (
@@ -710,7 +717,7 @@ def invert_stress_for_gamma_dot_hb(
         )
         # Newton-like update
         gamma_dot_new = gamma_dot * sigma_0 / jnp.maximum(sigma_pred, 1e-12)
-        return jnp.clip(gamma_dot_new, 1e-12, 1e8)
+        return jnp.clip(gamma_dot_new, 1e-12, gamma_dot_max)
 
     # R5-JAX-003: Replace Python for-loop with jax.lax.fori_loop.
     # A Python for-loop unrolls 10x into the trace graph, creating large JIT

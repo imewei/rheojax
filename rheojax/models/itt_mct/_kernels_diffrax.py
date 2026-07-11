@@ -205,10 +205,13 @@ def compute_adaptive_t_max(
     float
         Adaptive t_max for ODE integration
     """
-    # Effective relaxation time
+    # Effective relaxation time: use the LONGER timescale so the strain has
+    # time to accumulate to O(gamma_c) before the integration window closes
+    # (min() here previously locked t_max to tau_bare at low gamma_dot,
+    # starving strain accumulation and collapsing the yield-stress plateau).
     tau_bare = 1.0 / Gamma
     tau_shear = gamma_c / jnp.maximum(gamma_dot, 1e-10)
-    tau_eff = jnp.minimum(tau_bare, tau_shear)
+    tau_eff = jnp.maximum(tau_bare, tau_shear)
 
     # Integration time = n_relaxations * effective timescale
     t_max = n_relaxations * tau_eff

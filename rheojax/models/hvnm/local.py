@@ -1189,13 +1189,13 @@ class HVNMLocal(HVNMBase):
                 "nu_0_int": nu_0_int,
                 "E_a_int": E_a_int,
                 "V_act_int": V_act_int,
-                "Gamma_0": 0.0,
-                "lambda_crit": 10.0,
-                "Gamma_0_int": 0.0,
-                "lambda_crit_int": 10.0,
-                "h_0": 0.0,
-                "E_a_heal": 100e3,
-                "n_h": 1.0,
+                "Gamma_0": p_dict.get("Gamma_0", 0.0),
+                "lambda_crit": p_dict.get("lambda_crit", 10.0),
+                "Gamma_0_int": p_dict.get("Gamma_0_int", 0.0),
+                "lambda_crit_int": p_dict.get("lambda_crit_int", 10.0),
+                "h_0": p_dict.get("h_0", 0.0),
+                "E_a_heal": p_dict.get("E_a_heal", 100e3),
+                "n_h": p_dict.get("n_h", 1.0),
             }
             sol = hvnm_solve_laos(
                 t_arr,
@@ -1203,9 +1203,9 @@ class HVNMLocal(HVNMBase):
                 omega,
                 params_dict,
                 kinetics=self._kinetics,
-                include_damage=False,
+                include_damage=self._include_damage,
                 include_dissociative=self._include_dissociative,
-                include_interfacial_damage=False,
+                include_interfacial_damage=self._include_interfacial_damage,
             )
             # Mask failed ODE solutions with NaN so Bayesian NaN guard rejects them
             ys = _mask_failed_solution_ys(sol)

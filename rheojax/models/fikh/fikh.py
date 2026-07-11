@@ -600,18 +600,23 @@ class FIKH(FIKHBase):
     ) -> ArrayLike:
         """Predict startup shear response.
 
+        Uses the same return-mapping scan kernel as ``fit()``/``predict()``
+        for ``test_mode='startup'`` (see ``_predict_from_params``), so
+        parameters fitted via the class's documented usage pattern
+        (``fit(..., test_mode='startup', ...)``) are evaluated consistently.
+
         Args:
             t: Time array.
             gamma_dot: Constant shear rate.
-            T_init: Initial temperature.
+            T_init: Initial temperature (unused; thermal init follows
+                ``_predict_from_params``, matching ``fit``/``predict``).
 
         Returns:
             Stress vs time.
         """
-        params = self._get_params_dict()
-        return self._simulate_transient(
-            jnp.asarray(t), params, "startup", gamma_dot=gamma_dot, T_init=T_init
-        )
+        t_arr = jnp.asarray(t)
+        strain = gamma_dot * t_arr
+        return self._predict(jnp.stack([t_arr, strain]), test_mode="startup")
 
     def predict_relaxation(
         self,

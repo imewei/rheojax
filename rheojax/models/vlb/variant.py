@@ -1222,6 +1222,8 @@ class VLBVariant(VLBBase):
             period = 2 * np.pi / omega
             t = np.linspace(0, n_cycles * period, n_cycles * 200)
 
+        self._omega_laos = omega
+
         t_jax = jnp.asarray(t, dtype=jnp.float64)
         params = self._build_params_array()
         G0, k_d_0, eta_s = params[0], params[1], params[2]
@@ -1256,7 +1258,7 @@ class VLBVariant(VLBBase):
         """
         eps_dot_jax = jnp.asarray(eps_dot, dtype=jnp.float64)
         params = self._build_params_array()
-        G0, k_d_0 = params[0], params[1]
+        G0, k_d_0, eta_s = params[0], params[1], params[2]
         vp = self._unpack_variant_params(params)
         is_fene = self._stress_type == "fene"
 
@@ -1308,9 +1310,12 @@ class VLBVariant(VLBBase):
 
             if is_fene:
                 f = vlb_fene_factor(mu_11, mu_22, mu_22, vp["L_max"])
-                return G0 * f * (mu_11 - mu_22)
+                network_stress = G0 * f * (mu_11 - mu_22)
             else:
-                return G0 * (mu_11 - mu_22)
+                network_stress = G0 * (mu_11 - mu_22)
+
+            # Newtonian solvent Trouton contribution (uniaxial: 3*eta_s*eps_dot)
+            return network_stress + 3.0 * eta_s * ed
 
         return np.asarray(jax.vmap(solve_ext)(eps_dot_jax))
 

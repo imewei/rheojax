@@ -114,6 +114,22 @@ class TestSTZCoverage:
         ):
             self.model.predict(self.t)
 
+    def test_predict_unrecognized_test_mode_raises(self):
+        """_predict must raise, not silently return zeros, for an unset/unknown
+        test_mode (regression: previously fell through to np.zeros_like(X))."""
+        self.model._test_mode = None
+        with pytest.raises(ValueError, match="Unsupported or unset test_mode"):
+            self.model.predict(self.t)
+
+    def test_startup_predict_missing_gamma_dot_raises(self):
+        """_simulate_transient_jit's startup branch must reject gamma_dot=None
+        with a clear ValueError instead of crashing deep in the ODE RHS with
+        `None - <jax array>` (regression: missing None-guard)."""
+        self.model._test_mode = "startup"
+        self.model.fitted_ = True
+        with pytest.raises(ValueError, match="startup mode requires gamma_dot"):
+            self.model.predict(self.t)
+
     def test_extract_harmonics_zero_fundamental(self):
         """Test extract_harmonics with zero fundamental (edge case)."""
         # Create a signal with 0 amplitude (all zeros)

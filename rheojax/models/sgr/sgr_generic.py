@@ -239,9 +239,11 @@ class SGRGeneric(BaseModel):
         deformed trap elements. For SGR with stress sigma and
         structural parameter lambda:
 
-            U = (1/2) * (sigma^2 / (G0 * lambda^n))
+            U = (1/2) * (sigma^2 / (G0 * lambda))
 
-        where the effective modulus depends on structure.
+        i.e. the effective modulus is linear in lambda (no exposed
+        structural exponent on this code path; see predict_thixotropic_stress
+        for the separate n_struct exponent).
 
         Args:
             state: State vector [sigma, lambda]
@@ -912,8 +914,11 @@ class SGRGeneric(BaseModel):
         gamma_dot = kwargs.get("gamma_dot", 1.0)
         is_stress = kwargs.get("is_stress", False)
 
-        # Store gamma_dot for prediction
+        # Store gamma_dot and is_stress for prediction. is_stress must be
+        # persisted (not just read) so predict()/model_function() can convert
+        # eta_plus back to stress for models fit on raw stress data.
         self._startup_gamma_dot = gamma_dot
+        self._startup_is_stress = is_stress
 
         if is_stress:
             eta_plus_data = eta_plus / gamma_dot
@@ -1045,9 +1050,7 @@ class SGRGeneric(BaseModel):
             self._fit_oscillation_mode(omega_single, G_star_single, **remaining_kwargs)
         else:
             # Large amplitude - full MC-based LAOS fitting
-            self._fit_laos_mc(
-                t, sigma, gamma_0, omega, n_particles, **remaining_kwargs
-            )
+            self._fit_laos_mc(t, sigma, gamma_0, omega, n_particles, **remaining_kwargs)
 
     def _fit_laos_mc(
         self,
@@ -1260,9 +1263,18 @@ class SGRGeneric(BaseModel):
         # Dimensionless shear rate
         gamma_dot_scaled = gamma_dot_safe * tau0
 
-        # Flow curve: sigma = G0 * tau0 * gamma_dot * (gamma_dot * tau0)^(x-2)
+        # Fluid (x > 1): sigma = G0 * tau0 * gamma_dot * (gamma_dot * tau0)^(x-2)
         # = G0 * (gamma_dot * tau0)^(x-1)
-        sigma = G0_scale * G0_dim * jnp.power(gamma_dot_scaled, x - 1.0)
+        sigma_fluid = G0_scale * G0_dim * jnp.power(gamma_dot_scaled, x - 1.0)
+
+        # Glass (x < 1): finite yield stress sigma_y plus a power-law
+        # correction, so stress saturates instead of diverging as
+        # gamma_dot -> 0 (sigma_y = A = G0, matching the fluid branch's
+        # gamma_dot-independent limit as x -> 1).
+        sigma_y = G0_scale * G0_dim
+        sigma_glass = sigma_y * (1.0 + jnp.power(gamma_dot_scaled, 1.0 - x))
+
+        sigma = jnp.where(x < 1.0, sigma_glass, sigma_fluid)
 
         return sigma
 
@@ -1421,23 +1433,16 @@ class SGRGeneric(BaseModel):
             - Shear-thinning exponent: x - 2
             - Uses relationship: eta ~ G0 * tau0 * (gamma_dot * tau0)^(x-2)
         """
-        # Dimensionless shear rate
-        gamma_dot_scaled = gamma_dot * tau0
-
         epsilon = 1e-12
-        gamma_dot_safe = jnp.maximum(gamma_dot_scaled, epsilon)
+        gamma_dot_safe = jnp.maximum(gamma_dot, epsilon)
 
-        # Compute equilibrium modulus factor
-        G0_dim = G0(x)
-
-        # Viscosity power-law exponent
-        visc_exp = x - 2.0
-
-        # Viscosity formula
-        # eta = G0_scale * tau0 * G0_dim * (gamma_dot * tau0)^(x-2)
-        # For x = 2: eta = const (Newtonian)
-        # For x < 2: eta decreases with gamma_dot (shear-thinning)
-        eta = G0_scale * tau0 * G0_dim * jnp.power(gamma_dot_safe, visc_exp)
+        # eta = sigma / gamma_dot. Reusing _predict_steady_shear_jit (rather
+        # than re-deriving the power law here) keeps the glass-phase
+        # (x < 1) yield-stress term in sync instead of letting the two
+        # formulas drift apart; for x >= 1 this reduces exactly to the
+        # original G0_scale * tau0 * G0_dim * (gamma_dot * tau0)^(x-2).
+        sigma = SGRGeneric._predict_steady_shear_jit(gamma_dot_safe, x, G0_scale, tau0)
+        eta = sigma / gamma_dot_safe
 
         return eta
 
@@ -1590,6 +1595,8 @@ class SGRGeneric(BaseModel):
             )
         t_jax = jnp.asarray(t)
         eta_plus_jax = self._predict_startup_jit(t_jax, x, G0_scale, tau0, gamma_dot)
+        if getattr(self, "_startup_is_stress", False):
+            eta_plus_jax = eta_plus_jax * gamma_dot
         return np.array(eta_plus_jax)
 
     def model_function(self, X, params, test_mode=None, **kwargs):
@@ -1640,7 +1647,16 @@ class SGRGeneric(BaseModel):
                     "SGRGeneric.model_function: gamma_dot not provided and "
                     "_startup_gamma_dot not cached. Call fit() with startup data first."
                 )
-            return self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
+            eta_plus = self._predict_startup_jit(X_jax, x, G0_scale, tau0, gamma_dot)
+            # Same priority order as gamma_dot above: explicit kwarg >
+            # _last_fit_kwargs > cached instance attr.
+            is_stress = kwargs.get("is_stress")
+            if is_stress is None:
+                last_kwargs = getattr(self, "_last_fit_kwargs", None) or {}
+                is_stress = last_kwargs.get("is_stress")
+            if is_stress is None:
+                is_stress = getattr(self, "_startup_is_stress", False)
+            return eta_plus * gamma_dot if is_stress else eta_plus
         elif mode in ("laos", "oscillation_laos"):
             # R8-SGR-001: LAOS not supported in NUTS (OOM for Bayesian), raise informative error
             raise NotImplementedError(

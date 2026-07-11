@@ -643,3 +643,164 @@ class TestFIKHThermalYieldStress:
         # With lam < 1, should scale by lam^m_y
         result_lam = thermal_yield_stress(sigma_y0, lam, m_y, T, T_ref, E_y)
         assert jnp.isclose(result_lam, sigma_y0 * lam**m_y, atol=1e-6)
+
+
+class TestFIKHPredictStartupConsistency:
+    """predict_startup() must use the same return-mapping formulation as
+    fit()/predict() for test_mode='startup' (confirmed-bug #1, P0)."""
+
+    def test_predict_startup_matches_predict(self):
+        """predict_startup(t, gamma_dot) must agree with predict(test_mode='startup')."""
+        model = FIKH(include_thermal=False, alpha_structure=0.6)
+        t = jnp.linspace(0.01, 5.0, 50)
+        gamma_dot = 0.5
+
+        via_predict_startup = model.predict_startup(t, gamma_dot=gamma_dot)
+        strain = gamma_dot * t
+        via_predict = model.predict(t, test_mode="startup", strain=strain)
+
+        assert jnp.allclose(via_predict_startup, via_predict, rtol=1e-8)
+
+    def test_predict_startup_matches_return_mapping_kernel(self):
+        """predict_startup must route through the return-mapping scan kernel
+        (_predict_from_params), not the rate-dependent Perzyna ODE kernel."""
+        model = FIKH(include_thermal=False, alpha_structure=0.6)
+        t = jnp.linspace(0.01, 5.0, 50)
+        gamma_dot = 0.5
+        strain = gamma_dot * t
+
+        expected = model._predict_from_params(t, strain, model._get_params_dict())
+        actual = model.predict_startup(t, gamma_dot=gamma_dot)
+
+        assert jnp.allclose(actual, expected, rtol=1e-8)
+
+
+class TestFIKHCreepEtaInf:
+    """predict_creep() must include the eta_inf viscous contribution
+    (confirmed-bug #3, P1)."""
+
+    def test_eta_inf_zero_matches_old_formula(self):
+        """eta_inf=0 must reproduce gamma_dot_p + sigma/eta_T exactly (no regression)."""
+        from rheojax.models.fikh._kernels import _make_fikh_creep_ode_rhs
+
+        model = FIKH(include_thermal=False, alpha_structure=0.5)
+        params = model._get_params_dict()
+        params["eta_inf"] = 0.0
+
+        rhs = _make_fikh_creep_ode_rhs(False)
+        y = jnp.array([0.0, 0.0, params.get("T_ref", 298.15), 0.0, 1.0])
+        args = dict(params)
+        args["sigma_applied"] = 80.0
+        dy = rhs(0.0, y, args)
+
+        eta_T = params["eta"]
+        mu_p = params.get("mu_p", 1e-3)
+        sigma_y = params["sigma_y0"] + params.get("delta_sigma_y", 0.0)
+        f_yield = max(80.0 - sigma_y, 0.0)
+        gamma_dot_p_expected = f_yield / mu_p
+        d_gamma_expected = gamma_dot_p_expected + 80.0 / eta_T
+
+        assert jnp.isclose(dy[0], d_gamma_expected, rtol=1e-6)
+
+    def test_nonzero_eta_inf_changes_creep_rate(self):
+        """A non-negligible eta_inf must measurably change the creep strain
+        rate relative to eta_inf=0 (previously silently ignored). Uses an
+        eta_inf comparable in magnitude to eta so the effect isn't lost in
+        floating-point noise relative to the model's default eta ~ 1e6."""
+        model_no_eta_inf = FIKH(include_thermal=False, alpha_structure=0.5)
+        eta = model_no_eta_inf.parameters.get_value("eta")
+        model_no_eta_inf.parameters.set_value("eta_inf", 0.0)
+
+        model_with_eta_inf = FIKH(include_thermal=False, alpha_structure=0.5)
+        model_with_eta_inf.parameters.set_value("eta_inf", eta)
+
+        t = jnp.linspace(0, 50, 100)
+        sigma_applied = 80.0
+
+        strain_no_eta_inf = model_no_eta_inf.predict_creep(
+            t, sigma_applied=sigma_applied
+        )
+        strain_with_eta_inf = model_with_eta_inf.predict_creep(
+            t, sigma_applied=sigma_applied
+        )
+
+        assert jnp.all(jnp.isfinite(strain_no_eta_inf))
+        assert jnp.all(jnp.isfinite(strain_with_eta_inf))
+        # eta_inf == eta halves the eta_T + eta_inf denominator's viscous
+        # flow contribution -- a large, easily distinguishable effect.
+        assert not jnp.allclose(strain_no_eta_inf, strain_with_eta_inf, rtol=1e-3)
+
+
+class TestFIKHIsotropicHardening:
+    """include_isotropic_hardening's Q_iso/b_iso must affect predictions
+    rather than being silent no-ops (confirmed-bug #4, P1)."""
+
+    def test_b_iso_affects_thermal_startup(self):
+        """b_iso must change the thermal startup prediction (was previously
+        completely unused, fixing the hardening rate at 1 regardless)."""
+        model_slow = FIKH(
+            include_thermal=True,
+            include_isotropic_hardening=True,
+            alpha_structure=0.6,
+        )
+        model_slow.parameters.set_value("Q_iso", 20.0)
+        model_slow.parameters.set_value("b_iso", 0.1)
+
+        model_fast = FIKH(
+            include_thermal=True,
+            include_isotropic_hardening=True,
+            alpha_structure=0.6,
+        )
+        model_fast.parameters.set_value("Q_iso", 20.0)
+        model_fast.parameters.set_value("b_iso", 10.0)
+
+        t = jnp.linspace(0.01, 5.0, 50)
+        stress_slow = model_slow.predict_startup(t, gamma_dot=0.5)
+        stress_fast = model_fast.predict_startup(t, gamma_dot=0.5)
+
+        assert jnp.all(jnp.isfinite(stress_slow))
+        assert jnp.all(jnp.isfinite(stress_fast))
+        assert not jnp.allclose(stress_slow, stress_fast, rtol=1e-6)
+
+    def test_q_iso_affects_isothermal_startup(self):
+        """Q_iso must change the isothermal startup prediction (previously
+        isotropic hardening had zero effect for include_thermal=False)."""
+        model_off = FIKH(
+            include_thermal=False,
+            include_isotropic_hardening=True,
+            alpha_structure=0.6,
+        )
+        model_off.parameters.set_value("Q_iso", 0.0)
+
+        model_on = FIKH(
+            include_thermal=False,
+            include_isotropic_hardening=True,
+            alpha_structure=0.6,
+        )
+        model_on.parameters.set_value("Q_iso", 30.0)
+        model_on.parameters.set_value("b_iso", 1.0)
+
+        t = jnp.linspace(0.01, 5.0, 50)
+        stress_off = model_off.predict_startup(t, gamma_dot=0.5)
+        stress_on = model_on.predict_startup(t, gamma_dot=0.5)
+
+        assert jnp.all(jnp.isfinite(stress_off))
+        assert jnp.all(jnp.isfinite(stress_on))
+        assert not jnp.allclose(stress_off, stress_on, rtol=1e-6)
+
+    def test_q_iso_zero_is_backward_compatible(self):
+        """Default (include_isotropic_hardening=False) must be numerically
+        unaffected -- Q_iso defaults to 0.0 in the params dict either way."""
+        model_default = FIKH(include_thermal=False, alpha_structure=0.6)
+        model_explicit_off = FIKH(
+            include_thermal=False,
+            include_isotropic_hardening=True,
+            alpha_structure=0.6,
+        )
+        model_explicit_off.parameters.set_value("Q_iso", 0.0)
+
+        t = jnp.linspace(0.01, 5.0, 50)
+        stress_default = model_default.predict_startup(t, gamma_dot=0.5)
+        stress_explicit_off = model_explicit_off.predict_startup(t, gamma_dot=0.5)
+
+        assert jnp.allclose(stress_default, stress_explicit_off, rtol=1e-8)

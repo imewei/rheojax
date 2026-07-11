@@ -211,7 +211,16 @@ class FractionalBurgersModel(BaseModel):
         """Predict relaxation modulus G(t).
 
         Note: Analytical relaxation modulus requires numerical inversion.
-        This provides an approximation.
+        This provides an approximation that blends two Mittag-Leffler decay
+        stages so every parameter has a non-zero effect on the output:
+
+        - Stage 1 interpolates from the instantaneous modulus G_inst = 1/Jg
+          down to the retarded plateau G_plateau = 1/(Jg + Jk) over the
+          Kelvin-Voigt retardation timescale tau_k (same construction used
+          by the sibling FractionalKelvinVoigtZener model).
+        - Stage 2 multiplies in a Mittag-Leffler decay governed by the
+          Maxwell-arm timescale tau_M = eta1 * Jg, driving G(t) -> 0 as
+          t -> infinity (Burgers is a liquid: the Maxwell dashpot flows).
 
         Parameters
         ----------
@@ -242,17 +251,23 @@ class FractionalBurgersModel(BaseModel):
         tau_k_safe = tau_k + epsilon
         # P2-FRAC-004: Guard t=0 — power(0/tau, -alpha_safe) = +inf when alpha>0.
         t_safe = jnp.maximum(t, 1e-30)
-        # Approximate using inverse relationship
-        # G(0) ≈ 1/J_g (instantaneous modulus)
-        G_inst = 1.0 / (Jg + epsilon)
-        # Long-time decay (fractional Maxwell-like)
-        # G(t) ~ t^(-α) at intermediate times
-        G_decay = G_inst * jnp.power(t_safe / tau_k_safe, -alpha_safe)
-        # Smooth transition
-        z = -jnp.power(t_safe / tau_k_safe, alpha_safe)
-        ml_term = mittag_leffler_e(z, alpha=alpha_safe)
-        # Combine terms
-        G_t = G_inst * ml_term + G_decay * (1.0 - ml_term)
+
+        Jg_safe = Jg + epsilon
+        eta1_safe = eta1 + epsilon
+
+        # Stage 1: retardation (uses Jg, Jk, tau_k, alpha)
+        G_inst = 1.0 / Jg_safe
+        G_plateau = 1.0 / (Jg_safe + Jk)
+        z_retard = -jnp.power(t_safe / tau_k_safe, alpha_safe)
+        ml_retard = mittag_leffler_e(z_retard, alpha=alpha_safe)
+        G_retarded = G_plateau + (G_inst - G_plateau) * ml_retard
+
+        # Stage 2: viscous flow decay from the Maxwell arm (uses eta1)
+        tau_M = eta1_safe * Jg_safe + epsilon
+        z_flow = -jnp.power(t_safe / tau_M, alpha_safe)
+        ml_flow = mittag_leffler_e(z_flow, alpha=alpha_safe)
+
+        G_t = G_retarded * ml_flow
 
         return G_t
 

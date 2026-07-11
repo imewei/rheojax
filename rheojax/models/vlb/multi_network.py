@@ -631,10 +631,18 @@ class VLBMultiNetwork(VLBBase):
 
         y0 = jnp.concatenate([jnp.array([gamma_0]), mu_xy_0])
 
+        # Regularize eta_s=0 (no solvent) with a fraction of the network's own
+        # viscosity (G_total / fastest relaxation rate) so the fast timescale
+        # eta_eff/G_total stays resolvable by the adaptive Tsit5 solver,
+        # matching the eta_eff pattern used in nonlocal_model.py.
+        G_total = jnp.sum(G_modes) + G_e
+        kd_max = jnp.max(kd_modes)
+        eta_eff = jnp.maximum(eta_s, 1e-2 * G_total / jnp.maximum(kd_max, 1e-30))
+
         args = {
             "G_modes": G_modes,
             "kd_modes": kd_modes,
-            "eta_s": jnp.maximum(eta_s, 1e-10),  # Small regularization
+            "eta_s": eta_eff,
             "G_e": G_e,
             "sigma_0": sigma_0,
         }

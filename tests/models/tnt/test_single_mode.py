@@ -663,6 +663,50 @@ class TestBayesianInterface:
 
         assert np.allclose(y_fn, y_pred, rtol=1e-10)
 
+    def test_model_function_relaxation_matches_public_bell(self):
+        """model_function relaxation path must use the variant pre-shear
+        steady state (bug: internal path was seeding from the basic UCM
+        analytical steady state, giving wrong sigma(0) for non-basic
+        variants)."""
+        model = TNTSingleMode(breakage="bell")
+        G, tau_b, eta_s, nu = 1000.0, 1.0, 0.1, 3.0
+        model.parameters.set_value("G", G)
+        model.parameters.set_value("tau_b", tau_b)
+        model.parameters.set_value("eta_s", eta_s)
+        model.parameters.set_value("nu", nu)
+
+        t = np.linspace(0, 5.0, 50)
+        params = jnp.array([G, tau_b, eta_s, nu])
+
+        sigma_fn = model.model_function(
+            t, params, test_mode="relaxation", gamma_dot=5.0
+        )
+        sigma_pub = model.simulate_relaxation(t, gamma_dot_preshear=5.0)
+
+        assert np.allclose(sigma_fn, sigma_pub, rtol=1e-3, atol=1e-3)
+        # sigma(0) must not equal the basic-UCM value G*tau_b*gamma_dot
+        assert not np.isclose(float(sigma_fn[0]), G * tau_b * 5.0, rtol=1e-3)
+
+    def test_model_function_relaxation_matches_public_non_affine(self):
+        """Same regression as above for the Gordon-Schowalter (xi>0) branch,
+        which the old incomplete condition also misrouted."""
+        model = TNTSingleMode(xi=0.3)
+        G, tau_b, eta_s = 1000.0, 1.0, 0.0
+        model.parameters.set_value("G", G)
+        model.parameters.set_value("tau_b", tau_b)
+        model.parameters.set_value("eta_s", eta_s)
+
+        t = np.linspace(0, 5.0, 50)
+        params = jnp.array([G, tau_b, eta_s])
+
+        sigma_fn = model.model_function(
+            t, params, test_mode="relaxation", gamma_dot=5.0
+        )
+        sigma_pub = model.simulate_relaxation(t, gamma_dot_preshear=5.0)
+
+        assert np.allclose(sigma_fn, sigma_pub, rtol=1e-3, atol=1e-3)
+        assert not np.isclose(float(sigma_fn[0]), G * tau_b * 5.0, rtol=1e-3)
+
 
 # =============================================================================
 # Physical Consistency Tests
@@ -760,6 +804,51 @@ class TestFitting:
         )
 
         assert r2 > 0.95
+
+
+# =============================================================================
+# SAOS Initialization Tests
+# =============================================================================
+
+
+class TestSAOSInitialization:
+    """Tests for initialize_from_saos warm-start."""
+
+    def test_initialize_from_saos_unsorted_omega(self):
+        """eta_s estimate must use the same index for the raw value and the
+        Maxwell subtraction, regardless of frequency-array ordering.
+
+        Regression test: the Maxwell-contribution subtraction previously used
+        omega[-1] (last array element) instead of omega[high_freq_idx] (the
+        true max), so a descending (non-pre-sorted) frequency sweep produced
+        a wildly oversized subtraction that clipped eta_s to 0 via the
+        max(0.0, ...) guard.
+        """
+        model_sorted = TNTSingleMode()
+        model_unsorted = TNTSingleMode()
+
+        # Descending (not pre-sorted) frequency sweep, per the bug report.
+        omega_unsorted = np.array([100.0, 10.0, 1.0, 0.1])
+        G_prime_unsorted = np.array([90.0, 50.0, 5.0, 0.5])
+        G_double_prime_unsorted = np.array([30.0, 50.0, 8.0, 1.0])
+
+        # Same data, ascending order.
+        omega_sorted = omega_unsorted[::-1]
+        G_prime_sorted = G_prime_unsorted[::-1]
+        G_double_prime_sorted = G_double_prime_unsorted[::-1]
+
+        model_sorted.initialize_from_saos(
+            omega_sorted, G_prime_sorted, G_double_prime_sorted
+        )
+        model_unsorted.initialize_from_saos(
+            omega_unsorted, G_prime_unsorted, G_double_prime_unsorted
+        )
+
+        eta_s_sorted = model_sorted.parameters.get_value("eta_s")
+        eta_s_unsorted = model_unsorted.parameters.get_value("eta_s")
+
+        assert eta_s_unsorted == pytest.approx(eta_s_sorted, rel=1e-8)
+        assert eta_s_unsorted > 0.0
 
 
 # =============================================================================
@@ -913,6 +1002,36 @@ class TestBellVariant:
 
 
 # =============================================================================
+# Stretch-Creation Breakage Variant Tests
+# =============================================================================
+
+
+class TestStretchCreationBreakage:
+    """Tests for stretch_creation breakage: g0 = (1+kappa*(stretch-1))/tau_b."""
+
+    def test_stretch_creation_rate_nonnegative_when_contracted(self):
+        """Creation rate g0 must not go negative for a contracted state.
+
+        Regression test: for stretch < 1 - 1/kappa (chain contraction below
+        equilibrium, e.g. during creep/retraction) with kappa at its
+        documented upper bound (5.0), g0 previously went negative, producing
+        an unphysical negative creation term in dS/dt.
+        """
+        from rheojax.models.tnt._kernels import build_tnt_ode_rhs
+
+        ode = build_tnt_ode_rhs("stretch_creation", False, False)
+        state = jnp.array([0.3, 0.3, 0.3, 0.0])  # stretch = sqrt(0.3) ~ 0.548
+        kappa = 5.0
+        tau_b = 1.0
+
+        d = ode(0.0, state, 0.0, 1000.0, tau_b, 0.0, 0.0, kappa, 10.0, 0.0)
+
+        # With g0 clamped to 0, dS_xx/dt = -beta*S_xx = -0.3 (no positive
+        # creation contribution to fight against the sign).
+        assert float(d[0]) == pytest.approx(-0.3, abs=1e-10)
+
+
+# =============================================================================
 # FENE-P Variant Tests
 # =============================================================================
 
@@ -957,6 +1076,32 @@ class TestFENEVariant:
         # Both finite and positive
         assert np.all(np.isfinite(sigma_fene))
         assert np.all(sigma_fene > 0)
+
+    def test_fene_conformation_bounded_by_lmax(self):
+        """FENE conformation trace must saturate strictly below L_max^2.
+
+        Regression test: build_tnt_ode_rhs previously accepted use_fene but
+        never referenced it, so tr(S) grew identically to the non-FENE model
+        (unbounded) instead of saturating, which fed the stress-readout
+        Peterlin factor an unbounded tr(S) and produced astronomical stress.
+        """
+        from rheojax.models.tnt._kernels import build_tnt_ode_rhs
+
+        ode = build_tnt_ode_rhs("constant", True, False)
+        G, tau_b, L_max = 1000.0, 1.0, 5.0
+        gamma_dot = 10.0
+
+        def step(state, _):
+            d = ode(0.0, state, gamma_dot, G, tau_b, 0.0, 0.0, 0.0, L_max, 0.0)
+            return state + 1e-4 * d, None
+
+        final_state, _ = jax.lax.scan(
+            step, jnp.array([1.0, 1.0, 1.0, 0.0]), None, length=200_000
+        )
+        tr_S = float(final_state[0] + final_state[1] + final_state[2])
+
+        assert np.isfinite(tr_S)
+        assert tr_S < L_max * L_max
 
     def test_fene_strain_stiffening_startup(self):
         """FENE should show strain stiffening in startup (higher transient stress).

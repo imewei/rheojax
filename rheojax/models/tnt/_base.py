@@ -238,7 +238,7 @@ class TNTBase(BaseModel):
             high_freq_idx = np.argmax(omega)
             eta_s_est = G_double_prime[high_freq_idx] / omega[high_freq_idx]
             # Subtract Maxwell contribution
-            wt = omega[-1] * tau_b_est
+            wt = omega[high_freq_idx] * tau_b_est
             eta_s_est = max(0.0, eta_s_est - G_est * tau_b_est / (1 + wt * wt))
         else:
             eta_s_est = 0.0

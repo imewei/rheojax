@@ -81,6 +81,7 @@ class TensorialEPM(EPMBase):
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
         n_fluid: float = 1.0,
+        smoothing_width: float = 0.1,
         yield_criterion: str = "von_mises",
         n_bayesian_steps: int = 200,
         fluidity_form: str = "overstress",
@@ -121,6 +122,7 @@ class TensorialEPM(EPMBase):
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
             n_fluid=n_fluid,
+            smoothing_width=smoothing_width,
             n_bayesian_steps=n_bayesian_steps,
             fluidity_form=fluidity_form,
         )
@@ -680,16 +682,19 @@ class TensorialEPM(EPMBase):
     ) -> RheoData:
         """Creep: Strain(t) at constant stress using Adaptive P-Controller.
 
-        Extracts shear component from tensorial stress.
+        Extracts shear component from tensorial stress. The controller is
+        substepped at ``self.dt`` between adjacent data points, matching the
+        scalar/Lattice fix in ``EPMBase._run_creep`` — see that method's
+        docstring for the coarse-cadence regression this avoids.
         """
         time = data.x
         if time is None:
             raise ValueError("data.x (time array) must not be None")
 
-        # Calculate dt from data
-        dt = self.dt
-        if len(time) > 1:
-            dt = float(time[1] - time[0])
+        # Outer cadence from data; substep the controller at self.dt inside.
+        dt_data = float(time[1] - time[0]) if len(time) > 1 else self.dt
+        dt_sub = min(self.dt, dt_data) if dt_data > 0 else self.dt
+        n_sub = max(1, int(round(dt_data / dt_sub))) if dt_sub > 0 else 1
 
         # Target stress: metadata is canonical; fall back to mean(y) only when
         # the caller passed y=constant (legacy pattern). See the matching
@@ -716,7 +721,7 @@ class TensorialEPM(EPMBase):
 
         n_steps = max(0, len(time) - 1)
 
-        def body(carrier, _):
+        def sub_body(carrier, _):
             curr_epm, gdot = carrier
             stress_grid = curr_epm[0]
             # Extract shear stress component
@@ -733,16 +738,18 @@ class TensorialEPM(EPMBase):
             # Prevent negative shear rate
             gdot_new = jnp.maximum(gdot_new, 0.0)
 
-            # Step EPM
+            # Step EPM at the stable substep
             new_epm = self._epm_step(
-                curr_epm, propagator_q, gdot_new, dt, params, smooth
+                curr_epm, propagator_q, gdot_new, dt_sub, params, smooth
             )
+            return (new_epm, gdot_new), None
 
-            # Return Strain
-            return (new_epm, gdot_new), new_epm[2]
+        def outer_body(carrier, _):
+            carrier_next, _ = jax.lax.scan(sub_body, carrier, None, length=n_sub)
+            return carrier_next, carrier_next[0][2]  # sampled strain
 
         if n_steps > 0:
-            _, strains_scan = jax.lax.scan(body, aug_state, None, length=n_steps)
+            _, strains_scan = jax.lax.scan(outer_body, aug_state, None, length=n_steps)
             strains = jnp.concatenate([jnp.array([initial_strain]), strains_scan])
         else:
             strains = jnp.array([initial_strain])

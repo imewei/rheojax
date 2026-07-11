@@ -676,6 +676,38 @@ class TestModelFunctionCompleteness:
         with pytest.raises(ValueError, match="gamma_dot"):
             model.model_function(t, params, test_mode="startup")
 
+    def test_model_function_relaxation_uses_current_g_modes(self):
+        """model_function's relaxation branch (the path _fit/NLSQ optimizes)
+        must depend on G_modes so gradients are nonzero, and must agree with
+        _predict's relaxation branch for the same params (regression: it
+        previously hardcoded a fixed 1e3 Pa sigma_0 split evenly across
+        modes, ignoring both G_modes and the measured data scale).
+        """
+        model = TNTStickyRouse(n_modes=2)
+        model._relaxation_sigma_0 = 5.0e4  # simulate cached y[0] from _fit
+
+        t = jnp.linspace(0.0, 10.0, 20)  # t[0]=0 -> sigma(0) == sigma_0 exactly
+        params_a = jnp.array([800.0, 10.0, 200.0, 1.0, 0.1, 0.0])
+        params_b = jnp.array([200.0, 10.0, 800.0, 1.0, 0.1, 0.0])
+
+        y_a = model.model_function(t, params_a, test_mode="relaxation")
+        y_b = model.model_function(t, params_b, test_mode="relaxation")
+
+        # Swapping G_0/G_1 must change the prediction (nonzero gradient wrt G_k)
+        assert not np.allclose(y_a, y_b)
+        # Anchored at the cached data scale, not the old hardcoded 1e3 Pa
+        assert np.isclose(float(y_a[0]), 5.0e4, rtol=1e-6)
+
+        # model_function must agree with _predict for the same params/state
+        model.parameters.set_value("G_0", 800.0)
+        model.parameters.set_value("tau_R_0", 10.0)
+        model.parameters.set_value("G_1", 200.0)
+        model.parameters.set_value("tau_R_1", 1.0)
+        model.parameters.set_value("tau_s", 0.1)
+        model.parameters.set_value("eta_s", 0.0)
+        y_predict = model.predict(t, test_mode="relaxation")
+        assert np.allclose(np.asarray(y_a), y_predict, rtol=1e-8)
+
     def test_fit_caches_protocol_kwargs(self):
         """Test that _fit() caches protocol kwargs for model_function fallback."""
         model = TNTStickyRouse(n_modes=2)
@@ -748,6 +780,22 @@ class TestPhysicalConsistency:
 
         assert np.all(N1 > 0)
         assert np.all(np.isfinite(N1))
+
+    def test_normal_stress_matches_ucm_quadratic_scaling(self):
+        """N1 must follow the UCM formula N1 = Sum(2*G_k*(tau_eff_k*gamma_dot)^2)
+        consistent with this model's own Newtonian (non-shear-thinning) flow
+        curve (regression: a stray /(1+(tau*gamma_dot)^2) saturation term
+        previously made N1 plateau instead of growing as gamma_dot^2).
+        """
+        model = TNTStickyRouse(n_modes=1)
+        model.parameters.set_value("G_0", 1000.0)
+        model.parameters.set_value("tau_R_0", 10.0)
+        model.parameters.set_value("tau_s", 1e-6)  # ~negligible vs tau_R_0
+
+        N1 = model.predict_normal_stress_difference(np.array([10.0]))
+
+        # tau_eff ~= 10.0, N1 = 2*1000*(10*10)^2 = 2e7 Pa
+        assert np.isclose(N1[0], 2.0e7, rtol=1e-5)
 
     def test_plateau_modulus_sum_of_sticker_limited_modes(self):
         """Test plateau modulus equals sum of modes where tau_R < tau_s.

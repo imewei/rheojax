@@ -536,8 +536,14 @@ class DMTLocal(DMTBase):
 
     def _predict_startup(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict startup stress."""
-        gamma_dot = kwargs.get("gamma_dot", 1.0)
-        lam_init = kwargs.get("lam_init", 1.0)
+        _gd = kwargs.get("gamma_dot", _MISSING)
+        gamma_dot = (
+            _gd if _gd is not _MISSING else getattr(self, "_gamma_dot_applied", 1.0)
+        )
+        _li = kwargs.get("lam_init", _MISSING)
+        lam_init = (
+            _li if _li is not _MISSING else getattr(self, "_startup_lam_init", 1.0)
+        )
         t_jax = jnp.array(t)
         dt = float(t[1] - t[0]) if len(t) > 1 else 0.01
         params = self.get_parameter_dict()
@@ -707,8 +713,12 @@ class DMTLocal(DMTBase):
 
     def _predict_relaxation(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict relaxation stress."""
-        sigma_init = kwargs.get("sigma_init", 100.0)
-        lam_init = kwargs.get("lam_init", 0.5)
+        _si = kwargs.get("sigma_init", _MISSING)
+        sigma_init = (
+            _si if _si is not _MISSING else getattr(self, "_relax_sigma_init", 100.0)
+        )
+        _li = kwargs.get("lam_init", _MISSING)
+        lam_init = _li if _li is not _MISSING else getattr(self, "_relax_lam_init", 0.5)
         _, stress, _ = self.simulate_relaxation(
             float(t[-1]), float(t[1] - t[0]), sigma_init, lam_init
         )
@@ -1046,8 +1056,10 @@ class DMTLocal(DMTBase):
 
     def _predict_creep(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict creep strain."""
-        sigma_0 = kwargs.get("sigma_0", 10.0)
-        lam_init = kwargs.get("lam_init", 1.0)
+        _s0 = kwargs.get("sigma_0", _MISSING)
+        sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_applied", 10.0)
+        _li = kwargs.get("lam_init", _MISSING)
+        lam_init = _li if _li is not _MISSING else getattr(self, "_creep_lam_init", 1.0)
         _, gamma, _, _ = self.simulate_creep(
             sigma_0, float(t[-1]), float(t[1] - t[0]), lam_init
         )
@@ -1211,7 +1223,8 @@ class DMTLocal(DMTBase):
 
     def _predict_oscillation(self, omega: np.ndarray, **kwargs) -> np.ndarray:
         """Predict complex modulus."""
-        lam_0 = kwargs.get("lam_0", 1.0)
+        _l0 = kwargs.get("lam_0", _MISSING)
+        lam_0 = _l0 if _l0 is not _MISSING else getattr(self, "_saos_lam_0", 1.0)
         G_prime, G_double_prime = self.predict_saos(omega, lam_0)
         return G_prime + 1j * G_double_prime
 
@@ -1407,9 +1420,7 @@ class DMTLocal(DMTBase):
         I_n_1 = np.array(
             [
                 np.sqrt(sp**2 + spp**2) / I_1
-                for sp, spp in zip(
-                    sigma_prime_arr, sigma_double_prime_arr, strict=True
-                )
+                for sp, spp in zip(sigma_prime_arr, sigma_double_prime_arr, strict=True)
             ]
         )
 
@@ -1558,9 +1569,12 @@ class DMTLocal(DMTBase):
 
     def _predict_laos(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict LAOS stress waveform."""
-        gamma_0 = kwargs.get("gamma_0", 0.1)
-        omega = kwargs.get("omega_laos", kwargs.get("omega", 1.0))
-        lam_init = kwargs.get("lam_init", 1.0)
+        _g0 = kwargs.get("gamma_0", _MISSING)
+        gamma_0 = _g0 if _g0 is not _MISSING else getattr(self, "_gamma_0", 0.1)
+        _om = kwargs.get("omega_laos", kwargs.get("omega", _MISSING))
+        omega = _om if _om is not _MISSING else getattr(self, "_omega_laos", 1.0)
+        _li = kwargs.get("lam_init", _MISSING)
+        lam_init = _li if _li is not _MISSING else getattr(self, "_laos_lam_init", 1.0)
         n_cycles = kwargs.get("n_cycles", 10)
         points_per_cycle = max(1, len(t) // n_cycles) if len(t) > n_cycles else 128
         result = self.simulate_laos(

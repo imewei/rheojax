@@ -1289,10 +1289,25 @@ def build_vlb_creep_ode_rhs(breakage_type="constant", stress_type="linear"):
         # Two regimes: if eta_s is significant, use Jeffreys approach;
         # otherwise derive from constitutive equation
         # sigma_applied = sigma_elastic + eta_s * gamma_dot
-        # For pure Maxwell (eta_s → 0), d(sigma_elastic)/dt = 0 at steady creep
-        # → gamma_dot = k_d * mu_xy / max(mu_yy, eps)
+        # For pure Maxwell (eta_s → 0), d(sigma_elastic)/dt = 0 at constant stress.
+        # Linear: sigma_elastic = G0*mu_xy → gamma_dot = k_d*mu_xy/mu_yy.
+        # FENE: sigma_elastic = G0*f(tr(mu))*mu_xy, so the constant-stress
+        # condition also carries a df/dt(tr(mu)) term since f depends on the
+        # evolving trace. Solving f'*mu_xy*d(tr_mu)/dt + f*d(mu_xy)/dt = 0 for
+        # gamma_dot (with f' = f^2/L_max^2) gives the expression below; it
+        # reduces to the linear formula when f=1, f'=0.
         mu_yy_safe = jnp.maximum(mu_yy, 1e-10)
-        gamma_dot_maxwell = k_d * mu_xy / mu_yy_safe
+        if stress_type == "fene":
+            tr_mu = mu_xx + mu_yy + mu_zz
+            f = vlb_fene_factor(mu_xx, mu_yy, mu_zz, L_max)
+            df_dtr = f * f / (L_max * L_max)
+            numerator = k_d * mu_xy * (f - df_dtr * (3.0 - tr_mu))
+            denominator = jnp.maximum(
+                f * mu_yy_safe + 2.0 * df_dtr * mu_xy * mu_xy, 1e-20
+            )
+            gamma_dot_maxwell = numerator / denominator
+        else:
+            gamma_dot_maxwell = k_d * mu_xy / mu_yy_safe
         gamma_dot_jeffreys = (sigma_applied - sigma_elastic) / jnp.maximum(eta_s, 1e-20)
         # Use Jeffreys when eta_s is appreciable, Maxwell otherwise
         eta_threshold = 1e-6 * G0 / k_d_0

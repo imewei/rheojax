@@ -126,6 +126,26 @@ class VLBBase(BaseModel):
         return float(jnp.sqrt(jnp.maximum(tr_mu / 3.0, 0.0) + 1e-30))
 
     # =========================================================================
+    # Parameter Name Resolution
+    # =========================================================================
+
+    # Subclasses name the dissociation rate / modulus parameters differently:
+    # VLBLocal uses "k_d"/"G0"; VLBVariant and VLBNonlocal use "k_d_0"/"G0";
+    # VLBMultiNetwork uses "k_d_0"/"G_0" (mode-0 of a multi-mode array).
+    _KD_NAMES = ("k_d", "k_d_0")
+    _G0_NAMES = ("G0", "G_0")
+
+    def _resolve_param_name(self, candidates: tuple[str, ...]) -> str | None:
+        """Return the first name in `candidates` present on this model, else None."""
+        # parameters.keys() returns a fresh iterator per call, so it must be
+        # materialized once here rather than reused across multiple `in` checks.
+        keys = set(self.parameters.keys())
+        for name in candidates:
+            if name in keys:
+                return name
+        return None
+
+    # =========================================================================
     # Dimensionless Numbers
     # =========================================================================
 
@@ -142,7 +162,8 @@ class VLBBase(BaseModel):
         float
             Weissenberg number (dimensionless)
         """
-        val = self.parameters.get_value("k_d")
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        val = self.parameters.get_value(kd_name) if kd_name else None
         k_d = float(val) if val is not None else 1.0
         t_R = 1.0 / k_d
         return t_R * abs(gamma_dot)
@@ -160,7 +181,8 @@ class VLBBase(BaseModel):
         float
             Deborah number (dimensionless)
         """
-        val = self.parameters.get_value("k_d")
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        val = self.parameters.get_value(kd_name) if kd_name else None
         k_d = float(val) if val is not None else 1.0
         t_R = 1.0 / k_d
         return t_R * omega
@@ -247,10 +269,12 @@ class VLBBase(BaseModel):
             eta_s_est = 0.0
 
         # Set parameters
-        if "k_d" in self.parameters.keys():
-            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
-        if "G0" in self.parameters.keys():
-            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        if kd_name:
+            self.parameters.set_value(kd_name, np.clip(k_d_est, 1e-6, 1e6))
+        G0_name = self._resolve_param_name(self._G0_NAMES)
+        if G0_name:
+            self.parameters.set_value(G0_name, np.clip(G0_est, 1e0, 1e8))
         if "eta_s" in self.parameters.keys():
             self.parameters.set_value("eta_s", np.clip(eta_s_est, 0.0, 1e4))
 
@@ -289,10 +313,12 @@ class VLBBase(BaseModel):
         k_d_est = 1.0
         G0_est = eta_0_est * k_d_est
 
-        if "k_d" in self.parameters.keys():
-            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
-        if "G0" in self.parameters.keys():
-            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        if kd_name:
+            self.parameters.set_value(kd_name, np.clip(k_d_est, 1e-6, 1e6))
+        G0_name = self._resolve_param_name(self._G0_NAMES)
+        if G0_name:
+            self.parameters.set_value(G0_name, np.clip(G0_est, 1e0, 1e8))
 
         logger.debug(
             f"Flow curve initialization: k_d={k_d_est:.3e} 1/s, G0={G0_est:.3e} Pa"
@@ -325,10 +351,12 @@ class VLBBase(BaseModel):
 
         k_d_est = max(k_d_est, 1e-6)
 
-        if "k_d" in self.parameters.keys():
-            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
-        if "G0" in self.parameters.keys():
-            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        if kd_name:
+            self.parameters.set_value(kd_name, np.clip(k_d_est, 1e-6, 1e6))
+        G0_name = self._resolve_param_name(self._G0_NAMES)
+        if G0_name:
+            self.parameters.set_value(G0_name, np.clip(G0_est, 1e0, 1e8))
 
         logger.debug(
             f"Relaxation initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
@@ -370,10 +398,12 @@ class VLBBase(BaseModel):
 
         k_d_est = G0_est / max(eta_0_est, 1e-10)
 
-        if "k_d" in self.parameters.keys():
-            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
-        if "G0" in self.parameters.keys():
-            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        if kd_name:
+            self.parameters.set_value(kd_name, np.clip(k_d_est, 1e-6, 1e6))
+        G0_name = self._resolve_param_name(self._G0_NAMES)
+        if G0_name:
+            self.parameters.set_value(G0_name, np.clip(G0_est, 1e0, 1e8))
 
         logger.debug(
             f"Startup initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s"
@@ -411,10 +441,12 @@ class VLBBase(BaseModel):
 
         k_d_est = max(k_d_est, 1e-6)
 
-        if "k_d" in self.parameters.keys():
-            self.parameters.set_value("k_d", np.clip(k_d_est, 1e-6, 1e6))
-        if "G0" in self.parameters.keys():
-            self.parameters.set_value("G0", np.clip(G0_est, 1e0, 1e8))
+        kd_name = self._resolve_param_name(self._KD_NAMES)
+        if kd_name:
+            self.parameters.set_value(kd_name, np.clip(k_d_est, 1e-6, 1e6))
+        G0_name = self._resolve_param_name(self._G0_NAMES)
+        if G0_name:
+            self.parameters.set_value(G0_name, np.clip(G0_est, 1e0, 1e8))
 
         logger.debug(f"Creep initialization: G0={G0_est:.3e} Pa, k_d={k_d_est:.3e} 1/s")
 

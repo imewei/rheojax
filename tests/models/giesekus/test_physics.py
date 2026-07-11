@@ -289,6 +289,40 @@ class TestRelaxation:
             f"At t=λ: σ/σ₀ = {ratio_at_lambda:.3f} (exponential would be 0.368)"
         )
 
+    def test_relaxation_ic_excludes_solvent_stress(self):
+        """Test τ_xy(0+) is the polymer-only steady stress, not total.
+
+        With η_s > 0, the pre-shear steady stress σ = τ_xy_polymer +
+        η_s·γ̇ includes a Newtonian solvent contribution that has no
+        memory and must vanish instantly at cessation of flow. The
+        relaxation ODE only evolves polymer stress, so τ_xy(0+) must
+        equal the polymer-only steady value (from the Giesekus f(Wi,α)
+        solution), not the total steady shear stress.
+        """
+        from rheojax.models.giesekus._kernels import _solve_giesekus_f_quartic
+
+        eta_p, lambda_1, alpha, eta_s = 100.0, 1.0, 0.3, 50.0
+        gamma_dot_preshear = 1.0
+
+        model = GiesekusSingleMode()
+        model.parameters.set_value("eta_p", eta_p)
+        model.parameters.set_value("lambda_1", lambda_1)
+        model.parameters.set_value("alpha", alpha)
+        model.parameters.set_value("eta_s", eta_s)
+
+        t = np.array([0.0, 1.0, 5.0])
+        sigma = model.simulate_relaxation(t, gamma_dot_preshear=gamma_dot_preshear)
+
+        wi = lambda_1 * gamma_dot_preshear
+        f = float(_solve_giesekus_f_quartic(jnp.array(wi), jnp.array(alpha)))
+        expected_tau_xy_0 = f * eta_p * gamma_dot_preshear
+
+        assert sigma[0] == pytest.approx(expected_tau_xy_0, rel=1e-5), (
+            f"tau_xy(0) = {sigma[0]:.3f} Pa, expected polymer-only "
+            f"{expected_tau_xy_0:.3f} Pa (total steady stress would be "
+            f"{expected_tau_xy_0 + eta_s * gamma_dot_preshear:.3f} Pa)"
+        )
+
 
 class TestNormalStresses:
     """Tests for normal stress physics."""

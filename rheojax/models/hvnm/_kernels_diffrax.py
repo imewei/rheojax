@@ -223,6 +223,33 @@ def _compute_k_ber_interphase(
         )
 
 
+def _apply_diffusion_decay(
+    dmu_xx: float,
+    dmu_yy: float,
+    dmu_xy: float,
+    mu_xx: float,
+    mu_yy: float,
+    mu_xy: float,
+    mu_nat_xx: float,
+    mu_nat_yy: float,
+    mu_nat_xy: float,
+    k_diff: float,
+) -> tuple[float, float, float]:
+    """Add the diffusion-limited long-time relaxation channel to a network's RHS.
+
+    Subtracts k_diff*(mu - mu_nat) from each distribution-tensor derivative
+    (the natural-state derivatives are untouched), so the stress-relevant
+    difference (mu - mu_nat) decays at (BER rate) + k_diff instead of just
+    the BER rate -- matching the exp(-k_diff*t) tail already implemented in
+    hvnm_relaxation_modulus_with_diffusion (_kernels.py). k_diff=0.0 (the
+    default when include_diffusion=False) makes this a no-op.
+    """
+    dmu_xx = dmu_xx - k_diff * (mu_xx - mu_nat_xx)
+    dmu_yy = dmu_yy - k_diff * (mu_yy - mu_nat_yy)
+    dmu_xy = dmu_xy - k_diff * (mu_xy - mu_nat_xy)
+    return dmu_xx, dmu_yy, dmu_xy
+
+
 # =============================================================================
 # ODE Vector Fields
 # =============================================================================
@@ -263,6 +290,8 @@ def _make_hvnm_startup_vector_field(
         h_0 = args["h_0"]
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
+        k_diff_mat = args["k_diff_0_mat"]
+        k_diff_int = args["k_diff_0_int"]
 
         # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
@@ -292,6 +321,18 @@ def _make_hvnm_startup_vector_field(
                 k_BER_mat,
             )
         )
+        dmu_E_xx, dmu_E_yy, dmu_E_xy = _apply_diffusion_decay(
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_xy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            mu_E_nat_xy,
+            k_diff_mat,
+        )
 
         # D-network evolution (3 equations, reusing VLB kernel)
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
@@ -319,6 +360,18 @@ def _make_hvnm_startup_vector_field(
                 X_I,
                 k_BER_int,
             )
+        )
+        dmu_I_xx, dmu_I_yy, dmu_I_xy = _apply_diffusion_decay(
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            mu_I_xx,
+            mu_I_yy,
+            mu_I_xy,
+            mu_I_nat_xx,
+            mu_I_nat_yy,
+            mu_I_nat_xy,
+            k_diff_int,
         )
 
         # Strain accumulation
@@ -407,6 +460,8 @@ def _make_hvnm_relaxation_vector_field(
         nu_0_int = args["nu_0_int"]
         E_a_int = args["E_a_int"]
         V_act_int = args["V_act_int"]
+        k_diff_mat = args["k_diff_0_mat"]
+        k_diff_int = args["k_diff_0_int"]
 
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
         mu_E_nat_xx, mu_E_nat_yy, mu_E_nat_xy = y[3], y[4], y[5]
@@ -433,6 +488,18 @@ def _make_hvnm_relaxation_vector_field(
                 k_BER_mat,
             )
         )
+        dmu_E_xx, dmu_E_yy, dmu_E_xy = _apply_diffusion_decay(
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_xy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            mu_E_nat_xy,
+            k_diff_mat,
+        )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
             mu_D_xx,
@@ -458,6 +525,18 @@ def _make_hvnm_relaxation_vector_field(
                 X_I,
                 k_BER_int,
             )
+        )
+        dmu_I_xx, dmu_I_yy, dmu_I_xy = _apply_diffusion_decay(
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            mu_I_xx,
+            mu_I_yy,
+            mu_I_xy,
+            mu_I_nat_xx,
+            mu_I_nat_yy,
+            mu_I_nat_xy,
+            k_diff_int,
         )
 
         return jnp.array(
@@ -521,6 +600,8 @@ def _make_hvnm_laos_vector_field(
         h_0 = args["h_0"]
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
+        k_diff_mat = args["k_diff_0_mat"]
+        k_diff_int = args["k_diff_0_int"]
 
         # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
@@ -550,6 +631,18 @@ def _make_hvnm_laos_vector_field(
                 k_BER_mat,
             )
         )
+        dmu_E_xx, dmu_E_yy, dmu_E_xy = _apply_diffusion_decay(
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_xy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            mu_E_nat_xy,
+            k_diff_mat,
+        )
 
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
             mu_D_xx,
@@ -575,6 +668,18 @@ def _make_hvnm_laos_vector_field(
                 X_I,
                 k_BER_int,
             )
+        )
+        dmu_I_xx, dmu_I_yy, dmu_I_xy = _apply_diffusion_decay(
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            mu_I_xx,
+            mu_I_yy,
+            mu_I_xy,
+            mu_I_nat_xx,
+            mu_I_nat_yy,
+            mu_I_nat_xy,
+            k_diff_int,
         )
 
         dgamma = gamma_dot
@@ -676,6 +781,8 @@ def _make_hvnm_creep_vector_field(
         h_0 = args["h_0"]
         E_a_heal = args["E_a_heal"]
         n_h = args["n_h"]
+        k_diff_mat = args["k_diff_0_mat"]
+        k_diff_int = args["k_diff_0_int"]
 
         # Unpack state (always 18 components)
         mu_E_xx, mu_E_yy, mu_E_xy = y[0], y[1], y[2]
@@ -738,6 +845,18 @@ def _make_hvnm_creep_vector_field(
                 k_BER_mat,
             )
         )
+        dmu_E_xx, dmu_E_yy, dmu_E_xy = _apply_diffusion_decay(
+            dmu_E_xx,
+            dmu_E_yy,
+            dmu_E_xy,
+            mu_E_xx,
+            mu_E_yy,
+            mu_E_xy,
+            mu_E_nat_xx,
+            mu_E_nat_yy,
+            mu_E_nat_xy,
+            k_diff_mat,
+        )
 
         # D-network evolution
         dmu_D_xx, dmu_D_yy, _, dmu_D_xy = vlb_mu_rhs_shear(
@@ -765,6 +884,18 @@ def _make_hvnm_creep_vector_field(
                 X_I,
                 k_BER_int,
             )
+        )
+        dmu_I_xx, dmu_I_yy, dmu_I_xy = _apply_diffusion_decay(
+            dmu_I_xx,
+            dmu_I_yy,
+            dmu_I_xy,
+            mu_I_xx,
+            mu_I_yy,
+            mu_I_xy,
+            mu_I_nat_xx,
+            mu_I_nat_yy,
+            mu_I_nat_xy,
+            k_diff_int,
         )
 
         dgamma = gamma_dot
@@ -926,6 +1057,8 @@ def _default_hvnm_args(params: dict) -> dict:
     args.setdefault("h_0", 0.0)
     args.setdefault("E_a_heal", 100e3)
     args.setdefault("n_h", 1.0)
+    args.setdefault("k_diff_0_mat", 0.0)
+    args.setdefault("k_diff_0_int", 0.0)
     return args
 
 

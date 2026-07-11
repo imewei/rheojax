@@ -230,6 +230,53 @@ class TestSTZFlowTransient:
         for variant, stress in results.items():
             assert np.all(np.isfinite(stress)), f"{variant} produced non-finite stress"
 
+    def test_full_variant_m_feedback_changes_trajectory(self):
+        """'full' variant must actually differ from 'standard' (m feeds back).
+
+        Regression test: plastic_rate() previously never received the
+        orientational bias state `m`, so 'full' was numerically identical to
+        'standard' for every observable. With m wired into plastic_rate's
+        bias term, a nonzero m_inf/rate_m must shift the stress trajectory.
+        """
+        t = np.linspace(0, 1e-7, 30)
+        gamma_dot = 1e7
+
+        def make_params(variant):
+            model = STZConventional(variant=variant)
+            model.parameters.set_value("G0", 1e9)
+            model.parameters.set_value("sigma_y", 1e6)
+            model.parameters.set_value("chi_inf", 0.15)
+            model.parameters.set_value("tau0", 1e-9)
+            model.parameters.set_value("epsilon0", 0.1)
+            model.parameters.set_value("c0", 1.0)
+            if variant == "full":
+                model.parameters.set_value("m_inf", 0.3)
+                model.parameters.set_value("rate_m", 10.0)
+            p_values = {
+                k: model.parameters.get_value(k) for k in model.parameters.keys()
+            }
+            return model, p_values
+
+        std_model, std_params = make_params("standard")
+        full_model, full_params = make_params("full")
+
+        stress_std = np.array(
+            std_model._simulate_transient_jit(
+                jnp.asarray(t), std_params, "startup", gamma_dot, None, None, "standard"
+            )
+        )
+        stress_full = np.array(
+            full_model._simulate_transient_jit(
+                jnp.asarray(t), full_params, "startup", gamma_dot, None, None, "full"
+            )
+        )
+
+        assert np.all(np.isfinite(stress_full))
+        assert not np.allclose(stress_std, stress_full), (
+            "'full' variant produced identical trajectory to 'standard' — "
+            "m is not feeding back into the dynamics"
+        )
+
     @pytest.mark.slow
     def test_diffrax_integration_convergence(self):
         """Test that Diffrax ODE integration converges properly."""

@@ -96,6 +96,21 @@ class TestFractionalBurgersModel:
         # Oscillation returns (N, 2) for G', G''
         assert result.shape == (20, 2)
 
+    def test_relaxation_depends_on_eta1_and_jk(self):
+        """Regression: eta1 and Jk must move G(t), not be silently ignored."""
+        model = FractionalBurgersModel()
+        t = np.logspace(-2, 2, 20)
+        baseline = np.asarray(model.predict(t, test_mode="relaxation"))
+
+        model.parameters.set_value("eta1", 10.0)
+        changed_eta1 = np.asarray(model.predict(t, test_mode="relaxation"))
+        assert not np.allclose(baseline, changed_eta1)
+        model.parameters.set_value("eta1", 1000.0)
+
+        model.parameters.set_value("Jk", 1.0)
+        changed_jk = np.asarray(model.predict(t, test_mode="relaxation"))
+        assert not np.allclose(baseline, changed_jk)
+
 
 # ============================================================================
 # Fractional Jeffreys Model
@@ -396,6 +411,31 @@ class TestFractionalZenerLiquidLiquid:
         result = model.predict(t, test_mode="relaxation")
         assert np.all(np.isfinite(result))
 
+    def test_relaxation_depends_on_beta_and_gamma(self):
+        """Regression: beta and gamma must move G(t), not be silently ignored."""
+        model = FractionalZenerLiquidLiquid()
+        t = np.logspace(-2, 2, 20)
+        baseline = np.asarray(model.predict(t, test_mode="relaxation"))
+
+        model.parameters.set_value("beta", 0.9)
+        changed_beta = np.asarray(model.predict(t, test_mode="relaxation"))
+        assert not np.allclose(baseline, changed_beta)
+        model.parameters.set_value("beta", 0.5)
+
+        model.parameters.set_value("gamma", 0.9)
+        changed_gamma = np.asarray(model.predict(t, test_mode="relaxation"))
+        assert not np.allclose(baseline, changed_gamma)
+
+    def test_creep_depends_on_beta(self):
+        """Regression: beta must move J(t) in creep mode too."""
+        model = FractionalZenerLiquidLiquid()
+        t = np.logspace(-2, 2, 20)
+        baseline = np.asarray(model.predict(t, test_mode="creep"))
+
+        model.parameters.set_value("beta", 0.9)
+        changed_beta = np.asarray(model.predict(t, test_mode="creep"))
+        assert not np.allclose(baseline, changed_beta)
+
 
 # ============================================================================
 # Fractional Zener Solid-Solid
@@ -469,3 +509,10 @@ class TestFractionalZenerSolidSolid:
         assert G_short[0] > 200.0
         # Long time should approach Ge = 100
         assert G_long[0] < 200.0
+
+    def test_oscillation_finite_at_omega_zero(self):
+        """Regression: omega=0 must not produce inf/nan via 0**(-alpha)."""
+        model = FractionalZenerSolidSolid()
+        omega = np.array([0.0, 1.0, 10.0])
+        result = np.asarray(model.predict(omega, test_mode="oscillation"))
+        assert np.all(np.isfinite(result))

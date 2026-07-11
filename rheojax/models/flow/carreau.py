@@ -100,6 +100,10 @@ class Carreau(BaseModel):
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> Carreau:
         """Fit Carreau parameters to data.
 
+        Computes a heuristic initial guess from percentile plateaus and a
+        log-log power-law slope, then refines it against the actual Carreau
+        equation via NLSQ (see BaseModel._standard_nlsq_fit).
+
         Args:
             X: Shear rate data (gamma_dot)
             y: Viscosity data
@@ -217,14 +221,18 @@ class Carreau(BaseModel):
             ctx["n"] = float(n_est)
 
             logger.debug(
-                "Fitting completed successfully",
+                "Heuristic initial guess computed, refining with NLSQ",
                 eta0=float(eta0_est),
                 eta_inf=float(eta_inf_est),
                 lambda_=float(lambda_est),
                 n=float(n_est),
             )
 
-        return self
+        # Refine the heuristic initial guess against the actual Carreau
+        # equation via NLSQ (was previously never done, see P1-FLOW-CARREAU).
+        return self._standard_nlsq_fit(
+            X, y, self.model_function, default_test_mode="rotation", **kwargs
+        )
 
     def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict viscosity for given shear rates.

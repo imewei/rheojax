@@ -1065,16 +1065,17 @@ class TNTSingleMode(TNTBase):
         if vp is None:
             vp = {"nu": 0.0, "m_break": 0.0, "kappa": 0.0, "L_max": 10.0, "xi": 0.0}
 
-        if self._breakage == "constant" and self._stress_type == "linear":
+        if self._is_basic:
             # Analytical: σ(t) = G·τ_b·γ̇·exp(-t/τ_b)
             sigma_0 = G * tau_b * gamma_dot_preshear
             return tnt_base_relaxation_vec(t, sigma_0, tau_b)
 
-        # ODE-based relaxation for non-constant breakage
-        # First find steady-state conformation from pre-shear
-        S_xx_0, S_yy_0, S_zz_0, S_xy_0 = tnt_base_steady_conformation(
-            gamma_dot_preshear, tau_b
+        # ODE-based relaxation for non-constant breakage or Gordon-Schowalter (xi>0)
+        # First find steady-state conformation from pre-shear via variant ODE
+        ss = self._variant_steady_conformation(
+            jnp.array([gamma_dot_preshear]), G, tau_b, vp
         )
+        S_xx_0, S_yy_0, S_zz_0, S_xy_0 = (ss[0, 0], ss[0, 1], ss[0, 2], ss[0, 3])
         y0 = jnp.array([S_xx_0, S_yy_0, S_zz_0, S_xy_0], dtype=jnp.float64)
 
         variant_relax_ode = self._variant_relax_ode

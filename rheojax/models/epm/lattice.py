@@ -59,6 +59,7 @@ class LatticeEPM(EPMBase):
         sigma_c_mean: float = 1.0,
         sigma_c_std: float = 0.1,
         n_fluid: float = 1.0,
+        smoothing_width: float = 0.1,
         n_bayesian_steps: int = 200,
         fluidity_form: str = "overstress",
     ):
@@ -75,6 +76,7 @@ class LatticeEPM(EPMBase):
             sigma_c_mean=sigma_c_mean,
             sigma_c_std=sigma_c_std,
             n_fluid=n_fluid,
+            smoothing_width=smoothing_width,
             n_bayesian_steps=n_bayesian_steps,
             fluidity_form=fluidity_form,
         )

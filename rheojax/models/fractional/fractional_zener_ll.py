@@ -49,11 +49,13 @@ from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
+jax_gamma = jax.scipy.special.gamma
 
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
+from rheojax.utils.mittag_leffler import mittag_leffler_e2
 
 logger = get_logger(__name__)
 
@@ -212,29 +214,37 @@ class FractionalZenerLiquidLiquid(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        Approximate form (no exact closed-form in Mittag-Leffler for FZLL):
-            G(t) ≈ c1 / (1 + (t/τ)^α) + c2 · exp(-t/τ)
+        Exact term-by-term inverse Laplace transform of G*(ω) with (iω) -> s
+        (same technique used by the sibling FractionalMaxwellModel, whose
+        c1(iω)^α/(1+(iωτ)^β) branch is structurally identical to FZLL's
+        first term):
 
-        The first term captures the power-law decay from the springpot branch,
-        and the second term captures the exponential decay from the dashpot
-        branch. This approximation preserves the correct limiting behaviors:
-        G(0+) = c1 + c2, and G(∞) = 0 (liquid).
+            G(t) = (c1/τ^β) · t^(β-α) · E_{β,β-α+1}(-(t/τ)^β)
+                 + c2 · t^(-γ) / Γ(1-γ)
+
+        The second term is the standard SpringPot relaxation modulus for
+        the lone c2, γ branch.
         """
         epsilon = 1e-12
         # Clip fractional orders using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
+        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
         tau_safe = tau + epsilon
+        t_safe = jnp.maximum(t, epsilon)
 
-        # Use c1 as the main modulus contribution and alpha as the decay exponent
-        # This breaks the c1/c2 degeneracy by using them differently
-        # G(t) = c1 / (1 + (t/tau)^alpha) + c2 * exp(-t/tau)
-        t_tau_ratio = t / tau_safe
+        # First term: fractional-Maxwell branch (c1, alpha, beta, tau)
+        z = -jnp.power(t_safe / tau_safe, beta_safe)
+        ml_beta_param = beta_safe - alpha_safe + 1.0
+        ml_value = mittag_leffler_e2(z, alpha=beta_safe, beta=ml_beta_param)
+        term1 = (
+            (c1 / jnp.power(tau_safe, beta_safe))
+            * jnp.power(t_safe, beta_safe - alpha_safe)
+            * ml_value
+        )
 
-        # Primary power-law decay term from c1
-        term1 = c1 / (1.0 + jnp.power(t_tau_ratio, alpha_safe))
-
-        # Secondary exponential decay term from c2 (simpler decay)
-        term2 = c2 * jnp.exp(-t_tau_ratio)
+        # Second term: lone SpringPot branch (c2, gamma)
+        term2 = c2 * jnp.power(t_safe, -gamma_safe) / jax_gamma(1.0 - gamma_safe)
 
         G_t = term1 + term2
 
@@ -254,24 +264,36 @@ class FractionalZenerLiquidLiquid(BaseModel):
         """Predict creep compliance J(t).
 
         Note: Analytical creep compliance is complex for FZLL.
-        This provides a numerical approximation.
+        This provides a numerical approximation. The short-time term uses
+        the exact compliance of the isolated fractional-Maxwell branch
+        (c1, alpha, beta, tau) -- see FractionalMaxwellModel for the
+        derivation -- so beta has a real effect instead of being dropped.
         """
         epsilon = 1e-12
         # Clip fractional orders using JAX operations (tracer-safe)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
+        beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
         gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
+        tau_safe = tau + epsilon
+        t_safe = jnp.maximum(t, epsilon)
 
         # Compute average order
         avg_order = (alpha_safe + gamma_safe) / 2.0
 
-        # Short time behavior
-        J_short = jnp.power(t, alpha_safe) / (c1 + epsilon)
+        # Short time behavior: exact isolated branch-1 compliance
+        # J1(t) = (1/c1) [t^alpha/Gamma(1+alpha) + tau^beta * t^(alpha-beta)/Gamma(1+alpha-beta)]
+        J_short = (1.0 / (c1 + epsilon)) * (
+            jnp.power(t_safe, alpha_safe) / jax_gamma(1.0 + alpha_safe)
+            + jnp.power(tau_safe, beta_safe)
+            * jnp.power(t_safe, alpha_safe - beta_safe)
+            / jax_gamma(1.0 + alpha_safe - beta_safe)
+        )
 
         # Long time behavior (unbounded growth for liquid)
-        J_long = jnp.power(t, avg_order) / (c2 + epsilon)
+        J_long = jnp.power(t_safe, avg_order) / (c2 + epsilon)
 
         # Crossover
-        weight = jnp.tanh(t / (tau + epsilon))
+        weight = jnp.tanh(t_safe / tau_safe)
         J_t = J_short * (1.0 - weight) + J_long * weight
 
         return J_t

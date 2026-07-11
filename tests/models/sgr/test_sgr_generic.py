@@ -23,6 +23,7 @@ import pytest
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.models import SGRGeneric
+from rheojax.utils.sgr_kernels import G0
 
 
 class TestSGRGenericThermodynamics:
@@ -469,6 +470,23 @@ class TestSGRGenericAdditionalFitModes:
             model_fit.predict(gamma_dot), sigma, rtol=1e-3, atol=1e-8
         )
 
+    def test_steady_shear_glass_phase_has_finite_yield_stress(self):
+        """Glass phase (x < 1) must plateau to a finite yield stress as
+        gamma_dot -> 0, not diverge (sigma = sigma_y + A*gamma_dot^(1-x))."""
+        model = _make_model(x=0.8, G0=1000.0, tau0=0.01)
+        model._test_mode = "steady_shear"
+        gamma_dot = np.logspace(-4, 2, 60)
+        sigma = model.predict(gamma_dot)
+
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma > 0)
+        # Monotonically non-decreasing: no divergence as gamma_dot shrinks.
+        assert np.all(np.diff(sigma) >= 0)
+        # Plateaus toward the yield stress sigma_y = G0_scale * G0(x) at the
+        # smallest shear rates, rather than blowing up.
+        sigma_y = 1000.0 * float(G0(0.8))
+        assert sigma[0] == pytest.approx(sigma_y, rel=0.1)
+
     def test_flow_curve_alias_routes_to_steady_shear(self):
         model = _make_model()
         gamma_dot = np.logspace(-2, 2, 20)
@@ -493,12 +511,11 @@ class TestSGRGenericAdditionalFitModes:
         model_fit.fit(t, eta_plus, test_mode="startup", gamma_dot=1.0)
         assert model_fit.fitted_ is True
         assert model_fit._startup_gamma_dot == 1.0
-        np.testing.assert_allclose(
-            model_fit.predict(t), eta_plus, rtol=1e-3, atol=1e-8
-        )
+        np.testing.assert_allclose(model_fit.predict(t), eta_plus, rtol=1e-3, atol=1e-8)
 
     def test_startup_fit_from_stress_input(self):
-        """is_stress=True divides applied stress by gamma_dot before fitting."""
+        """is_stress=True divides applied stress by gamma_dot before fitting,
+        and predict() must convert back to stress (not leave it as eta_plus)."""
         model_true = _make_model()
         model_true._startup_gamma_dot = 2.0
         model_true._test_mode = "startup"
@@ -509,6 +526,8 @@ class TestSGRGenericAdditionalFitModes:
         model_fit = _make_model()
         model_fit.fit(t, stress, test_mode="startup", gamma_dot=2.0, is_stress=True)
         assert model_fit.fitted_ is True
+        # predict() must reproduce the original stress array, not eta_plus.
+        np.testing.assert_allclose(model_fit.predict(t), stress, rtol=1e-3, atol=1e-8)
 
 
 class TestSGRGenericFitValidation:
@@ -560,8 +579,13 @@ class TestSGRGenericLAOSFitBugs:
         t = np.linspace(0, 2 * 2 * np.pi / omega, 200)
         stress = 500.0 * gamma_0 * np.sin(omega * t)
         model.fit(
-            t, stress, test_mode="laos", gamma_0=gamma_0, omega=omega,
-            n_particles=50, max_iter=1,
+            t,
+            stress,
+            test_mode="laos",
+            gamma_0=gamma_0,
+            omega=omega,
+            n_particles=50,
+            max_iter=1,
         )
         assert model.fitted_ is True
 
@@ -597,7 +621,9 @@ class TestSGRGenericPredictJIT:
 class TestSGRGenericModelFunction:
     """model_function() routing for Bayesian inference across modes."""
 
-    @pytest.mark.parametrize("mode", ["oscillation", "relaxation", "steady_shear", "creep"])
+    @pytest.mark.parametrize(
+        "mode", ["oscillation", "relaxation", "steady_shear", "creep"]
+    )
     def test_model_function_basic_modes(self, mode):
         model = SGRGeneric()
         params = np.array([1.5, 1000.0, 1e-3])
@@ -672,7 +698,13 @@ class TestSGRGenericPhaseRegime:
 
     @pytest.mark.parametrize(
         "x,expected",
-        [(0.8, "glass"), (1.0, "power-law"), (1.5, "power-law"), (2.0, "newtonian"), (2.5, "newtonian")],
+        [
+            (0.8, "glass"),
+            (1.0, "power-law"),
+            (1.5, "power-law"),
+            (2.0, "newtonian"),
+            (2.5, "newtonian"),
+        ],
     )
     def test_phase_regime(self, x, expected):
         model = SGRGeneric()
@@ -685,7 +717,11 @@ class TestSGRGenericDynamicsSplit:
 
     def test_dynamics_components_finite(self):
         model = _make_model()
-        for state in (np.array([100.0, 0.5]), np.array([-500.0, 0.2]), np.array([0.0, 0.9])):
+        for state in (
+            np.array([100.0, 0.5]),
+            np.array([-500.0, 0.2]),
+            np.array([0.0, 0.9]),
+        ):
             rev = model.reversible_dynamics(state)
             irr = model.irreversible_dynamics(state)
             full = model.full_dynamics(state)
@@ -725,9 +761,7 @@ class TestSGRGenericThixotropyEdgeCases:
     def test_predict_thixotropic_stress_requires_enabled(self):
         model = SGRGeneric()
         with pytest.raises(ValueError, match="Thixotropy not enabled"):
-            model.predict_thixotropic_stress(
-                np.array([0.0, 1.0]), np.array([0.0, 1.0])
-            )
+            model.predict_thixotropic_stress(np.array([0.0, 1.0]), np.array([0.0, 1.0]))
 
 
 class TestSGRGenericDynamicXErrors:
@@ -781,7 +815,9 @@ class TestSGRGenericLAOSAnalysisEdgeCases:
         model = _make_model()
         strain = np.zeros(256)
         stress = np.zeros(256)
-        cheb = model.compute_chebyshev_coefficients(strain, stress, gamma_0=0.5, omega=1.0)
+        cheb = model.compute_chebyshev_coefficients(
+            strain, stress, gamma_0=0.5, omega=1.0
+        )
         # e_1 and v_1 near zero trigger the else-branches
         assert cheb["e_3_e_1"] == 0.0
         assert cheb["e_5_e_1"] == 0.0

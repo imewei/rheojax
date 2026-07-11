@@ -708,7 +708,9 @@ class SGRConventional(BaseModel):
         # _fit_laos_mc (gamma_0, omega, n_particles), raising "got multiple values
         # for argument".
         remaining_kwargs = {
-            k: v for k, v in kwargs.items() if k not in ("gamma_0", "omega", "n_particles")
+            k: v
+            for k, v in kwargs.items()
+            if k not in ("gamma_0", "omega", "n_particles")
         }
 
         # Use SAOS approximation for small amplitude
@@ -1052,8 +1054,16 @@ class SGRConventional(BaseModel):
         epsilon = 1e-12  # Prevent division by zero
         t_safe = jnp.maximum(t_scaled, epsilon)
 
-        # Smooth crossover: (1 + t_scaled)^(1-x) = 1 / (1 + t_scaled)^(x-1)
-        G_t = G0_scale * G0_dim / jnp.power(1.0 + t_safe, x - 1.0)
+        # Decay exponent (1-x), clamped to be non-positive so G(t) is always
+        # non-increasing (causal/thermodynamic monotonicity). For 1 < x < 2
+        # this is the unclamped theoretical decay t^(1-x). For the glass
+        # phase x < 1, 1-x > 0 would make G(t) grow with time, which is
+        # unphysical -- clamp to 0 so G(t) plateaus instead (non-ergodic
+        # glass: the modulus does not relax away).
+        decay_exp = jnp.minimum(1.0 - x, 0.0)
+
+        # Smooth crossover: (1 + t_scaled)^decay_exp
+        G_t = G0_scale * G0_dim * jnp.power(1.0 + t_safe, decay_exp)
 
         return G_t
 
@@ -1083,7 +1093,7 @@ class SGRConventional(BaseModel):
             Creep compliance J(t) with shape (M,)
 
         Notes:
-            - Monotonicity enforced via jnp.maximum.accumulate()
+            - Monotonicity enforced by clamping the growth exponent to >= 0
             - Power-law growth J(t) ~ t^(x-1) for large t
         """
         # Dimensionless time
@@ -1098,7 +1108,13 @@ class SGRConventional(BaseModel):
         # consistent with the canonical SAOS scaling G', G'' ~ omega^(x-1).
         # See utils.sgr_kernels.power_law_exponent(x) = x - 1.
         # (Earlier versions used 2-x, which only coincides with x-1 at x=1.5.)
-        growth_exp = x - 1.0
+        # Clamp to be non-negative so J(t) is always non-decreasing
+        # (causal/thermodynamic monotonicity). For 1 < x < 2 this is the
+        # unclamped theoretical growth t^(x-1). For the glass phase x < 1,
+        # x-1 < 0 would make J(t) shrink with time, which is unphysical --
+        # clamp to 0 so J(t) plateaus instead, mirroring the relaxation-side
+        # clamp in _predict_relaxation_jit.
+        growth_exp = jnp.maximum(x - 1.0, 0.0)
 
         epsilon = 1e-12
         t_safe = jnp.maximum(t_scaled, epsilon)
@@ -1107,7 +1123,6 @@ class SGRConventional(BaseModel):
         # J(t) = (1 / (G0_scale * G0_dim)) * (1 + t_scaled)^(x-1)
         J_t = jnp.power(1.0 + t_safe, growth_exp) / (G0_scale * G0_dim)
 
-        # Monotonicity enforced by physical parameter bounds, not in NUTS path
         return J_t
 
     # NOTE: SGR FLOW_CURVE returns steady-state viscosity eta(gamma_dot), not stress sigma.
@@ -1307,10 +1322,10 @@ class SGRConventional(BaseModel):
         """Predict LAOS response.
 
         Args:
-            X: Time array or strain array
+            X: Time array (s) at which to evaluate the stress response
 
         Returns:
-            Stress response array
+            Stress response array, same shape as X
         """
         if self._gamma_0 is None or self._omega_laos is None:
             raise ValueError(
@@ -1318,8 +1333,12 @@ class SGRConventional(BaseModel):
                 "Set via fit() with test_mode='laos' or simulate_laos()."
             )
 
-        strain, stress = self.simulate_laos(
-            self._gamma_0, self._omega_laos, n_cycles=1, n_points_per_cycle=len(X)
+        # Evaluate directly at the real times in X (bugfix: previously this
+        # called simulate_laos() with n_cycles=1, which regenerates its own
+        # single-period time grid and ignores X entirely -- aliasing whenever
+        # X spans more than one oscillation period).
+        _, stress = self._laos_stress_response(
+            np.asarray(X), self._gamma_0, self._omega_laos
         )
         return stress
 
@@ -1493,10 +1512,12 @@ class SGRConventional(BaseModel):
         assert A is not None
         assert n is not None
 
-        # Dimensionless shear rate
-        gamma_dot_dim = gamma_dot * tau0
+        # Dimensionless shear rate. Use the magnitude: gamma_dot changes sign
+        # under oscillatory/LAOS shear, and raising a negative base to the
+        # non-integer power n produces NaN.
+        gamma_dot_dim = abs(gamma_dot * tau0)
 
-        # Steady-state: x_ss = x_eq + A * (gamma_dot * tau0)^n
+        # Steady-state: x_ss = x_eq + A * |gamma_dot * tau0|^n
         x_ss = x_eq + A * (gamma_dot_dim**n)
 
         return x_ss
@@ -1614,7 +1635,11 @@ class SGRConventional(BaseModel):
             # so that traced values flow correctly during NUTS (Fix JAX-002).
             x_ss_A = args["x_ss_A"]
             x_ss_n = args["x_ss_n"]
-            gamma_dot_dim = gamma_dot_current * tau0
+            # Use the magnitude: gamma_dot changes sign under oscillatory/
+            # LAOS shear, and raising a negative base to the non-integer
+            # power x_ss_n produces NaN (see _compute_x_ss for the matching
+            # non-ODE-path guard).
+            gamma_dot_dim = jnp.abs(gamma_dot_current * tau0)
             x_ss_current = x_eq + x_ss_A * (gamma_dot_dim**x_ss_n)
 
             # Compute dx/dt
@@ -1791,16 +1816,35 @@ class SGRConventional(BaseModel):
         self._gamma_0 = gamma_0
         self._omega_laos = omega
 
-        # Get model parameters
-        x = self.parameters.get_value("x")
-        G0_scale = self.parameters.get_value("G0")
-        tau0 = self.parameters.get_value("tau0")
-
         # Time array
         period = 2.0 * np.pi / omega
         t_max = n_cycles * period
         n_points = n_cycles * n_points_per_cycle
         t = np.linspace(0, t_max, n_points, endpoint=False)
+
+        return self._laos_stress_response(t, gamma_0, omega)
+
+    def _laos_stress_response(
+        self, t: np.ndarray, gamma_0: float, omega: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Evaluate the LAOS strain/stress response at explicit times t.
+
+        Shared by simulate_laos() (which builds its own periodic t grid) and
+        _predict_laos() (which must evaluate at the caller's real time array).
+
+        Args:
+            t: Time array (s) at which to evaluate
+            gamma_0: Strain amplitude (dimensionless)
+            omega: Angular frequency (rad/s)
+
+        Returns:
+            strain: Strain array gamma(t)
+            stress: Stress array sigma(t)
+        """
+        # Get model parameters
+        x = self.parameters.get_value("x")
+        G0_scale = self.parameters.get_value("G0")
+        tau0 = self.parameters.get_value("tau0")
 
         # Strain: gamma(t) = gamma_0 * sin(omega * t)
         strain = gamma_0 * np.sin(omega * t)

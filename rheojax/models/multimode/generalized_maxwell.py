@@ -1549,7 +1549,9 @@ class GeneralizedMaxwell(BaseModel):
             E_eff = E_inf + jnp.sum(beta_i)
 
             # Solve for strain increment
-            stress_from_prev = jnp.sum(alpha_i * sig_i_prev)
+            # (equilibrium spring's already-accumulated stress E_inf*eps_prev
+            # must be subtracted along with the Maxwell modes' stress)
+            stress_from_prev = E_inf * eps_prev + jnp.sum(alpha_i * sig_i_prev)
             d_eps = (sigma_0 - stress_from_prev) / E_eff
             eps_new = eps_prev + d_eps
 
@@ -2144,11 +2146,13 @@ class GeneralizedMaxwell(BaseModel):
         """JIT-compiled startup flow prediction.
 
         Stress growth coefficient: η⁺(t) = σ(t)/γ̇
+        Equilibrium spring: E_inf*γ(t)/γ̇ = E_inf*t (solid keeps loading under
+        continued strain)
         For Maxwell element: ηᵢ⁺(t) = Gᵢτᵢ(1 - exp(-t/τᵢ))
-        Total: η⁺(t) = Σᵢ Gᵢτᵢ(1 - exp(-t/τᵢ))
+        Total: η⁺(t) = E_inf*t + Σᵢ Gᵢτᵢ(1 - exp(-t/τᵢ))
         """
-        # Each mode contribution: Gᵢτᵢ(1 - exp(-t/τᵢ))
-        eta_plus = jnp.sum(
+        # Equilibrium modulus contribution plus each mode's contribution
+        eta_plus = E_inf * t + jnp.sum(
             E_i[:, None] * tau_i[:, None] * (1 - jnp.exp(-t[None, :] / tau_i[:, None])),
             axis=0,
         )

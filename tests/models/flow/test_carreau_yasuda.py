@@ -180,6 +180,34 @@ class TestCarreauYasudaFitting:
         assert np.all(np.isfinite(predictions))
         assert np.all(predictions > 0)
 
+    def test_fit_estimates_a_instead_of_hardcoding(self):
+        """Regression test: 'a' must be estimated by NLSQ, not fixed at 2.0.
+
+        Previously a_est was hardcoded to 2.0 and never refined, so fit()
+        always collapsed to plain-Carreau behavior (see
+        P1-FLOW-CARREAU-YASUDA). With true a=1.5 (!= 2.0) on noiseless data,
+        NLSQ should recover 'a' and reproduce the curve to near machine
+        precision.
+        """
+        eta0_true = 100.0
+        eta_inf_true = 1.0
+        lambda_true = 1.0
+        n_true = 0.5
+        a_true = 1.5
+
+        gamma_dot = np.logspace(-2, 2, 50)
+        lambda_gamma = lambda_true * gamma_dot
+        factor = np.power(1.0 + np.power(lambda_gamma, a_true), (n_true - 1.0) / a_true)
+        viscosity_true = eta_inf_true + (eta0_true - eta_inf_true) * factor
+
+        model = CarreauYasuda()
+        model.fit(gamma_dot, viscosity_true)
+
+        assert abs(model.parameters.get_value("a") - 2.0) > 0.05
+        predictions = model.predict(gamma_dot)
+        rel_err = np.abs(predictions - viscosity_true) / viscosity_true
+        assert rel_err.max() < 1e-3
+
 
 class TestCarreauYasudaModelFunction:
     """Test model_function for Bayesian inference compatibility."""

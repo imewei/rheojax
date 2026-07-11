@@ -303,9 +303,7 @@ class TestHLModelFunction:
         t = np.linspace(0, 1, 6)
         # stress_target supplied only via explicit kwarg exercises the _kw
         # kwargs branch (not the _last_fit_kwargs fallback).
-        out = np.asarray(
-            model.model_function(t, self._params(), stress_target=0.5)
-        )
+        out = np.asarray(model.model_function(t, self._params(), stress_target=0.5))
         assert out.shape == t.shape
         assert np.all(np.isfinite(out))
 
@@ -385,9 +383,7 @@ class TestHLOscillation:
         """(M, 2) [G', G''] input format is accepted by _fit_oscillation."""
         omega = np.array([0.5, 2.0])
         G_star = np.array([[1.0, 0.2], [1.3, 0.4]])
-        model.fit(
-            omega, G_star, test_mode="oscillation", n_cycles=2, gamma0=0.01
-        )
+        model.fit(omega, G_star, test_mode="oscillation", n_cycles=2, gamma0=0.01)
         assert model.fitted_
         # Fitted parameters land inside their declared bounds.
         assert 0.01 <= model.parameters.get_value("alpha") <= 0.99
@@ -496,3 +492,88 @@ class TestHLPhaseAndGrid:
         # dt grows with t_max so n_steps stays within the scan cap.
         assert n_steps <= model._max_scan_steps + 1
         assert dt >= model._min_dt
+
+
+class TestHLCreepWarmStart:
+    """Regression for _fit_creep sigma_c warm-start (root-cause fix).
+
+    Without warm-starting sigma_c from stress_target, the default
+    sigma_c=1.0 leaves sigma_max~5.0 (via _get_grid_params), far below a
+    physical stress_target, so the servo controller can never represent
+    yielding near the true stress scale.
+    """
+
+    def test_creep_warm_starts_sigma_c_from_stress_target(self, monkeypatch):
+        import rheojax.utils.optimization as opt_mod
+
+        class _FakeResult:
+            success = True
+            message = "ok"
+
+        def fake_nlsq_optimize(objective, parameters, **kwargs):
+            return _FakeResult()
+
+        monkeypatch.setattr(opt_mod, "nlsq_optimize", fake_nlsq_optimize)
+
+        model = HebraudLequeux()  # default sigma_c = 1.0
+        t = np.linspace(0, 1, 5)
+        compliance = t * 0.01
+        model._fit_creep(t, compliance, stress_target=50.0, max_iter=1)
+
+        # sigma_c must be warm-started to the stress_target scale, not left
+        # at the default (which would cap sigma_max at 5.0).
+        assert model.parameters.get_value("sigma_c") == pytest.approx(50.0)
+        assert model._last_fit_kwargs["_sigma_max"] >= 50.0
+
+    def test_creep_does_not_override_explicit_sigma_c(self, monkeypatch):
+        """Warm-start only kicks in for the untouched default (<=1.0)."""
+        import rheojax.utils.optimization as opt_mod
+
+        class _FakeResult:
+            success = True
+            message = "ok"
+
+        def fake_nlsq_optimize(objective, parameters, **kwargs):
+            return _FakeResult()
+
+        monkeypatch.setattr(opt_mod, "nlsq_optimize", fake_nlsq_optimize)
+
+        model = HebraudLequeux()
+        model.parameters.set_value("sigma_c", 75.0)
+        t = np.linspace(0, 1, 5)
+        compliance = t * 0.01
+        model._fit_creep(t, compliance, stress_target=50.0, max_iter=1)
+
+        assert model.parameters.get_value("sigma_c") == pytest.approx(75.0)
+
+
+class TestHLFlowCurveNormalization:
+    """Regression for the flow-curve stress_scale epsilon-guard (root-cause fix).
+
+    The normalization must use the *magnitude* of the low-rate stress, like
+    every other epsilon-guard in the file, so a small negative low-rate
+    stress sample doesn't collapse stress_scale to ~1e-12.
+    """
+
+    def test_negative_low_rate_stress_normalizes_by_magnitude(self, monkeypatch):
+        import rheojax.models.hl.hebraud_lequeux as hl_mod
+
+        def fake_flow_curve(
+            gdot, alpha, tau, sigma_c, dt, sigma_max, n_bins, per_rate_schedule=None
+        ):
+            g = np.abs(np.asarray(gdot, dtype=np.float64))
+            return jnp.asarray(0.5 * sigma_c + 0.1 * np.sqrt(g))
+
+        monkeypatch.setattr(hl_mod, "run_flow_curve", fake_flow_curve)
+
+        model = HebraudLequeux()
+        gdot = np.array([-1e-3, 1.0, 3.16, 10.0])
+        # Low-rate sample (nearest gdot=0) has a small negative stress, as
+        # can happen from measurement noise near the yield point.
+        stress = np.array([-0.05, 0.6, 0.9, 1.6])
+        model.fit(gdot, stress, test_mode="flow_curve", max_iter=1)
+
+        stress_scale = model._last_fit_kwargs["_stress_scale"]
+        assert stress_scale == pytest.approx(0.05)
+        # Without the fix stress_scale would collapse to 1e-12.
+        assert stress_scale > 1e-6

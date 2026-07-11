@@ -431,6 +431,11 @@ class FluiditySaramitoBase(BaseModel):
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
         p = self.get_parameter_dict()
 
+        tau_y_coupling = (
+            p.get("tau_y_coupling", 0.0) if self.coupling == "full" else 0.0
+        )
+        m_yield = p.get("m_yield", 1.0) if self.coupling == "full" else 1.0
+
         tau_xy, tau_xx, N1 = saramito_steady_state_full(
             gamma_dot_jax,
             p["G"],
@@ -442,6 +447,10 @@ class FluiditySaramitoBase(BaseModel):
             p["t_a"],
             p["b"],
             p["n_rej"],
+            self.coupling,
+            tau_y_coupling,
+            m_yield,
+            p.get("eta_s", 0.0),
         )
 
         # N2 = 0 for upper-convected Maxwell

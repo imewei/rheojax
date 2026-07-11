@@ -341,6 +341,46 @@ def test_tensorial_epm_creep_protocol():
 
 
 @pytest.mark.unit
+def test_tensorial_epm_creep_coarse_dt_matches_fine_dt():
+    """Creep prediction must be insensitive to data spacing (controller substep).
+
+    Regression: _run_creep_tensorial and the JAX-pure _model_creep fit path
+    used dt = time[1]-time[0] as the ODE step directly, so coarse data grids
+    produced oversized Euler steps and underdrove the P-controller — the same
+    bug LatticeEPM._run_creep was fixed for (see
+    test_lattice_epm.py::test_lattice_epm_creep_coarse_dt_matches_fine_dt).
+    Both tensorial creep paths now substep at self.dt internally.
+    """
+    model = TensorialEPM(L=16, dt=0.01, sigma_c_mean=0.5, sigma_c_std=0.1)
+    target = 1.0  # above yield
+
+    def run(n):
+        t = jnp.linspace(0.5, 10.0, n)
+        d = RheoData(x=t, y=jnp.full_like(t, target))
+        return float(model.predict(d, test_mode="creep", seed=0).y[-1])
+
+    coarse = run(20)  # dt_data=0.5
+    fine = run(951)  # dt_data=0.01 (== self.dt, ground truth)
+    rel_err = abs(coarse - fine) / max(abs(fine), 1e-6)
+    assert rel_err < 0.15, (
+        f"coarse strain[-1]={coarse:.4f} diverges from fine={fine:.4f} "
+        f"(rel err {rel_err:.2%}) — controller substep missing"
+    )
+
+
+@pytest.mark.unit
+def test_tensorial_epm_smoothing_width_constructor_kwarg():
+    """smoothing_width must be settable at construction, like every other
+    documented Parameter (mu, tau_pl, sigma_c_mean, sigma_c_std, ...).
+
+    Regression: it was hardcoded to 0.1 inside EPMBase.__init__ even though
+    the class docstring documents it as a configurable Parameter.
+    """
+    model = TensorialEPM(L=16, dt=0.01, smoothing_width=0.05)
+    assert model.parameters.get_value("smoothing_width") == pytest.approx(0.05)
+
+
+@pytest.mark.unit
 def test_tensorial_epm_oscillation_protocol():
     """Test oscillatory shear protocol returns stress(t)."""
     model = TensorialEPM(L=16, dt=0.01)

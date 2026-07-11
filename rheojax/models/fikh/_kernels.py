@@ -18,7 +18,8 @@ State vector for thermal FIKH: [σ, α, R, T, γᵖ, λ]
     - γᵖ: accumulated plastic strain
     - λ: structure parameter
 
-State vector for isothermal FIKH: [σ, α, γᵖ, λ]
+State vector for isothermal FIKH: [σ, α, R, γᵖ, λ]
+    - R: isotropic hardening (optional; no-op when Q_iso=0)
 """
 
 from functools import partial
@@ -262,10 +263,13 @@ def fikh_return_step_isothermal(
 ) -> tuple[tuple, tuple, jnp.ndarray]:
     """Radial return mapping step for isothermal FIKH model.
 
-    State: (σ, α, γᵖ, λ) - stress, backstress, plastic strain, structure
+    State: (σ, α, R, γᵖ, λ) - stress, backstress, isotropic hardening,
+           plastic strain, structure. R is always tracked (Q_iso defaults
+           to 0.0, which keeps it a no-op when isotropic hardening is
+           disabled).
 
     Args:
-        state: Current state tuple (sigma, alpha, gamma_p, lam).
+        state: Current state tuple (sigma, alpha, R, gamma_p, lam).
         inputs: Input tuple (dt, d_gamma).
         params: Model parameters dictionary.
         lam_history: History buffer for λ.
@@ -277,7 +281,7 @@ def fikh_return_step_isothermal(
         outputs: (sigma_total, d_gamma_p) - total stress and plastic increment.
         lam_history_new: Updated history buffer.
     """
-    sigma_n, alpha_n, gamma_p_n, lam_n = state
+    sigma_n, alpha_n, R_n, gamma_p_n, lam_n = state
     dt, d_gamma = inputs
 
     # Extract parameters
@@ -291,6 +295,8 @@ def fikh_return_step_isothermal(
     tau_thix = params.get("tau_thix", 1.0)
     Gamma_thix = params.get("Gamma", 0.5)
     eta_inf = params.get("eta_inf", 0.0)
+    Q_iso = params.get("Q_iso", 0.0)
+    b_iso = params.get("b_iso", 1.0)
 
     # Shear rate
     dt_safe = jnp.maximum(dt, 1e-15)
@@ -308,8 +314,8 @@ def fikh_return_step_isothermal(
     xi_trial = sigma_trial - alpha_n
     xi_abs = jnp.abs(xi_trial)
 
-    # 2. Yield condition
-    f_yield = xi_abs - sigma_y_current
+    # 2. Yield condition (with isotropic hardening R)
+    f_yield = xi_abs - (sigma_y_current + R_n)
     is_plastic = f_yield > 0
 
     # 3. Plastic corrector
@@ -341,6 +347,11 @@ def fikh_return_step_isothermal(
     )
     alpha_next = alpha_n + d_alpha
 
+    # Isotropic hardening update (Voce saturating law; Q_iso=0.0 default
+    # keeps this a no-op when include_isotropic_hardening is disabled)
+    d_R = b_iso * (Q_iso - R_n) * d_gamma_p
+    R_next = R_n + d_R
+
     # Plastic strain accumulation
     gamma_p_next = gamma_p_n + d_gamma_p
 
@@ -362,6 +373,7 @@ def fikh_return_step_isothermal(
     # Select elastic or plastic values
     sigma_final = jnp.where(is_plastic, sigma_next, sigma_trial)
     alpha_final = jnp.where(is_plastic, alpha_next, alpha_n)
+    R_final = jnp.where(is_plastic, R_next, R_n)
     gamma_p_final = jnp.where(is_plastic, gamma_p_next, gamma_p_n)
     d_gamma_p_final = jnp.where(is_plastic, d_gamma_p, 0.0)
 
@@ -384,7 +396,7 @@ def fikh_return_step_isothermal(
     # 5. Total stress (with viscous background)
     sigma_total = sigma_final + eta_inf * gamma_dot
 
-    new_state = (sigma_final, alpha_final, gamma_p_final, lam_final)
+    new_state = (sigma_final, alpha_final, R_final, gamma_p_final, lam_final)
     outputs = (sigma_total, d_gamma_p_final)
 
     return new_state, outputs, lam_history_new
@@ -495,9 +507,13 @@ def fikh_return_step_thermal(
     )
     alpha_next = alpha_n + d_alpha
 
-    # Isotropic hardening update (optional)
+    # Isotropic hardening update (Voce saturating law; Q_iso=0.0 default
+    # keeps this a no-op when include_isotropic_hardening is disabled).
+    # b_iso is the hardening rate constant -- previously unused, which
+    # silently fixed the effective rate at 1 regardless of the user value.
     Q_iso = params.get("Q_iso", 0.0)
-    d_R = Q_iso * (1.0 - R_n / jnp.maximum(Q_iso, 1e-12)) * d_gamma_p
+    b_iso = params.get("b_iso", 1.0)
+    d_R = b_iso * (Q_iso - R_n) * d_gamma_p
     R_next = R_n + d_R
 
     # Plastic strain
@@ -712,9 +728,16 @@ def _make_fikh_creep_ode_rhs(include_thermal: bool):
         f_yield = xi_abs - sigma_y
         gamma_dot_p = macaulay(f_yield) / jnp.maximum(mu_p, 1e-12) * sign_xi
 
-        # Total strain rate: γ̇ = γ̇ᵖ + σ/η (plastic + viscous, no elastic since σ=const in creep)
-        # F-006: removed spurious eta_inf * gamma_dot_p / eta_T term
-        d_gamma = gamma_dot_p + sigma / eta_T
+        # Total strain rate: eta_inf is a parallel Newtonian dashpot sharing the
+        # applied stress at the same total rate (docstring: sigma_total = sigma
+        # + eta_inf*gamma_dot). Solving that split simultaneously with the
+        # Maxwell dashpot flow sigma/eta_T for gamma_dot gives:
+        #   gamma_dot = (gamma_dot_p*eta_T + sigma) / (eta_T + eta_inf)
+        # which reduces exactly to the eta_inf=0 formula (gamma_dot_p + sigma/eta_T)
+        # and matches fikh_flow_curve_steady_state's eta_eff = mu_p + eta_inf.
+        eta_inf = args.get("eta_inf", 0.0)
+        eta_visc_total = eta_T + jnp.maximum(eta_inf, 0.0)
+        d_gamma = (gamma_dot_p * eta_T + sigma) / jnp.maximum(eta_visc_total, 1e-12)
 
         # Backstress rate
         alpha_abs = jnp.abs(alpha)
@@ -777,8 +800,9 @@ def fikh_scan_kernel_isothermal(
     dts = jnp.diff(times, prepend=times[0])
     d_gammas = jnp.diff(strains, prepend=strains[0])
 
-    # Initial state: (sigma=0, alpha=0, gamma_p=0, lambda=1)
+    # Initial state: (sigma=0, alpha=0, R=0, gamma_p=0, lambda=1)
     init_state = (
+        jnp.array(0.0),
         jnp.array(0.0),
         jnp.array(0.0),
         jnp.array(0.0),

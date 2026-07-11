@@ -94,14 +94,17 @@ def plastic_rate(
     sigma_y: float,
     tau0: float,
     epsilon0: float,
+    m: float = 0.0,
 ) -> float:
     """Compute plastic strain rate.
 
-    gamma_dot_pl = (2 * epsilon0 / tau0) * Lambda * C(sigma) * T(sigma)
+    gamma_dot_pl = (2 * epsilon0 / tau0) * Lambda * C(sigma) * (T(sigma) - m)
 
     Lambda is passed explicitly (either a state variable or computed from chi
     via ``stz_density``).  The ``chi`` argument is unused here but retained so
-    that callers can forward the full ODE state without repackaging.
+    that callers can forward the full ODE state without repackaging. ``m`` is
+    the orientational bias state (Full variant only); it defaults to 0.0,
+    which recovers the Minimal/Standard behavior exactly (T(sigma) unbiased).
 
     Args:
         stress: Deviatoric stress (Pa)
@@ -110,12 +113,13 @@ def plastic_rate(
         sigma_y: Yield stress scale (Pa)
         tau0: Molecular attempt time (s)
         epsilon0: Characteristic strain increment (dimensionless)
+        m: Orientational bias (Full variant state variable, default 0.0)
 
     Returns:
         Plastic strain rate (1/s)
     """
     C = rate_factor_C(stress, sigma_y)
-    T = transition_T(stress, sigma_y)
+    T = transition_T(stress, sigma_y) - m
 
     prefactor = (2.0 * epsilon0) / tau0
 
@@ -292,8 +296,8 @@ def stz_ode_rhs(
     # Get forcing
     gamma_dot_tot = args.get("gamma_dot", 0.0)
 
-    # Compute plastic rate
-    d_gamma_pl = plastic_rate(stress, Lambda, chi, sigma_y, tau0, epsilon0)
+    # Compute plastic rate (m biases T(sigma); 0.0 for Minimal/Standard)
+    d_gamma_pl = plastic_rate(stress, Lambda, chi, sigma_y, tau0, epsilon0, m)
 
     # 1. Stress evolution: d_sigma/dt = G0 * (gamma_dot_tot - gamma_dot_pl)
     d_sigma = G0 * (gamma_dot_tot - d_gamma_pl)
@@ -374,8 +378,8 @@ def stz_creep_ode_rhs(
     # Constant stress input
     stress = args["sigma_applied"]
 
-    # Compute plastic rate
-    d_gamma_pl = plastic_rate(stress, Lambda, chi, sigma_y, tau0, epsilon0)
+    # Compute plastic rate (m biases T(sigma); 0.0 for Minimal/Standard)
+    d_gamma_pl = plastic_rate(stress, Lambda, chi, sigma_y, tau0, epsilon0, m)
 
     # 1. Strain evolution
     # In creep, d_stress/dt = 0 => gamma_dot_tot = gamma_dot_pl

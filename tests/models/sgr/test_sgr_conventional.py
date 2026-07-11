@@ -387,6 +387,29 @@ class TestSGRConventionalPredictions:
                 f"creep log-log slope {slope:.3f} != x-1 ({expected:.3f}) at x={x_val}"
             )
 
+    def test_relaxation_and_creep_monotonic_in_glass_phase(self):
+        """Regression: for x < 1 (glass phase, in-bounds), G(t) must not
+        increase and J(t) must not decrease with time.
+
+        The unconditional exponent (x-1) is only correct for 1 < x < 2; in
+        the glass phase it silently flips the sign of both curves, which
+        violates passive-material causality/monotonicity.
+        """
+        t = np.array([0.1, 1.0, 10.0, 100.0, 1000.0])
+
+        model = SGRConventional()
+        model.parameters.set_value("x", 0.8)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        model._test_mode = "relaxation"
+        G_t = np.asarray(model.predict(t))
+        assert np.all(np.diff(G_t) <= 1e-9), "G(t) must be non-increasing for x<1"
+
+        model._test_mode = "creep"
+        J_t = np.asarray(model.predict(t))
+        assert np.all(np.diff(J_t) >= -1e-9), "J(t) must be non-decreasing for x<1"
+
     def test_steady_shear_flow_curve(self):
         """Test eta(gamma_dot) viscosity shows shear-thinning behavior."""
         model = SGRConventional()
@@ -645,6 +668,45 @@ class TestSGRConventionalDynamicX:
             assert abs(final_x - x_ss) / x_ss < 0.15, (
                 f"x should converge to x_ss={x_ss:.3f}, got {final_x:.3f} at gamma_dot={gamma_dot_val}"
             )
+
+    def test_evolve_x_oscillatory_shear_no_nan(self):
+        """Regression: evolve_x must not produce NaN under oscillatory shear.
+
+        gamma_dot*tau0 is raised to the fractional power x_ss_n; without an
+        abs() guard a negative gamma_dot (normal for oscillation/LAOS) makes
+        this a fractional power of a negative number -> NaN from the first
+        ODE step.
+        """
+        model = SGRConventional(dynamic_x=True)
+        model.parameters.set_value("x_eq", 1.0)
+        model.parameters.set_value("x_ss_A", 0.5)
+        model.parameters.set_value("x_ss_n", 0.3)  # non-integer exponent
+        model.parameters.set_value("alpha_aging", 0.5)
+        model.parameters.set_value("beta_rejuv", 1.0)
+
+        t = np.linspace(0, 10, 50)
+        gamma_dot = 0.5 * np.cos(t)  # oscillatory: changes sign
+
+        x_t = model.evolve_x(t, gamma_dot, x_initial=1.0)
+
+        assert not np.any(np.isnan(x_t)), (
+            "evolve_x produced NaN under oscillatory shear"
+        )
+
+    def test_compute_x_ss_negative_shear_rate_no_nan(self):
+        """Regression: _compute_x_ss must not produce NaN for negative gamma_dot."""
+        model = SGRConventional(dynamic_x=True)
+        model.parameters.set_value("x_eq", 1.0)
+        model.parameters.set_value("x_ss_A", 0.5)
+        model.parameters.set_value("x_ss_n", 0.3)
+        tau0 = model.parameters.get_value("tau0")
+
+        x_ss_pos = model._compute_x_ss(0.5, tau0)
+        x_ss_neg = model._compute_x_ss(-0.5, tau0)
+
+        assert not np.isnan(x_ss_neg)
+        # Symmetric in sign, matching the |gamma_dot*tau0|^n formula.
+        assert x_ss_neg == pytest.approx(x_ss_pos)
 
     def test_static_x_mode_constant_parameter(self):
         """Test static x mode: x is constant fitted parameter, no dynamics."""
@@ -1376,9 +1438,7 @@ class TestSGRConventionalLAOSFitting:
         sigma = 1e3 * strain
 
         # Keep the MC fit cheap: few particles, few iterations
-        model._fit_laos_mc(
-            t, sigma, gamma_0, omega, n_particles=64, max_iter=2, seed=0
-        )
+        model._fit_laos_mc(t, sigma, gamma_0, omega, n_particles=64, max_iter=2, seed=0)
 
         assert model.fitted_ is True
         # Parameters remain within physical bounds after MC optimization
@@ -1469,6 +1529,43 @@ class TestSGRConventionalPredictRouting:
         assert stress.shape == (64,)
         assert not np.any(np.isnan(stress))
 
+    def test_predict_laos_multi_cycle_matches_closed_form(self):
+        """Regression: predict(test_mode='laos') must evaluate at the actual
+        times in X, not silently regenerate a single-period grid.
+
+        Previously _predict_laos called simulate_laos(n_cycles=1,
+        n_points_per_cycle=len(X)), aliasing whenever X spans more than one
+        oscillation period. Verify predict() matches the closed-form SAOS
+        reconstruction G'*gamma0*sin(wt) + G''*gamma0*cos(wt) at the real
+        times, for a 3-cycle time array.
+        """
+        model = SGRConventional()
+        model.parameters.set_value("x", 1.5)
+        model.parameters.set_value("G0", 1e3)
+        model.parameters.set_value("tau0", 1e-3)
+
+        gamma_0, omega = 0.1, 1.0
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0, 3 * period, 90, endpoint=False)
+
+        stress = model._predict(t, test_mode="laos", gamma_0=gamma_0, omega=omega)
+
+        # Closed-form linear-viscoelastic reconstruction at the real times.
+        G_star = np.asarray(
+            model.model_function(
+                np.array([omega]),
+                np.array([1.5, 1e3, 1e-3]),
+                test_mode="oscillation",
+            )
+        )
+        G_prime, G_double_prime = G_star[0, 0], G_star[0, 1]
+        strain = gamma_0 * np.sin(omega * t)
+        strain_rate = gamma_0 * omega * np.cos(omega * t)
+        expected = G_prime * strain + (G_double_prime / omega) * strain_rate
+
+        assert stress.shape == t.shape
+        np.testing.assert_allclose(stress, expected, rtol=1e-6, atol=1e-9)
+
 
 class TestSGRConventionalModelFunction:
     """Bayesian model_function routing across all modes (lines 1698-1738)."""
@@ -1478,7 +1575,9 @@ class TestSGRConventionalModelFunction:
     def test_model_function_oscillation(self):
         model = SGRConventional()
         omega = np.logspace(-2, 2, 20)
-        out = np.asarray(model.model_function(omega, self.PARAMS, test_mode="oscillation"))
+        out = np.asarray(
+            model.model_function(omega, self.PARAMS, test_mode="oscillation")
+        )
         assert out.shape == (20, 2)
         assert not np.any(np.isnan(out))
 
@@ -1494,7 +1593,9 @@ class TestSGRConventionalModelFunction:
         """flow_curve maps to steady_shear (line 1718)."""
         model = SGRConventional()
         gamma_dot = np.logspace(-2, 2, 15)
-        out = np.asarray(model.model_function(gamma_dot, self.PARAMS, test_mode="flow_curve"))
+        out = np.asarray(
+            model.model_function(gamma_dot, self.PARAMS, test_mode="flow_curve")
+        )
         assert out.shape == (15,)
 
     def test_model_function_laos_uses_oscillation(self):

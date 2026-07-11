@@ -325,6 +325,14 @@ class ITTMCTSchematic(ITTMCTBase):
     def _get_v2_critical(self, v1: float) -> float:
         """Get critical v₂ value for glass transition.
 
+        Uses the same exact closed-form as ``glass_transition_criterion``
+        (mct_kernels.py): eliminating v₂ between the fixed-point equation
+        f/(1-f) = v₁f + v₂f² and the marginal stability condition
+        1/(1-f)² = v₁ + 2v₂f gives v₂_c = (1 + √(1-v₁))². This must match
+        ``get_glass_transition_info()`` exactly, since both ``epsilon`` and
+        ``get_glass_transition_info()`` are read back and compared by
+        callers.
+
         Parameters
         ----------
         v1 : float
@@ -333,14 +341,12 @@ class ITTMCTSchematic(ITTMCTBase):
         Returns
         -------
         float
-            Critical v₂ value
+            Critical v₂ value (0.0 if v₁ ≥ 1, where v₂_c is undefined)
         """
-        # For F₁₂ with v₁ = 0: v₂_c = 4
-        if abs(v1) < 1e-10:
-            return 4.0
-        else:
-            # Approximate for non-zero v₁
-            return (4.0 - 2.0 * v1) / (1.0 - v1 / 4.0) if v1 < 4.0 else 4.0
+        if v1 >= 1.0:
+            return 0.0
+        s = (1.0 - v1) ** 0.5
+        return (1.0 + s) ** 2
 
     def _compute_equilibrium_correlator(
         self,
@@ -765,6 +771,28 @@ class ITTMCTSchematic(ITTMCTBase):
         # Integrate ODE
         t_span = [0, t_max]
         sol = solve_ivp(rhs_numpy, t_span, state0, method="LSODA", rtol=1e-5, atol=1e-7)
+
+        if not sol.success:
+            # LSODA did not reach t_max (e.g. stiff Prony-mode dynamics deep
+            # in the glass state). Retry with Radau (L-stable implicit RK),
+            # the same fallback isotropic.py's Volterra solver uses for
+            # stiff MCT dynamics, rather than silently reading the stress at
+            # whatever time the failed integration stopped at.
+            logger.warning(
+                "F12 steady-state ODE (LSODA) did not converge at "
+                "gamma_dot=%.3g (%s). Retrying with Radau.",
+                gamma_dot,
+                sol.message,
+            )
+            sol = solve_ivp(
+                rhs_numpy, t_span, state0, method="Radau", rtol=1e-5, atol=1e-7
+            )
+            if not sol.success:
+                raise RuntimeError(
+                    f"F12 steady-state stress ODE failed to converge at "
+                    f"gamma_dot={gamma_dot:.3g} with both LSODA and Radau: "
+                    f"{sol.message}"
+                )
 
         # Extract stress integral from final state
         sigma = sol.y[2 + self.n_prony_modes, -1]

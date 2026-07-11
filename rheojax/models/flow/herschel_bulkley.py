@@ -92,6 +92,11 @@ class HerschelBulkley(BaseModel):
     def _fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> HerschelBulkley:
         """Fit Herschel-Bulkley parameters to data.
 
+        Computes a two-stage closed-form initial guess (yield stress from
+        the low-shear percentile, then a power-law regression on the
+        yield-corrected residual), then refines it against the actual
+        Herschel-Bulkley equation via NLSQ (see BaseModel._standard_nlsq_fit).
+
         Args:
             X: Shear rate data (γ̇)
             y: Stress data (σ)
@@ -185,7 +190,7 @@ class HerschelBulkley(BaseModel):
                     material_type = "power-law fluid"
 
                 logger.debug(
-                    "Herschel-Bulkley fit completed successfully",
+                    "Heuristic initial guess computed, refining with NLSQ",
                     fitted_sigma_y=float(sigma_y_est),
                     fitted_K=float(K_est),
                     fitted_n=float(n_est),
@@ -205,7 +210,12 @@ class HerschelBulkley(BaseModel):
                 )
                 raise
 
-        return self
+        # Refine the heuristic initial guess against the actual
+        # Herschel-Bulkley equation via NLSQ (was previously never done,
+        # see P2-FLOW-HERSCHEL-BULKLEY).
+        return self._standard_nlsq_fit(
+            X, y, self.model_function, default_test_mode="rotation", **kwargs
+        )
 
     def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict stress for given shear rates.
