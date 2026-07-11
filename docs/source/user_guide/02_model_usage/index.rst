@@ -227,7 +227,7 @@ Common Pitfalls and How to Avoid Them
 .. code-block:: python
 
    # WRONG: Using complex model for simple data
-   from rheojax.models import FractionalBurgersModel  # 7 parameters
+   from rheojax.models import FractionalBurgersModel  # 5 parameters
    model.fit(omega, G_star)  # Data only has 10 points → overfitting!
 
    # CORRECT: Start with simplest model
