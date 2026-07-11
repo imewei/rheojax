@@ -291,7 +291,7 @@ Related Documentation
 - :doc:`/models/index` — Comprehensive Model Handbook (53 models, all equations and theory)
 - :doc:`/transforms/index` — Transform Reference (11 transforms, mathematical details)
 - :doc:`/api_reference` — Complete API documentation
-- :doc:`/examples/index` — 240+ example notebooks across all model families
+- :doc:`/examples/index` — 218 example notebooks across all model families
 
 Getting Help
 ------------
@@ -299,7 +299,7 @@ Getting Help
 - **Troubleshooting Guide**: :doc:`05_appendices/troubleshooting`
 - **Glossary**: :doc:`05_appendices/glossary`
 - **GitHub Issues**: Report bugs or request features
-- **Examples**: :doc:`/examples/index` — 240+ worked notebooks across all model families
+- **Examples**: :doc:`/examples/index` — 218 worked notebooks across all model families
 
 Next Steps
 ----------

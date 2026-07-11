@@ -19,7 +19,7 @@ full Bayesian uncertainty quantification.
 
 **Implementation Status**: [done] **FULLY IMPLEMENTED** (v0.2.0, enhanced v0.4.0)
 
-All 21 rheological models support the complete Bayesian workflow through ``BayesianMixin`` inheritance.
+All 53 rheological models support the complete Bayesian workflow through ``BayesianMixin`` inheritance.
 
 **v0.4.0 Enhancement**: Mode-aware Bayesian inference ensures correct posteriors for all test modes (relaxation, creep, oscillation).
 Previously, test_mode was captured as class state, causing all Bayesian fits to use the last-fitted mode.
@@ -900,39 +900,10 @@ Red Flags (Do Not Trust Results)
 Model Support
 =============
 
-All 20 rheological models inherit ``BayesianMixin`` through ``BaseModel`` and support complete Bayesian workflows:
-
-Classical Viscoelastic (3 models)
----------------------------------
-
-- Maxwell
-- Zener
-- SpringPot
-
-Flow Models (6 models)
-----------------------
-
-- Bingham
-- PowerLaw
-- Herschel-Bulkley
-- Carreau
-- Carreau-Yasuda
-- Cross
-
-Fractional Models (11 models)
------------------------------
-
-- fractional_burgers
-- fractional_jeffreys
-- fractional_kelvin_voigt
-- fractional_kv_zener
-- fractional_maxwell_gel
-- fractional_maxwell_liquid
-- fractional_maxwell_model
-- fractional_poynting_thomson
-- fractional_zener_ll
-- fractional_zener_sl
-- fractional_zener_ss
+All 53 rheological models inherit ``BayesianMixin`` through ``BaseModel`` and support complete Bayesian workflows.
+See :class:`rheojax.core.registry.ModelRegistry` (``ModelRegistry.list_models()``) for the current, authoritative
+list of registered models across all families (Classical, Flow, Fractional, Multi-Mode, Giesekus, VLB, HVM/HVNM,
+TNT, SGR, EPM, ITT-MCT, STZ, Hébraud-Lequeux, IKH/FIKH, SPP, and more).
 
 Each model provides:
 

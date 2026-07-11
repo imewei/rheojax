@@ -36,7 +36,7 @@ At a Glance
    * - **Performance**
      - 10-100x speedups via JAX; 5-270x optimization via NLSQ
    * - **Notebooks**
-     - 249 tutorial notebooks across 21 categories covering all model families and protocols
+     - 218 tutorial notebooks across 20 categories covering all model families and protocols
 
 Key Features
 ------------

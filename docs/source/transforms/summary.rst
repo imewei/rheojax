@@ -1640,7 +1640,7 @@ Next Steps
 * **Detailed transform documentation:** :doc:`/transforms/index` for individual transform pages
 * **User guide:** :doc:`/user_guide/transforms` for usage patterns and examples
 * **API reference:** :doc:`/api/transforms` for complete API documentation
-* **Example notebooks:** 8 transform examples in ``examples/transforms/`` directory
+* **Example notebooks:** 13 transform examples in ``examples/transforms/`` directory
 * **Pipeline integration:** :doc:`/user_guide/pipeline_api` for fluent transform chaining
 
 **Need a transform not listed?** Transforms are extensible via ``BaseTransform`` - see :doc:`/developer/contributing`.

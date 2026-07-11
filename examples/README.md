@@ -14,9 +14,9 @@ RheoJAX provides a unified framework for analyzing experimental rheology data wi
 - Advanced transforms for experimental data analysis (including SRFS, SPP)
 - **Google Colab compatible** - all notebooks run directly on https://colab.google/
 
-**230+ Tutorial Notebooks** (all complete ✅) organized into 20 categories:
+**218 Tutorial Notebooks** (all complete ✅) organized into 20 categories:
 - **Basic Model Fitting** (5 notebooks ✅) - Fundamental rheological models
-- **Transform Workflows** (8 notebooks ✅) - Data analysis techniques (FFT, TTS, SRFS, SPP)
+- **Transform Workflows** (13 notebooks ✅) - Data analysis techniques (FFT, TTS, SRFS, OWChirp, Cox-Merz, Prony, Spectrum Inversion, LVE Envelope, SPP)
 - **Bayesian Inference** (9 notebooks ✅) - Uncertainty quantification (including SPP LAOS)
 - **Advanced Workflows** (10 notebooks ✅) - Production patterns (including SGR and SPP)
 - **I/O** (1 notebook ✅) - TRIOS complex modulus handling
@@ -32,9 +32,9 @@ RheoJAX provides a unified framework for analyzing experimental rheology data wi
 - **ITT-MCT Mode-Coupling Theory Models** (12 notebooks ✅) - Schematic F₁₂ and Isotropic ISM models for colloidal glasses
 - **TNT Transient Network Theory Models** (30 notebooks ✅) - 5 TNT model classes (SingleMode, Cates, LoopBridge, MultiSpecies, StickyRouse) across all 6 protocols
 - **VLB Transient Network Models** (16 notebooks ✅) - 6 protocols + Bayesian + Bell + FENE + Nonlocal + NLSQ-to-NUTS
-- **HVM Hybrid Vitrimer Models** (13 notebooks ✅) - 6 basic + 7 advanced tutorials (TST kinetics, factory methods)
-- **HVNM Vitrimer Nanocomposite Models** (15 notebooks ✅) - 7 basic + 8 NLSQ/NUTS (dual TST, Guth-Gold)
-- **Verification Suite** (31 notebooks ✅) - Cross-model validation (6 protocol validators + 25 material-specific)
+- **HVM Hybrid Vitrimer Models** (8 notebooks ✅) - 6 protocols (forward + NLSQ/NUTS) + architecture overview + multi-protocol fit demo
+- **HVNM Vitrimer Nanocomposite Models** (9 notebooks ✅) - 6 protocols (forward + NLSQ/NUTS) + limiting-cases + data intake/QC + multi-protocol fit
+- **Verification Suite** (20 notebooks ✅) - Cross-model validation (index + 6 protocol validators + 13 material-specific case studies)
 
 ## Prerequisites
 

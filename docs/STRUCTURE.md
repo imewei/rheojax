@@ -49,7 +49,7 @@ docs/
 │   │   ├── 05_appendices/            # Reference material (5 files)
 │   │   └── 06_gui/                   # GUI reference (9 files)
 │   │
-│   ├── models/                       # Model Handbook — 53 models across 20 families
+│   ├── models/                       # Model Handbook — 53 models across 22 families
 │   │   ├── index.rst                 # Models overview (grouped toctree)
 │   │   ├── summary.rst               # Comparison matrix
 │   │   │
@@ -128,7 +128,7 @@ docs/
 - **Purpose:** Mathematical "what" and "how"
 - **Audience:** Researchers, practitioners
 - **Content:** Full equations, Quick Reference summaries, boxed governing equations
-- **Size:** 86 rst files, 53 models across 20 families
+- **Size:** 86 rst files, 53 models across 22 families
 
 ### Tier 3: Transform Reference (Preprocessing Math)
 - **Purpose:** Data preprocessing theory
@@ -158,16 +158,16 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 
 ## Key Features
 
-- **53 models** across 20 families with full Bayesian inference support
+- **53 models** across 22 families with full Bayesian inference support
 - **86 rst files** in the Model Handbook (equations, protocols, troubleshooting)
 - **11 transforms** with mathematical derivations
 - **6-section User Guide** structured as a 16-week graduate course
 - **9 learning pathways** for different user backgrounds
-- **240+ example notebooks** across all model families
+- **218 example notebooks** across all model families
 - **GUI reference** for interactive analysis (PyQt/PySide6)
 - **Furo theme** with custom CSS, light/dark modes
 
 ---
 
-**Documentation Version:** 0.6.0
+**Documentation Version:** 0.7.0
 **Build Status:** Clean (0 errors, 0 warnings)

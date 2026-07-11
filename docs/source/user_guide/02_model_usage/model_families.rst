@@ -342,7 +342,7 @@ Example: Fitting Fractional Zener Solid-Solid
 
 .. code-block:: python
 
-   from rheojax.models.fractional_zener_ss import FractionalZenerSolidSolid
+   from rheojax.models import FractionalZenerSolidSolid
 
    # SAOS frequency sweep (omega, [G', G"])
    model = FractionalZenerSolidSolid()

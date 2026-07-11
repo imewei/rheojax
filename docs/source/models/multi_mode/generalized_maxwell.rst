@@ -955,11 +955,11 @@ The GMM inherits full Bayesian capabilities from ``BayesianMixin``:
 
 .. code-block:: python
 
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
    import numpy as np
 
    # 1. NLSQ point estimation (fast warm-start)
-   gmm = GeneralizedMaxwell(n_modes=5, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=5)
    gmm.fit(t, G_data, test_mode='relaxation', optimization_factor=1.5)
 
    # Check optimized N
@@ -1216,7 +1216,7 @@ Sample Applications: DMA (Solid Mechanics)
 
    .. code-block:: python
 
-      from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+      from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
       from rheojax.transforms.mastercurve import Mastercurve
 
       # Create mastercurve (automatic shift factors)
@@ -1279,7 +1279,7 @@ Sample Applications: Rheometer (Fluid Dynamics)
 
    .. code-block:: python
 
-      gmm = GeneralizedMaxwell(n_modes=15, modulus_type='shear')
+      gmm = GeneralizedMaxwell(n_modes=15)
       gmm.fit(
           mastercurve.x,      # Shifted ω (rad/s)
           mastercurve.y,      # [G', G"] (Pa)
@@ -1322,7 +1322,7 @@ Element Minimization Best Practices
 .. code-block:: python
 
    # Request N=15 for broad spectra
-   gmm = GeneralizedMaxwell(n_modes=15, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=15)
    gmm.fit(omega, G_star, test_mode='oscillation', optimization_factor=1.5)
 
    # System auto-reduces to N_opt (e.g., 7)
@@ -1613,14 +1613,14 @@ Basic Fitting (Relaxation Mode)
 .. code-block:: python
 
    import numpy as np
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
 
    # Generate synthetic relaxation data (multi-mode)
    t = np.logspace(-2, 3, 100)
    G_t = 1e4 + 5e5*np.exp(-t/0.1) + 8e4*np.exp(-t/1.0) + 3e4*np.exp(-t/10.0)
 
    # Fit with transparent element minimization
-   gmm = GeneralizedMaxwell(n_modes=10, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=10)
    gmm.fit(t, G_t, test_mode='relaxation', optimization_factor=1.5)
 
    # Check optimized N
@@ -1641,7 +1641,7 @@ Oscillation Mode with Time-Temperature Superposition
 
 .. code-block:: python
 
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
    from rheojax.transforms.mastercurve import Mastercurve
    from rheojax.core.data import RheoData
    import numpy as np
@@ -1670,7 +1670,7 @@ Oscillation Mode with Time-Temperature Superposition
    mastercurve, shift_factors = mc.transform(datasets)
 
    # Fit GMM to mastercurve
-   gmm = GeneralizedMaxwell(n_modes=15, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=15)
    gmm.fit(
        mastercurve.x,      # Shifted omega
        mastercurve.y,      # [G', G"] concatenated
@@ -1695,7 +1695,7 @@ Creep Mode Prediction
 .. code-block:: python
 
    import numpy as np
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
 
    # Generate synthetic oscillation data
    omega = np.logspace(-2, 2, 50)
@@ -1704,7 +1704,7 @@ Creep Mode Prediction
    G_star = np.column_stack([G_prime, G_double_prime])
 
    # First fit to relaxation or oscillation data
-   gmm = GeneralizedMaxwell(n_modes=5, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=5)
    gmm.fit(omega, G_star, test_mode='oscillation', optimization_factor=1.5)
 
    # Predict creep compliance (tri-mode equality)
@@ -1726,11 +1726,11 @@ Bayesian Inference with Prior Safety
 
 .. code-block:: python
 
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
    import numpy as np
 
    # 1. NLSQ fit (fast)
-   gmm = GeneralizedMaxwell(n_modes=5, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=5)
    gmm.fit(t, G_data, test_mode='relaxation', optimization_factor=1.5)
 
    # 2. Bayesian inference with automatic prior safety
@@ -1795,7 +1795,7 @@ Rheometer Workflow (Fluid Dynamics)
 
 .. code-block:: python
 
-   from rheojax.models.generalized_maxwell import GeneralizedMaxwell
+   from rheojax.models.multimode.generalized_maxwell import GeneralizedMaxwell
    from rheojax.transforms.mastercurve import Mastercurve
    from rheojax.core.data import RheoData
    import numpy as np
@@ -1823,7 +1823,7 @@ Rheometer Workflow (Fluid Dynamics)
    mastercurve, shifts = mc.transform(datasets)
 
    # 3. Fit GMM
-   gmm = GeneralizedMaxwell(n_modes=12, modulus_type='shear')
+   gmm = GeneralizedMaxwell(n_modes=12)
    gmm.fit(mastercurve.x, mastercurve.y, test_mode='oscillation')
 
    # 4. Cox-Merz rule validation

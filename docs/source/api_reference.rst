@@ -386,7 +386,7 @@ For advanced users:
 Version Information
 -------------------
 
-This documentation covers rheojax version 0.6.0.
+This documentation covers rheojax version 0.7.0.
 
 **Phase 1** (v0.1.0): Core infrastructure, test mode detection, I/O, visualization
 

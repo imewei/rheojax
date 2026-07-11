@@ -7,7 +7,7 @@ This page tracks the development history of RheoJAX across 11 completed phases
 and provides performance benchmarks.
 
 .. note::
-   As of 2026-07-10, the test suite has grown to 6,415 tests (2,051 smoke tests)
+   As of 2026-07-10, the test suite has grown to 6,417 tests (2,051 smoke tests)
    through a dedicated coverage sprint (Phase 11), and the GUI/test infrastructure
    has been hardened against FreeType rendering crashes and pytest-xdist hangs.
 
@@ -25,9 +25,9 @@ Development Phases
 
 **Phase 2 (Complete)**: Models and Transforms
    - 53 rheological models across 22 families
-   - 7 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer)
+   - 11 data transforms (FFT, Mastercurve/TTS with auto-shift, Mutation Number, OWChirp/LAOS, Smooth Derivative, SRFS, SPP Decomposer, Cox-Merz, Prony Conversion, Spectrum Inversion, LVE Envelope)
    - Pipeline API for fluent workflows
-   - 238 tutorial notebooks across 20 categories (basic, transforms, bayesian, advanced, and 16 model family suites)
+   - 218 tutorial notebooks across 20 categories (basic, transforms, bayesian, advanced, and 16 model family suites)
 
 **Phase 3 (Complete)**: Bayesian Inference
    - NumPyro NUTS sampling with NLSQ warm-start (2-5x faster convergence)
