@@ -489,15 +489,21 @@ class GiesekusBase(BaseModel):
             lambda_est = 0.1 / gamma_dot[-1]
 
         # Estimate α from the high-Wi shear-stress plateau.
-        # As Wi → ∞, the Giesekus polymer shear stress saturates to a
-        # constant plateau σ → η_p/(2αλ) (i.e. η ~ γ̇^-1, n → 0 in the
-        # η ~ γ̇^(n-1) convention — NOT n → 0.5, which was the wrong
-        # asymptote previously assumed here). Use the highest-rate data
-        # point as a proxy for that plateau.
+        # As Wi → ∞, the Giesekus polymer shear stress saturates to
+        # sigma -> (eta_p/lambda) * sqrt((1-alpha)/alpha) (from the model's
+        # own steady-state equations: s_yy -> -1, then s_xy = Wi*f ->
+        # sqrt((1-alpha)/alpha); NOT the eta_p/(2*alpha*lambda) plateau used
+        # previously, which is only exact at alpha=0.5). Inverting
+        # P = sigma_plateau*lambda/eta_p = sqrt((1-alpha)/alpha) gives
+        # alpha = 1/(P^2+1) = eta_p^2/(sigma_plateau^2*lambda^2+eta_p^2). Use
+        # the highest-rate data point as a proxy for that plateau.
         sigma_plateau_est = eta[-1] * gamma_dot[-1]
         if sigma_plateau_est > 1e-30 and lambda_est > 1e-30:
             alpha_est = np.clip(
-                eta_0_est / (2.0 * lambda_est * sigma_plateau_est), 0.0, 0.5
+                eta_0_est**2
+                / (sigma_plateau_est**2 * lambda_est**2 + eta_0_est**2),
+                0.0,
+                0.5,
             )
         else:
             alpha_est = 0.3  # Default

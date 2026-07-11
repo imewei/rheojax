@@ -59,11 +59,13 @@ class Cross(BaseModel):
             γ̇ ≠ 0 (the γ̇ = 0 point is still exactly η_0 by definition,
             so this limit is discontinuous at γ̇ = 0)
         λ → ∞: η approaches η_∞
-        m > 1: the high-shear asymptote σ ≈ (η_0 - η_∞) λ^(-m) γ̇^(1-m) has a
-            *negative* exponent on γ̇, i.e. shear stress decreases with
-            increasing shear rate in that regime (non-monotonic flow curve).
-            Use m > 1 with care; m ∈ (0, 1] matches the physically
-            monotonic Cross-model range reported in the literature.
+        m > 1: the (η_0 - η_∞) λ^(-m) γ̇^(1-m) term has a *negative* exponent
+            on γ̇, but the full stress is σ = η_∞ γ̇ + (η_0 - η_∞) λ^(-m) γ̇^(1-m);
+            as γ̇ → ∞, dσ/dγ̇ → η_∞ > 0, so with the usual nonzero η_∞ the
+            flow curve stays monotonic at high shear -- non-monotonic
+            behavior only occurs in the η_∞ → 0 limit. Use m > 1 with care;
+            m ∈ (0, 1] matches the physically monotonic Cross-model range
+            reported in the literature.
 
     Test Mode:
         ROTATION (steady shear) only

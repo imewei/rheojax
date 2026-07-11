@@ -1905,7 +1905,10 @@ class SGRConventional(BaseModel):
             # this gate -- a violation of the requirement that nonlinear
             # harmonics scale with amplitude). Using strain directly makes
             # softening ~ gamma_0^2 within the gated (large-amplitude) regime.
-            softening = 1.0 - 0.1 * strain**2
+            # Clamp to non-negative: unclamped, this goes negative (and
+            # inverts/amplifies the stress) for |strain| > sqrt(10) ~= 3.16,
+            # well within common LAOS amplitude ranges.
+            softening = np.maximum(1.0 - 0.1 * strain**2, 0.0)
             stress = stress * softening
 
         return strain, stress

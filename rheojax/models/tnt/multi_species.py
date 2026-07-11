@@ -663,7 +663,9 @@ class TNTMultiSpecies(TNTBase):
     ) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Predict steady shear stress and viscosity.
 
-        Analytical superposition: σ = Σ G_i·τ_b_i·γ̇ / (1 + (τ_b_i·γ̇)²) + η_s·γ̇
+        This model's steady conformation is S_xy = τ_b·γ̇ (UCM, constant
+        breakage rate, no shear thinning), giving a linear flow curve:
+        σ = Σ G_i·τ_b_i·γ̇ + η_s·γ̇ = η₀·γ̇, with η₀ = Σ G_i·τ_b_i + η_s.
 
         Parameters
         ----------

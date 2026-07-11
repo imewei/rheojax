@@ -935,37 +935,68 @@ hvnm_startup_stress_linear_vec = jax.jit(
 @jax.jit
 def hvnm_steady_shear_stress(
     gamma_dot: float,
+    G_E: float,
     G_D: float,
+    k_BER_mat_0: float,
     k_d_D: float,
+    G_I_eff: float,
+    X_I: float,
+    k_BER_int_0: float,
+    D_int: float,
 ) -> float:
-    """Steady-state shear stress (E and I networks contribute zero).
+    """Steady-state (viscous) shear stress, linear regime (constant rates).
 
-    At steady state:
-    - mu^E -> mu^E_nat => sigma_E -> 0
-    - mu^I -> mu^I_nat => sigma_I -> 0
-    - sigma_P grows linearly (elastic, not viscous)
-    Only D-network contributes viscous: sigma_D = G_D * gamma_dot / k_d_D
+    mu^E and mu^I do *not* relax all the way to their natural states at
+    steady state under constant shear rate -- same mechanism as HVM's
+    hvm_steady_shear_stress: each difference d_xy = mu_xy - mu_nat_xy obeys
+    d(d_xy)/dt = (effective rate)*gamma_dot - 2*k_BER*d_xy, giving
+    d_xy_ss = (effective rate)*gamma_dot/(2*k_BER). The I-network's ODE
+    input is amplified by X_I (see hvnm_interphase_stress), so its
+    steady-state difference is X_I*gamma_dot/(2*k_BER_int_0). Only the
+    P-network is excluded here: sigma_P = (1-D)*G_P*X_phi*gamma grows
+    unbounded (elastic, not viscous) at steady state.
+
+    sigma_ss = sigma_E + sigma_D + sigma_I
+             = G_E*gamma_dot/(2*k_BER_mat_0) + G_D*gamma_dot/k_d_D
+               + (1-D_int)*G_I_eff*X_I*gamma_dot/(2*k_BER_int_0)
 
     Parameters
     ----------
     gamma_dot : float
         Shear rate (1/s)
+    G_E : float
+        Exchangeable (matrix) network modulus (Pa)
     G_D : float
         Dissociative network modulus (Pa)
+    k_BER_mat_0 : float
+        Zero-stress matrix BER rate (1/s)
     k_d_D : float
         Dissociative rate (1/s)
+    G_I_eff : float
+        Effective interphase modulus (Pa)
+    X_I : float
+        Strain amplification for the interphase network
+    k_BER_int_0 : float
+        Zero-stress interphase BER rate (1/s)
+    D_int : float
+        Interfacial damage [0, 1]
 
     Returns
     -------
     float
         Steady-state viscous shear stress (Pa)
     """
+    eta_E = G_E / jnp.maximum(2.0 * k_BER_mat_0, 1e-30)
     eta_D = G_D / jnp.maximum(k_d_D, 1e-30)
-    return eta_D * gamma_dot
+    eta_I = G_I_eff * X_I / jnp.maximum(2.0 * k_BER_int_0, 1e-30)
+    return eta_E * gamma_dot + eta_D * gamma_dot + (1.0 - D_int) * eta_I * gamma_dot
 
 
 hvnm_steady_shear_stress_vec = jax.jit(
-    jax.vmap(hvnm_steady_shear_stress, in_axes=(0, None, None))
+    jax.vmap(
+        hvnm_steady_shear_stress,
+        in_axes=(0, None, None, None, None, None, None, None, None),
+    )
 )
 
 

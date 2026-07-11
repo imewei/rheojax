@@ -504,12 +504,17 @@ class MLIKH(IKHBase):
                 # across parallel modes in proportion to relative stiffness
                 # (equal elastic strain jump => sigma_i(0) = G_i/sum(G) * sigma_applied).
                 G_arr = jnp.maximum(args["G"], 1e-30)
-                sigma_i0 = (
-                    G_arr / jnp.maximum(jnp.sum(G_arr), 1e-30)
-                ) * args["sigma_applied"]
+                sum_G = jnp.maximum(jnp.sum(G_arr), 1e-30)
+                sigma_i0 = (G_arr / sum_G) * args["sigma_applied"]
+                # The shared instantaneous elastic strain jump gamma(0+) must
+                # match every mode's own sigma_i(0)/G_i (= sigma_applied/sum_G,
+                # uniform across modes by construction above) -- otherwise the
+                # reported strain silently omits the elastic response even
+                # though the per-mode stresses already reflect it.
+                gamma0 = args["sigma_applied"] / sum_G
                 y0 = jnp.concatenate(
                     [
-                        jnp.array([0.0]),  # gamma
+                        jnp.array([gamma0]),  # gamma
                         sigma_i0,  # sigmas
                         jnp.zeros(n),  # alphas
                         jnp.full(n, lambda_init),  # lambdas

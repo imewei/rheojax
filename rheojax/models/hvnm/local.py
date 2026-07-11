@@ -250,9 +250,11 @@ class HVNMLocal(HVNMBase):
     ) -> np.ndarray | dict[str, np.ndarray]:
         """Predict steady-state flow curve.
 
-        At steady state, mu^E -> mu^E_nat and mu^I -> mu^I_nat,
-        so sigma_E -> 0 and sigma_I -> 0.
-        Only the D-network contributes viscous stress: sigma_D = eta_D * gamma_dot.
+        At steady state, mu^E and mu^I do not fully relax to their natural
+        states (same mechanism as HVM): sigma_E and sigma_I retain nonzero
+        viscous contributions eta_E*gamma_dot and eta_I*gamma_dot. Only the
+        P-network's elastic contribution is excluded (it grows unbounded).
+        See hvnm_steady_shear_stress for the full derivation.
 
         Parameters
         ----------
@@ -266,25 +268,41 @@ class HVNMLocal(HVNMBase):
         np.ndarray or dict
             Steady-state stress (Pa) or component dict
         """
+        G_E = self.G_E
         G_D = self.G_D
         k_d_D = self.k_d_D
+        if G_E is None:
+            raise ValueError("G_E must not be None")
         if G_D is None:
             raise ValueError("G_D must not be None")
         if k_d_D is None:
             raise ValueError("k_d_D must not be None")
 
+        p = self._get_params_dict()
+        d = self._get_derived_params(p)
+        k_BER_mat_0 = d["k_BER_mat_0"]
+        G_I_eff = d["G_I_eff"]
+        X_I = d["X_I"]
+        k_BER_int_0 = d["k_BER_int_0"]
+
         gamma_dot_jax = jnp.asarray(gamma_dot, dtype=jnp.float64)
-        sigma = hvnm_steady_shear_stress_vec(gamma_dot_jax, G_D, k_d_D)
+        sigma = hvnm_steady_shear_stress_vec(
+            gamma_dot_jax, G_E, G_D, k_BER_mat_0, k_d_D, G_I_eff, X_I, k_BER_int_0, 0.0
+        )
 
         if return_components:
+            eta_E = G_E / jnp.maximum(2.0 * k_BER_mat_0, 1e-30)
             eta_D = G_D / jnp.maximum(k_d_D, 1e-30)
+            eta_I = G_I_eff * X_I / jnp.maximum(2.0 * k_BER_int_0, 1e-30)
+            sigma_E = eta_E * gamma_dot_jax
             sigma_D = eta_D * gamma_dot_jax
+            sigma_I = eta_I * gamma_dot_jax
             return {
                 "stress": np.asarray(sigma),
                 "sigma_P": np.zeros_like(np.asarray(gamma_dot)),
-                "sigma_E": np.zeros_like(np.asarray(gamma_dot)),
+                "sigma_E": np.asarray(sigma_E),
                 "sigma_D": np.asarray(sigma_D),
-                "sigma_I": np.zeros_like(np.asarray(gamma_dot)),
+                "sigma_I": np.asarray(sigma_I),
                 "eta_eff": np.asarray(sigma / jnp.maximum(gamma_dot_jax, 1e-30)),
             }
         return np.asarray(sigma)
@@ -1121,7 +1139,9 @@ class HVNMLocal(HVNMBase):
         }
 
         if mode in ["flow_curve", "steady_shear", "rotation"]:
-            return hvnm_steady_shear_stress_vec(X_jax, G_D, k_d_D)
+            return hvnm_steady_shear_stress_vec(
+                X_jax, G_E, G_D, k_BER_mat_0, k_d_D, G_I_eff, X_I, k_BER_int_0, 0.0
+            )
 
         elif mode == "oscillation":
             G_prime, G_double_prime = hvnm_saos_moduli_vec(
@@ -1263,7 +1283,9 @@ class HVNMLocal(HVNMBase):
 
         else:
             logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
-            return hvnm_steady_shear_stress_vec(X_jax, G_D, k_d_D)
+            return hvnm_steady_shear_stress_vec(
+                X_jax, G_E, G_D, k_BER_mat_0, k_d_D, G_I_eff, X_I, k_BER_int_0, 0.0
+            )
 
     # =========================================================================
     # Factory Methods (Limiting Cases)

@@ -2189,7 +2189,10 @@ class SGRGeneric(BaseModel):
         # basic small-amplitude linear-response requirement I3/I1 -> 0 as
         # gamma_0 -> 0). Using strain directly makes softening ~ gamma_0^2,
         # so the induced third harmonic correctly vanishes as gamma_0 -> 0.
-        softening = 1.0 - 0.1 * strain**2
+        # Clamp to non-negative: unclamped, this goes negative (and
+        # inverts/amplifies the stress) for |strain| > sqrt(10) ~= 3.16,
+        # well within common LAOS amplitude ranges.
+        softening = np.maximum(1.0 - 0.1 * strain**2, 0.0)
         stress = stress * softening
 
         return strain, stress
