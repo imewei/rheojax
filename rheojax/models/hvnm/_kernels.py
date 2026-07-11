@@ -526,7 +526,13 @@ def hvnm_total_normal_stress_1(
 
     N1 = G_E*[(mu^E_xx - mu^E_nat_xx) - (mu^E_yy - mu^E_nat_yy)]
          + G_D*(mu^D_xx - mu^D_yy)
-         + (1-D_int)*G_I_eff*X_I*[(mu^I_xx - mu^I_nat_xx) - (mu^I_yy - mu^I_nat_yy)]
+         + (1-D_int)*G_I_eff*[(mu^I_xx - mu^I_nat_xx) - (mu^I_yy - mu^I_nat_yy)]
+
+    Note: X_I is NOT applied to N1_I, matching hvnm_total_stress_shear's
+    shear-stress convention -- X_I already enters mu^I_xx/mu^I_yy through
+    the ODE dynamics (see hvnm_interphase_rhs_shear), so multiplying again
+    here would double-count it, exactly as documented in
+    hvnm_interphase_stress's docstring for the shear component.
 
     Parameters
     ----------
@@ -537,14 +543,10 @@ def hvnm_total_normal_stress_1(
     float
         First normal stress difference N1 (Pa)
     """
+    del X_I  # ponytail: kept in signature, see docstring Note
     N1_E = G_E * ((mu_E_xx - mu_E_nat_xx) - (mu_E_yy - mu_E_nat_yy))
     N1_D = G_D * (mu_D_xx - mu_D_yy)
-    N1_I = (
-        (1.0 - D_int)
-        * G_I_eff
-        * X_I
-        * ((mu_I_xx - mu_I_nat_xx) - (mu_I_yy - mu_I_nat_yy))
-    )
+    N1_I = (1.0 - D_int) * G_I_eff * ((mu_I_xx - mu_I_nat_xx) - (mu_I_yy - mu_I_nat_yy))
     return N1_E + N1_D + N1_I
 
 
@@ -933,37 +935,68 @@ hvnm_startup_stress_linear_vec = jax.jit(
 @jax.jit
 def hvnm_steady_shear_stress(
     gamma_dot: float,
+    G_E: float,
     G_D: float,
+    k_BER_mat_0: float,
     k_d_D: float,
+    G_I_eff: float,
+    X_I: float,
+    k_BER_int_0: float,
+    D_int: float,
 ) -> float:
-    """Steady-state shear stress (E and I networks contribute zero).
+    """Steady-state (viscous) shear stress, linear regime (constant rates).
 
-    At steady state:
-    - mu^E -> mu^E_nat => sigma_E -> 0
-    - mu^I -> mu^I_nat => sigma_I -> 0
-    - sigma_P grows linearly (elastic, not viscous)
-    Only D-network contributes viscous: sigma_D = G_D * gamma_dot / k_d_D
+    mu^E and mu^I do *not* relax all the way to their natural states at
+    steady state under constant shear rate -- same mechanism as HVM's
+    hvm_steady_shear_stress: each difference d_xy = mu_xy - mu_nat_xy obeys
+    d(d_xy)/dt = (effective rate)*gamma_dot - 2*k_BER*d_xy, giving
+    d_xy_ss = (effective rate)*gamma_dot/(2*k_BER). The I-network's ODE
+    input is amplified by X_I (see hvnm_interphase_stress), so its
+    steady-state difference is X_I*gamma_dot/(2*k_BER_int_0). Only the
+    P-network is excluded here: sigma_P = (1-D)*G_P*X_phi*gamma grows
+    unbounded (elastic, not viscous) at steady state.
+
+    sigma_ss = sigma_E + sigma_D + sigma_I
+             = G_E*gamma_dot/(2*k_BER_mat_0) + G_D*gamma_dot/k_d_D
+               + (1-D_int)*G_I_eff*X_I*gamma_dot/(2*k_BER_int_0)
 
     Parameters
     ----------
     gamma_dot : float
         Shear rate (1/s)
+    G_E : float
+        Exchangeable (matrix) network modulus (Pa)
     G_D : float
         Dissociative network modulus (Pa)
+    k_BER_mat_0 : float
+        Zero-stress matrix BER rate (1/s)
     k_d_D : float
         Dissociative rate (1/s)
+    G_I_eff : float
+        Effective interphase modulus (Pa)
+    X_I : float
+        Strain amplification for the interphase network
+    k_BER_int_0 : float
+        Zero-stress interphase BER rate (1/s)
+    D_int : float
+        Interfacial damage [0, 1]
 
     Returns
     -------
     float
         Steady-state viscous shear stress (Pa)
     """
+    eta_E = G_E / jnp.maximum(2.0 * k_BER_mat_0, 1e-30)
     eta_D = G_D / jnp.maximum(k_d_D, 1e-30)
-    return eta_D * gamma_dot
+    eta_I = G_I_eff * X_I / jnp.maximum(2.0 * k_BER_int_0, 1e-30)
+    return eta_E * gamma_dot + eta_D * gamma_dot + (1.0 - D_int) * eta_I * gamma_dot
 
 
 hvnm_steady_shear_stress_vec = jax.jit(
-    jax.vmap(hvnm_steady_shear_stress, in_axes=(0, None, None))
+    jax.vmap(
+        hvnm_steady_shear_stress,
+        in_axes=(0, None, None, None, None, None, None, None, None),
+    )
 )
 
 
@@ -987,6 +1020,24 @@ def hvnm_creep_compliance_linear(
     J(0+) = 1 / G_tot^NC
     J(inf) = 1 / (G_P * X)
 
+    Exactness restriction
+    ---------------------
+    This additive per-mode decomposition (each mode assigned its own
+    independently-computed retardation time tau_ret_i = tau_i * G_tot/G_P_amp)
+    is the exact Laplace inversion only for a standard linear solid: a
+    spring in parallel with a SINGLE Maxwell element. When 2+ of
+    {G_E, G_D, G_I_eff*X_I} are simultaneously nonzero (the general HVNM
+    case), the true creep compliance is the Laplace inversion of the full
+    coupled Wiechert system and does NOT decompose additively with these
+    independently-assigned retardation times -- the true retardation
+    spectrum is instead given by the roots of the coupled compliance's
+    characteristic polynomial, which differ from tau_ret_i above. Verified
+    numerically: a 2-mode Wiechert model shows deviations up to ~9% of
+    J(t) at intermediate times relative to this closed form. Callers that
+    need exact multi-mode creep should use the ODE-based hvnm_solve_creep
+    instead (see hvnm.local.HVNMLocal.simulate_creep and model_function's
+    "creep" branch, which dispatch to it directly rather than this formula).
+
     Parameters
     ----------
     t : float
@@ -996,7 +1047,8 @@ def hvnm_creep_compliance_linear(
     Returns
     -------
     float
-        Creep compliance J(t) (1/Pa)
+        Creep compliance J(t) (1/Pa); exact only when at most one of
+        {G_E, G_D, G_I_eff*X_I} is nonzero, approximate otherwise.
     """
     G_P_amp = G_P * X_phi
     G_I_amp = G_I_eff * X_I
@@ -1051,35 +1103,42 @@ def hvnm_relaxation_modulus_with_diffusion(
     D: float,
     D_int: float,
 ) -> float:
-    """Relaxation modulus with diffusion-limited slow modes.
+    """Relaxation modulus with diffusion-limited slow (incomplete) relaxation.
 
     G(t) = (1-D)*G_P*X
-           + G_E*exp(-2*k_m*t)*exp(-k_diff_mat*t)
+           + G_E*exp(-rate_E*t)
            + G_D*exp(-k_D*t)
-           + (1-D_int)*G_I_eff*X_I*exp(-2*k_I*t)*exp(-k_diff_int*t)
+           + (1-D_int)*G_I_eff*X_I*exp(-rate_I*t)
 
-    The additional exp(-k_diff*t) factors produce long-time tails.
-    k_diff << k_BER, so these only matter at t >> 1/k_BER.
+    where rate_E = max(2*k_m - k_diff_mat, eps) and
+          rate_I = max(2*k_I - k_diff_int, eps).
+
+    A diffusion-limited process impedes (does not speed up) bond-exchange
+    relaxation, so k_diff reduces the effective decay rate below the bare
+    BER rate 2*k_BER, producing a genuine slow tail / incomplete relaxation
+    at fixed t (mode decays MORE SLOWLY as k_diff grows). k_diff=0 recovers
+    hvnm_relaxation_modulus exactly.
 
     Parameters
     ----------
     [same as hvnm_relaxation_modulus plus diffusion rates]
     k_diff_mat : float
-        Matrix diffusion rate (1/s)
+        Matrix diffusion rate (1/s), 0 <= k_diff_mat < 2*k_BER_mat_0
     k_diff_int : float
-        Interfacial diffusion rate (1/s)
+        Interfacial diffusion rate (1/s), 0 <= k_diff_int < 2*k_BER_int_0
 
     Returns
     -------
     float
-        Relaxation modulus with diffusion tails (Pa)
+        Relaxation modulus with diffusion-limited slow tails (Pa)
     """
+    rate_exch = jnp.maximum(2.0 * k_BER_mat_0 - k_diff_mat, 1e-30)
+    rate_inter = jnp.maximum(2.0 * k_BER_int_0 - k_diff_int, 1e-30)
+
     G_perm = (1.0 - D) * G_P * X_phi
-    G_exch = G_E * jnp.exp(-(2.0 * k_BER_mat_0 + k_diff_mat) * t)
+    G_exch = G_E * jnp.exp(-rate_exch * t)
     G_diss = G_D * jnp.exp(-k_d_D * t)
-    G_inter = (
-        (1.0 - D_int) * G_I_eff * X_I * jnp.exp(-(2.0 * k_BER_int_0 + k_diff_int) * t)
-    )
+    G_inter = (1.0 - D_int) * G_I_eff * X_I * jnp.exp(-rate_inter * t)
     return G_perm + G_exch + G_diss + G_inter
 
 

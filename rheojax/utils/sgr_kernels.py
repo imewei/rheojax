@@ -388,7 +388,16 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
     -----
     - Power-law scaling for 1 < x < 2: G' ~ G'' ~ omega^(x-1)
     - At low frequencies (omega → 0): G'' dominates (viscous)
-    - At high frequencies (omega → ∞): G' → G0(x) (elastic plateau)
+    - At high frequencies (omega → ∞): G' → 1 (dimensionless instantaneous/
+      glassy plateau), independent of x. This is a different quantity from
+      G0(x) (the equilibrium modulus returned by utils.sgr_kernels.G0):
+      G' here weights trap energies by rho(E)=exp(-E) alone, so every trap
+      is frozen once omega*tau_E >> 1 regardless of x, giving an
+      x-independent asymptote. G0(x) is used elsewhere in this codebase as
+      an x-dependent elastic-modulus scale factor (e.g. the short-time
+      limit of relaxation/creep/startup) -- do not assume Gp's high-freq
+      limit equals G0(x); they are not the same quantity as currently
+      implemented.
     - For x < 1: Solid-like with yield stress
     - For x >= 2: Newtonian with G' ~ omega^2, G'' ~ omega
     - Numerical integration uses adaptive quadrature
@@ -454,13 +463,26 @@ def Gp(x: "float | Array", omega_tau0: "float | Array") -> "tuple[Array, Array]"
 @jax.jit
 def Z(x: float, omega_tau0: "float | Array") -> "float | Array":
     """
-    Partition function for SGR model normalization.
+    Auxiliary normalization integral for the exponential trap distribution.
 
-    Computes the normalization integral:
-        Z(x, omega) = integral_0^inf rho(E) * exp(-E/x) dE
+    Computes:
+        Z(x) = integral_0^inf rho(E) * exp(-E/x) dE = x / (x + 1)
 
-    For exponential trap distribution rho(E) = exp(-E), this simplifies to:
-        Z(x) = x / (x + 1)
+    IMPORTANT -- this is NOT the Sollich 1998 equilibrium partition function.
+    The physically correct SGR equilibrium partition function weights traps
+    by the inverse-hopping-rate Boltzmann factor exp(+E/x) (deeper traps
+    hop out more slowly and are therefore more heavily populated at steady
+    state), giving Z_Sollich(x) = integral rho(E)*exp(E/x) dE = x/(x-1),
+    finite only for x > 1 and diverging as x -> 1+ (the mathematical
+    signature of the SGR glass transition). The exp(-E/x) formula computed
+    here is smooth and finite for all x > 0 and does NOT reproduce that
+    divergence, so it cannot be used as the SGR equilibrium partition
+    function or to normalize an equilibrium trap-occupation distribution.
+
+    This function is not currently called by SGRConventional or SGRGeneric
+    (confirmed dead code) and is kept only for the frequency-independence
+    behavior tested against it; do not wire it into equilibrium-occupation
+    weighting expecting Sollich's Z(x) = x/(x-1).
 
     Parameters
     ----------
@@ -473,7 +495,7 @@ def Z(x: float, omega_tau0: "float | Array") -> "float | Array":
     Returns
     -------
     float or jnp.ndarray
-        Partition function Z(x) (dimensionless)
+        Z(x) = x / (x + 1) (dimensionless)
 
     Examples
     --------
@@ -489,15 +511,14 @@ def Z(x: float, omega_tau0: "float | Array") -> "float | Array":
 
     Notes
     -----
-    - For exponential trap distribution: Z(x) = x / (x + 1)
-    - Z → 0 as x → 0 (deeply glassy, all traps occupied)
-    - Z → 1 as x → ∞ (high temperature, traps unoccupied)
+    - Z(x) = x / (x + 1), bounded in [0, 1) for all x > 0
+    - Z → 0 as x → 0, Z → 1 as x → ∞
+    - Does NOT diverge at x=1 and therefore does NOT capture the SGR glass
+      transition (see docstring above); not the Sollich partition function
     - In equilibrium SGR, Z is frequency-independent
-    - Required for proper probability normalization in GENERIC formulation
     """
     x_safe = jnp.maximum(x, 1e-10)
 
-    # Analytical formula for exponential distribution
     # Z = integral_0^inf exp(-E) * exp(-E/x) dE
     #   = integral_0^inf exp(-E(1 + 1/x)) dE
     #   = 1 / (1 + 1/x)

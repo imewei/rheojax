@@ -36,7 +36,7 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
-from rheojax.models.itt_mct._kernels import f12_memory, strain_decorrelation
+from rheojax.models.itt_mct._kernels import strain_decorrelation
 
 jax, jnp = safe_import_jax()
 
@@ -111,30 +111,26 @@ def make_flow_curve_vector_field(
 
         State: [Phi, K_1, ..., K_n, gamma_accumulated]
         """
-        # Unpack state
+        # Unpack state (gamma_accumulated not needed in this RHS: the
+        # memory-kernel double-count fix removed its only consumer, the
+        # strain-decorrelated advected correlator used for m(Phi))
         phi = state[0]
         K = state[1 : 1 + n_modes]
-        gamma_acc = state[1 + n_modes]
+        _gamma_acc = state[1 + n_modes]
 
-        # Unpack parameters
+        # Unpack parameters (v1, v2 kept on FlowCurveParams for API
+        # compatibility with the scipy-based _kernels.py call sites; the
+        # standard/fixed-kernel Prony form used here does not consume them)
         gamma_dot = args.gamma_dot
-        v1 = args.v1
-        v2 = args.v2
         Gamma = args.Gamma
         gamma_c = args.gamma_c
         g = args.g
         tau = args.tau
 
-        # Strain decorrelation (use_lorentzian captured from closure)
-        h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
-
-        # Advected correlator
-        phi_advected = phi * h_gamma
-
-        # Memory kernel
-        m_phi = f12_memory(phi_advected, v1, v2)
-
-        # Memory integral from Prony modes
+        # Memory integral from Prony modes: g, tau are Prony-fit to the m(t)
+        # time series itself (prony_decompose_memory), so the
+        # standard/fixed-kernel Prony form applies below (no extra m(Phi)
+        # factor -- matches the scipy-based _kernels.py fix).
         memory_integral = jnp.sum(K)
 
         # MCT equation: dPhi/dt = -Gamma * (Phi + memory_integral)
@@ -145,10 +141,10 @@ def make_flow_curve_vector_field(
             # Full two-time: mode-specific decorrelation
             gamma_mode = gamma_dot * tau
             h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-            dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+            dK_dt = -K / tau + g * h_mode * dphi_dt
         else:
             # Simplified: standard schematic
-            dK_dt = -K / tau + g * m_phi * dphi_dt
+            dK_dt = -K / tau + g * dphi_dt
 
         # Strain accumulation
         dgamma_dt = gamma_dot
@@ -296,26 +292,26 @@ def make_flow_curve_with_stress_vector_field(
         gamma_acc = state[1 + n_modes]
         # sigma_integral = state[2 + n_modes]  # Not needed in RHS
 
-        # Unpack parameters
+        # Unpack parameters (v1, v2 kept on FlowCurveParams for API
+        # compatibility with the scipy-based _kernels.py call sites; the
+        # standard/fixed-kernel Prony form used here does not consume them)
         gamma_dot = args.gamma_dot
-        v1 = args.v1
-        v2 = args.v2
         Gamma = args.Gamma
         gamma_c = args.gamma_c
         G_inf = args.G_inf
         g = args.g
         tau = args.tau
 
-        # Strain decorrelation (use_lorentzian captured from closure)
+        # Strain decorrelation (use_lorentzian captured from closure); the
+        # advected correlator is still needed below for the stress integrand,
+        # independent of the (now-removed) memory-kernel m(Phi) factor.
         h_gamma = strain_decorrelation(gamma_acc, gamma_c, use_lorentzian)
-
-        # Advected correlator
         phi_advected = phi * h_gamma
 
-        # Memory kernel
-        m_phi = f12_memory(phi_advected, v1, v2)
-
-        # Memory integral from Prony modes
+        # Memory integral from Prony modes: g, tau are Prony-fit to the m(t)
+        # time series itself (prony_decompose_memory), so the
+        # standard/fixed-kernel Prony form applies below (no extra m(Phi)
+        # factor -- matches the scipy-based _kernels.py fix).
         memory_integral = jnp.sum(K)
 
         # MCT equation
@@ -325,9 +321,9 @@ def make_flow_curve_with_stress_vector_field(
         if use_full_memory:
             gamma_mode = gamma_dot * tau
             h_mode = strain_decorrelation(gamma_mode, gamma_c, use_lorentzian)
-            dK_dt = -K / tau + g * m_phi * h_mode * dphi_dt
+            dK_dt = -K / tau + g * h_mode * dphi_dt
         else:
-            dK_dt = -K / tau + g * m_phi * dphi_dt
+            dK_dt = -K / tau + g * dphi_dt
 
         # Strain accumulation
         dgamma_dt = gamma_dot

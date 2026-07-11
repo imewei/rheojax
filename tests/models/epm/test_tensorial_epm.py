@@ -571,9 +571,9 @@ def test_tensorial_epm_overstress_matches_analytical_hb_flow_curve():
     rate. Uses n_fluid=2 (HB exponent 1/2) as the reference case.
 
     Analytical derivation (see tensor.py:_run_flow_curve warm-start comment):
-        σ_xy = σ_c/√3 + (1/√3) * (√3/2)^(1/n) * σ_c^((n-1)/n) * (γ̇·τ_pl)^(1/n)
-    The factor of 2 comes from the tensorial strain-rate convention
-    dσ_xy/dt = μγ̇ − 2μ·ε̇^p_xy ⇒ ε̇^p_xy = γ̇/2 at steady state.
+        σ_xy = σ_c/√3 + (1/√3) * √3^(1/n) * σ_c^((n-1)/n) * (γ̇·τ_pl)^(1/n)
+    This uses the scalar-EPM-consistent strain-rate convention
+    dσ_xy/dt = μγ̇ − μ·ε̇^p_xy ⇒ ε̇^p_xy = γ̇ at steady state.
     """
     import numpy as _np
 
@@ -597,10 +597,10 @@ def test_tensorial_epm_overstress_matches_analytical_hb_flow_curve():
 
     # Analytical expected values for n_fluid=2, σ_c=1, τ_pl_shear=1:
     sqrt3 = _np.sqrt(3.0)
-    expected = 1.0 / sqrt3 + (1.0 / sqrt3) * (sqrt3 / 2.0) ** (1.0 / 2.0) * (
+    expected = 1.0 / sqrt3 + (1.0 / sqrt3) * sqrt3 ** (1.0 / 2.0) * (
         gdot * 1.0
     ) ** (1.0 / 2.0)
-    # Expected ≈ [0.7474, 1.1146, 2.2764]
+    # Expected ≈ [0.8176, 1.3372, 2.9800]
 
     _np.testing.assert_allclose(
         sigma_xy_meas,

@@ -7,12 +7,12 @@ relaxation at long times, typical of polymer melts and concentrated solutions.
 Mathematical Description:
     Relaxation Modulus: G(t) = G_m E_{α,1}(-(t/τ_α)^α) = G_m E_α(-(t/τ_α)^α)
     Complex Modulus: G*(ω) = G_m (iωτ_α)^α / (1 + (iωτ_α)^α)
-    Creep Compliance: J(t) = (1/G_m) + (t^α)/(G_m τ_α^α) E_{α,1+α}(-(t/τ_α)^α)
+    Creep Compliance: J(t) = 1/G_m + t^α / (G_m τ_α^α Γ(1+α))
 
 Parameters:
     Gm (float): Maxwell modulus (Pa), bounds [1e-3, 1e9]
     alpha (float): Power-law exponent, bounds [0.0, 1.0]
-    tau_alpha (float): Relaxation time (s^α), bounds [1e-6, 1e6]
+    tau_alpha (float): Relaxation time (s), bounds [1e-6, 1e6]
 
 Test Modes: Relaxation, Creep, Oscillation
 
@@ -113,7 +113,7 @@ class FractionalMaxwellLiquid(BaseModel):
             name="tau_alpha",
             value=1.0,
             bounds=(1e-6, 1e6),
-            units="s^α",
+            units="s",
             description="Relaxation time",
         )
 

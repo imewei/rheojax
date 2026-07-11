@@ -124,7 +124,13 @@ class SGRConventional(BaseModel):
         - Float64 precision critical for numerical stability near x=1
     """
 
-    flow_quantity = "stress"
+    # NOTE: SGRConventional's FLOW_CURVE/steady_shear protocol returns
+    # viscosity eta(gamma_dot), not stress (see _predict_steady_shear_jit),
+    # unlike SGRGeneric which returns stress sigma(gamma_dot) for the same
+    # protocol. flow_quantity is set to match what is actually returned so
+    # fitting/GUI pipelines that branch on flow_quantity treat the two SGR
+    # models correctly instead of assuming they are interchangeable.
+    flow_quantity = "viscosity"
 
     def __init__(self, dynamic_x: bool = False):
         """Initialize SGR Conventional Model.
@@ -1127,6 +1133,7 @@ class SGRConventional(BaseModel):
 
     # NOTE: SGR FLOW_CURVE returns steady-state viscosity eta(gamma_dot), not stress sigma.
     # This is the physically meaningful SGR quantity. For stress, multiply by gamma_dot.
+    # (flow_quantity = "viscosity" reflects this; see class attribute above.)
 
     @staticmethod
     @jax.jit
@@ -1141,7 +1148,11 @@ class SGRConventional(BaseModel):
         Computes viscosity as function of shear rate:
             eta ~ gamma_dot^(x-2) for 1 < x < 2 (shear-thinning)
             eta = const for x >= 2 (Newtonian)
-            sigma_y > 0 for x < 1 (yield stress, glass phase)
+            eta = sigma_y(1 + (gamma_dot*tau0)^(1-x)) / gamma_dot for x < 1
+                (finite yield stress sigma_y, glass phase -- eta itself still
+                diverges as gamma_dot -> 0, as expected for a yield-stress
+                fluid, but the underlying stress sigma = eta*gamma_dot
+                saturates instead of diverging)
 
         Args:
             gamma_dot: Shear rate array (1/s)
@@ -1155,12 +1166,19 @@ class SGRConventional(BaseModel):
         Notes:
             - Shear-thinning exponent: x - 2
             - Uses relationship: eta ~ G0 * tau0 * (gamma_dot * tau0)^(x-2)
+            - Glass phase (x < 1) branch mirrors SGRGeneric's
+              _predict_steady_shear_jit stress formula (sigma_glass =
+              sigma_y*(1+(gamma_dot*tau0)^(1-x))), converted to viscosity
+              via eta = sigma/gamma_dot so the implied stress saturates
+              instead of diverging as gamma_dot -> 0.
         """
         # Dimensionless shear rate
         gamma_dot_scaled = gamma_dot * tau0
 
         epsilon = 1e-12
         gamma_dot_safe = jnp.maximum(gamma_dot_scaled, epsilon)
+        # Safe physical (non-dimensionless) shear rate for eta = sigma/gamma_dot
+        gamma_dot_phys_safe = gamma_dot_safe / tau0
 
         # Compute equilibrium modulus factor
         G0_dim = G0(x)
@@ -1168,12 +1186,19 @@ class SGRConventional(BaseModel):
         # Viscosity power-law exponent
         visc_exp = x - 2.0
 
-        # Viscosity formula
-        # eta = G0_scale * tau0 * G0_dim * (gamma_dot * tau0)^(x-2)
+        # Fluid branch (x >= 1): eta = G0_scale * tau0 * G0_dim * (gamma_dot * tau0)^(x-2)
         # For x = 2: eta = const (Newtonian)
         # For x < 2: eta decreases with gamma_dot (shear-thinning)
+        eta_fluid = G0_scale * tau0 * G0_dim * jnp.power(gamma_dot_safe, visc_exp)
 
-        eta = G0_scale * tau0 * G0_dim * jnp.power(gamma_dot_safe, visc_exp)
+        # Glass branch (x < 1): finite yield stress sigma_y = G0_scale*G0_dim,
+        # sigma_glass = sigma_y * (1 + (gamma_dot*tau0)^(1-x)), converted to
+        # viscosity eta = sigma_glass / gamma_dot.
+        sigma_y = G0_scale * G0_dim
+        sigma_glass = sigma_y * (1.0 + jnp.power(gamma_dot_safe, 1.0 - x))
+        eta_glass = sigma_glass / gamma_dot_phys_safe
+
+        eta = jnp.where(x < 1.0, eta_glass, eta_fluid)
 
         return eta
 
@@ -1535,13 +1560,16 @@ class SGRConventional(BaseModel):
         """JIT-compiled evolution equation for dx/dt.
 
         The effective temperature x evolves according to:
-            dx/dt = -alpha_aging * (x - x_eq) + beta_rejuv * gamma_dot * (x_ss - x)
+            dx/dt = -alpha_aging * (x - x_eq) + beta_rejuv * |gamma_dot| * (x_ss - x)
 
         Terms:
         - Aging term: -alpha_aging * (x - x_eq)
           Drives x toward equilibrium x_eq at rest (gamma_dot = 0)
-        - Rejuvenation term: beta_rejuv * gamma_dot * (x_ss - x)
-          Shear-induced increase in x toward steady-state x_ss
+        - Rejuvenation term: beta_rejuv * |gamma_dot| * (x_ss - x)
+          Shear-induced increase in x toward steady-state x_ss. Uses the
+          magnitude of gamma_dot (like x_ss itself, see _compute_x_ss) so
+          that reversing the shear direction still rejuvenates the material
+          instead of flipping the term's sign into anti-rejuvenation.
 
         Args:
             x: Current effective temperature
@@ -1557,8 +1585,10 @@ class SGRConventional(BaseModel):
         # Aging term (drives x -> x_eq)
         aging = -alpha_aging * (x - x_eq)
 
-        # Rejuvenation term (shear drives x -> x_ss)
-        rejuvenation = beta_rejuv * gamma_dot * (x_ss - x)
+        # Rejuvenation term (shear drives x -> x_ss). Use |gamma_dot| so that
+        # shearing in either direction rejuvenates (matches x_ss itself,
+        # which is direction-independent -- see _compute_x_ss).
+        rejuvenation = beta_rejuv * jnp.abs(gamma_dot) * (x_ss - x)
 
         return aging + rejuvenation
 
@@ -1869,8 +1899,16 @@ class SGRConventional(BaseModel):
         # Large strains can cause local yielding events in SGR
         # Approximate this by adding strain-softening at large |gamma|
         if gamma_0 > 0.1:  # Only for larger amplitudes
-            # Strain-softening factor: reduces stress at high strains
-            softening = 1.0 - 0.1 * (np.abs(strain) / gamma_0) ** 2
+            # Strain-softening factor: proportional to strain^2 (not
+            # strain^2/gamma_0^2 = sin^2(omega*t), which was independent of
+            # amplitude and so gave the same I3/I1 for any gamma_0 above
+            # this gate -- a violation of the requirement that nonlinear
+            # harmonics scale with amplitude). Using strain directly makes
+            # softening ~ gamma_0^2 within the gated (large-amplitude) regime.
+            # Clamp to non-negative: unclamped, this goes negative (and
+            # inverts/amplifies the stress) for |strain| > sqrt(10) ~= 3.16,
+            # well within common LAOS amplitude ranges.
+            softening = np.maximum(1.0 - 0.1 * strain**2, 0.0)
             stress = stress * softening
 
         return strain, stress

@@ -621,7 +621,13 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             )
         else:
             tau_y = tau_y0
-        alpha = jnp.clip(1.0 - tau_y / (jnp.abs(sigma_applied) + 1e-20), 0.0, 1.0)
+        # Reuse the same softplus-smoothed alpha as saramito_nonlocal_pde_rhs
+        # (alpha_local); a hard clip disagrees with the PDE's own smooth alpha
+        # within the ~1% softplus window around yield, so the strain computed
+        # here would not match the strain rate implied by f_avg's evolution.
+        raw_alpha = 1.0 - tau_y / (jnp.abs(sigma_applied) + 1e-20)
+        alpha_scale = 0.01
+        alpha = jnp.clip(alpha_scale * jax.nn.softplus(raw_alpha / alpha_scale), 0.0, 1.0)
 
         # Elastic jump: γ_e(0) = σ₀/G — always present in Maxwell-Saramito creep.
         # Without this, below-yield (α=0) gives γ=0 instead of the correct σ/G.

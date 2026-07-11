@@ -11,11 +11,12 @@ associations:
 
 - Each Rouse mode k has a natural relaxation time τ_R_k
 - Sticker association imposes a lifetime τ_s (the sticker lifetime)
-- Effective mode relaxation: τ_eff_k = max(τ_R_k, τ_s)
+- Effective mode relaxation: τ_eff_k = τ_R_k + τ_s (additive shift, per
+  Leibler-Rubinstein-Colby 1991)
 
-This creates a characteristic plateau in G(t) at intermediate times when
-τ_s dominates mode relaxation. Fast modes (τ_R_k < τ_s) are slowed by
-sticker lifetime, while slow modes (τ_R_k > τ_s) relax at their natural rate.
+This creates a characteristic slowdown in G(t) at intermediate times when
+τ_s dominates mode relaxation. Fast modes (τ_R_k << τ_s) are shifted toward
+τ_s, while slow modes (τ_R_k >> τ_s) relax close to their natural rate.
 
 The model is essentially a multi-mode Maxwell with mode-dependent effective
 relaxation times constrained by sticker kinetics.
@@ -27,9 +28,9 @@ Associative polymers include:
 - Supramolecular polymers with hydrogen bonds
 - Hydrogels with multiple crosslink types
 
-The sticker lifetime τ_s sets a minimum relaxation time floor. Rouse modes
-faster than sticker opening cannot fully relax — they are frozen by sticker
-association until breakage events allow chain rearrangement.
+The sticker lifetime τ_s adds a minimum relaxation time increment to every
+mode. Rouse modes faster than sticker opening (τ_R_k << τ_s) are shifted up
+toward τ_s, while slow modes (τ_R_k >> τ_s) are only weakly perturbed.
 
 Mathematical Framework
 ----------------------
@@ -37,7 +38,7 @@ Multi-mode Maxwell constitutive equation for each mode k::
 
     dS_k/dt = L·S_k + S_k·L^T + (1/τ_eff_k)·I - (1/τ_eff_k)·S_k
 
-where τ_eff_k = max(τ_R_k, τ_s).
+where τ_eff_k = τ_R_k + τ_s (additive).
 
 Total stress is the sum over all modes plus solvent contribution::
 
@@ -129,11 +130,11 @@ _MISSING = object()
 class TNTStickyRouse(TNTBase):
     """Sticky Rouse model for associative polymers.
 
-    Multi-mode Maxwell model where sticker dynamics impose a relaxation time
-    floor: τ_eff_k = max(τ_R_k, τ_s).
+    Multi-mode Maxwell model where sticker dynamics shift each mode's
+    relaxation time additively: τ_eff_k = τ_R_k + τ_s.
 
-    Creates a plateau in G(t) at intermediate times (sticker-dominated regime)
-    before terminal relaxation (slowest Rouse mode).
+    Creates a slowdown in G(t) at intermediate times (sticker-dominated
+    regime) before terminal relaxation (slowest Rouse mode).
 
     Parameters
     ----------

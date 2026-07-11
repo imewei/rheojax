@@ -87,8 +87,13 @@ class GiesekusBase(BaseModel):
     - α = 0: No shear-thinning (UCM limit)
     - α = 0.5: Maximum shear-thinning
 
-    The diagnostic ratio N₂/N₁ = -α/2 provides a direct experimental
-    route to determine α from normal stress measurements.
+    In the zero-shear (Wi → 0) limit only, N₂/N₁ → -α/2, giving an
+    approximate experimental route to determine α from normal stress
+    measurements taken at low shear rate. At finite/high Wi the true
+    ratio deviates strongly toward zero (see
+    ``giesekus_steady_normal_stresses`` for the exact, Wi-dependent
+    calculation) and -α/2 should not be used to back out α from data
+    taken at appreciable shear rates.
     """
 
     def __init__(self):
@@ -276,19 +281,26 @@ class GiesekusBase(BaseModel):
     # =========================================================================
 
     def get_normal_stress_ratio(self) -> float:
-        """Get theoretical N₂/N₁ ratio.
+        """Get zero-shear-limit N₂/N₁ ratio.
 
         For the Giesekus model, the ratio of second to first normal
-        stress difference is exactly::
+        stress difference approaches, in the zero-shear (Wi → 0)
+        limit only::
 
-            N₂/N₁ = -α/2
+            N₂/N₁ → -α/2
 
-        This provides a direct experimental route to determine α.
+        This limit provides an approximate route to determine α from
+        normal stress measurements taken at low shear rate. At
+        finite/high Wi the true ratio deviates strongly toward zero,
+        so this constant value must NOT be used to interpret data
+        taken at any appreciable shear rate. For the exact,
+        Wi-dependent ratio, compute N1/N2 directly from
+        ``giesekus_steady_normal_stresses`` at the Wi of interest.
 
         Returns
         -------
         float
-            N₂/N₁ ratio (negative, between -0.25 and 0)
+            Zero-shear-limit N₂/N₁ ratio (negative, between -0.25 and 0)
         """
         return -self.alpha / 2.0
 
@@ -476,20 +488,23 @@ class GiesekusBase(BaseModel):
             # No thinning observed, estimate from highest rate
             lambda_est = 0.1 / gamma_dot[-1]
 
-        # Estimate α from degree of shear-thinning
-        # At high Wi: η/η₀ ≈ 1/(α·Wi) for α > 0
-        if len(gamma_dot) > 3:
-            # Use slope in log-log space at high rates
-            log_gd = np.log(np.maximum(gamma_dot[-3:], 1e-30))
-            log_eta = np.log(np.maximum(eta[-3:], 1e-30))
-            dlog_gd = log_gd[-1] - log_gd[0]
-            slope = (
-                (log_eta[-1] - log_eta[0]) / dlog_gd if abs(dlog_gd) > 1e-30 else 0.0
+        # Estimate α from the high-Wi shear-stress plateau.
+        # As Wi → ∞, the Giesekus polymer shear stress saturates to
+        # sigma -> (eta_p/lambda) * sqrt((1-alpha)/alpha) (from the model's
+        # own steady-state equations: s_yy -> -1, then s_xy = Wi*f ->
+        # sqrt((1-alpha)/alpha); NOT the eta_p/(2*alpha*lambda) plateau used
+        # previously, which is only exact at alpha=0.5). Inverting
+        # P = sigma_plateau*lambda/eta_p = sqrt((1-alpha)/alpha) gives
+        # alpha = 1/(P^2+1) = eta_p^2/(sigma_plateau^2*lambda^2+eta_p^2). Use
+        # the highest-rate data point as a proxy for that plateau.
+        sigma_plateau_est = eta[-1] * gamma_dot[-1]
+        if sigma_plateau_est > 1e-30 and lambda_est > 1e-30:
+            alpha_est = np.clip(
+                eta_0_est**2
+                / (sigma_plateau_est**2 * lambda_est**2 + eta_0_est**2),
+                0.0,
+                0.5,
             )
-            # Power-law index n ≈ 1 + slope, and n relates to α
-            # For Giesekus: n → 0.5 as Wi → ∞, so α ≈ (1-2n)/2
-            n_est = max(0.1, min(1.0, 1.0 + slope))
-            alpha_est = np.clip((1.0 - 2.0 * n_est) / 2.0, 0.0, 0.5)
         else:
             alpha_est = 0.3  # Default
 
@@ -564,13 +579,18 @@ class GiesekusBase(BaseModel):
             return jnp.zeros(4, dtype=jnp.float64)
 
         elif protocol == "relaxation" and gamma_dot is not None:
-            # Start from steady state at given shear rate
+            # Start from steady state at given shear rate. Pass eta_s=0.0
+            # (matching single_mode.py's _simulate_relaxation_internal /
+            # simulate_relaxation): the relaxation ODE only evolves the
+            # polymer stress, and the solvent contribution eta_s*gamma_dot
+            # vanishes instantly at cessation of flow, so it must not be
+            # baked into this initial condition.
             from rheojax.models.giesekus._kernels import (
                 giesekus_steady_stress_components,
             )
 
             tau_xx, tau_yy, tau_xy, tau_zz = giesekus_steady_stress_components(
-                gamma_dot, self.eta_p, self.lambda_1, self.alpha, self.eta_s
+                gamma_dot, self.eta_p, self.lambda_1, self.alpha, 0.0
             )
             return jnp.array([tau_xx, tau_yy, tau_xy, tau_zz], dtype=jnp.float64)
 

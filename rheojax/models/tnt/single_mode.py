@@ -130,7 +130,7 @@ class TNTSingleMode(TNTBase):
         - "constant": β = 1/τ_b (Tanaka-Edwards, UCM-like)
         - "bell": β = (1/τ_b)·exp(ν·(stretch-1)) (force-dependent)
         - "power_law": β = (1/τ_b)·stretch^m
-        - "stretch_creation": β = (1/τ_b), g₀ = (1+κ·stretch)/τ_b
+        - "stretch_creation": β = (1/τ_b), g₀ = (1+κ·(stretch-1))/τ_b
     stress_type : str, default "linear"
         Stress formula:
         - "linear": σ = G·(S - I) (Gaussian chains)
@@ -432,7 +432,7 @@ class TNTSingleMode(TNTBase):
         if self._stress_type == "fene":
             tr_S = S_xx + S_yy + S_zz
             L2 = vp["L_max"] * vp["L_max"]
-            f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+            f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
             sigma_el = G * f * S_xy
         else:
             sigma_el = G * S_xy
@@ -761,7 +761,7 @@ class TNTSingleMode(TNTBase):
             if is_fene:
                 tr_S = S_final[0] + S_final[1] + S_final[2]
                 L2 = vp["L_max"] * vp["L_max"]
-                f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+                f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
                 sigma_el = G * f * S_final[3]
             else:
                 sigma_el = G * S_final[3]
@@ -885,7 +885,7 @@ class TNTSingleMode(TNTBase):
             if self._stress_type == "fene":
                 tr_S = S_ss[:, 0] + S_ss[:, 1] + S_ss[:, 2]
                 L2 = vp["L_max"] ** 2
-                f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+                f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
                 N1 = self.G * f * (S_ss[:, 0] - S_ss[:, 1])
             else:
                 N1 = self.G * (S_ss[:, 0] - S_ss[:, 1])
@@ -959,7 +959,7 @@ class TNTSingleMode(TNTBase):
         if self._stress_type == "fene":
             tr_S = S_ss[:, 0] + S_ss[:, 1] + S_ss[:, 2]
             L2 = vp["L_max"] ** 2
-            f = L2 / jnp.maximum(L2 - tr_S, 1e-10)
+            f = (L2 - 3.0) / jnp.maximum(L2 - tr_S, 1e-10)
             N1 = self.G * f * (S_ss[:, 0] - S_ss[:, 1])
             N2 = self.G * f * (S_ss[:, 1] - S_ss[:, 2])
         else:
@@ -1694,7 +1694,7 @@ class TNTSingleMode(TNTBase):
                     + np.asarray(sol.ys[:, 1])
                     + np.asarray(sol.ys[:, 2])
                 )
-                f_pet = L2 / np.maximum(L2 - tr_S, 1e-10)
+                f_pet = (L2 - 3.0) / np.maximum(L2 - tr_S, 1e-10)
                 sigma_elastic = self.G * f_pet * S_xy
             else:
                 sigma_elastic = self.G * S_xy

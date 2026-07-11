@@ -6,14 +6,14 @@ Local (0D) and Nonlocal (1D) Saramito EVP models.
 Key Features
 ------------
 - Tensorial stress state: [τ_xx, τ_yy, τ_xy] for normal stress predictions
-- Fluidity-dependent relaxation: λ = 1/f
+- Fluidity-dependent relaxation: λ = 1/(G*f)
 - Optional dynamic yield stress: τ_y(f) = τ_y0 + a_y/f^m
 - Herschel-Bulkley plastic flow: σ = τ_y + K*γ̇^n
 
 Coupling Modes
 --------------
-- "minimal": Only λ = 1/f, τ_y = τ_y0 (constant)
-- "full": λ = 1/f + τ_y(f) increases as structure ages
+- "minimal": Only λ = 1/(G*f), τ_y = τ_y0 (constant)
+- "full": λ = 1/(G*f) + τ_y(f) increases as structure ages
 
 References
 ----------
@@ -45,7 +45,7 @@ class FluiditySaramitoBase(BaseModel):
     trajectory storage for Local (0D) and Nonlocal (1D) variants.
 
     The Saramito model describes elastoviscoplastic materials through:
-    1. Upper-convected Maxwell viscoelasticity with λ = 1/f
+    1. Upper-convected Maxwell viscoelasticity with λ = 1/(G*f)
     2. Von Mises yield criterion with Herschel-Bulkley plastic flow
     3. Thixotropic fluidity evolution (aging + rejuvenation)
 
@@ -166,12 +166,15 @@ class FluiditySaramitoBase(BaseModel):
             description="Aging timescale (structural build-up)",
         )
 
+        # b is only truly dimensionless when n_rej == 1; for general n_rej
+        # the units are s^(n_rej-1) so that b*|driving|^n_rej matches
+        # df/dt's units of 1/(Pa*s^2).
         self.parameters.add(
             name="b",
             value=1.0,
             bounds=(0.0, 1e3),
-            units="dimensionless",
-            description="Rejuvenation amplitude",
+            units="s^(n_rej-1)",
+            description="Rejuvenation amplitude (dimensionless only at n_rej=1)",
         )
 
         self.parameters.add(
@@ -191,7 +194,7 @@ class FluiditySaramitoBase(BaseModel):
                 name="tau_y_coupling",
                 value=1.0,
                 bounds=(0.0, 1e4),
-                units="Pa·(Pa·s)^m",
+                units="Pa·(Pa·s)^(-m)",
                 description="Yield stress fluidity coupling coefficient",
             )
 

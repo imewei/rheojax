@@ -165,6 +165,30 @@ class TestVLBNonlocalHomogeneous:
         # Interior points should be ~0, boundaries may differ due to BC
         np.testing.assert_allclose(np.asarray(lap_lin[1:-1]), 0.0, atol=1.0)
 
+    def test_neumann_bc_boundary_laplacian_matches_analytical(self):
+        """Boundary Laplacian must match the analytical Neumann-consistent
+        value, not half of it (regression test for ghost-point mirroring).
+
+        f(y) = cos(pi*y/H) satisfies df/dy=0 at y=0 and y=H exactly, so the
+        Neumann ghost-point scheme should be exact there (up to O(dy^2)
+        truncation), including at the two boundary points themselves.
+        """
+        from rheojax.models.vlb._kernels import laplacian_1d_neumann_vlb
+
+        n = 101
+        H = 1.0
+        dy = H / (n - 1)
+        y = jnp.linspace(0.0, H, n)
+        k = np.pi / H
+        field = jnp.cos(k * y)
+
+        lap = np.asarray(laplacian_1d_neumann_vlb(field, dy))
+        analytical = -(k**2) * np.asarray(jnp.cos(k * y))
+
+        # A halved boundary Laplacian (the bug) would be off by ~50%;
+        # require agreement well inside that at both edges and interior.
+        np.testing.assert_allclose(lap, analytical, atol=2e-2, rtol=2e-2)
+
 
 # =============================================================================
 # Banding Tests (Bell breakage required)

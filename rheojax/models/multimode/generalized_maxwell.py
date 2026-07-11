@@ -83,7 +83,7 @@ class GeneralizedMaxwell(BaseModel):
         E"(ω) = Σᵢ Eᵢ (ωτᵢ)/(1+(ωτᵢ)²)
 
     **Creep mode (numerical simulation):**
-        J(t) = ε(t)/σ₀ via backward-Euler integration
+        J(t) = ε(t)/σ₀ via exact exponential (recursive Prony) integration
 
     **Performance Optimization (v0.4.0+):**
 
@@ -635,9 +635,6 @@ class GeneralizedMaxwell(BaseModel):
         X_jax = jnp.asarray(X)
         y_jax = jnp.asarray(y)
 
-        # Compute data-based upper bound for moduli
-        E_max = float(jnp.max(jnp.abs(y_jax)) * 10)
-
         # Select JIT prediction function based on test mode
         # All prediction functions use E_i[:, None] broadcasting or jnp.sum(E_i * ...),
         # so E_i=0 for inactive modes naturally contributes zero.
@@ -702,6 +699,13 @@ class GeneralizedMaxwell(BaseModel):
             E_i = [self.parameters.get_value(f"{symbol}_{i + 1}") for i in range(n_max)]
             tau_i = [self.parameters.get_value(f"tau_{i + 1}") for i in range(n_max)]
             current_params = np.array([E_inf] + E_i + tau_i)
+
+        # Compute data-based upper bound for moduli. `current_params` already
+        # holds the moduli (E_inf, E_i in Pa) from the initial N_max fit for
+        # every test_mode -- unlike `y`, which is in creep-compliance (Pa^-1)
+        # or startup-viscosity (Pa*s) units depending on test_mode and would
+        # silently clamp the moduli to the wrong order of magnitude.
+        E_max = float(np.max(np.abs(current_params[: 1 + n_max])) * 10)
 
         # Iterative N reduction with padded arrays
         fit_results: dict = {}
@@ -1158,7 +1162,10 @@ class GeneralizedMaxwell(BaseModel):
             J_t: Creep compliance array
             optimization_factor: R² threshold multiplier for element minimization
             initial_params: Optional initial parameter guess for warm-start
-                Shape: (2*n_modes + 1,) [J_0, J_1...J_N, tau_1...tau_N]
+                Shape: (2*n_modes + 1,) [E_inf, E_1...E_N, tau_1...tau_N]
+                (moduli, Pa -- same contract as every other ``_fit_*_mode``;
+                the objective always unpacks params[0] as E_inf and
+                params[1:1+n_modes] as E_i, never compliances)
                 If None, uses default heuristic initialization
             **kwargs: NLSQ optimizer arguments
         """
@@ -1189,6 +1196,24 @@ class GeneralizedMaxwell(BaseModel):
         J_0 = jnp.maximum(jnp.min(J_t), 1e-12)  # Initial compliance, clamped positive
         J_inf = jnp.maximum(jnp.max(J_t), 1e-12)  # Final compliance, clamped positive
 
+        # Derive tau range from the actual time data so master curves spanning
+        # many decades are fittable. Previously hardcoded to logspace(-2, 2),
+        # which silently truncated any t-range outside [0.01, 100] s (same
+        # fix as _fit_relaxation_mode/_fit_oscillation_mode).
+        t_np = np.asarray(t)
+        t_pos = t_np[t_np > 0]
+        if t_pos.size > 0:
+            log_t_lo = float(np.log10(t_pos.min()))
+            log_t_hi = float(np.log10(t_pos.max()))
+        else:
+            log_t_lo, log_t_hi = -2.0, 2.0
+        tau_lo_bound = max(10.0 ** (log_t_lo - 2.0), 1e-30)
+        tau_hi_bound = 10.0 ** (log_t_hi + 2.0)
+        if self._n_modes == 1:
+            tau_i_guess = jnp.array([10.0 ** (0.5 * (log_t_lo + log_t_hi))])
+        else:
+            tau_i_guess = jnp.logspace(log_t_lo, log_t_hi, self._n_modes)
+
         # Initial parameter guess (warm-start if provided, else default heuristic)
         if initial_params is not None:
             x0 = jnp.asarray(initial_params)
@@ -1202,7 +1227,6 @@ class GeneralizedMaxwell(BaseModel):
             E_sum_guess = max(E_total_guess - E_inf_guess, 1e-12)
 
             E_i_guess = jnp.full(self._n_modes, E_sum_guess / self._n_modes)
-            tau_i_guess = jnp.logspace(-2, 2, self._n_modes)
 
             x0 = jnp.concatenate(
                 [jnp.array([max(E_inf_guess, 1e-12)]), E_i_guess, tau_i_guess]
@@ -1213,7 +1237,7 @@ class GeneralizedMaxwell(BaseModel):
             [
                 jnp.array([0.0]),
                 jnp.full(self._n_modes, 1e-12),
-                jnp.full(self._n_modes, 1e-6),
+                jnp.full(self._n_modes, tau_lo_bound),
             ]
         )
         modulus_names = [f"{symbol}_inf"] + [
@@ -1230,7 +1254,7 @@ class GeneralizedMaxwell(BaseModel):
         bounds_upper = jnp.concatenate(
             [
                 jnp.minimum(data_modulus_upper, registered_modulus_upper),
-                jnp.full(self._n_modes, 1e6),
+                jnp.full(self._n_modes, tau_hi_bound),
             ]
         )
 
@@ -1501,7 +1525,7 @@ class GeneralizedMaxwell(BaseModel):
         tau_i: jnp_typing.ndarray,
         sigma_0: float = 1.0,
     ) -> jnp_typing.ndarray:
-        """JIT-compiled creep prediction via backward-Euler.
+        """JIT-compiled creep prediction via exact exponential integration.
 
         Args:
             t: Time array
@@ -1513,7 +1537,9 @@ class GeneralizedMaxwell(BaseModel):
         Returns:
             Creep compliance J(t)
         """
-        # Backward-Euler scheme for unconditional stability
+        # Exact exponential (recursive/analytic Prony) update, unconditionally
+        # stable for any step size since each mode's decay is integrated
+        # analytically over the step rather than finite-differenced.
         # GMM ODEs: dσᵢ/dt = -σᵢ/τᵢ + Eᵢ dε/dt
         # Total stress: σ = E_∞ ε + Σᵢ σᵢ
         # Apply step stress σ₀, solve for ε(t), compute J(t) = ε(t)/σ₀
@@ -1527,7 +1553,7 @@ class GeneralizedMaxwell(BaseModel):
         # Time step (assume uniform spacing for now, handle variable later)
         dt = jnp.diff(t, prepend=0.0)
 
-        # Backward-Euler update loop
+        # Exact exponential (recursive/analytic Prony) update loop
         def update_step(carry, inputs):
             """Update internal variables and strain."""
             eps_prev, sig_i_prev = carry
@@ -1536,12 +1562,12 @@ class GeneralizedMaxwell(BaseModel):
             # Protect against zero dt at first step
             dt_safe = jnp.maximum(dt_curr, 1e-12)
 
-            # Solve for new strain from total stress balance
-            # σ₀ = E_∞ εⁿ⁺¹ + Σᵢ σᵢⁿ⁺¹
-            # σᵢⁿ⁺¹ = (σᵢⁿ + Eᵢ Δε) / (1 + Δt/τᵢ)
-            # Substitute and solve for Δε
+            # Solve for new strain from total stress balance using the exact
+            # per-step exponential decay of each Maxwell mode (not a finite
+            # difference): σᵢⁿ⁺¹ = σᵢⁿ exp(-Δt/τᵢ) + Eᵢτᵢ(1-exp(-Δt/τᵢ)) Δε/Δt
+            # Substitute into σ₀ = E_∞ εⁿ⁺¹ + Σᵢ σᵢⁿ⁺¹ and solve for Δε
 
-            # Coefficients for backward-Euler
+            # Coefficients for the exact exponential update
             alpha_i = jnp.exp(-dt_safe / tau_i)  # Exact exponential integration
             beta_i = E_i * tau_i * (1 - alpha_i) / dt_safe
 
@@ -1993,6 +2019,14 @@ class GeneralizedMaxwell(BaseModel):
         """JIT-compiled zero-shear viscosity calculation.
 
         η₀ = Σᵢ Gᵢτᵢ
+
+        Valid only when E_inf == 0 (no equilibrium modulus). If E_inf > 0 the
+        model is a viscoelastic solid: under an imposed constant shear rate
+        its stress grows without bound (see ``_predict_startup_jit``'s
+        ``E_inf * t`` term) and no finite steady-state viscosity exists. This
+        formula deliberately omits that divergent contribution and is only
+        meaningful for the E_inf == 0 (liquid-like) limit; callers must check
+        E_inf themselves (see ``_predict_steady_shear``).
         """
         eta_0 = jnp.sum(E_i * tau_i)
         return eta_0
@@ -2005,6 +2039,14 @@ class GeneralizedMaxwell(BaseModel):
 
         Returns:
             Viscosity array (constant η₀ for all shear rates)
+
+        Warns:
+            UserWarning: If G_inf > 0. A generalized Maxwell solid with a
+                nonzero equilibrium modulus has no finite steady-shear
+                viscosity (stress grows unboundedly under constant shear
+                rate); the returned η₀ = ΣGᵢτᵢ omits the divergent G_inf
+                contribution and only applies to the liquid-like (G_inf=0)
+                limit.
         """
         symbol = "G"
 
@@ -2018,6 +2060,16 @@ class GeneralizedMaxwell(BaseModel):
         tau_i = jnp.array(
             [self.parameters.get_value(f"tau_{i + 1}") for i in range(self._n_modes)]
         )
+
+        if float(E_inf) > 0.0:
+            warnings.warn(
+                "GeneralizedMaxwell: steady-shear/flow-curve prediction requested "
+                f"with G_inf={float(E_inf):.6g} > 0. A viscoelastic solid has no "
+                "finite steady-state viscosity under constant shear rate; the "
+                "returned η₀ = ΣGᵢτᵢ omits the divergent G_inf contribution.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         eta_0 = self._predict_steady_shear_jit(E_inf, E_i, tau_i)
 
@@ -2074,6 +2126,24 @@ class GeneralizedMaxwell(BaseModel):
             )
             return eta_plus_pred - eta_plus
 
+        # Derive tau range from the actual time data so master curves spanning
+        # many decades are fittable. Previously hardcoded to logspace(-2, 2),
+        # which silently truncated any t-range outside [0.01, 100] s (same
+        # fix as _fit_relaxation_mode/_fit_oscillation_mode/_fit_creep_mode).
+        t_np = np.asarray(t)
+        t_pos = t_np[t_np > 0]
+        if t_pos.size > 0:
+            log_t_lo = float(np.log10(t_pos.min()))
+            log_t_hi = float(np.log10(t_pos.max()))
+        else:
+            log_t_lo, log_t_hi = -2.0, 2.0
+        tau_lo_bound = max(10.0 ** (log_t_lo - 2.0), 1e-30)
+        tau_hi_bound = 10.0 ** (log_t_hi + 2.0)
+        if self._n_modes == 1:
+            tau_i_guess = jnp.array([10.0 ** (0.5 * (log_t_lo + log_t_hi))])
+        else:
+            tau_i_guess = jnp.logspace(log_t_lo, log_t_hi, self._n_modes)
+
         # Initial guess from relaxation behavior
         # Use initial_params if provided (for warm-start in element minimization)
         initial_params = kwargs.get("initial_params", None)
@@ -2082,7 +2152,6 @@ class GeneralizedMaxwell(BaseModel):
         else:
             eta_inf = np.max(eta_plus)  # Long-time viscosity
             E_i_guess = jnp.full(self._n_modes, eta_inf / self._n_modes / 1.0)
-            tau_i_guess = jnp.logspace(-2, 2, self._n_modes)
             x0 = jnp.concatenate([jnp.array([0.0]), E_i_guess, tau_i_guess])
 
         # Bounds
@@ -2090,14 +2159,14 @@ class GeneralizedMaxwell(BaseModel):
             [
                 jnp.array([0.0]),
                 jnp.full(self._n_modes, 1e-12),
-                jnp.full(self._n_modes, 1e-6),
+                jnp.full(self._n_modes, tau_lo_bound),
             ]
         )
         bounds_upper = jnp.concatenate(
             [
                 jnp.array([np.max(eta_plus) * 10]),
                 jnp.full(self._n_modes, np.max(eta_plus) * 10),
-                jnp.full(self._n_modes, 1e6),
+                jnp.full(self._n_modes, tau_hi_bound),
             ]
         )
 

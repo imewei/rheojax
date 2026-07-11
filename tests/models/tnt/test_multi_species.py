@@ -466,11 +466,13 @@ class TestRelaxationSimulation:
         sigma = model.simulate_relaxation(t, gamma_dot_preshear=gamma_dot_pre)
 
         # Analytical: σ(t) = Σ σ₀_i·exp(-t/τ_b_i)
-        # σ₀_i = G_i·τ_b_i·γ̇ / (1 + (τ_b_i·γ̇)²)
+        # σ₀_i = G_i·τ_b_i·γ̇ (linear UCM steady-state stress per mode,
+        # matching this model's own constant-breakage steady conformation
+        # S_xy_i = Wi_i with no saturating denominator)
         wi_0 = tau_b_0 * gamma_dot_pre
         wi_1 = tau_b_1 * gamma_dot_pre
-        sigma_0_mode_0 = G_0 * wi_0 / (1.0 + wi_0**2)
-        sigma_0_mode_1 = G_1 * wi_1 / (1.0 + wi_1**2)
+        sigma_0_mode_0 = G_0 * wi_0
+        sigma_0_mode_1 = G_1 * wi_1
 
         expected = sigma_0_mode_0 * np.exp(-t / tau_b_0) + sigma_0_mode_1 * np.exp(
             -t / tau_b_1

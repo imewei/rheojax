@@ -242,9 +242,20 @@ def fluidity_evolution_saramito(
     aging_rate = (f_age - f_safe) / t_a
 
     # Rejuvenation: flow-induced increase toward f_flow
-    # Floor at 1e-6 (not 1e-20) to prevent gradient explosion for n_rej < 1
-    driving_abs = jnp.maximum(jnp.abs(driving_rate), 1e-6)
-    rejuv_rate = b * jnp.power(driving_abs, n_rej) * (f_flow - f_safe)
+    # Gate to exactly zero at rest (driving_rate == 0): for n_rej < 1,
+    # a naive floor like max(|driving|, 1e-6) would leave a spurious
+    # rejuvenation contribution b*(1e-6)^n_rej*(f_flow-f) even at rest
+    # (e.g. (1e-6)^0.1 ~ 0.25, ~25% of a full rejuvenation term).
+    # Using a safe base of 1.0 in the discarded branch keeps d/dx(x^n_rej)
+    # finite (avoids the gradient blow-up at x=0 for n_rej<1) while the
+    # jnp.where zeroes out the term exactly when driving_rate == 0.
+    driving_abs = jnp.abs(driving_rate)
+    driving_safe = jnp.where(driving_abs > 0.0, driving_abs, 1.0)
+    rejuv_rate = jnp.where(
+        driving_abs > 0.0,
+        b * jnp.power(driving_safe, n_rej) * (f_flow - f_safe),
+        0.0,
+    )
 
     df_dt = aging_rate + rejuv_rate
 
@@ -276,7 +287,7 @@ def yield_stress_from_fluidity(
     Args:
         f: Current fluidity (1/(Pa·s))
         tau_y0: Base yield stress (Pa) - minimum value
-        tau_y_coupling: Yield stress coupling coefficient (Pa / (1/(Pa·s))^m)
+        tau_y_coupling: Yield stress coupling coefficient (Pa·(Pa·s)^(-m))
         m_yield: Yield stress fluidity exponent (dimensionless)
 
     Returns:
@@ -354,23 +365,23 @@ def saramito_local_ode_rhs(
     λ(dτ/dt - L·τ - τ·L^T) + α(τ)τ = 2η_p D
 
     where:
-    - λ = 1/f (fluidity-dependent relaxation time)
+    - λ = 1/(G*f) (fluidity-dependent relaxation time)
     - α = max(0, 1 - τ_y/|τ|) (Von Mises plasticity)
-    - η_p = G*λ = G/f (polymeric viscosity)
+    - η_p = G*λ = 1/f (polymeric viscosity)
     - D = 0.5*(L + L^T) (rate of deformation, D_xy = γ̇/2)
 
     Rearranging for dτ/dt:
     dτ/dt = L·τ + τ·L^T + (2η_p D - α*τ) / λ
-          = L·τ + τ·L^T + (2G D - α*f*τ)
-          = L·τ + τ·L^T + G*γ̇*δ_xy - α*f*τ  (for shear)
+          = L·τ + τ·L^T + (2G D - α*G*f*τ)
+          = L·τ + τ·L^T + G*γ̇*δ_xy - α*G*f*τ  (for shear)
 
     Component equations (simple shear, D_xy = γ̇/2):
-    dτ_xx/dt = 2γ̇τ_xy - αfτ_xx
-    dτ_yy/dt = -αfτ_yy
-    dτ_xy/dt = γ̇τ_yy + Gγ̇ - αfτ_xy
+    dτ_xx/dt = 2γ̇τ_xy - αGfτ_xx
+    dτ_yy/dt = -αGfτ_yy
+    dτ_xy/dt = γ̇τ_yy + Gγ̇ - αGfτ_xy
 
-    Note: The Gγ̇ term comes from 2η_p*D_xy/λ = 2*(G/f)*(γ̇/2)/λ = G*γ̇
-    when λ = 1/f (so λ/f = 1).
+    Note: The Gγ̇ term comes from 2η_p*D_xy/λ = 2*(1/f)*(γ̇/2)/λ = G*γ̇
+    when λ = 1/(G*f) (so η_p/λ = G).
 
     Args:
         t: Time (s)
@@ -379,7 +390,7 @@ def saramito_local_ode_rhs(
             - gamma_dot: Applied shear rate (1/s)
             - G: Elastic modulus (Pa)
             - tau_y0: Base yield stress (Pa)
-            - tau_y_coupling: Yield stress coupling (Pa/(1/(Pa·s))^m)
+            - tau_y_coupling: Yield stress coupling (Pa·(Pa·s)^(-m))
             - m_yield: Yield stress exponent
             - f_age: Aging fluidity (1/(Pa·s))
             - f_flow: Flow fluidity (1/(Pa·s))
@@ -425,12 +436,12 @@ def saramito_local_ode_rhs(
     conv_xx, conv_yy, conv_xy = upper_convected_2d(tau_xx, tau_yy, tau_xy, gamma_dot)
 
     # 3. Stress evolution (Saramito equations)
-    # dτ/dt = L·τ + τ·L^T + G*γ̇*δ - α*f*τ
+    # dτ/dt = L·τ + τ·L^T + G*γ̇*δ - α*G*f*τ
     # δ_xy = 1 for shear stress (actually the rate contribution is Gγ̇)
 
-    d_tau_xx = conv_xx - alpha * f_safe * tau_xx
-    d_tau_yy = conv_yy - alpha * f_safe * tau_yy
-    d_tau_xy = conv_xy + G * gamma_dot - alpha * f_safe * tau_xy
+    d_tau_xx = conv_xx - alpha * G * f_safe * tau_xx
+    d_tau_yy = conv_yy - alpha * G * f_safe * tau_yy
+    d_tau_xy = conv_xy + G * gamma_dot - alpha * G * f_safe * tau_xy
 
     # 4. Fluidity evolution
     # For rate-controlled: driving = |γ̇|
@@ -472,7 +483,7 @@ def saramito_local_creep_ode_rhs(
             - sigma_applied: Applied stress (Pa)
             - G: Elastic modulus (Pa)
             - tau_y0: Base yield stress (Pa)
-            - tau_y_coupling: Yield stress coupling (Pa/(1/(Pa·s))^m)
+            - tau_y_coupling: Yield stress coupling (Pa·(Pa·s)^(-m))
             - m_yield: Yield stress exponent
             - f_age: Aging fluidity (1/(Pa·s))
             - f_flow: Flow fluidity (1/(Pa·s))
@@ -546,7 +557,7 @@ def saramito_local_relaxation_ode_rhs(
     State vector: y = [τ_xx, τ_yy, τ_xy, f]
 
     After step strain (γ̇ = 0), stress relaxes via:
-    dτ/dt = -α*f*τ (no convective terms, no elastic loading)
+    dτ/dt = -α*G*f*τ (no convective terms, no elastic loading)
 
     If stress falls below yield: α → 0, stress freezes (solid-like)
     If stress stays above yield: continues to relax (viscoplastic)
@@ -566,6 +577,7 @@ def saramito_local_relaxation_ode_rhs(
     f = y[3]
 
     # Get parameters
+    G = args["G"]
     tau_y0 = args["tau_y0"]
     f_age = args["f_age"]
     f_flow = args["f_flow"]
@@ -587,9 +599,9 @@ def saramito_local_relaxation_ode_rhs(
     alpha = saramito_plasticity_alpha(tau_xx, tau_yy, tau_xy, tau_y)
 
     # Stress evolution with γ̇ = 0 (no convective terms, no elastic loading)
-    d_tau_xx = -alpha * f_safe * tau_xx
-    d_tau_yy = -alpha * f_safe * tau_yy
-    d_tau_xy = -alpha * f_safe * tau_xy
+    d_tau_xx = -alpha * G * f_safe * tau_xx
+    d_tau_yy = -alpha * G * f_safe * tau_yy
+    d_tau_xy = -alpha * G * f_safe * tau_xy
 
     # Fluidity evolution with γ̇ = 0 (pure aging)
     # But there's still plastic flow if α > 0, so driving = |τ|*f*α ~ stress decay rate
@@ -629,8 +641,15 @@ def _saramito_flow_curve_steady_minimal(
     # Constant yield stress
     tau_y = tau_y0
 
-    # Herschel-Bulkley flow curve + Newtonian solvent contribution
-    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB) + eta_s * gamma_dot_abs
+    # Herschel-Bulkley flow curve + Newtonian solvent contribution.
+    # Gate the power-law term to exactly zero at γ̇=0 so σ(0)=τ_y exactly;
+    # otherwise K_HB*(eps)^n_HB is not negligible for small n_HB (shear-thinning).
+    gamma_dot_is_flowing = jnp.abs(gamma_dot) > 0.0
+    gamma_dot_hb_safe = jnp.where(gamma_dot_is_flowing, gamma_dot_abs, 1.0)
+    flow_term = jnp.where(
+        gamma_dot_is_flowing, K_HB * jnp.power(gamma_dot_hb_safe, n_HB), 0.0
+    )
+    sigma_HB = tau_y + flow_term + eta_s * gamma_dot_abs
     sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
@@ -663,8 +682,15 @@ def _saramito_flow_curve_steady_full(
     # Full coupling: yield stress depends on fluidity
     tau_y = tau_y0 + tau_y_coupling / jnp.power(f_ss + 1e-20, m_yield)
 
-    # Herschel-Bulkley flow curve + Newtonian solvent contribution
-    sigma_HB = tau_y + K_HB * jnp.power(gamma_dot_abs, n_HB) + eta_s * gamma_dot_abs
+    # Herschel-Bulkley flow curve + Newtonian solvent contribution.
+    # Gate the power-law term to exactly zero at γ̇=0 so σ(0)=τ_y exactly;
+    # otherwise K_HB*(eps)^n_HB is not negligible for small n_HB (shear-thinning).
+    gamma_dot_is_flowing = jnp.abs(gamma_dot) > 0.0
+    gamma_dot_hb_safe = jnp.where(gamma_dot_is_flowing, gamma_dot_abs, 1.0)
+    flow_term = jnp.where(
+        gamma_dot_is_flowing, K_HB * jnp.power(gamma_dot_hb_safe, n_HB), 0.0
+    )
+    sigma_HB = tau_y + flow_term + eta_s * gamma_dot_abs
     sigma_ss = sigma_HB * jnp.where(gamma_dot >= 0, 1.0, -1.0)
 
     return sigma_ss
@@ -765,7 +791,7 @@ def saramito_steady_state_full(
     to the elastic nature of the material.
 
     For upper-convected Maxwell at steady shear:
-    N₁ = 2 * λ * γ̇ * τ_xy  (where λ = 1/f)
+    N₁ = 2 * λ * γ̇ * τ_xy  (where λ = 1/(G*f))
 
     Args:
         gamma_dot: Shear rate array (1/s)
@@ -812,12 +838,12 @@ def saramito_steady_state_full(
     denominator = 1.0 / t_a + flow_term
     f_ss = numerator / (denominator + 1e-20)
 
-    # Relaxation time λ = 1/f
-    lam = 1.0 / f_ss
+    # Relaxation time λ = 1/(G*f)
+    lam = 1.0 / (G * f_ss)
 
     # First normal stress from UCM steady shear:
-    # At steady state: 2γ̇τ_xy = α*f*τ_xx
-    # So τ_xx = 2γ̇τ_xy / (α*f) ≈ 2*λ*γ̇*τ_xy (for α ≈ 1)
+    # At steady state: 2γ̇τ_xy = α*G*f*τ_xx
+    # So τ_xx = 2γ̇τ_xy / (α*G*f) ≈ 2*λ*γ̇*τ_xy (for α ≈ 1)
     tau_xx = 2.0 * lam * gamma_dot * tau_xy
 
     # First normal stress difference
@@ -934,7 +960,7 @@ def saramito_nonlocal_pde_rhs(
     # Bulk stress evolution (average over gap) with Von Mises yield
     # Mode flag: 0=rate-controlled, 1=stress-controlled (creep pins stress)
     mode_flag = args.get("mode_flag", 0)
-    d_tau_bulk_rate = G * gamma_dot - alpha_bulk * f_avg * tau_xy_bulk
+    d_tau_bulk_rate = G * gamma_dot - alpha_bulk * G * f_avg * tau_xy_bulk
     d_tau_bulk = jnp.where(mode_flag == 1, 0.0, d_tau_bulk_rate)
 
     # Local yield stress (may depend on local fluidity)

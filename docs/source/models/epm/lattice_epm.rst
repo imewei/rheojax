@@ -187,7 +187,7 @@ In 2D Fourier space, the propagator has characteristic **quadrupolar symmetry** 
 
 .. math::
 
-    \tilde{\mathcal{G}}(\mathbf{q}) = -4 \mu \frac{q_x^2 q_y^2}{(q_x^2 + q_y^2)^2} \quad \text{for } \mathbf{q} \neq 0
+    \tilde{\mathcal{G}}(\mathbf{q}) = -2 \mu \frac{q_x^2 q_y^2}{(q_x^2 + q_y^2)^2} \quad \text{for } \mathbf{q} \neq 0
 
 .. note::
 

@@ -184,13 +184,19 @@ def solve_fractional_lambda_explicit(
 ) -> jnp.ndarray:
     """Solve for λ_{n+1} using explicit predictor-corrector for fractional ODE.
 
-    Uses Adams-Bashforth-Moulton predictor-corrector adapted for fractional ODEs.
+    Uses a first-order fractional (product-integration) explicit Euler step
+    for D^α λ = f(λ, γ̇ᵖ):
 
-    For simplicity, we use a first-order approximation:
-        λ_{n+1} ≈ λ_n + dt^α · Γ(1+α) · f(λ_n, γ̇ᵖ_n) + O(dt^{2α})
+        λ_{n+1} ≈ λ_n + dt^α/Γ(1+α) · (f(λ_n, γ̇ᵖ_n) - memory_correction)
+            + O(dt^{2α})
 
-    This maintains the fractional scaling while being explicit and stable
-    for small dt.
+    NOTE (bug fix): this previously *multiplied* by Γ(1+α) instead of
+    dividing -- a reciprocal error (e.g. at α=0.5, Γ(1.5)≈0.886 vs the
+    correct 1/Γ(1.5)≈1.128, a ~27% leading-order error). The memory
+    correction is now normalized by the same Γ(1+α) factor as the
+    current-step term (previously it used a different, incompatible
+    Γ(2-α) normalization inherited from the L1 derivative-matching scheme
+    used by ``solve_fractional_lambda_implicit``).
 
     Args:
         lam_n: Current structure parameter.
@@ -211,7 +217,11 @@ def solve_fractional_lambda_explicit(
     # RHS at current state
     f_n = fractional_structure_rhs(lam_n, gamma_dot_p_abs, tau_thix, Gamma)
 
-    # Memory correction from history
+    gamma_1_plus_alpha = jax.scipy.special.gamma(1.0 + alpha)
+    dt_alpha = jnp.power(dt_safe, alpha)
+
+    # Memory correction from history (normalized by the same Γ(1+α) factor
+    # as the current-step term below, for a self-consistent scheme).
     # NOTE: ndim/shape checks are static under JIT (see comment in implicit solver)
     if lam_history.ndim == 0 or lam_history.shape[0] < 2:
         memory_correction = 0.0
@@ -224,23 +234,16 @@ def solve_fractional_lambda_explicit(
         diffs = full_history[1:] - full_history[:-1]
         diffs_reversed = jnp.flip(diffs, axis=0)
 
-        gamma_factor = jax.scipy.special.gamma(2.0 - alpha)
-        dt_alpha = jnp.power(dt_safe, alpha)
-
         # Past contribution (memory term)
         if len(b_trunc) > 1:
-            memory_correction = jnp.dot(b_trunc[1:], diffs_reversed[1:]) / (
-                gamma_factor * dt_alpha
-            )
+            memory_correction = jnp.dot(b_trunc[1:], diffs_reversed[1:]) / gamma_1_plus_alpha
         else:
             memory_correction = 0.0
 
-    # Explicit update with fractional scaling
-    gamma_1_plus_alpha = jax.scipy.special.gamma(1.0 + alpha)
-    dt_alpha = jnp.power(dt_safe, alpha)
-
+    # Explicit update with fractional scaling: divide (not multiply) by
+    # Γ(1+α) -- see docstring note.
     # For dt ≈ 0, no update (keep initial value)
-    update = dt_alpha * gamma_1_plus_alpha * (f_n - memory_correction)
+    update = (dt_alpha / gamma_1_plus_alpha) * (f_n - memory_correction)
     lam_next = jnp.where(dt > 1e-14, lam_n + update, lam_n)
 
     # Clip to valid range
@@ -295,6 +298,7 @@ def fikh_return_step_isothermal(
     tau_thix = params.get("tau_thix", 1.0)
     Gamma_thix = params.get("Gamma", 0.5)
     eta_inf = params.get("eta_inf", 0.0)
+    mu_p = params.get("mu_p", 1e-3)
     Q_iso = params.get("Q_iso", 0.0)
     b_iso = params.get("b_iso", 1.0)
 
@@ -327,8 +331,13 @@ def fikh_return_step_isothermal(
         gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
     )
 
-    # Denominator for plastic multiplier
-    denom = G + C - af_term
+    # Denominator for plastic multiplier. The mu_p/dt term is a
+    # backward-Euler discretization of the Perzyna viscoplastic overstress
+    # resistance mu_p*gamma_dot_p (see _make_fikh_maxwell_ode_rhs), so the
+    # return-mapping's steady-shear asymptote sigma_y_ss + (mu_p+eta_inf)*
+    # |gamma_dot| matches fikh_flow_curve_steady_state (F-confirmed-4)
+    # instead of silently dropping mu_p's contribution.
+    denom = G + C - af_term + mu_p / dt_safe
     denom_safe = jnp.maximum(denom, G / 10.0)
 
     # Plastic multiplier
@@ -443,6 +452,7 @@ def fikh_return_step_thermal(
     tau_thix = params.get("tau_thix", 1.0)
     Gamma_thix = params.get("Gamma", 0.5)
     eta_inf = params.get("eta_inf", 0.0)
+    mu_p = params.get("mu_p", 1e-3)
 
     # Thermal parameters
     T_ref = params.get("T_ref", 298.15)
@@ -457,11 +467,15 @@ def fikh_return_step_thermal(
     # Temperature-dependent viscosity
     eta_T = arrhenius_viscosity(eta, T_n, T_ref, E_a)
 
-    # Temperature and structure dependent yield stress
-    # Structure effect is already in sigma_y_base via delta_sigma_y * lam_n;
-    # pass lam=1.0 to thermal_yield_stress to avoid double-λ (F-007)
-    sigma_y_base = sigma_y0 + delta_sigma_y * lam_n
-    sigma_y_current = thermal_yield_stress(sigma_y_base, 1.0, m_y, T_n, T_ref, E_y)
+    # Temperature and structure dependent yield stress, matching the
+    # documented equation (fikh.py):
+    #   sigma_y = sigma_y0 + delta_sigma_y * lambda^m_y * exp(E_y/R*(1/T-1/T_ref))
+    # sigma_y0 is temperature/structure independent; only the structural
+    # (delta_sigma_y) contribution carries the lambda^m_y and Arrhenius
+    # factors (thermal_yield_stress(base, lam, m_y, ...) = base*lam^m_y*exp(...)).
+    sigma_y_current = sigma_y0 + thermal_yield_stress(
+        delta_sigma_y, lam_n, m_y, T_n, T_ref, E_y
+    )
 
     # Shear rate
     dt_safe = jnp.maximum(dt, 1e-15)
@@ -489,7 +503,10 @@ def fikh_return_step_thermal(
         gamma_dyn * jnp.power(jnp.maximum(alpha_abs, 1e-10), m - 1) * sign_xi * alpha_n
     )
 
-    denom = G + C - af_term
+    # mu_p/dt: backward-Euler Perzyna viscoplastic overstress resistance,
+    # matching the ODE path's mu_p and fikh_flow_curve_steady_state's
+    # eta_eff = mu_p + eta_inf (F-confirmed-4).
+    denom = G + C - af_term + mu_p / dt_safe
     denom_safe = jnp.maximum(denom, G / 10.0)
 
     d_gamma_p = macaulay(f_yield) / denom_safe
@@ -622,9 +639,14 @@ def _make_fikh_maxwell_ode_rhs(include_thermal: bool):
         # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
         eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-        # Yield stress — pass lam=1.0 to avoid double-λ (F-007)
+        # Yield stress, matching the documented equation (fikh.py):
+        #   sigma_y = sigma_y0 + delta_sigma_y * lambda^m_y * exp(E_y/R*(1/T-1/T_ref))
+        # sigma_y0 is temperature/structure independent; only the structural
+        # term carries lambda^m_y and the Arrhenius factor.
         sigma_y_base = sigma_y0 + delta_sigma_y * lam
-        sigma_y_thermal = thermal_yield_stress(sigma_y_base, 1.0, m_y, T, T_ref, E_y)
+        sigma_y_thermal = sigma_y0 + thermal_yield_stress(
+            delta_sigma_y, lam, m_y, T, T_ref, E_y
+        )
         sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
         # Effective stress
@@ -713,9 +735,14 @@ def _make_fikh_creep_ode_rhs(include_thermal: bool):
         # arrhenius(eta, T_ref, T_ref, E_a) = eta * exp(0) = eta (exact when isothermal)
         eta_T = arrhenius_viscosity(eta, T, T_ref, E_a)
 
-        # Yield stress — pass lam=1.0 to avoid double-λ (F-007)
+        # Yield stress, matching the documented equation (fikh.py):
+        #   sigma_y = sigma_y0 + delta_sigma_y * lambda^m_y * exp(E_y/R*(1/T-1/T_ref))
+        # sigma_y0 is temperature/structure independent; only the structural
+        # term carries lambda^m_y and the Arrhenius factor.
         sigma_y_base = sigma_y0 + delta_sigma_y * lam
-        sigma_y_thermal = thermal_yield_stress(sigma_y_base, 1.0, m_y, T, T_ref, E_y)
+        sigma_y_thermal = sigma_y0 + thermal_yield_stress(
+            delta_sigma_y, lam, m_y, T, T_ref, E_y
+        )
         sigma_y = jnp.where(include_thermal, sigma_y_thermal, sigma_y_base)
 
         # Effective stress

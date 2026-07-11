@@ -124,13 +124,15 @@ class FluidityBase(BaseModel):
             description="Structural relaxation time (aging timescale)",
         )
 
-        # a: Rejuvenation amplitude (dimensionless)
+        # a: Rejuvenation amplitude. Only truly dimensionless when
+        # n_rejuv == 1; for general n_rejuv the units are s^(n_rejuv-1) so
+        # that a*|gamma_dot|^n_rejuv matches df/dt's units of 1/(Pa*s^2).
         self.parameters.add(
             name="a",
             value=1.0,
             bounds=(0.0, 100.0),
-            units="dimensionless",
-            description="Rejuvenation amplitude",
+            units="s^(n_rejuv-1)",
+            description="Rejuvenation amplitude (dimensionless only at n_rejuv=1)",
         )
 
         # n_rejuv: Rejuvenation exponent (dimensionless)

@@ -154,14 +154,18 @@ def chi_evolution_langer2008(
     Returns:
         d(chi)/dt
     """
-    # Plastic work rate
+    # Plastic work rate (signed)
     work_rate = stress * gamma_dot_pl
 
     # Normalized driving force
-    # We use absolute work rate to ensure aging drives to chi_inf correctly
-    # Rate factor kappa * W_pl / sigma_y
-    # c0 handles the scaling
-    rate = jnp.abs(work_rate) / jnp.maximum(c0 * sigma_y, 1e-30)
+    # For Minimal/Standard (m=0), gamma_dot_pl always shares sign with stress,
+    # so work_rate >= 0 already. For Full (m != 0), T(sigma) - m can flip sign
+    # relative to stress (e.g. right after a LAOS stress reversal while m is
+    # still large), making work_rate momentarily negative. That is genuine
+    # negative plastic power, not ordinary dissipation, so it must not drive
+    # chi toward chi_inf as if it were positive — clamp instead of abs().
+    # Rate factor kappa * W_pl / sigma_y; c0 handles the scaling.
+    rate = jnp.maximum(work_rate, 0.0) / jnp.maximum(c0 * sigma_y, 1e-30)
 
     # Evolution
     dchi = rate * (chi_inf - chi)

@@ -147,9 +147,38 @@ class Zener(BaseModel):
             else:
                 raise ValueError(f"Unsupported test mode: {tm}")
 
-        return self._standard_nlsq_fit(
+        result = self._standard_nlsq_fit(
             X, y, model_fn, default_test_mode=TestMode.RELAXATION, **kwargs
         )
+        self._warn_if_flow_curve_undefined(self._test_mode)
+        return result
+
+    def _warn_if_flow_curve_undefined(self, test_mode) -> None:
+        """Warn when rotation/flow_curve is requested with non-negligible Ge.
+
+        Theory: sigma(t) = Ge*gamma_dot*t + (Maxwell transient) has no finite
+        steady state for Ge>0, so _predict_rotation's constant-viscosity
+        result reflects only the Maxwell-branch asymptote (see module and
+        _predict_rotation docstrings). Ge/Gm are not identifiable from such
+        a fit in that regime.
+        """
+        if test_mode not in (TestMode.ROTATION, TestMode.FLOW_CURVE):
+            return
+        Ge = self.parameters.get_value("Ge")
+        Gm = self.parameters.get_value("Gm")
+        if Ge is None or Gm in (None, 0):
+            return
+        if abs(Ge) > 1e-2 * abs(Gm):
+            logger.warning(
+                "Zener rotation/flow_curve mode with non-negligible Ge: no "
+                "finite steady-state stress exists for Ge>0 (Ge accumulates "
+                "Ge*gamma_dot*t without bound); sigma=eta*gamma_dot is only "
+                "the Maxwell-branch asymptote, not the full SLS response, "
+                "and Ge/Gm are not identifiable from this fit.",
+                Ge=Ge,
+                Gm=Gm,
+                ratio=Ge / Gm,
+            )
 
     def _predict(self, X, **kwargs):
         """Predict response based on input data.
@@ -183,6 +212,7 @@ class Zener(BaseModel):
         elif test_mode == TestMode.OSCILLATION:
             return self._predict_oscillation(x_data, Ge, Gm, eta)
         elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
+            self._warn_if_flow_curve_undefined(test_mode)
             return self._predict_rotation(x_data, Ge, Gm, eta)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")

@@ -571,7 +571,12 @@ class TestFlowCurveScipy:
         info = model.get_glass_transition_info()
         G_inf = model.parameters.get_value("G_inf")
         gamma_c = model.parameters.get_value("gamma_c")
-        expected = G_inf * gamma_c * info["f_neq"] ** 2
+        # Gaussian gamma_dot->0+ limit of sigma = G_inf*gamma_dot*int Phi_adv^2 dt
+        # includes the int_0^inf h(x)^2 dx = sqrt(pi)/(2*sqrt(2)) prefactor
+        # (see _predict_flow_curve_diffrax); a bare gamma_c*f_neq^2 would be
+        # discontinuous with the finite-rate branch as gamma_dot -> 0.
+        prefactor = np.sqrt(np.pi) / (2.0 * np.sqrt(2.0))
+        expected = G_inf * gamma_c * info["f_neq"] ** 2 * prefactor
         np.testing.assert_allclose(sigma[0], expected, rtol=1e-6)
 
     def test_flow_curve_microscopic_stress_form(self):

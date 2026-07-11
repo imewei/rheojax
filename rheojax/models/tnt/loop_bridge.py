@@ -109,6 +109,11 @@ def _loop_bridge_ode_rhs(
     where β(stretch) = (1/τ_b)·exp(ν·(stretch - 1))
     and g_0 = 1/τ_b (creation rate).
 
+    Note: at gamma_dot=0, stretch=1 so beta=1/tau_b, giving a true
+    zero-flow fixed point f_B = tau_b/(tau_a+tau_b) for the f_B equation.
+    Callers seed y0 from the independently-fitted f_B_eq parameter rather
+    than this derived value; see TNTLoopBridge.f_B_eq for the distinction.
+
     Parameters
     ----------
     t : float
@@ -447,7 +452,14 @@ class TNTLoopBridge(TNTBase):
             value=0.5,
             bounds=(0.01, 0.99),
             units="dimensionless",
-            description="Equilibrium bridge fraction at rest",
+            description=(
+                "Equilibrium bridge fraction at rest (phenomenological). "
+                "Fit independently of tau_a/tau_b; note the two-state "
+                "kinetics df_B/dt = (1-f_B)/tau_a - f_B*beta(stretch) have "
+                "their own true fixed point tau_b/(tau_a+tau_b) at "
+                "gamma_dot=0, which generally differs from the fitted value "
+                "used here to seed ODE initial conditions."
+            ),
         )
         self.parameters.add(
             name="eta_s",
@@ -604,7 +616,16 @@ class TNTLoopBridge(TNTBase):
 
     @property
     def f_B_eq(self) -> float:
-        """Get equilibrium bridge fraction f_B_eq (dimensionless)."""
+        """Get equilibrium bridge fraction f_B_eq (dimensionless).
+
+        Note: this is an independently fitted, phenomenological value used
+        to seed ODE initial conditions (y0 = [f_B_eq, 1, 1, 1, 0]). The
+        two-state kinetics df_B/dt = (1-f_B)/tau_a - f_B*beta(stretch)
+        mathematically fix the true zero-flow bridge fraction to
+        tau_b/(tau_a+tau_b); f_B_eq only coincides with that value if the
+        fit happens to satisfy it. Treat f_B_eq as approximate, not the
+        model's exact equilibrium.
+        """
         val = self.parameters.get_value("f_B_eq")
         return float(val) if val is not None else 0.0
 
@@ -618,13 +639,20 @@ class TNTLoopBridge(TNTBase):
     def G_eff(self) -> float:
         """Get effective modulus G_eff = f_B_eq·G (Pa).
 
-        This is the linearized modulus at equilibrium.
+        This is the linearized modulus at equilibrium, using the fitted
+        (phenomenological) f_B_eq rather than the kinetics' true fixed
+        point tau_b/(tau_a+tau_b); see the f_B_eq property docstring.
         """
         return self.f_B_eq * self.G
 
     @property
     def eta_0(self) -> float:
-        """Get zero-shear viscosity η₀ = f_B_eq·G·τ_b + η_s (Pa·s)."""
+        """Get zero-shear viscosity η₀ = f_B_eq·G·τ_b + η_s (Pa·s).
+
+        Uses the fitted (phenomenological) f_B_eq; see the f_B_eq property
+        docstring for how this can differ from the ODE's true zero-flow
+        limit.
+        """
         return self.f_B_eq * self.G * self.tau_b + self.eta_s
 
     # =========================================================================
@@ -634,7 +662,10 @@ class TNTLoopBridge(TNTBase):
     def get_equilibrium_state(self) -> jnp.ndarray:
         """Return equilibrium state [f_B_eq, 1, 1, 1, 0].
 
-        At rest: f_B = f_B_eq, S = I (unstretched, isotropic)
+        At rest: f_B = f_B_eq (fitted, phenomenological), S = I (unstretched,
+        isotropic). Note the two-state kinetics' true zero-flow fixed point
+        is tau_b/(tau_a+tau_b), which f_B_eq approximates but does not
+        generally equal; see the f_B_eq property docstring.
 
         Returns
         -------

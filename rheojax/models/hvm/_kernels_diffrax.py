@@ -265,6 +265,34 @@ def _make_relaxation_vector_field(
         else:
             dmu_D_xx, dmu_D_yy, dmu_D_xy = 0.0, 0.0, 0.0
 
+        # Damage evolution (resolved at closure creation time). A step
+        # strain leaves mu_E/mu_D far from their natural/equilibrium
+        # states, so the damage driving term is generally nonzero
+        # immediately after the step and damage must keep accumulating
+        # during relaxation when include_damage=True.
+        if include_damage:
+            G_P = args["G_P"]
+            G_D = args["G_D"]
+            Gamma_0 = args["Gamma_0"]
+            lambda_crit = args["lambda_crit"]
+            D_val = y[10]
+            dD = hvm_damage_rhs(
+                mu_E_xx,
+                mu_E_yy,
+                mu_E_nat_xx,
+                mu_E_nat_yy,
+                mu_D_xx,
+                mu_D_yy,
+                D_val,
+                G_P,
+                G_E,
+                G_D,
+                Gamma_0,
+                lambda_crit,
+            )
+        else:
+            dD = 0.0
+
         return jnp.array(
             [
                 dmu_E_xx,
@@ -276,8 +304,8 @@ def _make_relaxation_vector_field(
                 dmu_D_xx,
                 dmu_D_yy,
                 dmu_D_xy,
-                0.0,
-                0.0,  # dgamma = 0, dD = 0 during relaxation
+                0.0,  # dgamma = 0 during relaxation
+                dD,
             ]
         )
 
@@ -398,6 +426,19 @@ def _make_creep_vector_field(
 
     Uses Python ``if`` for compile-time constants (kinetics, include_*)
     to avoid tracing dead branches during NUTS reverse-mode AD.
+
+    Note (known limitation): this quasi-static feedback law starts from
+    gamma(0) = 0 (see ``_hvm_initial_state``) and only asymptotically
+    drives sigma toward sigma_0; it does *not* apply the instantaneous
+    elastic strain jump gamma(0+) = sigma_0 / G_tot that a standard
+    viscoelastic solid shows under a stress step (correspondence
+    principle, J(0) = 1/G(0) = 1/G_tot). It is therefore not valid at
+    very short times / high frequencies and disagrees at t=0 with the
+    closed-form ``hvm_creep_compliance_linear`` (which does include the
+    instantaneous jump but is otherwise unused elsewhere in this
+    module). Changing this behavior is a deliberate follow-up requiring
+    coordination with ``test_creep_initial_rate_uses_physical_viscosity``,
+    which currently pins gamma(0)=0 and gamma_dot(0)=sigma_0/eta_eff.
     """
     _k_ber_fn = _make_k_ber_fn(kinetics)
 
@@ -722,6 +763,8 @@ def hvm_solve_relaxation(
     args = {**params}
     args.setdefault("G_D", 0.0)
     args.setdefault("k_d_D", 1.0)
+    args.setdefault("Gamma_0", 0.0)
+    args.setdefault("lambda_crit", 10.0)
 
     # TST kinetics (stress/stretch) produce stiff BER rate changes
     return _solve_hvm_ode(t, vf, y0, args, use_stiff_solver=(kinetics != "none"))
@@ -736,6 +779,15 @@ def hvm_solve_creep(
     include_dissociative: bool = True,
 ) -> diffrax.Solution:
     """Solve creep ODE under constant stress.
+
+    Starts from the equilibrium state (gamma=0) and drives gamma_dot via
+    a quasi-static feedback law toward sigma_0; it does not apply the
+    instantaneous elastic strain jump gamma(0+) = sigma_0/G_tot that a
+    real solid shows at t=0 (see ``_make_creep_vector_field`` docstring
+    for the full rationale and the reconciliation note against
+    ``hvm_creep_compliance_linear``). Treat outputs near t=0 as only
+    approximate; they become accurate once bond-exchange/dissociative
+    relaxation dominates.
 
     Parameters
     ----------

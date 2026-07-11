@@ -571,13 +571,16 @@ def steady_stress_herschel_bulkley(
     """
     lam_eq = equilibrium_structure(gamma_dot, a, c)
     gamma_dot_abs = jnp.maximum(jnp.abs(gamma_dot), 1e-12)
+    sign = jnp.sign(gamma_dot)
 
     # Structure-dependent parameters
     tau_y = yield_stress(lam_eq, tau_y0, m1)
     K = consistency(lam_eq, K0, m2)
 
-    # HB stress (without Papanastasiou regularization for steady state)
-    return tau_y + K * jnp.power(gamma_dot_abs, n_flow) + eta_inf * gamma_dot_abs
+    # HB stress (without Papanastasiou regularization for steady state).
+    # Multiply by sign(gamma_dot) so sigma(-gamma_dot) = -sigma(gamma_dot),
+    # matching simple-shear odd symmetry (as steady_stress_exponential does).
+    return sign * (tau_y + K * jnp.power(gamma_dot_abs, n_flow) + eta_inf * gamma_dot_abs)
 
 
 # =============================================================================

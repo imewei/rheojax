@@ -9,13 +9,13 @@ The model parameterizes:
 - G_cage: Apparent cage modulus (elastic response)
 - σ_sy: Static yield stress (stress at strain reversal)
 - σ_dy: Dynamic yield stress (stress at rate reversal)
-- η_inf: Infinite-shear viscosity
+- K_flow: Flow consistency index (Herschel-Bulkley-like coefficient)
 - n: Flow power-law index
 
 For Bayesian inference, the model uses physically-motivated priors:
 - LogNormal for scale parameters (G_cage, stress scales, viscosity)
 - Beta for exponents bounded in [0, 1] or [0, 2]
-- HalfCauchy for noise scale
+- HalfNormal for noise scale
 
 References
 ----------
@@ -82,22 +82,21 @@ class SPPYieldStress(BaseModel):
         Dynamic yield stress scale factor (Pa)
     sigma_dy_exp : float
         Dynamic yield stress exponent for amplitude scaling
-    eta_inf : float
-        Infinite-shear viscosity (Pa·s)
+    K_flow : float
+        Flow consistency index (Pa·s^n_power_law); equals viscosity only when
+        n_power_law == 1
     n_power_law : float
         Power-law flow index (dimensionless)
-    noise : float
-        Observation noise scale (Pa), for Bayesian inference
 
     Constitutive Equations
     ----------------------
     For OSCILLATION (LAOS at amplitude γ_0):
         σ_sy(γ_0) = sigma_sy_scale * γ_0^sigma_sy_exp
         σ_dy(γ_0) = sigma_dy_scale * γ_0^sigma_dy_exp
-        σ_max(γ_0) = G_cage * γ_0 + η_inf * ω * γ_0
+        σ_max(γ_0) = γ_0 * sqrt(G_cage^2 + (K_flow * ω)^2)
 
     For ROTATION (steady shear at rate γ̇):
-        σ(γ̇) = σ_dy + η_inf * γ̇^n_power_law  (Herschel-Bulkley-like)
+        σ(γ̇) = σ_dy + K_flow * γ̇^n_power_law  (Herschel-Bulkley-like)
 
     Test Modes
     ----------
@@ -176,11 +175,12 @@ class SPPYieldStress(BaseModel):
 
         # Flow parameters
         self.parameters.add(
-            name="eta_inf",
+            name="K_flow",
             value=1.0,
             bounds=(1e-9, 1e6),
-            units="Pa·s",
-            description="Infinite-shear viscosity",
+            units="Pa·s^n",
+            description="Flow consistency index (Herschel-Bulkley-like); "
+            "equals viscosity only when n_power_law == 1",
         )
         self.parameters.add(
             name="n_power_law",
@@ -188,15 +188,6 @@ class SPPYieldStress(BaseModel):
             bounds=(0.01, 2.0),
             units="dimensionless",
             description="Flow power-law index",
-        )
-
-        # Noise scale for Bayesian inference
-        self.parameters.add(
-            name="noise",
-            value=1.0,
-            bounds=(1e-10, 1e6),
-            units="Pa",
-            description="Observation noise scale",
         )
 
         # Internal state
@@ -308,22 +299,27 @@ class SPPYieldStress(BaseModel):
             self.parameters.set_value("sigma_dy_scale", scale)
             self.parameters.set_value("sigma_dy_exp", np.clip(exponent, 0.0, 2.0))
 
-        # Estimate cage modulus from low-amplitude linear regime
-        # G_cage ≈ σ_sy / γ_0 at small γ_0
-        low_amp_mask = (gamma_0_array < 0.1 * np.max(gamma_0_array)) & (
-            gamma_0_array > 1e-10
-        )
-        if np.any(low_amp_mask):
-            G_cage_est = np.mean(
-                sigma_array[low_amp_mask]
-                / np.maximum(gamma_0_array[low_amp_mask], 1e-10)
+        # Estimate cage modulus from low-amplitude linear regime.
+        # In the linear low-amplitude limit, sigma_sy -> G'*gamma_0 = G_cage*gamma_0,
+        # so G_cage ~= sigma_sy / gamma_0 at small gamma_0 -- valid only for the
+        # STATIC yield stress. The DYNAMIC yield stress instead tends to
+        # G''*gamma_0 in that limit, which estimates a loss-modulus-like quantity,
+        # not G_cage, so this estimator must not run on the dynamic branch.
+        if yield_type == "static":
+            low_amp_mask = (gamma_0_array < 0.1 * np.max(gamma_0_array)) & (
+                gamma_0_array > 1e-10
             )
-            self.parameters.set_value("G_cage", np.clip(G_cage_est, 1e-3, 1e9))
+            if np.any(low_amp_mask):
+                G_cage_est = np.mean(
+                    sigma_array[low_amp_mask]
+                    / np.maximum(gamma_0_array[low_amp_mask], 1e-10)
+                )
+                self.parameters.set_value("G_cage", np.clip(G_cage_est, 1e-3, 1e9))
 
     def _fit_rotation(self, gamma_dot_array: np.ndarray, sigma_array: np.ndarray):
         """Fit to steady shear flow curve (rotation mode).
 
-        Uses Herschel-Bulkley-like model: σ = σ_dy + η_inf * γ̇^n
+        Uses Herschel-Bulkley-like model: σ = σ_dy + K_flow * γ̇^n
 
         Parameters
         ----------
@@ -370,7 +366,7 @@ class SPPYieldStress(BaseModel):
         self.parameters.set_value("sigma_dy_scale", np.clip(sigma_dy_est, 1e-6, 1e9))
         self.parameters.set_value("sigma_dy_exp", 0.0)  # Not amplitude-dependent
         self.parameters.set_value("n_power_law", np.clip(n_est, 0.01, 2.0))
-        self.parameters.set_value("eta_inf", np.clip(eta_est, 1e-9, 1e6))
+        self.parameters.set_value("K_flow", np.clip(eta_est, 1e-9, 1e6))
 
     def _predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Predict stress using fitted parameters.
@@ -379,6 +375,11 @@ class SPPYieldStress(BaseModel):
         ----------
         X : np.ndarray
             Independent variable (γ_0 for oscillation, γ̇ for rotation)
+        **kwargs : dict
+            Optional ``test_mode`` and/or ``yield_type`` overrides, forwarded
+            to :meth:`model_function` so a caller-requested mode is what
+            actually gets evaluated (rather than silently falling back to
+            ``self._test_mode``/``self._yield_type`` from the last fit).
 
         Returns
         -------
@@ -386,6 +387,10 @@ class SPPYieldStress(BaseModel):
             Predicted stress
         """
         X_jax = jnp.asarray(X, dtype=jnp.float64)
+
+        test_mode = kwargs.pop("test_mode", self._test_mode)
+        if isinstance(test_mode, str):
+            test_mode = TestMode(test_mode.lower())
 
         # Get parameters
         params = jnp.array(
@@ -395,13 +400,12 @@ class SPPYieldStress(BaseModel):
                 self.parameters.get_value("sigma_sy_exp"),
                 self.parameters.get_value("sigma_dy_scale"),
                 self.parameters.get_value("sigma_dy_exp"),
-                self.parameters.get_value("eta_inf"),
+                self.parameters.get_value("K_flow"),
                 self.parameters.get_value("n_power_law"),
-                self.parameters.get_value("noise"),
             ]
         )
 
-        predictions = self.model_function(X_jax, params, self._test_mode)
+        predictions = self.model_function(X_jax, params, test_mode, **kwargs)
         return np.array(predictions)
 
     def model_function(
@@ -424,7 +428,7 @@ class SPPYieldStress(BaseModel):
             - ROTATION: shear rates (gamma_dot)
         params : Array
             [G_cage, sigma_sy_scale, sigma_sy_exp, sigma_dy_scale,
-             sigma_dy_exp, eta_inf, n_power_law, noise]
+             sigma_dy_exp, K_flow, n_power_law]
         test_mode : TestMode, optional
             Mode selector; defaults to the model's stored test_mode.
 
@@ -436,15 +440,13 @@ class SPPYieldStress(BaseModel):
         if test_mode is None:
             test_mode = getattr(self, "_test_mode", TestMode.OSCILLATION)
 
-        # Extract parameters (params[0]=G_cage, params[7]=noise — used by Bayesian)
+        # Extract parameters (params[0]=G_cage is unused by either branch's formula)
         sigma_sy_scale = params[1]
         sigma_sy_exp = params[2]
         sigma_dy_scale = params[3]
         sigma_dy_exp = params[4]
-        eta_inf = params[5]
+        K_flow = params[5]
         n_power_law = params[6]
-        # noise = params[7]  — observation noise; used by BayesianMixin as the last
-        # parameter for the likelihood sigma. Not used directly in model_function predictions.
 
         if test_mode in (TestMode.OSCILLATION, TestMode.LAOS):
             yield_type = kwargs.get(
@@ -458,7 +460,7 @@ class SPPYieldStress(BaseModel):
                 return self._predict_dynamic_yield(X, sigma_dy_scale, sigma_dy_exp)
             return self._predict_oscillation(X, sigma_sy_scale, sigma_sy_exp)
         elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
-            return self._predict_rotation(X, sigma_dy_scale, eta_inf, n_power_law)
+            return self._predict_rotation(X, sigma_dy_scale, K_flow, n_power_law)
         else:
             raise ValueError(f"Unsupported test mode: {test_mode}")
 
@@ -509,12 +511,12 @@ class SPPYieldStress(BaseModel):
     def _predict_rotation(
         gamma_dot: Array,
         sigma_dy: jax.Array | float,
-        eta_inf: jax.Array | float,
+        K_flow: jax.Array | float,
         n_power_law: jax.Array | float,
     ) -> Array:
         """Predict stress for steady shear flow.
 
-        σ(γ̇) = σ_dy + η_inf * |γ̇|^n
+        σ(γ̇) = σ_dy + K_flow * |γ̇|^n
 
         Parameters
         ----------
@@ -522,8 +524,9 @@ class SPPYieldStress(BaseModel):
             Shear rates
         sigma_dy : float
             Dynamic yield stress
-        eta_inf : float
-            Infinite-shear viscosity
+        K_flow : float
+            Flow consistency index (Pa·s^n_power_law); equals viscosity only
+            when n_power_law == 1
         n_power_law : float
             Power-law index
 
@@ -534,7 +537,7 @@ class SPPYieldStress(BaseModel):
         """
         # Herschel-Bulkley-like formulation
         abs_rate = jnp.abs(gamma_dot)
-        sigma = sigma_dy + eta_inf * jnp.power(abs_rate, n_power_law)
+        sigma = sigma_dy + K_flow * jnp.power(abs_rate, n_power_law)
         return sigma
 
     def fit_bayesian(self, X, y=None, **kwargs):
@@ -569,7 +572,7 @@ class SPPYieldStress(BaseModel):
         Uses physically-motivated prior distributions:
         - LogNormal for scale parameters (positive, often log-distributed)
         - Beta for bounded exponents
-        - HalfCauchy for noise scale
+        - HalfNormal for noise scale
 
         Parameters
         ----------
@@ -607,8 +610,8 @@ class SPPYieldStress(BaseModel):
             center = _nlsq_value("sigma_dy_scale", 50.0)
             return dist.LogNormal(loc=jnp.log(center), scale=1.0)
 
-        elif name == "eta_inf":
-            center = _nlsq_value("eta_inf", 1.0)
+        elif name == "K_flow":
+            center = _nlsq_value("K_flow", 1.0)
             return dist.LogNormal(loc=jnp.log(center), scale=1.5)
 
         # Exponent parameters: Beta priors on [0, 2]
@@ -632,9 +635,6 @@ class SPPYieldStress(BaseModel):
                 dist.Beta(2.0, 2.0),
                 dist.transforms.AffineTransform(loc=0.01, scale=1.99),
             )
-
-        elif name == "noise":
-            return dist.HalfNormal(scale=5.0)
 
         # Noise prior for likelihood (overrides default Exponential(10×data_scale))
         elif name == "sigma":
@@ -674,7 +674,8 @@ class SPPYieldStress(BaseModel):
             - gamma_0: strain amplitudes
             - sigma_sy: static yield stresses (if requested)
             - sigma_dy: dynamic yield stresses (if requested)
-            - sigma_max: cage-breaking stress, G_cage * gamma_0 + eta_inf * omega * gamma_0
+            - sigma_max: cage-breaking stress,
+              gamma_0 * sqrt(G_cage**2 + (K_flow * omega)**2)
         """
         gamma_0_jax = jnp.asarray(gamma_0_array, dtype=jnp.float64)
 
@@ -683,7 +684,7 @@ class SPPYieldStress(BaseModel):
         sigma_dy_scale = self.parameters.get_value("sigma_dy_scale")
         sigma_dy_exp = self.parameters.get_value("sigma_dy_exp")
         G_cage = self.parameters.get_value("G_cage")
-        eta_inf = self.parameters.get_value("eta_inf")
+        K_flow = self.parameters.get_value("K_flow")
 
         result = {"gamma_0": gamma_0_array}
 
@@ -696,8 +697,11 @@ class SPPYieldStress(BaseModel):
             result["sigma_dy"] = np.array(sigma_dy)
 
         # Cage-breaking stress (class docstring's Constitutive Equations, OSCILLATION):
-        # sigma_max(gamma_0) = G_cage * gamma_0 + eta_inf * omega * gamma_0
-        sigma_max = G_cage * gamma_0_jax + eta_inf * omega * gamma_0_jax
+        # The elastic (in-phase with strain) and viscous (in-phase with strain-rate,
+        # 90 degrees out of phase) contributions never peak simultaneously for
+        # sinusoidal strain, so their amplitudes combine in quadrature, not linearly:
+        # sigma_max(gamma_0) = gamma_0 * sqrt(G_cage**2 + (K_flow * omega)**2)
+        sigma_max = gamma_0_jax * jnp.sqrt(G_cage**2 + (K_flow * omega) ** 2)
         result["sigma_max"] = np.array(sigma_max)
 
         return result
@@ -724,12 +728,12 @@ class SPPYieldStress(BaseModel):
         gamma_dot_jax = jnp.asarray(gamma_dot_array, dtype=jnp.float64)
 
         sigma_dy = self.parameters.get_value("sigma_dy_scale")
-        eta_inf = self.parameters.get_value("eta_inf")
+        K_flow = self.parameters.get_value("K_flow")
         n = self.parameters.get_value("n_power_law")
 
         # Stress
         abs_rate = jnp.abs(gamma_dot_jax)
-        sigma = sigma_dy + eta_inf * jnp.power(abs_rate, n)
+        sigma = sigma_dy + K_flow * jnp.power(abs_rate, n)
 
         # Apparent viscosity
         eta_app = sigma / jnp.maximum(abs_rate, 1e-10)
@@ -768,7 +772,7 @@ class SPPYieldStress(BaseModel):
         if X is None:
             raise ValueError("rheo_data.x is required for prediction")
         X = np.asarray(X)
-        predictions = self._predict(X)
+        predictions = self._predict(X, test_mode=test_mode)
 
         return RheoData(
             x=np.array(X),

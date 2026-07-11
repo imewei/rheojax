@@ -81,10 +81,16 @@ When a site yields plastically, the stress redistribution couples all components
 .. math::
 
     \boxed{
-    \frac{\partial \sigma_{ij}}{\partial t} = \mu \dot{\gamma} \delta_{ij}
+    \frac{\partial \sigma_{ij}}{\partial t} = \mu \dot{\gamma}_{ij}
     - \frac{\sigma_{ij}}{\tau_{ij}^{pl}} f(\sigma_{eff}, \sigma_c)
     + \sum_{kl} \mathcal{G}_{ij,kl}(\mathbf{q}) \dot{\gamma}^{pl}_{kl}
     }
+
+where :math:`\dot{\gamma}_{ij}` is the imposed macroscopic strain-rate tensor
+(nonzero only for the shear component under simple shear, :math:`\dot{\gamma}_{xy}
+= \dot{\gamma}`, so the loading term only drives :math:`\sigma_{xy}`) — not a
+Kronecker-delta-weighted scalar rate, which would incorrectly load the normal
+components instead.
 
 This is the tensorial extension of the scalar EPM evolution equation (see
 :ref:`Discrete State Variables <epm_model>` in :doc:`lattice_epm`).

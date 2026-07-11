@@ -55,7 +55,9 @@ class Carreau(BaseModel):
 
     Special Cases:
         ``λ`` → 0: Newtonian fluid with η = η_0
-        ``λ`` → ∞, η_∞ = 0: Power Law behavior
+        ``λγ̇`` >> 1, η_∞ = 0: Power Law behavior (high-shear asymptote,
+            η ≈ η_0 ``λ``^(n-1) γ̇^(n-1); this requires λγ̇ large, not λ
+            taken to infinity independently of γ̇)
         n = 1: Newtonian fluid for all shear rates
 
     Test Mode:

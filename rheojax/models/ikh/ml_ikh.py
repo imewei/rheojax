@@ -495,14 +495,27 @@ class MLIKH(IKHBase):
 
         if self._yield_mode == "per_mode":
             if mode == "creep":
-                # State: [γ, α_1..α_N, λ_1..λ_N] (1+2N)
+                # State: [γ, σ_1..σ_N, α_1..α_N, λ_1..λ_N] (1+3N)
                 ode_fn = make_ml_ikh_creep_ode_rhs_per_mode(n)
                 args["sigma_applied"] = (
                     sigma_applied if sigma_applied is not None else 100.0
                 )
+                # Instantaneous elastic jump distributes the applied stress
+                # across parallel modes in proportion to relative stiffness
+                # (equal elastic strain jump => sigma_i(0) = G_i/sum(G) * sigma_applied).
+                G_arr = jnp.maximum(args["G"], 1e-30)
+                sum_G = jnp.maximum(jnp.sum(G_arr), 1e-30)
+                sigma_i0 = (G_arr / sum_G) * args["sigma_applied"]
+                # The shared instantaneous elastic strain jump gamma(0+) must
+                # match every mode's own sigma_i(0)/G_i (= sigma_applied/sum_G,
+                # uniform across modes by construction above) -- otherwise the
+                # reported strain silently omits the elastic response even
+                # though the per-mode stresses already reflect it.
+                gamma0 = args["sigma_applied"] / sum_G
                 y0 = jnp.concatenate(
                     [
-                        jnp.array([0.0]),  # gamma
+                        jnp.array([gamma0]),  # gamma
+                        sigma_i0,  # sigmas
                         jnp.zeros(n),  # alphas
                         jnp.full(n, lambda_init),  # lambdas
                     ]
@@ -918,24 +931,31 @@ class MLIKH(IKHBase):
 
         .. warning::
 
-            The IKH constitutive model has no viscosity parameter, so the
-            Maxwell relaxation time τ = η/G is approximated with η = 1e12
-            (effectively infinite).  This gives ωτ >> 1 at all accessible
-            frequencies, producing G' ≈ G (constant) and G'' ≈ 0.  As a
-            result, **SAOS fitting can only recover the elastic modulus G;
-            it cannot reproduce frequency-dependent loss behaviour**.  If
-            your data shows significant G'' variation, consider a model
-            family with an explicit viscosity parameter (e.g. Giesekus,
-            fluidity, or Maxwell).
+            This closed form's Maxwell relaxation time τ = η/G is
+            approximated with η = 1e12 (effectively infinite), excluding
+            the model's ``eta_inf`` (high-shear/solvent viscosity)
+            parameter from this particular formula. This gives ωτ >> 1 at
+            all accessible frequencies, so the per-mode Maxwell terms
+            produce G' ≈ ΣG_i (constant) and G'' ≈ 0 (before the eta_inf*ω
+            term added below).  As a result, **SAOS fitting mainly recovers
+            the elastic moduli G_i; frequency-dependent loss behaviour
+            beyond the eta_inf*ω term is not reproduced**.  If your data
+            shows more loss-modulus structure than a single eta_inf*ω term
+            can capture, consider a model family with an explicit
+            frequency-dependent viscosity (e.g. Giesekus, fluidity, or
+            Maxwell).
 
         Args:
             X: Angular frequency array (omega)
             y: Complex G* = G' + iG'', (N, 2) array [G', G''], or real |G*|
         """
         logger.warning(
-            "IKH SAOS: model has no viscosity parameter; τ approximated as "
-            "η/G with η=1e12, giving G'≈G (constant) and G''≈0. "
-            "SAOS fitting can only recover elastic modulus, not loss behaviour."
+            "IKH SAOS: this closed form approximates each mode's Maxwell "
+            "relaxation time as eta/G with eta=1e12, giving G'~sum(G_i) "
+            "(constant) and G''~0 aside from the eta_inf*omega term. "
+            "eta_inf is a real model parameter but is excluded from this "
+            "closed-form beyond that linear term; SAOS fitting mainly "
+            "recovers the elastic moduli, not richer loss behaviour."
         )
         from rheojax.utils.optimization import nlsq_optimize
 
@@ -963,6 +983,7 @@ class MLIKH(IKHBase):
             """Compute residual using Maxwell analytical SAOS expressions."""
             p_names = list(self.parameters.keys())
             p_dict = dict(zip(p_names, param_values, strict=True))
+            eta_inf = p_dict.get("eta_inf", 0.0)
 
             # Extract G and eta based on yield_mode
             if self._yield_mode == "per_mode":
@@ -991,6 +1012,11 @@ class MLIKH(IKHBase):
                 wt = omega * tau
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
+
+            # eta_inf (high-shear/solvent viscosity) contributes
+            # eta_inf*omega to the loss modulus, matching
+            # sigma_total = sigma_Maxwell + eta_inf*gamma_dot.
+            G_double_prime_total = G_double_prime_total + eta_inf * omega
 
             if fit_components:
                 # Fit G' and G'' independently (preserves phase information)
@@ -1061,6 +1087,7 @@ class MLIKH(IKHBase):
         elif mode == "oscillation":
             # Frequency-domain SAOS using multi-Maxwell analytical expressions
             omega = jnp.asarray(X)
+            eta_inf = param_dict.get("eta_inf", 0.0)
 
             if self._yield_mode == "per_mode":
                 # Sum contributions from all modes (parallel Maxwell elements)
@@ -1086,6 +1113,11 @@ class MLIKH(IKHBase):
                 wt = omega * tau
                 G_prime_total = G * wt**2 / (1 + wt**2)
                 G_double_prime_total = G * wt / (1 + wt**2)
+
+            # eta_inf (high-shear/solvent viscosity) contributes
+            # eta_inf*omega to the loss modulus, matching
+            # sigma_total = sigma_Maxwell + eta_inf*gamma_dot.
+            G_double_prime_total = G_double_prime_total + eta_inf * omega
 
             return jnp.column_stack([G_prime_total, G_double_prime_total])
         else:  # startup, laos

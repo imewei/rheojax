@@ -12,8 +12,8 @@ The model captures:
 
 Coupling Modes
 --------------
-- "minimal": λ = 1/f only, τ_y = τ_y0 constant
-- "full": λ = 1/f + τ_y(f) aging yield stress
+- "minimal": λ = 1/(G*f) only, τ_y = τ_y0 constant
+- "full": λ = 1/(G*f) + τ_y(f) aging yield stress
 
 Supported Protocols
 -------------------
@@ -97,10 +97,10 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
 
     where:
 
-    - λ = 1/f: Fluidity-dependent relaxation time
+    - λ = 1/(G*f): Fluidity-dependent relaxation time
     - ∇̂τ: Upper-convected derivative
     - α = max(0, 1 - τ_y/\|τ\|): Von Mises plasticity
-    - η_p = G/f: Polymeric viscosity
+    - η_p = G*λ = 1/f: Polymeric viscosity
 
     Fluidity evolves via:
     df/dt = (f_age - f)/t_a + b\|γ̇\|^n(f_flow - f)

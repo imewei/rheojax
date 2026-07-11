@@ -246,18 +246,35 @@ class TestHVNMLimitingCases:
 class TestHVNMFlowCurve:
     """Test steady-state flow curve predictions."""
 
-    def test_sigma_e_zero_at_steady_state(self, filled_model):
-        """E and I networks relax to zero at steady state."""
-        gd = np.logspace(-2, 2, 50)
-        result = filled_model.predict_flow_curve(gd, return_components=True)
-        np.testing.assert_allclose(result["sigma_E"], 0.0, atol=1e-30)
-        np.testing.assert_allclose(result["sigma_I"], 0.0, atol=1e-30)
+    def test_sigma_e_and_sigma_i_nonzero_at_steady_state(self, filled_model):
+        """E and I networks retain nonzero viscous contributions at steady state.
 
-    def test_sigma_d_dominates(self, filled_model):
-        """D-network viscous stress dominates at steady state."""
+        mu^E and mu^I do not fully relax to their natural states under
+        continuous shear (same mechanism as HVM); each contributes a
+        Maxwell-like viscous term eta*gamma_dot. See
+        hvnm_steady_shear_stress for the derivation.
+        """
         gd = np.logspace(-2, 2, 50)
         result = filled_model.predict_flow_curve(gd, return_components=True)
-        np.testing.assert_allclose(result["stress"], result["sigma_D"], rtol=1e-10)
+        assert np.all(result["sigma_E"] > 0)
+        assert np.all(result["sigma_I"] > 0)
+        # Both are purely viscous (linear in gamma_dot), so sigma/gamma_dot is constant
+        np.testing.assert_allclose(
+            result["sigma_E"] / gd, result["sigma_E"][0] / gd[0], rtol=1e-8
+        )
+        np.testing.assert_allclose(
+            result["sigma_I"] / gd, result["sigma_I"][0] / gd[0], rtol=1e-8
+        )
+
+    def test_components_sum_to_total_stress(self, filled_model):
+        """Steady-state stress is exactly the sum of the E, D, and I viscous contributions."""
+        gd = np.logspace(-2, 2, 50)
+        result = filled_model.predict_flow_curve(gd, return_components=True)
+        np.testing.assert_allclose(
+            result["sigma_E"] + result["sigma_D"] + result["sigma_I"],
+            result["stress"],
+            rtol=1e-10,
+        )
 
     def test_monotonic_stress_rate(self, filled_model):
         gd = np.logspace(-2, 2, 50)
@@ -276,8 +293,13 @@ class TestHVNMFlowCurve:
         sigma = filled_model.predict_flow_curve(gd)
         assert np.all(sigma > 0)
 
-    def test_phi_does_not_affect_flow_curve(self):
-        """Steady-state flow curve is independent of phi (only D-network)."""
+    def test_phi_affects_flow_curve(self):
+        """Steady-state flow curve depends on phi via the interphase (I) network.
+
+        G_I_eff and X_I both derive from the NP volume fraction phi, and the
+        I-network now contributes a nonzero steady-state viscous term, so the
+        flow curve is no longer independent of phi.
+        """
         m1 = HVNMLocal()
         m1.parameters.set_value("phi", 0.0)
         m2 = HVNMLocal()
@@ -285,7 +307,7 @@ class TestHVNMFlowCurve:
         gd = np.logspace(-1, 1, 20)
         s1 = m1.predict_flow_curve(gd)
         s2 = m2.predict_flow_curve(gd)
-        np.testing.assert_allclose(s1, s2, rtol=1e-12)
+        assert not np.allclose(s1, s2, rtol=1e-6)
 
 
 # =============================================================================

@@ -260,11 +260,28 @@ class ITTMCTIsotropic(ITTMCTBase):
         # physical particle diameter. Without this, percus_yevick_sk defaults to
         # sigma=1 (dimensionless) while k_grid is in physical units (1/m), causing
         # a dimensional mismatch that shifts the S(k) peak by orders of magnitude.
+        #
+        # Respect sk_source: for "user_provided", the vertex quadrature needs
+        # S(k) at continuous p-values between |k-q| and k+q, so interpolate
+        # from the user's own (k_data, sk_data) rather than silently falling
+        # back to Percus-Yevick.
+        if self._sk_source == "user_provided":
+            assert self._user_k_data is not None
+            assert self._user_sk_data is not None
+            user_k_data, user_sk_data = self._user_k_data, self._user_sk_data
+
+            def sk_func(k: np.ndarray) -> np.ndarray:
+                return interpolate_sk(user_k_data, user_sk_data, k)
+        else:
+
+            def sk_func(k: np.ndarray) -> np.ndarray:
+                return percus_yevick_sk(k, phi, sigma=sigma_d)
+
         self.vertex = mct_vertex_isotropic(
             self.k_grid,
             self.k_grid,
             phi,
-            sk_func=lambda k: percus_yevick_sk(k, phi, sigma=sigma_d),
+            sk_func=sk_func,
         )
 
     def update_structure_factor(
@@ -375,8 +392,20 @@ class ITTMCTIsotropic(ITTMCTBase):
 
         # Dimensionless vertex V̈(k̃,q̃): recomputed with σ=1 so entries are
         # O(1)–O(100), compatible with the ODE step-size constraints.
-        def sk_func_dim(k_arg):
-            return percus_yevick_sk(k_arg, phi, sigma=1.0)
+        # Respect sk_source: for "user_provided", interpolate the user's own
+        # S(k) at the corresponding physical wave vector k = k̃/sigma_d
+        # instead of silently falling back to Percus-Yevick.
+        if self._sk_source == "user_provided":
+            assert self._user_k_data is not None
+            assert self._user_sk_data is not None
+            user_k_data, user_sk_data = self._user_k_data, self._user_sk_data
+
+            def sk_func_dim(k_arg):
+                return interpolate_sk(user_k_data, user_sk_data, k_arg / sigma_d)
+        else:
+
+            def sk_func_dim(k_arg):
+                return percus_yevick_sk(k_arg, phi, sigma=1.0)
 
         V_dim = mct_vertex_isotropic(k_dim, k_dim, phi, sk_func=sk_func_dim, sigma=1.0)
 
@@ -556,8 +585,12 @@ class ITTMCTIsotropic(ITTMCTBase):
         assert phi is not None
         assert sigma_d is not None
 
-        # S(k) at this wave vector
-        S_k_val = percus_yevick_sk(np.array([k]), phi, sigma=sigma_d)[0]
+        # S(k) at this wave vector. Respect sk_source: reuse the
+        # already-sourced self.S_k (Percus-Yevick or user-provided, set in
+        # _initialize_structure_factor) rather than silently recomputing
+        # Percus-Yevick regardless of sk_source. k is always an element of
+        # self.k_grid here (see caller), so this is an exact lookup.
+        S_k_val = float(interpolate_sk(self.k_grid, self.S_k, np.array([k]))[0])
 
         # Simplified f(k) estimate from MCT
         # f(k) ≈ 1 - 1/S(k)_max for k near peak
@@ -714,12 +747,17 @@ class ITTMCTIsotropic(ITTMCTBase):
         for i, gd in enumerate(gamma_dot):
             if gd < 1e-15:
                 # Zero shear rate: yield stress for glass, zero for fluid.
-                # σ_y ≈ G_prefactor · γ_c · ∫dq q⁴ S² f²  weighted by k-integral norm.
+                # This is the gd->0+ limit of the finite-rate branch below:
+                # sigma(gd) = gd * int_0^inf G(t) h(gd t) dt. Substituting
+                # x = gd*t, as gd->0 the argument t=x/gd -> inf for any fixed
+                # x, so G(t) -> its t->inf plateau G_prefactor * int dq q^4 S^2 f^2
+                # (the nonergodicity plateau, i.e. "weighted" below with NO
+                # extra k-integral normalization), and
+                # sigma -> G(inf) * int_0^inf h(x) dx = G(inf) * gamma_c * sqrt(pi)/2
+                # for the Gaussian h(x) = exp(-(x/gamma_c)^2) used here.
                 if is_glass:
-                    G_k_total = float(np.trapezoid(G_k_weights, q_grid))
-                    if G_k_total > 0:
-                        weighted = float(np.trapezoid(G_k_weights * f_k_arr**2, q_grid))
-                        sigma[i] = G_prefactor * gamma_c * weighted / G_k_total * 0.1
+                    weighted = float(np.trapezoid(G_k_weights * f_k_arr**2, q_grid))
+                    sigma[i] = G_prefactor * gamma_c * weighted * (np.sqrt(np.pi) / 2.0)
                 else:
                     sigma[i] = 0.0
                 continue
@@ -1114,13 +1152,28 @@ class ITTMCTIsotropic(ITTMCTBase):
                 tau_k = 1.0 / Gamma_k[j]
                 f_k = self._compute_nonergodicity_parameter(k)
 
-                # Simplified LAOS response with dimensionless integrand q⁴ S²
+                # G'_k/G''_k must match this model's own Phi(t)^2 stress
+                # functional (see _relaxation_modulus_prony_modes /
+                # _predict_oscillation), not the single-relaxation-time
+                # moduli for a bare linear-in-Phi correlator. Squaring
+                # Phi_q(t) = f_k + (1-f_k) e^{-t/tau_k} gives three terms:
+                # a constant plateau f_k^2, a linear term at rate 1/tau_k
+                # with weight 2 f_k (1-f_k), and a quadratic term at rate
+                # 2/tau_k (relaxation time tau_k/2) with weight (1-f_k)^2.
                 wt = omega * tau_k
+                wt2 = omega * (tau_k / 2.0)
                 G_k = q_grid[j] ** 4 * self.S_k[j] ** 2
 
                 # In-phase and out-of-phase contributions
-                G_prime_k = G_k * (f_k + (1 - f_k) * wt**2 / (1 + wt**2))
-                G_double_prime_k = G_k * (1 - f_k) * wt / (1 + wt**2)
+                G_prime_k = G_k * (
+                    f_k**2
+                    + 2.0 * f_k * (1.0 - f_k) * wt**2 / (1.0 + wt**2)
+                    + (1.0 - f_k) ** 2 * wt2**2 / (1.0 + wt2**2)
+                )
+                G_double_prime_k = G_k * (
+                    2.0 * f_k * (1.0 - f_k) * wt / (1.0 + wt**2)
+                    + (1.0 - f_k) ** 2 * wt2 / (1.0 + wt2**2)
+                )
 
                 # Nonlinear correction from h(γ)
                 stress_k[j] = h * (

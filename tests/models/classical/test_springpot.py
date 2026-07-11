@@ -175,7 +175,7 @@ class TestSpringPotRelaxation:
             assert_allclose(ratio, expected_ratio, rtol=1e-5)
 
     def test_relaxation_alpha_zero_limit(self):
-        """Test alpha=0 limit (pure fluid/constant)."""
+        """Test alpha=0 limit (pure elastic/solid, constant modulus)."""
         model = SpringPot()
         c_alpha = 1e5
         alpha = 1e-6  # Nearly zero
@@ -203,7 +203,7 @@ class TestSpringPotRelaxation:
         assert_allclose(np.mean(G_t), c_alpha, rtol=0.01)
 
     def test_relaxation_alpha_one_limit(self):
-        """Test alpha=1 limit (pure elastic)."""
+        """Test alpha=1 limit (pure viscous/fluid)."""
         model = SpringPot()
         c_alpha = 1e5
         alpha = 1.0 - 1e-6  # Nearly one

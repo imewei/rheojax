@@ -88,9 +88,10 @@ def test_fit_bayesian_accepts_yield_type_dynamic():
 
 
 def test_predict_amplitude_sweep_computes_sigma_max():
-    """sigma_max = G_cage * gamma_0 + eta_inf * omega * gamma_0 per the class
-    docstring's constitutive equation (regression: omega/G_cage/eta_inf used
-    to be silently ignored)."""
+    """sigma_max = gamma_0 * sqrt(G_cage**2 + (K_flow * omega)**2) per the class
+    docstring's constitutive equation (regression: omega/G_cage/K_flow used
+    to be silently ignored; elastic and viscous contributions combine in
+    quadrature, not as a linear sum, since they are 90 degrees out of phase)."""
     gamma_0, sigma = _synthetic_amplitude_sweep(scale=80.0, exp=0.8)
 
     model = SPPYieldStress()
@@ -100,8 +101,8 @@ def test_predict_amplitude_sweep_computes_sigma_max():
     result = model.predict_amplitude_sweep(gamma_0, omega=omega, yield_type="both")
 
     G_cage = model.parameters.get_value("G_cage")
-    eta_inf = model.parameters.get_value("eta_inf")
-    expected = G_cage * gamma_0 + eta_inf * omega * gamma_0
+    K_flow = model.parameters.get_value("K_flow")
+    expected = gamma_0 * np.sqrt(G_cage**2 + (K_flow * omega) ** 2)
 
     assert "sigma_max" in result
     np.testing.assert_allclose(result["sigma_max"], expected, rtol=1e-8)

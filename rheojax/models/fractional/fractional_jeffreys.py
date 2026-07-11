@@ -9,12 +9,19 @@ The FJM model consists of:
 - Dashpot (η_1) in parallel with
 - Series combination of dashpot (η_2) and SpringPot
 
-Relaxation modulus:
-    G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
+Relaxation modulus (smooth part, t > 0; the model's own complex modulus
+implies an additional eta1*r*delta(t) instantaneous-dashpot term that is not
+observable for t > 0):
+    G(t) = [η_1(1 - r) / τ_1^α] * t^(α-1) * E_{α,α}(-(t/τ_1)^α)
 
 where:
-- τ_1 = η_2 / characteristic_modulus (relaxation time)
+- r = (τ_2/τ_1)^α = (η_2/η_1)^α
+- τ_2 = (η_2/η_1) * τ_1 (second relaxation time)
 - E_{α,β} is the two-parameter Mittag-Leffler function
+
+This is the exact Laplace inverse of G*(s)/s using the model's own complex
+modulus below (s^2*G(s)*J(s) style consistency), so it depends on both
+τ_1 and η_2 (via τ_2), unlike a bare one-term power law.
 
 Complex modulus:
     G*(ω) = η_1(iω) * [1 + (iωτ_2)^α] / [1 + (iωτ_1)^α]
@@ -148,7 +155,16 @@ class FractionalJeffreysModel(BaseModel):
     ) -> jnp.ndarray:
         """Predict relaxation modulus G(t).
 
-        G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
+        Exact Laplace inverse of this model's own complex modulus
+        G*(s) = eta1*s*[1+(s*tau2)^alpha]/[1+(s*tau1)^alpha] (tau2 =
+        (eta2/eta1)*tau1), via G(t) = L^{-1}{G*(s)/s}. Writing
+        r = (tau2/tau1)^alpha = (eta2/eta1)^alpha splits G*(s)/s into a
+        constant eta1*r term (whose inverse transform is an unobservable
+        eta1*r*delta(t) at t=0, the instantaneous-dashpot response) plus a
+        smooth term:
+
+            G(t) = [eta1*(1-r) / tau1^alpha] * t^(alpha-1)
+                   * E_{alpha,alpha}(-(t/tau1)^alpha),   t > 0
 
         Parameters
         ----------
@@ -174,22 +190,25 @@ class FractionalJeffreysModel(BaseModel):
         # Clip alpha to safe range (works with JAX tracers)
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
-        # Parameters for two-parameter Mittag-Leffler: E_{1-α,1-α}
-        ml_alpha = 1.0 - alpha_safe
-        ml_beta = 1.0 - alpha_safe
-
         tau1_safe = tau1 + epsilon
         eta1_safe = eta1 + epsilon
-        # P2-FRAC-003: Guard t=0 — power(0, -alpha_safe) = +inf when alpha>0.
+        eta2_safe = eta2 + epsilon
+        # P2-FRAC-003: Guard t=0 — power(0, alpha-1) = +inf for alpha<1.
         t_safe = jnp.maximum(t, 1e-30)
-        # Compute fractional relaxation term
-        # E_{1-α,1-α}(-(t/τ_1)^(1-α))
-        z = -jnp.power(t_safe / tau1_safe, ml_alpha)
-        # Two-parameter Mittag-Leffler function with concrete α and β
-        ml_term = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
-        # G(t) = (η_1/τ_1) * t^(-α) * E_{1-α,1-α}(-(t/τ_1)^(1-α))
-        prefactor = eta1_safe / tau1_safe
-        G_t = prefactor * jnp.power(t_safe, -alpha_safe) * ml_term
+
+        # r = (tau2/tau1)^alpha = (eta2/eta1)^alpha -- brings eta2 into the
+        # relaxation modulus, matching its role in the complex modulus.
+        r = jnp.power(eta2_safe / eta1_safe, alpha_safe)
+
+        # E_{alpha,alpha}(-(t/tau1)^alpha)
+        z = -jnp.power(t_safe / tau1_safe, alpha_safe)
+        ml_term = mittag_leffler_e2(z, alpha=alpha_safe, beta=alpha_safe)
+
+        # G(t) = [eta1*(1-r)/tau1^alpha] * t^(alpha-1) * E_{alpha,alpha}(z)
+        # Units: eta1 (Pa*s) / tau1^alpha (s^alpha) * t^(alpha-1) (s^(alpha-1))
+        # = Pa*s^(1-alpha) * s^(alpha-1) = Pa.
+        prefactor = eta1_safe * (1.0 - r) / jnp.power(tau1_safe, alpha_safe)
+        G_t = prefactor * jnp.power(t_safe, alpha_safe - 1.0) * ml_term
 
         return G_t
 

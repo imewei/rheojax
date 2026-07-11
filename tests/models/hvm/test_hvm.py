@@ -203,16 +203,21 @@ class TestHVMLimitingCases:
         assert G_p[-1] == pytest.approx(8000.0, rel=0.01)
 
     def test_partial_vitrimer_no_d_stress(self):
-        """G_D=0 → no D-network stress at steady state."""
+        """G_D=0 → no D-network stress at steady state; the E-network
+        retains a nonzero Maxwell-like viscous term sigma_E = G_E*gamma_dot
+        / (2*k_BER_0) (vitrimer bond exchange never fully relaxes mu^E to
+        mu^E_nat under continuous shear — see hvm_steady_shear_stress)."""
         from rheojax.models import HVMLocal
 
         m = HVMLocal.partial_vitrimer(G_P=5000.0, G_E=3000.0)
         gamma_dot = np.logspace(-2, 2, 20)
-        sigma = m.predict_flow_curve(gamma_dot)
+        result = m.predict_flow_curve(gamma_dot, return_components=True)
 
-        # Sigma_E -> 0 at steady state, sigma_D = 0 (no D-network)
-        # Only remaining: sigma_D contribution = 0
-        np.testing.assert_allclose(sigma, 0.0, atol=1e-10)
+        np.testing.assert_allclose(result["sigma_D"], 0.0, atol=1e-10)
+        k_ber_0 = m._get_k_ber_0()
+        expected_sigma_E = m.G_E * gamma_dot / (2.0 * k_ber_0)
+        np.testing.assert_allclose(result["sigma_E"], expected_sigma_E, rtol=1e-6)
+        np.testing.assert_allclose(result["stress"], expected_sigma_E, rtol=1e-6)
 
     def test_pure_vitrimer_saos(self):
         """G_P=0, G_D=0 → single vitrimer mode with factor-of-2."""
@@ -265,11 +270,16 @@ class TestHVMLimitingCases:
 class TestHVMFlowCurve:
     """Steady-state flow curve behavior."""
 
-    def test_sigma_e_zero_at_steady_state(self, hvm_default):
-        """E-network stress → 0 at steady state (vitrimer signature)."""
+    def test_sigma_e_steady_state_matches_maxwell_formula(self, hvm_default):
+        """E-network retains a genuine nonzero Maxwell-like viscous term at
+        steady state: sigma_E = G_E*gamma_dot/(2*k_BER_0). Bond exchange
+        keeps mu^E - mu^E_nat balanced against continuous convective
+        loading rather than relaxing it fully to zero."""
         gamma_dot = np.logspace(-2, 2, 20)
         result = hvm_default.predict_flow_curve(gamma_dot, return_components=True)
-        np.testing.assert_allclose(result["sigma_E"], 0.0, atol=1e-10)
+        k_ber_0 = hvm_default._get_k_ber_0()
+        expected_sigma_E = hvm_default.G_E * gamma_dot / (2.0 * k_ber_0)
+        np.testing.assert_allclose(result["sigma_E"], expected_sigma_E, rtol=1e-6)
 
     def test_sigma_d_dominates(self, hvm_default):
         """D-network viscous stress dominates flow curve."""
