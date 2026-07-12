@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSize, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
@@ -23,11 +23,15 @@ class _CurrentPageStack(QStackedWidget):
     area and make the window impossible to maximize.
     """
 
-    def sizeHint(self):  # noqa: N802 - Qt override
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt override
         current = self.currentWidget()
-        return current.sizeHint() if current is not None else super().sizeHint()
+        if current is None:
+            return super().sizeHint()
+        # Match Qt's own QWidgetItem::sizeHint() formula (expandedTo minimumSize)
+        # so this never reports a preferred size smaller than the minimum below.
+        return current.sizeHint().expandedTo(current.minimumSize())
 
-    def minimumSizeHint(self):  # noqa: N802 - Qt override
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt override
         current = self.currentWidget()
         if current is None:
             return super().minimumSizeHint()
