@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSize, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
@@ -13,6 +13,34 @@ from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margi
 from rheojax.gui.workspace.controller import WorkflowController
 
 
+class _CurrentPageStack(QStackedWidget):
+    """QStackedWidget whose size hints reflect only the current page.
+
+    Qt's default QStackedWidget sizes itself to the largest of ALL pages
+    it holds, even hidden ones (documented behavior), so the tallest step
+    (e.g. NUTS diagnostics) permanently forces every other step's minimum
+    window size -- on a real display this can exceed the screen's usable
+    area and make the window impossible to maximize.
+    """
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt override
+        current = self.currentWidget()
+        if current is None:
+            return super().sizeHint()
+        # Match Qt's own QWidgetItem::sizeHint() formula (expandedTo minimumSize)
+        # so this never reports a preferred size smaller than the minimum below.
+        return current.sizeHint().expandedTo(current.minimumSize())
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt override
+        current = self.currentWidget()
+        if current is None:
+            return super().minimumSizeHint()
+        # Match Qt's own QWidgetItem::minimumSize() formula so a page that
+        # calls setMinimumSize() directly (not just via child layout
+        # constraints) is still honored.
+        return current.minimumSizeHint().expandedTo(current.minimumSize())
+
+
 class StepperCanvas(QWidget):
     step_clicked = Signal(int)
 
@@ -23,7 +51,8 @@ class StepperCanvas(QWidget):
         self._ctl = controller
         self._rail = QHBoxLayout()
         self._buttons: list[QPushButton] = []
-        self._stack = QStackedWidget(self)
+        self._stack = _CurrentPageStack(self)
+        self._stack.currentChanged.connect(lambda _: self._stack.updateGeometry())
         for i, step in enumerate(controller.steps):
             b = QPushButton(f"{i + 1} {step.title}", self)
             b.setCheckable(True)
@@ -44,6 +73,8 @@ class StepperCanvas(QWidget):
         self._stack.removeWidget(old)
         if old is not None:
             old.deleteLater()
+        if index == self._stack.currentIndex():
+            self._stack.updateGeometry()
 
     def is_enabled(self, index: int) -> bool:
         return self._buttons[index].isEnabled()
