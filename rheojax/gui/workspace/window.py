@@ -924,6 +924,9 @@ class WorkspaceWindow(QMainWindow):
         # out from under that read would pop the payload mid-job instead of
         # failing cleanly, so check ActiveJobsState (keyed by dataset id)
         # before offering the confirm-delete prompt at all.
+        # NOTE: This guard only covers by_id entries keyed by dataset id; a
+        # future producer reading payload on a worker thread while registering
+        # under a different key (e.g. job id) would silently bypass this check.
         with self._state.active_jobs.lock:
             has_active_job = dataset_id in self._state.active_jobs.by_id
         if has_active_job:
