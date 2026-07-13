@@ -140,6 +140,32 @@ class TestFFTAnalysis:
             ref_psd[ref_idx], rel=0.05
         )
 
+    def test_psd_odd_length_matches_scipy_periodogram(self):
+        """One-sided PSD must double the last bin for odd-length signals too.
+
+        Regression test: rfft's last bin is the true Nyquist bin (correctly
+        left undoubled) only when n is even. For odd n, the last bin is a
+        genuine two-sided bin like any other and must be doubled, or
+        sum(PSD)*df underestimates power (Parseval's theorem).
+        """
+        from scipy.signal import periodogram
+
+        n = 101
+        fs = 10.0
+        t = np.arange(n) / fs
+        signal = np.random.default_rng(0).standard_normal(n)
+        data = RheoData(x=jnp.array(t), y=jnp.array(signal), domain="time")
+
+        fft = FFTAnalysis(window="none", detrend=False, return_psd=True)
+        psd_data = fft.transform(data)
+
+        ref_freqs, ref_psd = periodogram(signal, fs=fs, window="boxcar", detrend=False)
+
+        np.testing.assert_allclose(np.array(psd_data.x), ref_freqs, atol=1e-9)
+        np.testing.assert_allclose(
+            np.array(psd_data.y), ref_psd, rtol=1e-6, atol=1e-12
+        )
+
     def test_psd_normalize_noop_warns(self, caplog):
         """normalize=True must not be silently ignored when return_psd=True."""
         import logging
@@ -179,6 +205,24 @@ class TestFFTAnalysis:
         recon_trim = reconstructed.y[trim:-trim]
         correlation = np.corrcoef(np.array(signal_trim), np.array(recon_trim))[0, 1]
         assert correlation > 0.95  # Relaxed requirement due to edge effects
+
+    def test_inverse_fft_preserves_time_units(self):
+        """Reconstructed time axis must carry the original time units, not 's'.
+
+        Regression test: the reconstructed x_units was hardcoded to "s"
+        regardless of the original time base, mislabeling e.g. minute-spaced
+        data by a 60x factor.
+        """
+        t = jnp.linspace(0, 10, 100)
+        signal = jnp.sin(2 * jnp.pi * 0.5 * t)
+        data = RheoData(x=t, y=signal, domain="time", x_units="min")
+
+        fft = FFTAnalysis(window="none", detrend=False, return_psd=False)
+        freq_data = fft.transform(data)
+        assert freq_data.x_units == "1/min"
+
+        reconstructed = fft.inverse_transform(freq_data)
+        assert reconstructed.x_units == "min"
 
     def test_detrending(self):
         """Test detrending functionality."""

@@ -255,6 +255,23 @@ class TestSmoothDerivative:
         assert jnp.all(jnp.isfinite(dy_dx.y))
         assert jnp.abs(jnp.mean(dy_dx.y) - 2.0) < 0.2
 
+    def test_savgol_non_uniform_spacing_warns_on_fallback(self, caplog):
+        """Regression: savgol silently fell back to unsmoothed finite
+        differences on non-uniform x with no warning (defect #3)."""
+        x = jnp.concatenate([jnp.linspace(0, 1, 20), jnp.linspace(1.1, 10, 180)])
+        y = 2 * x + 3
+
+        data = RheoData(x=x, y=y, domain="time")
+
+        deriv = SmoothDerivative(method="savgol", window_length=11, polyorder=3)
+        with caplog.at_level("WARNING"):
+            dy_dx = deriv.transform(data)
+
+        assert jnp.all(jnp.isfinite(dy_dx.y))
+        assert any(
+            "non-uniform" in record.message.lower() for record in caplog.records
+        )
+
     def test_finite_diff_duplicate_x_raises(self):
         """Regression: duplicate x silently injected NaN instead of raising (defect #2)."""
         x = jnp.array([0.0, 1.0, 1.0, 3.0, 4.0, 6.0])

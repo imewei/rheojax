@@ -249,6 +249,23 @@ class TestThixotropyKinetics:
             f"Lambda should converge to steady state {lambda_ss:.3f}, got {lambda_t[-1]:.3f}"
         )
 
+    def test_evolve_thixotropy_lambda_uses_left_endpoint_forward_euler(self):
+        """Forward Euler must evaluate the forcing term at the left endpoint
+        of each interval, i.e. dt[i] pairs with gamma_dot[i], not gamma_dot[i+1]."""
+        from rheojax.transforms.srfs import evolve_thixotropy_lambda
+
+        t = np.array([0.0, 0.01])
+        gamma_dot = np.array([1.0, 0.0])
+
+        lambda_t = evolve_thixotropy_lambda(
+            t, gamma_dot, lambda_initial=0.5, k_build=0.0, k_break=10.0
+        )
+
+        # dlambda/dt = -k_break * gamma_dot[0] * lambda_initial = -5.0
+        # lambda_new = 0.5 - 5.0 * 0.01 = 0.45
+        assert lambda_t[0] == pytest.approx(0.5)
+        assert lambda_t[1] == pytest.approx(0.45)
+
     def test_thixotropy_step_up_stress_overshoot(self):
         """Test thixotropy step-up protocol produces stress overshoot."""
         from rheojax.models import SGRConventional
@@ -444,6 +461,16 @@ class TestShearBanding:
             "be reported as shear banding"
         )
         assert banding_info is None
+
+    def test_shear_banding_rejects_non_finite_input(self):
+        """NaN-contaminated stress must raise, not silently report 'no banding'."""
+        from rheojax.transforms.srfs import detect_shear_banding
+
+        gamma_dot = np.array([1.0, 2.0, 3.0])
+        sigma = np.array([1.0, np.nan, 0.0])
+
+        with pytest.raises(ValueError, match="finite"):
+            detect_shear_banding(gamma_dot, sigma)
 
     def test_shear_banding_warning_generation(self):
         """Test shear banding warning is generated for non-monotonic curves."""

@@ -630,6 +630,13 @@ def detect_shear_banding(
         logger.debug("Insufficient data for banding detection (need >= 2 points)")
         return False, None
 
+    if not (np.all(np.isfinite(gamma_dot)) and np.all(np.isfinite(sigma))):
+        logger.error("Non-finite values in gamma_dot or sigma for banding detection")
+        raise ValueError(
+            "gamma_dot and sigma must be finite (no NaN/inf) for shear banding "
+            "detection; a non-finite derivative would silently report 'no banding'"
+        )
+
     # Sort by shear rate
     sort_idx = np.argsort(gamma_dot)
     gamma_dot = gamma_dot[sort_idx]
@@ -820,9 +827,14 @@ def compute_shear_band_coexistence(
     if np.any(left_mask):
         gamma_dot_left = gamma_dot_sorted[left_mask]
         sigma_left = sigma_sorted[left_mask]
-        # Interpolate to find gamma_dot at stress_plateau
+        # Interpolate to find gamma_dot at stress_plateau. np.interp requires
+        # its xp argument to be monotonically increasing, so re-sort by sigma
+        # (the left branch is only guaranteed sorted by gamma_dot, not sigma).
         if len(gamma_dot_left) > 1:
-            gamma_dot_low = np.interp(stress_plateau, sigma_left, gamma_dot_left)
+            sigma_order = np.argsort(sigma_left)
+            gamma_dot_low = np.interp(
+                stress_plateau, sigma_left[sigma_order], gamma_dot_left[sigma_order]
+            )
         else:
             gamma_dot_low = gamma_dot_low_bound
     else:
@@ -833,9 +845,12 @@ def compute_shear_band_coexistence(
     if np.any(right_mask):
         gamma_dot_right = gamma_dot_sorted[right_mask]
         sigma_right = sigma_sorted[right_mask]
-        # Interpolate
+        # Interpolate. Same monotonicity requirement as the left branch above.
         if len(gamma_dot_right) > 1:
-            gamma_dot_high = np.interp(stress_plateau, sigma_right, gamma_dot_right)
+            sigma_order = np.argsort(sigma_right)
+            gamma_dot_high = np.interp(
+                stress_plateau, sigma_right[sigma_order], gamma_dot_right[sigma_order]
+            )
         else:
             gamma_dot_high = gamma_dot_high_bound
     else:
@@ -1031,14 +1046,16 @@ def evolve_thixotropy_lambda(
     # Compute time steps (dt[0] is not used, but we need consistent shapes)
     dt = jnp.diff(t_jax)
 
-    # Prepare inputs for scan: (gamma_dot[1:], dt, k_build, k_break)
+    # Prepare inputs for scan: (gamma_dot[:-1], dt, k_build, k_break)
     # We broadcast k_build and k_break to match the sequence length
     n_steps = len(dt)
     k_build_arr = jnp.full(n_steps, k_build, dtype=jnp.float64)
     k_break_arr = jnp.full(n_steps, k_break, dtype=jnp.float64)
 
     # Stack inputs for scan: each element is (gamma_dot_i, dt_i, k_build, k_break)
-    scan_inputs = (gamma_dot_jax[1:], dt, k_build_arr, k_break_arr)
+    # Forward Euler evaluates the forcing term at the left endpoint of each
+    # interval [t_i, t_{i+1}], so dt[i] = t[i+1]-t[i] pairs with gamma_dot[i].
+    scan_inputs = (gamma_dot_jax[:-1], dt, k_build_arr, k_break_arr)
 
     # Run vectorized integration using lax.scan
     # This compiles the entire loop into a single fused kernel

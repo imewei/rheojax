@@ -79,7 +79,13 @@ class CoxMerz(BaseTransform):
         osc_data, flow_data = data[0], data[1]
 
         # Extract complex viscosity |η*(ω)| = |G*| / ω
+        # x_units only classifies the axis (e.g. "Hz" vs "rad/s") — it does
+        # not by itself convert the numeric values, so normalize to rad/s
+        # first (mirrors the y_flow SI normalization below).
         omega = np.asarray(osc_data.x)
+        osc_x_units = getattr(osc_data, "x_units", "") or ""
+        if osc_x_units:
+            omega, _ = normalize_units(omega, osc_x_units)
         y_osc = np.asarray(osc_data.y)
 
         if np.iscomplexobj(y_osc):

@@ -250,8 +250,13 @@ class SmoothDerivative(BaseTransform):
                 delta=delta,
             )
         else:
-            # Non-uniform spacing: use derivative of fitted polynomial
-            # This is more complex - use finite difference as fallback
+            # Non-uniform spacing: Savitzky-Golay requires uniform spacing,
+            # so fall back to (unsmoothed) finite differences.
+            logger.warning(
+                "Non-uniform x spacing; falling back to finite differences "
+                "(Savitzky-Golay smoothing not applied)",
+                data_length=len(x_np),
+            )
             dy_dx = self._finite_diff_derivative(x, y)
 
         return jnp.array(dy_dx)

@@ -192,13 +192,12 @@ class Mastercurve(BaseTransform):
         """
         # WLF equation: log(a_T) = -C1(T-T_ref)/(C2+(T-T_ref))
         denominator = C2 + (T - T_ref)
-        # Guard against division by zero at WLF singularity (T = T_ref - C2)
-        safe_denom = jnp.where(jnp.abs(denominator) < 1e-12, 1.0, denominator)
-        log_aT = jnp.where(
-            jnp.abs(denominator) < 1e-12,
-            0.0,
-            -C1 * (T - T_ref) / safe_denom,
-        )
+        if abs(float(denominator)) < 1e-12:
+            raise ValueError(
+                f"WLF shift factor is undefined at T={T} K: T - T_ref "
+                f"coincides with the WLF pole (T_ref - C2 = {T_ref - C2} K)."
+            )
+        log_aT = -C1 * (T - T_ref) / denominator
         return jnp.power(10.0, log_aT)
 
     def _calculate_arrhenius_shift(
@@ -411,13 +410,13 @@ class Mastercurve(BaseTransform):
         # Inverse power-law for top curve (guard against a≈0, negative base, b≈0)
         a_top_safe = np.sign(a_top) * max(abs(a_top), 1e-20)
         base_top = np.maximum((y_samples - e_top) / a_top_safe, 1e-20)
-        b_top_safe = np.sign(b_top) * max(abs(b_top), 1e-10)
+        b_top_safe = np.copysign(max(abs(b_top), 1e-10), b_top)
         x_top_inv = np.power(base_top, 1.0 / b_top_safe)
 
         # Inverse power-law for bottom curve (guard against a≈0, negative base, b≈0)
         a_bot_safe = np.sign(a_bot) * max(abs(a_bot), 1e-20)
         base_bot = np.maximum((y_samples - e_bot) / a_bot_safe, 1e-20)
-        b_bot_safe = np.sign(b_bot) * max(abs(b_bot), 1e-10)
+        b_bot_safe = np.copysign(max(abs(b_bot), 1e-10), b_bot)
         x_bot_inv = np.power(base_bot, 1.0 / b_bot_safe)
 
         # Compute log shift factors and average

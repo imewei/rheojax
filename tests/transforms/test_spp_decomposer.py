@@ -333,6 +333,59 @@ def test_invalid_cycle_range_raises():
         decomposer.transform(data)
 
 
+def test_scrambled_time_raises_instead_of_silent_corruption():
+    """Regression: unsorted/non-uniform time must raise, not silently produce
+    finite-but-wrong output from FFT/derivative kernels that assume ordered,
+    uniformly-spaced samples.
+    """
+    omega = 1.0
+    t = jnp.linspace(0, 4 * jnp.pi / omega, 200)
+    strain = jnp.sin(omega * t)
+    stress = 100.0 * strain + 50.0 * jnp.cos(omega * t)
+
+    rng = np.random.default_rng(0)
+    perm = rng.permutation(len(t))
+    t_scrambled = np.asarray(t)[perm]
+    stress_scrambled = np.asarray(stress)[perm]
+
+    data = RheoData(
+        x=t_scrambled,
+        y=stress_scrambled,
+        domain="time",
+        metadata={"omega": omega, "gamma_0": 1.0},
+        validate=False,
+    )
+    decomposer = SPPDecomposer(omega=omega, gamma_0=1.0, use_numerical_method=True)
+
+    with pytest.raises(ValueError):
+        decomposer.transform(data)
+
+
+def test_harmonic_reconstruction_uses_resolved_omega():
+    """Regression: harmonic_reconstruction must use the omega resolved from
+    dataset metadata, not the stale constructor omega, when they differ.
+    """
+    true_omega = 2.0
+    gamma_0 = 0.5
+    t = jnp.linspace(0, 4 * jnp.pi / true_omega, 2000, endpoint=False)
+    stress = 100.0 * jnp.sin(true_omega * t) + 20.0 * jnp.sin(3 * true_omega * t + 0.1)
+
+    data = RheoData(
+        x=np.asarray(t, dtype=float),
+        y=np.asarray(stress, dtype=float),
+        domain="time",
+        metadata={"omega": true_omega, "gamma_0": gamma_0},
+    )
+
+    # Constructor omega is intentionally stale relative to the dataset.
+    decomposer = SPPDecomposer(omega=1.0, gamma_0=gamma_0, n_harmonics=3)
+    decomposer.transform(data)
+
+    amps = decomposer.results_["harmonic_amplitudes"]
+    np.testing.assert_allclose(amps[0], 100.0, rtol=0.05)
+    np.testing.assert_allclose(amps[1], 20.0, rtol=0.05)
+
+
 def test_rogers_defaults_and_delta_present():
     omega = 2.0
     gamma_0 = 0.5

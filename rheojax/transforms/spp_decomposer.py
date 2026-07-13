@@ -317,14 +317,27 @@ class SPPDecomposer(BaseTransform):
         # Validate time steps uniformity
         if len(t) > 2:  # type: ignore[arg-type]
             dt_all = np.diff(t)  # type: ignore[type-var]
+            if np.any(dt_all <= 0):  # type: ignore[operator]
+                logger.error("Non-monotonic or duplicate time values in SPP data")
+                raise ValueError(
+                    "SPP decomposition requires strictly increasing, non-duplicate "
+                    "time values; the input time array is unsorted or contains "
+                    "duplicate timestamps."
+                )
             dt_mean = np.mean(dt_all)  # type: ignore[arg-type]
             dt_std = np.std(dt_all)  # type: ignore[arg-type]
             if dt_mean > 0 and (dt_std / dt_mean > 0.05):  # 5% tolerance
-                logger.warning(
+                logger.error(
                     "Non-uniform time steps detected in SPP data",
                     dt_mean=float(dt_mean),
                     dt_std=float(dt_std),
                     cv=float(dt_std / dt_mean),
+                )
+                raise ValueError(
+                    "SPP decomposition requires approximately uniformly spaced "
+                    f"time samples; coefficient of variation {dt_std / dt_mean:.3f} "
+                    "exceeds the 0.05 tolerance. Resample to a uniform time grid "
+                    "before calling transform()."
                 )
 
         logger.debug(
@@ -512,7 +525,7 @@ class SPPDecomposer(BaseTransform):
         # 4. Harmonic reconstruction (for reporting) - stress only
         logger.debug("Performing harmonic reconstruction", n_harmonics=self.n_harmonics)
         amplitudes, phases, stress_reconstructed = harmonic_reconstruction(
-            stress_jax, self.omega, n_harmonics=self.n_harmonics, dt=dt
+            stress_jax, omega_scalar, n_harmonics=self.n_harmonics, dt=dt
         )
 
         # 5. Power-law fit

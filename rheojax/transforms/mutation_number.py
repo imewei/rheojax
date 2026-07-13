@@ -125,6 +125,15 @@ class MutationNumber(BaseTransform):
             n_points=len(x),
         )
 
+        # R7-MUT-004: trapz/simpson assume x is sorted/monotonically
+        # increasing. Sort (x, y) together so out-of-order time samples
+        # produce the correct integral instead of a silently wrong one.
+        x = jnp.asarray(x)
+        y = jnp.asarray(y)
+        sort_idx = jnp.argsort(x)
+        x = x[sort_idx]
+        y = y[sort_idx]
+
         if self.integration_method == "trapz":
             # Use trapezoidal rule
             from jax.scipy.integrate import trapezoid

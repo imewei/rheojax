@@ -48,6 +48,13 @@ class TestMastercurve:
         a_T_low = mc.get_shift_factor(273.15)
         assert a_T_low > 1.0
 
+    def test_wlf_shift_factor_raises_at_singularity(self):
+        """get_shift_factor must not silently return 1.0 at the WLF pole T = T_ref - C2."""
+        mc = Mastercurve(reference_temp=300, C2=50, method="wlf")
+
+        with pytest.raises(ValueError, match="undefined"):
+            mc.get_shift_factor(250)
+
     @pytest.mark.smoke
     def test_arrhenius_shift_factor(self):
         """Test Arrhenius shift factor calculation."""

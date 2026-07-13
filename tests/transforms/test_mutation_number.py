@@ -247,6 +247,30 @@ class TestMutationNumber:
         # exponential-fit tail for genuine powerlaw-decay data.
         assert tail_tG_pow != pytest.approx(tail_tG_exp, rel=0.05)
 
+    def test_unsorted_time_matches_sorted_result(self):
+        """_integrate must sort (t, G) pairs before integrating, so the same
+        (t, G) samples presented out of chronological order give the same Δ
+        as the sorted presentation instead of a silently different,
+        wrong-but-plausible value (P1 regression: trapz/simpson assume
+        monotonically increasing x)."""
+        t = jnp.linspace(0, 10, 50)
+        G_t = 0.5 * jnp.exp(-t) + 0.3 * jnp.exp(-t / 4) + 0.05
+
+        data_sorted = RheoData(x=t, y=G_t, domain="time")
+        mn = MutationNumber()
+        delta_sorted = mn.calculate(data_sorted)
+
+        # Locally swap a few (t, G) pairs together, preserving each pair's
+        # correspondence but breaking chronological order.
+        perm = jnp.arange(len(t)).at[jnp.array([1, 2, 3])].set(jnp.array([3, 1, 2]))
+        t_shuffled = t[perm]
+        G_shuffled = G_t[perm]
+        with pytest.warns(UserWarning, match="not monotonic"):
+            data_shuffled = RheoData(x=t_shuffled, y=G_shuffled, domain="time")
+        delta_shuffled = mn.calculate(data_shuffled)
+
+        assert delta_shuffled == pytest.approx(delta_sorted, rel=1e-9)
+
     def test_non_relaxation_error(self):
         """Test error for non-relaxation data."""
         # Create monotonically increasing data (creep-like)

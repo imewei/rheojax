@@ -33,6 +33,48 @@ else:
 # Module logger
 logger = get_logger(__name__)
 
+# frequency_range is documented/assumed to be in Hz, so the wavelet math
+# (omega = 2*pi*frequency, chirp = exp(i*omega*t)) requires t in seconds.
+_TIME_UNITS_TO_SECONDS = {
+    "s": 1.0,
+    "sec": 1.0,
+    "second": 1.0,
+    "seconds": 1.0,
+    "ms": 1e-3,
+    "millisecond": 1e-3,
+    "milliseconds": 1e-3,
+    "us": 1e-6,
+    "microsecond": 1e-6,
+    "microseconds": 1e-6,
+    "min": 60.0,
+    "minute": 60.0,
+    "minutes": 60.0,
+    "h": 3600.0,
+    "hr": 3600.0,
+    "hour": 3600.0,
+    "hours": 3600.0,
+}
+
+
+def _time_to_seconds(t: Array, x_units: str | None) -> Array:
+    """Convert a time array to seconds so it matches the Hz-valued
+    frequency_range used by the chirp wavelet's omega*t exponent.
+
+    Unrecognized (or missing) x_units are assumed to already be seconds,
+    matching this transform's prior, always-seconds behavior.
+    """
+    if not x_units:
+        return t
+    unit_key = x_units.strip().lower()
+    factor = _TIME_UNITS_TO_SECONDS.get(unit_key)
+    if factor is None:
+        logger.warning(
+            "Unrecognized x_units for OWChirp; assuming seconds",
+            x_units=x_units,
+        )
+        return t
+    return t * factor
+
 
 @TransformRegistry.register("owchirp", type=TransformType.ANALYSIS)
 class OWChirp(BaseTransform):
@@ -361,6 +403,9 @@ class OWChirp(BaseTransform):
         if not isinstance(signal, Array):
             signal = jnp.array(signal)
 
+        # frequency_range is in Hz; convert t to seconds to match.
+        t = _time_to_seconds(t, data.x_units)
+
         # Handle complex data
         if jnp.iscomplexobj(signal):
             logger.debug("Converting complex signal to real part")
@@ -462,6 +507,10 @@ class OWChirp(BaseTransform):
         # R11-OWC-002: Remove DC offset to prevent spurious low-frequency peak
         signal = signal - jnp.mean(signal)
 
+        # frequency_range is in Hz; convert to seconds for the wavelet math,
+        # but return the original t so it lines up with the caller's data.
+        t_seconds = _time_to_seconds(t, data.x_units)
+
         # Generate frequencies
         frequencies = jnp.logspace(
             jnp.log10(self.frequency_range[0]),
@@ -470,7 +519,7 @@ class OWChirp(BaseTransform):
         )
 
         # Compute wavelet transform
-        coefficients = self._optimized_wavelet_transform(t, signal, frequencies)
+        coefficients = self._optimized_wavelet_transform(t_seconds, signal, frequencies)
 
         return t, frequencies, coefficients
 

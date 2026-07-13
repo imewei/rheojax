@@ -330,6 +330,27 @@ class TestOWChirp:
 
         assert jnp.allclose(direct_spectrum, fft_spectrum, rtol=0.15)
 
+    def test_non_second_x_units_are_not_mislabeled_as_hz(self):
+        """Regression: a signal stored with a non-second time axis (e.g.
+        minutes) must not have its output frequency axis mislabeled "Hz"
+        with the wrong numeric scale (was ~60x off for minutes)."""
+        f0_hz = 1.0
+        t_seconds = jnp.linspace(0, 120, 6000)  # 2 physical minutes @ 50 Hz
+        signal = jnp.sin(2 * jnp.pi * f0_hz * t_seconds)
+        t_minutes = t_seconds / 60.0
+
+        data = RheoData(x=t_minutes, y=signal, x_units="min", domain="time")
+
+        ow = OWChirp(n_frequencies=50, frequency_range=(0.1, 10))
+        spectrum = ow.transform(data)
+
+        assert spectrum.x_units == "Hz"
+
+        freqs = np.array(spectrum.x)
+        spec = np.array(spectrum.y)
+        peak_freq = freqs[np.argmax(spec)]
+        assert 0.5 < peak_freq < 2.0
+
     def test_metadata_preservation(self):
         """Test metadata preservation."""
         t = jnp.linspace(0, 20, 1000)

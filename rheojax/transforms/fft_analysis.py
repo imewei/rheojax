@@ -294,8 +294,14 @@ class FFTAnalysis(BaseTransform):
                 logger.debug("Computing power spectral density")
                 window_power = jnp.sum(window**2)
                 spectrum = jnp.abs(fft_result) ** 2 * (dt / window_power)
-                # One-sided PSD: double non-DC, non-Nyquist bins
-                spectrum = spectrum.at[1:-1].set(spectrum[1:-1] * 2.0)
+                # One-sided PSD: double non-DC, non-Nyquist bins. rfft's last
+                # bin is a genuine Nyquist bin (no distinct negative-frequency
+                # counterpart) only when n is even; for odd n every bin past
+                # DC is two-sided and must be doubled.
+                if n % 2 == 0:
+                    spectrum = spectrum.at[1:-1].set(spectrum[1:-1] * 2.0)
+                else:
+                    spectrum = spectrum.at[1:].set(spectrum[1:] * 2.0)
             else:
                 # Magnitude spectrum
                 logger.debug("Computing magnitude spectrum")
@@ -437,10 +443,23 @@ class FFTAnalysis(BaseTransform):
 
         logger.debug("Inverse FFT completed", output_points=len(y_reconstructed))
 
+        # Invert the forward transform's frequency-unit mapping (x_units="min"
+        # -> "1/min", "s" -> "Hz") so the reconstructed time axis is labeled
+        # in the original time base rather than being hardcoded to seconds.
+        freq_units = data.x_units
+        if not freq_units:
+            time_units = None
+        elif freq_units == "Hz":
+            time_units = "s"
+        elif freq_units.startswith("1/"):
+            time_units = freq_units[2:]
+        else:
+            time_units = None
+
         return RheoData(
             x=t,
             y=y_reconstructed,
-            x_units="s" if data.x_units else None,
+            x_units=time_units,
             y_units="reconstructed",
             domain="time",
             metadata=new_metadata,
