@@ -70,6 +70,23 @@ def _create_workspace_window() -> "WorkspaceWindow":  # noqa: F821
     return WorkspaceWindow(AppState())
 
 
+def _warn_legacy_deprecated() -> None:
+    """Print/log the --legacy deprecation warning.
+
+    Extracted as a standalone function (rather than inlined like the
+    --workspace warning) so it's unit-testable without going through
+    main()'s blocking app.exec() call.
+    """
+    logger.warning(
+        "--legacy is deprecated and will be removed in a future release; "
+        "the workspace shell is now feature-complete for all supported workflows."
+    )
+    print(
+        "WARNING: --legacy is deprecated and will be removed in a future release.",
+        file=sys.stderr,
+    )
+
+
 def setup_logging(verbose: bool = False) -> None:
     """Configure application logging.
 
@@ -471,6 +488,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
         return exit_code
+
+    _warn_legacy_deprecated()
 
     # Import main window after Qt app is created
     logger.debug("Importing main window module")

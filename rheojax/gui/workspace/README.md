@@ -2,8 +2,8 @@
 
 The default GUI shell for RheoJAX (`rheojax-gui` with no flags). A mode-based
 interface — Fit, Transform, Pipeline — that replaces the legacy page-based
-window (`rheojax/gui/app/`, `pages/`, `state/`, still available via
-`rheojax-gui --legacy`) as the default entry point.
+window (`rheojax/gui/app/`, `pages/`, `state/` — deprecated, available via
+`rheojax-gui --legacy` during a soak period) as the default entry point.
 
 ## Relationship to `foundation/`
 
