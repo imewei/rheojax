@@ -24,7 +24,6 @@ from rheojax.gui.resources.styles.tokens import (
     Typography,
     button_style,
     card_style,
-    empty_state_style,
     section_header_style,
     status_badge_style,
     themed,
@@ -56,7 +55,6 @@ __all__ = [
     "card_style",
     "status_badge_style",
     "section_header_style",
-    "empty_state_style",
 ]
 
 # Regex to match @token_name placeholders (lowercase + underscores only)
