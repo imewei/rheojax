@@ -36,10 +36,6 @@ The default launch opens the Workspace Shell::
 
 Other startup options::
 
-    # Launch the legacy page-based window instead (instant rollback if
-    # something isn't working right for you in the workspace shell)
-    rheojax-gui --legacy
-
     # Open a saved project on startup
     rheojax-gui --project analysis.rheojax
 
@@ -112,12 +108,3 @@ The window tracks unsaved changes and prompts you to save before starting a
 new project, opening another one, or closing, if anything is dirty. If
 background jobs (an NLSQ/NUTS fit, a running pipeline batch) are still in
 flight, it will also ask whether to cancel them before proceeding.
-
-Falling Back to the Legacy Window
-====================================
-
-The Workspace Shell recently became the default GUI experience. If you hit
-something that isn't working right for you, ``rheojax-gui --legacy`` is an
-instant rollback to the previous page-based window — see
-:doc:`getting_started` for that guide. The legacy window remains fully
-functional; it is simply no longer the default.

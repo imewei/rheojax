@@ -128,7 +128,6 @@ utils/
 ✓ rheojax.gui.state imports successfully
 ✓ rheojax.gui.services imports successfully
 ✓ rheojax.gui.jobs imports successfully
-✓ rheojax.gui.pages imports successfully
 ✓ rheojax.gui.utils imports successfully
 
 ✅ All package imports successful!

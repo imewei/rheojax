@@ -8,8 +8,8 @@ Complete inventory of the RheoJAX menu bar, listing every ``QAction`` with its
 label, keyboard shortcut, status-bar tooltip, handler method, and notes on
 special behaviour (disabled, checkable, etc.).
 
-The menu bar is implemented by :class:`rheojax.gui.app.menu_bar.MenuBar` and
-wired to handlers in :class:`rheojax.gui.app.main_window.RheoJAXMainWindow`.
+The menu bar is implemented and wired to handlers in
+:class:`rheojax.gui.workspace.window.WorkspaceWindow`.
 
 .. contents:: Menu Groups
    :local:

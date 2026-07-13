@@ -640,44 +640,25 @@ Use type hints for clarity:
 GUI Architecture
 ----------------
 
-The desktop app (``gui/``, ``rheojax-gui``) currently ships **two coexisting
-architectures**: the default main window and an opt-in ``--workspace``
-preview. See :doc:`../../architecture-overview` (GUI section) for the
-package-layout table; the summary below covers what a contributor needs to
-know before touching either one.
+The desktop app (``gui/``, ``rheojax-gui``) is built around a single shell,
+the workspace shell. See :doc:`../../architecture-overview` (GUI section) for
+the package-layout table; the summary below covers what a contributor needs
+to know before touching it.
 
-Shipped default: ``app/main_window.py``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Workspace Shell: ``workspace/window.py``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``RheoJAXMainWindow`` swaps flat page panels (``pages/*.py`` — Data, Transform,
-Fit, Bayesian, Diagnostics, Export) into a ``QStackedWidget`` via
-``navigate_to()``. All pages share one process-wide singleton,
-``state/store.py::StateStore``: a Redux-like store holding a single
-``AppState`` dataclass. ``dispatch(action)`` looks up a reducer in
-``state/reducers/*.py``, mutates state immutably (pushing the previous state
-onto an undo stack), and emits both a generic ``state_changed`` Qt signal and
-domain-specific signals (``fit_completed``, ``dataset_added``, ...) via
-``state/signals.py``. Dispatches from a worker thread defer signal emission
-to the GUI thread with ``QMetaObject.invokeMethod(QueuedConnection)``.
-Fitting/Bayesian sampling run on in-process ``QThreadPool`` workers
-(``jobs/worker_pool.py``, ``jobs/fit_worker.py``, ``jobs/bayesian_worker.py``).
-
-``--workspace`` preview: ``workspace/window.py``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Launched via ``rheojax-gui --workspace`` (explicitly labeled "preview" in
-``main.py``; does not yet support ``--project``/``--import``).
-``WorkspaceWindow`` renders the Fit and Transform workflows as a literal
-numbered step wizard (``workspace/stepper_canvas.py``), backed by
+``WorkspaceWindow`` renders the Fit, Transform, and Pipeline workflows as a
+literal numbered step wizard (``workspace/stepper_canvas.py``), backed by
 ``workspace/fit/step1_protocol_model.py`` .. ``step6_export.py`` and
-``workspace/transform/step1_pick.py`` .. ``step5_export.py``. State lives in a
-separate, lighter ``foundation/state.py::AppState`` (``library``, ``fit:
-FitState``, ``transform: TransformState``, ``jobs``, ``project``) — one
-instance per window, no reducer/signal layer; components mutate
-``FitState``/``TransformState`` fields directly via
-``dataclasses.replace()``. NLSQ/NUTS runs go through true OS subprocess
-isolation (``jobs/process_adapter.py``, ``jobs/subprocess_fit.py``,
-``jobs/subprocess_bayesian.py``) rather than in-process threads.
+``workspace/transform/step1_pick.py`` .. ``step5_export.py``. State lives in
+``foundation/state.py::AppState`` (``library``, ``fit: FitState``,
+``transform: TransformState``, ``jobs``, ``project``) — one instance per
+window, no reducer/signal layer; components mutate ``FitState``/
+``TransformState`` fields directly via ``dataclasses.replace()``. NLSQ/NUTS
+runs go through true OS subprocess isolation (``jobs/process_adapter.py``,
+``jobs/subprocess_fit.py``, ``jobs/subprocess_bayesian.py``) rather than
+in-process threads.
 
 Editing an earlier step (e.g. changing the model) calls
 ``foundation/invalidation.py::invalidate_downstream()``, which clears
@@ -686,10 +667,6 @@ dependent downstream ``FitState``/``TransformState`` fields (``nlsq_result``,
 ``workspace/controller.py::WorkflowController.on_edit()`` re-locks every step
 after the edited one in the stepper UI — this is what prevents a stale result
 computed under an old upstream choice from surviving an edit.
-
-**When touching the GUI:** confirm which of the two architectures a file
-belongs to before assuming behavior — ``state/store.py`` and
-``foundation/state.py`` are unrelated ``AppState`` types with the same name.
 
 Future Extensions
 -----------------
@@ -700,11 +677,9 @@ tracks what remains open rather than a roadmap from project inception.
 Near-Term
 ~~~~~~~~~
 
-- Promote the ``--workspace`` step-pipeline shell to the default GUI (add
-  ``--project``/``--import`` support, then retire the legacy
-  ``app/main_window.py`` + ``state/store.py`` stack)
-- Unify the two GUI ``AppState`` implementations once the workspace shell is
-  the default, removing the dual-architecture maintenance burden
+- Unify the ``foundation/state.py`` ``AppState`` used by the workspace shell
+  with the older ``state/store.py`` ``AppState`` still used by ``services/``,
+  removing the dual state-model maintenance burden
 
 Longer-Term
 ~~~~~~~~~~~

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING:** Removed the legacy `RheoJAXMainWindow` GUI shell and the deprecated `--legacy`/`--workspace` CLI flags. The workspace shell (`WorkspaceWindow`) has been the default since 0.x and is now the only GUI entry point. Migration: drop `--legacy`/`--workspace` from any scripts invoking `rheojax-gui`; both flags now produce an argparse "unrecognized arguments" error. All CLI capabilities the legacy shell exposed (`--project`, `--import`/`--protocol`, `--maximized`) are already fully supported on the default (and now only) workspace path.
+
 ## [0.7.0] - 2026-06-29
 
 ### Changed

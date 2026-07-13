@@ -1,9 +1,7 @@
 # RheoJAX Workspace Shell
 
-The default GUI shell for RheoJAX (`rheojax-gui` with no flags). A mode-based
-interface — Fit, Transform, Pipeline — that replaces the legacy page-based
-window (`rheojax/gui/app/`, `pages/`, `state/` — deprecated, available via
-`rheojax-gui --legacy` during a soak period) as the default entry point.
+The GUI shell for RheoJAX (`rheojax-gui`). A mode-based interface — Fit,
+Transform, Pipeline.
 
 ## Relationship to `foundation/`
 
@@ -24,11 +22,6 @@ services live in `rheojax/gui/foundation/`:
   `foundation/priors.py`, `foundation/contract.py` — supporting services
   (change notification, step invalidation, pipeline execution glue, priors,
   and the step-controller contract each mode's controller implements).
-
-`workspace/` never talks to the legacy `app/`/`pages/`/`state/` package, and
-vice versa — they are two independent shells over the same `rheojax` core
-API, selected at startup by `rheojax/gui/main.py` based on the `--legacy`
-flag.
 
 ## The Three Modes
 

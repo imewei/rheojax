@@ -4,13 +4,11 @@ Qt-based graphical user interface for RheoJAX rheological analysis.
 
 ## Architecture Overview
 
-RheoJAX GUI has two main implementations:
-
-1. **Workspace Shell** (Default, new): Modern mode-based interface with Fit, Transform, and Pipeline modes. Launched by `rheojax-gui` with no flags. Located in `foundation/` (core models) and `workspace/` (UI shell). Includes project save/load and batch pipeline execution.
-
-2. **Legacy Main Window** (Page-based, older, deprecated): Original page-based navigation with sidebar pages. Launched with `rheojax-gui --legacy`, which now prints a deprecation warning on startup. Located in `app/`, `pages/`, `state/`. Still fully functional during the current soak period; scheduled for removal in a future release.
-
-**This document describes the legacy architecture.** For the workspace shell, see `workspace/README.md`.
+RheoJAX GUI is a mode-based interface with Fit, Transform, and Pipeline
+modes, launched by `rheojax-gui`. It is located in `foundation/` (core
+models) and `workspace/` (UI shell), and includes project save/load and
+batch pipeline execution. See `workspace/README.md` for the workspace
+shell's own package structure and mode breakdown.
 
 ## Package Structure
 
@@ -18,12 +16,6 @@ RheoJAX GUI has two main implementations:
 rheojax/gui/
 ├── __init__.py                    # Package init with main() entry point
 ├── main.py                        # Application entry point
-├── app/                           # Application core
-│   ├── __init__.py
-│   ├── main_window.py             # Central window
-│   ├── menu_bar.py                # Application menu
-│   ├── toolbar.py                 # Quick-access toolbar
-│   └── status_bar.py              # Status and progress bar
 ├── state/                         # Redux-inspired state management
 │   ├── __init__.py
 │   ├── store.py                   # Central state store
@@ -44,25 +36,10 @@ rheojax/gui/
 │   ├── fit_worker.py              # Model fitting jobs
 │   ├── bayesian_worker.py         # MCMC sampling jobs
 │   └── cancellation.py            # Cancellation tokens
-├── pages/                         # Page-based navigation
-│   ├── __init__.py
-│   ├── home_page.py               # Landing page
-│   ├── data_page.py               # Data management
-│   ├── transform_page.py          # Transform application
-│   ├── fit_page.py                # Model fitting
-│   ├── bayesian_page.py           # Bayesian inference
-│   ├── diagnostics_page.py        # MCMC diagnostics
-│   └── export_page.py             # Result export
 ├── widgets/                       # Custom reusable widgets
 │   ├── __init__.py
-│   ├── dataset_tree.py            # Dataset hierarchy tree
 │   ├── parameter_table.py         # Parameter editor
-│   ├── plot_canvas.py             # Matplotlib canvas
-│   ├── multi_view.py              # Multi-panel plots
-│   ├── model_browser.py           # Model library browser
-│   ├── quick_fit_strip.py         # Quick fit toolbar
-│   ├── pipeline_chips.py          # Pipeline visualization
-│   ├── jax_status.py              # GPU status indicator
+│   ├── plot_canvas.py             # Matplotlib/PyQtGraph canvas
 │   ├── priors_editor.py           # Prior distribution editor
 │   ├── residuals_panel.py         # Residual analysis
 │   └── arviz_canvas.py            # ArviZ diagnostics
@@ -116,17 +93,6 @@ Thread pool for long-running operations:
 - Bayesian inference with NUTS
 - Transform computations
 - Cancellation support
-
-### Page-Based Navigation
-
-Workflow-oriented pages:
-1. **Home**: Quick start and examples
-2. **Data**: Load and validate data
-3. **Transform**: Apply mastercurve, FFT, SRFS
-4. **Fit**: Model fitting with NLSQ
-5. **Bayesian**: MCMC sampling
-6. **Diagnostics**: ArviZ plots (trace, pair, forest)
-7. **Export**: Save results
 
 ## Requirements
 

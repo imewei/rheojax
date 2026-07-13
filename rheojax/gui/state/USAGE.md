@@ -2,11 +2,12 @@
 
 Complete state management system for the RheoJAX GUI with immutable updates, undo/redo, and Qt signal integration.
 
-## Note: Legacy Architecture
+## Note
 
-This document describes the **legacy page-based GUI's state management system**
-(used by `rheojax-gui --legacy`). The default Workspace Shell uses a different
-foundation-based architecture in `rheojax.gui.foundation`.
+This document describes the `state/` package's Redux-inspired state
+management system, still used by several `services/` modules. The Workspace
+Shell itself (`workspace/`) uses a different, per-window architecture in
+`rheojax.gui.foundation` — see `foundation/state.py`.
 
 ## Architecture
 
