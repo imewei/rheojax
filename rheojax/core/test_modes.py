@@ -116,11 +116,6 @@ def is_monotonic_increasing(
     if len(data) < 2:
         return True
 
-    # Check overall trend first
-    overall_trend = data[-1] - data[0]
-    if overall_trend < 0:
-        return False
-
     # Calculate tolerance based on data magnitude
     data_mag = np.mean(np.abs(data))
     rel_tolerance = tolerance * data_mag
@@ -160,11 +155,6 @@ def is_monotonic_decreasing(
 
     if len(data) < 2:
         return True
-
-    # Check overall trend first
-    overall_trend = data[-1] - data[0]
-    if overall_trend > 0:
-        return False
 
     # Calculate tolerance based on data magnitude
     data_mag = np.mean(np.abs(data))
@@ -246,6 +236,21 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
 
         # Shear rate units → ROTATION (steady shear)
         if any(unit in x_units_lower for unit in ["1/s", "s^-1", "s-1", "/s"]):
+            # R-TESTMODE-002: '1/s'/'s^-1' is dimensionally identical to Hz
+            # (both are "per second"), so this is genuinely ambiguous between
+            # shear rate (rotation) and frequency (oscillation). domain ==
+            # 'frequency' already returned OSCILLATION above, so reaching here
+            # means domain is 'time'/None (the default) — warn instead of
+            # silently assuming ROTATION.
+            warnings.warn(
+                f"x_units='{x_units}' is ambiguous between shear rate "
+                "(rotation) and frequency (Hz = 1/s); assuming ROTATION "
+                "because domain != 'frequency'. If this is frequency-domain "
+                "oscillation/modulus data, construct RheoData with "
+                "domain='frequency' explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
             return TestModeEnum.ROTATION
 
     # 3. Time-domain analysis: check monotonicity
@@ -258,11 +263,28 @@ def detect_test_mode(rheo_data: RheoData) -> TestModeEnum:
         if np.iscomplexobj(y_data):
             y_data = np.real(y_data)
 
+        # R-TESTMODE-NAN: NaN/Inf must never fall through to the flatness
+        # heuristic below. np.max/np.min/np.mean all propagate NaN, which
+        # makes `data_magnitude > 0` False (NaN comparisons are always
+        # False), silently collapsing relative_change to 0 and misreporting
+        # NaN-poisoned data as flat RELAXATION. Fail loudly instead.
+        if not np.all(np.isfinite(y_data)):
+            warnings.warn(
+                "Time-domain y-data contains NaN or Inf; cannot reliably "
+                "detect test mode. Set test_mode explicitly in metadata.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return TestModeEnum.UNKNOWN
+
         # Check if data is essentially flat (no significant change)
-        # This handles elastic solids that have fully relaxed to equilibrium
-        overall_change = abs(y_data[-1] - y_data[0])
+        # This handles elastic solids that have fully relaxed to equilibrium.
+        # Use the full-series range (not just endpoints) so an oscillatory
+        # (e.g. LAOS) trace that happens to start/end at the same value isn't
+        # mistaken for flat/relaxed data.
+        data_range = np.max(y_data) - np.min(y_data)
         data_magnitude = np.mean(np.abs(y_data))
-        relative_change = overall_change / data_magnitude if data_magnitude > 0 else 0
+        relative_change = data_range / data_magnitude if data_magnitude > 0 else 0
 
         # If change < 5% of magnitude, consider it flat
         # Flat time-domain data is more likely relaxation (reached equilibrium) than creep
@@ -370,7 +392,11 @@ def get_compatible_test_modes(model_name: str) -> list[TestMode]:
         modes = model_cls.supported_test_modes
         try:
             return [TestMode(m) if isinstance(m, str) else m for m in modes]
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as e:
+            logger.warning(
+                f"Invalid supported_test_modes on model '{model_name}': {e}. "
+                "Falling back to default test modes."
+            )
             return [TestMode.RELAXATION, TestMode.CREEP, TestMode.OSCILLATION]
 
     # Check for _fit method and infer from docstring or signature (legacy)

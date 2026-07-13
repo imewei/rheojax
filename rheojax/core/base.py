@@ -41,10 +41,21 @@ class BaseModel(BayesianMixin, ABC):
     supporting JAX arrays, scikit-learn style APIs,
     and Bayesian inference via NumPyro NUTS.
 
-    All models inherit Bayesian capabilities from BayesianMixin, including:
+    Every subclass must implement ``_fit()`` and ``_predict()``. All subclasses
+    additionally inherit the Bayesian *methods* from BayesianMixin, including:
     - fit_bayesian(): Bayesian parameter estimation using NUTS
     - sample_prior(): Sample from prior distributions
     - get_credible_intervals(): Compute highest density intervals
+
+    However, calling ``fit_bayesian()`` only works if the subclass *also*
+    defines a ``model_function(X, params, **kwargs)`` method (not enforced as
+    an abstractmethod here to avoid forcing every model, including ones that
+    only ever do point-estimation, to implement it). Without ``model_function``,
+    ``fit_bayesian()`` raises ``AttributeError`` at call time
+    (see ``BayesianMixin._validate_bayesian_requirements``). Check
+    ``hasattr(instance, 'model_function')`` — not ``hasattr(instance, 'fit_bayesian')``,
+    which is always ``True`` — to determine whether a given model actually
+    supports Bayesian fitting.
 
     The fit() method uses NLSQ optimization by default for fast point estimation,
     which can be used to warm-start Bayesian inference.
@@ -135,7 +146,10 @@ class BaseModel(BayesianMixin, ABC):
                 y_np = y_raw.astype(np.complex128)
             else:
                 y_np = y_raw.astype(float)
-            resolved_test_mode = rheo_data.test_mode
+            supplied = test_mode if test_mode is not None else kwargs.get("test_mode")
+            resolved_test_mode = (
+                supplied if supplied is not None else rheo_data.test_mode
+            )
         else:
             x_np = np.asarray(X, dtype=float)
             y_raw = np.asarray(y)
@@ -550,6 +564,7 @@ class BaseModel(BayesianMixin, ABC):
             name: self.parameters.get_value(name) for name in self.parameters
         }
         saved_fitted = self.fitted_
+        saved_nlsq_result = self._nlsq_result
         _had_test_mode = hasattr(self, "_test_mode")  # BASE-003: track if attr existed
         saved_test_mode = getattr(self, "_test_mode", None)
         _raw = getattr(self, "_last_fit_kwargs", None)
@@ -581,6 +596,7 @@ class BaseModel(BayesianMixin, ABC):
             else:
                 self.parameters._parameters[name].value = None
         self.fitted_ = saved_fitted
+        self._nlsq_result = saved_nlsq_result
         # BASE-003: only restore _test_mode if the attribute existed before
         if _had_test_mode:
             self._test_mode = saved_test_mode
@@ -782,7 +798,10 @@ class BaseModel(BayesianMixin, ABC):
             Model predictions
         """
         reject_removed_options(kwargs)
-        x_shape = getattr(X, "shape", None) or (len(X),)
+        _shape = getattr(X, "shape", None)
+        x_shape = (
+            _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+        )
         logger.debug(
             "Predict called",
             model=self.__class__.__name__,
@@ -790,18 +809,6 @@ class BaseModel(BayesianMixin, ABC):
             test_mode=test_mode,
             kwargs=kwargs,
         )
-
-        # Check if parameters are set manually (allow predict without fit)
-        # but do NOT permanently mutate self.fitted_ — predict() must be read-only
-        _effectively_fitted = self.fitted_
-        if not _effectively_fitted and len(self.parameters) > 0:
-            if not any(p.value is None for p in self.parameters._parameters.values()):
-                _effectively_fitted = True
-                logger.debug(
-                    "Parameters set manually — proceeding with predict "
-                    "(model not marked as fitted)",
-                    model=self.__class__.__name__,
-                )
 
         # Preserve the test mode declared on a RheoData container. predict()
         # unpacks X.x below, which strips the metadata that _predict() relies
@@ -878,10 +885,14 @@ class BaseModel(BayesianMixin, ABC):
         Returns:
             Model predictions on training data
         """
+        _shape = getattr(X, "shape", None)
+        data_shape = (
+            _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+        )
         logger.debug(
             "fit_predict called",
             model=self.__class__.__name__,
-            data_shape=getattr(X, "shape", None) or (len(X),),
+            data_shape=data_shape,
         )
         self.fit(X, y, **kwargs)
         return self.predict(X)
@@ -1319,17 +1330,26 @@ class TransformPipeline(BaseTransform):
             Transformed data after all transforms
         """
         result = data
+        n_steps = len(self.transforms)
         for i, transform in enumerate(self.transforms):
             logger.debug(
-                f"Pipeline step {i + 1}/{len(self.transforms)}",
+                f"Pipeline step {i + 1}/{n_steps}",
                 transform="TransformPipeline",
                 step=i + 1,
-                total_steps=len(self.transforms),
+                total_steps=n_steps,
                 current_transform=transform.__class__.__name__,
             )
             step_result = transform.transform(result)
-            # Handle tuple returns (data, extras) from mid-pipeline steps
-            result = step_result[0] if isinstance(step_result, tuple) else step_result
+            is_last = i == n_steps - 1
+            # Mid-pipeline steps must unwrap (data, extras) tuples since the
+            # next step's .transform() expects only the data. The final
+            # step's extras are propagated to the caller instead of dropped.
+            if is_last:
+                result = step_result
+            else:
+                result = (
+                    step_result[0] if isinstance(step_result, tuple) else step_result
+                )
         return result
 
     def _inverse_transform(self, data):

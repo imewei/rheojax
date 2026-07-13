@@ -38,6 +38,14 @@ logger = get_logger(__name__)
 # Safe JAX import (verifies NLSQ was imported first)
 jax, jnp = safe_import_jax()
 
+# Canonical R-hat convergence threshold (see fit_bayesian docstring).
+R_HAT_THRESHOLD = 1.01
+
+# Canonical minimum bulk-ESS threshold (Vehtari/Stan/ArviZ rule of thumb):
+# below this, chains produced too few effective independent samples to trust
+# even if R-hat looks converged (see fit_bayesian docstring).
+ESS_THRESHOLD = 400
+
 
 def _import_numpyro():
     """Lazy-import NumPyro and its submodules.
@@ -336,6 +344,60 @@ class BayesianMixin:
             "scale_info": scale_info,
         }
 
+    def _validate_finite_inputs(self, X_jax: Array, y_jax: Array) -> None:
+        """Reject NaN/Inf in X or y before they reach NUTS.
+
+        Shared by fit_bayesian() and precompile_bayesian() (both build the
+        NumPyro model and call _run_nuts_sampling on the same X/y) so bad
+        input produces a clear error instead of silent divergences or an
+        opaque sampler failure downstream. isfinite (not isnan) also catches
+        +/-Inf. y_jax is always real-valued (complex y is split into
+        concatenated real/imag parts by _prepare_jax_data), so a single
+        isfinite check covers both the real and complex paths.
+        """
+        if bool(jnp.any(~jnp.isfinite(X_jax))):
+            raise ValueError("Input X contains NaN or Inf values.")
+        if bool(jnp.any(~jnp.isfinite(y_jax))):
+            raise ValueError("Input y contains NaN or Inf values.")
+
+    @staticmethod
+    def _validate_xy_shapes(X_array: ArrayLike, y_array: ArrayLike) -> None:
+        """Reject shape-mismatched or ambiguous-shaped y before JAX prep.
+
+        Must run on the raw X_array/y_array *before* _prepare_jax_data's
+        complex real/imag split (which concatenates y into length 2N while
+        X stays length N — a raw-shape check after that split would reject
+        every legitimate complex/oscillation fit).
+
+        A plain length-N check (``y.shape[0] == X.shape[0]``) is not enough:
+        a caller-supplied y of shape (N, 1) (e.g. from
+        ``df['col'].values.reshape(-1, 1)``) also has shape[0] == N but
+        broadcasts silently against an (N,)-shaped prediction inside
+        NumPyro's Normal likelihood, corrupting the log-likelihood instead
+        of raising. So y must be exactly 1-D, with the single exception of
+        the (N, 2) real/imag-columns convention that numpyro_model_builder
+        and RheoData both already support for oscillation data (G', G'').
+        """
+        x_arr = np.asarray(X_array)
+        y_arr = np.asarray(y_array)
+        n = x_arr.shape[0] if x_arr.ndim > 0 else None
+
+        if y_arr.ndim == 1:
+            pass
+        elif y_arr.ndim == 2 and y_arr.shape[1] == 2:
+            pass
+        else:
+            raise ValueError(
+                "y must be 1-dimensional (or shape (N, 2) for the real/imag "
+                f"-columns convention), got shape {y_arr.shape}"
+            )
+
+        if n is not None and y_arr.shape[0] != n:
+            raise ValueError(
+                "X and y must have the same length. "
+                f"Got X: {x_arr.shape}, y: {y_arr.shape}"
+            )
+
     def _get_parameter_bounds(
         self,
         X_array: np.ndarray,
@@ -424,6 +486,8 @@ class BayesianMixin:
             for name in param_names
         }
 
+        clamped_params: list[str] = []
+
         def sanitize_value(name: str, raw_value: float | None) -> float:
             lower_raw, upper_raw = param_bounds[name]
             safe_lower, safe_upper = init_intervals[name]
@@ -443,6 +507,15 @@ class BayesianMixin:
                     clamped=value,
                     interval=(float(safe_lower), float(safe_upper)),
                 )
+                # Only a caller-supplied initial_values entry outside bounds
+                # is worth a user-visible warning — the same clamp logic also
+                # runs on the synthesized default midpoint (which is
+                # constructed from the same bounds and can never be out of
+                # range), so gate on raw_value to avoid false positives there.
+                if raw_value is not None and np.isfinite(raw_value):
+                    clamped_params.append(
+                        f"{name}={original!r} -> {value!r}"
+                    )
             return float(value)
 
         warm_start: dict[str, float] = {}
@@ -462,6 +535,15 @@ class BayesianMixin:
                         parameter=name,
                     )
             warm_start[name] = sanitize_value(name, candidate)
+
+        if clamped_params:
+            warnings.warn(
+                "initial_values contained value(s) outside parameter bounds; "
+                "clamped to the nearest valid bound: "
+                f"{', '.join(clamped_params)}",
+                RuntimeWarning,
+                stacklevel=3,
+            )
 
         # Add noise scale initial values.
         # Use explicit None-check (not or-sentinel) so that a legitimately zero
@@ -501,11 +583,20 @@ class BayesianMixin:
         num_chains: int,
         nuts_kwargs: dict[str, Any],
         seed: int | None = None,
+        has_explicit_warm_start: bool = False,
     ) -> MCMC:
         """Run NUTS sampling with fallback to uniform initialization.
 
         Args:
             seed: Random seed for reproducibility. If None, uses 0.
+            has_explicit_warm_start: Whether the caller has a genuine warm
+                start (either caller-supplied `initial_values` or a prior
+                `.fit()` call), as opposed to `warm_start_values` merely being
+                non-empty because `_build_warm_start_values` always fills in
+                bounds-midpoint fallbacks. Computed by the caller from the raw
+                `initial_values`/`fitted_` state, not re-derived here, since
+                `bool(warm_start_values)` is always True in practice and
+                cannot distinguish a genuine warm start from a synthesized one.
         """
         _, _, _, MCMC, NUTS, init_to_uniform, init_to_value = _import_numpyro()
 
@@ -559,10 +650,10 @@ class BayesianMixin:
         # Use provided seed or default to 0 for reproducibility
         rng_seed = seed if seed is not None else 0
 
-        # Warm-start-aware NUTS defaults
-        has_warm_start = (
-            bool(warm_start_values) and hasattr(self, "fitted_") and self.fitted_
-        )
+        # Warm-start-aware NUTS defaults. Gated on the caller-computed
+        # has_explicit_warm_start flag (not re-derived from warm_start_values,
+        # which is always non-empty — see docstring above).
+        has_warm_start = has_explicit_warm_start
         if has_warm_start:
             nuts_kwargs.setdefault("target_accept_prob", 0.90)
             nuts_kwargs.setdefault("max_tree_depth", 8)
@@ -615,8 +706,14 @@ class BayesianMixin:
             rng_key = jax.random.PRNGKey(rng_seed)
             # R12-B-009: include "diverging" so _process_mcmc_results can report
             # per-transition divergence counts without a second MCMC.get_extra_fields() call.
+            # "energy" is the true Hamiltonian (potential + kinetic) NumPyro already
+            # computes every step; requesting it is free and lets bayesian_result.py
+            # report a correct BFMI instead of approximating from potential_energy alone.
             sampler.run(
-                rng_key, X_jax, y_jax, extra_fields=("potential_energy", "diverging")
+                rng_key,
+                X_jax,
+                y_jax,
+                extra_fields=("potential_energy", "energy", "diverging"),
             )
             return sampler
 
@@ -624,7 +721,10 @@ class BayesianMixin:
             logger.debug("Running MCMC sampling")
             result = run_mcmc(init_strategy)
             logger.debug("MCMC sampling completed successfully")
-            self._nuts_init_strategy = "warm_start"
+            # Do NOT unconditionally reset to "warm_start" here: if the
+            # `init_to_value` construction above already failed and downgraded
+            # this to "uniform_fallback", that is what actually ran and must
+            # be preserved for _process_mcmc_results()'s diagnostics.
             return result
         except RuntimeError as e:
             if "Cannot find valid initial parameters" in str(e):
@@ -685,6 +785,16 @@ class BayesianMixin:
             samples_grouped = None
             samples = mcmc.get_samples()
 
+        # Surface the NaN-guard's per-draw activity (numpyro.deterministic
+        # "num_nonfinite" in build_numpyro_model) so a model that is quietly
+        # hitting the ODE NaN guard on a meaningful fraction of draws is
+        # visible in diagnostics instead of silently dropped by the
+        # param_names/sigma-prefix filtering below. Not every model defines
+        # this site, so default to 0 when absent.
+        nonfinite_draws = (
+            int(np.sum(samples["num_nonfinite"])) if "num_nonfinite" in samples else 0
+        )
+
         # Convert to numpy arrays (model parameters only)
         posterior_samples = {}
         for name in param_names:
@@ -743,6 +853,7 @@ class BayesianMixin:
         diagnostics["init_strategy"] = init_strategy
         if init_strategy == "uniform_fallback":
             diagnostics["warm_start_failed"] = True
+        diagnostics["nonfinite_draws"] = nonfinite_draws
 
         return BayesianResult(
             posterior_samples=posterior_samples,
@@ -759,9 +870,14 @@ class BayesianMixin:
     ) -> dict[str, np.ndarray]:
         """Sample from prior distributions over parameter bounds.
 
-        Samples from uniform prior distributions defined by parameter bounds.
-        This is useful for prior predictive checks and understanding the prior's
-        influence on the posterior.
+        Mirrors the exact prior-selection order used by the NUTS model builder
+        (numpyro_model_builder.build_numpyro_model): bayesian_prior_factory
+        override -> Parameter.prior dict (via prior_dict_to_dist) -> alpha-suffixed
+        Beta(2,2) for bounded fractional-order parameters -> Uniform(lower, upper)
+        fallback -> constant for near-degenerate bounds. This guarantees
+        sample_prior() draws from the same distribution NUTS actually samples,
+        which is useful for prior predictive checks and understanding the
+        prior's influence on the posterior.
 
         Args:
             num_samples: Number of samples to draw from prior (default: 1000)
@@ -787,7 +903,9 @@ class BayesianMixin:
                 "Class must have 'parameters' attribute (ParameterSet)"
             )
 
-        rng = np.random.default_rng(seed)
+        _, dist, dist_transforms, *_ = _import_numpyro()
+        key = jax.random.PRNGKey(seed if seed is not None else 0)
+        prior_factory = getattr(self, "bayesian_prior_factory", None)
         prior_samples = {}
 
         for param_name in self.parameters:
@@ -805,16 +923,44 @@ class BayesianMixin:
             lower = float(lower) if lower is not None else -1e10
             upper = float(upper) if upper is not None else 1e10
 
-            # Respect user-specified prior distribution if available
-            prior = getattr(param, "prior", None)
-            if isinstance(prior, dict) and prior.get("type") == "beta":
-                a_val = float(prior.get("a", 2.0))
-                b_val = float(prior.get("b", 2.0))
-                unit_samples = rng.beta(a=a_val, b=b_val, size=num_samples)
-                samples = (lower + unit_samples * (upper - lower)).astype(np.float64)
+            key, subkey = jax.random.split(key)
+
+            # Same selection order as build_numpyro_model's numpyro_model():
+            # 1) bayesian_prior_factory override, 2) Parameter.prior dict,
+            # 3) alpha-suffix Beta(2,2), 4) Uniform fallback (or constant for
+            # near-degenerate bounds).
+            custom_dist = None
+            if callable(prior_factory):
+                custom_dist = prior_factory(param_name, lower, upper)
+
+            if custom_dist is None:
+                param_prior = getattr(param, "prior", None)
+                if isinstance(param_prior, dict):
+                    custom_dist = prior_dict_to_dist(param_prior, dist)
+
+            if custom_dist is not None:
+                samples = np.asarray(
+                    custom_dist.sample(subkey, (num_samples,)), dtype=np.float64
+                )
+            elif param_name.lower().endswith("alpha") and 0.0 <= lower < upper <= 1.0:
+                beta_base = dist.Beta(concentration1=2.0, concentration0=2.0)
+                if lower == 0.0 and upper == 1.0:
+                    beta_dist = beta_base
+                else:
+                    scale = upper - lower
+                    beta_trans = dist_transforms.AffineTransform(loc=lower, scale=scale)
+                    beta_dist = dist.TransformedDistribution(beta_base, beta_trans)
+                samples = np.asarray(
+                    beta_dist.sample(subkey, (num_samples,)), dtype=np.float64
+                )
+            elif abs(upper - lower) < 1e-10 * max(abs(lower), 1.0):
+                # PARAMS-001: near-degenerate bounds — NUTS uses a deterministic
+                # constant rather than sampling, so mirror that here.
+                samples = np.full(num_samples, lower, dtype=np.float64)
             else:
-                samples = rng.uniform(low=lower, high=upper, size=num_samples).astype(
-                    np.float64
+                uniform_dist = dist.Uniform(low=lower, high=upper)
+                samples = np.asarray(
+                    uniform_dist.sample(subkey, (num_samples,)), dtype=np.float64
                 )
 
             prior_samples[param_name] = samples
@@ -910,6 +1056,7 @@ class BayesianMixin:
         y: np.ndarray | None = None,
         test_mode: str | TestMode | None = None,
         num_chains: int = 4,
+        **protocol_kwargs,
     ) -> float:
         """Precompile NUTS kernel to eliminate JIT overhead in subsequent calls.
 
@@ -926,6 +1073,12 @@ class BayesianMixin:
             Sample output data. If None, generates dummy data.
         test_mode : str or TestMode, optional
             Test mode to precompile for. If None, defaults to 'relaxation'.
+        **protocol_kwargs
+            Protocol-specific kwargs (e.g. strain, omega_laos, lam_init) to
+            forward to the model builder. Must match the kwargs the real
+            fit_bayesian() call will use, otherwise the closure cache key
+            computed here will not match the real call's key and the warmed
+            closure will be a cache miss.
 
         Returns
         -------
@@ -971,9 +1124,18 @@ class BayesianMixin:
             self._validate_bayesian_requirements()
             self._validate_parameter_bounds()
 
+            # I/O boundary validation: same check fit_bayesian() enforces —
+            # reject shape-mismatched/ambiguous y before it reaches JAX prep.
+            self._validate_xy_shapes(X_array, y_array)
+
             # Prepare JAX data
             jax_data = self._prepare_jax_data(X_array, y_array)
             is_complex_data = jax_data["is_complex"]
+
+            # I/O boundary validation: same check fit_bayesian() enforces —
+            # callers are expected to pass their real X/y here to warm the
+            # JIT cache (see docstring), so bad input must fail the same way.
+            self._validate_finite_inputs(jax_data["X_jax"], jax_data["y_jax"])
 
             # Get parameter info
             param_names = list(self.parameters)
@@ -986,6 +1148,7 @@ class BayesianMixin:
                 test_mode=test_mode,
                 is_complex_data=is_complex_data,
                 scale_info=jax_data["scale_info"],
+                **protocol_kwargs,
             )
 
             # Build warm-start values
@@ -1013,6 +1176,8 @@ class BayesianMixin:
                     num_chains=num_chains,
                     nuts_kwargs={"progress_bar": False, "target_accept_prob": 0.5},
                     seed=0,
+                    has_explicit_warm_start=hasattr(self, "fitted_")
+                    and self.fitted_,
                 )
             except Exception as e:
                 logger.warning(
@@ -1168,6 +1333,21 @@ class BayesianMixin:
                 self._validate_bayesian_requirements()
                 self._validate_parameter_bounds()
 
+                # Reject initial_values keys that don't match a real parameter
+                # name (typo, stale key from a renamed/dropped parameter) here,
+                # before any warm-start construction. Silently dropping them
+                # would fall back to a midpoint init for that parameter while
+                # has_explicit_warm_start (below) still reports a genuine warm
+                # start, defeating the warm-start contract with no diagnostic.
+                if initial_values:
+                    unknown = set(initial_values) - set(self.parameters)
+                    if unknown:
+                        raise ValueError(
+                            "initial_values contains unrecognized parameter "
+                            f"name(s): {sorted(unknown)}; expected one of "
+                            f"{sorted(self.parameters)}"
+                        )
+
                 # Phase 2: Resolve test_mode and extract data
                 X_array, y_from_rheo, test_mode = self._resolve_test_mode(X, test_mode)
                 y_array = y_from_rheo if y_from_rheo is not None else y
@@ -1176,6 +1356,11 @@ class BayesianMixin:
                         "fit_bayesian() requires `y` when `X` is not a RheoData "
                         "instance (no observations to fit)."
                     )
+
+                # I/O boundary validation: reject shape-mismatched/ambiguous y
+                # (e.g. an accidental (N, 1) column vector) before it reaches
+                # _prepare_jax_data's complex real/imag split.
+                self._validate_xy_shapes(X_array, y_array)
 
                 # R12-B-004: On success, _test_mode is permanently updated.
                 self._test_mode = test_mode
@@ -1204,6 +1389,13 @@ class BayesianMixin:
                 y_jax = jax_data["y_jax"]
                 is_complex_data = jax_data["is_complex"]
                 scale_info = jax_data["scale_info"]
+
+                # I/O boundary validation: reject NaN/Inf in X or y before they
+                # reach NUTS (see _validate_finite_inputs), where they'd
+                # otherwise produce silent divergences or opaque sampler
+                # failures instead of a clear error. The y<=0 check below does
+                # not catch +/-Inf on its own (Inf > 0 is True).
+                self._validate_finite_inputs(X_jax, y_jax)
 
                 # Log-space likelihood requires real, strictly positive data
                 # (LogNormal support is (0, ∞)). Fail loudly rather than produce
@@ -1252,6 +1444,9 @@ class BayesianMixin:
                 )
 
                 # Phase 8: Run NUTS sampling with multi-chain parallelization
+                has_explicit_warm_start = bool(initial_values) or (
+                    hasattr(self, "fitted_") and self.fitted_
+                )
                 mcmc = self._run_nuts_sampling(
                     numpyro_model=numpyro_model,
                     X_jax=X_jax,
@@ -1262,6 +1457,7 @@ class BayesianMixin:
                     num_chains=num_chains,
                     nuts_kwargs=nuts_kwargs,
                     seed=seed,
+                    has_explicit_warm_start=has_explicit_warm_start,
                 )
 
                 # Phase 9: Process results
@@ -1270,7 +1466,9 @@ class BayesianMixin:
                 )
 
                 # Add diagnostics to log context
-                log_ctx["divergences"] = result.diagnostics.get("divergences", 0)
+                divergences = result.diagnostics.get("divergences", 0)
+                diagnostics_valid = result.diagnostics.get("diagnostics_valid", True)
+                log_ctx["divergences"] = divergences
                 r_hat_vals = result.diagnostics.get("r_hat", {}).values()
                 ess_vals = result.diagnostics.get("ess", {}).values()
                 _finite_r_hats = [v for v in r_hat_vals if np.isfinite(v)]
@@ -1283,10 +1481,33 @@ class BayesianMixin:
                 logger.info(
                     "Bayesian inference completed",
                     model=model_name,
-                    divergences=result.diagnostics.get("divergences", 0),
+                    divergences=divergences,
                     r_hat_max=max_r_hat,
                     ess_min=min_ess,
                 )
+
+                # Fail loudly (not just via logger, which may have no handler
+                # configured — see NullHandler default) when diagnostics
+                # indicate the posterior may not be trustworthy: divergences,
+                # an R-hat above the canonical convergence threshold, or
+                # compute_diagnostics itself flagging diagnostics_valid=False.
+                if (
+                    (np.isfinite(max_r_hat) and max_r_hat > R_HAT_THRESHOLD)
+                    or divergences > 0
+                    or not diagnostics_valid
+                    or (np.isfinite(min_ess) and min_ess < ESS_THRESHOLD)
+                ):
+                    warnings.warn(
+                        "Bayesian fit has questionable convergence diagnostics: "
+                        f"max R-hat={max_r_hat:.4f} (threshold {R_HAT_THRESHOLD}), "
+                        f"divergences={divergences}, "
+                        f"min ESS={min_ess:.1f} (threshold {ESS_THRESHOLD}), "
+                        f"diagnostics_valid={diagnostics_valid}. Inspect "
+                        "result.diagnostics and trace plots before trusting "
+                        "the posterior.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
 
                 _fit_bayesian_succeeded = True
                 return result

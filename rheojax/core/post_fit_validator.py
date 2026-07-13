@@ -5,9 +5,11 @@ Extracted from BaseModel.fit() to reduce its cyclomatic complexity.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.io._exceptions import RheoJaxPhysicsWarning
 from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
@@ -18,6 +20,13 @@ if TYPE_CHECKING:
     type ArrayLike = np.ndarray
 
 logger = get_logger(__name__)
+
+
+class RheoJaxUncertaintyWarning(UserWarning):
+    """Emitted when uncertainty computation (hessian/bootstrap) fails to run.
+
+    Subclasses UserWarning so standard warning filters apply.
+    """
 
 
 class PostFitValidator:
@@ -31,23 +40,29 @@ class PostFitValidator:
             model: Fitted BaseModel instance.
         """
         try:
-            import warnings as _warnings
-
-            from rheojax.io._exceptions import RheoJaxPhysicsWarning
             from rheojax.utils.physics_checks import check_fit_physics
 
             violations = check_fit_physics(model)
             for v in violations:
-                _warnings.warn(
+                warnings.warn(
                     f"{v.check}: {v.message} ({v.parameter}={v.value})",
                     RheoJaxPhysicsWarning,
                     stacklevel=3,
                 )
         except Exception as exc:
-            logger.debug(
+            # check_physics is advisory: a bug in one check rule must not crash
+            # fit(), but check_physics=True still promises RheoJaxPhysicsWarning
+            # on violations, so a failure to even run has to be visible too.
+            logger.warning(
                 "Physics check failed",
                 model=model.__class__.__name__,
                 error=str(exc),
+                exc_info=True,
+            )
+            warnings.warn(
+                f"check_physics failed to run: {exc}",
+                RheoJaxPhysicsWarning,
+                stacklevel=3,
             )
 
     @staticmethod
@@ -70,21 +85,33 @@ class PostFitValidator:
         Returns:
             Uncertainty result dict, or None on failure.
         """
+        if uncertainty not in ("hessian", "bootstrap"):
+            raise ValueError(
+                f"Unknown uncertainty method: {uncertainty!r}. "
+                "Expected 'hessian' or 'bootstrap'."
+            )
+
         try:
             from rheojax.utils.uncertainty import bootstrap_ci, hessian_ci
 
             if uncertainty == "hessian":
                 return hessian_ci(model, X, y, test_mode=test_mode)
-            elif uncertainty == "bootstrap":
-                return bootstrap_ci(model, X, y, test_mode=test_mode)
             else:
-                logger.warning("Unknown uncertainty method", method=uncertainty)
-                return None
+                return bootstrap_ci(model, X, y, test_mode=test_mode)
         except Exception as exc:
+            # Mirror check_physics's policy: a failure to even run has to be
+            # visible, not just logged, otherwise the caller gets a FitResult
+            # that silently lacks uncertainty metadata.
             logger.warning(
                 "Uncertainty computation failed",
                 model=model.__class__.__name__,
                 method=uncertainty,
                 error=str(exc),
+                exc_info=True,
+            )
+            warnings.warn(
+                f"Uncertainty computation ({uncertainty}) failed to run: {exc}",
+                RheoJaxUncertaintyWarning,
+                stacklevel=3,
             )
             return None

@@ -96,12 +96,34 @@ def _enable_compilation_cache(jax_module: Any) -> None:
     if os.environ.get("RHEOJAX_NO_JIT_CACHE", "0") == "1":
         return
 
-    cache_dir = pathlib.Path.home() / ".cache" / "rheojax" / "jax_cache"
+    try:
+        cache_dir = pathlib.Path.home() / ".cache" / "rheojax" / "jax_cache"
+    except RuntimeError:
+        # Non-fatal: home directory can't be resolved (e.g. containers with no
+        # $HOME and no matching /etc/passwd entry) -- skip the compilation cache.
+        return
+
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)
         # JAX >= 0.4.25: preferred config-based API
         jax_module.config.update("jax_compilation_cache_dir", str(cache_dir))
+        # Default min-compile-time-to-cache is 1.0s in installed JAX, which
+        # silently skips persisting the sub-second compiles typical of
+        # rheology models. Lower it so those are actually cached.
+        jax_module.config.update("jax_persistent_cache_min_compile_time_secs", 0.05)
     except (OSError, RuntimeError, AttributeError, TypeError):
+        # The experimental fallback API below has no equivalent to
+        # jax_persistent_cache_min_compile_time_secs, so the 1.0s-default
+        # problem the primary path fixes silently re-appears here. Warn so
+        # this doesn't fail silently.
+        warnings.warn(
+            "JAX compilation cache: primary config API unavailable, falling "
+            "back to the experimental compilation_cache API. This fallback "
+            "has no min-compile-time-secs knob, so sub-second JIT compiles "
+            "(typical for rheology models) will not be persisted to disk.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         try:
             # Fallback: older JAX experimental API
             from jax.experimental.compilation_cache import compilation_cache as cc
@@ -255,9 +277,14 @@ def reset_validation() -> None:
     This function is intended for use in tests that need to simulate
     different import scenarios. It should not be used in production code.
 
-    Warning:
-        This is not thread-safe and should only be used in single-threaded
-        test environments.
+    Note:
+        The state mutation itself is atomic and lock-guarded (it acquires the
+        same ``_validation_lock`` used by ``safe_import_jax()``), so no torn
+        or partial state is observable by concurrent callers. The caveat is
+        purely sequencing: a thread that captured ``jax``/``jnp`` references
+        before a concurrent reset keeps using those still-valid-but-stale
+        modules until it calls ``safe_import_jax()`` again, which will
+        legitimately re-run import/config/validation logic.
     """
     global _validation_done, _jax_module, _jnp_module
 

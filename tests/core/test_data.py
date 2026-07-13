@@ -259,6 +259,19 @@ class TestRheoDataMetadata:
         # Check that copy is independent
         assert "new_key" not in data2.metadata
 
+    def test_constructor_does_not_alias_caller_metadata(self):
+        """Two RheoData built from the same dict must not share state, and
+        the constructor must not mutate the caller's original dict either."""
+        shared = {"temperature": 25.0}
+        d1 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]), metadata=shared)
+        d2 = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]), metadata=shared)
+
+        d1.update_metadata({"sample": "A"})
+
+        assert d1.metadata is not d2.metadata
+        assert "sample" not in d2.metadata
+        assert "sample" not in shared
+
 
 class TestRheoDataDomainSupport:
     """Test time/frequency domain support."""
@@ -408,6 +421,25 @@ class TestRheoDataSerialization:
         assert restored.y_units == original.y_units
         assert restored.domain == original.domain
 
+    def test_from_dict_validates_by_default(self):
+        """from_dict() is a deserialization boundary and should validate
+        by default, catching NaN in an externally-edited payload."""
+        data_dict = {
+            "x": [1, 2, 3],
+            "y": [10, float("nan"), 30],
+        }
+        with pytest.raises(ValueError, match="NaN"):
+            RheoData.from_dict(data_dict)
+
+    def test_from_dict_validate_false_opt_out(self):
+        """Callers may still opt out of validation explicitly."""
+        data_dict = {
+            "x": [1, 2, 3],
+            "y": [10, float("nan"), 30],
+        }
+        data = RheoData.from_dict(data_dict, validate=False)
+        assert np.isnan(data.y).any()
+
 
 class TestRheoDataOperations:
     """Test data operations and transformations."""
@@ -547,12 +579,30 @@ class TestRheoDataConstructorEdges:
         assert isinstance(data.y, np.ndarray)
         np.testing.assert_allclose(data.y, [4, 5, 6])
 
+    def test_scalar_xy_raises_value_error(self):
+        """0-d scalar x/y must raise a clear ValueError, not IndexError."""
+        with pytest.raises(ValueError, match="0-d"):
+            RheoData(x=5, y=10)
+
     def test_update_metadata_test_mode_invalidates_detection(self):
         """Setting test_mode via update_metadata syncs explicit mode and clears cache."""
         data = RheoData(x=np.array([1, 2, 3]), y=np.array([4, 5, 6]))
         data.update_metadata({"test_mode": "creep"})
         assert data._explicit_test_mode == "creep"
         assert "detected_test_mode" not in data.metadata
+        assert data.test_mode == "creep"
+
+    def test_direct_metadata_mutation_overrides_test_mode(self):
+        """Directly mutating metadata['test_mode'] (bypassing update_metadata)
+        must be reflected by the test_mode property, per its own docstring
+        ('If explicitly set in metadata["test_mode"], returns that value')."""
+        data = RheoData(
+            x=np.array([1, 2, 3]),
+            y=np.array([4, 5, 6]),
+            initial_test_mode="relaxation",
+        )
+        assert data.test_mode == "relaxation"
+        data.metadata["test_mode"] = "creep"
         assert data.test_mode == "creep"
 
 
@@ -834,6 +884,16 @@ class TestRheoDataOperationBranches:
         out = data.interpolate(jnp.array([1.5, 2.5, 3.5]))
         np.testing.assert_allclose(np.asarray(out.y), [15.0, 25.0, 35.0])
 
+    def test_interpolate_unsorted_mixed_sign_numpy(self):
+        """x that is neither strictly increasing nor strictly decreasing
+        (validate=True only warns) must still interpolate correctly."""
+        x = np.array([1.0, 5.0, 2.0, 4.0, 3.0])
+        y = np.array([10.0, 50.0, 20.0, 40.0, 30.0])
+        with pytest.warns(UserWarning, match="not monotonic"):
+            data = RheoData(x=x, y=y, validate=True)
+        out = data.interpolate(np.array([3.5, 4.5]))
+        np.testing.assert_allclose(out.y, [35.0, 45.0])
+
     def test_interpolate_complex_numpy(self):
         x = np.array([1.0, 2.0, 3.0])
         y = np.array([1 + 1j, 2 + 2j, 3 + 3j])
@@ -932,6 +992,16 @@ class TestRheoDataOperationBranches:
         out = data.derivative()
         assert out.y_units == "d(Pa)/d(s)"
 
+    def test_derivative_duplicate_x_raises(self):
+        """Duplicate adjacent x (warn-only in validation) causes zero
+        spacing in np.gradient; derivative() must raise, not return NaN."""
+        x = np.array([0.0, 1.0, 1.0, 2.0, 3.0])
+        y = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+        with pytest.warns(UserWarning, match="not monotonic"):
+            data = RheoData(x=x, y=y, validate=True)
+        with pytest.raises(ValueError, match="non-finite"):
+            data.derivative()
+
     def test_integral_jax(self):
         x = jnp.linspace(0, 10, 100)
         y = jnp.ones_like(x)
@@ -975,6 +1045,20 @@ class TestRheoDataDomainConversion:
             x=np.array([0.1, 1.0, 10.0]), y=np.array([1.0, 2.0, 3.0]),
             domain="frequency",
         )
+        with pytest.raises(NotImplementedError):
+            data.to_time_domain()
+
+    def test_non_canonical_domain_not_implemented_not_warn(self):
+        """A non-canonical domain (e.g. 'scalar', as produced by
+        mutation_number transforms) is neither 'time' nor 'frequency', so
+        both conversion methods must fall through to NotImplementedError
+        instead of the '!=' bug that made them both claim success."""
+        data = RheoData(
+            x=np.array([0.0]), y=np.array([1.0]),
+            domain="scalar", validate=False,
+        )
+        with pytest.raises(NotImplementedError):
+            data.to_frequency_domain()
         with pytest.raises(NotImplementedError):
             data.to_time_domain()
 
@@ -1092,3 +1176,131 @@ class TestRheoDataNoneGuards:
         data.y = None
         with pytest.raises(ValueError, match="requires non-None"):
             _ = data.y_imag
+
+
+class TestRheoData2DYContract:
+    """RheoData's own accessors (is_complex/y_real/y_imag/modulus/phase/
+    storage_modulus/loss_modulus) must correctly split the real-valued
+    (N,2) DMTA/GMM convention (G', G'' as separate columns), not just
+    complex-dtype y — this is the root-cause fix for the contract mismatch
+    where __post_init__ documented/allowed (N,2) y but the accessors only
+    ever checked np.iscomplexobj and silently returned the full array."""
+
+    def _2d_data(self):
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.column_stack([[3.0, 6.0, 1.0], [4.0, 8.0, 0.0]])
+        return RheoData(x=x, y=y, domain="frequency")
+
+    def test_2d_y_still_constructs_without_opt_in(self):
+        """A real-valued (N,2) y must remain constructible (e.g. GMM/multimode
+        model.fit(omega, G_star) with G_star built via np.column_stack passes
+        raw 2-D y straight through FitOrchestrator's RheoData validation)."""
+        data = self._2d_data()
+        assert data.y.shape == (3, 2)
+
+    def test_2d_y_is_complex_true(self):
+        """is_complex must recognize the (N,2) convention, not just complex dtype."""
+        assert self._2d_data().is_complex is True
+
+    def test_2d_y_real_imag_split_columns(self):
+        """y_real/y_imag must split the two columns (G', G''), not return
+        the full (N,2) array unchanged (the original silent-bug behavior)."""
+        data = self._2d_data()
+        np.testing.assert_allclose(data.y_real, [3.0, 6.0, 1.0])
+        np.testing.assert_allclose(data.y_imag, [4.0, 8.0, 0.0])
+
+    def test_2d_y_modulus_phase(self):
+        data = self._2d_data()
+        np.testing.assert_allclose(data.modulus, [5.0, 10.0, 1.0])
+        np.testing.assert_allclose(
+            data.phase, np.arctan2([4.0, 8.0, 0.0], [3.0, 6.0, 1.0])
+        )
+
+    def test_2d_y_storage_loss_modulus(self):
+        data = self._2d_data()
+        np.testing.assert_allclose(data.storage_modulus, [3.0, 6.0, 1.0])
+        np.testing.assert_allclose(data.loss_modulus, [4.0, 8.0, 0.0])
+
+    def test_2d_y_matches_equivalent_complex_construction(self):
+        """The (N,2) convention and the complex-dtype convention must agree
+        on every accessor for the same underlying G'/G'' values."""
+        x = np.array([1.0, 2.0, 3.0])
+        two_d = RheoData(
+            x=x, y=np.column_stack([[3.0, 6.0, 1.0], [4.0, 8.0, 0.0]]),
+            domain="frequency",
+        )
+        complex_ = RheoData(
+            x=x, y=np.array([3 + 4j, 6 + 8j, 1 + 0j]), domain="frequency"
+        )
+        np.testing.assert_allclose(two_d.y_real, complex_.y_real)
+        np.testing.assert_allclose(two_d.y_imag, complex_.y_imag)
+        np.testing.assert_allclose(two_d.modulus, complex_.modulus)
+        np.testing.assert_allclose(two_d.phase, complex_.phase)
+
+
+class TestRheoDataDtypeAndShapeValidation:
+    """Dtype and x.ndim boundary checks at the RheoData construction contract."""
+
+    def test_bool_x_rejected(self):
+        x = np.array([True, False, True, True, False])
+        y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        with pytest.raises(ValueError, match="x data must be"):
+            RheoData(x=x, y=y)
+
+    def test_bool_y_rejected(self):
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([True, False, True])
+        with pytest.raises(ValueError, match="y data must be"):
+            RheoData(x=x, y=y)
+
+    def test_object_dtype_x_rejected(self):
+        x = np.array([1.0, 2.0, "3.0"], dtype=object)
+        y = np.array([1.0, 2.0, 3.0])
+        with pytest.raises(ValueError, match="x data must be"):
+            RheoData(x=x, y=y)
+
+    def test_int_x_and_y_still_allowed(self):
+        """Integer dtype is legitimate numeric data, not a mask — must not
+        be rejected by the new dtype check."""
+        data = RheoData(x=np.array([0, 1, 2, 3, 4]), y=np.array([0, 1, 0, 1, 0]))
+        assert data.x.dtype.kind in "iu"
+
+    def test_complex_y_still_allowed(self):
+        """Complex y (DMTA/GMM complex modulus) must remain valid."""
+        data = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([1 + 2j, 3 + 4j, 5 + 6j]),
+            domain="frequency",
+        )
+        assert data.is_complex
+
+    def test_2d_x_rejected(self):
+        """A (N,1) x (common pandas df[['col']].values footgun) must raise,
+        not silently pass through to model.X_data unreshaped."""
+        x = np.array([[1.0], [2.0], [3.0], [4.0], [5.0]])
+        y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        with pytest.raises(ValueError, match="1-dimensional"):
+            RheoData(x=x, y=y)
+
+    def test_y_3_columns_rejected(self):
+        """y with shape (N, 3) is neither the plain (N,) nor the (N, 2)
+        DMTA/GMM G'/G'' convention the class supports — must raise, not
+        silently pass through as if it were valid scalar data."""
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        with pytest.raises(ValueError, match="unsupported|2-dimensional"):
+            RheoData(x=x, y=y)
+
+    def test_y_3d_rejected(self):
+        """y with ndim > 2 must raise."""
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.zeros((3, 2, 2))
+        with pytest.raises(ValueError, match="unsupported|2-dimensional"):
+            RheoData(x=x, y=y)
+
+    def test_y_2_columns_still_allowed(self):
+        """The documented (N, 2) DMTA/GMM convention must still construct."""
+        x = np.array([1.0, 2.0, 3.0])
+        y = np.array([[1.0, 0.5], [2.0, 1.0], [3.0, 1.5]])
+        data = RheoData(x=x, y=y)
+        assert data.y.shape == (3, 2)

@@ -1225,3 +1225,108 @@ class TestJAXSupport:
 
         expected = jnp.exp(batch)
         assert jnp.allclose(result, expected)
+
+
+class TestFitPredictZeroDimensional:
+    """Regression test: fit_predict()'s debug-log shape computation must not
+    crash on a 0-d array input (same root cause as BaseModel.predict())."""
+
+    def test_fit_predict_with_0d_array_no_typeerror(self):
+        """0-d X must not raise TypeError from len() before fit() even runs."""
+
+        class DummyModel(BaseModel):
+            def _fit(self, X, y, **kwargs):
+                return self
+
+            def _predict(self, X):
+                return X
+
+            def fit(self, X, y, **kwargs):
+                # Bypass FitOrchestrator entirely; this isolates the
+                # data_shape debug-log computation in fit_predict() itself.
+                self.fitted_ = True
+                return self
+
+        model = DummyModel()
+        X = np.array(5.0)
+        y = np.array(100.0)
+        result = model.fit_predict(X, y)
+        assert float(result) == 5.0
+
+
+class TestStandardNlsqFitTestModeOverride:
+    """Regression test: _standard_nlsq_fit must honor an explicit test_mode
+    override even when X is a RheoData with its own embedded test_mode."""
+
+    def test_explicit_test_mode_overrides_rheodata_test_mode(self):
+        from rheojax.core.data import RheoData
+
+        class LinearModel(BaseModel):
+            def __init__(self):
+                super().__init__()
+                self.parameters = ParameterSet()
+                self.parameters.add("a", value=1.0, bounds=(0.0, 10.0))
+
+            def _fit(self, X, y, **kwargs):
+                def model_fn(x, params):
+                    return params[0] * x
+
+                return self._standard_nlsq_fit(X, y, model_fn, **kwargs)
+
+            def _predict(self, X):
+                return X * self.parameters.get_value("a")
+
+        model = LinearModel()
+        x = np.array([1.0, 2.0, 3.0, 4.0])
+        y = np.array([2.0, 4.0, 6.0, 8.0])
+        rheo_data = RheoData(x=x, y=y, initial_test_mode="relaxation")
+
+        model._fit(rheo_data, None, test_mode="oscillation", max_iter=5)
+
+        assert model._test_mode == "oscillation"
+
+
+class TestTransformPipelineExtrasPassthrough:
+    """Regression test: TransformPipeline must not silently drop a tuple
+    (data, extras) return from the pipeline's final transform step."""
+
+    def test_pipeline_preserves_last_step_extras(self):
+        from rheojax.core.base import TransformPipeline
+
+        class PassthroughTransform(BaseTransform):
+            def _transform(self, data):
+                return data
+
+        class ExtrasTransform(BaseTransform):
+            def _transform(self, data):
+                return data, {"shift_factor": 2.0}
+
+        pipeline = TransformPipeline([PassthroughTransform(), ExtrasTransform()])
+        result = pipeline.transform(np.array([1.0, 2.0, 3.0]))
+
+        assert isinstance(result, tuple)
+        data, extras = result
+        assert extras == {"shift_factor": 2.0}
+        assert np.array_equal(data, np.array([1.0, 2.0, 3.0]))
+
+    def test_pipeline_still_unwraps_mid_pipeline_extras(self):
+        """Mid-pipeline tuple returns must still be unwrapped so the next
+        step receives only the data, not a (data, extras) tuple."""
+        from rheojax.core.base import TransformPipeline
+
+        class ExtrasTransform(BaseTransform):
+            def _transform(self, data):
+                return data, {"shift_factor": 2.0}
+
+        class RecordingTransform(BaseTransform):
+            def _transform(self, data):
+                self.received = data
+                return data
+
+        recorder = RecordingTransform()
+        pipeline = TransformPipeline([ExtrasTransform(), recorder])
+        result = pipeline.transform(np.array([1.0, 2.0, 3.0]))
+
+        assert not isinstance(recorder.received, tuple)
+        assert np.array_equal(recorder.received, np.array([1.0, 2.0, 3.0]))
+        assert not isinstance(result, tuple)

@@ -269,6 +269,280 @@ class TestDivergenceReporting:
         # Divergences should be a non-negative integer (actual count)
         assert result.diagnostics["divergences"] >= 0
 
+    @pytest.mark.smoke
+    def test_divergence_extraction_failure_preserves_r_hat_and_ess(self):
+        """A broad (non-TypeError/KeyError/AttributeError) failure while
+        counting divergences must not discard already-computed r_hat/ess.
+
+        Regression test: previously only (KeyError, AttributeError) were
+        caught around divergence extraction, so e.g. a RuntimeError from
+        mcmc.get_extra_fields() propagated to the outer handler, which
+        unconditionally overwrote diagnostics['r_hat']/['ess'] with NaN
+        even though they had already been computed successfully.
+        """
+        from rheojax.core.bayesian_diagnostics import compute_diagnostics
+
+        class _BrokenDivergenceMCMC:
+            def get_extra_fields(self, *args, **kwargs):
+                raise RuntimeError("simulated device error")
+
+        rng = np.random.default_rng(0)
+        posterior_samples = {
+            "a": rng.normal(0.0, 1.0, 400),
+            "b": rng.normal(0.0, 1.0, 400),
+        }
+
+        diagnostics = compute_diagnostics(
+            mcmc=_BrokenDivergenceMCMC(),
+            posterior_samples=posterior_samples,
+            num_samples=200,
+            num_chains=2,
+        )
+
+        # r_hat/ess must be the real computed values, not NaN fallback
+        assert np.isfinite(diagnostics["r_hat"]["a"])
+        assert np.isfinite(diagnostics["r_hat"]["b"])
+        assert np.isfinite(diagnostics["ess"]["a"])
+        assert np.isfinite(diagnostics["ess"]["b"])
+        # Divergence count is unknown, and diagnostics as a whole are marked
+        # invalid, but the successful sub-results are not clobbered.
+        assert diagnostics["divergences"] == -1
+        assert diagnostics["diagnostics_valid"] is False
+
+    @pytest.mark.smoke
+    def test_all_nan_diagnostics_mark_invalid(self):
+        """diagnostics_valid must be False when r_hat/ess are NaN without a raise.
+
+        Regression test: numpyro's split_gelman_rubin/effective_sample_size
+        return NaN (not an exception) for degenerate/constant chains. The old
+        code only flipped all_succeeded inside the except branch, so a clean
+        NaN return left diagnostics_valid=True even though every parameter's
+        r_hat/ess was NaN.
+        """
+        from rheojax.core.bayesian_diagnostics import compute_diagnostics
+
+        class _CleanMCMC:
+            def get_extra_fields(self, *args, **kwargs):
+                return {"diverging": np.zeros((2, 100), dtype=bool)}
+
+        # Constant (zero-variance) samples for every parameter, every chain —
+        # numpyro returns NaN for these without raising.
+        posterior_samples = {
+            "a": np.ones(200),
+            "b": np.full(200, 3.0),
+        }
+
+        diagnostics = compute_diagnostics(
+            mcmc=_CleanMCMC(),
+            posterior_samples=posterior_samples,
+            num_samples=100,
+            num_chains=2,
+        )
+
+        assert np.isnan(diagnostics["r_hat"]["a"])
+        assert np.isnan(diagnostics["r_hat"]["b"])
+        assert diagnostics["divergences"] == 0
+        assert diagnostics["diagnostics_valid"] is False
+
+
+# ---------------------------------------------------------------------------
+# BFMI (E-BFMI) computation
+# ---------------------------------------------------------------------------
+
+
+class TestBFMI:
+    """Verify compute_diagnostics() computes BFMI from the energy extra field."""
+
+    @pytest.mark.smoke
+    def test_bfmi_computed_from_energy_field(self):
+        """A well-mixing synthetic energy trace should give a finite BFMI."""
+        from rheojax.core.bayesian_diagnostics import compute_diagnostics
+
+        rng = np.random.default_rng(0)
+        energy = rng.normal(10.0, 1.0, size=(2, 100))
+
+        class _EnergyMCMC:
+            def get_extra_fields(self, *args, **kwargs):
+                return {
+                    "diverging": np.zeros((2, 100), dtype=bool),
+                    "energy": energy,
+                }
+
+        posterior_samples = {
+            "a": rng.normal(0.0, 1.0, 200),
+            "b": rng.normal(0.0, 1.0, 200),
+        }
+
+        diagnostics = compute_diagnostics(
+            mcmc=_EnergyMCMC(),
+            posterior_samples=posterior_samples,
+            num_samples=100,
+            num_chains=2,
+        )
+
+        assert "bfmi" in diagnostics
+        assert np.isfinite(diagnostics["bfmi"])
+
+        # Cross-check against the direct formula (matches
+        # rheojax.gui.foundation.metrics.bfmi): mean(diff(E)**2) / var(E),
+        # reduced to the worst (minimum) chain.
+        expected = min(
+            float(np.mean(np.diff(chain) ** 2) / np.var(chain)) for chain in energy
+        )
+        assert diagnostics["bfmi"] == pytest.approx(expected)
+
+    @pytest.mark.smoke
+    def test_bfmi_nan_when_energy_field_unavailable(self):
+        """Missing 'energy' extra field should yield NaN, not a crash."""
+        from rheojax.core.bayesian_diagnostics import compute_diagnostics
+
+        class _NoEnergyMCMC:
+            def get_extra_fields(self, *args, **kwargs):
+                return {"diverging": np.zeros((2, 100), dtype=bool)}
+
+        rng = np.random.default_rng(1)
+        posterior_samples = {
+            "a": rng.normal(0.0, 1.0, 200),
+            "b": rng.normal(0.0, 1.0, 200),
+        }
+
+        diagnostics = compute_diagnostics(
+            mcmc=_NoEnergyMCMC(),
+            posterior_samples=posterior_samples,
+            num_samples=100,
+            num_chains=2,
+        )
+
+        assert np.isnan(diagnostics["bfmi"])
+        # Absence of the energy field is a normal "unavailable" state, not a
+        # diagnostics failure — r_hat/ess/divergences are unaffected.
+        assert diagnostics["diagnostics_valid"] is True
+
+    @pytest.mark.smoke
+    def test_bfmi_nan_chain_does_not_mask_worst_chain(self):
+        """A NaN-valued chain must not hide a genuinely low BFMI chain.
+
+        Regression test: the old code reduced chain_bfmis with Python's
+        min(), which is order-dependent in the presence of NaN (all
+        comparisons against NaN are False). A chain whose energy trace
+        overflowed to NaN could silently swallow the real worst (lowest)
+        BFMI from a different, genuinely poorly-mixing chain, depending on
+        list order. np.nanmin is order-independent and must be used instead.
+        """
+        from rheojax.core.bayesian_diagnostics import compute_bfmi
+
+        rng = np.random.default_rng(2)
+        # Chain 0: genuinely poor mixing (tiny variance in diffs relative to
+        # var) -> low BFMI. Chain 1: NaN energy trace (simulated leapfrog
+        # overflow).
+        good_chain = rng.normal(10.0, 1.0, size=100)
+        nan_chain = np.full(100, np.nan)
+
+        class _MockMCMC:
+            def __init__(self, energy):
+                self._energy = energy
+
+            def get_extra_fields(self, group_by_chain=False):
+                return {"energy": self._energy}
+
+        # Order 1: [poor-mixing, NaN] — old min() would return NaN here too
+        # in some numpy/py versions, but the critical case is order 2.
+        mcmc_a = _MockMCMC(np.stack([good_chain, nan_chain]))
+        bfmi_a = compute_bfmi(mcmc_a, num_chains=2)
+
+        # Order 2: [NaN, poor-mixing] — old min() definitely returns NaN
+        # here since nan compares False against everything that follows.
+        mcmc_b = _MockMCMC(np.stack([nan_chain, good_chain]))
+        bfmi_b = compute_bfmi(mcmc_b, num_chains=2)
+
+        expected = float(
+            np.mean(np.diff(good_chain) ** 2) / np.var(good_chain)
+        )
+        assert bfmi_a == pytest.approx(expected)
+        assert bfmi_b == pytest.approx(expected)
+
+    @pytest.mark.smoke
+    def test_bfmi_below_threshold_marks_diagnostics_invalid(self):
+        """A finite BFMI below BFMI_THRESHOLD must gate diagnostics_valid.
+
+        Regression test: BFMI was computed and stored in diagnostics but
+        never folded into all_valid/diagnostics_valid, so a genuinely poor
+        E-BFMI (<0.3) with healthy-looking r_hat/ess returned silently with
+        diagnostics_valid=True.
+        """
+        from rheojax.core.bayesian_diagnostics import compute_diagnostics
+
+        rng = np.random.default_rng(3)
+        # Slow random-walk energy trace: step-to-step diffs are tiny (small
+        # BFMI numerator) while the cumulative drift makes the marginal
+        # energy variance large (large BFMI denominator) -> BFMI well below
+        # the 0.3 threshold. This is the textbook "energy barely explores
+        # between draws" poor-mixing signature.
+        poor_energy = np.stack(
+            [np.cumsum(rng.normal(0.0, 0.05, size=100)) for _ in range(2)]
+        )
+
+        class _PoorBfmiMCMC:
+            def get_extra_fields(self, *args, **kwargs):
+                return {
+                    "diverging": np.zeros((2, 100), dtype=bool),
+                    "energy": poor_energy,
+                }
+
+        posterior_samples = {
+            "a": rng.normal(0.0, 1.0, 200),
+            "b": rng.normal(0.0, 1.0, 200),
+        }
+
+        diagnostics = compute_diagnostics(
+            mcmc=_PoorBfmiMCMC(),
+            posterior_samples=posterior_samples,
+            num_samples=100,
+            num_chains=2,
+        )
+
+        assert np.isfinite(diagnostics["bfmi"])
+        assert diagnostics["bfmi"] < 0.3
+        assert diagnostics["diagnostics_valid"] is False
+
+    @pytest.mark.smoke
+    def test_bfmi_group_by_chain_fallback_reshapes_per_chain(self):
+        """Legacy get_extra_fields() (no group_by_chain support) must reshape
+        the flat concatenated energy trace by num_chains, not treat it as a
+        single chain.
+
+        Regression test: compute_bfmi had no num_chains parameter, so on the
+        TypeError fallback path it did `energy[None, :]` on the flat
+        concatenated array, taking np.diff across chain boundaries and
+        collapsing multi-chain worst-case semantics into a single corrupted
+        value.
+        """
+        from rheojax.core.bayesian_diagnostics import compute_bfmi
+
+        rng = np.random.default_rng(4)
+        chain_a = rng.normal(10.0, 1.0, size=100)
+        chain_b = rng.normal(10.0, 5.0, size=100)  # different scale/mixing
+        flat_energy = np.concatenate([chain_a, chain_b])
+
+        class _LegacyMCMC:
+            """Simulates an older NumPyro without group_by_chain kwarg."""
+
+            def get_extra_fields(self):
+                return {"energy": flat_energy}
+
+        bfmi = compute_bfmi(_LegacyMCMC(), num_chains=2)
+
+        expected = min(
+            float(np.mean(np.diff(chain) ** 2) / np.var(chain))
+            for chain in (chain_a, chain_b)
+        )
+        # Flattened (wrong) single-chain value for comparison — must NOT match.
+        wrong = float(
+            np.mean(np.diff(flat_energy) ** 2) / np.var(flat_energy)
+        )
+        assert bfmi == pytest.approx(expected)
+        assert bfmi != pytest.approx(wrong)
+
 
 # ---------------------------------------------------------------------------
 # score() NaN handling fix
