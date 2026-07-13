@@ -100,3 +100,19 @@ def test_context_menu_targets_clicked_item_not_current_selection(qtbot, monkeypa
         rail._on_context_menu_requested(pos)
 
     assert blocker.args == ["d2"]
+
+
+def test_context_menu_delete_action_emits_dataset_delete_requested(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMenu
+
+    library = DatasetLibrary()
+    library.add(_ref("d1"))
+    rail = LibraryRail(library)
+    qtbot.addWidget(rail)
+    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[1])
+    pos = rail._list.visualItemRect(rail._list.item(0)).center()
+
+    with qtbot.waitSignal(rail.dataset_delete_requested, timeout=1000) as blocker:
+        rail._on_context_menu_requested(pos)
+
+    assert blocker.args == ["d1"]

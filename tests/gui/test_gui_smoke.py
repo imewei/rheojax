@@ -726,6 +726,16 @@ class TestQtIntegration:
         assert parse_args(["--workspace"]).workspace is True
 
     @pytest.mark.smoke
+    def test_legacy_deprecation_warning_prints_to_stderr(self, capsys) -> None:
+        """--legacy prints a deprecation warning, mirroring --workspace's."""
+        from rheojax.gui.main import _warn_legacy_deprecated
+
+        _warn_legacy_deprecated()
+
+        captured = capsys.readouterr()
+        assert "WARNING: --legacy is deprecated" in captured.err
+
+    @pytest.mark.smoke
     def test_create_workspace_window_reachable_from_entrypoint(self, qapp) -> None:
         """The exact function --workspace triggers must build a real WorkspaceWindow.
 

@@ -17,6 +17,7 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 class LibraryRail(QWidget):
     dataset_selected = Signal(str)
     dataset_preview_requested = Signal(str)
+    dataset_delete_requested = Signal(str)
     import_requested = Signal()
 
     def __init__(self, library: DatasetLibrary, parent: QWidget | None = None) -> None:
@@ -54,6 +55,7 @@ class LibraryRail(QWidget):
             return
         menu = QMenu(self)
         preview_action = menu.addAction("Preview…")
+        delete_action = menu.addAction("Delete…")
         # ponytail: call via QMenu.exec(menu, ...) rather than menu.exec(...) --
         # functionally identical, but PySide6 6.11's instance attribute lookup
         # bypasses Python-level monkeypatching of QMenu.exec (class-level
@@ -62,6 +64,8 @@ class LibraryRail(QWidget):
         chosen = QMenu.exec(menu, self._list.mapToGlobal(pos))
         if chosen is preview_action:
             self.dataset_preview_requested.emit(item.data(Qt.ItemDataRole.UserRole))
+        elif chosen is delete_action:
+            self.dataset_delete_requested.emit(item.data(Qt.ItemDataRole.UserRole))
 
     def count(self) -> int:
         return self._list.count()

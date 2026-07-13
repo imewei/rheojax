@@ -90,6 +90,7 @@ class WorkspaceWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
         self.log_dock.setVisible(False)
         self._build_view_menu()
+        self._build_help_menu()
 
         self._build_workspace(app_state)
         self._setup_os_theme_watcher()
@@ -188,6 +189,44 @@ class WorkspaceWindow(QMainWindow):
         theme_menu.addAction(self._theme_light_action)
         theme_menu.addAction(self._theme_dark_action)
         theme_menu.addAction(self._theme_system_action)
+
+    def _build_help_menu(self) -> None:
+        menu = self.menuBar().addMenu("&Help")
+        menu.addAction("&Documentation", self._on_open_docs)
+        menu.addAction("&Tutorials", self._on_open_tutorials)
+        menu.addAction("&Keyboard Shortcuts", self._on_show_shortcuts)
+        menu.addSeparator()
+        menu.addAction("&About RheoJAX", self._on_about)
+
+    def _on_open_docs(self) -> None:
+        import webbrowser
+
+        webbrowser.open("https://rheojax.readthedocs.io")
+
+    def _on_open_tutorials(self) -> None:
+        import webbrowser
+
+        webbrowser.open("https://rheojax.readthedocs.io/en/latest/tutorials/")
+
+    def _on_show_shortcuts(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        shortcuts = """
+<h3>Keyboard Shortcuts</h3>
+<table>
+<tr><td><b>Ctrl+N</b></td><td>New Project</td></tr>
+<tr><td><b>Ctrl+O</b></td><td>Open Project</td></tr>
+<tr><td><b>Ctrl+S</b></td><td>Save Project</td></tr>
+<tr><td><b>Ctrl+Shift+S</b></td><td>Save Project As</td></tr>
+<tr><td><b>Ctrl+K</b></td><td>Command Palette</td></tr>
+</table>
+        """
+        QMessageBox.information(self, "Keyboard Shortcuts", shortcuts)
+
+    def _on_about(self) -> None:
+        from rheojax.gui.dialogs.about import AboutDialog
+
+        AboutDialog(self).exec()
 
     def _apply_theme(self, theme: str) -> None:
         """Apply a QSS theme to the QApplication and sync UI/state.
@@ -367,6 +406,7 @@ class WorkspaceWindow(QMainWindow):
             self._on_dataset_preview_requested
         )
         self._rail.dataset_selected.connect(self._on_rail_dataset_selected)
+        self._rail.dataset_delete_requested.connect(self._on_dataset_delete_requested)
         self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
@@ -488,6 +528,12 @@ class WorkspaceWindow(QMainWindow):
             pass
         try:
             self._rail.dataset_selected.disconnect(self._on_rail_dataset_selected)
+        except (RuntimeError, TypeError):
+            pass
+        try:
+            self._rail.dataset_delete_requested.disconnect(
+                self._on_dataset_delete_requested
+            )
         except (RuntimeError, TypeError):
             pass
         from rheojax.gui.compat import _is_qobject_alive
@@ -858,6 +904,59 @@ class WorkspaceWindow(QMainWindow):
         self._preview_dialog.show()
         self._preview_dialog.raise_()
         self._preview_dialog.activateWindow()
+
+    def _on_dataset_delete_requested(self, dataset_id: str) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        with self._state.library.lock:
+            try:
+                ref = self._state.library.get(dataset_id)
+            except KeyError:
+                self.log_dock.append_record(
+                    logging.WARNING,
+                    f"Delete requested for unknown dataset id: {dataset_id}",
+                )
+                return
+
+        # Mirrors _blocked_by_active_jobs (used for Save/Close): a running fit
+        # or Pipeline batch job reads a dataset's payload via
+        # library.load_payload() from a worker thread. Deleting the dataset
+        # out from under that read would pop the payload mid-job instead of
+        # failing cleanly, so check ActiveJobsState (keyed by dataset id)
+        # before offering the confirm-delete prompt at all.
+        # NOTE: This guard only covers by_id entries keyed by dataset id; a
+        # future producer reading payload on a worker thread while registering
+        # under a different key (e.g. job id) would silently bypass this check.
+        with self._state.active_jobs.lock:
+            has_active_job = dataset_id in self._state.active_jobs.by_id
+        if has_active_job:
+            QMessageBox.warning(
+                self,
+                "Delete Dataset",
+                "A job is currently running on this dataset. Wait for it to "
+                "finish (or cancel it) before deleting.",
+            )
+            return
+
+        choice = QMessageBox.question(
+            self,
+            "Delete Dataset",
+            f'Delete dataset "{ref.name}"? This cannot be undone.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+
+        with self._state.library.lock:
+            self._state.library.remove(dataset_id)
+        self._notifier.changed.emit()
+        self.log_dock.append_record(logging.INFO, f'Deleted dataset "{ref.name}"')
+        # ponytail: a derived dataset's DatasetRef.lineage may reference this
+        # id afterward -- lineage is provenance/display metadata only (never
+        # dereferenced at runtime, per DatasetLibrary's own field comment), so
+        # this is a known, accepted display-only gap, not a functional one.
+        # Clean up lineage entries if a future spec makes lineage load-bearing.
 
     def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
         # Hold the library's lock across both calls so a concurrent reader never

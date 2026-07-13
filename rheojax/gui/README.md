@@ -8,7 +8,7 @@ RheoJAX GUI has two main implementations:
 
 1. **Workspace Shell** (Default, new): Modern mode-based interface with Fit, Transform, and Pipeline modes. Launched by `rheojax-gui` with no flags. Located in `foundation/` (core models) and `workspace/` (UI shell). Includes project save/load and batch pipeline execution.
 
-2. **Legacy Main Window** (Page-based, older): Original page-based navigation with sidebar pages. Launched with `rheojax-gui --legacy`. Located in `app/`, `pages/`, `state/`. Still fully functional but no longer the default.
+2. **Legacy Main Window** (Page-based, older, deprecated): Original page-based navigation with sidebar pages. Launched with `rheojax-gui --legacy`, which now prints a deprecation warning on startup. Located in `app/`, `pages/`, `state/`. Still fully functional during the current soak period; scheduled for removal in a future release.
 
 **This document describes the legacy architecture.** For the workspace shell, see `workspace/README.md`.
 
