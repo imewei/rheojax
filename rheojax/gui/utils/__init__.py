@@ -2,8 +2,7 @@
 GUI Utilities
 ============
 
-Configuration, JAX utilities, layout helpers, provenance, seed management,
-and platform-safe icons.
+Configuration, JAX utilities, layout helpers, provenance, and platform-safe icons.
 """
 
 __all__ = [
@@ -11,7 +10,6 @@ __all__ = [
     "IconProvider",
     "JaxUtils",
     "Provenance",
-    "SeedManager",
     "StandardIcon",
     "apply_group_box_style",
     "emoji_safe",
@@ -45,10 +43,6 @@ def __getattr__(name: str):
         from rheojax.gui.utils.provenance import Provenance
 
         return Provenance
-    elif name == "SeedManager":
-        from rheojax.gui.utils.seeds import SeedManager
-
-        return SeedManager
     elif name == "IconProvider":
         from rheojax.gui.utils.icons import IconProvider
 
