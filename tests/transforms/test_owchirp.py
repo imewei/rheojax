@@ -211,6 +211,125 @@ class TestOWChirp:
         assert jnp.all(jnp.isfinite(spectrum_narrow.y))
         assert jnp.all(jnp.isfinite(spectrum_wide.y))
 
+    def test_nonzero_time_origin_not_all_zero(self):
+        """Regression: a signal with a nonzero absolute time origin must not
+        produce an all-zero spectrum (was caused by the wavelet being built
+        at a fixed t_center=0.0 on the raw physical time array)."""
+        t = jnp.linspace(1000, 1100, 5000)
+        signal = jnp.sin(2 * jnp.pi * 1.0 * t)
+        data = RheoData(x=t, y=signal, domain="time")
+
+        ow = OWChirp(n_frequencies=50, frequency_range=(0.1, 10))
+        spectrum = ow.transform(data)
+
+        assert float(jnp.max(spectrum.y)) > 0.0
+
+        freqs = np.array(spectrum.x)
+        spec = np.array(spectrum.y)
+        peak_freq = freqs[np.argmax(spec)]
+        assert 0.5 < peak_freq < 2.0
+
+    def test_high_frequency_peak_not_mis_centered(self):
+        """Regression: a 5 Hz signal must peak near 5 Hz, not collapse to the
+        frequency_range minimum (caused by the mis-centered, causal-clipped
+        wavelet envelope that narrows and loses energy as frequency grows)."""
+        t = jnp.linspace(0, 100, 5000)
+        signal = jnp.sin(2 * jnp.pi * 5.0 * t)
+        data = RheoData(x=t, y=signal, domain="time")
+
+        ow = OWChirp(n_frequencies=50, frequency_range=(0.1, 10))
+        spectrum = ow.transform(data)
+
+        freqs = np.array(spectrum.x)
+        spec = np.array(spectrum.y)
+        peak_freq = freqs[np.argmax(spec)]
+        assert 4.0 < peak_freq < 6.5
+
+    def test_amplitude_calibration_across_frequencies(self):
+        """Regression: unit-amplitude sinusoids at different frequencies must
+        yield comparable peak spectrum magnitude (was >100x apart due to the
+        unnormalized Gaussian envelope combined with a mismatched /sqrt(f)
+        compensation)."""
+        t = jnp.linspace(0, 100, 5000)
+        peaks = []
+        for f in (0.1, 1.0, 10.0):
+            signal = jnp.sin(2 * jnp.pi * f * t)
+            data = RheoData(x=t, y=signal, domain="time")
+            ow = OWChirp(n_frequencies=80, frequency_range=(0.01, 100))
+            spectrum = ow.transform(data)
+            peaks.append(float(jnp.max(spectrum.y)))
+
+        # Previously ranged from 16.81 to 0.13 (>100x). Now should be tight.
+        assert max(peaks) / min(peaks) < 2.0
+
+    def test_harmonic_amplitude_ratio_matches_true_nonlinearity(self):
+        """Regression: I3/I1 extracted via get_harmonics must match the true
+        injected nonlinearity ratio, not be skewed by frequency-dependent
+        normalization defects."""
+        t = jnp.linspace(0, 100, 5000)
+        omega = 2 * jnp.pi * 1.0
+        signal = jnp.sin(omega * t) + 0.3 * jnp.sin(3 * omega * t)
+        data = RheoData(x=t, y=signal, domain="time")
+
+        ow = OWChirp(
+            n_frequencies=80, frequency_range=(0.1, 10), extract_harmonics=True
+        )
+        harmonics = ow.get_harmonics(data, fundamental_freq=1.0)
+
+        _, fundamental_amp = harmonics["fundamental"]
+        _, third_amp = harmonics["third"]
+        ratio = third_amp / fundamental_amp
+
+        # True ratio is 0.3; previously measured 0.079 (off by 3.8x).
+        assert 0.2 < ratio < 0.4
+
+    def test_frequency_range_lower_bound_must_be_positive(self):
+        """Regression: frequency_range[0] <= 0 must raise, not silently
+        collapse most of the log-spaced frequency array to 0.0."""
+        with pytest.raises(ValueError, match="frequency_range"):
+            OWChirp(n_frequencies=10, frequency_range=(0.0, 10.0))
+
+        with pytest.raises(ValueError, match="frequency_range"):
+            OWChirp(frequency_range=(-1.0, 10.0))
+
+    def test_max_harmonic_above_ninth_is_not_silently_dropped(self):
+        """Regression: max_harmonic > 9 (e.g. 11) must appear in the returned
+        dict instead of being computed and discarded."""
+        t = jnp.linspace(0, 100, 5000)
+        omega = 2 * jnp.pi * 1.0
+        signal = jnp.sin(omega * t) + 0.1 * jnp.sin(11 * omega * t)
+        data = RheoData(x=t, y=signal, domain="time")
+
+        ow = OWChirp(
+            n_frequencies=100,
+            frequency_range=(0.1, 15),
+            extract_harmonics=True,
+            max_harmonic=11,
+        )
+        harmonics = ow.get_harmonics(data, fundamental_freq=1.0)
+
+        assert any(
+            freq_amp[0] == pytest.approx(11.0) for freq_amp in harmonics.values()
+        )
+
+    def test_direct_and_fft_wavelet_paths_agree(self):
+        """Regression: the private direct/vmap implementation (_wavelet_transform)
+        must agree with the production FFT-based path (_optimized_wavelet_transform)
+        so it cannot silently diverge if ever wired up or reused."""
+        t = jnp.linspace(0, 20, 200)
+        signal = jnp.sin(2 * jnp.pi * 1.0 * t)
+        signal = signal - jnp.mean(signal)
+        frequencies = jnp.array([0.5, 1.0, 2.0])
+
+        ow = OWChirp()
+        direct = ow._wavelet_transform(t, signal, frequencies)
+        fft_based = ow._optimized_wavelet_transform(t, signal, frequencies)
+
+        direct_spectrum = jnp.mean(jnp.abs(direct), axis=1)
+        fft_spectrum = jnp.mean(jnp.abs(fft_based), axis=1)
+
+        assert jnp.allclose(direct_spectrum, fft_spectrum, rtol=0.15)
+
     def test_metadata_preservation(self):
         """Test metadata preservation."""
         t = jnp.linspace(0, 20, 1000)

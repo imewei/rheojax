@@ -101,6 +101,41 @@ class TestCoxMerz:
         result, meta = transform.transform([osc, flow_stress])
         assert meta["cox_merz_result"].mean_deviation < 0.15
 
+    def test_mpa_s_y_units_converted_to_si(self):
+        """Flow-curve viscosity labeled 'mPa.s' must be scaled by 1e-3, not
+        used at face value, so physically-matching data still passes."""
+        osc, flow = self._make_matching_data()
+        # Same physical viscosity as `flow`, but expressed in mPa.s (1000x
+        # the Pa.s numeric value) and labeled accordingly.
+        flow_mpas = RheoData(
+            x=flow.x,
+            y=np.asarray(flow.y) * 1000.0,
+            y_units="mPa.s",
+            metadata={"test_mode": "flow_curve", "is_viscosity": True},
+        )
+        transform = CoxMerz(tolerance=0.1)
+        result, meta = transform.transform([osc, flow_mpas])
+        assert meta["cox_merz_result"].passes is True
+        assert meta["cox_merz_result"].mean_deviation < 0.1
+
+    def test_kpa_stress_y_units_converted_to_si(self):
+        """Flow-curve stress labeled 'kPa' must be scaled by 1e3, not used
+        at face value, so physically-matching data still passes."""
+        osc, flow = self._make_matching_data()
+        gamma_dot = np.asarray(flow.x)
+        eta = np.asarray(flow.y)
+        sigma_kpa = (eta * gamma_dot) / 1000.0  # stress in kPa
+
+        flow_stress_kpa = RheoData(
+            x=gamma_dot,
+            y=sigma_kpa,
+            y_units="kPa",
+            metadata={"test_mode": "flow_curve"},
+        )
+        transform = CoxMerz(tolerance=0.1)
+        result, meta = transform.transform([osc, flow_stress_kpa])
+        assert meta["cox_merz_result"].mean_deviation < 0.15
+
     def test_zero_viscosity_no_nan(self):
         """Zero viscosity values should not produce NaN/inf in log interpolation."""
         omega = np.logspace(-1, 1, 20)

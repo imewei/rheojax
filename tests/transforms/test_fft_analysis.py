@@ -107,6 +107,56 @@ class TestFFTAnalysis:
         assert jnp.all(psd_data.y >= 0)
         assert psd_data.y_units == "PSD"
 
+    def test_psd_magnitude_matches_scipy_periodogram(self):
+        """PSD scale must correct for window power loss (sum(w**2)), not just n.
+
+        Regression test for the default window='hann': the old dt/n scaling
+        under-reported PSD magnitude by a window-dependent factor (~2.7x for
+        Hann) relative to the standard periodogram/Welch definition used by
+        scipy.signal.periodogram(..., window='hann').
+        """
+        from scipy.signal import periodogram
+
+        n = 1000
+        fs = 100.0
+        t = np.arange(n) / fs
+        f0 = 5.0
+        signal = np.sin(2 * np.pi * f0 * t)
+        data = RheoData(x=jnp.array(t), y=jnp.array(signal), domain="time")
+
+        fft = FFTAnalysis(window="hann", detrend=False, return_psd=True)
+        psd_data = fft.transform(data)
+
+        ref_freqs, ref_psd = periodogram(signal, fs=fs, window="hann")
+
+        # Compare at the peak frequency bin, where the two frequency grids
+        # (rfftfreq vs scipy) coincide.
+        peak_idx = int(np.argmax(np.array(psd_data.y)))
+        ref_idx = int(np.argmax(ref_psd))
+        assert np.array(psd_data.x)[peak_idx] == pytest.approx(
+            ref_freqs[ref_idx], abs=1e-6
+        )
+        assert float(np.array(psd_data.y)[peak_idx]) == pytest.approx(
+            ref_psd[ref_idx], rel=0.05
+        )
+
+    def test_psd_normalize_noop_warns(self, caplog):
+        """normalize=True must not be silently ignored when return_psd=True."""
+        import logging
+
+        t = jnp.linspace(0, 10, 1000)
+        signal = jnp.sin(2 * jnp.pi * 1.0 * t)
+        data = RheoData(x=t, y=signal, domain="time")
+
+        fft = FFTAnalysis(return_psd=True, normalize=True)
+        with caplog.at_level(logging.WARNING):
+            fft.transform(data)
+
+        assert any(
+            "normalize" in record.getMessage() and "return_psd" in record.getMessage()
+            for record in caplog.records
+        )
+
     def test_inverse_fft(self):
         """Test round-trip FFT → inverse FFT."""
         # Create signal
@@ -212,6 +262,42 @@ class TestFFTAnalysis:
         fft = FFTAnalysis()
         with pytest.raises(ValueError, match="time-domain"):
             fft.transform(data)
+
+    def test_non_monotonic_time_raises(self):
+        """A backward step buried in an otherwise-increasing array must raise.
+
+        Regression test: np.diff(t) = [1, 1, -0.5, 1.5, 1] has median=1.0 > 0,
+        so a median-only dt<=0 check would miss the non-monotonicity and feed
+        unsorted knots into interpax's interpolator, producing silently wrong
+        resampled data instead of an error.
+        """
+        t = jnp.array([0.0, 1.0, 2.0, 1.5, 3.0, 4.0])
+        signal = jnp.sin(t)
+        # RheoData only warns (not errors) on non-monotonic x, so this path
+        # is reachable from ordinary construction.
+        with pytest.warns(UserWarning, match="not monotonic"):
+            data = RheoData(x=t, y=signal, domain="time")
+
+        fft = FFTAnalysis()
+        with pytest.raises(ValueError, match="monotonically increasing"):
+            fft.transform(data)
+
+    def test_frequency_units_only_hz_for_seconds(self):
+        """x_units='Hz' must only be stamped when the input was in seconds."""
+        t_min = jnp.linspace(0, 10, 1000)
+        signal = jnp.sin(2 * jnp.pi * 1.0 * t_min)
+        data = RheoData(x=t_min, y=signal, domain="time", x_units="min")
+
+        fft = FFTAnalysis()
+        freq_data = fft.transform(data)
+
+        assert freq_data.x_units != "Hz"
+        assert freq_data.x_units == "1/min"
+
+        t_sec = jnp.linspace(0, 10, 1000)
+        data_sec = RheoData(x=t_sec, y=signal, domain="time", x_units="s")
+        freq_data_sec = fft.transform(data_sec)
+        assert freq_data_sec.x_units == "Hz"
 
     def test_complex_data_handling(self):
         """Test FFT with complex input data."""

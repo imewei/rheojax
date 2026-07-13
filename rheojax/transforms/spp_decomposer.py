@@ -229,7 +229,7 @@ class SPPDecomposer(BaseTransform):
         # Compute period and number of cycles
         T_period = 2 * jnp.pi / self.omega
         total_time = float(t[-1] - t[0])
-        n_cycles_total = max(1, int(total_time / T_period))
+        n_cycles_total = max(1, int(jnp.round(total_time / T_period)))
 
         # Determine cycle range
         actual_start = max(0, min(self.start_cycle, n_cycles_total - 1))
@@ -238,10 +238,16 @@ class SPPDecomposer(BaseTransform):
         else:
             actual_end = min(self.end_cycle, n_cycles_total)
 
-        # If no valid range, use all data
+        # An invalid range (e.g. end_cycle <= start_cycle after clamping) means
+        # the caller's explicit cycle selection cannot be honored -- raise
+        # rather than silently falling back to analyzing all cycles.
         if actual_start >= actual_end:
-            mask = jnp.ones(len(t), dtype=bool)
-            return mask, 0, n_cycles_total
+            raise ValueError(
+                f"Invalid cycle range: start_cycle={self.start_cycle}, "
+                f"end_cycle={self.end_cycle} resolved to (start={actual_start}, "
+                f"end={actual_end}) out of {n_cycles_total} available cycle(s). "
+                "end_cycle must resolve to a value greater than start_cycle."
+            )
 
         # Calculate time bounds for selected cycles
         t_start = float(t[0]) + actual_start * T_period
@@ -468,6 +474,7 @@ class SPPDecomposer(BaseTransform):
                 dt,
                 n_harmonics=self.n_harmonics,
                 n_cycles=n_cycles_obs,
+                looped=self.wrap_strain_rate,
             )
             fsf_data_out = core_results["fsf_data_out"]
             ft_out = core_results.get("ft_out")

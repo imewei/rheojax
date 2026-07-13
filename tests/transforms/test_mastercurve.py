@@ -178,6 +178,80 @@ class TestMastercurve:
         assert mc.get_shift_factor(298.15) == 1.0
         assert mc.get_shift_factor(323.15) == 0.5
 
+    def test_manual_shift_factor_missing_temperature_raises(self):
+        """get_shift_factor must not silently fall back to 1.0 for an unknown T."""
+        mc = Mastercurve()
+        mc.set_manual_shifts({273.15: 2.0, 298.15: 1.0, 323.15: 0.5})
+
+        with pytest.raises(ValueError, match="No manual shift factor"):
+            mc.get_shift_factor(310.0)
+
+    def test_optimize_shifts_true_raises_not_implemented(self):
+        """optimize_shifts=True is documented but unimplemented; must raise."""
+        with pytest.raises(NotImplementedError):
+            Mastercurve(optimize_shifts=True)
+
+    def test_transform_single_time_domain_matches_create_mastercurve(self):
+        """transform() on a single time-domain dataset must match the
+        (correct) domain-aware shift applied by create_mastercurve()."""
+        time = jnp.logspace(-2, 2, 20)
+        relaxation_modulus = 1e5 * time ** (-0.3)
+
+        data = RheoData(
+            x=time,
+            y=relaxation_modulus,
+            domain="time",
+            metadata={"temperature": 273.15},
+        )
+
+        mc = Mastercurve(
+            reference_temp=298.15, method="arrhenius", E_a=50000.0
+        )
+        a_T = mc.get_shift_factor(273.15)
+        assert a_T > 1.0  # sanity: below T_ref should slow down (aT > 1)
+
+        # Single-dataset path (the class docstring's `mc.transform(data)` usage).
+        shifted_single = mc.transform(data)
+        ratio_single = float(shifted_single.x[0] / data.x[0])
+
+        # Multi-dataset path (merge=False) for the identical dataset.
+        [shifted_multi] = mc.create_mastercurve([data], merge=False)
+        ratio_multi = float(shifted_multi.x[0] / data.x[0])
+
+        # Both entry points must apply the reciprocal (divide-by-aT) convention
+        # for time-domain data, not the multiply-by-aT frequency convention.
+        assert ratio_single == pytest.approx(1.0 / a_T, rel=1e-8)
+        assert ratio_single == pytest.approx(ratio_multi, rel=1e-8)
+
+    def test_auto_shift_time_domain_multiplies_not_divides(self):
+        """auto_shift on time-domain data must apply aT as a direct x
+        multiplier (matching what _compute_auto_shift_factors recovers),
+        not divide by it as the physically-defined-method convention does."""
+        x_ref = np.logspace(-1, 1, 30)
+        true_shift = 3.0
+        x_i = x_ref / true_shift  # so that x_ref = x_i * true_shift
+
+        y = 1e4 * x_ref ** (-0.5)
+
+        data_ref = RheoData(
+            x=x_ref, y=y, domain="time", metadata={"temperature": 298.15}
+        )
+        data_i = RheoData(
+            x=x_i, y=y, domain="time", metadata={"temperature": 273.15}
+        )
+
+        mc = Mastercurve(reference_temp=298.15, auto_shift=True)
+        shifted = mc.create_mastercurve([data_i, data_ref], merge=False)
+
+        shifted_i = next(
+            d for d in shifted if d.metadata["temperature"] == 273.15
+        )
+        aT_i = shifted_i.metadata["horizontal_shift"]
+        ratio = float(np.asarray(shifted_i.x)[0] / np.asarray(data_i.x)[0])
+
+        # Must multiply by aT (collapsing onto the reference curve), not divide.
+        assert ratio == pytest.approx(aT_i, rel=1e-6)
+
     def test_missing_temperature_error(self):
         """Test error when temperature is missing."""
         freq = jnp.logspace(-2, 2, 30)

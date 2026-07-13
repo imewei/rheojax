@@ -61,7 +61,8 @@ class FFTAnalysis(BaseTransform):
     return_psd : bool, default=False
         If True, return power spectral density instead of FFT magnitude
     normalize : bool, default=True
-        Whether to normalize the FFT result
+        Whether to normalize the FFT result. No effect when return_psd=True
+        (PSD is always returned in physical units; a warning is logged).
 
     Examples
     --------
@@ -240,12 +241,16 @@ class FFTAnalysis(BaseTransform):
             # Compute frequencies and check spacing before windowing/FFT
             # R8-FFT-001: use median diff for robust dt estimation (handles log-spaced time)
             dt_values = np.diff(np.asarray(t))
-            dt = float(np.median(dt_values))
-            if dt <= 0:
+            # Every step must be strictly positive: a majority-positive median
+            # (e.g. one backward step buried in an otherwise increasing array)
+            # would pass a median-only check yet still be non-monotonic, which
+            # feeds unsorted knots into interpax's interpolator below.
+            if np.any(dt_values <= 0):
                 raise ValueError(
-                    "Time array must be monotonically increasing for FFT "
-                    f"(got dt={dt:.3e})"
+                    "Time array must be strictly monotonically increasing for "
+                    f"FFT (found non-positive step(s); min diff={np.min(dt_values):.3e})"
                 )
+            dt = float(np.median(dt_values))
             if np.std(dt_values) / dt > 0.1:  # >10% variation in spacing
                 logger.warning(
                     "Non-uniform time spacing detected (std/mean=%.2f). "
@@ -280,9 +285,15 @@ class FFTAnalysis(BaseTransform):
 
             # Compute magnitude or PSD
             if self.return_psd:
-                # Power spectral density
+                # Power spectral density. Normalize by sum(window**2), not n:
+                # a window's power loss (e.g. Hann's ~0.375*n effective power)
+                # must be corrected for, per the standard periodogram/Welch
+                # definition (scipy.signal.periodogram/welch use
+                # fs*sum(win**2) in the denominator; dt/sum(win**2) is the
+                # equivalent since fs = 1/dt).
                 logger.debug("Computing power spectral density")
-                spectrum = jnp.abs(fft_result) ** 2 * (dt / n)
+                window_power = jnp.sum(window**2)
+                spectrum = jnp.abs(fft_result) ** 2 * (dt / window_power)
                 # One-sided PSD: double non-DC, non-Nyquist bins
                 spectrum = spectrum.at[1:-1].set(spectrum[1:-1] * 2.0)
             else:
@@ -298,6 +309,14 @@ class FFTAnalysis(BaseTransform):
                 logger.debug("Normalizing spectrum")
                 max_val = jnp.max(spectrum)
                 spectrum = jnp.where(max_val > 1e-12, spectrum / max_val, spectrum)
+            elif self.normalize and self.return_psd:
+                # normalize has no effect on PSD output (PSD must stay in
+                # physical units to remain meaningful) — say so instead of
+                # silently ignoring the flag.
+                logger.warning(
+                    "normalize=True has no effect when return_psd=True; "
+                    "PSD is returned in physical units, not rescaled to [0,1]."
+                )
 
             # Create metadata
             new_metadata = (data.metadata or {}).copy()
@@ -322,11 +341,21 @@ class FFTAnalysis(BaseTransform):
             ctx["output_shape"] = (len(freqs),)
             ctx["frequency_range"] = (float(freqs[0]), float(freqs[-1]))
 
+            # Frequency units are the reciprocal of the input time units.
+            # Only stamp "Hz" when the input was actually seconds — otherwise
+            # a "Hz" label would misrepresent e.g. minutes-based data by 60x.
+            if not data.x_units:
+                freq_units = None
+            elif data.x_units.lower() in ("s", "sec", "second", "seconds"):
+                freq_units = "Hz"
+            else:
+                freq_units = f"1/{data.x_units}"
+
             # Create new RheoData in frequency domain
             return RheoData(
                 x=freqs,
                 y=spectrum,
-                x_units="Hz" if data.x_units else None,
+                x_units=freq_units,
                 y_units="PSD" if self.return_psd else "magnitude",
                 domain="frequency",
                 metadata=new_metadata,

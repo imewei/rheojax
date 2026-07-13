@@ -1,0 +1,61 @@
+{
+  "runs": [
+    {
+      "date": "2026-05-06T15:40:29.442253+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 6,
+      "type": "incremental"
+    },
+    {
+      "date": "2026-07-01T08:19:29.655330+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 89
+    },
+    {
+      "date": "2026-07-02T15:54:56.627069+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 59
+    },
+    {
+      "date": "2026-07-02T19:57:52.873098+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 35
+    },
+    {
+      "date": "2026-07-04T05:49:43.859789+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 86
+    },
+    {
+      "date": "2026-07-08T17:26:35.308030+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 319
+    },
+    {
+      "date": "2026-07-08T23:17:21.506597+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 67
+    },
+    {
+      "date": "2026-07-10T14:46:05.612277+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 118
+    },
+    {
+      "date": "2026-07-13T15:01:31.207972+00:00",
+      "input_tokens": 127236,
+      "output_tokens": 1507,
+      "files": 180
+    }
+  ],
+  "total_input_tokens": 127236,
+  "total_output_tokens": 1507
+}

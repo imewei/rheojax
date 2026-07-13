@@ -98,7 +98,7 @@ class TestMutationNumber:
         G_t = 1000.0 * jnp.exp(-t / tau)
         data = RheoData(x=t, y=G_t, domain="time")
 
-        methods = ["trapz", "simpson", "cumulative"]
+        methods = ["trapz", "simpson"]
         deltas = []
 
         for method in methods:
@@ -112,6 +112,18 @@ class TestMutationNumber:
         # All methods should give similar results
         deltas = np.array(deltas)
         assert np.std(deltas) / np.mean(deltas) < 0.1  # <10% variation
+
+    def test_cumulative_integration_not_implemented(self):
+        """integration_method='cumulative' must raise, not silently behave
+        like 'trapz' (P3 regression: the branch was byte-identical to trapz
+        with no indication the option had no effect)."""
+        t = jnp.linspace(0, 50, 1000)
+        G_t = 1000.0 * jnp.exp(-t / 5.0)
+        data = RheoData(x=t, y=G_t, domain="time")
+
+        mn = MutationNumber(integration_method="cumulative")
+        with pytest.raises(NotImplementedError):
+            mn.calculate(data)
 
     def test_transform_method(self):
         """Test transform method returns RheoData."""
@@ -147,6 +159,30 @@ class TestMutationNumber:
         # Should be close to actual tau
         # (May differ due to finite integration range)
         assert 3.0 < tau_avg < 7.0
+
+    def test_relaxation_time_converges_for_nonzero_geq(self):
+        """get_relaxation_time must subtract G_eq so tau_avg converges to the
+        true relaxation time regardless of the measurement window, instead of
+        growing roughly linearly with the window length (P1 regression:
+        previously integrated raw G(t) without subtracting G_eq)."""
+        G_0 = 1000.0
+        G_eq = 200.0
+        tau = 5.0
+
+        mn = MutationNumber()
+        taus = []
+        for t_max in (50.0, 200.0, 500.0):
+            t = jnp.linspace(0, t_max, 2000)
+            G_t = G_eq + (G_0 - G_eq) * jnp.exp(-t / tau)
+            data = RheoData(x=t, y=G_t, domain="time")
+            taus.append(mn.get_relaxation_time(data))
+
+        for tau_avg in taus:
+            assert 4.5 < tau_avg < 5.5
+
+        # Must not blow up with the measurement window like the old
+        # (buggy) behavior, where tau_avg roughly tripled per window extension.
+        assert max(taus) - min(taus) < 0.5
 
     def test_equilibrium_modulus_estimation(self):
         """Test equilibrium modulus estimation."""
@@ -186,6 +222,30 @@ class TestMutationNumber:
         # Extrapolation might capture slightly more tail contribution
         assert delta_no_extrap >= 0.9
         assert delta_extrap >= delta_no_extrap  # Can be equal if both hit 1.0 ceiling
+
+    def test_extrapolate_tG_integral_respects_powerlaw_model(self):
+        """_extrapolate_tG_integral must use self.extrapolation_model instead
+        of always fitting an exponential tail (P1 regression: previously the
+        ∫t×G dt tail correction ignored extrapolation_model entirely, so
+        'powerlaw' mode silently got an exponential-fit tail mismatched with
+        the powerlaw-fit ∫G dt tail from _extrapolate_tail)."""
+        t = jnp.linspace(0.5, 5.0, 50)
+        G_relax = 1000.0 * jnp.power(t + 1.0, -3.0)  # exact powerlaw decay
+
+        mn_exp = MutationNumber(extrapolation_model="exponential")
+        mn_pow = MutationNumber(extrapolation_model="powerlaw")
+
+        tail_tG_exp = mn_exp._extrapolate_tG_integral(t, G_relax)
+        tail_tG_pow = mn_pow._extrapolate_tG_integral(t, G_relax)
+
+        assert np.isfinite(tail_tG_exp) and tail_tG_exp > 0
+        assert np.isfinite(tail_tG_pow) and tail_tG_pow > 0
+
+        # Before the fix, both configurations produced the exact same value
+        # because the powerlaw setting was ignored. After the fix, the
+        # powerlaw-consistent tail must differ materially from the
+        # exponential-fit tail for genuine powerlaw-decay data.
+        assert tail_tG_pow != pytest.approx(tail_tG_exp, rel=0.05)
 
     def test_non_relaxation_error(self):
         """Test error for non-relaxation data."""

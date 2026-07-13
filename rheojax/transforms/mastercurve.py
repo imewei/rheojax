@@ -70,8 +70,10 @@ class Mastercurve(BaseTransform):
         Activation energy for Arrhenius (J/mol)
     vertical_shift : bool, default=False
         Whether to apply vertical shifting (for modulus scaling)
-    optimize_shifts : bool, default=True
-        Whether to optimize shift factors to minimize overlap error
+    optimize_shifts : bool, default=False
+        Not implemented: automatic shift-factor optimization does not run
+        inside create_mastercurve()/transform(). Passing True raises
+        NotImplementedError; call optimize_wlf_parameters() manually instead.
     auto_shift : bool, default=False
         Whether to use automatic shift factor calculation via power-law intersection.
         If True, overrides manual WLF/Arrhenius calculations.
@@ -115,7 +117,7 @@ class Mastercurve(BaseTransform):
         C2: float = 51.6,
         E_a: float | None = None,
         vertical_shift: bool = False,
-        optimize_shifts: bool = True,
+        optimize_shifts: bool = False,
         auto_shift: bool = False,
     ):
         """Initialize Mastercurve transform.
@@ -135,11 +137,24 @@ class Mastercurve(BaseTransform):
         vertical_shift : bool
             Apply vertical shifting
         optimize_shifts : bool
-            Optimize shift factors
+            Not implemented; passing True raises NotImplementedError.
         auto_shift : bool
             Use automatic power-law intersection for shift calculation
+
+        Raises
+        ------
+        NotImplementedError
+            If optimize_shifts=True (automatic shift-factor optimization is
+            not implemented; call optimize_wlf_parameters() manually).
         """
         super().__init__()
+        if optimize_shifts:
+            raise NotImplementedError(
+                "optimize_shifts=True is not implemented: Mastercurve does not "
+                "automatically optimize shift factors inside "
+                "create_mastercurve()/transform(). Call "
+                "optimize_wlf_parameters(datasets) manually instead."
+            )
         self.T_ref = reference_temp
         self.method = method
         self.C1 = C1
@@ -256,18 +271,15 @@ class Mastercurve(BaseTransform):
             objective, params, use_jax=True, max_iter=1000, ftol=1e-8, xtol=1e-8
         )
 
-        # Extract parameter uncertainties from Jacobian
-        if result.jac is not None:
-            # Estimate covariance from Jacobian: Cov ≈ (J^T J)^-1
-            try:
-                jtj = result.jac.T @ result.jac
-                cov = np.linalg.inv(jtj)
-                perr = np.sqrt(np.maximum(np.diag(cov), 0.0))
-            except np.linalg.LinAlgError:
-                # Singular matrix, use large uncertainties
-                logger.debug("Jacobian singular, using large uncertainties")
-                perr = np.full(3, 1e6)
-        else:
+        # Extract parameter uncertainties from the RSS/dof-scaled covariance
+        # (result.pcov, computed by nlsq_optimize via the canonical
+        # compute_covariance_from_jacobian helper) rather than an unscaled
+        # inv(J^T J), so uncertainties from fits with different residual
+        # magnitudes (e.g. full-data vs. outlier-removed in _detect_outliers)
+        # are directly comparable.
+        perr = result.get_parameter_uncertainties()
+        if perr is None:
+            logger.debug("Covariance unavailable, using large uncertainties")
             perr = np.full(3, 1e6)
 
         logger.debug(
@@ -557,7 +569,12 @@ class Mastercurve(BaseTransform):
         elif self.method == "manual":
             if self.shift_factors_ is None:
                 raise ValueError("Manual shift factors not set")
-            return self.shift_factors_.get(T, 1.0)
+            if T not in self.shift_factors_:
+                raise ValueError(
+                    f"No manual shift factor set for temperature {T}. "
+                    f"Available temperatures: {sorted(self.shift_factors_)}"
+                )
+            return self.shift_factors_[T]
         else:
             raise ValueError(f"Unknown shift method: {self.method}")
 
@@ -705,8 +722,14 @@ class Mastercurve(BaseTransform):
         # Get shift factor
         a_T = self.get_shift_factor(T)
 
-        # Apply horizontal shift (frequency or time shift)
-        x_shifted = data.x * a_T  # type: ignore[operator]
+        # Apply horizontal shift. Frequency and time are reciprocal domains:
+        # reduced frequency is ω·a_T, but reduced time is t/a_T. Applying ×a_T
+        # to a relaxation/creep time axis shifts it the wrong way (see
+        # create_mastercurve, which already handles this correctly).
+        if getattr(data, "domain", "frequency") == "time":
+            x_shifted = data.x / a_T  # type: ignore[operator]
+        else:
+            x_shifted = data.x * a_T  # type: ignore[operator]
 
         # Apply vertical shift if requested
         y_shifted = data.y
@@ -876,9 +899,14 @@ class Mastercurve(BaseTransform):
             a_T = shift_factors[T]
 
             # Apply horizontal shift. Frequency and time are reciprocal domains:
-            # reduced frequency is ω·a_T, but reduced time is t/a_T. Applying ×a_T
-            # to a relaxation/creep time axis shifts it the wrong way.
-            if getattr(data, "domain", "frequency") == "time":
+            # reduced frequency is ω·a_T, but reduced time is t/a_T — but that
+            # reciprocal convention only holds for physically-defined shift
+            # factors (WLF/Arrhenius/manual). auto_shift computes a_T directly
+            # as an x-axis multiplier via curve-intersection fitting on the raw
+            # x data (whatever domain it's in), so it must always multiply.
+            if self._auto_shift:
+                x_shifted = data.x * a_T
+            elif getattr(data, "domain", "frequency") == "time":
                 x_shifted = data.x / a_T
             else:
                 x_shifted = data.x * a_T

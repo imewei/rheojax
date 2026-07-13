@@ -46,6 +46,20 @@ class TestSmoothDerivative:
         with pytest.raises(ValueError, match="at least 1"):
             SmoothDerivative(deriv=0)
 
+    def test_savgol_deriv_exceeds_polyorder_raises(self):
+        """Regression: deriv > polyorder made savgol silently return zeros (defect #1)."""
+        with pytest.raises(ValueError, match="polyorder"):
+            SmoothDerivative(method="savgol", polyorder=1, deriv=2)
+
+        # Also covers the default polyorder=3 case mentioned in the report.
+        with pytest.raises(ValueError, match="polyorder"):
+            SmoothDerivative(method="savgol", deriv=4)
+
+    def test_spline_deriv_exceeds_cubic_degree_raises(self):
+        """Regression: deriv >= 4 made spline silently return zeros (defect #1)."""
+        with pytest.raises(ValueError, match="cubic"):
+            SmoothDerivative(method="spline", deriv=4)
+
     def test_linear_function_derivative(self):
         """Test derivative of linear function."""
         # dy/dx of (y = 2x + 3) should be 2
@@ -227,9 +241,10 @@ class TestSmoothDerivative:
         assert jnp.all(jnp.isfinite(dy_dx.y))
 
     def test_non_uniform_spacing(self):
-        """Test derivative with non-uniform spacing."""
-        # Non-uniform spacing
-        x = jnp.concatenate([jnp.linspace(0, 1, 20), jnp.linspace(1, 10, 180)])
+        """Test derivative with non-uniform (but strictly increasing) spacing."""
+        # Non-uniform spacing, no duplicate x (see test_finite_diff_duplicate_x_raises
+        # for the duplicate-x case, which is now a hard error rather than silent NaN).
+        x = jnp.concatenate([jnp.linspace(0, 1, 20), jnp.linspace(1.1, 10, 180)])
         y = 2 * x + 3
 
         data = RheoData(x=x, y=y, domain="time")
@@ -237,9 +252,34 @@ class TestSmoothDerivative:
         deriv = SmoothDerivative(method="finite_diff")
         dy_dx = deriv.transform(data)
 
-        # Finite diff can produce NaN at duplicate points (x=1.0 appears twice)
-        # Use nanmean to compute average excluding NaN values
-        assert jnp.abs(jnp.nanmean(dy_dx.y) - 2.0) < 0.2
+        assert jnp.all(jnp.isfinite(dy_dx.y))
+        assert jnp.abs(jnp.mean(dy_dx.y) - 2.0) < 0.2
+
+    def test_finite_diff_duplicate_x_raises(self):
+        """Regression: duplicate x silently injected NaN instead of raising (defect #2)."""
+        x = jnp.array([0.0, 1.0, 1.0, 3.0, 4.0, 6.0])
+        y = x**2
+
+        data = RheoData(x=x, y=y, domain="time")
+
+        deriv = SmoothDerivative(method="finite_diff")
+        with pytest.raises(ValueError, match="duplicate"):
+            deriv.transform(data)
+
+    def test_finite_diff_nonmonotonic_x_is_sorted(self):
+        """Regression: non-monotonic x silently produced wrong values (defect #2)."""
+        x = jnp.array([0.0, 1.0, 2.0, 1.5, 3.0, 4.0])
+        y = x**2  # true derivative is 2x
+
+        data = RheoData(x=x, y=y, domain="time")
+
+        deriv = SmoothDerivative(method="finite_diff")
+        dy_dx = deriv.transform(data)
+
+        # A 6-point array with a sharp reversal has larger one-sided error at
+        # the edges; the interior points (where central differences apply)
+        # should closely match the analytic derivative once x is sorted.
+        assert jnp.allclose(dy_dx.y[1:-1], (2 * x)[1:-1], atol=0.5)
 
     def test_noise_estimation(self):
         """Test noise level estimation."""
@@ -280,6 +320,31 @@ class TestSmoothDerivative:
         d2y_dx2 = deriv2.transform(data)
 
         assert "^2" in d2y_dx2.y_units or "order_2" in d2y_dx2.y_units
+
+    def test_smooth_data_edge_bias_fixed(self):
+        """Regression: moving-average edges were biased toward 0 by zero-padding (defect #3)."""
+        y = jnp.full(20, 5.0)
+        deriv = SmoothDerivative()
+
+        smoothed = deriv._smooth_data(y, 5)
+
+        # A constant signal's local average is the constant everywhere,
+        # including at the boundaries.
+        assert jnp.allclose(smoothed, 5.0)
+
+    def test_total_variation_method_warns_and_computes(self):
+        """Regression: total_variation method was entirely untested (defect #4)."""
+        x = jnp.linspace(0, 10, 200)
+        y = 2 * x + 3
+
+        data = RheoData(x=x, y=y, domain="time")
+
+        deriv = SmoothDerivative(method="total_variation")
+        with pytest.warns(UserWarning, match="approximation"):
+            dy_dx = deriv.transform(data)
+
+        assert jnp.all(jnp.isfinite(dy_dx.y))
+        assert jnp.abs(jnp.mean(dy_dx.y) - 2.0) < 0.5
 
     def test_metadata_preservation(self):
         """Test metadata preservation."""

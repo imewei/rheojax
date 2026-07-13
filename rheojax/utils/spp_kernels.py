@@ -557,7 +557,7 @@ def harmonic_reconstruction_full(
     }
 
 
-@partial(jax.jit, static_argnums=(4, 5))
+@partial(jax.jit, static_argnums=(4, 5, 6))
 def spp_fourier_analysis(
     strain: "Array",
     stress: "Array",
@@ -565,6 +565,7 @@ def spp_fourier_analysis(
     dt: float,
     n_harmonics: int = 39,
     n_cycles: int = 1,
+    looped: bool = True,
 ) -> dict:
     """
     Complete SPP analysis using Fourier-based analytical derivatives (MATLAB-compatible).
@@ -592,6 +593,11 @@ def spp_fourier_analysis(
         Number of odd harmonics for reconstruction (default: 15)
     n_cycles : int
         Number of complete cycles in data (default: 1)
+    looped : bool
+        If True (default), infer the strain rate used to seed the Fourier
+        rate reconstruction with periodic wrapping. If False, use edge-aware
+        (non-periodic) differentiation instead. Mirrors the caller's
+        ``wrap_strain_rate`` setting.
 
     Returns
     -------
@@ -641,10 +647,10 @@ def spp_fourier_analysis(
         window_size=W_int,
     )
 
-    # Compute strain rate from strain (wrapped 8-point stencil)
-    logger.debug("Computing strain rate from strain (8-point stencil)")
+    # Compute strain rate from strain (8-point stencil, periodicity per `looped`)
+    logger.debug("Computing strain rate from strain (8-point stencil)", looped=looped)
     strain_rate = differentiate_rate_from_strain(
-        strain_arr, dt, step_size=8, looped=True
+        strain_arr, dt, step_size=8, looped=looped
     )
 
     # Get phase-aligned reconstruction with concrete W

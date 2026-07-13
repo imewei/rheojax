@@ -111,6 +111,12 @@ class OWChirp(BaseTransform):
             Maximum harmonic order
         """
         super().__init__()
+        if frequency_range[0] <= 0:
+            raise ValueError(
+                f"frequency_range[0] (lower bound) must be > 0, got "
+                f"{frequency_range[0]}. A zero or negative lower bound makes "
+                "log10(f_min) undefined for the log-spaced frequency array."
+            )
         self.n_frequencies = n_frequencies
         self.frequency_range = frequency_range
         self.wavelet_width = wavelet_width
@@ -148,8 +154,11 @@ class OWChirp(BaseTransform):
         # Gaussian envelope width
         sigma = width / (2.0 * jnp.pi * freq_safe)
 
-        # Gaussian envelope
-        envelope = jnp.exp(-0.5 * (((t - t_center) / sigma) ** 2))
+        # Gaussian envelope, normalized by 1/sigma so that equal-amplitude
+        # sinusoids at different frequencies produce equal-magnitude wavelet
+        # coefficients. Without this, the envelope's integrated energy scales
+        # as sigma (~1/frequency), biasing low frequencies to dominate.
+        envelope = jnp.exp(-0.5 * (((t - t_center) / sigma) ** 2)) / sigma
 
         # Complex exponential (chirp)
         omega = 2.0 * jnp.pi * frequency
@@ -259,14 +268,22 @@ class OWChirp(BaseTransform):
         # operations: one fft on the wavelet matrix, one pointwise multiply, one
         # ifft.  Shape legend: F = n_frequencies, N = n_orig, P = n_pad.
 
-        # Build wavelet matrix (F, P) — all wavelets zero-padded in one shot.
-        # vmap over frequencies; each call produces a length-n_orig complex array
-        # that is then zero-padded to n_pad.
+        # Build wavelet matrix (F, P) — one FFT-ready kernel per frequency.
+        # vmap over frequencies.
         def _make_wavelet_row(freq: Array) -> Array:
-            """Return zero-padded wavelet for a single frequency (shape: (n_pad,))."""
-            # Center at t=0 per R10-OWC-002 convention.
-            wavelet = self._chirp_wavelet(t, 0.0, freq, self.wavelet_width)
-            return jnp.pad(wavelet, (0, n_pad - n_orig))
+            """Return an FFT-ready wavelet kernel for one frequency (shape: (n_pad,)).
+
+            Built on a lag array symmetric about zero (independent of the
+            signal's absolute time origin, unlike using `t` directly), so the
+            Gaussian envelope is not clipped to a causal, one-sided half.
+            ifftshift then rotates the zero-lag peak from the middle of the
+            array to index 0, which is the layout FFT-based circular
+            cross-correlation requires so that output index k corresponds to
+            the wavelet centered at t[k].
+            """
+            tau = (jnp.arange(n_pad) - n_pad // 2) * dt
+            wavelet = self._chirp_wavelet(tau, 0.0, freq, self.wavelet_width)
+            return jnp.fft.ifftshift(wavelet)
 
         # wavelet_matrix: (F, P)
         wavelet_matrix = jax.vmap(_make_wavelet_row)(jnp.asarray(frequencies))
@@ -286,17 +303,10 @@ class OWChirp(BaseTransform):
         conv_full = jnp.fft.ifft(conv_fft, axis=-1)
         conv_trimmed = conv_full[:, :n_orig]  # (F, N)
 
-        # Apply 1/√f scale normalization (standard L² CWT normalization).
-        # TR-02: Use jnp.maximum instead of Python max() — avoids device→host
-        # transfer when frequencies is a JAX array.
-        # R7-OWC-002: Guard against freq=0 (logspace guarantees positive values
-        # but defend against edge cases in direct calls).
-        freq_safe = jnp.maximum(jnp.asarray(frequencies), 1e-30)  # (F,)
-        scale = jnp.sqrt(freq_safe)[:, None]  # (F, 1) for broadcasting over N
-
-        coefficients = conv_trimmed / scale  # (F, N)
-
-        return coefficients * dt
+        # No extra per-frequency scale needed here: the wavelet's own 1/sigma
+        # envelope normalization (see _chirp_wavelet) already makes
+        # equal-amplitude sinusoids report equal magnitude across frequencies.
+        return conv_trimmed * dt
 
     def _transform(self, data: RheoData) -> RheoData:
         """Apply OWChirp transform to LAOS data.
@@ -551,8 +561,8 @@ class OWChirp(BaseTransform):
                 amplitude = self._get_amplitude_at_freq(freqs, spectrum, harmonic_freq)
 
                 harmonic_name = {3: "third", 5: "fifth", 7: "seventh", 9: "ninth"}
-                if n in harmonic_name:
-                    harmonics[harmonic_name[n]] = (harmonic_freq, amplitude)
+                key = harmonic_name.get(n, f"harmonic_{n}")
+                harmonics[key] = (harmonic_freq, amplitude)
 
         logger.info(
             "Harmonic extraction completed",

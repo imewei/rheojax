@@ -78,6 +78,48 @@ class TestSRFSShiftFactor:
         # Accept slope within reasonable range for SGR theory
         assert abs(slope) < 1.5, f"Shift exponent {slope} unreasonable for SGR"
 
+    def test_srfs_compute_shift_factor_rejects_nonpositive_gamma_dot(self):
+        """compute_shift_factor must reject gamma_dot <= 0 instead of returning
+        a complex-derived TypeError (negative base) or silent inf (zero base,
+        m < 0)."""
+        from rheojax.transforms.srfs import SRFS
+
+        srfs = SRFS(reference_gamma_dot=1.0)
+
+        # Negative gamma_dot with non-integer m used to raise an opaque
+        # TypeError from float(complex(...)).
+        with pytest.raises(ValueError, match="gamma_dot must be positive"):
+            srfs.compute_shift_factor(-2.0, 1.5, 1e-3)
+
+        # gamma_dot = 0 with m < 0 (x > 2) used to silently produce inf.
+        with pytest.raises(ValueError, match="gamma_dot must be positive"):
+            srfs.compute_shift_factor(0.0, 2.5, 1e-3)
+
+    def test_srfs_auto_shift_raises_not_implemented(self):
+        """auto_shift=True is documented but has no auto-fitting algorithm;
+        calling transform() without explicit x/tau0 must raise
+        NotImplementedError, not silently no-op into the generic
+        'x and tau0 are required' ValueError."""
+        from rheojax.transforms.srfs import SRFS
+
+        srfs = SRFS(reference_gamma_dot=1.0, auto_shift=True)
+        datasets = [
+            RheoData(
+                x=np.array([1.0, 2.0, 3.0]),
+                y=np.array([1.0, 2.0, 3.0]),
+                metadata={"reference_gamma_dot": 1.0},
+            )
+        ]
+
+        with pytest.raises(NotImplementedError, match="auto_shift"):
+            srfs.transform(datasets)
+
+        # auto_shift=False (the default) must keep raising the original
+        # ValueError, not NotImplementedError.
+        srfs_manual = SRFS(reference_gamma_dot=1.0, auto_shift=False)
+        with pytest.raises(ValueError, match="x and tau0 are required"):
+            srfs_manual.transform(datasets)
+
     @pytest.mark.smoke
     def test_srfs_mastercurve_collapse(self):
         """Test SRFS mastercurve collapse of flow curves."""
@@ -366,6 +408,42 @@ class TestShearBanding:
         # Check banding info contains expected fields
         if is_banding_nonmono:
             assert "gamma_dot_low" in banding_info or banding_info is not None
+
+    def test_shear_banding_detection_normalized_for_small_magnitude_data(self):
+        """A genuine non-monotonic dip must be detected regardless of the
+        absolute stress scale. The raw derivative for sub-Pa stresses can be
+        far smaller in magnitude than the fixed default threshold (-0.01),
+        so the criterion must be normalized to the data's own scale rather
+        than compared as an absolute Pa/(1/s) magnitude."""
+        from rheojax.transforms.srfs import detect_shear_banding
+
+        gamma_dot = np.logspace(-2, 2, 100)
+        sigma = 0.001 * gamma_dot**0.5  # sub-Pa stress scale
+        mid_idx = len(gamma_dot) // 2
+        sigma[mid_idx - 10 : mid_idx + 10] *= 0.7  # 30% dip
+
+        is_banding, banding_info = detect_shear_banding(gamma_dot, sigma)
+        assert is_banding, (
+            "Genuine non-monotonic dip in small-magnitude data should be "
+            "detected, not silently missed due to an unnormalized threshold"
+        )
+        assert banding_info is not None
+
+    def test_shear_banding_ignores_duplicate_gamma_dot_noise(self):
+        """A repeated shear-rate measurement with floating-point noise in
+        sigma (not a real instability) must not trigger a spurious banding
+        detection from dividing by a near-zero d_gamma_dot."""
+        from rheojax.transforms.srfs import detect_shear_banding
+
+        gamma_dot = np.array([1.0, 2.0, 2.0, 3.0, 4.0, 5.0])
+        sigma = np.array([1.0, 2.0, 1.9999999, 3.0, 4.0, 5.0])
+
+        is_banding, banding_info = detect_shear_banding(gamma_dot, sigma)
+        assert not is_banding, (
+            "Duplicate gamma_dot point with floating-point noise should not "
+            "be reported as shear banding"
+        )
+        assert banding_info is None
 
     def test_shear_banding_warning_generation(self):
         """Test shear banding warning is generated for non-monotonic curves."""

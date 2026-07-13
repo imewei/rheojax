@@ -246,6 +246,93 @@ def test_step_size_parameter():
     assert var_k3 <= var_k1 * 1.1  # Allow some tolerance
 
 
+def test_wrap_strain_rate_affects_fourier_core_outputs():
+    """Regression: wrap_strain_rate must propagate into the Fourier core path.
+
+    Before the fix, spp_fourier_analysis always recomputed its internal
+    strain rate with periodic wrapping (looped=True) regardless of the
+    constructor's wrap_strain_rate setting, so Gp_t/Gpp_t/etc. were
+    identical whether wrap_strain_rate was True or False.
+    """
+    # A coarse single-cycle signal makes the 8-point-stencil edge zone a
+    # sizeable fraction of the array, so periodic-wrap vs edge-aware strain
+    # rate inference diverge well above floating-point noise.
+    omega = 1.5
+    gamma_0 = 0.5
+    t = jnp.linspace(0, 2 * jnp.pi / omega, 64, endpoint=False)
+    strain = gamma_0 * jnp.sin(omega * t)
+    stress = 80.0 * strain + 5.0 * jnp.sin(3 * omega * t)
+    data = RheoData(
+        x=np.asarray(t, dtype=float),
+        y=np.asarray(stress, dtype=float),
+        domain="time",
+        metadata={
+            "test_mode": "oscillation",
+            "omega": omega,
+            "gamma_0": gamma_0,
+            "strain": strain,
+        },
+    )
+
+    decomposer_wrap = SPPDecomposer(
+        omega=omega, gamma_0=gamma_0, n_harmonics=3, wrap_strain_rate=True
+    )
+    decomposer_wrap.transform(data)
+
+    decomposer_nowrap = SPPDecomposer(
+        omega=omega, gamma_0=gamma_0, n_harmonics=3, wrap_strain_rate=False
+    )
+    decomposer_nowrap.transform(data)
+
+    Gp_wrap = decomposer_wrap.results_["core"]["Gp_t"]
+    Gp_nowrap = decomposer_nowrap.results_["core"]["Gp_t"]
+    assert not np.allclose(Gp_wrap, Gp_nowrap, rtol=1e-4, atol=1e-6)
+
+
+def test_get_cycle_mask_rounds_not_truncates_cycle_count():
+    """Regression: floating-point drift just under N periods must round to
+    N cycles, not floor to N-1 (spp_decomposer.py _get_cycle_mask).
+    """
+    omega = 1.0
+    T_period = 2 * np.pi / omega
+    dt = T_period / 500.0
+    n_periods = 5
+    # Cumulative summation of a non-exact dt accumulates floating-point
+    # error, landing total_time/T_period just under 5.0 (~4.998).
+    t = np.cumsum(np.full(n_periods * 500, dt)) - dt
+    gamma_0 = 0.5
+    strain = gamma_0 * np.sin(omega * t)
+    stress = 80.0 * strain
+
+    data = RheoData(
+        x=t,
+        y=stress,
+        domain="time",
+        metadata={"omega": omega, "gamma_0": gamma_0, "strain": strain},
+    )
+
+    decomposer = SPPDecomposer(omega=omega, gamma_0=gamma_0, start_cycle=2)
+    decomposer.transform(data)
+
+    assert decomposer.results_["cycles_analyzed"] == (2, 5)
+
+
+def test_invalid_cycle_range_raises():
+    """Regression: end_cycle before start_cycle after clamping must raise,
+    not silently fall back to analyzing the entire dataset.
+    """
+    data = _make_multi_cycle_data(n_cycles=5)
+    decomposer = SPPDecomposer(
+        omega=data.metadata["omega"],
+        gamma_0=data.metadata["gamma_0"],
+        start_cycle=3,
+        end_cycle=1,
+    )
+
+    with pytest.raises(ValueError):
+        decomposer.transform(data)
+
+
 def test_rogers_defaults_and_delta_present():
     omega = 2.0
     gamma_0 = 0.5

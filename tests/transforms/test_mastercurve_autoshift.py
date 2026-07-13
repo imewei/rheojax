@@ -39,6 +39,27 @@ class TestPowerLawFitting:
         assert len(perr) == 3
         assert all(perr > 0)
 
+    def test_perr_scales_with_residual_magnitude(self):
+        """Parameter uncertainties must be scaled by residual variance
+        (RSS/dof), not just the Jacobian geometry. An unscaled inv(J^T J)
+        estimate is invariant to noise level; the correctly-scaled estimate
+        must grow with it, which this test exercises directly."""
+        x = np.logspace(-2, 2, 50)
+        a_true, b_true, e_true = 1.5, -0.7, 0.1
+        y_clean = a_true * x**b_true + e_true
+
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
+
+        np.random.seed(0)
+        noise = np.random.randn(len(x))
+
+        _, perr_small = mc._fit_power_law(x, y_clean + 0.001 * noise)
+        _, perr_large = mc._fit_power_law(x, y_clean + 0.5 * noise)
+
+        # Much noisier fit must report substantially larger uncertainty on
+        # the exponent (b) parameter.
+        assert perr_large[1] > 10 * perr_small[1]
+
     def test_power_law_outlier_detection_logic(self):
         """Test that outlier detection logic works correctly."""
         # Create clean data (no outliers)

@@ -20,6 +20,7 @@ from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.io.readers._utils import normalize_units
 from rheojax.logging import get_logger
 
 jax, jnp = safe_import_jax()
@@ -98,6 +99,13 @@ class CoxMerz(BaseTransform):
         # Flow data might be σ(γ̇) or η(γ̇) — detect by y_units, then metadata, else assume stress
         flow_meta = getattr(flow_data, "metadata", {}) or {}
         flow_y_units = getattr(flow_data, "y_units", "") or ""
+
+        # y_units only classifies the quantity (viscosity vs. stress) below —
+        # it does not by itself convert the numeric values. Scale y_flow to
+        # SI (Pa or Pa.s) first so "mPa.s", "kPa", etc. aren't used at face
+        # value. Unrecognized/already-SI units pass through unchanged.
+        if flow_y_units:
+            y_flow, _ = normalize_units(y_flow, flow_y_units)
 
         # Detect viscosity from y_units (most reliable indicator) or metadata.
         # Normalize case + separators so "Pa.s", "Pa·s", "Pa*s", "Pa s", "mPa.s",
