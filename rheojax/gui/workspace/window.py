@@ -90,6 +90,7 @@ class WorkspaceWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
         self.log_dock.setVisible(False)
         self._build_view_menu()
+        self._build_help_menu()
 
         self._build_workspace(app_state)
         self._setup_os_theme_watcher()
@@ -188,6 +189,44 @@ class WorkspaceWindow(QMainWindow):
         theme_menu.addAction(self._theme_light_action)
         theme_menu.addAction(self._theme_dark_action)
         theme_menu.addAction(self._theme_system_action)
+
+    def _build_help_menu(self) -> None:
+        menu = self.menuBar().addMenu("&Help")
+        menu.addAction("&Documentation", self._on_open_docs)
+        menu.addAction("&Tutorials", self._on_open_tutorials)
+        menu.addAction("&Keyboard Shortcuts", self._on_show_shortcuts)
+        menu.addSeparator()
+        menu.addAction("&About RheoJAX", self._on_about)
+
+    def _on_open_docs(self) -> None:
+        import webbrowser
+
+        webbrowser.open("https://rheojax.readthedocs.io")
+
+    def _on_open_tutorials(self) -> None:
+        import webbrowser
+
+        webbrowser.open("https://rheojax.readthedocs.io/en/latest/tutorials/")
+
+    def _on_show_shortcuts(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        shortcuts = """
+<h3>Keyboard Shortcuts</h3>
+<table>
+<tr><td><b>Ctrl+N</b></td><td>New Project</td></tr>
+<tr><td><b>Ctrl+O</b></td><td>Open Project</td></tr>
+<tr><td><b>Ctrl+S</b></td><td>Save Project</td></tr>
+<tr><td><b>Ctrl+Shift+S</b></td><td>Save Project As</td></tr>
+<tr><td><b>Ctrl+K</b></td><td>Command Palette</td></tr>
+</table>
+        """
+        QMessageBox.information(self, "Keyboard Shortcuts", shortcuts)
+
+    def _on_about(self) -> None:
+        from rheojax.gui.dialogs.about import AboutDialog
+
+        AboutDialog(self).exec()
 
     def _apply_theme(self, theme: str) -> None:
         """Apply a QSS theme to the QApplication and sync UI/state.
