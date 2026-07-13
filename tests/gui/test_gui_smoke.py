@@ -685,11 +685,11 @@ class TestQtIntegration:
 
     @pytest.mark.smoke
     def test_create_workspace_window_reachable_from_entrypoint(self, qapp) -> None:
-        """The exact function --workspace triggers must build a real WorkspaceWindow.
+        """The exact function `rheojax-gui`'s main() calls must build a real WorkspaceWindow.
 
-        This is the entrypoint-level regression test: it proves the new
-        workspace shell is reachable from `rheojax-gui --workspace`, not
-        just constructible in isolation (dead code from a user's perspective
+        This is the entrypoint-level regression test: it proves the
+        workspace shell is reachable from the CLI entrypoint, not just
+        constructible in isolation (dead code from a user's perspective
         otherwise).
         """
         from rheojax.gui.main import _create_workspace_window
