@@ -84,7 +84,9 @@ def save_fit_result_npz(
 ) -> None:
     """Save a FitResult to a NumPy .npz archive (no pickle, safe serialization).
 
-    Stores all fields as numpy arrays and UTF-8 encoded strings.
+    Uses the same unprefixed key schema as ``FitResult._save_npz`` / read by
+    ``FitResult._load_npz`` (the only FitResult npz reader), so files written
+    here load back through ``FitResult.load(...)``.
 
     Args:
         result: A FitResult instance (from rheojax.core.fit_result).
@@ -94,22 +96,29 @@ def save_fit_result_npz(
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    # Build arrays dict — all values are numpy arrays (no pickle used)
-    arrays: dict[str, np.ndarray] = {
-        "_model_name": _encode_str(result.model_name or ""),
-        "_model_class_name": _encode_str(result.model_class_name or ""),
-        "_protocol": _encode_str(result.protocol or ""),
-        "_n_params": np.array([result.n_params]),
-        "_timestamp": _encode_str(result.timestamp or ""),
-    }
-
-    # Parameters as JSON-encoded string (safe serialization)
     param_names = list(result.params.keys())
     param_values = np.array([result.params[n] for n in param_names], dtype=np.float64)
-    arrays["_param_names"] = _encode_str(json.dumps(param_names))
-    arrays["_param_values"] = param_values
 
-    # Units as JSON-encoded string
+    # Build arrays dict — all values are numpy arrays (no pickle used).
+    # Key names match FitResult._load_npz's expectations exactly.
+    arrays: dict[str, np.ndarray] = {
+        "model_name": _encode_str(result.model_name or ""),
+        "model_class_name": _encode_str(result.model_class_name or ""),
+        "protocol": _encode_str(result.protocol or ""),
+        "n_params": np.array(result.n_params),
+        "timestamp": _encode_str(result.timestamp or ""),
+        "param_names": _encode_str(json.dumps(param_names)),
+        "param_values": param_values,
+        "success": np.array(result.success),
+        "n_data": np.array(result.n_data),
+    }
+    if result.optimization_result is not None:
+        arrays["_is_complex_split"] = np.array(
+            result.optimization_result._is_complex_split
+        )
+
+    # Units as JSON-encoded string (informational; not read back by
+    # FitResult._load_npz, which always sets params_units={}).
     if result.params_units:
         arrays["_params_units"] = _encode_str(json.dumps(result.params_units))
 
@@ -119,11 +128,12 @@ def save_fit_result_npz(
 
     # Input data
     if result.X is not None:
-        arrays["input_x"] = np.asarray(result.X)
+        arrays["X"] = np.asarray(result.X)
     if result.y is not None:
-        arrays["input_y"] = np.asarray(result.y)
+        arrays["y"] = np.asarray(result.y)
 
-    # Statistics as JSON-encoded string
+    # Statistics as JSON-encoded string (informational; not read back by
+    # FitResult._load_npz, which recomputes stats from y/fitted_curve).
     stats = {}
     for attr_name in ("r_squared", "aic", "bic", "rmse", "mae"):
         val = getattr(result, attr_name, None)

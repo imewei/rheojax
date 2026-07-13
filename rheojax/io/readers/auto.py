@@ -566,6 +566,18 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                         ["stress", "strain", "modulus", "viscosity"],
                     )
 
+            # VIS-AUTO-001 corollary: the heuristic re-detects x_col/y_col
+            # from a fixed pattern list even when the caller already supplied
+            # a valid value that simply doesn't match those patterns (e.g.
+            # x_col="ElapsedDuration"). Fall back to the caller's value
+            # before treating a None heuristic result as a real failure —
+            # otherwise a perfectly valid caller-supplied column gets
+            # rejected just because it isn't a recognized keyword.
+            if x_col is None and "x_col" in kwargs:
+                x_col = kwargs["x_col"]
+            if y_col is None and "y_col" in kwargs:
+                y_col = kwargs["y_col"]
+
             if x_col is None or y_col is None:
                 logger.error(
                     "Could not auto-detect x and y columns",
@@ -663,6 +675,13 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
                     columns_lower,
                     ["stress", "strain", "modulus", "viscosity"],
                 )
+
+            # Same fallback as _try_csv() — see VIS-AUTO-001 corollary above:
+            # prefer a caller-supplied column over a None heuristic result.
+            if x_col is None and "x_col" in kwargs:
+                x_col = kwargs["x_col"]
+            if y_col is None and "y_col" in kwargs:
+                y_col = kwargs["y_col"]
 
             if x_col is None or y_col is None:
                 raise ValueError(

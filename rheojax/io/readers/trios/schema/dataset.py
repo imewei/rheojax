@@ -93,15 +93,18 @@ class TRIOSDataSet:
         df = pd.DataFrame(self.values, columns=column_names)
         logger.debug("DataFrame created", shape=df.shape, columns=list(df.columns))
 
-        # Convert numeric columns
+        # Convert numeric columns. Use errors="raise" to detect genuinely
+        # non-numeric columns (e.g. TRIOS "Point type"/status flag columns)
+        # so they are left untouched instead of being silently replaced
+        # with all-NaN via errors="coerce".
         converted_columns = []
         for col in df.columns:
             try:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = pd.to_numeric(df[col], errors="raise")
                 converted_columns.append(col)
             except (ValueError, TypeError) as e:
-                logger.debug(
-                    "Column could not be converted to numeric",
+                logger.warning(
+                    "Column could not be converted to numeric, preserving original values",
                     column=col,
                     error=str(e),
                 )

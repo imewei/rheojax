@@ -126,8 +126,8 @@ _TENSILE_MODULUS_PATTERNS: list[re.Pattern] = [
         r"E[-_]?loss",  # E_loss, Eloss, E-loss
         r"Young",  # Young's modulus
         r"tensile",  # Tensile modulus
-        r"storage\s+modulus.*E",  # "Storage Modulus E'"
-        r"loss\s+modulus.*E",  # "Loss Modulus E'"
+        r"storage\s+modulus\s*[\(:]?\s*E['\"*]",  # "Storage Modulus E'"/"(E')"
+        r"loss\s+modulus\s*[\(:]?\s*E['\"*]",  # "Loss Modulus E'"/"(E')"
     ]
 ]
 
@@ -168,7 +168,11 @@ _COMPRESSION_MODULUS_PATTERNS: list[re.Pattern] = [
 _UNIT_PATTERN = re.compile(r"^(.+?)\s*\(([^)]+)\)$")
 
 # Domain detection patterns
-_FREQUENCY_UNITS = {"rad/s", "hz", "1/s"}
+# Note: "1/s" is deliberately excluded -- it is the SI unit for shear rate
+# (see UNIFIED_UNIT_CONVERSIONS' rpm/rev/min/rev/s targets), not just frequency.
+# Data with x_units="1/s" falls through to header-keyword checks and then
+# defaults to "time" domain, matching RheoData's own default.
+_FREQUENCY_UNITS = {"rad/s", "hz"}
 _TIME_UNITS = {"s", "sec", "min", "ms"}
 _FREQUENCY_KEYWORDS = {"omega", "frequency", "freq", "angular"}
 _TIME_KEYWORDS = {"time", "t"}
@@ -512,6 +516,13 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
                 e, UnsupportedDataError
             ):
                 raise
+            logger.warning(
+                "Tensile-data pre-scan of Excel file could not complete; "
+                "the safety guard was skipped for this file",
+                filepath=str(filepath),
+                error=str(e),
+                exc_info=True,
+            )
     else:
         # Text files (CSV, TSV, TXT, JSON)
         try:
@@ -550,6 +561,13 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
                 e, UnsupportedDataError
             ):
                 raise
+            logger.warning(
+                "Tensile-data pre-scan of text file could not complete; "
+                "the safety guard was skipped for this file",
+                filepath=str(filepath),
+                error=str(e),
+                exc_info=True,
+            )
 
 
 # =============================================================================
@@ -753,6 +771,16 @@ UNIFIED_UNIT_CONVERSIONS: dict[str, tuple[str, float | None]] = {
     "f": ("K", None),
 }
 
+# SI prefix case matters for Pa: "M" (mega, 1e6) vs "m" (milli, 1e-3) collide
+# onto the same "mpa" key once lowercased. Checked before the case-insensitive
+# UNIFIED_UNIT_CONVERSIONS lookup so a literal "mPa" header (millipascal,
+# plausible for soft/low-modulus samples) isn't silently misread as megapascal
+# (mirrors anton_paar.py's _CASE_SENSITIVE_UNIT_CONVERSIONS).
+_CASE_SENSITIVE_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
+    "MPa": ("Pa", 1e6),
+    "mPa": ("Pa", 0.001),
+}
+
 
 def normalize_temperature(value: float, unit: str = "C") -> float:
     """Convert a temperature value to Kelvin.
@@ -795,6 +823,12 @@ def normalize_units(
         Tuple of (converted_values, target_unit_string).
         If no conversion found, returns (values, source_unit) unchanged.
     """
+    stripped = source_unit.strip()
+    if stripped in _CASE_SENSITIVE_UNIT_CONVERSIONS:
+        target_unit, factor = _CASE_SENSITIVE_UNIT_CONVERSIONS[stripped]
+        values = np.asarray(values, dtype=np.float64)
+        return values * factor, target_unit
+
     key = source_unit.lower()
     if key not in UNIFIED_UNIT_CONVERSIONS:
         return values, source_unit

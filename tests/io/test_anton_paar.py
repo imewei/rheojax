@@ -343,7 +343,7 @@ class TestMetadataExtraction:
         data = load_anton_paar(filepath)
 
         assert "temperature" in data.metadata
-        assert "25.0" in data.metadata["temperature"]
+        assert data.metadata["temperature"] == pytest.approx(298.15)
 
     def test_normal_force_preserved(self, tmp_path):
         """T049: Test normal force column preserved in metadata."""

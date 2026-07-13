@@ -18,8 +18,10 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    normalize_units,
     validate_transform,
 )
+from rheojax.io.readers.csv_reader import _to_float
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -201,13 +203,16 @@ def load_excel(
 
     logger.debug("Excel file read successfully", n_rows=len(df), n_cols=len(df.columns))
 
+    # Guard: check for tensile/E* columns/units/mode. Must run on the
+    # original file headers (before column_mapping renaming) — otherwise
+    # renaming a tensile column (e.g. "E'" -> "modulus") would silently
+    # bypass the safety check.
+    check_tensile_guard(df.columns, units=y_units)
+
     # Apply column renaming if provided
     if column_mapping is not None:
         df = df.rename(columns=column_mapping)
         logger.debug("Applied column_mapping", mapping=column_mapping)
-
-    # Guard: check for tensile/E* columns/units/mode
-    check_tensile_guard(df.columns, units=y_units)
 
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
@@ -232,9 +237,11 @@ def load_excel(
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
 
-        # Convert to float arrays before constructing complex modulus
-        g_prime_data = np.array(g_prime_data, dtype=float)
-        g_double_prime_data = np.array(g_double_prime_data, dtype=float)
+        # Convert to float arrays before constructing complex modulus.
+        # Use the same locale-tolerant conversion as load_csv so text-formatted
+        # EU decimal-comma cells (e.g. "1,0") parse instead of raising.
+        g_prime_data = _to_float(g_prime_data)
+        g_double_prime_data = _to_float(g_double_prime_data)
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
@@ -247,10 +254,12 @@ def load_excel(
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
 
-    # Convert to numpy arrays and handle NaN
-    x_data = np.array(x_data, dtype=float)
+    # Convert to numpy arrays and handle NaN. Use the same locale-tolerant
+    # conversion as load_csv so text-formatted EU decimal-comma cells (e.g.
+    # "1,0") parse instead of raising a raw ValueError.
+    x_data = _to_float(x_data)
     if not is_complex:
-        y_data = np.array(y_data, dtype=float)
+        y_data = _to_float(y_data)
 
     # Remove non-finite values (NaN and ±inf) in single pass.
     # np.isfinite covers both NaN and inf, preventing RheoData's isfinite
@@ -282,12 +291,28 @@ def load_excel(
 
     logger.debug("Data points after NaN removal", n_points=len(x_data))
 
-    # Auto-extract units from headers if not provided
+    # Auto-extract units from headers if not provided, normalizing the
+    # extracted unit (and the numeric data) to SI via UNIFIED_UNIT_CONVERSIONS —
+    # matching the anton_paar.py/trios readers' behavior. Units passed
+    # explicitly by the caller are trusted as-is and left unconverted.
     if x_units is None:
-        _, x_units = extract_unit_from_header(x_header)
+        _, extracted_x_units = extract_unit_from_header(x_header)
+        if extracted_x_units is not None:
+            x_data, x_units = normalize_units(x_data, extracted_x_units)
+        else:
+            x_units = extracted_x_units
     if y_units is None:
         # Use first y column header for units
-        _, y_units = extract_unit_from_header(y_headers[0])
+        _, extracted_y_units = extract_unit_from_header(y_headers[0])
+        if extracted_y_units is not None:
+            if is_complex:
+                real_part, y_units = normalize_units(y_data.real, extracted_y_units)
+                imag_part, _ = normalize_units(y_data.imag, extracted_y_units)
+                y_data = real_part + 1j * imag_part
+            else:
+                y_data, y_units = normalize_units(y_data, extracted_y_units)
+        else:
+            y_units = extracted_y_units
 
     # Auto-detect domain if not provided
     if domain is None:

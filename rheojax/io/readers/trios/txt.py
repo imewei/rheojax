@@ -112,6 +112,10 @@ def convert_units(
 ) -> float | np.ndarray:
     """Convert values between units.
 
+    Only conversions from a known ``from_unit`` (see ``UNIT_CONVERSIONS``) to
+    its designated target unit (or to "Pa") are supported. Any other
+    from/to combination returns the value unconverted and raises a warning.
+
     Args:
         value: Value or array to convert
         from_unit: Source unit
@@ -127,6 +131,12 @@ def convert_units(
         target, factor = UNIT_CONVERSIONS[from_unit]
         if target == to_unit or to_unit == "Pa":
             return value * factor
+        warnings.warn(
+            f"convert_units: no conversion defined from {from_unit!r} to "
+            f"{to_unit!r} (only {from_unit!r} -> {target!r} is supported); "
+            "returning value unconverted.",
+            stacklevel=2,
+        )
 
     return value
 
@@ -1184,6 +1194,7 @@ def _process_remaining_rows(
 
         values = line.split("\t")
         if len(values) != expected_columns:
+            _skipped_rows += 1
             continue
 
         try:
@@ -1399,6 +1410,7 @@ def _parse_segment(
     # Parse data rows
     data_start = header_offset + 2
     data_rows = []
+    skipped_rows = 0
 
     for line in segment_lines[data_start:]:
         if not line.strip() or line.startswith("["):
@@ -1424,6 +1436,14 @@ def _parse_segment(
 
             if row:  # Only add if we have data
                 data_rows.append(row)
+        else:
+            skipped_rows += 1
+
+    if skipped_rows > 0:
+        logger.warning(
+            "Skipped malformed rows in TRIOS TXT file",
+            skipped_rows=skipped_rows,
+        )
 
     if not data_rows:
         return None
@@ -1569,6 +1589,12 @@ def _parse_segment(
     )
 
 
+def _column_range(col: np.ndarray) -> float:
+    """Return max - min of a 1-D column, ignoring NaNs (0.0 if all-NaN/empty)."""
+    valid = col[~np.isnan(col)]
+    return float(valid.max() - valid.min()) if valid.size else 0.0
+
+
 def _determine_xy_columns(
     columns: list[str], units: list[str], data: np.ndarray
 ) -> tuple:
@@ -1618,6 +1644,30 @@ def _determine_xy_columns(
     for priority in x_priorities:
         for i, col in enumerate(columns_lower):
             if priority in col:
+                # A steady-shear ramp's "Shear rate" set-point is one-signed
+                # (>= 0); Arbitrary Wave / LAOS chirp segments also export a
+                # "Shear rate" column, but it oscillates through zero, so it
+                # cannot be the ramp's independent variable. Skip it there and
+                # fall through to the next priority (Step time/Time), which
+                # is the real independent variable for those segments.
+                if (
+                    priority == "shear rate"
+                    and i < data.shape[1]
+                    and np.any(data[:, i] < 0)
+                ):
+                    continue
+                # Every TRIOS segment logs "Temperature", even isothermal
+                # ones, where it is just sensor noise around the soak
+                # set-point (~0.01-0.1 range). Only treat it as the swept
+                # independent variable when it actually spans a real range
+                # (e.g. a dedicated temperature sweep), else fall through to
+                # Step time/Time.
+                if (
+                    priority == "temperature"
+                    and i < data.shape[1]
+                    and _column_range(data[:, i]) < 1.0
+                ):
+                    continue
                 x_col = i
                 break
         if x_col is not None:

@@ -273,6 +273,13 @@ def _write_metadata_recursive(
                 key=full_key,
                 value_type=type(value).__name__,
             )
+            warnings.warn(
+                f"Metadata key '{full_key}' could not be serialized "
+                f"(value of type {type(value).__name__}) and was dropped "
+                f"from the HDF5 file",
+                RheoJaxValidationWarning,
+                stacklevel=4,
+            )
 
     return dropped_keys
 
@@ -325,10 +332,12 @@ def save_fit_result_hdf5(
             f.attrs["protocol"] = result.protocol or ""
             f.attrs["n_params"] = result.n_params
 
-            # Store scalar statistics
+            # Store scalar statistics (including non-finite NaN/Inf values —
+            # HDF5 attrs support IEEE754 NaN/Inf, and dropping them silently
+            # would hide degenerate fits; matches save_fit_result_npz).
             for attr_name in ("r_squared", "aic", "bic", "aicc", "rmse", "mae"):
                 val = getattr(result, attr_name, None)
-                if val is not None and np.isfinite(val):
+                if val is not None:
                     f.attrs[attr_name] = float(val)
 
             # Parameters
@@ -388,6 +397,108 @@ def save_fit_result_hdf5(
         filepath=str(filepath),
         model_name=result.model_name,
     )
+
+
+def load_fit_result_hdf5(filepath: str | Path) -> Any:
+    """Load a FitResult previously written by :func:`save_fit_result_hdf5`.
+
+    This is the HDF5 counterpart of ``FitResult._load_npz``: it reconstructs
+    a best-effort ``OptimizationResult`` from the stored ``y``/``fitted_curve``
+    arrays (statistics not stored directly, e.g. ``success``, are set to
+    their backward-compatible defaults, matching ``FitResult._load_npz``).
+
+    Args:
+        filepath: Path to the HDF5 file.
+
+    Returns:
+        Reconstructed FitResult.
+
+    Raises:
+        ImportError: If h5py not installed.
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the file is not a FitResult HDF5 archive.
+    """
+    try:
+        import h5py
+    except ImportError as exc:
+        raise ImportError(
+            "h5py is required for HDF5 reading. Install with: pip install h5py"
+        ) from exc
+
+    filepath = Path(filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
+    from rheojax.core.fit_result import FitResult
+    from rheojax.utils.optimization import OptimizationResult
+
+    with h5py.File(filepath, "r") as f:
+        rheojax_type = f.attrs.get("rheojax_type")
+        if isinstance(rheojax_type, bytes):
+            rheojax_type = rheojax_type.decode("utf-8")
+        if rheojax_type != "FitResult":
+            raise ValueError(
+                f"Not a FitResult HDF5 archive (rheojax_type={rheojax_type!r}): "
+                f"{filepath}"
+            )
+
+        model_name = _safe_decode_hdf5_string(f.attrs.get("model_name", ""))
+        model_class_name = _safe_decode_hdf5_string(
+            f.attrs.get("model_class_name", "")
+        )
+        protocol = _safe_decode_hdf5_string(f.attrs.get("protocol", "")) or None
+        n_params = int(f.attrs["n_params"])
+
+        params: dict[str, float] = {}
+        if "params" in f:
+            params = {name: float(val) for name, val in f["params"].attrs.items()}
+
+        params_units: dict[str, str] = {}
+        if "params_units" in f:
+            params_units = {
+                name: _safe_decode_hdf5_string(val)
+                for name, val in f["params_units"].attrs.items()
+            }
+
+        fitted_curve = f["fitted_curve"][:] if "fitted_curve" in f else None
+        X = f["input_x"][:] if "input_x" in f else None
+        y = f["input_y"][:] if "input_y" in f else None
+        timestamp = _safe_decode_hdf5_string(f.attrs.get("timestamp", ""))
+
+        opt_result = None
+        if y is not None and fitted_curve is not None:
+            y_np = np.asarray(y)
+            fitted_np = np.asarray(fitted_curve)
+            is_complex = np.iscomplexobj(y_np)
+            if is_complex:
+                residuals = np.concatenate(
+                    [y_np.real - fitted_np.real, y_np.imag - fitted_np.imag]
+                )
+            else:
+                residuals = (y_np - fitted_np).ravel()
+            opt_result = OptimizationResult(
+                x=np.array(list(params.values())),
+                fun=float(np.sum(residuals**2)),
+                success=True,
+                y_data=y_np,
+                residuals=residuals,
+                n_data=len(y_np),
+                _is_complex_split=is_complex,
+            )
+
+        return FitResult(
+            model_name=model_name,
+            model_class_name=model_class_name,
+            protocol=protocol,
+            params=params,
+            params_units=params_units,
+            n_params=n_params,
+            optimization_result=opt_result,
+            fitted_curve=fitted_curve,
+            X=X,
+            y=y,
+            timestamp=timestamp,
+        )
 
 
 def load_hdf5(filepath: str | Path) -> RheoData:

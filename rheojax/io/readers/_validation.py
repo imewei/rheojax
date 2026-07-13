@@ -154,7 +154,7 @@ def _check_creep(data: RheoData, report: LoaderReport) -> None:
         )
         report.warnings.append(msg)
         report.quality_flags["sigma_metadata_present"] = False
-        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=4)
+        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=3)
         logger.debug(
             "Creep sigma metadata check failed", metadata_keys=list(meta.keys())
         )
@@ -204,7 +204,7 @@ def _check_rotation(data: RheoData, report: LoaderReport) -> None:
         )
         report.warnings.append(msg)
         report.quality_flags["shear_rate_metadata_present"] = False
-        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=4)
+        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=3)
         logger.debug(
             "Rotation shear-rate metadata check failed",
             metadata_keys=list(meta.keys()),
@@ -224,7 +224,7 @@ def _check_startup(data: RheoData, report: LoaderReport) -> None:
         )
         report.warnings.append(msg)
         report.quality_flags["shear_rate_metadata_present"] = False
-        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=4)
+        warnings.warn(msg, RheoJaxValidationWarning, stacklevel=3)
         logger.debug(
             "Startup shear-rate metadata check failed",
             metadata_keys=list(meta.keys()),
