@@ -66,3 +66,23 @@ def test_about_shows_about_dialog(qtbot, monkeypatch):
     win._on_about()
 
     assert shown == [True]
+
+
+def test_documentation_action_trigger_reaches_open_docs_handler(qtbot, monkeypatch):
+    # Every other test in this file calls win._on_open_docs()/etc directly --
+    # a missing or mis-wired menu.addAction(text, handler) call (e.g. the
+    # wrong handler connected to the wrong label) would leave those tests
+    # passing while a real click on "Documentation" did nothing or opened
+    # the wrong page. This goes through the real QAction instead, matching
+    # test_library_rail.py's test_context_menu_signal_wiring_reaches_handler_through_real_emission.
+    win = _win(qtbot)
+    opened = []
+    monkeypatch.setattr("webbrowser.open", lambda url: opened.append(url))
+    help_action = next(a for a in win.menuBar().actions() if a.text() == "&Help")
+    doc_action = next(
+        a for a in help_action.menu().actions() if a.text() == "&Documentation"
+    )
+
+    doc_action.trigger()
+
+    assert opened == ["https://rheojax.readthedocs.io"]
