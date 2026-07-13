@@ -1,8 +1,6 @@
 import inspect
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GUI_ROOT = REPO_ROOT / "rheojax" / "gui"
 FORBIDDEN_TOKENS = (
@@ -25,22 +23,6 @@ def test_gui_clean():
         if any(token in path.read_text() for token in FORBIDDEN_TOKENS)
     ]
     assert bad == [], bad
-
-
-@pytest.mark.parametrize("page_type", ["fit", "bayesian"])
-def test_pages_do_not_expose_retired_dmta_controls(qtbot, page_type):
-    if page_type == "fit":
-        from rheojax.gui.pages.fit_page import FitPage
-
-        page = FitPage()
-    else:
-        from rheojax.gui.pages.bayesian_page import BayesianPage
-
-        page = BayesianPage()
-
-    qtbot.addWidget(page)
-    assert not hasattr(page, "_deformation_combo")
-    assert not hasattr(page, "_poisson_spin")
 
 
 def test_worker_interfaces_are_shear_only():

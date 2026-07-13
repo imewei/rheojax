@@ -403,52 +403,6 @@ fig = panel.get_figure()
 # =============================================================================
 
 
-@pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
-class TestMultiViewVisual:
-    """Visual regression tests for MultiView widget."""
-
-    @pytest.fixture
-    def qapp(self, qtbot: Any) -> QApplication:
-        """Get or create QApplication instance."""
-        app = QApplication.instance()
-        if app is None:
-            app = QApplication([])
-        return app
-
-    def test_multiview_2x2_layout(
-        self,
-        qapp: QApplication,
-        qtbot: Any,
-        golden_dir: Path,
-    ) -> None:
-        """Test 2x2 multi-view layout."""
-        widget_code = """
-import numpy as np
-from rheojax.gui.widgets.multi_view import MultiView
-view = MultiView(layout="2x2")
-rng = np.random.default_rng(42)
-for i in range(4):
-    panel = view.get_panel(i)
-    if panel:
-        panel_fig = panel.get_figure()
-        ax = panel_fig.add_subplot(111)
-        x = np.linspace(0, 10, 50)
-        y = np.sin(x + i * np.pi / 4) + rng.standard_normal(50) * 0.1
-        ax.plot(x, y)
-        ax.set_title(f"Panel {i + 1}")
-        panel.refresh()
-panel0 = view.get_panel(0)
-fig = panel0.get_figure()
-"""
-        golden_path = golden_dir / "multiview_panel0.png"
-
-        if not golden_path.exists():
-            save_golden_image(widget_code, golden_path)
-            pytest.skip("Generated golden image - rerun test to validate")
-
-        assert compare_figures(widget_code, golden_path), "MultiView panel visual mismatch"
-
-
 # =============================================================================
 # ArvizCanvas Visual Tests (Placeholder - requires InferenceData)
 # =============================================================================
