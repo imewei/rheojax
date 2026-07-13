@@ -412,7 +412,7 @@ class FitResult:
         """Load a fit result from a file.
 
         Args:
-            path: Path to a ``.json`` or ``.npz`` file.
+            path: Path to a ``.json``, ``.npz``, ``.h5``, or ``.hdf5`` file.
 
         Returns:
             Reconstructed FitResult (without the OptimizationResult reference).
@@ -424,8 +424,14 @@ class FitResult:
             return cls._load_json(path)
         elif ext == ".npz":
             return cls._load_npz(path)
+        elif ext in (".h5", ".hdf5"):
+            from rheojax.io.writers.hdf5_writer import load_fit_result_hdf5
+
+            return load_fit_result_hdf5(path)
         else:
-            raise ValueError(f"Unsupported extension '{ext}'. Use .json or .npz.")
+            raise ValueError(
+                f"Unsupported extension '{ext}'. Use .json, .npz, .h5, or .hdf5."
+            )
 
     @classmethod
     def _load_json(cls, path: str) -> FitResult:

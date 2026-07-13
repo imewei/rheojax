@@ -90,6 +90,20 @@ def test_normalize_units_passthrough():
 
 
 @pytest.mark.smoke
+def test_normalize_units_megapascal_vs_millipascal_case_sensitive():
+    """'MPa' (megapascal, x1e6) and 'mPa' (millipascal, x0.001) must not
+    collide via a case-insensitive lookup (PR #67 regression: a ~1e9x error
+    for millipascal-labeled data)."""
+    result_mega, unit_mega = normalize_units(np.array([1.0]), "MPa")
+    np.testing.assert_allclose(result_mega, [1e6])
+    assert unit_mega == "Pa"
+
+    result_milli, unit_milli = normalize_units(np.array([1.0]), "mPa")
+    np.testing.assert_allclose(result_milli, [0.001])
+    assert unit_milli == "Pa"
+
+
+@pytest.mark.smoke
 def test_unified_dict_has_expected_keys():
     expected_keys = {
         "hz",

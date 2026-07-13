@@ -527,6 +527,21 @@ def _get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
     return df.iloc[:, col].values
 
 
+def _looks_like_eu_thousands(val: str) -> bool:
+    """Whether a dot-only numeric string has the shape of EU thousands
+    grouping (e.g. "1.234", "12.345.678") rather than a plain decimal.
+
+    Real EU thousands grouping always groups digits in 3s: every group after
+    the first has exactly 3 digits, and the leading group has 1-3. A value
+    that doesn't fit that shape (e.g. "5.5", or sci-notation "5.5e3") is a
+    plain decimal, not a thousands-grouped integer.
+    """
+    groups = val.split(".")
+    if len(groups) < 2 or not all(g.isdigit() for g in groups):
+        return False
+    return len(groups[0]) in (1, 2, 3) and all(len(g) == 3 for g in groups[1:])
+
+
 def _to_float(arr: np.ndarray) -> np.ndarray:
     """Convert array to float, handling European decimal comma and US thousands.
 
@@ -570,16 +585,27 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
             last_dot = sample.rfind(".")
             if last_comma > last_dot:
                 # EU: 1.234,56 — dot=thousands, comma=decimal. Convert
-                # element-wise: only values that actually contain a comma
-                # are EU-formatted. A value with just a dot (e.g. "5.5", or
-                # sci-notation like "5.5e3") is already standard format —
-                # blanket-stripping its dot would silently corrupt it (e.g.
-                # "5.5" becoming 55.0), so such values are parsed as-is.
+                # element-wise since not every value in the column need be
+                # EU-formatted:
+                # - a value with a comma is unambiguously EU (strip dots,
+                #   comma -> decimal point)
+                # - a dot-only value is ambiguous ("1.234" could be EU
+                #   thousands-grouped 1234, or a plain decimal 1.234) —
+                #   resolve it the same way genuine EU thousands grouping
+                #   would look: every dot-separated group must be all-digit,
+                #   the leading group 1-3 digits, and every following group
+                #   exactly 3 digits (e.g. "1.234", "12.345.678"). A value
+                #   like "5.5" or sci-notation like "5.5e3" fails that shape
+                #   (a 1-digit or non-digit trailing group) and is left as a
+                #   plain decimal — blanket-stripping its dot would silently
+                #   corrupt it (e.g. "5.5" becoming 55.0).
                 result = np.empty(str_arr.shape, dtype=float)
                 for idx in np.ndindex(str_arr.shape):
                     val = str(str_arr[idx]).strip()
                     if "," in val:
                         val = val.replace(".", "").replace(",", ".")
+                    elif _looks_like_eu_thousands(val):
+                        val = val.replace(".", "")
                     try:
                         result[idx] = float(val)
                     except ValueError:

@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from rheojax.io.spp_export import (
+    _extract_spp_arrays,
     export_spp_csv,
     export_spp_hdf5,
     export_spp_txt,
@@ -55,6 +56,41 @@ def _make_mock_spp_results(n_points: int = 500) -> dict:
             [np.zeros(n_points), np.zeros(n_points), np.ones(n_points)]
         ),
     }
+
+
+def test_extract_spp_arrays_fallback_quadrant_correct_when_gp_negative():
+    """Regression test (PR #67): when tan_delta_t/delta_t are absent from
+    spp_results, _extract_spp_arrays must derive them via the quadrant-correct
+    arctan2(Gpp_t, Gp_t) formula, not plain arctan(Gpp_t/Gp_t) -- the latter
+    silently folds the angle back into (-90, 90) degrees whenever Gp_t goes
+    negative (an SPP yielding transition, exactly the regime this analysis
+    targets)."""
+    n_points = 4
+    Gp_t = np.array([100.0, -50.0, -20.0, 10.0])
+    Gpp_t = np.array([30.0, 40.0, -15.0, 5.0])
+    spp_results = {
+        "time_new": np.arange(n_points, dtype=float),
+        "strain_recon": np.zeros(n_points),
+        "rate_recon": np.zeros(n_points),
+        "stress_recon": np.zeros(n_points),
+        "Gp_t": Gp_t,
+        "Gpp_t": Gpp_t,
+        # tan_delta_t / delta_t / G_star_t deliberately omitted to exercise
+        # the fallback derivation path.
+    }
+
+    arrays = _extract_spp_arrays(spp_results, n_points=n_points)
+
+    expected_delta_t = np.arctan2(Gpp_t, Gp_t)
+    np.testing.assert_allclose(arrays["delta_t"], expected_delta_t)
+    # Sanity: for the Gp_t < 0 points, plain arctan(Gpp/Gp) would land in a
+    # different quadrant than arctan2 -- confirm they actually disagree here,
+    # i.e. this test would have caught the pre-fix bug.
+    wrong_delta_t = np.arctan(Gpp_t / Gp_t)
+    assert not np.allclose(wrong_delta_t[Gp_t < 0], expected_delta_t[Gp_t < 0])
+
+    expected_tan_delta_t = Gpp_t / np.maximum(np.abs(Gp_t), 1e-12) * np.sign(Gp_t)
+    np.testing.assert_allclose(arrays["tan_delta_t"], expected_tan_delta_t)
 
 
 # ============================================================================

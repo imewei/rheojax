@@ -90,3 +90,45 @@ def test_load_csv_semicolon_values(tmp_path: Path):
     data = load_csv(csv_path, x_col="time", y_col="stress")
     np.testing.assert_allclose(data.x, [1.0, 2.0], rtol=1e-10)
     np.testing.assert_allclose(data.y, [3.0, 4.0], rtol=1e-10)
+
+
+def test_to_float_eu_locale_mixed_with_plain_and_thousands():
+    """Regression test for two _to_float bugs found in PR #67 review:
+
+    1. A plain US-style decimal ("5.5") in an EU-detected column must not
+       have its dot blanket-stripped into 55.0.
+    2. A dot-only EU-thousands-grouped value ("1.234" meaning 1234) must not
+       be left as the literal decimal 1.234 just because it lacks a comma.
+    """
+    from rheojax.io.readers.csv_reader import _to_float
+
+    result = _to_float(np.array(["1.234.567,89", "1.234", "42", "5,5"], dtype=object))
+    np.testing.assert_allclose(result, [1234567.89, 1234.0, 42.0, 5.5])
+
+
+def test_load_csv_auto_detected_units_normalized_to_si(tmp_path: Path):
+    """load_csv must normalize auto-detected header units to SI, matching
+    the anton_paar/TRIOS readers (PR #67), not just extract the raw unit
+    string and leave the numeric values unconverted."""
+    csv_path = tmp_path / "units.csv"
+    _write(csv_path, "Frequency (Hz),Storage Modulus (kPa)\n1.0,10.0\n2.0,20.0\n")
+
+    data = load_csv(csv_path, x_col="Frequency (Hz)", y_col="Storage Modulus (kPa)")
+
+    assert data.x_units == "rad/s"
+    np.testing.assert_allclose(data.x, [2 * np.pi, 4 * np.pi])
+    assert data.y_units == "Pa"
+    np.testing.assert_allclose(data.y, [10000.0, 20000.0])
+
+
+def test_load_csv_percent_strain_normalized_to_fraction(tmp_path: Path):
+    """A '%' unit header must be converted to a dimensionless fraction, not
+    left as a raw percentage (a 100x silent error if downstream code assumes
+    fractional strain)."""
+    csv_path = tmp_path / "strain.csv"
+    _write(csv_path, "Time (s),Strain (%)\n1.0,5.0\n2.0,10.0\n")
+
+    data = load_csv(csv_path, x_col="Time (s)", y_col="Strain (%)")
+
+    assert data.y_units == "dimensionless"
+    np.testing.assert_allclose(data.y, [0.05, 0.10])

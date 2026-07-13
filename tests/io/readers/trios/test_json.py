@@ -23,6 +23,7 @@ from rheojax.io.readers.trios.json import (
     parse_trios_json,
     validate_schema,
 )
+from rheojax.io.readers.trios.schema.dataset import TRIOSDataSet
 
 
 def _dataset(columns, values):
@@ -297,3 +298,31 @@ class TestNanFiltering:
         # The NaN row is dropped; two finite points remain.
         assert len(data.x) == 2
         assert np.all(np.isfinite(data.y))
+
+
+class TestToDataframeNumericCoercion:
+    """Regression tests (PR #67) for TRIOSDataSet.to_dataframe()'s per-column
+    numeric coercion, which must neither silently NaN-fill a genuinely
+    non-numeric column nor hard-crash a mostly-numeric column over one bad
+    cell."""
+
+    def test_fully_non_numeric_column_preserved(self):
+        ds = TRIOSDataSet(
+            columns=[{"name": "Time"}, {"name": "Point type"}],
+            values=[[0.1, "Normal"], [0.2, "Rejected"], [0.3, "Interpolated"]],
+        )
+        df = ds.to_dataframe()
+        assert df["Point type"].tolist() == ["Normal", "Rejected", "Interpolated"]
+        assert np.issubdtype(df["Time"].dtype, np.number)
+
+    def test_mostly_numeric_column_with_one_bad_cell_still_coerced(self):
+        ds = TRIOSDataSet(
+            columns=[{"name": "Time"}, {"name": "Normal Force"}],
+            values=[[0.1, 100.0], [0.2, "n.a."], [0.3, 105.0]],
+        )
+        df = ds.to_dataframe()
+        # Coerced to numeric (usable downstream), not left as strings and
+        # not raising -- the bad cell becomes NaN, not a hard failure.
+        assert np.issubdtype(df["Normal Force"].dtype, np.number)
+        assert np.isnan(df["Normal Force"].iloc[1])
+        np.testing.assert_allclose(df["Normal Force"].dropna(), [100.0, 105.0])

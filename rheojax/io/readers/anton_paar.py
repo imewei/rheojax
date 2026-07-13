@@ -1004,9 +1004,12 @@ def _extract_temperature_metadata(
             # single token rather than a separate unit key — split it off
             # so the float() parse below succeeds and the unit is detected.
             if not raw_unit:
-                inline_match = re.match(r"^(-?\d+(?:\.\d+)?)\s*(.*)$", str(raw_value).strip())
+                # Accept both '.' and ',' as the decimal separator -- EU-locale
+                # RheoCompass exports write e.g. "25,7 °C" (see the identical
+                # fix in trios/common.py's segment_to_rheodata).
+                inline_match = re.match(r"^(-?\d+[.,]?\d*)\s*(.*)$", str(raw_value).strip())
                 if inline_match and inline_match.group(2):
-                    raw_value = inline_match.group(1)
+                    raw_value = inline_match.group(1).replace(",", ".")
                     raw_unit = inline_match.group(2).strip()
             # Determine whether the value is in Celsius
             is_celsius = "°C" in str(raw_unit) or raw_unit.strip().lower() in (
