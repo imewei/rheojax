@@ -163,6 +163,8 @@ gpu_cuda12 = [
 [project.scripts]
 rheojax = "rheojax.cli.main:cli_entry"
 rheojax-gui = "rheojax.gui.main:main"
+rj = "rheojax.cli.main:cli_entry"
+rj-gui = "rheojax.gui.main:main"
 
 [project.urls]
 "Homepage" = "https://github.com/imewei/rheojax"
