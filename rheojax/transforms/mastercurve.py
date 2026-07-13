@@ -711,6 +711,21 @@ class Mastercurve(BaseTransform):
         ValueError
             If temperature metadata is missing
         """
+        # auto_shift computes a_T via power-law curve-intersection across
+        # multiple datasets (see create_mastercurve); there is no single-curve
+        # equivalent. get_shift_factor() has no auto_shift branch, so without
+        # this guard a single-dataset transform() call would silently fall
+        # through to a WLF/Arrhenius shift using whatever self.method/C1/C2
+        # happen to be set (defaults if unspecified) instead of honoring
+        # auto_shift or raising.
+        if self._auto_shift:
+            raise NotImplementedError(
+                "Mastercurve auto_shift=True is not implemented for a single "
+                "dataset: automatic shift factors require curve-intersection "
+                "fitting across multiple temperatures. Pass a list of "
+                "datasets to transform()/create_mastercurve() instead."
+            )
+
         # Get temperature from metadata
         _meta_ts = data.metadata or {}
         if "temperature" not in _meta_ts:

@@ -198,6 +198,29 @@ class TestMastercurve:
         with pytest.raises(NotImplementedError):
             Mastercurve(optimize_shifts=True)
 
+    def test_auto_shift_single_dataset_raises_not_implemented(self):
+        """transform() on a single dataset with auto_shift=True must raise,
+        not silently fall through to a default-parameter WLF shift.
+
+        auto_shift computes a_T via curve-intersection fitting across
+        multiple temperatures; get_shift_factor() has no auto_shift branch,
+        so without an explicit guard a single-dataset call silently used
+        method='wlf' with whatever C1/C2 happened to be set (defaults if
+        unspecified) instead of honoring auto_shift or raising.
+        """
+        time = jnp.logspace(-2, 2, 20)
+        relaxation_modulus = 1e5 * time ** (-0.3)
+        data = RheoData(
+            x=time,
+            y=relaxation_modulus,
+            domain="time",
+            metadata={"temperature": 320.0},
+        )
+
+        mc = Mastercurve(reference_temp=298.15, auto_shift=True)
+        with pytest.raises(NotImplementedError, match="auto_shift"):
+            mc.transform(data)
+
     def test_transform_single_time_domain_matches_create_mastercurve(self):
         """transform() on a single time-domain dataset must match the
         (correct) domain-aware shift applied by create_mastercurve()."""
