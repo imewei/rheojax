@@ -279,16 +279,15 @@ class TestRunAnalyze:
         assert rc == 1
 
     @pytest.mark.unit
-    def test_export_matlab_reports_error(self, tmp_path):
-        # BUG: --export-matlab passes SPPDecomposer results straight to
-        # export_spp_txt, which needs length-bearing keys (Gp_t/time_new/...)
-        # that the decomposer nests under results["numerical"]. So MATLAB
-        # export currently always fails; the CLI reports it and returns 1.
+    def test_export_matlab_succeeds(self, tmp_path):
+        # export_spp_txt now writes the MATLAB-compatible SPP text output
+        # directly from the SPPDecomposer results.
         csv = _write_laos_csv(tmp_path / "laos.csv")
         rc = run_analyze(
             _analyze_ns(input_file=csv, output=tmp_path / "o.txt", export_matlab=True)
         )
-        assert rc == 1
+        assert rc == 0
+        assert (tmp_path / "o_SPP_NUMERICAL.txt").exists()
 
     @pytest.mark.unit
     def test_bayesian_reports_error(self, tmp_path):

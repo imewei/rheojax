@@ -220,7 +220,11 @@ class TestNonStandardShapeConventions:
     """Regression: this generic I/O-boundary gate wraps X/y in a 1-D-x-axis
     RheoData, which is stricter than some models' own documented input
     conventions -- it used to reject them before the model's own (already
-    correct) handling ever ran. Both conventions must pass through."""
+    correct) handling ever ran. For any shape RheoData can't represent
+    (2-D X, or y with a second dimension other than 2), this gate now
+    defers entirely to the model's own validation instead of raising
+    RheoData's generic message -- it only still enforces dtype/finiteness
+    directly, since a downstream model may not check that itself."""
 
     def test_ikh_packed_time_strain_x_is_not_rejected(self):
         """IKH/FIKH pack X as (2, N) [time, strain] for startup/LAOS (see
@@ -231,12 +235,6 @@ class TestNonStandardShapeConventions:
         y = np.linspace(1.0, 5.0, 20)
         FitOrchestrator._validate_fit_data(X, y, test_mode="startup")
 
-    def test_ikh_packed_time_strain_length_mismatch_still_raises(self):
-        X = np.stack([np.linspace(0, 5.0, 20), np.linspace(0, 10.0, 20)])
-        y = np.linspace(1.0, 5.0, 19)  # wrong length
-        with pytest.raises(ValueError, match="X and y must have the same length"):
-            FitOrchestrator._validate_fit_data(X, y, test_mode="startup")
-
     def test_ikh_packed_time_strain_nan_still_raises(self):
         X = np.stack([np.linspace(0, 5.0, 20), np.linspace(0, 10.0, 20)])
         y = np.linspace(1.0, 5.0, 20)
@@ -246,19 +244,14 @@ class TestNonStandardShapeConventions:
 
     def test_transposed_g_star_2xm_is_not_rejected(self):
         """Some oscillation models (e.g. SGRConventional) accept a
-        transposed (2, M) G'/G'' array and auto-transpose it to (M, 2)
-        internally; the gate must transpose it too before delegating."""
+        transposed (2, M) G'/G'' array and auto-transpose it internally;
+        this gate defers to that model-level handling rather than raising
+        RheoData's (N, 2)-only message."""
         omega = np.logspace(-2, 2, 10)
         g_prime = np.linspace(1e3, 1e4, 10)
         g_double_prime = np.linspace(1e2, 1e3, 10)
         G_2xM = np.vstack([g_prime, g_double_prime])
         FitOrchestrator._validate_fit_data(omega, G_2xM, test_mode="oscillation")
-
-    def test_genuinely_bad_shape_still_raises(self):
-        omega = np.logspace(-2, 2, 10)
-        bad = np.ones((10, 3))
-        with pytest.raises(ValueError, match=r"2-dimensional with shape \(N, 2\)"):
-            FitOrchestrator._validate_fit_data(omega, bad, test_mode="oscillation")
 
 
 @pytest.mark.smoke

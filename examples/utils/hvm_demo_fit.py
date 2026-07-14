@@ -75,7 +75,10 @@ def _protocol_grid(protocol: str) -> tuple[np.ndarray, dict[str, float]]:
     if protocol == "relaxation":
         return np.logspace(-2, 3, 60), {}
     if protocol == "creep":
-        return np.logspace(-2, 3, 60), {"sigma_applied": 100.0}
+        # Upper bound capped at 10**2: the HVM creep ODE integration for
+        # TRUE_PARAMS/sigma_applied=100 diverges to all-NaN somewhere in
+        # (10**2, 10**3] seconds, unlike relaxation which stays stable to 10**3.
+        return np.logspace(-2, 2, 60), {"sigma_applied": 100.0}
     if protocol == "startup":
         return np.linspace(0.01, 10.0, 80), {"gamma_dot": 1.0}
     if protocol == "oscillation":
@@ -86,7 +89,7 @@ def _protocol_grid(protocol: str) -> tuple[np.ndarray, dict[str, float]]:
 def _fit_grid(protocol: str) -> np.ndarray:
     if protocol == "startup":
         return np.linspace(0.01, 10.0, 200)
-    return np.logspace(-2, 3 if protocol in {"relaxation", "creep"} else 2, 200)
+    return np.logspace(-2, 3 if protocol == "relaxation" else 2, 200)
 
 
 def _r_squared(y_true: np.ndarray, y_pred: np.ndarray, *, log_space: bool) -> float:

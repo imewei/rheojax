@@ -267,52 +267,35 @@ class FitOrchestrator:
         so the frequency-domain negative-value check in
         ``RheoData._validate_data`` also runs for raw-array oscillation
         fits (``domain`` otherwise defaults to "time" and skips that check).
-
-        Two model-specific input conventions RheoData cannot represent are
-        special-cased here so this generic gate doesn't reject them before
-        the model's own (already correct) handling ever runs:
-
-        - IKH/FIKH's startup/LAOS protocols accept X packed as ``(2, N)``
-          ``[time, strain]`` (see ``ikh/_base.py::_extract_time_strain``) --
-          not a 1-D x-axis, so validate shape/finiteness directly instead.
-        - Several oscillation models (e.g. SGRConventional) accept a
-          transposed ``(2, M)`` G'/G'' array and auto-transpose it to
-          ``(M, 2)`` internally -- transpose here too before delegating, so
-          the same input that a fitted model accepts doesn't fail this
-          earlier gate.
         """
-        from rheojax.core.data import RheoData
+        from rheojax.core.data import RheoData, _check_dtype
 
-        X_arr = np.asarray(X)
+        x_arr = np.asarray(X)
         y_arr = np.asarray(y)
 
-        if X_arr.ndim == 2 and X_arr.shape[0] == 2:
-            if X_arr.shape[1] != y_arr.shape[-1]:
-                raise ValueError(
-                    "X and y must have the same length. "
-                    f"Got X: {X_arr.shape}, y: {y_arr.shape}"
-                )
-            if not np.all(np.isfinite(X_arr)):
-                raise ValueError("X contains non-finite (NaN/Inf) values")
-            if not np.all(np.isfinite(y_arr)):
-                raise ValueError("y contains non-finite (NaN/Inf) values")
+        # Some models accept protocol-encoded X (e.g. stacked (time, strain)
+        # rows for startup/LAOS, shape (2, N)) or a transposed complex-modulus
+        # y (shape (2, N) real/imag rows) — both fall outside RheoData's
+        # plain (x: 1D, y: 1D/complex/(N, 2)) convention. Those models already
+        # run their own shape validation with model-specific error messages,
+        # so defer to them here instead of raising RheoData's generic one;
+        # still run the same dtype/NaN/non-finite checks directly so those
+        # guarantees (in particular rejecting bool/object dtypes, which
+        # would otherwise silently pass the finite check below) aren't lost.
+        if x_arr.ndim > 1 or (y_arr.ndim == 2 and y_arr.shape[1] != 2):
+            _check_dtype(x_arr, "X")
+            _check_dtype(y_arr, "y", allow_complex=True)
+            for name, arr in (("X", x_arr), ("y", y_arr)):
+                if not np.all(np.isfinite(arr)):
+                    raise ValueError(f"{name} data contains NaN or non-finite values")
             return
-
-        if (
-            X_arr.ndim == 1
-            and y_arr.ndim == 2
-            and y_arr.shape[0] == 2
-            and y_arr.shape[1] != 2
-            and y_arr.shape[1] == X_arr.shape[0]
-        ):
-            y_arr = y_arr.T
 
         domain = (
             "frequency"
-            if test_mode == "oscillation" or np.iscomplexobj(y_arr)
+            if test_mode == "oscillation" or np.iscomplexobj(np.asarray(y))
             else "time"
         )
-        RheoData(x=X, y=y_arr, domain=domain, validate=True)
+        RheoData(x=X, y=y, domain=domain, validate=True)
 
     @staticmethod
     def _sort_by_x(X: ArrayLike, y: ArrayLike) -> tuple[ArrayLike, ArrayLike]:

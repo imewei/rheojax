@@ -774,15 +774,20 @@ class HVMLocal(HVMBase):
         )
 
         # ODE-based protocols use diffrax with custom_vjp, incompatible with
-        # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
+        # NLSQ forward-mode AD. "nlsq" — BaseModel.fit()'s default, so always
+        # present in kwargs even when the caller didn't request it explicitly
+        # — is remapped to scipy for these protocols to avoid a guaranteed-
+        # failing attempt; any other explicitly-requested method is honored.
         _ode_protocols = {"laos", "startup", "relaxation", "creep"}
-        _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        _method = kwargs.get("method", "nlsq")
+        if test_mode in _ode_protocols and _method == "nlsq":
+            _method = "scipy"
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 

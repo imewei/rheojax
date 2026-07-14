@@ -182,16 +182,10 @@ class TestHLValidation:
             model.predict(np.linspace(0, 1, 5))
 
     def test_oscillation_bad_g_star_shape(self, model):
-        """SAOS fit rejects G* that is neither complex nor (M, 2).
-
-        Caught by FitOrchestrator._validate_fit_data's I/O-boundary gate
-        (rheojax/core/fit_orchestrator.py) before model._fit() ever runs,
-        so the message is RheoData's generic shape-validation text rather
-        than a model-specific one.
-        """
+        """SAOS fit rejects G* that is neither complex nor (M, 2)."""
         omega = np.logspace(-1, 1, 4)
         bad = np.ones((4, 3))  # wrong second dimension
-        with pytest.raises(ValueError, match=r"2-dimensional with shape \(N, 2\)"):
+        with pytest.raises(ValueError, match=r"complex array or \(M, 2\)"):
             model.fit(omega, bad, test_mode="oscillation", max_iter=1)
 
 
