@@ -382,7 +382,7 @@ class Carreau(BaseModel):
         # Validate test mode
         if test_mode not in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             raise ValueError(
-                f"Carreau model only supports ROTATION test mode, got {test_mode}"
+                f"Carreau model only supports ROTATION/FLOW_CURVE test mode, got {test_mode}"
             )
 
         # Get shear rate data
