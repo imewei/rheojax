@@ -380,7 +380,11 @@ class BayesianMixin:
         """
         x_arr = np.asarray(X_array)
         y_arr = np.asarray(y_array)
-        n = x_arr.shape[0] if x_arr.ndim > 0 else None
+        # Protocol-encoded X (e.g. stacked (time, strain) rows for
+        # startup/LAOS, shape (2, N)) carries the sample count in its last
+        # axis, not its first — use shape[-1] so both that convention and
+        # the plain 1-D case (where shape[-1] == shape[0]) are covered.
+        n = x_arr.shape[-1] if x_arr.ndim > 0 else None
 
         if y_arr.ndim == 1:
             pass
