@@ -171,6 +171,14 @@ class SRFS(BaseTransform):
             reference_gamma_dot=self.reference_gamma_dot,
         )
 
+        if gamma_dot <= 0.0:
+            raise ValueError(
+                f"gamma_dot must be positive, got {gamma_dot}. Shift factors are "
+                "a power law a(gamma_dot) = (gamma_dot / gamma_dot_ref)^m with "
+                "generally non-integer m, which is undefined (complex) for a "
+                "negative base and ill-defined (inf/0) for a zero base."
+            )
+
         # Compute shift exponent from SGR theory
         # In power-law regime: a ~ gamma_dot^(2-x)
         # This comes from the scaling of viscosity eta ~ gamma_dot^(x-2)
@@ -315,16 +323,35 @@ class SRFS(BaseTransform):
         # Handle single dataset
         if isinstance(data, RheoData):
             if x is None or tau0 is None:
-                logger.error("Missing required SGR parameters for SRFS transformation")
-                raise ValueError("x and tau0 are required for SRFS transformation")
+                self._raise_missing_sgr_params()
             return self._transform_single(data, x, tau0)
 
         # Handle list of datasets
         if x is None or tau0 is None:
-            logger.error("Missing required SGR parameters for SRFS transformation")
-            raise ValueError("x and tau0 are required for SRFS transformation")
+            self._raise_missing_sgr_params()
 
         return self.create_mastercurve(data, x, tau0, return_shifts=return_shifts)
+
+    def _raise_missing_sgr_params(self) -> None:
+        """Raise the appropriate error when x/tau0 are not supplied.
+
+        auto_shift=True is documented as a way to skip explicit x/tau0, but
+        SRFS shift factors are derived from SGR theory (a ~ gamma_dot^(2-x)),
+        not from curve-overlap optimization like Mastercurve's TTS auto_shift.
+        No auto-fitting is implemented, so this raises NotImplementedError
+        instead of silently requiring x/tau0 anyway (auto_shift=False) or
+        silently substituting a different algorithm (auto_shift=True).
+        """
+        if self._auto_shift:
+            logger.error("auto_shift=True requested but not implemented for SRFS")
+            raise NotImplementedError(
+                "SRFS auto_shift=True is not implemented: SRFS shift factors "
+                "require explicit SGR parameters x and tau0 (unlike Mastercurve's "
+                "auto_shift, which optimizes curve overlap). Pass x and tau0 "
+                "explicitly to transform()."
+            )
+        logger.error("Missing required SGR parameters for SRFS transformation")
+        raise ValueError("x and tau0 are required for SRFS transformation")
 
     def transform(
         self,
@@ -566,7 +593,9 @@ def detect_shear_banding(
     warn : bool, default=False
         If True, issue a warning when shear banding is detected
     threshold : float, default=-0.01
-        Threshold for detecting negative slope (allows for numerical noise)
+        Threshold for detecting negative slope (allows for numerical noise).
+        Applied to the derivative after normalizing by the data's own
+        stress/shear-rate range, so it is scale-invariant across unit systems.
 
     Returns
     -------
@@ -601,6 +630,13 @@ def detect_shear_banding(
         logger.debug("Insufficient data for banding detection (need >= 2 points)")
         return False, None
 
+    if not (np.all(np.isfinite(gamma_dot)) and np.all(np.isfinite(sigma))):
+        logger.error("Non-finite values in gamma_dot or sigma for banding detection")
+        raise ValueError(
+            "gamma_dot and sigma must be finite (no NaN/inf) for shear banding "
+            "detection; a non-finite derivative would silently report 'no banding'"
+        )
+
     # Sort by shear rate
     sort_idx = np.argsort(gamma_dot)
     gamma_dot = gamma_dot[sort_idx]
@@ -610,10 +646,28 @@ def detect_shear_banding(
     d_sigma = np.diff(sigma)
     d_gamma_dot = np.diff(gamma_dot)
 
-    # Avoid division by zero
-    d_gamma_dot = np.maximum(d_gamma_dot, 1e-20)
+    gamma_dot_range = np.max(gamma_dot) - np.min(gamma_dot)
 
-    derivative = d_sigma / d_gamma_dot
+    # Guard against (near-)duplicate shear-rate points: a finite-difference
+    # slope there is numerically meaningless, and clamping d_gamma_dot to a
+    # fixed epsilon (as opposed to a floor scaled to the data's own
+    # resolution) turns ordinary floating-point noise in sigma into a huge
+    # spurious derivative. Intervals below the resolution floor carry no
+    # slope information, so their derivative is set to 0 (neither positive
+    # nor negative) rather than divided out.
+    resolution_floor = max(gamma_dot_range, 1e-300) * 1e-9
+    valid_interval = d_gamma_dot > resolution_floor
+    d_gamma_dot_safe = np.where(valid_interval, d_gamma_dot, 1.0)
+    derivative = np.where(valid_interval, d_sigma / d_gamma_dot_safe, 0.0)
+
+    # Normalize the derivative to the data's own stress/shear-rate scale so
+    # that `threshold` is a scale-invariant (dimensionless) criterion rather
+    # than a fixed Pa/(1/s) magnitude. Without this, genuine non-monotonicity
+    # in small-magnitude data (e.g. sub-Pa stresses) never crosses a threshold
+    # tuned for O(1) data.
+    sigma_range = np.max(sigma) - np.min(sigma)
+    if sigma_range > 0 and gamma_dot_range > 0:
+        derivative = derivative * (gamma_dot_range / sigma_range)
 
     # Detect regions with negative slope
     negative_slope_mask = derivative < threshold
@@ -773,9 +827,14 @@ def compute_shear_band_coexistence(
     if np.any(left_mask):
         gamma_dot_left = gamma_dot_sorted[left_mask]
         sigma_left = sigma_sorted[left_mask]
-        # Interpolate to find gamma_dot at stress_plateau
+        # Interpolate to find gamma_dot at stress_plateau. np.interp requires
+        # its xp argument to be monotonically increasing, so re-sort by sigma
+        # (the left branch is only guaranteed sorted by gamma_dot, not sigma).
         if len(gamma_dot_left) > 1:
-            gamma_dot_low = np.interp(stress_plateau, sigma_left, gamma_dot_left)
+            sigma_order = np.argsort(sigma_left)
+            gamma_dot_low = np.interp(
+                stress_plateau, sigma_left[sigma_order], gamma_dot_left[sigma_order]
+            )
         else:
             gamma_dot_low = gamma_dot_low_bound
     else:
@@ -786,9 +845,12 @@ def compute_shear_band_coexistence(
     if np.any(right_mask):
         gamma_dot_right = gamma_dot_sorted[right_mask]
         sigma_right = sigma_sorted[right_mask]
-        # Interpolate
+        # Interpolate. Same monotonicity requirement as the left branch above.
         if len(gamma_dot_right) > 1:
-            gamma_dot_high = np.interp(stress_plateau, sigma_right, gamma_dot_right)
+            sigma_order = np.argsort(sigma_right)
+            gamma_dot_high = np.interp(
+                stress_plateau, sigma_right[sigma_order], gamma_dot_right[sigma_order]
+            )
         else:
             gamma_dot_high = gamma_dot_high_bound
     else:
@@ -984,14 +1046,16 @@ def evolve_thixotropy_lambda(
     # Compute time steps (dt[0] is not used, but we need consistent shapes)
     dt = jnp.diff(t_jax)
 
-    # Prepare inputs for scan: (gamma_dot[1:], dt, k_build, k_break)
+    # Prepare inputs for scan: (gamma_dot[:-1], dt, k_build, k_break)
     # We broadcast k_build and k_break to match the sequence length
     n_steps = len(dt)
     k_build_arr = jnp.full(n_steps, k_build, dtype=jnp.float64)
     k_break_arr = jnp.full(n_steps, k_break, dtype=jnp.float64)
 
     # Stack inputs for scan: each element is (gamma_dot_i, dt_i, k_build, k_break)
-    scan_inputs = (gamma_dot_jax[1:], dt, k_build_arr, k_break_arr)
+    # Forward Euler evaluates the forcing term at the left endpoint of each
+    # interval [t_i, t_{i+1}], so dt[i] = t[i+1]-t[i] pairs with gamma_dot[i].
+    scan_inputs = (gamma_dot_jax[:-1], dt, k_build_arr, k_break_arr)
 
     # Run vectorized integration using lax.scan
     # This compiles the entire loop into a single fused kernel

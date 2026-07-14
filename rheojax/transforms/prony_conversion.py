@@ -27,6 +27,7 @@ from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
 from rheojax.logging import get_logger
+from rheojax.utils.prony import compute_r_squared
 
 jax, jnp = safe_import_jax()
 
@@ -48,8 +49,9 @@ class PronyResult:
 class PronyConversion(BaseTransform):
     """Convert between time-domain and frequency-domain via Prony series.
 
-    This transform uses the Prony series utilities in ``rheojax.utils.prony``
-    for fitting and conversion.
+    Fitting and analytical conversion are self-contained (NNLS via
+    ``scipy.optimize.nnls``); fit-quality scoring is delegated to
+    ``rheojax.utils.prony.compute_r_squared``.
 
     Args:
         n_modes: Number of Prony modes (default: auto-select).
@@ -103,9 +105,10 @@ class PronyConversion(BaseTransform):
 
         # Fit Prony series to G(t)
         G_i, tau_i, G_e = _fit_prony_relaxation(t, G_t, n_modes)
+        r_squared = compute_r_squared(G_t, _prony_to_time(G_i, tau_i, G_e, t))
 
         self._prony_result = PronyResult(
-            G_i=G_i, tau_i=tau_i, G_e=G_e, n_modes=len(G_i)
+            G_i=G_i, tau_i=tau_i, G_e=G_e, n_modes=len(G_i), r_squared=r_squared
         )
 
         # Convert to frequency domain
@@ -166,18 +169,28 @@ class PronyConversion(BaseTransform):
         G_i, tau_i, G_e = _fit_prony_oscillation(
             omega, G_prime, G_double_prime, n_modes
         )
+        G_prime_pred, G_double_prime_pred = _prony_to_frequency(
+            G_i, tau_i, G_e, omega
+        )
+        r_squared = compute_r_squared(
+            np.concatenate([G_prime, G_double_prime]),
+            np.concatenate([G_prime_pred, G_double_prime_pred]),
+        )
 
         self._prony_result = PronyResult(
-            G_i=G_i, tau_i=tau_i, G_e=G_e, n_modes=len(G_i)
+            G_i=G_i, tau_i=tau_i, G_e=G_e, n_modes=len(G_i), r_squared=r_squared
         )
 
         t = self.t_out
         if t is None:
             # Mirror the time→freq convention: output t ∈ [1/omega_max, 1/omega_min],
             # which is the data-informed range rather than the wider tau_i-based range.
+            # PC-001 (frequency-domain twin): filter to omega > 0, same root cause
+            # as the tau_i computation in _fit_prony_oscillation above.
+            omega_positive = omega[omega > 0]
             t = np.logspace(
-                np.log10(1.0 / np.max(omega)),
-                np.log10(1.0 / np.min(omega)),
+                np.log10(1.0 / np.max(omega_positive)),
+                np.log10(1.0 / np.min(omega_positive)),
                 100,
             )
 
@@ -297,6 +310,9 @@ def _fit_prony_oscillation(
     """Fit Prony series to dynamic moduli G'(ω), G''(ω)."""
     from scipy.optimize import nnls
 
+    if len(omega) < 2:
+        raise ValueError("Prony fitting requires at least 2 frequency points.")
+
     # T-04: Ensure omega is sorted ascending for correct tau range computation.
     # Must reorder G_prime and G_double_prime to stay aligned with sorted omega.
     sort_idx = np.argsort(omega)
@@ -304,11 +320,23 @@ def _fit_prony_oscillation(
     G_prime = G_prime[sort_idx]
     G_double_prime = G_double_prime[sort_idx]
 
+    # PC-001 (frequency-domain twin of _fit_prony_relaxation's t_positive
+    # filtering): drop non-positive omega before taking 1/omega. Otherwise an
+    # omega=0 entry makes 1/omega non-finite, poisoning tau_i with inf/NaN
+    # which propagates into an all-NaN NNLS kernel matrix below.
+    omega_positive = omega[omega > 0]
+    if len(omega_positive) == 0:
+        raise ValueError(
+            "Prony fitting requires at least one positive frequency value."
+        )
+    omega_min = float(np.min(omega_positive))
+    omega_max = float(np.max(omega_positive))
+
     # Same n+2 / drop-edges approach as _fit_prony_relaxation: modes at exactly
     # 1/omega_max and 1/omega_min are at the boundary of the informative range
     # and pick up spurious weight that distorts G(t) predictions.
     tau_all = np.logspace(
-        np.log10(1.0 / omega[-1]), np.log10(1.0 / omega[0]), n_modes + 2
+        np.log10(1.0 / omega_max), np.log10(1.0 / omega_min), n_modes + 2
     )
     tau_i = tau_all[1:-1]
 

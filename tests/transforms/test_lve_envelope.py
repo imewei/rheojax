@@ -94,6 +94,22 @@ class TestLVEEnvelopeTransform:
         with pytest.raises(ValueError, match="G_i and tau_i must be provided"):
             transform.transform(None)
 
+    def test_explicit_g_e_zero_not_overridden_by_metadata(self):
+        """Explicit G_e=0.0 must not be silently overridden by metadata['G_e']."""
+        G_i = np.array([1000.0])
+        tau_i = np.array([1.0])
+        t = np.array([10.0])
+        data = RheoData(
+            x=t,
+            y=np.zeros(1),
+            metadata={"G_e": 50.0},
+        )
+        transform = LVEEnvelope(shear_rate=1.0, G_i=G_i, tau_i=tau_i, G_e=0.0)
+        result, _ = transform.transform(data)
+
+        expected = lve_envelope(t, G_i, tau_i, 0.0, 1.0)
+        np.testing.assert_allclose(result.y, expected, rtol=1e-10)
+
     def test_mismatched_lengths_raises(self):
         """G_i and tau_i must have same length."""
         transform = LVEEnvelope(

@@ -50,7 +50,9 @@ class LVEEnvelope(BaseTransform):
         shear_rate: Applied shear rate γ̇₀ (s⁻¹).
         G_i: Prony mode strengths (Pa). If None, must be in data metadata.
         tau_i: Prony relaxation times (s). If None, must be in data metadata.
-        G_e: Equilibrium modulus (Pa, default 0).
+        G_e: Equilibrium modulus (Pa). If None (default), read from
+            ``data.metadata['G_e']`` when available, otherwise treated as 0.
+            Pass an explicit value (including 0.0) to override metadata.
         t_out: Time array for output. If None, auto-generated.
     """
 
@@ -59,7 +61,7 @@ class LVEEnvelope(BaseTransform):
         shear_rate: float = 1.0,
         G_i: np.ndarray | None = None,
         tau_i: np.ndarray | None = None,
-        G_e: float = 0.0,
+        G_e: float | None = None,
         t_out: np.ndarray | None = None,
     ):
         super().__init__()
@@ -94,8 +96,11 @@ class LVEEnvelope(BaseTransform):
                 G_i = np.asarray(meta["G_i"])
             if tau_i is None and "tau_i" in meta:
                 tau_i = np.asarray(meta["tau_i"])
-            if abs(self.G_e) < 1e-30 and "G_e" in meta:
+            if G_e is None and "G_e" in meta:
                 G_e = float(meta["G_e"])
+
+        if G_e is None:
+            G_e = 0.0
 
         if G_i is None or tau_i is None:
             raise ValueError(

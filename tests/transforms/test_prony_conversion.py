@@ -6,6 +6,7 @@ import pytest
 from rheojax.core.data import RheoData
 from rheojax.transforms.prony_conversion import (
     PronyConversion,
+    _fit_prony_oscillation,
     _prony_to_frequency,
     _prony_to_time,
 )
@@ -109,3 +110,69 @@ class TestPronyConversionTransform:
         transform = PronyConversion(direction="invalid")
         with pytest.raises(ValueError, match="Invalid direction"):
             transform.transform(data)
+
+    def test_r_squared_populated(self):
+        """PronyResult.r_squared should be a real fit-quality score, not None."""
+        G_i = np.array([500.0, 300.0])
+        tau_i = np.array([0.1, 10.0])
+        t = np.logspace(-3, 3, 200)
+        G_t = _prony_to_time(G_i, tau_i, 0.0, t)
+
+        data = RheoData(x=t, y=G_t, metadata={"test_mode": "relaxation"})
+        transform = PronyConversion(direction="time_to_freq", n_modes=5)
+        _, meta = transform.transform(data)
+
+        r_squared = meta["prony_result"].r_squared
+        assert r_squared is not None
+        assert r_squared > 0.9  # near-exact synthetic data should fit well
+
+    def test_freq_to_time_zero_omega_does_not_produce_nan(self):
+        """A zero-frequency point (like a zero time point in the time-domain
+        twin) must be tolerated by filtering, not crash NNLS with an opaque
+        'array must not contain infs or NaNs' from an inf tau_i range."""
+        omega = np.array([0.0, 0.1, 1.0, 10.0])
+        G_star = np.array([1.0 + 0.5j, 2.0 + 1.0j, 3.0 + 1.5j, 4.0 + 2.0j])
+        data = RheoData(x=omega, y=G_star, domain="frequency")
+        transform = PronyConversion(direction="freq_to_time", n_modes=2)
+        result, meta = transform.transform(data)
+        assert np.all(np.isfinite(result.y))
+        assert np.all(np.isfinite(meta["prony_result"].tau_i))
+
+    def test_freq_to_time_all_nonpositive_omega_raises_clear_error(self):
+        """No positive frequencies at all must raise a clear ValueError."""
+        omega = np.array([0.0, -1.0])
+        G_star = np.array([1.0 + 0.5j, 2.0 + 1.0j])
+        data = RheoData(x=omega, y=G_star, domain="frequency")
+        transform = PronyConversion(direction="freq_to_time", n_modes=1)
+        with pytest.raises(ValueError, match="positive frequency"):
+            transform.transform(data)
+
+
+class TestFitPronyOscillationValidation:
+    """Regression tests mirroring _fit_prony_relaxation's input validation."""
+
+    def test_tolerates_zero_omega_mixed_with_positive(self):
+        """omega=0 mixed with positive frequencies must not poison tau_i with
+        inf/NaN (mirrors _fit_prony_relaxation's t=0 handling)."""
+        omega = np.array([0.0, 0.1, 1.0, 10.0])
+        G_prime = np.array([1.0, 2.0, 3.0, 4.0])
+        G_double_prime = np.array([0.5, 1.0, 1.5, 2.0])
+        G_i, tau_i, G_e = _fit_prony_oscillation(
+            omega, G_prime, G_double_prime, n_modes=2
+        )
+        assert np.all(np.isfinite(tau_i))
+        assert np.all(np.isfinite(G_i))
+
+    def test_rejects_all_nonpositive_omega(self):
+        omega = np.array([0.0, -1.0])
+        G_prime = np.array([1.0, 2.0])
+        G_double_prime = np.array([0.5, 1.0])
+        with pytest.raises(ValueError, match="positive frequency"):
+            _fit_prony_oscillation(omega, G_prime, G_double_prime, n_modes=1)
+
+    def test_rejects_too_few_points(self):
+        omega = np.array([])
+        G_prime = np.array([])
+        G_double_prime = np.array([])
+        with pytest.raises(ValueError, match="at least 2 frequency points"):
+            _fit_prony_oscillation(omega, G_prime, G_double_prime, n_modes=2)

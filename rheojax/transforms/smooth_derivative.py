@@ -141,6 +141,29 @@ class SmoothDerivative(BaseTransform):
         if self.deriv < 1:
             raise ValueError("deriv must be at least 1")
 
+        # R7-DERIV-003: A degree-`polyorder` local polynomial fit has an
+        # identically-zero `deriv`-order derivative when deriv > polyorder,
+        # so savgol would silently return all zeros instead of the real
+        # derivative.
+        if self.method == "savgol" and self.deriv > self.polyorder:
+            raise ValueError(
+                f"deriv ({self.deriv}) must be <= polyorder ({self.polyorder}) "
+                f"for method='savgol'; a degree-{self.polyorder} local "
+                "polynomial fit cannot represent a derivative of higher "
+                "order than its own degree (the result would be identically "
+                "zero). Increase polyorder or lower deriv."
+            )
+
+        # interpax CubicSpline is always degree-3, so any derivative order
+        # above 3 is identically zero.
+        if self.method == "spline" and self.deriv > 3:
+            raise ValueError(
+                f"deriv ({self.deriv}) exceeds 3: method='spline' fits a "
+                "cubic (degree-3) spline, so derivatives of order 4+ are "
+                "identically zero. Use method='savgol' or 'finite_diff' for "
+                "higher-order derivatives."
+            )
+
     def _smooth_data(self, y: JaxArray, window: int) -> JaxArray:
         """Apply moving average smoothing.
 
@@ -159,10 +182,16 @@ class SmoothDerivative(BaseTransform):
         if window % 2 == 0:
             window += 1
 
-        kernel = jnp.ones(window) / window
+        # R7-DERIV-005: plain mode="same" convolution implicitly zero-pads
+        # past the edges, biasing the first/last window//2 points toward
+        # zero instead of computing a true local average. Normalize by a
+        # coverage array (the same convolution applied to a ones-array) so
+        # edge points divide by the actual number of overlapping samples.
+        kernel = jnp.ones(window)
         smoothed = jnp.convolve(y, kernel, mode="same")
+        coverage = jnp.convolve(jnp.ones_like(y), kernel, mode="same")
 
-        return smoothed
+        return smoothed / coverage
 
     def _savgol_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative using Savitzky-Golay filter.
@@ -221,8 +250,13 @@ class SmoothDerivative(BaseTransform):
                 delta=delta,
             )
         else:
-            # Non-uniform spacing: use derivative of fitted polynomial
-            # This is more complex - use finite difference as fallback
+            # Non-uniform spacing: Savitzky-Golay requires uniform spacing,
+            # so fall back to (unsmoothed) finite differences.
+            logger.warning(
+                "Non-uniform x spacing; falling back to finite differences "
+                "(Savitzky-Golay smoothing not applied)",
+                data_length=len(x_np),
+            )
             dy_dx = self._finite_diff_derivative(x, y)
 
         return jnp.array(dy_dx)
@@ -242,20 +276,42 @@ class SmoothDerivative(BaseTransform):
         jnp.ndarray
             Derivative dy/dx
         """
+        # R7-DERIV-004: jnp.gradient assumes x is sorted/monotonic. Sort
+        # (mirroring _spline_derivative) so non-monotonic input produces the
+        # correct derivative instead of silently wrong values.
+        x_jax = jnp.asarray(x)
+        y_jax = jnp.asarray(y)
+        sort_idx = jnp.argsort(x_jax)
+        x_sorted = x_jax[sort_idx]
+        y_sorted = y_jax[sort_idx]
+
+        # Guard against duplicate/near-duplicate x (zero spacing), which
+        # makes jnp.gradient divide by zero and silently inject NaN.
+        dx = np.diff(np.asarray(x_sorted))
+        if dx.size and np.any(np.abs(dx) < 1e-30):
+            raise ValueError(
+                "SmoothDerivative: finite-difference method requires "
+                "distinct x values; data contains duplicate/near-duplicate "
+                "x, which causes division by zero. Remove duplicates before "
+                "computing derivatives."
+            )
+
         if self.deriv == 1:
             # First derivative using central differences
-            dy_dx = jnp.gradient(y, x)
+            dy_dx_sorted = jnp.gradient(y_sorted, x_sorted)
         elif self.deriv == 2:
             # Second derivative
-            dy_dx_1 = jnp.gradient(y, x)
-            dy_dx = jnp.gradient(dy_dx_1, x)
+            dy_dx_1 = jnp.gradient(y_sorted, x_sorted)
+            dy_dx_sorted = jnp.gradient(dy_dx_1, x_sorted)
         else:
             # Higher-order derivatives (recursive)
-            dy_dx = y
+            dy_dx_sorted = y_sorted
             for _ in range(self.deriv):
-                dy_dx = jnp.gradient(dy_dx, x)
+                dy_dx_sorted = jnp.gradient(dy_dx_sorted, x_sorted)
 
-        return dy_dx
+        # Unsort back to the original x ordering.
+        unsort_idx = jnp.argsort(sort_idx)
+        return dy_dx_sorted[unsort_idx]
 
     def _spline_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative using JIT-safe cubic splines via interpax.
@@ -297,18 +353,16 @@ class SmoothDerivative(BaseTransform):
 
         return dy_dx
 
-    def _total_variation_derivative(
-        self, x: JaxArray, y: JaxArray, alpha: float = 0.1
-    ) -> JaxArray:
+    def _total_variation_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
         """Compute derivative with total variation regularization.
-
-        This minimizes:
-            ||y - integral(u)||² + α * TV(u)
-        where u = dy/dx is the derivative.
 
         .. warning::
             Currently uses finite differences with smoothing as an
-            approximation, not true TV-regularised differentiation.
+            approximation, not true TV-regularised differentiation. There is
+            no regularization-strength parameter yet since none of the
+            underlying computation is actually regularized; a real ``alpha``
+            knob should be added alongside a real TV solver
+            (:func:`_total_variation_derivative`'s TODO), not before.
 
         Parameters
         ----------
@@ -316,8 +370,6 @@ class SmoothDerivative(BaseTransform):
             Independent variable
         y : jnp.ndarray
             Dependent variable
-        alpha : float
-            Regularization parameter
 
         Returns
         -------
