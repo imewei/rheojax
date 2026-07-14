@@ -433,6 +433,48 @@ data point 1	1.0	100
         np.testing.assert_allclose(data.x, [1.0, 10.0, 100.0])
         np.testing.assert_allclose(data.y, [100.0, 80.0, 60.0])
 
+    def test_auto_detect_flow_curve_shear_rate_column_excel(self, tmp_path):
+        """Same fix as test_auto_detect_flow_curve_shear_rate_column, but for
+        the Excel auto-detect path: _try_excel() carries its own independent
+        copy of the x-column pattern list (find_column_by_pattern() takes a
+        pattern list per call site, not a shared default), so fixing _try_csv()
+        alone left this sibling code path with the identical bug."""
+        pytest.importorskip("openpyxl")
+        import pandas as pd
+
+        excel_file = tmp_path / "flow_curve.xlsx"
+        df = pd.DataFrame(
+            {"Shear Rate": [1.0, 10.0, 100.0], "Viscosity": [100.0, 80.0, 60.0]}
+        )
+        df.to_excel(excel_file, index=False)
+
+        data = auto_load(str(excel_file))
+
+        np.testing.assert_allclose(data.x, [1.0, 10.0, 100.0])
+        np.testing.assert_allclose(data.y, [100.0, 80.0, 60.0])
+
+    def test_auto_detect_ambiguous_when_time_and_shear_rate_both_present(
+        self, tmp_path
+    ):
+        """Known trade-off of the shear-rate fix: a flow-curve export that
+        also logs elapsed time alongside shear rate (common in real
+        instrument exports) now has two equally-valid exact-match x-axis
+        candidates ("Time" and "Shear Rate"). Per find_column_by_pattern's
+        documented contract, genuine ambiguity must raise rather than
+        silently guess -- so this case requires an explicit x_col rather
+        than auto-detecting (previously it silently picked "Time", which
+        is not the swept independent variable for rotation/flow data)."""
+        csv_file = tmp_path / "flow_curve_with_time.csv"
+        csv_file.write_text(
+            "Time,Shear Rate,Viscosity\n0.1,1.0,100.0\n0.2,10.0,80.0\n0.3,100.0,60.0\n"
+        )
+
+        with pytest.raises(ValueError, match="auto-detect"):
+            auto_load(str(csv_file))
+
+        data = auto_load(str(csv_file), x_col="Shear Rate", y_col="Viscosity")
+        np.testing.assert_allclose(data.x, [1.0, 10.0, 100.0])
+
     def test_auto_detect_headerless_two_column_csv(self, tmp_path):
         """Regression: a headerless (x, y) CSV has its first data row misread
         as column names by pandas' default header=0, so none of the heuristic
