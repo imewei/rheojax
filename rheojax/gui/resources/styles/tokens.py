@@ -503,17 +503,6 @@ def field_label_style() -> str:
     """
 
 
-def empty_state_style() -> str:
-    """Generate empty state placeholder style string."""
-    spacing = Spacing
-
-    return f"""
-        color: {themed("TEXT_MUTED")};
-        padding: {spacing.XL}px;
-        font-size: 11pt;
-    """
-
-
 # Python-dict mirrors of the QSS token files (light.qss / dark.qss).
 # Keys match the @token_name identifiers used in base.qss (without the @ prefix).
 # These dicts enable fully programmatic QSS generation via _generate_qss().
@@ -661,5 +650,4 @@ __all__ = [
     "status_badge_style",
     "section_header_style",
     "field_label_style",
-    "empty_state_style",
 ]

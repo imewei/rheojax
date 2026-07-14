@@ -133,18 +133,10 @@ class TestModuleImports:
 
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
     def test_gui_app_imports(self) -> None:
-        """Test app module imports (requires PySide6)."""
-        from rheojax.gui.app import (
-            main_window,
-            menu_bar,
-            status_bar,
-            toolbar,
-        )
+        """Test surviving app-adjacent modules import (requires PySide6)."""
+        from rheojax.gui.workspace import status_bar
 
-        assert main_window is not None, "main_window module should import"
-        assert menu_bar is not None, "menu_bar module should import"
         assert status_bar is not None, "status_bar module should import"
-        assert toolbar is not None, "toolbar module should import"
 
     @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
     def test_gui_utils_imports(self) -> None:
@@ -692,56 +684,12 @@ class TestQtIntegration:
     """
 
     @pytest.mark.smoke
-    def test_main_window_creation(self, qapp) -> None:
-        """Test main window can be created with QApplication."""
-        from rheojax.gui.app.main_window import RheoJAXMainWindow
-
-        window = RheoJAXMainWindow()
-
-        assert window is not None, "Main window should create"
-        assert window.windowTitle() == "RheoJAX - Rheological Analysis"
-
-        # Cleanup
-        window.deleteLater()
-
-    @pytest.mark.smoke
-    def test_main_window_has_geometry(self, qapp) -> None:
-        """Test main window has valid geometry."""
-        from rheojax.gui.app.main_window import RheoJAXMainWindow
-
-        window = RheoJAXMainWindow()
-
-        geometry = window.geometry()
-        assert geometry.width() > 0, "Window width should be positive"
-        assert geometry.height() > 0, "Window height should be positive"
-
-        window.deleteLater()
-
-    @pytest.mark.smoke
-    def test_workspace_cli_flag_registered(self) -> None:
-        """The --workspace flag exists and defaults to False."""
-        from rheojax.gui.main import parse_args
-
-        assert parse_args([]).workspace is False
-        assert parse_args(["--workspace"]).workspace is True
-
-    @pytest.mark.smoke
-    def test_legacy_deprecation_warning_prints_to_stderr(self, capsys) -> None:
-        """--legacy prints a deprecation warning, mirroring --workspace's."""
-        from rheojax.gui.main import _warn_legacy_deprecated
-
-        _warn_legacy_deprecated()
-
-        captured = capsys.readouterr()
-        assert "WARNING: --legacy is deprecated" in captured.err
-
-    @pytest.mark.smoke
     def test_create_workspace_window_reachable_from_entrypoint(self, qapp) -> None:
-        """The exact function --workspace triggers must build a real WorkspaceWindow.
+        """The exact function `rheojax-gui`'s main() calls must build a real WorkspaceWindow.
 
-        This is the entrypoint-level regression test: it proves the new
-        workspace shell is reachable from `rheojax-gui --workspace`, not
-        just constructible in isolation (dead code from a user's perspective
+        This is the entrypoint-level regression test: it proves the
+        workspace shell is reachable from the CLI entrypoint, not just
+        constructible in isolation (dead code from a user's perspective
         otherwise).
         """
         from rheojax.gui.main import _create_workspace_window

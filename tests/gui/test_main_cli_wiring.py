@@ -54,21 +54,6 @@ def test_project_alone_still_parses():
     assert args.protocol is None
 
 
-def test_no_flags_parses_with_legacy_false():
-    args = parse_args([])
-    assert args.legacy is False
-
-
-def test_legacy_flag_parses():
-    args = parse_args(["--legacy"])
-    assert args.legacy is True
-
-
-def test_workspace_flag_still_parses_for_back_compat():
-    args = parse_args(["--workspace"])
-    assert args.workspace is True
-
-
 def _run_isolated(script: str) -> subprocess.CompletedProcess:
     """Run a main()-invoking scenario in a fresh subprocess.
 
@@ -100,27 +85,6 @@ def test_default_launch_constructs_workspace_window():
         "except SystemExit:\n"
         "    pass\n"
         "print('OK' if created.get('workspace') else 'FAIL')\n"
-    )
-    result = _run_isolated(script)
-    assert result.returncode == 0, result.stderr
-    assert "OK" in result.stdout, result.stdout + result.stderr
-
-
-def test_legacy_flag_constructs_main_window():
-    script = (
-        "import rheojax.gui.app.main_window as mw_module\n"
-        "created = {}\n"
-        "class _FakeMainWindow:\n"
-        "    def __init__(self, *a, **k):\n"
-        "        created['legacy'] = True\n"
-        "        raise SystemExit(0)\n"
-        "mw_module.RheoJAXMainWindow = _FakeMainWindow\n"
-        "import rheojax.gui.main as main_module\n"
-        "try:\n"
-        "    main_module.main(['--legacy'])\n"
-        "except SystemExit:\n"
-        "    pass\n"
-        "print('OK' if created.get('legacy') else 'FAIL')\n"
     )
     result = _run_isolated(script)
     assert result.returncode == 0, result.stderr

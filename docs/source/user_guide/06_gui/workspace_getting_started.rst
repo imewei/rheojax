@@ -36,10 +36,6 @@ The default launch opens the Workspace Shell::
 
 Other startup options::
 
-    # Launch the legacy page-based window instead (instant rollback if
-    # something isn't working right for you in the workspace shell)
-    rheojax-gui --legacy
-
     # Open a saved project on startup
     rheojax-gui --project analysis.rheojax
 
@@ -113,11 +109,35 @@ new project, opening another one, or closing, if anything is dirty. If
 background jobs (an NLSQ/NUTS fit, a running pipeline batch) are still in
 flight, it will also ask whether to cancel them before proceeding.
 
-Falling Back to the Legacy Window
-====================================
+Troubleshooting
+================
 
-The Workspace Shell recently became the default GUI experience. If you hit
-something that isn't working right for you, ``rheojax-gui --legacy`` is an
-instant rollback to the previous page-based window — see
-:doc:`getting_started` for that guide. The legacy window remains fully
-functional; it is simply no longer the default.
+GUI Won't Launch
+-----------------
+
+1. Verify PySide6 is installed::
+
+       pip show PySide6
+
+2. Check for Qt platform issues (Linux)::
+
+       export QT_QPA_PLATFORM=xcb
+
+3. Try reinstalling::
+
+       pip uninstall PySide6
+       pip install PySide6
+
+Slow Performance
+-----------------
+
+1. Check JAX device (prefer GPU when available)
+2. Reduce data size for initial exploration
+3. Close unnecessary ArviZ diagnostic plots
+
+Display Issues
+---------------
+
+For high-DPI displays, set environment variable::
+
+    export QT_AUTO_SCREEN_SCALE_FACTOR=1

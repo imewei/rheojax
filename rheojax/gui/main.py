@@ -7,13 +7,11 @@ main event loop.
 
 Usage
 -----
-    rheojax-gui                    # Launch GUI (workspace shell, now the default)
-    rheojax-gui --legacy           # Launch the legacy main window
+    rheojax-gui                    # Launch GUI
     rheojax-gui --project FILE     # Open project
     rheojax-gui --import FILE --protocol PROTOCOL   # Import data file on startup
     rheojax-gui --maximized        # Start window maximized
     rheojax-gui --verbose          # Enable verbose logging
-    rheojax-gui --workspace        # Deprecated no-op alias (workspace is now default)
     rheojax-gui --help             # Show help
 
 Example
@@ -68,23 +66,6 @@ def _create_workspace_window() -> "WorkspaceWindow":  # noqa: F821
     from rheojax.gui.workspace.window import WorkspaceWindow
 
     return WorkspaceWindow(AppState())
-
-
-def _warn_legacy_deprecated() -> None:
-    """Print/log the --legacy deprecation warning.
-
-    Extracted as a standalone function (rather than inlined like the
-    --workspace warning) so it's unit-testable without going through
-    main()'s blocking app.exec() call.
-    """
-    logger.warning(
-        "--legacy is deprecated and will be removed in a future release; "
-        "the workspace shell is now feature-complete for all supported workflows."
-    )
-    print(
-        "WARNING: --legacy is deprecated and will be removed in a future release.",
-        file=sys.stderr,
-    )
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -162,13 +143,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rheojax-gui                              # Launch GUI (workspace shell, now the default)
-  rheojax-gui --legacy                     # Launch the legacy main window
+  rheojax-gui                              # Launch GUI
   rheojax-gui --project analysis.rheojax     # Open project file
   rheojax-gui --import data.xlsx --protocol relaxation  # Import data on startup
   rheojax-gui --maximized                 # Start maximized (per-window manager)
   rheojax-gui --verbose                   # Enable verbose logging
-  rheojax-gui --workspace                 # Deprecated no-op alias (workspace is now default)
 
 For more information, visit: https://github.com/imewei/rheojax
         """,
@@ -211,18 +190,6 @@ For more information, visit: https://github.com/imewei/rheojax
         "-M",
         action="store_true",
         help="Start the main window maximized",
-    )
-
-    parser.add_argument(
-        "--workspace",
-        action="store_true",
-        help="Deprecated no-op alias; the workspace shell is now the default",
-    )
-
-    parser.add_argument(
-        "--legacy",
-        action="store_true",
-        help="Launch the legacy main window instead of the (now default) workspace shell",
     )
 
     parser.add_argument(
@@ -345,7 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         # Cap scaling to avoid excessively large fonts on very high DPI setups.
         return min(base_size * dpi_scale, 16.0)
 
-    def _show_main_window(window: "RheoJAXMainWindow", maximize: bool) -> None:
+    def _show_main_window(window: "WorkspaceWindow", maximize: bool) -> None:  # noqa: F821
         """Show the main window with cross-platform maximize handling."""
 
         if maximize:
@@ -414,250 +381,57 @@ def main(argv: list[str] | None = None) -> int:
 
     logger.debug("Qt application initialized", font_size=base_font_size)
 
-    # Workspace shell (preview): early-return path, kept separate from the
-    # legacy window's project/import/smoke-fit hooks below since those are
-    # RheoJAXMainWindow-specific APIs the workspace shell does not have yet.
-    if not args.legacy:
-        if args.workspace:
-            logger.warning(
-                "--workspace is deprecated and no longer needed -- the workspace shell is now "
-                "the default. This flag will be removed in a future release."
-            )
-            print(
-                "WARNING: --workspace is deprecated (workspace is now the default); "
-                "this flag will be removed in a future release.",
-                file=sys.stderr,
-            )
-        logger.debug("Launching workspace shell (now the default)")
-        try:
-            workspace_window = _create_workspace_window()
-        except Exception as e:
-            logger.error(
-                "Failed to create workspace window", error=str(e), exc_info=True
-            )
-            print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
-            return 1
-
-        gui_handler = install_gui_log_handler(
-            workspace_window.log_dock.append_record,
-            level=logging.DEBUG if args.verbose else logging.INFO,
-        )
-        workspace_window.destroyed.connect(
-            lambda *_: logging.getLogger().removeHandler(gui_handler)
-        )
-
-        app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
-        _show_main_window(workspace_window, args.maximized)
-        logger.info("RheoJAX GUI workspace shell ready", version=__version__)
-
-        if args.project:
-            from rheojax.gui.foundation.project_codec import load_project_v2
-
-            try:
-                loaded_state = load_project_v2(args.project)
-            except (ValueError, FileNotFoundError) as e:
-                logger.error(
-                    "Failed to load project", path=str(args.project), error=str(e)
-                )
-                print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
-                return 1
-            workspace_window._rebuild(loaded_state)
-            workspace_window._state.project.path = str(args.project)
-
-        if args.import_file:
-            from rheojax.gui.foundation.import_service import import_dataset
-
-            try:
-                ref, data = import_dataset(args.import_file, args.protocol)
-            except (ValueError, FileNotFoundError) as e:
-                logger.error(
-                    "Failed to import data", path=str(args.import_file), error=str(e)
-                )
-                print(f"ERROR: Failed to import data: {e}", file=sys.stderr)
-                return 1
-            workspace_window._commit_dataset(ref, data, overwrite=False)
-
-        exit_code = app.exec()
-        logger.info("Application exiting", exit_code=exit_code)
-        try:
-            from multiprocessing import resource_tracker
-
-            tracker = resource_tracker._resource_tracker
-            if tracker._pid is not None:
-                tracker._stop()
-        except Exception:
-            pass
-        return exit_code
-
-    _warn_legacy_deprecated()
-
-    # Import main window after Qt app is created
-    logger.debug("Importing main window module")
+    logger.debug("Launching workspace shell (now the default)")
     try:
-        from rheojax.gui.app.main_window import RheoJAXMainWindow
-    except ImportError as e:
-        logger.error("Failed to import main window", error=str(e), exc_info=True)
-        print(
-            f"ERROR: Failed to import main window: {e}",
-            file=sys.stderr,
-        )
-        return 1
-
-    # Create main window
-    try:
-        logger.debug("Creating main window", maximized=args.maximized)
-        window = RheoJAXMainWindow(start_maximized=args.maximized)
-        gui_handler = install_gui_log_handler(
-            window.log_dock.append_record,
-            level=logging.DEBUG if args.verbose else logging.INFO,
-        )
-        logger.debug("GUI log handler attached")
-        window.destroyed.connect(
-            lambda *_: logging.getLogger().removeHandler(gui_handler)
-        )
-        app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
-
-        _show_main_window(window, args.maximized)
-
-        logger.info("RheoJAX GUI ready", version=__version__)
-
-        # ------------------------------------------------------------------
-        # Optional: headless fit smoke
-        # ------------------------------------------------------------------
-        # Used for local debugging/CI to verify that a basic fit completes
-        # without crashes. Triggered via env var so normal GUI behavior is
-        # unchanged.
-        if os.environ.get("RHEOJAX_GUI_SMOKE_FIT") == "1":
-            logger.info("GUI smoke mode enabled", action="running one fit then exiting")
-
-            def _smoke_exit(code: int = 0) -> None:
-                try:
-                    app.exit(code)
-                except Exception:
-                    app.quit()
-
-            def _run_smoke_fit() -> None:
-                try:
-                    import numpy as np
-
-                    x = np.logspace(-2, 2, 200)
-                    y = 1e3 * np.exp(-x / 0.5) + 10.0
-                    dataset_id = "smoke"
-
-                    window.store.dispatch(
-                        "IMPORT_DATA_SUCCESS",
-                        {
-                            "dataset_id": dataset_id,
-                            "name": "GUI Smoke Dataset",
-                            "test_mode": "relaxation",
-                            "file_path": None,
-                            "x_data": x,
-                            "y_data": y,
-                            "y2_data": None,
-                            "metadata": {"test_mode": "relaxation", "domain": "time"},
-                        },
-                    )
-                    window.store.dispatch(
-                        "SET_ACTIVE_DATASET", {"dataset_id": dataset_id}
-                    )
-                    model = "maxwell"
-                    window.store.dispatch("SET_ACTIVE_MODEL", {"model_name": model})
-                    window.navigate_to("fit")
-
-                    if getattr(window, "worker_pool", None) is None:
-                        logger.error(
-                            "Smoke fit failed", reason="worker pool unavailable"
-                        )
-                        _smoke_exit(2)
-                        return
-
-                    def _on_done(_job_id: str, _result: object) -> None:
-                        try:
-                            window.worker_pool.shutdown(wait=True, timeout_ms=5000)
-                        except Exception:
-                            pass
-                        _smoke_exit(0)
-
-                    def _on_failed(_job_id: str, error: str) -> None:
-                        logger.error("Smoke fit failed", error=error)
-                        try:
-                            window.worker_pool.shutdown(wait=True, timeout_ms=5000)
-                        except Exception:
-                            pass
-                        _smoke_exit(3)
-
-                    window.worker_pool.job_completed.connect(_on_done)
-                    window.worker_pool.job_failed.connect(_on_failed)
-
-                    window._on_fit_requested_from_page(
-                        {"model_name": model, "dataset_id": dataset_id}
-                    )
-                except Exception as exc:
-                    logger.error(
-                        "Smoke fit raised exception", error=str(exc), exc_info=True
-                    )
-                    _smoke_exit(1)
-
-            timeout_ms = int(os.environ.get("RHEOJAX_GUI_SMOKE_TIMEOUT_MS", "30000"))
-            QTimer.singleShot(0, _run_smoke_fit)
-            QTimer.singleShot(timeout_ms, lambda: _smoke_exit(124))
+        workspace_window = _create_workspace_window()
     except Exception as e:
-        logger.error("Failed to create main window", error=str(e), exc_info=True)
-        print(
-            f"ERROR: Failed to create main window: {e}",
-            file=sys.stderr,
+        logger.error(
+            "Failed to create workspace window", error=str(e), exc_info=True
         )
+        print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
         return 1
 
-    # Handle startup arguments
+    gui_handler = install_gui_log_handler(
+        workspace_window.log_dock.append_record,
+        level=logging.DEBUG if args.verbose else logging.INFO,
+    )
+    workspace_window.destroyed.connect(
+        lambda *_: logging.getLogger().removeHandler(gui_handler)
+    )
+
+    app.setWindowIcon(QIcon(str(get_icon_path("rheojax"))))
+    _show_main_window(workspace_window, args.maximized)
+    logger.info("RheoJAX GUI workspace shell ready", version=__version__)
+
     if args.project:
-        # GUI-P1: LOAD_PROJECT's reducer never restores datasets/results in
-        # this legacy window (see main_window._on_open_file). Don't dispatch
-        # it or claim success here either -- match the GUI's own messaging.
-        logger.warning("--project is not yet implemented in --legacy mode", path=str(args.project))
-        window.log(
-            f"ERROR: Project open is not yet implemented in this legacy window: {args.project}"
-        )
+        from rheojax.gui.foundation.project_codec import load_project_v2
+
+        try:
+            loaded_state = load_project_v2(args.project)
+        except (ValueError, FileNotFoundError) as e:
+            logger.error(
+                "Failed to load project", path=str(args.project), error=str(e)
+            )
+            print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
+            return 1
+        workspace_window._rebuild(loaded_state)
+        workspace_window._state.project.path = str(args.project)
 
     if args.import_file:
-        logger.info("Importing data file", path=str(args.import_file))
+        from rheojax.gui.foundation.import_service import import_dataset
+
         try:
-            from rheojax.gui.foundation.import_service import import_dataset
-
             ref, data = import_dataset(args.import_file, args.protocol)
-            window.log(f"Importing data from: {args.import_file}")
-            window.store.dispatch(
-                "IMPORT_DATA_SUCCESS",
-                {
-                    "dataset_id": ref.id,
-                    "file_path": str(args.import_file),
-                    "name": ref.name,
-                    "test_mode": args.protocol,
-                    "x_data": data.x,
-                    "y_data": data.y,
-                    "y2_data": getattr(data, "y2", None),
-                    "metadata": getattr(data, "metadata", {}),
-                },
-            )
-            window.store.dispatch("SET_ACTIVE_DATASET", {"dataset_id": ref.id})
-            window.navigate_to("data")
-            logger.debug("Data import successful", path=str(args.import_file))
-        except Exception as e:
+        except (ValueError, FileNotFoundError) as e:
             logger.error(
-                "Failed to import data",
-                path=str(args.import_file),
-                error=str(e),
-                exc_info=True,
+                "Failed to import data", path=str(args.import_file), error=str(e)
             )
-            window.log(f"ERROR: Failed to import data: {e}")
+            print(f"ERROR: Failed to import data: {e}", file=sys.stderr)
+            return 1
+        workspace_window._commit_dataset(ref, data, overwrite=False)
 
-    # Run event loop
-    logger.debug("Entering Qt event loop")
-    exit_code: int = app.exec()
+    exit_code = app.exec()
     logger.info("Application exiting", exit_code=exit_code)
-
-    # Clean up multiprocessing resource tracker so it does not warn about
-    # semaphores leaked by third-party libraries (pyqtgraph, PySide6 Cocoa).
     try:
         from multiprocessing import resource_tracker
 
@@ -665,8 +439,7 @@ def main(argv: list[str] | None = None) -> int:
         if tracker._pid is not None:
             tracker._stop()
     except Exception:
-        pass  # Best-effort; suppression via PYTHONWARNINGS is the fallback.
-
+        pass
     return exit_code
 
 

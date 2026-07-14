@@ -2,8 +2,8 @@
 Shared GUI Log Dock
 ===================
 
-A dockable, filterable, severity-colored log viewer shared by both the
-workspace shell (`WorkspaceWindow`) and the legacy `RheoJAXMainWindow`.
+A dockable, filterable, severity-colored log viewer used by the workspace
+shell (`WorkspaceWindow`).
 Fed by `rheojax.gui.utils.logging.install_gui_log_handler`.
 """
 

@@ -2,9 +2,9 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.resources.styles.tokens import ThemeManager
+from rheojax.gui.workspace.status_bar import StatusBar
 from rheojax.gui.workspace.window import WorkspaceWindow
 
 

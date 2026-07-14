@@ -261,7 +261,7 @@ class TestSubprocessCrashDetection:
         """Verify StatusBar updates don't crash."""
         code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
-            from rheojax.gui.app.status_bar import StatusBar
+            from rheojax.gui.workspace.status_bar import StatusBar
 
             app = QApplication([])
             status_bar = StatusBar()
@@ -334,7 +334,7 @@ class TestRegressionCrashPrevention:
         """
         code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
-            from rheojax.gui.app.status_bar import StatusBar
+            from rheojax.gui.workspace.status_bar import StatusBar
 
             app = QApplication([])
             status_bar = StatusBar()

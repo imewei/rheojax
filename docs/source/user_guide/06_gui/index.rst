@@ -7,14 +7,6 @@ GUI Reference Guide
 RheoJAX provides an optional graphical user interface (GUI) built with PySide6/Qt6
 for interactive rheological analysis workflows.
 
-.. warning::
-
-   **Workspace Shell is now the default** (as of v0.7.0+): ``rheojax-gui`` launches
-   the modern **Workspace Shell** with Fit, Transform, and Pipeline modes by default.
-   This guide documents the **Legacy Page-Based Window**, which is still available
-   via ``rheojax-gui --legacy`` but no longer the default. See
-   :doc:`workspace_getting_started` for the new default.
-
 .. toctree::
    :maxdepth: 2
    :caption: GUI Documentation
@@ -60,36 +52,26 @@ Or from Python::
     from rheojax.gui import main
     main()
 
-Architecture (Legacy Window)
-============================
+Architecture
+============
 
-The legacy page-based window uses the following architecture:
+The Workspace Shell uses the following architecture:
 
-- **State Management**: Redux-like centralized state store with undo/redo
+- **State Management**: Per-window ``AppState`` (``foundation/state.py``) with
+  step invalidation cascades
 - **Service Layer**: Business logic abstraction via services (ModelService, etc.)
-- **Background Workers**: Non-blocking NLSQ/MCMC execution using QThreadPool
+- **Background Workers**: NLSQ/MCMC execution via OS subprocess isolation
 - **Signal-Slot**: Qt's reactive signal/slot pattern for UI updates
 
 Key Components
 --------------
 
-**Pages** (Main Views, Legacy Only):
-
-- ``DataPage``: Data import and preview
-- ``FitPage``: Model selection and NLSQ fitting
-- ``BayesianPage``: MCMC configuration and sampling
-- ``DiagnosticsPage``: MCMC diagnostics and ArviZ plots
-- ``TransformPage``: Data transformation workflows
-- ``ExportPage``: Results export and report generation
-
 **Widgets** (Reusable Components):
 
 - ``PlotCanvas``: Interactive matplotlib plotting with zoom/pan
 - ``ParameterTable``: Model parameter editing with bounds
-- ``ModelBrowser``: Hierarchical model selection tree
 - ``ArvizCanvas``: ArviZ diagnostic plot integration
 - ``ResidualsPanel``: Residual analysis visualizations
-- ``MultiView``: Multi-panel comparison layouts
 
 Performance
 ===========

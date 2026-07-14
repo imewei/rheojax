@@ -6,7 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from rheojax.gui.app.status_bar import StatusBar
 from rheojax.gui.compat import (
     QAction,
     QApplication,
@@ -33,6 +32,7 @@ from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
 from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
+from rheojax.gui.workspace.status_bar import StatusBar
 from rheojax.gui.workspace.stepper_canvas import StepperCanvas
 from rheojax.gui.workspace.transform.transform_controller import (
     build_transform_controller,

@@ -1,23 +1,10 @@
-"""Tests for design token migration and keyboard accessibility.
-
-Validates that:
-- Pages use design tokens instead of hardcoded values
-- Clickable widgets have keyboard accessibility (focus policy, key handlers)
-- Import consistency (no direct PySide6 imports in pages)
-"""
+"""Tests for design token migration and theme synchronization."""
 
 import re
 
 import pytest
 
 pytestmark = pytest.mark.gui
-
-try:
-    from PySide6.QtWidgets import QApplication
-
-    HAS_PYSIDE6 = True
-except ImportError:
-    HAS_PYSIDE6 = False
 
 
 # =============================================================================
@@ -27,117 +14,6 @@ except ImportError:
 
 class TestDesignTokenUsage:
     """Verify pages reference design tokens instead of hardcoded values."""
-
-    @pytest.mark.smoke
-    def test_home_page_no_raw_hex_in_stylesheets(self) -> None:
-        """home_page.py should not contain bare hex colour literals
-        outside of gradient stop definitions that already use token refs.
-        """
-        import inspect
-
-        from rheojax.gui.pages.home_page import HomePage
-
-        source = inspect.getsource(HomePage)
-
-        # These hardcoded hex colors should no longer appear
-        banned = ["#0F172A", "#1E3A8A", "#4338CA", "#94A3B8", "#E2E8F0", "#64748B"]
-        for color in banned:
-            assert color not in source, (
-                f"Hardcoded color {color} found in HomePage source — "
-                "should use ColorPalette token"
-            )
-
-    @pytest.mark.smoke
-    def test_home_page_uses_typography_tokens(self) -> None:
-        """home_page.py should reference Typography tokens for fonts."""
-        import inspect
-
-        from rheojax.gui.pages.home_page import HomePage
-
-        source = inspect.getsource(HomePage)
-
-        # The old hardcoded font-family string should be gone
-        assert "'Inter'" not in source, (
-            "Hardcoded 'Inter' font-family found — should use Typography.FONT_FAMILY"
-        )
-
-    @pytest.mark.smoke
-    def test_data_page_uses_typography_tokens(self) -> None:
-        """data_page.py should use Typography for font-size/font-weight."""
-        import inspect
-
-        from rheojax.gui.pages.data_page import DataPage
-
-        source = inspect.getsource(DataPage)
-
-        # Check that bare font-size: 24pt was migrated
-        assert "font-size: 24pt" not in source, (
-            "Hardcoded 'font-size: 24pt' found — should use Typography.SIZE_HEADING"
-        )
-
-    @pytest.mark.smoke
-    def test_transform_page_no_hardcoded_white(self) -> None:
-        """transform_page.py should not have bare 'color: white' inline."""
-        import inspect
-
-        from rheojax.gui.pages.transform_page import TransformPage
-
-        source = inspect.getsource(TransformPage)
-        # The old "color: white; font-size: 13pt; font-weight: bold;"
-        assert "color: white;" not in source, (
-            "Hardcoded 'color: white' found — should use ColorPalette.TEXT_INVERSE"
-        )
-
-    @pytest.mark.smoke
-    def test_transform_page_configure_button_uses_button_style(self) -> None:
-        """Configure button should use button_style() helper."""
-        import inspect
-
-        from rheojax.gui.pages.transform_page import TransformPage
-
-        source = inspect.getsource(TransformPage)
-        assert "background-color: white; color: black" not in source, (
-            "Hardcoded button style found — should use button_style()"
-        )
-
-    @pytest.mark.smoke
-    def test_export_page_uses_spacing_tokens(self) -> None:
-        """export_page.py should use Spacing tokens for margin-top."""
-        import inspect
-
-        from rheojax.gui.pages.export_page import ExportPage
-
-        source = inspect.getsource(ExportPage)
-        # The old hardcoded 'margin-top: 15px' should be gone
-        assert "margin-top: 15px" not in source, (
-            "Hardcoded 'margin-top: 15px' found — should use Spacing.LG"
-        )
-
-    @pytest.mark.smoke
-    def test_diagnostics_page_no_direct_pyside6_import(self) -> None:
-        """diagnostics_page.py should not import from PySide6 directly."""
-        import inspect
-
-        from rheojax.gui.pages.diagnostics_page import DiagnosticsPage
-
-        source = inspect.getsource(DiagnosticsPage)
-        assert "from PySide6" not in source, (
-            "Direct PySide6 import found — should use rheojax.gui.compat"
-        )
-
-    @pytest.mark.smoke
-    def test_home_page_chart_colors_use_tokens(self) -> None:
-        """Example card chart colors should reference ColorPalette tokens."""
-        import inspect
-
-        from rheojax.gui.pages.home_page import HomePage
-
-        source = inspect.getsource(HomePage)
-        # Old hardcoded chart list included #0891B2 (cyan) and #DB2777 (pink)
-        assert "#0891B2" not in source, (
-            "Hardcoded chart color #0891B2 found — "
-            "should use ColorPalette.CHART_* or similar"
-        )
 
     @pytest.mark.smoke
     def test_pyqtgraph_canvas_uses_theme_tokens(self) -> None:
@@ -161,30 +37,6 @@ class TestDesignTokenUsage:
         assert "themed(" in source, (
             "PyQtGraphCanvas must use themed() for dynamic colors"
         )
-
-
-# =============================================================================
-# Keyboard Accessibility Tests
-# =============================================================================
-
-
-@pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
-class TestKeyboardAccessibility:
-    """Verify interactive widgets have keyboard support."""
-
-    @pytest.fixture(autouse=True)
-    def _ensure_qapp(self, qapp):
-        """Ensure QApplication exists for widget tests."""
-
-    @pytest.mark.smoke
-    def test_drop_zone_is_focusable(self) -> None:
-        """DropZone should accept keyboard focus."""
-        from rheojax.gui.compat import Qt
-        from rheojax.gui.pages.data_page import DropZone
-
-        drop_zone = DropZone()
-        assert drop_zone.focusPolicy() == Qt.StrongFocus
-        assert drop_zone.accessibleName() == "File drop zone"
 
 
 # =============================================================================
@@ -352,70 +204,3 @@ class TestDarkColorPaletteParity:
         ):
             assert hasattr(ColorPalette, name), f"ColorPalette missing {name}"
             assert hasattr(DarkColorPalette, name), f"DarkColorPalette missing {name}"
-
-
-class TestNoSizeBaseArithmetic:
-    """Verify SIZE_BASE - 1 arithmetic has been replaced."""
-
-    @pytest.mark.smoke
-    def test_data_page_no_size_base_minus_one(self) -> None:
-        """data_page.py should use SIZE_MD_SM instead of SIZE_BASE - 1."""
-        import inspect
-
-        from rheojax.gui.pages.data_page import DataPage
-
-        source = inspect.getsource(DataPage)
-        assert "SIZE_BASE - 1" not in source, (
-            "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
-        )
-
-    @pytest.mark.smoke
-    def test_transform_page_no_size_base_minus_one(self) -> None:
-        """transform_page.py should use SIZE_MD_SM instead of SIZE_BASE - 1."""
-        import inspect
-
-        from rheojax.gui.pages.transform_page import TransformPage
-
-        source = inspect.getsource(TransformPage)
-        assert "SIZE_BASE - 1" not in source, (
-            "SIZE_BASE - 1 found — should use Typography.SIZE_MD_SM"
-        )
-
-
-class TestHomePageGradientTokens:
-    """Verify home_page gradient hex colors have been replaced with tokens."""
-
-    @pytest.mark.smoke
-    def test_no_hardcoded_gradient_hex(self) -> None:
-        """Gradient hex values should be replaced with themed() token calls."""
-        import inspect
-
-        from rheojax.gui.pages.home_page import HomePage
-
-        source = inspect.getsource(HomePage)
-        # These were the old hardcoded gradient hex values
-        banned_gradient_hex = [
-            "#10B981",
-            "#F59E0B",
-            "#EF4444",
-            "#8B5CF6",
-        ]
-        for color in banned_gradient_hex:
-            assert color not in source, (
-                f"Hardcoded gradient color {color} found — should use themed() token"
-            )
-
-    @pytest.mark.smoke
-    def test_no_hardcoded_px_font_sizes(self) -> None:
-        """home_page.py should not use hardcoded px font sizes in inline styles."""
-        import inspect
-
-        from rheojax.gui.pages.home_page import HomePage
-
-        source = inspect.getsource(HomePage)
-        assert "font-size: 48px" not in source, (
-            "Hardcoded 48px font-size found — should use Typography.SIZE_HERO"
-        )
-        assert "font-size: 18px" not in source, (
-            "Hardcoded 18px font-size found — should use Typography token"
-        )

@@ -451,7 +451,7 @@ class TestY2DataComplexExtraction:
 
         data = RheoData(x=omega, y=G_star, domain="frequency")
 
-        # Simulate the dispatch payload logic from data_page.py
+        # Simulate the import dispatch's complex-value split logic
         y2_data = np.imag(data.y) if np.iscomplexobj(data.y) else None
 
         assert y2_data is not None
@@ -980,39 +980,6 @@ class TestImportWizardCacheCleanup:
             pytest.skip("PySide6 not available")
 
 
-class TestDataPageTestModeCombo:
-    """F-IO-R2-003: DataPage must include all canonical test modes."""
-
-    @pytest.mark.smoke
-    def test_canonical_modes_available(self):
-        """All canonical test modes must be in the combo items."""
-        # Test the canonical list directly rather than requiring PySide6
-        canonical_modes = {
-            "Auto-detect",
-            "oscillation",
-            "relaxation",
-            "creep",
-            "flow_curve",
-            "startup",
-            "laos",
-        }
-
-        # Verify by reading the source
-        import ast
-        from pathlib import Path
-
-        data_page_path = Path("rheojax/gui/pages/data_page.py")
-        if not data_page_path.exists():
-            pytest.skip("data_page.py not found")
-
-        source = data_page_path.read_text()
-        # Find the addItems call with our modes
-        for mode in ["flow_curve", "startup", "laos"]:
-            assert mode in source, f"'{mode}' not found in data_page.py test_mode combo"
-        # Ensure "rotation" is gone (replaced by "flow_curve")
-        assert '"rotation"' not in source or "flow_curve" in source
-
-
 # ── RCA Round 3 (2026-02-24): IO + GUI integration fixes ──────────────────
 
 
@@ -1158,32 +1125,6 @@ class TestRheoDataDomainConsistency:
 
         rd = rheodata_from_dataset_state(ds)
         assert rd.domain == "time"
-
-
-class TestImportDispatchSplitsComplex:
-    """F-IO-R3-009: _on_import_completed must store real y_data + real y2_data."""
-
-    @pytest.mark.smoke
-    def test_dispatch_payload_splits_complex(self):
-        """Verify the import dispatch stores real G' and real G'' separately."""
-        # This tests the convention by reading the source code, since we
-        # can't easily instantiate DataPage without PySide6.
-        from pathlib import Path
-
-        src = Path("rheojax/gui/pages/data_page.py")
-        if not src.exists():
-            pytest.skip("data_page.py not found")
-
-        code = src.read_text()
-        # The dispatch must use np.real for y_data when complex.
-        # After GUI-009 fix, data is first converted via np.asarray then
-        # split with np.real(y_np) / np.imag(y_np).
-        assert "np.real(" in code and "y_data" in code, (
-            "Import dispatch must store np.real(y) as y_data for complex data"
-        )
-        assert "np.imag(" in code and "y2_data" in code, (
-            "Import dispatch must store np.imag(y) as y2_data for complex data"
-        )
 
 
 class TestDetectTestModeFlow:

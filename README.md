@@ -891,11 +891,8 @@ RheoJAX includes an optional GUI built with PySide6/Qt6 for interactive analysis
 ### Launching
 
 ```bash
-# From command line (launches workspace shell by default)
+# From command line
 rheojax-gui
-
-# Launch the legacy main window instead
-rheojax-gui --legacy
 
 # Start maximized (useful on high-DPI desktops)
 rheojax-gui --maximized
