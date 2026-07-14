@@ -176,7 +176,12 @@ class BaseModel(BayesianMixin, ABC):
             if hasattr(resolved_test_mode, "name")
             else str(resolved_test_mode)
         )
-        data_shape = (int(x_np.shape[0]),) if hasattr(x_np, "shape") else None
+        # x_np is always an ndarray (np.asarray above), so hasattr(shape) is
+        # always True; a 0-d array (scalar X) has shape == () and shape[0]
+        # raises IndexError. Guard on ndim instead, matching the (1,)
+        # scalar-fallback used by the sibling data_shape computations in
+        # predict()/fit_predict()/fit_bayesian().
+        data_shape = (int(x_np.shape[0]),) if x_np.ndim > 0 else (1,)
 
         x_data = jnp.array(x_np)
         y_data = jnp.array(y_np)
@@ -232,7 +237,8 @@ class BaseModel(BayesianMixin, ABC):
 
             # --- 4. Validate ---
             if not result.success:
-                if not np.isfinite(result.fun) or result.fun > 1e6 * len(x_np):
+                _n_points = int(x_np.shape[0]) if x_np.ndim > 0 else 1
+                if not np.isfinite(result.fun) or result.fun > 1e6 * _n_points:
                     logger.error(
                         "Optimization failed",
                         message=result.message,

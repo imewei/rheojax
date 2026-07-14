@@ -1286,6 +1286,75 @@ class TestStandardNlsqFitTestModeOverride:
         assert model._test_mode == "oscillation"
 
 
+class TestStandardNlsqFit0DArray:
+    """Regression test: _standard_nlsq_fit's debug-log shape computation and
+    its failure-path point-count check must not crash on a 0-d array input
+    (same root cause, and same fix pattern, as the predict()/fit_predict()/
+    fit_bayesian() 0-d fixes above -- these are sibling call sites that fix
+    missed).
+
+    nlsq_optimize itself is mocked: rheojax.utils.optimization has its own,
+    separate pre-existing 0-d-unsafe len() calls (e.g. in the r_squared
+    property and the normalization-weights length check) that are a
+    different module's bug, out of scope here. Mocking isolates exactly the
+    two lines in base.py these tests target.
+    """
+
+    def _make_model(self):
+        class LinearModel(BaseModel):
+            def __init__(self):
+                super().__init__()
+                self.parameters = ParameterSet()
+                self.parameters.add("a", value=1.0, bounds=(0.0, 10.0))
+
+            def _fit(self, X, y, **kwargs):
+                def model_fn(x, params):
+                    return params[0] * x
+
+                return self._standard_nlsq_fit(X, y, model_fn, **kwargs)
+
+            def _predict(self, X):
+                return X * self.parameters.get_value("a")
+
+        return LinearModel()
+
+    def test_standard_nlsq_fit_with_0d_array_no_indexerror(self):
+        """Success path: data_shape computation (line ~179) must not raise
+        IndexError from x_np.shape[0] on a 0-d array."""
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        X = np.array(5.0)
+        y = np.array(10.0)
+
+        stub_result = MagicMock(success=True, fun=0.0, x=np.array([2.0]), nit=3)
+        with patch(
+            "rheojax.utils.optimization.nlsq_optimize", return_value=stub_result
+        ):
+            model._fit(X, y, max_iter=5)
+
+        assert model.fitted_ is True
+
+    def test_standard_nlsq_fit_with_0d_array_failure_path_no_indexerror(self):
+        """Failure path: the len(x_np) point-count check (line ~239) must not
+        raise TypeError ('len() of unsized object') on a 0-d array; it should
+        reach the intended RuntimeError instead."""
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        X = np.array(5.0)
+        y = np.array(10.0)
+
+        stub_result = MagicMock(
+            success=False, fun=float("nan"), message="did not converge", nit=1
+        )
+        with patch(
+            "rheojax.utils.optimization.nlsq_optimize", return_value=stub_result
+        ):
+            with pytest.raises(RuntimeError, match="Optimization failed"):
+                model._fit(X, y, max_iter=5)
+
+
 class TestTransformPipelineExtrasPassthrough:
     """Regression test: TransformPipeline must not silently drop a tuple
     (data, extras) return from the pipeline's final transform step."""

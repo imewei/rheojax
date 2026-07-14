@@ -547,12 +547,14 @@ def test_sample_prior_missing_bounds_raises():
 
 
 def test_sample_prior_unsupported_prior_dict_falls_back_to_uniform():
-    """A prior dict type not recognized by prior_dict_to_dist (e.g. 'beta',
-    which build_numpyro_model's own NUTS prior selection does not support
-    either — it is not one of prior_dict_to_dist's recognized types) falls
-    back to Uniform(lower, upper), matching NUTS exactly instead of
-    sample_prior's old hand-rolled 'beta' special case that NUTS never
-    actually implemented.
+    """A malformed prior dict falls back to Uniform(lower, upper), matching
+    NUTS exactly instead of sample_prior's old hand-rolled 'beta' special
+    case that NUTS never actually implemented. 'type': 'beta' IS recognized
+    by prior_dict_to_dist, but with keys 'concentration0'/'concentration1'
+    -- this spec's 'a'/'b' keys are wrong, so it hits the malformed-spec
+    (KeyError) fallback rather than the unrecognized-type fallback; either
+    way, prior_dict_to_dist returns None and sample_prior falls back to
+    Uniform.
     """
     model = LinearModel()
     param = model.parameters.get("a")
