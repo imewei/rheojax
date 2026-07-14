@@ -522,6 +522,14 @@ def parse_trios_csv(
     # Extract units
     units = extract_units_from_header(header, unit_row)
 
+    # IO-CSV-005: Some multi-table TRIOS CSV exports repeat the header row
+    # between data blocks without a `[section]` marker. detect_repeated_headers
+    # finds those boundaries so the row loop below can split them into
+    # separate tables instead of silently merging two experiments into one.
+    repeated_header_starts = set(
+        detect_repeated_headers(lines, delimiter, header, data_start)
+    )
+
     # Determine whether the first column is a non-numeric label column BEFORE
     # parsing any data rows.  This ensures the col_offset is applied uniformly
     # to every row, preventing rows from being 1 element shorter than the header.
@@ -560,6 +568,14 @@ def parse_trios_csv(
             # blocks.  TRIOS multi-step CSV exports commonly have blank lines
             # between step sections.  Breaking here would silently truncate data.
             continue
+
+        if i in repeated_header_starts:
+            # IO-CSV-005: A bare repeated header row (no `[section]` marker)
+            # ends this table's data.  Point next_section_start at the line
+            # before it so the continuation loop's detect_header_row() call
+            # (which starts at next_section_start + 1) lands on this header.
+            next_section_start = i - 1
+            break
 
         parts = line.split(delimiter)
         if len(parts) == expected_cols:
@@ -663,6 +679,12 @@ def parse_trios_csv(
         if next_header_row == search_start + 1:
             _probe = lines[next_header_row].strip().split(delimiter)
             if _probe and _is_numeric(_probe[0].strip()):
+                logger.debug(
+                    "Multi-table section skipped: no repeated header found "
+                    "after section marker, next line looks like data",
+                    section_start=search_start,
+                    probed_row=next_header_row,
+                )
                 search_start = None
                 for _si in range(next_header_row, len(lines)):
                     if lines[_si].strip().startswith("["):
@@ -693,6 +715,12 @@ def parse_trios_csv(
                         next_data_start += 1
 
         next_units = extract_units_from_header(next_header, next_unit_row)
+
+        # IO-CSV-005: same bare-repeated-header detection as the first table,
+        # scoped to this section's own header pattern.
+        next_repeated_header_starts = set(
+            detect_repeated_headers(lines, delimiter, next_header, next_data_start)
+        )
 
         # Determine label-column offset for this section
         next_first_col_is_label = next_header[0].lower() in {
@@ -743,6 +771,9 @@ def parse_trios_csv(
                 break
             if not line:
                 continue
+            if i in next_repeated_header_starts:
+                next_section_start = i - 1
+                break
             parts2 = line.split(delimiter)
             if len(parts2) == next_expected:
                 row2: list[float] = []
@@ -1001,9 +1032,11 @@ def load_trios_csv(
                     ) from e
                 is_complex = False
 
-            # Convert x units (e.g., Hz to rad/s)
+            # Convert x units (e.g., Hz to rad/s for oscillation, ensure 1/s for rotation)
             if detected_mode == "oscillation":
                 x_data, x_units = convert_unit(x_data, x_units, "rad/s")
+            elif detected_mode == "rotation":
+                x_data, x_units = convert_unit(x_data, x_units, "1/s")
 
             # Remove non-finite values (NaN and ±inf) — both poison model
             # fits and violate RheoData's isfinite invariant which raises

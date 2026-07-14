@@ -177,10 +177,19 @@ UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     "mins": ("s", 60.0),
     "minutes": ("s", 60.0),
     "kpa": ("Pa", 1000.0),
-    "mpa": ("Pa", 1e6),
+    "mpa": ("Pa", 1e6),  # megapascal fallback for case-insensitive lookup
     "mpa·s": ("Pa.s", 0.001),
     "mpa.s": ("Pa.s", 0.001),
     "%": ("dimensionless", 0.01),
+}
+
+# SI prefix case matters for Pa: "M" (mega, 1e6) vs "m" (milli, 1e-3) collide
+# onto the same key once lowercased. Checked before the case-insensitive
+# UNIT_CONVERSIONS lookup so a literal "mPa" header (millipascal, plausible
+# for soft/low-modulus samples) isn't silently misread as megapascal.
+_CASE_SENSITIVE_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
+    "MPa": ("Pa", 1e6),
+    "mPa": ("Pa", 0.001),
 }
 
 
@@ -493,8 +502,11 @@ def _parse_single_interval(
             try:
                 row_values.append(float(p))
             except ValueError:
-                # Non-numeric value - could be end of data
-                break
+                # Non-numeric/placeholder token (e.g. "n.a.") in this column.
+                # Record it as missing but keep parsing the remaining fields
+                # so valid data later in the same row isn't discarded and
+                # subsequent columns don't shift out of alignment.
+                row_values.append(float("nan"))
 
         if row_values and len(row_values) == len(column_headers):
             data_rows.append(row_values)
@@ -518,6 +530,15 @@ def _parse_single_interval(
 
     # Create DataFrame
     df = pd.DataFrame(data_rows, columns=column_headers)
+
+    if n_points is not None and n_points != len(df):
+        logger.warning(
+            "Interval header point count does not match parsed row count "
+            "(file may be truncated or corrupted)",
+            interval=interval_idx,
+            declared_points=n_points,
+            parsed_rows=len(df),
+        )
 
     logger.debug(
         "Interval parsed",
@@ -699,8 +720,18 @@ def _convert_unit(
     if source_unit is None:
         return values, target_unit
 
-    source_lower = source_unit.lower().strip()
+    stripped = source_unit.strip()
+    if stripped in _CASE_SENSITIVE_UNIT_CONVERSIONS:
+        target, factor = _CASE_SENSITIVE_UNIT_CONVERSIONS[stripped]
+        return values * factor, target
+
+    source_lower = stripped.lower()
     if source_lower in UNIT_CONVERSIONS:
+        if source_lower == "mpa" and stripped not in ("MPa", "mpa", "MPA"):
+            logger.warning(
+                "Ambiguous mega/milli-pascal unit string; assuming megapascal",
+                source_unit=source_unit,
+            )
         target, factor = UNIT_CONVERSIONS[source_lower]
         return values * factor, target
 
@@ -968,6 +999,18 @@ def _extract_temperature_metadata(
                 f"{key}_unit" if f"{key}_unit" in global_meta else "temperature_unit"
             )
             raw_unit = global_meta.get(unit_key, "")
+            # Combined "value unit" strings (e.g. "25.0 °C") pack the unit
+            # into raw_value itself since RheoCompass headers often emit a
+            # single token rather than a separate unit key — split it off
+            # so the float() parse below succeeds and the unit is detected.
+            if not raw_unit:
+                # Accept both '.' and ',' as the decimal separator -- EU-locale
+                # RheoCompass exports write e.g. "25,7 °C" (see the identical
+                # fix in trios/common.py's segment_to_rheodata).
+                inline_match = re.match(r"^(-?\d+[.,]?\d*)\s*(.*)$", str(raw_value).strip())
+                if inline_match and inline_match.group(2):
+                    raw_value = inline_match.group(1).replace(",", ".")
+                    raw_unit = inline_match.group(2).strip()
             # Determine whether the value is in Celsius
             is_celsius = "°C" in str(raw_unit) or raw_unit.strip().lower() in (
                 "c",

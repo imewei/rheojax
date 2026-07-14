@@ -125,6 +125,15 @@ class MutationNumber(BaseTransform):
             n_points=len(x),
         )
 
+        # R7-MUT-004: trapz/simpson assume x is sorted/monotonically
+        # increasing. Sort (x, y) together so out-of-order time samples
+        # produce the correct integral instead of a silently wrong one.
+        x = jnp.asarray(x)
+        y = jnp.asarray(y)
+        sort_idx = jnp.argsort(x)
+        x = x[sort_idx]
+        y = y[sort_idx]
+
         if self.integration_method == "trapz":
             # Use trapezoidal rule
             from jax.scipy.integrate import trapezoid
@@ -139,10 +148,16 @@ class MutationNumber(BaseTransform):
             y_np = np.array(y) if isinstance(y, jnp.ndarray) else y
             return float(simpson(y_np, x_np))
         elif self.integration_method == "cumulative":
-            # Use trapezoid for cumulative integral
-            from jax.scipy.integrate import trapezoid
-
-            return float(trapezoid(y, x))
+            # A cumulative (running-sum) trapezoidal integral's final value is
+            # mathematically identical to the plain trapezoidal total, so no
+            # distinct algorithm exists for this option within this API
+            # (which returns a single scalar, not the running array). Rather
+            # than silently substituting 'trapz' behavior, make the
+            # unimplemented option fail loudly.
+            raise NotImplementedError(
+                "integration_method='cumulative' is not implemented; use "
+                "'trapz' or 'simpson' instead."
+            )
         else:
             logger.error(  # type: ignore[unreachable]
                 "Unknown integration method",
@@ -367,26 +382,59 @@ class MutationNumber(BaseTransform):
         if len(t) < n_fit or G_relax_tail <= 0:
             return 0.0
 
-        # Fit exponential decay to estimate tau
         t_fit = t[-n_fit:]
         G_relax_fit = G_relax[-n_fit:]
-        log_G = jnp.log(G_relax_fit + 1e-10)
 
-        t_mean = jnp.mean(t_fit)
-        log_G_mean = jnp.mean(log_G)
-        slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
-            jnp.sum((t_fit - t_mean) ** 2) + 1e-10
-        )
-        safe_slope = slope if abs(float(slope)) > 1e-20 else -1e-20
-        tau = -1.0 / safe_slope
+        # Use the model configured via self.extrapolation_model so the ∫t×G dt
+        # tail correction is consistent with the ∫G dt tail correction computed
+        # by _extrapolate_tail (previously this always fit an exponential,
+        # producing a mismatched tail estimate when extrapolation_model was
+        # 'powerlaw').
+        if self.extrapolation_model == "exponential":
+            # Fit exponential decay to estimate tau
+            log_G = jnp.log(G_relax_fit + 1e-10)
 
-        # Reasonable tau bounds
-        if tau <= 0 or tau >= 1e6:
-            return 0.0
+            t_mean = jnp.mean(t_fit)
+            log_G_mean = jnp.mean(log_G)
+            slope = jnp.sum((t_fit - t_mean) * (log_G - log_G_mean)) / (
+                jnp.sum((t_fit - t_mean) ** 2) + 1e-10
+            )
+            safe_slope = slope if abs(float(slope)) > 1e-20 else -1e-20
+            tau = -1.0 / safe_slope
 
-        # Compute tail integral: ∫[t_max to ∞] t×A×exp(-t/tau)dt
-        A = G_relax_tail * jnp.exp(t_max / tau)
-        tail_tG = A * tau * (tau + t_max) * jnp.exp(-t_max / tau)
+            # Reasonable tau bounds
+            if tau <= 0 or tau >= 1e6:
+                return 0.0
+
+            # Compute tail integral: ∫[t_max to ∞] t×A×exp(-t/tau)dt
+            A = G_relax_tail * jnp.exp(t_max / tau)
+            tail_tG = A * tau * (tau + t_max) * jnp.exp(-t_max / tau)
+
+        elif self.extrapolation_model == "powerlaw":
+            # Fit G(t) = A * t^(-n), identical regression to _extrapolate_tail
+            # so both tail corrections share the same functional assumption.
+            log_t = jnp.log(jnp.maximum(t_fit, 1e-30))
+            log_G = jnp.log(jnp.maximum(G_relax_fit, 1e-10))
+
+            log_t_mean = jnp.mean(log_t)
+            log_G_mean = jnp.mean(log_G)
+            denom = jnp.sum((log_t - log_t_mean) ** 2)
+            n = jnp.where(
+                denom > 1e-30,
+                -jnp.sum((log_t - log_t_mean) * (log_G - log_G_mean)) / denom,
+                0.0,
+            )
+            A = jnp.exp(log_G_mean + n * log_t_mean)
+
+            if n <= 2:
+                # ∫[t_max to ∞] t×A×t^(-n) dt diverges for n <= 2
+                return 0.0
+
+            # ∫[t_max to ∞] t×A×t^(-n) dt = A/(n-2) × t_max^(2-n)
+            tail_tG = A / (n - 2) * jnp.power(t_max, 2 - n)
+
+        else:
+            raise ValueError(f"Unknown extrapolation model: {self.extrapolation_model}")
 
         if jnp.isnan(tail_tG) or jnp.isinf(tail_tG) or tail_tG <= 0:
             return 0.0
@@ -655,11 +703,24 @@ class MutationNumber(BaseTransform):
             )
             return float("nan")
 
-        # Calculate ∫G(t)dt
-        integral_G = self._integrate(t, G_t)
+        # Subtract the equilibrium/plateau modulus so tau_avg reflects only the
+        # decaying component. Integrating raw G(t) is dominated by the constant
+        # G_eq*T term, so tau_avg would grow with the measurement window instead
+        # of converging to a material property for any solid-like (G_eq > 0)
+        # sample.
+        G_eq = self._estimate_equilibrium_modulus(G_t)
+        G_relax = G_t - G_eq
+        G_0_relax = G_0 - G_eq
+
+        if float(G_0_relax) <= 0:
+            # Pure elastic solid (no relaxing component): no finite tau.
+            return 0.0
+
+        # Calculate ∫G_relax(t)dt
+        integral_G = self._integrate(t, G_relax)
 
         # Average relaxation time
-        tau_avg = integral_G / G_0
+        tau_avg = integral_G / G_0_relax
 
         return float(tau_avg)
 

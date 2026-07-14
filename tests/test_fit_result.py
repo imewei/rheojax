@@ -222,6 +222,21 @@ class TestFitResultSerialization:
         np.testing.assert_array_almost_equal(loaded.X, result.X)
         Path(path).unlink()
 
+    def test_hdf5_round_trip(self):
+        """Regression test (PR #67): FitResult.load() must handle .h5/.hdf5,
+        since FitResult.save() already writes them via save_fit_result_hdf5."""
+        pytest.importorskip("h5py")
+        result = _make_fit_result()
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as f:
+            path = f.name
+        result.save(path)
+        loaded = FitResult.load(path)
+        assert loaded.model_name == result.model_name
+        assert loaded.n_params == result.n_params
+        assert loaded.params["G0"] == result.params["G0"]
+        np.testing.assert_array_almost_equal(loaded.X, result.X)
+        Path(path).unlink()
+
     def test_unsupported_extension(self):
         result = _make_fit_result()
         with pytest.raises(ValueError, match="Unsupported extension"):

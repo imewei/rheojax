@@ -34,6 +34,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Statistics computed by OptimizationResult (correctly accounting for
+# _use_log_residuals / _normalization_weights) that to_dict()/save() persist
+# and load() must read back verbatim rather than recompute. See FitResult
+# ._persisted_stats.
+_STAT_KEYS = ("r_squared", "adj_r_squared", "rmse", "mae", "aic", "bic", "aicc")
+
 
 # ---------------------------------------------------------------------------
 # FitResult
@@ -80,14 +86,34 @@ class FitResult:
     )
     metadata: dict[str, Any] = field(default_factory=dict)
     _fitted_model: Any = field(default=None, repr=False, compare=False)
+    # Statistics persisted at save-time (e.g. r_squared/aic/bic computed by the
+    # original OptimizationResult, which correctly accounts for
+    # _use_log_residuals / _normalization_weights). load() cannot reconstruct
+    # those semantics from the raw y/fitted_curve arrays alone, so the
+    # statistics properties below prefer these saved values over recomputing
+    # from the reconstructed (linear-space) OptimizationResult.
+    _persisted_stats: dict[str, float] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     # ------------------------------------------------------------------
     # Delegated statistical properties
     # ------------------------------------------------------------------
 
+    def _persisted(self, name: str) -> float | None:
+        """Return a saved statistic from load(), if one was persisted."""
+        if self._persisted_stats is not None:
+            val = self._persisted_stats.get(name)
+            if val is not None:
+                return val
+        return None
+
     @property
     def r_squared(self) -> float | None:
         """Coefficient of determination (R²), delegated to OptimizationResult."""
+        persisted = self._persisted("r_squared")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.r_squared
@@ -95,6 +121,9 @@ class FitResult:
     @property
     def adj_r_squared(self) -> float | None:
         """Adjusted R², delegated to OptimizationResult."""
+        persisted = self._persisted("adj_r_squared")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.adj_r_squared
@@ -102,6 +131,9 @@ class FitResult:
     @property
     def rmse(self) -> float | None:
         """Root mean squared error, delegated to OptimizationResult."""
+        persisted = self._persisted("rmse")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.rmse
@@ -109,6 +141,9 @@ class FitResult:
     @property
     def mae(self) -> float | None:
         """Mean absolute error, delegated to OptimizationResult."""
+        persisted = self._persisted("mae")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.mae
@@ -116,6 +151,9 @@ class FitResult:
     @property
     def aic(self) -> float | None:
         """Akaike Information Criterion, delegated to OptimizationResult."""
+        persisted = self._persisted("aic")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.aic
@@ -123,6 +161,9 @@ class FitResult:
     @property
     def bic(self) -> float | None:
         """Bayesian Information Criterion, delegated to OptimizationResult."""
+        persisted = self._persisted("bic")
+        if persisted is not None:
+            return persisted
         if self.optimization_result is None:
             return None
         return self.optimization_result.bic
@@ -243,13 +284,16 @@ class FitResult:
 
         AICc = AIC + 2k(k+1) / (n - k - 1)
         """
+        persisted = self._persisted("aicc")
+        if persisted is not None:
+            return persisted
         aic = self.aic
         if aic is None:
             return None
         n = self.n_data
         k = self.n_params
         if n - k - 1 <= 0:
-            return np.nan
+            return None
         return float(aic + 2 * k * (k + 1) / (n - k - 1))
 
     def summary(self) -> str:
@@ -318,6 +362,7 @@ class FitResult:
             "r_squared": self.r_squared,
             "adj_r_squared": self.adj_r_squared,
             "rmse": self.rmse,
+            "mae": self.mae,
             "aic": self.aic,
             "bic": self.bic,
             "aicc": self.aicc,
@@ -344,6 +389,22 @@ class FitResult:
                 result["fitted_curve_is_complex"] = True
             else:
                 result["fitted_curve"] = fc_arr.tolist()
+        if self.optimization_result is not None:
+            opt_residuals = getattr(self.optimization_result, "residuals", None)
+            if opt_residuals is not None:
+                # Persist the exact residuals computed by OptimizationResult
+                # (already real-valued even for complex-split fits) so
+                # load() doesn't have to re-derive log10/normalization
+                # transforms itself (see _load_json).
+                result["residuals"] = np.asarray(opt_residuals).tolist()
+                result["_use_log_residuals"] = bool(
+                    getattr(self.optimization_result, "_use_log_residuals", False)
+                )
+                norm_w = getattr(
+                    self.optimization_result, "_normalization_weights", None
+                )
+                if norm_w is not None:
+                    result["_normalization_weights"] = np.asarray(norm_w).tolist()
         return result
 
     def save(self, path: str) -> None:
@@ -390,15 +451,37 @@ class FitResult:
             "timestamp": _str_to_bytes(self.timestamp),
             "param_names": _str_to_bytes(_json.dumps(list(self.params.keys()))),
             "param_values": np.array(list(self.params.values()), dtype=np.float64),
+            "params_units": _str_to_bytes(_json.dumps(self.params_units)),
+            "metadata": _str_to_bytes(_json.dumps(self.metadata, default=str)),
             # P2-Fit-8: Persist success, n_data, and _is_complex_split for
             # correct round-trip of statistics.
             "success": np.array(self.success),
             "n_data": np.array(self.n_data),
         }
+        # Persist statistics so load() can return the exact values computed
+        # here (which correctly account for _use_log_residuals /
+        # _normalization_weights) instead of recomputing from raw arrays.
+        for stat_name in _STAT_KEYS:
+            val = getattr(self, stat_name)
+            if val is not None:
+                save_dict[stat_name] = np.array(val, dtype=np.float64)
         if self.optimization_result is not None:
             save_dict["_is_complex_split"] = np.array(
                 self.optimization_result._is_complex_split
             )
+            opt_residuals = getattr(self.optimization_result, "residuals", None)
+            if opt_residuals is not None:
+                # See to_dict(): persist the exact residuals array verbatim
+                # so load() need not re-derive log10/normalization transforms.
+                save_dict["residuals"] = np.asarray(opt_residuals)
+                save_dict["_use_log_residuals"] = np.array(
+                    getattr(self.optimization_result, "_use_log_residuals", False)
+                )
+                norm_w = getattr(
+                    self.optimization_result, "_normalization_weights", None
+                )
+                if norm_w is not None:
+                    save_dict["_normalization_weights"] = np.asarray(norm_w)
         if self.X is not None:
             save_dict["X"] = np.asarray(self.X)
         if self.y is not None:
@@ -412,7 +495,7 @@ class FitResult:
         """Load a fit result from a file.
 
         Args:
-            path: Path to a ``.json`` or ``.npz`` file.
+            path: Path to a ``.json``, ``.npz``, ``.h5``, or ``.hdf5`` file.
 
         Returns:
             Reconstructed FitResult (without the OptimizationResult reference).
@@ -424,8 +507,14 @@ class FitResult:
             return cls._load_json(path)
         elif ext == ".npz":
             return cls._load_npz(path)
+        elif ext in (".h5", ".hdf5"):
+            from rheojax.io.writers.hdf5_writer import load_fit_result_hdf5
+
+            return load_fit_result_hdf5(path)
         else:
-            raise ValueError(f"Unsupported extension '{ext}'. Use .json or .npz.")
+            raise ValueError(
+                f"Unsupported extension '{ext}'. Use .json, .npz, .h5, or .hdf5."
+            )
 
     @classmethod
     def _load_json(cls, path: str) -> FitResult:
@@ -455,7 +544,12 @@ class FitResult:
             from rheojax.utils.optimization import OptimizationResult
 
             _is_complex = np.iscomplexobj(y_arr)
-            if _is_complex:
+            if d.get("residuals") is not None:
+                # Prefer the exact residuals array persisted by to_dict(),
+                # which already accounts for _use_log_residuals /
+                # _normalization_weights transforms applied at fit time.
+                residuals = np.array(d["residuals"])
+            elif _is_complex:
                 residuals = np.concatenate(
                     [
                         y_arr.real - fitted.real,
@@ -465,6 +559,7 @@ class FitResult:
             else:
                 residuals = (y_arr - fitted).ravel()
             rss = float(np.sum(residuals**2))
+            norm_w = d.get("_normalization_weights")
             opt_result = OptimizationResult(
                 x=np.array(list(d["params"].values())),
                 fun=rss,
@@ -473,7 +568,15 @@ class FitResult:
                 residuals=residuals,
                 n_data=len(y_arr),
                 _is_complex_split=_is_complex,
+                _use_log_residuals=bool(d.get("_use_log_residuals", False)),
+                _normalization_weights=(
+                    np.array(norm_w) if norm_w is not None else None
+                ),
             )
+
+        persisted_stats = {
+            key: d[key] for key in _STAT_KEYS if d.get(key) is not None
+        }
 
         return cls(
             model_name=d["model_name"],
@@ -488,6 +591,7 @@ class FitResult:
             y=y_arr,
             timestamp=d.get("timestamp", ""),
             metadata=d.get("metadata", {}),
+            _persisted_stats=persisted_stats or None,
         )
 
     @classmethod
@@ -523,7 +627,12 @@ class FitResult:
 
             y_np = np.asarray(y_arr)
             fitted_np = np.asarray(fitted)
-            if np.iscomplexobj(y_np):
+            if "residuals" in data:
+                # Prefer the exact residuals array persisted by _save_npz(),
+                # which already accounts for _use_log_residuals /
+                # _normalization_weights transforms applied at fit time.
+                residuals = np.asarray(data["residuals"])
+            elif np.iscomplexobj(y_np):
                 residuals = np.concatenate(
                     [y_np.real - fitted_np.real, y_np.imag - fitted_np.imag]
                 )
@@ -537,20 +646,45 @@ class FitResult:
                 residuals=residuals,
                 n_data=_n_data,
                 _is_complex_split=_is_complex_split,
+                _use_log_residuals=bool(data["_use_log_residuals"])
+                if "_use_log_residuals" in data
+                else False,
+                _normalization_weights=(
+                    np.asarray(data["_normalization_weights"])
+                    if "_normalization_weights" in data
+                    else None
+                ),
             )
+
+        persisted_stats = {
+            key: float(data[key]) for key in _STAT_KEYS if key in data
+        }
+
+        # Backward-compatible: .npz files saved before params_units/metadata
+        # were persisted (see _save_npz) fall back to {} rather than KeyError.
+        params_units = (
+            _json.loads(_bytes_to_str(data["params_units"]))
+            if "params_units" in data
+            else {}
+        )
+        metadata = (
+            _json.loads(_bytes_to_str(data["metadata"])) if "metadata" in data else {}
+        )
 
         return cls(
             model_name=_bytes_to_str(data["model_name"]),
             model_class_name=_bytes_to_str(data["model_class_name"]),
             protocol=_bytes_to_str(data["protocol"]) or None,
             params=dict(zip(param_names, param_values, strict=True)),
-            params_units={},
+            params_units=params_units,
             n_params=int(data["n_params"]),
             optimization_result=opt_result,
             fitted_curve=fitted,
             X=data["X"] if "X" in data else None,
             y=y_arr,
             timestamp=_bytes_to_str(data["timestamp"]),
+            metadata=metadata,
+            _persisted_stats=persisted_stats or None,
         )
 
     def plot(self, ax=None, show_residuals: bool = True, **kwargs):
@@ -603,14 +737,43 @@ class FitResult:
         )
 
         if ax_res is not None and self.fitted_curve is not None:
-            residuals = y - np.asarray(self.fitted_curve)
+            # Prefer the log-space residuals actually used for r_squared/aic/
+            # bic (self.residuals, via OptimizationResult) when the fit used
+            # _use_log_residuals=True, so this panel doesn't contradict the
+            # R² reported in the title above. Falls back to the plain linear
+            # y - fitted_curve when unavailable or shape-incompatible with X
+            # (e.g. residuals aren't split-complex-aligned with X).
+            use_log = bool(
+                getattr(self.optimization_result, "_use_log_residuals", False)
+            )
+            residuals = None
+            res_label = "Residuals"
+            if use_log and self.residuals is not None:
+                res_arr = np.asarray(self.residuals)
+                norm_w = getattr(
+                    self.optimization_result, "_normalization_weights", None
+                )
+                if norm_w is not None:
+                    res_arr = res_arr * np.asarray(norm_w)
+                is_split = bool(
+                    getattr(self.optimization_result, "_is_complex_split", False)
+                )
+                if is_split and res_arr.size == 2 * len(X):
+                    half = res_arr.size // 2
+                    residuals = res_arr[:half] + 1j * res_arr[half:]
+                    res_label = "Log10 Residual"
+                elif not is_split and res_arr.size == len(X):
+                    residuals = res_arr
+                    res_label = "Log10 Residual"
+            if residuals is None:
+                residuals = y - np.asarray(self.fitted_curve)
             if np.iscomplexobj(residuals):
                 ax_res.plot(X, residuals.real, "o", ms=3, label="real")
                 ax_res.plot(X, residuals.imag, "s", ms=3, label="imag")
             else:
                 ax_res.plot(X, residuals, "o", ms=3)
             ax_res.axhline(0, color="k", lw=0.5)
-            ax_res.set_ylabel("Residuals")
+            ax_res.set_ylabel(res_label)
             ax_res.set_xlabel("X")
 
         fig.tight_layout()
@@ -685,7 +848,12 @@ class ModelInfo:
                 param_bounds[pname] = p.bounds if p.bounds else (None, None)
                 param_units[pname] = getattr(p, "units", "") or ""
             n_params = len(param_names)
-            supports_bayesian = hasattr(instance, "fit_bayesian")
+            # NOTE: fit_bayesian is defined unconditionally on BaseModel, so
+            # hasattr(instance, "fit_bayesian") is always True and cannot
+            # discriminate. The actual runtime contract enforced by
+            # BayesianMixin._validate_bayesian_requirements() requires
+            # model_function; check that instead.
+            supports_bayesian = hasattr(instance, "model_function")
         except Exception:
             logger.warning(
                 "ModelInfo.from_registry: instantiation failed for model '%s'",
@@ -739,6 +907,12 @@ class ModelComparison:
     delta_criterion: dict[str, float] = field(default_factory=dict)
     weights: dict[str, float] = field(default_factory=dict)
     best_model: str = ""
+    # Maps ranking key (possibly "#index"-suffixed, see _compute_rankings)
+    # back to its source FitResult, so summary() can look results up
+    # correctly even when duplicate model_names were disambiguated.
+    _entry_results: dict[str, FitResult] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     _VALID_CRITERIA = {"aic", "bic", "aicc"}
 
@@ -753,25 +927,48 @@ class ModelComparison:
 
     def _compute_rankings(self) -> None:
         """Compute rankings and Akaike weights from results."""
-        # Collect criterion values
-        entries: list[tuple[str, float]] = []
+        # Collect criterion values, carrying the source FitResult along so
+        # it can still be recovered after any disambiguation below.
+        entries: list[tuple[str, float, FitResult]] = []
         for r in self.results:
             val = getattr(r, self.criterion, None)
             if val is not None and np.isfinite(val):
-                entries.append((r.model_name, float(val)))
+                entries.append((r.model_name, float(val), r))
 
         if not entries:
             return
 
         # Sort by criterion (lower is better)
         entries.sort(key=lambda e: e[1])
+
+        # Disambiguate duplicate model_names (e.g. two pre-instantiated
+        # instances of the same model class, as via compare_models(models=[...])).
+        # Without this, self.rankings/delta_criterion/weights below — all
+        # dict-keyed purely by model_name — would silently collide and drop
+        # every result but the last one with a given name. The suffix index
+        # is derived from position within `entries` (already filtered to
+        # finite-criterion results), not a raw self.results index, since the
+        # two lists can desync.
+        names = [name for name, _, _ in entries]
+        if len(set(names)) != len(names):
+            logger.warning(
+                "ModelComparison: duplicate model_name(s) found among "
+                "results for criterion %r; disambiguating rankings with "
+                "'#index' suffixes so no result is silently dropped.",
+                self.criterion,
+            )
+            entries = [
+                (f"{name}#{i}", val, r) for i, (name, val, r) in enumerate(entries)
+            ]
+
         best_val = entries[0][1]
 
-        self.rankings = {name: rank for rank, (name, _) in enumerate(entries, 1)}
+        self.rankings = {name: rank for rank, (name, _, _) in enumerate(entries, 1)}
         self.best_model = entries[0][0]
+        self._entry_results = {name: r for name, _, r in entries}
 
         # Delta and Akaike weights
-        deltas = {name: val - best_val for name, val in entries}
+        deltas = {name: val - best_val for name, val, _ in entries}
         self.delta_criterion = deltas
 
         raw_weights = {name: np.exp(-0.5 * d) for name, d in deltas.items()}
@@ -798,13 +995,16 @@ class ModelComparison:
         ]
         for name in self.ranked_names():
             rank = self.rankings[name]
-            r = next((x for x in self.results if x.model_name == name), None)
+            r = self._entry_results.get(name)
             crit_val = getattr(r, self.criterion, None) if r else None
             delta = self.delta_criterion.get(name, float("nan"))
             weight = self.weights.get(name, 0.0)
             crit_str = f"{crit_val:.4f}" if crit_val is not None else "--"
+            # Recover the original model_name if it was "#index"-suffixed
+            # for disambiguation (see _compute_rankings).
+            label = name.rsplit("#", 1)[0] if "#" in name else name
             lines.append(
-                f"{rank:<6}{name:<25}{crit_str:<14}{delta:<12.4f}{weight:<10.4f}"
+                f"{rank:<6}{label:<25}{crit_str:<14}{delta:<12.4f}{weight:<10.4f}"
             )
         return "\n".join(lines)
 

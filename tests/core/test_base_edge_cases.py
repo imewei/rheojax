@@ -101,3 +101,15 @@ class TestBaseModelEdgeCases:
         for name in param_names:
             val = model.parameters.get_value(name)
             assert val is not None
+
+    def test_predict_with_0d_array(self):
+        """predict() must not raise TypeError on a 0-d array input.
+
+        np.array(5.0) has .shape == () which is falsy but not None; the
+        old `getattr(X, "shape", None) or (len(X),)` pattern fell through
+        to len(X), which raises TypeError on a 0-d array.
+        """
+        model = Maxwell()
+        X = np.array(5.0)
+        result = model.predict(X, test_mode="relaxation")
+        assert np.isfinite(float(result))

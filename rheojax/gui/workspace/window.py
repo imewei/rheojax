@@ -92,6 +92,42 @@ class WorkspaceWindow(QMainWindow):
         self._build_view_menu()
         self._build_help_menu()
 
+        # These fire ~20 times through a real pipeline run but had no
+        # listener anywhere -- real per-step/per-phase progress was computed
+        # and silently discarded, with no user-visible feedback beyond the
+        # coarse per-dataset start/finish. Route them to the log dock (the
+        # existing mechanism for this kind of event, see log_dock.append_record
+        # elsewhere in this file) rather than building new progress UI.
+        # QueuedConnection: PipelineExecutionService documents that it runs
+        # off the GUI thread, same as phase_worker_ready above.
+        self._pipeline_service.pipeline_started.connect(
+            self._on_pipeline_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.pipeline_completed.connect(
+            self._on_pipeline_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.pipeline_failed.connect(
+            self._on_pipeline_failed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_started.connect(
+            self._on_pipeline_step_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_completed.connect(
+            self._on_pipeline_step_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_failed.connect(
+            self._on_pipeline_step_failed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_started.connect(
+            self._on_pipeline_step_phase_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_completed.connect(
+            self._on_pipeline_step_phase_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_failed.connect(
+            self._on_pipeline_step_phase_failed, Qt.ConnectionType.QueuedConnection
+        )
+
         self._build_workspace(app_state)
         self._setup_os_theme_watcher()
         QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
@@ -755,14 +791,30 @@ class WorkspaceWindow(QMainWindow):
             # do NOT proceed(): that would rebuild/replace self._state while a
             # worker is still mutating the project it belonged to. Tell the
             # user and let them retry once cancellation actually finishes.
-            from PySide6.QtWidgets import QMessageBox
+            #
+            # Only show that warning if this window is actually visible.
+            # _is_qobject_alive above only catches the case where self's C++
+            # object has already been destroyed -- it does NOT catch a
+            # window that is still fully alive but orphaned (e.g. a stale
+            # instance from a previous test that was never shown, still
+            # ticking down this same 250ms/30s chain). A real user always
+            # has this window visible for the entire duration of a close/new
+            # confirmation, so gating on isVisible() costs nothing for real
+            # usage while preventing this modal from firing into whatever
+            # unrelated context happens to be running when a stale chain's
+            # timer finally elapses -- that reentrant QMessageBox.warning()
+            # call is what caused a reproducible Fatal Python error: Aborted
+            # crash under the full GUI test suite.
+            if self.isVisible():
+                from PySide6.QtWidgets import QMessageBox
 
-            QMessageBox.warning(
-                self,
-                "Jobs Still Running",
-                "Some jobs did not finish cancelling in time. This action was "
-                "cancelled -- try again once they've stopped.",
-            )
+                QMessageBox.warning(
+                    self,
+                    "Jobs Still Running",
+                    "Some jobs did not finish cancelling in time. This "
+                    "action was cancelled -- try again once they've "
+                    "stopped.",
+                )
             self._active_jobs_action_pending = False
             return
         from PySide6.QtCore import QTimer
@@ -782,9 +834,53 @@ class WorkspaceWindow(QMainWindow):
     def _on_phase_worker_ready(
         self, dataset_id: str, step_id: str, phase: str, worker
     ) -> None:
-        job = self._state.active_jobs.by_id.get(dataset_id)
-        if job is not None:
-            job["worker"] = worker
+        # Every other active_jobs.by_id access in this file takes this lock --
+        # PipelineBatchRunner mutates the same dict from a worker thread, so
+        # skipping it here left a TOCTOU gap where a job could be evicted
+        # between the .get() and the assignment, silently dropping the worker
+        # reference the cancel-on-close path (_maybe_confirm_active_jobs)
+        # needs to actually cancel a still-running job.
+        with self._state.active_jobs.lock:
+            job = self._state.active_jobs.by_id.get(dataset_id)
+            if job is not None:
+                job["worker"] = worker
+
+    def _on_pipeline_started(self) -> None:
+        self.log_dock.append_record(logging.INFO, "Pipeline run started")
+
+    def _on_pipeline_completed(self) -> None:
+        self.log_dock.append_record(logging.INFO, "Pipeline run completed")
+
+    def _on_pipeline_failed(self, error: str) -> None:
+        self.log_dock.append_record(logging.ERROR, f"Pipeline run failed: {error}")
+
+    def _on_pipeline_step_started(self, step_id: str) -> None:
+        self.log_dock.append_record(logging.INFO, f"Step {step_id} started")
+
+    def _on_pipeline_step_completed(self, step_id: str) -> None:
+        self.log_dock.append_record(logging.INFO, f"Step {step_id} completed")
+
+    def _on_pipeline_step_failed(self, step_id: str, error: str) -> None:
+        self.log_dock.append_record(
+            logging.ERROR, f"Step {step_id} failed: {error}"
+        )
+
+    def _on_pipeline_step_phase_started(self, step_id: str, phase: str) -> None:
+        self.log_dock.append_record(
+            logging.INFO, f"Step {step_id}: {phase} phase started"
+        )
+
+    def _on_pipeline_step_phase_completed(self, step_id: str, phase: str) -> None:
+        self.log_dock.append_record(
+            logging.INFO, f"Step {step_id}: {phase} phase completed"
+        )
+
+    def _on_pipeline_step_phase_failed(
+        self, step_id: str, phase: str, error: str
+    ) -> None:
+        self.log_dock.append_record(
+            logging.ERROR, f"Step {step_id}: {phase} phase failed: {error}"
+        )
 
     def _maybe_confirm_unsaved_changes(self, proceed) -> None:
         if not self._state.project.dirty:

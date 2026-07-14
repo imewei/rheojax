@@ -31,8 +31,8 @@ def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
             ArviZ module (e.g., "plot_pair", "plot_forest", "from_numpyro").
 
     Raises:
-        ImportError: When ArviZ itself cannot be imported or has been disabled.
-        RuntimeError: When ArviZ imports but is missing required helpers.
+        ImportError: When ArviZ itself cannot be imported or has been disabled,
+            or when ArviZ imports but is missing required helpers.
     """
 
     if sys.modules.get("arviz", object()) is None:
@@ -52,10 +52,12 @@ def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
         missing = sorted(name for name in required if not hasattr(arviz, name))
         if missing:
             missing_csv = ", ".join(missing)
-            raise RuntimeError(
+            raise ImportError(
                 "ArviZ is installed but missing required component(s) "
-                f"[{missing_csv}]. Reinstall ArviZ with optional plotting extras "
-                "(`pip install arviz[plots]`) to enable Bayesian diagnostics."
+                f"[{missing_csv}]. This usually means an incompatible ArviZ "
+                "version or a partial install -- try `pip install -U "
+                '"arviz>=0.23.4,<2.0.0"`, or `pip install arviz[matplotlib]` '
+                "if this is a plotting-backend gap."
             )
 
     return arviz

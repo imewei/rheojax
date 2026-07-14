@@ -123,3 +123,36 @@ def test_run_all_double_click_starts_only_one_runner(qtbot, monkeypatch):
     win._on_pipeline_run_requested()
 
     assert len(start_calls) == 1
+
+
+def test_pipeline_progress_signals_are_wired_to_log_dock(qtbot):
+    # Regression: step_started/step_completed/step_failed, pipeline_started/
+    # completed/failed, and step_phase_started/completed/failed used to have
+    # zero listeners anywhere -- real per-step/per-phase progress was
+    # computed and silently discarded during a pipeline run, with no
+    # user-visible feedback beyond the coarse per-dataset start/finish.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    service = win._pipeline_service
+
+    service.pipeline_started.emit()
+    service.step_started.emit("s1")
+    service.step_phase_started.emit("s1", "nlsq")
+    service.step_phase_completed.emit("s1", "nlsq")
+    service.step_completed.emit("s1")
+    service.step_failed.emit("s2", "boom")
+    service.step_phase_failed.emit("s3", "nuts", "kaboom")
+    service.pipeline_failed.emit("fatal")
+    service.pipeline_completed.emit()
+    qtbot.wait(50)  # these connections are QueuedConnection
+
+    messages = [msg for _, msg in win.log_dock._records]
+    assert any("Pipeline run started" in m for m in messages)
+    assert any("Step s1 started" in m for m in messages)
+    assert any("s1: nlsq phase started" in m for m in messages)
+    assert any("s1: nlsq phase completed" in m for m in messages)
+    assert any("Step s1 completed" in m for m in messages)
+    assert any("Step s2 failed: boom" in m for m in messages)
+    assert any("s3: nuts phase failed: kaboom" in m for m in messages)
+    assert any("Pipeline run failed: fatal" in m for m in messages)
+    assert any("Pipeline run completed" in m for m in messages)

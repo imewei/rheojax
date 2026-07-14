@@ -4,6 +4,8 @@ This module tests the power-law intersection algorithm for automatic shift facto
 calculation in time-temperature superposition, following the pyvisco algorithm.
 """
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -38,6 +40,27 @@ class TestPowerLawFitting:
         # Check uncertainties are positive
         assert len(perr) == 3
         assert all(perr > 0)
+
+    def test_perr_scales_with_residual_magnitude(self):
+        """Parameter uncertainties must be scaled by residual variance
+        (RSS/dof), not just the Jacobian geometry. An unscaled inv(J^T J)
+        estimate is invariant to noise level; the correctly-scaled estimate
+        must grow with it, which this test exercises directly."""
+        x = np.logspace(-2, 2, 50)
+        a_true, b_true, e_true = 1.5, -0.7, 0.1
+        y_clean = a_true * x**b_true + e_true
+
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
+
+        np.random.seed(0)
+        noise = np.random.randn(len(x))
+
+        _, perr_small = mc._fit_power_law(x, y_clean + 0.001 * noise)
+        _, perr_large = mc._fit_power_law(x, y_clean + 0.5 * noise)
+
+        # Much noisier fit must report substantially larger uncertainty on
+        # the exponent (b) parameter.
+        assert perr_large[1] > 10 * perr_small[1]
 
     def test_power_law_outlier_detection_logic(self):
         """Test that outlier detection logic works correctly."""
@@ -121,6 +144,34 @@ class TestShiftCalculation:
         # Check shift is finite
         assert np.isfinite(log_aT)
         assert -3.0 < log_aT < 3.0
+
+    def test_zero_exponent_does_not_divide_by_zero(self):
+        """b_top == 0.0 must not defeat the near-zero floor (np.sign(0.0) == 0.0)."""
+        x1 = np.logspace(-1, 1, 30)
+        x2 = np.logspace(0, 2, 30)
+
+        a1, b1 = 1.0, -0.6
+        a2, b2 = 1.5, -0.6
+
+        y1 = a1 * x1**b1
+        y2 = a2 * x2**b2
+
+        curve_top = np.column_stack([x1, y1])
+        curve_bot = np.column_stack([x2, y2])
+
+        mc = Mastercurve(reference_temp=298.15, method="wlf")
+
+        # Degenerate zero exponent for the top curve's fit.
+        popt_top = np.array([a1, 0.0, 0.0])
+        popt_bot = np.array([a2, b2, 0.0])
+
+        # The floor on b_top_safe must fire (np.sign(0.0) == 0.0 previously
+        # defeated it), so 1.0 / b_top_safe must never divide by an exact zero.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", RuntimeWarning)
+            mc._compute_pairwise_shift(curve_top, curve_bot, popt_top, popt_bot)
+
+        assert not any("scalar divide" in str(w.message) for w in caught)
 
 
 class TestSequentialShifting:

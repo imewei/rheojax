@@ -57,6 +57,15 @@ class ParameterConstraint:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize constraint to a dictionary."""
+        if self.type == "custom":
+            # A Python callable cannot be serialized to JSON/HDF5. Fail here,
+            # at the actual point of data loss, instead of silently emitting
+            # a dict that deserializes into a no-op `validate() -> True`.
+            raise ValueError(
+                "Cannot serialize a 'custom' constraint: its validator "
+                "callable is not JSON/HDF5-serializable and would be "
+                "silently dropped on a to_dict()/from_dict() round-trip."
+            )
         d: dict[str, Any] = {"type": self.type}
         if self.type == "bounds":
             d["min_value"] = self.min_value
@@ -123,8 +132,26 @@ class ParameterConstraint:
                 return value > other_value
             elif self.relation == "equal":
                 return value == other_value
+            else:
+                # Fail closed: an unset/misspelled relation must not silently
+                # fall through to the trailing `return True` below, which
+                # would validate every value as satisfying a broken
+                # constraint (mirrors the 'custom' fail-closed pattern).
+                raise ValueError(
+                    f"Unknown or missing relation {self.relation!r} for "
+                    "relative constraint"
+                )
 
-        elif self.type == "custom" and self.validator:
+        elif self.type == "custom":
+            if self.validator is None:
+                # Fail closed: a validator-less 'custom' constraint can only
+                # arise from a broken deserialization (validators can't be
+                # serialized — see to_dict()). Accepting every value here
+                # would silently no-op the constraint.
+                raise ValueError(
+                    "custom constraint has no validator (cannot be restored "
+                    "from serialized data)"
+                )
             return self.validator(value)
 
         elif self.type not in {
@@ -209,18 +236,71 @@ class Parameter:
     @bounds.setter
     def bounds(self, new_bounds: tuple[float, float] | None) -> None:
         """Set parameter bounds and sync any bounds constraint."""
+        if new_bounds is not None and new_bounds[0] > new_bounds[1]:
+            logger.error(
+                "Invalid bounds: lower > upper",
+                parameter=self.name,
+                bounds=new_bounds,
+            )
+            raise ValueError(
+                f"Invalid bounds for parameter '{self.name}': {new_bounds}"
+            )
         self._bounds = new_bounds
         # Sync ALL bounds constraints — iterate the full list so that every
         # "bounds" constraint is updated, not only the first one.
+        found_bounds_constraint = False
         if hasattr(self, "constraints"):
             for c in self.constraints:
                 if hasattr(c, "type") and c.type == "bounds":
+                    found_bounds_constraint = True
                     if new_bounds is not None:
                         c.min_value = new_bounds[0]
                         c.max_value = new_bounds[1]
                     else:
                         c.min_value = None
                         c.max_value = None
+            # No existing "bounds" constraint to sync (e.g. the Parameter was
+            # constructed with bounds=None and bounds are being set for the
+            # first time afterward) — insert one, mirroring the same
+            # insert-if-missing logic _initialize() applies at construction.
+            if new_bounds is not None and not found_bounds_constraint:
+                self.constraints.insert(
+                    0,
+                    ParameterConstraint(
+                        type="bounds",
+                        min_value=new_bounds[0],
+                        max_value=new_bounds[1],
+                    ),
+                )
+
+        # Re-validate the currently-held value against the new bounds; clamp
+        # (with a warning) instead of leaving `self._value` silently outside
+        # `self._bounds`. `new_bounds[0] <= new_bounds[1]` always holds here
+        # since inverted bounds are rejected above.
+        if (
+            new_bounds is not None
+            and self._value is not None
+            and new_bounds[0] <= new_bounds[1]
+        ):
+            lower, upper = new_bounds
+            if self._value < lower:
+                warnings.warn(
+                    f"Parameter '{self.name}' value {self._value} is below "
+                    f"new bounds; clamped to {lower}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._value = lower
+                self._was_clamped = True
+            elif self._value > upper:
+                warnings.warn(
+                    f"Parameter '{self.name}' value {self._value} is above "
+                    f"new bounds; clamped to {upper}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                self._value = upper
+                self._was_clamped = True
 
     def _initialize(self, value: float | None) -> None:
         """Validate parameter after initialization."""
@@ -362,10 +442,10 @@ class Parameter:
         if self._clamp_on_set:
             self._was_clamped = clamped_during_init
         else:
-            # R12-B-017: _was_clamped is only meaningful at initialization time
-            # (when _clamp_on_set=True). For all subsequent set_value() calls it
-            # is reset to False because clamping is not applied — out-of-bounds
-            # values raise ValueError instead.
+            # R12-B-017: for set_value() calls (as opposed to construction or
+            # a `.bounds =` reassignment, see the bounds setter), _was_clamped
+            # is reset to False because clamping is not applied here —
+            # out-of-bounds values raise ValueError instead.
             self._was_clamped = False
 
         self._value = numeric_val
@@ -1011,7 +1091,16 @@ class ParameterSet:
                 parameter=key,
             )
         if isinstance(value, Parameter):
-            # Replace entire parameter
+            # Replace entire parameter. Reject a name mismatch rather than
+            # silently letting the ParameterSet key and Parameter.name
+            # diverge (the divergence would otherwise be masked until a
+            # to_dict()/from_dict() round-trip silently overwrites the
+            # stored Parameter's name back to the key).
+            if value.name != key:
+                raise ValueError(
+                    f"Parameter name '{value.name}' does not match "
+                    f"assignment key '{key}'"
+                )
             self._parameters[key] = value
             if key not in self._order:
                 self._order.append(key)
@@ -1206,8 +1295,13 @@ class SharedParameterSet:
 
         param = self._shared[name]
 
-        # Validate
-        if not param.validate(value):
+        # Validate. Build a context dict (mirroring ParameterSet.set_value/
+        # update) so that "relative" constraints between shared parameters
+        # are actually enforced instead of silently no-op'd.
+        context = {
+            p.name: p.value for p in self._shared.values() if p.value is not None
+        }
+        if not param.validate(value, context):
             logger.error(
                 "Value violates constraints for shared parameter",
                 parameter=name,
@@ -1379,13 +1473,17 @@ class ParameterOptimizer:
             use_jax=self.use_jax,
         )
         if not self.use_jax or not HAS_JAX:
-            # Numerical gradient
-            eps = 1e-8
-            values_array = _coerce_array(values)
+            # Numerical gradient. Force float64 so in-place perturbation below
+            # can't be silently truncated by integer casting (e.g. int64 input).
+            values_array = _coerce_array(values).astype(np.float64)
             n = len(values_array)
             grad = np.zeros(n)
 
             for i in range(n):
+                # Scale the step to the parameter's magnitude (standard
+                # relative finite-difference step) so it doesn't underflow
+                # to a no-op for large values (e.g. G0 ~ 1e5-1e9 Pa).
+                eps = max(1e-8, abs(values_array[i]) * math.sqrt(np.finfo(np.float64).eps))
                 values_plus = values_array.copy()
                 values_plus[i] += eps
 

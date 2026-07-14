@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import re as _re
 import warnings
 from pathlib import Path
 from typing import Any
@@ -21,14 +20,12 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    normalize_units,
     validate_transform,
 )
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
-
-# Pre-compiled regex for detecting scientific notation in numeric strings
-_SCI_RE = _re.compile(r"[eE][+\-]?\d")
 
 # Exported for lightweight preview/loading helpers
 __all__ = ["load_csv", "detect_csv_delimiter"]
@@ -96,7 +93,11 @@ def load_csv(
         reference_gamma_dot: Reference shear rate stored in metadata as
             ``reference_gamma_dot``. Used for dimensionless flow analysis.
         header: Row number for column headers (None if no header).
-        **kwargs: Additional arguments passed to pandas.read_csv.
+        **kwargs: Additional arguments passed to pandas.read_csv. Pass
+            ``thousands=","`` if numeric columns use US-style thousands
+            grouping without a decimal point (e.g. "1,234" meaning 1234) —
+            otherwise the locale-detection heuristic assumes EU decimal-comma
+            (see :func:`_to_float`).
 
     Returns:
         RheoData object with populated fields.
@@ -319,13 +320,16 @@ def load_csv(
             encoding=used_encoding,
         )
 
+    # Guard: check for tensile/E* columns/units/mode. Must run on the
+    # original file headers (before column_mapping renaming) — otherwise
+    # renaming a tensile column (e.g. "E'" -> "modulus") would silently
+    # bypass the safety check.
+    check_tensile_guard(df.columns, units=y_units)
+
     # Apply column renaming if provided
     if column_mapping is not None:
         df = df.rename(columns=column_mapping)
         logger.debug("Applied column_mapping", mapping=column_mapping)
-
-    # Guard: check for tensile/E* columns/units/mode
-    check_tensile_guard(df.columns, units=y_units)
 
     # Get column headers for detection
     x_header = _get_column_header(df, x_col)
@@ -349,6 +353,11 @@ def load_csv(
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
+        # Run both columns through the same locale-aware decimal detection as
+        # the single y_col path (_to_float) before casting to complex, so
+        # European decimal-comma files (e.g. "1000,5") don't crash here.
+        g_prime_data = _to_float(g_prime_data)
+        g_double_prime_data = _to_float(g_double_prime_data)
         y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
         logger.debug("Constructed complex modulus from G' and G''")
     else:
@@ -396,12 +405,28 @@ def load_csv(
 
     logger.debug("Data points after NaN removal", n_points=len(x_data))
 
-    # Auto-extract units from headers if not provided
+    # Auto-extract units from headers if not provided, normalizing the
+    # extracted unit (and the numeric data) to SI via UNIFIED_UNIT_CONVERSIONS —
+    # matching the anton_paar.py/trios readers' behavior. Units passed
+    # explicitly by the caller are trusted as-is and left unconverted.
     if x_units is None:
-        _, x_units = extract_unit_from_header(x_header)
+        _, extracted_x_units = extract_unit_from_header(x_header)
+        if extracted_x_units is not None:
+            x_data, x_units = normalize_units(x_data, extracted_x_units)
+        else:
+            x_units = extracted_x_units
     if y_units is None:
         # Use first y column header for units
-        _, y_units = extract_unit_from_header(y_headers[0])
+        _, extracted_y_units = extract_unit_from_header(y_headers[0])
+        if extracted_y_units is not None:
+            if is_complex:
+                real_part, y_units = normalize_units(y_data.real, extracted_y_units)
+                imag_part, _ = normalize_units(y_data.imag, extracted_y_units)
+                y_data = real_part + 1j * imag_part
+            else:
+                y_data, y_units = normalize_units(y_data, extracted_y_units)
+        else:
+            y_units = extracted_y_units
 
     # Auto-detect domain if not provided
     if domain is None:
@@ -502,6 +527,21 @@ def _get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
     return df.iloc[:, col].values
 
 
+def _looks_like_eu_thousands(val: str) -> bool:
+    """Whether a dot-only numeric string has the shape of EU thousands
+    grouping (e.g. "1.234", "12.345.678") rather than a plain decimal.
+
+    Real EU thousands grouping always groups digits in 3s: every group after
+    the first has exactly 3 digits, and the leading group has 1-3. A value
+    that doesn't fit that shape (e.g. "5.5", or sci-notation "5.5e3") is a
+    plain decimal, not a thousands-grouped integer.
+    """
+    groups = val.split(".")
+    if len(groups) < 2 or not all(g.isdigit() for g in groups):
+        return False
+    return len(groups[0]) in (1, 2, 3) and all(len(g) == 3 for g in groups[1:])
+
+
 def _to_float(arr: np.ndarray) -> np.ndarray:
     """Convert array to float, handling European decimal comma and US thousands.
 
@@ -511,6 +551,16 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
     - "1.234,56" (EU thousands+decimal): remove dots, comma→dot
     - "1,56" (EU decimal only): comma→dot
     - "1.56" (standard): no change
+
+    Note:
+        A comma-only value with no decimal point (e.g. "1,234") is ambiguous
+        between EU decimal-comma (1.234) and US thousands-grouping (1234) —
+        there is no way to distinguish the two from the string alone, so this
+        heuristic always assumes EU decimal-comma. Callers whose data uses
+        thousands-grouping without a decimal point should pass
+        ``thousands=","`` to :func:`load_csv` (forwarded to ``pandas.read_csv``
+        via ``**kwargs``); pandas will then parse the column as numeric before
+        it ever reaches this function, bypassing the heuristic entirely.
     """
     arr = np.array(arr)
     if arr.dtype.kind in {"U", "S", "O"}:
@@ -534,28 +584,42 @@ def _to_float(arr: np.ndarray) -> np.ndarray:
             last_comma = sample.rfind(",")
             last_dot = sample.rfind(".")
             if last_comma > last_dot:
-                # EU: 1.234,56 — dot=thousands, comma=decimal
-                # But skip dot-removal for scientific notation values
-                if any(_SCI_RE.search(s) for s in samples):
-                    # Mixed: some values have sci notation, some EU format.
-                    # Process element-wise: try float as-is first, then EU convert.
-                    result = np.empty(str_arr.shape, dtype=float)
-                    for idx in np.ndindex(str_arr.shape):
-                        val = str(str_arr[idx]).strip()
-                        if _SCI_RE.search(val):
-                            try:
-                                result[idx] = float(val.replace(",", "."))
-                                continue
-                            except ValueError:
-                                pass
-                        eu_val = val.replace(".", "").replace(",", ".")
-                        try:
-                            result[idx] = float(eu_val)
-                        except ValueError:
-                            result[idx] = np.nan
-                    return result
-                str_arr = np.char.replace(str_arr, ".", "")
-                str_arr = np.char.replace(str_arr, ",", ".")
+                # EU: 1.234,56 — dot=thousands, comma=decimal. Convert
+                # element-wise since not every value in the column need be
+                # EU-formatted:
+                # - a value with a comma is unambiguously EU (strip dots,
+                #   comma -> decimal point)
+                # - a dot-only value is ambiguous ("1.234" could be EU
+                #   thousands-grouped 1234, or a plain decimal 1.234) —
+                #   resolve it the same way genuine EU thousands grouping
+                #   would look: every dot-separated group must be all-digit,
+                #   the leading group 1-3 digits, and every following group
+                #   exactly 3 digits (e.g. "1.234", "12.345.678"). A value
+                #   like "5.5" or sci-notation like "5.5e3" fails that shape
+                #   (a 1-digit or non-digit trailing group) and is left as a
+                #   plain decimal — blanket-stripping its dot would silently
+                #   corrupt it (e.g. "5.5" becoming 55.0).
+                result = np.empty(str_arr.shape, dtype=float)
+                for idx in np.ndindex(str_arr.shape):
+                    val = str(str_arr[idx]).strip()
+                    if "," in val:
+                        val = val.replace(".", "").replace(",", ".")
+                    elif _looks_like_eu_thousands(val):
+                        val = val.replace(".", "")
+                    try:
+                        result[idx] = float(val)
+                    except ValueError:
+                        result[idx] = np.nan
+                nan_ratio = np.isnan(result).sum() / max(len(result), 1)
+                if nan_ratio > 0.5:
+                    logger.warning(
+                        "More than 50% of values could not be converted to float — "
+                        "decimal separator detection may be incorrect. "
+                        "Consider specifying the decimal separator explicitly.",
+                        nan_ratio=f"{nan_ratio:.1%}",
+                        n_total=len(result),
+                    )
+                return result
             else:
                 # US: 1,234.56 — comma=thousands, dot=decimal
                 str_arr = np.char.replace(str_arr, ",", "")

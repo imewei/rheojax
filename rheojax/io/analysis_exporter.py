@@ -86,8 +86,10 @@ class AnalysisExporter:
             ├── summary.json          # Analysis metadata + parameters
             ├── summary.txt           # Human-readable summary
             ├── data/
-            │   ├── input_data.hdf5   # Raw input data
-            │   └── fitted_data.hdf5  # Post-transform data (if different)
+            │   └── current_data.h5   # pipeline.data as it stands now (post-
+            │                         # transform if any transform ran; see
+            │                         # results/transforms/*_input.npz below
+            │                         # for the pre-transform snapshot)
             ├── figures/
             │   ├── fit.pdf/.png      # NLSQ fit plot
             │   ├── bayesian.pdf/.png # Bayesian posterior predictive
@@ -101,7 +103,8 @@ class AnalysisExporter:
         Args:
             pipeline: Pipeline instance with analysis state.
             output_dir: Root directory for export (created if needed).
-            include_data: Save raw and transformed data.
+            include_data: Save pipeline.data in its current state (see
+                data/current_data.h5 in the structure above).
             include_figures: Save all generated figures.
             include_diagnostics: Save MCMC diagnostic plots (if available).
             include_summary: Write summary.json and summary.txt.
@@ -353,8 +356,15 @@ class AnalysisExporter:
                 "aicc",
             ):
                 val = getattr(fr, attr, None)
-                if val is not None and np.isfinite(val):
-                    summary["fit"]["statistics"][attr] = float(val)
+                if val is None:
+                    continue
+                # Non-finite statistics (e.g. aicc when n_data - n_params - 1
+                # <= 0) are still recorded, matching the params handling
+                # above, so "failed to compute" is distinguishable from
+                # "not requested" rather than silently vanishing.
+                summary["fit"]["statistics"][attr] = (
+                    float(val) if np.isfinite(val) else str(float(val))
+                )
 
             # Confidence intervals
             ci = fr.confidence_intervals()
@@ -455,7 +465,10 @@ class AnalysisExporter:
             lines.append("")
             lines.append("Statistics:")
             for metric, value in fit.get("statistics", {}).items():
-                lines.append(f"  {metric}: {value:.6g}")
+                # Non-finite statistics are stored as strings (e.g. "nan");
+                # format only genuine floats with %.6g.
+                value_str = value if isinstance(value, str) else f"{value:.6g}"
+                lines.append(f"  {metric}: {value_str}")
             lines.append("")
 
         bayes = summary.get("bayesian")
@@ -489,7 +502,14 @@ class AnalysisExporter:
     def _write_data(
         self, state: dict[str, Any], output_dir: Path, data_format: str
     ) -> None:
-        """Write input data to data/ subdirectory."""
+        """Write pipeline.data (current state, post-transform if applicable)
+        to data/ as current_data.h5 or current_data.npz.
+
+        This is a single snapshot of ``pipeline.data`` as it stands when
+        export runs — not a separate raw-input file. The pre-transform
+        snapshot, if any transform ran, is written per-transform under
+        results/transforms/<name>_input.npz by ``_write_transform_results``.
+        """
         data = state["data"]
         if data is None:
             return
@@ -608,6 +628,8 @@ class AnalysisExporter:
         diag_dir = output_dir / "figures" / "diagnostics"
         diag_dir.mkdir(parents=True, exist_ok=True)
 
+        import shutil
+
         import matplotlib.pyplot as plt
 
         for name, fig_or_path in diag.items():
@@ -615,6 +637,18 @@ class AnalysisExporter:
                 # It's a matplotlib Figure
                 self._save_fig(fig_or_path, diag_dir / name, name)
                 plt.close(fig_or_path)
+            elif isinstance(fig_or_path, Path):
+                # plot_diagnostics(output_dir=...) already saved this to disk
+                # (generate_diagnostic_suite returns Path, not Figure, in that
+                # case) — copy the existing file in rather than skipping it.
+                try:
+                    shutil.copy2(fig_or_path, diag_dir / fig_or_path.name)
+                except OSError as e:
+                    logger.warning(
+                        "Failed to copy diagnostic figure",
+                        label=name,
+                        error=str(e),
+                    )
 
     def _save_fig(self, fig: Any, base_path: Path, label: str) -> None:
         """Save a figure in all configured formats."""
@@ -702,7 +736,15 @@ class AnalysisExporter:
             ("success", "Converged"),
         ]:
             val = getattr(fr, attr, None)
-            if val is not None:
+            if val is None:
+                continue
+            # Non-finite values (e.g. aicc when n_data - n_params - 1 <= 0)
+            # would otherwise render as a blank cell via pandas' default
+            # na_rep, indistinguishable from a metric that was never
+            # computed at all. Annotate explicitly instead.
+            if isinstance(val, (float, np.floating)) and not np.isfinite(val):
+                rows.append({"Metric": label, "Value": f"N/A ({val})"})
+            else:
                 rows.append({"Metric": label, "Value": val})
 
         pd.DataFrame(rows).to_excel(writer, sheet_name="Fit Quality", index=False)
@@ -831,11 +873,19 @@ class AnalysisExporter:
             if val is not None:
                 rows.append({"Field": attr, "Value": val})
 
+        # Model parameter names, so we only drop the observation-noise term
+        # (named "sigma"/"sigma_real"/"sigma_imag") and not a genuine fitted
+        # parameter that happens to start with "sigma" (e.g. Bingham/
+        # Herschel-Bulkley "sigma_y" yield stress). Mirrors the noise-param
+        # filter in rheojax.core.bayesian.
+        fr = state.get("fit_result")
+        param_names = set(fr.params.keys()) if fr is not None else set()
+
         # Posterior summary statistics
         posterior = getattr(br, "posterior_samples", None)
         if posterior and isinstance(posterior, dict):
             for name, samples in posterior.items():
-                if name.startswith("sigma"):
+                if name.startswith("sigma") and name not in param_names:
                     continue
                 arr = np.asarray(samples).ravel()
                 rows.append({"Field": f"{name} (mean)", "Value": float(np.mean(arr))})

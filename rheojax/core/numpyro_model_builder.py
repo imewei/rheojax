@@ -43,8 +43,12 @@ def prior_dict_to_dist(prior_spec: dict, dist_module) -> Any | None:
         {"type": "lognormal", "loc": 0, "scale": 1}
         {"type": "exponential", "rate": 0.01}
         {"type": "halfnormal", "scale": 500}
+        {"type": "truncatednormal", "loc": 0, "scale": 1, "low": ..., "high": ...}
+        {"type": "gamma", "concentration": 2.0, "rate": 1.0}
+        {"type": "beta", "concentration0": 2.0, "concentration1": 2.0}
 
-    Returns None if the spec is unrecognized.
+    Returns None if the spec is unrecognized or malformed (a warning is
+    logged in both cases so a silently-wrong fallback prior is diagnosable).
     """
     dist_type = prior_spec.get("type", "").lower()
     try:
@@ -78,9 +82,31 @@ def prior_dict_to_dist(prior_spec: dict, dist_module) -> Any | None:
                 low=float(prior_spec.get("low", float("-inf"))),
                 high=float(prior_spec.get("high", float("inf"))),
             )
-    except (KeyError, TypeError, ValueError):
-        pass
-    return None
+        elif dist_type == "gamma":
+            return dist_module.Gamma(
+                concentration=float(prior_spec["concentration"]),
+                rate=float(prior_spec["rate"]),
+            )
+        elif dist_type == "beta":
+            return dist_module.Beta(
+                concentration1=float(prior_spec["concentration1"]),
+                concentration0=float(prior_spec["concentration0"]),
+            )
+        else:
+            logger.warning(
+                "Unrecognized prior dist_type; falling back to default prior",
+                dist_type=dist_type,
+                prior_spec=prior_spec,
+            )
+            return None
+    except (KeyError, TypeError, ValueError) as exc:
+        logger.warning(
+            "Malformed prior spec; falling back to default prior",
+            dist_type=dist_type,
+            prior_spec=prior_spec,
+            error=str(exc),
+        )
+        return None
 
 
 def build_numpyro_model(
@@ -101,7 +127,13 @@ def build_numpyro_model(
 
     Args:
         model_self: The model instance (provides model_function, parameters,
-            bayesian_prior_factory, _closure_cache).
+            bayesian_prior_factory, _closure_cache). If it sets
+            `_bayesian_nan_safe_grad_reeval = True`, non-finite
+            model_function outputs trigger a second, gradient-safe
+            re-evaluation (via stop_gradient) at ~2x the per-step cost —
+            an opt-in escape hatch for models whose non-finite outputs come
+            from a solver blow-up that can't be localized and guarded inline
+            (see the finite_check NaN-gradient note in the model closure).
         param_names: List of parameter names to sample.
         param_bounds: Dict mapping parameter names to (lower, upper) bounds.
         test_mode: TestMode enum for the current protocol.
@@ -139,7 +171,13 @@ def build_numpyro_model(
     if "model_returns_2col" not in scale_info:
         _model_returns_2col = False
         try:
-            _n_probe = max(scale_info.get("n_points", 0) or 0, 10)
+            # Use the real data length when known so the probe's synthetic
+            # call matches the actual invocation shape; only fall back to a
+            # dummy size when n_points is unknown/non-positive. A mismatched
+            # probe length can make an otherwise-fine model raise here for
+            # reasons unrelated to its true (N,2)-vs-complex output shape.
+            _n_known = scale_info.get("n_points", 0) or 0
+            _n_probe = _n_known if _n_known > 0 else 10
             _test_X = jax.ShapeDtypeStruct((_n_probe,), jnp.float64)
             _test_params = jax.ShapeDtypeStruct((len(param_names),), jnp.float64)
             _probe_fn = functools.partial(
@@ -177,6 +215,16 @@ def build_numpyro_model(
             if getattr(model_self, "_bayes_likelihood_space", "linear") == "log"
             else 0.0
         )
+
+    # Opt-in escape hatch for models whose non-finite predictions come from a
+    # solver blow-up (rather than a clean algebraic singularity a model author
+    # can localize with a safe_div/safe_log-style guard). See the NaN-gradient
+    # note near the finite_check factor below. Off by default: it costs a full
+    # second model_function evaluation per gradient step, so it must not be a
+    # blanket cost on every NUTS gradient for every model.
+    _nan_safe_grad_reeval = bool(
+        getattr(model_self, "_bayesian_nan_safe_grad_reeval", False)
+    )
 
     # Skip cache when prior_factory or param-level priors are set
     if not has_ndarray_kwargs and prior_factory is None and not _has_param_priors:
@@ -216,6 +264,7 @@ def build_numpyro_model(
                         for k, v in scale_info.items()
                     )
                 ),
+                _nan_safe_grad_reeval,
             )
         if cache_key in model_self._closure_cache:
             model_self._closure_cache.move_to_end(cache_key)
@@ -294,9 +343,12 @@ def build_numpyro_model(
                 lower is not None
                 and upper is not None
                 and abs(float(upper) - float(lower))
-                < 1e-9 * max(abs(float(lower)), abs(float(upper)), 1.0)
+                < 1e-10 * max(abs(float(lower)), 1.0)
             ):
                 # PARAMS-001: fixed parameter — use deterministic instead of Uniform.
+                # Tolerance matches BayesianMixin._validate_parameter_bounds()
+                # (bayesian.py) exactly, so both agree on what counts as "fixed"
+                # instead of disagreeing in a narrow bound-width gap.
                 param_val = numpyro.deterministic(name, lower)
                 params_dict[name] = param_val
             else:
@@ -313,12 +365,56 @@ def build_numpyro_model(
             X, params_array, test_mode, **protocol_kwargs
         )
 
-        # Guard against NaN/Inf from ODE-based models
+        # R5-JAX-002 cross-check: the model_returns_2col probe above can
+        # misclassify (e.g. its synthetic dummy call raised for a reason
+        # unrelated to the model's true output shape, silently defaulting to
+        # False). Catch that here with a cheap static-shape check on the real
+        # call so the failure is a clear diagnostic instead of an opaque
+        # NumPyro/JAX broadcasting error further down.
+        if (
+            not _model_returns_2col
+            and predictions_raw.ndim == 2
+            and predictions_raw.shape[-1] == 2
+        ):
+            raise ValueError(
+                "model_function returned a 2-column (N, 2) array but the "
+                "model_returns_2col probe misclassified it as not-2col; "
+                "check why jax.eval_shape failed for this model_function "
+                "(see the 'model_function probe failed' warning, if logged)."
+            )
+
+        # Guard against NaN/Inf from ODE-based models.
+        #
+        # NOTE: jnp.where(is_finite, predictions_raw, 0.0) below only sanitizes
+        # the primal log-density value, not its gradient. If a non-finite
+        # value here originates from a locally-singular op inside
+        # model_function (e.g. dividing by a relaxation time that hit its
+        # prior boundary), the local Jacobian at that internal node is itself
+        # NaN/Inf, and 0 * inf = NaN under IEEE754 survives lax.select's
+        # gradient rule — so NUTS can still receive a NaN gradient even though
+        # this factor's value is finite. Model authors are responsible for
+        # gradient-safe internals (guard hazards BEFORE the unsafe op, e.g.
+        # `safe_tau = jnp.where(tau > eps, tau, eps)`), unless the model opts
+        # into `_bayesian_nan_safe_grad_reeval` below.
         is_finite = jnp.isfinite(predictions_raw)
         not_finite = ~is_finite
         finite_penalty = jnp.where(is_finite, 0.0, -1e18).sum()
         numpyro.factor("finite_check", finite_penalty)
         numpyro.deterministic("num_nonfinite", not_finite.sum().astype(jnp.float64))
+        if _nan_safe_grad_reeval:
+            # Re-evaluate model_function with stop_gradient applied to the
+            # sampled params whenever any output was non-finite. stop_gradient's
+            # backward rule discards the incoming cotangent via a symbolic
+            # zero (not an arithmetic multiplication), so this severs the
+            # NaN/Inf gradient path instead of merely masking the primal
+            # value. This costs a second full model_function evaluation, so
+            # it only runs for models that explicitly opt in.
+            params_safe = jnp.where(
+                is_finite.all(), params_array, jax.lax.stop_gradient(params_array)
+            )
+            predictions_raw = model_self.model_function(
+                X, params_safe, test_mode, **protocol_kwargs
+            )
         predictions_raw = jnp.where(is_finite, predictions_raw, 0.0)
 
         # Normalize oscillation predictions: some models return (N,2) real
@@ -330,7 +426,7 @@ def build_numpyro_model(
                 predictions_raw = jnp.sqrt(
                     predictions_raw[:, 0] ** 2 + predictions_raw[:, 1] ** 2 + 1e-30
                 )
-                if y.ndim == 2 and y.shape[1] == 2:
+                if y is not None and y.ndim == 2 and y.shape[1] == 2:
                     y = jnp.sqrt(y[:, 0] ** 2 + y[:, 1] ** 2 + 1e-30)
 
         # Handle complex vs real predictions
@@ -338,7 +434,7 @@ def build_numpyro_model(
             pred_real = jnp.real(predictions_raw)
             pred_imag = jnp.imag(predictions_raw)
             n = scale_info["n_real"]
-            y_real_obs, y_imag_obs = y[:n], y[n:]
+            y_real_obs, y_imag_obs = (None, None) if y is None else (y[:n], y[n:])
 
             # Let prior_factory override noise priors if it provides them
             sigma_real_dist = None
@@ -348,10 +444,14 @@ def build_numpyro_model(
                 sigma_imag_dist = prior_factory("sigma_imag", 0.0, None)
 
             if sigma_real_dist is None:
-                sigma_real_scale = max(y_real_scale * 10.0, y_real_mean * 0.01, 1e-3)
+                # Scale noise prior to ~1x the data's peak-to-peak range,
+                # matching the real-data branch below (P0-3 fix): a 10x
+                # multiplier drowns the likelihood for small N, collapsing
+                # the posterior to the prior.
+                sigma_real_scale = max(y_real_scale * 1.0, y_real_mean * 0.01, 1e-3)
                 sigma_real_dist = dist.Exponential(rate=1.0 / sigma_real_scale)
             if sigma_imag_dist is None:
-                sigma_imag_scale = max(y_imag_scale * 10.0, y_imag_mean * 0.01, 1e-3)
+                sigma_imag_scale = max(y_imag_scale * 1.0, y_imag_mean * 0.01, 1e-3)
                 sigma_imag_dist = dist.Exponential(rate=1.0 / sigma_imag_scale)
 
             sigma_real = numpyro.sample("sigma_real", sigma_real_dist)

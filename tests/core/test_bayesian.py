@@ -480,26 +480,11 @@ def test_error_handling_invalid_bounds():
     """Test that invalid parameter bounds raise appropriate errors."""
     model = SimpleBayesianModel()
 
-    # Set invalid bounds (lower > upper)
-    model.parameters.get("a").bounds = (10.0, 1.0)  # Invalid
-
-    # Create synthetic data
-    X = np.linspace(0, 10, 30)
-    y = 2.0 * X + 3.0
-
-    model.X_data = X
-    model.y_data = y
-
-    # Should raise RuntimeError or ValueError for invalid bounds
+    # Setting invalid bounds (lower > upper) now raises immediately at
+    # assignment time (Parameter.bounds setter fail-closed fix), rather than
+    # silently accepting them and only failing later inside fit_bayesian().
     with pytest.raises((RuntimeError, ValueError)):
-        model.fit_bayesian(
-            X,
-            y,
-            test_mode="relaxation",
-            num_warmup=50,
-            num_samples=100,
-            num_chains=1,
-        )
+        model.parameters.get("a").bounds = (10.0, 1.0)  # Invalid
 
 
 def test_error_handling_mismatched_data_dimensions():
@@ -515,6 +500,31 @@ def test_error_handling_mismatched_data_dimensions():
 
     # Should raise RuntimeError or ValueError for mismatched dimensions
     with pytest.raises((RuntimeError, ValueError, AssertionError)):
+        model.fit_bayesian(
+            X,
+            y,
+            test_mode="relaxation",
+            num_warmup=50,
+            num_samples=100,
+            num_chains=1,
+        )
+
+
+def test_error_handling_broadcastable_but_wrong_y_shape():
+    """A (N, 1) y (e.g. from `df['col'].values.reshape(-1, 1)`) must raise,
+    not silently broadcast against the (N,)-shaped prediction inside
+    NumPyro's Normal likelihood (which would corrupt the log-likelihood
+    over N^2 mismatched pairs instead of erroring).
+    """
+    model = SimpleBayesianModel()
+
+    X = np.linspace(0, 10, 30)
+    y = np.linspace(0, 10, 30).reshape(-1, 1)  # same shape[0], wrong ndim
+
+    model.X_data = X
+    model.y_data = y
+
+    with pytest.raises(ValueError, match="1-dimensional"):
         model.fit_bayesian(
             X,
             y,

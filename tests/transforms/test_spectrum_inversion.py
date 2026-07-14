@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.transforms.spectrum_inversion import SpectrumInversion
+from rheojax.transforms.spectrum_inversion import SpectrumInversion, _build_kernel
 
 
 class TestSpectrumInversionTikhonov:
@@ -104,6 +104,46 @@ class TestSpectrumInversionTikhonov:
         peak_tau = tau[np.argmax(H)]
         assert 0.1 * tau_0 < peak_tau < 10.0 * tau_0
 
+    def test_d_ln_tau_boundary_weights_symmetric_and_exact(self):
+        """Quadrature weights must be symmetric at both ends and sum to the
+        true log(tau) range, not overshoot it by half a bin at tau_min.
+        """
+        tau = np.logspace(-3, 3, 10)
+        # exp(-t/tau) ~= 1 for all tau when t is tiny, so the first row of the
+        # relaxation kernel isolates the d_ln_tau weight vector directly.
+        t = np.array([1e-15])
+        A = _build_kernel(t, tau, "relaxation", 0.0)
+        d_ln_tau = A[0, :]
+
+        assert np.isclose(d_ln_tau[0], d_ln_tau[-1])
+        assert np.isclose(
+            np.sum(d_ln_tau), np.log(tau[-1] / tau[0]), rtol=1e-9
+        )
+
+    def test_nan_input_raises_validation_error(self):
+        """NaN in x must raise a clear validation error instead of silently
+        propagating into an all-NaN tau grid. Uses validate=False to bypass
+        RheoData's own upstream NaN check and exercise the transform's guard
+        directly (the guard must not rely solely on the caller pre-validating).
+        """
+        x = np.array([1.0, 2.0, np.nan, 3.0])
+        y = np.array([1.0, 2.0, 3.0, 4.0])
+        data = RheoData(x=x, y=y, validate=False)
+        transform = SpectrumInversion(method="tikhonov", n_tau=10)
+        with pytest.raises(ValueError, match="strictly positive"):
+            transform.transform(data)
+
+    def test_G_e_none_raises_not_implemented(self):
+        """G_e=None is documented as 'estimated from data' but no estimator
+        exists. It must raise a clear NotImplementedError instead of an
+        opaque TypeError from `y - None` inside _assemble_target.
+        """
+        omega, G_star, _ = self._make_single_mode_data()
+        data = RheoData(x=omega, y=G_star)
+        transform = SpectrumInversion(method="tikhonov", n_tau=50, G_e=None)
+        with pytest.raises(NotImplementedError, match="G_e"):
+            transform.transform(data)
+
 
 class TestSpectrumInversionMaxEnt:
     """Test maximum entropy spectrum inversion."""
@@ -124,6 +164,53 @@ class TestSpectrumInversionMaxEnt:
         H = np.asarray(result.y)
         assert np.all(H >= 0)
         assert np.max(H) > 0
+
+    def test_entropy_regularization_flattens_spectrum(self):
+        """Larger lambda must pull H(tau) toward the flat default model m,
+        proving the entropy term (S, m) actually enters the update rule
+        instead of being dead code behind plain chi-squared descent.
+        """
+        G_0 = 1000.0
+        tau_0 = 1.0
+        omega = np.logspace(-2, 2, 50)
+        wt2 = (omega * tau_0) ** 2
+        G_star = G_0 * wt2 / (1 + wt2) + 1j * G_0 * omega * tau_0 / (1 + wt2)
+        data = RheoData(x=omega, y=G_star)
+
+        weak = SpectrumInversion(method="max_entropy", n_tau=40, regularization=1e-8)
+        strong = SpectrumInversion(method="max_entropy", n_tau=40, regularization=1e6)
+
+        H_weak = np.asarray(weak.transform(data)[0].y)
+        H_strong = np.asarray(strong.transform(data)[0].y)
+
+        peakiness_weak = H_weak.max() / H_weak.mean()
+        peakiness_strong = H_strong.max() / H_strong.mean()
+
+        # Strong entropy weighting should be markedly flatter (closer to the
+        # uniform default model) than weak entropy weighting.
+        assert peakiness_strong < peakiness_weak
+
+    def test_auto_regularization_scales_with_data(self):
+        """Auto-selected lambda must reflect the data, not a hardcoded 1.0
+        constant that reports the same 'selection' regardless of scale.
+        """
+        tau_0 = 1.0
+        omega = np.logspace(-2, 2, 50)
+        wt2 = (omega * tau_0) ** 2
+
+        def fit(G_0):
+            G_star = G_0 * wt2 / (1 + wt2) + 1j * G_0 * omega * tau_0 / (1 + wt2)
+            data = RheoData(x=omega, y=G_star)
+            transform = SpectrumInversion(method="max_entropy", n_tau=40)
+            _, meta = transform.transform(data)
+            return meta["spectrum_result"].regularization_param
+
+        lam_small = fit(1.0)
+        lam_large = fit(1.0e6)
+
+        assert lam_small != 1.0
+        assert lam_large != 1.0
+        assert lam_small != lam_large
 
     def test_invalid_method(self):
         """Unknown method should raise ValueError."""

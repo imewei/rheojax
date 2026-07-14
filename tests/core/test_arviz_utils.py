@@ -174,6 +174,19 @@ def test_arviz_figure_uses_arviz_1_plot_collection_viz() -> None:
     assert arviz_utils.arviz_figure(plot_collection) is figure
 
 
+def test_import_arviz_missing_required_attr_raises_import_error(monkeypatch) -> None:
+    stub_arviz = SimpleNamespace(__version__="1.2.0")
+    monkeypatch.setitem(__import__("sys").modules, "arviz", stub_arviz)
+
+    with pytest.raises(ImportError) as excinfo:
+        arviz_utils.import_arviz(required=("plot_pair",))
+
+    message = str(excinfo.value)
+    assert "plot_pair" in message
+    assert "arviz[plots]" not in message
+    assert "arviz[matplotlib]" in message
+
+
 def test_arviz_figure_rejects_unknown_result_instead_of_guessing() -> None:
     active_figure = plt.figure()
 

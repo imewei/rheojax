@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from rheojax.core.data import RheoData
-from rheojax.io.readers._utils import normalize_temperature
+from rheojax.io.readers._utils import check_tensile_guard, normalize_temperature
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -732,15 +732,28 @@ def segment_to_rheodata(
     metadata["y_column"] = segment.y_column
     metadata["is_complex"] = segment.is_complex
 
+    # Guard: TRIOS metadata headers ("Geometry name"/"Geometry type") are
+    # extracted by the format-specific parsers but the generic column-name
+    # patterns in TRIOS_COLUMN_MAPPINGS can't see them, so a tensile/bending/
+    # compression DMA run would otherwise pass through undetected. Reuse the
+    # same guard the generic csv_reader.py/excel_reader.py path applies.
+    geometry_text = " ".join(
+        str(metadata[key]) for key in ("geometry", "geometry_type") if metadata.get(key)
+    )
+    if geometry_text:
+        check_tensile_guard([geometry_text], source="TRIOS geometry metadata")
+
     # Normalize temperature metadata to Kelvin (preserve original as temperature_celsius)
     if "temperature" in metadata:
         raw_temp = metadata["temperature"]
         # May be a string like "25.0 °C", "25.0", or already a float in K
         if isinstance(raw_temp, str):
-            # Try to extract numeric value and unit
-            temp_match = re.match(r"^\s*(-?\d+\.?\d*)\s*(°C|°F|C|F|K)?\s*$", raw_temp)
+            # Try to extract numeric value and unit. Accept both '.' and ','
+            # as the decimal separator -- EU-locale TRIOS exports (see
+            # TRIOSFile.decimal_separator) write e.g. "25,0 °C".
+            temp_match = re.match(r"^\s*(-?\d+[.,]?\d*)\s*(°C|°F|C|F|K)?\s*$", raw_temp)
             if temp_match:
-                numeric_val = float(temp_match.group(1))
+                numeric_val = float(temp_match.group(1).replace(",", "."))
                 unit_str = (temp_match.group(2) or "C").strip()
                 try:
                     converted = normalize_temperature(numeric_val, unit_str)

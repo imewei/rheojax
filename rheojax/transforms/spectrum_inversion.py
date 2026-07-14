@@ -56,7 +56,9 @@ class SpectrumInversion(BaseTransform):
         regularization: Manual regularization parameter λ. If None,
             automatically selected via L-curve (Tikhonov) or GCV.
         source: Data type: ``"oscillation"`` or ``"relaxation"``.
-        G_e: Equilibrium modulus (default: 0). If None, estimated from data.
+        G_e: Equilibrium modulus (default: 0.0). Automatic estimation from
+            data is not implemented; passing ``None`` raises
+            ``NotImplementedError`` rather than silently guessing a value.
     """
 
     def __init__(
@@ -66,7 +68,7 @@ class SpectrumInversion(BaseTransform):
         tau_range: tuple[float, float] | None = None,
         regularization: float | None = None,
         source: str = "oscillation",
-        G_e: float = 0.0,
+        G_e: float | None = 0.0,
     ):
         super().__init__()
         self.method = method
@@ -89,6 +91,18 @@ class SpectrumInversion(BaseTransform):
         x = np.asarray(data.x)
         y = np.asarray(data.y)
 
+        # G_e=None is not implemented (no data-driven estimator exists yet).
+        # Fail loudly here rather than letting `y - None` raise an opaque
+        # TypeError deep inside _assemble_target.
+        if self.G_e is None:
+            raise NotImplementedError(
+                "SpectrumInversion: automatic estimation of G_e from data is "
+                "not implemented. Pass an explicit float via G_e (default "
+                "0.0 for a purely viscous/viscoelastic liquid, or the "
+                "measured equilibrium/plateau modulus for a crosslinked "
+                "network)."
+            )
+
         # Validate n_tau — must be >=2 so that d_ln_tau has at least one element
         if self.n_tau < 2:
             raise ValueError(
@@ -96,11 +110,13 @@ class SpectrumInversion(BaseTransform):
                 "The kernel matrix requires at least 2 τ points to compute d(ln τ) bin widths."
             )
 
-        # Validate inputs — x must be strictly positive for log-space operations
-        if np.any(x <= 0):
+        # Validate inputs — x must be strictly positive for log-space operations.
+        # `~(x > 0)` (rather than `x <= 0`) also catches NaN, since NaN comparisons
+        # are always False and would otherwise silently pass the `x <= 0` check.
+        if np.any(~(x > 0)):
             raise ValueError(
-                f"SpectrumInversion: x (frequency/time) must be strictly positive; "
-                f"got min(x) = {np.min(x):.4g}"
+                f"SpectrumInversion: x (frequency/time) must be strictly positive "
+                f"and finite; got min(x) = {np.min(x):.4g}"
             )
 
         # Build τ grid
@@ -166,8 +182,15 @@ def _build_kernel(
         A: Kernel matrix with shape ``(M, n_tau)`` where M = N for relaxation
            and M = 2N for oscillation (stacked G'/G'' rows).
     """
-    d_ln_tau = np.diff(np.log(tau))
-    d_ln_tau = np.append(d_ln_tau, d_ln_tau[-1] / 2.0)  # half-width boundary bin
+    # Centered trapezoidal quadrature weights in log(tau): each interior point
+    # gets the half-width to both neighbors, and both boundary points (not just
+    # the last) get a half-width bin so the total weight equals the true
+    # log(tau_max/tau_min) range.
+    log_tau = np.log(tau)
+    d_ln_tau = np.empty_like(log_tau)
+    d_ln_tau[0] = (log_tau[1] - log_tau[0]) / 2.0
+    d_ln_tau[-1] = (log_tau[-1] - log_tau[-2]) / 2.0
+    d_ln_tau[1:-1] = (log_tau[2:] - log_tau[:-2]) / 2.0
 
     if source == "oscillation":
         omega = x
@@ -355,6 +378,7 @@ def _max_entropy_inversion(
     b = _assemble_target(y, source, G_e)
 
     n_tau = len(tau)
+    n_data = len(b)
 
     # Default model: uniform spectrum
     m = np.ones(n_tau) * np.mean(np.abs(b)) / n_tau
@@ -362,8 +386,17 @@ def _max_entropy_inversion(
 
     H = m.copy()
 
-    if lam is None:
-        lam = 1.0  # Initial guess, refined during iteration
+    auto_lam = lam is None
+    if auto_lam:
+        # Scale the initial entropy weight to the data. At H = m the entropy
+        # gradient is the constant vector -1, so matching its magnitude to the
+        # typical chi-squared gradient there makes the entropy term a genuine,
+        # data-scaled competitor to the data-fidelity term (unlike a hardcoded
+        # constant, which under- or over-regularizes depending on how large
+        # G*/G(t) happens to be).
+        grad_chi2_at_m = 2.0 * A.T @ (A @ m - b)
+        lam = max(float(np.mean(np.abs(grad_chi2_at_m))), 1e-30)
+        lam_lo, lam_hi = lam * 1e-3, lam * 1e3
 
     max_iter = 200
     tol = 1e-6
@@ -373,13 +406,31 @@ def _max_entropy_inversion(
         residual = A @ H - b
         grad_chi2 = 2.0 * A.T @ residual
 
-        # Multiplicative update (entropy gradient implicit in exponential form)
-        H_new = H * np.exp(-lam * grad_chi2 / (1.0 + lam * np.abs(grad_chi2)))
+        # Entropy gradient: S = -Σ H_i ln(H_i/m_i)  =>  ∂S/∂H_i = -(ln(H_i/m_i) + 1)
+        grad_entropy = -(np.log(H / m) + 1.0)
+
+        # Minimize F = χ² - λ·S (Lagrangian form of "maximize entropy subject to
+        # data fidelity"): grad_F = grad_chi2 - λ·grad_entropy. This is what makes
+        # `m`/entropy actually enter the update rule instead of being dead weight.
+        grad_total = grad_chi2 - lam * grad_entropy
+
+        # Multiplicative update, damped to a bounded step regardless of gradient scale.
+        H_new = H * np.exp(-grad_total / (1.0 + np.abs(grad_total)))
         H_new = np.maximum(H_new, 1e-30)
 
         # Convergence check
         rel_change = np.linalg.norm(H_new - H) / (np.linalg.norm(H) + 1e-30)
         H = H_new
+
+        if auto_lam:
+            # Nudge lambda toward the classic MaxEnt target chi2 ~= n_data
+            # (degrees of freedom): increase the entropy weight while
+            # overfitting (chi2 < n_data), relax it while underfitting
+            # (chi2 > n_data). Small step + clamp keep this a gentle
+            # refinement rather than a divergent feedback loop.
+            chi2 = float(np.sum((A @ H - b) ** 2))
+            lam = lam * (n_data / max(chi2, 1e-30)) ** 0.02
+            lam = float(np.clip(lam, lam_lo, lam_hi))
 
         if rel_change < tol:
             logger.debug(

@@ -343,7 +343,7 @@ class TestMetadataExtraction:
         data = load_anton_paar(filepath)
 
         assert "temperature" in data.metadata
-        assert "25.0" in data.metadata["temperature"]
+        assert data.metadata["temperature"] == pytest.approx(298.15)
 
     def test_normal_force_preserved(self, tmp_path):
         """T049: Test normal force column preserved in metadata."""
@@ -700,6 +700,26 @@ Interval data:\tTime\tShear Stress\tShear Strain
         assert np.isclose(data.x[0], 0.1, rtol=1e-2)
         assert np.isclose(data.x[2], 1.0, rtol=1e-2)
         assert np.isclose(data.x[4], 5.0, rtol=1e-2)
+
+    def test_comma_decimal_inline_temperature(self, tmp_path):
+        """A combined value+unit temperature header using a comma decimal
+        separator (e.g. "25,7 °C") must not lose its fractional part."""
+        content = """Project:\tEuropean Temp Test
+Temperature:\t25,7 °C
+Interval and data points:\t1\t3
+Interval data:\tTime\tShear Stress\tShear Strain
+\t[s]\t[Pa]\t[%]
+0.1\t100.5\t0.05
+0.5\t100.8\t0.25
+1.0\t101.2\t0.50
+"""
+        filepath = tmp_path / "comma_temp.csv"
+        filepath.write_text(content)
+
+        data = load_anton_paar(filepath)
+
+        assert "temperature" in data.metadata
+        assert data.metadata["temperature"] == pytest.approx(298.85)
 
     def test_european_relaxation_data(self, tmp_path):
         """Test parsing relaxation data with European comma decimal format."""

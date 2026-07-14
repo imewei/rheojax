@@ -54,6 +54,7 @@ from rheojax.io.readers.trios.common import (
     select_xy_columns,
     split_by_step,
 )
+from rheojax.io.readers.trios.csv import _default_y_units
 
 logger = get_logger(__name__)
 
@@ -580,6 +581,10 @@ def parse_trios_excel(
             # Parse sheets
             tables: list[TRIOSTable] = []
             global_metadata: dict[str, Any] = {}
+            # Full metadata for every sheet, keyed by table_index, so each
+            # RheoData segment can be given its own sheet's values (e.g.
+            # temperature) instead of silently inheriting sheet 0's.
+            per_sheet_metadata: dict[int, dict[str, Any]] = {}
 
             for idx, sheet_idx in enumerate(sheets_to_parse):
                 sheet_name_str = sheet_names[sheet_idx]
@@ -617,12 +622,14 @@ def parse_trios_excel(
                     columns=len(table.df.columns),
                 )
 
-                # Merge metadata (first sheet metadata is primary)
+                # Merge metadata (first sheet metadata is primary, used for
+                # top-level/shared fields); each sheet's own metadata is also
+                # preserved so load_trios_excel can apply it per-table.
+                per_sheet_metadata[idx] = sheet_metadata
                 if idx == 0:
-                    global_metadata = sheet_metadata
-                else:
-                    # Store per-sheet metadata
-                    global_metadata[f"sheet_{sheet_idx}_metadata"] = sheet_metadata
+                    # Copy (not alias) so later attaching per_sheet_metadata
+                    # to global_metadata doesn't create a circular reference.
+                    global_metadata = dict(sheet_metadata)
         finally:
             if wb is not None:
                 if suffix == ".xlsx":
@@ -636,6 +643,8 @@ def parse_trios_excel(
 
         io_ctx["sheets_parsed"] = len(tables)
         io_ctx["total_rows"] = sum(len(t.df) for t in tables)
+
+    global_metadata["_per_sheet_metadata"] = per_sheet_metadata
 
     return TRIOSFile(
         filepath=str(filepath),
@@ -717,10 +726,21 @@ def load_trios_excel(
     # Convert tables to RheoData
     rheo_data_list: list[RheoData] = []
 
+    per_sheet_metadata = trios_file.metadata.get("_per_sheet_metadata", {})
+
     for table in trios_file.tables:
         df = table.df
         units = table.units
         sheet_name_str = table.sheet_name
+
+        # Base metadata is per-table (falls back to the shared/global
+        # metadata for keys the sheet itself didn't define) so multi-sheet
+        # loads don't leak sheet 0's temperature/sample_name/etc. into every
+        # other sheet's RheoData.
+        table_metadata = {
+            k: v for k, v in trios_file.metadata.items() if k != "_per_sheet_metadata"
+        }
+        table_metadata.update(per_sheet_metadata.get(table.table_index, {}))
 
         # Detect or use provided test mode.
         # IO-FIX-002: explicit None check avoids or-sentinel swallowing
@@ -764,7 +784,7 @@ def load_trios_excel(
 
             # Get units
             x_units = units.get(x_col, "")
-            y_units = units.get(y_col, "Pa")
+            y_units = units.get(y_col, _default_y_units(detected_mode))
 
             # Handle complex modulus case
             if y2_col is not None:
@@ -833,7 +853,7 @@ def load_trios_excel(
                     x_units = "s"
 
             # Build metadata
-            seg_metadata = trios_file.metadata.copy()
+            seg_metadata = table_metadata.copy()
             seg_metadata["test_mode"] = detected_mode
             seg_metadata["source_format"] = "excel"
             seg_metadata["sheet_name"] = sheet_name_str

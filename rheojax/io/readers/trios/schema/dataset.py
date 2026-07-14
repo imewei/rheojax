@@ -93,18 +93,40 @@ class TRIOSDataSet:
         df = pd.DataFrame(self.values, columns=column_names)
         logger.debug("DataFrame created", shape=df.shape, columns=list(df.columns))
 
-        # Convert numeric columns
+        # Convert numeric columns via per-column majority vote instead of a
+        # single blanket errors="coerce"/"raise":
+        # - A column that is genuinely non-numeric (e.g. a TRIOS "Point
+        #   type"/status flag column, every value fails) is left untouched
+        #   rather than silently replaced with all-NaN.
+        # - A column that is mostly numeric with a few bad cells (e.g. a
+        #   stray "n.a." placeholder) is still coerced to numeric -- so it
+        #   stays usable downstream instead of becoming an all-or-nothing
+        #   hard failure -- but an explicit warning names how many values
+        #   were dropped, so the loss is never silent.
         converted_columns = []
         for col in df.columns:
-            try:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-                converted_columns.append(col)
-            except (ValueError, TypeError) as e:
+            original = df[col]
+            non_null = original.notna()
+            n_non_null = int(non_null.sum())
+            if n_non_null == 0:
+                continue
+            coerced = pd.to_numeric(original, errors="coerce")
+            n_failed = int((coerced.isna() & non_null).sum())
+            if n_failed == n_non_null:
                 logger.debug(
-                    "Column could not be converted to numeric",
+                    "Column is entirely non-numeric, preserving original values",
                     column=col,
-                    error=str(e),
                 )
+                continue
+            if n_failed > 0:
+                logger.warning(
+                    "Column has some non-numeric values; coercing those to NaN",
+                    column=col,
+                    n_failed=n_failed,
+                    n_total=n_non_null,
+                )
+            df[col] = coerced
+            converted_columns.append(col)
 
         logger.debug(
             "DataFrame conversion completed",

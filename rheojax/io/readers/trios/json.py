@@ -23,6 +23,7 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
+from rheojax.io._exceptions import RheoJaxValidationWarning
 from rheojax.io.readers.trios.common import (
     DataSegment,
     construct_complex_modulus,
@@ -40,6 +41,18 @@ logger = get_logger(__name__)
 
 # Path to bundled schema
 SCHEMA_PATH = Path(__file__).parent / "schema" / "TRIOSJSONExportSchema.json"
+
+
+def _default_y_units(test_mode: str) -> str:
+    """Get default y-axis units for a test mode (used when a column's unit
+    field is missing/empty in the source JSON). Mirrors csv.py's
+    _default_y_units so CSV and JSON readers agree on non-SI-labeled defaults.
+    """
+    if test_mode == "creep":
+        return "1/Pa"
+    elif test_mode == "rotation":
+        return "Pa*s"
+    return "Pa"
 
 
 def _load_schema() -> dict[str, Any] | None:
@@ -276,6 +289,10 @@ def load_trios_json(
     )
 
     rheo_data_list: list[RheoData] = []
+    # Track segments to detect dangerous partial data loss (most segments
+    # dropped after NaN filtering while a few survive), mirroring csv.py.
+    total_segments = 0
+    skipped_segments = 0
 
     for res_idx in result_indices:
         result = experiment.results[res_idx]
@@ -312,6 +329,7 @@ def load_trios_json(
         )
 
         for seg_idx, seg_df in enumerate(segments):
+            total_segments += 1
             # Select x/y columns
             x_col, y_col, y2_col = select_xy_columns(seg_df, detected_mode)
 
@@ -350,7 +368,7 @@ def load_trios_json(
 
             # Get units
             x_units = units.get(x_col, "")
-            y_units = units.get(y_col, "Pa")
+            y_units = units.get(y_col, _default_y_units(detected_mode))
 
             # Handle complex modulus case
             if y2_col is not None:
@@ -410,10 +428,17 @@ def load_trios_json(
             y_data = y_data[valid_mask]
 
             if len(x_data) == 0:
+                skipped_segments += 1
                 logger.warning(
                     "Segment has 0 valid data points after non-finite filtering; skipping",
                     segment_index=seg_idx,
                     result_index=res_idx,
+                )
+                warnings.warn(
+                    f"Segment {seg_idx} (result {res_idx}) has no valid data after "
+                    "NaN filtering and was skipped.",
+                    RheoJaxValidationWarning,
+                    stacklevel=2,
                 )
                 continue
 
@@ -465,6 +490,23 @@ def load_trios_json(
                 test_mode=detected_mode,
                 is_complex=is_complex,
             )
+
+    # Catch dangerous partial data loss: if more than half of the parsed
+    # segments were dropped during NaN filtering (but some survived), the
+    # caller is silently getting an incomplete dataset — fail loudly.
+    # All-valid (skipped == 0) and all-skipped (handled below) are preserved.
+    if rheo_data_list and skipped_segments > total_segments * 0.5:
+        logger.error(
+            "Excessive segment loss during NaN filtering",
+            filepath=str(filepath),
+            skipped_segments=skipped_segments,
+            total_segments=total_segments,
+        )
+        raise ValueError(
+            f"{skipped_segments} of {total_segments} segments were dropped as "
+            f"empty after NaN filtering from {filepath}; refusing to return a "
+            f"partially loaded dataset."
+        )
 
     if not rheo_data_list:
         logger.error("No valid data segments parsed", filepath=str(filepath))

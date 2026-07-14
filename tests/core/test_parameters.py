@@ -117,6 +117,86 @@ class TestParameterConstraints:
         assert param.validate(11.0) == False  # Out of bounds
         assert param.validate(5.5) == False  # Not integer
 
+    @pytest.mark.smoke
+    def test_bounds_setter_none_to_tuple_creates_constraint(self):
+        """bounds setter must insert a bounds constraint when none exists yet.
+
+        Regression test: a Parameter created with bounds=None has no bounds
+        constraint. Assigning `.bounds =` afterward must create one so that
+        `.validate()` actually enforces the newly-set range (previously it
+        silently accepted any value because the constraint list stayed empty).
+        """
+        param = Parameter("x", value=5.0)
+        assert param.constraints == []
+
+        param.bounds = (0.0, 10.0)
+
+        assert any(c.type == "bounds" for c in param.constraints)
+        assert param.validate(50.0) is False
+        assert param.validate(5.0) is True
+
+    @pytest.mark.smoke
+    def test_bounds_setter_does_not_duplicate_constraint(self):
+        """Repeated `.bounds =` assignment must sync, not append, constraints."""
+        param = Parameter("x", value=5.0, bounds=(0.0, 10.0))
+        assert sum(1 for c in param.constraints if c.type == "bounds") == 1
+
+        param.bounds = (0.0, 20.0)
+
+        assert sum(1 for c in param.constraints if c.type == "bounds") == 1
+        assert param.validate(15.0) is True
+
+    @pytest.mark.smoke
+    def test_bounds_setter_clamps_out_of_range_value(self):
+        """Narrowing bounds past the current value must clamp it, with a warning,
+        instead of leaving `.value` silently outside the new `.bounds`.
+        """
+        param = Parameter("x", value=5.0, bounds=(0.0, 10.0))
+
+        with pytest.warns(RuntimeWarning):
+            param.bounds = (6.0, 20.0)
+
+        assert param.value == 6.0
+        assert param.bounds == (6.0, 20.0)
+        assert param.was_clamped is True
+
+    @pytest.mark.smoke
+    def test_bounds_setter_rejects_inverted_bounds(self):
+        """The bounds setter must reject lower > upper, matching the
+        validation already performed at construction time (_initialize)
+        and by ParameterSet.set_bounds(). Without this check, a direct
+        `.bounds =` assignment can install unsatisfiable bounds that make
+        every subsequent value rejected with an opaque error.
+        """
+        param = Parameter("x", value=5.0, bounds=(0.0, 10.0))
+
+        with pytest.raises(ValueError, match="Invalid bounds"):
+            param.bounds = (10.0, 0.0)
+
+        # Original bounds must be left untouched after the rejected assignment.
+        assert param.bounds == (0.0, 10.0)
+
+    @pytest.mark.smoke
+    def test_custom_constraint_to_dict_raises(self):
+        """Serializing a 'custom' constraint must fail loudly, not silently
+        drop the validator callable (which cannot round-trip through JSON/HDF5).
+        """
+        constraint = ParameterConstraint(
+            type="custom", validator=lambda value: value % 2 == 0
+        )
+        with pytest.raises(ValueError):
+            constraint.to_dict()
+
+    @pytest.mark.smoke
+    def test_custom_constraint_without_validator_fails_closed(self):
+        """A 'custom' constraint with no validator (e.g. a hand-built dict that
+        bypassed to_dict()'s guard) must raise on validate(), not silently
+        return True for every value.
+        """
+        constraint = ParameterConstraint(type="custom", validator=None)
+        with pytest.raises(ValueError):
+            constraint.validate(4.0)
+
 
 class TestSharedParameters:
     """Test shared parameter management across models."""
@@ -191,6 +271,33 @@ class TestSharedParameters:
         # Invalid update should raise
         with pytest.raises(ValueError, match="violates constraints"):
             shared.set_value("ratio", 1.5)
+
+    def test_shared_parameter_relative_constraint_enforced(self):
+        """SharedParameterSet.set_value must build a validation context so
+        'relative' constraints between shared parameters are actually
+        enforced, instead of silently no-op'ing (ParameterConstraint.validate
+        only evaluates the 'relative' branch when a context dict is passed).
+        """
+        shared = SharedParameterSet()
+        shared.add_shared("param_a", value=5.0)
+        shared.add_shared(
+            "param_b",
+            value=10.0,
+            constraints=[
+                ParameterConstraint(
+                    type="relative", relation="less_than", other_param="param_a"
+                )
+            ],
+        )
+
+        # Valid: 8.0 < param_a (5.0)? No -- pick values that satisfy first.
+        shared.set_value("param_a", 20.0)
+        shared.set_value("param_b", 8.0)
+        assert shared.get_value("param_b") == 8.0
+
+        # Invalid update should raise: param_b must stay less_than param_a.
+        with pytest.raises(ValueError, match="violates constraints"):
+            shared.set_value("param_b", 100.0)
 
     def test_shared_parameter_groups(self):
         """Test grouping related shared parameters."""
@@ -481,6 +588,38 @@ class TestParameterSensitivity:
         # Check condition number (high = poor identifiability)
         condition_number = np.linalg.cond(fim)
         assert condition_number > 100  # Indicates poor identifiability
+
+
+class TestParameterSetItem:
+    """Test ParameterSet.__setitem__ Parameter-replacement identity guard."""
+
+    @pytest.mark.smoke
+    def test_setitem_rejects_name_mismatch(self):
+        """Replacing a stored Parameter via subscript assignment must reject
+        a Parameter whose .name differs from the assignment key. Otherwise
+        the ParameterSet key and Parameter.name silently diverge, which is
+        masked (rather than fixed) by from_dict() forcibly overwriting the
+        name on every serialization round-trip.
+        """
+        params = ParameterSet()
+        params.add("alpha", value=0.5, bounds=(0, 1))
+
+        with pytest.raises(ValueError, match="does not match"):
+            params["alpha"] = Parameter("beta", value=0.8, bounds=(0, 1))
+
+        # Original parameter must be untouched after the rejected assignment.
+        assert params["alpha"].name == "alpha"
+        assert params["alpha"].value == 0.5
+
+    @pytest.mark.smoke
+    def test_setitem_accepts_matching_name(self):
+        """Sanity check: replacement with a matching name still works."""
+        params = ParameterSet()
+        params.add("alpha", value=0.5, bounds=(0, 1))
+
+        params["alpha"] = Parameter("alpha", value=0.8, bounds=(0, 1))
+
+        assert params["alpha"].value == 0.8
 
 
 class TestParameterSetUnpack:

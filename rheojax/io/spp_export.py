@@ -65,8 +65,17 @@ def _extract_spp_arrays(
     dict[str, np.ndarray]
         Mapping of canonical key names to 1-D NumPy arrays, all of length
         ``n_points``. Missing keys are filled with zeros (or derived values
-        where applicable).
+        where applicable) and a warning is logged for every fabricated
+        value so callers can tell "computed as zero" from "never computed".
     """
+    # SPPDecomposer.get_results() (the real production caller, reached via
+    # the `rheojax spp analyze --export-matlab` CLI flag) nests the core SPP
+    # arrays under a 'core' sub-dict instead of at the top level. Merge them
+    # in so every consumer of this helper still finds them.
+    core = spp_results.get("core")
+    if isinstance(core, dict):
+        spp_results = {**core, **spp_results}
+
     if n_points is None:
         for key in ("Gp_t", "Gpp_t", "time_new", "strain_recon"):
             if key in spp_results:
@@ -81,10 +90,50 @@ def _extract_spp_arrays(
             )
 
     def _get(key: str, default_val: float = 0.0) -> np.ndarray:
+        if key not in spp_results:
+            logger.warning(
+                "SPP results missing key; filling with fabricated default "
+                "(not computed) for export",
+                key=key,
+                default_val=default_val,
+                n_points=n_points,
+            )
         return np.asarray(spp_results.get(key, np.full(n_points, default_val)))
 
     Gp_t = _get("Gp_t")
     Gpp_t = _get("Gpp_t")
+
+    if "G_star_t" in spp_results:
+        G_star_t = np.asarray(spp_results["G_star_t"])
+    else:
+        logger.warning(
+            "SPP results missing key 'G_star_t'; deriving from Gp_t/Gpp_t for export"
+        )
+        G_star_t = np.sqrt(Gp_t**2 + Gpp_t**2)
+
+    if "tan_delta_t" in spp_results:
+        tan_delta_t = np.asarray(spp_results["tan_delta_t"])
+    else:
+        logger.warning(
+            "SPP results missing key 'tan_delta_t'; deriving from Gp_t/Gpp_t "
+            "for export (matches rheojax.utils.spp_kernels canonical formula)"
+        )
+        # Matches the canonical formula in rheojax.utils.spp_kernels (e.g.
+        # lines ~794, ~1731): sign(Gp_t) correction is required so the fallback
+        # doesn't silently flip sign during SPP yielding transitions where
+        # Gp_t goes negative.
+        tan_delta_t = Gpp_t / np.maximum(np.abs(Gp_t), 1e-12) * np.sign(Gp_t)
+
+    if "delta_t" in spp_results:
+        delta_t = np.asarray(spp_results["delta_t"])
+    else:
+        logger.warning(
+            "SPP results missing key 'delta_t'; deriving via "
+            "arctan2(Gpp_t, Gp_t) for export"
+        )
+        # arctan2 (not arctan(tan_delta_t)) is required to resolve all four
+        # quadrants correctly, matching rheojax.utils.spp_kernels.
+        delta_t = np.arctan2(Gpp_t, Gp_t)
 
     return {
         "time": _get("time_new"),
@@ -93,22 +142,9 @@ def _extract_spp_arrays(
         "stress": _get("stress_recon"),
         "Gp_t": Gp_t,
         "Gpp_t": Gpp_t,
-        "G_star_t": np.asarray(
-            spp_results.get("G_star_t", np.sqrt(Gp_t**2 + Gpp_t**2))
-        ),
-        "tan_delta_t": np.asarray(
-            spp_results.get("tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12))
-        ),
-        "delta_t": np.asarray(
-            spp_results.get(
-                "delta_t",
-                np.arctan(
-                    spp_results.get(
-                        "tan_delta_t", Gpp_t / np.maximum(np.abs(Gp_t), 1e-12)
-                    )
-                ),
-            )
-        ),
+        "G_star_t": G_star_t,
+        "tan_delta_t": tan_delta_t,
+        "delta_t": delta_t,
         "disp_stress": _get("disp_stress"),
         "eq_strain_est": _get("eq_strain_est"),
         "Gp_t_dot": _get("Gp_t_dot"),
@@ -347,7 +383,7 @@ def _write_spp_main_txt(
                 "tan(delta_t)",
                 "delta_t",
                 "displacement stress",
-                "est. elastic stress",
+                "est. equilibrium strain",
                 "dG'_{t}/dt",
                 'dG"_{t}/dt',
                 "Speed",
@@ -364,7 +400,7 @@ def _write_spp_main_txt(
                 "[]",
                 "[rad]",
                 "[Pa]",
-                "[Pa]",
+                "[-]",
                 "[Pa/s]",
                 "[Pa/s]",
                 "[Pa/s]",
@@ -867,7 +903,7 @@ def to_matlab_dict(
                 "tan(delta_t)",
                 "delta_t",
                 "displacement stress",
-                "est. elastic stress",
+                "est. equilibrium strain",
                 "dG'_{t}/dt",
                 'dG"_{t}/dt',
                 "Speed",
@@ -884,7 +920,7 @@ def to_matlab_dict(
                 "[]",
                 "[rad]",
                 "[Pa]",
-                "[Pa]",
+                "[-]",
                 "[Pa/s]",
                 "[Pa/s]",
                 "[Pa/s]",
@@ -943,17 +979,7 @@ def to_matlab_dict(
                     "Binormal(y)",
                     "Binormal(z)",
                 ],
-                [
-                    "[-]",
-                    "[1/s]",
-                    "[Pa]",
-                    "[-]",
-                    "[1/s]",
-                    "[Pa]",
-                    "[-]",
-                    "[1/s]",
-                    "[Pa]",
-                ],
+                ["[-]"] * 9,  # T/N/B are dimensionless unit vectors
             ],
             dtype=object,
         )

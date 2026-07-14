@@ -371,3 +371,19 @@ class TestPrecompile:
         assert model.fitted_ is False
         model.precompile()
         assert model.fitted_ is False
+
+    @pytest.mark.smoke
+    def test_precompile_preserves_nlsq_result(self):
+        """precompile() must not clobber a real fit's stored NLSQ result."""
+        model = Maxwell()
+        t = np.logspace(-2, 2, 20)
+        G = 1000.0 * np.exp(-t / 1.0)
+        model.fit(t, G, test_mode="relaxation")
+        original_result = model.get_nlsq_result()
+        assert original_result is not None
+
+        model.precompile(test_mode="relaxation")
+
+        # The throwaway max_iter=1 precompile fit must not overwrite the
+        # real optimization result.
+        assert model.get_nlsq_result() is original_result
