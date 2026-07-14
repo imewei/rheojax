@@ -110,6 +110,24 @@ def test_import_completed_maps_rotation_test_mode_to_flow_curve_protocol(
     assert ref.protocol_type == "flow_curve"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("flow", "flow_curve"),  # legacy alias, not a TestModeEnum member
+        ("rotation", "flow_curve"),  # TestModeEnum.to_protocol() delegation
+        ("flow_curve", "flow_curve"),  # already canonical -- identity
+        ("startup", "startup"),  # other protocols pass through unchanged
+        ("unknown", "unknown"),  # to_protocol() returns None -- keep as-is
+        ("not_a_real_mode", "not_a_real_mode"),  # invalid enum value -- keep as-is
+    ],
+)
+def test_normalize_import_test_mode(raw, expected):
+    # Unit-level coverage for the alias-dict vs TestModeEnum.to_protocol()
+    # branches in WorkspaceWindow._normalize_import_test_mode, independent
+    # of the full import pipeline exercised by the tests above.
+    assert WorkspaceWindow._normalize_import_test_mode(raw) == expected
+
+
 def test_import_failed_shows_message_box(qtbot, monkeypatch):
     messages = []
     monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))
