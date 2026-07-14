@@ -4,12 +4,14 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 if str(EXAMPLES_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLES_DIR))
 
 
+@pytest.mark.slow
 def test_hvm_demo_fits_overlap_generated_rheology_data():
     from utils.hvm_demo_fit import run_hvm_demo_fits
 

@@ -350,6 +350,7 @@ def ansys_fractional_relaxation_data():
 class TestFractionalZenerANSYS:
     """Validate fractional models against ANSYS UD material reference."""
 
+    @pytest.mark.slow
     def test_fractional_zener_ansys_fit(self, ansys_fractional_relaxation_data):
         """Test FZSS fits ANSYS fractional relaxation data."""
         model = FractionalZenerSolidSolid()
@@ -464,15 +465,55 @@ class TestPronySeries:
 # =============================================================================
 
 
+@pytest.fixture
+def ansys_maxwell_pure_relaxation_data():
+    """Pure single-Maxwell-element relaxation data (no equilibrium baseline).
+
+    ``ansys_maxwell_relaxation_data`` adds a ``G_infinity`` baseline term
+    that a bare ``Maxwell()`` (spring + dashpot in series, no parallel
+    spring) structurally cannot represent — fitting it to that fixture
+    always yields biased G0/eta estimates. This fixture is for tests that
+    check exact parameter recovery against a model that fully relaxes to
+    zero, matching what a single Maxwell element actually is.
+    """
+    time = np.logspace(-2, 2, 30)
+
+    G_0 = 1e5  # Pa
+    tau_0 = 1.0  # seconds
+
+    G_t = G_0 * np.exp(-time / tau_0)
+
+    metadata = {
+        "ansys_reference": True,
+        "reference_element": "MELAS",
+        "G_0": G_0,
+        "tau_0": tau_0,
+    }
+
+    return RheoData(
+        x=time,
+        y=G_t,
+        x_units="s",
+        y_units="Pa",
+        domain="time",
+        metadata=metadata,
+        initial_test_mode="relaxation",
+    )
+
+
 @pytest.mark.validation
 class TestParameterEstimation:
     """Test parameter estimation accuracy vs ANSYS references."""
 
-    def test_maxwell_parameter_recovery(self, ansys_maxwell_relaxation_data):
+    def test_maxwell_parameter_recovery(self, ansys_maxwell_pure_relaxation_data):
         """Test Maxwell parameter estimation matches ANSYS values.
 
         ANSYS provided: G_0, tau_0
         RheoJAX estimates: G0, eta = G0 * tau
+
+        Uses the pure (no G_infinity baseline) fixture: a bare Maxwell
+        element fully relaxes to zero, so only data generated that way
+        can be recovered to tight tolerance by a bare Maxwell fit.
         """
         model = Maxwell()
 
@@ -480,8 +521,8 @@ class TestParameterEstimation:
             warnings.simplefilter("ignore")
 
             model.fit(
-                ansys_maxwell_relaxation_data.x,
-                ansys_maxwell_relaxation_data.y,
+                ansys_maxwell_pure_relaxation_data.x,
+                ansys_maxwell_pure_relaxation_data.y,
                 test_mode="relaxation",
                 max_iter=10000,
             )
@@ -491,8 +532,8 @@ class TestParameterEstimation:
         eta_fitted = model.parameters.get("eta").value
 
         # Reference values
-        G0_ref = ansys_maxwell_relaxation_data.metadata["G_0"]
-        tau_ref = ansys_maxwell_relaxation_data.metadata["tau_0"]
+        G0_ref = ansys_maxwell_pure_relaxation_data.metadata["G_0"]
+        tau_ref = ansys_maxwell_pure_relaxation_data.metadata["tau_0"]
         eta_ref = G0_ref * tau_ref
 
         # Check recovery (allow 10% error for fitting)

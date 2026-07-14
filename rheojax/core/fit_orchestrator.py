@@ -270,6 +270,24 @@ class FitOrchestrator:
         """
         from rheojax.core.data import RheoData
 
+        x_arr = np.asarray(X)
+        y_arr = np.asarray(y)
+
+        # Some models accept protocol-encoded X (e.g. stacked (time, strain)
+        # rows for startup/LAOS, shape (2, N)) or a transposed complex-modulus
+        # y (shape (2, N) real/imag rows) — both fall outside RheoData's
+        # plain (x: 1D, y: 1D/complex/(N, 2)) convention. Those models already
+        # run their own shape validation with model-specific error messages,
+        # so defer to them here instead of raising RheoData's generic one;
+        # still check NaN/non-finite directly so that guarantee isn't lost.
+        if x_arr.ndim > 1 or (y_arr.ndim == 2 and y_arr.shape[1] != 2):
+            for name, arr in (("X", x_arr), ("y", y_arr)):
+                if np.issubdtype(arr.dtype, np.number) and not np.all(
+                    np.isfinite(arr)
+                ):
+                    raise ValueError(f"{name} data contains NaN or non-finite values")
+            return
+
         domain = (
             "frequency"
             if test_mode == "oscillation" or np.iscomplexobj(np.asarray(y))
