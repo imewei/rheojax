@@ -545,11 +545,20 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
                 x_col: int | str | None = 0
                 y_col: int | str | None = 1
             else:
-                # Try to find time/frequency column
+                # Try to find time/frequency/shear-rate column
                 x_col = find_column_by_pattern(
                     df.columns,
                     columns_lower,
-                    ["time", "frequency", "angular frequency", "t", "f", "omega"],
+                    [
+                        "time",
+                        "frequency",
+                        "angular frequency",
+                        "t",
+                        "f",
+                        "omega",
+                        "shear rate",
+                        "shear_rate",
+                    ],
                 )
 
                 # Try to find complex modulus pair (E'/E'' or G'/G'')
@@ -657,7 +666,16 @@ def _try_excel(filepath: Path, **kwargs) -> RheoData:
             x_col = find_column_by_pattern(
                 df.columns,
                 columns_lower,
-                ["time", "frequency", "angular frequency", "t", "f", "omega"],
+                [
+                    "time",
+                    "frequency",
+                    "angular frequency",
+                    "t",
+                    "f",
+                    "omega",
+                    "shear rate",
+                    "shear_rate",
+                ],
             )
 
             y_cols_pair = _detect_modulus_pair(df.columns, columns_lower)
