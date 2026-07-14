@@ -416,6 +416,23 @@ data point 1	1.0	100
         np.testing.assert_allclose(data.x, [0.001, 0.01])
         np.testing.assert_allclose(data.y, [383502000.0, 380000000.0])
 
+    def test_auto_detect_flow_curve_shear_rate_column(self, tmp_path):
+        """Regression: the x-column heuristic only recognized time/frequency
+        headers, so a flow-curve (rotation) CSV with "Shear Rate" as its
+        independent variable and "Viscosity" as y could never auto-detect
+        x_col even though y_col matched "viscosity" fine -- auto-detection
+        failed on every flow-curve CSV imported without manual column
+        mapping."""
+        csv_file = tmp_path / "flow_curve.csv"
+        csv_file.write_text(
+            "Shear Rate,Viscosity\n1.0,100.0\n10.0,80.0\n100.0,60.0\n"
+        )
+
+        data = auto_load(str(csv_file))
+
+        np.testing.assert_allclose(data.x, [1.0, 10.0, 100.0])
+        np.testing.assert_allclose(data.y, [100.0, 80.0, 60.0])
+
     def test_auto_detect_headerless_two_column_csv(self, tmp_path):
         """Regression: a headerless (x, y) CSV has its first data row misread
         as column names by pandas' default header=0, so none of the heuristic
