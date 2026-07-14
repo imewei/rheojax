@@ -1065,11 +1065,14 @@ class WorkspaceWindow(QMainWindow):
         self._notifier.changed.emit()
 
     # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
-    # predates Protocol.FLOW_CURVE), which never equality-matches
-    # DatasetLibrary.datasets_of_type("flow_curve") -- normalize it here so
-    # imported flow-curve datasets actually show up in the Fit/Transform Data
-    # step instead of silently landing in no protocol bucket at all.
-    _IMPORT_TEST_MODE_ALIASES = {"flow": "flow_curve"}
+    # predates Protocol.FLOW_CURVE), and the CSV/Excel reader's column-based
+    # detector (_utils.detect_test_mode_from_columns) tags the same data
+    # "rotation" (shear rate / viscosity columns -> steady-shear rotation
+    # test). Neither equality-matches DatasetLibrary.datasets_of_type(
+    # "flow_curve") -- normalize both here so imported flow-curve datasets
+    # actually show up in the Fit/Transform Data step instead of silently
+    # landing in no protocol bucket at all.
+    _IMPORT_TEST_MODE_ALIASES = {"flow": "flow_curve", "rotation": "flow_curve"}
 
     def _on_import_requested(self) -> None:
         """Handle LibraryRail's "+ Import data..." button."""
