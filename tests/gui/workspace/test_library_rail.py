@@ -36,13 +36,13 @@ def test_double_click_emits_dataset_preview_requested(qtbot):
 
 
 def test_context_menu_on_item_emits_dataset_preview_requested(qtbot, monkeypatch):
-    from PySide6.QtWidgets import QMenu
-
     library = DatasetLibrary()
     library.add(_ref("d1"))
     rail = LibraryRail(library)
     qtbot.addWidget(rail)
-    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[0])
+    monkeypatch.setattr(
+        LibraryRail, "_exec_context_menu", lambda self, menu, pos: menu.actions()[0]
+    )
     pos = rail._list.visualItemRect(rail._list.item(0)).center()
 
     with qtbot.waitSignal(rail.dataset_preview_requested, timeout=1000) as blocker:
@@ -59,13 +59,13 @@ def test_context_menu_signal_wiring_reaches_handler_through_real_emission(
     # customContextMenuRequested.connect(...) in __init__ would leave those
     # tests passing while a real right-click did nothing -- this test goes
     # through the real Qt signal instead of calling the handler.
-    from PySide6.QtWidgets import QMenu
-
     library = DatasetLibrary()
     library.add(_ref("d1"))
     rail = LibraryRail(library)
     qtbot.addWidget(rail)
-    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[0])
+    monkeypatch.setattr(
+        LibraryRail, "_exec_context_menu", lambda self, menu, pos: menu.actions()[0]
+    )
     pos = rail._list.visualItemRect(rail._list.item(0)).center()
 
     with qtbot.waitSignal(rail.dataset_preview_requested, timeout=1000) as blocker:
@@ -85,15 +85,15 @@ def test_context_menu_on_empty_space_does_nothing(qtbot):
 
 
 def test_context_menu_targets_clicked_item_not_current_selection(qtbot, monkeypatch):
-    from PySide6.QtWidgets import QMenu
-
     library = DatasetLibrary()
     library.add(_ref("d1"))
     library.add(_ref("d2"))
     rail = LibraryRail(library)
     qtbot.addWidget(rail)
     rail._list.setCurrentRow(0)  # "d1" is the current selection
-    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[0])
+    monkeypatch.setattr(
+        LibraryRail, "_exec_context_menu", lambda self, menu, pos: menu.actions()[0]
+    )
     pos = rail._list.visualItemRect(rail._list.item(1)).center()  # right-click on "d2"
 
     with qtbot.waitSignal(rail.dataset_preview_requested, timeout=1000) as blocker:
@@ -103,13 +103,13 @@ def test_context_menu_targets_clicked_item_not_current_selection(qtbot, monkeypa
 
 
 def test_context_menu_delete_action_emits_dataset_delete_requested(qtbot, monkeypatch):
-    from PySide6.QtWidgets import QMenu
-
     library = DatasetLibrary()
     library.add(_ref("d1"))
     rail = LibraryRail(library)
     qtbot.addWidget(rail)
-    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: self.actions()[1])
+    monkeypatch.setattr(
+        LibraryRail, "_exec_context_menu", lambda self, menu, pos: menu.actions()[1]
+    )
     pos = rail._list.visualItemRect(rail._list.item(0)).center()
 
     with qtbot.waitSignal(rail.dataset_delete_requested, timeout=1000) as blocker:

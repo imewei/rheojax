@@ -56,16 +56,19 @@ class LibraryRail(QWidget):
         menu = QMenu(self)
         preview_action = menu.addAction("Preview…")
         delete_action = menu.addAction("Delete…")
-        # ponytail: call via QMenu.exec(menu, ...) rather than menu.exec(...) --
-        # functionally identical, but PySide6 6.11's instance attribute lookup
-        # bypasses Python-level monkeypatching of QMenu.exec (class-level
-        # override only takes effect through the unbound call). This keeps
-        # QMenu.exec mockable in tests without changing runtime behavior.
-        chosen = QMenu.exec(menu, self._list.mapToGlobal(pos))
+        chosen = self._exec_context_menu(menu, self._list.mapToGlobal(pos))
         if chosen is preview_action:
             self.dataset_preview_requested.emit(item.data(Qt.ItemDataRole.UserRole))
         elif chosen is delete_action:
             self.dataset_delete_requested.emit(item.data(Qt.ItemDataRole.UserRole))
+
+    def _exec_context_menu(self, menu: QMenu, global_pos):
+        # ponytail: seam for tests to monkeypatch instead of QMenu.exec directly --
+        # PySide6 6.11's bound-method lookup for QMenu.exec bypasses class-level
+        # Python monkeypatching, so patching Qt's own class silently falls through
+        # to the real (blocking) exec(). Patching this plain-Python method instead
+        # behaves like normal Python attribute lookup.
+        return menu.exec(global_pos)
 
     def count(self) -> int:
         return self._list.count()

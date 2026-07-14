@@ -97,6 +97,85 @@ def test_stale_poll_chain_timer_is_parented_to_window(qtbot):
     )
 
 
+def test_poll_timeout_does_not_show_modal_when_window_not_visible(qtbot, monkeypatch):
+    # Regression: a stale/orphaned WorkspaceWindow (never shown, or already
+    # closed -- e.g. left behind by a previous test whose poll chain never
+    # resolved) must not pop a real modal QMessageBox.warning() once its 30s
+    # budget expires. _is_qobject_alive only catches the case where the C++
+    # object is already destroyed; it does NOT catch a window that is still
+    # fully alive but orphaned. Showing a modal from an orphaned window's
+    # timer callback, reentrant into whatever unrelated test happens to be
+    # running at that moment, is exactly what caused a reproducible
+    # Fatal Python error: Aborted crash under the full GUI test suite.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    assert not win.isVisible()  # never shown -- the orphaned-window case
+
+    from PySide6.QtWidgets import QMessageBox
+
+    warned = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warned.append(1))
+
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+    win._active_jobs_action_pending = True
+    win._poll_active_jobs_then(lambda: None, remaining_polls=0)
+
+    assert warned == []
+    assert win._active_jobs_action_pending is False
+
+
+def test_poll_timeout_shows_modal_when_window_visible(qtbot, monkeypatch):
+    # Complement to the test above: a real, visible window (the only case
+    # that occurs in actual usage -- a user closing/starting-new always has
+    # this window shown) must still get the warning.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    from PySide6.QtWidgets import QMessageBox
+
+    warned = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warned.append(1))
+
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+    win._active_jobs_action_pending = True
+    win._poll_active_jobs_then(lambda: None, remaining_polls=0)
+
+    assert warned == [1]
+
+
+def test_phase_worker_ready_takes_active_jobs_lock(qtbot, monkeypatch):
+    # Regression: _on_phase_worker_ready used to read/write
+    # active_jobs.by_id without taking active_jobs.lock, unlike every other
+    # call site in this file -- a real TOCTOU gap against
+    # PipelineBatchRunner, which mutates the same dict from a worker thread.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    win._state.active_jobs.by_id["d1"] = {"status": "running"}
+
+    acquired = []
+    real_lock = win._state.active_jobs.lock
+
+    class _SpyLock:
+        def __enter__(self):
+            acquired.append(1)
+            return real_lock.__enter__()
+
+        def __exit__(self, *exc):
+            return real_lock.__exit__(*exc)
+
+    monkeypatch.setattr(win._state.active_jobs, "lock", _SpyLock())
+
+    class _FakeWorker:
+        pass
+
+    win._on_phase_worker_ready("d1", "s1", "nlsq", _FakeWorker())
+
+    assert acquired == [1]
+    assert win._state.active_jobs.by_id["d1"].get("worker") is not None
+
+
 def test_phase_worker_ready_updates_only_its_own_dataset(qtbot):
     win = WorkspaceWindow(AppState())
     qtbot.addWidget(win)
