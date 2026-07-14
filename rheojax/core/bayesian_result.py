@@ -32,9 +32,11 @@ class DiagnosticsDict(TypedDict, total=False):
     error: str
     init_strategy: str
     warm_start_failed: bool
+    bfmi: float
+    nonfinite_draws: int
 
 
-@dataclass
+@dataclass(eq=False)
 class BayesianResult:
     """Results from Bayesian inference with NUTS sampling.
 
@@ -97,6 +99,32 @@ class BayesianResult:
         logger.debug(
             "BayesianResult initialized",
             parameter_names=list(self.posterior_samples.keys()),
+        )
+
+    def __eq__(self, other: object) -> bool:
+        """Compare results by value, using np.array_equal for posterior_samples.
+
+        The default dataclass __eq__ would crash (ValueError) whenever any
+        posterior_samples array has more than one element, because tuple/dict
+        equality forces bool() on the ndarray comparison result. mcmc and the
+        cached InferenceData objects are excluded as not meaningfully
+        comparable via value equality.
+        """
+        if not isinstance(other, BayesianResult):
+            return NotImplemented
+        if self.posterior_samples.keys() != other.posterior_samples.keys():
+            return False
+        if not all(
+            np.array_equal(self.posterior_samples[k], other.posterior_samples[k])
+            for k in self.posterior_samples
+        ):
+            return False
+        return (
+            self.summary == other.summary
+            and self.diagnostics == other.diagnostics
+            and self.num_samples == other.num_samples
+            and self.num_chains == other.num_chains
+            and self.model_comparison == other.model_comparison
         )
 
     def to_inference_data(self, log_likelihood: bool = False) -> Any:
@@ -245,8 +273,14 @@ class BayesianResult:
                         shaped = np_arr[np.newaxis, :]
                     posterior_dict[name] = xr.DataArray(shaped, dims=("chain", "draw"))
         except Exception as exc:
-            # Fall back to posterior_samples (already numpy, already on host)
-            logger.debug(
+            # Fall back to posterior_samples (already numpy, already on host).
+            # Reset any partially-populated entries so a mid-loop failure
+            # can't leave an internally-inconsistent subset of fields
+            # silently attached, and log at WARNING (not DEBUG) so the drop
+            # is visible at normal verbosity instead of only in debug logs
+            # (mirrors the sample_stats fallback below).
+            posterior_dict = {}
+            logger.warning(
                 "get_samples(group_by_chain=True) failed, using posterior_samples",
                 error=str(exc),
             )
@@ -277,6 +311,11 @@ class BayesianResult:
             if isinstance(extra_fields, dict):
                 for stat, value in extra_fields.items():
                     if isinstance(value, (dict, tuple)):
+                        logger.debug(
+                            "Skipping sample_stats field: unsupported container type",
+                            stat=stat,
+                            value_type=type(value).__name__,
+                        )
                         continue
                     arr = np.asarray(value)
                     # Ensure (chain, draw) shape
@@ -286,24 +325,54 @@ class BayesianResult:
                         except ValueError:
                             arr = arr[np.newaxis, :]
                     elif arr.ndim != 2:
+                        logger.debug(
+                            "Skipping sample_stats field: unexpected ndim",
+                            stat=stat,
+                            ndim=arr.ndim,
+                        )
                         continue  # Skip unexpected shapes
 
-                    # Match ArviZ's NumPyroConverter: potential_energy → negated "lp".
-                    # Also synthesise "energy" from potential_energy so that
-                    # ArviZ's plot_energy() works out of the box.  True HMC
-                    # energy = potential + kinetic, but potential_energy alone is
-                    # the standard proxy when kinetic energy is not stored.
+                    # Match ArviZ's real NumPyroConverter.sample_stats_to_xarray():
+                    # potential_energy -> "lp" verbatim, no sign flip. "energy" (the
+                    # true Hamiltonian = potential + kinetic) is passed through as-is
+                    # when NumPyro provided it via extra_fields; see fallback below
+                    # for older MCMC objects that only requested potential_energy.
                     if stat == "potential_energy":
-                        stats_dict["lp"] = xr.DataArray(-arr, dims=("chain", "draw"))
+                        stats_dict["lp"] = xr.DataArray(arr, dims=("chain", "draw"))
+                    elif stat == "energy":
                         stats_dict["energy"] = xr.DataArray(arr, dims=("chain", "draw"))
                     else:
                         dest_name = _stat_rename.get(stat, stat)
                         stats_dict[dest_name] = xr.DataArray(
                             arr, dims=("chain", "draw")
                         )
+
+                # Fallback only: older MCMC objects that never requested the real
+                # "energy" extra field. Approximate it from potential_energy alone
+                # and say so — this proxy omits kinetic energy, so BFMI computed
+                # from it is approximate, not the exact E-BFMI statistic.
+                if "energy" not in stats_dict and "lp" in stats_dict:
+                    logger.warning(
+                        "NumPyro extra_fields did not include 'energy' (true "
+                        "Hamiltonian); approximating sample_stats['energy'] from "
+                        "potential_energy alone. BFMI computed from this proxy "
+                        "will be approximate.",
+                    )
+                    stats_dict["energy"] = xr.DataArray(
+                        stats_dict["lp"].values, dims=("chain", "draw")
+                    )
         except Exception as exc:
-            logger.debug(
-                "Failed to extract sample_stats from MCMC extra fields",
+            # sample_stats is a best-effort group here (posterior-only callers,
+            # e.g. WAIC/LOO consumers, must not break on an unrelated failure
+            # in this block). Reset any partially-populated stats so a
+            # mid-loop failure can't leave an internally-inconsistent subset
+            # of fields silently attached, and log at WARNING (not DEBUG) so
+            # the drop is visible at normal verbosity instead of only in
+            # debug logs.
+            stats_dict = {}
+            logger.warning(
+                "Failed to extract sample_stats from MCMC extra fields; "
+                "sample_stats group will be absent from InferenceData",
                 error=str(exc),
             )
 

@@ -180,6 +180,43 @@ class TestRegistryRegistration:
         with pytest.raises(ValueError, match="Invalid plugin type"):
             registry.register("test", Mock(), plugin_type="invalid")
 
+    def test_register_invalid_protocol_string_raises_error(self):
+        """A typo'd protocol string must fail loudly at registration time,
+        not silently register the model with an empty protocols list."""
+        registry = Registry()
+
+        class MockModel:
+            pass
+
+        with pytest.raises(ValueError, match="Invalid protocol"):
+            registry.register(
+                "maxwell",
+                MockModel,
+                plugin_type=PluginType.MODEL,
+                protocols=["relaxaton"],
+            )
+
+        # The model must not have been silently registered either.
+        assert "maxwell" not in registry.get_all_models()
+
+    def test_register_invalid_transform_type_raises_error(self):
+        """A typo'd transform_type string must fail loudly at registration
+        time, not silently register the transform with transform_type=None."""
+        registry = Registry()
+
+        class MockTransform:
+            pass
+
+        with pytest.raises(ValueError, match="Invalid transform_type"):
+            registry.register(
+                "fft",
+                MockTransform,
+                plugin_type=PluginType.TRANSFORM,
+                transform_type="not_a_real_type",
+            )
+
+        assert "fft" not in registry.get_all_transforms()
+
 
 class TestRegistryRetrieval:
     """Test plugin retrieval."""
@@ -354,6 +391,41 @@ class TestRegistryValidation:
                 validate=True,
             )
 
+    def test_validate_model_interface_rejects_incomplete_abc_subclass(self):
+        """hasattr(fit)/hasattr(predict) alone can't catch an incomplete ABC
+        subclass, since abstract stubs and inherited concrete wrappers are
+        still present via attribute lookup. validate=True must additionally
+        reject a class that still has unimplemented abstract methods."""
+        import abc
+
+        registry = Registry()
+
+        class AbstractModel(abc.ABC):
+            @abc.abstractmethod
+            def fit(self, data): ...
+
+            @abc.abstractmethod
+            def predict(self, data): ...
+
+        class IncompleteModel(AbstractModel):
+            """Overrides fit but never implements predict."""
+
+            def fit(self, data):
+                pass
+
+        # hasattr checks alone would pass (predict is still present as the
+        # inherited abstract stub), so this only fails via the abstractness
+        # check.
+        assert hasattr(IncompleteModel, "predict")
+
+        with pytest.raises(ValueError, match="abstract"):
+            registry.register(
+                "incomplete",
+                IncompleteModel,
+                plugin_type=PluginType.MODEL,
+                validate=True,
+            )
+
     def test_skip_validation(self):
         """Test that validation can be skipped."""
         registry = Registry()
@@ -448,12 +520,72 @@ class TestRegistryDiscovery:
             mock_module.CustomModel = type(
                 "CustomModel", (), {"fit": None, "predict": None}
             )
+            # discover() now only registers classes actually defined in the
+            # scanned module (obj.__module__ == module_name), so the mock
+            # class must claim membership in "custom_model" to be picked up.
+            mock_module.CustomModel.__module__ = "custom_model"
             mock_import.return_value = mock_module
 
             registry.discover_directory("/custom/plugins")
 
             # Should discover custom plugins
             assert len(registry.get_all_models()) > 0
+
+    def test_discover_skips_classes_imported_from_elsewhere(self):
+        """discover() must not register classes merely imported into the
+        scanned module's namespace (e.g. a base class), only ones actually
+        defined there - otherwise e.g. BaseModel pollutes get_all_models()."""
+        registry = Registry()
+
+        class BaseModelLike:
+            """Stand-in for a base class defined in another module."""
+
+            def fit(self, data):
+                pass
+
+            def predict(self, data):
+                pass
+
+        # Simulate importing BaseModelLike into the scanned module: its
+        # __module__ still points at its real (different) origin module.
+        BaseModelLike.__module__ = "some.other.module"
+
+        class LocalModel:
+            def fit(self, data):
+                pass
+
+            def predict(self, data):
+                pass
+
+        LocalModel.__module__ = "fake_scanned_module"
+
+        fake_module = Mock()
+        fake_module.BaseModelLike = BaseModelLike
+        fake_module.LocalModel = LocalModel
+
+        with patch("importlib.import_module", return_value=fake_module):
+            registry.discover("fake_scanned_module")
+
+        assert "LocalModel" in registry.get_all_models()
+        assert "BaseModelLike" not in registry.get_all_models()
+
+    def test_discover_logs_warning_on_import_error(self, caplog):
+        """A broken module path must be logged, not silently swallowed."""
+        registry = Registry()
+
+        with (
+            patch(
+                "importlib.import_module", side_effect=ImportError("no such module")
+            ),
+            caplog.at_level("WARNING"),
+        ):
+            registry.discover("nonexistent.module.path")
+
+        assert len(caplog.records) >= 1
+        assert any(
+            "nonexistent.module.path" in str(record.__dict__)
+            for record in caplog.records
+        )
 
 
 class TestRegistryManagement:
@@ -506,6 +638,51 @@ class TestRegistryManagement:
         assert len(registry.get_all_models()) == 0
         assert len(registry.get_all_transforms()) == 0
 
+    def test_get_all_returns_models_and_transforms(self):
+        """get_all() must return every registered plugin with its type."""
+        registry = Registry()
+
+        class MockModel:
+            pass
+
+        class MockTransform:
+            pass
+
+        registry.register("some_model", MockModel, plugin_type=PluginType.MODEL)
+        registry.register(
+            "some_transform", MockTransform, plugin_type=PluginType.TRANSFORM
+        )
+
+        all_plugins = registry.get_all()
+        assert all_plugins["some_model"] == (MockModel, PluginType.MODEL)
+        assert all_plugins["some_transform"] == (MockTransform, PluginType.TRANSFORM)
+
+    def test_get_all_warns_on_cross_type_name_collision(self, caplog):
+        """A name registered as both a model and a transform is valid (see
+        test_registry_namespaces - separate namespaces by design), but
+        get_all() can only return one entry per name. It must log a
+        warning instead of silently dropping the model entry."""
+        registry = Registry()
+
+        class MockModel:
+            pass
+
+        class MockTransform:
+            pass
+
+        registry.register("dual", MockModel, plugin_type=PluginType.MODEL)
+        registry.register("dual", MockTransform, plugin_type=PluginType.TRANSFORM)
+
+        with caplog.at_level("WARNING"):
+            all_plugins = registry.get_all()
+
+        # Both registrations remain independently retrievable via get().
+        assert registry.get("dual", PluginType.MODEL) is MockModel
+        assert registry.get("dual", PluginType.TRANSFORM) is MockTransform
+        # get_all() can only surface one; make sure the collision is logged.
+        assert all_plugins["dual"] == (MockTransform, PluginType.TRANSFORM)
+        assert any("dual" in str(record.__dict__) for record in caplog.records)
+
     def test_registry_stats(self):
         """Test getting registry statistics."""
         registry = Registry()
@@ -552,6 +729,66 @@ class TestRegistryManagement:
         # Verify restoration
         assert "model1" in registry.get_all_models()
         assert "transform1" in registry.get_all_transforms()
+
+    def test_import_state_logs_warning_on_missing_class(self, caplog):
+        """A renamed/moved class must be logged, not silently dropped."""
+        registry = Registry()
+
+        state = {
+            "models": {
+                "ghost_model": {
+                    "class_name": "NoLongerExists",
+                    "module": "unittest.mock",
+                    "metadata": {},
+                    "protocols": [],
+                }
+            },
+            "transforms": {},
+        }
+
+        with caplog.at_level("WARNING"):
+            registry.import_state(state)
+
+        assert "ghost_model" not in registry.get_all_models()
+        assert len(caplog.records) >= 1
+        assert any(
+            "ghost_model" in str(record.__dict__) for record in caplog.records
+        )
+
+    def test_import_state_skips_malformed_entries_without_crashing(self, caplog):
+        """Entries missing required keys (or not dict-shaped) must be skipped
+        per-entry, not crash import_state and abort remaining restoration."""
+        registry = Registry()
+
+        state = {
+            "models": {
+                # Missing "module" key entirely -> KeyError on info["module"]
+                "no_module": {"class_name": "Mock"},
+                # Not a dict at all -> TypeError on info["module"]
+                "not_a_dict": None,
+                # Well-formed entry that should still restore successfully
+                "good_model": {
+                    "class_name": "Mock",
+                    "module": "unittest.mock",
+                    "metadata": {},
+                    "protocols": [],
+                },
+            },
+            "transforms": {
+                "no_class_name": {"module": "unittest.mock"},
+                "also_not_a_dict": ["oops"],
+            },
+        }
+
+        with caplog.at_level("WARNING"):
+            registry.import_state(state)
+
+        assert "no_module" not in registry.get_all_models()
+        assert "not_a_dict" not in registry.get_all_models()
+        assert "no_class_name" not in registry.get_all_transforms()
+        assert "also_not_a_dict" not in registry.get_all_transforms()
+        # The well-formed entry must still be restored despite the bad ones.
+        assert "good_model" in registry.get_all_models()
 
 
 class TestRegistryCompatibility:
@@ -621,6 +858,86 @@ class TestRegistryCompatibility:
 
         assert "freq_model" in compatible
         assert "time_model" not in compatible
+
+    def test_find_compatible_plugin_type_scopes_search(self):
+        """find_compatible(plugin_type=...) must not mix models and transforms.
+
+        Without a protocol/transform_type filter, a bare find_compatible()
+        call still scans both namespaces (back-compat default), but callers
+        that scope with plugin_type must get only that namespace back.
+        """
+        registry = Registry()
+
+        class MyModel:
+            pass
+
+        class MyTransform:
+            pass
+
+        registry.register(
+            "mymodel",
+            MyModel,
+            plugin_type=PluginType.MODEL,
+            metadata={"domain": "x"},
+        )
+        registry.register(
+            "mytransform",
+            MyTransform,
+            plugin_type=PluginType.TRANSFORM,
+            metadata={"domain": "x"},
+        )
+
+        # Bare call (no scoping) still searches both, preserving existing behavior.
+        both = registry.find_compatible(domain="x")
+        assert set(both) == {"mymodel", "mytransform"}
+
+        # Scoped calls must not leak across namespaces.
+        models_only = registry.find_compatible(
+            domain="x", plugin_type=PluginType.MODEL
+        )
+        assert models_only == ["mymodel"]
+
+        transforms_only = registry.find_compatible(
+            domain="x", plugin_type=PluginType.TRANSFORM
+        )
+        assert transforms_only == ["mytransform"]
+
+    def test_find_compatible_invalid_protocol_returns_no_matches(self):
+        """An unrecognized protocol string must not raise, just match nothing."""
+        registry = Registry()
+
+        class SomeModel:
+            pass
+
+        registry.register(
+            "some_model",
+            SomeModel,
+            plugin_type=PluginType.MODEL,
+            protocols=["relaxation"],
+        )
+
+        # "rotation"/"unknown" are real RheoData.test_mode values that are not
+        # members of the Protocol enum (see TestModeEnum) - must not crash.
+        compatible = registry.find_compatible(protocol="unknown")
+        assert compatible == []
+
+    def test_find_compatible_invalid_transform_type_returns_no_matches(self):
+        """An unrecognized transform_type string must not raise, just match
+        nothing (mirrors the protocol-side graceful-degradation contract)."""
+        registry = Registry()
+
+        class SomeTransform:
+            pass
+
+        registry.register(
+            "some_transform",
+            SomeTransform,
+            plugin_type=PluginType.TRANSFORM,
+            transform_type="spectral",
+        )
+
+        compatible = registry.find_compatible(transform_type="not_a_real_type")
+        assert compatible == []
 
     def test_plugin_versioning(self):
         """Test plugin versioning support."""

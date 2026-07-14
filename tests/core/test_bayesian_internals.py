@@ -190,6 +190,45 @@ def test_prepare_jax_data_empty_complex():
 
 
 # ---------------------------------------------------------------------------
+# _validate_xy_shapes
+# ---------------------------------------------------------------------------
+
+
+def test_validate_xy_shapes_accepts_matching_1d():
+    """Matching 1-D X/y pass without error."""
+    X, y = _linear_data(n=10)
+    BayesianMixin._validate_xy_shapes(X, y)  # no raise
+
+
+def test_validate_xy_shapes_rejects_column_vector_y():
+    """A (N, 1) y has the same shape[0] as X but must still be rejected —
+    shape[0] equality alone would silently pass through the exact
+    broadcasting bug this check exists to catch.
+    """
+    X = np.linspace(0, 1, 10)
+    y = np.linspace(0, 1, 10).reshape(-1, 1)
+    with pytest.raises(ValueError, match="1-dimensional"):
+        BayesianMixin._validate_xy_shapes(X, y)
+
+
+def test_validate_xy_shapes_accepts_n2_real_imag_columns():
+    """The (N, 2) real/imag-columns convention (supported by
+    numpyro_model_builder and RheoData) is not rejected.
+    """
+    X = np.linspace(0, 1, 10)
+    y = np.zeros((10, 2))
+    BayesianMixin._validate_xy_shapes(X, y)  # no raise
+
+
+def test_validate_xy_shapes_rejects_length_mismatch():
+    """Non-broadcastable length mismatch still raises."""
+    X = np.linspace(0, 1, 30)
+    y = np.linspace(0, 1, 50)
+    with pytest.raises(ValueError, match="same length"):
+        BayesianMixin._validate_xy_shapes(X, y)
+
+
+# ---------------------------------------------------------------------------
 # _get_parameter_bounds (lines 352-357, 361)
 # ---------------------------------------------------------------------------
 
@@ -321,6 +360,175 @@ def test_build_warm_start_complex_sigmas():
     np.testing.assert_allclose(ws["sigma_imag"], 0.4, rtol=1e-9)
 
 
+def test_build_warm_start_out_of_bounds_value_warns_and_clamps():
+    """An out-of-bounds initial_values entry is clamped (as before) but must
+    now also surface a user-visible RuntimeWarning — previously this was
+    logged at DEBUG only, silently defeating the warm-start contract.
+    """
+    model = LinearModel()
+    bounds = {"a": (0.1, 10.0), "b": (0.1, 10.0)}
+    with pytest.warns(RuntimeWarning, match="outside parameter bounds"):
+        ws = model._build_warm_start_values(
+            ["a", "b"], bounds, {"a": 100.0, "b": 1.0}, {"data_scale": 1.0}, False
+        )
+    assert ws["a"] <= 10.0
+
+
+def test_build_warm_start_within_bounds_no_warning():
+    """A value within bounds is not clamped and emits no warning."""
+    model = LinearModel()
+    bounds = {"a": (0.1, 10.0), "b": (0.1, 10.0)}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        ws = model._build_warm_start_values(
+            ["a", "b"], bounds, {"a": 2.0, "b": 1.0}, {"data_scale": 1.0}, False
+        )
+    assert ws["a"] == 2.0
+
+
+# ---------------------------------------------------------------------------
+# fit_bayesian initial_values key validation
+# ---------------------------------------------------------------------------
+
+
+def test_fit_bayesian_rejects_unrecognized_initial_values_key():
+    """A typo'd/stale key in initial_values must raise, not be silently
+    dropped (which would fall back to a midpoint init while
+    has_explicit_warm_start still reports a genuine warm start).
+    """
+    model = LinearModel()
+    X, y = _linear_data()
+    with pytest.raises(ValueError, match="unrecognized parameter"):
+        model.fit_bayesian(
+            X, y, test_mode="relaxation", initial_values={"aa": 2.0}
+        )
+
+
+# ---------------------------------------------------------------------------
+# _run_nuts_sampling has_explicit_warm_start gating (lines 563-565)
+# ---------------------------------------------------------------------------
+
+
+def _prep_run_nuts_args(model, initial_values):
+    X, y = _linear_data(n=10)
+    jax_data = model._prepare_jax_data(X, y)
+    param_names = list(model.parameters)
+    param_bounds = model._get_parameter_bounds(X, y, TestMode.RELAXATION)
+    numpyro_model = model._build_numpyro_model(
+        param_names=param_names,
+        param_bounds=param_bounds,
+        test_mode=TestMode.RELAXATION,
+        is_complex_data=False,
+        scale_info=jax_data["scale_info"],
+    )
+    warm_start_values = model._build_warm_start_values(
+        param_names, param_bounds, initial_values, jax_data["scale_info"], False
+    )
+    return jax_data, numpyro_model, warm_start_values
+
+
+@pytest.mark.slow
+def test_run_nuts_sampling_explicit_initial_values_gets_permissive_defaults():
+    """A genuine caller-supplied initial_values (no prior .fit()) must select
+    the permissive warm-start NUTS defaults, not the conservative cold-start
+    ones. Regression for the bug where has_warm_start reduced to `fitted_`
+    alone because _build_warm_start_values always returns a non-empty dict.
+    """
+    model = LinearModel()
+    assert not hasattr(model, "fitted_")
+    jax_data, numpyro_model, warm_start_values = _prep_run_nuts_args(
+        model, {"a": 2.0, "b": 1.0}
+    )
+    nuts_kwargs = {}
+    model._run_nuts_sampling(
+        numpyro_model=numpyro_model,
+        X_jax=jax_data["X_jax"],
+        y_jax=jax_data["y_jax"],
+        warm_start_values=warm_start_values,
+        num_warmup=1,
+        num_samples=1,
+        num_chains=1,
+        nuts_kwargs=nuts_kwargs,
+        seed=0,
+        has_explicit_warm_start=True,
+    )
+    assert nuts_kwargs["target_accept_prob"] == 0.90
+    assert nuts_kwargs["max_tree_depth"] == 8
+
+
+@pytest.mark.slow
+def test_run_nuts_sampling_no_explicit_warm_start_gets_conservative_defaults():
+    """Without has_explicit_warm_start, cold-start defaults apply even though
+    _build_warm_start_values still returns a fully-populated (midpoint) dict.
+    """
+    model = LinearModel()
+    assert not hasattr(model, "fitted_")
+    jax_data, numpyro_model, warm_start_values = _prep_run_nuts_args(model, None)
+    assert bool(warm_start_values)  # always non-empty, per _build_warm_start_values
+    nuts_kwargs = {}
+    model._run_nuts_sampling(
+        numpyro_model=numpyro_model,
+        X_jax=jax_data["X_jax"],
+        y_jax=jax_data["y_jax"],
+        warm_start_values=warm_start_values,
+        num_warmup=1,
+        num_samples=1,
+        num_chains=1,
+        nuts_kwargs=nuts_kwargs,
+        seed=0,
+        has_explicit_warm_start=False,
+    )
+    assert nuts_kwargs["target_accept_prob"] == 0.99
+    assert "max_tree_depth" not in nuts_kwargs
+
+
+@pytest.mark.slow
+def test_run_nuts_sampling_construction_failure_preserves_uniform_fallback_flag(
+    monkeypatch,
+):
+    """If init_to_value(values=...) raises during construction (a distinct
+    failure surface from the runtime 'Cannot find valid initial parameters'
+    RuntimeError handled separately below), _nuts_init_strategy is correctly
+    downgraded to 'uniform_fallback'. It must stay there even though the
+    subsequent run_mcmc succeeds — not get unconditionally clobbered back to
+    'warm_start' on the happy-path return.
+    """
+    import rheojax.core.bayesian as bayesian_mod
+
+    model = LinearModel()
+    jax_data, numpyro_model, warm_start_values = _prep_run_nuts_args(
+        model, {"a": 2.0, "b": 1.0}
+    )
+
+    real_import_numpyro = bayesian_mod._import_numpyro
+
+    def _broken_init_to_value(*args, **kwargs):
+        raise ValueError("simulated init_to_value construction failure")
+
+    def _patched_import_numpyro():
+        symbols = list(real_import_numpyro())
+        symbols[-1] = _broken_init_to_value  # init_to_value is the last symbol
+        return tuple(symbols)
+
+    monkeypatch.setattr(bayesian_mod, "_import_numpyro", _patched_import_numpyro)
+
+    with pytest.warns(RuntimeWarning, match="Warm-start initialization failed"):
+        model._run_nuts_sampling(
+            numpyro_model=numpyro_model,
+            X_jax=jax_data["X_jax"],
+            y_jax=jax_data["y_jax"],
+            warm_start_values=warm_start_values,
+            num_warmup=1,
+            num_samples=1,
+            num_chains=1,
+            nuts_kwargs={},
+            seed=0,
+            has_explicit_warm_start=True,
+        )
+
+    assert model._nuts_init_strategy == "uniform_fallback"
+
+
 # ---------------------------------------------------------------------------
 # sample_prior (lines 785-786, 797-800, 811-814)
 # ---------------------------------------------------------------------------
@@ -338,16 +546,82 @@ def test_sample_prior_missing_bounds_raises():
         model.sample_prior(num_samples=10)
 
 
-def test_sample_prior_beta_prior_respects_bounds():
-    """A beta prior spec draws within bounds and skews away from uniform."""
+def test_sample_prior_unsupported_prior_dict_falls_back_to_uniform():
+    """A malformed prior dict falls back to Uniform(lower, upper), matching
+    NUTS exactly instead of sample_prior's old hand-rolled 'beta' special
+    case that NUTS never actually implemented. 'type': 'beta' IS recognized
+    by prior_dict_to_dist, but with keys 'concentration0'/'concentration1'
+    -- this spec's 'a'/'b' keys are wrong, so it hits the malformed-spec
+    (KeyError) fallback rather than the unrecognized-type fallback; either
+    way, prior_dict_to_dist returns None and sample_prior falls back to
+    Uniform.
+    """
     model = LinearModel()
     param = model.parameters.get("a")
-    param.prior = {"type": "beta", "a": 5.0, "b": 1.0}  # skewed toward upper
-    samples = model.sample_prior(num_samples=2000, seed=0)["a"]
+    param.prior = {"type": "beta", "a": 5.0, "b": 1.0}
+    samples = model.sample_prior(num_samples=5000, seed=0)["a"]
     lo, hi = param.bounds
     assert np.all(samples >= lo) and np.all(samples <= hi)
-    # Beta(5,1) mass concentrates near the upper bound; mean above midpoint.
-    assert samples.mean() > 0.5 * (lo + hi)
+    # Falls back to Uniform — mean near midpoint, not skewed toward upper bound.
+    assert samples.mean() == pytest.approx(0.5 * (lo + hi), abs=0.5)
+
+
+def test_sample_prior_normal_prior_dict_matches_nuts():
+    """A GUI-supported Parameter.prior dict (normal) is honored via the same
+    prior_dict_to_dist conversion NUTS uses, not the old Uniform-only fallback.
+    """
+    model = LinearModel()
+    param = model.parameters.get("a")
+    param.prior = {"type": "normal", "loc": 5.0, "scale": 0.01}
+    samples = model.sample_prior(num_samples=2000, seed=0)["a"]
+    # Tight Normal(5, 0.01) clusters near 5, well inside bounds (0.1, 10.0).
+    assert samples.mean() == pytest.approx(5.0, abs=0.05)
+    assert samples.std() < 0.1
+
+
+def test_sample_prior_alpha_suffix_uses_beta_default():
+    """Alpha-suffixed bounded parameters get the same Beta(2,2) prior NUTS
+    uses by default (numpyro_model_builder.py), not a Uniform.
+    """
+    model = LinearModel()
+    model.parameters.add("alpha", value=0.5, bounds=(0.0, 1.0), overwrite=True)
+    samples = model.sample_prior(num_samples=5000, seed=0)["alpha"]
+    assert np.all(samples >= 0.0) and np.all(samples <= 1.0)
+    # Beta(2,2) std = sqrt(1/20) ~ 0.2236, notably below Uniform(0,1)'s
+    # std = 1/sqrt(12) ~ 0.2887 — distinguishes the two distributions.
+    assert samples.std() < 0.26
+
+
+def test_sample_prior_bayesian_prior_factory_override():
+    """bayesian_prior_factory, when set, overrides both the alpha-suffix
+    Beta default and any Parameter.prior dict, matching NUTS's priority order.
+    """
+    import numpyro.distributions as dist
+
+    model = LinearModel()
+    model.bayesian_prior_factory = lambda name, lower, upper: (
+        dist.Normal(loc=3.0, scale=0.001) if name == "a" else None
+    )
+    samples = model.sample_prior(num_samples=1000, seed=0)["a"]
+    assert samples.mean() == pytest.approx(3.0, abs=0.01)
+
+
+def test_sample_prior_near_degenerate_tolerance_matches_nuts_builder():
+    """sample_prior's degenerate-bounds tolerance must exactly match the NUTS
+    model builder's (numpyro_model_builder.py) and _validate_parameter_bounds's:
+    abs(upper-lower) < 1e-10 * max(abs(lower), 1.0). Bounds (100.0,
+    100.00000005) have width 5e-8, which is real (non-degenerate) under that
+    shared 1e-10 formula (threshold 1e-8) but was wrongly flagged as
+    degenerate by sample_prior's previous 10x-looser, differently-shaped
+    tolerance (1e-9 * max(|lower|, |upper|, 1) ~= 1e-7) -- silently returning
+    a constant instead of the Uniform NUTS actually samples.
+    """
+    model = LinearModel()
+    lower, upper = 100.0, 100.00000005
+    model.parameters.add("a", value=lower, bounds=(lower, upper), overwrite=True)
+    samples = model.sample_prior(num_samples=2000, seed=0)["a"]
+    assert samples.std() > 0.0
+    assert np.all(samples >= lower) and np.all(samples <= upper)
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +756,40 @@ def test_process_mcmc_results_group_by_chain_fallback():
     assert result.diagnostics["warm_start_failed"] is True
 
 
+def test_process_mcmc_results_surfaces_nonfinite_draws_diagnostic():
+    """num_nonfinite (the numpyro.deterministic site numpyro_model_builder.py
+    records every draw to track NaN-guard activity) must reach
+    diagnostics['nonfinite_draws'] instead of being silently dropped by the
+    param_names/sigma-prefix filtering used to build posterior_samples.
+    """
+    model = LinearModel()
+    rng = np.random.default_rng(11)
+    grouped = {
+        "a": rng.normal(2.0, 0.1, (2, 50)),
+        "b": rng.normal(1.0, 0.1, (2, 50)),
+        "num_nonfinite": np.zeros((2, 50)),
+    }
+    grouped["num_nonfinite"][0, :3] = 1.0  # 3 draws hit the NaN guard
+    flat = {k: v.reshape(-1) for k, v in grouped.items()}
+    mcmc = _FakeMCMC(flat, grouped=grouped)
+
+    result = model._process_mcmc_results(mcmc, ["a", "b"], num_samples=50, num_chains=2)
+    assert result.diagnostics["nonfinite_draws"] == 3
+    assert "num_nonfinite" not in result.posterior_samples
+
+
+def test_process_mcmc_results_nonfinite_draws_defaults_zero_when_absent():
+    """Models that don't define the NaN-guard deterministic must not KeyError;
+    diagnostics['nonfinite_draws'] defaults to 0.
+    """
+    model = LinearModel()
+    rng = np.random.default_rng(12)
+    flat = {"a": rng.normal(2.0, 0.1, 100), "b": rng.normal(1.0, 0.1, 100)}
+    mcmc = _FakeMCMC(flat, grouped=None, group_raises=True)
+    result = model._process_mcmc_results(mcmc, ["a", "b"], num_samples=100, num_chains=1)
+    assert result.diagnostics["nonfinite_draws"] == 0
+
+
 def test_compute_diagnostics_delegator_handles_missing_divergences():
     """_compute_diagnostics tolerates an mcmc lacking extra fields (-1 divergences)."""
     model = LinearModel()
@@ -534,6 +842,57 @@ def test_fit_bayesian_log_space_rejects_nonpositive():
         model.fit_bayesian(X, y, test_mode="relaxation", likelihood_space="log")
 
 
+@pytest.mark.slow
+def test_fit_bayesian_warns_on_low_ess_despite_clean_r_hat_and_no_divergences(
+    monkeypatch,
+):
+    """A run with clean R-hat (<1.01), zero divergences, and
+    diagnostics_valid=True but pathologically low ESS (a well-known MCMC
+    pathology: R-hat converges on short/autocorrelated chains while ESS stays
+    low) must still trigger the questionable-convergence RuntimeWarning. ESS
+    was previously computed and logged but never included in the warning
+    gate, so this case returned silently.
+    """
+    model = LinearModel()
+    X, y = _linear_data(n=10)
+
+    fake_result = BayesianResult(
+        posterior_samples={"a": np.array([1.0]), "b": np.array([1.0])},
+        summary={},
+        diagnostics={
+            "r_hat": {"a": 1.001, "b": 1.001},
+            "ess": {"a": 3.0, "b": 3.0},
+            "divergences": 0,
+            "diagnostics_valid": True,
+        },
+        num_samples=1,
+        num_chains=1,
+        mcmc=None,
+        model_comparison={},
+    )
+    monkeypatch.setattr(model, "_process_mcmc_results", lambda *a, **k: fake_result)
+
+    with pytest.warns(RuntimeWarning, match="questionable convergence"):
+        model.fit_bayesian(
+            X, y, test_mode="relaxation", num_warmup=1, num_samples=1, num_chains=1
+        )
+
+
+def test_precompile_bayesian_rejects_nonfinite_input():
+    """precompile_bayesian must reject NaN/Inf input the same way
+    fit_bayesian does: its docstring explicitly invites passing the caller's
+    real X/y to warm the JIT cache for the actual dataset, so bad input must
+    fail loudly here too instead of only being caught by the generic
+    except-Exception-and-warn wrapper around sampling.
+    """
+    model = LinearModel()
+    X, y = _linear_data(n=10)
+    y = y.copy()
+    y[0] = np.nan
+    with pytest.raises(ValueError, match="NaN or Inf"):
+        model.precompile_bayesian(X, y, test_mode="relaxation", num_chains=1)
+
+
 # ---------------------------------------------------------------------------
 # NUTS-adjacent wiring: precompile + protocol/override/forward-mode roundtrip
 # ---------------------------------------------------------------------------
@@ -577,6 +936,29 @@ def test_precompile_bayesian_sampling_failure_returns_time_no_cache():
     assert isinstance(t, float)
     # Sampling failed -> model must NOT be marked precompiled.
     assert not getattr(model, "_precompiled_models", {})
+
+
+@pytest.mark.slow
+def test_precompile_bayesian_forwards_protocol_kwargs(monkeypatch):
+    """precompile_bayesian must forward protocol_kwargs to _build_numpyro_model,
+    mirroring fit_bayesian's Phase 5 call. Without this, the closure cache key
+    computed during precompilation (built with an empty protocol_kwargs dict)
+    never matches the key a real fit_bayesian(..., strain=...) call computes,
+    silently defeating the precompile speedup for any model using protocol
+    kwargs (LAOS, thixotropic lam_init/sigma_init, etc.).
+    """
+    model = LinearModel()
+    captured = {}
+    orig = model._build_numpyro_model
+
+    def spy(*args, **kwargs):
+        captured.update(kwargs)
+        return orig(*args, **kwargs)
+
+    monkeypatch.setattr(model, "_build_numpyro_model", spy)
+    X, y = _linear_data(n=10)
+    model.precompile_bayesian(X, y, test_mode="relaxation", num_chains=1, strain=2.5)
+    assert captured.get("strain") == 2.5
 
 
 @pytest.mark.slow

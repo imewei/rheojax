@@ -55,6 +55,20 @@ def _coerce_ndarray(data: ArrayLike | jnp_typing.ndarray | None) -> np.ndarray:
     return np.asarray(data)
 
 
+def _check_dtype(arr: np.ndarray, name: str, *, allow_complex: bool = False) -> None:
+    """Raise if arr's dtype is not numeric.
+
+    Rejects bool and object dtypes (e.g. an accidental 0/1 mask array),
+    which would otherwise silently pass NaN/finite checks and be treated
+    as real physical data.
+    """
+    kind = arr.dtype.kind
+    allowed_kinds = "fiu" + ("c" if allow_complex else "")
+    if kind not in allowed_kinds:
+        kinds_desc = "floating/integer" + (" or complex" if allow_complex else "")
+        raise ValueError(f"{name} data must be {kinds_desc}, got dtype {arr.dtype}")
+
+
 @dataclass
 class RheoData:
     """JAX-native container for rheological data with NumPy/JAX array support.
@@ -96,9 +110,9 @@ class RheoData:
         )
 
         # Normalize metadata container (defensive — callers may pass None explicitly,
-        # bypassing the type checker since dataclasses do not validate at runtime).
-        if self.metadata is None:
-            self.metadata = {}  # type: ignore[unreachable]
+        # bypassing the type checker since dataclasses do not validate at runtime)
+        # and always copy so two RheoData instances never alias the same dict.
+        self.metadata = dict(self.metadata) if self.metadata else {}
 
         # Persist explicitly provided test mode into metadata and internal cache
         if initial_test_mode is not None:
@@ -133,7 +147,30 @@ class RheoData:
             y_dtype=str(y_array.dtype),
         )
 
-        # Validate shapes — allow (N,) x with (N,2) y for DMTA/GMM complex data
+        if x_array.ndim == 0 or y_array.ndim == 0:
+            logger.error(
+                "Scalar (0-d) x or y data provided",
+                x_shape=x_array.shape,
+                y_shape=y_array.shape,
+            )
+            raise ValueError(
+                "x and y must be at least 1-dimensional arrays, got 0-d input"
+            )
+
+        if x_array.ndim > 1:
+            logger.error("x data is not 1-dimensional", x_shape=x_array.shape)
+            raise ValueError(f"x must be 1-dimensional, got shape {x_array.shape}")
+
+        # Validate shapes — allow (N,) x with (N,2) y for DMTA/GMM complex
+        # data (G', G'' as separate columns). is_complex/y_real/y_imag/etc.
+        # below recognize this (N,2) convention as well as complex dtype.
+        if y_array.ndim > 2 or (y_array.ndim == 2 and y_array.shape[1] != 2):
+            logger.error("y data has unsupported shape", y_shape=y_array.shape)
+            raise ValueError(
+                f"y must be 1-dimensional (real/complex), or 2-dimensional with "
+                f"shape (N, 2) for the DMTA/GMM G'/G'' convention. Got shape {y_array.shape}"
+            )
+
         if x_array.shape[0] != y_array.shape[0]:
             logger.error(
                 "Shape mismatch between x and y data",
@@ -172,8 +209,15 @@ class RheoData:
         """Validate data for common issues."""
         logger.debug(
             "Validating data",
-            checks=["nan", "finite", "monotonic", "negative_frequency"],
+            checks=["dtype", "nan", "finite", "monotonic", "negative_frequency"],
         )
+
+        # Reject non-numeric dtypes (bool masks, object arrays) before the
+        # NaN/finite checks below — those checks trivially pass for bool/int
+        # data (never NaN, always finite), so a stray mask array would
+        # otherwise be silently treated as real physical data.
+        _check_dtype(_coerce_ndarray(self.x), "x")
+        _check_dtype(_coerce_ndarray(self.y), "y", allow_complex=True)
 
         # Check for NaN values first (NaN is also non-finite)
         if isinstance(self.x, np.ndarray):
@@ -378,11 +422,15 @@ class RheoData:
         return data_dict
 
     @classmethod
-    def from_dict(cls, data_dict: dict[str, Any]) -> RheoData:
+    def from_dict(cls, data_dict: dict[str, Any], validate: bool = True) -> RheoData:
         """Create from dictionary representation.
 
         Args:
             data_dict: Dictionary with data and metadata
+            validate: Whether to validate the deserialized data (NaN/Inf/
+                monotonicity checks). Defaults to True since this is a
+                deserialization boundary for potentially external/edited
+                payloads, matching the primary constructor's default.
 
         Returns:
             RheoData instance
@@ -404,7 +452,7 @@ class RheoData:
             domain=data_dict.get("domain", "time"),
             metadata=dict(metadata),
             initial_test_mode=test_mode,
-            validate=False,
+            validate=validate,
         )
 
     # NumPy-like interface
@@ -430,25 +478,37 @@ class RheoData:
 
     @property
     def is_complex(self) -> bool:
-        """Check if y data is complex."""
-        return np.iscomplexobj(_coerce_ndarray(self.y))
+        """Check if y data represents complex modulus data.
+
+        True for complex-dtype y (G* = G' + i*G'') and for the real-valued
+        (N,2) DMTA/GMM convention (G', G'' as separate columns) — both
+        encode the same storage/loss modulus split; see y_real/y_imag.
+        """
+        y = _coerce_ndarray(self.y)
+        return bool(np.iscomplexobj(y) or (y.ndim == 2 and y.shape[1] == 2))
 
     @property
     def modulus(self) -> np.ndarray | None:
-        """Get modulus of complex data."""
+        """Get modulus of complex modulus data (|G*| = sqrt(G'^2 + G''^2))."""
         if self.is_complex:
             if self.y is None:
                 raise ValueError("RheoData.modulus requires non-None y data")
-            return np.abs(self.y)
+            G_prime, G_double_prime = self.y_real, self.y_imag
+            if isinstance(self.y, jnp.ndarray):
+                return jnp.sqrt(G_prime**2 + G_double_prime**2)
+            return np.sqrt(G_prime**2 + G_double_prime**2)
         return None
 
     @property
     def phase(self) -> np.ndarray | None:
-        """Get phase of complex data."""
+        """Get phase angle of complex modulus data (delta = atan2(G'', G'))."""
         if self.is_complex:
             if self.y is None:
                 raise ValueError("RheoData.phase requires non-None y data")
-            return np.angle(self.y)
+            G_prime, G_double_prime = self.y_real, self.y_imag
+            if isinstance(self.y, jnp.ndarray):
+                return jnp.arctan2(G_double_prime, G_prime)
+            return np.arctan2(G_double_prime, G_prime)
         return None
 
     @property
@@ -456,7 +516,9 @@ class RheoData:
         """Get real component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the storage
-        modulus (G'). For real data, returns y unchanged.
+        modulus (G'). For the real-valued (N,2) DMTA/GMM convention (G', G''
+        as separate columns), this returns column 0 (G'). For plain real
+        data, returns y unchanged.
 
         Returns:
             Real component of y data (G' for complex modulus)
@@ -469,10 +531,14 @@ class RheoData:
         if self.y is None:
             raise ValueError("RheoData.y_real requires non-None y data")
         y = self.y
-        if self.is_complex:
+        y_np = _coerce_ndarray(y)
+        if np.iscomplexobj(y_np):
             if isinstance(y, jnp.ndarray):
                 return jnp.real(y)
             return np.real(y)
+        if y_np.ndim == 2 and y_np.shape[1] == 2:
+            # (N,2) DMTA/GMM convention: column 0 is G' (storage modulus)
+            return y[:, 0]
         # Invariant: __post_init__ always converts x/y via _ensure_array, so y is
         # never a bare list/tuple here — narrow for mypy, raise loudly if violated.
         if not isinstance(y, (np.ndarray, jnp.ndarray)):
@@ -486,7 +552,9 @@ class RheoData:
         """Get imaginary component of y data.
 
         For complex modulus data (G* = G' + i·G''), this returns the loss
-        modulus (G''). For real data, returns zeros.
+        modulus (G''). For the real-valued (N,2) DMTA/GMM convention (G', G''
+        as separate columns), this returns column 1 (G''). For plain real
+        data, returns zeros.
 
         Returns:
             Imaginary component of y data (G'' for complex modulus)
@@ -499,10 +567,14 @@ class RheoData:
         if self.y is None:
             raise ValueError("RheoData.y_imag requires non-None y data")
         y = self.y
-        if self.is_complex:
+        y_np = _coerce_ndarray(y)
+        if np.iscomplexobj(y_np):
             if isinstance(y, jnp.ndarray):
                 return jnp.imag(y)
             return np.imag(y)
+        if y_np.ndim == 2 and y_np.shape[1] == 2:
+            # (N,2) DMTA/GMM convention: column 1 is G'' (loss modulus)
+            return y[:, 1]
         if isinstance(y, jnp.ndarray):
             return jnp.zeros_like(y)
         return np.zeros_like(y)
@@ -578,16 +650,10 @@ class RheoData:
         Returns:
             Test mode string (relaxation, creep, oscillation, rotation, unknown)
         """
-        # Prefer explicitly provided test mode
-        if self._explicit_test_mode is not None:
-            return self._explicit_test_mode
-
-        # R8-DATA-001: check private cache first, avoid shared metadata dict
-        _cached = getattr(self, "_detected_test_mode", None)
-        if _cached is not None:
-            return _cached
-
-        # Check if already set in metadata (explicit or previously detected)
+        # metadata['test_mode'] is the live source of truth: check it first so a
+        # direct `data.metadata['test_mode'] = ...` mutation takes effect, matching
+        # this docstring's contract instead of silently deferring to the frozen
+        # _explicit_test_mode snapshot taken at construction time.
         if "test_mode" in self.metadata:
             _raw = self.metadata["test_mode"]
             try:
@@ -596,6 +662,16 @@ class RheoData:
                 return TestMode(_raw.lower()).value if isinstance(_raw, str) else _raw
             except (ValueError, AttributeError):
                 return _raw
+
+        # R8-DATA-001: check private cache first, avoid shared metadata dict
+        _cached = getattr(self, "_detected_test_mode", None)
+        if _cached is not None:
+            return _cached
+
+        # Fall back to explicitly provided test mode (kept for the case where
+        # _explicit_test_mode was set without a corresponding metadata entry)
+        if self._explicit_test_mode is not None:
+            return self._explicit_test_mode
 
         # Lazy import to avoid circular dependency
         from rheojax.core.test_modes import detect_test_mode
@@ -756,14 +832,18 @@ class RheoData:
         if len(x_for_interp) > 1:
             x_np = _coerce_ndarray(x_for_interp)
             diffs = np.diff(x_np)
-            if np.all(diffs < 0):  # strictly decreasing
-                # Reverse both arrays to make x increasing
+            if not np.all(diffs > 0):  # not already strictly increasing
+                # Covers both the strictly-decreasing case and genuinely
+                # unsorted/mixed-sign x (which _validate_data only warns
+                # about) — np.interp/jnp.interp silently produce wrong
+                # values unless x is increasing.
+                order = np.argsort(x_np)
                 if isinstance(x_for_interp, jnp.ndarray):
-                    x_for_interp = jnp.flip(x_for_interp)
-                    y_for_interp = jnp.flip(y_for_interp)
+                    x_for_interp = x_for_interp[order]
+                    y_for_interp = y_for_interp[order]
                 else:
-                    x_for_interp = np.flip(x_for_interp)
-                    y_for_interp = np.flip(y_for_interp)
+                    x_for_interp = np.asarray(x_for_interp)[order]
+                    y_for_interp = np.asarray(y_for_interp)[order]
 
         if np.iscomplexobj(y_for_interp):
             # Complex data: interpolate real and imaginary parts separately.
@@ -896,6 +976,13 @@ class RheoData:
         else:
             dy_dx = np.gradient(y, x)
 
+        if not np.all(np.isfinite(np.asarray(dy_dx))):
+            logger.error("derivative() produced non-finite values")
+            raise ValueError(
+                "derivative() produced non-finite values; check for "
+                "duplicate/zero-spacing x values"
+            )
+
         return RheoData(
             x=self.x,
             y=dy_dx,
@@ -957,7 +1044,7 @@ class RheoData:
         Returns:
             Frequency domain RheoData
         """
-        if self.domain != "time":
+        if self.domain == "frequency":
             logger.debug("Data is already in frequency domain")
             warnings.warn(
                 "Data is already in frequency domain", UserWarning, stacklevel=2
@@ -976,7 +1063,7 @@ class RheoData:
         Returns:
             Time domain RheoData
         """
-        if self.domain != "frequency":
+        if self.domain == "time":
             logger.debug("Data is already in time domain")
             warnings.warn("Data is already in time domain", UserWarning, stacklevel=2)
             return self.copy()

@@ -153,8 +153,10 @@ class Registry:
                 if isinstance(p, str):
                     try:
                         normalized_protocols.append(Protocol(p))
-                    except ValueError:
-                        logger.warning(f"Invalid protocol '{p}' for plugin '{name}'")
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"Invalid protocol '{p}' for plugin '{name}'"
+                        ) from exc
                 elif isinstance(p, Protocol):  # type: ignore[unreachable]
                     normalized_protocols.append(p)
 
@@ -164,10 +166,10 @@ class Registry:
             if isinstance(transform_type, str):
                 try:
                     normalized_transform_type = TransformType(transform_type)
-                except ValueError:
-                    logger.warning(
+                except ValueError as exc:
+                    raise ValueError(
                         f"Invalid transform_type '{transform_type}' for plugin '{name}'"
-                    )
+                    ) from exc
             elif isinstance(transform_type, TransformType):  # type: ignore[unreachable]
                 normalized_transform_type = transform_type
 
@@ -202,12 +204,30 @@ class Registry:
                     raise ValueError(
                         f"Model plugin does not implement required interface: missing '{method}' method"
                     )
+            # hasattr alone can't catch an incomplete ABC subclass: the
+            # concrete fit()/predict() wrappers (and even the abstract
+            # _fit/_predict stubs) are always present via inheritance.
+            # Reject any plugin class that still has unimplemented
+            # abstract methods (e.g. BaseModel._fit/_predict never
+            # overridden).
+            if inspect.isabstract(plugin_class):
+                missing = sorted(plugin_class.__abstractmethods__)
+                raise ValueError(
+                    f"Model plugin '{plugin_class.__name__}' is abstract; "
+                    f"missing implementation for: {', '.join(missing)}"
+                )
 
         elif plugin_type == PluginType.TRANSFORM:
             # Check for required transform methods
             if not hasattr(plugin_class, "transform"):
                 raise ValueError(
                     "Transform plugin does not implement required interface: missing 'transform' method"
+                )
+            if inspect.isabstract(plugin_class):
+                missing = sorted(plugin_class.__abstractmethods__)
+                raise ValueError(
+                    f"Transform plugin '{plugin_class.__name__}' is abstract; "
+                    f"missing implementation for: {', '.join(missing)}"
                 )
 
     def get(
@@ -289,10 +309,20 @@ class Registry:
         Returns:
             Dictionary mapping plugin names to (class, type) tuples
         """
-        result = {}
+        result: dict[str, tuple[type, PluginType]] = {}
         for name, info in self._models.items():
             result[name] = (info.plugin_class, PluginType.MODEL)
         for name, info in self._transforms.items():
+            if name in result:
+                # Model and transform namespaces are independent (see
+                # __contains__/get), but get_all() flattens both into a
+                # single name-keyed dict, so a name registered as both
+                # would otherwise silently drop the model entry here.
+                logger.warning(
+                    "Plugin name registered as both a model and a transform; "
+                    "get_all() will only return the transform entry",
+                    name=name,
+                )
             result[name] = (info.plugin_class, PluginType.TRANSFORM)
         return result
 
@@ -341,11 +371,18 @@ class Registry:
         try:
             module = importlib.import_module(module_name)
         except ImportError:
+            logger.warning(
+                "Failed to import module during discovery", module_name=module_name
+            )
             return
 
         # Scan module for plugins
         for name, obj in inspect.getmembers(module):
             if inspect.isclass(obj):
+                # Only register classes actually defined in this module, not
+                # base classes merely imported into its namespace (e.g. BaseModel).
+                if getattr(obj, "__module__", None) != module_name:
+                    continue
                 # Check if it's a model
                 if hasattr(obj, "fit") and hasattr(obj, "predict"):
                     try:
@@ -422,6 +459,7 @@ class Registry:
         self,
         protocol: Protocol | str | None = None,
         transform_type: TransformType | str | None = None,
+        plugin_type: PluginType | None = None,
         **criteria,
     ) -> list[str]:
         """Find plugins matching certain criteria.
@@ -429,6 +467,9 @@ class Registry:
         Args:
             protocol: Filter models by supported protocol
             transform_type: Filter transforms by type
+            plugin_type: Restrict the scan to PluginType.MODEL or
+                PluginType.TRANSFORM. Defaults to None, which scans both
+                (preserves the historical bare-call behavior).
             **criteria: Additional criteria to match against plugin metadata
 
         Returns:
@@ -438,13 +479,17 @@ class Registry:
         compatible = []
 
         # Check models
-        if transform_type is None:
+        if transform_type is None and plugin_type in (None, PluginType.MODEL):
             for name, info in self._models.items():
                 # Protocol filtering
                 if protocol:
-                    target_proto = (
-                        Protocol(protocol) if isinstance(protocol, str) else protocol
-                    )
+                    try:
+                        target_proto = (
+                            Protocol(protocol) if isinstance(protocol, str) else protocol
+                        )
+                    except ValueError:
+                        # Unrecognized protocol string: no model can match it.
+                        continue
                     if target_proto not in info.protocols:
                         continue
 
@@ -452,15 +497,19 @@ class Registry:
                     compatible.append(name)
 
         # Check transforms
-        if protocol is None:
+        if protocol is None and plugin_type in (None, PluginType.TRANSFORM):
             for name, info in self._transforms.items():
                 # Transform type filtering
                 if transform_type:
-                    target_type = (
-                        TransformType(transform_type)
-                        if isinstance(transform_type, str)
-                        else transform_type
-                    )
+                    try:
+                        target_type = (
+                            TransformType(transform_type)
+                            if isinstance(transform_type, str)
+                            else transform_type
+                        )
+                    except ValueError:
+                        # Unrecognized transform_type string: no transform can match it.
+                        continue
                     if info.transform_type != target_type:
                         continue
 
@@ -535,7 +584,14 @@ class Registry:
                     force=True,
                     protocols=protocols,
                 )
-            except (ImportError, AttributeError):
+            except (ImportError, AttributeError, KeyError, TypeError) as exc:
+                logger.warning(
+                    "Failed to restore model from state",
+                    name=name,
+                    module=info.get("module") if isinstance(info, dict) else None,
+                    class_name=info.get("class_name") if isinstance(info, dict) else None,
+                    error=str(exc),
+                )
                 continue
 
         # Import transforms
@@ -552,7 +608,14 @@ class Registry:
                     force=True,
                     transform_type=transform_type,
                 )
-            except (ImportError, AttributeError):
+            except (ImportError, AttributeError, KeyError, TypeError) as exc:
+                logger.warning(
+                    "Failed to restore transform from state",
+                    name=name,
+                    module=info.get("module") if isinstance(info, dict) else None,
+                    class_name=info.get("class_name") if isinstance(info, dict) else None,
+                    error=str(exc),
+                )
                 continue
 
     def inventory(self) -> dict[str, Any]:
@@ -685,6 +748,7 @@ class ModelRegistry:
         cls,
         name: str,
         protocols: list[Protocol | str] | None = None,
+        validate: bool = True,
         **metadata,
     ):
         """Decorator for registering a model.
@@ -692,6 +756,9 @@ class ModelRegistry:
         Args:
             name: Name for the model
             protocols: List of supported protocols
+            validate: Whether to validate the model implements the required
+                interface (fit/predict, and no unimplemented abstract
+                methods) at registration time. Defaults to True.
             **metadata: Additional metadata for the model
 
         Returns:
@@ -711,6 +778,7 @@ class ModelRegistry:
                 model_class,
                 PluginType.MODEL,
                 metadata=metadata,
+                validate=validate,
                 protocols=protocols,
             )
             return model_class
@@ -782,7 +850,9 @@ class ModelRegistry:
 
         _ensure_all_registered()
         registry = cls._get_registry()
-        return registry.find_compatible(protocol=protocol, **criteria)
+        return registry.find_compatible(
+            protocol=protocol, plugin_type=PluginType.MODEL, **criteria
+        )
 
     @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:
@@ -922,12 +992,21 @@ class TransformRegistry:
         return cls._registry
 
     @classmethod
-    def register(cls, name: str, type: TransformType | str | None = None, **metadata):
+    def register(
+        cls,
+        name: str,
+        type: TransformType | str | None = None,
+        validate: bool = True,
+        **metadata,
+    ):
         """Decorator for registering a transform.
 
         Args:
             name: Name for the transform
             type: Type of transform (TransformType)
+            validate: Whether to validate the transform implements the
+                required interface (transform, and no unimplemented
+                abstract methods) at registration time. Defaults to True.
             **metadata: Additional metadata for the transform
 
         Returns:
@@ -946,6 +1025,7 @@ class TransformRegistry:
                 transform_class,
                 PluginType.TRANSFORM,
                 metadata=metadata,
+                validate=validate,
                 transform_type=type,
             )
             return transform_class
@@ -1013,7 +1093,9 @@ class TransformRegistry:
 
         _ensure_all_registered()
         registry = cls._get_registry()
-        return registry.find_compatible(transform_type=type, **criteria)
+        return registry.find_compatible(
+            transform_type=type, plugin_type=PluginType.TRANSFORM, **criteria
+        )
 
     @classmethod
     def get_info(cls, name: str) -> PluginInfo | None:

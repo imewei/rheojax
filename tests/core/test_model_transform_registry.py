@@ -86,6 +86,29 @@ class TestModelRegistryDecorator:
         assert isinstance(model, TestModel)
         assert isinstance(model, BaseModel)
 
+    def test_register_validates_by_default(self):
+        """@ModelRegistry.register() must validate the plugin interface by
+        default: a BaseModel subclass that never overrides the abstract
+        _fit/_predict hooks must be rejected at registration time, not
+        silently accepted and only fail later at instantiation."""
+        with pytest.raises(ValueError, match="abstract"):
+
+            @ModelRegistry.register("incomplete_model")
+            class IncompleteModel(BaseModel):
+                """Never implements _fit/_predict."""
+
+        assert "incomplete_model" not in ModelRegistry.list_models()
+
+    def test_register_validate_false_opts_out(self):
+        """validate=False must still allow registering an incomplete
+        BaseModel subclass, preserving the escape hatch."""
+
+        @ModelRegistry.register("incomplete_model_opt_out", validate=False)
+        class IncompleteModel(BaseModel):
+            """Never implements _fit/_predict."""
+
+        assert "incomplete_model_opt_out" in ModelRegistry.list_models()
+
 
 class TestModelRegistryFactory:
     """Test ModelRegistry factory method (Task 6.2)."""
@@ -234,6 +257,25 @@ class TestModelRegistryDiscovery:
         assert info.metadata["domain"] == "frequency"
         assert "Test model documentation" in info.doc
 
+    def test_compatible_models_with_unrecognized_test_mode_does_not_raise(self):
+        """compatible_models() must degrade gracefully (empty list), not
+        crash, for real RheoData.test_mode values like 'rotation'/'unknown'
+        that are valid TestModeEnum members but not Protocol enum members."""
+
+        @ModelRegistry.register("test_model_for_mode_check")
+        class TestModelForModeCheck(BaseModel):
+            def _fit(self, X, y, **kwargs):
+                return self
+
+            def _predict(self, X):
+                return X
+
+        class FakeData:
+            test_mode = "unknown"
+
+        result = ModelRegistry.compatible_models(FakeData())
+        assert result == []
+
 
 class TestTransformRegistryDecorator:
     """Test TransformRegistry decorator registration (Task 6.3)."""
@@ -288,6 +330,28 @@ class TestTransformRegistryDecorator:
         info = TransformRegistry.get_info("mastercurve")
         assert info.metadata["method"] == "wlf"
         assert info.metadata["algorithm"] == "ml"
+
+    def test_register_validates_by_default(self):
+        """@TransformRegistry.register() must validate the plugin interface
+        by default: a BaseTransform subclass that never overrides the
+        abstract _transform hook must be rejected at registration time."""
+        with pytest.raises(ValueError, match="abstract"):
+
+            @TransformRegistry.register("incomplete_transform")
+            class IncompleteTransform(BaseTransform):
+                """Never implements _transform."""
+
+        assert "incomplete_transform" not in TransformRegistry.list_transforms()
+
+    def test_register_validate_false_opts_out(self):
+        """validate=False must still allow registering an incomplete
+        BaseTransform subclass, preserving the escape hatch."""
+
+        @TransformRegistry.register("incomplete_transform_opt_out", validate=False)
+        class IncompleteTransform(BaseTransform):
+            """Never implements _transform."""
+
+        assert "incomplete_transform_opt_out" in TransformRegistry.list_transforms()
 
 
 class TestTransformRegistryFactory:
@@ -472,3 +536,27 @@ class TestRegistryIsolation:
         # Verify unregistration
         assert "temp_model" not in ModelRegistry.list_models()
         assert "temp_transform" not in TransformRegistry.list_transforms()
+
+    def test_find_does_not_leak_across_namespaces(self):
+        """ModelRegistry.find()/TransformRegistry.find() must each only ever
+        return names from their own namespace, even when a model and a
+        transform share matching metadata and no protocol/type is given."""
+
+        @ModelRegistry.register("shared_domain_model", domain="leak_test")
+        class SharedDomainModel(BaseModel):
+            def _fit(self, X, y, **kwargs):
+                return self
+
+            def _predict(self, X):
+                return X
+
+        @TransformRegistry.register("shared_domain_transform", domain="leak_test")
+        class SharedDomainTransform(BaseTransform):
+            def _transform(self, data):
+                return data
+
+        model_matches = ModelRegistry.find(domain="leak_test")
+        transform_matches = TransformRegistry.find(domain="leak_test")
+
+        assert model_matches == ["shared_domain_model"]
+        assert transform_matches == ["shared_domain_transform"]
