@@ -543,7 +543,7 @@ class SGRGeneric(BaseModel):
                     self._fit_relaxation_mode(X, y, **kwargs)
                 elif test_mode == "creep":
                     self._fit_creep_mode(X, y, **kwargs)
-                elif test_mode in ("steady_shear", "flow_curve"):
+                elif test_mode in ("steady_shear", "rotation", "flow_curve"):
                     self._fit_steady_shear_mode(X, y, **kwargs)
                 elif test_mode == "laos":
                     self._fit_laos_mode(X, y, **kwargs)
@@ -1474,7 +1474,7 @@ class SGRGeneric(BaseModel):
             return self._predict_oscillation(X)
         elif test_mode == "relaxation":
             return self._predict_relaxation(X)
-        elif test_mode in ("steady_shear", "flow_curve"):
+        elif test_mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear(X)
         elif test_mode == "creep":
             return self._predict_creep(X)
@@ -1627,7 +1627,7 @@ class SGRGeneric(BaseModel):
             return self._predict_oscillation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "relaxation":
             return self._predict_relaxation_jit(X_jax, x, G0_scale, tau0)
-        elif mode in ("steady_shear", "flow_curve"):
+        elif mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear_jit(X_jax, x, G0_scale, tau0)
         elif mode == "creep":
             return self._predict_creep_jit(X_jax, x, G0_scale, tau0)

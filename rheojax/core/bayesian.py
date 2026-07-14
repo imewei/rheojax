@@ -377,10 +377,18 @@ class BayesianMixin:
         of raising. So y must be exactly 1-D, with the single exception of
         the (N, 2) real/imag-columns convention that numpyro_model_builder
         and RheoData both already support for oscillation data (G', G'').
+
+        IKH/FIKH's startup/LAOS protocols pack X as ``(2, N)`` [time, strain]
+        (see ``ikh/_base.py::_extract_time_strain``) -- length there is the
+        second axis, not the first, so use that instead of assuming X is a
+        1-D length-N x-axis.
         """
         x_arr = np.asarray(X_array)
         y_arr = np.asarray(y_array)
-        n = x_arr.shape[0] if x_arr.ndim > 0 else None
+        if x_arr.ndim == 2 and x_arr.shape[0] == 2:
+            n = x_arr.shape[1]
+        else:
+            n = x_arr.shape[0] if x_arr.ndim > 0 else None
 
         if y_arr.ndim == 1:
             pass

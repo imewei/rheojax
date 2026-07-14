@@ -614,6 +614,8 @@ class FIKHBase(BaseModel, FractionalModelMixin):
                 return TestMode.STARTUP
             elif mode_str == "saos":
                 return TestMode.OSCILLATION
+            elif mode_str in ("rotation", "steady_shear"):
+                return TestMode.FLOW_CURVE
             test_mode = TestMode(mode_str)
 
         if test_mode not in self.SUPPORTED_PROTOCOLS:

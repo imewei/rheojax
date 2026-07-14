@@ -534,8 +534,11 @@ class TestSGRGenericFitValidation:
     """Input validation raised before optimization begins."""
 
     def test_oscillation_bad_gstar_shape_raises(self):
+        """Caught by FitOrchestrator._validate_fit_data's I/O-boundary gate
+        before model._fit() ever runs, so the message is RheoData's generic
+        shape-validation text rather than this model's own."""
         model = SGRGeneric()
-        with pytest.raises(ValueError, match="G_star must be complex"):
+        with pytest.raises(ValueError, match=r"2-dimensional with shape \(N, 2\)"):
             model.fit(np.logspace(0, 2, 10), np.ones((10, 3)), test_mode="oscillation")
 
     def test_laos_fit_requires_gamma0_and_omega(self):

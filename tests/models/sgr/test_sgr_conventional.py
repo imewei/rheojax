@@ -1481,12 +1481,17 @@ class TestSGRConventionalOscillationInputFormats:
         assert model.fitted_ is True
 
     def test_fit_invalid_shape_raises(self):
-        """Wrong-shape modulus raises ValueError (lines 393-396)."""
+        """Wrong-shape modulus raises ValueError (lines 393-396).
+
+        Caught by FitOrchestrator._validate_fit_data's I/O-boundary gate
+        before model._fit() ever runs, so the message is RheoData's generic
+        shape-validation text rather than this model's own.
+        """
         omega = np.logspace(-2, 2, 30)
         bad = np.ones((30, 3))  # neither complex, (M,2), nor (2,M)
 
         model = SGRConventional()
-        with pytest.raises(ValueError, match=r"G_star must be complex"):
+        with pytest.raises(ValueError, match=r"2-dimensional with shape \(N, 2\)"):
             model.fit(omega, bad, test_mode="oscillation")
 
 

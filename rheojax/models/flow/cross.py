@@ -374,7 +374,7 @@ class Cross(BaseModel):
             test_mode = detect_test_mode(rheo_data)
 
         # Validate test mode
-        if test_mode != TestMode.ROTATION:
+        if test_mode not in (TestMode.ROTATION, TestMode.FLOW_CURVE):
             raise ValueError(
                 f"Cross model only supports ROTATION test mode, got {test_mode}"
             )

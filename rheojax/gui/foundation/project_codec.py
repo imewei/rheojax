@@ -439,6 +439,26 @@ def load_project_v2(path: Path):
                 (tmp_root / "library" / "manifest.json").read_text()
             )
             for ref_dict in library_manifest:
+                # Normalize stale rotation/flow protocol_type tags the same way
+                # GUI import does (WorkspaceWindow._normalize_import_test_mode),
+                # so reopening an old project doesn't hide datasets from
+                # DatasetLibrary.datasets_of_type("flow_curve"). Duplicated here
+                # (rather than imported from gui/workspace/window.py) to avoid a
+                # foundation -> workspace dependency.
+                protocol_type = ref_dict.get("protocol_type")
+                if protocol_type == "flow":
+                    ref_dict["protocol_type"] = "flow_curve"
+                else:
+                    try:
+                        from rheojax.core.test_modes import TestModeEnum
+
+                        _protocol = TestModeEnum(
+                            str(protocol_type).lower()
+                        ).to_protocol()
+                        if _protocol is not None:
+                            ref_dict["protocol_type"] = _protocol.value
+                    except ValueError:
+                        pass
                 ref = DatasetRef(**ref_dict)
                 _validate_ref_id(ref.id)
                 state.library.add(ref)

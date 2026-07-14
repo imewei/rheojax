@@ -179,7 +179,7 @@ class LatticeEPM(EPMBase):
         # Use base class method for parameter extraction
         param_dict = self._get_param_dict()
 
-        if test_mode == "flow_curve":
+        if test_mode in ("flow_curve", "rotation", "steady_shear"):
             return self._run_flow_curve(
                 rheo_data, key, propagator_q, param_dict, smooth
             )

@@ -1092,9 +1092,13 @@ class TransformService:
                 warnings.append(f"{name} requires at least 2 datasets")
 
             # Check for consistent test modes
-            test_modes = [d.metadata.get("test_mode") for d in data]
-            if len(set(test_modes)) > 1:
-                warnings.append("Datasets have different test modes")
+            # ponytail: cox_merz is a by-design heterogeneous pair (oscillation +
+            # flow_curve/rotation) -- skip the same-mode check for it, add a
+            # typed-pair-aware check (slots_spec._TYPED_PAIRS) if more pairs need it.
+            if name != "cox_merz":
+                test_modes = [d.metadata.get("test_mode") for d in data]
+                if len(set(test_modes)) > 1:
+                    warnings.append("Datasets have different test modes")
 
         else:
             # Single dataset checks
@@ -1115,7 +1119,7 @@ class TransformService:
                         "SPP typically requires at least 100 points per cycle"
                     )
                 test_mode = data.metadata.get("test_mode", "")
-                if test_mode and test_mode != "oscillation":
+                if test_mode and test_mode not in ("oscillation", "laos"):
                     warnings.append(
                         f"SPP is for oscillatory (LAOS) data, got {test_mode}"
                     )

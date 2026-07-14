@@ -229,6 +229,8 @@ class ITTMCTBase(BaseModel):
         # Dispatch to protocol-specific fitting
         protocol_dispatch = {
             "flow_curve": self._fit_flow_curve,
+            "steady_shear": self._fit_flow_curve,
+            "rotation": self._fit_flow_curve,
             "oscillation": self._fit_oscillation,
             "startup": self._fit_startup,
             "creep": self._fit_creep,
@@ -275,6 +277,8 @@ class ITTMCTBase(BaseModel):
         # Dispatch to protocol-specific prediction
         protocol_dispatch = {
             "flow_curve": self._predict_flow_curve,
+            "steady_shear": self._predict_flow_curve,
+            "rotation": self._predict_flow_curve,
             "oscillation": self._predict_oscillation,
             "startup": self._predict_startup,
             "creep": self._predict_creep,

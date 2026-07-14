@@ -639,7 +639,7 @@ class TNTStickyRouse(TNTBase):
         # Dispatch by protocol
         if test_mode == "oscillation":
             result = self._predict_oscillation_vec(x_jax, G_modes, tau_eff, eta_s)
-        elif test_mode == "flow_curve":
+        elif test_mode in ("flow_curve", "steady_shear", "rotation"):
             result = self._predict_flow_curve_vec(x_jax, G_modes, tau_eff, eta_s)
         elif test_mode == "relaxation":
             # Compute per-mode initial stress from CURRENT G_modes each call —

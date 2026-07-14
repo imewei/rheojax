@@ -49,7 +49,11 @@ class TestSTZCoverage:
             # Case 1: gamma_0 > 0.01 -> LAOS
             # We must pass omega as well for LAOS
             self.model.fit(
-                self.omega, self.y, test_mode="oscillation", gamma_0=0.1, omega=1.0
+                self.omega,
+                self.G_star,
+                test_mode="oscillation",
+                gamma_0=0.1,
+                omega=1.0,
             )
             mock_laos.assert_called_once()
             mock_saos.assert_not_called()
