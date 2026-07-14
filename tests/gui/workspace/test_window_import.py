@@ -82,6 +82,52 @@ def test_import_completed_maps_flow_test_mode_to_flow_curve_protocol(qtbot, tmp_
     assert ref.protocol_type == "flow_curve"
 
 
+def test_import_completed_maps_rotation_test_mode_to_flow_curve_protocol(
+    qtbot, tmp_path
+):
+    # Regression: the CSV/Excel reader's column-based detector tags
+    # shear-rate/viscosity data "rotation" (see
+    # rheojax/io/readers/_utils.py::detect_test_mode_from_columns), which
+    # the old alias map didn't cover -- imported flow-curve CSVs like
+    # "Shear Rate, Viscosity" silently never appeared in any protocol's
+    # Data step even though the import itself reported success.
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+
+    source = tmp_path / "flow.csv"
+    source.write_text("Shear Rate,Viscosity\n0.1,7348.0\n1.0,831.83\n")
+    data = RheoData(
+        x=np.array([0.1, 1.0, 10.0]),
+        y=np.array([7348.0, 831.83, 94.353]),
+        domain="time",
+        metadata={"_source_file": str(source), "test_mode": "rotation"},
+    )
+
+    win._on_import_completed([data])
+
+    ref = next(iter(state.library.all()))
+    assert ref.protocol_type == "flow_curve"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("flow", "flow_curve"),  # legacy alias, not a TestModeEnum member
+        ("rotation", "flow_curve"),  # TestModeEnum.to_protocol() delegation
+        ("flow_curve", "flow_curve"),  # already canonical -- identity
+        ("startup", "startup"),  # other protocols pass through unchanged
+        ("unknown", "unknown"),  # to_protocol() returns None -- keep as-is
+        ("not_a_real_mode", "not_a_real_mode"),  # invalid enum value -- keep as-is
+    ],
+)
+def test_normalize_import_test_mode(raw, expected):
+    # Unit-level coverage for the alias-dict vs TestModeEnum.to_protocol()
+    # branches in WorkspaceWindow._normalize_import_test_mode, independent
+    # of the full import pipeline exercised by the tests above.
+    assert WorkspaceWindow._normalize_import_test_mode(raw) == expected
+
+
 def test_import_failed_shows_message_box(qtbot, monkeypatch):
     messages = []
     monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: messages.append(a[-1]))

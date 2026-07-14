@@ -1065,11 +1065,29 @@ class WorkspaceWindow(QMainWindow):
         self._notifier.changed.emit()
 
     # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
-    # predates Protocol.FLOW_CURVE), which never equality-matches
-    # DatasetLibrary.datasets_of_type("flow_curve") -- normalize it here so
-    # imported flow-curve datasets actually show up in the Fit/Transform Data
-    # step instead of silently landing in no protocol bucket at all.
+    # predates Protocol.FLOW_CURVE) -- not a TestModeEnum member, so it needs
+    # its own alias below. Every other test_mode string the reader can emit
+    # (e.g. "rotation" from the CSV/Excel column-based detector in
+    # _utils.detect_test_mode_from_columns) already has an authoritative
+    # equivalence encoded in TestModeEnum.to_protocol() -- delegate to that
+    # in _normalize_import_test_mode() instead of re-encoding the same
+    # rotation->flow_curve mapping a second time here. Without normalizing,
+    # a dataset's protocol_type never equality-matches
+    # DatasetLibrary.datasets_of_type("flow_curve") and it silently lands in
+    # no protocol bucket at all, invisible to the Fit/Transform Data step.
     _IMPORT_TEST_MODE_ALIASES = {"flow": "flow_curve"}
+
+    @classmethod
+    def _normalize_import_test_mode(cls, test_mode: str | None) -> str | None:
+        if test_mode in cls._IMPORT_TEST_MODE_ALIASES:
+            return cls._IMPORT_TEST_MODE_ALIASES[test_mode]
+        try:
+            from rheojax.core.test_modes import TestModeEnum
+
+            protocol = TestModeEnum(str(test_mode).lower()).to_protocol()
+        except ValueError:
+            return test_mode
+        return protocol.value if protocol is not None else test_mode
 
     def _on_import_requested(self) -> None:
         """Handle LibraryRail's "+ Import data..." button."""
@@ -1187,7 +1205,7 @@ class WorkspaceWindow(QMainWindow):
             meta = rheo_data.metadata
             source_file = meta.pop("_source_file", None)
             test_mode = meta.get("test_mode") or service.detect_test_mode(rheo_data)
-            test_mode = self._IMPORT_TEST_MODE_ALIASES.get(test_mode, test_mode)
+            test_mode = self._normalize_import_test_mode(test_mode)
             meta["test_mode"] = test_mode
 
             if source_file and source_file not in hash_cache:
