@@ -53,7 +53,7 @@ class TestGMMBayesianInference:
         omega = np.logspace(-2, 2, 30)
         G_prime = 1e6 * (omega * 0.1) ** 2 / (1 + (omega * 0.1) ** 2)
         G_double_prime = 1e6 * (omega * 0.1) / (1 + (omega * 0.1) ** 2)
-        G_star = np.vstack([G_prime, G_double_prime])
+        G_star = np.column_stack([G_prime, G_double_prime])  # (M, 2): G', G'' convention
         model.fit(omega, G_star, test_mode="oscillation")
 
         # Test model_function
