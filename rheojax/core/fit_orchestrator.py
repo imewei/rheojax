@@ -268,7 +268,7 @@ class FitOrchestrator:
         ``RheoData._validate_data`` also runs for raw-array oscillation
         fits (``domain`` otherwise defaults to "time" and skips that check).
         """
-        from rheojax.core.data import RheoData
+        from rheojax.core.data import RheoData, _check_dtype
 
         x_arr = np.asarray(X)
         y_arr = np.asarray(y)
@@ -279,12 +279,14 @@ class FitOrchestrator:
         # plain (x: 1D, y: 1D/complex/(N, 2)) convention. Those models already
         # run their own shape validation with model-specific error messages,
         # so defer to them here instead of raising RheoData's generic one;
-        # still check NaN/non-finite directly so that guarantee isn't lost.
+        # still run the same dtype/NaN/non-finite checks directly so those
+        # guarantees (in particular rejecting bool/object dtypes, which
+        # would otherwise silently pass the finite check below) aren't lost.
         if x_arr.ndim > 1 or (y_arr.ndim == 2 and y_arr.shape[1] != 2):
+            _check_dtype(x_arr, "X")
+            _check_dtype(y_arr, "y", allow_complex=True)
             for name, arr in (("X", x_arr), ("y", y_arr)):
-                if np.issubdtype(arr.dtype, np.number) and not np.all(
-                    np.isfinite(arr)
-                ):
+                if not np.all(np.isfinite(arr)):
                     raise ValueError(f"{name} data contains NaN or non-finite values")
             return
 
