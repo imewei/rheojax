@@ -557,6 +557,23 @@ class TestGMMSteadyShearMode:
         eta_0_expected = 1e4 * 0.1 + 1e3 * 1.0
         np.testing.assert_allclose(eta_pred, eta_0_expected, rtol=1e-6)
 
+    @pytest.mark.parametrize("alias", ["flow_curve", "rotation"])
+    def test_fit_accepts_steady_shear_aliases(self, alias):
+        """Regression: fit() previously only recognized test_mode='steady_shear',
+        raising ValueError('Unknown test_mode') for the 'flow_curve'/'rotation'
+        aliases every other model and GMM's own predict()/model_function()
+        already accept (GUI datasets are tagged 'flow_curve' after import)."""
+        gamma_dot = np.logspace(-2, 2, 30)
+        eta_avg = 5e3
+        eta_data = np.full_like(gamma_dot, eta_avg)
+
+        model = GeneralizedMaxwell(n_modes=3)
+        model.fit(gamma_dot, eta_data, test_mode=alias)
+        eta_pred = np.asarray(model.predict(gamma_dot, test_mode=alias))
+
+        assert np.all(np.isfinite(eta_pred))
+        np.testing.assert_allclose(eta_pred, eta_avg, rtol=1e-6)
+
 
 class TestGMMStartupMode:
     """Test GMM startup flow (stress growth) protocol."""
@@ -753,6 +770,19 @@ class TestGMMModelFunction:
         gamma_dot = np.logspace(-1, 1, 20)
         eta_0 = np.asarray(
             model.model_function(gamma_dot, self._params(), test_mode="steady_shear")
+        )
+        expected = 1e5 * 0.01 + 1e4 * 1.0
+        np.testing.assert_allclose(float(eta_0), expected, rtol=1e-6)
+
+    @pytest.mark.parametrize("alias", ["flow_curve", "rotation"])
+    def test_model_function_accepts_steady_shear_aliases(self, alias):
+        """Regression: model_function() previously only recognized
+        test_mode='steady_shear', raising ValueError for the 'flow_curve'/
+        'rotation' aliases (needed for NumPyro NUTS on GUI-imported flow data)."""
+        model = GeneralizedMaxwell(n_modes=2)
+        gamma_dot = np.logspace(-1, 1, 20)
+        eta_0 = np.asarray(
+            model.model_function(gamma_dot, self._params(), test_mode=alias)
         )
         expected = 1e5 * 0.01 + 1e4 * 1.0
         np.testing.assert_allclose(float(eta_0), expected, rtol=1e-6)

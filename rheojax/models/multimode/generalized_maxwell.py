@@ -196,7 +196,7 @@ class GeneralizedMaxwell(BaseModel):
                     self._fit_creep_mode(
                         X, y, optimization_factor=optimization_factor, **kwargs
                     )
-                elif test_mode == "steady_shear":
+                elif test_mode in ("steady_shear", "rotation", "flow_curve"):
                     self._fit_steady_shear_mode(
                         X, y, optimization_factor=optimization_factor, **kwargs
                     )
@@ -1381,7 +1381,7 @@ class GeneralizedMaxwell(BaseModel):
             return self._predict_oscillation(X)
         elif test_mode == "creep":
             return self._predict_creep(X)
-        elif test_mode in ("steady_shear", "flow_curve"):
+        elif test_mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear(X)
         elif test_mode == "startup":
             return self._predict_startup(X)
@@ -1940,7 +1940,7 @@ class GeneralizedMaxwell(BaseModel):
             return self._predict_creep_jit(
                 jnp.asarray(X), E_inf, E_i, tau_i, sigma_0=1.0
             )
-        elif test_mode == "steady_shear":
+        elif test_mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear_jit(E_inf, E_i, tau_i)
         elif test_mode == "startup":
             gamma_dot = kwargs.get(
