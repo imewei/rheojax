@@ -811,7 +811,18 @@ class ModelService:
             # Validate test mode is supported by this model
             model_info = self.get_model_info(model_name)
             supported_modes = model_info.get("supported_test_modes", [])
-            if supported_modes and test_mode not in supported_modes:
+            # Canonicalize aliases (e.g. "rotation" -> "flow_curve") before the
+            # gate so it isn't stricter than the model's own fit/predict dispatch.
+            canonical_test_mode = test_mode
+            try:
+                from rheojax.core.test_modes import TestModeEnum
+
+                _protocol = TestModeEnum(str(test_mode).lower()).to_protocol()
+                if _protocol is not None:
+                    canonical_test_mode = _protocol.value
+            except ValueError:
+                pass
+            if supported_modes and canonical_test_mode not in supported_modes:
                 error_msg = (
                     f"Model '{model_name}' does not support test_mode='{test_mode}'. "
                     f"Supported modes: {supported_modes}"

@@ -169,6 +169,27 @@ class TestBinghamRheoData:
         with pytest.raises(ValueError, match="only supports ROTATION"):
             model.predict_rheo(rheo_data)
 
+    def test_predict_rheo_accepts_flow_curve_test_mode(self):
+        """Regression: predict_rheo() previously rejected FLOW_CURVE-tagged
+        data even though Bingham is registered for Protocol.FLOW_CURVE and
+        GUI-imported flow-curve datasets are tagged 'flow_curve' (not
+        'rotation') since #74 -- ROTATION and FLOW_CURVE are the same
+        physical protocol and must both be accepted."""
+        model = Bingham()
+        model.parameters.set_value("sigma_y", 10.0)
+        model.parameters.set_value("eta_p", 0.5)
+
+        gamma_dot = np.logspace(-1, 2, 50)
+        rheo_data = RheoData(
+            x=gamma_dot,
+            y=np.zeros_like(gamma_dot),
+            metadata={"test_mode": TestMode.FLOW_CURVE},
+            validate=False,
+        )
+
+        result = model.predict_rheo(rheo_data, output="stress")
+        assert np.all(np.diff(result.y) >= 0)
+
 
 class TestBinghamFitting:
     """Test parameter fitting."""

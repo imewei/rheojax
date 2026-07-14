@@ -182,7 +182,7 @@ class DMTNonlocal(DMTBase):
         # P1-DMTNL-001: Cache test_mode for Bayesian _resolve_test_mode() fallback
         self._test_mode = test_mode
 
-        if test_mode in ("flow_curve", "rotation"):
+        if test_mode in ("flow_curve", "rotation", "steady_shear"):
             return self._fit_flow_curve(X, y, **kwargs)
         elif test_mode == "startup":
             return self._fit_startup(X, y, **kwargs)
@@ -193,7 +193,7 @@ class DMTNonlocal(DMTBase):
         """Predict model response."""
         test_mode = kwargs.get("test_mode", "flow_curve")
 
-        if test_mode in ("flow_curve", "rotation"):
+        if test_mode in ("flow_curve", "rotation", "steady_shear"):
             return self._predict_flow_curve(X, **kwargs)
         else:
             raise ValueError(f"Unknown test_mode for prediction: {test_mode}")

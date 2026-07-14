@@ -228,6 +228,24 @@ def test_validate_xy_shapes_rejects_length_mismatch():
         BayesianMixin._validate_xy_shapes(X, y)
 
 
+def test_validate_xy_shapes_accepts_ikh_packed_time_strain_x():
+    """IKH/FIKH pack X as (2, N) [time, strain] for startup/LAOS (see
+    ikh/_base.py::_extract_time_strain) -- length lives on axis 1, not
+    axis 0, so the plain X.shape[0] check must not apply here.
+    """
+    t = np.linspace(0, 5.0, 20)
+    X = np.stack([t, 2.0 * t])
+    y = np.linspace(0, 1, 20)
+    BayesianMixin._validate_xy_shapes(X, y)  # no raise
+
+
+def test_validate_xy_shapes_rejects_ikh_packed_x_length_mismatch():
+    X = np.stack([np.linspace(0, 5.0, 20), np.linspace(0, 10.0, 20)])
+    y = np.linspace(0, 1, 19)  # wrong length
+    with pytest.raises(ValueError, match="same length"):
+        BayesianMixin._validate_xy_shapes(X, y)
+
+
 # ---------------------------------------------------------------------------
 # _get_parameter_bounds (lines 352-357, 361)
 # ---------------------------------------------------------------------------

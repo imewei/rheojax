@@ -307,7 +307,7 @@ class SGRConventional(BaseModel):
                     self._fit_relaxation_mode(X, y, **kwargs)
                 elif test_mode == "creep":
                     self._fit_creep_mode(X, y, **kwargs)
-                elif test_mode in ("steady_shear", "flow_curve"):
+                elif test_mode in ("steady_shear", "rotation", "flow_curve"):
                     self._fit_steady_shear_mode(X, y, **kwargs)
                 elif test_mode == "laos":
                     self._fit_laos_mode(X, y, **kwargs)
@@ -1241,7 +1241,7 @@ class SGRConventional(BaseModel):
             return self._predict_relaxation(X)
         elif test_mode == "creep":
             return self._predict_creep(X)
-        elif test_mode in ("steady_shear", "flow_curve"):
+        elif test_mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear(X)
         elif test_mode == "laos":
             return self._predict_laos(X)
@@ -1785,7 +1785,7 @@ class SGRConventional(BaseModel):
             return self._predict_relaxation_jit(X_jax, x, G0_scale, tau0)
         elif mode == "creep":
             return self._predict_creep_jit(X_jax, x, G0_scale, tau0)
-        elif mode in ("steady_shear", "flow_curve"):
+        elif mode in ("steady_shear", "rotation", "flow_curve"):
             return self._predict_steady_shear_jit(X_jax, x, G0_scale, tau0)
         elif mode == "laos":
             # For LAOS Bayesian inference, use oscillation response

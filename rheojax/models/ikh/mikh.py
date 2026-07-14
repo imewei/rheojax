@@ -201,7 +201,7 @@ class MIKH(IKHBase):
         test_mode = kwargs.get("test_mode", "startup")
         self._test_mode = test_mode
 
-        if test_mode == "flow_curve":
+        if test_mode in ("flow_curve", "steady_shear", "rotation"):
             return self._fit_flow_curve(X, y, **kwargs)
         elif test_mode in ["creep", "relaxation"]:
             return self._fit_ode_formulation(X, y, **kwargs)
@@ -513,7 +513,7 @@ class MIKH(IKHBase):
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 
-        if test_mode == "flow_curve":
+        if test_mode in ("flow_curve", "steady_shear", "rotation"):
             gamma_dot = jnp.asarray(X)
             return ikh_flow_curve_steady_state(gamma_dot, **param_dict)
 

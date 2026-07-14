@@ -648,7 +648,7 @@ class MLIKH(IKHBase):
         params = self.parameters.get_values()
         param_dict = dict(zip(self.parameters.keys(), params, strict=True))
 
-        if test_mode == "flow_curve":
+        if test_mode in ("flow_curve", "steady_shear", "rotation"):
             return self._predict_flow_curve_from_params(jnp.asarray(X), param_dict)
         elif test_mode in ["creep", "relaxation"]:
             return self._simulate_transient(
@@ -683,7 +683,7 @@ class MLIKH(IKHBase):
         test_mode = kwargs.get("test_mode", "startup")
         self._test_mode = test_mode
 
-        if test_mode == "flow_curve":
+        if test_mode in ("flow_curve", "steady_shear", "rotation"):
             return self._fit_flow_curve(X, y, **kwargs)
         elif test_mode in ["creep", "relaxation"]:
             return self._fit_ode_formulation(X, y, **kwargs)

@@ -220,7 +220,7 @@ class HebraudLequeux(BaseModel):
             logger.info(f"Fitting HL model in mode: {test_mode}")
             ctx["test_mode"] = test_mode
 
-            if test_mode == "steady_shear" or test_mode == "flow_curve":
+            if test_mode in ("steady_shear", "rotation", "flow_curve"):
                 self._fit_steady_shear(X, y, **kwargs)
             elif test_mode == "creep":
                 self._fit_creep(X, y, **kwargs)
@@ -911,7 +911,7 @@ class HebraudLequeux(BaseModel):
         # handle t_max/n_steps correctly (computes it from X array)
         # So we can use them directly here as X is provided at runtime.
 
-        if self._test_mode in ("steady_shear", "flow_curve"):
+        if self._test_mode in ("steady_shear", "rotation", "flow_curve"):
             from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
             # Predict in normalized units (same as fitting) then scale back
@@ -1095,7 +1095,7 @@ class HebraudLequeux(BaseModel):
             return dt, n_steps
 
         # Dispatch to kernels
-        if mode in ("steady_shear", "flow_curve"):
+        if mode in ("steady_shear", "rotation", "flow_curve"):
             from rheojax.utils.hl_kernels import _compute_dt_and_steps_for_rate
 
             dt = (
