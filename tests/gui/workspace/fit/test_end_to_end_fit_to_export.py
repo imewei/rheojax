@@ -121,3 +121,68 @@ def test_full_fit_workflow_seeds_tables_and_exports(monkeypatch, qapp, tmp_path)
     #    because nlsq_result["x"] was always None.
     written = bodies[5].export_bundle(tmp_path)
     assert written["fitted_curve"].exists()
+
+
+def test_nuts_advanced_options_reach_run_bayesian_isolated(monkeypatch, qapp):
+    # Regression guard for issue #69 (a coverage gap left by the legacy
+    # RheoJAXMainWindow/BayesianPage removal, which deleted
+    # test_advanced_options_reach_make_bayesian_worker with no
+    # workspace-shell replacement): the surviving workspace shell's Bayesian
+    # fit step (NutsStep) must actually forward user-edited
+    # target_accept/max_tree_depth through to the sampler entry point, not
+    # silently drop them in favor of hardcoded defaults. Drives the real
+    # QDoubleSpinBox/QSpinBox widgets (not state.nuts_config directly) so the
+    # test fails if a future edit breaks the widget -> _on_settings_changed
+    # -> NutsStep.run()'s cfg dict -> _make_sample_fn -> run_bayesian_isolated
+    # chain at any link.
+    captured: dict = {}
+
+    def _fake_run_bayesian_isolated(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "posterior_samples": {"eta": [1.0]},
+            "sample_stats": {},
+            "r_hat": {},
+            "ess": {},
+            "bfmi": None,
+        }
+
+    monkeypatch.setattr(
+        fit_controller, "run_bayesian_isolated", _fake_run_bayesian_isolated
+    )
+
+    library = DatasetLibrary()
+    library.add(
+        DatasetRef(
+            id="ds1",
+            name="ds1",
+            protocol_type="oscillation",
+            origin="imported",
+            units={"x": "rad/s"},
+            row_count=5,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    x = np.linspace(0.1, 10.0, 5)
+    y = np.linspace(0.2, 5.0, 5)
+    library.store_payload("ds1", _RheoData(x, y))
+    app_state = AppState(library=library)
+
+    ctl, bodies = build_fit_controller(app_state)
+    bodies[0].set_protocol("oscillation")
+    bodies[0].set_model("maxwell")
+    bodies[1].select_dataset("ds1")
+
+    nuts_body = bodies[3]
+    # Drive the real widgets away from their library defaults (0.8 /
+    # unset-> None), matching a user actually opening Advanced Options and
+    # changing them.
+    nuts_body._target.setValue(0.95)
+    nuts_body._max_tree_depth.setValue(7)
+
+    nuts_body.run()
+
+    assert captured["target_accept"] == pytest.approx(0.95)
+    assert captured["max_tree_depth"] == 7
