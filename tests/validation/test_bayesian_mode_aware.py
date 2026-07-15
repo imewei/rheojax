@@ -988,6 +988,7 @@ class TestFractionalModelsRelaxation:
             FractionalPoyntingThomson,
         ],
     )
+    @pytest.mark.timeout(300)
     def test_fractional_model_relaxation_sampling(
         self, model_class, relaxation_fractional_data
     ):
