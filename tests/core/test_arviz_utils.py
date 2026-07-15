@@ -28,44 +28,6 @@ def test_inference_data_from_dict_uses_grouped_arviz_1_api() -> None:
     )
 
 
-def test_inference_data_from_dict_uses_keyword_arviz_0_api(monkeypatch) -> None:
-    calls = []
-
-    def legacy_from_dict(**kwargs):
-        calls.append(kwargs)
-        return "legacy-inference-data"
-
-    legacy_arviz = SimpleNamespace(__version__="0.23.4", from_dict=legacy_from_dict)
-    monkeypatch.setitem(__import__("sys").modules, "arviz", legacy_arviz)
-
-    posterior = {"tau": np.array([[1.0, 2.0]])}
-    sample_stats = {"diverging": np.array([[False, True]])}
-
-    result = arviz_utils.inference_data_from_dict(
-        {"posterior": posterior, "sample_stats": sample_stats}
-    )
-
-    assert result == "legacy-inference-data"
-    assert len(calls) == 1
-    assert calls[0].keys() == {"posterior", "sample_stats"}
-    np.testing.assert_array_equal(calls[0]["posterior"]["tau"], posterior["tau"])
-    np.testing.assert_array_equal(
-        calls[0]["sample_stats"]["diverging"], sample_stats["diverging"]
-    )
-
-
-def test_plot_kwargs_keep_legacy_arviz_keywords() -> None:
-    legacy_arviz = SimpleNamespace(__version__="0.23.4")
-
-    kwargs = arviz_utils.arviz_plot_kwargs(
-        legacy_arviz,
-        "plot_pair",
-        kind="kde",
-        divergences=True,
-        marginals=False,
-    )
-
-    assert kwargs == {"kind": "kde", "divergences": True, "marginals": False}
 
 
 def test_plot_pair_kwargs_map_arviz_1_divergences_and_marginal() -> None:
@@ -103,6 +65,73 @@ def test_plot_pair_kwargs_reject_unavailable_arviz_1_plot_kind() -> None:
 
     with pytest.raises(ValueError, match="only supports.*scatter"):
         arviz_utils.arviz_plot_kwargs(current_arviz, "plot_pair", kind="kde")
+
+
+def test_plot_posterior_kwargs_map_hdi_prob_and_set_defaults() -> None:
+    current_arviz = SimpleNamespace(__version__="1.2.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_posterior",
+        var_names=["a", "b"],
+        hdi_prob=0.9,
+    )
+
+    assert kwargs == {
+        "var_names": ["a", "b"],
+        "ci_prob": 0.9,
+        "ci_kind": "hdi",
+        "point_estimate": "mean",
+        "kind": "kde",
+    }
+
+
+def test_plot_posterior_kwargs_without_hdi_prob_still_sets_defaults() -> None:
+    current_arviz = SimpleNamespace(__version__="1.2.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_posterior",
+        var_names=["a"],
+    )
+
+    assert kwargs == {
+        "var_names": ["a"],
+        "ci_kind": "hdi",
+        "point_estimate": "mean",
+        "kind": "kde",
+    }
+
+
+@pytest.mark.parametrize(
+    ("combined", "sample_dims"),
+    [(False, ("draw",)), (True, ("chain", "draw"))],
+)
+def test_plot_trace_kwargs_map_arviz_1_chain_combination(
+    combined: bool, sample_dims: tuple[str, ...]
+) -> None:
+    current_arviz = SimpleNamespace(__version__="1.2.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_trace",
+        var_names=["a"],
+        combined=combined,
+    )
+
+    assert kwargs == {"var_names": ["a"], "sample_dims": sample_dims}
+
+
+def test_plot_trace_kwargs_preserve_default_without_combined() -> None:
+    current_arviz = SimpleNamespace(__version__="1.2.0")
+
+    kwargs = arviz_utils.arviz_plot_kwargs(
+        current_arviz,
+        "plot_trace",
+        var_names=["a"],
+    )
+
+    assert kwargs == {"var_names": ["a"]}
 
 
 @pytest.mark.parametrize(

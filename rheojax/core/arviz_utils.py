@@ -13,16 +13,6 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
-def _arviz_major_version(arviz: ModuleType) -> int:
-    """Return ArviZ's major version, defaulting to the legacy API."""
-
-    version = str(getattr(arviz, "__version__", "0"))
-    try:
-        return int(version.split(".", 1)[0])
-    except ValueError:
-        return 0
-
-
 def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
     """Return the ArviZ module or raise ImportError/RuntimeError as needed.
 
@@ -45,7 +35,8 @@ def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
         arviz = importlib.import_module("arviz")
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised when ArviZ absent
         raise ImportError(
-            "ArviZ is required for Bayesian diagnostics. Install it with `pip install arviz`."
+            "ArviZ is required for Bayesian diagnostics. Install it with "
+            '`pip install "arviz>=1.2.0,<2.0.0"`.'
         ) from exc
 
     if required:
@@ -56,7 +47,7 @@ def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
                 "ArviZ is installed but missing required component(s) "
                 f"[{missing_csv}]. This usually means an incompatible ArviZ "
                 "version or a partial install -- try `pip install -U "
-                '"arviz>=0.23.4,<2.0.0"`, or `pip install arviz[matplotlib]` '
+                '"arviz>=1.2.0,<2.0.0"`, or `pip install arviz[matplotlib]` '
                 "if this is a plotting-backend gap."
             )
 
@@ -66,35 +57,32 @@ def import_arviz(*, required: Iterable[str] | None = None) -> ModuleType:
 def inference_data_from_dict(
     groups: Mapping[str, Mapping[str, Any] | None],
 ) -> Any:
-    """Build inference data across the ArviZ 0.x and 1.x dictionary APIs.
+    """Build InferenceData from a group-oriented dict via ArviZ 1.x's API.
 
-    ``groups`` always uses the ArviZ group-oriented representation, for
-    example ``{"posterior": {"tau": samples}}``. ArviZ 1.x accepts that
-    mapping as its positional ``data`` argument, while ArviZ 0.x expects the
-    groups as keyword arguments.
+    ``groups`` uses the ArviZ group-oriented representation, for example
+    ``{"posterior": {"tau": samples}}``.
     """
 
     arviz = import_arviz(required=("from_dict",))
     populated_groups = {name: data for name, data in groups.items() if data is not None}
-    if _arviz_major_version(arviz) >= 1:
-        return arviz.from_dict(populated_groups)
-    return arviz.from_dict(**populated_groups)
+    return arviz.from_dict(populated_groups)
 
 
 def arviz_plot_kwargs(
     arviz: ModuleType, plot_name: str, /, **kwargs: Any
 ) -> dict[str, Any]:
-    """Translate supported ArviZ 0.x plotting options to the 1.x API.
+    """Translate 0.x-shaped plotting kwargs to ArviZ 1.x's kwarg shape.
 
     ArviZ 1.x plotting functions accept unknown keywords through ``**pc_kwargs``.
     Passing removed 0.x options therefore fails later as an invalid aesthetic
     mapping instead of raising a useful signature error. This function keeps
-    that compatibility policy in one place and leaves 0.x calls untouched.
+    that translation policy in one place.
     """
+    # ponytail: arviz param is now unused (0.x/1.x version dispatch was
+    # removed -- only 1.x is supported) but kept for signature stability
+    # across the 8+ existing call sites that already pass it.
 
     normalized = dict(kwargs)
-    if _arviz_major_version(arviz) < 1:
-        return normalized
 
     if plot_name == "plot_pair":
         kind = normalized.pop("kind", "scatter")
@@ -122,6 +110,22 @@ def arviz_plot_kwargs(
         # replace with explicit ci_probs kwarg if ArviZ exposes a migration guide.
         inner_prob = 0.5 if hdi_prob > 0.5 else hdi_prob / 2
         normalized.setdefault("ci_probs", (inner_prob, hdi_prob))
+
+    elif plot_name == "plot_posterior":
+        # ArviZ 1.x has no plot_posterior; callers pass this name to look up
+        # kwargs while calling az.plot_dist directly (see arviz_canvas.py).
+        hdi_prob = normalized.pop("hdi_prob", None)
+        if hdi_prob is not None:
+            normalized.setdefault("ci_prob", hdi_prob)
+        normalized.setdefault("ci_kind", "hdi")
+        normalized.setdefault("point_estimate", "mean")
+        normalized.setdefault("kind", "kde")
+
+    elif plot_name == "plot_trace" and "combined" in normalized:
+        combined = normalized.pop("combined")
+        normalized.setdefault(
+            "sample_dims", ("chain", "draw") if combined else ("draw",)
+        )
 
     elif plot_name == "plot_autocorr":
         combined = normalized.pop("combined", False)
