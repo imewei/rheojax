@@ -194,6 +194,14 @@ def relaxation_fractional_data():
 
     # Fractional relaxation (simplified)
     G_t = G0 / (1 + (time / tau) ** alpha)
+    # Add a small realistic measurement noise (0.3%). See creep_maxwell_data
+    # above: perfectly noiseless data makes the likelihood's noise-scale
+    # parameter (sigma) degenerate -- its posterior collapses onto the zero
+    # boundary and cannot mix (R-hat 3-4, ESS~2 across every parameter, not
+    # just sigma, since the collapsed-sigma geometry poisons NUTS's whole
+    # joint proposal). A tiny noise floor makes sigma identifiable without
+    # perturbing G0/eta/alpha recovery.
+    G_t = G_t * (1.0 + 0.003 * np.random.default_rng(0).standard_normal(G_t.shape))
 
     metadata = {
         "test_type": "Stress Relaxation",
@@ -367,10 +375,16 @@ class TestBayesianRelaxationMode:
         """
         model = model_class()
 
-        # Use minimal MCMC settings for slow models (Mittag-Leffler based)
+        # Use minimal MCMC settings for slow models (Mittag-Leffler based).
+        # 200/100 was tuned back when the fixture's noiseless data made sigma
+        # degenerate (any budget failed regardless of size); now that the
+        # fixture has a noise floor, 300/100 clears R-hat but 100 samples/chain
+        # is too thin to clear ESS>=100 for every parameter (min ESS ~74-86 of
+        # 400 total draws) -- bump samples to 200 to give enough draws once
+        # convergence is actually achievable.
         if model_class in self.SLOW_MODELS:
-            num_warmup = 200
-            num_samples = 100
+            num_warmup = 300
+            num_samples = 200
             max_tree_depth = 8
         else:
             num_warmup = 2000
