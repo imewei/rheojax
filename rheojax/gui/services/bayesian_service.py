@@ -614,7 +614,7 @@ class BayesianService:
     def compare_models(
         self,
         results: list[BayesianResult],
-        criterion: str = "waic",
+        criterion: str = "loo",
     ) -> dict[str, float]:
         """Compare models using information criteria.
 
@@ -622,14 +622,23 @@ class BayesianService:
         ----------
         results : list[BayesianResult]
             List of Bayesian results to compare
-        criterion : str, default='waic'
-            Information criterion ('waic', 'loo', 'dic')
+        criterion : str, default='loo'
+            Information criterion. Only 'loo' is supported -- ArviZ 1.x has
+            no WAIC implementation (upstream dropped it in favor of PSIS-LOO).
 
         Returns
         -------
         dict
             Model comparison scores
+
+        Raises
+        ------
+        ValueError
+            If criterion is 'waic' (removed in ArviZ 1.x; use 'loo').
         """
+        if criterion.lower() == "waic":
+            raise ValueError("WAIC removed in arviz>=1.0; use criterion='loo'")
+
         logger.debug(
             "Entering compare_models",
             num_models=len(results),
@@ -667,7 +676,7 @@ class BayesianService:
                     }
                     idata = inference_data_from_dict({"posterior": idata_dict})
 
-                # WAIC/LOO require log_likelihood group
+                # LOO requires log_likelihood group
                 if not hasattr(idata, "log_likelihood"):
                     logger.warning(
                         "Skipping model comparison — no log_likelihood",
@@ -677,12 +686,9 @@ class BayesianService:
                     continue
 
                 # Calculate criterion
-                if criterion.lower() == "waic":
-                    score = az.waic(idata)
-                    comparison[model_name] = float(score.elpd_waic)
-                elif criterion.lower() == "loo":
+                if criterion.lower() == "loo":
                     score = az.loo(idata)
-                    comparison[model_name] = float(score.elpd_loo)
+                    comparison[model_name] = float(score.elpd)
                 else:
                     logger.warning(f"Unknown criterion: {criterion}")
 
