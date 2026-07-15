@@ -73,7 +73,7 @@ requires-python = ">=3.12"
 # ============================================================================
 dependencies = [
     # Core scientific computing
-    "numpy>=2.3.5,<3.0.0",          # Maintain compatibility with Numba 0.63.1
+    "numpy>=2.3.5,<3.0.0",          # numpy 3.0 not yet released (audited 2026-07-15); no numba dependency in this project
     "scipy>=1.17.0,<2.0.0",
     "pandas>=2.3.3,<4.0.0",
     "matplotlib>=3.10.8,<4.0.0",
@@ -85,7 +85,10 @@ dependencies = [
 
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
-    "jax>=0.8.3,<0.11.0",     # JAX 0.8.0+ for CUDA 12/13 support; <0.10.0 until numpyro drops xla_pmap_p
+    "jax>=0.8.3,<0.11.0",     # JAX 0.8.0+ for CUDA 12/13 support. numpyro's xla_pmap_p import
+                              # is now try/except-guarded (resolved). JAX 0.11.0 will change
+                              # jnp.empty to return uninitialized memory instead of zero-fill --
+                              # audit for reliance on zero-init before raising this ceiling.
     "jaxlib>=0.8.3,<0.11.0",  # jaxlib must match JAX version
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
