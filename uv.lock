@@ -3908,10 +3908,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arviz", specifier = ">=0.23.4,<2.0.0" },
-    { name = "arviz-base", specifier = ">=0.8.2" },
-    { name = "arviz-plots", specifier = ">=0.8.0" },
-    { name = "arviz-stats", specifier = ">=0.8.0" },
+    { name = "arviz", specifier = ">=1.2.0,<2.0.0" },
+    { name = "arviz-base", specifier = ">=1.2.0" },
+    { name = "arviz-plots", specifier = ">=1.2.0" },
+    { name = "arviz-stats", specifier = ">=1.2.0" },
     { name = "diffrax", specifier = ">=0.7.1" },
     { name = "furo", specifier = ">=2025.12.19" },
     { name = "h5netcdf", specifier = ">=1.8.1" },
