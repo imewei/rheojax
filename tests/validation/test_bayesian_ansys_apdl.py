@@ -365,11 +365,20 @@ class TestFractionalZenerANSYS:
                 max_iter=10000,
             )
 
+            # num_chains=1 (default is 4): on a CPU-only host with no
+            # accelerator, fit_bayesian's default chains=4 selects the
+            # "vectorized" chain method, which measured 12x+ slower here than
+            # a single chain for a fraction of the draws -- this Mittag-
+            # Leffler-based model doesn't vectorize well across chains on
+            # CPU. The assertion below only checks the pipeline produces a
+            # non-empty summary (no R-hat/ESS convergence check), so a small
+            # single-chain budget is sufficient.
             result = model.fit_bayesian(
                 ansys_fractional_relaxation_data.x,
                 ansys_fractional_relaxation_data.y,
-                num_warmup=500,
-                num_samples=1000,
+                num_warmup=100,
+                num_samples=100,
+                num_chains=1,
             )
 
         # Check parameters exist

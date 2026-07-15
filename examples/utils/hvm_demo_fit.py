@@ -187,13 +187,21 @@ def fit_hvm_demo_protocol(
             if np.isfinite(G_P_candidate) and G_P_candidate > 0:
                 G_P_seed = float(G_P_candidate)
 
+    # ODE protocols (relaxation/creep/startup) fall back to scipy's TRF with
+    # a numerical Jacobian (NLSQ's forward-mode AD is incompatible with
+    # diffrax's custom_vjp -- see HVMLocal._fit), where each residual
+    # evaluation re-solves the ODE (~2s each, not cacheable): relaxation
+    # alone took 75 evaluations (~150s) to chase ftol=1e-10, well past what
+    # the R^2>0.95 assertion needs (relaxation already reaches R^2=1.0000
+    # at that tolerance). Loosening to the more typical 1e-6 cuts the
+    # iteration count substantially with negligible fit-quality cost.
     fit_kwargs: dict = {
         "test_mode": protocol,
         "use_log_residuals": protocol != "startup",
         "max_iter": 5_000,
-        "ftol": 1e-10,
-        "xtol": 1e-10,
-        "gtol": 1e-10,
+        "ftol": 1e-6,
+        "xtol": 1e-6,
+        "gtol": 1e-6,
     }
 
     def _build_seeded_model(ge_scale: float = 1.0) -> HVMLocal:
@@ -208,11 +216,15 @@ def fit_hvm_demo_protocol(
     # does not move from INITIAL_PARAMS. workflow="auto_global" does not help
     # there because differential evolution only runs after TRF *fails*, and
     # TRF reports success. A short manual multi-start over G_E (the param
-    # that gets pinned) reliably finds the global basin.
+    # that gets pinned) reliably finds the global basin. Two trials
+    # bracketing INITIAL_PARAMS's G_E from both sides (half/double) is
+    # sufficient to escape the pinned basin -- each full fit costs ~2
+    # minutes (ODE-based scipy fallback), so this halves startup's cost
+    # relative to the original four-trial (0.5/1/2/4x) sweep.
     if protocol == "startup":
         best_model: HVMLocal | None = None
         best_cost = float("inf")
-        for ge_scale in (0.5, 1.0, 2.0, 4.0):
+        for ge_scale in (0.5, 2.0):
             trial = _build_seeded_model(ge_scale=ge_scale)
             trial.fit(x_data, y_data, **fit_kwargs, **predict_kwargs)
             trial_pred = np.asarray(
