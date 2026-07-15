@@ -572,20 +572,25 @@ class TestModelIntegration:
             # Some models may fail to fit with synthetic data, which is acceptable
             pass
 
-    @pytest.mark.slow
     def test_smart_initialization_improves_fit(self):
         """Test that smart initialization improves fit quality vs defaults."""
         from rheojax.models import FractionalZenerSolidSolid
 
-        # Create known data
+        # Generate data from the model's own equation (self-consistent ground
+        # truth) rather than an ad-hoc power law. The FZSS closed form
+        # saturates at high frequency (G' -> Ge + Gm); a generic
+        # (omega/omega_c)**0.5 power law never saturates over this omega
+        # range, so no FZSS parameters short of a numerically degenerate
+        # corner (tau_alpha -> 0, Gm -> huge) could reach R² > 0.90 there,
+        # making the old assertion an unreliable test of the optimizer.
         omega = np.logspace(-2, 3, 100)
-        G_low = 1e5
-        G_high = 1e6
-        omega_c = 10.0
-
-        G_prime = G_low + (G_high - G_low) * (omega / omega_c) ** 0.5
-        G_double_prime = 5e4 * (omega / omega_c) ** 0.3
-        y_data = np.column_stack([G_prime, G_double_prime])
+        data_model = FractionalZenerSolidSolid()
+        data_model.parameters.set_value("Ge", 1e5)
+        data_model.parameters.set_value("Gm", 9e5)
+        data_model.parameters.set_value("alpha", 0.5)
+        data_model.parameters.set_value("tau_alpha", 0.1)
+        data_model.fitted_ = True
+        y_data = np.asarray(data_model.predict(omega, test_mode="oscillation"))
 
         # Fit with smart initialization (should converge faster/better)
         model_smart = FractionalZenerSolidSolid()
