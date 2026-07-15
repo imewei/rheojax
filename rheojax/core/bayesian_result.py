@@ -141,9 +141,10 @@ class BayesianResult:
 
         Args:
             log_likelihood: If True, compute pointwise log-likelihood for
-                WAIC/LOO model comparison (az.waic(), az.loo()). This
-                re-evaluates the model for all samples (~600-800ms slower).
-                Default False for faster conversion when only plotting.
+                LOO model comparison (az.loo()). ArviZ 1.x has no WAIC
+                implementation. This re-evaluates the model for all samples
+                (~600-800ms slower). Default False for faster conversion
+                when only plotting.
 
         Returns:
             ArviZ InferenceData object containing:
@@ -163,7 +164,7 @@ class BayesianResult:
             >>>
             >>> # For model comparison (slower):
             >>> idata_ll = result.to_inference_data(log_likelihood=True)
-            >>> az.waic(idata_ll)
+            >>> az.loo(idata_ll)
 
         Note:
             Requires arviz package: pip install arviz
