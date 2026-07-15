@@ -167,6 +167,29 @@ class TestInferenceDataConversion:
         has_diagnostic = any(hasattr(sample_stats, d) for d in nuts_diagnostics)
         assert has_diagnostic, "No NUTS diagnostics found in sample_stats"
 
+    def test_log_likelihood_group_usable_by_az_loo(self, fitted_pipeline):
+        """to_inference_data(log_likelihood=True) must produce a
+        log_likelihood group that az.loo() can consume.
+
+        az.from_numpyro() leaves the log_likelihood group JAX-array-backed;
+        ArviZ 1.x's PSIS-LOO backend mutates array buffers in place, which
+        JAX arrays reject. Regression test for that incompatibility.
+        """
+        try:
+            import arviz as az
+        except ImportError:
+            pytest.skip("ArviZ not installed")
+
+        idata = fitted_pipeline._bayesian_result.to_inference_data(
+            log_likelihood=True
+        )
+
+        assert hasattr(idata, "log_likelihood")
+
+        # Must not raise TypeError: JAX arrays are immutable
+        loo_result = az.loo(idata, var_name="obs")
+        assert loo_result is not None
+
 
 # ============================================================================
 # plot_pair() Tests
