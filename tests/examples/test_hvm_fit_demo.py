@@ -12,7 +12,15 @@ if str(EXAMPLES_DIR) not in sys.path:
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(1200)
 def test_hvm_demo_fits_overlap_generated_rheology_data():
+    # HVMLocal's ODE-based protocols (relaxation/creep/startup) fall back to
+    # scipy's TRF with a numerical Jacobian (see HVMLocal._fit -- NLSQ's
+    # forward-mode AD is incompatible with diffrax's custom_vjp), where each
+    # residual evaluation re-solves the ODE at ~2s and can't be cached. Even
+    # after loosening fit tolerances and halving the startup multi-start
+    # count (see examples/utils/hvm_demo_fit.py), this measured 854s; 1200s
+    # gives ~1.4x margin without masking a genuine hang.
     from utils.hvm_demo_fit import run_hvm_demo_fits
 
     results = run_hvm_demo_fits(noise_level=0.01)
