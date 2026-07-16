@@ -37,7 +37,10 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode
 from rheojax.logging import get_logger, log_fit
-from rheojax.utils.optimization import OptimizationResult
+from rheojax.utils.optimization import (
+    OptimizationResult,
+    compute_covariance_from_jacobian,
+)
 from rheojax.utils.prony import (
     compute_r_squared,
     create_prony_parameter_set,
@@ -167,6 +170,16 @@ class GeneralizedMaxwell(BaseModel):
             raise ValueError("test_mode must be specified for GMM fitting")
 
         self._test_mode = test_mode
+        # Stashed here (single dispatch point, mirroring the existing
+        # _current_y_data pattern each _fit_*_mode method sets for itself)
+        # rather than threaded through every _fit_*_mode -> _nlsq_fit call
+        # site individually. Without this, GMM's custom _nlsq_fit() (which
+        # calls nlsq.LeastSquares().least_squares() directly, unlike models
+        # routed through the shared _standard_nlsq_fit()) silently dropped
+        # the GUI's progress_callback kwarg -- the progress bar never
+        # animated during a real GMM fit despite the optimizer running
+        # multiple real iterations.
+        self._current_callback = kwargs.get("callback")
 
         with log_fit(
             logger,
@@ -271,6 +284,7 @@ class GeneralizedMaxwell(BaseModel):
         )
 
         ls = nlsq.LeastSquares()
+        callback = getattr(self, "_current_callback", None)
 
         try:
             # nlsq.LeastSquares.least_squares is annotated -> dict[str, Any] but
@@ -288,6 +302,7 @@ class GeneralizedMaxwell(BaseModel):
                     gtol=gtol,
                     max_nfev=max_nfev,
                     verbose=0,
+                    callback=callback,
                 ),
             )
         except ValueError as e:
@@ -343,6 +358,17 @@ class GeneralizedMaxwell(BaseModel):
             nlsq_result=nlsq_result,
             residuals=_final_res,
         )
+
+        # Unlike models routed through the shared _standard_nlsq_fit()
+        # (which always attaches pcov via this same helper), this custom
+        # path built its own OptimizationResult and never computed
+        # covariance -- pcov/uncertainties stayed None for every GMM fit,
+        # even a clean converged one where the Jacobian (already computed
+        # above) makes it directly computable.
+        if result.jac is not None and result.residuals is not None:
+            result.pcov = compute_covariance_from_jacobian(
+                result.jac, result.residuals
+            )
 
         # Prefer the explicit y_data argument; fall back to one stashed on
         # the objective itself by the caller, then on self (set by the
@@ -849,10 +875,35 @@ class GeneralizedMaxwell(BaseModel):
             # Build slimmed-down NLSQ result for the optimal model
             slim_x = np.concatenate([[E_inf_opt], E_i_opt, tau_i_opt])
             optimal_result = fit_results[n_optimal]["result"]
+            # optimal_result.jac is shaped for the PADDED (n_max-sized)
+            # parameter vector, not slim_x -- can't reuse it as-is (that's
+            # why jac/pcov were previously always dropped here, even though
+            # optimal_result.pcov itself is populated for the padded fit).
+            # Slice to the same active-parameter columns already used above
+            # to extract E_inf_opt/E_i_opt/tau_i_opt from the padded result,
+            # so the sliced Jacobian's columns line up with slim_x exactly.
+            active_cols = (
+                [0]
+                + list(range(1, 1 + n_optimal))
+                + list(range(1 + n_max, 1 + n_max + n_optimal))
+            )
+            optimal_jac = getattr(optimal_result, "jac", None)
+            slim_jac = (
+                np.asarray(optimal_jac)[:, active_cols]
+                if optimal_jac is not None
+                else None
+            )
+            slim_residuals = getattr(optimal_result, "residuals", None)
+            slim_pcov = (
+                compute_covariance_from_jacobian(slim_jac, slim_residuals)
+                if slim_jac is not None
+                else None
+            )
             self._nlsq_result = OptimizationResult(
                 x=slim_x,
                 fun=optimal_result.fun,
-                jac=None,
+                jac=slim_jac,
+                pcov=slim_pcov,
                 success=optimal_result.success,
                 message=optimal_result.message,
                 nit=optimal_result.nit,
@@ -865,7 +916,7 @@ class GeneralizedMaxwell(BaseModel):
                 nlsq_result=optimal_result.nlsq_result,
                 # OPT-YDATA-001: forward y_data so r_squared is computable on
                 # the slimmed (post-element-minimization) result too.
-                residuals=getattr(optimal_result, "residuals", None),
+                residuals=slim_residuals,
                 y_data=getattr(optimal_result, "y_data", None),
                 n_data=getattr(optimal_result, "n_data", None),
             )

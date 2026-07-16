@@ -1018,13 +1018,18 @@ class WorkspaceWindow(QMainWindow):
         # or Pipeline batch job reads a dataset's payload via
         # library.load_payload() from a worker thread. Deleting the dataset
         # out from under that read would pop the payload mid-job instead of
-        # failing cleanly, so check ActiveJobsState (keyed by dataset id)
-        # before offering the confirm-delete prompt at all.
-        # NOTE: This guard only covers by_id entries keyed by dataset id; a
-        # future producer reading payload on a worker thread while registering
-        # under a different key (e.g. job id) would silently bypass this check.
+        # failing cleanly, so check ActiveJobsState before offering the
+        # confirm-delete prompt at all.
+        # fit_controller.py's NLSQ/NUTS jobs key by "{dataset_id}:nlsq" /
+        # "{dataset_id}:nuts" (not the bare dataset id, so two concurrent
+        # jobs on the same dataset don't clobber each other's active_jobs
+        # entry) -- match both the bare key (other producers, e.g. Pipeline
+        # batch jobs) and the ":"-suffixed form.
         with self._state.active_jobs.lock:
-            has_active_job = dataset_id in self._state.active_jobs.by_id
+            has_active_job = any(
+                key == dataset_id or key.startswith(f"{dataset_id}:")
+                for key in self._state.active_jobs.by_id
+            )
         if has_active_job:
             QMessageBox.warning(
                 self,

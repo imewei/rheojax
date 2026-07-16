@@ -98,7 +98,6 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
     nlsq_step = bodies[2]
     nlsq_step.run()
     assert calls["fit"] == ("power_law", {"n_modes": 2})
-    assert app.fit.nlsq_result["r_squared"] == 0.9
     # Regression: fit_fn hardcoded test_mode=None, which (via ModelService's
     # data.metadata.get("test_mode", "oscillation") fallback on a never-
     # forwarded, empty metadata dict) always ran real fits as "oscillation"
@@ -126,6 +125,100 @@ def test_build_fit_controller_injects_real_fit_and_sample_fn(monkeypatch, qtbot)
     # reconstructed with constructor defaults for NUTS only.
     assert calls["sample"][2] == {"n_modes": 2}
     assert calls["sample_test_mode"] == "flow_curve"
+    assert app.fit.nuts_result["r_hat"] == {"a": 1.0}
+
+
+def test_nlsq_and_nuts_jobs_use_distinct_active_jobs_keys(monkeypatch, qtbot):
+    # Regression: both used to register under the bare data_ref, so a
+    # concurrent NLSQ re-run and NUTS run on the same dataset would
+    # clobber each other's active_jobs.by_id entry, orphaning one job's
+    # cancellation token from window.py's Close/New/Open cancel dialog.
+    seen_keys_during_fit = []
+    seen_keys_during_sample = []
+
+    def fake_run_fit_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        initial_params,
+        options,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        dataset_id="",
+        model_config=None,
+    ):
+        seen_keys_during_fit.extend(app.active_jobs.by_id.keys())
+        return {"params": {"a": 1.0}, "r_squared": 0.9, "success": True}
+
+    def fake_run_bayesian_isolated(
+        model_name,
+        x_data,
+        y_data,
+        test_mode,
+        num_warmup,
+        num_samples,
+        num_chains,
+        warm_start,
+        priors,
+        seed,
+        progress_queue,
+        cancel_event,
+        y2_data=None,
+        metadata=None,
+        fitted_model_state=None,
+        dataset_id="",
+        target_accept=0.8,
+        model_config=None,
+        max_tree_depth=None,
+    ):
+        seen_keys_during_sample.extend(app.active_jobs.by_id.keys())
+        return {"posterior_samples": {"a": [1.0, 1.1]}, "r_hat": {"a": 1.0}}
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.fit_controller.run_fit_isolated",
+        fake_run_fit_isolated,
+    )
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.fit.fit_controller.run_bayesian_isolated",
+        fake_run_bayesian_isolated,
+    )
+
+    app = AppState()
+    app.library.add(
+        DatasetRef(
+            id="d1",
+            name="d1",
+            protocol_type="flow_curve",
+            origin="imported",
+            units={},
+            row_count=2,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    app.library.store_payload("d1", _RheoData([1.0, 2.0], [1.0, 2.0]))
+    app.fit.protocol = "flow_curve"
+    app.fit.model_key = "power_law"
+    app.fit.data_ref = "d1"
+    app.fit.column_map = {"x": 0, "y": 1}
+
+    ctl, bodies = build_fit_controller(app)
+    nlsq_step, nuts_step = bodies[2], bodies[3]
+    nlsq_step.run()
+    nuts_step.run()
+
+    assert seen_keys_during_fit == ["d1:nlsq"]
+    assert seen_keys_during_sample == ["d1:nuts"]
+    # Neither job's key should be the bare dataset id (the collision).
+    assert "d1" not in seen_keys_during_fit
+    assert "d1" not in seen_keys_during_sample
+    # Both entries must be popped once their (fake, synchronous) runs finish.
+    assert app.active_jobs.by_id == {}
+    assert app.fit.nlsq_result["r_squared"] == 0.9
     assert app.fit.nuts_result["r_hat"] == {"a": 1.0}
 
 

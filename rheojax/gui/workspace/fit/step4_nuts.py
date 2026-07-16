@@ -217,6 +217,14 @@ class NutsStep(QWidget):
         self._target.setValue(v)
 
     def skip(self) -> None:
+        if not self._run_btn.isEnabled():
+            # A run is in flight (see run()'s busy-guard) -- skipping now
+            # would set nuts_result=None and emit finished immediately, then
+            # the still-running sample_fn would later resume and overwrite
+            # nuts_result with the real result plus a second finished
+            # emission, silently un-skipping what the user believed was
+            # skipped.
+            return
         self._skipped = True
         self._state.nuts_result = None
         self.edited.emit()
@@ -240,27 +248,56 @@ class NutsStep(QWidget):
         priors = {
             name: adapt_prior(entry) for name, entry in edited_priors.items()
         } or self.suggested_priors()
+        # Guard against re-entrant clicks: _sample_fn pumps a nested event
+        # loop (see fit_controller._run_on_thread) while staying responsive,
+        # so both buttons must be disabled for the duration -- otherwise a
+        # second Sample click (or a Skip click) mid-run collides with this
+        # run on the same active_jobs tracking entry and/or silently
+        # overwrites/un-skips nuts_result once one of the two calls
+        # completes. Mirrors NlsqStep.run()'s identical guard.
+        self._run_btn.setEnabled(False)
+        self._skip_btn.setEnabled(False)
+        # See NlsqStep.run()'s matching comment: discard a result that no
+        # longer corresponds to the current selection if state moved on
+        # while this run was in flight.
+        revision_at_start = self._state.revision
         try:
-            result = self._sample_fn(priors, warm_start, cfg)
-        except NotImplementedError:
-            # ponytail: real sampler wiring is out of scope here (tracked separately);
-            # this guard only keeps an unwired Sample button from crashing the Qt slot.
-            self._result.setText("NUTS sampler is not wired up yet.")
-            return
-        except Exception as exc:
-            self._result.setText(f"NUTS failed: {exc}")
-            return
-        verdict = _diagnostics_verdict(result)
-        result["verdict"] = verdict
-        self._state.nuts_result = result
-        status = (
-            "✓ converged"
-            if verdict["converged"]
-            else "⚠ " + "; ".join(verdict["reasons"])
-        )
-        self._result.setText(status)
-        self.edited.emit()
-        self.finished.emit()
+            try:
+                result = self._sample_fn(priors, warm_start, cfg)
+            except NotImplementedError:
+                # ponytail: real sampler wiring is out of scope here (tracked separately);
+                # this guard only keeps an unwired Sample button from crashing the Qt slot.
+                self._result.setText("NUTS sampler is not wired up yet.")
+                if self._state.revision == revision_at_start:
+                    self._state.nuts_result = None
+                    self.edited.emit()
+                return
+            except Exception as exc:
+                self._result.setText(f"NUTS failed: {exc}")
+                # A prior successful nuts_result must not survive a failed
+                # re-run -- is_ready() reads nuts_result live, so leaving
+                # the old result in place would misrepresent this run as
+                # having succeeded.
+                if self._state.revision == revision_at_start:
+                    self._state.nuts_result = None
+                    self.edited.emit()
+                return
+            if self._state.revision != revision_at_start:
+                return
+            verdict = _diagnostics_verdict(result)
+            result["verdict"] = verdict
+            self._state.nuts_result = result
+            status = (
+                "✓ converged"
+                if verdict["converged"]
+                else "⚠ " + "; ".join(verdict["reasons"])
+            )
+            self._result.setText(status)
+            self.edited.emit()
+            self.finished.emit()
+        finally:
+            self._run_btn.setEnabled(True)
+            self._skip_btn.setEnabled(True)
 
     def is_ready(self) -> bool:
         return self._skipped or self._state.nuts_result is not None

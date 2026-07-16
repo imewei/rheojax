@@ -81,6 +81,17 @@ def import_dataset(path: Path, protocol: str) -> tuple[DatasetRef, RheoData]:
             data.x = np.asarray(data.x) * (2 * np.pi)
             data.x_units = "rad/s"
         units["x"] = data.x_units
+    # Same reasoning as the x block above, for the flow_curve stress<->
+    # viscosity guard (contract.py's "y": "stress<->viscosity" entry,
+    # step2_data.py's needs_quantity_conversion()): the reader auto-detects
+    # y_units (including inferring it from a bare "Viscosity"/"Stress"
+    # header via infer_y_unit_from_name()), but this CLI import path
+    # previously never copied it into DatasetRef.units, so the guard could
+    # never see it -- unlike the interactive GUI import (window.py), which
+    # does copy both x and y units. Without this, a CLI-imported viscosity
+    # column silently gets fit as stress with no warning.
+    if data.y_units:
+        units["y"] = data.y_units
 
     ref = DatasetRef(
         id=uuid.uuid4().hex,

@@ -138,6 +138,14 @@ class BaseArviZWidget(QWidget):
         self._figure: Figure | None = None
         self._canvas: FigureCanvasQTAgg | None = None
         self._pending_cleanup: list[Figure] = []
+        # closeEvent() only fires for top-level widgets; when embedded as a
+        # child (e.g. ArvizCanvas inside step5_visualize.py's Diagnostics
+        # tab) it's destroyed via Qt's parent-cascade deleteLater() instead,
+        # which closeEvent never sees. destroyed fires on every teardown
+        # path, so wiring cleanup() to it covers both -- same fix already
+        # applied to residuals_panel.py (PR #48/#52) for the identical
+        # deferred-draw_idle()-on-a-freed-canvas crash class.
+        self.destroyed.connect(lambda: self.cleanup())
         logger.debug(
             "Widget initialization complete",
             widget=self.__class__.__name__,
