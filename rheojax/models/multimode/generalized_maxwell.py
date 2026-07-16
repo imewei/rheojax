@@ -1804,7 +1804,8 @@ class GeneralizedMaxwell(BaseModel):
             # Suspicious: use safer priors, optionally widen
             if prior_mode == "auto_widen":
                 warnings.warn(
-                    "Suspicious NLSQ convergence detected (high Hessian condition, params near bounds, or high uncertainty). "
+                    "Suspicious NLSQ convergence detected (high Hessian condition, "
+                    "params near bounds, or high uncertainty). "
                     "Using inflated priors centered at NLSQ estimates.",
                     UserWarning,
                     stacklevel=2,

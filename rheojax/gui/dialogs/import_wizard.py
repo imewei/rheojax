@@ -122,7 +122,9 @@ class FileSelectionPage(QWizardPage):
             self,
             "Select Data File",
             "",
-            "All Supported (*.csv *.txt *.xlsx *.xls *.tri *.dat);;CSV Files (*.csv);;Text Files (*.txt *.dat);;Excel Files (*.xlsx *.xls);;TRIOS Files (*.tri);;All Files (*.*)",
+            "All Supported (*.csv *.txt *.xlsx *.xls *.tri *.dat);;"
+            "CSV Files (*.csv);;Text Files (*.txt *.dat);;"
+            "Excel Files (*.xlsx *.xls);;TRIOS Files (*.tri);;All Files (*.*)",
         )
         if file_path:
             self.file_path_edit.setText(file_path)
