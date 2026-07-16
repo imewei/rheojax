@@ -6,6 +6,8 @@ Test coverage:
 - Task Group 2.2: Creep Mode (Phase 2)
 """
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -573,6 +575,31 @@ class TestGMMSteadyShearMode:
 
         assert np.all(np.isfinite(eta_pred))
         np.testing.assert_allclose(eta_pred, eta_avg, rtol=1e-6)
+
+    def test_steady_shear_fit_warns_on_shear_thinning_data(self):
+        """Shear-thinning η(γ̇) (order-of-magnitude drop) should trigger the
+        poor-fit warning since the linear GMM can only predict constant η."""
+        gamma_dot = np.logspace(-2, 2, 30)
+        eta_data = 5e3 / (1.0 + gamma_dot)  # strongly shear-thinning
+
+        model = GeneralizedMaxwell(n_modes=3)
+        with pytest.warns(UserWarning, match="non-constant viscosity"):
+            model.fit(gamma_dot, eta_data, test_mode="steady_shear")
+
+    def test_steady_shear_fit_no_warning_on_noisy_but_flat_data(self):
+        """Near-constant η with small measurement noise should NOT warn --
+        regression guard for a prior bug where R² was computed against the
+        fit's own mean prediction, making it identically 0.0 (and thus always
+        below threshold) for any data with nonzero variance."""
+        rng = np.random.default_rng(0)
+        gamma_dot = np.logspace(-2, 2, 30)
+        eta_avg = 5e3
+        eta_data = eta_avg + rng.normal(0, eta_avg * 0.01, size=gamma_dot.shape)
+
+        model = GeneralizedMaxwell(n_modes=3)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            model.fit(gamma_dot, eta_data, test_mode="steady_shear")
 
 
 class TestGMMStartupMode:

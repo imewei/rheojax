@@ -2004,11 +2004,38 @@ class GeneralizedMaxwell(BaseModel):
             self.parameters.set_value(f"{symbol}_{i + 1}", float(G_i_guess[i]))
             self.parameters.set_value(f"tau_{i + 1}", float(tau_i_guess[i]))
 
+        # NOTE: compute_r_squared(eta, full_like(eta, eta_avg)) is mathematically
+        # identical to 0.0 for any non-constant data (R² of a mean-predictor is 0
+        # by construction: SS_res == SS_tot), so it cannot distinguish a poor
+        # (shear-thinning) fit from a good (near-Newtonian) one. Use the
+        # coefficient of variation of the raw data instead — it directly
+        # measures how far the data deviates from the constant viscosity this
+        # linear model predicts.
+        eta_arr = np.asarray(eta)
+        eta_std = float(np.std(eta_arr))
+        cv = eta_std / abs(eta_avg) if eta_avg != 0 else 0.0
+
         logger.info(
             "GMM fitted to steady-shear mode",
             eta_0=eta_avg,
+            coefficient_of_variation=cv,
             note="Linear model gives constant viscosity η₀=ΣGᵢτᵢ",
         )
+
+        # ponytail: 10% relative variability is a heuristic threshold, not a
+        # statistically derived one; tighten/loosen if it proves noisy in practice.
+        if cv > 0.1:
+            warnings.warn(
+                "GeneralizedMaxwell: steady-shear/flow-curve data shows "
+                f"{cv:.1%} relative variability (std/mean of η), suggesting "
+                "non-constant viscosity. This model is linear viscoelastic and "
+                "can only predict a constant viscosity — it cannot capture "
+                "shear-thinning or shear-thickening behavior. If your data "
+                "shows non-constant viscosity, use a flow model instead "
+                "(e.g. Cross or Carreau in rheojax.models.flow).",
+                UserWarning,
+                stacklevel=2,
+            )
 
     @staticmethod
     @jax.jit
