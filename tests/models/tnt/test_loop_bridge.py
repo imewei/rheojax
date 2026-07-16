@@ -660,8 +660,14 @@ class TestFitting:
     """Tests for model fitting."""
 
     @pytest.mark.slow
+    @pytest.mark.timeout(400)
     def test_fit_flow_curve(self):
-        """Test fitting to flow curve data via scipy (NLSQ AD incompatible with diffrax)."""
+        """Test fitting to flow curve data via scipy (NLSQ AD incompatible with diffrax).
+
+        scipy's numerical-Jacobian TRF fallback re-solves the ODE per residual
+        evaluation (same pattern as 0ac133e6's HVM demo fix); measures ~268s,
+        past the project's default 120s pytest-timeout. 400s gives ~1.5x margin.
+        """
         model_true = TNTLoopBridge()
         model_true.parameters.set_value("G", 1500.0)
         model_true.parameters.set_value("tau_b", 0.5)
