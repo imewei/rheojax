@@ -36,22 +36,17 @@ class RheoComboBox(QComboBox):
 
     def set_items_safely(
         self,
-        items: list[str] | list[tuple[str, Any]] | dict[str, Any],
+        items: list[str] | list[tuple[str, Any]],
         selected_data: Any = None,
     ) -> None:
         """Clear and repopulate without emitting signals mid-update."""
         was_blocked = self.blockSignals(True)
         try:
             self.clear()
-            if isinstance(items, dict):
-                pairs = items.items()
-            elif isinstance(items, list):
-                pairs = (
-                    item if isinstance(item, tuple) and len(item) == 2 else (item, item)
-                    for item in items
-                )
-            else:
-                raise TypeError("items must be a dict, list of strings, or list of tuples")
+            pairs = (
+                item if isinstance(item, tuple) and len(item) == 2 else (item, item)
+                for item in items
+            )
             for text, data in pairs:
                 self.addItem(str(text), data)
 
@@ -63,7 +58,12 @@ class RheoComboBox(QComboBox):
             self.blockSignals(was_blocked)
 
     def set_current_data(self, data: Any) -> bool:
-        """Select the item whose UserRole data matches. Returns False if not found."""
+        """Select the item whose UserRole data matches.
+
+        Returns True if selected, including clearing the selection when
+        `data` is None. Returns False only when `data` is not None and no
+        item matches it.
+        """
         if data is None:
             self.setCurrentIndex(-1)
             return True

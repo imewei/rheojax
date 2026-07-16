@@ -131,9 +131,7 @@ class SlotsStep(QWidget):
             self._state.slots.pop(spec.name, None)
             current = None
         combo = RheoComboBox(self)
-        combo.set_items_safely([""] + candidates)
-        if current:
-            combo.setCurrentText(current)
+        combo.set_items_safely([""] + candidates, selected_data=current or None)
         combo.currentTextChanged.connect(
             lambda text, name=spec.name: self._on_single_slot_changed(name, text)
         )

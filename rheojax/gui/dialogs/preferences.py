@@ -144,7 +144,7 @@ class PreferencesDialog(QDialog):
         theme_layout = QFormLayout()
 
         self.theme_combo = RheoComboBox()
-        self.theme_combo.addItems(["Light", "Dark", "System"])
+        self.theme_combo.set_items_safely(["Light", "Dark", "System"])
         self.theme_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -163,7 +163,7 @@ class PreferencesDialog(QDialog):
         worker_layout = QFormLayout()
 
         self.worker_isolation_combo = RheoComboBox()
-        self.worker_isolation_combo.addItems(["subprocess", "thread"])
+        self.worker_isolation_combo.set_items_safely(["subprocess", "thread"])
         self.worker_isolation_combo.setToolTip(
             "subprocess: each fit/Bayesian job runs in an isolated process "
             "(safer on macOS, killable); "
@@ -264,7 +264,7 @@ class PreferencesDialog(QDialog):
         device_layout = QFormLayout()
 
         self.device_combo = RheoComboBox()
-        self.device_combo.addItems(["cpu", "gpu", "tpu"])
+        self.device_combo.set_items_safely(["cpu", "gpu", "tpu"])
         self.device_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -365,7 +365,7 @@ class PreferencesDialog(QDialog):
         style_layout = QFormLayout()
 
         self.plot_style_combo = RheoComboBox()
-        self.plot_style_combo.addItems(
+        self.plot_style_combo.set_items_safely(
             [
                 "default",
                 "publication",
@@ -388,7 +388,7 @@ class PreferencesDialog(QDialog):
         style_layout.addRow("Default Plot Style:", self.plot_style_combo)
 
         self.color_palette_combo = RheoComboBox()
-        self.color_palette_combo.addItems(
+        self.color_palette_combo.set_items_safely(
             [
                 "tab10",
                 "Set1",

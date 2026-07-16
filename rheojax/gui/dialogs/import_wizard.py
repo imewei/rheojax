@@ -356,6 +356,13 @@ class ColumnMappingPage(QWizardPage):
 
         self._auto_detect()
 
+        # set_items_safely() blocks signals during populate, and _auto_detect()'s
+        # setCurrentIndex() only emits when the index actually changes — so
+        # currentTextChanged (and therefore completeChanged) can go un-fired even
+        # though x_combo/y_combo now hold valid selections. Force one explicit
+        # re-check so the wizard's Next button reflects the real completion state.
+        self.completeChanged.emit()
+
     def _on_columns_load_failed(self, error: str) -> None:
         """Handle a failed background column read."""
         logger.error(

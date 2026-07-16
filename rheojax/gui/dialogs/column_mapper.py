@@ -195,6 +195,13 @@ class ColumnMapperDialog(QDialog):
 
     def _on_accept(self) -> None:
         """Handle dialog accept."""
+        if self.x_combo.currentIndex() == -1 or self.y_combo.currentIndex() == -1:
+            QMessageBox.warning(
+                self,
+                "Missing Column Mapping",
+                "Please select both an X and a Y column before continuing.",
+            )
+            return
         logger.debug("Dialog closed", dialog=self.__class__.__name__, result="accepted")
         self.accept()
 
