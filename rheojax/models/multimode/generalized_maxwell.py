@@ -2004,11 +2004,26 @@ class GeneralizedMaxwell(BaseModel):
             self.parameters.set_value(f"{symbol}_{i + 1}", float(G_i_guess[i]))
             self.parameters.set_value(f"tau_{i + 1}", float(tau_i_guess[i]))
 
+        r_squared = compute_r_squared(eta, np.full_like(np.asarray(eta), eta_avg))
+
         logger.info(
             "GMM fitted to steady-shear mode",
             eta_0=eta_avg,
+            r_squared=r_squared,
             note="Linear model gives constant viscosity η₀=ΣGᵢτᵢ",
         )
+
+        if r_squared < 0.5:
+            warnings.warn(
+                "GeneralizedMaxwell: steady-shear/flow-curve fit gives "
+                f"R²={r_squared:.3g}. This model is linear viscoelastic and "
+                "can only predict a constant viscosity — it cannot capture "
+                "shear-thinning or shear-thickening behavior. If your data "
+                "shows non-constant viscosity, use a flow model instead "
+                "(e.g. Cross or Carreau in rheojax.models.flow).",
+                UserWarning,
+                stacklevel=2,
+            )
 
     @staticmethod
     @jax.jit
