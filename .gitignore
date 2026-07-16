@@ -321,3 +321,4 @@ three-brain-out/
 # Agent investigation scratch dirs
 .investigation/
 .claude-flow
+.claude-flow/
