@@ -317,3 +317,6 @@ three-brain-out/
 
 # Superpowers brainstorming visual companion
 .superpowers/
+
+# Agent investigation scratch dirs
+.investigation/
