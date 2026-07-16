@@ -78,16 +78,16 @@ def run_fit_isolated(
     last_iteration = 0
     last_loss = float("inf")
 
-    def progress_callback(iteration: int, loss: float, **kwargs):
+    def progress_callback(iteration: int, cost: float, **kwargs):
         nonlocal last_iteration, last_loss
         if cancel_event.is_set():
             from rheojax.gui.jobs.cancellation import CancellationError
 
             raise CancellationError("Operation cancelled by user")
         last_iteration = iteration
-        last_loss = loss
+        last_loss = cost
         percent = min(int(iteration / max_iter * 100), 100)
-        message = f"Iteration {iteration}: loss = {loss:.6e}"
+        message = f"Iteration {iteration}: loss = {cost:.6e}"
         progress_queue.put(
             {
                 "type": "progress",
