@@ -309,10 +309,20 @@ class PriorsEditor(QWidget):
         """
         prior = self._priors.get(param, {})
         dist = prior.get("distribution", "normal")
-        params = prior.get("params", DIST_DEFAULTS.get(dist, {}))
 
-        # Set distribution
-        self._dist_combo.set_current_data(dist)
+        # Fall back to "normal" if the persisted distribution isn't one of
+        # the combo's known ids (e.g. stale/foreign data), so the dropdown,
+        # params, and visibility stay in sync instead of silently diverging.
+        if not self._dist_combo.set_current_data(dist):
+            logger.warning(
+                "Unknown prior distribution, falling back to normal",
+                param=param,
+                distribution=dist,
+            )
+            dist = "normal"
+            self._dist_combo.set_current_data(dist)
+
+        params = prior.get("params", DIST_DEFAULTS.get(dist, {}))
 
         # Set parameter values
         for key, spinbox in self._param_spinboxes.items():
