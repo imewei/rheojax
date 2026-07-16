@@ -12,7 +12,6 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
-    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
@@ -31,6 +30,8 @@ from rheojax.gui.compat import (
     Signal,
 )
 from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.utils.layout_helpers import set_zero_margins
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -107,7 +108,7 @@ class PriorsEditor(QWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
         layout.setSpacing(Spacing.SM)
 
         # Splitter for table and editor
@@ -116,7 +117,7 @@ class PriorsEditor(QWidget):
         # Left: Parameter table
         table_frame = QFrame()
         table_layout = QVBoxLayout(table_frame)
-        table_layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(table_layout)
 
         table_label = QLabel("Parameters")
         table_label.setStyleSheet("font-weight: bold;")
@@ -149,9 +150,10 @@ class PriorsEditor(QWidget):
         dist_group = QGroupBox("Distribution")
         dist_layout = QFormLayout(dist_group)
 
-        self._dist_combo = QComboBox()
-        for dist_id, display_name, _ in DISTRIBUTIONS:
-            self._dist_combo.addItem(display_name, dist_id)
+        self._dist_combo = RheoComboBox()
+        self._dist_combo.set_items_safely(
+            [(display_name, dist_id) for dist_id, display_name, _ in DISTRIBUTIONS]
+        )
         dist_layout.addRow("Type:", self._dist_combo)
 
         editor_layout.addWidget(dist_group)
@@ -310,9 +312,7 @@ class PriorsEditor(QWidget):
         params = prior.get("params", DIST_DEFAULTS.get(dist, {}))
 
         # Set distribution
-        idx = self._dist_combo.findData(dist)
-        if idx >= 0:
-            self._dist_combo.setCurrentIndex(idx)
+        self._dist_combo.set_current_data(dist)
 
         # Set parameter values
         for key, spinbox in self._param_spinboxes.items():

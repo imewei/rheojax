@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 
 from rheojax.gui.compat import QVBoxLayout, QWidget
 from rheojax.gui.resources.styles.tokens import themed
+from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,7 +75,7 @@ class PlotCanvas(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self.toolbar)
         layout.addWidget(self.canvas)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
 
         # Track plot data for tooltips
         self._plot_data: list[tuple[np.ndarray, np.ndarray, str]] = []

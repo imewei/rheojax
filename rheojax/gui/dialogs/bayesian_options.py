@@ -11,7 +11,6 @@ from typing import Any
 
 from rheojax.gui.compat import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -29,6 +28,7 @@ from rheojax.gui.compat import (
     QWidget,
 )
 from rheojax.gui.resources.styles.tokens import Typography, themed
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -89,8 +89,8 @@ class BayesianOptionsDialog(QDialog):
         sampler_group = QGroupBox("Sampler")
         sampler_layout = QFormLayout()
 
-        self.sampler_combo = QComboBox()
-        self.sampler_combo.addItems(["NUTS (No U-Turn Sampler)"])
+        self.sampler_combo = RheoComboBox()
+        self.sampler_combo.set_items_safely(["NUTS (No U-Turn Sampler)"])
         self.sampler_combo.currentTextChanged.connect(self._on_sampler_changed)
         sampler_layout.addRow("Sampling Method:", self.sampler_combo)
 

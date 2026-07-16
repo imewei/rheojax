@@ -24,6 +24,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -108,7 +109,7 @@ class ColumnMapperDialog(QDialog):
         x_label = QLabel("X (Frequency/Time):")
         x_label.setMinimumWidth(150)
         x_layout.addWidget(x_label)
-        self.x_combo = QComboBox()
+        self.x_combo = RheoComboBox(placeholder="Select a column...")
         self.x_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -125,7 +126,7 @@ class ColumnMapperDialog(QDialog):
         y_label = QLabel("Y (Modulus/Viscosity):")
         y_label.setMinimumWidth(150)
         y_layout.addWidget(y_label)
-        self.y_combo = QComboBox()
+        self.y_combo = RheoComboBox(placeholder="Select a column...")
         self.y_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -142,7 +143,7 @@ class ColumnMapperDialog(QDialog):
         y2_label = QLabel("Y2 (Optional, e.g., G''):")
         y2_label.setMinimumWidth(150)
         y2_layout.addWidget(y2_label)
-        self.y2_combo = QComboBox()
+        self.y2_combo = RheoComboBox(placeholder="None (optional)")
         self.y2_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -159,7 +160,7 @@ class ColumnMapperDialog(QDialog):
         temp_label = QLabel("Temperature (Optional):")
         temp_label.setMinimumWidth(150)
         temp_layout.addWidget(temp_label)
-        self.temp_combo = QComboBox()
+        self.temp_combo = RheoComboBox(placeholder="None (optional)")
         self.temp_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -269,22 +270,11 @@ class ColumnMapperDialog(QDialog):
 
     def _populate_combos(self) -> None:
         """Populate combo boxes with column names."""
-        # X and Y are required
-        self.x_combo.clear()
-        self.y_combo.clear()
-
-        self.x_combo.addItems(self.columns)
-        self.y_combo.addItems(self.columns)
-
-        # Y2 and Temperature are optional
-        self.y2_combo.clear()
-        self.temp_combo.clear()
-
-        self.y2_combo.addItem("(None)")
-        self.y2_combo.addItems(self.columns)
-
-        self.temp_combo.addItem("(None)")
-        self.temp_combo.addItems(self.columns)
+        # X and Y are required; Y2 and Temperature are optional (placeholder = unset)
+        self.x_combo.set_items_safely(self.columns)
+        self.y_combo.set_items_safely(self.columns)
+        self.y2_combo.set_items_safely(self.columns)
+        self.temp_combo.set_items_safely(self.columns)
 
     def _apply_current_mapping(self) -> None:
         """Apply current mapping to combo boxes."""
@@ -344,8 +334,6 @@ class ColumnMapperDialog(QDialog):
             """Find best match for column."""
             for i in range(combo.count()):
                 text = combo.itemText(i).lower()
-                if text == "(none)":
-                    continue
                 for pattern in patterns:
                     # Alphanumeric boundaries (not \b): \b fails after symbolic
                     # modulus patterns like g', g'', g* whose last char is non-word,
@@ -406,13 +394,13 @@ class ColumnMapperDialog(QDialog):
             "y": self.y_combo.currentText(),
         }
 
-        # Add optional columns if selected
+        # Add optional columns if selected (empty text = placeholder/unset)
         y2_col = self.y2_combo.currentText()
-        if y2_col and y2_col != "(None)":
+        if y2_col:
             mapping["y2"] = y2_col
 
         temp_col = self.temp_combo.currentText()
-        if temp_col and temp_col != "(None)":
+        if temp_col:
             mapping["temperature"] = temp_col
 
         logger.debug(

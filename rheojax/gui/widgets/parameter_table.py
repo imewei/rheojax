@@ -23,6 +23,7 @@ from rheojax.gui.compat import (
 )
 from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.gui.state.store import ParameterState
+from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -291,7 +292,7 @@ class ParameterTable(QTableWidget):
         """
         widget = QWidget()
         layout = QHBoxLayout(widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
         layout.setAlignment(Qt.AlignCenter)
 
         checkbox = QCheckBox()

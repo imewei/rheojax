@@ -10,7 +10,6 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolb
 from matplotlib.figure import Figure
 
 from rheojax.gui.compat import (
-    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -22,7 +21,8 @@ from rheojax.gui.compat import (
     Signal,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, themed
-from rheojax.gui.utils.layout_helpers import set_toolbar_margins
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margins
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -121,7 +121,7 @@ class ResidualsPanel(QWidget):
     def _setup_ui(self) -> None:
         """Set up the user interface."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
         layout.setSpacing(Spacing.XS)
 
         # Toolbar
@@ -132,11 +132,12 @@ class ResidualsPanel(QWidget):
         type_label = QLabel("Plot Type:")
         toolbar_layout.addWidget(type_label)
 
-        self._type_combo = QComboBox()
+        self._type_combo = RheoComboBox()
         self._type_combo.setMinimumWidth(140)
-        for plot_id, display_name, tooltip in PLOT_TYPES:
-            self._type_combo.addItem(display_name, plot_id)
-            idx = self._type_combo.count() - 1
+        self._type_combo.set_items_safely(
+            [(display_name, plot_id) for plot_id, display_name, _tooltip in PLOT_TYPES]
+        )
+        for idx, (_plot_id, _display_name, tooltip) in enumerate(PLOT_TYPES):
             self._type_combo.setItemData(idx, tooltip, Qt.ItemDataRole.ToolTipRole)
         toolbar_layout.addWidget(self._type_combo)
 
@@ -200,7 +201,7 @@ class ResidualsPanel(QWidget):
         index : int
             New combo box index
         """
-        plot_type = self._type_combo.currentData()
+        plot_type = self._type_combo.current_data()
         self._current_plot_type = plot_type
         logger.debug(
             "User interaction",
@@ -653,9 +654,7 @@ class ResidualsPanel(QWidget):
             action="set_plot_type",
             plot_type=plot_type,
         )
-        idx = self._type_combo.findData(plot_type)
-        if idx >= 0:
-            self._type_combo.setCurrentIndex(idx)
+        self._type_combo.set_current_data(plot_type)
 
     def get_plot_type(self) -> str:
         """Get current plot type.

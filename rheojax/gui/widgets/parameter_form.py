@@ -20,6 +20,8 @@ from rheojax.gui.compat import (
     Signal,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, Typography
+from rheojax.gui.utils.layout_helpers import set_zero_margins
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -59,8 +61,8 @@ class ParameterFormBuilder(QWidget):
 
     def _build_form(self) -> None:
         layout = QFormLayout(self)
+        set_zero_margins(layout)
         layout.setSpacing(Spacing.SM)
-        layout.setContentsMargins(0, 0, 0, 0)
         layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
         for name, spec in self._specs.items():
@@ -103,11 +105,10 @@ class ParameterFormBuilder(QWidget):
                 widget.blockSignals(False)
                 widget.stateChanged.connect(self._on_change)
             elif ptype == "choice":
-                widget = QComboBox()
-                widget.blockSignals(True)
-                widget.addItems(spec.get("choices", []))
-                widget.setCurrentText(str(spec["default"]))
-                widget.blockSignals(False)
+                widget = RheoComboBox()
+                widget.set_items_safely(
+                    spec.get("choices", []), selected_data=str(spec["default"])
+                )
                 widget.currentTextChanged.connect(self._on_change)
             else:
                 logger.warning("Unknown param type", param=name, type=ptype)

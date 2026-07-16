@@ -21,6 +21,7 @@ from rheojax.gui.foundation.state import FitState
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.model_service import FAMILY_LABELS, ModelService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
+from rheojax.gui.widgets import RheoComboBox
 
 _PROTOCOLS = ["flow_curve", "creep", "relaxation", "startup", "oscillation", "laos"]
 
@@ -79,9 +80,10 @@ def _make_config_widget(annotation: Any, default: Any):
         w.setChecked(bool(default))
         return w, w.isChecked
     if get_origin(annotation) is Literal:
-        w = QComboBox()
-        w.addItems([str(a) for a in get_args(annotation)])
-        w.setCurrentText(str(default))
+        w = RheoComboBox()
+        w.set_items_safely(
+            [str(a) for a in get_args(annotation)], selected_data=str(default)
+        )
         return w, w.currentText
     if annotation is int:
         w = QSpinBox()
@@ -114,9 +116,9 @@ class ProtocolModelStep(QWidget):
         _ensure_all_registered()
         self._state = state
         self._config_widgets: dict[str, tuple[QWidget, Any]] = {}
-        self._protocol = QComboBox(self)
+        self._protocol = RheoComboBox(self)
         self._protocol.addItems([""] + _PROTOCOLS)
-        self._model = QComboBox(self)
+        self._model = RheoComboBox(self)
         self._config_form = QFormLayout()
         self._params = QLabel("", self)
         lay = QVBoxLayout(self)
@@ -163,13 +165,7 @@ class ProtocolModelStep(QWidget):
                 if not names:
                     continue
                 label = FAMILY_LABELS.get(family, family.replace("_", " ").title())
-                self._model.addItem(f"── {label} ──", None)
-                header_idx = self._model.count() - 1
-                item_model = self._model.model()
-                if item_model is not None:
-                    item = item_model.item(header_idx)
-                    if item is not None:
-                        item.setEnabled(False)
+                self._model.add_group_header(f"── {label} ──")
                 for name in names:
                     self._model.addItem(f"  {name}", name)
         self._model.blockSignals(False)

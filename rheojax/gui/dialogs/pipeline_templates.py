@@ -22,6 +22,7 @@ from rheojax.gui.compat import (
     QWidget,
 )
 from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
+from rheojax.gui.utils.layout_helpers import set_panel_margins, set_zero_margins
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -69,8 +70,7 @@ class PipelineTemplateDialog(QDialog):
     def _setup_ui(self) -> None:
         """Build the dialog layout."""
         root = QVBoxLayout(self)
-        root.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        root.setSpacing(Spacing.SM)
+        set_panel_margins(root)
 
         # Instruction label
         instruction = QLabel(
@@ -91,7 +91,7 @@ class PipelineTemplateDialog(QDialog):
         # Left: template list
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(left_layout)
         left_layout.setSpacing(Spacing.XS)
 
         list_label = QLabel("Templates")
@@ -110,7 +110,7 @@ class PipelineTemplateDialog(QDialog):
         # Right: YAML preview
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(right_layout)
         right_layout.setSpacing(Spacing.XS)
 
         preview_label = QLabel("Preview")

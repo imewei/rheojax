@@ -10,7 +10,6 @@ from typing import Any
 from rheojax.gui.compat import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -20,6 +19,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -135,8 +135,8 @@ class ExportOptionsDialog(QDialog):
         settings_layout.addRow("Resolution (DPI):", self.dpi_spin)
 
         # Style preset
-        self.style_combo = QComboBox()
-        self.style_combo.addItems(
+        self.style_combo = RheoComboBox()
+        self.style_combo.set_items_safely(
             [
                 "default",
                 "publication",
