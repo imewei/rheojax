@@ -78,7 +78,8 @@ def input_contract(protocol: str, model_key: str | None = None) -> InputContract
         # Stress (Pa) and viscosity (Pa·s) are the two quantities flow-curve
         # models fit; a dataset labeled with the other one is silently
         # wrong-scale, not just wrong-unit, so DataStep needs a converter
-        # (sigma = eta * gamma_dot), same as the x Hz->rad/s guard below.
+        # (sigma = eta * gamma_dot), same as the oscillation template's x
+        # Hz->rad/s guard above.
         unit_conversions["y"] = "stress<->viscosity"
     else:
         cols = [ColumnSpec(role, unit) for role, unit in t["columns"]]

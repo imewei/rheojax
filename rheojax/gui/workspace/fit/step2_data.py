@@ -305,6 +305,10 @@ class DataStep(QWidget):
             rheo_data.y = y * gamma_dot
             new_unit = "Pa"
         else:  # actual == "stress" and expected == "viscosity"
+            # gamma_dot == 0 (a legitimate flow-curve point) divides to inf,
+            # not an exception -- _validate_shape_and_values() below is what
+            # actually catches it, same as it catches a raw NaN/Inf y-column
+            # loaded straight from a file.
             rheo_data.y = y / gamma_dot
             new_unit = "Pa.s"
         # Same persistence ordering as apply_unit_conversion(): update the
@@ -318,6 +322,10 @@ class DataStep(QWidget):
         self._library.store_payload(self._state.data_ref, rheo_data)
         self._quantity_converted = True
         self._quantity_guard.setText("")
+        # The conversion mutates y in place -- re-run the same NaN/Inf check
+        # _on_select() runs on load, or a divide-by-zero at gamma_dot==0
+        # silently reaches NLSQ/NUTS as a "valid", already-passed dataset.
+        self._set_errors(_validate_shape_and_values(rheo_data))
         self.edited.emit()
 
     def quantity_conversion_applied(self) -> bool:
