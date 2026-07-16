@@ -5,9 +5,28 @@ import pytest
 
 from rheojax.io.readers._utils import (
     UNIFIED_UNIT_CONVERSIONS,
+    infer_y_unit_from_name,
     normalize_temperature,
     normalize_units,
 )
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_viscosity():
+    assert infer_y_unit_from_name("Viscosity") == "Pa.s"
+    assert infer_y_unit_from_name("  viscosity  ") == "Pa.s"
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_stress():
+    assert infer_y_unit_from_name("Stress") == "Pa"
+    assert infer_y_unit_from_name("Shear Stress") == "Pa"
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_unrecognized():
+    assert infer_y_unit_from_name("G_prime") is None
+    assert infer_y_unit_from_name("") is None
 
 
 @pytest.mark.smoke

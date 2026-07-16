@@ -1,18 +1,20 @@
+import numpy as np
 import pytest
 
 pytest.importorskip("PySide6")
+from rheojax.core.data import RheoData
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.workspace.fit.step2_data import DataStep
 
 
-def _ref(i, t):
+def _ref(i, t, units=None):
     return DatasetRef(
         id=i,
         name=i,
         protocol_type=t,
         origin="imported",
-        units={"x": "Hz"},
+        units=units if units is not None else {"x": "Hz"},
         row_count=64,
         hash="h",
         provenance={},
@@ -88,3 +90,52 @@ def test_data_step_refresh_clears_stale_selection(qtbot):
     assert st.data_ref is None
     assert st.column_map == {}
     assert step.available_datasets() == ["c1"]
+
+
+def test_data_step_flags_viscosity_data_for_stress_model(qtbot):
+    # Regression: MIKH (flow_quantity="stress") silently fit raw viscosity
+    # values as stress when a flow_curve CSV had no explicit unit conversion.
+    st = FitState(protocol="flow_curve", model_key="mikh")
+    lib = DatasetLibrary()
+    lib.add(_ref("flow1", "flow_curve", units={"y": "Pa.s"}))
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("flow1")
+    assert step.needs_quantity_conversion() is True
+    assert "viscosity" in step._quantity_mismatch_message()
+    assert "stress" in step._quantity_mismatch_message()
+
+
+def test_data_step_no_quantity_mismatch_when_units_match(qtbot):
+    st = FitState(protocol="flow_curve", model_key="mikh")
+    lib = DatasetLibrary()
+    lib.add(_ref("flow1", "flow_curve", units={"y": "Pa"}))
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("flow1")
+    assert step.needs_quantity_conversion() is False
+
+
+def test_data_step_apply_quantity_conversion_viscosity_to_stress(qtbot):
+    st = FitState(protocol="flow_curve", model_key="mikh")
+    lib = DatasetLibrary()
+    lib.add(_ref("flow1", "flow_curve", units={"y": "Pa.s"}))
+    gamma_dot = np.array([0.1, 1.0, 10.0])
+    viscosity = np.array([7348.0, 831.83, 94.353])
+    lib.store_payload(
+        "flow1", RheoData(x=gamma_dot, y=viscosity, x_units="1/s", y_units="Pa.s")
+    )
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("flow1")
+    assert step.needs_quantity_conversion() is True
+
+    step.apply_quantity_conversion()
+
+    assert step.needs_quantity_conversion() is False
+    assert step.quantity_conversion_applied() is True
+    converted = lib.load_payload("flow1")
+    np.testing.assert_allclose(
+        np.asarray(converted.y), viscosity * gamma_dot, rtol=1e-10
+    )
+    assert lib.get("flow1").units["y"] == "Pa"
