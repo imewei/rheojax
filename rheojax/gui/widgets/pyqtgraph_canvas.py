@@ -37,13 +37,14 @@ except ImportError:
     PYQTGRAPH_AVAILABLE = False
 
 from rheojax.gui.compat import (
-    QComboBox,
     QHBoxLayout,
     QPushButton,
     Qt,
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margins
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -168,7 +169,7 @@ class PyQtGraphCanvas(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(toolbar)
         layout.addWidget(self._plot_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
 
         logger.debug("PyQtGraph canvas initialized")
 
@@ -176,11 +177,11 @@ class PyQtGraphCanvas(QWidget):
         """Create toolbar with scale and export controls."""
         toolbar = QWidget()
         layout = QHBoxLayout(toolbar)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_toolbar_margins(layout)
 
         # Scale selector
-        self._scale_combo = QComboBox()
-        self._scale_combo.addItems(["Log-Log", "Lin-Lin", "Log-Lin", "Lin-Log"])
+        self._scale_combo = RheoComboBox()
+        self._scale_combo.set_items_safely(["Log-Log", "Lin-Lin", "Log-Lin", "Lin-Log"])
         self._scale_combo.currentTextChanged.connect(self._on_scale_changed)
         layout.addWidget(self._scale_combo)
 

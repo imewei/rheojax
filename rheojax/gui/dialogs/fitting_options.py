@@ -9,7 +9,6 @@ from typing import Any
 
 from rheojax.gui.compat import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -23,6 +22,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -80,16 +80,16 @@ class FittingOptionsDialog(QDialog):
         algo_group = QGroupBox("Algorithm")
         algo_layout = QFormLayout()
 
-        self.algo_combo = QComboBox()
-        self.algo_combo.addItems(
+        self.algo_combo = RheoComboBox()
+        self.algo_combo.set_items_safely(
             ["NLSQ (default)", "NLSQ Global", "L-BFGS-B", "Trust Region"]
         )
         self.algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addRow("Optimization Method:", self.algo_combo)
 
         # Workflow dropdown (auto / auto_global)
-        self.workflow_combo = QComboBox()
-        self.workflow_combo.addItems(["auto", "auto_global"])
+        self.workflow_combo = RheoComboBox()
+        self.workflow_combo.set_items_safely(["auto", "auto_global"])
         self.workflow_combo.setToolTip(
             "auto: single multi-start NLSQ run; "
             "auto_global: basin-hopping global search before refinement"
@@ -112,8 +112,8 @@ class FittingOptionsDialog(QDialog):
         algo_layout.addRow("", self.auto_bounds_check)
 
         # Stability dropdown (auto / on / off)
-        self.stability_combo = QComboBox()
-        self.stability_combo.addItems(["auto", "on", "off"])
+        self.stability_combo = RheoComboBox()
+        self.stability_combo.set_items_safely(["auto", "on", "off"])
         self.stability_combo.setToolTip(
             "Stability analysis after fitting: "
             "auto = run when convergence is borderline, "
@@ -127,8 +127,8 @@ class FittingOptionsDialog(QDialog):
         algo_layout.addRow("Stability:", self.stability_combo)
 
         # Jacobian mode
-        self.jacobian_combo = QComboBox()
-        self.jacobian_combo.addItems(["Auto", "Forward (fwd)", "Reverse (rev)"])
+        self.jacobian_combo = RheoComboBox()
+        self.jacobian_combo.set_items_safely(["Auto", "Forward (fwd)", "Reverse (rev)"])
         self.jacobian_combo.setToolTip(
             "Jacobian computation mode: Auto selects based on problem size. "
             "Forward is better for few parameters, Reverse for many."

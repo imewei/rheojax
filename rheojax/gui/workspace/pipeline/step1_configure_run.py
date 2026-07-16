@@ -18,7 +18,6 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -29,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from rheojax.core.registry import ModelRegistry, TransformRegistry
 from rheojax.gui.foundation.state import PipelineStepConfig
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.gui.workspace.transform.slots_spec import _MULTI, _TYPED_PAIRS
 
 _EXCLUDED_TRANSFORM_KEYS = set(_MULTI) | set(_TYPED_PAIRS)
@@ -56,13 +56,13 @@ class PipelineConfigureRunStep(QWidget):
         self._state = state
         self._library = library
 
-        self._step_type_combo = QComboBox(self)
+        self._step_type_combo = RheoComboBox(self)
         self._step_type_combo.addItems(["transform", "fit", "export"])
 
-        self._transform_key_combo = QComboBox(self)
+        self._transform_key_combo = RheoComboBox(self)
         self._transform_key_combo.addItems(self.available_transform_keys())
 
-        self._fit_model_combo = QComboBox(self)
+        self._fit_model_combo = RheoComboBox(self)
         self._fit_model_combo.addItems(ModelRegistry.list_models())
         self._fit_run_nuts_checkbox = QCheckBox("Run NUTS after NLSQ", self)
 
@@ -70,7 +70,7 @@ class PipelineConfigureRunStep(QWidget):
         self._export_path_edit.setPlaceholderText(
             "/path/to/output_{id}.csv  ({id} = dataset id)"
         )
-        self._export_format_combo = QComboBox(self)
+        self._export_format_combo = RheoComboBox(self)
         self._export_format_combo.addItems(["csv", "json", "xlsx", "hdf5"])
 
         self._add_step_btn = QPushButton("+ Add Step", self)

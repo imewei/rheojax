@@ -12,7 +12,6 @@ from matplotlib.figure import Figure
 
 from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
 from rheojax.gui.compat import (
-    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -23,8 +22,9 @@ from rheojax.gui.compat import (
     Signal,
 )
 from rheojax.gui.resources.styles.tokens import Spacing
-from rheojax.gui.utils.layout_helpers import set_toolbar_margins
+from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margins
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -125,7 +125,7 @@ class ArvizCanvas(BaseArviZWidget):
         user can scroll vertically instead of having everything squashed.
         """
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        set_zero_margins(layout)
         layout.setSpacing(Spacing.XS)
 
         # --- Fixed header: Plot Type selector + Refresh/Export buttons ---
@@ -135,7 +135,7 @@ class ArvizCanvas(BaseArviZWidget):
         type_label = QLabel("Plot Type:")
         toolbar_layout.addWidget(type_label)
 
-        self._type_combo = QComboBox()
+        self._type_combo = RheoComboBox()
         self._type_combo.setMinimumWidth(120)
         for plot_id, display_name, tooltip in PLOT_TYPES:
             self._type_combo.addItem(display_name, plot_id)
@@ -234,7 +234,7 @@ class ArvizCanvas(BaseArviZWidget):
         index : int
             New combo box index
         """
-        plot_type = self._type_combo.currentData()
+        plot_type = self._type_combo.current_data()
         old_plot_type = self._current_plot_type
         self._current_plot_type = plot_type
 
@@ -410,9 +410,7 @@ class ArvizCanvas(BaseArviZWidget):
         plot_type : str
             Plot type identifier
         """
-        idx = self._type_combo.findData(plot_type)
-        if idx >= 0:
-            self._type_combo.setCurrentIndex(idx)
+        self._type_combo.set_current_data(plot_type)
 
     def get_plot_type(self) -> str:
         """Get current plot type.

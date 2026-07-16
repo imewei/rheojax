@@ -9,6 +9,7 @@ Reusable UI components for the RheoJAX GUI.
 from rheojax.gui.state.store import PipelineStep, StepStatus
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas, ArvizCanvas
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
+from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.widgets.parameter_table import ParameterTable
 from rheojax.gui.widgets.plot_canvas import PlotCanvas
@@ -35,4 +36,5 @@ __all__ = [
     "is_pyqtgraph_available",
     "ParameterFormBuilder",
     "PYQTGRAPH_AVAILABLE",
+    "RheoComboBox",
 ]

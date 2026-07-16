@@ -14,7 +14,6 @@ import logging
 from collections import deque
 
 from rheojax.gui.compat import (
-    QComboBox,
     QDockWidget,
     QFileDialog,
     QHBoxLayout,
@@ -24,6 +23,8 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.utils.layout_helpers import set_compact_margins
+from rheojax.gui.widgets.dropdown import RheoComboBox
 
 _MAX_RECORDS = 2000
 
@@ -49,13 +50,12 @@ class LogDockWidget(QDockWidget):
 
         container = QWidget(self)
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(4, 4, 4, 4)
+        set_compact_margins(layout)
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Level:", container))
-        self.level_combo = QComboBox(container)
-        self.level_combo.addItems(_LEVEL_NAMES)
-        self.level_combo.setCurrentText("INFO")
+        self.level_combo = RheoComboBox(container)
+        self.level_combo.set_items_safely(list(_LEVEL_NAMES), selected_data="INFO")
         self.level_combo.currentTextChanged.connect(self._rerender)
         toolbar.addWidget(self.level_combo)
         toolbar.addStretch(1)

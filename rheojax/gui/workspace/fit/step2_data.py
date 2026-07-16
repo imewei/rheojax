@@ -4,13 +4,14 @@ from dataclasses import replace
 
 import numpy as np
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.foundation.contract import input_contract
 from rheojax.gui.foundation.library import DatasetLibrary
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.utils.layout_helpers import set_panel_margins
+from rheojax.gui.widgets import RheoComboBox
 
 
 def _validate_shape_and_values(rheo_data) -> list[str]:
@@ -58,8 +59,8 @@ class DataStep(QWidget):
         # Guard: protocol may be None on a fresh AppState; defer contract build until set
         self._contract, cols_text = self._build_contract()
         self._expected = QLabel(cols_text, self)
-        self._source = QComboBox(self)
-        self._source.addItems([""] + self.available_datasets())
+        self._source = RheoComboBox(self)
+        self._source.set_items_safely([""] + self.available_datasets())
         self._guard = QLabel("", self)
         self._convert_btn = QPushButton("⇄ Convert Hz → rad/s", self)
         self._error_label = QLabel("", self)
@@ -113,11 +114,9 @@ class DataStep(QWidget):
             bool(current) and current in new_datasets and not y_quantity_changed
         )
 
-        self._source.blockSignals(True)
-        self._source.clear()
-        self._source.addItems([""] + new_datasets)
-        self._source.setCurrentText(current if still_valid else "")
-        self._source.blockSignals(False)
+        self._source.set_items_safely(
+            [""] + new_datasets, selected_data=current if still_valid else None
+        )
 
         if still_valid:
             # The upstream Step-1 edit cascade clears state.data_ref/column_map

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QComboBox,
     QLabel,
     QListWidget,
     QPushButton,
@@ -15,6 +14,7 @@ from rheojax.gui.foundation.state import TransformState
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.transform_service import TransformService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.gui.widgets.parameter_form import ParameterFormBuilder
 from rheojax.gui.workspace.transform.slots_spec import SlotSpec, transform_slots
 
@@ -34,9 +34,9 @@ class SlotsStep(QWidget):
         self._library = library
         self._transform_service = transform_service or TransformService()
         self._specs: list[SlotSpec] = []
-        self._combo_widgets: dict[str, QComboBox] = {}
+        self._combo_widgets: dict[str, RheoComboBox] = {}
         self._list_widgets: dict[str, QListWidget] = {}
-        self._list_add_combos: dict[str, QComboBox] = {}
+        self._list_add_combos: dict[str, RheoComboBox] = {}
         self._list_add_buttons: dict[str, QPushButton] = {}
         self._list_remove_buttons: dict[str, QPushButton] = {}
         self._param_form: ParameterFormBuilder | None = None
@@ -130,10 +130,8 @@ class SlotsStep(QWidget):
         if isinstance(current, str) and current not in candidates:
             self._state.slots.pop(spec.name, None)
             current = None
-        combo = QComboBox(self)
-        combo.addItems([""] + candidates)
-        if current:
-            combo.setCurrentText(current)
+        combo = RheoComboBox(self)
+        combo.set_items_safely([""] + candidates, selected_data=current or None)
         combo.currentTextChanged.connect(
             lambda text, name=spec.name: self._on_single_slot_changed(name, text)
         )
@@ -151,8 +149,8 @@ class SlotsStep(QWidget):
 
         list_widget = QListWidget(self)
         list_widget.addItems(current_list)
-        add_combo = QComboBox(self)
-        add_combo.addItems(
+        add_combo = RheoComboBox(self)
+        add_combo.set_items_safely(
             [""] + [c for c in self.candidates(spec.name) if c not in current_list]
         )
         add_btn = QPushButton("Add", self)

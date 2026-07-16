@@ -12,7 +12,6 @@ import pandas as pd
 
 from rheojax.gui.compat import (
     QCheckBox,
-    QComboBox,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -32,6 +31,7 @@ from rheojax.gui.compat import (
     QWizardPage,
     Signal,
 )
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -207,7 +207,7 @@ class ColumnMappingPage(QWizardPage):
         # X axis (frequency/time)
         x_layout = QHBoxLayout()
         x_layout.addWidget(QLabel("X (Frequency/Time):"))
-        self.x_combo = QComboBox()
+        self.x_combo = RheoComboBox()
         # Ignore the emitted text; we only care that completion state may have changed
         self.x_combo.currentTextChanged.connect(self._on_x_column_changed)
         x_layout.addWidget(self.x_combo, 1)
@@ -216,7 +216,7 @@ class ColumnMappingPage(QWizardPage):
         # Y axis (modulus/compliance/viscosity)
         y_layout = QHBoxLayout()
         y_layout.addWidget(QLabel("Y (Modulus/Viscosity):"))
-        self.y_combo = QComboBox()
+        self.y_combo = RheoComboBox()
         self.y_combo.currentTextChanged.connect(self._on_y_column_changed)
         y_layout.addWidget(self.y_combo, 1)
         mapping_layout.addLayout(y_layout)
@@ -224,7 +224,7 @@ class ColumnMappingPage(QWizardPage):
         # Y2 axis (optional, e.g., G'')
         y2_layout = QHBoxLayout()
         y2_layout.addWidget(QLabel("Y2 (Optional, e.g., G''):"))
-        self.y2_combo = QComboBox()
+        self.y2_combo = RheoComboBox()
         self.y2_combo.currentTextChanged.connect(self._on_y2_column_changed)
         y2_layout.addWidget(self.y2_combo, 1)
         mapping_layout.addLayout(y2_layout)
@@ -232,7 +232,7 @@ class ColumnMappingPage(QWizardPage):
         # Temperature (optional)
         temp_layout = QHBoxLayout()
         temp_layout.addWidget(QLabel("Temperature (Optional):"))
-        self.temp_combo = QComboBox()
+        self.temp_combo = RheoComboBox()
         self.temp_combo.currentTextChanged.connect(self._on_temp_column_changed)
         temp_layout.addWidget(self.temp_combo, 1)
         mapping_layout.addLayout(temp_layout)
@@ -346,24 +346,22 @@ class ColumnMappingPage(QWizardPage):
         )
 
         # Populate combo boxes
-        self.x_combo.clear()
-        self.y_combo.clear()
-        self.y2_combo.clear()
-        self.temp_combo.clear()
-
-        self.x_combo.addItems(columns)
-        self.y_combo.addItems(columns)
-
-        self.y2_combo.addItem("(None)")
-        self.y2_combo.addItems(columns)
-
-        self.temp_combo.addItem("(None)")
-        self.temp_combo.addItems(columns)
+        self.x_combo.set_items_safely(columns)
+        self.y_combo.set_items_safely(columns)
+        self.y2_combo.set_items_safely(["(None)", *columns])
+        self.temp_combo.set_items_safely(["(None)", *columns])
 
         # Update preview
         self._update_preview(df)
 
         self._auto_detect()
+
+        # set_items_safely() blocks signals during populate, and _auto_detect()'s
+        # setCurrentIndex() only emits when the index actually changes — so
+        # currentTextChanged (and therefore completeChanged) can go un-fired even
+        # though x_combo/y_combo now hold valid selections. Force one explicit
+        # re-check so the wizard's Next button reflects the real completion state.
+        self.completeChanged.emit()
 
     def _on_columns_load_failed(self, error: str) -> None:
         """Handle a failed background column read."""
@@ -398,7 +396,7 @@ class ColumnMappingPage(QWizardPage):
 
         claimed: set[str] = set()
 
-        def find_match(combo: QComboBox, patterns: list[str]) -> None:
+        def find_match(combo: RheoComboBox, patterns: list[str]) -> None:
             """Find best match for column, skipping columns already claimed
             by another field (e.g. "g'" is a substring of "g''", so G''
             must be claimed by y2 before y is matched against it)."""
@@ -444,8 +442,8 @@ class TestModeSelectionPage(QWizardPage):
         mode_group = QGroupBox("Test Mode")
         mode_layout = QVBoxLayout()
 
-        self.test_mode_combo = QComboBox()
-        self.test_mode_combo.addItems(
+        self.test_mode_combo = RheoComboBox()
+        self.test_mode_combo.set_items_safely(
             [
                 "oscillation",
                 "relaxation",
