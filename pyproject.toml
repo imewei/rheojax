@@ -99,10 +99,14 @@ dependencies = [
     "numpyro>=0.20.0,<1.0.0",
 
     # Bayesian visualization and diagnostics
-    "arviz>=0.23.4,<2.0.0",
-    "arviz-base>=0.8.2",
-    "arviz-stats>=0.8.0",
-    "arviz-plots>=0.8.0",
+    # NOTE: arviz 1.x split plot_*/rhat/ess/loo into arviz-plots/arviz-stats
+    # with a different kwarg shape than 0.x. This codebase targets 1.x only
+    # (see rheojax/core/arviz_utils.py for the kwarg-translation shim, and
+    # docs/superpowers/specs/2026-07-14-arviz-1x-migration-design.md).
+    "arviz>=1.2.0,<2.0.0",
+    "arviz-base>=1.2.0",
+    "arviz-stats>=1.2.0",
+    "arviz-plots>=1.2.0",
     "h5netcdf>=1.8.1",     # NetCDF backend for arviz InferenceData.to_netcdf()
 
     # Data structures (used directly in bayesian.py for InferenceData)

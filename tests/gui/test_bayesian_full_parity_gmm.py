@@ -4,10 +4,8 @@ Uses bundled multi-technique fixture with GMM model if available.
 """
 
 import hashlib
-import io
 
 import arviz as az
-import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
@@ -66,35 +64,25 @@ def test_bayesian_full_parity_gmm_like():
     min_ess = min(float(v.values) for v in ess.data_vars.values())
     # Record diagnostics but do not fail; this test is opt-in and may be noisy
 
-    # Posterior predictive-style hash
+    # Posterior predictive-style data hash for regression evidence. Hashing
+    # the underlying numeric arrays (not a rendered PNG, as this used to)
+    # avoids the host FreeType/Agg "raster overflow" glyph-rendering bug --
+    # see test_bayesian_full_parity.py for the full rationale.
     y_level = float(
         np.array(
             result.posterior_samples[list(result.posterior_samples.keys())[0]]
         ).mean()
     )
     y_mean = np.full_like(t, y_level)
-    plt.figure(figsize=(4, 3), dpi=100)
-    plt.plot(t, y, "k.", label="data")
-    plt.plot(t, y_mean, "b-", label="post mean")
-    plt.tight_layout()
-    buf = io.BytesIO()
-    try:
-        plt.savefig(buf, format="png")
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real numerical regressions.
-        plt.close()
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    plt.close()
-    digest = hashlib.sha256(buf.getvalue()).hexdigest()
+    digest = hashlib.sha256(
+        np.concatenate([t, y, y_mean]).astype(np.float64).round(8).tobytes()
+    ).hexdigest()
 
     assert len(digest) == 64
-    # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib.
+    # Locked-environment baseline for the current uv.lock JAX/NumPyro.
     # NOTE: this hash differs from main because adding 'flow_quantity: str' as a
     # class-level annotation on GeneralizedMaxwell changes XLA compilation,
     # which subtly shifts NUTS samples even with a fixed seed. The change is
     # genuine (not environment drift); it cannot be undone without removing the
     # attribute required by the flow_quantity fix (see CHANGES).
-    assert digest == "e5159224bab91ffc4a448add8b6a6cd0705d9ae90e31e2d72206fbfb92bdaf3d"
+    assert digest == "fc13f0eeae7a6db013acef0713267702c7cc65fe2653f35b2955d8b2f5608abd"

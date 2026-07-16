@@ -110,6 +110,7 @@ def test_creep_strain_monotone_increasing_above_yield():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(300)
 def test_creep_roundtrip_synthetic_high_R2():
     """STZ creep should fit its own forward simulation with R^2 > 0.99.
 
@@ -117,6 +118,10 @@ def test_creep_roundtrip_synthetic_high_R2():
     sanity check that the elastic-offset IC plus the plastic ODE together
     are self-consistent under NLSQ. Prior to the IC fix, this test would
     fail with the optimizer stuck at R^2 < 0.
+
+    ODE-per-residual-evaluation NLSQ measures ~176s (genuine, non-reducible
+    compute cost -- see 0ac133e6's HVM demo fix for the same pattern), just
+    past the project's default 120s pytest-timeout. 300s gives ~1.7x margin.
     """
     true_params = {
         "G0": 1000.0,

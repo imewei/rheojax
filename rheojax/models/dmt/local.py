@@ -1091,7 +1091,12 @@ class DMTLocal(DMTBase):
     def _predict_creep(self, t: np.ndarray, **kwargs) -> np.ndarray:
         """Predict creep strain."""
         _s0 = kwargs.get("sigma_0", _MISSING)
-        sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_applied", 10.0)
+        if _s0 is _MISSING:
+            # _sigma_applied is pre-declared None in DMTBase.__init__ (only
+            # set once _fit_creep runs), so getattr's default never fires --
+            # it finds the attribute, just with value None.
+            _s0 = self._sigma_applied if self._sigma_applied is not None else 10.0
+        sigma_0 = _s0
         _li = kwargs.get("lam_init", _MISSING)
         lam_init = _li if _li is not _MISSING else getattr(self, "_creep_lam_init", 1.0)
         _, gamma, _, _ = self.simulate_creep(
@@ -1923,7 +1928,11 @@ class DMTLocal(DMTBase):
         _s0 = kwargs.get("sigma_0", _MISSING)
         if _s0 is _MISSING:
             _s0 = kwargs.get("sigma_applied", _MISSING)
-        sigma_0 = _s0 if _s0 is not _MISSING else getattr(self, "_sigma_applied", 50.0)
+        if _s0 is _MISSING:
+            # See _predict_creep: _sigma_applied is pre-declared None in
+            # DMTBase.__init__, so getattr's default never fires pre-fit.
+            _s0 = self._sigma_applied if self._sigma_applied is not None else 50.0
+        sigma_0 = _s0
         lam_init = getattr(self, "_creep_lam_init", 1.0)
         dt = X_jax[1] - X_jax[0]
         n_steps = X_jax.shape[0]

@@ -407,6 +407,24 @@ fig = panel.get_figure()
 # ArvizCanvas Visual Tests (Placeholder - requires InferenceData)
 # =============================================================================
 
+# Runs inside the isolated render subprocess (see _render_widget_figure) --
+# must be self-contained, no references to names from the outer test module.
+_ARVIZ_SYNTHETIC_IDATA_CODE = """
+import numpy as np
+from rheojax.core.arviz_utils import inference_data_from_dict
+
+rng = np.random.default_rng(0)
+posterior = {
+    "a": rng.normal(loc=2.0, scale=0.5, size=(2, 50)),
+    "b": rng.normal(loc=-1.0, scale=0.3, size=(2, 50)),
+}
+sample_stats = {
+    "energy": rng.normal(loc=10.0, scale=2.0, size=(2, 50)),
+    "diverging": np.zeros((2, 50), dtype=bool),
+}
+idata = inference_data_from_dict({"posterior": posterior, "sample_stats": sample_stats})
+"""
+
 
 @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
 class TestArvizCanvasVisual:
@@ -444,6 +462,40 @@ fig = canvas.get_figure()
 
         assert compare_figures(widget_code, golden_path, threshold=0.05), (
             "ArviZ empty state visual mismatch"
+        )
+
+    @pytest.mark.parametrize(
+        "plot_type",
+        ["trace", "pair", "forest", "posterior", "energy", "rank", "ess", "autocorr"],
+    )
+    def test_arviz_canvas_plot_type_renders(
+        self,
+        qapp: QApplication,
+        qtbot: Any,
+        golden_dir: Path,
+        plot_type: str,
+    ) -> None:
+        """Golden-image coverage for each ArviZ 1.x plot type. Pixel-exact
+        parity with the old 0.x rendering engine is not a goal -- only that
+        each plot type renders without error and stays visually stable."""
+        widget_code = (
+            _ARVIZ_SYNTHETIC_IDATA_CODE
+            + f"""
+from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+canvas = ArvizCanvas()
+canvas.set_inference_data(idata)
+canvas.set_plot_type({plot_type!r})
+fig = canvas.get_figure()
+"""
+        )
+        golden_path = golden_dir / f"arviz_canvas_{plot_type}.png"
+
+        if not golden_path.exists():
+            save_golden_image(widget_code, golden_path)
+            pytest.skip("Generated golden image - rerun test to validate")
+
+        assert compare_figures(widget_code, golden_path, threshold=0.05), (
+            f"ArviZ {plot_type} plot visual mismatch"
         )
 
 

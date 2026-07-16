@@ -119,7 +119,7 @@ def check_dependencies() -> tuple[bool, list[str]]:
     try:
         import arviz  # noqa: F401
     except ImportError:
-        missing.append("arviz>=0.22.0")
+        missing.append("arviz>=1.2.0")
 
     return not missing, missing
 

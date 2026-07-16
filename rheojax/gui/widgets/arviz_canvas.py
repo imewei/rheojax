@@ -639,12 +639,17 @@ class ArvizCanvas(BaseArviZWidget):
                 return
             # Posterior plots use 1 subplot per variable -- same max_subplots
             # ceiling as _plot_trace/_plot_pair for very high parameter counts.
+            # ArviZ 1.x removed plot_posterior; plot_dist is its successor.
             with az.rc_context({"plot.max_subplots": len(var_names)}):
                 self._arviz_plot(
-                    az.plot_posterior,
+                    az.plot_dist,
                     self._inference_data,
-                    var_names=var_names,
-                    hdi_prob=self._hdi_prob,
+                    **arviz_plot_kwargs(
+                        az,
+                        "plot_posterior",
+                        var_names=var_names,
+                        hdi_prob=self._hdi_prob,
+                    ),
                 )
         except ImportError:
             logger.error(

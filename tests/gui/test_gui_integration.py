@@ -353,6 +353,35 @@ class TestWidgetIntegration:
 
         canvas.close()
 
+    def test_arviz_canvas_posterior_plot_renders(
+        self, qapp: QApplication, qtbot: Any
+    ) -> None:
+        """Regression: ArviZ 1.x removed plot_posterior; _plot_posterior must
+        call plot_dist instead, or this raises AttributeError before any
+        kwarg translation runs (see docs/superpowers/specs/2026-07-14-arviz-1x-migration-design.md)."""
+        import numpy as np
+
+        from rheojax.core.arviz_utils import inference_data_from_dict
+        from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+
+        canvas = ArvizCanvas()
+        qtbot.addWidget(canvas)
+
+        rng = np.random.default_rng(0)
+        posterior = {
+            "a": rng.normal(size=(2, 50)),
+            "b": rng.normal(size=(2, 50)),
+        }
+        idata = inference_data_from_dict({"posterior": posterior})
+
+        canvas.set_inference_data(idata)
+        canvas._current_plot_type = "posterior"
+        canvas._refresh_plot()
+
+        assert not canvas._status_label.text().startswith("Error:")
+
+        canvas.close()
+
 
 # =============================================================================
 # Full End-to-End Workflow Tests

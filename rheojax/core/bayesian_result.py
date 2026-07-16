@@ -141,9 +141,10 @@ class BayesianResult:
 
         Args:
             log_likelihood: If True, compute pointwise log-likelihood for
-                WAIC/LOO model comparison (az.waic(), az.loo()). This
-                re-evaluates the model for all samples (~600-800ms slower).
-                Default False for faster conversion when only plotting.
+                LOO model comparison (az.loo()). ArviZ 1.x has no WAIC
+                implementation. This re-evaluates the model for all samples
+                (~600-800ms slower). Default False for faster conversion
+                when only plotting.
 
         Returns:
             ArviZ InferenceData object containing:
@@ -163,7 +164,7 @@ class BayesianResult:
             >>>
             >>> # For model comparison (slower):
             >>> idata_ll = result.to_inference_data(log_likelihood=True)
-            >>> az.waic(idata_ll)
+            >>> az.loo(idata_ll)
 
         Note:
             Requires arviz package: pip install arviz
@@ -220,6 +221,16 @@ class BayesianResult:
                     "ArviZ is required for log-likelihood computation. "
                     "Install it with: pip install arviz"
                 ) from exc
+
+            # ArviZ 1.x's PSIS-LOO backend (arviz_stats) mutates array
+            # buffers in place; az.from_numpyro() leaves log_likelihood as
+            # a live JAX array, which rejects in-place mutation (TypeError:
+            # JAX arrays are immutable). Materialize to plain numpy so
+            # az.loo()/az.compare()/az.plot_khat() work on this idata.
+            for var in idata.log_likelihood.data_vars:
+                idata.log_likelihood[var].values = np.asarray(
+                    idata.log_likelihood[var].values
+                )
             logger.info(
                 "InferenceData created successfully (with log_likelihood)",
                 num_chains=self.num_chains,

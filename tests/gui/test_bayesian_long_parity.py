@@ -5,9 +5,7 @@ Runs a modest SPP-like Bayesian inference and checks diagnostics + PPD hash.
 
 import csv
 import hashlib
-import io
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
@@ -63,22 +61,12 @@ def test_bayesian_long_parity_relaxation_fixture():
         result.posterior_samples[list(result.posterior_samples.keys())[0]].mean(axis=-1)
     ).flatten()
     x_plot = t[: len(y_mean)]
-    plt.figure(figsize=(4, 3), dpi=100)
-    plt.plot(t, y, "k.", label="data")
-    plt.plot(x_plot, y_mean, "b-", label="post mean")
-    plt.tight_layout()
-    buf = io.BytesIO()
-    try:
-        plt.savefig(buf, format="png")
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real numerical regressions.
-        plt.close()
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    plt.close()
-    digest = hashlib.sha256(buf.getvalue()).hexdigest()
+    # Hash the underlying numeric arrays (not a rendered PNG, as this used to)
+    # to avoid the host FreeType/Agg "raster overflow" glyph-rendering bug --
+    # see test_bayesian_full_parity.py for the full rationale.
+    digest = hashlib.sha256(
+        np.concatenate([t, y, x_plot, y_mean]).astype(np.float64).round(8).tobytes()
+    ).hexdigest()
 
     # Loose expected hash; this is to detect major regressions, not pixel perfection
     assert len(digest) == 64

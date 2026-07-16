@@ -5,10 +5,8 @@ fixture with notebook-like sampler settings and checks convergence + PPD hash.
 """
 
 import hashlib
-import io
 
 import arviz as az
-import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
@@ -70,32 +68,23 @@ def test_bayesian_full_parity_notebook_like_relaxation():
     assert max_rhat < 1.05
     assert min_ess > 400
 
-    # Posterior predictive-style plot hash for regression evidence.
+    # Posterior predictive-style data hash for regression evidence. Hashing
+    # the underlying numeric arrays (not a rendered PNG, as this used to)
+    # avoids the host FreeType/Agg "raster overflow" glyph-rendering bug that
+    # intermittently corrupted matplotlib text rendering on this machine --
+    # text rendering was never the point of this check, only detecting
+    # numeric drift in the posterior predictive.
     y_level = float(
         np.array(
             result.posterior_samples[list(result.posterior_samples.keys())[0]]
         ).mean()
     )
     y_mean = np.full_like(t, y_level)
-    x_plot = t
-    plt.figure(figsize=(4, 3), dpi=100)
-    plt.plot(t, y, "k.", label="data")
-    plt.plot(x_plot, y_mean, "b-", label="post mean")
-    plt.tight_layout()
-    buf = io.BytesIO()
-    try:
-        plt.savefig(buf, format="png")
-    except (RuntimeError, MemoryError) as e:
-        # Known host-environment FreeType/Agg rendering bug (glyph "raster
-        # overflow", sometimes cascading to a std::bad_alloc) -- not a
-        # regression in the code under test. Skip rather than fail so a
-        # flaky font/DPI environment doesn't mask real numerical regressions.
-        plt.close()
-        pytest.skip(f"Host FreeType rendering issue, not a regression: {e}")
-    plt.close()
-    digest = hashlib.sha256(buf.getvalue()).hexdigest()
+    digest = hashlib.sha256(
+        np.concatenate([t, y, y_mean]).astype(np.float64).round(8).tobytes()
+    ).hexdigest()
 
     assert len(digest) == 64
-    # Locked-environment baseline for the current uv.lock JAX/NumPyro/Matplotlib;
-    # the constructor compatibility layer does not affect the rendered values.
-    assert digest == "801d50fcc8650f5dc8b287600c32b3ef91ac121f468e21eb45290b1269f1a89e"
+    # Locked-environment baseline for the current uv.lock JAX/NumPyro;
+    # the constructor compatibility layer does not affect the computed values.
+    assert digest == "446b169d23eb7e10a5ba559515c9779bed3fa987f18e3ef28a351d4cbfd4e806"

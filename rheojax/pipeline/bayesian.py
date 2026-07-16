@@ -940,12 +940,7 @@ class BayesianPipeline(Pipeline):
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -1111,12 +1106,7 @@ class BayesianPipeline(Pipeline):
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
@@ -1202,12 +1192,7 @@ class BayesianPipeline(Pipeline):
         # Extract figure from axes
         import matplotlib.pyplot as plt
 
-        if hasattr(axes, "figure"):
-            fig = axes.figure
-        elif isinstance(axes, np.ndarray):
-            fig = axes.ravel()[0].figure
-        else:
-            fig = plt.gcf()
+        fig = arviz_figure(axes)
 
         # Store figure for save_figure() method
         self._current_figure = fig
