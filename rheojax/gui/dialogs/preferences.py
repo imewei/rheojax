@@ -9,7 +9,6 @@ from typing import Any
 
 from rheojax.gui.compat import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -24,6 +23,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.widgets import RheoComboBox
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -143,7 +143,7 @@ class PreferencesDialog(QDialog):
         theme_group = QGroupBox("Appearance")
         theme_layout = QFormLayout()
 
-        self.theme_combo = QComboBox()
+        self.theme_combo = RheoComboBox()
         self.theme_combo.addItems(["Light", "Dark", "System"])
         self.theme_combo.currentTextChanged.connect(
             lambda value: logger.debug(
@@ -162,7 +162,7 @@ class PreferencesDialog(QDialog):
         worker_group = QGroupBox("Worker Settings")
         worker_layout = QFormLayout()
 
-        self.worker_isolation_combo = QComboBox()
+        self.worker_isolation_combo = RheoComboBox()
         self.worker_isolation_combo.addItems(["subprocess", "thread"])
         self.worker_isolation_combo.setToolTip(
             "subprocess: each fit/Bayesian job runs in an isolated process "
@@ -263,7 +263,7 @@ class PreferencesDialog(QDialog):
         device_group = QGroupBox("Device Configuration")
         device_layout = QFormLayout()
 
-        self.device_combo = QComboBox()
+        self.device_combo = RheoComboBox()
         self.device_combo.addItems(["cpu", "gpu", "tpu"])
         self.device_combo.currentTextChanged.connect(
             lambda value: logger.debug(
@@ -364,7 +364,7 @@ class PreferencesDialog(QDialog):
         style_group = QGroupBox("Plot Style")
         style_layout = QFormLayout()
 
-        self.plot_style_combo = QComboBox()
+        self.plot_style_combo = RheoComboBox()
         self.plot_style_combo.addItems(
             [
                 "default",
@@ -387,7 +387,7 @@ class PreferencesDialog(QDialog):
         )
         style_layout.addRow("Default Plot Style:", self.plot_style_combo)
 
-        self.color_palette_combo = QComboBox()
+        self.color_palette_combo = RheoComboBox()
         self.color_palette_combo.addItems(
             [
                 "tab10",
