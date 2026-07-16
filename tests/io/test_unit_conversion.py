@@ -1,13 +1,56 @@
 """Tests for unified unit normalization (Phase 1)."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
+from rheojax.io.readers import load_csv
 from rheojax.io.readers._utils import (
     UNIFIED_UNIT_CONVERSIONS,
+    infer_y_unit_from_name,
     normalize_temperature,
     normalize_units,
 )
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_viscosity():
+    assert infer_y_unit_from_name("Viscosity") == "Pa.s"
+    assert infer_y_unit_from_name("  viscosity  ") == "Pa.s"
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_stress():
+    assert infer_y_unit_from_name("Stress") == "Pa"
+    assert infer_y_unit_from_name("Shear Stress") == "Pa"
+
+
+@pytest.mark.smoke
+def test_infer_y_unit_from_name_unrecognized():
+    assert infer_y_unit_from_name("G_prime") is None
+    assert infer_y_unit_from_name("") is None
+
+
+def test_load_csv_infers_pa_s_from_bare_viscosity_header(tmp_path: Path):
+    # Regression: the reported repro (cellulose_hydrogel_flow.csv) has a
+    # "Viscosity" header with no bracketed unit -- confirms load_csv actually
+    # wires infer_y_unit_from_name() in, not just the helper in isolation.
+    csv_path = tmp_path / "flow.csv"
+    csv_path.write_text("Shear Rate\tViscosity\n0.1\t7348.0\n1.0\t831.83\n")
+
+    data = load_csv(csv_path, x_col=0, y_col=1, delimiter="\t")
+
+    assert data.y_units == "Pa.s"
+
+
+def test_load_csv_infers_pa_from_bare_stress_header(tmp_path: Path):
+    csv_path = tmp_path / "flow.csv"
+    csv_path.write_text("Shear Rate\tStress\n0.1\t734.8\n1.0\t831.83\n")
+
+    data = load_csv(csv_path, x_col=0, y_col=1, delimiter="\t")
+
+    assert data.y_units == "Pa"
 
 
 @pytest.mark.smoke

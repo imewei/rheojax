@@ -20,6 +20,7 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    infer_y_unit_from_name,
     normalize_units,
     validate_transform,
 )
@@ -418,6 +419,11 @@ def load_csv(
     if y_units is None:
         # Use first y column header for units
         _, extracted_y_units = extract_unit_from_header(y_headers[0])
+        if extracted_y_units is None:
+            # No bracketed unit (e.g. header is just "Viscosity" or "Stress")
+            # -- infer from the name itself so a flow-curve viscosity column
+            # never gets silently treated as stress (or vice versa) downstream.
+            extracted_y_units = infer_y_unit_from_name(y_headers[0])
         if extracted_y_units is not None:
             if is_complex:
                 real_part, y_units = normalize_units(y_data.real, extracted_y_units)

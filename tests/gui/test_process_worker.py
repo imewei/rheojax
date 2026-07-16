@@ -432,6 +432,78 @@ class TestRunFitIsolated:
         if result.get("residuals") is not None:
             assert isinstance(result["residuals"], np.ndarray)
 
+    def test_progress_callback_matches_nlsq_kwarg_contract(self):
+        # Regression: nlsq's trf callback invokes callback(iteration=,
+        # cost=, params=, info=) by keyword only. A stale signature (e.g.
+        # requiring a `loss` argument nlsq never passes) doesn't crash the
+        # fit -- nlsq's broad except swallows the TypeError into an
+        # invisible RuntimeWarning and silently drops progress reporting
+        # (and cancellation, which is checked from inside the same
+        # callback). Assert progress messages actually made it through.
+        #
+        # Uses MIKH's flow-curve fit (the original repro shape: 11 params)
+        # rather than a small 2-param model -- nlsq's "auto" workflow takes
+        # a different internal fast path for very small problems that
+        # never invokes the user callback at all (confirmed by patching
+        # TrustRegionReflective._invoke_callback and counting calls: 0 for
+        # a 2-param Maxwell fit, 11 for this 11-param MIKH fit), which
+        # would make a small-model version of this test pass regardless of
+        # the callback's signature.
+        import multiprocessing as mp
+        import warnings
+
+        import numpy as np
+
+        from rheojax.gui.jobs.subprocess_fit import run_fit_isolated
+
+        gamma_dot = np.array(
+            [0.1, 0.178, 0.316, 0.562, 1.0, 1.78, 3.16, 5.62, 10.0, 17.8, 31.6, 56.2]
+        )
+        viscosity = np.array(
+            [
+                7348.0,
+                4264.943820224719,
+                2478.4493670886077,
+                1436.0498220640568,
+                831.83,
+                481.7865168539326,
+                279.98417721518985,
+                162.52313167259786,
+                94.353,
+                54.75,
+                31.816455696202528,
+                18.243772241992882,
+            ]
+        )
+        stress = viscosity * gamma_dot  # sigma = eta * gamma_dot
+        progress_queue = mp.Queue()
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = run_fit_isolated(
+                model_name="mikh",
+                x_data=gamma_dot,
+                y_data=stress,
+                test_mode="flow_curve",
+                initial_params={},
+                options={"max_iter": 500},
+                progress_queue=progress_queue,
+                cancel_event=mp.Event(),
+            )
+
+        assert result["success"]
+        assert not any(
+            "Callback raised exception" in str(w.message) for w in caught
+        ), "progress_callback raised inside nlsq -- kwarg signature mismatch"
+
+        messages = []
+        while not progress_queue.empty():
+            messages.append(progress_queue.get_nowait())
+        assert any(m.get("type") == "progress" for m in messages), (
+            "progress_callback never reported progress -- likely a kwarg "
+            "mismatch with nlsq's actual callback signature"
+        )
+
 
 # ===========================================================================
 # Tests for run_bayesian_isolated

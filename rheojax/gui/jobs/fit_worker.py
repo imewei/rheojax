@@ -193,16 +193,16 @@ class FitWorker(QRunnable):
             _progress_lock = threading.Lock()
 
             # Add progress callback that checks cancellation and emits percentage
-            def progress_callback(iteration: int, loss: float, **kwargs):
+            def progress_callback(iteration: int, cost: float, **kwargs):
                 """Progress callback for NLSQ optimization."""
                 nonlocal _last_nlsq_progress
                 with _progress_lock:
                     _last_nlsq_progress = time.perf_counter()
                 self.cancel_token.check()
                 self._last_iteration = iteration
-                self._last_loss = loss
+                self._last_loss = cost
                 percent = min(int(iteration / max_iter * 100), 100)
-                message = f"Iteration {iteration}: loss = {loss:.6e}"
+                message = f"Iteration {iteration}: loss = {cost:.6e}"
 
                 # Log iteration timing at DEBUG level
                 elapsed = time.perf_counter() - start_time
@@ -210,7 +210,7 @@ class FitWorker(QRunnable):
                     "Iteration complete",
                     iteration=iteration,
                     elapsed=elapsed,
-                    loss=loss,
+                    loss=cost,
                     percent=percent,
                 )
 

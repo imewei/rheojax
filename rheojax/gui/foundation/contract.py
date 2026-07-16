@@ -61,6 +61,7 @@ def input_contract(protocol: str, model_key: str | None = None) -> InputContract
     if protocol not in _TEMPLATES:
         raise ValueError(f"unknown protocol: {protocol}")
     t = _TEMPLATES[protocol]
+    unit_conversions = dict(t.get("unit_conversions", {}))
     y_quantity = None
     if protocol == "flow_curve":
         if model_key is not None:
@@ -74,6 +75,12 @@ def input_contract(protocol: str, model_key: str | None = None) -> InputContract
                 "Pa·s" if y_quantity == "viscosity" else "Pa",
             ),
         ]
+        # Stress (Pa) and viscosity (Pa·s) are the two quantities flow-curve
+        # models fit; a dataset labeled with the other one is silently
+        # wrong-scale, not just wrong-unit, so DataStep needs a converter
+        # (sigma = eta * gamma_dot), same as the oscillation template's x
+        # Hz->rad/s guard above.
+        unit_conversions["y"] = "stress<->viscosity"
     else:
         cols = [ColumnSpec(role, unit) for role, unit in t["columns"]]
     return InputContract(
@@ -81,6 +88,6 @@ def input_contract(protocol: str, model_key: str | None = None) -> InputContract
         columns=cols,
         domain=t["domain"],
         y_quantity=y_quantity,
-        unit_conversions=dict(t.get("unit_conversions", {})),
+        unit_conversions=unit_conversions,
         control_vars=list(t["control_vars"]),
     )

@@ -30,6 +30,7 @@ __all__ = [
     "VALID_TRANSFORMS",
     "TRANSFORM_REQUIREMENTS",
     "extract_unit_from_header",
+    "infer_y_unit_from_name",
     "detect_domain",
     "detect_test_mode_from_columns",
     "check_tensile_guard",
@@ -268,6 +269,30 @@ def extract_unit_from_header(header: str) -> tuple[str, str | None]:
         return name, unit
     logger.debug("No unit found in header", name=header)
     return header, None
+
+
+def infer_y_unit_from_name(name: str) -> str | None:
+    """Infer a default SI y-unit from a bare flow-curve column name.
+
+    Flow-curve exports frequently label the y-column "Viscosity" or "Stress"
+    with no bracketed unit (``extract_unit_from_header`` returns ``None`` for
+    these). Stress and viscosity have the same order of magnitude at low
+    shear rates, so leaving the unit unset lets a viscosity column silently
+    be fit as stress (or vice versa) with no error -- only a bad fit.
+
+    Args:
+        name: Column header string (already unit-stripped, or bare).
+
+    Returns:
+        "Pa.s" for a viscosity-labeled column, "Pa" for a stress-labeled
+        column, or None if the name doesn't match either.
+    """
+    normalized = name.strip().lower()
+    if "viscosity" in normalized:
+        return "Pa.s"
+    if "stress" in normalized:
+        return "Pa"
+    return None
 
 
 # =============================================================================

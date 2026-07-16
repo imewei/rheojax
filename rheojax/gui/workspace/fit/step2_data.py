@@ -14,6 +14,30 @@ from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets import RheoComboBox
 
 
+def _classify_y_unit(unit: str) -> str | None:
+    """Classify a y-axis unit string as "stress" or "viscosity".
+
+    Returns None when the unit is empty or doesn't match either pattern
+    (e.g. an unrelated protocol's units) -- callers should treat that as
+    "unknown, don't flag a mismatch" rather than a hard error.
+    """
+    normalized = (
+        unit.strip()
+        .lower()
+        .replace("·", "")
+        .replace("*", "")
+        .replace(" ", "")
+        .replace(".", "")
+    )
+    if not normalized:
+        return None
+    if "poise" in normalized or normalized.endswith("pas") or normalized == "cp":
+        return "viscosity"
+    if normalized in ("pa", "kpa", "mpa", "gpa"):
+        return "stress"
+    return None
+
+
 def _validate_shape_and_values(rheo_data) -> list[str]:
     """Shape/NaN/monotonicity checks against a loaded RheoData. Empty = valid."""
     errors: list[str] = []
@@ -56,6 +80,7 @@ class DataStep(QWidget):
         self._library = library
         self._errors: list[str] = []
         self._unit_converted = False
+        self._quantity_converted = False
         # Guard: protocol may be None on a fresh AppState; defer contract build until set
         self._contract, cols_text = self._build_contract()
         self._expected = QLabel(cols_text, self)
@@ -63,6 +88,8 @@ class DataStep(QWidget):
         self._source.set_items_safely([""] + self.available_datasets())
         self._guard = QLabel("", self)
         self._convert_btn = QPushButton("⇄ Convert Hz → rad/s", self)
+        self._quantity_guard = QLabel("", self)
+        self._quantity_convert_btn = QPushButton("⇄ Convert σ ↔ η", self)
         self._error_label = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
@@ -74,11 +101,14 @@ class DataStep(QWidget):
             self._source,
             self._guard,
             self._convert_btn,
+            self._quantity_guard,
+            self._quantity_convert_btn,
             self._error_label,
         ):
             lay.addWidget(w)
         self._source.currentTextChanged.connect(self._on_select)
         self._convert_btn.clicked.connect(self.apply_unit_conversion)
+        self._quantity_convert_btn.clicked.connect(self.apply_quantity_conversion)
 
     def _build_contract(self):
         """Derive (contract, label text) from the current state's protocol/model_key."""
@@ -129,6 +159,7 @@ class DataStep(QWidget):
             self._state.data_ref = None
             self._state.column_map = {}
             self._guard.setText("")
+            self._quantity_guard.setText("")
             self._set_errors([])
             self.edited.emit()
 
@@ -143,6 +174,7 @@ class DataStep(QWidget):
 
     def _on_select(self, ds_id: str) -> None:
         self._unit_converted = False
+        self._quantity_converted = False
         self._state.data_ref = ds_id or None
         errors: list[str] = []
         if ds_id and self._contract:
@@ -155,6 +187,7 @@ class DataStep(QWidget):
                 if self.needs_hz_conversion()
                 else ""
             )
+            self._quantity_guard.setText(self._quantity_mismatch_message())
             try:
                 payload = self._library.load_payload(ds_id)
             except KeyError:
@@ -222,6 +255,81 @@ class DataStep(QWidget):
 
     def unit_conversion_applied(self) -> bool:
         return self._unit_converted
+
+    def _actual_y_quantity(self) -> str | None:
+        """Classify the loaded dataset's y-column as "stress" or "viscosity".
+
+        None means unclassifiable (missing/unrecognized unit) -- treated as
+        "no mismatch" everywhere this is consulted, since we can't tell
+        whether it disagrees with the contract's expected quantity.
+        """
+        if not self._contract or "y" not in self._contract.unit_conversions:
+            return None
+        if not self._state.data_ref:
+            return None
+        ref = self._library.get(self._state.data_ref)
+        return _classify_y_unit(ref.units.get("y", ""))
+
+    def needs_quantity_conversion(self) -> bool:
+        if self.quantity_conversion_applied():
+            return False
+        actual = self._actual_y_quantity()
+        expected = self._contract.y_quantity if self._contract else None
+        return actual is not None and expected is not None and actual != expected
+
+    def _quantity_mismatch_message(self) -> str:
+        if not self.needs_quantity_conversion():
+            return ""
+        actual = self._actual_y_quantity()
+        expected = self._contract.y_quantity
+        formula = "σ = η·γ̇" if expected == "stress" else "η = σ/γ̇"
+        return (
+            f"⚠ y data is {actual}, model expects {expected} → convert ({formula})"
+        )
+
+    def apply_quantity_conversion(self) -> None:
+        """Convert loaded y data between stress (Pa) and viscosity (Pa·s).
+
+        Uses the already-loaded shear_rate (x) column: sigma = eta * gamma_dot
+        in the viscosity->stress direction, eta = sigma / gamma_dot in the
+        stress->viscosity direction.
+        """
+        if not self.needs_quantity_conversion():
+            return
+        actual = self._actual_y_quantity()
+        expected = self._contract.y_quantity
+        rheo_data = self._library.load_payload(self._state.data_ref)
+        gamma_dot = np.asarray(rheo_data.x)
+        y = np.asarray(rheo_data.y)
+        if actual == "viscosity" and expected == "stress":
+            rheo_data.y = y * gamma_dot
+            new_unit = "Pa"
+        else:  # actual == "stress" and expected == "viscosity"
+            # gamma_dot == 0 (a legitimate flow-curve point) divides to inf,
+            # not an exception -- _validate_shape_and_values() below is what
+            # actually catches it, same as it catches a raw NaN/Inf y-column
+            # loaded straight from a file.
+            rheo_data.y = y / gamma_dot
+            new_unit = "Pa.s"
+        # Same persistence ordering as apply_unit_conversion(): update the
+        # library's authoritative units metadata before re-storing the
+        # converted payload, so needs_quantity_conversion() doesn't flag a
+        # second conversion on the very next _on_select()/refresh() call.
+        ref = self._library.get(self._state.data_ref)
+        self._library.add(
+            replace(ref, units={**ref.units, "y": new_unit}), overwrite=True
+        )
+        self._library.store_payload(self._state.data_ref, rheo_data)
+        self._quantity_converted = True
+        self._quantity_guard.setText("")
+        # The conversion mutates y in place -- re-run the same NaN/Inf check
+        # _on_select() runs on load, or a divide-by-zero at gamma_dot==0
+        # silently reaches NLSQ/NUTS as a "valid", already-passed dataset.
+        self._set_errors(_validate_shape_and_values(rheo_data))
+        self.edited.emit()
+
+    def quantity_conversion_applied(self) -> bool:
+        return self._quantity_converted
 
     def is_ready(self) -> bool:
         return bool(
