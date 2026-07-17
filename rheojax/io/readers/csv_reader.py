@@ -202,8 +202,15 @@ def load_csv(
 
     # Auto-detect comment preamble: if file starts with '#' lines and user
     # hasn't explicitly set a comment character, pass comment='#' to pandas.
+    # Skip this when the requested columns already carry a literal '#'
+    # prefix (e.g. auto-detected from a raw "#time,stress" header): that
+    # means the '#' is part of the header itself, not a preamble marker,
+    # and stripping it here would make usecols/header disagree.
     comment_char = kwargs.pop("comment", None)
-    if comment_char is None and header == 0:
+    has_hash_column = any(
+        isinstance(c, str) and c.startswith("#") for c in (usecols or [])
+    )
+    if comment_char is None and header == 0 and not has_hash_column:
         try:
             with open(filepath, encoding=default_encoding, errors="replace") as _f:
                 first_line = _f.readline()

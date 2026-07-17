@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from rheojax.gui.foundation.metrics import bfmi
 from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.priors_editor import PriorsEditor
 
@@ -271,6 +272,13 @@ class NutsStep(QWidget):
                 if self._state.revision == revision_at_start:
                     self._state.nuts_result = None
                     self.edited.emit()
+                return
+            except CancellationError:
+                # A user-initiated cancel is not a sampling failure -- show
+                # a clean cancelled state and leave a stale successful
+                # nuts_result untouched (mirrors NlsqStep.run()'s identical
+                # branch).
+                self._result.setText("Cancelled.")
                 return
             except Exception as exc:
                 self._result.setText(f"NUTS failed: {exc}")

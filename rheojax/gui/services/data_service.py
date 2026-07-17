@@ -1234,7 +1234,10 @@ class DataService:
         suffix = file_path.suffix.lower()
         try:
             if suffix in {".csv", ".txt", ".dat", ".tsv"}:
-                df = pd.read_csv(str(file_path), nrows=200, comment="#")
+                delimiter = detect_csv_delimiter(file_path)
+                df = pd.read_csv(
+                    str(file_path), sep=delimiter, nrows=200, comment="#"
+                )
             elif suffix in {".xlsx", ".xls"}:
                 df = pd.read_excel(str(file_path), nrows=200)
             else:

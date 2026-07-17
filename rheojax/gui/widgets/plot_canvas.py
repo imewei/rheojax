@@ -93,6 +93,13 @@ class PlotCanvas(QWidget):
         # Annotation for tooltips
         self._annotation = None
 
+        # closeEvent() never fires when this widget is torn down via Qt's
+        # parent-cascade delete (e.g. as a child in a tab widget) instead of
+        # being closed directly -- the same deferred-draw_idle()-on-freed-
+        # canvas crash class fixed for ResidualsPanel/BaseArviZWidget
+        # (PR #48, PR #83). Wire destroyed the same way for symmetry.
+        self.destroyed.connect(lambda: self.cleanup())
+
         logger.debug(
             "Initialization complete",
             class_name=self.__class__.__name__,

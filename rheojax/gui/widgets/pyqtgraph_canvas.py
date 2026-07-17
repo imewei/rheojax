@@ -184,6 +184,11 @@ class PyQtGraphCanvas(QWidget):
         self._scale_combo.set_items_safely(["Log-Log", "Lin-Lin", "Log-Lin", "Lin-Log"])
         self._scale_combo.currentTextChanged.connect(self._on_scale_changed)
         layout.addWidget(self._scale_combo)
+        # set_items_safely() populates the combo (defaulting to "Log-Log")
+        # before currentTextChanged is connected above, so that initial
+        # selection never actually applied setLogMode -- the plot stayed
+        # lin-lin while the combo claimed log-log. Sync once, explicitly.
+        self._on_scale_changed(self._scale_combo.currentText())
 
         # Auto-range button
         auto_btn = QPushButton("Auto Range")

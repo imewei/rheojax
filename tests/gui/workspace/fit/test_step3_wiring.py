@@ -320,6 +320,30 @@ def test_nlsq_step_loads_parameter_table_and_passes_bounds(monkeypatch):
     assert ip["b"] == {"value": 2.0, "bounds": (0.0, 5.0), "fixed": True}
 
 
+def test_nlsq_step_run_shows_cancelled_not_failed_on_cancellation():
+    """A user cancel must render as "Cancelled.", not be swallowed by the
+    generic except Exception branch and shown as an NLSQ failure."""
+    from rheojax.gui.foundation.state import FitState
+    from rheojax.gui.jobs.cancellation import CancellationError
+    from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
+
+    def cancelling_fit_fn(
+        model_key,
+        model_config,
+        data_ref,
+        column_map,
+        initial_params=None,
+        multi_start=None,
+        options=None,
+    ):
+        raise CancellationError("Operation cancelled by user")
+
+    st = FitState(model_key="m", model_config={})
+    step = NlsqStep(st, fit_fn=cancelling_fit_fn)
+    step.run()
+    assert step._result.text() == "Cancelled."
+
+
 def test_multistart_forwards_config_to_fit_fn():
     from rheojax.gui.foundation.state import FitState
     from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep

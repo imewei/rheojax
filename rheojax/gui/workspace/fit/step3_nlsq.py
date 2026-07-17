@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from rheojax.core.registry import ModelRegistry
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.state.store import ParameterState
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.parameter_table import ParameterTable
@@ -200,6 +201,14 @@ class NlsqStep(QWidget):
                         "message": "NLSQ solver is not wired up yet.",
                     }
                     self.edited.emit()
+                return
+            except CancellationError:
+                # A user-initiated cancel is not a fit failure -- show a
+                # clean cancelled state and leave a stale successful result
+                # in place untouched (unlike a real failure, cancelling
+                # doesn't invalidate a prior success the user hasn't acted
+                # on yet).
+                self._result.setText("Cancelled.")
                 return
             except Exception as exc:
                 self._result.setText(f"NLSQ failed: {exc}")
