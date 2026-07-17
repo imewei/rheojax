@@ -554,7 +554,7 @@ class TestIKHProtocols:
         pred = model.predict(X_input, test_mode="startup")
         assert pred.shape == stress.shape
 
-    @pytest.mark.smoke
+    @pytest.mark.slow  # covers predict_flow_curve + multiple protocols; exceeds 120s smoke budget
     def test_predict_methods(self):
         """Test convenience predict methods."""
         model = MIKH()

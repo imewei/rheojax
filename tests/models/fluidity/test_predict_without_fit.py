@@ -315,6 +315,21 @@ _TRANSIENT_KWARGS: dict[Protocol, dict] = {
 _SLOW_MODELS_DENYLIST: set[str] = {
     "itt_mct_schematic",  # PDE integrator chokes on default aging params
     "itt_mct_isotropic",  # same family
+    # nonlocal PDE grid setup exceeds 120s smoke budget on every transient
+    # protocol (confirmed: startup alone ran 6+ minutes before manual kill
+    # in a full `pytest -m smoke` run; not independently profiled per-protocol).
+    "fluidity_nonlocal",
+}
+
+# (model_name, protocol) pairs that are individually too slow for the smoke
+# budget, but where OTHER protocols of the same model are fine (confirmed:
+# fikh/fmlikh relaxation both run in <5s) — excluded per-pair rather than
+# via _SLOW_MODELS_DENYLIST so the fast protocols stay in the canary sweep.
+_SLOW_PROTOCOL_DENYLIST: set[tuple[str, str]] = {
+    # Confirmed >120s in a full `pytest -m smoke` run; startup is already
+    # routed to the dedicated test below, so only creep needs excluding here.
+    ("fikh", "creep"),
+    ("fmlikh", "creep"),
 }
 
 
@@ -369,6 +384,8 @@ def _transient_model_cases() -> list[tuple[str, str]]:
     for proto in _TRANSIENT_KWARGS:
         for info in ModelRegistry.for_protocol(proto):
             if info.name in _SLOW_MODELS_DENYLIST:
+                continue
+            if (info.name, proto.value) in _SLOW_PROTOCOL_DENYLIST:
                 continue
             if (info.name, proto.value) in _COVERED_BY_DEDICATED_TESTS:
                 continue

@@ -90,6 +90,18 @@ _KNOWN_SLOW_PREDICT = {
     ("ml_ikh", "relaxation"),
     # HL flow_curve uses population-balance PDE solver that exceeds 120s in smoke
     ("hebraud_lequeux", "flow_curve"),
+    # HL oscillation: same population-balance PDE solver, same >120s cost
+    ("hebraud_lequeux", "oscillation"),
+    # FMLIKH creep exceeds 120s smoke budget (confirmed via full smoke-suite
+    # timeout; not independently profiled to isolate JIT-compile vs solve cost)
+    ("fmlikh", "creep"),
+    # STZ conventional exceeds 120s on these 3 of 6 protocols specifically
+    # (confirmed via full smoke-suite run; flow_curve/creep/oscillation use
+    # the same diffrax ODE machinery but stayed within budget — asymmetry
+    # not re-verified per protocol, e.g. may depend on saveat density/steps)
+    ("stz_conventional", "laos"),
+    ("stz_conventional", "relaxation"),
+    ("stz_conventional", "startup"),
 }
 
 
