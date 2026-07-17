@@ -315,6 +315,9 @@ _TRANSIENT_KWARGS: dict[Protocol, dict] = {
 _SLOW_MODELS_DENYLIST: set[str] = {
     "itt_mct_schematic",  # PDE integrator chokes on default aging params
     "itt_mct_isotropic",  # same family
+    "fluidity_nonlocal",  # nonlocal PDE JIT compile exceeds 120s smoke budget
+    "fikh",  # creep-protocol JIT compile exceeds 120s smoke budget
+    "fmlikh",  # same family as fikh
 }
 
 
