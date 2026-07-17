@@ -234,9 +234,25 @@ class ProtocolModelStep(QWidget):
         if not self._state.model_key:
             self._params.setText("")
             return
-        instance = ModelRegistry.create(
-            self._state.model_key, **self._state.model_config
-        )
+        # A model constructor can raise on an out-of-range constructor-config
+        # value (e.g. N_y=1 on a model that divides by N_y-1) -- letting
+        # that propagate out of this Qt slot means _on_config_changed()'s
+        # config_edited.emit() (and _on_model()'s edited.emit()) never run,
+        # since both call this AFTER already committing the bad config to
+        # the shared FitState. That leaves state.model_config permanently
+        # holding an un-constructible value with no cascade/re-lock ever
+        # having run, and no feedback beyond a log line PySide6's
+        # excepthook swallows -- the wizard just looks unchanged. Catch and
+        # surface it instead, so the caller's edited/config_edited signal
+        # still fires normally (the cascade needs to run either way -- the
+        # config genuinely changed, even if it doesn't build).
+        try:
+            instance = ModelRegistry.create(
+                self._state.model_key, **self._state.model_config
+            )
+        except Exception as exc:
+            self._params.setText(f"⚠ invalid config: {exc}")
+            return
         self._params.setText(", ".join(instance.parameters.keys()))
 
     def is_ready(self) -> bool:

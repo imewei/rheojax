@@ -155,13 +155,27 @@ class DataStep(QWidget):
             # same logic _on_select uses for a fresh pick, since signals were
             # blocked above and _on_select was never triggered for `current`.
             self._on_select(current)
-        elif self._state.data_ref is not None or self._state.column_map:
-            self._state.data_ref = None
-            self._state.column_map = {}
+        else:
+            # Regression: in the real wired app, the upstream cascade
+            # (fit_controller.py's _cascade_and_relock, connected BEFORE
+            # data_body.refresh) already nulls state.data_ref/column_map
+            # before this runs -- so gating label-clearing on "was there
+            # something to clear" left a stale guard/quantity-mismatch
+            # message on screen after a model switch that changes the
+            # combo box back to empty. Clear the labels unconditionally;
+            # only mutate state and emit `edited` when there was an actual
+            # selection to invalidate, to avoid a no-op signal on every
+            # refresh() call.
             self._guard.setText("")
             self._quantity_guard.setText("")
             self._set_errors([])
-            self.edited.emit()
+            had_selection = (
+                self._state.data_ref is not None or self._state.column_map
+            )
+            if had_selection:
+                self._state.data_ref = None
+                self._state.column_map = {}
+                self.edited.emit()
 
     def expected_columns(self) -> list[str]:
         return [c.role for c in self._contract.columns] if self._contract else []

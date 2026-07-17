@@ -137,7 +137,12 @@ def run_fit_isolated(
         "chi_squared": float(getattr(service_result, "chi_squared", 0.0)),
         "fit_time": fit_time,
         "timestamp": datetime.now().isoformat(),
-        "num_iterations": svc_metadata.get("n_iterations", last_iteration),
+        # dict.get()'s default only applies when the key is ABSENT --
+        # ModelService.fit() always inserts "n_iterations" (possibly None,
+        # since no model actually sets _n_iterations today), so `.get(...,
+        # last_iteration)` never fell back to the real iteration count
+        # tracked from progress_callback. `or` falls back on None too.
+        "num_iterations": svc_metadata.get("n_iterations") or last_iteration,
         "message": getattr(service_result, "message", ""),
         "dataset_id": dataset_id,
         "x_fit": _to_numpy(getattr(service_result, "x_fit", None)),

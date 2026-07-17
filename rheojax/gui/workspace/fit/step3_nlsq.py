@@ -82,9 +82,20 @@ class NlsqStep(QWidget):
     def load_parameters_from_model(self) -> None:
         if not self._state.model_key:
             return
-        instance = ModelRegistry.create(
-            self._state.model_key, **self._state.model_config
-        )
+        # Same fallible call as step1_protocol_model.py's _refresh_preview()
+        # (an out-of-range constructor-config value, e.g. N_y=1, can raise) --
+        # this method is wired directly to Step 1's edited/config_edited
+        # signals (fit_controller.py), so it runs in the same tick as a bad
+        # config edit. Without this guard, step1's own try/except only
+        # prevented ITS crash; this identical unguarded call one signal
+        # handler later would still raise uncaught, leaving the parameter
+        # table showing the PREVIOUS model's params with no indication why.
+        try:
+            instance = ModelRegistry.create(
+                self._state.model_key, **self._state.model_config
+            )
+        except Exception:
+            return
         # instance.parameters is a ParameterSet of core.parameters.Parameter
         # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs gui.state.store
         # .ParameterState (`.min_bound`/`.max_bound`/`.fixed`). Convert here,
@@ -133,6 +144,13 @@ class NlsqStep(QWidget):
         # button must be disabled for the duration or a second click launches
         # an overlapping fit that corrupts shared active_jobs tracking.
         self._run_btn.setEnabled(False)
+        # Snapshot: _fit_fn pumps a nested QEventLoop, so the user can
+        # navigate elsewhere/edit Step 1 while this run is in flight --
+        # that invalidation bumps FitState.revision (invalidation.py). If it
+        # changed by the time the fit returns, the result no longer
+        # corresponds to the current model/protocol/data selection and must
+        # be discarded rather than silently written over the newer state.
+        revision_at_start = self._state.revision
         try:
             # This step's own _ms_enabled/_ms_count widgets are the single
             # source of truth for multi-start (outer restart loop in
@@ -167,9 +185,44 @@ class NlsqStep(QWidget):
                 # ponytail: real solver wiring is out of scope here (tracked separately);
                 # this guard only keeps an unwired Run button from crashing the Qt slot.
                 self._result.setText("NLSQ solver is not wired up yet.")
+                # A first-ever failure with nlsq_result already None needs no
+                # change -- is_ready() already reads that as not-ready. Only
+                # a STALE successful result (from an earlier run) needs to
+                # be cleared here; leaving it as a fresh {"success": False}
+                # dict rather than None would be an unrelated contract
+                # change with no is_ready() difference.
+                if (
+                    self._state.revision == revision_at_start
+                    and self._state.nlsq_result is not None
+                ):
+                    self._state.nlsq_result = {
+                        "success": False,
+                        "message": "NLSQ solver is not wired up yet.",
+                    }
+                    self.edited.emit()
                 return
             except Exception as exc:
                 self._result.setText(f"NLSQ failed: {exc}")
+                # Discarded if state moved on while this fit was running
+                # (see revision_at_start above); otherwise a prior
+                # successful nlsq_result must NOT survive a failed re-fit --
+                # is_ready() reads nlsq_result live, so leaving the old
+                # success dict in place would let the wizard advance to
+                # NUTS (warm-starting from stale params) while the screen
+                # plainly says the current attempt failed. A first-ever
+                # failure (nlsq_result already None) needs no change --
+                # is_ready() already reads that as not-ready.
+                if (
+                    self._state.revision == revision_at_start
+                    and self._state.nlsq_result is not None
+                ):
+                    self._state.nlsq_result = {"success": False, "message": str(exc)}
+                    self.edited.emit()
+                return
+            if self._state.revision != revision_at_start:
+                # State was invalidated (model/protocol/data changed) while
+                # this fit was running in the nested event loop -- the
+                # result belongs to a selection that no longer applies.
                 return
             # Normalize to dict: ModelService.fit() returns FitResult (dataclass), fakes return dict
             if isinstance(res, dict):
@@ -213,6 +266,15 @@ class NlsqStep(QWidget):
         fit_time = result.get("fit_time")
         if fit_time is not None:
             lines.append(f"time={float(fit_time):.2f}s")
+
+        # ModelService.fit() appends a poor-fit note to `message` when
+        # r_squared < 0.5 despite nlsq reporting success (model_service.py) --
+        # without surfacing it here, that's the only place the warning was
+        # ever written, and nothing else in the GUI reads it. A plain
+        # "Fit successful" is the boring default and not worth a line.
+        message = result.get("message")
+        if message and message != "Fit successful":
+            lines.append(f"⚠ {message}")
 
         # Recompute locally from pcov (sorted param names + shape-checked
         # sqrt(diag)) rather than trusting a precomputed uncertainties list's

@@ -153,7 +153,15 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
         model_key,
         model_config,
         data_ref,
-        column_map,
+        column_map,  # ponytail: accepted but not read HERE -- unlike
+        # FitState.control_vars (state.py), which no GUI step writes and no
+        # fit call reads at all, column_map IS actively populated by
+        # DataStep and gates its is_ready()/validation; it just never
+        # reaches this fixed-convention fit call. _fit_fn_body below loads
+        # the payload and always uses RheoData.x/.y directly regardless of
+        # column_map's contents. Not currently exploitable; wire it in if/
+        # when a protocol needs per-column selection instead of the fixed
+        # convention.
         initial_params=None,
         multi_start=None,
         options=None,
@@ -164,14 +172,20 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
         # worker.cancel() -> the same cancel_event run_fit_isolated already
         # polls between restarts. Previously no "worker" key was registered at
         # all, so Close/New/Open could only wait out the timeout, never cancel.
-        token = ProcessCancellationToken(job_id=data_ref)
+        # job_id carries a ":nlsq" suffix (not the bare data_ref) so a
+        # concurrent NUTS run on the same dataset (_make_sample_fn below)
+        # can't clobber this entry in active_jobs.by_id -- window.py's
+        # dataset-delete guard does a prefix match on data_ref, see its
+        # own NOTE at window.py's _on_delete_dataset_clicked.
+        job_id = f"{data_ref}:nlsq"
+        token = ProcessCancellationToken(job_id=job_id)
         # Register for the whole call (all multi-start restarts), not per
         # _run_on_thread call -- _run_on_thread pumps a nested QEventLoop, so
         # New/Open/Close (which only check active_jobs.by_id) would otherwise
         # see it empty and rebuild the workspace out from under this step
         # while the loop is still suspended waiting on the worker thread.
         if active_jobs is not None:
-            active_jobs.by_id[data_ref] = {"status": "running", "worker": token}
+            active_jobs.by_id[job_id] = {"status": "running", "worker": token}
         try:
             return _fit_fn_body(
                 library,
@@ -184,10 +198,11 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
                 options,
                 token.event,
                 active_jobs,
+                job_id,
             )
         finally:
             if active_jobs is not None:
-                active_jobs.by_id.pop(data_ref, None)
+                active_jobs.by_id.pop(job_id, None)
 
     return _fit_fn
 
@@ -203,6 +218,7 @@ def _fit_fn_body(
     options,
     cancel_event,
     active_jobs=None,
+    job_id=None,
 ):
     rheo_data = library.load_payload(data_ref)
     # ponytail: Step 1's protocol combo uses the same vocabulary as
@@ -220,6 +236,15 @@ def _fit_fn_body(
     rng = np.random.default_rng(0)
     best = None
     for i in range(max(count, 1)):
+        # Multi-start's only other cancellation check is inside
+        # run_fit_isolated's progress_callback, which doesn't fire until a
+        # restart's fit is already underway -- Cancel clicked in the gap
+        # between one restart finishing and the next starting would
+        # otherwise go unnoticed until that next restart's first iteration.
+        if cancel_event is not None and cancel_event.is_set():
+            from rheojax.gui.jobs.cancellation import CancellationError
+
+            raise CancellationError("Operation cancelled by user")
         # First run uses the caller's initial_params as-is; restarts 2..N
         # jitter each value by +/-20% (seeded, so runs are reproducible).
         start_params = initial_params
@@ -252,7 +277,7 @@ def _fit_fn_body(
                     metadata=metadata,
                 ),
                 progress_queue=progress_queue,
-                on_progress=_make_progress_reporter(active_jobs, data_ref),
+                on_progress=_make_progress_reporter(active_jobs, job_id or data_ref),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
@@ -291,12 +316,16 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
         rheo_data = library.load_payload(fit_state.data_ref)
         # Same real, cancellable token as _fit_fn (see its comment) so
         # "Cancel them and continue?" can actually stop a running NUTS sample.
-        token = ProcessCancellationToken(job_id=fit_state.data_ref)
+        # job_id carries a ":nuts" suffix (not the bare data_ref) -- see
+        # _make_fit_fn's matching comment: NLSQ and NUTS running against the
+        # same dataset must not collide on the same active_jobs.by_id key.
+        job_id = f"{fit_state.data_ref}:nuts"
+        token = ProcessCancellationToken(job_id=job_id)
         # See _fit_fn's comment above: _run_on_thread pumps a nested
         # QEventLoop, so New/Open/Close must see this NUTS run as active for
         # its whole duration, not just while a signal happens to be in flight.
         if active_jobs is not None:
-            active_jobs.by_id[fit_state.data_ref] = {
+            active_jobs.by_id[job_id] = {
                 "status": "running",
                 "worker": token,
             }
@@ -323,7 +352,7 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                     max_tree_depth=config.get("max_tree_depth"),
                 ),
                 progress_queue=progress_queue,
-                on_progress=_make_progress_reporter(active_jobs, fit_state.data_ref),
+                on_progress=_make_progress_reporter(active_jobs, job_id),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
@@ -334,7 +363,7 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
             except (OSError, ValueError, BrokenPipeError):
                 pass
             if active_jobs is not None:
-                active_jobs.by_id.pop(fit_state.data_ref, None)
+                active_jobs.by_id.pop(job_id, None)
 
     return _sample_fn
 

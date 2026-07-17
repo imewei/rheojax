@@ -7,6 +7,8 @@ Service for model fitting, prediction, and parameter management.
 
 from __future__ import annotations
 
+import math
+import warnings
 from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -1059,6 +1061,35 @@ class ModelService:
             elif hasattr(model, "_nlsq_result") and model._nlsq_result:
                 fit_success = getattr(model._nlsq_result, "success", True)
                 fit_message = getattr(model._nlsq_result, "message", fit_message)
+
+            # A converged optimizer (nlsq_result.success=True) and a
+            # genuinely poor fit (low R²) are independent things -- NLSQ
+            # reports "success" for hitting a convergence tolerance, not
+            # for explaining the data. Without this, a fit like MIKH's
+            # flow-curve mode at R²=0.09 (several parameters pinned at
+            # their initial value, per the identifiability-check warning
+            # logged during optimization) reports an unqualified "Fit
+            # successful" with nothing pointing the user at the mismatch.
+            # GeneralizedMaxwell already has a narrower, model-specific
+            # version of this warning for its steady-shear case; this is
+            # the model-agnostic version so every model gets the same
+            # basic goodness-of-fit signal.
+            if (
+                fit_success
+                and r_squared is not None
+                and not (isinstance(r_squared, float) and math.isnan(r_squared))
+                and r_squared < 0.5
+            ):
+                warnings.warn(
+                    f"{model_name}: fit reports success but R²={r_squared:.3g} "
+                    "indicates a poor fit -- some parameters may not be "
+                    "well-constrained by this data/protocol. Check the fit "
+                    "log for an identifiability warning, or try a different "
+                    "model/protocol.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                fit_message = f"{fit_message} (poor fit: R²={r_squared:.3g})"
 
             logger.info(
                 "Model fit complete",
