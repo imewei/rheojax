@@ -86,9 +86,13 @@ dependencies = [
     # JAX ecosystem (CPU-only - works on all platforms)
     # GPU users: see installation instructions above
     "jax>=0.8.3,<0.11.0",     # JAX 0.8.0+ for CUDA 12/13 support. numpyro's xla_pmap_p import
-                              # is now try/except-guarded (resolved). JAX 0.11.0 will change
-                              # jnp.empty to return uninitialized memory instead of zero-fill --
-                              # audit for reliance on zero-init before raising this ceiling.
+                              # is now try/except-guarded (resolved). Ceiling matches interpax's
+                              # own cap (interpax==0.3.14 depends on jax<0.11 -- confirmed via
+                              # `uv add jax==0.11.0` conflict trace, 2026-07-17); interpax has not
+                              # released jax-0.11 support yet, so this is a real, not redundant, cap.
+                              # rheojax's own code has zero jnp.empty call sites (host-side np.empty
+                              # only, all fully written before read), so 0.11.0's zero-fill removal
+                              # is a non-issue here once interpax unblocks.
     "jaxlib>=0.8.3,<0.11.0",  # jaxlib must match JAX version
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)
