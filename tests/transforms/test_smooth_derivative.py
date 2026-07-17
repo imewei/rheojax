@@ -283,6 +283,17 @@ class TestSmoothDerivative:
         with pytest.raises(ValueError, match="duplicate"):
             deriv.transform(data)
 
+    def test_spline_duplicate_x_raises(self):
+        """Duplicate x must raise, matching finite_diff/savgol (not silent NaN)."""
+        x = jnp.array([0.0, 1.0, 1.0, 3.0, 4.0, 6.0])
+        y = x**2
+
+        data = RheoData(x=x, y=y, domain="time")
+
+        deriv = SmoothDerivative(method="spline")
+        with pytest.raises(ValueError, match="duplicate"):
+            deriv.transform(data)
+
     def test_finite_diff_nonmonotonic_x_is_sorted(self):
         """Regression: non-monotonic x silently produced wrong values (defect #2)."""
         x = jnp.array([0.0, 1.0, 2.0, 1.5, 3.0, 4.0])

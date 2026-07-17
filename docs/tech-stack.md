@@ -26,7 +26,6 @@
 |---------|---------|---------|
 | **jax** | >=0.8.3 | Functional numerical computing (JIT, vmap, grad) |
 | **jaxlib** | >=0.8.3 | XLA compiler backend |
-| **interpax** | >=0.3.12 | JIT-safe interpolation (replaces scipy.interpolate) |
 | **diffrax** | >=0.7.1 | JAX-native ODE/SDE solver (Tsit5, Kvaerno5, etc.) |
 | **nlsq** | >=0.6.10 | GPU-accelerated non-linear least squares (imported before JAX) |
 | **optimistix** | (via diffrax) | Root-finding and optimization |

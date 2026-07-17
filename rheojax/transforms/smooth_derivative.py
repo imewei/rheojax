@@ -339,6 +339,19 @@ class SmoothDerivative(BaseTransform):
         x_sorted = x_jax[sort_idx]
         y_sorted = y_jax[sort_idx]
 
+        # R7-DERIV-006: Guard against duplicate/near-duplicate x (zero
+        # spacing), matching _savgol_derivative/_finite_diff_derivative.
+        # The spline's tridiagonal solve divides by spacing-derived terms
+        # and would otherwise silently produce NaN/Inf.
+        dx = np.diff(np.asarray(x_sorted))
+        if dx.size and np.any(np.abs(dx) < 1e-30):
+            raise ValueError(
+                "SmoothDerivative: spline method requires distinct x "
+                "values; data contains duplicate/near-duplicate x, which "
+                "causes division by zero. Remove duplicates before "
+                "computing derivatives."
+            )
+
         # Fit cubic spline (JIT-compatible)
         spline = NotAKnotCubicSpline(x_sorted, y_sorted)
 

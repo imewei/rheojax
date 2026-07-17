@@ -89,8 +89,8 @@ dependencies = [
                       # is now try/except-guarded (resolved). Ceiling formerly capped at
                       # <0.11.0 to match interpax's own jax<0.11 pin (2026-07-17); interpax
                       # was replaced by rheojax.utils.jax_cubic_spline (pure-JAX cubic spline,
-                      # numerically validated against interpax/scipy to ~1e-8), which has no
-                      # jax version constraint, so the ceiling is no longer needed.
+                      # see tests/utils/test_jax_cubic_spline.py for scipy-validated parity),
+                      # which has no jax version constraint, so the ceiling is no longer needed.
     "jaxlib>=0.8.3",  # jaxlib must match JAX version
 
     # JAX-compatible scientific computing (§2 Technical Guidelines)

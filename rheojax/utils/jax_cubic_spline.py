@@ -16,6 +16,19 @@ call site's output changes:
   system below is transcribed directly from
   ``scipy.interpolate._cubic.CubicSpline.__init__`` and solved with a JAX
   Thomas algorithm (O(n), not a dense O(n^3) solve).
+
+Numerically validated in ``tests/utils/test_jax_cubic_spline.py`` (random
+arrays, edge cases n=2/3, derivative orders 0-3, exact cubic reproduction)
+against ``scipy.interpolate.CubicSpline``/``CubicHermiteSpline`` -- interpax
+itself is no longer a dependency, so scipy is the committed oracle. Matches
+to ~1e-8 for values/1st derivatives, looser (~1e-4) for the noisier 3rd
+derivative.
+
+One deliberate behavioral difference from interpax: query points outside
+``[x[0], x[-1]]`` are cubically extrapolated here (clipped to the boundary
+segment), whereas interpax's default ``extrap=False`` returns NaN outside the
+domain. No current call site queries out-of-bounds points, so this is latent;
+a future caller relying on NaN-on-out-of-bounds should clamp/mask explicitly.
 """
 
 from rheojax.core.jax_config import safe_import_jax
@@ -28,6 +41,10 @@ def _thomas_solve(sub, diag, sup, rhs):
 
     ``sub[i]``/``sup[i]`` are the coefficients of ``x[i-1]``/``x[i+1]`` in
     row ``i``; ``sub[0]`` and ``sup[-1]`` are unused padding.
+
+    # ponytail: unpivoted (unlike scipy's solve_banded), valid for the
+    # diagonally-dominant systems well-conditioned monotone grids produce;
+    # add partial pivoting if ever fed extreme non-uniform spacing.
     """
     sup0 = sup[0] / diag[0]
     rhs0 = rhs[0] / diag[0]
@@ -58,10 +75,21 @@ def _thomas_solve(sub, diag, sup, rhs):
     return jnp.concatenate([x_rest_rev, x_last[None]])
 
 
+def _safe_slope(x, y):
+    """``diff(y)/diff(x)``, matching interpax's zero-spacing guard.
+
+    interpax's own ``_cubic1``/``_cubic2`` use
+    ``jnp.where(dx == 0, 0, 1/dx)`` rather than dividing directly, so a
+    duplicate x value yields a finite (zero) slope instead of inf/NaN.
+    """
+    dx = jnp.diff(x)
+    dxi = jnp.where(dx == 0, 0.0, 1.0 / dx)
+    return jnp.diff(y) * dxi
+
+
 def _local_cubic_slopes(x, y):
     """Node tangents matching interpax's ``_cubic1`` (centered secant average)."""
-    dx = jnp.diff(x)
-    slope = jnp.diff(y) / dx
+    slope = _safe_slope(x, y)
     interior = 0.5 * (slope[:-1] + slope[1:])
     return jnp.concatenate([slope[:1], interior, slope[-1:]])
 
@@ -75,7 +103,7 @@ def _not_a_knot_slopes(x, y):
     """
     n = x.shape[0]
     dx = jnp.diff(x)
-    slope = jnp.diff(y) / dx
+    slope = _safe_slope(x, y)
 
     if n == 2:
         return jnp.array([slope[0], slope[0]])
@@ -172,6 +200,16 @@ class NotAKnotCubicSpline:
     def __init__(self, x, y):
         self.x = jnp.asarray(x)
         self.y = jnp.asarray(y)
+        # Matches scipy.interpolate.CubicSpline: a duplicate/non-monotonic x
+        # makes the not-a-knot boundary rows singular (e.g. diag[0] = dx[1]
+        # is exactly zero for a duplicate at index 1), so reject upfront
+        # rather than silently returning NaN/Inf from a singular solve.
+        if not bool(jnp.all(jnp.diff(self.x) > 0)):
+            raise ValueError(
+                "NotAKnotCubicSpline requires strictly increasing x (no "
+                "duplicate or non-monotonic values); the not-a-knot system "
+                "is singular otherwise."
+            )
         self.s = _not_a_knot_slopes(self.x, self.y)
 
     def __call__(self, xq, nu=0):
