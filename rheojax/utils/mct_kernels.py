@@ -1049,9 +1049,9 @@ def _solve_equilibrium_correlator_f12_jit(
         [jnp.array([0.0]), jnp.linspace(dt, t_max, n_steps)]
     )
     phi_full = jnp.concatenate([jnp.array([1.0]), phi_trajectory])
-    from interpax import interp1d
+    from rheojax.utils.jax_cubic_spline import local_cubic_eval
 
-    phi_at_times = interp1d(t_integration, phi_full, method="cubic")(t_array)
+    phi_at_times = local_cubic_eval(t_integration, phi_full, t_array)
 
     return phi_at_times
 

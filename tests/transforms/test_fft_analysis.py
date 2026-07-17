@@ -312,7 +312,7 @@ class TestFFTAnalysis:
 
         Regression test: np.diff(t) = [1, 1, -0.5, 1.5, 1] has median=1.0 > 0,
         so a median-only dt<=0 check would miss the non-monotonicity and feed
-        unsorted knots into interpax's interpolator, producing silently wrong
+        unsorted knots into the interpolation below, producing silently wrong
         resampled data instead of an error.
         """
         t = jnp.array([0.0, 1.0, 2.0, 1.5, 3.0, 4.0])
