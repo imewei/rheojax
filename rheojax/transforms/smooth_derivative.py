@@ -154,7 +154,7 @@ class SmoothDerivative(BaseTransform):
                 "zero). Increase polyorder or lower deriv."
             )
 
-        # interpax CubicSpline is always degree-3, so any derivative order
+        # The cubic spline is always degree-3, so any derivative order
         # above 3 is identically zero.
         if self.method == "spline" and self.deriv > 3:
             raise ValueError(
@@ -314,7 +314,7 @@ class SmoothDerivative(BaseTransform):
         return dy_dx_sorted[unsort_idx]
 
     def _spline_derivative(self, x: JaxArray, y: JaxArray) -> JaxArray:
-        """Compute derivative using JIT-safe cubic splines via interpax.
+        """Compute derivative using JIT-safe cubic splines.
 
         Parameters
         ----------
@@ -328,22 +328,21 @@ class SmoothDerivative(BaseTransform):
         jnp.ndarray
             Derivative dy/dx
         """
-        from interpax import CubicSpline
+        from rheojax.utils.jax_cubic_spline import NotAKnotCubicSpline
 
         # Ensure JAX arrays
         x_jax = jnp.asarray(x)
         y_jax = jnp.asarray(y)
 
-        # Sort data if needed (interpax requires sorted x)
+        # Sort data if needed (spline requires sorted x)
         sort_idx = jnp.argsort(x_jax)
         x_sorted = x_jax[sort_idx]
         y_sorted = y_jax[sort_idx]
 
         # Fit cubic spline (JIT-compatible)
-        spline = CubicSpline(x_sorted, y_sorted)
+        spline = NotAKnotCubicSpline(x_sorted, y_sorted)
 
         # Compute derivative at original x points
-        # interpax splines have .derivative() method
         deriv_spline = spline.derivative(nu=self.deriv)
         dy_dx = deriv_spline(x_sorted)
 

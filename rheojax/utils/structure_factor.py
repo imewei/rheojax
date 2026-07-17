@@ -19,7 +19,6 @@ from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING
 
-import interpax
 import numpy as np
 from scipy.interpolate import CubicSpline
 
@@ -289,10 +288,11 @@ def create_sk_interpolator(
 def create_sk_interpolator_jax(
     k_data: np.ndarray,
     sk_data: np.ndarray,
-) -> interpax.Interpolator1D:
+) -> Callable[[jax.Array], jax.Array]:
     """Create a JAX-compatible cubic spline interpolator for S(k).
 
-    Uses interpax for JIT-compatible, differentiable interpolation.
+    Uses a pure-JAX C1 local cubic Hermite spline (matching interpax's former
+    ``method="cubic"``) for JIT-compatible, differentiable interpolation.
     Suitable for use inside jax.jit-decorated functions.
 
     Parameters
@@ -304,13 +304,15 @@ def create_sk_interpolator_jax(
 
     Returns
     -------
-    interpax.Interpolator1D
+    Callable[[jax.Array], jax.Array]
         JAX-native interpolator callable as sk_interp(k)
     """
+    from rheojax.utils.jax_cubic_spline import local_cubic_eval
+
     sort_idx = np.argsort(k_data)
     k_sorted = jnp.asarray(k_data[sort_idx])
     sk_sorted = jnp.asarray(sk_data[sort_idx])
-    return interpax.Interpolator1D(k_sorted, sk_sorted, method="cubic")
+    return partial(local_cubic_eval, k_sorted, sk_sorted)
 
 
 # =============================================================================

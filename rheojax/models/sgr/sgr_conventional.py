@@ -1656,9 +1656,8 @@ class SGRConventional(BaseModel):
         def vector_field(t_val, x_val, args):
             """ODE vector field: dx/dt = f(t, x)."""
             # Interpolate gamma_dot at current time t_val
-            # Use linear interpolation (jnp.interp is acceptable for
-            # piecewise-linear interpolation; interpax would be preferred
-            # for JIT-safe differentiable interpolation if imported).
+            # jnp.interp gives JIT-safe piecewise-linear interpolation,
+            # which is sufficient here (no need for a cubic spline).
             gamma_dot_current = jnp.interp(t_val, t_jax, gamma_dot_jax)
 
             # Compute x_ss at current shear rate using args, not self.parameters,
