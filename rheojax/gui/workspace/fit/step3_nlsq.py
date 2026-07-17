@@ -82,9 +82,20 @@ class NlsqStep(QWidget):
     def load_parameters_from_model(self) -> None:
         if not self._state.model_key:
             return
-        instance = ModelRegistry.create(
-            self._state.model_key, **self._state.model_config
-        )
+        # Same fallible call as step1_protocol_model.py's _refresh_preview()
+        # (an out-of-range constructor-config value, e.g. N_y=1, can raise) --
+        # this method is wired directly to Step 1's edited/config_edited
+        # signals (fit_controller.py), so it runs in the same tick as a bad
+        # config edit. Without this guard, step1's own try/except only
+        # prevented ITS crash; this identical unguarded call one signal
+        # handler later would still raise uncaught, leaving the parameter
+        # table showing the PREVIOUS model's params with no indication why.
+        try:
+            instance = ModelRegistry.create(
+                self._state.model_key, **self._state.model_config
+            )
+        except Exception:
+            return
         # instance.parameters is a ParameterSet of core.parameters.Parameter
         # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs gui.state.store
         # .ParameterState (`.min_bound`/`.max_bound`/`.fixed`). Convert here,
@@ -255,6 +266,15 @@ class NlsqStep(QWidget):
         fit_time = result.get("fit_time")
         if fit_time is not None:
             lines.append(f"time={float(fit_time):.2f}s")
+
+        # ModelService.fit() appends a poor-fit note to `message` when
+        # r_squared < 0.5 despite nlsq reporting success (model_service.py) --
+        # without surfacing it here, that's the only place the warning was
+        # ever written, and nothing else in the GUI reads it. A plain
+        # "Fit successful" is the boring default and not worth a line.
+        message = result.get("message")
+        if message and message != "Fit successful":
+            lines.append(f"⚠ {message}")
 
         # Recompute locally from pcov (sorted param names + shape-checked
         # sqrt(diag)) rather than trusting a precomputed uncertainties list's

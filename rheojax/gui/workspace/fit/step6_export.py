@@ -14,6 +14,9 @@ from rheojax.gui.foundation.state import FitState
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExportStep(QWidget):
@@ -51,13 +54,19 @@ class ExportStep(QWidget):
             return
         try:
             self.export_bundle(Path(chosen))
-        except Exception as exc:
+        except (OSError, ValueError, TypeError, RuntimeError) as exc:
             # ExportService wraps most of its own failures as RuntimeError
             # ("Export failed: ..."), but export_posterior_netcdf() (used
             # for the NUTS branch below) has no such wrapper -- a malformed/
             # empty posterior_samples dict can raise ValueError/TypeError
             # straight from arviz.from_dict()/to_netcdf() uncaught. An
             # OSError-only catch here let both of those escape this Qt slot.
+            # Named to these four (not a bare Exception) so an actual
+            # programming bug elsewhere in export_bundle() -- AttributeError,
+            # KeyError from a typo -- still surfaces loudly instead of being
+            # reported identically to a legitimate "your data is malformed"
+            # failure; exc_info logs it either way for post-mortem digging.
+            logger.error("Export failed", exc_info=True)
             self._export_status.setText(f"Export failed: {exc}")
             return
         self._export_status.setText(f"Exported to {Path(chosen)}")

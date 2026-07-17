@@ -143,7 +143,7 @@ class BaseArviZWidget(QWidget):
         # tab) it's destroyed via Qt's parent-cascade deleteLater() instead,
         # which closeEvent never sees. destroyed fires on every teardown
         # path, so wiring cleanup() to it covers both -- same fix already
-        # applied to residuals_panel.py (PR #48/#52) for the identical
+        # applied to residuals_panel.py (PR #48) for the identical
         # deferred-draw_idle()-on-a-freed-canvas crash class.
         self.destroyed.connect(lambda: self.cleanup())
         logger.debug(

@@ -153,12 +153,15 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
         model_key,
         model_config,
         data_ref,
-        column_map,  # ponytail: accepted but not read, same as FitState.control_vars
-        # (state.py) -- oscillation/flow_curve data always uses the fixed
-        # RheoData.x/.y(complex) convention regardless of column_map's
-        # contents, so _fit_fn_body below loads the payload and uses x/y
-        # directly. Not currently exploitable; wire it in if/when a protocol
-        # needs per-column selection instead of the fixed convention.
+        column_map,  # ponytail: accepted but not read HERE -- unlike
+        # FitState.control_vars (state.py), which no GUI step writes and no
+        # fit call reads at all, column_map IS actively populated by
+        # DataStep and gates its is_ready()/validation; it just never
+        # reaches this fixed-convention fit call. _fit_fn_body below loads
+        # the payload and always uses RheoData.x/.y directly regardless of
+        # column_map's contents. Not currently exploitable; wire it in if/
+        # when a protocol needs per-column selection instead of the fixed
+        # convention.
         initial_params=None,
         multi_start=None,
         options=None,
