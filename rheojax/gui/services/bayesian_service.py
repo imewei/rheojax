@@ -16,6 +16,7 @@ import numpy as np
 from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.services.model_service import normalize_model_name
 from rheojax.gui.state.store import BayesianResult, DatasetState
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
@@ -371,6 +372,11 @@ class BayesianService:
                 diagnostics_valid=bool(diagnostics.get("diagnostics_valid", True)),
             )
 
+        except CancellationError:
+            # Re-raise instead of wrapping into RuntimeError below: the
+            # caller (run_bayesian_isolated/step4_nuts) needs to distinguish
+            # "the user cancelled" from "sampling errored out".
+            raise
         except Exception as e:
             logger.error(
                 f"MCMC failed for {model_name}: {e}",

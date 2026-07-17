@@ -82,6 +82,21 @@ def test_load_csv_comment_preamble_autodetect(tmp_path: Path):
     np.testing.assert_allclose(data.y, [100.0, 200.0], rtol=1e-10)
 
 
+def test_load_csv_hash_prefixed_header_is_not_stripped_as_preamble(tmp_path: Path):
+    """A '#'-prefixed header row (numpy.savetxt style, e.g. "#time,stress")
+    is real column data, not a metadata preamble -- the auto-comment
+    detector must not enable comment='#' when the caller's usecols already
+    carry that literal '#' prefix, or pandas strips the very header row
+    usecols expects to find.
+    """
+    csv_path = tmp_path / "hashheader.csv"
+    csv_path.write_text("#time,stress\n0.1,100\n0.2,95\n")
+
+    data = auto_load(str(csv_path))
+    np.testing.assert_allclose(data.x, [0.1, 0.2], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [100.0, 95.0], rtol=1e-10)
+
+
 def test_load_csv_semicolon_values(tmp_path: Path):
     """Test that column values are correctly extracted after delimiter detection."""
     csv_path = tmp_path / "simple.csv"

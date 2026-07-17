@@ -102,13 +102,19 @@ class VisualizeStep(QWidget):
         return "⚠ not-converged: " + "; ".join(verdict.get("reasons", []))
 
     def _refresh_overlay(self) -> None:
+        self._overlay.clear()
+        try:
+            self._refresh_overlay_impl()
+        except Exception:
+            logger.exception("Failed to refresh fit overlay")
+
+    def _refresh_overlay_impl(self) -> None:
         result = self._state.nlsq_result or {}
         x, y, y_fit = result.get("x"), result.get("y"), result.get("y_fit")
         if x is None or y is None:
             return
         x = np.asarray(x)
         y = np.asarray(y)
-        self._overlay.clear()
         # PyQtGraph rejects complex dtype arrays outright. Oscillation-mode
         # data/fits carry y = G' + i*G'' as a genuine complex array (see
         # RheoData.is_complex) -- split into separate real/imag traces
@@ -151,13 +157,17 @@ class VisualizeStep(QWidget):
                 self._overlay.plot_line(x, hi, name="Posterior hi", line_style="dash")
 
     def _refresh_residuals(self) -> None:
-        result = self._state.nlsq_result or {}
-        y, y_fit = result.get("y"), result.get("y_fit")
-        if y is None or y_fit is None:
-            return
-        self._residuals.plot_residuals(
-            np.asarray(y), np.asarray(y_fit), result.get("x")
-        )
+        self._residuals.clear()
+        try:
+            result = self._state.nlsq_result or {}
+            y, y_fit = result.get("y"), result.get("y_fit")
+            if y is None or y_fit is None:
+                return
+            self._residuals.plot_residuals(
+                np.asarray(y), np.asarray(y_fit), result.get("x")
+            )
+        except Exception:
+            logger.exception("Failed to refresh residuals")
 
     def _add_diagnostics_tab(self) -> None:
         page = QWidget(self)

@@ -337,10 +337,17 @@ class ColumnMapperDialog(QDialog):
         y2_patterns = ["g''", "gpp", "loss"]
         temp_patterns = ["temp", "temperature"]
 
+        claimed: set[str] = set()
+
         def find_match(combo: QComboBox, patterns: list[str]) -> bool:
-            """Find best match for column."""
+            """Find best match for column, skipping columns already claimed
+            by another field (e.g. "stress" matches both x and y patterns
+            for a "shear stress" column, so a field claimed by an earlier
+            call must not be re-matched by a later one)."""
             for i in range(combo.count()):
                 text = combo.itemText(i).lower()
+                if text in claimed:
+                    continue
                 for pattern in patterns:
                     # Alphanumeric boundaries (not \b): \b fails after symbolic
                     # modulus patterns like g', g'', g* whose last char is non-word,
@@ -349,12 +356,15 @@ class ColumnMapperDialog(QDialog):
                         r"(?<![a-z0-9])" + re.escape(pattern) + r"(?![a-z0-9])", text
                     ):
                         combo.setCurrentIndex(i)
+                        claimed.add(text)
                         return True
             return False
 
+        # y2 claims before y: "g''" is a substring pattern-space neighbor of
+        # "g'", so G'' must be claimed by y2 before y is matched against it.
         x_found = find_match(self.x_combo, x_patterns)
-        y_found = find_match(self.y_combo, y_patterns)
         y2_found = find_match(self.y2_combo, y2_patterns)
+        y_found = find_match(self.y_combo, y_patterns)
         temp_found = find_match(self.temp_combo, temp_patterns)
 
         logger.debug(

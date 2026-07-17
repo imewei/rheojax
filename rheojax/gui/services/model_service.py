@@ -17,6 +17,7 @@ import numpy as np
 
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.state.store import FitResult
 from rheojax.logging import get_logger
 from rheojax.utils.compatibility import check_model_compatibility
@@ -1121,6 +1122,12 @@ class ModelService:
                 metadata=metadata,
             )
 
+        except CancellationError:
+            # Re-raise instead of falling into the broad except below: the
+            # caller (run_fit_isolated/step3_nlsq) needs to distinguish "the
+            # user cancelled" from "the fit errored out" -- collapsing both
+            # into FitResult(success=False) shows a misleading error chip.
+            raise
         except Exception as e:
             logger.error(
                 "Fit failed",

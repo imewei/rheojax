@@ -27,6 +27,23 @@ def test_diagnostics_tab_added_by_refresh(qtbot):
     ]
 
 
+def test_refresh_clears_stale_overlay_and_residuals_on_failed_result(qtbot):
+    """A failed re-fit (nlsq_result with no x/y) must blank the overlay and
+    residuals canvases, not leave the previous successful fit's curve on
+    screen looking current."""
+    x = np.array([1.0, 2.0, 3.0])
+    y = np.array([10.0, 20.0, 30.0])
+    y_fit = np.array([11.0, 19.0, 31.0])
+    st = FitState(nlsq_result={"x": x, "y": y, "y_fit": y_fit, "success": True})
+    v = VisualizeStep(st)
+    qtbot.addWidget(v)
+    assert len(v._overlay._data_items) > 0
+
+    st.nlsq_result = {"success": False, "message": "failed"}
+    v.refresh()
+    assert v._overlay._data_items == []
+
+
 def test_diagnostics_builds_with_real_nuts_result(qtbot):
     # Shaped like the worker output: NlsqStep normalizes FitResult to a plain
     # dict (see step3_nlsq.py); by analogy the NUTS sample_fn wired in

@@ -41,6 +41,22 @@ def test_nuts_sampler_failure_is_reported_without_escaping_qt_slot(qtbot):
     assert "sampler failed" in step._result.text()
 
 
+def test_nuts_run_shows_cancelled_not_failed_on_cancellation(qtbot):
+    """A user cancel must render as "Cancelled.", not be swallowed by the
+    generic except Exception branch and shown as a NUTS failure."""
+    from rheojax.gui.jobs.cancellation import CancellationError
+
+    st = FitState(nlsq_result={"params": {"G0": 1000.0}})
+
+    def cancelled(*args, **kwargs):
+        raise CancellationError("Operation cancelled by user")
+
+    step = NutsStep(st, sample_fn=cancelled)
+    qtbot.addWidget(step)
+    step.run()
+    assert step._result.text() == "Cancelled."
+
+
 def test_reset_skip_clears_stale_skip_decision(qtbot):
     # Regression: skip() sets _skipped=True permanently. If NLSQ is later
     # re-run (invalidating nuts_result via the cascade), is_ready() must not
