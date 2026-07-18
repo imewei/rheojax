@@ -323,3 +323,5 @@ three-brain-out/
 .claude-flow
 .claude-flow/
 node_modules/
+package.json
+package-lock.json
