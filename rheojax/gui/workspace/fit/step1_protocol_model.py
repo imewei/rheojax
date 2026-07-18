@@ -153,6 +153,12 @@ class ProtocolModelStep(QWidget):
         params_caption.setStyleSheet(field_label_style())
         lay.addWidget(params_caption)
         lay.addWidget(self._params)
+        # Without this, the step body (stretched to fill the wizard panel's
+        # full height by its parent QStackedWidget) has no widget with an
+        # Expanding size policy to absorb the leftover space, so Qt spreads
+        # it across every Preferred-policy caption instead -- each QLabel
+        # above rendered ~150px tall instead of its natural ~20px.
+        lay.addStretch()
         self._protocol.currentTextChanged.connect(self._on_protocol)
         self._model.currentIndexChanged.connect(
             lambda _idx: self._on_model(self._model.currentData())
