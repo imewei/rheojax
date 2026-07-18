@@ -325,3 +325,7 @@ three-brain-out/
 node_modules/
 package.json
 package-lock.json
+.clinerules/
+.windsurf/
+.reports/
+
