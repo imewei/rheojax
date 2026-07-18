@@ -143,12 +143,14 @@ class WorkspaceWindow(QMainWindow):
         self._setup_os_theme_watcher()
         QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
         # Ctrl+1..Ctrl+9 jump to a step in the *current* mode's wizard.
-        # self._canvas is reassigned (not recreated as a new attribute) on
-        # every set_mode()/rebuild, so binding these once here -- rather than
-        # re-binding per StepperCanvas -- keeps them live across mode
-        # switches. click_step() on an out-of-range/not-yet-reached index is
-        # a no-op (disabled QToolButton.click()), so no bounds guard needed
-        # beyond skipping indices the current mode doesn't have.
+        # self._canvas always points at the mode's current StepperCanvas even
+        # though set_mode() builds a brand-new instance on every switch --
+        # binding these once here (dereferencing self._canvas dynamically at
+        # call time, not capturing today's instance) keeps them live across
+        # mode switches without re-binding per StepperCanvas. Out-of-range
+        # indices are rejected by _jump_to_step's own bounds check below;
+        # a not-yet-reached-but-in-range index reaches click_step(), which
+        # is a no-op there because that button is disabled.
         for step_idx in range(9):
             QShortcut(
                 QKeySequence(f"Ctrl+{step_idx + 1}"),
@@ -447,9 +449,10 @@ class WorkspaceWindow(QMainWindow):
         self._sync_mode_buttons()
         # Deferred (not called inline): get_jax_info() queries live JAX
         # devices/memory, which is needless synchronous work on the path to
-        # first paint. Parented to self, like _poll_active_jobs_then's timer
-        # above, so a destroyed-mid-construction window (e.g. test teardown)
-        # takes the timer down with it instead of firing into a dangling self.
+        # first paint. Parented to self, like the same pattern used by
+        # _poll_active_jobs_then's timer elsewhere in this file, so a
+        # destroyed-mid-construction window (e.g. test teardown) takes the
+        # timer down with it instead of firing into a dangling self.
         from PySide6.QtCore import QTimer
 
         timer = QTimer(self)

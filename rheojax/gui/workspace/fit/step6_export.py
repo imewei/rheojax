@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,7 +11,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from rheojax.gui.compat import QFileDialog, QThreadPool
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
-from rheojax.gui.foundation.state import FitState
+from rheojax.gui.foundation.state import ActiveJobsState, FitState
 from rheojax.gui.jobs.export_worker import ExportWorker
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.export_service import ExportService
@@ -26,13 +27,23 @@ class ExportStep(QWidget):
     )  # ref, payload | None, overwrite
 
     def __init__(
-        self, state: FitState, library: DatasetLibrary, parent: QWidget | None = None
+        self,
+        state: FitState,
+        library: DatasetLibrary,
+        active_jobs: ActiveJobsState | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._state = state
         self._library = library
+        self._active_jobs = active_jobs
         self._export_service = ExportService()
-        self._export_worker: ExportWorker | None = None
+        # Keyed by job_id (mirrors window.py's _active_import_workers), not a
+        # single scalar -- and read via .pop() in the finished/failed
+        # handlers below, so this is never a dead store even though the
+        # button-disable above already rules out concurrent launches from
+        # this one step instance.
+        self._active_export_workers: dict[str, ExportWorker] = {}
         self._save_btn = QPushButton("＋ Save fit → library", self)
         # "Bundle" (not bare "Export"): the plot canvas has its own,
         # differently-scoped "Export Chart..." button (single image) inside
@@ -67,27 +78,45 @@ class ExportStep(QWidget):
         # the window for its duration.
         self._export_btn.setEnabled(False)
         self._export_status.setText("Exporting...")
+        # Registered in active_jobs (mirrors window.py's _launch_import and
+        # fit_controller.py's _make_fit_fn) so Close/New/Open wait for this
+        # export to finish instead of tearing down this widget -- and this
+        # widget's underlying C++ object with it -- while the worker thread
+        # is still mid-write and about to emit into it. No "worker" key: like
+        # ImportWorker, an ExportWorker has no cancel() path, so the
+        # close-confirmation dialog's cancel button skips this entry and the
+        # poll loop just waits for it to finish naturally.
+        job_id = f"export:{uuid.uuid4().hex}"
+        if self._active_jobs is not None:
+            self._active_jobs.by_id[job_id] = {}
         worker = ExportWorker(lambda _progress: self.export_bundle(directory))
         worker.signals.completed.connect(
-            lambda _result: self._on_export_finished(directory)
+            lambda _result, jid=job_id: self._on_export_finished(directory, jid)
         )
-        worker.signals.failed.connect(self._on_export_failed)
+        worker.signals.failed.connect(
+            lambda msg, jid=job_id: self._on_export_failed(msg, jid)
+        )
         # QThreadPool takes ownership of `worker` on the C++ side, but that
         # doesn't keep its Python wrapper (or the plain QObject at
         # worker.signals, which has no Qt parent) alive once this method's
         # local `worker` goes out of scope -- GC could tear it down mid-run,
         # silently dropping the completed/failed signal. Hold a reference
         # until one of those signals fires.
-        self._export_worker = worker
+        self._active_export_workers[job_id] = worker
         QThreadPool.globalInstance().start(worker)
 
-    def _on_export_finished(self, directory: Path) -> None:
-        self._export_worker = None
+    def _clear_export_job(self, job_id: str) -> None:
+        self._active_export_workers.pop(job_id, None)
+        if self._active_jobs is not None:
+            self._active_jobs.by_id.pop(job_id, None)
+
+    def _on_export_finished(self, directory: Path, job_id: str) -> None:
+        self._clear_export_job(job_id)
         self._export_btn.setEnabled(True)
         self._export_status.setText(f"Exported to {directory}")
 
-    def _on_export_failed(self, message: str) -> None:
-        self._export_worker = None
+    def _on_export_failed(self, message: str, job_id: str) -> None:
+        self._clear_export_job(job_id)
         self._export_btn.setEnabled(True)
         logger.error("Export failed", error=message)
         self._export_status.setText(f"Export failed: {message}")

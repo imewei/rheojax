@@ -66,9 +66,6 @@ class StepperCanvas(QWidget):
             self._buttons.append(b)
             self._rail.addWidget(b)
             self._stack.addWidget(QWidget(self))  # placeholder body
-        # Enabled/checked state alone doesn't tell a screen reader (or a
-        # sighted user hovering before clicking) *why* a step is locked --
-        # refresh() below keeps this in sync with each button's actual state.
         set_toolbar_margins(self._rail)
         lay = QVBoxLayout(self)
         set_zero_margins(lay)
@@ -98,6 +95,9 @@ class StepperCanvas(QWidget):
         self._buttons[index].click()
 
     def refresh(self) -> None:
+        # Enabled/checked state alone doesn't tell a screen reader (or a
+        # sighted user hovering before clicking) *why* a step is locked --
+        # the per-button tooltip below keeps that in sync with actual state.
         for i, b in enumerate(self._buttons):
             reached = i in self._ctl.reached
             b.setEnabled(reached)

@@ -380,7 +380,7 @@ def build_fit_controller(app_state: AppState):
             st, sample_fn=_make_sample_fn(app_state.library, st, app_state.active_jobs)
         ),
         VisualizeStep(st),
-        ExportStep(st, app_state.library),
+        ExportStep(st, app_state.library, app_state.active_jobs),
     ]
     validators = [
         lambda b=bodies[0]: b.is_ready(),
