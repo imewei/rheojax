@@ -3,8 +3,8 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QPushButton,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -50,11 +50,17 @@ class StepperCanvas(QWidget):
         super().__init__(parent)
         self._ctl = controller
         self._rail = QHBoxLayout()
-        self._buttons: list[QPushButton] = []
+        self._buttons: list[QToolButton] = []
         self._stack = _CurrentPageStack(self)
         self._stack.currentChanged.connect(lambda _: self._stack.updateGeometry())
+        # QToolButton (not QPushButton) for the step rail, same rationale as
+        # WorkspaceWindow's mode switcher: base.qss's checked-pill toggle
+        # style (light highlight, not a filled gradient) reads as "you are
+        # here" progress-track navigation, matching what a wizard step rail
+        # should look like rather than a row of primary-action buttons.
         for i, step in enumerate(controller.steps):
-            b = QPushButton(f"{i + 1} {step.title}", self)
+            b = QToolButton(self)
+            b.setText(f"{i + 1} {step.title}")
             b.setCheckable(True)
             b.clicked.connect(lambda _=False, idx=i: self.step_clicked.emit(idx))
             self._buttons.append(b)
