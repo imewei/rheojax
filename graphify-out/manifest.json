@@ -284,25 +284,20 @@
     "ast_hash": "3d64dde3ec7d12d11de46a3199f6c497",
     "semantic_hash": "3d64dde3ec7d12d11de46a3199f6c497"
   },
-  "rheojax/gui/jobs/test_jobs.py": {
-    "mtime": 1783293679.7052052,
-    "ast_hash": "9532c56318dc1be0b45b85a356ac4034",
-    "semantic_hash": "9532c56318dc1be0b45b85a356ac4034"
-  },
   "rheojax/gui/jobs/transform_worker.py": {
     "mtime": 1777045619.9353702,
     "ast_hash": "ff1a2bb2177caef903cbf1bf4e4c4921",
     "semantic_hash": "ff1a2bb2177caef903cbf1bf4e4c4921"
   },
   "rheojax/gui/jobs/worker_pool.py": {
-    "mtime": 1783301955.8012848,
-    "ast_hash": "a103dcb87ee6e3480aa19449843d6780",
-    "semantic_hash": "a103dcb87ee6e3480aa19449843d6780"
+    "mtime": 1784411999.5261083,
+    "ast_hash": "f304a27dcbaa55048b4fbff8a40bdc1a",
+    "semantic_hash": "f304a27dcbaa55048b4fbff8a40bdc1a"
   },
   "rheojax/gui/main.py": {
-    "mtime": 1784189858.0106168,
-    "ast_hash": "ccf4231200c8cb8738dd5b787bf46d1d",
-    "semantic_hash": "ccf4231200c8cb8738dd5b787bf46d1d"
+    "mtime": 1784411999.5271082,
+    "ast_hash": "f5d34ffa2ec33ad28f0a32e2ec1d7866",
+    "semantic_hash": "f5d34ffa2ec33ad28f0a32e2ec1d7866"
   },
   "rheojax/gui/resources/__init__.py": {
     "mtime": 1765012492.0,
@@ -445,14 +440,14 @@
     "semantic_hash": "485e09914ed372a2323d83c87c0a8f99"
   },
   "rheojax/gui/utils/icons.py": {
-    "mtime": 1782840586.0514202,
-    "ast_hash": "dbc353612f6c52671f19389440390304",
-    "semantic_hash": "dbc353612f6c52671f19389440390304"
+    "mtime": 1784411999.5271082,
+    "ast_hash": "c3cbb0f892b0965b4c82e4a3cd6b9182",
+    "semantic_hash": "c3cbb0f892b0965b4c82e4a3cd6b9182"
   },
   "rheojax/gui/utils/jax_utils.py": {
-    "mtime": 1768360824.2710142,
-    "ast_hash": "640822b90218f0440477c8cd91dacbfe",
-    "semantic_hash": "640822b90218f0440477c8cd91dacbfe"
+    "mtime": 1784411999.5281081,
+    "ast_hash": "ccdf00b9b47eae5c8dc6603e7c6bb67b",
+    "semantic_hash": "ccdf00b9b47eae5c8dc6603e7c6bb67b"
   },
   "rheojax/gui/utils/layout_helpers.py": {
     "mtime": 1773332567.6729536,
@@ -505,9 +500,9 @@
     "semantic_hash": "0d9068ba9f6f8fe21b8a3332aebea318"
   },
   "rheojax/gui/widgets/parameter_table.py": {
-    "mtime": 1784210974.3972013,
-    "ast_hash": "bfee4b81eafc2f83a94b155344f58e8d",
-    "semantic_hash": "bfee4b81eafc2f83a94b155344f58e8d"
+    "mtime": 1784411999.5281081,
+    "ast_hash": "7a4a9b9c87fe1cbd0148202ae3bee48e",
+    "semantic_hash": "7a4a9b9c87fe1cbd0148202ae3bee48e"
   },
   "rheojax/gui/widgets/plot_canvas.py": {
     "mtime": 1784263922.1617618,
@@ -515,9 +510,9 @@
     "semantic_hash": "d7a392bf48fa76badb8521602a9fffd4"
   },
   "rheojax/gui/widgets/priors_editor.py": {
-    "mtime": 1784210974.3972013,
-    "ast_hash": "66bf6d323d85f84e9d557bc7d3c13cfc",
-    "semantic_hash": "66bf6d323d85f84e9d557bc7d3c13cfc"
+    "mtime": 1784411999.5291083,
+    "ast_hash": "91deb27c5b3814619f54af7bb454d625",
+    "semantic_hash": "91deb27c5b3814619f54af7bb454d625"
   },
   "rheojax/gui/widgets/pyqtgraph_canvas.py": {
     "mtime": 1784365517.9421868,
@@ -4505,14 +4500,14 @@
     "semantic_hash": "86a93757692ee8b7d09b6d4c35bc95b0"
   },
   "rheojax/gui/workspace/inspector.py": {
-    "mtime": 1783293679.7132063,
-    "ast_hash": "a47139a37ad27b9f691741c76101343c",
-    "semantic_hash": "a47139a37ad27b9f691741c76101343c"
+    "mtime": 1784397273.0218124,
+    "ast_hash": "43fe1c96cb46c578057e858a2725e864",
+    "semantic_hash": "43fe1c96cb46c578057e858a2725e864"
   },
   "rheojax/gui/workspace/library_rail.py": {
-    "mtime": 1784342996.5001965,
-    "ast_hash": "ac7c15104a1914be5c7cd8826e984a2f",
-    "semantic_hash": "ac7c15104a1914be5c7cd8826e984a2f"
+    "mtime": 1784411999.5311081,
+    "ast_hash": "6968362e6d704381619b43dbaa70902e",
+    "semantic_hash": "6968362e6d704381619b43dbaa70902e"
   },
   "rheojax/gui/workspace/stepper_canvas.py": {
     "mtime": 1784365517.9421868,
@@ -4520,9 +4515,9 @@
     "semantic_hash": "21cba2c295dab94b8741e98bba6b906c"
   },
   "rheojax/gui/workspace/window.py": {
-    "mtime": 1784365517.943187,
-    "ast_hash": "c82b12270e6a0e9bcc483a55b37daed0",
-    "semantic_hash": "c82b12270e6a0e9bcc483a55b37daed0"
+    "mtime": 1784411999.5341082,
+    "ast_hash": "99c425e5856068d28890691bcb06a540",
+    "semantic_hash": "99c425e5856068d28890691bcb06a540"
   },
   "tests/gui/foundation/__init__.py": {
     "mtime": 1782868060.7423556,
@@ -4590,9 +4585,9 @@
     "semantic_hash": "5a4415d4102cc81fb02d28b7b49de4c7"
   },
   "tests/gui/workspace/test_widgets.py": {
-    "mtime": 1783152248.896702,
-    "ast_hash": "869739df229b3f73ceb588f8b2671a0b",
-    "semantic_hash": "869739df229b3f73ceb588f8b2671a0b"
+    "mtime": 1784411999.535108,
+    "ast_hash": "a366d7f45736fb4e01f0bea8c9f83858",
+    "semantic_hash": "a366d7f45736fb4e01f0bea8c9f83858"
   },
   "rheojax/gui/workspace/fit/__init__.py": {
     "mtime": 1782931710.7590752,
@@ -4600,19 +4595,19 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "rheojax/gui/workspace/fit/fit_controller.py": {
-    "mtime": 1784365517.9421868,
-    "ast_hash": "80cd860640657968233a76c3223e3462",
-    "semantic_hash": "80cd860640657968233a76c3223e3462"
+    "mtime": 1784411999.5301082,
+    "ast_hash": "f072cc29714295fde6c308d6e9ec3d2b",
+    "semantic_hash": "f072cc29714295fde6c308d6e9ec3d2b"
   },
   "rheojax/gui/workspace/fit/step1_protocol_model.py": {
-    "mtime": 1784365517.9421868,
-    "ast_hash": "1306da5e0c8ca52ff39a92c7abf96447",
-    "semantic_hash": "1306da5e0c8ca52ff39a92c7abf96447"
+    "mtime": 1784411999.5301082,
+    "ast_hash": "72f8fa9ecc811c141ef18d78d74d45a5",
+    "semantic_hash": "72f8fa9ecc811c141ef18d78d74d45a5"
   },
   "rheojax/gui/workspace/fit/step2_data.py": {
-    "mtime": 1784357847.7421396,
-    "ast_hash": "50f1b3f3997219b134b5a4c3d974d6c2",
-    "semantic_hash": "50f1b3f3997219b134b5a4c3d974d6c2"
+    "mtime": 1784411999.5301082,
+    "ast_hash": "ddbbb64d514b760ace10d711402262fd",
+    "semantic_hash": "ddbbb64d514b760ace10d711402262fd"
   },
   "rheojax/gui/workspace/fit/step3_nlsq.py": {
     "mtime": 1784263922.1627617,
@@ -4620,9 +4615,9 @@
     "semantic_hash": "f8ccc8c8c0f92de00a277593b40a366c"
   },
   "rheojax/gui/workspace/fit/step4_nuts.py": {
-    "mtime": 1784263922.1637616,
-    "ast_hash": "d99a16b9efc461f482dff2a4d782eb40",
-    "semantic_hash": "d99a16b9efc461f482dff2a4d782eb40"
+    "mtime": 1784411999.5311081,
+    "ast_hash": "4f6839bf2c9a90a732cb317b889ccb2b",
+    "semantic_hash": "4f6839bf2c9a90a732cb317b889ccb2b"
   },
   "rheojax/gui/workspace/fit/step5_visualize.py": {
     "mtime": 1784263922.1637616,
@@ -4630,9 +4625,9 @@
     "semantic_hash": "896fb98c0e43e8eb2b3e6bcea0d3e249"
   },
   "rheojax/gui/workspace/fit/step6_export.py": {
-    "mtime": 1784365517.9421868,
-    "ast_hash": "100846cffeff138b78deadf422e0b8eb",
-    "semantic_hash": "100846cffeff138b78deadf422e0b8eb"
+    "mtime": 1784411999.5311081,
+    "ast_hash": "61d3f4ce830c14b5fd80da2b811474ad",
+    "semantic_hash": "61d3f4ce830c14b5fd80da2b811474ad"
   },
   "rheojax/gui/workspace/transform/__init__.py": {
     "mtime": 1782962110.1028078,
@@ -4650,9 +4645,9 @@
     "semantic_hash": "dbdf94a4057f74fce35b985a4a8a254f"
   },
   "rheojax/gui/workspace/transform/step2_slots.py": {
-    "mtime": 1784210974.3982012,
-    "ast_hash": "c9a52cea7f55b123c293553c19fc7275",
-    "semantic_hash": "c9a52cea7f55b123c293553c19fc7275"
+    "mtime": 1784411999.532108,
+    "ast_hash": "51735ff6baa4d6fc97b5b62b5f718b84",
+    "semantic_hash": "51735ff6baa4d6fc97b5b62b5f718b84"
   },
   "rheojax/gui/workspace/transform/step3_run.py": {
     "mtime": 1783293679.7142062,
@@ -4665,9 +4660,9 @@
     "semantic_hash": "7933f69f0a02b98de2b6db3f4a7e21fb"
   },
   "rheojax/gui/workspace/transform/step5_export.py": {
-    "mtime": 1784365517.943187,
-    "ast_hash": "60ed6f685e5045ca31a08ca770295c22",
-    "semantic_hash": "60ed6f685e5045ca31a08ca770295c22"
+    "mtime": 1784411999.532108,
+    "ast_hash": "d32704d186bf53c722b49413ba9bd7b7",
+    "semantic_hash": "d32704d186bf53c722b49413ba9bd7b7"
   },
   "rheojax/gui/workspace/transform/transform_controller.py": {
     "mtime": 1784365517.943187,
@@ -4705,9 +4700,9 @@
     "semantic_hash": "13af0d14bbb47c5db26804847179fb31"
   },
   "tests/gui/workspace/fit/test_step2_validation.py": {
-    "mtime": 1783152248.896702,
-    "ast_hash": "d23a93b14e3005af1bfffa9e54ea98f3",
-    "semantic_hash": "d23a93b14e3005af1bfffa9e54ea98f3"
+    "mtime": 1784411999.535108,
+    "ast_hash": "090190e845e96291afd7e0578649f84f",
+    "semantic_hash": "090190e845e96291afd7e0578649f84f"
   },
   "tests/gui/workspace/fit/test_step3.py": {
     "mtime": 1783409715.3708193,
@@ -4845,9 +4840,9 @@
     "semantic_hash": "dd7cd9dbcb78fe4503e425817e61d43e"
   },
   "tests/gui/workspace/fit/test_fit_controller_validate.py": {
-    "mtime": 1783152248.896702,
-    "ast_hash": "980e51aace9b9ddc2eabfd6739219237",
-    "semantic_hash": "980e51aace9b9ddc2eabfd6739219237"
+    "mtime": 1784411999.535108,
+    "ast_hash": "2cff6e7d10f62e0f1c0f6dc93dfa5420",
+    "semantic_hash": "2cff6e7d10f62e0f1c0f6dc93dfa5420"
   },
   "rheojax/gui/foundation/import_service.py": {
     "mtime": 1784257089.3078291,
@@ -5000,9 +4995,9 @@
     "semantic_hash": "6239121d40e117f83849998413c4e9b0"
   },
   "tests/gui/test_parameter_table_validation.py": {
-    "mtime": 1783301955.809285,
-    "ast_hash": "97aacbcb7126f2608c16c4d63188dc58",
-    "semantic_hash": "97aacbcb7126f2608c16c4d63188dc58"
+    "mtime": 1784411999.5341082,
+    "ast_hash": "31c9882f813300f7ffda5a3cb9629145",
+    "semantic_hash": "31c9882f813300f7ffda5a3cb9629145"
   },
   "rheojax/gui/widgets/log_dock.py": {
     "mtime": 1784210974.3962011,
@@ -5065,9 +5060,9 @@
     "semantic_hash": "ad28204ea56a667b32d5e0751c5673dd"
   },
   "tests/gui/workspace/test_library_rail.py": {
-    "mtime": 1783992940.98839,
-    "ast_hash": "3c1aebc3b240860898463d3246652753",
-    "semantic_hash": "3c1aebc3b240860898463d3246652753"
+    "mtime": 1784411999.535108,
+    "ast_hash": "c9cdac64ca34b257aa64ccf961e6a085",
+    "semantic_hash": "c9cdac64ca34b257aa64ccf961e6a085"
   },
   "tests/gui/workspace/test_window_chrome.py": {
     "mtime": 1784357847.7441397,
@@ -5135,14 +5130,14 @@
     "semantic_hash": "72b71c853fddf3cc3ba208b0b2f5f325"
   },
   "tests/gui/workspace/test_window_help_menu.py": {
-    "mtime": 1783949355.9071348,
-    "ast_hash": "7819ac102ee087db4ea0291d34fc9729",
-    "semantic_hash": "7819ac102ee087db4ea0291d34fc9729"
+    "mtime": 1784397273.0218124,
+    "ast_hash": "044451e39f4e4c76ee108f0b26d77a2e",
+    "semantic_hash": "044451e39f4e4c76ee108f0b26d77a2e"
   },
   "rheojax/gui/workspace/status_bar.py": {
-    "mtime": 1784342996.5011964,
-    "ast_hash": "a0153322bd490073abf103a65a9d0c3a",
-    "semantic_hash": "a0153322bd490073abf103a65a9d0c3a"
+    "mtime": 1784411999.532108,
+    "ast_hash": "967665523c1cfc47829380535917dd00",
+    "semantic_hash": "967665523c1cfc47829380535917dd00"
   },
   "tests/core/test_bayesian_result.py": {
     "mtime": 1783992940.9863899,
@@ -5308,5 +5303,10 @@
     "mtime": 1784189858.0126169,
     "ast_hash": "e3938a9d15cc494cd148a9cc8c880480",
     "semantic_hash": "e3938a9d15cc494cd148a9cc8c880480"
+  },
+  "tests/gui/widgets/test_priors_editor.py": {
+    "mtime": 1784411999.5341082,
+    "ast_hash": "8db0b233caf2d1c43c4f5e46843039d5",
+    "semantic_hash": "8db0b233caf2d1c43c4f5e46843039d5"
   }
 }
