@@ -507,12 +507,6 @@ class WorkspaceWindow(QMainWindow):
                 )
             except (RuntimeError, TypeError):
                 pass
-            try:
-                self._pipeline_service.phase_worker_ready.disconnect(
-                    pipeline_ctl._worker_ready_slot
-                )
-            except (RuntimeError, TypeError):
-                pass
         # Disconnect only the handler each body list actually wired in
         # __init__ -- attempting to disconnect a slot that was never
         # connected to a given body (e.g. _on_transform_body_edited from a
@@ -1454,12 +1448,14 @@ class WorkspaceWindow(QMainWindow):
             service=self._pipeline_service,
             # Shallow-copy both lists: PipelineBatchRunner.run() iterates
             # them on a worker thread across the whole (potentially long)
-            # batch, while Add/Remove Step and the dataset picker in
-            # step1_configure_run.py stay clickable on the GUI thread and
-            # mutate `pipeline_state.steps`/`.selected_dataset_ids` in place
-            # -- without a copy, an in-flight batch can silently skip,
-            # duplicate, or misconfigure steps for whichever dataset happens
-            # to be substituting when the GUI thread's edit lands.
+            # batch. Add/Remove Step in step1_configure_run.py mutate
+            # `pipeline_state.steps` in place (append/del) while staying
+            # clickable on the GUI thread -- without a copy, an in-flight
+            # batch can silently skip, duplicate, or misconfigure steps for
+            # whichever dataset happens to be substituting when the edit
+            # lands. `selected_dataset_ids` is only ever wholesale-reassigned
+            # today (never mutated in place), so this copy is precautionary
+            # for it rather than closing a currently-reachable race.
             steps=list(pipeline_state.steps),
             selected_dataset_ids=list(pipeline_state.selected_dataset_ids),
             library=self._state.library,

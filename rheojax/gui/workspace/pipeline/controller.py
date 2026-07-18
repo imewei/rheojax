@@ -36,38 +36,20 @@ class PipelineController(WorkflowController):
         super().__init__(steps=[])
         on_started = self._on_dataset_run_started
         on_finished = self._commit_job_result
-        on_worker_ready = self._on_phase_worker_ready
         # guard() no-ops these handlers once WorkspaceWindow._epoch advances past
         # `epoch` (a rebuild happened), so a stale controller left connected to the
         # persistent PipelineExecutionService can't write into a discarded AppState.
         if guard is not None:
             on_started = guard(epoch, on_started)
             on_finished = guard(epoch, on_finished)
-            on_worker_ready = guard(epoch, on_worker_ready)
         self._service.dataset_run_started.connect(on_started)
         self._service.dataset_run_finished.connect(on_finished)
-        self._service.phase_worker_ready.connect(on_worker_ready)
         # Keep the exact connected callables so WorkspaceWindow._dispose_workspace
         # can disconnect them from the persistent service on rebuild -- without
         # this, every New/Open leaves the old controller (and the AppState it
         # closed over) connected and reachable for the life of the window.
         self._started_slot = on_started
         self._finished_slot = on_finished
-        self._worker_ready_slot = on_worker_ready
-
-    def _on_phase_worker_ready(
-        self, dataset_id: str, step_id: str, phase: str, worker
-    ) -> None:
-        # Stashes the actual cancellable worker (ProcessWorkerAdapter/FitWorker)
-        # into this dataset's active_jobs entry, mirroring fit_controller.py's
-        # {"status": "running", "worker": token} pattern. Without this, no
-        # Pipeline active_jobs entry ever carried a "worker" key, so window.py's
-        # "Cancel them and continue?" dialog (which reads job.get("worker")) could
-        # never actually stop an in-flight NLSQ/NUTS phase -- it only prevented
-        # the batch from starting the NEXT dataset.
-        job = self._state.active_jobs.by_id.get(dataset_id)
-        if job is not None:
-            job["worker"] = worker
 
     def _on_dataset_run_started(self, dataset_id: str) -> None:
         # Registers ONE dataset's active_jobs entry right before it starts running -- not the
