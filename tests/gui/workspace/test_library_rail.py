@@ -4,6 +4,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
+
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.workspace.library_rail import LibraryRail
 
@@ -116,3 +118,25 @@ def test_context_menu_delete_action_emits_dataset_delete_requested(qtbot, monkey
         rail._on_context_menu_requested(pos)
 
     assert blocker.args == ["d1"]
+
+
+def test_empty_library_shows_placeholder_that_ignores_interaction(qtbot):
+    # Regression test: the empty-state placeholder item occupies the same
+    # list geometry a real dataset row would. itemAt() is a pure hit-test
+    # and does not consult item flags, so without an explicit UserRole guard
+    # a click/context-menu on the placeholder would reach the real
+    # (unmocked) _exec_context_menu / emit a None dataset id instead of
+    # being a no-op like empty space.
+    library = DatasetLibrary()
+    rail = LibraryRail(library)
+    qtbot.addWidget(rail)
+
+    assert rail._list.count() == 1
+    placeholder = rail._list.item(0)
+    assert placeholder.data(Qt.ItemDataRole.UserRole) is None
+
+    pos = rail._list.visualItemRect(placeholder).center()
+    # Must not raise, hang, or emit -- same contract as clicking empty space.
+    rail._on_context_menu_requested(pos)
+    rail._list.itemClicked.emit(placeholder)
+    rail._list.itemDoubleClicked.emit(placeholder)

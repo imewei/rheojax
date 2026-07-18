@@ -92,6 +92,10 @@ class StatusBar(QStatusBar):
         """
         logger.debug("Status updated", message=message, timeout=timeout)
         self.message_label.setText(message)
+        # QLabel doesn't elide/wrap here, so a long message (a file path, a
+        # dataset name) can be visually clipped by the fixed-width indicators
+        # to its right; the tooltip is the only way to recover the full text.
+        self.message_label.setToolTip(message)
         self._message_token += 1
         if timeout > 0:
             # NOTE: deliberately NOT calling super().showMessage(message, timeout) --

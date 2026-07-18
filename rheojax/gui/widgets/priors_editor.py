@@ -543,6 +543,28 @@ class PriorsEditor(QWidget):
                     params[name] = self._param_spinboxes[name].value()
                 break
 
+        # PRED-001: _compute_pdf is the same validation the live preview runs
+        # (rejects non-positive scale, inverted uniform bounds, etc.). Apply
+        # must not skip it — a prior it would reject here otherwise reaches
+        # NUTS unfiltered and fails there with an opaque NumPyro/JAX error.
+        try:
+            self._compute_pdf(dist)
+        except Exception as e:
+            logger.warning(
+                "Refusing to apply invalid prior",
+                widget=self.__class__.__name__,
+                parameter=self._current_param,
+                distribution=dist,
+                params=params,
+                error=str(e),
+            )
+            # No need to force a preview refresh here: every spinbox/combo
+            # change that could have produced this invalid state already
+            # re-runs _update_preview() via its own valueChanged/
+            # currentIndexChanged connection, so the error text is already
+            # showing by the time Apply is clicked.
+            return
+
         logger.info(
             "Prior applied",
             widget=self.__class__.__name__,
