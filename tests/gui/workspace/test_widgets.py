@@ -108,6 +108,15 @@ def test_inspector_tabs(qtbot):
     assert ins.current_tab() == "log"
 
 
+def test_inspector_panel_min_width_covers_tab_bar(qtbot):
+    ins = InspectorPanel()
+    qtbot.addWidget(ins)
+    # The parent QSplitter has no setSizes()/stretch factors, so without this
+    # floor it squeezes the panel below its own tab bar's natural width and
+    # the "log" tab gets pushed behind Qt's overflow scroll button.
+    assert ins.minimumWidth() >= ins._tabs.tabBar().sizeHint().width()
+
+
 def test_inspector_set_tab_widget_preserves_selection_and_deletes_old(qtbot):
     ins = InspectorPanel()
     qtbot.addWidget(ins)
