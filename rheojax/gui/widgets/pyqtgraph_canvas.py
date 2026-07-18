@@ -199,16 +199,23 @@ class PyQtGraphCanvas(QWidget):
 
         # Auto-range button
         auto_btn = QPushButton("Auto Range")
+        auto_btn.setToolTip("Reset zoom/pan to fit all plotted data")
         auto_btn.clicked.connect(self._plot_widget.autoRange)
         layout.addWidget(auto_btn)
 
         # Clear button
         clear_btn = QPushButton("Clear")
+        clear_btn.setToolTip("Remove all curves from this chart")
         clear_btn.clicked.connect(self.clear)
         layout.addWidget(clear_btn)
 
         # Export button
-        export_btn = QPushButton("Export")
+        # "Chart" (not bare "Export"): the wizard's own Export step writes a
+        # full CSV/NetCDF/JSON bundle -- this button only saves this one
+        # chart as an image, a different scope that a same-labeled button
+        # elsewhere in the same flow could easily be mistaken for.
+        export_btn = QPushButton("Export Chart...")
+        export_btn.setToolTip("Save this chart as an image file")
         export_btn.clicked.connect(self._on_export)
         layout.addWidget(export_btn)
 

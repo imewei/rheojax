@@ -34,7 +34,14 @@ class ExportStep(QWidget):
         self._export_service = ExportService()
         self._export_worker: ExportWorker | None = None
         self._save_btn = QPushButton("＋ Save fit → library", self)
-        self._export_btn = QPushButton("⤓ Export", self)
+        # "Bundle" (not bare "Export"): the plot canvas has its own,
+        # differently-scoped "Export Chart..." button (single image) inside
+        # this same Fit flow -- this one writes the full CSV/NetCDF/JSON set.
+        self._export_btn = QPushButton("⤓ Export Bundle...", self)
+        self._export_btn.setToolTip(
+            "Write parameters, fitted curve, provenance"
+            " (and posterior samples/diagnostics, if NUTS ran) to a folder"
+        )
         self._export_status = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)

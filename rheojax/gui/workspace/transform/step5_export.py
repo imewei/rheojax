@@ -35,7 +35,10 @@ class TransformExportStep(QWidget):
         self._export_service = ExportService()
         self._export_worker: ExportWorker | None = None
         self._save_btn = QPushButton("＋ Save output → library", self)
-        self._export_btn = QPushButton("⤓ Export", self)
+        self._export_btn = QPushButton("⤓ Export Bundle...", self)
+        self._export_btn.setToolTip(
+            "Write the transform output, result, and provenance to a folder"
+        )
         self._export_status = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
