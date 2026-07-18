@@ -14,11 +14,11 @@ from rheojax.gui.compat import (
     QInputDialog,
     QKeySequence,
     QMainWindow,
-    QPushButton,
     QShortcut,
     QSplitter,
     Qt,
     QToolBar,
+    QToolButton,
     QWidget,
     Signal,
 )
@@ -71,9 +71,17 @@ class WorkspaceWindow(QMainWindow):
 
         bar = QToolBar(self)
         self.addToolBar(bar)
-        self._fit_btn = QPushButton("Fit", self)
-        self._tx_btn = QPushButton("Transform", self)
-        self._pipeline_btn = QPushButton("Pipeline", self)
+        # QToolButton (not QPushButton) for the mode switcher: base.qss already
+        # styles QToolButton as a flat toggle pill (checked = @primary_light
+        # highlight), whereas QPushButton carries the heavy gradient "primary
+        # action" look meant for Save/Open-type CTAs -- wrong affordance for a
+        # segmented mode switch that should read as navigation, not a command.
+        self._fit_btn = QToolButton(self)
+        self._fit_btn.setText("Fit")
+        self._tx_btn = QToolButton(self)
+        self._tx_btn.setText("Transform")
+        self._pipeline_btn = QToolButton(self)
+        self._pipeline_btn.setText("Pipeline")
         self._fit_btn.setCheckable(True)
         self._tx_btn.setCheckable(True)
         self._pipeline_btn.setCheckable(True)
