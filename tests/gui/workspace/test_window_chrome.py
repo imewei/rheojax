@@ -227,6 +227,25 @@ def test_preferences_dialog_restores_current_theme_selection(qtbot):
     assert dialog.theme_combo.currentText() == "Dark"
 
 
+def test_mode_switcher_button_stays_checked_on_reclick(qtbot):
+    # Regression: the three mode-switcher pills had no exclusive QButtonGroup,
+    # so Qt would uncheck the already-active pill on a re-click before
+    # set_mode()'s no-op early return (mode == self._mode) ever reached
+    # _sync_mode_buttons() -- the toolbar could show no mode selected while
+    # the app stayed in that mode. QButtonGroup(exclusive=True) makes Qt
+    # itself refuse to uncheck the sole checked button.
+    from PySide6.QtCore import Qt
+
+    win = _win(qtbot)
+    assert win.mode() == "fit"
+    assert win._fit_btn.isChecked() is True
+
+    qtbot.mouseClick(win._fit_btn, Qt.MouseButton.LeftButton)
+
+    assert win.mode() == "fit"
+    assert win._fit_btn.isChecked() is True
+
+
 def test_command_palette_action_list_has_expected_labels(qtbot):
     win = _win(qtbot)
     actions = win._command_palette_actions()

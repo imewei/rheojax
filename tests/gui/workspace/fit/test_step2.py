@@ -92,6 +92,35 @@ def test_data_step_refresh_clears_stale_selection(qtbot):
     assert step.available_datasets() == ["c1"]
 
 
+def test_data_step_refresh_preserves_result_when_selection_unchanged(qtbot):
+    # Regression: refresh() used to unconditionally re-run _on_select() even
+    # when the selected dataset hadn't changed -- e.g. when called from
+    # DatasetLibraryNotifier.changed on an unrelated event like "Save fit to
+    # library" or another dataset import. That re-emitted `edited`, which
+    # cascades through invalidate_downstream("column_map") and silently
+    # wiped nlsq_result/nuts_result for a selection that never changed.
+    st = FitState(protocol="oscillation", model_key="generalized_maxwell")
+    lib = DatasetLibrary()
+    lib.add(_ref("osc1", "oscillation"))
+    step = DataStep(st, lib)
+    qtbot.addWidget(step)
+    step.select_dataset("osc1")
+    assert st.data_ref == "osc1"
+    assert st.column_map
+
+    st.nlsq_result = {"success": True, "params": {}}
+    st.nuts_result = {"success": True}
+
+    edited_calls = []
+    step.edited.connect(lambda: edited_calls.append(1))
+    step.refresh()  # same protocol/model/dataset -- nothing actually changed
+
+    assert edited_calls == []
+    assert st.data_ref == "osc1"
+    assert st.nlsq_result is not None
+    assert st.nuts_result is not None
+
+
 def test_data_step_flags_viscosity_data_for_stress_model(qtbot):
     # Regression: MIKH (flow_quantity="stress") silently fit raw viscosity
     # values as stress when a flow_curve CSV had no explicit unit conversion.
