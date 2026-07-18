@@ -41,6 +41,7 @@ def test_validate_shape_and_values_catches_mismatch_nan_nonmonotonic():
         "x is not monotonic"
     ]
     assert _validate_shape_and_values(_RheoData([1, 2, 3], [1, 2, 3])) == []
+    assert _validate_shape_and_values(_RheoData([], [])) == ["dataset has no rows"]
 
 
 def test_data_step_blocks_advance_on_invalid_data(qtbot):

@@ -218,6 +218,31 @@ class ParameterTable(QTableWidget):
                 )
                 continue
 
+            # PTBL-002: same invariant _on_item_changed enforces on live edits
+            # ("invalid values must never reach the state store") also applies
+            # here, since a fit can be launched without ever triggering that
+            # per-cell signal (e.g. paste, or a row never focused after edit).
+            if (
+                not math.isfinite(value)
+                or not math.isfinite(min_bound)
+                or not math.isfinite(max_bound)
+                or min_bound > max_bound
+                or value < min_bound
+                or value > max_bound
+            ):
+                logger.warning(
+                    "Skipping row with invalid value/bounds — parameter will "
+                    "use model default; check the table for out-of-range or "
+                    "non-finite entries",
+                    widget=self.__class__.__name__,
+                    row=row,
+                    param_name=param_name,
+                    value=value,
+                    min_bound=min_bound,
+                    max_bound=max_bound,
+                )
+                continue
+
             # Get fixed state from checkbox
             checkbox_widget = self.cellWidget(row, 4)
             checkbox = checkbox_widget.findChild(QCheckBox) if checkbox_widget else None

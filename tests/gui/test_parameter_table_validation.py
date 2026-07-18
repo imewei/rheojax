@@ -40,6 +40,19 @@ def test_invalid_bounds_are_not_emitted(qapp):
     assert emitted == []
 
 
+def test_get_parameters_skips_invalid_rows(qapp):
+    # Regression test: get_parameters() is the read path a Run click uses
+    # (fit/step3_nlsq.py), separate from the itemChanged signal path the
+    # tests above cover. A cell can hold invalid text without ever emitting
+    # (e.g. "-5" is out of [0, 10] bounds -- itemChanged blocks the signal
+    # but leaves the cell text as "-5"), so get_parameters() must re-check
+    # rather than trust that "no signal fired" means "no invalid state".
+    table = _make_table(qapp)
+    table.item(0, 1).setText("-5")  # out of bounds, itemChanged already saw this
+
+    assert table.get_parameters() == {}
+
+
 def test_valid_value_and_bounds_are_emitted(qapp):
     table = _make_table(qapp)
     values = []

@@ -39,13 +39,19 @@ def _classify_y_unit(unit: str) -> str | None:
 
 
 def _validate_shape_and_values(rheo_data) -> list[str]:
-    """Shape/NaN/monotonicity checks against a loaded RheoData. Empty = valid."""
+    """Shape/NaN/monotonicity checks against a loaded RheoData."""
     errors: list[str] = []
     x = np.asarray(rheo_data.x)
     y = np.asarray(rheo_data.y)
     if x.shape[0] != y.shape[0]:
         errors.append(f"x/y length mismatch: {x.shape[0]} vs {y.shape[0]}")
         return errors  # remaining checks assume matching length
+    if x.shape[0] == 0:
+        # A 0-row dataset used to pass validation vacuously and only fail
+        # deep inside NLSQ with a cryptic scipy/JAX error. Report it here,
+        # where it's actually knowable, instead.
+        errors.append("dataset has no rows")
+        return errors
     x_has_nan = bool(np.isnan(x).any())
     if x_has_nan:
         errors.append("x contains NaN values")

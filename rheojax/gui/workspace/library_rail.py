@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, SignalInstance
 from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
@@ -35,12 +35,10 @@ class LibraryRail(QWidget):
         lay.addWidget(self._list)
         lay.addWidget(self._import)
         self._list.itemClicked.connect(
-            lambda it: self.dataset_selected.emit(it.data(Qt.ItemDataRole.UserRole))
+            lambda it: self._emit_if_dataset(self.dataset_selected, it)
         )
         self._list.itemDoubleClicked.connect(
-            lambda it: self.dataset_preview_requested.emit(
-                it.data(Qt.ItemDataRole.UserRole)
-            )
+            lambda it: self._emit_if_dataset(self.dataset_preview_requested, it)
         )
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu_requested)
@@ -49,14 +47,35 @@ class LibraryRail(QWidget):
 
     def refresh(self) -> None:
         self._list.clear()
-        for ref in self._library.all():
-            it = QListWidgetItem(f"{ref.name}   [{ref.protocol_type}]")
+        refs = self._library.all()
+        if not refs:
+            placeholder = QListWidgetItem("No datasets yet — import a file to begin")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._list.addItem(placeholder)
+            return
+        for ref in refs:
+            label = f"{ref.name}   [{ref.protocol_type}]"
+            it = QListWidgetItem(label)
+            # QListWidget does not elide item text; a long dataset name (common
+            # for TRIOS exports) is otherwise clipped with no way to recover it.
+            it.setToolTip(label)
             it.setData(Qt.ItemDataRole.UserRole, ref.id)
             self._list.addItem(it)
 
+    def _emit_if_dataset(self, signal: SignalInstance, item: QListWidgetItem) -> None:
+        # The empty-state placeholder item has no UserRole data; skip it so
+        # clicking/double-clicking the "No datasets yet" row is a no-op.
+        dataset_id = item.data(Qt.ItemDataRole.UserRole)
+        if dataset_id is not None:
+            signal.emit(dataset_id)
+
     def _on_context_menu_requested(self, pos) -> None:
         item = self._list.itemAt(pos)
-        if item is None:
+        # itemAt() is a pure geometry hit-test and ignores item flags, so the
+        # empty-state placeholder (NoItemFlags, no UserRole data) still gets
+        # returned here; treat it the same as "no item under the cursor" so
+        # we don't open a context menu with actions that have no target.
+        if item is None or item.data(Qt.ItemDataRole.UserRole) is None:
             return
         menu = QMenu(self)
         preview_action = menu.addAction("Preview…")
