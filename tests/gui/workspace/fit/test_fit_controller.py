@@ -150,6 +150,53 @@ def test_model_only_edit_restores_still_valid_dataset_selection(qtbot):
     assert bodies[1]._source.currentText() == "osc1"
 
 
+def test_refresh_on_unrelated_notify_preserves_fit_results(qtbot):
+    # End-to-end regression: DataStep.refresh() also runs when
+    # WorkspaceWindow wires DatasetLibraryNotifier.changed -> refresh() for
+    # events unrelated to Step 1 (e.g. "Save fit to library", another
+    # dataset import) -- not just via the Step-1 edit cascade exercised by
+    # test_model_only_edit_restores_still_valid_dataset_selection above.
+    # Before the fix, refresh() unconditionally re-ran _on_select(), which
+    # unconditionally emits `edited`; through this real controller's wiring
+    # (body.edited -> _cascade_and_relock(1, "column_map") ->
+    # invalidate_downstream), that silently wiped nlsq_result/nuts_result
+    # for a selection that never changed. This drives the actual wired
+    # cascade (unlike test_step2.py's DataStep-in-isolation test, which
+    # only proves `edited` doesn't fire and can't see this invalidation).
+    app = AppState()
+    app.library.add(
+        DatasetRef(
+            id="osc1",
+            name="osc1",
+            protocol_type="oscillation",
+            origin="imported",
+            units={"x": "rad/s"},
+            row_count=64,
+            hash="h",
+            provenance={},
+            lineage=[],
+        )
+    )
+    app.library.store_payload(
+        "osc1", _RheoData(np.linspace(0.1, 10.0, 64), np.linspace(1.0, 5.0, 64))
+    )
+    ctl, bodies = build_fit_controller(app)
+    for b in bodies:
+        qtbot.addWidget(b)
+
+    bodies[0].set_protocol("oscillation")
+    bodies[0].set_model("maxwell")
+    bodies[1].select_dataset("osc1")
+    app.fit.nlsq_result = {"success": True, "params": {}}
+    app.fit.nuts_result = {"success": True}
+
+    bodies[1].refresh()  # simulates DatasetLibraryNotifier.changed -> refresh()
+
+    assert app.fit.data_ref == "osc1"
+    assert app.fit.nlsq_result is not None
+    assert app.fit.nuts_result is not None
+
+
 def test_export_step_unlocked_once_visualize_reached(qtbot):
     # Regression: ExportStep (index 5) was structurally unreachable.
     # WorkflowController.advance() is only ever invoked from

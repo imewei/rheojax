@@ -160,6 +160,29 @@ def test_on_save_holds_active_jobs_lock_during_save(qtbot, monkeypatch, tmp_path
     assert lock_held_during_save == [True]
 
 
+def test_on_save_as_holds_active_jobs_lock_during_save(qtbot, monkeypatch, tmp_path):
+    # Same regression as test_on_save_holds_active_jobs_lock_during_save
+    # above, for the _on_save_as call site specifically -- it received the
+    # identical on_unblocked-holds-the-lock fix, on a separate code path
+    # that a revert scoped to just _on_save could silently leave broken.
+    win = _win(qtbot)
+    path = str(tmp_path / "proj.rheojax")
+
+    lock_held_during_save = []
+
+    def _fake_save(state, save_path):
+        lock_held_during_save.append(state.active_jobs.lock.locked())
+
+    monkeypatch.setattr(
+        "rheojax.gui.foundation.project_codec.save_project_v2", _fake_save
+    )
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (path, ""))
+
+    win._on_save_as()
+
+    assert lock_held_during_save == [True]
+
+
 def test_on_save_as_shows_critical_dialog_on_os_error(qtbot, monkeypatch):
     win = _win(qtbot)
 

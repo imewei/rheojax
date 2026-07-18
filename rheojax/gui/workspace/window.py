@@ -653,7 +653,9 @@ class WorkspaceWindow(QMainWindow):
             lambda: self._maybe_confirm_unsaved_changes(_open)
         )
 
-    def _blocked_by_active_jobs(self, action: str, on_unblocked=None) -> bool:
+    def _blocked_by_active_jobs(
+        self, action: str, on_unblocked: Callable[[], None] | None = None
+    ) -> bool:
         # Spec §3.3: "Save snapshots job_history only; blocked while active_jobs is
         # non-empty" -- a running Pipeline batch mutates DatasetLibrary/job_history from
         # a worker thread, so a concurrent Save could serialize a torn, inconsistent
