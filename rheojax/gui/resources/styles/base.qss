@@ -59,20 +59,6 @@ QPushButton:disabled {
     color: @text_disabled;
 }
 
-/* Checked state — e.g. active step/mode toggle buttons (stepper, mode bar).
-   Without this, checkable QPushButtons fall back to native rendering and
-   give no visual "current step" cue. */
-QPushButton:checked {
-    background-color: @primary_pressed;
-    border: 2px solid @primary_dark;
-    color: @text_inverse;
-}
-
-QPushButton:checked:hover {
-    background-color: @primary_pressed;
-    border-color: @primary_dark;
-}
-
 /* Button variants via property */
 QPushButton[variant="primary"] {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @primary_gradient_start, stop:1 @primary_gradient_end);
