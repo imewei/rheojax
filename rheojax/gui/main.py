@@ -300,17 +300,22 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     def _adaptive_font_size(app: QApplication) -> float:
-        """Compute a font size that scales with screen DPI."""
+        """Compute a font size that scales with screen DPI.
+
+        Bounded to the stylesheet's own type scale (base.qss tops out at
+        12pt for its largest label) so the DPI-adaptive default never
+        outgrows widgets/menus sized in QSS for that ceiling.
+        """
 
         screen = app.primaryScreen()
         if not screen:
-            return 12.0
+            return 10.0
 
         # 96 DPI is the typical desktop baseline; scale relative to it.
-        base_size = 12.0
+        base_size = 10.0
         dpi_scale = max(screen.logicalDotsPerInch() / 96.0, 1.0)
         # Cap scaling to avoid excessively large fonts on very high DPI setups.
-        return min(base_size * dpi_scale, 16.0)
+        return min(base_size * dpi_scale, 12.0)
 
     def _show_main_window(window: "WorkspaceWindow", maximize: bool) -> None:  # noqa: F821
         """Show the main window with cross-platform maximize handling."""
@@ -357,9 +362,8 @@ def main(argv: list[str] | None = None) -> int:
     QFont.insertSubstitution("Sans Serif", "DejaVu Sans")
     QFont.insertSubstitution("sans-serif", "DejaVu Sans")
 
-    # Apply adaptive base font before the stylesheet so the theme inherits it
-    # Bump all fonts by +2pt for better readability.
-    base_font_size = _adaptive_font_size(app) + 2.0
+    # Apply adaptive base font before the stylesheet so the theme inherits it.
+    base_font_size = _adaptive_font_size(app)
     base_font = QFont()
     base_font.setFamilies(
         [
@@ -374,9 +378,12 @@ def main(argv: list[str] | None = None) -> int:
     base_font.setPointSizeF(base_font_size)
     app.setFont(base_font)
 
-    # Append a global rule to bump widget font sizes while keeping the theme
+    # QApplication.setFont() above already cascades to every widget that
+    # doesn't declare its own font-size in QSS; no separate `* {}` stylesheet
+    # rule is needed, and appending one previously let a +2pt bump push the
+    # default past base.qss's own largest declared size (12pt), inverting
+    # the type hierarchy and overflowing fixed-width widgets/menus.
     stylesheet = load_stylesheet("light")
-    stylesheet += f"\n* {{ font-size: {base_font_size:.1f}pt; }}\n"
     app.setStyleSheet(stylesheet)
 
     logger.debug("Qt application initialized", font_size=base_font_size)

@@ -37,7 +37,7 @@ def test_open_tutorials_opens_browser(qtbot, monkeypatch):
 
     win._on_open_tutorials()
 
-    assert opened == ["https://rheojax.readthedocs.io/en/latest/tutorials/"]
+    assert opened == ["https://github.com/imewei/rheojax/tree/main/examples"]
 
 
 def test_show_shortcuts_displays_message_box(qtbot, monkeypatch):
