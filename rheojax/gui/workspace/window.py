@@ -995,6 +995,13 @@ class WorkspaceWindow(QMainWindow):
         new_canvas = StepperCanvas(self._controllers[mode], self)
         self._wire_canvas(new_canvas)
         self._install_bodies(mode, new_canvas)
+        # _install_bodies() swaps every placeholder page for its real body via
+        # a sequence of QStackedWidget insertWidget()/removeWidget() calls;
+        # Qt reassigns currentIndex during that churn to keep pointing at
+        # whatever widget was "current" at each step, which does not reliably
+        # land back on index 0. refresh() re-syncs the displayed page (and
+        # button checked-state) to the controller's actual current step.
+        new_canvas.refresh()
         old_canvas = self._splitter.replaceWidget(1, new_canvas)
         # Both fit and transform bodies are persistent, stateful widgets
         # owned by their controller (not disposable skeleton stubs) — pull

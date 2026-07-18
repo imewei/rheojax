@@ -146,6 +146,23 @@ def test_window_mode_switch(qtbot):
     assert win.active_step_count() == 5
 
 
+def test_window_mode_switch_displays_step_matching_controller_current(qtbot):
+    # Regression test: StepperCanvas._install_bodies() swaps every placeholder
+    # page for its real body via a sequence of QStackedWidget insertWidget()/
+    # removeWidget() calls. Qt reassigns currentIndex during that churn to
+    # keep pointing at whatever widget was "current" at each step, which does
+    # not reliably land back on index 0 -- previously left the canvas showing
+    # a stale/wrong step body (e.g. Export) while the step-1 button still
+    # read as checked. set_mode() must resync via refresh() after installing
+    # bodies so the displayed page always matches controller.current.
+    win = WorkspaceWindow(AppState())
+    qtbot.addWidget(win)
+    for mode in ("transform", "pipeline", "fit"):
+        win.set_mode(mode)
+        assert win._canvas.current_index() == win._controllers[mode].current == 0
+        assert win._canvas._buttons[0].isChecked() is True
+
+
 def test_window_mode_buttons_reflect_active_mode(qtbot):
     win = WorkspaceWindow(AppState())
     qtbot.addWidget(win)

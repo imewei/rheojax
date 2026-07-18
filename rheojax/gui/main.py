@@ -446,7 +446,7 @@ def main(argv: list[str] | None = None) -> int:
         if tracker._pid is not None:
             tracker._stop()
     except Exception:
-        pass
+        logger.debug("Failed to stop multiprocessing resource_tracker", exc_info=True)
     return exit_code
 
 

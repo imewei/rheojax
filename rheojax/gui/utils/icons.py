@@ -105,26 +105,6 @@ def is_macos() -> bool:
     return result
 
 
-def is_macos_arm64() -> bool:
-    """Check if running on macOS ARM64 (Apple Silicon).
-
-    Returns
-    -------
-    bool
-        True if running on macOS with ARM64 architecture
-    """
-    import platform
-
-    logger.debug(
-        "Checking if platform is macOS ARM64",
-        platform=sys.platform,
-        machine=platform.machine(),
-    )
-    result = sys.platform == "darwin" and platform.machine() == "arm64"
-    logger.debug("is_macos_arm64 check complete", result=result)
-    return result
-
-
 def emoji_safe() -> bool:
     """Check if emoji rendering is safe on current platform.
 

@@ -170,6 +170,7 @@ class NutsStep(QWidget):
         lay.addLayout(settings_form)
         for w in (self._skip_btn, self._run_btn, self._result):
             lay.addWidget(w)
+        lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self.run)
         for spin in (

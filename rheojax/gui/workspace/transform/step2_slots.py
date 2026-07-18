@@ -79,6 +79,10 @@ class SlotsStep(QWidget):
                 self._add_single_slot_widget(s)
 
         self._add_param_form()
+        # see step1_protocol_model.py's addStretch() comment. Safe to add
+        # every refresh(): the while-loop above tears down the whole layout
+        # (including any stretch from a prior rebuild) before this runs.
+        self._layout.addStretch()
 
     def _add_param_form(self) -> None:
         """Auto-generated parameter form for the current transform.

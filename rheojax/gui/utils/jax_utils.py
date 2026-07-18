@@ -325,34 +325,3 @@ def get_jax_info() -> dict[str, Any]:
         float64_enabled=result["float64_enabled"],
     )
     return result
-
-
-def format_memory_usage(memory: dict[str, float]) -> str:
-    """Format memory usage for display.
-
-    Parameters
-    ----------
-    memory : dict
-        Memory stats from get_memory_usage()
-
-    Returns
-    -------
-    str
-        Formatted memory string (e.g., "1.2 GB / 8.0 GB (15%)")
-    """
-    logger.debug("Entering format_memory_usage", memory=memory)
-    used = memory.get("used_mb", 0)
-    total = memory.get("total_mb", 0)
-    percent = memory.get("percent", 0)
-
-    if total == 0:
-        logger.debug("Total memory is 0, returning N/A")
-        return "N/A"
-
-    # Convert to GB if large
-    if total >= 1024:
-        formatted = f"{used / 1024:.1f} GB / {total / 1024:.1f} GB ({percent:.0f}%)"
-    else:
-        formatted = f"{used:.0f} MB / {total:.0f} MB ({percent:.0f}%)"
-    logger.debug("Memory formatted", result=formatted)
-    return formatted

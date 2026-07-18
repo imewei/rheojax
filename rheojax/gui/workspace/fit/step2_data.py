@@ -112,6 +112,7 @@ class DataStep(QWidget):
             self._error_label,
         ):
             lay.addWidget(w)
+        lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
         self._source.currentTextChanged.connect(self._on_select)
         self._convert_btn.clicked.connect(self.apply_unit_conversion)
         self._quantity_convert_btn.clicked.connect(self.apply_quantity_conversion)

@@ -390,10 +390,16 @@ def build_fit_controller(app_state: AppState):
         lambda: True,  # Visualize is read-only
         lambda: True,  # Export just saves/writes
     ]
+    # STEP_IDS doubles as the display title for every step except the first:
+    # "protocol_model" reads as a raw identifier rather than a label, unlike
+    # its single-word siblings ("data", "nlsq", ...), so it gets an explicit
+    # human-facing override here. `id` stays STEP_IDS[i] unchanged.
+    step_titles = dict(enumerate(FitController.STEP_IDS))
+    step_titles[0] = "protocol & model"
     steps = [
         Step(
             id=FitController.STEP_IDS[i],
-            title=FitController.STEP_IDS[i],
+            title=step_titles[i],
             is_ready=getattr(bodies[i], "is_ready", lambda: True),
             validate=validators[i],
         )

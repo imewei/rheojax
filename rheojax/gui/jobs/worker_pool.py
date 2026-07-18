@@ -515,7 +515,10 @@ class WorkerPool(QObject):
                         try:
                             token.close()
                         except Exception:
-                            pass
+                            logger.debug(
+                                "Failed to close cancellation token during shutdown",
+                                exc_info=True,
+                            )
 
         # Clear active jobs — only if the wait actually completed. If it
         # timed out, workers may still be running; leaving them tracked
