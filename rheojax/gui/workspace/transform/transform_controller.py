@@ -81,6 +81,15 @@ def _make_run_fn(library, active_jobs=None):
         # (e.g. for protocol_type) could see a different selection than the
         # one `data` was actually resolved from.
         slots = dict(slots)
+        # Same reasoning as the slots snapshot above: config is the live,
+        # mutable TransformState.config dict, and step2_slots.py's
+        # _on_params_changed() mutates it in place from the GUI thread while
+        # loop.exec() below pumps events. Without a copy, TransformWorker
+        # (and TransformService.apply_transform()'s multiple params.get()
+        # reads + the later provenance record) can observe a dict changing
+        # mid-run -- a single run silently computing with an inconsistent
+        # mix of pre-/post-edit parameter values.
+        config = dict(config)
         data = _resolve_slot_data(library, transform_key, slots)
         # A real, cancellable token registered in active_jobs -- mirrors
         # fit_controller.py's _make_fit_fn/_make_sample_fn. Without this,

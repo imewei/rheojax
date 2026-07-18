@@ -99,6 +99,43 @@ def test_run_fn_registers_active_job_during_run(qapp, monkeypatch):
     assert app.active_jobs.by_id == {}
 
 
+def test_run_fn_snapshots_config_before_worker_starts(qapp, monkeypatch):
+    # Regression: the run closure snapshotted `slots` but not `config`,
+    # leaving TransformWorker holding a live reference into
+    # TransformState.config. step2_slots.py's _on_params_changed() mutates
+    # that same dict in place from the GUI thread while loop.exec() pumps
+    # events during the run -- a single run could compute with an
+    # inconsistent mix of pre-/post-edit parameter values. config must be
+    # snapshotted the same way slots already was.
+    captured_params = {}
+
+    def fake_apply_transform(self, name, data, params):
+        captured_params["params"] = params
+        # Simulate a concurrent GUI-thread edit to the live config dict
+        # while the worker is "in flight" -- must not be visible below.
+        app.transform.config["threshold"] = "mutated-mid-run"
+        return _RheoData([1.0], [2.0])
+
+    monkeypatch.setattr(
+        "rheojax.gui.services.transform_service.TransformService.apply_transform",
+        fake_apply_transform,
+    )
+
+    app = AppState()
+    app.library.add(_ref("d1", "flow_curve"))
+    app.library.store_payload("d1", _RheoData([0.0], [0.0]))
+    app.transform.transform_key = "smooth_derivative"
+    app.transform.slots = {"input": "d1"}
+    app.transform.config = {"threshold": "original"}
+
+    ctl, bodies = build_transform_controller(app)
+    run_step = bodies[2]
+    run_step.run()
+
+    assert captured_params["params"]["threshold"] == "original"
+    assert captured_params["params"] is not app.transform.config
+
+
 def test_run_fn_raises_on_worker_failure(qapp, monkeypatch):
     def fake_apply_transform(self, name, data, params):
         raise ValueError("bad params")

@@ -74,6 +74,54 @@ def test_run_all_populates_active_jobs(qtbot, tmp_path, monkeypatch):
     assert "d1" in captured["d1"]
 
 
+def test_pipeline_run_requested_passes_step_list_copies_not_live_refs(
+    qtbot, monkeypatch
+):
+    # Regression: PipelineBatchRunner used to receive the live
+    # pipeline_state.steps/.selected_dataset_ids list objects by reference
+    # and iterate them on a worker thread across the whole (potentially
+    # long) batch, while Add/Remove Step and the dataset picker in
+    # step1_configure_run.py stayed clickable on the GUI thread and mutated
+    # those same lists in place -- an in-flight batch could silently skip,
+    # duplicate, or misconfigure steps for whichever dataset happened to be
+    # substituting when the edit landed. The window must now pass shallow
+    # copies at construction time.
+    from PySide6.QtCore import QThreadPool
+
+    state = AppState()
+    win = WorkspaceWindow(state)
+    qtbot.addWidget(win)
+    win.set_mode("pipeline")
+    pipeline_body = win._pipeline_bodies[0]
+    pipeline_body.add_step(
+        "export", {"path": "out.csv", "format": "csv"}
+    )
+    pipeline_body.set_selected_dataset_ids(["d1"])
+
+    started_runners = []
+    monkeypatch.setattr(
+        QThreadPool.globalInstance(),
+        "start",
+        lambda runner: started_runners.append(runner),
+    )
+
+    win._on_pipeline_run_requested()
+
+    assert len(started_runners) == 1
+    runner = started_runners[0]
+    assert runner._steps is not state.pipeline.steps
+    assert runner._selected_dataset_ids is not state.pipeline.selected_dataset_ids
+    assert runner._steps == state.pipeline.steps  # same content, distinct object
+    assert runner._selected_dataset_ids == state.pipeline.selected_dataset_ids
+
+    # Mutating the live state after the runner was constructed must not
+    # reach the runner's copies.
+    state.pipeline.steps.clear()
+    state.pipeline.selected_dataset_ids.clear()
+    assert len(runner._steps) == 1
+    assert runner._selected_dataset_ids == ["d1"]
+
+
 def test_run_all_ignored_while_batch_already_running(qtbot, monkeypatch):
     from PySide6.QtCore import QThreadPool
 

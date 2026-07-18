@@ -136,6 +136,53 @@ def test_on_save_shows_critical_dialog_on_value_error(qtbot, monkeypatch):
     assert win._state.project.dirty is True
 
 
+def test_on_save_holds_active_jobs_lock_during_save(qtbot, monkeypatch, tmp_path):
+    # Regression: _blocked_by_active_jobs used to check active_jobs.by_id
+    # under lock, release the lock, then call save_project_v2() unlocked --
+    # a worker thread could register a job in that TOCTOU gap and produce a
+    # torn save, exactly the race Save is meant to prevent (see its own
+    # Spec S3.3 comment). The save I/O must now run while active_jobs.lock
+    # is still held.
+    win = _win(qtbot)
+    win._state.project.path = str(tmp_path / "proj.rheojax")
+
+    lock_held_during_save = []
+
+    def _fake_save(state, path):
+        lock_held_during_save.append(state.active_jobs.lock.locked())
+
+    monkeypatch.setattr(
+        "rheojax.gui.foundation.project_codec.save_project_v2", _fake_save
+    )
+
+    win._on_save()
+
+    assert lock_held_during_save == [True]
+
+
+def test_on_save_as_holds_active_jobs_lock_during_save(qtbot, monkeypatch, tmp_path):
+    # Same regression as test_on_save_holds_active_jobs_lock_during_save
+    # above, for the _on_save_as call site specifically -- it received the
+    # identical on_unblocked-holds-the-lock fix, on a separate code path
+    # that a revert scoped to just _on_save could silently leave broken.
+    win = _win(qtbot)
+    path = str(tmp_path / "proj.rheojax")
+
+    lock_held_during_save = []
+
+    def _fake_save(state, save_path):
+        lock_held_during_save.append(state.active_jobs.lock.locked())
+
+    monkeypatch.setattr(
+        "rheojax.gui.foundation.project_codec.save_project_v2", _fake_save
+    )
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (path, ""))
+
+    win._on_save_as()
+
+    assert lock_held_during_save == [True]
+
+
 def test_on_save_as_shows_critical_dialog_on_os_error(qtbot, monkeypatch):
     win = _win(qtbot)
 
