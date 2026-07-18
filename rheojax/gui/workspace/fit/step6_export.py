@@ -8,9 +8,10 @@ import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
-from rheojax.gui.compat import QFileDialog
+from rheojax.gui.compat import QFileDialog, QThreadPool
 from rheojax.gui.foundation.library import DatasetLibrary, DatasetRef
 from rheojax.gui.foundation.state import FitState
+from rheojax.gui.jobs.export_worker import ExportWorker
 from rheojax.gui.resources.styles.tokens import field_label_style
 from rheojax.gui.services.export_service import ExportService
 from rheojax.gui.utils.layout_helpers import set_panel_margins
@@ -31,6 +32,7 @@ class ExportStep(QWidget):
         self._state = state
         self._library = library
         self._export_service = ExportService()
+        self._export_worker: ExportWorker | None = None
         self._save_btn = QPushButton("＋ Save fit → library", self)
         self._export_btn = QPushButton("⤓ Export", self)
         self._export_status = QLabel("", self)
@@ -52,24 +54,36 @@ class ExportStep(QWidget):
         )
         if not chosen:
             return
-        try:
-            self.export_bundle(Path(chosen))
-        except (OSError, ValueError, TypeError, RuntimeError) as exc:
-            # ExportService wraps most of its own failures as RuntimeError
-            # ("Export failed: ..."), but export_posterior_netcdf() (used
-            # for the NUTS branch below) has no such wrapper -- a malformed/
-            # empty posterior_samples dict can raise ValueError/TypeError
-            # straight from arviz.from_dict()/to_netcdf() uncaught. An
-            # OSError-only catch here let both of those escape this Qt slot.
-            # Named to these four (not a bare Exception) so an actual
-            # programming bug elsewhere in export_bundle() -- AttributeError,
-            # KeyError from a typo -- still surfaces loudly instead of being
-            # reported identically to a legitimate "your data is malformed"
-            # failure; exc_info logs it either way for post-mortem digging.
-            logger.error("Export failed", exc_info=True)
-            self._export_status.setText(f"Export failed: {exc}")
-            return
-        self._export_status.setText(f"Exported to {Path(chosen)}")
+        directory = Path(chosen)
+        # export_bundle() does real disk I/O (CSV/NetCDF/JSON writes); run it
+        # off the GUI thread via ExportWorker so a large bundle doesn't freeze
+        # the window for its duration.
+        self._export_btn.setEnabled(False)
+        self._export_status.setText("Exporting...")
+        worker = ExportWorker(lambda _progress: self.export_bundle(directory))
+        worker.signals.completed.connect(
+            lambda _result: self._on_export_finished(directory)
+        )
+        worker.signals.failed.connect(self._on_export_failed)
+        # QThreadPool takes ownership of `worker` on the C++ side, but that
+        # doesn't keep its Python wrapper (or the plain QObject at
+        # worker.signals, which has no Qt parent) alive once this method's
+        # local `worker` goes out of scope -- GC could tear it down mid-run,
+        # silently dropping the completed/failed signal. Hold a reference
+        # until one of those signals fires.
+        self._export_worker = worker
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_export_finished(self, directory: Path) -> None:
+        self._export_worker = None
+        self._export_btn.setEnabled(True)
+        self._export_status.setText(f"Exported to {directory}")
+
+    def _on_export_failed(self, message: str) -> None:
+        self._export_worker = None
+        self._export_btn.setEnabled(True)
+        logger.error("Export failed", error=message)
+        self._export_status.setText(f"Export failed: {message}")
 
     def bundle_manifest(self) -> list[str]:
         # ponytail: "figures" isn't listed -- export_bundle() has no figure

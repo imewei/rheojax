@@ -116,5 +116,5 @@ def test_on_export_clicked_reports_failure_instead_of_raising(qtbot, monkeypatch
     monkeypatch.setattr(step, "export_bundle", _raise)
 
     step._on_export_clicked()  # must not raise
-    assert "failed" in step._export_status.text().lower()
+    qtbot.waitUntil(lambda: "failed" in step._export_status.text().lower())
     assert "disk full" in step._export_status.text()

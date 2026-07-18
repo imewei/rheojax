@@ -429,7 +429,17 @@ class WorkspaceWindow(QMainWindow):
                 body.run_requested.connect(self._on_pipeline_run_requested)
 
         self._sync_mode_buttons()
-        self._refresh_status_bar()
+        # Deferred (not called inline): get_jax_info() queries live JAX
+        # devices/memory, which is needless synchronous work on the path to
+        # first paint. Parented to self, like _poll_active_jobs_then's timer
+        # above, so a destroyed-mid-construction window (e.g. test teardown)
+        # takes the timer down with it instead of firing into a dangling self.
+        from PySide6.QtCore import QTimer
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(self._refresh_status_bar)
+        timer.start(0)
 
         self._rail = LibraryRail(state.library, self)
         # LibraryRail otherwise only ever renders the snapshot present at construction

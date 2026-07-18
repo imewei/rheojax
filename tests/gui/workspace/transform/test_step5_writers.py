@@ -72,8 +72,8 @@ def test_export_button_prompts_for_directory_instead_of_using_cwd(
 
     step._on_export_clicked()
 
+    qtbot.waitUntil(lambda: str(tmp_path) in step._export_status.text())
     assert (tmp_path / "provenance.json").exists()
-    assert str(tmp_path) in step._export_status.text()
 
 
 def test_export_button_reports_failure_instead_of_raising(qtbot, monkeypatch):
@@ -94,4 +94,4 @@ def test_export_button_reports_failure_instead_of_raising(qtbot, monkeypatch):
     monkeypatch.setattr(step, "export_bundle", _raise)
 
     step._on_export_clicked()  # must not raise
-    assert "failed" in step._export_status.text().lower()
+    qtbot.waitUntil(lambda: "failed" in step._export_status.text().lower())

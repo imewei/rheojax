@@ -131,6 +131,13 @@ class PyQtGraphCanvas(QWidget):
         # Enable grid
         self._plot_item.showGrid(x=True, y=True, alpha=0.3)
 
+        # Large series (e.g. LAOS/time-domain sweeps) were rendering every
+        # raw sample; peak-mode downsampling collapses off-screen density
+        # without losing visible curve shape, and clip-to-view skips points
+        # outside the current pan/zoom range.
+        self._plot_widget.setDownsampling(auto=True, mode="peak")
+        self._plot_widget.setClipToView(True)
+
         # Setup axes
         self._plot_item.setLabel("left", "Y")
         self._plot_item.setLabel("bottom", "X")
