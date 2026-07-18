@@ -322,3 +322,4 @@ three-brain-out/
 .investigation/
 .claude-flow
 .claude-flow/
+node_modules/
