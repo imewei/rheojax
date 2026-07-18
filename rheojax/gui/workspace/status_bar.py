@@ -13,6 +13,7 @@ from rheojax.gui.compat import (
     QWidget,
     _is_qobject_alive,
 )
+from rheojax.gui.resources.styles.tokens import themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -172,16 +173,21 @@ class StatusBar(QStatusBar):
         self.memory_label.setText(f"Memory: {int(memory_used)}/{int(memory_total)} MB")
 
         # Update float64 indicator (ASCII to avoid macOS rendering issues)
-        if float64_enabled:
+        self._set_float64_label(float64_enabled)
+
+    def _set_float64_label(self, enabled: bool) -> None:
+        # themed("SUCCESS")/themed("WARNING") (not literal "green"/"orange") --
+        # same pattern already used for pass/fail coloring in
+        # workspace/fit/step5_visualize.py -- so this label tracks the active
+        # theme instead of a fixed CSS color name clashing with the app's
+        # indigo/slate "Precision Laboratory" palette in dark mode.
+        if enabled:
             self.float64_label.setText("Float64: [OK]")
-            self.float64_label.setStyleSheet(
-                "QLabel { padding: 0 10px; color: green; }"
-            )
+            color = themed("SUCCESS")
         else:
             self.float64_label.setText("Float64: [X]")
-            self.float64_label.setStyleSheet(
-                "QLabel { padding: 0 10px; color: orange; }"
-            )
+            color = themed("WARNING")
+        self.float64_label.setStyleSheet(f"QLabel {{ padding: 0 10px; color: {color}; }}")
 
     def update_memory(self, used_mb: float, total_mb: float) -> None:
         """Update memory usage indicator.
@@ -216,14 +222,4 @@ class StatusBar(QStatusBar):
             Whether float64 is enabled
         """
         logger.debug("Float64 status set", enabled=enabled)
-        # ASCII characters to avoid macOS CoreText rendering issues
-        if enabled:
-            self.float64_label.setText("Float64: [OK]")
-            self.float64_label.setStyleSheet(
-                "QLabel { padding: 0 10px; color: green; }"
-            )
-        else:
-            self.float64_label.setText("Float64: [X]")
-            self.float64_label.setStyleSheet(
-                "QLabel { padding: 0 10px; color: orange; }"
-            )
+        self._set_float64_label(enabled)
