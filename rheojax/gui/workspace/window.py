@@ -9,6 +9,7 @@ from typing import Any
 from rheojax.gui.compat import (
     QAction,
     QApplication,
+    QButtonGroup,
     QCloseEvent,
     QDialog,
     QInputDialog,
@@ -85,6 +86,15 @@ class WorkspaceWindow(QMainWindow):
         self._fit_btn.setCheckable(True)
         self._tx_btn.setCheckable(True)
         self._pipeline_btn.setCheckable(True)
+        # Exclusive group so Qt itself refuses to uncheck the sole checked
+        # button on a re-click. Without this, clicking the already-active
+        # mode pill toggles it unchecked before set_mode()'s no-op early
+        # return (mode == self._mode) ever reaches _sync_mode_buttons() --
+        # the pill goes visually unselected while the app stays in that mode.
+        self._mode_btn_group = QButtonGroup(self)
+        self._mode_btn_group.setExclusive(True)
+        for btn in (self._fit_btn, self._tx_btn, self._pipeline_btn):
+            self._mode_btn_group.addButton(btn)
         self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
         self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
         self._pipeline_btn.clicked.connect(lambda: self.set_mode("pipeline"))
@@ -497,6 +507,12 @@ class WorkspaceWindow(QMainWindow):
                 )
             except (RuntimeError, TypeError):
                 pass
+            try:
+                self._pipeline_service.phase_worker_ready.disconnect(
+                    pipeline_ctl._worker_ready_slot
+                )
+            except (RuntimeError, TypeError):
+                pass
         # Disconnect only the handler each body list actually wired in
         # __init__ -- attempting to disconnect a slot that was never
         # connected to a given body (e.g. _on_transform_body_edited from a
@@ -643,16 +659,25 @@ class WorkspaceWindow(QMainWindow):
             lambda: self._maybe_confirm_unsaved_changes(_open)
         )
 
-    def _blocked_by_active_jobs(self, action: str) -> bool:
+    def _blocked_by_active_jobs(self, action: str, on_unblocked=None) -> bool:
         # Spec §3.3: "Save snapshots job_history only; blocked while active_jobs is
         # non-empty" -- a running Pipeline batch mutates DatasetLibrary/job_history from
         # a worker thread, so a concurrent Save could serialize a torn, inconsistent
         # snapshot. Unlike Close/New/Open (which offer to cancel jobs and proceed), Save
         # is a hard block: there is no safe "discard the running job" option here.
+        #
+        # on_unblocked, if given, runs while active_jobs.lock is still held --
+        # closes the gap between "is anything running?" and the caller's own
+        # save I/O that a worker thread could otherwise slip a new job
+        # registration into (the exact race Save is meant to prevent). Any
+        # exception on_unblocked raises propagates to the caller after the
+        # lock is released (the `with` block's __exit__ still runs).
         with self._state.active_jobs.lock:
             job_count = len(self._state.active_jobs.by_id)
-        if job_count == 0:
-            return False
+            if job_count == 0:
+                if on_unblocked is not None:
+                    on_unblocked()
+                return False
         from PySide6.QtWidgets import QMessageBox
 
         QMessageBox.information(
@@ -664,8 +689,6 @@ class WorkspaceWindow(QMainWindow):
         return True
 
     def _on_save(self) -> None:
-        if self._blocked_by_active_jobs("save"):
-            return
         if self._state.project.path is None:
             self._on_save_as()
             return
@@ -673,7 +696,13 @@ class WorkspaceWindow(QMainWindow):
         from rheojax.gui.foundation.project_codec import save_project_v2
 
         try:
-            save_project_v2(self._state, self._state.project.path)
+            if self._blocked_by_active_jobs(
+                "save",
+                on_unblocked=lambda: save_project_v2(
+                    self._state, self._state.project.path
+                ),
+            ):
+                return
         except (ValueError, FileNotFoundError, OSError) as exc:
             QMessageBox.critical(self, "Save Failed", str(exc))
             return
@@ -681,8 +710,6 @@ class WorkspaceWindow(QMainWindow):
         self.statusBar().show_message("Project saved", 2000)
 
     def _on_save_as(self) -> None:
-        if self._blocked_by_active_jobs("save"):
-            return
         from rheojax.gui.compat import QFileDialog, QMessageBox
 
         path, _ = QFileDialog.getSaveFileName(
@@ -692,7 +719,10 @@ class WorkspaceWindow(QMainWindow):
             from rheojax.gui.foundation.project_codec import save_project_v2
 
             try:
-                save_project_v2(self._state, path)
+                if self._blocked_by_active_jobs(
+                    "save", on_unblocked=lambda: save_project_v2(self._state, path)
+                ):
+                    return
             except (ValueError, FileNotFoundError, OSError) as exc:
                 QMessageBox.critical(self, "Save Failed", str(exc))
                 return
@@ -1422,8 +1452,16 @@ class WorkspaceWindow(QMainWindow):
             self._state.active_jobs.by_id[batch_job_id] = {"status": "starting"}
         runner = PipelineBatchRunner(
             service=self._pipeline_service,
-            steps=pipeline_state.steps,
-            selected_dataset_ids=pipeline_state.selected_dataset_ids,
+            # Shallow-copy both lists: PipelineBatchRunner.run() iterates
+            # them on a worker thread across the whole (potentially long)
+            # batch, while Add/Remove Step and the dataset picker in
+            # step1_configure_run.py stay clickable on the GUI thread and
+            # mutate `pipeline_state.steps`/`.selected_dataset_ids` in place
+            # -- without a copy, an in-flight batch can silently skip,
+            # duplicate, or misconfigure steps for whichever dataset happens
+            # to be substituting when the GUI thread's edit lands.
+            steps=list(pipeline_state.steps),
+            selected_dataset_ids=list(pipeline_state.selected_dataset_ids),
             library=self._state.library,
             stop_requested=self._pipeline_stop_event,
             app_state=self._state,

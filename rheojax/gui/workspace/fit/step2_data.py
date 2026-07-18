@@ -154,7 +154,17 @@ class DataStep(QWidget):
             # valid for the new protocol/model). Re-derive them here via the
             # same logic _on_select uses for a fresh pick, since signals were
             # blocked above and _on_select was never triggered for `current`.
-            self._on_select(current)
+            #
+            # Only do this when state was actually cleared: refresh() is also
+            # invoked from DatasetLibraryNotifier.changed on events unrelated
+            # to this step (e.g. "Save fit to library", another dataset
+            # import) where data_ref/column_map are still intact. Calling
+            # _on_select unconditionally there re-emits `edited` for a
+            # selection that never changed, which cascades through
+            # invalidate_downstream("column_map") and silently wipes
+            # nlsq_result/nuts_result out from under the user.
+            if self._state.data_ref != current or not self._state.column_map:
+                self._on_select(current)
         else:
             # Regression: in the real wired app, the upstream cascade
             # (fit_controller.py's _cascade_and_relock, connected BEFORE
