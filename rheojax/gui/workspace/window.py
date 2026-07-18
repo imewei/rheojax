@@ -278,7 +278,7 @@ class WorkspaceWindow(QMainWindow):
     def _on_open_tutorials(self) -> None:
         import webbrowser
 
-        webbrowser.open("https://rheojax.readthedocs.io/en/latest/tutorials/")
+        webbrowser.open("https://github.com/imewei/rheojax/tree/main/examples")
 
     def _on_show_shortcuts(self) -> None:
         from PySide6.QtWidgets import QMessageBox
