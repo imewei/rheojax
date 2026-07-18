@@ -22,6 +22,12 @@ class InspectorPanel(QWidget):
         lay = QVBoxLayout(self)
         set_zero_margins(lay)
         lay.addWidget(self._tabs)
+        # The parent splitter has no explicit setSizes(), so it squeezes this
+        # panel to whatever space is left over -- without a floor, the tab
+        # bar's own labels (e.g. "log") get pushed behind the overflow
+        # scroll button. Bound to the tab bar's current sizeHint rather than
+        # a fixed pixel value so it stays correct at any font size/DPI.
+        self.setMinimumWidth(self._tabs.tabBar().sizeHint().width())
 
     def tab_names(self) -> list[str]:
         return list(self._TABS)
