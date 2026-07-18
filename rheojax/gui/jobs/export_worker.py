@@ -84,6 +84,14 @@ class ExportWorker(QRunnable):
             )
             self.signals.completed.emit(result)
         except Exception as e:
+            # Broad on purpose: an uncaught exception on a QThreadPool
+            # worker thread is silently dropped by Qt rather than crashing
+            # or propagating anywhere catchable, which would be worse than
+            # over-catching here. The tradeoff: a genuine programming bug
+            # (AttributeError/KeyError from a typo) now reaches the user as
+            # the same generic "Export failed: ..." text as a legitimate
+            # malformed-data failure, instead of surfacing distinctly.
+            # exception_type is still logged below for post-mortem digging.
             error_msg = str(e)
             logger.error(
                 "Export worker failed",

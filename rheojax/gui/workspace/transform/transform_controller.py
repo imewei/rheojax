@@ -162,7 +162,7 @@ def build_transform_controller(app_state: AppState):
         SlotsStep(st, app_state.library),
         RunStep(st, run_fn=_make_run_fn(app_state.library, app_state.active_jobs)),
         TransformVisualizeStep(st),
-        TransformExportStep(st, app_state.library),
+        TransformExportStep(st, app_state.library, app_state.active_jobs),
     ]
     validators = [
         lambda b=bodies[0]: b.is_ready(),

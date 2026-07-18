@@ -4,7 +4,7 @@ pytest.importorskip("PySide6")
 
 from rheojax.gui.compat import QFileDialog
 from rheojax.gui.foundation.library import DatasetLibrary
-from rheojax.gui.foundation.state import FitState
+from rheojax.gui.foundation.state import ActiveJobsState, FitState
 from rheojax.gui.workspace.fit.step6_export import ExportStep
 
 
@@ -116,5 +116,43 @@ def test_on_export_clicked_reports_failure_instead_of_raising(qtbot, monkeypatch
     monkeypatch.setattr(step, "export_bundle", _raise)
 
     step._on_export_clicked()  # must not raise
-    assert "failed" in step._export_status.text().lower()
+    qtbot.waitUntil(lambda: "failed" in step._export_status.text().lower())
     assert "disk full" in step._export_status.text()
+
+
+def test_export_holds_worker_ref_and_registers_active_job(qtbot, monkeypatch, tmp_path):
+    """Regression: _active_export_workers/active_jobs registration must
+    happen synchronously inside _on_export_clicked() and clear exactly once
+    the export finishes. self._active_export_workers[job_id] = worker looks
+    like a dead store to a future cleanup pass (assigned, later popped,
+    never read in between) -- deleting it would silently reintroduce the
+    GC-lifetime bug where the worker's parentless `.signals` QObject could
+    be collected mid-run, and nothing else in this suite would catch that
+    deletion."""
+    st = FitState(
+        protocol="oscillation",
+        model_key="maxwell",
+        model_config={},
+        data_ref="d",
+        nlsq_result={"params": {"G0": 1.0}},
+        nuts_result=None,
+        revision=2,
+    )
+    lib = DatasetLibrary()
+    active_jobs = ActiveJobsState()
+    step = ExportStep(st, lib, active_jobs)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *a, **k: str(tmp_path)
+    )
+
+    step._on_export_clicked()
+    # Synchronous up to QThreadPool.start(): both registrations must already
+    # be in place before the worker thread has any chance to run.
+    assert len(step._active_export_workers) == 1
+    assert len(active_jobs.by_id) == 1
+
+    qtbot.waitUntil(lambda: "Exported to" in step._export_status.text())
+    assert step._active_export_workers == {}
+    assert active_jobs.by_id == {}

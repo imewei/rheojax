@@ -95,7 +95,17 @@ class StepperCanvas(QWidget):
         self._buttons[index].click()
 
     def refresh(self) -> None:
+        # Enabled/checked state alone doesn't tell a screen reader (or a
+        # sighted user hovering before clicking) *why* a step is locked --
+        # the per-button tooltip below keeps that in sync with actual state.
         for i, b in enumerate(self._buttons):
-            b.setEnabled(i in self._ctl.reached)
+            reached = i in self._ctl.reached
+            b.setEnabled(reached)
             b.setChecked(i == self._ctl.current)
+            if i == self._ctl.current:
+                b.setToolTip(f"Step {i + 1} of {len(self._buttons)} (current)")
+            elif reached:
+                b.setToolTip(f"Step {i + 1} of {len(self._buttons)} -- click to revisit")
+            else:
+                b.setToolTip("Complete the earlier steps to unlock this one")
         self._stack.setCurrentIndex(self._ctl.current)

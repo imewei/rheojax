@@ -4,7 +4,7 @@ import inspect
 import typing
 from typing import Any, Literal, get_args, get_origin
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -46,6 +46,20 @@ def _grouped_models(protocol: str) -> dict[str, list[str]]:
     if leftover:
         grouped.setdefault("other", []).extend(leftover)
     return grouped
+
+
+def _model_tooltip(name: str) -> str:
+    """First line of the model class's docstring, or "" if it has none.
+
+    Surfaced as a hover tooltip so picking among a protocol-filtered but
+    still potentially long list of models doesn't require already knowing
+    what each one assumes, or leaving the app to check the docs.
+    """
+    info = ModelRegistry.get_info(name)
+    doc = getattr(info, "doc", None) if info is not None else None
+    if not doc:
+        return ""
+    return doc.strip().split("\n")[0]
 
 
 def _constructor_params(model_key: str) -> list[tuple[str, Any, Any]]:
@@ -168,6 +182,11 @@ class ProtocolModelStep(QWidget):
                 self._model.add_group_header(f"── {label} ──")
                 for name in names:
                     self._model.addItem(f"  {name}", name)
+                    tooltip = _model_tooltip(name)
+                    if tooltip:
+                        self._model.setItemData(
+                            self._model.count() - 1, tooltip, Qt.ItemDataRole.ToolTipRole
+                        )
         self._model.blockSignals(False)
         self._on_model(self._model.currentData())
 
@@ -183,6 +202,10 @@ class ProtocolModelStep(QWidget):
     def _on_model(self, key: str | None) -> None:
         self._state.model_key = key or None
         self._state.model_config = {}
+        # Reflect the *selected* model's description on the closed combo box
+        # itself -- the per-item tooltips set in _on_protocol only show
+        # while the dropdown list is open.
+        self._model.setToolTip(_model_tooltip(key) if key else "")
         self._rebuild_config_widgets(key)
         self._refresh_preview()
         self.edited.emit()

@@ -79,10 +79,13 @@ class WorkspaceWindow(QMainWindow):
         # segmented mode switch that should read as navigation, not a command.
         self._fit_btn = QToolButton(self)
         self._fit_btn.setText("Fit")
+        self._fit_btn.setToolTip("Switch to the model-fitting workflow")
         self._tx_btn = QToolButton(self)
         self._tx_btn.setText("Transform")
+        self._tx_btn.setToolTip("Switch to the data-transform workflow")
         self._pipeline_btn = QToolButton(self)
         self._pipeline_btn.setText("Pipeline")
+        self._pipeline_btn.setToolTip("Switch to the batch-pipeline workflow")
         self._fit_btn.setCheckable(True)
         self._tx_btn.setCheckable(True)
         self._pipeline_btn.setCheckable(True)
@@ -149,6 +152,21 @@ class WorkspaceWindow(QMainWindow):
         self._build_workspace(app_state)
         self._setup_os_theme_watcher()
         QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
+        # Ctrl+1..Ctrl+9 jump to a step in the *current* mode's wizard.
+        # self._canvas always points at the mode's current StepperCanvas even
+        # though set_mode() builds a brand-new instance on every switch --
+        # binding these once here (dereferencing self._canvas dynamically at
+        # call time, not capturing today's instance) keeps them live across
+        # mode switches without re-binding per StepperCanvas. Out-of-range
+        # indices are rejected by _jump_to_step's own bounds check below;
+        # a not-yet-reached-but-in-range index reaches click_step(), which
+        # is a no-op there because that button is disabled.
+        for step_idx in range(9):
+            QShortcut(
+                QKeySequence(f"Ctrl+{step_idx + 1}"),
+                self,
+                lambda i=step_idx: self._jump_to_step(i),
+            )
 
     def _build_file_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
@@ -439,7 +457,18 @@ class WorkspaceWindow(QMainWindow):
                 body.run_requested.connect(self._on_pipeline_run_requested)
 
         self._sync_mode_buttons()
-        self._refresh_status_bar()
+        # Deferred (not called inline): get_jax_info() queries live JAX
+        # devices/memory, which is needless synchronous work on the path to
+        # first paint. Parented to self, like the same pattern used by
+        # _poll_active_jobs_then's timer elsewhere in this file, so a
+        # destroyed-mid-construction window (e.g. test teardown) takes the
+        # timer down with it instead of firing into a dangling self.
+        from PySide6.QtCore import QTimer
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(self._refresh_status_bar)
+        timer.start(0)
 
         self._rail = LibraryRail(state.library, self)
         # LibraryRail otherwise only ever renders the snapshot present at construction
@@ -1368,6 +1397,15 @@ class WorkspaceWindow(QMainWindow):
 
     def active_step_count(self) -> int:
         return len(self._controllers[self._mode].steps)
+
+    def _jump_to_step(self, index: int) -> None:
+        """Ctrl+N handler: jump to step `index` of the current mode's wizard.
+
+        No-op for an index past the current mode's step count (e.g. Ctrl+9
+        while Transform, which only has 5 steps) or a step not yet reached.
+        """
+        if index < self.active_step_count():
+            self._canvas.click_step(index)
 
     def current_step(self) -> int:
         return self._controllers[self._mode].current
