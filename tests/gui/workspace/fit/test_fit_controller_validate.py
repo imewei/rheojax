@@ -73,6 +73,20 @@ def test_protocol_model_step_validate_requires_model(qtbot):
     assert ctl.steps[0].validate() is True
 
 
+def test_step_titles_are_human_readable(qtbot):
+    # Regression test: FitController.STEP_IDS doubled as the display title
+    # for every step, so step 0's "protocol_model" id rendered as a raw
+    # identifier ("1 protocol_model") in the stepper rail instead of a label
+    # -- unlike its single-word siblings ("data", "nlsq", ...). No title may
+    # contain an underscore.
+    app = AppState()
+    ctl, bodies = build_fit_controller(app)
+    for b in bodies:
+        qtbot.addWidget(b)
+    for step in ctl.steps:
+        assert "_" not in step.title, step.title
+
+
 def test_nuts_step_validate_true_when_not_converged(qtbot):
     """A not-converged verdict must never hard-block validate() -- it flags,
     it does not gate. Only presence of a result (or an explicit skip) may
