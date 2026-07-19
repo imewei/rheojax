@@ -21,8 +21,8 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.foundation.state import ParameterState
 from rheojax.gui.resources.styles.tokens import Typography, themed
-from rheojax.gui.state.store import ParameterState
 from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.logging import get_logger
 
@@ -169,6 +169,14 @@ class ParameterTable(QTableWidget):
             param_names=list(parameters.keys()),
         )
 
+    @staticmethod
+    def _bounds_valid(min_val: float, max_val: float) -> bool:
+        return math.isfinite(min_val) and math.isfinite(max_val) and min_val <= max_val
+
+    @staticmethod
+    def _value_valid(value: float, min_val: float, max_val: float) -> bool:
+        return math.isfinite(value) and min_val <= value <= max_val
+
     def get_parameters(self) -> dict[str, ParameterState]:
         """Get current parameter values and states.
 
@@ -222,13 +230,8 @@ class ParameterTable(QTableWidget):
             # ("invalid values must never reach the state store") also applies
             # here, since a fit can be launched without ever triggering that
             # per-cell signal (e.g. paste, or a row never focused after edit).
-            if (
-                not math.isfinite(value)
-                or not math.isfinite(min_bound)
-                or not math.isfinite(max_bound)
-                or min_bound > max_bound
-                or value < min_bound
-                or value > max_bound
+            if not self._bounds_valid(min_bound, max_bound) or not self._value_valid(
+                value, min_bound, max_bound
             ):
                 logger.warning(
                     "Skipping row with invalid value/bounds — parameter will "
@@ -359,7 +362,7 @@ class ParameterTable(QTableWidget):
                 min_val = float(self.item(row, 2).text())
                 max_val = float(self.item(row, 3).text())
 
-                if not math.isfinite(value) or value < min_val or value > max_val:
+                if not self._value_valid(value, min_val, max_val):
                     # Out of bounds (or nan/inf, which NaN comparisons would
                     # otherwise silently pass as "in bounds") - red text.
                     # Do not emit: invalid values must never reach the state store.
@@ -401,7 +404,7 @@ class ParameterTable(QTableWidget):
                     max_val=max_val,
                 )
 
-                if not math.isfinite(min_val) or not math.isfinite(max_val) or min_val > max_val:
+                if not self._bounds_valid(min_val, max_val):
                     # Invalid bounds (non-finite or inverted) - red text.
                     # Do not emit: invalid bounds must never reach the state store.
                     item.setForeground(QBrush(QColor(themed("ERROR"))))
@@ -417,7 +420,7 @@ class ParameterTable(QTableWidget):
                 # Revalidate value
                 value_item = self.item(row, 1)
                 value = float(value_item.text())
-                if not math.isfinite(value) or value < min_val or value > max_val:
+                if not self._value_valid(value, min_val, max_val):
                     value_item.setForeground(QBrush(QColor(themed("ERROR"))))
                 else:
                     value_item.setForeground(

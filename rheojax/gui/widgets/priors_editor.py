@@ -29,6 +29,7 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.foundation.priors import adapt_prior
 from rheojax.gui.resources.styles.tokens import Spacing
 from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.gui.widgets.dropdown import RheoComboBox
@@ -649,6 +650,40 @@ class PriorsEditor(QWidget):
             All priors keyed by parameter name
         """
         return self._priors.copy()
+
+    def to_numpyro_priors(self) -> dict[str, dict[str, Any]]:
+        """Get all priors in the ``{"type": ..., **params}`` shape NUTS expects.
+
+        Callers previously did this conversion themselves (iterating
+        get_all_priors() through foundation.priors.adapt_prior()); doing it
+        here means the editor's stored shape (chosen for the table UI) never
+        leaks across the widget boundary as something a caller must know how
+        to translate.
+
+        Returns
+        -------
+        dict
+            ``{param_name: {"type": <dist>, **params}}``
+        """
+        return {name: adapt_prior(entry) for name, entry in self._priors.items()}
+
+    def load_numpyro_priors(self, priors: dict[str, dict[str, Any]]) -> None:
+        """Seed the editor from priors in the ``{"type": ..., **params}`` shape.
+
+        Reverses to_numpyro_priors()'s conversion -- the parameter set is
+        replaced with priors' keys and each entry becomes a set_prior() call.
+
+        Parameters
+        ----------
+        priors : dict
+            ``{param_name: {"type": <dist>, **params}}``, e.g. the output of
+            ``foundation.priors.map_centered_priors()``.
+        """
+        self.set_parameters(list(priors.keys()))
+        for name, prior in priors.items():
+            dist = prior.get("type", "normal")
+            params = {k: v for k, v in prior.items() if k != "type"}
+            self.set_prior(name, dist, **params)
 
     def clear(self) -> None:
         """Clear all priors."""

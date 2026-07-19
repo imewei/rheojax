@@ -7,7 +7,7 @@ import queue
 import numpy as np
 from PySide6.QtCore import QEventLoop, QObject, QRunnable, QThreadPool, QTimer, Signal
 
-from rheojax.gui.foundation.invalidation import invalidate_downstream
+from rheojax.gui.foundation.invalidation import _CLEAR, _FIT_CASCADE, register_step
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.jobs.cancellation import ProcessCancellationToken
 from rheojax.gui.jobs.subprocess_bayesian import run_bayesian_isolated
@@ -407,82 +407,91 @@ def build_fit_controller(app_state: AppState):
     ]
     ctl = FitController(steps)
 
-    def _cascade_and_relock(idx: int, changed: str | None) -> None:
-        ctl.on_edit(idx)
-        if changed:
-            new_fit = invalidate_downstream(app_state.fit, changed)
-            # Mutate in place so step bodies (which hold a reference to
-            # app_state.fit via `st`) see the cleared fields immediately.
-            # FitState is non-frozen, so setattr works without replace().
-            for attr, val in vars(new_fit).items():
-                setattr(app_state.fit, attr, val)
+    protocol_body, data_body, nlsq_body, nuts_body, visualize_body = bodies[:5]
 
-    for i, body in enumerate(bodies):
-        if hasattr(body, "edited"):
-            body.edited.connect(lambda idx=i: _cascade_and_relock(idx, _CHANGED[idx]))
-        # ProtocolModelStep also fires config_edited for constructor-config
-        # widget changes (model/protocol unchanged) -- those must cascade
-        # with the narrower "model_config" key, not _CHANGED[idx] ==
-        # "model_key" (which would wipe the model_config edit right back to
-        # {} via invalidation.py's _CLEAR, silently discarding it before any
-        # real NLSQ/NUTS run ever saw it).
-        if hasattr(body, "config_edited"):
-            body.config_edited.connect(
-                lambda idx=i: _cascade_and_relock(idx, "model_config")
-            )
+    # Downstream refreshes that must observe cascaded/relocked state, not the
+    # stale pre-edit state -- register_step connects cascade before these, in
+    # that fixed order, so getting it right no longer depends on where these
+    # .connect() calls happen to sit in the file.
+    protocol_downstream = [
+        fn
+        for fn in (
+            getattr(data_body, "refresh", None),
+            getattr(nlsq_body, "load_parameters_from_model", None),
+            getattr(nlsq_body, "refresh_display", None),
+        )
+        if fn is not None
+    ]
+    data_downstream = [
+        fn for fn in (getattr(nlsq_body, "refresh_display", None),) if fn is not None
+    ]
+    nlsq_downstream = [
+        fn for fn in (getattr(nuts_body, "reset_skip", None),) if fn is not None
+    ]
 
-    # Wire Protocol/Model edits -> Data step refresh, so the contract/combo
-    # rebuild after Step 1 completes (connected after the _cascade_and_relock
-    # loop above, so invalidation/state-update runs first, then refresh sees
-    # fresh state).
-    protocol_body, data_body = bodies[0], bodies[1]
-    if hasattr(protocol_body, "edited") and hasattr(data_body, "refresh"):
-        protocol_body.edited.connect(data_body.refresh)
-    if hasattr(protocol_body, "config_edited") and hasattr(data_body, "refresh"):
-        protocol_body.config_edited.connect(data_body.refresh)
-
-    # Wire Protocol/Model edits -> NlsqStep.load_parameters_from_model, so the
-    # ParameterTable stays seeded with whatever model is currently selected
-    # (protocol-only edits are a safe no-op -- load_parameters_from_model()
-    # guards on self._state.model_key being set). Constructor-config changes
-    # (e.g. n_modes) can also change the model's parameter set, so
-    # config_edited needs the same reseed.
-    nlsq_body = bodies[2]
-    if hasattr(protocol_body, "edited") and hasattr(
-        nlsq_body, "load_parameters_from_model"
-    ):
-        protocol_body.edited.connect(nlsq_body.load_parameters_from_model)
-    if hasattr(protocol_body, "config_edited") and hasattr(
-        nlsq_body, "load_parameters_from_model"
-    ):
-        protocol_body.config_edited.connect(nlsq_body.load_parameters_from_model)
-
-    # Wire every upstream edit that invalidates nlsq_result (protocol/model,
-    # constructor-config, and data/column-map changes) -> NlsqStep.refresh_display,
-    # so the "R²=..." label is cleared instead of showing a stale readout for
-    # a fit that state.nlsq_result no longer reflects.
-    if hasattr(protocol_body, "edited") and hasattr(nlsq_body, "refresh_display"):
-        protocol_body.edited.connect(nlsq_body.refresh_display)
-    if hasattr(protocol_body, "config_edited") and hasattr(
-        nlsq_body, "refresh_display"
-    ):
-        protocol_body.config_edited.connect(nlsq_body.refresh_display)
-    if hasattr(data_body, "edited") and hasattr(nlsq_body, "refresh_display"):
-        data_body.edited.connect(nlsq_body.refresh_display)
-
-    # Wire NLSQ edits -> NutsStep.reset_skip, so a stale "skipped" decision
-    # doesn't survive an NLSQ re-run that invalidates nuts_result.
-    nuts_body = bodies[3]
-    if hasattr(nlsq_body, "edited") and hasattr(nuts_body, "reset_skip"):
-        nlsq_body.edited.connect(nuts_body.reset_skip)
+    register_step(
+        protocol_body,
+        "edited",
+        lambda: ctl.on_edit(0),
+        changed=_CHANGED[0],
+        live_state=app_state.fit,
+        cascade_table=_FIT_CASCADE,
+        clear_table=_CLEAR,
+        downstream=protocol_downstream,
+    )
+    # ProtocolModelStep also fires config_edited for constructor-config
+    # widget changes (model/protocol unchanged) -- those must cascade with
+    # the narrower "model_config" key, not _CHANGED[0] == "model_key" (which
+    # would wipe the model_config edit right back to {} via invalidation.py's
+    # _CLEAR, silently discarding it before any real NLSQ/NUTS run saw it).
+    register_step(
+        protocol_body,
+        "config_edited",
+        lambda: ctl.on_edit(0),
+        changed="model_config",
+        live_state=app_state.fit,
+        cascade_table=_FIT_CASCADE,
+        clear_table=_CLEAR,
+        downstream=protocol_downstream,
+    )
+    register_step(
+        data_body,
+        "edited",
+        lambda: ctl.on_edit(1),
+        changed=_CHANGED[1],
+        live_state=app_state.fit,
+        cascade_table=_FIT_CASCADE,
+        clear_table=_CLEAR,
+        downstream=data_downstream,
+    )
+    register_step(
+        nlsq_body,
+        "edited",
+        lambda: ctl.on_edit(2),
+        changed=_CHANGED[2],
+        live_state=app_state.fit,
+        cascade_table=_FIT_CASCADE,
+        clear_table=_CLEAR,
+        downstream=nlsq_downstream,
+    )
+    register_step(
+        nuts_body,
+        "edited",
+        lambda: ctl.on_edit(3),
+        changed=_CHANGED[3],
+        live_state=app_state.fit,
+        cascade_table=_FIT_CASCADE,
+        clear_table=_CLEAR,
+    )
 
     # Wire NLSQ finish -> NutsStep.load_suggested_priors, so the PriorsEditor
     # is seeded from the fresh MAP estimate as soon as NLSQ produces a result.
+    # `finished` (a fit completing) is a different signal than `edited` (a
+    # user edit) -- not part of the cascade/relock ordering above.
     if hasattr(nlsq_body, "finished") and hasattr(nuts_body, "load_suggested_priors"):
         nlsq_body.finished.connect(nuts_body.load_suggested_priors)
 
     # Wire NUTS finish -> Visualize refresh so Diagnostics tab appears after sampling
-    visualize_body = bodies[4]
     if hasattr(nuts_body, "finished") and hasattr(visualize_body, "refresh"):
         nuts_body.finished.connect(visualize_body.refresh)
 

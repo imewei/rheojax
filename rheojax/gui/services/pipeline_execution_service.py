@@ -7,29 +7,19 @@ service (DataService, TransformService, ModelService, etc.).
 This service runs SYNCHRONOUSLY — the caller is responsible for
 invoking it from a worker thread, not the GUI thread.
 
-Thread Safety
--------------
-All state mutations are routed through ``rheojax.gui.state.actions``
-(GUI-001 through GUI-005), whose functions call ``StateStore.dispatch()``
-directly and synchronously.  ``StateStore.dispatch()`` itself hard-fails
-(``RuntimeError``) when called off the GUI thread under
-``RHEOJAX_DEBUG`` (store.py), so ``execute_all()``/``execute_single_step()``
-never call ``pipeline_actions.*`` directly -- they go through
-``self._dispatch_action()``, which marshals the call onto this
-``QObject``'s own thread via a private Qt signal/slot (queued when called
-from a worker thread, direct when already on that thread).
+Status reporting is entirely signal-based (step_started/step_completed/
+step_failed/pipeline_started/pipeline_completed/pipeline_failed) -- the
+UI (window.py) connects directly to these signals rather than reading
+back a shared store.
 """
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, Signal
 
-from rheojax.gui.state import actions as pipeline_actions
-from rheojax.gui.state.store import StepStatus
 from rheojax.logging import get_logger
 
 if TYPE_CHECKING:
@@ -114,10 +104,6 @@ class PipelineExecutionService(QObject):
     # upfront
     dataset_run_finished = Signal(str, object)  # dataset_id, PipelineRunResult
 
-    # Not part of the public signal API -- internal plumbing for
-    # _dispatch_action() (see class docstring's Thread Safety note).
-    _invoke_action = Signal(object)
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         # Lazy service creation — instantiated on first use per step type.
@@ -126,20 +112,6 @@ class PipelineExecutionService(QObject):
         self._model_service = None
         self._bayesian_service = None
         self._export_service = None
-        self._invoke_action.connect(self._run_action)
-
-    def _run_action(self, fn) -> None:
-        fn()
-
-    def _dispatch_action(self, fn, *args) -> None:
-        """Run a ``pipeline_actions.*`` call on this object's own (GUI) thread.
-
-        Qt's AutoConnection delivers the signal directly when the caller is
-        already on this object's thread, and via a queued event when called
-        from a worker thread -- avoiding StateStore.dispatch()'s off-thread
-        RuntimeError guard under RHEOJAX_DEBUG.
-        """
-        self._invoke_action.emit(functools.partial(fn, *args))
 
     # ------------------------------------------------------------------
     # Public API
@@ -160,15 +132,9 @@ class PipelineExecutionService(QObject):
         # observers always see the started signal before completed.
         if not steps:
             self.pipeline_started.emit()
-            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
             return
 
-        # GUI-001 / GUI-002: use public action function — goes through
-        # dispatch() → reducer → pipeline_execution_started signal.
-        self._dispatch_action(
-            pipeline_actions.set_pipeline_running, True, steps[0].id
-        )
         self.pipeline_started.emit()
 
         # Accumulates results shared across steps (data, fit_result, etc.)
@@ -176,44 +142,19 @@ class PipelineExecutionService(QObject):
 
         try:
             for step in steps:
-                # GUI-002: dispatch via actions, not direct store mutation.
-                self._dispatch_action(
-                    pipeline_actions.set_pipeline_running, True, step.id
-                )
-                # GUI-001: dispatch via actions — emits pipeline_step_status_changed.
-                self._dispatch_action(
-                    pipeline_actions.update_step_status, step.id, StepStatus.ACTIVE
-                )
                 self.step_started.emit(step.id)
 
                 try:
-                    result = self._execute_step(step, context)
-                    # GUI-004: dispatch via actions — immutable reducer path.
-                    self._dispatch_action(
-                        pipeline_actions.cache_step_result, step.id, result
-                    )
-                    self._dispatch_action(
-                        pipeline_actions.update_step_status,
-                        step.id,
-                        StepStatus.COMPLETE,
-                    )
+                    self._execute_step(step, context)
                     self.step_completed.emit(step.id)
                 except Exception as exc:
                     error_msg = str(exc)
-                    self._dispatch_action(
-                        pipeline_actions.update_step_status,
-                        step.id,
-                        StepStatus.ERROR,
-                        error_msg,
-                    )
                     self.step_failed.emit(step.id, error_msg)
                     raise
 
-            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
 
         except Exception as exc:
-            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_failed.emit(str(exc))
             # Re-raise so callers (main_window's _RunAllWorker/_BatchWorker)
             # can detect the failure instead of treating this as a normal
@@ -223,7 +164,7 @@ class PipelineExecutionService(QObject):
     def execute_single_step(self, step, context: dict) -> Any:
         """Execute a single step with the given context.
 
-        Wraps the step in the same status-dispatch lifecycle as
+        Wraps the step in the same status-signal lifecycle as
         ``execute_all``.  The caller is responsible for providing a
         ``context`` dict that accumulates inter-step results.
 
@@ -243,35 +184,19 @@ class PipelineExecutionService(QObject):
         ------
         Exception
             Re-raises any exception from the underlying service after
-            dispatching ERROR status.
+            emitting step_failed.
         """
-        self._dispatch_action(pipeline_actions.set_pipeline_running, True, step.id)
         self.pipeline_started.emit()
-        self._dispatch_action(
-            pipeline_actions.update_step_status, step.id, StepStatus.ACTIVE
-        )
         self.step_started.emit(step.id)
 
         try:
             result = self._execute_step(step, context)
-            self._dispatch_action(pipeline_actions.cache_step_result, step.id, result)
-            self._dispatch_action(
-                pipeline_actions.update_step_status, step.id, StepStatus.COMPLETE
-            )
             self.step_completed.emit(step.id)
-            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_completed.emit()
             return result
         except Exception as exc:
             error_msg = str(exc)
-            self._dispatch_action(
-                pipeline_actions.update_step_status,
-                step.id,
-                StepStatus.ERROR,
-                error_msg,
-            )
             self.step_failed.emit(step.id, error_msg)
-            self._dispatch_action(pipeline_actions.set_pipeline_running, False)
             self.pipeline_failed.emit(error_msg)
             raise
 
@@ -285,11 +210,10 @@ class PipelineExecutionService(QObject):
         """Run a Pipeline-mode batch (transform/fit/export steps) over one dataset.
 
         Distinct from ``execute_all``/``execute_single_step`` (the visual
-        pipeline builder's load/transform/fit/bayesian/export steps, driven
-        by ``StepStatus`` dispatch). This is the new Pipeline batch-execution
-        mode's per-dataset runner: it consumes ``foundation.state.PipelineStepConfig``
-        and reports results via ``PipelineRunResult``/``FitStepResult``
-        (``workspace.pipeline.models``) rather than caching into the state store.
+        pipeline builder's load/transform/fit/bayesian/export steps). This is
+        the new Pipeline batch-execution mode's per-dataset runner: it
+        consumes ``foundation.state.PipelineStepConfig`` and reports results
+        via ``PipelineRunResult``/``FitStepResult`` (``workspace.pipeline.models``).
         """
         from rheojax.gui.workspace.pipeline.models import PipelineRunResult
 

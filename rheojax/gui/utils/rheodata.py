@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from rheojax.core.data import RheoData
-from rheojax.gui.state.store import DatasetState
+from rheojax.gui.foundation.state import DatasetState
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)

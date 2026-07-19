@@ -13,10 +13,10 @@ Features:
     - GPU acceleration status monitoring
 
 Architecture:
-    - Redux-inspired state management with Qt signals
+    - Per-window state (plain mutable dataclasses in foundation/state.py)
     - Service layer for RheoJAX API integration
     - Background workers for long-running computations
-    - Page-based navigation with Material Design widgets
+    - WorkspaceWindow shell: a single fit/transform/pipeline step wizard
 
 Requirements:
     - PySide6 >= 6.7.0

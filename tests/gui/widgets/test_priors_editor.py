@@ -39,3 +39,57 @@ def test_apply_refuses_invalid_prior(qtbot):
 
     assert editor.get_prior("a") == default_prior
     assert emitted == []
+
+
+def test_to_numpyro_priors_converts_editor_shape(qtbot):
+    editor = PriorsEditor()
+    qtbot.addWidget(editor)
+    editor.set_prior("G0", "lognormal", loc=0.0, scale=1.0)
+
+    result = editor.to_numpyro_priors()
+
+    assert result == {"G0": {"type": "lognormal", "loc": 0.0, "scale": 1.0}}
+
+
+def test_to_numpyro_priors_applies_exponential_scale_to_rate(qtbot):
+    # foundation.priors.adapt_prior's NumPyro-specific correction must be
+    # reachable through the editor's own interface, not just the free
+    # function -- this is the whole point of wrapping it here.
+    editor = PriorsEditor()
+    qtbot.addWidget(editor)
+    editor.set_prior("tau", "exponential", scale=2.0)
+
+    result = editor.to_numpyro_priors()
+
+    assert result == {"tau": {"type": "exponential", "rate": 0.5}}
+
+
+def test_load_numpyro_priors_seeds_editor_shape(qtbot):
+    editor = PriorsEditor()
+    qtbot.addWidget(editor)
+
+    editor.load_numpyro_priors(
+        {
+            "G0": {"type": "lognormal", "loc": 0.0, "scale": 1.0},
+            "sigma": {"type": "halfnormal", "scale": 1.0},
+        }
+    )
+
+    assert editor.get_prior("G0") == {
+        "distribution": "lognormal",
+        "params": {"loc": 0.0, "scale": 1.0},
+    }
+    assert editor.get_prior("sigma") == {
+        "distribution": "halfnormal",
+        "params": {"scale": 1.0},
+    }
+
+
+def test_load_numpyro_priors_round_trips_through_to_numpyro_priors(qtbot):
+    editor = PriorsEditor()
+    qtbot.addWidget(editor)
+    suggested = {"G0": {"type": "lognormal", "loc": 2.3, "scale": 1.0}}
+
+    editor.load_numpyro_priors(suggested)
+
+    assert editor.to_numpyro_priors() == suggested

@@ -16,12 +16,12 @@ shell's own package structure and mode breakdown.
 rheojax/gui/
 ├── __init__.py                    # Package init with main() entry point
 ├── main.py                        # Application entry point
-├── state/                         # Redux-inspired state management
+├── foundation/                    # Per-window state, library, invalidation cascade
 │   ├── __init__.py
-│   ├── store.py                   # Central state store
-│   ├── signals.py                 # Qt signals for reactivity
-│   ├── actions.py                 # State mutation actions
-│   └── selectors.py               # State query utilities
+│   ├── state.py                   # AppState/FitState/TransformState/PipelineState dataclasses
+│   ├── invalidation.py            # Cross-step cascade (apply_cascade/register_step)
+│   └── library.py                 # DatasetLibrary
+├── workspace/                     # WorkspaceWindow shell (fit/transform/pipeline steps)
 ├── services/                      # RheoJAX API integration layer
 │   ├── __init__.py
 │   ├── data_service.py            # Data loading/validation
@@ -72,12 +72,13 @@ rheojax/gui/
 
 ## Architecture
 
-### State Management (Redux-inspired)
+### State Management
 
-- **Store**: Central immutable state container
-- **Actions**: State mutation operations
-- **Signals**: Qt signals for reactive UI updates
-- **Selectors**: Memoized state queries
+`foundation/state.py` holds one `AppState` per window -- plain mutable
+dataclasses (`FitState`/`TransformState`/`PipelineState`/...), passed
+directly to step-widget bodies and mutated in place. Cross-step
+invalidation (editing step N clears downstream state) is centralized in
+`foundation/invalidation.py`'s `apply_cascade()`/`register_step()`.
 
 ### Service Layer
 

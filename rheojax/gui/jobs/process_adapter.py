@@ -645,7 +645,7 @@ def fit_result_from_dict(d: dict[str, Any]) -> Any:
     """
     from datetime import datetime
 
-    from rheojax.gui.state.store import FitResult
+    from rheojax.gui.foundation.state import FitResult
 
     timestamp = d.get("timestamp")
     if isinstance(timestamp, str):
@@ -818,7 +818,7 @@ def bayesian_result_from_dict(d: dict[str, Any]) -> Any:
     """
     from datetime import datetime
 
-    from rheojax.gui.state.store import BayesianResult
+    from rheojax.gui.foundation.state import BayesianResult
 
     timestamp = d.get("timestamp")
     if isinstance(timestamp, str):

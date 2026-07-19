@@ -44,7 +44,6 @@ DEFAULT_SUBSYSTEM_LEVELS: dict[str, str] = {
     "rheojax.visualization": "WARNING",
     # GUI modules - hierarchical for fine-grained control
     "rheojax.gui": "INFO",
-    "rheojax.gui.state": "INFO",
     "rheojax.gui.services": "INFO",
     "rheojax.gui.jobs": "INFO",
     "rheojax.gui.widgets": "WARNING",  # Verbose at DEBUG, quiet by default

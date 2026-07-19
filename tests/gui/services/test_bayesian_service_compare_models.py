@@ -10,8 +10,8 @@ import pytest
 pytest.importorskip("PySide6")
 
 from rheojax.core.arviz_utils import inference_data_from_dict
+from rheojax.gui.foundation.state import BayesianResult
 from rheojax.gui.services.bayesian_service import BayesianService
-from rheojax.gui.state.store import BayesianResult
 
 
 def _make_result(model_name: str, seed: int) -> BayesianResult:

@@ -48,8 +48,8 @@ def test_diagnostics_builds_with_real_nuts_result(qtbot):
     # Shaped like the worker output: NlsqStep normalizes FitResult to a plain
     # dict (see step3_nlsq.py); by analogy the NUTS sample_fn wired in
     # build_fit_controller normalizes BayesianResult the same way — see
-    # BayesianResult in rheojax/gui/state/store.py and its consumption in
-    # rheojax/gui/pages/diagnostics_page.py::_get_inference_data.
+    # BayesianResult in rheojax/gui/foundation/state.py and its
+    # inference_data field, read directly by this step's diagnostics tab.
     rng = np.random.default_rng(0)
     num_chains, num_draws = 2, 50
     nuts_result = {

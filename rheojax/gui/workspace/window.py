@@ -424,6 +424,12 @@ class WorkspaceWindow(QMainWindow):
             guard=self._guard,
             notify=self._notifier.changed.emit,
         )
+        # Named references for the step bodies this window reaches into by
+        # semantic role (dataset refresh/selection), not by wizard position --
+        # derived once here so a future step insertion can't silently shift
+        # what index 1/0 means at each of the reach-in call sites below.
+        self._fit_data_step = self._fit_bodies[1]  # build_fit_controller: DataStep
+        self._transform_slots_step = self._transform_bodies[1]  # SlotsStep
         self._controllers = {
             "fit": fit_ctl,
             "transform": transform_ctl,
@@ -481,8 +487,8 @@ class WorkspaceWindow(QMainWindow):
         # PipelineConfigureRunStep each render their own dataset list/combo
         # and were never told to rebuild when a new dataset is committed
         # elsewhere (import, export-to-library, a Pipeline job).
-        self._notifier.changed.connect(self._fit_bodies[1].refresh)
-        self._notifier.changed.connect(self._transform_bodies[1].refresh)
+        self._notifier.changed.connect(self._fit_data_step.refresh)
+        self._notifier.changed.connect(self._transform_slots_step.refresh)
         self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
         self._rail.dataset_preview_requested.connect(
@@ -588,11 +594,11 @@ class WorkspaceWindow(QMainWindow):
         except (RuntimeError, TypeError):
             pass
         try:
-            self._notifier.changed.disconnect(self._fit_bodies[1].refresh)
+            self._notifier.changed.disconnect(self._fit_data_step.refresh)
         except (RuntimeError, TypeError):
             pass
         try:
-            self._notifier.changed.disconnect(self._transform_bodies[1].refresh)
+            self._notifier.changed.disconnect(self._transform_slots_step.refresh)
         except (RuntimeError, TypeError):
             pass
         try:
@@ -1189,7 +1195,7 @@ class WorkspaceWindow(QMainWindow):
         wired here.
         """
         if self._mode == "fit":
-            self._fit_bodies[1].select_dataset(dataset_id)
+            self._fit_data_step.select_dataset(dataset_id)
 
     def _launch_import(
         self,

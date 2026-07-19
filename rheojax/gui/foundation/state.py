@@ -2,9 +2,140 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field, replace
+from datetime import datetime
+from enum import Enum, auto
+from pathlib import Path
 from typing import Any
 
 from rheojax.gui.foundation.library import DatasetLibrary
+
+
+class PipelineStep(Enum):
+    """Pipeline execution steps."""
+
+    LOAD = auto()
+    TRANSFORM = auto()
+    FIT = auto()
+    BAYESIAN = auto()
+    EXPORT = auto()
+
+
+class StepStatus(Enum):
+    """Status of each pipeline step."""
+
+    PENDING = auto()
+    ACTIVE = auto()
+    COMPLETE = auto()
+    WARNING = auto()
+    ERROR = auto()
+
+
+@dataclass
+class ParameterState:
+    """State for a single model parameter."""
+
+    name: str
+    value: float
+    min_bound: float
+    max_bound: float
+    fixed: bool = False
+    unit: str = ""
+    description: str = ""
+
+
+@dataclass
+class DatasetState:
+    """State for a loaded dataset."""
+
+    id: str
+    name: str
+    file_path: Path | None
+    test_mode: str  # oscillation, relaxation, creep, rotation
+    x_data: Any | None = None  # NumPy array
+    y_data: Any | None = None
+    y2_data: Any | None = None  # For G'' in oscillation
+    metadata: dict = field(default_factory=dict)
+    is_modified: bool = False
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class FitResult:
+    """Canonical result from NLSQ point estimation fit.
+
+    Single source of truth for fit results across the GUI -- fit_worker,
+    model_service, and pages all import from here.
+    """
+
+    model_name: str
+    parameters: dict[str, float]
+    chi_squared: float
+    success: bool
+    message: str
+    timestamp: datetime
+    # Optional fields — populated when available
+    dataset_id: str = ""
+    r_squared: float = 0.0
+    mpe: float = 0.0
+    fit_time: float = 0.0
+    num_iterations: int = 0
+    convergence_message: str = ""
+    x_fit: Any | None = None
+    y_fit: Any | None = None
+    residuals: Any | None = None
+    pcov: Any | None = None
+    rmse: float | None = None
+    mae: float | None = None
+    aic: float | None = None
+    bic: float | None = None
+    metadata: dict[str, Any] | None = None
+
+
+@dataclass
+class BayesianResult:
+    """Result from Bayesian NUTS inference."""
+
+    model_name: str
+    dataset_id: str
+    posterior_samples: Any | None  # Dict of posterior samples
+    summary: dict[str, dict[str, float]] | None
+    r_hat: dict[str, float]
+    ess: dict[str, float]
+    divergences: int
+    credible_intervals: dict[str, tuple[float, float]]
+    mcmc_time: float
+    timestamp: datetime
+    num_warmup: int = 1000
+    num_samples: int = 2000
+    num_chains: int = 4
+    inference_data: Any | None = None  # Full ArviZ InferenceData with sample_stats
+    sample_stats: dict[str, Any] | None = None  # Raw energy/diverging arrays from MCMC
+    diagnostics_valid: bool = True  # False when R-hat/ESS fell back to NaN/defaults
+
+    @property
+    def sampling_time(self) -> float:
+        """Alias for mcmc_time (compatibility with worker BayesianResult)."""
+        return self.mcmc_time
+
+    @property
+    def diagnostics(self) -> dict[str, Any]:
+        """Computed diagnostics dict (compatibility with worker BayesianResult)."""
+        return {
+            "r_hat": self.r_hat,
+            "ess": self.ess,
+            "divergences": self.divergences,
+            "diagnostics_valid": self.diagnostics_valid,
+        }
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Synthesized metadata dict for backward compatibility."""
+        return {
+            "model_name": self.model_name,
+            "num_warmup": self.num_warmup,
+            "num_samples": self.num_samples,
+            "num_chains": self.num_chains,
+        }
 
 
 @dataclass

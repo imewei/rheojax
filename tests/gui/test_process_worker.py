@@ -657,8 +657,8 @@ class TestResultReconstruction:
     """fit_result_from_dict / bayesian_result_from_dict reconstruct dataclasses."""
 
     def test_fit_result_from_dict(self):
+        from rheojax.gui.foundation.state import FitResult
         from rheojax.gui.jobs.process_adapter import fit_result_from_dict
-        from rheojax.gui.state.store import FitResult
 
         d = {
             "model_name": "maxwell",
@@ -683,8 +683,8 @@ class TestResultReconstruction:
         assert result.dataset_id == "test"
 
     def test_fit_result_from_dict_missing_fields(self):
+        from rheojax.gui.foundation.state import FitResult
         from rheojax.gui.jobs.process_adapter import fit_result_from_dict
-        from rheojax.gui.state.store import FitResult
 
         d = {
             "model_name": "maxwell",
@@ -700,8 +700,8 @@ class TestResultReconstruction:
     def test_bayesian_result_from_dict(self):
         import numpy as np
 
+        from rheojax.gui.foundation.state import BayesianResult
         from rheojax.gui.jobs.process_adapter import bayesian_result_from_dict
-        from rheojax.gui.state.store import BayesianResult
 
         d = {
             "model_name": "maxwell",
@@ -732,8 +732,8 @@ class TestResultReconstruction:
         assert result.diagnostics_valid is True
 
     def test_bayesian_result_from_dict_missing_fields(self):
+        from rheojax.gui.foundation.state import BayesianResult
         from rheojax.gui.jobs.process_adapter import bayesian_result_from_dict
-        from rheojax.gui.state.store import BayesianResult
 
         d = {
             "model_name": "maxwell",

@@ -95,7 +95,11 @@ class LibraryRail(QWidget):
         return menu.exec(global_pos)
 
     def count(self) -> int:
-        return self._list.count()
+        # self._list.count() is the raw QListWidget row count, which includes
+        # the "No datasets yet" placeholder refresh() adds when the library is
+        # empty -- that placeholder made count() return 1, never 0, for an
+        # empty library. Count real datasets instead.
+        return len(self._library.all())
 
     def select_row(self, row: int) -> None:
         self._list.setCurrentRow(row)

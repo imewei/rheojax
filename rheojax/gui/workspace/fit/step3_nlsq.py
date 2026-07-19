@@ -15,9 +15,8 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.core.registry import ModelRegistry
-from rheojax.gui.foundation.state import FitState
+from rheojax.gui.foundation.state import FitState, ParameterState
 from rheojax.gui.jobs.cancellation import CancellationError
-from rheojax.gui.state.store import ParameterState
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
@@ -98,7 +97,7 @@ class NlsqStep(QWidget):
         except Exception:
             return
         # instance.parameters is a ParameterSet of core.parameters.Parameter
-        # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs gui.state.store
+        # (`.bounds` tuple, no `.fixed`) -- ParameterTable needs foundation.state
         # .ParameterState (`.min_bound`/`.max_bound`/`.fixed`). Convert here,
         # mirroring ModelService.get_parameter_defaults()'s same conversion.
         params = {
