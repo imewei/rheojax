@@ -43,9 +43,9 @@ class VisualizeStep(QWidget):
     them; until then those two tabs are constructed but stay empty.
 
     ``state.nuts_result`` is expected to be normalized the same way, by
-    analogy with ``BayesianResult`` (rheojax/gui/state/store.py) and its
-    ``inference_data`` consumption in
-    ``rheojax/gui/pages/diagnostics_page.py::_get_inference_data``:
+    analogy with ``BayesianResult`` (rheojax/gui/foundation/state.py) and
+    its ``inference_data`` field, which this step's diagnostics tab reads
+    directly:
     ``{"inference_data": arviz.InferenceData | None, "posterior_samples":
     dict, "sample_stats": dict | None, "num_chains": int, "r_hat": dict,
     "ess": dict, "divergences": int}``.

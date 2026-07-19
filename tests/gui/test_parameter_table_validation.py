@@ -53,6 +53,24 @@ def test_get_parameters_skips_invalid_rows(qapp):
     assert table.get_parameters() == {}
 
 
+def test_narrowing_bounds_below_current_value_invalidates_it(qapp):
+    # Bounds edit itself is valid (0 <= 0.5, both finite) so bounds_changed
+    # fires -- but it retroactively excludes the current value (fixture's
+    # G0 = 1.0), which must be caught by the value-cell revalidation inside
+    # the same handler and reflected in get_parameters(), not just left as
+    # red styling with no observable effect on the read path.
+    table = _make_table(qapp)
+    bounds = []
+    table.bounds_changed.connect(lambda name, lo, hi: bounds.append((lo, hi)))
+
+    table.item(0, 3).setText("0.5")  # narrow max below the current value (1.0)
+
+    # Qt may re-fire itemChanged when styling is applied inside the handler
+    # (see test_valid_value_and_bounds_are_emitted's identical caveat).
+    assert bounds and all(b == (0.0, 0.5) for b in bounds)
+    assert table.get_parameters() == {}
+
+
 def test_valid_value_and_bounds_are_emitted(qapp):
     table = _make_table(qapp)
     values = []

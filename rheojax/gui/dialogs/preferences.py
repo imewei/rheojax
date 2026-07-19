@@ -607,12 +607,9 @@ class PreferencesDialog(QDialog):
         # Get current preferences and update internal state
         self.current_preferences = self.get_preferences()
 
-        # Persist to StateStore so preferences survive the dialog session
+        # Forward to the parent window so preferences survive the dialog session.
         parent = self.parent()
-        if parent is not None and hasattr(parent, "store"):
-            parent.store.dispatch("UPDATE_PREFERENCES", self.current_preferences)  # type: ignore[attr-defined]
-            logger.debug("Preferences applied via StateStore")
-        elif parent is not None and hasattr(parent, "apply_preferences"):
+        if parent is not None and hasattr(parent, "apply_preferences"):
             parent.apply_preferences(self.current_preferences)  # type: ignore[attr-defined]
 
     def _restore_defaults(self) -> None:

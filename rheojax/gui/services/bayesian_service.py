@@ -346,14 +346,13 @@ class BayesianService:
 
             # dataset_id is intentionally empty here: BayesianService operates at
             # model scope and has no knowledge of which dataset is being analysed.
-            # BayesianWorker._on_finished() sets the real dataset_id on the result
-            # before dispatching it to the StateStore.  The StateStore reducer guards
-            # against empty dataset_id (``if not dataset_id: return state``), so the
-            # worker MUST populate this field — failing to do so would silently drop
-            # the result.
+            # This BayesianResult is not the one that reaches callers -- BayesianWorker
+            # .run() (jobs/bayesian_worker.py) constructs its own BayesianResult with
+            # the real dataset_id=self._dataset_id directly, rather than mutating or
+            # forwarding this one.
             return BayesianResult(
                 model_name=model_name,
-                dataset_id="",  # Set by BayesianWorker._on_finished() before dispatch
+                dataset_id="",
                 posterior_samples=posterior_samples,
                 summary=result.summary,
                 r_hat=diagnostics.get("r_hat", {}),
@@ -367,8 +366,8 @@ class BayesianService:
                 num_chains=num_chains,
                 inference_data=inference_data,
                 # R6-BSVC-001: Propagate diagnostics_valid from get_diagnostics()
-                # so the STORE_BAYESIAN_RESULT reducer can detect NaN-fallback
-                # diagnostics instead of always defaulting to True.
+                # so callers (e.g. step4_nuts.py's diagnostics display) can detect
+                # NaN-fallback diagnostics instead of always defaulting to True.
                 diagnostics_valid=bool(diagnostics.get("diagnostics_valid", True)),
             )
 

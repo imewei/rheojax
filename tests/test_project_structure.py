@@ -435,24 +435,5 @@ class TestDatasetIdPropagation:
             pytest.skip("GUI module not available")
 
 
-class TestThreadAffinity:
-    """Ensure StateStore checks thread affinity on creation."""
-
-    @pytest.mark.smoke
-    def test_state_store_has_thread_check(self):
-        """StateStore should warn if created from non-main thread."""
-        import pathlib
-
-        store_path = pathlib.Path("rheojax/gui/state/store.py")
-        if not store_path.exists():
-            pytest.skip("GUI module not available")
-
-        content = store_path.read_text()
-        assert "QThread" in content and "currentThread" in content, (
-            "StateStore must check QThread.currentThread() to prevent "
-            "incorrect signal thread affinity. See G-015 in the RCA report."
-        )
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
