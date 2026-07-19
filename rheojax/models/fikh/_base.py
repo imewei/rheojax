@@ -35,6 +35,9 @@ jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
 
+# diffrax.diffeqsolve max_steps ceiling for this model's ODE integration.
+_MAX_STEPS = 10_000_000
+
 
 class FIKHBase(BaseModel, FractionalModelMixin):
     """Base class for Fractional Isotropic-Kinematic Hardening models.
@@ -568,7 +571,7 @@ class FIKHBase(BaseModel, FractionalModelMixin):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 

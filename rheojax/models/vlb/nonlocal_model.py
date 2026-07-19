@@ -56,6 +56,9 @@ jax, jnp = safe_import_jax()
 
 logger = logging.getLogger(__name__)
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 5_000_000
+
 BreakageType = Literal["constant", "bell"]
 StressType = Literal["linear", "fene"]
 
@@ -447,7 +450,7 @@ class VLBNonlocal(VLBBase):
             args=args,
             saveat=diffrax.SaveAt(ts=t_save),
             stepsize_controller=controller,
-            max_steps=5_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -648,7 +651,7 @@ class VLBNonlocal(VLBBase):
             args=args,
             saveat=diffrax.SaveAt(ts=t_save),
             stepsize_controller=controller,
-            max_steps=5_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 

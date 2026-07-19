@@ -32,6 +32,14 @@ logger = get_logger(__name__)
 # Sentinel for distinguishing "not provided" from falsy values (FL-009)
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceilings. LAOS integrates a continuously
+# oscillating gamma_dot(t) = gamma_0*omega*cos(omega*t) forcing term over
+# many cycles with a PID step-size controller, so it needs a higher ceiling
+# than the monotonic transient protocols (flow curve, creep, relaxation,
+# startup) sharing _MAX_STEPS_TRANSIENT.
+_MAX_STEPS_TRANSIENT = 10_000_000
+_MAX_STEPS_LAOS = 16_000_000
+
 # FL-006: kwargs to pop before forwarding to nlsq_optimize.
 # Start from the central set and add model-specific extras so the two
 # never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
@@ -366,7 +374,7 @@ class FluidityLocal(FluidityBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS_TRANSIENT,
             throw=False,  # Return partial result on failure (for optimization)
         )
 
@@ -679,7 +687,7 @@ class FluidityLocal(FluidityBase):
             args=base_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=16_000_000,
+            max_steps=_MAX_STEPS_LAOS,
         )
 
         stress = sol.ys[:, 0]

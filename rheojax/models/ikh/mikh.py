@@ -35,6 +35,9 @@ from rheojax.models.ikh._kernels import (
 
 jax, jnp = safe_import_jax()
 
+# diffrax.diffeqsolve max_steps ceiling for this model's ODE integration.
+_MAX_STEPS = 1_000_000
+
 
 # kwargs to filter before passing to nlsq_optimize
 _IKH_RESERVED = {
@@ -459,7 +462,7 @@ class MIKH(IKHBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 

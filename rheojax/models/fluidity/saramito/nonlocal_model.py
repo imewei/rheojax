@@ -54,6 +54,9 @@ logger = logging.getLogger(__name__)
 # Sentinel for distinguishing "not provided" from None/0.0 (FS-004/FS-013)
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 10_000_000
+
 # kwargs to strip before forwarding to nlsq_optimize (FS-005).
 # Start from the central set and add model-specific extras so the two
 # never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
@@ -514,7 +517,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             args=args,
             saveat=diffrax.SaveAt(ts=t),
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,  # Return partial result on failure (for optimization)
         )
 
@@ -593,7 +596,7 @@ class FluiditySaramitoNonlocal(FluiditySaramitoBase):
             args=args,
             saveat=diffrax.SaveAt(ts=t),
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,  # Return partial result on failure (for optimization)
         )
 

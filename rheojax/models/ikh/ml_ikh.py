@@ -41,6 +41,9 @@ jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
 
+# diffrax.diffeqsolve max_steps ceiling for this model's ODE integration.
+_MAX_STEPS = 1_000_000
+
 
 # kwargs to filter before passing to nlsq_optimize
 _MLIKH_RESERVED = {
@@ -457,7 +460,7 @@ class MLIKH(IKHBase):
                     args=args,
                     saveat=diffrax.SaveAt(ts=t),
                     stepsize_controller=controller,
-                    max_steps=1_000_000,
+                    max_steps=_MAX_STEPS,
                     throw=False,
                 )
 

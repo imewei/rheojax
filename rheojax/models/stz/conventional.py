@@ -30,6 +30,9 @@ logger = get_logger(__name__)
 
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 10_000_000
+
 # kwargs to filter before passing to nlsq_optimize
 _STZ_RESERVED = {
     "test_mode",
@@ -418,7 +421,7 @@ class STZConventional(STZBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -741,7 +744,7 @@ class STZConventional(STZBase):
             args=base_args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=10_000_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
