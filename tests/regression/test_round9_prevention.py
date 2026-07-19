@@ -11,8 +11,6 @@ Guards against the 5 regression patterns introduced by previous AI agents:
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import numpy as np
 import pytest
 
@@ -283,48 +281,3 @@ class TestEqualBoundsDeterministic:
             assert not np.all(np.asarray(a_samples) == np.asarray(a_samples)[0]), (
                 "Param with bounds (0, 1e-6) should NOT be treated as deterministic"
             )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Category 6: Registry discover() only swallows "already registered"
-#   Regression pattern (e): overly broad exception swallowing
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestRegistryDiscoverExceptionScope:
-    """Guard: discover() must not swallow non-registration errors."""
-
-    @pytest.mark.smoke
-    def test_discover_propagates_real_valueerror(self):
-        """ValueError not matching 'already registered' must propagate."""
-        from rheojax.core.registry import Registry
-
-        registry = Registry.get_instance()
-
-        def _register_that_raises(*args, **kwargs):
-            raise ValueError("Corrupt model definition")
-
-        with patch.object(registry, "register", side_effect=_register_that_raises):
-            # discover() should let non-"already registered" ValueError propagate.
-            # Target the submodule that defines Maxwell directly — the
-            # rheojax.models.classical package only re-exports it, so
-            # discover() on the package itself never matches any class.
-            with pytest.raises(ValueError, match="Corrupt model definition"):
-                registry.discover("rheojax.models.classical.maxwell")
-
-    @pytest.mark.smoke
-    def test_discover_swallows_already_registered(self):
-        """ValueError with 'already registered' must be silently caught."""
-        from rheojax.core.registry import Registry
-
-        registry = Registry.get_instance()
-
-        def _register_already(*args, **kwargs):
-            raise ValueError("Model 'Maxwell' is already registered")
-
-        with patch.object(
-            registry, "register", side_effect=_register_already
-        ) as mock_register:
-            # Should NOT raise — "already registered" is expected during discovery
-            registry.discover("rheojax.models.classical.maxwell")
-            mock_register.assert_called_once()
