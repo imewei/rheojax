@@ -43,130 +43,21 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 
-class WorkspaceWindow(QMainWindow):
-    mode_changed = Signal(str)
-    MODES = ("fit", "transform", "pipeline")
+class _WindowChrome:
+    """Menu, theme, help, and command-palette collaborator for WorkspaceWindow.
 
-    def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._epoch = 0
-        self._notifier = DatasetLibraryNotifier()
-        self._notifier.changed.connect(self._mark_dirty)
-        self._pipeline_service = PipelineExecutionService()
-        self._pipeline_stop_event: threading.Event | None = None
-        self._active_jobs_action_pending = False
-        self._close_confirmed = False
-        self._preview_dialog = None
-        # Keyed by job_id, not a single scalar -- a second concurrent import
-        # launched before the first one finishes must not drop the only
-        # Python reference to the first ImportWorker/ImportWorkerSignals
-        # QObject (which would otherwise risk it being garbage-collected
-        # mid-run and losing its queued signal).
-        self._active_import_workers: dict[str, object] = {}
-        self._pipeline_service.phase_worker_ready.connect(
-            self._on_phase_worker_ready, Qt.ConnectionType.QueuedConnection
-        )
-
-        self.setWindowTitle("RheoJAX Workspace")
-        self.resize(1200, 800)
-
-        bar = QToolBar(self)
-        self.addToolBar(bar)
-        # QToolButton (not QPushButton) for the mode switcher: base.qss already
-        # styles QToolButton as a flat toggle pill (checked = @primary_light
-        # highlight), whereas QPushButton carries the heavy gradient "primary
-        # action" look meant for Save/Open-type CTAs -- wrong affordance for a
-        # segmented mode switch that should read as navigation, not a command.
-        self._fit_btn = QToolButton(self)
-        self._fit_btn.setText("Fit")
-        self._fit_btn.setToolTip("Switch to the model-fitting workflow")
-        self._tx_btn = QToolButton(self)
-        self._tx_btn.setText("Transform")
-        self._tx_btn.setToolTip("Switch to the data-transform workflow")
-        self._pipeline_btn = QToolButton(self)
-        self._pipeline_btn.setText("Pipeline")
-        self._pipeline_btn.setToolTip("Switch to the batch-pipeline workflow")
-        self._fit_btn.setCheckable(True)
-        self._tx_btn.setCheckable(True)
-        self._pipeline_btn.setCheckable(True)
-        # Exclusive group so Qt itself refuses to uncheck the sole checked
-        # button on a re-click. Without this, clicking the already-active
-        # mode pill toggles it unchecked before set_mode()'s no-op early
-        # return (mode == self._mode) ever reaches _sync_mode_buttons() --
-        # the pill goes visually unselected while the app stays in that mode.
-        self._mode_btn_group = QButtonGroup(self)
-        self._mode_btn_group.setExclusive(True)
-        for btn in (self._fit_btn, self._tx_btn, self._pipeline_btn):
-            self._mode_btn_group.addButton(btn)
-        self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
-        self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
-        self._pipeline_btn.clicked.connect(lambda: self.set_mode("pipeline"))
-        bar.addWidget(self._fit_btn)
-        bar.addWidget(self._tx_btn)
-        bar.addWidget(self._pipeline_btn)
-        self.setStatusBar(StatusBar(self))
-        self._build_file_menu()
-
-        self.log_dock = LogDockWidget(self)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
-        self.log_dock.setVisible(False)
-        self._build_view_menu()
-        self._build_help_menu()
-
-        # These fire ~20 times through a real pipeline run but had no
-        # listener anywhere -- real per-step/per-phase progress was computed
-        # and silently discarded, with no user-visible feedback beyond the
-        # coarse per-dataset start/finish. Route them to the log dock (the
-        # existing mechanism for this kind of event, see log_dock.append_record
-        # elsewhere in this file) rather than building new progress UI.
-        # QueuedConnection: PipelineExecutionService documents that it runs
-        # off the GUI thread, same as phase_worker_ready above.
-        self._pipeline_service.pipeline_started.connect(
-            self._on_pipeline_started, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.pipeline_completed.connect(
-            self._on_pipeline_completed, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.pipeline_failed.connect(
-            self._on_pipeline_failed, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_started.connect(
-            self._on_pipeline_step_started, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_completed.connect(
-            self._on_pipeline_step_completed, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_failed.connect(
-            self._on_pipeline_step_failed, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_phase_started.connect(
-            self._on_pipeline_step_phase_started, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_phase_completed.connect(
-            self._on_pipeline_step_phase_completed, Qt.ConnectionType.QueuedConnection
-        )
-        self._pipeline_service.step_phase_failed.connect(
-            self._on_pipeline_step_phase_failed, Qt.ConnectionType.QueuedConnection
-        )
-
-        self._build_workspace(app_state)
-        self._setup_os_theme_watcher()
-        QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
-        # Ctrl+1..Ctrl+9 jump to a step in the *current* mode's wizard.
-        # self._canvas always points at the mode's current StepperCanvas even
-        # though set_mode() builds a brand-new instance on every switch --
-        # binding these once here (dereferencing self._canvas dynamically at
-        # call time, not capturing today's instance) keeps them live across
-        # mode switches without re-binding per StepperCanvas. Out-of-range
-        # indices are rejected by _jump_to_step's own bounds check below;
-        # a not-yet-reached-but-in-range index reaches click_step(), which
-        # is a no-op there because that button is disabled.
-        for step_idx in range(9):
-            QShortcut(
-                QKeySequence(f"Ctrl+{step_idx + 1}"),
-                self,
-                lambda i=step_idx: self._jump_to_step(i),
-            )
+    Split out of the former monolithic WorkspaceWindow class (ASSESSMENT.md
+    Technical Debt #6) -- window chrome (menus, theme application, OS color
+    scheme watching, help dialogs, the command palette, log dock append)
+    doesn't touch the stepper/dataset state machine and is the most
+    self-contained concern to extract, per that finding's own suggestion.
+    Composed into WorkspaceWindow; methods operate on attributes/methods
+    owned by WorkspaceWindow.__init__ and its other methods (self._state,
+    self.log_dock, self._on_new/_on_open/_on_save/_on_save_as/_on_close,
+    self.set_mode). rheojax.gui.* is mypy-ignored (PySide6 stub issues,
+    see pyproject.toml), so no typing-only attribute stub is needed here
+    (contrast rheojax/pipeline/base.py's _PipelineState, which types-checks).
+    """
 
     def _build_file_menu(self) -> None:
         menu = self.menuBar().addMenu("&File")
@@ -407,6 +298,133 @@ class WorkspaceWindow(QMainWindow):
     def log(self, message: str) -> None:
         """Append message to the log dock at INFO level."""
         self.log_dock.append_record(logging.INFO, message)
+
+
+class WorkspaceWindow(QMainWindow, _WindowChrome):
+    mode_changed = Signal(str)
+
+    MODES = ("fit", "transform", "pipeline")
+
+    def __init__(self, app_state: AppState, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._epoch = 0
+        self._notifier = DatasetLibraryNotifier()
+        self._notifier.changed.connect(self._mark_dirty)
+        self._pipeline_service = PipelineExecutionService()
+        self._pipeline_stop_event: threading.Event | None = None
+        self._active_jobs_action_pending = False
+        self._close_confirmed = False
+        self._preview_dialog = None
+        # Keyed by job_id, not a single scalar -- a second concurrent import
+        # launched before the first one finishes must not drop the only
+        # Python reference to the first ImportWorker/ImportWorkerSignals
+        # QObject (which would otherwise risk it being garbage-collected
+        # mid-run and losing its queued signal).
+        self._active_import_workers: dict[str, object] = {}
+        self._pipeline_service.phase_worker_ready.connect(
+            self._on_phase_worker_ready, Qt.ConnectionType.QueuedConnection
+        )
+
+        self.setWindowTitle("RheoJAX Workspace")
+        self.resize(1200, 800)
+
+        bar = QToolBar(self)
+        self.addToolBar(bar)
+        # QToolButton (not QPushButton) for the mode switcher: base.qss already
+        # styles QToolButton as a flat toggle pill (checked = @primary_light
+        # highlight), whereas QPushButton carries the heavy gradient "primary
+        # action" look meant for Save/Open-type CTAs -- wrong affordance for a
+        # segmented mode switch that should read as navigation, not a command.
+        self._fit_btn = QToolButton(self)
+        self._fit_btn.setText("Fit")
+        self._fit_btn.setToolTip("Switch to the model-fitting workflow")
+        self._tx_btn = QToolButton(self)
+        self._tx_btn.setText("Transform")
+        self._tx_btn.setToolTip("Switch to the data-transform workflow")
+        self._pipeline_btn = QToolButton(self)
+        self._pipeline_btn.setText("Pipeline")
+        self._pipeline_btn.setToolTip("Switch to the batch-pipeline workflow")
+        self._fit_btn.setCheckable(True)
+        self._tx_btn.setCheckable(True)
+        self._pipeline_btn.setCheckable(True)
+        # Exclusive group so Qt itself refuses to uncheck the sole checked
+        # button on a re-click. Without this, clicking the already-active
+        # mode pill toggles it unchecked before set_mode()'s no-op early
+        # return (mode == self._mode) ever reaches _sync_mode_buttons() --
+        # the pill goes visually unselected while the app stays in that mode.
+        self._mode_btn_group = QButtonGroup(self)
+        self._mode_btn_group.setExclusive(True)
+        for btn in (self._fit_btn, self._tx_btn, self._pipeline_btn):
+            self._mode_btn_group.addButton(btn)
+        self._fit_btn.clicked.connect(lambda: self.set_mode("fit"))
+        self._tx_btn.clicked.connect(lambda: self.set_mode("transform"))
+        self._pipeline_btn.clicked.connect(lambda: self.set_mode("pipeline"))
+        bar.addWidget(self._fit_btn)
+        bar.addWidget(self._tx_btn)
+        bar.addWidget(self._pipeline_btn)
+        self.setStatusBar(StatusBar(self))
+        self._build_file_menu()
+
+        self.log_dock = LogDockWidget(self)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.log_dock)
+        self.log_dock.setVisible(False)
+        self._build_view_menu()
+        self._build_help_menu()
+
+        # These fire ~20 times through a real pipeline run but had no
+        # listener anywhere -- real per-step/per-phase progress was computed
+        # and silently discarded, with no user-visible feedback beyond the
+        # coarse per-dataset start/finish. Route them to the log dock (the
+        # existing mechanism for this kind of event, see log_dock.append_record
+        # elsewhere in this file) rather than building new progress UI.
+        # QueuedConnection: PipelineExecutionService documents that it runs
+        # off the GUI thread, same as phase_worker_ready above.
+        self._pipeline_service.pipeline_started.connect(
+            self._on_pipeline_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.pipeline_completed.connect(
+            self._on_pipeline_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.pipeline_failed.connect(
+            self._on_pipeline_failed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_started.connect(
+            self._on_pipeline_step_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_completed.connect(
+            self._on_pipeline_step_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_failed.connect(
+            self._on_pipeline_step_failed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_started.connect(
+            self._on_pipeline_step_phase_started, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_completed.connect(
+            self._on_pipeline_step_phase_completed, Qt.ConnectionType.QueuedConnection
+        )
+        self._pipeline_service.step_phase_failed.connect(
+            self._on_pipeline_step_phase_failed, Qt.ConnectionType.QueuedConnection
+        )
+
+        self._build_workspace(app_state)
+        self._setup_os_theme_watcher()
+        QShortcut(QKeySequence("Ctrl+K"), self, self._open_command_palette)
+        # Ctrl+1..Ctrl+9 jump to a step in the *current* mode's wizard.
+        # self._canvas always points at the mode's current StepperCanvas even
+        # though set_mode() builds a brand-new instance on every switch --
+        # binding these once here (dereferencing self._canvas dynamically at
+        # call time, not capturing today's instance) keeps them live across
+        # mode switches without re-binding per StepperCanvas. Out-of-range
+        # indices are rejected by _jump_to_step's own bounds check below;
+        # a not-yet-reached-but-in-range index reaches click_step(), which
+        # is a no-op there because that button is disabled.
+        for step_idx in range(9):
+            QShortcut(
+                QKeySequence(f"Ctrl+{step_idx + 1}"),
+                self,
+                lambda i=step_idx: self._jump_to_step(i),
+            )
 
     def _build_workspace(self, state: AppState) -> None:
         self._state = state
@@ -1129,11 +1147,6 @@ class WorkspaceWindow(QMainWindow):
             self._state.library.remove(dataset_id)
         self._notifier.changed.emit()
         self.log_dock.append_record(logging.INFO, f'Deleted dataset "{ref.name}"')
-        # ponytail: a derived dataset's DatasetRef.lineage may reference this
-        # id afterward -- lineage is provenance/display metadata only (never
-        # dereferenced at runtime, per DatasetLibrary's own field comment), so
-        # this is a known, accepted display-only gap, not a functional one.
-        # Clean up lineage entries if a future spec makes lineage load-bearing.
 
     def _commit_dataset(self, ref, payload=None, overwrite: bool = False) -> None:
         # Hold the library's lock across both calls so a concurrent reader never
@@ -1145,17 +1158,6 @@ class WorkspaceWindow(QMainWindow):
                 self._state.library.store_payload(ref.id, payload)
         self._notifier.changed.emit()
 
-    # detect_test_mode() reports "flow" for flow-curve data (F-IO-R... naming
-    # predates Protocol.FLOW_CURVE) -- not a TestModeEnum member, so it needs
-    # its own alias below. Every other test_mode string the reader can emit
-    # (e.g. "rotation" from the CSV/Excel column-based detector in
-    # _utils.detect_test_mode_from_columns) already has an authoritative
-    # equivalence encoded in TestModeEnum.to_protocol() -- delegate to that
-    # in _normalize_import_test_mode() instead of re-encoding the same
-    # rotation->flow_curve mapping a second time here. Without normalizing,
-    # a dataset's protocol_type never equality-matches
-    # DatasetLibrary.datasets_of_type("flow_curve") and it silently lands in
-    # no protocol bucket at all, invisible to the Fit/Transform Data step.
     _IMPORT_TEST_MODE_ALIASES = {"flow": "flow_curve"}
 
     @classmethod
@@ -1321,10 +1323,6 @@ class WorkspaceWindow(QMainWindow):
             )
             self._commit_dataset(ref, rheo_data, overwrite=False)
 
-    # Extensions ColumnMapperDialog can actually parse (see its _load_data) --
-    # anything else (.tri, .json, .dat, ...) falls back to a raw pd.read_csv
-    # attempt there too, so offering the dialog for those would just stack a
-    # second, more confusing failure on top of the original one.
     _COLUMN_MAPPABLE_SUFFIXES = {".csv", ".txt", ".xlsx", ".xls"}
 
     def _on_import_failed(
