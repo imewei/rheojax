@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.foundation.metrics import bfmi
-from rheojax.gui.foundation.priors import adapt_prior, map_centered_priors
+from rheojax.gui.foundation.priors import map_centered_priors
 from rheojax.gui.foundation.state import FitState
 from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.utils.layout_helpers import set_panel_margins
@@ -203,17 +203,8 @@ class NutsStep(QWidget):
         )  # safe: FitResult was normalized to dict in step 3
 
     def load_suggested_priors(self) -> None:
-        """Seed the editable PriorsEditor from the NLSQ MAP estimate.
-
-        Converts map_centered_priors()'s {"type": ..., ...} shape into
-        PriorsEditor.set_prior(name, dist, **params) calls.
-        """
-        suggested = self.suggested_priors()
-        self._priors_editor.set_parameters(list(suggested.keys()))
-        for name, prior in suggested.items():
-            dist = prior.get("type", "normal")
-            params = {k: v for k, v in prior.items() if k != "type"}
-            self._priors_editor.set_prior(name, dist, **params)
+        """Seed the editable PriorsEditor from the NLSQ MAP estimate."""
+        self._priors_editor.load_numpyro_priors(self.suggested_priors())
 
     def set_target_accept(self, v: float) -> None:
         self._target.setValue(v)
@@ -246,10 +237,7 @@ class NutsStep(QWidget):
         # Build priors from the (possibly user-edited) PriorsEditor; if the editor
         # was never seeded via load_suggested_priors(), it's empty and we fall back
         # to the raw suggested_priors(), matching pre-Task-7 behavior exactly.
-        edited_priors = self._priors_editor.get_all_priors()
-        priors = {
-            name: adapt_prior(entry) for name, entry in edited_priors.items()
-        } or self.suggested_priors()
+        priors = self._priors_editor.to_numpyro_priors() or self.suggested_priors()
         # Guard against re-entrant clicks: _sample_fn pumps a nested event
         # loop (see fit_controller._run_on_thread) while staying responsive,
         # so both buttons must be disabled for the duration -- otherwise a
