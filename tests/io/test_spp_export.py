@@ -94,6 +94,67 @@ def test_extract_spp_arrays_fallback_quadrant_correct_when_gp_negative():
 
 
 # ============================================================================
+# Atomic Write Helper Tests
+# ============================================================================
+
+
+class TestAtomicTextWrite:
+    """Tests for _atomic_text_write, the shared tmp-file/os.replace/cleanup
+    helper used by all three writers in this module (ASSESSMENT.md
+    Technical Debt #6 dedup). Covers the failure/cleanup path, which the
+    happy-path-only writer tests below never exercise."""
+
+    def test_success_replaces_target(self, tmp_path):
+        from rheojax.io.spp_export import _atomic_text_write
+
+        target = tmp_path / "output.txt"
+        with _atomic_text_write(target) as f:
+            f.write("new content")
+
+        assert target.read_text() == "new content"
+        assert not target.with_suffix(".tmp").exists()
+
+    def test_cleans_up_tmp_file_on_failure(self, tmp_path):
+        from rheojax.io.spp_export import _atomic_text_write
+
+        target = tmp_path / "output.txt"
+        tmp_file = target.with_suffix(".tmp")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            with _atomic_text_write(target) as f:
+                f.write("partial content")
+                raise RuntimeError("boom")
+
+        assert not target.exists(), "target file must not be created on failure"
+        assert not tmp_file.exists(), "tmp file must be cleaned up on failure"
+
+    def test_preserves_original_file_on_failure(self, tmp_path):
+        from rheojax.io.spp_export import _atomic_text_write
+
+        target = tmp_path / "output.txt"
+        target.write_text("original content")
+
+        with pytest.raises(RuntimeError):
+            with _atomic_text_write(target) as f:
+                f.write("corrupted")
+                raise RuntimeError("boom")
+
+        assert target.read_text() == "original content", (
+            "a failed write must not clobber the pre-existing target file"
+        )
+
+    def test_custom_suffix(self, tmp_path):
+        from rheojax.io.spp_export import _atomic_text_write
+
+        target = tmp_path / "output.csv"
+        with _atomic_text_write(target, suffix=".csv.tmp") as f:
+            f.write("a,b,c")
+
+        assert target.read_text() == "a,b,c"
+        assert not target.with_suffix(".csv.tmp").exists()
+
+
+# ============================================================================
 # Text Export Tests
 # ============================================================================
 

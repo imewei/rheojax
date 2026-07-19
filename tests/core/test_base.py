@@ -205,9 +205,13 @@ class TestBaseModel:
     `class TestBaseModel:` defined later in this file (search for it).
     Python module execution means that later definition silently
     overwrites this one in the module namespace, so pytest never
-    collects any of the ~31 test methods below -- they do not run.
-    This is a pre-existing, deliberately-tracked defect (left unfixed
-    as of the PR #68 core-module audit) rather than an oversight.
+    collects any of the 7 test methods below -- they do not run.
+    The same defect duplicates 4 other classes in this file
+    (TestParameterClass, TestParameterSet, TestBaseTransform,
+    TestJAXSupport), for 31 shadowed test methods total across the
+    file's first half. This is a pre-existing, deliberately-tracked
+    defect (left unfixed as of the PR #68 core-module audit) rather
+    than an oversight.
     """
 
     def test_base_model_interface(self):
@@ -821,14 +825,17 @@ class TestParameterSet:
 class TestBaseModel:
     """Test BaseModel abstract class.
 
-    KNOWN ISSUE: a second `class TestBaseModel:` is defined later in
-    this file. Python module execution means that later definition
-    silently overwrites this one in the module namespace, so pytest
-    only collects the second class -- none of the ~31 test methods in
-    *this* class ever run. This is a pre-existing, deliberately-
-    tracked defect (left unfixed as of the PR #68 core-module audit)
-    rather than an oversight; do not assume the coverage implied by
-    this class exists.
+    KNOWN ISSUE: a second `class TestBaseModel:` is defined earlier in
+    this file (search for it). Python module execution means this
+    later definition silently overwrites that one in the module
+    namespace, so pytest collects only this class's 7 test methods --
+    the earlier `TestBaseModel`'s 7 never run. The same defect
+    duplicates 4 other classes in this file (TestParameterClass,
+    TestParameterSet, TestBaseTransform, TestJAXSupport), for 31
+    shadowed test methods total across the file's first half. This is
+    a pre-existing, deliberately-tracked defect (left unfixed as of
+    the PR #68 core-module audit) rather than an oversight; do not
+    assume the coverage implied by the shadowed classes exists.
     """
 
     def test_base_model_interface(self):

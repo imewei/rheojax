@@ -84,6 +84,9 @@ logger = logging.getLogger(__name__)
 
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 500_000
+
 
 @ModelRegistry.register(
     "tnt_multi_species",
@@ -826,7 +829,7 @@ class TNTMultiSpecies(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -979,7 +982,7 @@ class TNTMultiSpecies(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -1062,7 +1065,7 @@ class TNTMultiSpecies(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -1146,7 +1149,7 @@ class TNTMultiSpecies(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -1317,7 +1320,7 @@ class TNTMultiSpecies(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 

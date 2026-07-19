@@ -346,6 +346,40 @@ class TestAnalysisExporterExcel:
         assert "amplitude" in params_df["Parameter"].values
         assert "decay" in params_df["Parameter"].values
 
+    def test_export_excel_summary_sanitizes_metadata_formula_injection(
+        self, sample_data, tmp_path
+    ):
+        """CWE-1236: file-derived metadata (e.g. a sample name field read
+        from an instrument export) must be neutralized in the Summary
+        sheet, not written verbatim (regression test for ASSESSMENT.md's
+        Excel/formula-injection security finding).
+
+        test_mode is the field that actually reaches
+        AnalysisExporter._gather_state()'s metadata dict
+        (analysis_exporter.py's `metadata["test_mode"] = dm.get("test_mode")`)
+        -- other RheoData.metadata keys are not passed through, so this is
+        the real attacker-controllable value to target, not an arbitrary
+        made-up metadata key.
+        """
+        import pandas as pd
+
+        sample_data.metadata["test_mode"] = "=HYPERLINK(\"http://evil\",\"click\")"
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit(_ExportTestModel())
+
+        exporter = AnalysisExporter()
+        out = exporter.export_excel(
+            pipeline, tmp_path / "malicious_metadata.xlsx", include_plots=False
+        )
+
+        summary_df = pd.read_excel(out, sheet_name="Summary")
+        row = summary_df[summary_df["Field"] == "test_mode"]
+        assert not row.empty, "test_mode metadata field missing from Summary sheet"
+        value = row["Value"].iloc[0]
+        assert value.startswith("'"), (
+            f"Summary Value cell must be neutralized with a leading quote, got: {value!r}"
+        )
+
     def test_export_excel_with_transforms(self, full_pipeline, tmp_path):
         """Excel export includes transforms sheet."""
         import pandas as pd
