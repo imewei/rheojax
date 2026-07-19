@@ -1210,7 +1210,13 @@ class OptimizationResult:
                     else:
                         # Residual length != x_eval length (e.g. complex-split)
                         pred_std = np.sqrt(mse) * np.ones_like(y_pred)
-                except Exception:
+                except Exception as leverage_err:
+                    logger.warning(
+                        "Leverage-weighted prediction interval failed; "
+                        "falling back to constant-MSE approximation "
+                        "(less accurate, ignores parameter uncertainty)",
+                        error=str(leverage_err),
+                    )
                     pred_std = np.sqrt(mse) * np.ones_like(y_pred)
             else:
                 pred_std = np.sqrt(mse) * np.ones_like(y_pred)

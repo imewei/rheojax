@@ -561,48 +561,12 @@ class FluidityLocal(FluidityBase):
 
         f_eq_seed = 1.0 / max(G_seed * tau_seed, 1e-30)
 
-        def _clipped(name: str, value: float) -> float:
-            param = self.parameters[name]
-            lo, hi = param.bounds if param.bounds else (-np.inf, np.inf)
-            lo_v = lo if lo is not None else -np.inf
-            hi_v = hi if hi is not None else np.inf
-            return float(np.clip(value, lo_v, hi_v))
+        self.parameters.set_value("G", self._clip_to_bounds("G", G_seed))
+        self.parameters.set_value("f_eq", self._clip_to_bounds("f_eq", f_eq_seed))
 
-        self.parameters.set_value("G", _clipped("G", G_seed))
-        self.parameters.set_value("f_eq", _clipped("f_eq", f_eq_seed))
-
-    # TODO (FL-010): _predict_saos_jit is duplicated in FluidityNonlocal.
-    # Consider extracting to a shared module-level function or into _base.py.
-    @staticmethod
-    @jax.jit
-    def _predict_saos_jit(
-        omega: jnp.ndarray,
-        G: float,
-        f_eq: float,
-        theta: float = 0.0,  # FL-005: dead parameter, kept for backward compatibility
-    ) -> jnp.ndarray:
-        """SAOS prediction using linear viscoelastic approximation.
-
-        In the linear limit (small strain), the model behaves like a Maxwell
-        model with effective relaxation time tau_eff = 1/(G*f_eq).
-
-        G*(ω) = G * (iωτ) / (1 + iωτ)
-
-        Note:
-            theta parameter is unused (FL-005) but kept for backward
-            compatibility with external callers.
-        """
-        del theta  # FL-005: explicitly unused
-        # Effective relaxation time
-        tau_eff = 1.0 / (G * f_eq + 1e-30)
-
-        omega_tau = omega * tau_eff
-        denom = 1.0 + omega_tau**2
-
-        G_prime = G * omega_tau**2 / denom
-        G_double_prime = G * omega_tau / denom
-
-        return jnp.stack([G_prime, G_double_prime], axis=1)
+    # _predict_saos_jit and its bounds-clamping helper are inherited from
+    # FluidityBase — FL-010: this class and FluidityNonlocal previously
+    # carried byte-identical copies of _predict_saos_jit.
 
     def _fit_laos(self, t: np.ndarray, sigma: np.ndarray, **kwargs) -> None:
         """Fit LAOS data using full ODE integration.

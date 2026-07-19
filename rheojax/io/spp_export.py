@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -335,6 +336,25 @@ def export_spp_txt(
             ctx["analysis_type"] = analysis_type
 
 
+@contextmanager
+def _atomic_text_write(filepath: Path, *, suffix: str = ".tmp", **open_kwargs):
+    """Write to *filepath* atomically via a same-directory temp file.
+
+    Yields the open file handle for the caller to write into. On success the
+    temp file is atomically renamed onto *filepath* via ``os.replace``; on
+    any exception the temp file is removed and the exception re-raised.
+    """
+    tmp_path = filepath.with_suffix(suffix)
+    try:
+        with open(tmp_path, "w", **open_kwargs) as f:
+            yield f
+        os.replace(tmp_path, filepath)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def _write_spp_main_txt(
     filepath: Path,
     data: np.ndarray,
@@ -348,76 +368,69 @@ def _write_spp_main_txt(
     precision: int,
 ) -> None:
     """Write main SPP data file in MATLAB format."""
-    tmp_path = filepath.with_suffix(".tmp")
-    try:
-        with open(tmp_path, "w", newline="") as f:
-            # Write analysis type header
-            if analysis_type == "NUMERICAL":
-                f.write("Data calculated via numerical differentiation\r\n")
-            else:
-                f.write("Data calculated via Fourier domain filtering\r\n")
+    with _atomic_text_write(filepath, newline="") as f:
+        # Write analysis type header
+        if analysis_type == "NUMERICAL":
+            f.write("Data calculated via numerical differentiation\r\n")
+        else:
+            f.write("Data calculated via Fourier domain filtering\r\n")
 
-            # Write parameters
-            f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
-            if n_harmonics is not None:
-                f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
-            if n_cycles is not None:
-                f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
-            if step_size is not None:
-                f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
-            if num_mode is not None:
-                if num_mode == 1:
-                    f.write("Standard differentiation\r\n")
-                elif num_mode == 2:
-                    f.write("Looped differentiation\r\n")
+        # Write parameters
+        f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
+        if n_harmonics is not None:
+            f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
+        if n_cycles is not None:
+            f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
+        if step_size is not None:
+            f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
+        if num_mode is not None:
+            if num_mode == 1:
+                f.write("Standard differentiation\r\n")
+            elif num_mode == 2:
+                f.write("Looped differentiation\r\n")
 
-            # Write column headers (matching MATLAB exactly)
-            headers1 = [
-                "Time",
-                "Strain",
-                "Rate",
-                "Stress",
-                "G'_t",
-                'G"_t',
-                "|G*_t|",
-                "tan(delta_t)",
-                "delta_t",
-                "displacement stress",
-                "est. equilibrium strain",
-                "dG'_{t}/dt",
-                'dG"_{t}/dt',
-                "Speed",
-                "norm. PAV",
-            ]
-            headers2 = [
-                "[s]",
-                "[-]",
-                "[1/s]",
-                "[Pa]",
-                "[Pa]",
-                "[Pa]",
-                "[Pa]",
-                "[]",
-                "[rad]",
-                "[Pa]",
-                "[-]",
-                "[Pa/s]",
-                "[Pa/s]",
-                "[Pa/s]",
-                "[]",
-            ]
-            f.write("\t".join(headers1) + "\r\n")
-            f.write("\t".join(headers2) + "\r\n")
+        # Write column headers (matching MATLAB exactly)
+        headers1 = [
+            "Time",
+            "Strain",
+            "Rate",
+            "Stress",
+            "G'_t",
+            'G"_t',
+            "|G*_t|",
+            "tan(delta_t)",
+            "delta_t",
+            "displacement stress",
+            "est. equilibrium strain",
+            "dG'_{t}/dt",
+            'dG"_{t}/dt',
+            "Speed",
+            "norm. PAV",
+        ]
+        headers2 = [
+            "[s]",
+            "[-]",
+            "[1/s]",
+            "[Pa]",
+            "[Pa]",
+            "[Pa]",
+            "[Pa]",
+            "[]",
+            "[rad]",
+            "[Pa]",
+            "[-]",
+            "[Pa/s]",
+            "[Pa/s]",
+            "[Pa/s]",
+            "[]",
+        ]
+        f.write("\t".join(headers1) + "\r\n")
+        f.write("\t".join(headers2) + "\r\n")
 
-            # Write data rows
-            fmt = f"%.{precision}f"
-            for row in data:
-                f.write("\t".join(fmt % val for val in row) + "\r\n")
-        os.replace(tmp_path, filepath)
-    except Exception:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
-        raise
+        # Write data rows
+        fmt = f"%.{precision}f"
+        for row in data:
+            f.write("\t".join(fmt % val for val in row) + "\r\n")
 
 
 def _write_spp_fsf_txt(
@@ -433,54 +446,47 @@ def _write_spp_fsf_txt(
     precision: int,
 ) -> None:
     """Write Frenet-Serret frame data file in MATLAB format."""
-    tmp_path = filepath.with_suffix(".tmp")
-    try:
-        with open(tmp_path, "w", newline="") as f:
-            # Write analysis type header
-            if analysis_type == "NUMERICAL":
-                f.write("Data calculated via numerical differentiation\r\n")
-            else:
-                f.write("Data calculated via Fourier domain filtering\r\n")
+    with _atomic_text_write(filepath, newline="") as f:
+        # Write analysis type header
+        if analysis_type == "NUMERICAL":
+            f.write("Data calculated via numerical differentiation\r\n")
+        else:
+            f.write("Data calculated via Fourier domain filtering\r\n")
 
-            # Write parameters
-            f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
-            if n_harmonics is not None:
-                f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
-            if n_cycles is not None:
-                f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
-            if step_size is not None:
-                f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
-            if num_mode is not None:
-                if num_mode == 1:
-                    f.write("Standard differentiation\r\n")
-                elif num_mode == 2:
-                    f.write("Looped differentiation\r\n")
+        # Write parameters
+        f.write(f"Angular Frequency (rad/s):\t{omega:.{precision}f}\r\n")
+        if n_harmonics is not None:
+            f.write(f"Number of harmonics used:\t{n_harmonics}\r\n")
+        if n_cycles is not None:
+            f.write(f"Number of cycles in input:\t{n_cycles}\r\n")
+        if step_size is not None:
+            f.write(f"Step size for numerical diff.:\t{step_size}\r\n")
+        if num_mode is not None:
+            if num_mode == 1:
+                f.write("Standard differentiation\r\n")
+            elif num_mode == 2:
+                f.write("Looped differentiation\r\n")
 
-            # Write column headers (matching MATLAB exactly)
-            headers1 = [
-                "Tangent(x)",
-                "Tangent(y)",
-                "Tangent(z)",
-                "Normal(x)",
-                "Normal(y)",
-                "Normal(z)",
-                "Binormal(x)",
-                "Binormal(y)",
-                "Binormal(z)",
-            ]
-            headers2 = ["[-]"] * 9  # All FSF components are dimensionless unit vectors
-            f.write("\t".join(headers1) + "\r\n")
-            f.write("\t".join(headers2) + "\r\n")
+        # Write column headers (matching MATLAB exactly)
+        headers1 = [
+            "Tangent(x)",
+            "Tangent(y)",
+            "Tangent(z)",
+            "Normal(x)",
+            "Normal(y)",
+            "Normal(z)",
+            "Binormal(x)",
+            "Binormal(y)",
+            "Binormal(z)",
+        ]
+        headers2 = ["[-]"] * 9  # All FSF components are dimensionless unit vectors
+        f.write("\t".join(headers1) + "\r\n")
+        f.write("\t".join(headers2) + "\r\n")
 
-            # Write data rows
-            fmt = f"%.{precision}f"
-            for row in data:
-                f.write("\t".join(fmt % val for val in row) + "\r\n")
-        os.replace(tmp_path, filepath)
-    except Exception:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
-        raise
+        # Write data rows
+        fmt = f"%.{precision}f"
+        for row in data:
+            f.write("\t".join(fmt % val for val in row) + "\r\n")
 
 
 # ============================================================================
@@ -737,32 +743,26 @@ def export_spp_csv(
         columns["B_z"] = B_vec[:, 2]
 
     with log_io(logger, "write", filepath=str(filepath)) as ctx:
-        # Atomic write: write to temp file, then os.replace()
-        tmp_path = filepath.with_suffix(".csv.tmp")
-        try:
-            with open(tmp_path, "w", encoding="utf-8", newline="") as f:
-                # Header
-                logger.debug(
-                    "Writing CSV header",
-                    num_columns=len(columns),
-                    column_names=list(columns.keys()),
-                )
-                # R11-SPP-IO-001: Use CRLF to match MATLAB convention
-                # (consistent with export_spp_txt)
-                f.write(",".join(columns.keys()) + "\r\n")
-                # Data
-                data = np.column_stack(list(columns.values()))
-                logger.debug(
-                    "Writing CSV data rows",
-                    data_shape=data.shape,
-                )
-                for row in data:
-                    f.write(",".join(f"{val:.7g}" for val in row) + "\r\n")
-            os.replace(tmp_path, filepath)
-        except Exception:
-            if tmp_path.exists():
-                tmp_path.unlink(missing_ok=True)
-            raise
+        with _atomic_text_write(
+            filepath, suffix=".csv.tmp", encoding="utf-8", newline=""
+        ) as f:
+            # Header
+            logger.debug(
+                "Writing CSV header",
+                num_columns=len(columns),
+                column_names=list(columns.keys()),
+            )
+            # R11-SPP-IO-001: Use CRLF to match MATLAB convention
+            # (consistent with export_spp_txt)
+            f.write(",".join(columns.keys()) + "\r\n")
+            # Data
+            data = np.column_stack(list(columns.values()))
+            logger.debug(
+                "Writing CSV data rows",
+                data_shape=data.shape,
+            )
+            for row in data:
+                f.write(",".join(f"{val:.7g}" for val in row) + "\r\n")
 
         ctx["data_rows"] = len(data)
         ctx["columns"] = len(columns)

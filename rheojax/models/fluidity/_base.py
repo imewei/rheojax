@@ -199,16 +199,11 @@ class FluidityBase(BaseModel):
 
         # Clip seeds to bounds before applying so set_value() does not
         # raise on edge cases (e.g. data well below the lower bound).
-        def _clipped(name: str, value: float) -> float:
-            param = self.parameters[name]
-            lo, hi_b = param.bounds if param.bounds else (None, None)
-            lo_v = lo if lo is not None else -np.inf
-            hi_v = hi_b if hi_b is not None else np.inf
-            return float(np.clip(value, lo_v, hi_v))
-
-        self.parameters.set_value("tau_y", _clipped("tau_y", tau_y_seed))
-        self.parameters.set_value("K", _clipped("K", max(K_seed, 1e-3)))
-        self.parameters.set_value("n_flow", _clipped("n_flow", n_seed))
+        self.parameters.set_value(
+            "tau_y", self._clip_to_bounds("tau_y", tau_y_seed)
+        )
+        self.parameters.set_value("K", self._clip_to_bounds("K", max(K_seed, 1e-3)))
+        self.parameters.set_value("n_flow", self._clip_to_bounds("n_flow", n_seed))
 
     # Parameters that enter each protocol's dynamics, partitioned by role.
     # "identifiable": appear non-degenerately in the residual.
@@ -366,3 +361,51 @@ class FluidityBase(BaseModel):
             "a": params["a"],
             "n_rejuv": params["n_rejuv"],
         }
+
+    def _clip_to_bounds(self, name: str, value: float) -> float:
+        """Clip a seed value to the named parameter's bounds.
+
+        Shared by both flow-curve (Hershel-Bulkley) and SAOS seeding, which
+        independently reimplemented this identical clamp before it was
+        hoisted here (FluidityLocal and FluidityNonlocal both defined the
+        same closure for G/f_eq seeding).
+        """
+        param = self.parameters[name]
+        lo, hi = param.bounds if param.bounds else (None, None)
+        lo_v = lo if lo is not None else -np.inf
+        hi_v = hi if hi is not None else np.inf
+        return float(np.clip(value, lo_v, hi_v))
+
+    @staticmethod
+    @jax.jit
+    def _predict_saos_jit(
+        omega: jnp.ndarray,
+        G: float,
+        f_eq: float,
+        theta: float = 0.0,  # FL-005: dead parameter, kept for backward compatibility
+    ) -> jnp.ndarray:
+        """SAOS prediction using linear viscoelastic approximation.
+
+        In the linear limit (small strain), the model behaves like a Maxwell
+        model with effective relaxation time tau_eff = 1/(G*f_eq).
+
+        G*(ω) = G * (iωτ) / (1 + iωτ)
+
+        Shared by FluidityLocal and FluidityNonlocal (FL-010): both
+        previously carried byte-identical copies of this function.
+
+        Note:
+            theta parameter is unused (FL-005) but kept for backward
+            compatibility with external callers.
+        """
+        del theta  # FL-005: explicitly unused
+        # Effective relaxation time
+        tau_eff = 1.0 / (G * f_eq + 1e-30)
+
+        omega_tau = omega * tau_eff
+        denom = 1.0 + omega_tau**2
+
+        G_prime = G * omega_tau**2 / denom
+        G_double_prime = G * omega_tau / denom
+
+        return jnp.stack([G_prime, G_double_prime], axis=1)
