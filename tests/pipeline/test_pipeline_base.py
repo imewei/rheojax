@@ -366,6 +366,25 @@ class TestPipelineUtilities:
         assert "has_data=True" in repr_str
         assert "has_model=True" in repr_str
 
+    def test_get_fit_result(self, sample_data):
+        """Test get_fit_result method (characterization: was only exercised
+        indirectly via plot_fit/plot_diagnostics before this test)."""
+        pipeline = Pipeline(data=sample_data)
+        pipeline.fit("mock_model")
+
+        fit_result = pipeline.get_fit_result()
+
+        assert fit_result is not None
+        assert hasattr(fit_result, "params")
+        assert set(fit_result.params.keys()) == {"a", "b"}
+
+    def test_get_fit_result_without_fit_raises(self, sample_data):
+        """get_fit_result must raise before any model has been fitted."""
+        pipeline = Pipeline(data=sample_data)
+
+        with pytest.raises(ValueError, match="No model fitted"):
+            pipeline.get_fit_result()
+
 
 class TestPipelinePlotting:
     """Test plotting functionality."""
