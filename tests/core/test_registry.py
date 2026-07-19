@@ -1,7 +1,7 @@
 """Tests for plugin registry system.
 
-This test suite ensures the registry system can discover, register,
-validate, and manage models and transforms as plugins.
+This test suite ensures the registry system can register, validate,
+and manage models and transforms as plugins.
 """
 
 from unittest.mock import Mock

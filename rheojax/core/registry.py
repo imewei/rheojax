@@ -1,7 +1,7 @@
 """Plugin registry system for models and transforms.
 
-This module provides a registry system for discovering, registering, and managing
-models and transforms as plugins, enabling extensibility of the rheojax package.
+This module provides a registry system for registering and managing models
+and transforms as plugins, enabling extensibility of the rheojax package.
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ class PluginInfo:
 class Registry:
     """Central registry for models and transforms.
 
-    This class manages plugin registration, discovery, and retrieval
-    for all models and transforms in the rheojax package.
+    This class manages plugin registration and retrieval for all models
+    and transforms in the rheojax package.
     """
 
     _instance: Registry | None = None
