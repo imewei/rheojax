@@ -270,7 +270,7 @@ class PlotService:
                 )
 
                 # Helper: compute uncertainty band for real-valued fits
-                def _compute_band(x_vals, y_vals):
+                def _compute_band(y_vals):
                     """Compute +/-1.96*sigma band if pcov available (RSS approximation).
 
                     GUI-IO-017 NOTE: This uncertainty band uses the root-sum-square
@@ -382,7 +382,7 @@ class PlotService:
                         )
 
                         # Add uncertainty band
-                        y_lo, y_hi = _compute_band(x, y_fit)
+                        y_lo, y_hi = _compute_band(y_fit)
                         if y_lo is not None and y_hi is not None:
                             y_lo = np.maximum(
                                 y_lo, 1e-30
@@ -407,7 +407,7 @@ class PlotService:
                     )
 
                     # Add uncertainty band
-                    y_lo, y_hi = _compute_band(x, y_fit)
+                    y_lo, y_hi = _compute_band(y_fit)
                     if y_lo is not None and y_hi is not None:
                         y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
                         ax.fill_between(
@@ -430,7 +430,7 @@ class PlotService:
                     )
 
                     # Add uncertainty band
-                    y_lo, y_hi = _compute_band(x, y_fit)
+                    y_lo, y_hi = _compute_band(y_fit)
                     if y_lo is not None and y_hi is not None:
                         y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
                         ax.fill_between(
@@ -453,7 +453,7 @@ class PlotService:
                     )
 
                     # Add uncertainty band
-                    y_lo, y_hi = _compute_band(x, y_fit)
+                    y_lo, y_hi = _compute_band(y_fit)
                     if y_lo is not None and y_hi is not None:
                         y_lo = np.maximum(y_lo, 1e-30)  # Ensure positive for log scale
                         ax.fill_between(

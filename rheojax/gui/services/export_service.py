@@ -794,7 +794,7 @@ class ExportService:
                 import matplotlib.pyplot as plt
                 from matplotlib.backends.backend_pdf import PdfPages
 
-                def _new_page(pdf_handle, figures):
+                def _new_page(figures):
                     """Create a new blank axes page and append to figures list."""
                     _fig, _ax = plt.subplots(figsize=(8.5, 11))
                     _ax.axis("off")
@@ -803,7 +803,7 @@ class ExportService:
 
                 with PdfPages(path) as pdf:
                     figures = []
-                    fig, ax, y = _new_page(pdf, figures)
+                    fig, ax, y = _new_page(figures)
                     for line in report_lines:
                         for subline in line.split("\n"):
                             # GUI-IO-019: page-break when near bottom margin.
@@ -814,7 +814,7 @@ class ExportService:
                                 pdf.savefig(fig, bbox_inches="tight")
                                 plt.close(fig)
                                 figures.pop()
-                                fig, ax, y = _new_page(pdf, figures)
+                                fig, ax, y = _new_page(figures)
                             if not subline:
                                 y -= 0.03
                                 continue
