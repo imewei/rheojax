@@ -38,6 +38,30 @@ Basic Batch Workflow
    batch.save_summary('summary.xlsx')  # Parameter table
    batch.save_all_hdf5('results/')      # Individual HDF5 files
 
+CLI Batch Processing
+---------------------
+
+The ``rheojax batch`` command fits one model across many files matching a
+glob pattern, without writing any Python:
+
+.. code-block:: bash
+
+   rheojax batch 'experiments/*.csv' --model maxwell --x-col time --y-col G_t \
+       --output-dir results/ --json
+
+.. admonition:: --parallel is not yet implemented
+   :class: warning
+
+   The ``--parallel`` and ``--workers`` flags are accepted but currently
+   **no-op** — ``rheojax batch`` always processes files sequentially and
+   logs "``--parallel`` is reserved for future use; running sequentially."
+   :mod:`rheojax.parallel` (a process-pool module) exists and is used
+   internally by :class:`rheojax.pipeline.workflows`, but it is not yet
+   wired into this CLI command. For parallel batch fitting today, use the
+   Python :class:`~rheojax.pipeline.batch.BatchPipeline` API above, or
+   drive multiple ``rheojax fit`` invocations yourself (e.g. with GNU
+   ``parallel`` or a process pool).
+
 Manual Batch Processing
 -----------------------
 

@@ -87,9 +87,12 @@ class TestModeEnum(StrEnum):
         return None
 
 
-# Backward compatibility aliases
-RheoTestMode = TestModeEnum  # Transition name
-TestMode = TestModeEnum  # Original name (deprecated)
+# TestMode is the primary public name, used throughout the codebase (see
+# import sites). It is NOT deprecated — TestModeEnum is the alias that
+# exists only to dodge pytest's "Test*" class-collection heuristic (see
+# the class docstring above). RheoTestMode is a secondary transition alias.
+RheoTestMode = TestModeEnum
+TestMode = TestModeEnum
 
 
 def is_monotonic_increasing(
