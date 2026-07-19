@@ -23,6 +23,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.resources.styles.tokens import themed
 from rheojax.gui.utils.layout_helpers import set_compact_margins
 from rheojax.gui.widgets.dropdown import RheoComboBox
 
@@ -30,12 +31,15 @@ _MAX_RECORDS = 2000
 
 _LEVEL_NAMES = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
-_LEVEL_COLORS = {
-    logging.DEBUG: "#8a8a8a",
+# Resolved via themed() at render time (not a frozen dict) so log lines stay
+# WCAG AA-contrast (>=4.5:1) and repaint correctly after a light/dark theme
+# switch, instead of the fixed hex values this used to hardcode.
+_LEVEL_TOKENS = {
+    logging.DEBUG: "TEXT_SECONDARY",
     logging.INFO: None,  # default text color
-    logging.WARNING: "#b8860b",
-    logging.ERROR: "#cc3333",
-    logging.CRITICAL: "#cc3333",
+    logging.WARNING: "WARNING",
+    logging.ERROR: "ERROR",
+    logging.CRITICAL: "ERROR",
 }
 
 
@@ -88,7 +92,8 @@ class LogDockWidget(QDockWidget):
             self._append_line(levelno, message)
 
     def _append_line(self, levelno: int, message: str) -> None:
-        color = _LEVEL_COLORS.get(levelno)
+        token = _LEVEL_TOKENS.get(levelno)
+        color = themed(token) if token else None
         escaped = html.escape(message)
         if color:
             self.text_edit.append(f'<span style="color:{color};">{escaped}</span>')

@@ -182,6 +182,7 @@ class _WindowChrome:
 <tr><td><b>Ctrl+S</b></td><td>Save Project</td></tr>
 <tr><td><b>Ctrl+Shift+S</b></td><td>Save Project As</td></tr>
 <tr><td><b>Ctrl+K</b></td><td>Command Palette</td></tr>
+<tr><td><b>Ctrl+1..9</b></td><td>Jump to Step 1..9 (current mode)</td></tr>
 </table>
         """
         QMessageBox.information(self, "Keyboard Shortcuts", shortcuts)
@@ -433,7 +434,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         self._mode = initial_mode if initial_mode in self.MODES else "fit"
         from rheojax.gui.workspace.pipeline.controller import build_pipeline_controller
 
-        fit_ctl, self._fit_bodies = build_fit_controller(state)
+        fit_ctl, self._fit_bodies = build_fit_controller(state, self.statusBar())
         transform_ctl, self._transform_bodies = build_transform_controller(state)
         pipeline_ctl, self._pipeline_bodies = build_pipeline_controller(
             state,

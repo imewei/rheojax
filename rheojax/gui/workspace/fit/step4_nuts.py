@@ -116,13 +116,16 @@ class NutsStep(QWidget):
         self,
         state: FitState,
         sample_fn: Callable | None = None,
+        active_jobs=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._state = state
         self._sample_fn = sample_fn or _default_sample_fn
+        self._active_jobs = active_jobs
         self._skipped = False
         self._banner = QLabel("⚡ warm-started from NLSQ MAP", self)
+        self._banner.setAccessibleName("Warm-started from NLSQ MAP")
         self._priors_editor = PriorsEditor(self)
 
         # Sampler settings (previously hardcoded in fit_controller.py's
@@ -162,13 +165,21 @@ class NutsStep(QWidget):
 
         self._skip_btn = QPushButton("Skip NUTS", self)
         self._run_btn = QPushButton("▶ Sample", self)
+        self._run_btn.setAccessibleName("Sample")
+        # Only path to stop a running NUTS sample used to be Close/New/Open's
+        # heavyweight "Jobs Running -- Cancel them and continue?" dialog.
+        # This reuses the same active_jobs "worker" token + CancelWorkerRunnable
+        # that dialog already dispatches, just from a direct per-step button.
+        self._cancel_btn = QPushButton("Cancel", self)
+        self._cancel_btn.setVisible(False)
+        self._cancel_btn.clicked.connect(self._on_cancel_clicked)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
         lay.addWidget(self._banner)
         lay.addWidget(self._priors_editor)
         lay.addLayout(settings_form)
-        for w in (self._skip_btn, self._run_btn, self._result):
+        for w in (self._skip_btn, self._run_btn, self._cancel_btn, self._result):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
         self._skip_btn.clicked.connect(self.skip)
@@ -191,6 +202,22 @@ class NutsStep(QWidget):
         cfg.seed = self._seed.value()
         cfg.target_accept = self._target.value()
         cfg.max_tree_depth = self._max_tree_depth.value() or None
+
+    def _on_cancel_clicked(self) -> None:
+        if self._active_jobs is None:
+            return
+        job_id = f"{self._state.data_ref}:nuts"
+        job = self._active_jobs.by_id.get(job_id)
+        worker = job.get("worker") if job else None
+        if worker is None:
+            return
+        from PySide6.QtCore import QThreadPool
+
+        from rheojax.gui.workspace.pipeline.cancel_runnable import (
+            CancelWorkerRunnable,
+        )
+
+        QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))
 
     def priors_editor(self) -> PriorsEditor:
         return self._priors_editor
@@ -247,6 +274,7 @@ class NutsStep(QWidget):
         # completes. Mirrors NlsqStep.run()'s identical guard.
         self._run_btn.setEnabled(False)
         self._skip_btn.setEnabled(False)
+        self._cancel_btn.setVisible(True)
         # See NlsqStep.run()'s matching comment: discard a result that no
         # longer corresponds to the current selection if state moved on
         # while this run was in flight.
@@ -295,6 +323,7 @@ class NutsStep(QWidget):
         finally:
             self._run_btn.setEnabled(True)
             self._skip_btn.setEnabled(True)
+            self._cancel_btn.setVisible(False)
 
     def is_ready(self) -> bool:
         return self._skipped or self._state.nuts_result is not None

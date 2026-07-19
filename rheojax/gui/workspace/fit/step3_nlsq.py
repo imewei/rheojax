@@ -48,11 +48,13 @@ class NlsqStep(QWidget):
         self,
         state: FitState,
         fit_fn: Callable | None = None,
+        active_jobs=None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._state = state
         self._fit_fn = fit_fn or _default_fit_fn
+        self._active_jobs = active_jobs
         self._table = ParameterTable(self)
         self._ms_enabled = QCheckBox("multi-start", self)
         self._ms_count = QSpinBox(self)
@@ -60,8 +62,17 @@ class NlsqStep(QWidget):
         self._ms_count.setValue(8)
         self._fit_options: dict = {}
         self._options_btn = QPushButton("⚙ Fit Options", self)
+        self._options_btn.setAccessibleName("Fit Options")
         self._options_btn.clicked.connect(self._on_options_clicked)
         self._run_btn = QPushButton("▶ Run NLSQ", self)
+        self._run_btn.setAccessibleName("Run NLSQ")
+        # Only path to stop a running NLSQ fit used to be Close/New/Open's
+        # heavyweight "Jobs Running -- Cancel them and continue?" dialog.
+        # This reuses the same active_jobs "worker" token + CancelWorkerRunnable
+        # that dialog already dispatches, just from a direct per-step button.
+        self._cancel_btn = QPushButton("Cancel", self)
+        self._cancel_btn.setVisible(False)
+        self._cancel_btn.clicked.connect(self._on_cancel_clicked)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
@@ -71,10 +82,27 @@ class NlsqStep(QWidget):
             self._ms_count,
             self._options_btn,
             self._run_btn,
+            self._cancel_btn,
             self._result,
         ):
             lay.addWidget(w)
         self._run_btn.clicked.connect(self.run)
+
+    def _on_cancel_clicked(self) -> None:
+        if self._active_jobs is None:
+            return
+        job_id = f"{self._state.data_ref}:nlsq"
+        job = self._active_jobs.by_id.get(job_id)
+        worker = job.get("worker") if job else None
+        if worker is None:
+            return
+        from PySide6.QtCore import QThreadPool
+
+        from rheojax.gui.workspace.pipeline.cancel_runnable import (
+            CancelWorkerRunnable,
+        )
+
+        QThreadPool.globalInstance().start(CancelWorkerRunnable(worker))
 
     def parameter_table(self) -> ParameterTable:
         return self._table
@@ -144,6 +172,7 @@ class NlsqStep(QWidget):
         # button must be disabled for the duration or a second click launches
         # an overlapping fit that corrupts shared active_jobs tracking.
         self._run_btn.setEnabled(False)
+        self._cancel_btn.setVisible(True)
         # Snapshot: _fit_fn pumps a nested QEventLoop, so the user can
         # navigate elsewhere/edit Step 1 while this run is in flight --
         # that invalidation bumps FitState.revision (invalidation.py). If it
@@ -246,6 +275,7 @@ class NlsqStep(QWidget):
             self.finished.emit()
         finally:
             self._run_btn.setEnabled(True)
+            self._cancel_btn.setVisible(False)
 
     def refresh_display(self) -> None:
         """Sync the result label to current state.

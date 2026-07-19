@@ -129,24 +129,30 @@ def _run_on_thread(fn, *, progress_queue=None, on_progress=None):
     return outcome["result"]
 
 
-def _make_progress_reporter(active_jobs, job_id):
+def _make_progress_reporter(active_jobs, job_id, status_bar=None):
     """Build an on_progress callback that stashes the latest progress
-    message on the job's active_jobs.by_id entry, so anything reading
-    active_jobs (e.g. a future status-bar/progress widget) can see it.
+    message on the job's active_jobs.by_id entry, and -- if *status_bar* is
+    given -- forwards it to StatusBar.show_progress() so a running NLSQ/NUTS
+    job is actually visible (previously this only wrote to active_jobs,
+    which nothing read: the run showed no feedback beyond a disabled
+    button for its whole duration).
     GUI-thread only -- no lock needed, see ActiveJobsState.lock's docstring.
     """
 
     def _on_progress(msg) -> None:
-        if active_jobs is None:
-            return
-        job = active_jobs.by_id.get(job_id)
-        if job is not None:
-            job["progress"] = msg
+        if active_jobs is not None:
+            job = active_jobs.by_id.get(job_id)
+            if job is not None:
+                job["progress"] = msg
+        if status_bar is not None and isinstance(msg, dict):
+            status_bar.show_progress(
+                msg.get("percent", 0), msg.get("total", 100), msg.get("message", "")
+            )
 
     return _on_progress
 
 
-def _make_fit_fn(library, fit_state, active_jobs=None):
+def _make_fit_fn(library, fit_state, active_jobs=None, status_bar=None):
     """Build the real fit_fn NlsqStep.run() calls."""
 
     def _fit_fn(
@@ -186,6 +192,8 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
         # while the loop is still suspended waiting on the worker thread.
         if active_jobs is not None:
             active_jobs.by_id[job_id] = {"status": "running", "worker": token}
+        if status_bar is not None:
+            status_bar.show_progress(0, 100, "Fitting...")
         try:
             return _fit_fn_body(
                 library,
@@ -199,10 +207,13 @@ def _make_fit_fn(library, fit_state, active_jobs=None):
                 token.event,
                 active_jobs,
                 job_id,
+                status_bar,
             )
         finally:
             if active_jobs is not None:
                 active_jobs.by_id.pop(job_id, None)
+            if status_bar is not None:
+                status_bar.hide_progress()
 
     return _fit_fn
 
@@ -219,6 +230,7 @@ def _fit_fn_body(
     cancel_event,
     active_jobs=None,
     job_id=None,
+    status_bar=None,
 ):
     rheo_data = library.load_payload(data_ref)
     # ponytail: Step 1's protocol combo uses the same vocabulary as
@@ -277,7 +289,9 @@ def _fit_fn_body(
                     metadata=metadata,
                 ),
                 progress_queue=progress_queue,
-                on_progress=_make_progress_reporter(active_jobs, job_id or data_ref),
+                on_progress=_make_progress_reporter(
+                    active_jobs, job_id or data_ref, status_bar
+                ),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
@@ -309,7 +323,7 @@ def _fit_fn_body(
     return best
 
 
-def _make_sample_fn(library, fit_state, active_jobs=None):
+def _make_sample_fn(library, fit_state, active_jobs=None, status_bar=None):
     """Build the real sample_fn NutsStep.run() calls."""
 
     def _sample_fn(priors, warm_start, config):
@@ -329,6 +343,8 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                 "status": "running",
                 "worker": token,
             }
+        if status_bar is not None:
+            status_bar.show_progress(0, 100, "Sampling...")
         progress_queue = multiprocessing.Queue()
         try:
             return _run_on_thread(
@@ -352,7 +368,7 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                     max_tree_depth=config.get("max_tree_depth"),
                 ),
                 progress_queue=progress_queue,
-                on_progress=_make_progress_reporter(active_jobs, job_id),
+                on_progress=_make_progress_reporter(active_jobs, job_id, status_bar),
             )
         finally:
             # Release the queue's feeder thread/fds/semaphore -- mirrors
@@ -364,20 +380,30 @@ def _make_sample_fn(library, fit_state, active_jobs=None):
                 pass
             if active_jobs is not None:
                 active_jobs.by_id.pop(job_id, None)
+            if status_bar is not None:
+                status_bar.hide_progress()
 
     return _sample_fn
 
 
-def build_fit_controller(app_state: AppState):
+def build_fit_controller(app_state: AppState, status_bar=None):
     st = app_state.fit
     bodies = [
         ProtocolModelStep(st),
         DataStep(st, app_state.library),
         NlsqStep(
-            st, fit_fn=_make_fit_fn(app_state.library, st, app_state.active_jobs)
+            st,
+            fit_fn=_make_fit_fn(
+                app_state.library, st, app_state.active_jobs, status_bar
+            ),
+            active_jobs=app_state.active_jobs,
         ),
         NutsStep(
-            st, sample_fn=_make_sample_fn(app_state.library, st, app_state.active_jobs)
+            st,
+            sample_fn=_make_sample_fn(
+                app_state.library, st, app_state.active_jobs, status_bar
+            ),
+            active_jobs=app_state.active_jobs,
         ),
         VisualizeStep(st),
         ExportStep(st, app_state.library, app_state.active_jobs),

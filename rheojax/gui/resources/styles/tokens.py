@@ -42,8 +42,8 @@ class ColorPalette:
     SUCCESS_HOVER: ClassVar[str] = "#047857"
     SUCCESS_LIGHT: ClassVar[str] = "#D1FAE5"
 
-    WARNING: ClassVar[str] = "#D97706"
-    WARNING_HOVER: ClassVar[str] = "#B45309"
+    WARNING: ClassVar[str] = "#92400E"  # amber-800 (4.5:1+ on BG_SURFACE/WARNING_LIGHT, was #D97706 at 3.05:1)
+    WARNING_HOVER: ClassVar[str] = "#78350F"  # amber-900
     WARNING_LIGHT: ClassVar[str] = "#FEF3C7"
 
     ERROR: ClassVar[str] = "#DC2626"

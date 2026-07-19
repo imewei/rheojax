@@ -97,6 +97,7 @@ class PipelineConfigureRunStep(QWidget):
         )
 
         self._run_all_btn = QPushButton("▶ Run All", self)
+        self._run_all_btn.setAccessibleName("Run All")
         self._run_all_btn.clicked.connect(self.run_requested.emit)
 
         layout = QVBoxLayout(self)

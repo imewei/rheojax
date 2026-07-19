@@ -185,7 +185,9 @@ class PreferencesDialog(QDialog):
         self.max_undo_spin.setSuffix(" steps")
         self.max_undo_spin.setToolTip(
             "Maximum number of undo steps kept in memory. "
-            "Larger values use more memory when fitting large datasets."
+            "Larger values use more memory when fitting large datasets.\n"
+            "Not yet implemented -- no undo history is currently kept. "
+            "Delete Dataset always asks for confirmation instead."
         )
         self.max_undo_spin.valueChanged.connect(
             lambda value: logger.debug(
