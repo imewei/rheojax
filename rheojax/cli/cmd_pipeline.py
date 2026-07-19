@@ -16,14 +16,13 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rheojax.cli._templates import TEMPLATES as _TEMPLATES
 from rheojax.logging import get_logger
 
 if TYPE_CHECKING:
     pass
 
 logger = get_logger(__name__)
-
-from rheojax.cli._templates import TEMPLATES as _TEMPLATES
 
 _TEMPLATE_CHOICES = tuple(sorted(_TEMPLATES.keys()))
 
