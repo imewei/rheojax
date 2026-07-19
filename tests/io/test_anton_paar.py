@@ -617,6 +617,45 @@ class TestExcelExport:
         assert any("Test Mode" in p for p in properties)
         assert any("Points" in p for p in properties)
 
+    def test_export_metadata_sanitizes_formula_injection(self, tmp_path):
+        """CWE-1236: malicious file-derived global metadata and unit
+        strings must be neutralized before they reach the workbook
+        (regression test for ASSESSMENT.md's Excel/formula-injection
+        security finding)."""
+        import openpyxl
+
+        data = RheoData(
+            x=np.array([1.0, 2.0, 3.0]),
+            y=np.array([1.0, 2.0, 3.0]),
+            x_units="=HYPERLINK(\"http://evil\",\"click\")",
+            metadata={
+                "global_metadata": {
+                    "=cmd|'/C calc'!A1": "+2+3",
+                },
+            },
+        )
+
+        output_path = tmp_path / "malicious_metadata.xlsx"
+        save_intervals_to_excel(data, output_path)
+
+        wb = openpyxl.load_workbook(output_path)
+        ws = wb["Metadata"]
+        header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+        prop_col = header.index("Property") + 1
+        value_col = header.index("Value") + 1
+
+        rows = list(ws.iter_rows(min_row=2, values_only=False))
+        global_row = next(r for r in rows if r[prop_col - 1].value.startswith("'="))
+        assert global_row[prop_col - 1].value == "'=cmd|'/C calc'!A1"
+        assert global_row[value_col - 1].value == "'+2+3"
+
+        units_row = next(
+            r for r in rows if "X Units" in str(r[prop_col - 1].value)
+        )
+        assert units_row[value_col - 1].value.startswith("'"), (
+            f"X Units cell must be neutralized, got: {units_row[value_col - 1].value!r}"
+        )
+
     def test_export_interval_data_columns(self, tmp_path):
         """Test interval sheets have correct columns for oscillatory data."""
         filepath = FIXTURES_DIR / "frequency_sweep.csv"
