@@ -6,9 +6,7 @@ models and transforms as plugins, enabling extensibility of the rheojax package.
 
 from __future__ import annotations
 
-import importlib
 import inspect
-import os
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
@@ -19,9 +17,6 @@ from rheojax.core.inventory import Protocol, TransformType
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
-
-# R11-REG-001: Lock for discover_directory sys.path mutation
-_discover_lock = threading.Lock()
 
 
 class PluginType(Enum):
@@ -362,75 +357,6 @@ class Registry:
             "transforms": len(self._transforms),
         }
 
-    def discover(self, module_name: str):
-        """Discover and register plugins from a module.
-
-        Args:
-            module_name: Name of the module to import and scan
-        """
-        try:
-            module = importlib.import_module(module_name)
-        except ImportError:
-            logger.warning(
-                "Failed to import module during discovery", module_name=module_name
-            )
-            return
-
-        # Scan module for plugins
-        for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj):
-                # Only register classes actually defined in this module, not
-                # base classes merely imported into its namespace (e.g. BaseModel).
-                if getattr(obj, "__module__", None) != module_name:
-                    continue
-                # Check if it's a model
-                if hasattr(obj, "fit") and hasattr(obj, "predict"):
-                    try:
-                        self.register(name, obj, PluginType.MODEL, validate=False)
-                    except ValueError as e:
-                        if "already registered" in str(e):
-                            pass  # Expected: duplicate class during discovery
-                        else:
-                            raise
-                # Check if it's a transform
-                elif hasattr(obj, "transform"):
-                    try:
-                        self.register(name, obj, PluginType.TRANSFORM, validate=False)
-                    except ValueError as e:
-                        if "already registered" in str(e):
-                            pass  # Expected: duplicate class during discovery
-                        else:
-                            raise
-
-    def discover_directory(self, path: str):
-        """Discover plugins in a directory.
-
-        Args:
-            path: Path to directory containing plugin modules
-        """
-        if not os.path.exists(path):
-            return
-
-        # R11-REG-001: Wrap sys.path mutation in a lock to prevent races
-        # when multiple threads discover directories concurrently.
-        import sys
-
-        with _discover_lock:
-            sys.path.insert(0, path)
-
-            try:
-                # Scan for Python files
-                for filename in os.listdir(path):
-                    if filename.endswith(".py") and not filename.startswith("_"):
-                        module_name = filename[:-3]
-                        self.discover(module_name)
-            finally:
-                # Remove temporary path (use remove() not pop(0) for thread safety)
-                try:
-                    sys.path.remove(path)
-                except ValueError:
-                    pass
-
     def create_instance(
         self, name: str, plugin_type: PluginType | str, *args, **kwargs
     ) -> Any:
@@ -534,89 +460,6 @@ class Registry:
             if key not in metadata or metadata[key] != value:
                 return False
         return True
-
-    def export_state(self) -> dict[str, Any]:
-        """Export registry state for serialization.
-
-        Returns:
-            Dictionary representation of registry state
-        """
-        return {
-            "models": {
-                name: {
-                    "class_name": info.plugin_class.__name__,
-                    "module": info.plugin_class.__module__,
-                    "metadata": info.metadata,
-                    "protocols": [str(p) for p in info.protocols],
-                }
-                for name, info in self._models.items()
-            },
-            "transforms": {
-                name: {
-                    "class_name": info.plugin_class.__name__,
-                    "module": info.plugin_class.__module__,
-                    "metadata": info.metadata,
-                    "transform_type": (
-                        str(info.transform_type) if info.transform_type else None
-                    ),
-                }
-                for name, info in self._transforms.items()
-            },
-        }
-
-    def import_state(self, state: dict[str, Any]):
-        """Import registry state from serialization.
-
-        Args:
-            state: Dictionary representation of registry state
-        """
-        # Import models
-        for name, info in state.get("models", {}).items():
-            try:
-                module = importlib.import_module(info["module"])
-                plugin_class = getattr(module, info["class_name"])
-                protocols = info.get("protocols", [])
-                self.register(
-                    name,
-                    plugin_class,
-                    PluginType.MODEL,
-                    metadata=info.get("metadata", {}),
-                    force=True,
-                    protocols=protocols,
-                )
-            except (ImportError, AttributeError, KeyError, TypeError) as exc:
-                logger.warning(
-                    "Failed to restore model from state",
-                    name=name,
-                    module=info.get("module") if isinstance(info, dict) else None,
-                    class_name=info.get("class_name") if isinstance(info, dict) else None,
-                    error=str(exc),
-                )
-                continue
-
-        # Import transforms
-        for name, info in state.get("transforms", {}).items():
-            try:
-                module = importlib.import_module(info["module"])
-                plugin_class = getattr(module, info["class_name"])
-                transform_type = info.get("transform_type")
-                self.register(
-                    name,
-                    plugin_class,
-                    PluginType.TRANSFORM,
-                    metadata=info.get("metadata", {}),
-                    force=True,
-                    transform_type=transform_type,
-                )
-            except (ImportError, AttributeError, KeyError, TypeError) as exc:
-                logger.warning(
-                    "Failed to restore transform from state",
-                    name=name,
-                    module=info.get("module") if isinstance(info, dict) else None,
-                    class_name=info.get("class_name") if isinstance(info, dict) else None,
-                    error=str(exc),
-                )
-                continue
 
     def inventory(self) -> dict[str, Any]:
         """Get full inventory of registered plugins.

@@ -215,9 +215,9 @@ def run_bayesian_isolated(
     # Ensure models are registered in this (sub)process.
     # In a subprocess the @ModelRegistry.register decorators haven't fired yet
     # because the model modules use lazy __getattr__ imports.
-    # Registry.discover() cannot trigger __getattr__ (inspect.getmembers uses
-    # dir() which doesn't list lazy names), so we must eagerly import all
-    # submodules to fire the decorators.
+    # Scanning via inspect.getmembers()/dir() cannot trigger __getattr__
+    # (lazy names aren't listed), so we must eagerly import all submodules
+    # to fire the decorators.
     from rheojax.models import _ensure_all_registered
 
     _ensure_all_registered()
