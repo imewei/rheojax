@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from PySide6.QtCore import QEventLoop, QThreadPool
 
 from rheojax.core.registry import TransformRegistry
+from rheojax.gui.foundation.invalidation import (
+    _TRANSFORM_CASCADE,
+    _TRANSFORM_CLEAR,
+    register_step,
+)
 from rheojax.gui.foundation.state import AppState
 from rheojax.gui.jobs.cancellation import CancellationToken
 from rheojax.gui.jobs.transform_worker import TransformWorker
@@ -182,51 +185,35 @@ def build_transform_controller(app_state: AppState):
     ]
     ctl = TransformController(steps)
 
-    for i, body in enumerate(bodies):
-        if hasattr(body, "edited"):
+    pick_body, slots_body, run_body = bodies[0], bodies[1], bodies[2]
 
-            def _on_edit(idx=i):
-                ctl.on_edit(idx)
-                if idx == 0:  # changing the transform clears slots/config/result
-                    new_tx = replace(
-                        app_state.transform,
-                        slots={},
-                        config={},
-                        result=None,
-                        revision=app_state.transform.revision + 1,
-                    )
-                    # Mutate in place so step bodies (which hold a reference
-                    # to app_state.transform via `st`) see the cleared fields
-                    # immediately. TransformState is non-frozen, so setattr
-                    # works without reassigning app_state.transform (mirrors
-                    # fit_controller.py's identical fix for the same hazard).
-                    for attr, val in vars(new_tx).items():
-                        setattr(app_state.transform, attr, val)
-                elif idx == 1 and app_state.transform.result is not None:
-                    # Refilling a slot clears only the stale result -- NOT
-                    # slots/config, since slots is exactly the field the user
-                    # is actively setting via SlotsStep.fill() right now.
-                    # Without this, RunStep.is_ready() (result is not None)
-                    # stays True after a slot change, and the window's
-                    # _advance_and_unlock forward-unlock loop immediately
-                    # re-adds Visualize/Export to `reached`, undoing the
-                    # re-lock that ctl.on_edit(1) just applied and leaving a
-                    # stale result reachable/exportable for a dataset that
-                    # was never actually run.
-                    app_state.transform.result = None
-                    app_state.transform.revision += 1
+    # Downstream refresh that must observe cascaded/relocked state, not the
+    # stale pre-edit state -- register_step connects cascade before this, in
+    # that fixed order (mirrors fit_controller.py's identical guarantee).
+    pick_downstream = [
+        fn for fn in (getattr(slots_body, "refresh", None),) if fn is not None
+    ]
 
-            body.edited.connect(_on_edit)
-
-    # Wire TransformPick edits -> Slots refresh, so `_specs` (frozen at
-    # transform_key=None construction time) gets rebuilt against the picked
-    # transform. Connected after the _on_edit loop above, so the
-    # slots/config/result invalidation runs first and refresh() rebuilds
-    # specs against the already-cleared state (mirrors fit_controller.py's
-    # ProtocolModel -> DataStep.refresh wiring).
-    pick_body, slots_body = bodies[0], bodies[1]
-    if hasattr(pick_body, "edited") and hasattr(slots_body, "refresh"):
-        pick_body.edited.connect(slots_body.refresh)
+    register_step(
+        pick_body,
+        "edited",
+        lambda: ctl.on_edit(0),
+        changed="transform_key",
+        live_state=app_state.transform,
+        cascade_table=_TRANSFORM_CASCADE,
+        clear_table=_TRANSFORM_CLEAR,
+        downstream=pick_downstream,
+    )
+    register_step(
+        slots_body,
+        "edited",
+        lambda: ctl.on_edit(1),
+        changed="slots",
+        live_state=app_state.transform,
+        cascade_table=_TRANSFORM_CASCADE,
+        clear_table=_TRANSFORM_CLEAR,
+    )
+    register_step(run_body, "edited", lambda: ctl.on_edit(2))
 
     # Wire Run finish -> Visualize refresh so the tabs reflect the completed
     # transform_key/result instead of the construction-time (None) state
