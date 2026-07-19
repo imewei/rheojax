@@ -2,8 +2,8 @@
 
 import numpy as np
 
+from rheojax.gui.foundation.state import DatasetState
 from rheojax.gui.services.bayesian_service import BayesianService
-from rheojax.gui.state.store import DatasetState
 
 
 def test_bayesian_with_dataset_state_small_samples():

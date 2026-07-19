@@ -173,74 +173,6 @@ class TestServiceIntegration:
 # =============================================================================
 
 
-class TestStateIntegration:
-    """Test state management integration."""
-
-    @pytest.fixture(autouse=True)
-    def reset_store(self) -> None:
-        """Reset StateStore singleton before each test."""
-        from rheojax.gui.state.store import StateStore
-
-        StateStore.reset()
-        yield
-        StateStore.reset()
-
-    @pytest.mark.smoke
-    def test_state_store_singleton(self) -> None:
-        """Test StateStore is a proper singleton."""
-        from rheojax.gui.state.store import StateStore
-
-        store1 = StateStore()
-        store2 = StateStore()
-
-        assert store1 is store2
-
-    @pytest.mark.smoke
-    def test_state_store_dispatch(self) -> None:
-        """Test StateStore dispatch method."""
-        from rheojax.gui.state.store import StateStore
-
-        store = StateStore()
-
-        # Dispatch should work without signals set
-        store.dispatch({"type": "SET_ACTIVE_MODEL", "model_name": "maxwell"})
-
-        # Should not raise
-        assert True
-
-    @pytest.mark.smoke
-    def test_state_store_update_state(self) -> None:
-        """Test StateStore update_state method."""
-        from rheojax.gui.state.store import AppState, StateStore
-
-        store = StateStore()
-
-        def updater(state: AppState) -> AppState:
-            return AppState(**{**state.__dict__, "project_name": "Test Project"})
-
-        store.update_state(updater)
-
-        state = store.get_state()
-        assert state.project_name == "Test Project"
-
-    @pytest.mark.smoke
-    def test_action_creators(self) -> None:
-        """Test effector action functions dispatch internally and return None."""
-        from rheojax.gui.state.actions import (
-            set_active_model,
-            start_bayesian,
-            start_fitting,
-            update_bayesian_progress,
-        )
-
-        # All action creators are effectors: they dispatch internally
-        # and return None (not dicts).
-        assert set_active_model("maxwell") is None
-        assert start_fitting("maxwell", "dataset_1") is None
-        assert start_bayesian("maxwell", "dataset_1") is None
-        assert update_bayesian_progress(75.0) is None
-
-
 # =============================================================================
 # Widget Integration Tests
 # =============================================================================
@@ -262,7 +194,7 @@ class TestWidgetIntegration:
         self, qapp: QApplication, qtbot: Any
     ) -> None:
         """Test ParameterTable can set and get parameters."""
-        from rheojax.gui.state.store import ParameterState
+        from rheojax.gui.foundation.state import ParameterState
         from rheojax.gui.widgets.parameter_table import ParameterTable
 
         table = ParameterTable()
@@ -390,15 +322,6 @@ class TestWidgetIntegration:
 
 class TestEndToEndWorkflows:
     """Test complete end-to-end workflows without Qt UI."""
-
-    @pytest.fixture(autouse=True)
-    def reset_store(self) -> None:
-        """Reset StateStore singleton before each test."""
-        from rheojax.gui.state.store import StateStore
-
-        StateStore.reset()
-        yield
-        StateStore.reset()
 
     def test_model_fit_workflow_with_services(
         self, sample_oscillation_data: dict[str, Any]

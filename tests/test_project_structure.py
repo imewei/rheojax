@@ -408,7 +408,7 @@ class TestDatasetIdPropagation:
         """FitResult dataclass should have a dataset_id field."""
         # Import FitResult — it may be defined in different locations
         try:
-            from rheojax.gui.state.store import FitResult
+            from rheojax.gui.foundation.state import FitResult
         except ImportError:
             pytest.skip("GUI module not available")
 

@@ -14,21 +14,20 @@ Comprehensive smoke tests for the RheoJAX GUI without requiring a display enviro
 Tests that all GUI modules can be imported successfully.
 
 - `test_gui_main_module_imports`: GUI entry point
-- `test_gui_state_store_imports_no_qt`: State classes (requires PySide6 due to state/__init__.py)
-- `test_gui_state_signals_imports`: Qt signal classes
+- `test_gui_state_store_imports_no_qt`: State dataclasses (`rheojax.gui.foundation.state`)
 - `test_gui_services_imports`: Service layer (data, model, bayesian, transform, plot, export)
 - `test_gui_styles_imports`: Stylesheet utilities
 - `test_gui_app_imports`: App components (main window, menu bar, status bar, toolbar)
 - `test_gui_utils_imports`: Utility modules
 
-### TestStateManagement (18 tests)
-Tests state dataclasses and management without Qt. All tests require PySide6 because importing from `rheojax.gui.state.store` triggers `rheojax.gui.state.__init__.py` which imports `StateSignals`.
+### TestStateManagement
+Tests state dataclasses without Qt (`rheojax.gui.foundation.state` -- plain
+mutable dataclasses, no Redux/signals layer).
 
-- **AppState tests**: Creation with defaults, custom values
-- **DatasetState tests**: Creation, cloning with deep copy
-- **PipelineState tests**: Creation, step enums, status enums
+- **DatasetState tests**: Creation, metadata mutability
+- **PipelineStep/StepStatus enum tests**
 - **ParameterState tests**: Creation, units and descriptions
-- **FitResult/BayesianResult tests**: Creation, cloning
+- **FitResult/BayesianResult tests**: Creation, canonical fields
 
 ### TestServiceInstantiation (7 tests)
 Tests that all services can be instantiated and provide expected APIs.
@@ -109,12 +108,9 @@ The test suite gracefully handles environments with and without PySide6:
 
 ### Tests Requiring PySide6
 
-Tests that import from `rheojax.gui.state.store` require PySide6 because the state module's `__init__.py` imports `StateSignals` which depends on Qt:
-
-- All `TestStateManagement` tests
-- `test_state_and_services_work_together` (integration test)
-- `test_stylesheet_selection_matches_state_theme` (integration test)
-- Various edge case tests
+`rheojax.gui.foundation.state`'s dataclasses have no Qt dependency by
+themselves; tests still skip without PySide6 where they exercise Qt
+widgets/services alongside state (e.g. `ParameterTable`, `WorkspaceWindow`).
 
 ## Test Fixtures
 
@@ -122,19 +118,17 @@ Tests that import from `rheojax.gui.state.store` require PySide6 because the sta
 
 - `qapp`: Session-scoped QApplication (created only if PySide6 available)
 - `gui_config`: GUI configuration (display availability, headless mode)
-- `app_state_instance`: Sample AppState data dictionary
 - `service_config`: Service configuration
 - `stylesheet_sample`: Sample QSS stylesheet
 
 ## Architecture
 
 ### State Management
-State classes are dataclasses under `/rheojax/gui/state/`:
-- `store.py`: State dataclasses (AppState, DatasetState, ParameterState, etc.)
-- `signals.py`: Qt signals (requires PySide6)
-- `__init__.py`: Re-exports both (requires PySide6 due to signals import)
-
-Tests import directly from `store.py` where possible, but some tests need to skip because importing the module triggers the `__init__.py` load.
+State classes are dataclasses under `/rheojax/gui/foundation/state.py`
+(`AppState`, `FitState`, `TransformState`, `PipelineState`, `DatasetState`,
+`ParameterState`, `FitResult`, `BayesianResult`, ...) -- plain mutable
+dataclasses, no Redux store/signals layer. Cross-step invalidation lives in
+`foundation/invalidation.py`.
 
 ### Services
 Service layer under `/rheojax/gui/services/`:
@@ -186,7 +180,7 @@ Result: PASS
 
 ### Adding New Tests
 
-1. **State tests**: Use fixtures from conftest.py, import from `store.py`
+1. **State tests**: Use fixtures from conftest.py, import from `foundation/state.py`
 2. **Service tests**: Call service methods, test return types
 3. **Qt tests**: Mark with `@pytest.mark.skipif(not HAS_PYSIDE6, ...)`
 4. **All tests**: Use descriptive names and docstrings
@@ -195,10 +189,9 @@ Result: PASS
 
 ```python
 @pytest.mark.smoke
-@pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
-def test_new_feature(self, qapp):
+def test_new_feature(self):
     """Test that new feature works correctly."""
-    from rheojax.gui.state.store import SomeState
+    from rheojax.gui.foundation.state import SomeState
 
     state = SomeState(...)
     assert state.property == expected_value
@@ -212,15 +205,6 @@ If tests are being skipped:
 ```bash
 pip install PySide6
 ```
-
-### Import errors from state.store
-
-The `rheojax.gui.state.__init__.py` imports `StateSignals` which requires PySide6. If you see:
-```
-ModuleNotFoundError: No module named 'PySide6'
-```
-
-This is expected when PySide6 is not installed. Tests handle this gracefully.
 
 ### Display-related errors
 

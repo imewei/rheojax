@@ -42,8 +42,8 @@ except ImportError:
 
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.gui.foundation.state import FitResult
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
-from rheojax.gui.state.store import FitResult
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)

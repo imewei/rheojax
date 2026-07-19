@@ -84,7 +84,7 @@ from PySide6.QtWidgets import QApplication
 app = QApplication.instance() or QApplication([])
 from rheojax.core.data import RheoData
 from rheojax.gui.services.plot_service import PlotService
-from rheojax.gui.state.store import FitResult
+from rheojax.gui.foundation.state import FitResult
 
 plot_service = PlotService()
 x = np.logspace(-1, 2, 20)

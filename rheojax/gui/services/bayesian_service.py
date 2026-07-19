@@ -16,9 +16,9 @@ import numpy as np
 from rheojax.core.arviz_utils import inference_data_from_dict
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.foundation.state import BayesianResult, DatasetState
 from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.services.model_service import normalize_model_name
-from rheojax.gui.state.store import BayesianResult, DatasetState
 from rheojax.gui.utils.rheodata import rheodata_from_dataset_state
 from rheojax.logging import get_logger
 

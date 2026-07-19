@@ -4,7 +4,7 @@ Guards against invalid scientific inputs (NaN, inf, out-of-range, inverted
 bounds) reaching FitPage's state-store handlers, which apply them unchecked.
 """
 
-from rheojax.gui.state.store import ParameterState
+from rheojax.gui.foundation.state import ParameterState
 from rheojax.gui.widgets.parameter_table import ParameterTable
 
 

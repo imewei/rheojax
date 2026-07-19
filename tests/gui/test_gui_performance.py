@@ -42,15 +42,6 @@ except ImportError:
 class TestServicePerformance:
     """Performance benchmarks for GUI service layer."""
 
-    @pytest.fixture(autouse=True)
-    def reset_store(self) -> None:
-        """Reset StateStore singleton before each test."""
-        from rheojax.gui.state.store import StateStore
-
-        StateStore.reset()
-        yield
-        StateStore.reset()
-
     def test_model_service_instantiation_time(self) -> None:
         """Benchmark ModelService instantiation time.
 
@@ -176,87 +167,6 @@ class TestServicePerformance:
 # =============================================================================
 
 
-class TestStatePerformance:
-    """Performance benchmarks for state management."""
-
-    @pytest.fixture(autouse=True)
-    def reset_store(self) -> None:
-        """Reset StateStore singleton before each test."""
-        from rheojax.gui.state.store import StateStore
-
-        StateStore.reset()
-        yield
-        StateStore.reset()
-
-    def test_state_dispatch_performance(self) -> None:
-        """Benchmark state dispatch performance.
-
-        Target: <1ms per action dispatch
-        """
-        import time
-
-        from rheojax.gui.state.store import StateStore
-
-        store = StateStore()
-
-        start = time.perf_counter()
-        for i in range(1000):
-            store.dispatch({"type": "SET_ACTIVE_MODEL", "model_name": f"model_{i}"})
-        elapsed = time.perf_counter() - start
-
-        avg_time = elapsed / 1000 * 1000  # ms
-        print(f"State dispatch: {avg_time:.3f}ms avg")
-
-        assert avg_time < 1, f"State dispatch too slow: {avg_time:.3f}ms"
-
-    def test_state_update_performance(self) -> None:
-        """Benchmark state update performance.
-
-        Target: <5ms per state update (includes clone)
-        """
-        import time
-
-        from rheojax.gui.state.store import AppState, StateStore
-
-        store = StateStore()
-
-        def simple_updater(state: AppState) -> AppState:
-            return AppState(**{**state.__dict__, "project_name": "Updated"})
-
-        start = time.perf_counter()
-        for _ in range(100):
-            store.update_state(simple_updater, track_undo=False, emit_signal=False)
-        elapsed = time.perf_counter() - start
-
-        avg_time = elapsed / 100 * 1000  # ms
-        print(f"State update: {avg_time:.2f}ms avg")
-
-        assert avg_time < 5, f"State update too slow: {avg_time:.2f}ms"
-
-    def test_state_clone_performance(self) -> None:
-        """Benchmark state cloning performance.
-
-        Target: <10ms to clone full state
-        """
-        import time
-
-        from rheojax.gui.state.store import StateStore
-
-        store = StateStore()
-        state = store.get_state()
-
-        start = time.perf_counter()
-        for _ in range(100):
-            cloned = state.clone()
-        elapsed = time.perf_counter() - start
-
-        avg_time = elapsed / 100 * 1000  # ms
-        print(f"State clone: {avg_time:.2f}ms avg")
-
-        assert cloned is not state
-        assert avg_time < 10, f"State clone too slow: {avg_time:.2f}ms"
-
-
 # =============================================================================
 # Widget Performance Benchmarks (Require Qt)
 # =============================================================================
@@ -313,7 +223,7 @@ class TestWidgetPerformance:
         """
         import time
 
-        from rheojax.gui.state.store import ParameterState
+        from rheojax.gui.foundation.state import ParameterState
         from rheojax.gui.widgets.parameter_table import ParameterTable
 
         table = ParameterTable()

@@ -17,13 +17,13 @@ import numpy as np
 
 from rheojax.core.data import RheoData
 from rheojax.core.registry import Registry
+from rheojax.gui.foundation.state import FitResult
 from rheojax.gui.jobs.cancellation import CancellationError
-from rheojax.gui.state.store import FitResult
 from rheojax.logging import get_logger
 from rheojax.utils.compatibility import check_model_compatibility
 
 if TYPE_CHECKING:
-    from rheojax.gui.state.store import ParameterState
+    from rheojax.gui.foundation.state import ParameterState
 
 logger = get_logger(__name__)
 
@@ -401,7 +401,7 @@ class ModelService:
 
         model_name = self._normalize_model_name(model_name)
 
-        from rheojax.gui.state.store import ParameterState
+        from rheojax.gui.foundation.state import ParameterState
 
         try:
             model = self._registry.create_instance(model_name, plugin_type="model")

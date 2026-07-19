@@ -21,8 +21,8 @@ from rheojax.gui.compat import (
     QWidget,
     Signal,
 )
+from rheojax.gui.foundation.state import ParameterState
 from rheojax.gui.resources.styles.tokens import Typography, themed
-from rheojax.gui.state.store import ParameterState
 from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.logging import get_logger
 

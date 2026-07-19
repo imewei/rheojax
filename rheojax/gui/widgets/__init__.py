@@ -6,7 +6,7 @@ Reusable UI components for the RheoJAX GUI.
 """
 
 # Export enums from store for convenience
-from rheojax.gui.state.store import PipelineStep, StepStatus
+from rheojax.gui.foundation.state import PipelineStep, StepStatus
 from rheojax.gui.widgets.arviz_canvas import ArviZCanvas, ArvizCanvas
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget, PlotMetrics
 from rheojax.gui.widgets.dropdown import RheoComboBox

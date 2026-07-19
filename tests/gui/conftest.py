@@ -85,37 +85,6 @@ def qapp() -> Generator:
 
 
 @pytest.fixture
-def app_state_instance() -> dict:
-    """Provide sample AppState data for testing without Qt.
-
-    Returns
-    -------
-    dict
-        Sample application state matching AppState structure.
-
-    Notes
-    -----
-    This fixture provides test data without importing Qt components,
-    useful for testing state management and serialization.
-    """
-    return {
-        "project_path": None,
-        "project_name": "Test Project",
-        "is_modified": False,
-        "datasets": {},
-        "active_dataset_id": None,
-        "active_model_name": None,
-        "model_params": {},
-        "fit_results": {},
-        "bayesian_results": {},
-        "current_tab": "home",
-        "theme": "light",
-        "auto_save_enabled": True,
-        "current_seed": 42,
-    }
-
-
-@pytest.fixture
 def service_config() -> dict:
     """Provide configuration for service testing.
 
@@ -400,22 +369,11 @@ def emoji_checker():
 
 @pytest.fixture(autouse=True)
 def reset_state_store():
-    """Reset StateStore and WorkerPool singletons between tests.
+    """Reset WorkerPool singleton between tests.
 
-    This fixture ensures each test starts with clean singleton instances,
-    preventing state leakage and process accumulation between tests.
-
-    Without WorkerPool reset, subprocess workers spawned by one test
-    persist into subsequent tests, compounding memory usage.
+    Without this reset, subprocess workers spawned by one test persist
+    into subsequent tests, compounding memory usage.
     """
-    # Reset before test
-    try:
-        from rheojax.gui.state.store import StateStore
-
-        StateStore._instance = None
-    except ImportError:
-        pass
-
     try:
         from rheojax.gui.jobs.worker_pool import WorkerPool
 
@@ -424,14 +382,6 @@ def reset_state_store():
         pass
 
     yield
-
-    # Reset after test to clean up
-    try:
-        from rheojax.gui.state.store import StateStore
-
-        StateStore._instance = None
-    except ImportError:
-        pass
 
     try:
         from rheojax.gui.jobs.worker_pool import WorkerPool

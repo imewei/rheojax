@@ -41,8 +41,8 @@ except ImportError:
 
 
 from rheojax.core.jax_config import safe_import_jax
+from rheojax.gui.foundation.state import BayesianResult
 from rheojax.gui.jobs.cancellation import CancellationError, CancellationToken
-from rheojax.gui.state.store import BayesianResult
 from rheojax.logging import get_logger
 
 # Safe JAX import (enforces float64)

@@ -109,7 +109,7 @@ def __getattr__(name: str):
 
         return BayesianWorkerSignals
     elif name == "BayesianResult":
-        from rheojax.gui.state.store import BayesianResult
+        from rheojax.gui.foundation.state import BayesianResult
 
         return BayesianResult
     elif name == "TransformWorker":

@@ -186,7 +186,7 @@ class TestWidgetRenderingSafety:
     @pytest.mark.gui
     def test_parameter_table_creates_safely(self, qapp):
         """Verify ParameterTable creates without crash."""
-        from rheojax.gui.state.store import ParameterState
+        from rheojax.gui.foundation.state import ParameterState
         from rheojax.gui.widgets.parameter_table import ParameterTable
 
         table = ParameterTable()
@@ -229,7 +229,7 @@ class TestSubprocessCrashDetection:
         """Verify ParameterTable creation doesn't crash."""
         code = textwrap.dedent("""
             from PySide6.QtWidgets import QApplication
-            from rheojax.gui.state.store import ParameterState
+            from rheojax.gui.foundation.state import ParameterState
             from rheojax.gui.widgets.parameter_table import ParameterTable
 
             app = QApplication([])
