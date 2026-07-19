@@ -21,7 +21,7 @@ import copy
 import uuid
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
@@ -44,47 +44,48 @@ def _is_jax_array(x: Any) -> bool:
     return hasattr(x, "devices") and not isinstance(x, np.ndarray)
 
 
-class Pipeline:
-    """Fluent API for rheological analysis workflows.
+class _PipelineState:
+    """Shared instance-attribute/method declarations for Pipeline's mixins.
 
-    This class provides a chainable interface for loading data, applying
-    transforms, fitting models, and generating outputs. All methods return
-    self to enable method chaining.
-
-    Attributes:
-        data: Current RheoData state
-        steps: List of (operation, object) tuples for fitted models
-        history: List of (operation, details) tuples tracking all operations
-        _last_model: Last fitted model for convenience
-
-    Example:
-        >>> pipeline = Pipeline()
-        >>> pipeline.load('data.csv').fit('maxwell').plot()
+    Purely a static-typing aid: the actual attributes are set by
+    Pipeline.__init__ and the stubbed methods are implemented in Pipeline
+    itself. Subclassed (never instantiated directly) by _PipelineIO and
+    _PipelinePlotting so mypy knows what `self` provides in each mixin,
+    without duplicating the real implementations.
     """
 
-    def __init__(self, data: RheoData | None = None):
-        """Initialize pipeline.
+    if TYPE_CHECKING:
+        data: RheoData | None
+        steps: list[tuple[str, Any]]
+        history: list[tuple[Any, ...]]
+        _last_model: BaseModel | None
+        _last_fit_result: Any
+        _last_bayesian_result: Any
+        _transform_results: dict[str, tuple[Any, RheoData | None]]
+        _last_transform_name: str | None
+        _current_figure: Any
+        _diagnostic_results: Any
+        _last_comparison: Any
+        _id: str
 
-        Args:
-            data: Optional initial RheoData. If None, must call load() first.
-        """
-        self.data = data
-        self.steps: list[tuple[str, Any]] = []
-        self.history: list[tuple[Any, ...]] = []
-        self._last_model: BaseModel | None = None
-        self._last_fit_result: Any = None
-        self._last_bayesian_result: Any = None
-        self._transform_results: dict[str, tuple[Any, RheoData | None]] = {}
-        self._last_transform_name: str | None = None
-        self._current_figure: Any = None
-        self._diagnostic_results: Any = None
-        self._last_comparison: Any = None
-        self._id = str(uuid.uuid4())[:8]
-        logger.debug(
-            "Pipeline initialized",
-            pipeline_id=self._id,
-            has_initial_data=data is not None,
-        )
+        def predict(
+            self, model: BaseModel | None = ..., X: np.ndarray | None = ...
+        ) -> RheoData: ...
+        def get_fit_result(self) -> Any: ...
+        def _apply_test_mode_metadata(
+            self, data: RheoData | None, mode: str | None
+        ) -> None: ...
+
+
+class _PipelineIO(_PipelineState):
+    """File I/O collaborator for Pipeline: load, save, export.
+
+    Split out of the former monolithic Pipeline class (ASSESSMENT.md
+    Technical Debt #5) to separate file-format concerns from the
+    fit/predict/model-management core. Composed into Pipeline via multiple
+    inheritance -- methods here operate on attributes owned by
+    Pipeline.__init__ (self.data, self.steps, self.history, self._id).
+    """
 
     def load(
         self,
@@ -94,7 +95,7 @@ class Pipeline:
         test_mode: str | None = None,
         initial_test_mode: str | None = None,
         **kwargs,
-    ) -> Pipeline:
+    ) -> Self:
         """Load data from file.
 
         Args:
@@ -187,6 +188,731 @@ class Pipeline:
 
         self.history.append(("load", str(path), format))
         return self
+
+    def save(self, file_path: str | Path, format: str = "hdf5", **kwargs) -> Self:
+        """Save current data to file.
+
+        Args:
+            file_path: Output file path
+            format: Output format ('hdf5', 'excel', 'csv')
+            **kwargs: Additional arguments passed to writer
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.save('output.hdf5')
+        """
+        if self.data is None:
+            raise ValueError("No data to save. Call load() first.")
+
+        path = Path(file_path)
+
+        # R12-E-007: include fitted model parameters in data metadata before saving
+        if self.steps:
+            _last_fit_steps = [s for s in self.steps if s[0] in ("fit", "fit_nlsq")]
+            if _last_fit_steps:
+                _fit_model = _last_fit_steps[-1][1]
+                if hasattr(_fit_model, "parameters"):
+                    # See _apply_test_mode_metadata: RheoData.metadata is
+                    # never None post-construction, so this is unreachable
+                    # per the type checker; kept as defense-in-depth.
+                    if self.data.metadata is None:
+                        self.data.metadata = {}  # type: ignore[unreachable]
+                    for _pname in _fit_model.parameters.keys():
+                        try:
+                            self.data.metadata[f"fitted_{_pname}"] = float(
+                                _fit_model.parameters.get_value(_pname)
+                            )
+                        except (TypeError, ValueError):
+                            pass
+                    self.data.metadata["fitted_model"] = type(_fit_model).__name__
+
+        with log_pipeline_stage(
+            logger,
+            "save",
+            pipeline_id=self._id,
+            file_path=str(path),
+            format=format,
+        ) as ctx:
+            try:
+                if format == "hdf5":
+                    from rheojax.io import save_hdf5
+
+                    save_hdf5(self.data, path, **kwargs)
+                elif format == "excel":
+                    from rheojax.io import save_excel
+
+                    # R13-PIPE-XLS-001: The "parameters" key should contain
+                    # actual model parameters (name → value), not metadata
+                    # labels. Data metadata (units, domain) goes into a
+                    # separate "fit_quality" dict for the Fit Quality sheet.
+                    parameters: dict[str, Any] = {}
+                    _last_fit_steps = [
+                        s for s in self.steps if s[0] in ("fit", "fit_nlsq")
+                    ]
+                    if _last_fit_steps:
+                        _fit_model = _last_fit_steps[-1][1]
+                        if hasattr(_fit_model, "parameters"):
+                            for _pname in _fit_model.parameters.keys():
+                                try:
+                                    parameters[_pname] = float(
+                                        _fit_model.parameters.get_value(_pname)
+                                    )
+                                except (TypeError, ValueError):
+                                    pass
+                            parameters["model"] = type(_fit_model).__name__
+
+                    fit_quality: dict[str, Any] = {}
+                    if self.data.x_units:
+                        fit_quality["x_units"] = self.data.x_units
+                    if self.data.y_units:
+                        fit_quality["y_units"] = self.data.y_units
+                    if self.data.domain:
+                        fit_quality["domain"] = self.data.domain
+
+                    excel_payload: dict[str, Any] = {
+                        "x": np.array(self.data.x),
+                        "predictions": np.array(self.data.y),
+                    }
+                    if parameters:
+                        excel_payload["parameters"] = parameters
+                    if fit_quality:
+                        excel_payload["fit_quality"] = fit_quality
+                    save_excel(excel_payload, path, **kwargs)
+                elif format == "csv":
+                    # R13-PIPE-CSV-001: Handle complex and 2D y arrays
+                    # in CSV export. Complex y is split into real/imag
+                    # columns; 2D y is split into numbered columns.
+                    import pandas as pd
+
+                    x_arr = np.array(self.data.x)
+                    y_arr = np.array(self.data.y)
+                    if np.iscomplexobj(y_arr):
+                        df = pd.DataFrame(
+                            {
+                                "x": x_arr,
+                                "y_real": np.real(y_arr),
+                                "y_imag": np.imag(y_arr),
+                            }
+                        )
+                    elif y_arr.ndim == 2:
+                        cols: dict[str, Any] = {"x": x_arr}
+                        for ci in range(y_arr.shape[1]):
+                            cols[f"y_{ci}"] = y_arr[:, ci]
+                        df = pd.DataFrame(cols)
+                    else:
+                        df = pd.DataFrame({"x": x_arr, "y": y_arr})
+                    df.to_csv(path, index=False, **kwargs)
+                else:
+                    raise ValueError(f"Unknown format: {format}")
+
+                ctx["n_points"] = (
+                    len(self.data.x) if self.data.x is not None else 0
+                )
+            except Exception as e:
+                logger.error(
+                    "Failed to save data",
+                    pipeline_id=self._id,
+                    file_path=str(path),
+                    format=format,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        self.history.append(("save", str(path), format))
+        return self
+
+    def export(
+        self,
+        output: str | Path,
+        format: str = "auto",
+        *,
+        include_data: bool = True,
+        include_figures: bool = True,
+        include_diagnostics: bool = True,
+        figure_formats: tuple[str, ...] = ("pdf", "png"),
+        figure_dpi: int = 300,
+        **kwargs,
+    ) -> Self:
+        """Export the full analysis to a directory or file.
+
+        This bundles data, parameters, statistics, figures, transform results,
+        and Bayesian diagnostics into a single export.
+
+        Args:
+            output: Output path. If a directory (no extension or trailing /),
+                exports as structured directory. If .xlsx, exports Excel.
+            format: Export format ('auto', 'directory', 'excel').
+                'auto' infers from the output path extension.
+            include_data: Save raw and transformed data files.
+            include_figures: Save generated matplotlib figures.
+            include_diagnostics: Save MCMC diagnostic plots.
+            figure_formats: Formats for figure files (default: ('pdf', 'png')).
+            figure_dpi: Resolution for raster figures (default: 300).
+            **kwargs: Additional arguments forwarded to the exporter.
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.load('data.csv').fit('maxwell').plot_fit().export('./results')
+            >>> pipeline.export('report.xlsx')
+        """
+        from rheojax.io.analysis_exporter import AnalysisExporter
+
+        output_path = Path(output)
+        exporter = AnalysisExporter(
+            figure_formats=figure_formats,
+            figure_dpi=figure_dpi,
+        )
+
+        # Determine format
+        if format == "auto":
+            if output_path.suffix.lower() == ".xlsx":
+                format = "excel"
+            else:
+                format = "directory"
+
+        with log_pipeline_stage(
+            logger,
+            "export",
+            pipeline_id=self._id,
+            output=str(output_path),
+            format=format,
+        ) as ctx:
+            try:
+                if format == "directory":
+                    exporter.export_directory(
+                        self,
+                        output_path,
+                        include_data=include_data,
+                        include_figures=include_figures,
+                        include_diagnostics=include_diagnostics,
+                        **kwargs,
+                    )
+                elif format == "excel":
+                    exporter.export_excel(
+                        self,
+                        output_path,
+                        include_plots=include_figures,
+                        **kwargs,
+                    )
+                else:
+                    raise ValueError(
+                        f"Unknown export format: {format}. Use 'directory' or 'excel'."
+                    )
+                ctx["format"] = format
+            except Exception as e:
+                logger.error(
+                    "Export failed",
+                    pipeline_id=self._id,
+                    output=str(output_path),
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        self.steps.append(
+            ("export", {"output_path": str(output_path), "format": format})
+        )
+        self.history.append(("export", str(output_path), format))
+        return self
+
+
+class _PipelinePlotting(_PipelineState):
+    """Plotting collaborator for Pipeline: plot, save_figure, plot_*.
+
+    Split out of the former monolithic Pipeline class (ASSESSMENT.md
+    Technical Debt #5). All methods here share self._current_figure and
+    call back into Pipeline core methods (e.g. plot_fit calls
+    self.get_fit_result()) -- safe because Pipeline composes this mixin,
+    so `self` always has the full method/attribute set at runtime.
+    """
+
+    def plot(
+        self,
+        show: bool = True,
+        style: str = "default",
+        include_prediction: bool = False,
+        **plot_kwargs,
+    ) -> Self:
+        """Plot current data state.
+
+        Args:
+            show: Whether to call plt.show()
+            style: Plot style ('default', 'publication', 'presentation')
+            include_prediction: If True and model fitted, overlay predictions
+            **plot_kwargs: Additional arguments passed to plotting function
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.plot(style='publication')
+        """
+        if self.data is None:
+            raise ValueError("No data loaded. Call load() first.")
+
+        with log_pipeline_stage(
+            logger,
+            "plot",
+            pipeline_id=self._id,
+            style=style,
+            include_prediction=include_prediction,
+        ) as ctx:
+            from rheojax.visualization.plotter import plot_rheo_data
+
+            fig, ax = plot_rheo_data(self.data, style=style, **plot_kwargs)
+
+            # Optionally overlay predictions
+            if include_prediction and self._last_model is not None:
+                predictions = self.predict()
+                import matplotlib.pyplot as plt
+
+                # Get the axes (handle both single and multiple axes)
+                if isinstance(ax, np.ndarray):
+                    ax_plot = ax[0]
+                else:
+                    ax_plot = ax
+
+                ax_plot.plot(
+                    predictions.x,
+                    predictions.y,
+                    "--",
+                    label="Model Prediction",
+                    linewidth=2,
+                )
+                ax_plot.legend()
+                ctx["prediction_overlay"] = True
+
+            if show:
+                import matplotlib.pyplot as plt
+
+                plt.show()
+
+            # Store figure for save_figure() method
+            self._current_figure = fig
+
+        self.history.append(("plot", style))
+        return self
+
+    def save_figure(
+        self,
+        filepath: str | Path,
+        format: str | None = None,
+        dpi: int = 300,
+        **kwargs: Any,
+    ) -> Self:
+        """
+        Save the most recent plot to file.
+
+        Convenience method for exporting plots with publication-quality defaults.
+        Wraps rheojax.visualization.plotter.save_figure() to enable fluent API chaining.
+
+        Parameters
+        ----------
+        filepath : str or Path
+            Output file path. Format inferred from extension if not specified.
+        format : str, optional
+            Output format ('pdf', 'svg', 'png', 'eps'). If None, inferred from filepath.
+        dpi : int, default=300
+            Resolution for raster formats (PNG).
+        **kwargs : dict
+            Additional arguments passed to save_figure().
+            See rheojax.visualization.plotter.save_figure() for details.
+
+        Returns
+        -------
+        self : Pipeline
+            Returns self to enable method chaining
+
+        Raises
+        ------
+        ValueError
+            If no plot exists (plot() not called yet)
+        ValueError
+            If format cannot be inferred or is unsupported
+        OSError
+            If filepath directory doesn't exist
+
+        Examples
+        --------
+        Basic usage with method chaining:
+
+        >>> pipeline = Pipeline()
+        >>> pipeline.load('data.csv').fit('maxwell').plot().save_figure('result.pdf')
+
+        Save multiple formats:
+
+        >>> pipeline.plot(style='publication')
+        >>> pipeline.save_figure('figure.pdf')
+        >>> pipeline.save_figure('figure.png', dpi=600)
+        >>> pipeline.save_figure('figure.svg', transparent=True)
+
+        Explicit format:
+
+        >>> pipeline.plot().save_figure('output', format='pdf')
+
+        See Also
+        --------
+        plot : Generate plot with automatic type selection
+        rheojax.visualization.plotter.save_figure : Core export function
+
+        Notes
+        -----
+        This method saves the most recent plot generated by plot(). If you call plot()
+        multiple times, only the last figure is saved. To save multiple plots, call
+        save_figure() after each plot() call.
+
+        The figure is stored internally by plot() and retrieved by save_figure().
+        """
+        if self._current_figure is None:
+            raise ValueError(
+                "No figure to save. Call plot() before save_figure(). "
+                "Example: pipeline.load('data.csv').fit('maxwell').plot().save_figure('output.pdf')"
+            )
+
+        from rheojax.visualization.plotter import save_figure
+
+        path = Path(filepath)
+
+        with log_pipeline_stage(
+            logger,
+            "save_figure",
+            pipeline_id=self._id,
+            file_path=str(path),
+            format=format,
+            dpi=dpi,
+        ) as ctx:
+            try:
+                save_figure(
+                    self._current_figure, path, format=format, dpi=dpi, **kwargs
+                )
+                ctx["saved"] = True
+            except Exception as e:
+                logger.error(
+                    "Failed to save figure",
+                    pipeline_id=self._id,
+                    file_path=str(path),
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
+
+        self.history.append(("save_figure", str(path)))
+        return self
+
+    def plot_fit(
+        self,
+        confidence: float = 0.95,
+        show_residuals: bool = True,
+        show_uncertainty: bool = True,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Self:
+        """Plot NLSQ fit with uncertainty band and residuals.
+
+        Requires a prior call to fit(). Uses FitPlotter internally.
+
+        Args:
+            confidence: Confidence level for uncertainty band (default: 0.95).
+            show_residuals: If True, add residuals subplot.
+            show_uncertainty: If True and covariance available, show band.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style ('default', 'publication', 'presentation').
+            **kwargs: Additional arguments forwarded to FitPlotter.plot_nlsq().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit('maxwell').plot_fit(confidence=0.95)
+        """
+        if self._last_model is None:
+            raise ValueError("No model fitted. Call fit() first.")
+        if self.data is None:
+            raise ValueError("No data loaded. Call load() first.")
+
+        from rheojax.visualization.fit_plotter import FitPlotter
+
+        fit_result = self.get_fit_result()
+        plotter = FitPlotter()
+
+        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        X = np.asarray(self.data.x)
+        y = np.asarray(self.data.y)
+
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "test_mode" not in kwargs:
+            tm = _meta.get("test_mode")
+            if tm is not None:
+                kwargs["test_mode"] = tm
+
+        fig, axes = plotter.plot_nlsq(
+            X,
+            y,
+            fit_result,
+            self._last_model,
+            confidence=confidence,
+            show_residuals=show_residuals,
+            show_uncertainty=show_uncertainty,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_fit", style))
+        return self
+
+    def plot_bayesian(
+        self,
+        credible_level: float = 0.95,
+        max_draws: int = 500,
+        show_nlsq_overlay: bool = False,
+        show_residuals: bool = False,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Self:
+        """Plot Bayesian posterior predictive with credible interval.
+
+        Requires a prior call to fit_bayesian().
+
+        Args:
+            credible_level: Credible interval level (default: 0.95).
+            max_draws: Maximum posterior draws for band computation.
+            show_nlsq_overlay: If True, overlay NLSQ fit for comparison.
+            show_residuals: If True, add residuals subplot.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style.
+            **kwargs: Additional arguments forwarded to FitPlotter.plot_bayesian().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit('maxwell').fit_bayesian(seed=42).plot_bayesian()
+        """
+        if self._last_bayesian_result is None:
+            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
+        if self._last_model is None:
+            raise ValueError("No model available.")
+        if self.data is None:
+            raise ValueError("No data loaded.")
+
+        from rheojax.visualization.fit_plotter import FitPlotter
+
+        plotter = FitPlotter()
+        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        X = np.asarray(self.data.x)
+        y = np.asarray(self.data.y)
+
+        # Forward metadata
+        _meta = getattr(self.data, "metadata", None) or {}
+        if "test_mode" not in kwargs:
+            tm = _meta.get("test_mode")
+            if tm is not None:
+                kwargs["test_mode"] = tm
+
+        fit_result = None
+        if show_nlsq_overlay:
+            try:
+                fit_result = self.get_fit_result()
+            except ValueError:
+                pass
+
+        fig, axes = plotter.plot_bayesian(
+            X,
+            y,
+            self._last_bayesian_result,
+            self._last_model,
+            credible_level=credible_level,
+            max_draws=max_draws,
+            show_nlsq_overlay=show_nlsq_overlay,
+            fit_result=fit_result,
+            show_residuals=show_residuals,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_bayesian", style))
+        return self
+
+    def plot_diagnostics(
+        self,
+        output_dir: str | Path | None = None,
+        style: str = "default",
+        prefix: str = "mcmc",
+        formats: tuple[str, ...] = ("pdf", "png"),
+        dpi: int = 300,
+        **kwargs,
+    ) -> Self:
+        """Generate ArviZ MCMC diagnostic suite (6 plots).
+
+        Requires a prior call to fit_bayesian().
+
+        Args:
+            output_dir: Directory for saving plots. If None, displays only.
+            style: Plot style.
+            prefix: Filename prefix for saved plots.
+            formats: Output formats (default: ('pdf', 'png')).
+            dpi: Resolution for raster formats.
+            **kwargs: Additional arguments forwarded to generate_diagnostic_suite().
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.fit_bayesian(seed=42).plot_diagnostics(output_dir='./diag')
+        """
+        if self._last_bayesian_result is None:
+            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
+
+        from rheojax.visualization.fit_plotter import generate_diagnostic_suite
+
+        result = generate_diagnostic_suite(
+            self._last_bayesian_result,
+            style=style,
+            output_dir=output_dir,
+            prefix=prefix,
+            formats=formats,
+            dpi=dpi,
+            **kwargs,
+        )
+
+        self._diagnostic_results = result
+
+        # Expose the first diagnostic figure for save_figure() chaining.
+        # generate_diagnostic_suite returns Mapping[str, Figure | Path]
+        # (a real dict at runtime).
+        if isinstance(result, dict):
+            for fig_or_path in result.values():
+                if hasattr(fig_or_path, "savefig"):
+                    self._current_figure = fig_or_path
+                    break
+
+        self.history.append(("plot_diagnostics", str(output_dir)))
+        return self
+
+    def plot_transform(
+        self,
+        transform_name: str | None = None,
+        show_intermediate: bool = True,
+        show: bool = True,
+        style: str = "default",
+        **kwargs,
+    ) -> Self:
+        """Plot the result of a previously applied transform.
+
+        Uses TransformPlotter for per-transform layout dispatch.
+
+        Args:
+            transform_name: Name of the transform to plot. If None, uses the
+                most recently applied transform.
+            show_intermediate: Whether to show before/after comparison.
+            show: Whether to call plt.show() (default: True).
+            style: Plot style.
+            **kwargs: Additional arguments forwarded to TransformPlotter.
+
+        Returns:
+            self for method chaining
+
+        Example:
+            >>> pipeline.transform('mastercurve', reference_temp=25.0).plot_transform()
+        """
+        from rheojax.visualization.transform_plotter import TransformPlotter
+
+        if transform_name is None:
+            transform_name = self._last_transform_name
+
+        if transform_name is None or transform_name not in self._transform_results:
+            available = list(self._transform_results.keys())
+            raise ValueError(
+                f"No cached result for transform '{transform_name}'. "
+                f"Available transforms: {available}. "
+                "Call transform() before plot_transform()."
+            )
+
+        cached_result, pre_data = self._transform_results[transform_name]
+        plotter = TransformPlotter()
+
+        fig, axes = plotter.plot(
+            transform_name,
+            cached_result,
+            input_data=pre_data if show_intermediate else None,
+            show_intermediate=show_intermediate,
+            style=style,
+            **kwargs,
+        )
+
+        self._current_figure = fig
+
+        if show:
+            import matplotlib.pyplot as plt
+
+            plt.show()
+
+        self.history.append(("plot_transform", transform_name, style))
+        return self
+
+
+class Pipeline(_PipelineIO, _PipelinePlotting):
+    """Fluent API for rheological analysis workflows.
+
+    This class provides a chainable interface for loading data, applying
+    transforms, fitting models, and generating outputs. All methods return
+    self to enable method chaining.
+
+    Attributes:
+        data: Current RheoData state
+        steps: List of (operation, object) tuples for fitted models
+        history: List of (operation, details) tuples tracking all operations
+        _last_model: Last fitted model for convenience
+
+    Example:
+        >>> pipeline = Pipeline()
+        >>> pipeline.load('data.csv').fit('maxwell').plot()
+    """
+
+    def __init__(self, data: RheoData | None = None):
+        """Initialize pipeline.
+
+        Args:
+            data: Optional initial RheoData. If None, must call load() first.
+        """
+        self.data = data
+        self.steps: list[tuple[str, Any]] = []
+        self.history: list[tuple[Any, ...]] = []
+        self._last_model: BaseModel | None = None
+        self._last_fit_result: Any = None
+        self._last_bayesian_result: Any = None
+        self._transform_results: dict[str, tuple[Any, RheoData | None]] = {}
+        self._last_transform_name: str | None = None
+        self._current_figure: Any = None
+        self._diagnostic_results: Any = None
+        self._last_comparison: Any = None
+        self._id = str(uuid.uuid4())[:8]
+        logger.debug(
+            "Pipeline initialized",
+            pipeline_id=self._id,
+            has_initial_data=data is not None,
+        )
 
     def transform(self, transform: str | BaseTransform, **kwargs) -> Pipeline:
         """Apply a transform to the data.
@@ -438,314 +1164,6 @@ class Pipeline:
             validate=False,
         )
 
-    def plot(
-        self,
-        show: bool = True,
-        style: str = "default",
-        include_prediction: bool = False,
-        **plot_kwargs,
-    ) -> Pipeline:
-        """Plot current data state.
-
-        Args:
-            show: Whether to call plt.show()
-            style: Plot style ('default', 'publication', 'presentation')
-            include_prediction: If True and model fitted, overlay predictions
-            **plot_kwargs: Additional arguments passed to plotting function
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.plot(style='publication')
-        """
-        if self.data is None:
-            raise ValueError("No data loaded. Call load() first.")
-
-        with log_pipeline_stage(
-            logger,
-            "plot",
-            pipeline_id=self._id,
-            style=style,
-            include_prediction=include_prediction,
-        ) as ctx:
-            from rheojax.visualization.plotter import plot_rheo_data
-
-            fig, ax = plot_rheo_data(self.data, style=style, **plot_kwargs)
-
-            # Optionally overlay predictions
-            if include_prediction and self._last_model is not None:
-                predictions = self.predict()
-                import matplotlib.pyplot as plt
-
-                # Get the axes (handle both single and multiple axes)
-                if isinstance(ax, np.ndarray):
-                    ax_plot = ax[0]
-                else:
-                    ax_plot = ax
-
-                ax_plot.plot(
-                    predictions.x,
-                    predictions.y,
-                    "--",
-                    label="Model Prediction",
-                    linewidth=2,
-                )
-                ax_plot.legend()
-                ctx["prediction_overlay"] = True
-
-            if show:
-                import matplotlib.pyplot as plt
-
-                plt.show()
-
-            # Store figure for save_figure() method
-            self._current_figure = fig
-
-        self.history.append(("plot", style))
-        return self
-
-    def save(self, file_path: str | Path, format: str = "hdf5", **kwargs) -> Pipeline:
-        """Save current data to file.
-
-        Args:
-            file_path: Output file path
-            format: Output format ('hdf5', 'excel', 'csv')
-            **kwargs: Additional arguments passed to writer
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.save('output.hdf5')
-        """
-        if self.data is None:
-            raise ValueError("No data to save. Call load() first.")
-
-        path = Path(file_path)
-
-        # R12-E-007: include fitted model parameters in data metadata before saving
-        if self.steps:
-            _last_fit_steps = [s for s in self.steps if s[0] in ("fit", "fit_nlsq")]
-            if _last_fit_steps:
-                _fit_model = _last_fit_steps[-1][1]
-                if hasattr(_fit_model, "parameters"):
-                    # See _apply_test_mode_metadata: RheoData.metadata is
-                    # never None post-construction, so this is unreachable
-                    # per the type checker; kept as defense-in-depth.
-                    if self.data.metadata is None:
-                        self.data.metadata = {}  # type: ignore[unreachable]
-                    for _pname in _fit_model.parameters.keys():
-                        try:
-                            self.data.metadata[f"fitted_{_pname}"] = float(
-                                _fit_model.parameters.get_value(_pname)
-                            )
-                        except (TypeError, ValueError):
-                            pass
-                    self.data.metadata["fitted_model"] = type(_fit_model).__name__
-
-        with log_pipeline_stage(
-            logger,
-            "save",
-            pipeline_id=self._id,
-            file_path=str(path),
-            format=format,
-        ) as ctx:
-            try:
-                if format == "hdf5":
-                    from rheojax.io import save_hdf5
-
-                    save_hdf5(self.data, path, **kwargs)
-                elif format == "excel":
-                    from rheojax.io import save_excel
-
-                    # R13-PIPE-XLS-001: The "parameters" key should contain
-                    # actual model parameters (name → value), not metadata
-                    # labels. Data metadata (units, domain) goes into a
-                    # separate "fit_quality" dict for the Fit Quality sheet.
-                    parameters: dict[str, Any] = {}
-                    _last_fit_steps = [
-                        s for s in self.steps if s[0] in ("fit", "fit_nlsq")
-                    ]
-                    if _last_fit_steps:
-                        _fit_model = _last_fit_steps[-1][1]
-                        if hasattr(_fit_model, "parameters"):
-                            for _pname in _fit_model.parameters.keys():
-                                try:
-                                    parameters[_pname] = float(
-                                        _fit_model.parameters.get_value(_pname)
-                                    )
-                                except (TypeError, ValueError):
-                                    pass
-                            parameters["model"] = type(_fit_model).__name__
-
-                    fit_quality: dict[str, Any] = {}
-                    if self.data.x_units:
-                        fit_quality["x_units"] = self.data.x_units
-                    if self.data.y_units:
-                        fit_quality["y_units"] = self.data.y_units
-                    if self.data.domain:
-                        fit_quality["domain"] = self.data.domain
-
-                    excel_payload: dict[str, Any] = {
-                        "x": np.array(self.data.x),
-                        "predictions": np.array(self.data.y),
-                    }
-                    if parameters:
-                        excel_payload["parameters"] = parameters
-                    if fit_quality:
-                        excel_payload["fit_quality"] = fit_quality
-                    save_excel(excel_payload, path, **kwargs)
-                elif format == "csv":
-                    # R13-PIPE-CSV-001: Handle complex and 2D y arrays
-                    # in CSV export. Complex y is split into real/imag
-                    # columns; 2D y is split into numbered columns.
-                    import pandas as pd
-
-                    x_arr = np.array(self.data.x)
-                    y_arr = np.array(self.data.y)
-                    if np.iscomplexobj(y_arr):
-                        df = pd.DataFrame(
-                            {
-                                "x": x_arr,
-                                "y_real": np.real(y_arr),
-                                "y_imag": np.imag(y_arr),
-                            }
-                        )
-                    elif y_arr.ndim == 2:
-                        cols: dict[str, Any] = {"x": x_arr}
-                        for ci in range(y_arr.shape[1]):
-                            cols[f"y_{ci}"] = y_arr[:, ci]
-                        df = pd.DataFrame(cols)
-                    else:
-                        df = pd.DataFrame({"x": x_arr, "y": y_arr})
-                    df.to_csv(path, index=False, **kwargs)
-                else:
-                    raise ValueError(f"Unknown format: {format}")
-
-                ctx["n_points"] = (
-                    len(self.data.x) if self.data.x is not None else 0
-                )
-            except Exception as e:
-                logger.error(
-                    "Failed to save data",
-                    pipeline_id=self._id,
-                    file_path=str(path),
-                    format=format,
-                    error=str(e),
-                    exc_info=True,
-                )
-                raise
-
-        self.history.append(("save", str(path), format))
-        return self
-
-    def save_figure(
-        self,
-        filepath: str | Path,
-        format: str | None = None,
-        dpi: int = 300,
-        **kwargs: Any,
-    ) -> Pipeline:
-        """
-        Save the most recent plot to file.
-
-        Convenience method for exporting plots with publication-quality defaults.
-        Wraps rheojax.visualization.plotter.save_figure() to enable fluent API chaining.
-
-        Parameters
-        ----------
-        filepath : str or Path
-            Output file path. Format inferred from extension if not specified.
-        format : str, optional
-            Output format ('pdf', 'svg', 'png', 'eps'). If None, inferred from filepath.
-        dpi : int, default=300
-            Resolution for raster formats (PNG).
-        **kwargs : dict
-            Additional arguments passed to save_figure().
-            See rheojax.visualization.plotter.save_figure() for details.
-
-        Returns
-        -------
-        self : Pipeline
-            Returns self to enable method chaining
-
-        Raises
-        ------
-        ValueError
-            If no plot exists (plot() not called yet)
-        ValueError
-            If format cannot be inferred or is unsupported
-        OSError
-            If filepath directory doesn't exist
-
-        Examples
-        --------
-        Basic usage with method chaining:
-
-        >>> pipeline = Pipeline()
-        >>> pipeline.load('data.csv').fit('maxwell').plot().save_figure('result.pdf')
-
-        Save multiple formats:
-
-        >>> pipeline.plot(style='publication')
-        >>> pipeline.save_figure('figure.pdf')
-        >>> pipeline.save_figure('figure.png', dpi=600)
-        >>> pipeline.save_figure('figure.svg', transparent=True)
-
-        Explicit format:
-
-        >>> pipeline.plot().save_figure('output', format='pdf')
-
-        See Also
-        --------
-        plot : Generate plot with automatic type selection
-        rheojax.visualization.plotter.save_figure : Core export function
-
-        Notes
-        -----
-        This method saves the most recent plot generated by plot(). If you call plot()
-        multiple times, only the last figure is saved. To save multiple plots, call
-        save_figure() after each plot() call.
-
-        The figure is stored internally by plot() and retrieved by save_figure().
-        """
-        if self._current_figure is None:
-            raise ValueError(
-                "No figure to save. Call plot() before save_figure(). "
-                "Example: pipeline.load('data.csv').fit('maxwell').plot().save_figure('output.pdf')"
-            )
-
-        from rheojax.visualization.plotter import save_figure
-
-        path = Path(filepath)
-
-        with log_pipeline_stage(
-            logger,
-            "save_figure",
-            pipeline_id=self._id,
-            file_path=str(path),
-            format=format,
-            dpi=dpi,
-        ) as ctx:
-            try:
-                save_figure(
-                    self._current_figure, path, format=format, dpi=dpi, **kwargs
-                )
-                ctx["saved"] = True
-            except Exception as e:
-                logger.error(
-                    "Failed to save figure",
-                    pipeline_id=self._id,
-                    file_path=str(path),
-                    error=str(e),
-                    exc_info=True,
-                )
-                raise
-
-        self.history.append(("save_figure", str(path)))
-        return self
-
     def fit_bayesian(
         self,
         model: str | BaseModel | None = None,
@@ -865,273 +1283,6 @@ class Pipeline:
                 )
                 raise
 
-        return self
-
-    def plot_fit(
-        self,
-        confidence: float = 0.95,
-        show_residuals: bool = True,
-        show_uncertainty: bool = True,
-        show: bool = True,
-        style: str = "default",
-        **kwargs,
-    ) -> Pipeline:
-        """Plot NLSQ fit with uncertainty band and residuals.
-
-        Requires a prior call to fit(). Uses FitPlotter internally.
-
-        Args:
-            confidence: Confidence level for uncertainty band (default: 0.95).
-            show_residuals: If True, add residuals subplot.
-            show_uncertainty: If True and covariance available, show band.
-            show: Whether to call plt.show() (default: True).
-            style: Plot style ('default', 'publication', 'presentation').
-            **kwargs: Additional arguments forwarded to FitPlotter.plot_nlsq().
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.fit('maxwell').plot_fit(confidence=0.95)
-        """
-        if self._last_model is None:
-            raise ValueError("No model fitted. Call fit() first.")
-        if self.data is None:
-            raise ValueError("No data loaded. Call load() first.")
-
-        from rheojax.visualization.fit_plotter import FitPlotter
-
-        fit_result = self.get_fit_result()
-        plotter = FitPlotter()
-
-        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
-        X = np.asarray(self.data.x)
-        y = np.asarray(self.data.y)
-
-        _meta = getattr(self.data, "metadata", None) or {}
-        if "test_mode" not in kwargs:
-            tm = _meta.get("test_mode")
-            if tm is not None:
-                kwargs["test_mode"] = tm
-
-        fig, axes = plotter.plot_nlsq(
-            X,
-            y,
-            fit_result,
-            self._last_model,
-            confidence=confidence,
-            show_residuals=show_residuals,
-            show_uncertainty=show_uncertainty,
-            style=style,
-            **kwargs,
-        )
-
-        self._current_figure = fig
-
-        if show:
-            import matplotlib.pyplot as plt
-
-            plt.show()
-
-        self.history.append(("plot_fit", style))
-        return self
-
-    def plot_bayesian(
-        self,
-        credible_level: float = 0.95,
-        max_draws: int = 500,
-        show_nlsq_overlay: bool = False,
-        show_residuals: bool = False,
-        show: bool = True,
-        style: str = "default",
-        **kwargs,
-    ) -> Pipeline:
-        """Plot Bayesian posterior predictive with credible interval.
-
-        Requires a prior call to fit_bayesian().
-
-        Args:
-            credible_level: Credible interval level (default: 0.95).
-            max_draws: Maximum posterior draws for band computation.
-            show_nlsq_overlay: If True, overlay NLSQ fit for comparison.
-            show_residuals: If True, add residuals subplot.
-            show: Whether to call plt.show() (default: True).
-            style: Plot style.
-            **kwargs: Additional arguments forwarded to FitPlotter.plot_bayesian().
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.fit('maxwell').fit_bayesian(seed=42).plot_bayesian()
-        """
-        if self._last_bayesian_result is None:
-            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
-        if self._last_model is None:
-            raise ValueError("No model available.")
-        if self.data is None:
-            raise ValueError("No data loaded.")
-
-        from rheojax.visualization.fit_plotter import FitPlotter
-
-        plotter = FitPlotter()
-        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
-        X = np.asarray(self.data.x)
-        y = np.asarray(self.data.y)
-
-        # Forward metadata
-        _meta = getattr(self.data, "metadata", None) or {}
-        if "test_mode" not in kwargs:
-            tm = _meta.get("test_mode")
-            if tm is not None:
-                kwargs["test_mode"] = tm
-
-        fit_result = None
-        if show_nlsq_overlay:
-            try:
-                fit_result = self.get_fit_result()
-            except ValueError:
-                pass
-
-        fig, axes = plotter.plot_bayesian(
-            X,
-            y,
-            self._last_bayesian_result,
-            self._last_model,
-            credible_level=credible_level,
-            max_draws=max_draws,
-            show_nlsq_overlay=show_nlsq_overlay,
-            fit_result=fit_result,
-            show_residuals=show_residuals,
-            style=style,
-            **kwargs,
-        )
-
-        self._current_figure = fig
-
-        if show:
-            import matplotlib.pyplot as plt
-
-            plt.show()
-
-        self.history.append(("plot_bayesian", style))
-        return self
-
-    def plot_diagnostics(
-        self,
-        output_dir: str | Path | None = None,
-        style: str = "default",
-        prefix: str = "mcmc",
-        formats: tuple[str, ...] = ("pdf", "png"),
-        dpi: int = 300,
-        **kwargs,
-    ) -> Pipeline:
-        """Generate ArviZ MCMC diagnostic suite (6 plots).
-
-        Requires a prior call to fit_bayesian().
-
-        Args:
-            output_dir: Directory for saving plots. If None, displays only.
-            style: Plot style.
-            prefix: Filename prefix for saved plots.
-            formats: Output formats (default: ('pdf', 'png')).
-            dpi: Resolution for raster formats.
-            **kwargs: Additional arguments forwarded to generate_diagnostic_suite().
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.fit_bayesian(seed=42).plot_diagnostics(output_dir='./diag')
-        """
-        if self._last_bayesian_result is None:
-            raise ValueError("No Bayesian result available. Call fit_bayesian() first.")
-
-        from rheojax.visualization.fit_plotter import generate_diagnostic_suite
-
-        result = generate_diagnostic_suite(
-            self._last_bayesian_result,
-            style=style,
-            output_dir=output_dir,
-            prefix=prefix,
-            formats=formats,
-            dpi=dpi,
-            **kwargs,
-        )
-
-        self._diagnostic_results = result
-
-        # Expose the first diagnostic figure for save_figure() chaining.
-        # generate_diagnostic_suite returns Mapping[str, Figure | Path]
-        # (a real dict at runtime).
-        if isinstance(result, dict):
-            for fig_or_path in result.values():
-                if hasattr(fig_or_path, "savefig"):
-                    self._current_figure = fig_or_path
-                    break
-
-        self.history.append(("plot_diagnostics", str(output_dir)))
-        return self
-
-    def plot_transform(
-        self,
-        transform_name: str | None = None,
-        show_intermediate: bool = True,
-        show: bool = True,
-        style: str = "default",
-        **kwargs,
-    ) -> Pipeline:
-        """Plot the result of a previously applied transform.
-
-        Uses TransformPlotter for per-transform layout dispatch.
-
-        Args:
-            transform_name: Name of the transform to plot. If None, uses the
-                most recently applied transform.
-            show_intermediate: Whether to show before/after comparison.
-            show: Whether to call plt.show() (default: True).
-            style: Plot style.
-            **kwargs: Additional arguments forwarded to TransformPlotter.
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.transform('mastercurve', reference_temp=25.0).plot_transform()
-        """
-        from rheojax.visualization.transform_plotter import TransformPlotter
-
-        if transform_name is None:
-            transform_name = self._last_transform_name
-
-        if transform_name is None or transform_name not in self._transform_results:
-            available = list(self._transform_results.keys())
-            raise ValueError(
-                f"No cached result for transform '{transform_name}'. "
-                f"Available transforms: {available}. "
-                "Call transform() before plot_transform()."
-            )
-
-        cached_result, pre_data = self._transform_results[transform_name]
-        plotter = TransformPlotter()
-
-        fig, axes = plotter.plot(
-            transform_name,
-            cached_result,
-            input_data=pre_data if show_intermediate else None,
-            show_intermediate=show_intermediate,
-            style=style,
-            **kwargs,
-        )
-
-        self._current_figure = fig
-
-        if show:
-            import matplotlib.pyplot as plt
-
-            plt.show()
-
-        self.history.append(("plot_transform", transform_name, style))
         return self
 
     def get_result(self) -> RheoData:
@@ -1381,102 +1532,6 @@ class Pipeline:
         self._current_figure = None
         self._diagnostic_results = None
         self._last_comparison = None
-        return self
-
-    def export(
-        self,
-        output: str | Path,
-        format: str = "auto",
-        *,
-        include_data: bool = True,
-        include_figures: bool = True,
-        include_diagnostics: bool = True,
-        figure_formats: tuple[str, ...] = ("pdf", "png"),
-        figure_dpi: int = 300,
-        **kwargs,
-    ) -> Pipeline:
-        """Export the full analysis to a directory or file.
-
-        This bundles data, parameters, statistics, figures, transform results,
-        and Bayesian diagnostics into a single export.
-
-        Args:
-            output: Output path. If a directory (no extension or trailing /),
-                exports as structured directory. If .xlsx, exports Excel.
-            format: Export format ('auto', 'directory', 'excel').
-                'auto' infers from the output path extension.
-            include_data: Save raw and transformed data files.
-            include_figures: Save generated matplotlib figures.
-            include_diagnostics: Save MCMC diagnostic plots.
-            figure_formats: Formats for figure files (default: ('pdf', 'png')).
-            figure_dpi: Resolution for raster figures (default: 300).
-            **kwargs: Additional arguments forwarded to the exporter.
-
-        Returns:
-            self for method chaining
-
-        Example:
-            >>> pipeline.load('data.csv').fit('maxwell').plot_fit().export('./results')
-            >>> pipeline.export('report.xlsx')
-        """
-        from rheojax.io.analysis_exporter import AnalysisExporter
-
-        output_path = Path(output)
-        exporter = AnalysisExporter(
-            figure_formats=figure_formats,
-            figure_dpi=figure_dpi,
-        )
-
-        # Determine format
-        if format == "auto":
-            if output_path.suffix.lower() == ".xlsx":
-                format = "excel"
-            else:
-                format = "directory"
-
-        with log_pipeline_stage(
-            logger,
-            "export",
-            pipeline_id=self._id,
-            output=str(output_path),
-            format=format,
-        ) as ctx:
-            try:
-                if format == "directory":
-                    exporter.export_directory(
-                        self,
-                        output_path,
-                        include_data=include_data,
-                        include_figures=include_figures,
-                        include_diagnostics=include_diagnostics,
-                        **kwargs,
-                    )
-                elif format == "excel":
-                    exporter.export_excel(
-                        self,
-                        output_path,
-                        include_plots=include_figures,
-                        **kwargs,
-                    )
-                else:
-                    raise ValueError(
-                        f"Unknown export format: {format}. Use 'directory' or 'excel'."
-                    )
-                ctx["format"] = format
-            except Exception as e:
-                logger.error(
-                    "Export failed",
-                    pipeline_id=self._id,
-                    output=str(output_path),
-                    error=str(e),
-                    exc_info=True,
-                )
-                raise
-
-        self.steps.append(
-            ("export", {"output_path": str(output_path), "format": format})
-        )
-        self.history.append(("export", str(output_path), format))
         return self
 
     def __repr__(self) -> str:

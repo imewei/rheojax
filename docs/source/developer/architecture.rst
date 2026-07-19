@@ -160,6 +160,28 @@ Component Relationships
     |      (Numerical Foundation)         |
     \--------------------------------------+
 
+.. note:: GUI does not route through Pipeline
+
+   The diagram above simplifies the GUI's relationship to ``Pipeline``.
+   In practice, ``rheojax.gui.services.pipeline_execution_service``
+   independently reimplements pipeline-wizard step execution (driving
+   ``ModelService``, ``TransformService``, and ``DataService`` directly)
+   rather than calling ``rheojax.pipeline.Pipeline``/``PipelineBuilder`` —
+   the GUI never imports ``rheojax.pipeline`` at all. The CLI's YAML
+   pipeline runner (``cli/_yaml_runner.py``) does use ``PipelineBuilder``.
+   This means the two entry points can drift independently; a change to
+   pipeline-step semantics (retries, checkpoints, error handling) made in
+   one does not automatically apply to the other.
+
+.. note:: Two independent plotting stacks
+
+   ``rheojax.visualization`` (matplotlib, used by ``Pipeline.plot_fit()``
+   etc.) and the GUI's native PyQtGraph canvas
+   (``rheojax.gui.widgets.pyqtgraph_canvas``) are maintained completely
+   separately — the GUI does not import ``rheojax.visualization``. A
+   plot-styling or behavior fix made in one stack (axis scaling, colorbar
+   handling, etc.) does not propagate to the other.
+
 Base Class Hierarchy
 --------------------
 

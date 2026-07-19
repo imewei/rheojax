@@ -1210,7 +1210,13 @@ class OptimizationResult:
                     else:
                         # Residual length != x_eval length (e.g. complex-split)
                         pred_std = np.sqrt(mse) * np.ones_like(y_pred)
-                except Exception:
+                except Exception as leverage_err:
+                    logger.warning(
+                        "Leverage-weighted prediction interval failed; "
+                        "falling back to constant-MSE approximation "
+                        "(less accurate, ignores parameter uncertainty)",
+                        error=str(leverage_err),
+                    )
                     pred_std = np.sqrt(mse) * np.ones_like(y_pred)
             else:
                 pred_std = np.sqrt(mse) * np.ones_like(y_pred)
@@ -1453,6 +1459,38 @@ class OptimizationResult:
             n_data=n_data,
             _is_complex_split=_complex_split,
         )
+
+
+def _finalize_fallback_result(
+    result: OptimizationResult,
+    objective: Callable[[np.ndarray], float | np.ndarray],
+    parameters: ParameterSet,
+    original_values: np.ndarray,
+    nlsq_bounds: tuple[np.ndarray, np.ndarray],
+) -> None:
+    """Recompute residuals/fun, validate, and write back params.
+
+    Shared by nlsq_optimize's exception-handler fallback and its
+    non-convergence retry fallback — both previously duplicated this
+    logic independently, including a normalization-weight propagation
+    step (P1-6) that had silently drifted out of sync between the two
+    copies (present in one, missing in the other).
+    """
+    residuals_fb_raw = np.asarray(objective(result.x))
+    if np.iscomplexobj(residuals_fb_raw):
+        residuals_fb = np.concatenate(
+            [np.real(residuals_fb_raw), np.imag(residuals_fb_raw)]
+        ).astype(np.float64)
+    else:
+        residuals_fb = residuals_fb_raw.astype(np.float64)
+    result.fun = float(np.sum(residuals_fb**2))
+    # P1-6: Propagate normalization weights for correct R²/AIC/BIC
+    nw = getattr(objective, "_normalization_weights", None)
+    if nw is not None:
+        result._normalization_weights = nw
+    _validate_optimization_result(result, residuals_fb)
+    parameters.set_values(result.x)
+    _warn_stuck_parameters(parameters, original_values, result.x, nlsq_bounds)
 
 
 def nlsq_optimize(
@@ -1715,23 +1753,10 @@ def nlsq_optimize(
         )
         result = _scipy_fallback(x0)
         result.message = f"[SciPy fallback] {result.message} (NLSQ failed: {e})"
-        # Compute residuals for validation (OPT-001)
-        _residuals_fb_raw = np.asarray(objective(result.x))
-        if np.iscomplexobj(_residuals_fb_raw):
-            residuals_fb = np.concatenate(
-                [np.real(_residuals_fb_raw), np.imag(_residuals_fb_raw)]
-            ).astype(np.float64)
-        else:
-            residuals_fb = _residuals_fb_raw.astype(np.float64)
-        result.fun = float(np.sum(residuals_fb**2))
-        # P1-6: Propagate normalization weights for correct R²/AIC/BIC
-        _nw = getattr(objective, "_normalization_weights", None)
-        if _nw is not None:
-            result._normalization_weights = _nw
-        _validate_optimization_result(result, residuals_fb)
-        # Write back optimal params so model state reflects the fit
-        parameters.set_values(result.x)
-        _warn_stuck_parameters(parameters, original_values, result.x, nlsq_bounds)
+        # OPT-001: compute residuals, validate, and write back params
+        _finalize_fallback_result(
+            result, objective, parameters, original_values, nlsq_bounds
+        )
         return result
 
     # Compute residuals at optimal point for covariance scaling.
@@ -1812,19 +1837,9 @@ def nlsq_optimize(
         fallback_result.message = (
             f"[SciPy fallback] {fallback_result.message} (NLSQ inner loop limit)"
         )
-        # OPT-004: validate the fallback result
-        _residuals_fb_raw = np.asarray(objective(fallback_result.x))
-        if np.iscomplexobj(_residuals_fb_raw):
-            residuals_fb = np.concatenate(
-                [np.real(_residuals_fb_raw), np.imag(_residuals_fb_raw)]
-            ).astype(np.float64)
-        else:
-            residuals_fb = _residuals_fb_raw.astype(np.float64)
-        fallback_result.fun = float(np.sum(residuals_fb**2))
-        _validate_optimization_result(fallback_result, residuals_fb)
-        parameters.set_values(fallback_result.x)
-        _warn_stuck_parameters(
-            parameters, original_values, fallback_result.x, nlsq_bounds
+        # OPT-004: compute residuals, validate, and write back params
+        _finalize_fallback_result(
+            fallback_result, objective, parameters, original_values, nlsq_bounds
         )
         # OPT-YDATA-001: ensure y_data/n_data are attached on the fallback path
         _attach_y_data_from_objective(fallback_result, objective)

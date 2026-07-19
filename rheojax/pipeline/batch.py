@@ -24,6 +24,7 @@ import pandas as pd
 
 from rheojax.core._validation import reject_removed_options
 from rheojax.core.data import RheoData
+from rheojax.io.writers.excel_writer import sanitize_excel_cell
 from rheojax.logging import get_logger, log_fit, log_pipeline_stage
 from rheojax.pipeline.base import Pipeline
 
@@ -734,10 +735,16 @@ class BatchPipeline:
             n_results=len(df),
         )
 
+        # File paths/names and metric values are file-derived and
+        # attacker-controllable; neutralize CSV/formula-injection triggers
+        # (CWE-1236) before they reach Excel or CSV — both are formula-
+        # injection vectors when opened in a spreadsheet application.
+        sanitized = df.map(sanitize_excel_cell)
+
         if format == "excel":
-            df.to_excel(output_path, index=False)
+            sanitized.to_excel(output_path, index=False)
         elif format == "csv":
-            df.to_csv(output_path, index=False)
+            sanitized.to_csv(output_path, index=False)
         else:
             logger.error("Unknown export format", format=format)
             raise ValueError(f"Unknown format: {format}")

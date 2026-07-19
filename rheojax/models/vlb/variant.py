@@ -81,6 +81,9 @@ jax, jnp = safe_import_jax()
 logger = logging.getLogger(__name__)
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 500_000
+
 BreakageType = Literal["constant", "bell"]
 StressType = Literal["linear", "fene"]
 
@@ -651,7 +654,7 @@ class VLBVariant(VLBBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS,
                 throw=False,
             )
 
@@ -718,7 +721,7 @@ class VLBVariant(VLBBase):
             args=args,
             saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -798,7 +801,7 @@ class VLBVariant(VLBBase):
             args=args,
             saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -878,7 +881,7 @@ class VLBVariant(VLBBase):
             args=args,
             saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -946,7 +949,7 @@ class VLBVariant(VLBBase):
             args=args,
             saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -1085,7 +1088,7 @@ class VLBVariant(VLBBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS,
                 throw=False,
             )
 
@@ -1295,7 +1298,7 @@ class VLBVariant(VLBBase):
                     args=None,
                     saveat=saveat,
                     stepsize_controller=controller,
-                    max_steps=500_000,
+                    max_steps=_MAX_STEPS,
                     throw=False,
                 )
 

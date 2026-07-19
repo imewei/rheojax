@@ -86,6 +86,9 @@ jax, jnp = safe_import_jax()
 logger = logging.getLogger(__name__)
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceiling shared by all protocols in this model.
+_MAX_STEPS = 500_000
+
 
 @ModelRegistry.register(
     "vlb_local",
@@ -525,7 +528,7 @@ class VLBLocal(VLBBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 
@@ -752,7 +755,7 @@ class VLBLocal(VLBBase):
             y0,
             saveat=saveat,
             stepsize_controller=controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS,
             throw=False,
         )
 

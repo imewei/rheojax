@@ -28,6 +28,7 @@ import pandas as pd
 
 from rheojax.core.data import RheoData
 from rheojax.io.readers._utils import normalize_temperature
+from rheojax.io.writers.excel_writer import sanitize_excel_cell
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1590,8 +1591,16 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
     global_meta = first_data.metadata.get("global_metadata", {})
 
     # Add global metadata rows
+    # File-derived keys/values are attacker-controllable; neutralize
+    # CSV/formula-injection triggers (CWE-1236) before they reach the workbook.
     for key, value in global_meta.items():
-        rows.append({"Property": key, "Value": str(value), "Interval": "Global"})
+        rows.append(
+            {
+                "Property": sanitize_excel_cell(key),
+                "Value": sanitize_excel_cell(str(value)),
+                "Interval": "Global",
+            }
+        )
 
     # Add per-interval summary
     for i, rheo_data in enumerate(rheo_data_list, start=1):
@@ -1613,14 +1622,14 @@ def _create_metadata_sheet(rheo_data_list: list[RheoData]) -> pd.DataFrame:
         rows.append(
             {
                 "Property": f"Interval {interval_idx} - X Units",
-                "Value": rheo_data.x_units or "",
+                "Value": sanitize_excel_cell(rheo_data.x_units or ""),
                 "Interval": str(interval_idx),
             }
         )
         rows.append(
             {
                 "Property": f"Interval {interval_idx} - Y Units",
-                "Value": rheo_data.y_units or "",
+                "Value": sanitize_excel_cell(rheo_data.y_units or ""),
                 "Interval": str(interval_idx),
             }
         )

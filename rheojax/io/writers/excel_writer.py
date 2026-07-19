@@ -31,6 +31,24 @@ def _to_python_scalar(value: Any) -> Any:
     return value
 
 
+_FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def sanitize_excel_cell(value: Any) -> Any:
+    """Neutralize CSV/formula-injection triggers (CWE-1236) in cell values.
+
+    Values sourced from parsed data files (headers, sample metadata, unit
+    strings) are attacker-controllable. A leading ``=``, ``+``, ``-``, ``@``,
+    tab, or CR is a known formula/DDE injection trigger recognized by
+    spreadsheet applications; prefixing with a single quote neutralizes it
+    while leaving the rest of the text unchanged. Non-string values pass
+    through untouched.
+    """
+    if isinstance(value, str) and value.startswith(_FORMULA_TRIGGER_CHARS):
+        return "'" + value
+    return value
+
+
 def save_excel(
     results: dict[str, Any], filepath: str | Path, include_plots: bool = False, **kwargs
 ) -> None:
@@ -205,7 +223,7 @@ def _create_parameters_dataframe(parameters: dict[str, Any]) -> Any:
                 {
                     "Parameter": name,
                     "Value": _to_python_scalar(value.get("value", value)),
-                    "Units": value.get("units", ""),
+                    "Units": sanitize_excel_cell(value.get("units", "")),
                     "Bounds": str(value.get("bounds", "")),
                 }
             )

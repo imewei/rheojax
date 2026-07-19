@@ -29,6 +29,7 @@ import numpy as np
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.io.json_encoder import NumpyJSONEncoder as _NumpyJSONEncoder
+from rheojax.io.writers.excel_writer import sanitize_excel_cell
 from rheojax.logging import get_logger
 
 # Ensure float64 is configured before any JAX array handling
@@ -683,7 +684,12 @@ class AnalysisExporter:
         ]
         for key, val in state["metadata"].items():
             if val is not None:
-                rows.append({"Field": key, "Value": str(val)})
+                rows.append(
+                    {
+                        "Field": sanitize_excel_cell(key),
+                        "Value": sanitize_excel_cell(str(val)),
+                    }
+                )
 
         # History
         for i, h in enumerate(state["history"]):

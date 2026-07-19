@@ -83,6 +83,12 @@ logger = logging.getLogger(__name__)
 
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceilings. The stiff (non-basic) creep
+# variant uses a 10x finer initial dt (see n_steps_hint below) and so
+# needs a higher ceiling than the shared default.
+_MAX_STEPS_DEFAULT = 500_000
+_MAX_STEPS_CREEP = 1_000_000
+
 # Breakage type alias
 BreakageType = Literal["constant", "bell", "power_law", "stretch_creation"]
 StressType = Literal["linear", "fene"]
@@ -753,7 +759,7 @@ class TNTSingleMode(TNTBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS_DEFAULT,
                 throw=False,
             )
 
@@ -823,7 +829,7 @@ class TNTSingleMode(TNTBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS_DEFAULT,
                 throw=False,
             )
             result = sol.ys[0]
@@ -1027,7 +1033,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1115,7 +1121,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1198,7 +1204,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1273,7 +1279,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1369,7 +1375,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1526,7 +1532,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1660,7 +1666,7 @@ class TNTSingleMode(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1_000_000,
+            max_steps=_MAX_STEPS_CREEP,
             throw=False,
         )
 

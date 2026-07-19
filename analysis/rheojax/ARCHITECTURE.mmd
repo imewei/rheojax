@@ -1,0 +1,71 @@
+graph TD
+    subgraph Foundation
+        LOG[logging]
+        CORE[core<br/>RheoData / ParameterSet / FitResult / BayesianResult<br/>FitOrchestrator, Registries]
+        UTILS[utils<br/>optimization, kernels, initialization]
+    end
+
+    subgraph Domain_Logic
+        MODELS[models<br/>53 models / 22 families]
+        TRANSFORMS[transforms<br/>11 transforms]
+        IO[io<br/>readers / writers]
+    end
+
+    subgraph Orchestration
+        PIPE[pipeline<br/>+ parallel]
+        VIZ[visualization<br/>matplotlib]
+    end
+
+    subgraph Entry_Points
+        CLI[cli]
+        GUI[gui<br/>services / jobs / workspace]
+    end
+
+    CORE -.lazy, function-local.-> MODELS
+    CORE -.lazy.-> TRANSFORMS
+    CORE -.lazy.-> IO
+    CORE --> UTILS
+    UTILS --> CORE
+
+    MODELS --> CORE
+    MODELS --> TRANSFORMS
+    MODELS --> UTILS
+
+    TRANSFORMS --> CORE
+    TRANSFORMS --> IO
+    TRANSFORMS --> UTILS
+
+    IO --> CORE
+    IO -.lazy.-> UTILS
+
+    PIPE --> CORE
+    PIPE --> MODELS
+    PIPE --> TRANSFORMS
+    PIPE --> IO
+    PIPE --> VIZ
+
+    VIZ --> CORE
+    VIZ --> UTILS
+
+    CLI --> CORE
+    CLI --> MODELS
+    CLI --> TRANSFORMS
+    CLI --> IO
+    CLI --> PIPE
+
+    GUI --> CORE
+    GUI --> MODELS
+    GUI --> TRANSFORMS
+    GUI --> IO
+    GUI --> UTILS
+    GUI -.lazy, 2 narrow calls only.-> CLI
+
+    MODELS -.-> LOG
+    TRANSFORMS -.-> LOG
+    IO -.-> LOG
+    CORE -.-> LOG
+    UTILS -.-> LOG
+    PIPE -.-> LOG
+    CLI -.-> LOG
+    GUI -.-> LOG
+    VIZ -.-> LOG

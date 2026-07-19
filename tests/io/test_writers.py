@@ -151,6 +151,34 @@ class TestExcelWriter:
         wb = openpyxl.load_workbook(str(output_file))
         assert len(wb.sheetnames) > 0
 
+    def test_excel_units_column_sanitizes_formula_injection(self, tmp_path):
+        """CWE-1236: a malicious file-derived units string in the Units
+        column must be neutralized before it reaches the workbook, not
+        just accepted verbatim (regression test for ASSESSMENT.md's
+        Excel/formula-injection security finding)."""
+        results = {
+            "parameters": {
+                "G_s": {
+                    "value": 1.5e5,
+                    "units": "=cmd|'/C calc'!A1",
+                    "bounds": (0, 1e6),
+                }
+            },
+        }
+        output_file = tmp_path / "malicious_units.xlsx"
+
+        save_excel(results, str(output_file))
+
+        wb = openpyxl.load_workbook(str(output_file))
+        ws = wb["Parameters"]
+        header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+        units_col = header.index("Units") + 1
+        units_value = ws.cell(row=2, column=units_col).value
+        assert units_value.startswith("'"), (
+            f"Units cell must be neutralized with a leading quote, got: {units_value!r}"
+        )
+        assert units_value == "'=cmd|'/C calc'!A1"
+
 
 # ======================================================================
 # HDF5 Round-Trip Data Integrity Tests

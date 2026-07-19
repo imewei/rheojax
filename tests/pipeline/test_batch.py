@@ -345,3 +345,55 @@ class TestBatchExport:
 
         with pytest.warns(UserWarning, match="No results"):
             batch.export_summary("output.xlsx")
+
+    def test_export_summary_excel_sanitizes_formula_injection(self):
+        """CWE-1236: a malicious file-derived path/name in the summary must
+        be neutralized before it reaches the workbook (regression test for
+        ASSESSMENT.md's Excel/formula-injection security finding)."""
+        openpyxl = pytest.importorskip("openpyxl")
+
+        batch = BatchPipeline()
+        data = RheoData(x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]))
+        batch.results = [
+            (Path("=HYPERLINK(evil.com,click).csv"), data, {"r_squared": 0.9}),
+        ]
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
+            output_path = f.name
+
+        try:
+            batch.export_summary(output_path, format="excel")
+            wb = openpyxl.load_workbook(output_path)
+            ws = wb.active
+            header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+            name_col = header.index("file_name") + 1
+            file_name_value = ws.cell(row=2, column=name_col).value
+            assert file_name_value.startswith("'"), (
+                f"file_name cell must be neutralized, got: {file_name_value!r}"
+            )
+        finally:
+            if os.path.exists(output_path):
+                os.unlink(output_path)
+
+    def test_export_summary_csv_sanitizes_formula_injection(self):
+        """CWE-1236 applies to CSV too: a malicious file-derived path/name
+        must be neutralized before it reaches the file, since spreadsheet
+        apps treat leading '=' etc. as a formula trigger on CSV import."""
+        batch = BatchPipeline()
+        data = RheoData(x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]))
+        batch.results = [
+            (Path("=HYPERLINK(evil.com,click).csv"), data, {"r_squared": 0.9}),
+        ]
+
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            output_path = f.name
+
+        try:
+            batch.export_summary(output_path, format="csv")
+            content = Path(output_path).read_text()
+            assert "'=HYPERLINK" in content, (
+                f"file_name must be neutralized in CSV output, got: {content!r}"
+            )
+        finally:
+            if os.path.exists(output_path):
+                os.unlink(output_path)

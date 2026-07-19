@@ -82,6 +82,12 @@ logger = logging.getLogger(__name__)
 
 _MISSING = object()
 
+# diffrax.diffeqsolve max_steps ceilings. Creep protocols use a finer
+# minimum step count (dt0 = (t1-t0)/max(len(t), 10_000) vs 1_000 elsewhere)
+# and so need a higher ceiling than the shared default.
+_MAX_STEPS_DEFAULT = 500_000
+_MAX_STEPS_CREEP = 1_000_000
+
 
 # =============================================================================
 # Loop-Bridge ODE Kernels
@@ -1020,7 +1026,7 @@ class TNTLoopBridge(TNTBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS_DEFAULT,
                 throw=False,
             )
 
@@ -1115,7 +1121,7 @@ class TNTLoopBridge(TNTBase):
                 args=args,
                 saveat=saveat,
                 stepsize_controller=controller,
-                max_steps=500_000,
+                max_steps=_MAX_STEPS_DEFAULT,
                 throw=False,
             )
 
@@ -1190,7 +1196,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1256,7 +1262,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1334,7 +1340,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1_000_000,
+            max_steps=_MAX_STEPS_CREEP,
             throw=False,
         )
 
@@ -1406,7 +1412,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1614,7 +1620,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1729,7 +1735,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 
@@ -1845,7 +1851,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=1_000_000,
+            max_steps=_MAX_STEPS_CREEP,
             throw=False,
         )
 
@@ -1973,7 +1979,7 @@ class TNTLoopBridge(TNTBase):
             args=args,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
-            max_steps=500_000,
+            max_steps=_MAX_STEPS_DEFAULT,
             throw=False,
         )
 

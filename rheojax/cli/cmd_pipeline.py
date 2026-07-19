@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rheojax.cli._templates import TEMPLATES as _TEMPLATES
 from rheojax.logging import get_logger
 
 if TYPE_CHECKING:
@@ -23,21 +24,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-try:
-    from rheojax.cli._templates import TEMPLATES as _TEMPLATES
-
-    _TEMPLATE_CHOICES = tuple(sorted(_TEMPLATES.keys()))
-except Exception:
-    # Fallback if _templates is unavailable at import time.
-    # Keep in sync with TEMPLATES dict in rheojax/cli/_templates.py.
-    _TEMPLATE_CHOICES = (
-        "basic",
-        "bayesian",
-        "batch",
-        "creep",
-        "mastercurve",
-        "oscillation",
-    )
+_TEMPLATE_CHOICES = tuple(sorted(_TEMPLATES.keys()))
 
 
 def create_parser() -> argparse.ArgumentParser:

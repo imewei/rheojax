@@ -1425,9 +1425,19 @@ class TestNlsqOptimizeFallbackPaths:
         def cobj(v):
             return jnp.array([(v[0] - 4.0) + 1j * (v[0] - 6.0)], dtype=jnp.complex128)
 
+        # P1-6 regression guard: this attribute is what _finalize_fallback_result
+        # must propagate onto the fallback result. Before that helper existed,
+        # this exact path (non-convergence retry) silently dropped it while the
+        # sibling exception-handler path propagated it correctly.
+        cobj._normalization_weights = np.array([2.0, 2.0])
+
         result = optm.nlsq_optimize(cobj, params, fallback=True, max_iter=100)
         assert "SciPy fallback" in result.message
         np.testing.assert_allclose(result.x[0], 5.0, atol=1e-2)
+        assert result._normalization_weights is not None
+        np.testing.assert_array_equal(
+            result._normalization_weights, cobj._normalization_weights
+        )
 
 
 class TestNlsqMultistartOptimize:
