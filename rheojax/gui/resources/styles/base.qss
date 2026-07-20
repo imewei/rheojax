@@ -107,6 +107,11 @@ QToolButton:checked {
     border-color: @tool_checked_border;
 }
 
+QToolButton:focus {
+    border: 2px solid @border_focus;
+    padding: 5px;
+}
+
 /* ========== Input Widgets ========== */
 
 QLineEdit, QSpinBox, QDoubleSpinBox {
@@ -311,6 +316,11 @@ QToolButton[class="icon-button"]:pressed {
     background-color: @bg_pressed;
 }
 
+QToolButton[class="icon-button"]:focus {
+    border: 2px solid @border_focus;
+    padding: 6px;
+}
+
 QToolButton[class="icon-button-primary"] {
     background-color: @icon_btn_primary_bg;
     border: none;
@@ -322,6 +332,11 @@ QToolButton[class="icon-button-primary"] {
 
 QToolButton[class="icon-button-primary"]:hover {
     background-color: @icon_btn_primary_hover;
+}
+
+QToolButton[class="icon-button-primary"]:focus {
+    border: 2px solid @border_focus;
+    padding: 6px;
 }
 
 /* ========== Page Containers ========== */
@@ -725,13 +740,13 @@ QMenuBar::item:selected {
 /* ========== Empty State Labels ========== */
 
 QLabel[class="empty-message"] {
-    color: @text_disabled;
+    color: @text_secondary;
     font-size: 12pt;
     padding: 0;
 }
 
 QLabel[class="empty-desc"] {
-    color: @text_disabled;
+    color: @text_secondary;
     font-size: 10pt;
     padding: 0;
 }

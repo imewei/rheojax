@@ -34,6 +34,7 @@ class RunStep(QWidget):
         self._state = state
         self._run_fn = run_fn or _default_run_fn
         self._btn = QPushButton("▶ Run transform", self)
+        self._btn.setAccessibleName("Run transform")
         self._status = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
