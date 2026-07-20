@@ -322,7 +322,7 @@ def prony_decompose_memory(
             f"Only {valid_mask.sum()} valid points for {n_modes} modes. "
             "Reducing n_modes."
         )
-        n_modes = max(2, valid_mask.sum() // 2)
+        n_modes = max(2, int(valid_mask.sum() // 2))
 
     t_valid = t[valid_mask]
     m_valid = m_t[valid_mask]

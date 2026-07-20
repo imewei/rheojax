@@ -2130,6 +2130,8 @@ class GeneralizedMaxwell(BaseModel):
         symbol = "G"
 
         E_inf = self.parameters.get_value(f"{symbol}_inf")
+        if E_inf is None:
+            raise ValueError(f"Parameter '{symbol}_inf' is not set")
         E_i = jnp.array(
             [
                 self.parameters.get_value(f"{symbol}_{i + 1}")

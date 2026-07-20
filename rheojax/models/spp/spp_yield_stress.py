@@ -685,6 +685,8 @@ class SPPYieldStress(BaseModel):
         sigma_dy_exp = self.parameters.get_value("sigma_dy_exp")
         G_cage = self.parameters.get_value("G_cage")
         K_flow = self.parameters.get_value("K_flow")
+        if G_cage is None or K_flow is None:
+            raise ValueError("Parameters 'G_cage' and 'K_flow' must be set")
 
         result = {"gamma_0": gamma_0_array}
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
@@ -110,7 +110,7 @@ class BaseModel(BayesianMixin, ABC):
         default_test_mode=None,
         normalize: bool = True,
         **kwargs,
-    ) -> BaseModel:
+    ) -> Self:
         """Standard NLSQ fitting pipeline for models with a stateless model_fn.
 
         Handles: RheoData unpacking, test_mode resolution/caching,

@@ -511,7 +511,7 @@ class DMTNonlocal(DMTBase):
             band_location = self.y[band_indices].mean()
         else:
             band_width = self.gap_width
-            band_location = self.gap_width / 2
+            band_location = np.float64(self.gap_width / 2)
 
         return {
             "is_banding": is_banding,

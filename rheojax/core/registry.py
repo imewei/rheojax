@@ -206,7 +206,7 @@ class Registry:
             # abstract methods (e.g. BaseModel._fit/_predict never
             # overridden).
             if inspect.isabstract(plugin_class):
-                missing = sorted(plugin_class.__abstractmethods__)
+                missing = sorted(getattr(plugin_class, "__abstractmethods__", ()))
                 raise ValueError(
                     f"Model plugin '{plugin_class.__name__}' is abstract; "
                     f"missing implementation for: {', '.join(missing)}"
@@ -219,7 +219,7 @@ class Registry:
                     "Transform plugin does not implement required interface: missing 'transform' method"
                 )
             if inspect.isabstract(plugin_class):
-                missing = sorted(plugin_class.__abstractmethods__)
+                missing = sorted(getattr(plugin_class, "__abstractmethods__", ()))
                 raise ValueError(
                     f"Transform plugin '{plugin_class.__name__}' is abstract; "
                     f"missing implementation for: {', '.join(missing)}"

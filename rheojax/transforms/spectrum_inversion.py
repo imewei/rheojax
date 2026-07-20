@@ -397,6 +397,7 @@ def _max_entropy_inversion(
         grad_chi2_at_m = 2.0 * A.T @ (A @ m - b)
         lam = max(float(np.mean(np.abs(grad_chi2_at_m))), 1e-30)
         lam_lo, lam_hi = lam * 1e-3, lam * 1e3
+    assert lam is not None  # guaranteed by the auto_lam branch above or the caller
 
     max_iter = 200
     tol = 1e-6

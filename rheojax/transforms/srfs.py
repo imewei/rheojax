@@ -29,7 +29,7 @@ References:
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 import numpy as np
 
@@ -332,7 +332,7 @@ class SRFS(BaseTransform):
 
         return self.create_mastercurve(data, x, tau0, return_shifts=return_shifts)
 
-    def _raise_missing_sgr_params(self) -> None:
+    def _raise_missing_sgr_params(self) -> NoReturn:
         """Raise the appropriate error when x/tau0 are not supplied.
 
         auto_shift=True is documented as a way to skip explicit x/tau0, but
