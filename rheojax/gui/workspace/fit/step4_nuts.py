@@ -21,6 +21,9 @@ from rheojax.gui.foundation.state import FitState
 from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.priors_editor import PriorsEditor
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 _R_HAT_THRESHOLD = 1.05
 _ESS_MIN = 400
@@ -123,6 +126,7 @@ class NutsStep(QWidget):
         self._state = state
         self._sample_fn = sample_fn or _default_sample_fn
         self._active_jobs = active_jobs
+        self._current_job_id: str | None = None
         self._skipped = False
         self._banner = QLabel("⚡ warm-started from NLSQ MAP", self)
         self._banner.setAccessibleName("Warm-started from NLSQ MAP")
@@ -204,12 +208,19 @@ class NutsStep(QWidget):
         cfg.max_tree_depth = self._max_tree_depth.value() or None
 
     def _on_cancel_clicked(self) -> None:
-        if self._active_jobs is None:
+        if self._active_jobs is None or self._current_job_id is None:
             return
-        job_id = f"{self._state.data_ref}:nuts"
-        job = self._active_jobs.by_id.get(job_id)
+        # See NlsqStep._on_cancel_clicked's matching comment: uses the job_id
+        # captured when THIS run started, not recomputed from live
+        # state.data_ref, so a dataset switch mid-run can't make Cancel
+        # silently miss the job it's actually trying to stop.
+        job = self._active_jobs.by_id.get(self._current_job_id)
         worker = job.get("worker") if job else None
         if worker is None:
+            logger.debug(
+                "Cancel clicked with no live worker",
+                job_id=self._current_job_id,
+            )
             return
         from PySide6.QtCore import QThreadPool
 
@@ -274,7 +285,10 @@ class NutsStep(QWidget):
         # completes. Mirrors NlsqStep.run()'s identical guard.
         self._run_btn.setEnabled(False)
         self._skip_btn.setEnabled(False)
-        self._cancel_btn.setVisible(True)
+        # job_id mirrors fit_controller._make_sample_fn's own
+        # f"{data_ref}:nuts" exactly -- see NlsqStep.run()'s matching comment.
+        self._current_job_id = f"{self._state.data_ref}:nuts"
+        self._cancel_btn.setVisible(self._active_jobs is not None)
         # See NlsqStep.run()'s matching comment: discard a result that no
         # longer corresponds to the current selection if state moved on
         # while this run was in flight.
@@ -324,6 +338,7 @@ class NutsStep(QWidget):
             self._run_btn.setEnabled(True)
             self._skip_btn.setEnabled(True)
             self._cancel_btn.setVisible(False)
+            self._current_job_id = None
 
     def is_ready(self) -> bool:
         return self._skipped or self._state.nuts_result is not None

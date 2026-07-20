@@ -19,6 +19,9 @@ from rheojax.gui.foundation.state import FitState, ParameterState
 from rheojax.gui.jobs.cancellation import CancellationError
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 from rheojax.gui.widgets.parameter_table import ParameterTable
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _default_fit_fn(
@@ -55,6 +58,7 @@ class NlsqStep(QWidget):
         self._state = state
         self._fit_fn = fit_fn or _default_fit_fn
         self._active_jobs = active_jobs
+        self._current_job_id: str | None = None
         self._table = ParameterTable(self)
         self._ms_enabled = QCheckBox("multi-start", self)
         self._ms_count = QSpinBox(self)
@@ -89,12 +93,23 @@ class NlsqStep(QWidget):
         self._run_btn.clicked.connect(self.run)
 
     def _on_cancel_clicked(self) -> None:
-        if self._active_jobs is None:
+        if self._active_jobs is None or self._current_job_id is None:
             return
-        job_id = f"{self._state.data_ref}:nlsq"
-        job = self._active_jobs.by_id.get(job_id)
+        # Look up the job_id captured when THIS run started (not recomputed
+        # from live state.data_ref) -- run()'s own comments document that the
+        # nested event loop lets the user navigate to Step 2 and pick a
+        # different dataset while a fit is in flight, which would otherwise
+        # make this button silently miss and do nothing.
+        job = self._active_jobs.by_id.get(self._current_job_id)
         worker = job.get("worker") if job else None
         if worker is None:
+            # Job already finished (or never registered) -- not an error,
+            # just a stale click, but worth a trace since it's the one path
+            # that makes this button silently do nothing.
+            logger.debug(
+                "Cancel clicked with no live worker",
+                job_id=self._current_job_id,
+            )
             return
         from PySide6.QtCore import QThreadPool
 
@@ -172,7 +187,12 @@ class NlsqStep(QWidget):
         # button must be disabled for the duration or a second click launches
         # an overlapping fit that corrupts shared active_jobs tracking.
         self._run_btn.setEnabled(False)
-        self._cancel_btn.setVisible(True)
+        # job_id mirrors fit_controller._make_fit_fn's own f"{data_ref}:nlsq"
+        # exactly, captured here (not recomputed from live state in
+        # _on_cancel_clicked) so a dataset switch mid-run can't make Cancel
+        # silently miss the job it's actually trying to stop.
+        self._current_job_id = f"{self._state.data_ref}:nlsq"
+        self._cancel_btn.setVisible(self._active_jobs is not None)
         # Snapshot: _fit_fn pumps a nested QEventLoop, so the user can
         # navigate elsewhere/edit Step 1 while this run is in flight --
         # that invalidation bumps FitState.revision (invalidation.py). If it
@@ -276,6 +296,7 @@ class NlsqStep(QWidget):
         finally:
             self._run_btn.setEnabled(True)
             self._cancel_btn.setVisible(False)
+            self._current_job_id = None
 
     def refresh_display(self) -> None:
         """Sync the result label to current state.
