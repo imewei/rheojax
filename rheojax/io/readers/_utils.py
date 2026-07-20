@@ -858,11 +858,11 @@ def normalize_units(
     if key not in UNIFIED_UNIT_CONVERSIONS:
         return values, source_unit
 
-    target_unit, factor = UNIFIED_UNIT_CONVERSIONS[key]
+    target_unit, unit_factor = UNIFIED_UNIT_CONVERSIONS[key]
     values = np.asarray(values, dtype=np.float64)
 
-    if factor is not None:
-        return values * factor, target_unit
+    if unit_factor is not None:
+        return values * unit_factor, target_unit
 
     # Additive temperature conversion
     if key in ("°c", "c"):

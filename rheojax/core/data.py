@@ -531,6 +531,12 @@ class RheoData:
         if self.y is None:
             raise ValueError("RheoData.y_real requires non-None y data")
         y = self.y
+        # Invariant: __post_init__ always converts x/y via _ensure_array, so y is
+        # never a bare list/tuple here — narrow for mypy, raise loudly if violated.
+        if not isinstance(y, (np.ndarray, jnp.ndarray)):
+            raise TypeError(
+                f"RheoData.y_real: expected a converted ndarray, got {type(y).__name__}"
+            )
         y_np = _coerce_ndarray(y)
         if np.iscomplexobj(y_np):
             if isinstance(y, jnp.ndarray):
@@ -539,12 +545,6 @@ class RheoData:
         if y_np.ndim == 2 and y_np.shape[1] == 2:
             # (N,2) DMTA/GMM convention: column 0 is G' (storage modulus)
             return y[:, 0]
-        # Invariant: __post_init__ always converts x/y via _ensure_array, so y is
-        # never a bare list/tuple here — narrow for mypy, raise loudly if violated.
-        if not isinstance(y, (np.ndarray, jnp.ndarray)):
-            raise TypeError(
-                f"RheoData.y_real: expected a converted ndarray, got {type(y).__name__}"
-            )
         return y
 
     @property
@@ -567,6 +567,12 @@ class RheoData:
         if self.y is None:
             raise ValueError("RheoData.y_imag requires non-None y data")
         y = self.y
+        # Invariant: __post_init__ always converts x/y via _ensure_array, so y is
+        # never a bare list/tuple here — narrow for mypy, raise loudly if violated.
+        if not isinstance(y, (np.ndarray, jnp.ndarray)):
+            raise TypeError(
+                f"RheoData.y_imag: expected a converted ndarray, got {type(y).__name__}"
+            )
         y_np = _coerce_ndarray(y)
         if np.iscomplexobj(y_np):
             if isinstance(y, jnp.ndarray):

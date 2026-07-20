@@ -227,6 +227,7 @@ def load_excel(
 
     # Extract y data (single column or complex modulus)
     is_complex = y_cols is not None
+    y_data: np.ndarray
     if is_complex:
         if y_cols is None:  # pragma: no cover — guarded by is_complex
             raise ValueError("y_cols must not be None for complex data")
@@ -316,7 +317,9 @@ def load_excel(
                 imag_part, _ = normalize_units(y_data.imag, extracted_y_units)
                 y_data = real_part + 1j * imag_part
             else:
-                y_data, y_units = normalize_units(y_data, extracted_y_units)
+                y_data, y_units = normalize_units(
+                    np.asarray(y_data, dtype=np.float64), extracted_y_units
+                )
         else:
             y_units = extracted_y_units
 
