@@ -932,6 +932,71 @@ class TestRheoDataOperationBranches:
         with pytest.raises(ValueError, match="non-positive values"):
             data.resample(5)
 
+    def test_resample_time_domain_autodetects_log_spacing(self):
+        """Log-sampled time-domain data (e.g. relaxation/creep) must resample
+        onto a log-spaced grid, not linspace, or the flat late-time tail gets
+        over-resolved at the expense of the fast-decay region."""
+        x = np.logspace(-3, 3, 50)
+        y = np.exp(-x)
+        data = RheoData(x=x, y=y)  # domain defaults to "time"
+        out = data.resample(n_points=20)
+
+        new_x = np.asarray(out.x)
+
+        def cv(a):
+            return np.std(a) / abs(np.mean(a))
+
+        log_cv = cv(np.diff(np.log(new_x)))
+        linear_cv = cv(np.diff(new_x))
+        # log-spacing selected: near-uniform steps in log-space, wildly
+        # non-uniform steps in linear space
+        assert log_cv < 1e-6
+        assert linear_cv > 0.5
+
+    def test_resample_time_domain_linear_stays_linear(self):
+        """Regression guard: genuinely linear time-domain data must not be
+        mistaken for log-spaced by the auto-detection heuristic."""
+        x = np.linspace(1, 101, 50)
+        y = np.exp(-x / 50)
+        data = RheoData(x=x, y=y)  # domain defaults to "time"
+        out = data.resample(n_points=20)
+
+        new_x = np.asarray(out.x)
+
+        def cv(a):
+            return np.std(a) / abs(np.mean(a))
+
+        linear_cv = cv(np.diff(new_x))
+        log_cv = cv(np.diff(np.log(new_x)))
+        # linear spacing selected: near-uniform steps in linear space
+        assert linear_cv < 1e-6
+        assert log_cv > 0.5
+
+    def test_resample_time_domain_short_array_falls_back_linear(self):
+        """size<=2 guard: too few points to compute a CV comparison, so
+        detection must not run and resample must not crash."""
+        x = np.array([1.0, 2.0])
+        y = np.array([1.0, 4.0])
+        data = RheoData(x=x, y=y)
+        out = data.resample(n_points=5)
+
+        new_x = np.asarray(out.x)
+        assert len(new_x) == 5
+        np.testing.assert_allclose(new_x, np.linspace(1.0, 2.0, 5))
+
+    def test_resample_time_domain_nonpositive_falls_back_linear(self):
+        """positivity guard: a non-positive x value in time domain must skip
+        log-detection (log undefined there) and fall back to linear without
+        raising, unlike the frequency-domain path which requires positivity."""
+        x = np.array([-1.0, 0.0, 1.0, 2.0, 3.0])
+        y = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        data = RheoData(x=x, y=y)
+        out = data.resample(n_points=5)
+
+        new_x = np.asarray(out.x)
+        assert len(new_x) == 5
+        np.testing.assert_allclose(new_x, np.linspace(-1.0, 3.0, 5))
+
     def test_smooth_even_window_made_odd(self):
         x = np.linspace(0, 10, 50)
         y = np.sin(x)

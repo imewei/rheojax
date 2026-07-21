@@ -31,24 +31,24 @@ def reject_removed_options(options: Mapping[str, object]) -> None:
 
 
 def validate_predict_input(X: object, *, name: str = "X") -> None:
-    """Validate a predict()/fit() input array at the public API boundary.
+    """Validate a predict() input array at the public API boundary.
 
     Checks for NaNs and, for a 1-D axis (time/frequency), monotonic
     non-decreasing ordering. Runs as a host-side NumPy check (eager, not
     inside JIT) so it raises a clear error before bad data ever reaches an
-    ODE solver, where a NaN silently produces garbage instead of a error.
+    ODE solver, where a NaN silently produces garbage instead of an error.
 
     Args:
         X: Input array-like (NumPy or JAX array).
         name: Name used in the raised error message.
 
     Raises:
-        ValueError: If X contains NaN, or if a 1-D X is not monotonically
-            non-decreasing.
+        ValueError: If X contains NaN, is empty, or if a 1-D X is not
+            monotonically non-decreasing.
     """
     arr = np.asarray(X)
     if arr.size == 0:
-        return
+        raise ValueError(f"{name} is empty; cannot predict on zero data points.")
     if np.issubdtype(arr.dtype, np.number) and np.isnan(arr).any():
         raise ValueError(
             f"{name} contains NaN value(s); check input data for missing/invalid entries."

@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 
 from rheojax.core.data import RheoData
-from rheojax.transforms.spectrum_inversion import SpectrumInversion, _build_kernel
+from rheojax.transforms.spectrum_inversion import (
+    SpectrumInversion,
+    _assemble_target,
+    _build_kernel,
+)
 
 
 class TestSpectrumInversionTikhonov:
@@ -49,6 +53,53 @@ class TestSpectrumInversionTikhonov:
         transform = SpectrumInversion(method="tikhonov", n_tau=50)
         result, _ = transform.transform(data)
         assert np.all(np.asarray(result.y) >= 0)
+
+    def test_nnls_beats_naive_clip_on_augmented_residual(self):
+        """NNLS must find a genuinely better constrained solution than
+        naive "solve then clip negatives to zero" -- the old (broken)
+        approach this module replaced. `test_non_negative_spectrum` alone
+        can't distinguish the two, since clip-after-solve is also
+        elementwise non-negative by construction.
+
+        Uses weak regularization (lam=1e-6) on the single-mode fixture,
+        which produces a large negative lobe in the unconstrained ridge
+        solution (verified below), and checks that the NNLS solution this
+        module returns achieves a lower-or-equal residual on the
+        Tikhonov-augmented system than the naive clipped baseline computed
+        independently here.
+        """
+        omega, G_star, _ = self._make_single_mode_data()
+        data = RheoData(x=omega, y=G_star)
+        lam = 1e-6
+        transform = SpectrumInversion(
+            method="tikhonov", n_tau=80, regularization=lam
+        )
+        result, _ = transform.transform(data)
+        H_nnls = np.asarray(result.y)
+        tau = np.asarray(result.x)
+
+        A = _build_kernel(omega, tau, "oscillation", 0.0)
+        b = _assemble_target(G_star, "oscillation", 0.0)
+        L = np.eye(len(tau))
+        A_aug = np.vstack([A, lam * L])
+        b_aug = np.concatenate([b, np.zeros(L.shape[0])])
+
+        # Naive baseline: unconstrained ridge solve, then clip negatives.
+        ATA = A.T @ A
+        ATb = A.T @ b
+        H_unconstrained = np.linalg.solve(ATA + lam**2 * L.T @ L, ATb)
+        assert np.any(H_unconstrained < 0), (
+            "test setup must produce a negative lobe for this to be a "
+            "meaningful check"
+        )
+        H_naive = np.maximum(H_unconstrained, 0.0)
+
+        res_nnls = np.linalg.norm(A_aug @ H_nnls - b_aug)
+        res_naive = np.linalg.norm(A_aug @ H_naive - b_aug)
+        # Strict: with a confirmed negative lobe, a converged NNLS solve is
+        # guaranteed strictly better than clip-after-solve. `<=` would pass
+        # vacuously if NNLS ever fell back to the identical ridge+clip path.
+        assert res_nnls < res_naive
 
     def test_two_mode_spectrum(self):
         """Two-mode system should show two distinct peaks."""

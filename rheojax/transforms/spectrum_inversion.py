@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from scipy.optimize import nnls
+from scipy.optimize import minimize_scalar, nnls
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
@@ -249,12 +249,12 @@ def _tikhonov_inversion(
 ) -> tuple[np.ndarray, float, float]:
     """Tikhonov-regularized spectrum inversion.
 
-    Solves:  min ||A H - b||²  s.t. H >= 0, via NNLS on the Tikhonov-
-    augmented stacked system  [A; λL] H ≈ [b; 0]  -- the non-negativity
-    constraint is enforced directly by NNLS rather than by solving the
-    unconstrained ridge normal equations and clipping negative values
-    afterward (clip-after-solve is not the minimizer of the constrained
-    problem).
+    Solves:  min ||A H - b||² + λ² ||L H||²  s.t. H >= 0, via NNLS on the
+    Tikhonov-augmented stacked system  [A; λL] H ≈ [b; 0]  -- the non-
+    negativity constraint is enforced directly by NNLS rather than by
+    solving the unconstrained ridge normal equations and clipping negative
+    values afterward (clip-after-solve is not the minimizer of the
+    constrained problem).
 
     where L is the identity (zeroth order) for stability.
     """
@@ -269,7 +269,19 @@ def _tikhonov_inversion(
 
     A_aug = np.vstack([A, lam * L])
     b_aug = np.concatenate([b, np.zeros(L.shape[0])])
-    H_tau, _ = nnls(A_aug, b_aug)
+    try:
+        H_tau, _ = nnls(A_aug, b_aug)
+    except (RuntimeError, np.linalg.LinAlgError) as exc:
+        logger.warning(
+            "NNLS failed to converge on the Tikhonov-augmented system; "
+            "falling back to unconstrained ridge solve + clip (degraded, "
+            "non-optimal, but always-available spectrum)",
+            error=str(exc),
+            lam=float(lam),
+        )
+        ATA = A.T @ A
+        ATb = A.T @ b
+        H_tau = np.maximum(np.linalg.solve(ATA + lam**2 * L.T @ L, ATb), 0.0)
 
     residual_norm = float(np.linalg.norm(A @ H_tau - b))
     return H_tau, float(lam), residual_norm
@@ -287,74 +299,88 @@ def _select_lambda_gcv(A: np.ndarray, b: np.ndarray, L: np.ndarray) -> float:
     degrees-of-freedom trace still uses the linear ridge influence
     operator (the standard GCV approximation); when L = I it simplifies
     via the SVD of A: trace(A(A^T A + λ²I)^{-1} A^T) = Σ σ_i²/(σ_i² + λ²).
+
+    Lambda candidates are searched via a bounded 1-D scalar minimization
+    over log10(λ) (scipy.optimize.minimize_scalar, method="bounded") rather
+    than a fixed 50-point np.logspace grid. Each scored candidate still
+    requires one NNLS solve of the augmented system, so this is the
+    dominant cost; bounded Brent typically needs ~15-25 evaluations to
+    converge versus a fixed 50, meaningfully cutting NNLS call count for
+    the same GCV-optimal (or very close to it) lambda.
     """
     n = A.shape[0]
-    lambdas = np.logspace(-6, 4, 50)
-    gcv_scores = np.full(len(lambdas), np.inf)
+    log_lam_lo, log_lam_hi = -6.0, 4.0
 
-    # Check if L is identity — enables fast SVD path for the trace term
     is_identity_L = L.shape[0] == L.shape[1] and np.allclose(L, np.eye(L.shape[0]))
 
     if is_identity_L:
-        # Fast SVD-based trace: precompute once, O(min(n,m)) per lambda
+        # Fast SVD-based trace: precompute once, O(min(n,m)) per candidate
         _U, s, _Vt = np.linalg.svd(A, full_matrices=False)
         s2 = s**2
 
-        for i, lam in enumerate(lambdas):
+        def gcv_score(log_lam: float) -> float:
+            lam = 10.0**log_lam
             # Filter factors: f_j = σ_j² / (σ_j² + λ²)
             f = s2 / (s2 + lam**2)
-            # trace(I - M) = n - Σ f_j
             trace_I_minus_M = n - np.sum(f)
-
             if trace_I_minus_M <= 0:
-                continue
+                return np.inf
 
             A_aug = np.vstack([A, lam * L])
             b_aug = np.concatenate([b, np.zeros(L.shape[0])])
-            H_lam, _ = nnls(A_aug, b_aug)
+            try:
+                H_lam, _ = nnls(A_aug, b_aug)
+            except RuntimeError:
+                return np.inf
             res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
+            return res_norm_sq / trace_I_minus_M**2
 
-            gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
     else:
         # General case: L ≠ I — use direct solve for the trace term
         ATA = A.T @ A
         LTL = L.T @ L
 
-        for i, lam in enumerate(lambdas):
+        def gcv_score(log_lam: float) -> float:
+            lam = 10.0**log_lam
             try:
                 # Influence matrix trace via solve (avoids forming full n×n matrix)
                 # trace(A (ATA + λ²LTL)^{-1} A^T) = trace((ATA + λ²LTL)^{-1} ATA)
                 C = np.linalg.solve(ATA + lam**2 * LTL, ATA)
-                trace_I_minus_M = n - np.trace(C)
-
-                if trace_I_minus_M <= 0:
-                    continue
-
-                A_aug = np.vstack([A, lam * L])
-                b_aug = np.concatenate([b, np.zeros(L.shape[0])])
-                H_lam, _ = nnls(A_aug, b_aug)
-                res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
-
-                gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
             except np.linalg.LinAlgError:
-                continue
+                return np.inf
+            trace_I_minus_M = n - np.trace(C)
+            if trace_I_minus_M <= 0:
+                return np.inf
 
-    finite_mask = np.isfinite(gcv_scores)
-    if not np.any(finite_mask):
-        # All GCV scores are inf (e.g. degenerate kernel / zero trace denominators).
+            A_aug = np.vstack([A, lam * L])
+            b_aug = np.concatenate([b, np.zeros(L.shape[0])])
+            try:
+                H_lam, _ = nnls(A_aug, b_aug)
+            except RuntimeError:
+                return np.inf
+            res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
+            return res_norm_sq / trace_I_minus_M**2
+
+    opt = minimize_scalar(
+        gcv_score, bounds=(log_lam_lo, log_lam_hi), method="bounded"
+    )
+
+    if not np.isfinite(opt.fun):
+        # All candidates the optimizer tried were infinite (e.g. degenerate
+        # kernel / zero trace denominators / persistent NNLS non-convergence).
         # Fall back to a moderate regularization parameter and warn.
         import warnings as _warnings
 
         _warnings.warn(
-            "GCV: all regularization candidates produced infinite scores. "
+            "GCV: regularization search produced only infinite scores. "
             "Falling back to lambda=1e-3. Consider providing a manual "
             "regularization parameter via the 'regularization' argument.",
             UserWarning,
             stacklevel=2,
         )
         return 1e-3
-    best_idx = int(np.argmin(gcv_scores))
-    return float(lambdas[best_idx])
+
+    return float(10.0**opt.x)
 
 
 # ---------------------------------------------------------------------------

@@ -1082,14 +1082,23 @@ def _extract_auxiliary_columns(
 
 def _filter_nonfinite(
     x: np.ndarray, y: np.ndarray, *, interval: int
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Drop rows where x or y is NaN/Inf before RheoData construction.
 
     RheoCompass exports use NaN to mark unparseable/blank cells (see
     parse_rheocompass_intervals); RheoData(validate=True) raises on any
-    NaN, so those rows must be filtered here first. np.isfinite handles
-    complex y (oscillation G*) natively: it is True only if both the real
-    and imaginary parts are finite.
+    NaN, so those rows must be filtered here first. NaN can also arise
+    locally from the creep/relaxation compliance/modulus divide-by-zero
+    guards (e.g. _compute_compliance's np.where(stress != 0, ..., np.nan)
+    at t=0). np.isfinite handles complex y (oscillation G*) natively: it
+    is True only if both the real and imaginary parts are finite.
+
+    Returns the filtered x, y and the positional index array (``valid_idx``)
+    used to select them, so callers can apply the identical mask to any
+    other per-row arrays (e.g. per-row metadata) that must stay aligned.
+
+    Raises:
+        ValueError: If every row is non-finite (nothing usable remains).
     """
     valid_idx = np.flatnonzero(np.isfinite(x) & np.isfinite(y))
     n_dropped = len(x) - len(valid_idx)
@@ -1100,7 +1109,12 @@ def _filter_nonfinite(
             n_dropped=n_dropped,
             n_total=len(x),
         )
-    return np.take(x, valid_idx), np.take(y, valid_idx)
+    if len(valid_idx) == 0:
+        raise ValueError(
+            f"Interval {interval}: all rows are non-finite; "
+            f"0 of {len(x)} points usable"
+        )
+    return np.take(x, valid_idx), np.take(y, valid_idx), valid_idx
 
 
 def _interval_to_rheodata_creep(
@@ -1139,7 +1153,8 @@ def _interval_to_rheodata_creep(
         y_units = mapped_units.get("shear_strain", "dimensionless")
 
     x_units = mapped_units.get("time", "s")
-    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
+    x, y, valid_idx = _filter_nonfinite(x, y, interval=block.interval_index)
+    row_filtered_df = mapped_df.iloc[valid_idx]
 
     # Build metadata
     metadata = {
@@ -1147,8 +1162,8 @@ def _interval_to_rheodata_creep(
         "interval_index": block.interval_index,
         "test_mode": "creep",
         **_extract_geometry_metadata(global_meta),
-        **_extract_temperature_metadata(global_meta, mapped_df),
-        **_extract_auxiliary_columns(mapped_df, mapped_units),
+        **_extract_temperature_metadata(global_meta, row_filtered_df),
+        **_extract_auxiliary_columns(row_filtered_df, mapped_units),
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
@@ -1212,7 +1227,8 @@ def _interval_to_rheodata_relaxation(
             )
 
     x_units = mapped_units.get("time", "s")
-    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
+    x, y, valid_idx = _filter_nonfinite(x, y, interval=block.interval_index)
+    row_filtered_df = mapped_df.iloc[valid_idx]
 
     # Build metadata
     metadata = {
@@ -1220,8 +1236,8 @@ def _interval_to_rheodata_relaxation(
         "interval_index": block.interval_index,
         "test_mode": "relaxation",
         **_extract_geometry_metadata(global_meta),
-        **_extract_temperature_metadata(global_meta, mapped_df),
-        **_extract_auxiliary_columns(mapped_df, mapped_units),
+        **_extract_temperature_metadata(global_meta, row_filtered_df),
+        **_extract_auxiliary_columns(row_filtered_df, mapped_units),
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
@@ -1279,7 +1295,8 @@ def _interval_to_rheodata_oscillation(
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa
-    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
+    x, y, valid_idx = _filter_nonfinite(x, y, interval=block.interval_index)
+    row_filtered_df = mapped_df.iloc[valid_idx]
 
     # Build metadata with G' and G'' accessible
     metadata = {
@@ -1287,8 +1304,8 @@ def _interval_to_rheodata_oscillation(
         "interval_index": block.interval_index,
         "test_mode": "oscillation",
         **_extract_geometry_metadata(global_meta),
-        **_extract_temperature_metadata(global_meta, mapped_df),
-        **_extract_auxiliary_columns(mapped_df, mapped_units),
+        **_extract_temperature_metadata(global_meta, row_filtered_df),
+        **_extract_auxiliary_columns(row_filtered_df, mapped_units),
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
@@ -1342,7 +1359,8 @@ def _interval_to_rheodata_rotation(
         )
 
     x_units = mapped_units.get("shear_rate", "1/s")
-    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
+    x, y, valid_idx = _filter_nonfinite(x, y, interval=block.interval_index)
+    row_filtered_df = mapped_df.iloc[valid_idx]
 
     # Build metadata
     metadata = {
@@ -1350,8 +1368,8 @@ def _interval_to_rheodata_rotation(
         "interval_index": block.interval_index,
         "test_mode": "rotation",
         **_extract_geometry_metadata(global_meta),
-        **_extract_temperature_metadata(global_meta, mapped_df),
-        **_extract_auxiliary_columns(mapped_df, mapped_units),
+        **_extract_temperature_metadata(global_meta, row_filtered_df),
+        **_extract_auxiliary_columns(row_filtered_df, mapped_units),
         "columns": list(mapped_df.columns),
         "global_metadata": global_meta,
     }
@@ -1525,6 +1543,7 @@ def load_anton_paar(
                 "Skipping interval that failed to convert to RheoData",
                 interval=block.interval_index,
                 error=str(e),
+                exc_info=True,
             )
             continue
 

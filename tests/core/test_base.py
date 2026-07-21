@@ -1425,3 +1425,28 @@ class TestTransformPipelineExtrasPassthrough:
         assert not isinstance(recorder.received, tuple)
         assert np.array_equal(recorder.received, np.array([1.0, 2.0, 3.0]))
         assert not isinstance(result, tuple)
+
+
+class TestPredictInputValidation:
+    """Regression tests: BaseModel.predict() must reject NaN/non-monotonic
+    input via validate_predict_input() before it reaches _predict()."""
+
+    def _make_model(self):
+        class DummyModel(BaseModel):
+            def _fit(self, X, y, **kwargs):
+                return self
+
+            def _predict(self, X):
+                return X
+
+        return DummyModel()
+
+    def test_predict_rejects_nan(self):
+        model = self._make_model()
+        with pytest.raises(ValueError, match="NaN"):
+            model.predict(np.array([1.0, np.nan, 3.0]))
+
+    def test_predict_rejects_non_monotonic(self):
+        model = self._make_model()
+        with pytest.raises(ValueError, match="monotonic"):
+            model.predict(np.array([1.0, 3.0, 2.0]))
