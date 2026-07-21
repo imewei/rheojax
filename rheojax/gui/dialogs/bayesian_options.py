@@ -468,15 +468,16 @@ class BayesianOptionsDialog(QDialog):
 
         priors_text = self.priors_edit.toPlainText().strip()
         if priors_text:
-            try:
-                options["priors"] = json.loads(priors_text)
-            except Exception:
+            error = self._validate_priors_json()
+            if error:
                 logger.error(
                     "Failed to parse priors JSON",
                     dialog=self.__class__.__name__,
-                    exc_info=True,
+                    error=error,
                 )
                 options["priors"] = None
+            else:
+                options["priors"] = json.loads(priors_text)
 
         return options
 

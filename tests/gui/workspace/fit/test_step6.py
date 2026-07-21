@@ -156,3 +156,118 @@ def test_export_holds_worker_ref_and_registers_active_job(qtbot, monkeypatch, tm
     qtbot.waitUntil(lambda: "Exported to" in step._export_status.text())
     assert step._active_export_workers == {}
     assert active_jobs.by_id == {}
+
+
+def _non_converged_state(**overrides):
+    kwargs = dict(
+        protocol="oscillation",
+        model_key="maxwell",
+        model_config={},
+        data_ref="d",
+        nlsq_result={"params": {"G0": 1.0}},
+        nuts_result={
+            "verdict": {"converged": False, "reasons": ["ESS too low for G0"]}
+        },
+        revision=2,
+    )
+    kwargs.update(overrides)
+    return FitState(**kwargs)
+
+
+def test_save_button_confirm_gate_blocks_on_non_converged_cancel(qtbot, monkeypatch):
+    """PR #104 gate: clicking the real Save button (not calling
+    save_to_library() directly) with a non-converged NUTS verdict must show
+    a confirm dialog, and Cancel must prevent the save from proceeding."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = _non_converged_state()
+    lib = DatasetLibrary()
+    step = ExportStep(st, lib)
+    qtbot.addWidget(step)
+    _commit_on_request(step, lib)
+
+    captured = {}
+
+    def fake_question(self_, title, text, *args, **kwargs):
+        captured["text"] = text
+        return QMessageBox.StandardButton.Cancel
+
+    monkeypatch.setattr(QMessageBox, "question", fake_question)
+
+    emitted = {"called": False}
+    step.dataset_commit_requested.connect(lambda *a: emitted.__setitem__("called", True))
+
+    step._save_btn.click()
+
+    assert "did not converge" in captured["text"].lower()
+    assert emitted["called"] is False
+
+
+def test_save_button_confirm_gate_proceeds_on_non_converged_yes(qtbot, monkeypatch):
+    """Positive-path guard: answering Yes to the non-converged confirm must
+    let the real Save button proceed to save_to_library()."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = _non_converged_state()
+    lib = DatasetLibrary()
+    step = ExportStep(st, lib)
+    qtbot.addWidget(step)
+    _commit_on_request(step, lib)
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+
+    with qtbot.waitSignal(step.dataset_commit_requested, timeout=1000):
+        step._save_btn.click()
+
+    assert lib.get(step.provenance()["model_key"] + "_fit_2").origin == "derived"
+
+
+def test_export_button_confirm_gate_blocks_on_non_converged_cancel(
+    qtbot, monkeypatch, tmp_path
+):
+    """The real Export Bundle button must also honor the non-converged
+    confirm gate -- Cancel must stop before even prompting for a directory."""
+    from rheojax.gui.compat import QFileDialog, QMessageBox
+
+    st = _non_converged_state()
+    lib = DatasetLibrary()
+    step = ExportStep(st, lib)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    dir_dialog_called = {"called": False}
+    monkeypatch.setattr(
+        QFileDialog,
+        "getExistingDirectory",
+        lambda *a, **k: dir_dialog_called.__setitem__("called", True) or str(tmp_path),
+    )
+
+    step._export_btn.click()
+
+    assert dir_dialog_called["called"] is False
+    assert step._export_status.text() == ""
+
+
+def test_export_button_confirm_gate_proceeds_on_non_converged_yes(
+    qtbot, monkeypatch, tmp_path
+):
+    """Answering Yes to the non-converged confirm must let Export Bundle
+    proceed to the directory prompt and the export itself."""
+    from rheojax.gui.compat import QFileDialog, QMessageBox
+
+    st = _non_converged_state()
+    lib = DatasetLibrary()
+    step = ExportStep(st, lib)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda *a, **k: str(tmp_path)
+    )
+
+    step._export_btn.click()
+    qtbot.waitUntil(lambda: "Exported to" in step._export_status.text())

@@ -8,8 +8,9 @@ from rheojax.gui.utils.layout_helpers import set_zero_margins
 
 
 class InspectorPanel(QWidget):
-    # ponytail: set_tab_widget() has no caller anywhere in the app, so all
-    # three tabs stay empty placeholders. Populating them for real requires
+    # ponytail: set_tab_widget() has no production caller (tests call it
+    # directly), so all three tabs stay empty placeholders in the running
+    # app. Populating them for real requires
     # designing what each tab shows per active mode/step (a params view
     # synced to the current FitState/TransformState, a priors editor, a log
     # viewer) -- a feature to design deliberately, not a one-line wiring fix.

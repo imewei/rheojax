@@ -144,3 +144,9 @@ def test_move_step_up_and_down_swaps_state_order(qtbot):
     step._step_list.setCurrentRow(0)
     step._on_move_step_up_clicked()
     assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]
+
+    # Mirror case: last row + Move Down is also a no-op (guarded by
+    # `row >= self._step_list.count() - 1` in _on_move_step_down_clicked).
+    step._step_list.setCurrentRow(step._step_list.count() - 1)
+    step._on_move_step_down_clicked()
+    assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]

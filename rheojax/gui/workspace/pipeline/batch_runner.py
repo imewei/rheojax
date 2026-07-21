@@ -16,6 +16,9 @@ from PySide6.QtCore import QRunnable
 
 from rheojax.gui.foundation.pipeline_bridge import pipeline_context_from_library
 from rheojax.gui.workspace.pipeline.models import FitStepResult
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PipelineBatchRunner(QRunnable):
@@ -100,6 +103,12 @@ class PipelineBatchRunner(QRunnable):
                     # construction). Without this, such an exception would propagate out
                     # of run() with dataset_run_finished never emitted, leaving this
                     # dataset's active_jobs entry stuck forever (nothing else clears it).
+                    logger.error(
+                        "Unexpected error running pipeline for dataset",
+                        dataset_id=dataset_id,
+                        error=str(exc),
+                        exc_info=True,
+                    )
                     record = self._failed_record(dataset_id, str(exc))
                 self._service.dataset_run_finished.emit(dataset_id, record)
                 if fatal:
@@ -109,7 +118,14 @@ class PipelineBatchRunner(QRunnable):
                     # commits to job_history) instead of leaving it with no
                     # job_history/active_jobs entry at all, which was indistinguishable
                     # from "never got to it yet" when reviewing results afterwards.
-                    for skipped_id in self._selected_dataset_ids[idx + 1 :]:
+                    remaining = self._selected_dataset_ids[idx + 1 :]
+                    if remaining:
+                        logger.warning(
+                            "Skipping remaining datasets after fatal precondition error",
+                            skipped_count=len(remaining),
+                            reason=error_msg,
+                        )
+                    for skipped_id in remaining:
                         self._service.dataset_run_finished.emit(
                             skipped_id, self._skipped_record(skipped_id, error_msg)
                         )
