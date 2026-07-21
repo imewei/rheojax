@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "cc_tested_version": "2.1.50",
+  "_comment": "rheojax is Python-only (no JS/TS, no Dockerfiles) — non-Python languages disabled. See CLAUDE.md.",
+  "languages": {
+    "python": true,
+    "shell": false,
+    "yaml": false,
+    "json": true,
+    "toml": false,
+    "dockerfile": false,
+    "markdown": false,
+    "typescript": false
+  },
+  "security_linter_exclusions": [".venv/", "node_modules/", ".git/", "graphify-out/"],
+  "phases": {
+    "auto_format": true,
+    "subprocess_delegation": true
+  },
+  "subprocess": {
+    "settings_file": ".claude/subprocess-settings.json"
+  },
+  "package_managers": {
+    "python": "uv",
+    "javascript": "bun",
+    "allowed_subcommands": {
+      "npm": ["audit", "view", "pack", "publish", "whoami", "login"],
+      "pip": ["download"],
+      "yarn": ["audit", "info"],
+      "pnpm": ["audit", "info"],
+      "poetry": [],
+      "pipenv": []
+    }
+  }
+}
