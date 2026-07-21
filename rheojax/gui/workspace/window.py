@@ -31,7 +31,6 @@ from rheojax.gui.resources.styles.tokens import ThemeManager
 from rheojax.gui.services.pipeline_execution_service import PipelineExecutionService
 from rheojax.gui.widgets.log_dock import LogDockWidget
 from rheojax.gui.workspace.fit.fit_controller import build_fit_controller
-from rheojax.gui.workspace.inspector import InspectorPanel
 from rheojax.gui.workspace.library_rail import LibraryRail
 from rheojax.gui.workspace.status_bar import StatusBar
 from rheojax.gui.workspace.stepper_canvas import StepperCanvas
@@ -515,14 +514,12 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         )
         self._rail.dataset_selected.connect(self._on_rail_dataset_selected)
         self._rail.dataset_delete_requested.connect(self._on_dataset_delete_requested)
-        self._inspector = InspectorPanel(self)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
         self._wire_canvas(self._canvas)
         self._install_bodies(self._mode, self._canvas)
         self._splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._splitter.addWidget(self._rail)
         self._splitter.addWidget(self._canvas)
-        self._splitter.addWidget(self._inspector)
         self.setCentralWidget(self._splitter)
 
         # A rebuild (fresh New, or Open loading a saved project) always starts
@@ -651,7 +648,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
                 self._preview_dialog.close()
                 self._preview_dialog.deleteLater()
             self._preview_dialog = None
-        for widget in (self._canvas, self._rail, self._inspector, self._splitter):
+        for widget in (self._canvas, self._rail, self._splitter):
             widget.deleteLater()
         self._controllers = {}
         self._body_lists = {}

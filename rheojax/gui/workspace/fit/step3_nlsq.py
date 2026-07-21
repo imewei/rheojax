@@ -47,6 +47,15 @@ def _default_fit_fn(
 
 class NlsqStep(QWidget):
     edited = Signal()
+    # Mirrors ProtocolModelStep's edited/config_edited split: `edited` means
+    # nlsq_result itself changed (fit_controller.py registers it with
+    # changed="nlsq_result", which cascades-clears nuts_result and relocks
+    # downstream). Multi-start is a setting for the NEXT run, not a result
+    # change -- emitting `edited` for it would silently wipe an existing
+    # NUTS result every time the user toggles the checkbox. config_edited
+    # only marks the project dirty (window.py's generic hasattr(body,
+    # "config_edited") wiring) without touching the cascade.
+    config_edited = Signal()
     finished = Signal()
 
     def __init__(
@@ -62,10 +71,20 @@ class NlsqStep(QWidget):
         self._active_jobs = active_jobs
         self._current_job_id: str | None = None
         self._table = ParameterTable(self)
+        # Seeded from FitState.nlsq_config (mirrors NutsStep's nuts_config
+        # pattern) rather than a hardcoded default -- previously this was
+        # transient widget state only, so navigating away and back (or a
+        # workspace rebuild) silently reset it with no warning.
+        ms_cfg = self._state.nlsq_config
         self._ms_enabled = QCheckBox("multi-start", self)
+        self._ms_enabled.setChecked(ms_cfg.multi_start)
+        self._ms_enabled.setAccessibleDescription(
+            "Run multiple randomized restarts and keep the best fit by R²."
+        )
         self._ms_count = QSpinBox(self)
         self._ms_count.setRange(1, 64)
-        self._ms_count.setValue(8)
+        self._ms_count.setValue(ms_cfg.n_starts)
+        self._ms_count.setAccessibleName("Number of multi-start restarts")
         self._fit_options: dict = {}
         self._options_btn = QPushButton("⚙ Fit Options", self)
         self._options_btn.setAccessibleName("Fit Options")
@@ -87,6 +106,9 @@ class NlsqStep(QWidget):
         # indeterminate + elapsed time is the honest, always-correct fallback
         # per the audit's own guidance, and matches step4_nuts.py's identical
         # treatment for NUTS (which has no per-iteration percent at all).
+        # In-body (not just status-bar) feedback: the status bar's progress
+        # sliver lives 300px wide at the bottom of the window and is easy to
+        # miss during a multi-minute run; this sits right next to Cancel.
         self._progress_bar = QProgressBar(self)
         self._progress_bar.setRange(0, 0)  # indeterminate/busy
         self._progress_bar.setVisible(False)
@@ -111,11 +133,28 @@ class NlsqStep(QWidget):
             self._result,
         ):
             lay.addWidget(w)
+        self.setTabOrder(self._ms_enabled, self._ms_count)
+        self.setTabOrder(self._ms_count, self._options_btn)
+        self.setTabOrder(self._options_btn, self._run_btn)
+        self._ms_enabled.toggled.connect(self._on_multistart_changed)
+        self._ms_count.valueChanged.connect(self._on_multistart_changed)
         self._run_btn.clicked.connect(self.run)
 
     def _on_elapsed_tick(self) -> None:
         elapsed = time.monotonic() - self._run_start_time
         self._elapsed_label.setText(f"Running... ({elapsed:.0f}s elapsed)")
+
+    def _on_multistart_changed(self, *_args: object) -> None:
+        cfg = self._state.nlsq_config
+        cfg.multi_start = self._ms_enabled.isChecked()
+        cfg.n_starts = self._ms_count.value()
+        # Multi-start is now persisted into FitState.nlsq_config (see
+        # __init__'s seeding comment), which project_codec serializes into
+        # fit.json -- without this emit, window.py's dirty-tracking never
+        # sees the edit, so New/Open/Close would silently discard an
+        # un-rerun multi-start change with no unsaved-changes prompt.
+        # config_edited, not edited -- see the class-level comment on why.
+        self.config_edited.emit()
 
     def _on_cancel_clicked(self) -> None:
         if self._active_jobs is None or self._current_job_id is None:
@@ -212,7 +251,6 @@ class NlsqStep(QWidget):
                 "highlighted cell(s) before running.",
             )
             return
-        # Multi-start config is transient widget state — not stored in FitState
         table_params = self._table.get_parameters()
         initial_params = {
             name: {

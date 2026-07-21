@@ -97,6 +97,10 @@ class ColumnMapperDialog(QDialog):
 
         # Auto-detect button
         auto_detect_button = QPushButton("Auto-Detect Columns")
+        auto_detect_button.setAccessibleDescription(
+            "Attempts to automatically match file columns to X, Y, Y2, and "
+            "Temperature fields based on common naming patterns."
+        )
         auto_detect_button.clicked.connect(self._auto_detect)
         layout.addWidget(auto_detect_button)
 
@@ -110,6 +114,11 @@ class ColumnMapperDialog(QDialog):
         x_label.setMinimumWidth(150)
         x_layout.addWidget(x_label)
         self.x_combo = RheoComboBox(placeholder="Select a column...")
+        self.x_combo.setAccessibleName("X axis column")
+        self.x_combo.setAccessibleDescription(
+            "Required. Select the column containing the independent "
+            "variable (frequency or time)."
+        )
         self.x_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -127,6 +136,11 @@ class ColumnMapperDialog(QDialog):
         y_label.setMinimumWidth(150)
         y_layout.addWidget(y_label)
         self.y_combo = RheoComboBox(placeholder="Select a column...")
+        self.y_combo.setAccessibleName("Y axis column")
+        self.y_combo.setAccessibleDescription(
+            "Required. Select the column containing the primary response "
+            "(modulus, viscosity, or stress)."
+        )
         self.y_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -144,6 +158,11 @@ class ColumnMapperDialog(QDialog):
         y2_label.setMinimumWidth(150)
         y2_layout.addWidget(y2_label)
         self.y2_combo = RheoComboBox(placeholder="None (optional)")
+        self.y2_combo.setAccessibleName("Y2 axis column (optional)")
+        self.y2_combo.setAccessibleDescription(
+            "Optional. Select a secondary response column (e.g. loss "
+            "modulus G'')."
+        )
         self.y2_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -161,6 +180,10 @@ class ColumnMapperDialog(QDialog):
         temp_label.setMinimumWidth(150)
         temp_layout.addWidget(temp_label)
         self.temp_combo = RheoComboBox(placeholder="None (optional)")
+        self.temp_combo.setAccessibleName("Temperature column (optional)")
+        self.temp_combo.setAccessibleDescription(
+            "Optional. Select the column containing sample temperature."
+        )
         self.temp_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -190,6 +213,12 @@ class ColumnMapperDialog(QDialog):
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self._on_reject)
         layout.addWidget(button_box)
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(auto_detect_button, self.x_combo)
+        self.setTabOrder(self.x_combo, self.y_combo)
+        self.setTabOrder(self.y_combo, self.y2_combo)
+        self.setTabOrder(self.y2_combo, self.temp_combo)
 
         self.setLayout(layout)
 

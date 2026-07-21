@@ -339,3 +339,54 @@ def test_run_button_proceeds_when_all_rows_valid(qtbot, monkeypatch):
     assert warned["called"] is False
     assert calls["invoked"] is True
     assert st.nlsq_result["r_squared"] == 0.9
+
+
+def test_multistart_widgets_write_back_to_nlsq_config(qtbot):
+    """Regression: multi-start was previously transient widget state, silently
+    reset on step rebuild/navigation. It must now persist into FitState."""
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    step._ms_enabled.setChecked(True)
+    step._ms_count.setValue(5)
+
+    assert st.nlsq_config.multi_start is True
+    assert st.nlsq_config.n_starts == 5
+
+
+def test_multistart_widgets_reseed_from_existing_nlsq_config(qtbot):
+    """The other half of the same regression: a step built AFTER FitState
+    already has a saved/loaded multi-start config (e.g. a reopened project)
+    must show that config, not the hardcoded defaults."""
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nlsq_config.multi_start = True
+    st.nlsq_config.n_starts = 12
+
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    assert step._ms_enabled.isChecked() is True
+    assert step._ms_count.value() == 12
+
+
+def test_multistart_change_marks_project_dirty_without_clearing_nuts_result(qtbot):
+    """config_edited (not edited) is the correct signal here: `edited` is wired
+    in fit_controller.py to the nlsq_result invalidation cascade, which would
+    wrongly clear an existing nuts_result on every checkbox toggle even though
+    no fit was actually re-run."""
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    st.nuts_result = {"params": {"G0": 1000.0}}
+    step = NlsqStep(st)
+    qtbot.addWidget(step)
+
+    with qtbot.waitSignal(step.config_edited, timeout=2000):
+        step._ms_enabled.setChecked(True)
+
+    assert st.nuts_result == {"params": {"G0": 1000.0}}

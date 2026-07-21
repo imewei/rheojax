@@ -92,6 +92,7 @@ class BayesianOptionsDialog(QDialog):
         self.sampler_combo = RheoComboBox()
         self.sampler_combo.set_items_safely(["NUTS (No U-Turn Sampler)"])
         self.sampler_combo.currentTextChanged.connect(self._on_sampler_changed)
+        self.sampler_combo.setAccessibleName("Sampling method")
         sampler_layout.addRow("Sampling Method:", self.sampler_combo)
 
         sampler_group.setLayout(sampler_layout)
@@ -109,6 +110,10 @@ class BayesianOptionsDialog(QDialog):
         self.warmup_spin.valueChanged.connect(
             lambda v: self._on_option_changed("num_warmup", v)
         )
+        self.warmup_spin.setAccessibleName("Warmup samples")
+        self.warmup_spin.setAccessibleDescription(
+            "Number of MCMC warmup (burn-in) iterations, 100 to 10000."
+        )
         sampling_layout.addRow("Warmup Samples:", self.warmup_spin)
 
         # Number of samples
@@ -119,6 +124,10 @@ class BayesianOptionsDialog(QDialog):
         self.samples_spin.valueChanged.connect(
             lambda v: self._on_option_changed("num_samples", v)
         )
+        self.samples_spin.setAccessibleName("Number of samples")
+        self.samples_spin.setAccessibleDescription(
+            "Number of MCMC samples to draw after warmup, 100 to 20000."
+        )
         sampling_layout.addRow("Number of Samples:", self.samples_spin)
 
         # Number of chains
@@ -127,6 +136,10 @@ class BayesianOptionsDialog(QDialog):
         self.chains_spin.setValue(4)
         self.chains_spin.valueChanged.connect(
             lambda v: self._on_option_changed("num_chains", v)
+        )
+        self.chains_spin.setAccessibleName("Number of chains")
+        self.chains_spin.setAccessibleDescription(
+            "Number of independent MCMC chains to run in parallel, 1 to 8."
         )
         sampling_layout.addRow("Number of Chains:", self.chains_spin)
 
@@ -161,6 +174,10 @@ class BayesianOptionsDialog(QDialog):
         )
         self.warmstart_check.setChecked(True)
         self.warmstart_check.setEnabled(self._nlsq_result_available)
+        self.warmstart_check.setAccessibleDescription(
+            "Disabled until an NLSQ fit has been run; when enabled, uses the "
+            "NLSQ result to initialize NUTS sampling."
+        )
         self.warmstart_check.stateChanged.connect(
             lambda s: self._on_option_changed("warm_start", s != 0)
         )
@@ -172,12 +189,20 @@ class BayesianOptionsDialog(QDialog):
         self.seed_edit = QLineEdit()
         self.seed_edit.setPlaceholderText("(Optional)")
         self.seed_edit.setMaximumWidth(150)
+        self.seed_edit.setAccessibleName("Random seed")
+        self.seed_edit.setAccessibleDescription(
+            "Optional integer seed for reproducible MCMC sampling; leave "
+            "blank for a random seed."
+        )
         self.seed_edit.textChanged.connect(
             lambda t: self._on_option_changed("seed", t if t else None)
         )
         seed_layout.addWidget(self.seed_edit)
 
         generate_seed_button = QPushButton("Generate")
+        generate_seed_button.setAccessibleDescription(
+            "Fills the Random Seed field with a randomly generated seed value."
+        )
         generate_seed_button.clicked.connect(self._generate_seed)
         seed_layout.addWidget(generate_seed_button)
         seed_layout.addStretch()
@@ -198,6 +223,10 @@ class BayesianOptionsDialog(QDialog):
         # Dense mass matrix
         self.dense_mass_check = QCheckBox("Use dense mass matrix")
         self.dense_mass_check.setChecked(False)
+        self.dense_mass_check.setAccessibleDescription(
+            "Enables a dense (fully correlated) mass matrix for NUTS; more "
+            "accurate for correlated parameters but slower per step."
+        )
         self.dense_mass_check.stateChanged.connect(
             lambda s: self._on_option_changed("dense_mass", s != 0)
         )
@@ -217,6 +246,11 @@ class BayesianOptionsDialog(QDialog):
         self.target_slider.setValue(80)  # 0.80
         self.target_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.target_slider.setTickInterval(5)
+        self.target_slider.setAccessibleName("Target accept rate")
+        self.target_slider.setAccessibleDescription(
+            "NUTS target acceptance probability, from 0.65 to 0.95; higher "
+            "values increase step-size adaptation caution."
+        )
         self.target_slider.valueChanged.connect(self._on_target_changed)
         target_layout.addWidget(self.target_slider)
 
@@ -229,6 +263,11 @@ class BayesianOptionsDialog(QDialog):
         self.max_depth_spin.setValue(10)
         self.max_depth_spin.valueChanged.connect(
             lambda v: self._on_option_changed("max_tree_depth", v)
+        )
+        self.max_depth_spin.setAccessibleName("Maximum tree depth")
+        self.max_depth_spin.setAccessibleDescription(
+            "Maximum NUTS trajectory tree depth, 5 to 15; higher values "
+            "allow longer trajectories per iteration."
         )
         max_depth_layout.addRow("Max Tree Depth:", self.max_depth_spin)
         advanced_layout.addLayout(max_depth_layout)
@@ -246,6 +285,11 @@ class BayesianOptionsDialog(QDialog):
             'e.g. {\n  "G_cage": {"dist": "lognormal", "loc": 8.5, "scale": 1.0}\n}'
         )
         self.priors_edit.setMinimumHeight(120)
+        self.priors_edit.setAccessibleName("Priors JSON")
+        self.priors_edit.setAccessibleDescription(
+            "Optional JSON object specifying custom priors per parameter, "
+            "e.g. {'G_cage': {'dist': 'lognormal', 'loc': 8.5, 'scale': 1.0}}."
+        )
         self.priors_edit.textChanged.connect(self._on_priors_changed)
         priors_layout.addWidget(self.priors_edit)
         self._priors_error_label = QLabel("")
@@ -278,6 +322,19 @@ class BayesianOptionsDialog(QDialog):
         button_box.accepted.connect(self._on_accepted)
         button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.sampler_combo, self.warmup_spin)
+        self.setTabOrder(self.warmup_spin, self.samples_spin)
+        self.setTabOrder(self.samples_spin, self.chains_spin)
+        self.setTabOrder(self.chains_spin, self.warmstart_check)
+        self.setTabOrder(self.warmstart_check, self.seed_edit)
+        self.setTabOrder(self.seed_edit, generate_seed_button)
+        self.setTabOrder(generate_seed_button, self.advanced_group)
+        self.setTabOrder(self.advanced_group, self.dense_mass_check)
+        self.setTabOrder(self.dense_mass_check, self.target_slider)
+        self.setTabOrder(self.target_slider, self.max_depth_spin)
+        self.setTabOrder(self.max_depth_spin, self.priors_edit)
 
         self.setLayout(layout)
 

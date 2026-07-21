@@ -102,6 +102,11 @@ class PipelineTemplateDialog(QDialog):
 
         self.template_list = QListWidget()
         self.template_list.setMinimumWidth(200)
+        self.template_list.setAccessibleName("Pipeline templates")
+        self.template_list.setAccessibleDescription(
+            "List of available pipeline templates; select one to preview "
+            "its YAML configuration."
+        )
         self.template_list.currentItemChanged.connect(self._on_selection_changed)
         left_layout.addWidget(self.template_list)
 
@@ -121,6 +126,10 @@ class PipelineTemplateDialog(QDialog):
 
         self.preview_edit = QTextEdit()
         self.preview_edit.setReadOnly(True)
+        self.preview_edit.setAccessibleName("Template YAML preview")
+        self.preview_edit.setAccessibleDescription(
+            "Read-only preview of the selected template's YAML configuration."
+        )
         self.preview_edit.setStyleSheet(
             f"font-family: {Typography.FONT_FAMILY_MONO}; font-size: {Typography.SIZE_SM}pt;"
         )

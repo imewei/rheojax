@@ -150,3 +150,35 @@ def test_move_step_up_and_down_swaps_state_order(qtbot):
     step._step_list.setCurrentRow(step._step_list.count() - 1)
     step._on_move_step_down_clicked()
     assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]
+
+
+def test_browse_button_populates_export_path(monkeypatch, qtbot):
+    state = AppState()
+    step = PipelineConfigureRunStep(state.pipeline, state.library)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.pipeline.step1_configure_run.QFileDialog.getSaveFileName",
+        lambda *a, **k: ("/tmp/chosen_{id}.csv", ""),
+    )
+    step._export_browse_btn.click()
+
+    assert step._export_path_edit.text() == "/tmp/chosen_{id}.csv"
+
+
+def test_browse_button_cancel_leaves_export_path_unchanged(monkeypatch, qtbot):
+    # QFileDialog.getSaveFileName returns ("", "") when the user cancels the
+    # native dialog -- the `if path:` guard must keep an existing value
+    # instead of clobbering it with an empty string.
+    state = AppState()
+    step = PipelineConfigureRunStep(state.pipeline, state.library)
+    qtbot.addWidget(step)
+    step._export_path_edit.setText("/tmp/existing.csv")
+
+    monkeypatch.setattr(
+        "rheojax.gui.workspace.pipeline.step1_configure_run.QFileDialog.getSaveFileName",
+        lambda *a, **k: ("", ""),
+    )
+    step._export_browse_btn.click()
+
+    assert step._export_path_edit.text() == "/tmp/existing.csv"

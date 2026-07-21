@@ -85,6 +85,7 @@ class FittingOptionsDialog(QDialog):
         self.algo_combo.set_items_safely(
             ["NLSQ (default)", "NLSQ Global", "L-BFGS-B", "Trust Region"]
         )
+        self.algo_combo.setAccessibleName("Optimization method")
         self.algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         algo_layout.addRow("Optimization Method:", self.algo_combo)
 
@@ -92,6 +93,11 @@ class FittingOptionsDialog(QDialog):
         self.workflow_combo = RheoComboBox()
         self.workflow_combo.set_items_safely(["auto", "auto_global"])
         self.workflow_combo.setToolTip(
+            "auto: single multi-start NLSQ run; "
+            "auto_global: basin-hopping global search before refinement"
+        )
+        self.workflow_combo.setAccessibleName("Workflow")
+        self.workflow_combo.setAccessibleDescription(
             "auto: single multi-start NLSQ run; "
             "auto_global: basin-hopping global search before refinement"
         )
@@ -107,6 +113,10 @@ class FittingOptionsDialog(QDialog):
             "Automatically derive parameter bounds from data scale; "
             "disable to use manually specified bounds only"
         )
+        self.auto_bounds_check.setAccessibleDescription(
+            "Automatically derive parameter bounds from data scale; "
+            "disable to use manually specified bounds only."
+        )
         self.auto_bounds_check.stateChanged.connect(
             lambda s: self._on_option_changed("auto_bounds", s != 0)
         )
@@ -116,6 +126,12 @@ class FittingOptionsDialog(QDialog):
         self.stability_combo = RheoComboBox()
         self.stability_combo.set_items_safely(["auto", "on", "off"])
         self.stability_combo.setToolTip(
+            "Stability analysis after fitting: "
+            "auto = run when convergence is borderline, "
+            "on = always run, off = never run"
+        )
+        self.stability_combo.setAccessibleName("Stability analysis mode")
+        self.stability_combo.setAccessibleDescription(
             "Stability analysis after fitting: "
             "auto = run when convergence is borderline, "
             "on = always run, off = never run"
@@ -131,6 +147,11 @@ class FittingOptionsDialog(QDialog):
         self.jacobian_combo = RheoComboBox()
         self.jacobian_combo.set_items_safely(["Auto", "Forward (fwd)", "Reverse (rev)"])
         self.jacobian_combo.setToolTip(
+            "Jacobian computation mode: Auto selects based on problem size. "
+            "Forward is better for few parameters, Reverse for many."
+        )
+        self.jacobian_combo.setAccessibleName("Jacobian computation mode")
+        self.jacobian_combo.setAccessibleDescription(
             "Jacobian computation mode: Auto selects based on problem size. "
             "Forward is better for few parameters, Reverse for many."
         )
@@ -151,6 +172,10 @@ class FittingOptionsDialog(QDialog):
         self.max_iter_spin.setRange(100, 50000)
         self.max_iter_spin.setValue(5000)
         self.max_iter_spin.setSingleStep(500)
+        self.max_iter_spin.setAccessibleName("Maximum iterations")
+        self.max_iter_spin.setAccessibleDescription(
+            "Maximum optimizer iterations, 100 to 50000."
+        )
         self.max_iter_spin.valueChanged.connect(
             lambda v: self._on_option_changed("max_iter", v)
         )
@@ -163,6 +188,11 @@ class FittingOptionsDialog(QDialog):
         self.ftol_spin.setValue(1e-8)
         self.ftol_spin.setSingleStep(1e-9)
         self.ftol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
+        self.ftol_spin.setAccessibleName("Function tolerance")
+        self.ftol_spin.setAccessibleDescription(
+            "Convergence tolerance on the objective function value, "
+            "1e-15 to 1e-3."
+        )
         self.ftol_spin.valueChanged.connect(
             lambda v: self._on_option_changed("ftol", v)
         )
@@ -175,6 +205,11 @@ class FittingOptionsDialog(QDialog):
         self.xtol_spin.setValue(1e-8)
         self.xtol_spin.setSingleStep(1e-9)
         self.xtol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
+        self.xtol_spin.setAccessibleName("Parameter tolerance")
+        self.xtol_spin.setAccessibleDescription(
+            "Convergence tolerance on the parameter update step, "
+            "1e-15 to 1e-3."
+        )
         self.xtol_spin.valueChanged.connect(
             lambda v: self._on_option_changed("xtol", v)
         )
@@ -190,6 +225,11 @@ class FittingOptionsDialog(QDialog):
         # Enable multi-start
         self.multistart_check = QCheckBox("Enable multi-start optimization")
         self.multistart_check.setChecked(False)
+        self.multistart_check.setAccessibleDescription(
+            "When enabled, runs optimization from multiple randomized "
+            "starting points to avoid local minima; enables the Number of "
+            "starts field."
+        )
         self.multistart_check.stateChanged.connect(self._on_multistart_changed)
         multistart_layout.addWidget(self.multistart_check)
 
@@ -200,6 +240,10 @@ class FittingOptionsDialog(QDialog):
         self.num_starts_spin.setRange(2, 20)
         self.num_starts_spin.setValue(5)
         self.num_starts_spin.setEnabled(False)
+        self.num_starts_spin.setAccessibleName("Number of starts")
+        self.num_starts_spin.setAccessibleDescription(
+            "2 to 20; only used when multi-start optimization is enabled."
+        )
         self.num_starts_spin.valueChanged.connect(
             lambda v: self._on_option_changed("num_starts", v)
         )
@@ -248,6 +292,20 @@ class FittingOptionsDialog(QDialog):
         button_box.accepted.connect(self._on_accepted)
         button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.algo_combo, self.workflow_combo)
+        self.setTabOrder(self.workflow_combo, self.auto_bounds_check)
+        self.setTabOrder(self.auto_bounds_check, self.stability_combo)
+        self.setTabOrder(self.stability_combo, self.jacobian_combo)
+        self.setTabOrder(self.jacobian_combo, self.max_iter_spin)
+        self.setTabOrder(self.max_iter_spin, self.ftol_spin)
+        self.setTabOrder(self.ftol_spin, self.xtol_spin)
+        self.setTabOrder(self.xtol_spin, self.multistart_check)
+        self.setTabOrder(self.multistart_check, self.num_starts_spin)
+        self.setTabOrder(self.num_starts_spin, self.use_bounds_check)
+        self.setTabOrder(self.use_bounds_check, self.verbose_check)
+        self.setTabOrder(self.verbose_check, reset_button)
 
         self.setLayout(layout)
 

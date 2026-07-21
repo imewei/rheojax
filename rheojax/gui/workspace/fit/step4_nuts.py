@@ -146,12 +146,15 @@ class NutsStep(QWidget):
         self._warmup = QSpinBox(self)
         self._warmup.setRange(50, 100_000)
         self._warmup.setValue(nuts_cfg.num_warmup)
+        self._warmup.setAccessibleName("Warmup steps")
         self._samples = QSpinBox(self)
         self._samples.setRange(50, 100_000)
         self._samples.setValue(nuts_cfg.num_samples)
+        self._samples.setAccessibleName("Number of samples")
         self._chains = QSpinBox(self)
         self._chains.setRange(1, 16)
         self._chains.setValue(nuts_cfg.num_chains)
+        self._chains.setAccessibleName("Number of chains")
         settings_form = QFormLayout()
         settings_form.addRow("Warmup:", self._warmup)
         settings_form.addRow("Samples:", self._samples)
@@ -169,14 +172,17 @@ class NutsStep(QWidget):
         self._seed = QSpinBox(self)
         self._seed.setRange(0, 2**31 - 1)
         self._seed.setValue(nuts_cfg.seed)
+        self._seed.setAccessibleName("Random seed")
         self._target = QDoubleSpinBox(self)
         self._target.setRange(0.5, 0.999)
         self._target.setValue(nuts_cfg.target_accept)
+        self._target.setAccessibleName("Target acceptance rate")
         self._max_tree_depth = QSpinBox(self)
         # 0 means "unset" -- library default (10) applies; see run()/_make_sample_fn.
         self._max_tree_depth.setRange(0, 20)
         self._max_tree_depth.setValue(nuts_cfg.max_tree_depth or 0)
         self._max_tree_depth.setSpecialValueText("default")
+        self._max_tree_depth.setAccessibleName("Max tree depth")
         self._sampler_dialog = QDialog(self)
         self._sampler_dialog.setWindowTitle("Sampler Options")
         dialog_form = QFormLayout()
@@ -207,7 +213,9 @@ class NutsStep(QWidget):
         # no feedback beyond a disabled button -- run_bayesian_isolated has
         # no reliable per-iteration percent (NumPyro NUTS doesn't support a
         # progress callback the way NLSQ does), so indeterminate + elapsed
-        # time is the honest fix rather than a fake percentage.
+        # time is the honest fix rather than a fake percentage. In-body
+        # feedback next to Cancel matters even more here than for NLSQ,
+        # since NUTS runs are the app's longest.
         self._progress_bar = QProgressBar(self)
         self._progress_bar.setRange(0, 0)  # indeterminate/busy
         self._progress_bar.setVisible(False)
@@ -234,6 +242,17 @@ class NutsStep(QWidget):
         ):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
+        # Explicit tab order for the settings form. Qt's default (inferred
+        # from construction order) already matches the visual layout above
+        # today -- this pins that against silently drifting the next time
+        # a field is added or reordered, rather than fixing a live bug.
+        self.setTabOrder(self._warmup, self._samples)
+        self.setTabOrder(self._samples, self._chains)
+        self.setTabOrder(self._chains, self._seed)
+        self.setTabOrder(self._seed, self._target)
+        self.setTabOrder(self._target, self._max_tree_depth)
+        self.setTabOrder(self._max_tree_depth, self._skip_btn)
+        self.setTabOrder(self._skip_btn, self._run_btn)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self._on_sample_clicked)
         for spin in (

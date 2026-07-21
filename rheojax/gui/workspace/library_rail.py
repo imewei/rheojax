@@ -29,7 +29,13 @@ class LibraryRail(QWidget):
         self._header = QLabel("Datasets", self)
         self._header.setStyleSheet(section_header_style())
         self._list = QListWidget(self)
+        self._list.setAccessibleName("Dataset list")
+        self._list.setAccessibleDescription(
+            "Imported datasets. Select to load, double-click to preview, "
+            "right-click for more actions."
+        )
         self._import = QPushButton("+ Import data…", self)
+        self._import.setAccessibleName("Import data")
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
         lay.addWidget(self._header)

@@ -100,6 +100,10 @@ class PreferencesDialog(QDialog):
         # Restore defaults button
         restore_layout = QHBoxLayout()
         restore_button = QPushButton("Restore Defaults")
+        restore_button.setAccessibleDescription(
+            "Resets all preferences across General, JAX, and Visualization "
+            "tabs to their default values."
+        )
         restore_button.clicked.connect(self._restore_defaults)
         restore_layout.addStretch()
         restore_layout.addWidget(restore_button)
@@ -146,6 +150,7 @@ class PreferencesDialog(QDialog):
 
         self.theme_combo = RheoComboBox()
         self.theme_combo.set_items_safely(["Light", "Dark", "System"])
+        self.theme_combo.setAccessibleName("Theme")
         self.theme_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -170,6 +175,12 @@ class PreferencesDialog(QDialog):
             "(safer on macOS, killable); "
             "thread: runs in the Qt thread pool (lower overhead, not killable)"
         )
+        self.worker_isolation_combo.setAccessibleName("Worker isolation mode")
+        self.worker_isolation_combo.setAccessibleDescription(
+            "subprocess: each fit/Bayesian job runs in an isolated process "
+            "(safer on macOS, killable); "
+            "thread: runs in the Qt thread pool (lower overhead, not killable)"
+        )
         self.worker_isolation_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -190,6 +201,11 @@ class PreferencesDialog(QDialog):
             "Not yet implemented -- no undo history is currently kept. "
             "Delete Dataset always asks for confirmation instead."
         )
+        self.max_undo_spin.setAccessibleName("Maximum undo steps")
+        self.max_undo_spin.setAccessibleDescription(
+            "Maximum number of undo steps kept in memory, 10 to 500. "
+            "Not yet implemented -- no undo history is currently kept."
+        )
         self.max_undo_spin.valueChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -209,6 +225,10 @@ class PreferencesDialog(QDialog):
 
         self.autosave_check = QCheckBox("Enable auto-save")
         self.autosave_check.setChecked(True)
+        self.autosave_check.setAccessibleDescription(
+            "When enabled, automatically saves the workspace at the "
+            "configured interval; enables the Auto-save interval field."
+        )
         self.autosave_check.stateChanged.connect(self._on_autosave_changed)
         autosave_layout.addWidget(self.autosave_check)
 
@@ -218,6 +238,10 @@ class PreferencesDialog(QDialog):
         self.autosave_spin.setRange(1, 60)
         self.autosave_spin.setValue(5)
         self.autosave_spin.setSuffix(" minutes")
+        self.autosave_spin.setAccessibleName("Auto-save interval in minutes")
+        self.autosave_spin.setAccessibleDescription(
+            "1 to 60 minutes; only used when auto-save is enabled."
+        )
         self.autosave_spin.valueChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -240,6 +264,10 @@ class PreferencesDialog(QDialog):
         self.recent_count_spin = QSpinBox()
         self.recent_count_spin.setRange(5, 50)
         self.recent_count_spin.setValue(10)
+        self.recent_count_spin.setAccessibleName(
+            "Number of recent projects to remember"
+        )
+        self.recent_count_spin.setAccessibleDescription("5 to 50 projects.")
         self.recent_count_spin.valueChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -254,6 +282,14 @@ class PreferencesDialog(QDialog):
         layout.addWidget(recent_group)
 
         layout.addStretch()
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.theme_combo, self.worker_isolation_combo)
+        self.setTabOrder(self.worker_isolation_combo, self.max_undo_spin)
+        self.setTabOrder(self.max_undo_spin, self.autosave_check)
+        self.setTabOrder(self.autosave_check, self.autosave_spin)
+        self.setTabOrder(self.autosave_spin, self.recent_count_spin)
+
         tab.setLayout(layout)
         return tab
 
@@ -268,6 +304,7 @@ class PreferencesDialog(QDialog):
 
         self.device_combo = RheoComboBox()
         self.device_combo.set_items_safely(["cpu", "gpu", "tpu"])
+        self.device_combo.setAccessibleName("Default JAX device")
         self.device_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -327,6 +364,8 @@ class PreferencesDialog(QDialog):
         self.memory_limit_spin.setValue(8192)
         self.memory_limit_spin.setSingleStep(512)
         self.memory_limit_spin.setSuffix(" MB")
+        self.memory_limit_spin.setAccessibleName("GPU memory limit in megabytes")
+        self.memory_limit_spin.setAccessibleDescription("512 to 32768 MB.")
         self.memory_limit_spin.valueChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -341,6 +380,10 @@ class PreferencesDialog(QDialog):
 
         self.preallocate_check = QCheckBox("Pre-allocate GPU memory")
         self.preallocate_check.setChecked(False)
+        self.preallocate_check.setAccessibleDescription(
+            "Reserves GPU memory upfront instead of allocating on demand; "
+            "may reduce fragmentation but increases startup memory usage."
+        )
         self.preallocate_check.stateChanged.connect(
             lambda state: logger.debug(
                 "Value changed",
@@ -355,6 +398,13 @@ class PreferencesDialog(QDialog):
         layout.addWidget(memory_group)
 
         layout.addStretch()
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.device_combo, self.float64_warning_check)
+        self.setTabOrder(self.float64_warning_check, self.auto_enable_float64_check)
+        self.setTabOrder(self.auto_enable_float64_check, self.memory_limit_spin)
+        self.setTabOrder(self.memory_limit_spin, self.preallocate_check)
+
         tab.setLayout(layout)
         return tab
 
@@ -380,6 +430,7 @@ class PreferencesDialog(QDialog):
                 "fivethirtyeight",
             ]
         )
+        self.plot_style_combo.setAccessibleName("Default plot style")
         self.plot_style_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -403,6 +454,7 @@ class PreferencesDialog(QDialog):
                 "magma",
             ]
         )
+        self.color_palette_combo.setAccessibleName("Default color palette")
         self.color_palette_combo.currentTextChanged.connect(
             lambda value: logger.debug(
                 "Value changed",
@@ -434,6 +486,8 @@ class PreferencesDialog(QDialog):
         self.font_size_slider.setValue(12)
         self.font_size_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.font_size_slider.setTickInterval(2)
+        self.font_size_slider.setAccessibleName("Font size")
+        self.font_size_slider.setAccessibleDescription("8 to 24 points.")
         self.font_size_slider.valueChanged.connect(self._on_font_size_changed)
         font_size_layout.addWidget(self.font_size_slider)
 
@@ -485,6 +539,14 @@ class PreferencesDialog(QDialog):
         layout.addWidget(display_group)
 
         layout.addStretch()
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.plot_style_combo, self.color_palette_combo)
+        self.setTabOrder(self.color_palette_combo, self.font_size_slider)
+        self.setTabOrder(self.font_size_slider, self.show_grid_check)
+        self.setTabOrder(self.show_grid_check, self.show_legend_check)
+        self.setTabOrder(self.show_legend_check, self.tight_layout_check)
+
         tab.setLayout(layout)
         return tab
 

@@ -76,6 +76,11 @@ class ParameterTable(QTableWidget):
         """
         super().__init__(parent)
         logger.debug("Initializing", class_name=self.__class__.__name__)
+        self.setAccessibleName("Parameter table")
+        self.setAccessibleDescription(
+            "Model parameters: value, min bound, max bound, and whether "
+            "each is fixed during fitting."
+        )
 
         # Configure table
         self.setColumnCount(5)
@@ -354,11 +359,10 @@ class ParameterTable(QTableWidget):
 
         checkbox = QCheckBox()
         checkbox.setChecked(checked)
-        # WCAG/assistive-tech: setCellWidget's wrapper widget isn't well
-        # exposed to screen readers by row on its own -- an accessible name
-        # per checkbox lets assistive tech distinguish "Fixed: G0" from
-        # "Fixed: tau" rather than reading every row's checkbox identically.
-        checkbox.setAccessibleName(f"Fixed: {param_name}")
+        checkbox.setAccessibleName(f"Fix {param_name}")
+        checkbox.setAccessibleDescription(
+            f"Hold {param_name} constant during fitting instead of optimizing it."
+        )
         checkbox.stateChanged.connect(
             lambda state: self._on_fixed_toggled(
                 param_name, state == Qt.CheckState.Checked.value
