@@ -231,8 +231,13 @@ class PersistentProcessPool:
             self._task_counter += 1
             future = PoolFuture(task_id)
             self._futures[task_id] = future
+            # PARALLEL-004: put() while still holding the lock makes the
+            # shutdown check and the enqueue atomic, closing a TOCTOU window
+            # where a concurrent shutdown() could close the queue between the
+            # check and the put(). self._task_queue has no maxsize (unbounded
+            # mp.Queue), so put() does not block here.
+            self._task_queue.put((task_id, fn, args, kwargs))
 
-        self._task_queue.put((task_id, fn, args, kwargs))
         return future
 
     def map(

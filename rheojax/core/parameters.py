@@ -577,13 +577,12 @@ class ParameterSet:
         SharedParameterSet: For multi-model parameter sharing.
     """
 
-    __slots__ = ("_parameters", "_order", "_has_relative_constraints")
+    __slots__ = ("_parameters", "_order")
 
     def __init__(self):
         """Initialize empty parameter set."""
         self._parameters: dict[str, Parameter] = {}
         self._order: list[str] = []
-        self._has_relative_constraints: bool = False
         if logger.isEnabledFor(10):  # logging.DEBUG == 10
             logger.debug("ParameterSet created")
 
@@ -640,11 +639,6 @@ class ParameterSet:
         self._parameters[name] = param
         if name not in self._order:
             self._order.append(name)
-
-        # Track whether any relative constraints exist (for set_value optimization)
-        if constraints:
-            if any(c.type == "relative" for c in constraints):
-                self._has_relative_constraints = True
 
         if _debug:
             logger.debug(
@@ -1104,9 +1098,6 @@ class ParameterSet:
             self._parameters[key] = value
             if key not in self._order:
                 self._order.append(key)
-            if not self._has_relative_constraints and value.constraints:
-                if any(c.type == "relative" for c in value.constraints):
-                    self._has_relative_constraints = True
         else:
             # Set value only
             if key not in self._parameters:
@@ -1152,11 +1143,6 @@ class ParameterSet:
                 param = Parameter.from_dict(param_data_with_name)
                 params._parameters[name] = param
                 params._order.append(name)
-        for _param in params._parameters.values():
-            if not params._has_relative_constraints and _param.constraints:
-                if any(c.type == "relative" for c in _param.constraints):
-                    params._has_relative_constraints = True
-                    break
         return params
 
 

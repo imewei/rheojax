@@ -594,17 +594,23 @@ def hard_sphere_properties(phi: float) -> dict:
     denom = (1 - eta) ** 4
     S0 = denom / ((1 + 2 * eta) ** 2)
 
-    # Peak position roughly at k*σ ≈ 7.0-7.5 for dense systems
+    # Peak position roughly at k*σ ≈ 7.0-7.5 for dense systems; used only
+    # to center a scan grid, not returned directly (see below).
     k_peak_approx = 7.2 * (1 + 0.1 * phi)  # Empirical approximation
 
-    # Peak height from S(k)
-    S_peak = percus_yevick_sk(np.array([k_peak_approx]), phi)[0]
+    # True peak via argmax over a k-scan around the empirical estimate,
+    # rather than returning the unlabeled empirical formula itself.
+    k_grid = np.linspace(0.5 * k_peak_approx, 1.5 * k_peak_approx, 200)
+    S_vals = percus_yevick_sk(k_grid, phi)
+    peak_idx = int(np.argmax(S_vals))
+    k_max_position = float(k_grid[peak_idx])
+    S_peak = float(S_vals[peak_idx])
 
     return {
         "phi": phi,
         "eta": eta,
         "S0": S0,
-        "k_max_position": k_peak_approx,
+        "k_max_position": k_max_position,
         "S_max": S_peak,
         "is_glassy": phi > 0.516,
         "phi_mct": 0.516,

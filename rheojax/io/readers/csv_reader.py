@@ -173,7 +173,8 @@ def load_csv(
     else:
         default_encoding = "utf-8-sig"
         try:
-            head_bytes = filepath.read_bytes()[:4]
+            with open(filepath, "rb") as f:
+                head_bytes = f.read(4)
             if (
                 b"\xff\xfe" in head_bytes
                 or b"\xfe\xff" in head_bytes

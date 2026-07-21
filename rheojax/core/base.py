@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
-from rheojax.core._validation import reject_removed_options
+from rheojax.core._validation import reject_removed_options, validate_predict_input
 from rheojax.core.bayesian import BayesianMixin, BayesianResult
 from rheojax.core.fit_orchestrator import FitOrchestrator
 from rheojax.core.jax_config import safe_import_jax
@@ -852,6 +852,11 @@ class BaseModel(BayesianMixin, ABC):
                 if X.x is None:
                     raise ValueError("RheoData.x is None; cannot use as predict input")
                 X = np.asarray(X.x)
+
+            # I/O boundary validation (CLAUDE.md #3): catch NaN/non-monotonic
+            # input here, eagerly on the host, before it reaches _predict()'s
+            # ODE solvers where it would otherwise silently produce garbage.
+            validate_predict_input(X, name="X")
 
             # ADR-004: All _predict() signatures now accept **kwargs,
             # so we can call directly without try/except/retry.

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+from scipy.optimize import nnls
 
 from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
@@ -248,7 +249,12 @@ def _tikhonov_inversion(
 ) -> tuple[np.ndarray, float, float]:
     """Tikhonov-regularized spectrum inversion.
 
-    Solves:  min ||A H - b||² + λ² ||L H||²
+    Solves:  min ||A H - b||²  s.t. H >= 0, via NNLS on the Tikhonov-
+    augmented stacked system  [A; λL] H ≈ [b; 0]  -- the non-negativity
+    constraint is enforced directly by NNLS rather than by solving the
+    unconstrained ridge normal equations and clipping negative values
+    afterward (clip-after-solve is not the minimizer of the constrained
+    problem).
 
     where L is the identity (zeroth order) for stability.
     """
@@ -261,13 +267,9 @@ def _tikhonov_inversion(
     if lam is None:
         lam = _select_lambda_gcv(A, b, L)
 
-    # Solve regularized normal equations
-    ATA = A.T @ A
-    ATb = A.T @ b
-    H_tau = np.linalg.solve(ATA + lam**2 * L.T @ L, ATb)
-
-    # Enforce non-negativity
-    H_tau = np.maximum(H_tau, 0.0)
+    A_aug = np.vstack([A, lam * L])
+    b_aug = np.concatenate([b, np.zeros(L.shape[0])])
+    H_tau, _ = nnls(A_aug, b_aug)
 
     residual_norm = float(np.linalg.norm(A @ H_tau - b))
     return H_tau, float(lam), residual_norm
@@ -278,62 +280,62 @@ def _select_lambda_gcv(A: np.ndarray, b: np.ndarray, L: np.ndarray) -> float:
 
     GCV(λ) = ||A H_λ - b||² / (trace(I - A(A^TA + λ²L^TL)^{-1}A^T))²
 
-    When L = I (zeroth-order Tikhonov), the influence trace simplifies via
-    the SVD of A:  trace(A(A^T A + λ²I)^{-1} A^T) = Σ σ_i²/(σ_i² + λ²).
-    This reduces the per-lambda cost from O(n·m²) to O(min(n,m)).
+    H_λ is the non-negativity-constrained NNLS solution of the augmented
+    system [A; λL] H ≈ [b; 0] -- the same solve used by the caller -- so
+    the residual driving lambda selection matches the H_tau actually
+    returned, rather than the unconstrained ridge residual. The
+    degrees-of-freedom trace still uses the linear ridge influence
+    operator (the standard GCV approximation); when L = I it simplifies
+    via the SVD of A: trace(A(A^T A + λ²I)^{-1} A^T) = Σ σ_i²/(σ_i² + λ²).
     """
     n = A.shape[0]
     lambdas = np.logspace(-6, 4, 50)
     gcv_scores = np.full(len(lambdas), np.inf)
 
-    # Check if L is identity — enables fast SVD path
+    # Check if L is identity — enables fast SVD path for the trace term
     is_identity_L = L.shape[0] == L.shape[1] and np.allclose(L, np.eye(L.shape[0]))
 
     if is_identity_L:
-        # Fast SVD-based GCV: precompute once, O(min(n,m)) per lambda
-        U, s, Vt = np.linalg.svd(A, full_matrices=False)
+        # Fast SVD-based trace: precompute once, O(min(n,m)) per lambda
+        _U, s, _Vt = np.linalg.svd(A, full_matrices=False)
         s2 = s**2
-        # Coefficients for residual: UTb projected onto singular vectors
-        UTb = U.T @ b
 
         for i, lam in enumerate(lambdas):
-            lam2 = lam**2
             # Filter factors: f_j = σ_j² / (σ_j² + λ²)
-            f = s2 / (s2 + lam2)
-
-            # H_λ = V diag(f/σ) U^T b  (without non-negativity clamp for GCV)
-            # Residual = b - A H_λ = b - U diag(f) U^T b
-            # = U (I - diag(f)) U^T b  +  (I - UU^T) b
-            # ||residual||² = Σ (1-f_j)² (UTb_j)² + ||b - UU^Tb||²
-            res_filtered = (1.0 - f) * UTb
-            # Component orthogonal to range(A) is constant across lambdas
-            b_perp_sq = max(0.0, float(np.sum(b**2) - np.sum(UTb**2)))
-            res_norm_sq = float(np.sum(res_filtered**2) + b_perp_sq)
-
+            f = s2 / (s2 + lam**2)
             # trace(I - M) = n - Σ f_j
             trace_I_minus_M = n - np.sum(f)
 
-            if trace_I_minus_M > 0:
-                gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
+            if trace_I_minus_M <= 0:
+                continue
+
+            A_aug = np.vstack([A, lam * L])
+            b_aug = np.concatenate([b, np.zeros(L.shape[0])])
+            H_lam, _ = nnls(A_aug, b_aug)
+            res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
+
+            gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
     else:
-        # General case: L ≠ I — use direct solve (original algorithm)
+        # General case: L ≠ I — use direct solve for the trace term
         ATA = A.T @ A
-        ATb = A.T @ b
         LTL = L.T @ L
 
         for i, lam in enumerate(lambdas):
             try:
-                H = np.linalg.solve(ATA + lam**2 * LTL, ATb)
-                residual = A @ H - b
-                res_norm_sq = np.sum(residual**2)
-
                 # Influence matrix trace via solve (avoids forming full n×n matrix)
                 # trace(A (ATA + λ²LTL)^{-1} A^T) = trace((ATA + λ²LTL)^{-1} ATA)
                 C = np.linalg.solve(ATA + lam**2 * LTL, ATA)
                 trace_I_minus_M = n - np.trace(C)
 
-                if trace_I_minus_M > 0:
-                    gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
+                if trace_I_minus_M <= 0:
+                    continue
+
+                A_aug = np.vstack([A, lam * L])
+                b_aug = np.concatenate([b, np.zeros(L.shape[0])])
+                H_lam, _ = nnls(A_aug, b_aug)
+                res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
+
+                gcv_scores[i] = res_norm_sq / trace_I_minus_M**2
             except np.linalg.LinAlgError:
                 continue
 

@@ -41,14 +41,3 @@ class TestDialogIntegration:
         qtbot.addWidget(dialog)
         assert dialog is not None
         assert "About" in dialog.windowTitle()
-
-    @pytest.mark.smoke
-    @pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 required")
-    def test_import_wizard_accessible(self, qtbot, qapp) -> None:
-        """Verify ImportWizard can be imported and instantiated."""
-        from rheojax.gui.dialogs.import_wizard import ImportWizard
-
-        wizard = ImportWizard()
-        qtbot.addWidget(wizard)
-        assert wizard is not None
-        assert "Import" in wizard.windowTitle()

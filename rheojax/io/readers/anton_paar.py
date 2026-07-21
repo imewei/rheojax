@@ -1080,6 +1080,29 @@ def _extract_auxiliary_columns(
 # =============================================================================
 
 
+def _filter_nonfinite(
+    x: np.ndarray, y: np.ndarray, *, interval: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Drop rows where x or y is NaN/Inf before RheoData construction.
+
+    RheoCompass exports use NaN to mark unparseable/blank cells (see
+    parse_rheocompass_intervals); RheoData(validate=True) raises on any
+    NaN, so those rows must be filtered here first. np.isfinite handles
+    complex y (oscillation G*) natively: it is True only if both the real
+    and imaginary parts are finite.
+    """
+    valid_idx = np.flatnonzero(np.isfinite(x) & np.isfinite(y))
+    n_dropped = len(x) - len(valid_idx)
+    if n_dropped > 0:
+        logger.warning(
+            "Dropped non-finite (NaN/Inf) rows from RheoCompass interval",
+            interval=interval,
+            n_dropped=n_dropped,
+            n_total=len(x),
+        )
+    return np.take(x, valid_idx), np.take(y, valid_idx)
+
+
 def _interval_to_rheodata_creep(
     block: IntervalBlock,
     global_meta: dict[str, Any],
@@ -1116,6 +1139,7 @@ def _interval_to_rheodata_creep(
         y_units = mapped_units.get("shear_strain", "dimensionless")
 
     x_units = mapped_units.get("time", "s")
+    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
 
     # Build metadata
     metadata = {
@@ -1188,6 +1212,7 @@ def _interval_to_rheodata_relaxation(
             )
 
     x_units = mapped_units.get("time", "s")
+    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
 
     # Build metadata
     metadata = {
@@ -1254,6 +1279,7 @@ def _interval_to_rheodata_oscillation(
 
     x_units = mapped_units.get("angular_frequency", "rad/s")
     y_units = "Pa"  # Complex modulus in Pa
+    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
 
     # Build metadata with G' and G'' accessible
     metadata = {
@@ -1316,6 +1342,7 @@ def _interval_to_rheodata_rotation(
         )
 
     x_units = mapped_units.get("shear_rate", "1/s")
+    x, y = _filter_nonfinite(x, y, interval=block.interval_index)
 
     # Build metadata
     metadata = {
@@ -1409,88 +1436,102 @@ def load_anton_paar(
         if progress_callback:
             progress_callback(i + 1, total_blocks)
 
-        # Map columns to canonical names
-        mapped_df, mapped_units = _map_columns_to_canonical(block.df, block.units)
+        try:
+            # Map columns to canonical names
+            mapped_df, mapped_units = _map_columns_to_canonical(block.df, block.units)
 
-        # Handle custom x/y column selection
-        if x_col is not None and x_col not in mapped_df.columns:
-            logger.warning(
-                "x_col override is not supported for Anton Paar format; "
-                "column selection is automatic based on test mode",
-                x_col=x_col,
-            )
-        if y_col is not None and y_col not in mapped_df.columns:
-            logger.warning(
-                "y_col override is not supported for Anton Paar format; "
-                "column selection is automatic based on test mode",
-                y_col=y_col,
-            )
+            # Handle custom x/y column selection
+            if x_col is not None and x_col not in mapped_df.columns:
+                logger.warning(
+                    "x_col override is not supported for Anton Paar format; "
+                    "column selection is automatic based on test mode",
+                    x_col=x_col,
+                )
+            if y_col is not None and y_col not in mapped_df.columns:
+                logger.warning(
+                    "y_col override is not supported for Anton Paar format; "
+                    "column selection is automatic based on test mode",
+                    y_col=y_col,
+                )
 
-        # Detect or use specified test mode
-        detected_mode = test_mode
-        if detected_mode is None:
-            detected_mode = _detect_test_type(mapped_df)
-            logger.debug(
-                "Auto-detected test mode",
-                test_mode=detected_mode,
+            # Detect or use specified test mode
+            detected_mode = test_mode
+            if detected_mode is None:
+                detected_mode = _detect_test_type(mapped_df)
+                logger.debug(
+                    "Auto-detected test mode",
+                    test_mode=detected_mode,
+                    interval=block.interval_index,
+                )
+
+            if detected_mode is None:
+                warnings.warn(
+                    f"Could not auto-detect test type for interval "
+                    f"{block.interval_index}. Specify test_mode parameter "
+                    "explicitly.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                # Default to relaxation as safest assumption for time-domain data
+                detected_mode = "relaxation"
+
+            # Convert to RheoData using appropriate converter
+            if detected_mode == "creep":
+                rheo_data = _interval_to_rheodata_creep(
+                    block, global_meta, mapped_df, mapped_units
+                )
+            elif detected_mode == "relaxation":
+                rheo_data = _interval_to_rheodata_relaxation(
+                    block, global_meta, mapped_df, mapped_units
+                )
+            elif detected_mode == "oscillation":
+                rheo_data = _interval_to_rheodata_oscillation(
+                    block, global_meta, mapped_df, mapped_units
+                )
+            elif detected_mode == "rotation":
+                rheo_data = _interval_to_rheodata_rotation(
+                    block, global_meta, mapped_df, mapped_units
+                )
+            else:
+                logger.error("Unknown test mode", test_mode=detected_mode)
+                raise ValueError(f"Unknown test mode: {detected_mode}")
+
+            # Handle custom column overrides
+            if x_col is not None and x_col in mapped_df.columns:
+                rheo_data = RheoData(
+                    x=mapped_df[x_col].values,
+                    y=rheo_data.y,
+                    x_units=mapped_units.get(x_col),
+                    y_units=rheo_data.y_units,
+                    domain=rheo_data.domain,
+                    initial_test_mode=detected_mode,
+                    metadata=rheo_data.metadata,
+                )
+
+            if y_col is not None and y_col in mapped_df.columns:
+                rheo_data = RheoData(
+                    x=rheo_data.x,
+                    y=mapped_df[y_col].values,
+                    x_units=rheo_data.x_units,
+                    y_units=mapped_units.get(y_col),
+                    domain=rheo_data.domain,
+                    initial_test_mode=detected_mode,
+                    metadata=rheo_data.metadata,
+                )
+        except Exception as e:
+            # One malformed interval shouldn't abort loading the rest of a
+            # multi-interval file — skip it and keep going.
+            logger.warning(
+                "Skipping interval that failed to convert to RheoData",
                 interval=block.interval_index,
+                error=str(e),
             )
-
-        if detected_mode is None:
-            warnings.warn(
-                f"Could not auto-detect test type for interval {block.interval_index}. "
-                "Specify test_mode parameter explicitly.",
-                UserWarning,
-                stacklevel=2,
-            )
-            # Default to relaxation as safest assumption for time-domain data
-            detected_mode = "relaxation"
-
-        # Convert to RheoData using appropriate converter
-        if detected_mode == "creep":
-            rheo_data = _interval_to_rheodata_creep(
-                block, global_meta, mapped_df, mapped_units
-            )
-        elif detected_mode == "relaxation":
-            rheo_data = _interval_to_rheodata_relaxation(
-                block, global_meta, mapped_df, mapped_units
-            )
-        elif detected_mode == "oscillation":
-            rheo_data = _interval_to_rheodata_oscillation(
-                block, global_meta, mapped_df, mapped_units
-            )
-        elif detected_mode == "rotation":
-            rheo_data = _interval_to_rheodata_rotation(
-                block, global_meta, mapped_df, mapped_units
-            )
-        else:
-            logger.error("Unknown test mode", test_mode=detected_mode)
-            raise ValueError(f"Unknown test mode: {detected_mode}")
-
-        # Handle custom column overrides
-        if x_col is not None and x_col in mapped_df.columns:
-            rheo_data = RheoData(
-                x=mapped_df[x_col].values,
-                y=rheo_data.y,
-                x_units=mapped_units.get(x_col),
-                y_units=rheo_data.y_units,
-                domain=rheo_data.domain,
-                initial_test_mode=detected_mode,
-                metadata=rheo_data.metadata,
-            )
-
-        if y_col is not None and y_col in mapped_df.columns:
-            rheo_data = RheoData(
-                x=rheo_data.x,
-                y=mapped_df[y_col].values,
-                x_units=rheo_data.x_units,
-                y_units=mapped_units.get(y_col),
-                domain=rheo_data.domain,
-                initial_test_mode=detected_mode,
-                metadata=rheo_data.metadata,
-            )
+            continue
 
         results.append(rheo_data)
+
+    if not results:
+        raise ValueError("No interval could be converted to RheoData")
 
     # Return single or list based on parameters
     if return_all or len(results) > 1:

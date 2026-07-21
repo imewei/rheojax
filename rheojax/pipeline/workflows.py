@@ -345,25 +345,48 @@ def _fit_model_in_subprocess(
 
         y_for_res = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
         residuals = y_for_res - y_pred_mag
-        rmse = float(np.sqrt(np.mean(residuals**2)))
 
-        ss_res = float(np.sum(residuals**2))
-        y_for_ss = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
-        ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
-        r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
-
-        n = len(y_data)
+        # Mirror the sequential path (ModelComparisonPipeline.run): prefer the
+        # NLSQ optimizer's own CurveFitResult metrics when available, since
+        # .aic/.bic apply normalization-weight un-normalization that a plain
+        # residuals-based .rmse recompute does not. Falling back to manual
+        # computation only when nlsq_result is unavailable keeps parallel and
+        # sequential paths producing identical rankings for get_best_model().
+        nlsq_result = (
+            model.get_nlsq_result() if hasattr(model, "get_nlsq_result") else None
+        )
         k = len(model.parameters) if hasattr(model, "parameters") else 0
-        rss = np.sum(residuals**2)
-        if n > 0 and rss > 0:
-            aic = float(2 * k + n * np.log(rss / n))
-            bic = float(k * np.log(n) + n * np.log(rss / n))
-        elif n > 0:
-            aic = float("-inf")
-            bic = float("-inf")
+
+        if nlsq_result is not None and nlsq_result.rmse is not None:
+            rmse = float(nlsq_result.rmse)
+            if nlsq_result.r_squared is not None:
+                r_squared = float(nlsq_result.r_squared)
+            else:
+                ss_res = float(np.sum(residuals**2))
+                y_for_ss = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
+                ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+                r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+            aic = float(nlsq_result.aic) if nlsq_result.aic is not None else float("inf")
+            bic = float(nlsq_result.bic) if nlsq_result.bic is not None else float("inf")
         else:
-            aic = float("inf")
-            bic = float("inf")
+            rmse = float(np.sqrt(np.mean(residuals**2)))
+
+            ss_res = float(np.sum(residuals**2))
+            y_for_ss = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
+            ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+            r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+            n = len(y_data)
+            rss = np.sum(residuals**2)
+            if n > 0 and rss > 0:
+                aic = float(2 * k + n * np.log(rss / n))
+                bic = float(k * np.log(n) + n * np.log(rss / n))
+            elif n > 0:
+                aic = float("-inf")
+                bic = float("-inf")
+            else:
+                aic = float("inf")
+                bic = float("inf")
 
         mean_abs_y = np.mean(np.abs(y_data))
         rel_rmse = float(rmse / mean_abs_y) if mean_abs_y > 1e-15 else float("inf")
