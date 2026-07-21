@@ -513,6 +513,104 @@ class TestErrorHandling:
 
 
 # =============================================================================
+# Non-Finite Row Handling (PR review of dab06627)
+# =============================================================================
+
+
+class TestNonFiniteRowHandling:
+    """Regression tests for _filter_nonfinite fixes (blank cells, all-NaN)."""
+
+    def test_blank_cell_row_dropped_and_metadata_stays_aligned(self, tmp_path):
+        """A single unparseable cell drops that row; metadata stays aligned.
+
+        Regression test for the metadata-misalignment bug: previously
+        temperature/auxiliary per-row arrays were built from the
+        unfiltered DataFrame, so after _filter_nonfinite dropped a row
+        they were one element longer than x/y.
+
+        Uses "n.a." rather than a truly empty cell: a fully blank
+        tab-delimited field is dropped by the row tokenizer (shifting
+        later columns left) rather than becoming an in-place NaN — see
+        parse_rheocompass_intervals's ``if not p: continue``. "n.a." is a
+        non-numeric placeholder that keeps its column position and parses
+        to NaN.
+        """
+        content = """Project:\tTest
+Interval and data points:\t1\t3
+Interval data:\tTime\tShear Stress\tShear Strain\tNormal Force
+\t[s]\t[Pa]\t[%]\t[N]
+1.0\t100\t0.5\t0.1
+2.0\t100\tn.a.\t0.2
+3.0\t100\t1.5\t0.3
+"""
+        filepath = tmp_path / "blank_cell.csv"
+        filepath.write_text(content)
+
+        original_len = 3
+        data = load_anton_paar(filepath)
+
+        assert len(data.x) == original_len - 1
+        assert len(data.y) == original_len - 1
+        # Per-row auxiliary metadata must be filtered in lockstep with x/y.
+        assert "normal_force" in data.metadata
+        assert len(data.metadata["normal_force"]) == len(data.x)
+
+    def test_malformed_interval_skipped_others_returned(self, tmp_path, caplog):
+        """One unparseable interval is skipped; valid intervals still load."""
+        content = """Project:\tTest
+Interval and data points:\t1\t2
+Interval data:\tTime\tShear Stress\tShear Strain
+\t[s]\t[Pa]\t[%]
+1.0\t100\t1.0
+2.0\t100\t2.0
+
+Interval and data points:\t2\t2
+Interval data:\tTime
+\t[s]
+1.0
+2.0
+
+Interval and data points:\t3\t2
+Interval data:\tTime\tShear Stress\tShear Strain
+\t[s]\t[Pa]\t[%]
+1.0\t100\t1.5
+2.0\t100\t2.5
+"""
+        filepath = tmp_path / "one_bad_interval.csv"
+        filepath.write_text(content)
+
+        with caplog.at_level(
+            "WARNING", logger="rheojax.io.readers.anton_paar"
+        ), pytest.warns(UserWarning, match="Could not auto-detect"):
+            data_list = load_anton_paar(filepath, return_all=True)
+
+        assert isinstance(data_list, list)
+        assert len(data_list) == 2
+        assert {d.metadata["interval_index"] for d in data_list} == {1, 3}
+        assert any(
+            "Skipping interval that failed to convert" in r.message
+            for r in caplog.records
+        )
+
+    def test_all_nonfinite_interval_raises(self, tmp_path):
+        """An interval where every row is non-finite must not silently
+        become an empty, vacuously-valid RheoData — it must be rejected.
+        """
+        content = """Project:\tTest
+Interval and data points:\t1\t2
+Interval data:\tTime\tShear Stress\tShear Strain
+\t[s]\t[Pa]\t[%]
+1.0\t100\tn.a.
+2.0\t100\tn.a.
+"""
+        filepath = tmp_path / "all_nan.csv"
+        filepath.write_text(content)
+
+        with pytest.raises(ValueError, match="No interval could be converted"):
+            load_anton_paar(filepath)
+
+
+# =============================================================================
 # Integration Tests
 # =============================================================================
 

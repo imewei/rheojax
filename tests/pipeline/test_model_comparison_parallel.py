@@ -42,6 +42,28 @@ class TestModelComparisonParallel:
                 f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
             )
 
+            # Tight parity on rmse/aic/bic: the parallel path
+            # (_fit_model_in_subprocess) must prefer nlsq_result.rmse/.aic/.bic
+            # exactly like the sequential path, not fall back to a manually
+            # recomputed value. A loose r_squared check alone doesn't catch a
+            # regression here because r_squared computation is unaffected.
+            assert mc_seq.results[model]["rmse"] == pytest.approx(
+                mc_par.results[model]["rmse"], rel=1e-6
+            ), f"Model {model}: rmse mismatch between sequential and parallel paths"
+            assert mc_seq.results[model]["aic"] == pytest.approx(
+                mc_par.results[model]["aic"], rel=1e-6
+            ), f"Model {model}: aic mismatch between sequential and parallel paths"
+            assert mc_seq.results[model]["bic"] == pytest.approx(
+                mc_par.results[model]["bic"], rel=1e-6
+            ), f"Model {model}: bic mismatch between sequential and parallel paths"
+
+        # The actual regression this fix prevents: ranking by a metric must
+        # not depend on the parallel flag. r_squared alone wouldn't have
+        # caught the original bug since aic/bic were the ones diverging.
+        assert mc_seq.get_best_model(metric="aic") == mc_par.get_best_model(
+            metric="aic"
+        ), "get_best_model(metric='aic') disagrees between sequential and parallel runs"
+
     def test_parallel_single_model_fallback(self, relaxation_data):
         """With only 1 model, parallel=True should not use pool."""
         from rheojax.pipeline.workflows import ModelComparisonPipeline

@@ -953,33 +953,6 @@ class TestDetectTestModeFlowVsRelaxation:
         assert mode != "flow_curve", "Sub-decade data should not be classified as flow"
 
 
-class TestImportWizardCacheCleanup:
-    """F-IO-R2-010: Import wizard must clear cached DataFrames on finish."""
-
-    @pytest.mark.smoke
-    def test_on_finished_clears_cache_attrs(self):
-        """_on_finished should set all cache attributes to None."""
-        from rheojax.gui.dialogs.import_wizard import ImportWizard
-
-        try:
-            wizard = ImportWizard.__new__(ImportWizard)
-            # Simulate cached state
-            wizard._cached_df = "fake_dataframe"
-            wizard._cached_file_path = "/fake/path"
-            wizard._cached_preview_df = "fake_preview_df"
-            wizard._cached_preview_path = "/fake/preview/path"
-
-            # Call _on_finished (result=0 = rejected)
-            wizard._on_finished(0)
-
-            assert wizard._cached_df is None
-            assert wizard._cached_file_path is None
-            assert wizard._cached_preview_df is None
-            assert wizard._cached_preview_path is None
-        except ImportError:
-            pytest.skip("PySide6 not available")
-
-
 # ── RCA Round 3 (2026-02-24): IO + GUI integration fixes ──────────────────
 
 

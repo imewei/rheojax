@@ -2,9 +2,10 @@
 
 from types import MappingProxyType
 
+import numpy as np
 import pytest
 
-from rheojax.core._validation import reject_removed_options
+from rheojax.core._validation import reject_removed_options, validate_predict_input
 from rheojax.core.post_fit_validator import PostFitValidator, RheoJaxUncertaintyWarning
 from rheojax.io._exceptions import RheoJaxPhysicsWarning
 
@@ -71,6 +72,26 @@ def test_compute_uncertainty_rejects_unknown_method():
             uncertainty="bootstrp",
             test_mode=None,
         )
+
+
+def test_validate_predict_input_rejects_nan():
+    with pytest.raises(ValueError, match="NaN"):
+        validate_predict_input(np.array([1.0, np.nan, 3.0]))
+
+
+def test_validate_predict_input_rejects_non_monotonic():
+    with pytest.raises(ValueError, match="monotonic"):
+        validate_predict_input(np.array([1.0, 3.0, 2.0]))
+
+
+def test_validate_predict_input_rejects_empty_array():
+    """Empty arrays must not silently skip validation (CRITICAL fix)."""
+    with pytest.raises(ValueError, match="empty"):
+        validate_predict_input(np.array([]))
+
+
+def test_validate_predict_input_accepts_valid_array():
+    validate_predict_input(np.array([1.0, 2.0, 3.0]))
 
 
 def test_compute_uncertainty_surfaces_failure_via_warning_and_log(monkeypatch, caplog):

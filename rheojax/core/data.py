@@ -894,7 +894,21 @@ class RheoData:
         logger.debug("Resampling data", n_points=n_points, domain=self.domain)
         x_array = _coerce_ndarray(self.x)
 
-        if self.domain == "frequency":
+        # Detect log-vs-linear spacing from the data itself rather than trusting
+        # `domain` alone: relaxation/creep data (domain == "time") is routinely
+        # sampled on a log-time grid, and unconditionally using linspace there
+        # silently under-resolves the fast-decay region.
+        use_log = self.domain == "frequency"
+        if not use_log and x_array.size > 2 and np.all(x_array > 0):
+            diffs = np.diff(x_array)
+            log_diffs = np.diff(np.log(x_array))
+            linear_cv = np.std(diffs) / abs(np.mean(diffs)) if np.mean(diffs) != 0 else np.inf
+            log_cv = (
+                np.std(log_diffs) / abs(np.mean(log_diffs)) if np.mean(log_diffs) != 0 else np.inf
+            )
+            use_log = log_cv < linear_cv
+
+        if use_log:
             if x_array.min() <= 0:
                 raise ValueError(
                     f"Cannot resample in log-space: x contains non-positive values "
@@ -904,7 +918,6 @@ class RheoData:
                 np.log10(x_array.min()), np.log10(x_array.max()), n_points
             )
         else:
-            # Linear-spaced for time domain
             new_x = np.linspace(x_array.min(), x_array.max(), n_points)
 
         return self.interpolate(new_x)

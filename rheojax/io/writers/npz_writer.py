@@ -178,28 +178,33 @@ def load_npz(filepath: str | Path) -> RheoData:
     except Exception as e:
         raise ValueError(f"Failed to load npz archive: {filepath}: {e}") from e
 
-    x = npz["x"]
-    y = npz["y"]
+    with npz:
+        x = npz["x"]
+        y = npz["y"]
 
-    # Validate array shape compatibility before constructing RheoData
-    if x.ndim >= 1 and y.ndim >= 1 and len(x) != len(y):
-        raise ValueError(
-            f"Corrupt npz archive: x has {len(x)} points but y has {len(y)}"
+        # Validate array shape compatibility before constructing RheoData
+        if x.ndim >= 1 and y.ndim >= 1 and len(x) != len(y):
+            raise ValueError(
+                f"Corrupt npz archive: x has {len(x)} points but y has {len(y)}"
+            )
+
+        # Parse metadata from UTF-8 bytes
+        try:
+            metadata: dict = json.loads(
+                npz["_metadata_json"].tobytes().decode("utf-8")
+            )
+        except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+            logger.warning("Could not parse metadata JSON from npz, using empty dict")
+            metadata = {}
+
+        x_units = _decode_str(npz["_x_units"]) if "_x_units" in npz else None
+        y_units = _decode_str(npz["_y_units"]) if "_y_units" in npz else None
+        domain = _decode_str(npz["_domain"]) if "_domain" in npz else None
+        initial_test_mode = (
+            _decode_str(npz["_initial_test_mode"])
+            if "_initial_test_mode" in npz
+            else None
         )
-
-    # Parse metadata from UTF-8 bytes
-    try:
-        metadata: dict = json.loads(npz["_metadata_json"].tobytes().decode("utf-8"))
-    except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
-        logger.warning("Could not parse metadata JSON from npz, using empty dict")
-        metadata = {}
-
-    x_units = _decode_str(npz["_x_units"]) if "_x_units" in npz else None
-    y_units = _decode_str(npz["_y_units"]) if "_y_units" in npz else None
-    domain = _decode_str(npz["_domain"]) if "_domain" in npz else None
-    initial_test_mode = (
-        _decode_str(npz["_initial_test_mode"]) if "_initial_test_mode" in npz else None
-    )
 
     logger.info(
         "Loaded RheoData from npz",

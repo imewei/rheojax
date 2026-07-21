@@ -11,12 +11,10 @@ from rheojax.gui.dialogs.column_mapper import ColumnMapper, ColumnMapperDialog
 from rheojax.gui.dialogs.dataset_preview import DatasetPreviewDialog
 from rheojax.gui.dialogs.export_options import ExportOptions, ExportOptionsDialog
 from rheojax.gui.dialogs.fitting_options import FittingOptions, FittingOptionsDialog
-from rheojax.gui.dialogs.import_wizard import ImportWizard
 from rheojax.gui.dialogs.pipeline_templates import PipelineTemplateDialog
 from rheojax.gui.dialogs.preferences import Preferences, PreferencesDialog
 
 __all__ = [
-    "ImportWizard",
     "PipelineTemplateDialog",
     "ColumnMapper",
     "ColumnMapperDialog",
