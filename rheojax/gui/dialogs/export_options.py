@@ -131,6 +131,10 @@ class ExportOptionsDialog(QDialog):
         self.dpi_spin.setValue(300)
         self.dpi_spin.setSingleStep(50)
         self.dpi_spin.setSuffix(" dpi")
+        self.dpi_spin.setAccessibleName("Resolution in DPI")
+        self.dpi_spin.setAccessibleDescription(
+            "Figure export resolution, 72 to 1200 dots per inch."
+        )
         self.dpi_spin.valueChanged.connect(lambda v: self._on_option_changed("dpi", v))
         settings_layout.addRow("Resolution (DPI):", self.dpi_spin)
 
@@ -146,6 +150,7 @@ class ExportOptionsDialog(QDialog):
                 "ggplot",
             ]
         )
+        self.style_combo.setAccessibleName("Style preset")
         self.style_combo.currentTextChanged.connect(
             lambda t: self._on_option_changed("style", t)
         )
@@ -198,6 +203,19 @@ class ExportOptionsDialog(QDialog):
         button_box.accepted.connect(self._on_accepted)
         button_box.rejected.connect(self._on_rejected)
         layout.addWidget(button_box)
+
+        # Tab order follows the visual top-to-bottom layout of the form.
+        self.setTabOrder(self.csv_radio, self.json_radio)
+        self.setTabOrder(self.json_radio, self.excel_radio)
+        self.setTabOrder(self.excel_radio, self.hdf5_radio)
+        self.setTabOrder(self.hdf5_radio, self.png_radio)
+        self.setTabOrder(self.png_radio, self.svg_radio)
+        self.setTabOrder(self.svg_radio, self.pdf_radio)
+        self.setTabOrder(self.pdf_radio, self.dpi_spin)
+        self.setTabOrder(self.dpi_spin, self.style_combo)
+        self.setTabOrder(self.style_combo, self.metadata_check)
+        self.setTabOrder(self.metadata_check, self.provenance_check)
+        self.setTabOrder(self.provenance_check, self.compress_check)
 
         self.setLayout(layout)
 

@@ -18,6 +18,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QFileDialog,
+    QHBoxLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -70,6 +72,13 @@ class PipelineConfigureRunStep(QWidget):
         self._export_path_edit.setPlaceholderText(
             "/path/to/output_{id}.csv  ({id} = dataset id)"
         )
+        self._export_path_edit.setAccessibleName("Export output path")
+        # Every other file-touching action in the app (Open, Save As, Import)
+        # goes through QFileDialog -- this was the one exception, a bare text
+        # field with no browse affordance and no native overwrite check.
+        self._export_browse_btn = QPushButton("Browse…", self)
+        self._export_browse_btn.setAccessibleName("Browse for export output path")
+        self._export_browse_btn.clicked.connect(self._on_browse_export_path_clicked)
         self._export_format_combo = RheoComboBox(self)
         self._export_format_combo.addItems(["csv", "json", "xlsx", "hdf5"])
 
@@ -100,12 +109,16 @@ class PipelineConfigureRunStep(QWidget):
         self._run_all_btn.setAccessibleName("Run All")
         self._run_all_btn.clicked.connect(self.run_requested.emit)
 
+        export_path_row = QHBoxLayout()
+        export_path_row.addWidget(self._export_path_edit)
+        export_path_row.addWidget(self._export_browse_btn)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self._step_type_combo)
         layout.addWidget(self._transform_key_combo)
         layout.addWidget(self._fit_model_combo)
         layout.addWidget(self._fit_run_nuts_checkbox)
-        layout.addWidget(self._export_path_edit)
+        layout.addLayout(export_path_row)
         layout.addWidget(self._export_format_combo)
         layout.addWidget(self._add_step_btn)
         layout.addWidget(self._step_list)
@@ -127,6 +140,20 @@ class PipelineConfigureRunStep(QWidget):
         self._state.steps.append(step)
         self._step_list.addItem(QListWidgetItem(f"{step.step_type}: {step.config}"))
         self.edited.emit()
+
+    def _on_browse_export_path_clicked(self) -> None:
+        # getSaveFileName rather than getOpenFileName -- this picks a
+        # destination path (with the OS's native overwrite confirmation),
+        # not an existing file to read. "{id}" in the returned path is a
+        # per-dataset placeholder execute() substitutes at run time, not a
+        # literal file the dialog needs to resolve.
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Choose export output path",
+            self._export_path_edit.text() or "output_{id}.csv",
+        )
+        if path:
+            self._export_path_edit.setText(path)
 
     def _on_add_step_clicked(self) -> None:
         step_type = self._step_type_combo.currentText()

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QLabel,
+    QProgressBar,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -60,10 +61,20 @@ class NlsqStep(QWidget):
         self._active_jobs = active_jobs
         self._current_job_id: str | None = None
         self._table = ParameterTable(self)
+        # Seeded from FitState.nlsq_config (mirrors NutsStep's nuts_config
+        # pattern) rather than a hardcoded default -- previously this was
+        # transient widget state only, so navigating away and back (or a
+        # workspace rebuild) silently reset it with no warning.
+        ms_cfg = self._state.nlsq_config
         self._ms_enabled = QCheckBox("multi-start", self)
+        self._ms_enabled.setChecked(ms_cfg.multi_start)
+        self._ms_enabled.setAccessibleDescription(
+            "Run multiple randomized restarts and keep the best fit by R²."
+        )
         self._ms_count = QSpinBox(self)
         self._ms_count.setRange(1, 64)
-        self._ms_count.setValue(8)
+        self._ms_count.setValue(ms_cfg.n_starts)
+        self._ms_count.setAccessibleName("Number of multi-start restarts")
         self._fit_options: dict = {}
         self._options_btn = QPushButton("⚙ Fit Options", self)
         self._options_btn.setAccessibleName("Fit Options")
@@ -77,6 +88,14 @@ class NlsqStep(QWidget):
         self._cancel_btn = QPushButton("Cancel", self)
         self._cancel_btn.setVisible(False)
         self._cancel_btn.clicked.connect(self._on_cancel_clicked)
+        # In-body feedback for the run itself -- the status bar's progress
+        # sliver lives 300px wide at the bottom of the window and is easy to
+        # miss during a multi-minute run; this indeterminate bar sits right
+        # next to Cancel so "is this still working?" has an answer without
+        # looking away from the step.
+        self._progress = QProgressBar(self)
+        self._progress.setRange(0, 0)
+        self._progress.setVisible(False)
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
@@ -87,10 +106,21 @@ class NlsqStep(QWidget):
             self._options_btn,
             self._run_btn,
             self._cancel_btn,
+            self._progress,
             self._result,
         ):
             lay.addWidget(w)
+        self.setTabOrder(self._ms_enabled, self._ms_count)
+        self.setTabOrder(self._ms_count, self._options_btn)
+        self.setTabOrder(self._options_btn, self._run_btn)
+        self._ms_enabled.toggled.connect(self._on_multistart_changed)
+        self._ms_count.valueChanged.connect(self._on_multistart_changed)
         self._run_btn.clicked.connect(self.run)
+
+    def _on_multistart_changed(self, *_args: object) -> None:
+        cfg = self._state.nlsq_config
+        cfg.multi_start = self._ms_enabled.isChecked()
+        cfg.n_starts = self._ms_count.value()
 
     def _on_cancel_clicked(self) -> None:
         if self._active_jobs is None or self._current_job_id is None:
@@ -172,7 +202,6 @@ class NlsqStep(QWidget):
             self._fit_options = dialog.get_options()
 
     def run(self) -> None:
-        # Multi-start config is transient widget state — not stored in FitState
         table_params = self._table.get_parameters()
         initial_params = {
             name: {
@@ -193,6 +222,7 @@ class NlsqStep(QWidget):
         # silently miss the job it's actually trying to stop.
         self._current_job_id = f"{self._state.data_ref}:nlsq"
         self._cancel_btn.setVisible(self._active_jobs is not None)
+        self._progress.setVisible(True)
         # Snapshot: _fit_fn pumps a nested QEventLoop, so the user can
         # navigate elsewhere/edit Step 1 while this run is in flight --
         # that invalidation bumps FitState.revision (invalidation.py). If it
@@ -296,6 +326,7 @@ class NlsqStep(QWidget):
         finally:
             self._run_btn.setEnabled(True)
             self._cancel_btn.setVisible(False)
+            self._progress.setVisible(False)
             self._current_job_id = None
 
     def refresh_display(self) -> None:
