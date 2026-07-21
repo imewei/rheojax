@@ -15,6 +15,7 @@ from rheojax.gui.compat import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSlider,
     QSpinBox,
@@ -678,6 +679,16 @@ class PreferencesDialog(QDialog):
 
     def _restore_defaults(self) -> None:
         """Restore all preferences to defaults."""
+        choice = QMessageBox.question(
+            self,
+            "Restore Defaults",
+            "Restore all preferences to their defaults? This discards any "
+            "unsaved changes in this dialog.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
         logger.debug("Restoring defaults", dialog=self.__class__.__name__)
 
         # General

@@ -16,6 +16,9 @@ from PySide6.QtCore import QRunnable
 
 from rheojax.gui.foundation.pipeline_bridge import pipeline_context_from_library
 from rheojax.gui.workspace.pipeline.models import FitStepResult
+from rheojax.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PipelineBatchRunner(QRunnable):
@@ -49,7 +52,16 @@ class PipelineBatchRunner(QRunnable):
         )
 
         try:
-            for dataset_id in self._selected_dataset_ids:
+            # ponytail: stop_requested is checked here (between datasets) and again
+            # inside self._service.execute() (between steps, and between a fit
+            # step's NLSQ/NUTS phases) -- but once a phase's worker.run() actually
+            # starts (a blocking subprocess call inside _run_worker_phase), nothing
+            # polls stop_requested again until that call returns. Cancelling
+            # mid-NUTS-run genuinely can't be made finer-grained without the
+            # worker/subprocess protocol itself supporting mid-run interruption;
+            # upgrade path is a cancellation channel into ProcessWorkerAdapter, not
+            # another check here.
+            for idx, dataset_id in enumerate(self._selected_dataset_ids):
                 if self._stop_requested.is_set():
                     break
                 # Register synchronously (plain dict write, not via the Qt signal)
@@ -69,6 +81,7 @@ class PipelineBatchRunner(QRunnable):
                 ctx = pipeline_context_from_library(self._library, [dataset_id])
                 steps_for_dataset = self._substitute_dataset_id(self._steps, dataset_id)
                 fatal = False
+                error_msg = None
                 try:
                     result = self._service.execute(
                         steps=steps_for_dataset,
@@ -80,7 +93,8 @@ class PipelineBatchRunner(QRunnable):
                 except WorkerIsolationRequiredError as exc:
                     # Misconfigured environment -- would fail identically for every
                     # remaining dataset, so this is the batch's last iteration too.
-                    record = self._failed_record(dataset_id, str(exc))
+                    error_msg = str(exc)
+                    record = self._failed_record(dataset_id, error_msg)
                     fatal = True
                 except Exception as exc:  # pragma: no cover - defensive backstop
                     # execute() already converts ordinary step failures into a
@@ -89,9 +103,32 @@ class PipelineBatchRunner(QRunnable):
                     # construction). Without this, such an exception would propagate out
                     # of run() with dataset_run_finished never emitted, leaving this
                     # dataset's active_jobs entry stuck forever (nothing else clears it).
+                    logger.error(
+                        "Unexpected error running pipeline for dataset",
+                        dataset_id=dataset_id,
+                        error=str(exc),
+                        exc_info=True,
+                    )
                     record = self._failed_record(dataset_id, str(exc))
                 self._service.dataset_run_finished.emit(dataset_id, record)
                 if fatal:
+                    # Every dataset still queued behind this one would hit the exact
+                    # same fatal precondition error -- record each as "skipped" (via
+                    # the same dataset_run_finished path PipelineController already
+                    # commits to job_history) instead of leaving it with no
+                    # job_history/active_jobs entry at all, which was indistinguishable
+                    # from "never got to it yet" when reviewing results afterwards.
+                    remaining = self._selected_dataset_ids[idx + 1 :]
+                    if remaining:
+                        logger.warning(
+                            "Skipping remaining datasets after fatal precondition error",
+                            skipped_count=len(remaining),
+                            reason=error_msg,
+                        )
+                    for skipped_id in remaining:
+                        self._service.dataset_run_finished.emit(
+                            skipped_id, self._skipped_record(skipped_id, error_msg)
+                        )
                     break
         finally:
             # Runs on every exit path (normal completion, stop_requested break, fatal
@@ -107,6 +144,15 @@ class PipelineBatchRunner(QRunnable):
             "dataset_id": dataset_id,
             "status": "failed",
             "error": error,
+            "step_results": {},
+        }
+
+    @staticmethod
+    def _skipped_record(dataset_id: str, reason: str | None) -> dict:
+        return {
+            "dataset_id": dataset_id,
+            "status": "skipped",
+            "error": f"Batch aborted before this dataset could run: {reason}",
             "step_results": {},
         }
 

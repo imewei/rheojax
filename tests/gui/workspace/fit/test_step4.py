@@ -94,3 +94,60 @@ def test_reset_skip_wired_to_nlsq_edited_in_fit_controller(qtbot):
     nlsq_body.edited.emit()
 
     assert nuts_body.is_ready() is False
+
+
+def test_sample_button_confirm_cancel_blocks_run(qtbot, monkeypatch):
+    """PR #104 gate: clicking the real Sample button (not calling run()
+    directly) must show a QMessageBox.question confirm mentioning the
+    chain/iteration count, and answering Cancel must NOT launch a sample."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = FitState(nlsq_result={"params": {"G0": 1000.0, "eta": 50.0}})
+    calls = {"invoked": False}
+
+    def fake_sample(priors, warm_start, config):
+        calls["invoked"] = True
+        return {"rhat": 1.0}
+
+    step = NutsStep(st, sample_fn=fake_sample)
+    qtbot.addWidget(step)
+
+    captured = {}
+
+    def fake_question(self_, title, text, *args, **kwargs):
+        captured["text"] = text
+        return QMessageBox.StandardButton.Cancel
+
+    monkeypatch.setattr(QMessageBox, "question", fake_question)
+
+    step._run_btn.click()
+
+    assert "chain" in captured["text"].lower()
+    assert calls["invoked"] is False
+    assert st.nuts_result is None
+
+
+def test_sample_button_confirm_yes_proceeds(qtbot, monkeypatch):
+    """Positive-path guard: answering Yes to the confirm dialog must let the
+    real Sample button proceed to the underlying sample_fn."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = FitState(nlsq_result={"params": {"G0": 1000.0, "eta": 50.0}})
+    calls = {"invoked": False}
+
+    def fake_sample(priors, warm_start, config):
+        calls["invoked"] = True
+        return {"rhat": 1.0}
+
+    step = NutsStep(st, sample_fn=fake_sample)
+    qtbot.addWidget(step)
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step._run_btn.click()
+
+    assert calls["invoked"] is True
+    assert st.nuts_result is not None

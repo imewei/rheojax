@@ -85,7 +85,9 @@ class ParameterTable(QTableWidget):
         # Configure table
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(["Parameter", "Value", "Min", "Max", "Fixed"])
-        _table_font = f"{Typography.SIZE_MD_SM}pt"
+        # Bumped from SIZE_MD_SM to the next type-scale step: this is a dense
+        # numeric-entry grid, borderline small at typical desk-viewing distance.
+        _table_font = f"{Typography.SIZE_BASE}pt"
         self.setStyleSheet(
             f"QTableWidget {{ font-size: {_table_font}; }} "
             f"QHeaderView::section {{ font-size: {_table_font}; }}"
@@ -181,6 +183,33 @@ class ParameterTable(QTableWidget):
     @staticmethod
     def _value_valid(value: float, min_val: float, max_val: float) -> bool:
         return math.isfinite(value) and min_val <= value <= max_val
+
+    def has_invalid_rows(self) -> bool:
+        """Return True if any row currently holds a non-numeric, non-finite,
+        out-of-range, or inverted-bounds entry.
+
+        get_parameters() silently skips such rows (a caller trusting its
+        returned dict alone would launch a fit with those parameters
+        defaulted with no indication anything was wrong) -- callers that
+        need to warn the user before launching should check this first.
+        """
+        for row in range(self.rowCount()):
+            val_item = self.item(row, 1)
+            min_item = self.item(row, 2)
+            max_item = self.item(row, 3)
+            if val_item is None or min_item is None or max_item is None:
+                continue
+            try:
+                value = float(val_item.text())
+                min_bound = float(min_item.text())
+                max_bound = float(max_item.text())
+            except ValueError:
+                return True
+            if not self._bounds_valid(min_bound, max_bound) or not self._value_valid(
+                value, min_bound, max_bound
+            ):
+                return True
+        return False
 
     def get_parameters(self) -> dict[str, ParameterState]:
         """Get current parameter values and states.
@@ -376,6 +405,12 @@ class ParameterTable(QTableWidget):
                     # otherwise silently pass as "in bounds") - red text.
                     # Do not emit: invalid values must never reach the state store.
                     item.setForeground(QBrush(QColor(themed("ERROR"))))
+                    # WCAG 1.4.1: don't rely on color alone -- a tooltip
+                    # explaining the problem is the minimal non-color cue.
+                    item.setToolTip(
+                        f"Value must be finite and within [{min_val:.6g}, "
+                        f"{max_val:.6g}]"
+                    )
                     return
 
                 # In bounds - check if modified
@@ -397,6 +432,7 @@ class ParameterTable(QTableWidget):
                 item.setForeground(
                     QBrush(self.palette().color(QPalette.ColorRole.Text))
                 )
+                item.setToolTip("")
 
                 # Emit signal
                 self.parameter_changed.emit(param_name, value)
@@ -417,11 +453,14 @@ class ParameterTable(QTableWidget):
                     # Invalid bounds (non-finite or inverted) - red text.
                     # Do not emit: invalid bounds must never reach the state store.
                     item.setForeground(QBrush(QColor(themed("ERROR"))))
+                    # WCAG 1.4.1: don't rely on color alone.
+                    item.setToolTip("Bounds must be finite with min <= max")
                     return
 
                 item.setForeground(
                     QBrush(self.palette().color(QPalette.ColorRole.Text))
                 )
+                item.setToolTip("")
 
                 # Emit bounds changed
                 self.bounds_changed.emit(param_name, min_val, max_val)
@@ -431,10 +470,15 @@ class ParameterTable(QTableWidget):
                 value = float(value_item.text())
                 if not self._value_valid(value, min_val, max_val):
                     value_item.setForeground(QBrush(QColor(themed("ERROR"))))
+                    value_item.setToolTip(
+                        f"Value must be finite and within [{min_val:.6g}, "
+                        f"{max_val:.6g}]"
+                    )
                 else:
                     value_item.setForeground(
                         QBrush(self.palette().color(QPalette.ColorRole.Text))
                     )
+                    value_item.setToolTip("")
 
         except ValueError:
             # Invalid number - reset to previous value without cascading signals

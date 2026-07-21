@@ -45,7 +45,6 @@ rheojax/gui/
 │   └── arviz_canvas.py            # ArviZ diagnostics
 ├── dialogs/                       # Modal dialogs
 │   ├── __init__.py
-│   ├── import_wizard.py           # Data import wizard
 │   ├── column_mapper.py           # Column mapping dialog
 │   ├── fitting_options.py         # NLSQ configuration
 │   ├── bayesian_options.py        # NUTS configuration

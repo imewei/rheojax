@@ -84,12 +84,15 @@ class PyQtGraphCanvas(QWidget):
         """Dynamic color palette based on current theme."""
         from rheojax.gui.resources.styles.tokens import themed
 
+        # Ordered so no two colorblind-confusable hues (red/green, red/brown) are
+        # adjacent -- red (index 1) and green (index 4) are kept apart by purple
+        # and orange, since multi-series G'/G'' overlays are core to this app.
         return [
             themed("CHART_1"),  # Blue - typically G'
             themed("CHART_5"),  # Red - typically G''
-            themed("CHART_3"),  # Green - fits/predictions
-            themed("CHART_4"),  # Orange - secondary data
             themed("CHART_2"),  # Purple
+            themed("CHART_4"),  # Orange - secondary data
+            themed("CHART_3"),  # Green - fits/predictions
             themed("CHART_6"),  # Pink
             themed("TEXT_SECONDARY"),  # Gray
         ]

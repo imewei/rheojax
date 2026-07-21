@@ -237,16 +237,16 @@ def test_nlsq_run_shows_in_body_progress_bar_during_run_and_hides_after(qtbot):
     step = None
 
     def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
-        assert step._progress.isVisible() is True
+        assert step._progress_bar.isVisible() is True
         return {"params": {"a": 1.0}, "r_squared": 0.9}
 
     step = NlsqStep(state=AppState().fit, fit_fn=fake_fit)
     qtbot.addWidget(step)
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False
 
     step.run()
 
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False
 
 
 def test_nlsq_run_hides_progress_bar_even_when_fit_raises(qtbot):
@@ -261,23 +261,23 @@ def test_nlsq_run_hides_progress_bar_even_when_fit_raises(qtbot):
 
     step.run()
 
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False
 
 
 def test_nuts_run_shows_in_body_progress_bar_during_run_and_hides_after(qtbot):
     step = None
 
     def fake_sample(priors, warm_start, cfg):
-        assert step._progress.isVisible() is True
+        assert step._progress_bar.isVisible() is True
         return {"posterior_samples": {"a": [1.0, 1.1]}, "r_hat": {"a": 1.0}}
 
     step = NutsStep(state=AppState().fit, sample_fn=fake_sample)
     qtbot.addWidget(step)
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False
 
     step.run()
 
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False
 
 
 def test_nuts_run_hides_progress_bar_even_when_sample_raises(qtbot):
@@ -289,4 +289,4 @@ def test_nuts_run_hides_progress_bar_even_when_sample_raises(qtbot):
 
     step.run()
 
-    assert step._progress.isVisible() is False
+    assert step._progress_bar.isVisible() is False

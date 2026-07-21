@@ -224,10 +224,64 @@ def test_batch_runner_emits_finished_with_failed_record_on_fatal_precondition_er
     assert started == [
         "d1"
     ]  # fatal precondition error stops the batch -- d2 never started
-    assert len(records) == 1
+    assert len(records) == 2
     assert records[0]["status"] == "failed"
     assert "subprocess" in records[0]["error"]
     assert records[0]["step_results"] == {}
+    # d2 never ran (never got dataset_run_started), but must still get an explicit
+    # "skipped" record -- not silent absence -- so it's distinguishable from
+    # "not yet attempted" when reviewing job_history afterwards.
+    assert records[1]["dataset_id"] == "d2"
+    assert records[1]["status"] == "skipped"
+    assert records[1]["step_results"] == {}
+    # The skip record must surface *why* -- both the fixed "Batch aborted"
+    # framing and the underlying failure reason text (not just a generic
+    # placeholder), so reviewing job_history afterwards explains the skip.
+    assert "Batch aborted" in records[1]["error"]
+    assert "subprocess" in records[1]["error"]
+
+
+def test_batch_runner_skips_all_datasets_queued_behind_fatal_precondition_error(
+    qtbot, monkeypatch
+):
+    # With 3+ datasets, every dataset after the fatal one must get a skipped
+    # record -- not just the immediate next one. This exercises the
+    # `selected_dataset_ids[idx + 1 :]` slice for a queue longer than 2.
+    monkeypatch.setenv("RHEOJAX_WORKER_ISOLATION", "thread")
+    lib = DatasetLibrary()
+    for id_ in ("d1", "d2", "d3", "d4"):
+        lib.add(_ref(id_, "relaxation"))
+        lib.store_payload(
+            id_, RheoData(x=[0.1, 1.0], y=[100.0, 50.0], initial_test_mode="relaxation")
+        )
+    svc = PipelineExecutionService()
+    steps = [
+        PipelineStepConfig(
+            id="s1",
+            step_type="fit",
+            config={"model_name": "maxwell", "run_nuts": False},
+        )
+    ]
+    runner = PipelineBatchRunner(
+        service=svc,
+        steps=steps,
+        selected_dataset_ids=["d1", "d2", "d3", "d4"],
+        library=lib,
+        stop_requested=threading.Event(),
+    )
+    started, records = [], []
+    svc.dataset_run_started.connect(lambda dsid: started.append(dsid))
+    svc.dataset_run_finished.connect(lambda dsid, record: records.append(record))
+    with qtbot.waitSignal(svc.dataset_run_finished, timeout=5000):
+        runner.run()
+    assert started == ["d1"]  # fatal precondition error stops the batch
+    assert len(records) == 4
+    assert records[0]["status"] == "failed"
+    for record, dataset_id in zip(records[1:], ("d2", "d3", "d4")):
+        assert record["dataset_id"] == dataset_id
+        assert record["status"] == "skipped"
+        assert record["step_results"] == {}
+        assert "Batch aborted" in record["error"]
 
 
 def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(

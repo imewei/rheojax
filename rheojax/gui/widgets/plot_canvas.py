@@ -173,6 +173,21 @@ class PlotCanvas(QWidget):
         # rendering can fail for host-environment reasons outside this
         # widget's control (e.g. a "raster overflow" from a font-cache/DPI
         # quirk) -- degrade gracefully instead of propagating a crash.
+        #
+        # ponytail: this only catches Python-level exceptions. The known
+        # "FT_Render_Glyph ... raster overflow" FreeType bug (see
+        # tests/gui/test_residuals_panel_render_errors.py) raises a plain
+        # RuntimeError in every case reproduced so far -- and self.canvas.draw is
+        # already monkey-patched to _safe_draw() above, which swallows RuntimeError
+        # before it would even reach this except. If the underlying corrupted
+        # Agg/FreeType renderer state ever manifests as a true C-level segfault
+        # instead (the "unfixable upstream" savefig-only variant), no try/except
+        # anywhere in Python can catch it -- there is no runtime mitigation for
+        # that case in this widget. The test suite avoids
+        # the trigger instead of catching it (tests/conftest.py forces
+        # QT_QPA_PLATFORM=offscreen before any QApplication exists, so
+        # devicePixelRatio is always an integer); that isn't available to a real
+        # interactive display, so this remains a known residual risk.
         try:
             self.canvas.draw()
         except Exception as e:

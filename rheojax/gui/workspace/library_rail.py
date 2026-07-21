@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal, SignalInstance
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
@@ -12,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from rheojax.gui.foundation.library import DatasetLibrary
-from rheojax.gui.resources.styles.tokens import section_header_style
+from rheojax.gui.resources.styles.tokens import section_header_style, themed
 from rheojax.gui.utils.layout_helpers import set_panel_margins
 
 
@@ -57,6 +58,13 @@ class LibraryRail(QWidget):
         if not refs:
             placeholder = QListWidgetItem("No datasets yet — import a file to begin")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            # Visually distinguish the empty-state row from real dataset rows
+            # (muted color + italic) -- previously identical styling made it
+            # look like a selectable/real entry rather than a status message.
+            placeholder.setForeground(QColor(themed("TEXT_MUTED")))
+            font = placeholder.font()
+            font.setItalic(True)
+            placeholder.setFont(font)
             self._list.addItem(placeholder)
             return
         for ref in refs:

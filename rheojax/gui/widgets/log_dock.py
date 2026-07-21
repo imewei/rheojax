@@ -70,7 +70,10 @@ class LogDockWidget(QDockWidget):
 
         self.text_edit = QTextEdit(container)
         self.text_edit.setReadOnly(True)
-        self.text_edit.setMaximumHeight(200)
+        # Derived from font metrics (not a fixed 200px) so this scales with
+        # the OS font-size setting and per-display DPI instead of clipping to
+        # fewer visible lines as text scale increases.
+        self.text_edit.setMaximumHeight(self.text_edit.fontMetrics().height() * 10)
         self.text_edit.setPlaceholderText("Application logs will appear here...")
         # Without this, the document grows unboundedly (memory) even though
         # `_records` is capped at _MAX_RECORDS -- and _rerender() (level-filter

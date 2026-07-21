@@ -16,6 +16,7 @@ from rheojax.gui.compat import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     Qt,
@@ -411,6 +412,16 @@ class FittingOptionsDialog(QDialog):
 
     def _reset_defaults(self) -> None:
         """Reset all options to defaults."""
+        choice = QMessageBox.question(
+            self,
+            "Reset to Defaults",
+            "Reset all fitting options to their defaults? This discards any "
+            "unsaved changes in this dialog.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
         logger.debug("Resetting to defaults", dialog=self.__class__.__name__)
         self.algo_combo.setCurrentIndex(0)  # NLSQ
         self.workflow_combo.setCurrentText("auto")

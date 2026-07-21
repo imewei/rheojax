@@ -61,13 +61,44 @@ class ExportStep(QWidget):
         for w in (bundle_caption, self._save_btn, self._export_btn, self._export_status):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
-        self._save_btn.clicked.connect(self.save_to_library)
+        self._save_btn.clicked.connect(self._on_save_clicked)
         self._export_btn.clicked.connect(self._on_export_clicked)
+
+    def _confirm_if_not_converged(self) -> bool:
+        """Gate export/save on a non-converged NUTS verdict.
+
+        Previously the only warning was a small colored badge on the
+        Diagnostics tab (step5_visualize.py) -- easy to miss before writing
+        out a posterior nobody should trust yet. Button-only gate (not
+        inside export_bundle()/save_to_library() themselves) so direct/test
+        callers of those two methods are unaffected.
+        """
+        verdict = (self._state.nuts_result or {}).get("verdict")
+        if not verdict or verdict.get("converged", True):
+            return True
+        from rheojax.gui.compat import QMessageBox
+
+        choice = QMessageBox.question(
+            self,
+            "Sampling did not converge",
+            "NUTS diagnostics did not converge ("
+            + "; ".join(verdict.get("reasons", []))
+            + "). Export anyway?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        return choice == QMessageBox.StandardButton.Yes
+
+    def _on_save_clicked(self) -> None:
+        if self._confirm_if_not_converged():
+            self.save_to_library()
 
     def _on_export_clicked(self) -> None:
         """Prompt for a destination directory rather than silently writing
         to Path.cwd() -- the user previously had no way to know or choose
         where the bundle landed."""
+        if not self._confirm_if_not_converged():
+            return
         chosen = QFileDialog.getExistingDirectory(
             self, "Export bundle to...", str(Path.cwd())
         )

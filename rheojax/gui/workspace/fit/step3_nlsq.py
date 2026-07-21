@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -97,14 +98,26 @@ class NlsqStep(QWidget):
         self._cancel_btn = QPushButton("Cancel", self)
         self._cancel_btn.setVisible(False)
         self._cancel_btn.clicked.connect(self._on_cancel_clicked)
-        # In-body feedback for the run itself -- the status bar's progress
+        # NLSQ can take minutes (e.g. multi-start restarts, EPM lattice sims);
+        # the only prior feedback was a disabled Run button. run_fit_isolated
+        # (subprocess_fit.py) does emit a real iteration/max_iter percent, but
+        # multi-start restarts reset that percent each restart and nothing
+        # here currently wires the queue through to a widget-local bar --
+        # indeterminate + elapsed time is the honest, always-correct fallback
+        # per the audit's own guidance, and matches step4_nuts.py's identical
+        # treatment for NUTS (which has no per-iteration percent at all).
+        # In-body (not just status-bar) feedback: the status bar's progress
         # sliver lives 300px wide at the bottom of the window and is easy to
-        # miss during a multi-minute run; this indeterminate bar sits right
-        # next to Cancel so "is this still working?" has an answer without
-        # looking away from the step.
-        self._progress = QProgressBar(self)
-        self._progress.setRange(0, 0)
-        self._progress.setVisible(False)
+        # miss during a multi-minute run; this sits right next to Cancel.
+        self._progress_bar = QProgressBar(self)
+        self._progress_bar.setRange(0, 0)  # indeterminate/busy
+        self._progress_bar.setVisible(False)
+        self._elapsed_label = QLabel("", self)
+        self._elapsed_label.setVisible(False)
+        self._elapsed_timer = QTimer(self)
+        self._elapsed_timer.setInterval(1000)
+        self._elapsed_timer.timeout.connect(self._on_elapsed_tick)
+        self._run_start_time = 0.0
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
@@ -115,7 +128,8 @@ class NlsqStep(QWidget):
             self._options_btn,
             self._run_btn,
             self._cancel_btn,
-            self._progress,
+            self._progress_bar,
+            self._elapsed_label,
             self._result,
         ):
             lay.addWidget(w)
@@ -125,6 +139,10 @@ class NlsqStep(QWidget):
         self._ms_enabled.toggled.connect(self._on_multistart_changed)
         self._ms_count.valueChanged.connect(self._on_multistart_changed)
         self._run_btn.clicked.connect(self.run)
+
+    def _on_elapsed_tick(self) -> None:
+        elapsed = time.monotonic() - self._run_start_time
+        self._elapsed_label.setText(f"Running... ({elapsed:.0f}s elapsed)")
 
     def _on_multistart_changed(self, *_args: object) -> None:
         cfg = self._state.nlsq_config
@@ -218,6 +236,21 @@ class NlsqStep(QWidget):
             self._fit_options = dialog.get_options()
 
     def run(self) -> None:
+        # get_parameters() silently skips invalid rows (out-of-range/non-
+        # numeric text) so a fit could previously launch with those
+        # parameters silently defaulted -- refuse to run until the user
+        # fixes the highlighted cell(s) instead.
+        if self._table.has_invalid_rows():
+            from rheojax.gui.compat import QMessageBox
+
+            QMessageBox.warning(
+                self,
+                "Invalid Parameters",
+                "One or more parameter values or bounds are invalid "
+                "(non-numeric, out of range, or min > max). Fix the "
+                "highlighted cell(s) before running.",
+            )
+            return
         table_params = self._table.get_parameters()
         initial_params = {
             name: {
@@ -232,13 +265,17 @@ class NlsqStep(QWidget):
         # button must be disabled for the duration or a second click launches
         # an overlapping fit that corrupts shared active_jobs tracking.
         self._run_btn.setEnabled(False)
+        self._run_start_time = time.monotonic()
+        self._progress_bar.setVisible(True)
+        self._elapsed_label.setVisible(True)
+        self._elapsed_label.setText("Running... (0s elapsed)")
+        self._elapsed_timer.start()
         # job_id mirrors fit_controller._make_fit_fn's own f"{data_ref}:nlsq"
         # exactly, captured here (not recomputed from live state in
         # _on_cancel_clicked) so a dataset switch mid-run can't make Cancel
         # silently miss the job it's actually trying to stop.
         self._current_job_id = f"{self._state.data_ref}:nlsq"
         self._cancel_btn.setVisible(self._active_jobs is not None)
-        self._progress.setVisible(True)
         # Snapshot: _fit_fn pumps a nested QEventLoop, so the user can
         # navigate elsewhere/edit Step 1 while this run is in flight --
         # that invalidation bumps FitState.revision (invalidation.py). If it
@@ -342,8 +379,10 @@ class NlsqStep(QWidget):
         finally:
             self._run_btn.setEnabled(True)
             self._cancel_btn.setVisible(False)
-            self._progress.setVisible(False)
             self._current_job_id = None
+            self._elapsed_timer.stop()
+            self._progress_bar.setVisible(False)
+            self._elapsed_label.setVisible(False)
 
     def refresh_display(self) -> None:
         """Sync the result label to current state.

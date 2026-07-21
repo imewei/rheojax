@@ -30,7 +30,7 @@ from rheojax.gui.compat import (
     Signal,
 )
 from rheojax.gui.foundation.priors import adapt_prior
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, Typography, themed
 from rheojax.gui.utils.layout_helpers import set_zero_margins
 from rheojax.gui.widgets.dropdown import RheoComboBox
 from rheojax.logging import get_logger
@@ -209,6 +209,17 @@ class PriorsEditor(QWidget):
         btn_layout.addWidget(self._reset_btn)
         btn_layout.addStretch()
         editor_layout.addLayout(btn_layout)
+
+        # Apply-time error feedback -- distinct from the preview's own inline
+        # "Error: ..." text, which can go stale/unnoticed if the user changed a
+        # different control since it last rendered.
+        self._apply_error_label = QLabel("")
+        self._apply_error_label.setWordWrap(True)
+        self._apply_error_label.setStyleSheet(
+            f"color: {themed('ERROR')}; font-size: {Typography.SIZE_SM}pt;"
+        )
+        self._apply_error_label.hide()
+        editor_layout.addWidget(self._apply_error_label)
 
         splitter.addWidget(editor_frame)
         splitter.setSizes([200, 300])
@@ -525,6 +536,7 @@ class PriorsEditor(QWidget):
 
     def _apply_prior(self) -> None:
         """Apply current editor settings to selected parameter."""
+        self._apply_error_label.hide()
         if self._current_param is None:
             logger.debug(
                 "User interaction",
@@ -559,11 +571,12 @@ class PriorsEditor(QWidget):
                 params=params,
                 error=str(e),
             )
-            # No need to force a preview refresh here: every spinbox/combo
-            # change that could have produced this invalid state already
-            # re-runs _update_preview() via its own valueChanged/
-            # currentIndexChanged connection, so the error text is already
-            # showing by the time Apply is clicked.
+            # The preview's own inline "Error: ..." text can be stale/easy to
+            # miss by the time Apply is clicked (e.g. scrolled out of view, or
+            # the user's attention was on a different control) -- show a
+            # dedicated, visible warning here rather than relying on that.
+            self._apply_error_label.setText(f"Not applied: {e}")
+            self._apply_error_label.show()
             return
 
         logger.info(

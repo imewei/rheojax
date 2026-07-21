@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QLabel,
     QStackedWidget,
     QToolButton,
     QVBoxLayout,
@@ -51,6 +52,11 @@ class StepperCanvas(QWidget):
         self._ctl = controller
         self._rail = QHBoxLayout()
         self._buttons: list[QToolButton] = []
+        # Persistent, always-visible "Step X of N" indicator -- the per-button
+        # tooltip (below) only reaches a user hovering with a mouse; keyboard
+        # users and anyone not currently hovering had no on-screen indication
+        # of wizard position at all.
+        self._position_label = QLabel(self)
         self._stack = _CurrentPageStack(self)
         self._stack.currentChanged.connect(lambda _: self._stack.updateGeometry())
         # QToolButton (not QPushButton) for the step rail, same rationale as
@@ -69,6 +75,7 @@ class StepperCanvas(QWidget):
         set_toolbar_margins(self._rail)
         lay = QVBoxLayout(self)
         set_zero_margins(lay)
+        lay.addWidget(self._position_label)
         lay.addLayout(self._rail)
         lay.addWidget(self._stack)
         self.refresh()
@@ -98,14 +105,29 @@ class StepperCanvas(QWidget):
         # Enabled/checked state alone doesn't tell a screen reader (or a
         # sighted user hovering before clicking) *why* a step is locked --
         # the per-button tooltip below keeps that in sync with actual state.
+        total = len(self._buttons)
         for i, b in enumerate(self._buttons):
             reached = i in self._ctl.reached
+            is_current = i == self._ctl.current
             b.setEnabled(reached)
-            b.setChecked(i == self._ctl.current)
-            if i == self._ctl.current:
-                b.setToolTip(f"Step {i + 1} of {len(self._buttons)} (current)")
+            b.setChecked(is_current)
+            # Bold weight is a non-color cue for "current" -- the checked-pill
+            # highlight alone is a color/background difference only.
+            font = b.font()
+            font.setBold(is_current)
+            b.setFont(font)
+            if is_current:
+                b.setToolTip(f"Step {i + 1} of {total} (current)")
             elif reached:
-                b.setToolTip(f"Step {i + 1} of {len(self._buttons)} -- click to revisit")
+                b.setToolTip(f"Step {i + 1} of {total} -- click to revisit")
             else:
                 b.setToolTip("Complete the earlier steps to unlock this one")
+        current_title = (
+            self._ctl.steps[self._ctl.current].title
+            if 0 <= self._ctl.current < total
+            else ""
+        )
+        self._position_label.setText(
+            f"Step {self._ctl.current + 1} of {total}: {current_title}"
+        )
         self._stack.setCurrentIndex(self._ctl.current)

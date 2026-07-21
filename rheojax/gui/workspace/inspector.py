@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QTabWidget, QVBoxLayout, QWidget
 
+from rheojax.gui.resources.styles.tokens import themed
 from rheojax.gui.utils.layout_helpers import set_zero_margins
 
 
@@ -15,6 +17,10 @@ class InspectorPanel(QWidget):
     # FitState/TransformState, a priors editor, a log viewer) -- a feature
     # to design deliberately, not a one-line wiring fix. Re-mount it (see
     # git history for the removed window.py wiring) once that design lands.
+    # Each placeholder is an explicit "not connected yet" label (muted,
+    # italic) rather than a bare blank QWidget, so an empty tab reads as
+    # unfinished rather than broken, in case it's re-mounted before that
+    # redesign happens.
     _TABS = ["params", "priors", "log"]
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -22,7 +28,9 @@ class InspectorPanel(QWidget):
         self._tabs = QTabWidget(self)
         self._index: dict[str, int] = {}
         for name in self._TABS:
-            self._index[name] = self._tabs.addTab(QWidget(self), name)
+            self._index[name] = self._tabs.addTab(
+                self._placeholder(f"{name.capitalize()} view not yet connected"), name
+            )
         lay = QVBoxLayout(self)
         set_zero_margins(lay)
         lay.addWidget(self._tabs)
@@ -33,6 +41,16 @@ class InspectorPanel(QWidget):
         # sizeHint rather than a fixed pixel value so it stays correct at
         # any font size/DPI.
         self.setMinimumWidth(self._tabs.tabBar().sizeHint().width())
+
+    def _placeholder(self, text: str) -> QWidget:
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setWordWrap(True)
+        label.setStyleSheet(f"QLabel {{ color: {themed('TEXT_MUTED')}; font-style: italic; }}")
+        wrapper = QWidget(self)
+        lay = QVBoxLayout(wrapper)
+        lay.addWidget(label)
+        return wrapper
 
     def tab_names(self) -> list[str]:
         return list(self._TABS)

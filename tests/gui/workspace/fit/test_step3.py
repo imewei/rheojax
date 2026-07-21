@@ -3,7 +3,7 @@ import types
 import pytest
 
 pytest.importorskip("PySide6")
-from rheojax.gui.foundation.state import FitState
+from rheojax.gui.foundation.state import FitState, ParameterState
 from rheojax.gui.workspace.fit.step3_nlsq import NlsqStep
 
 
@@ -250,6 +250,95 @@ def test_run_strips_dialog_multistart_keys_from_options(qtbot):
         "num_starts": 10,
         "ftol": 1e-10,
     }
+
+
+def _make_param_state(value=1.0, min_bound=0.0, max_bound=10.0):
+    return ParameterState(
+        name="G0",
+        value=value,
+        min_bound=min_bound,
+        max_bound=max_bound,
+        fixed=False,
+        unit="Pa",
+        description="",
+    )
+
+
+def test_run_button_blocked_by_invalid_row_shows_warning(qtbot, monkeypatch):
+    """PR #104 gate: clicking the real Run NLSQ button (not calling run()
+    directly) with an invalid parameter row must warn the user and must NOT
+    invoke the underlying fit_fn."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {"invoked": False}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["invoked"] = True
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._table.set_parameters({"G0": _make_param_state()})
+    # Set the value cell out of its [min_bound, max_bound] range --
+    # ParameterTable._on_item_changed only reverts genuinely non-numeric
+    # text; an out-of-range *numeric* value is left in place (red/tooltip
+    # only), so has_invalid_rows() must catch it and the click handler must
+    # refuse to launch.
+    step._table.item(0, 1).setText("999")
+    assert step._table.has_invalid_rows() is True
+
+    warned = {}
+
+    def fake_warning(*args, **kwargs):
+        warned["called"] = True
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "warning", fake_warning)
+
+    step._run_btn.click()
+
+    assert warned.get("called") is True
+    assert calls["invoked"] is False
+    assert st.nlsq_result is None
+
+
+def test_run_button_proceeds_when_all_rows_valid(qtbot, monkeypatch):
+    """Positive-path guard: an all-valid parameter table must NOT be blocked
+    by the has_invalid_rows() gate -- clicking Run NLSQ must still launch the
+    fit and must not pop the warning dialog."""
+    from rheojax.gui.compat import QMessageBox
+
+    st = FitState(
+        protocol="oscillation", model_key="maxwell", data_ref="d", column_map={"x": 0}
+    )
+    calls = {"invoked": False}
+
+    def fake_fit(model_key, model_config, data_ref, column_map, **kwargs):
+        calls["invoked"] = True
+        return {"params": {"G0": 1000.0}, "r_squared": 0.9}
+
+    step = NlsqStep(st, fit_fn=fake_fit)
+    qtbot.addWidget(step)
+    step._table.set_parameters({"G0": _make_param_state()})
+    assert step._table.has_invalid_rows() is False
+
+    warned = {"called": False}
+
+    def fake_warning(*args, **kwargs):
+        warned["called"] = True
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr(QMessageBox, "warning", fake_warning)
+
+    with qtbot.waitSignal(step.finished, timeout=2000):
+        step._run_btn.click()
+
+    assert warned["called"] is False
+    assert calls["invoked"] is True
+    assert st.nlsq_result["r_squared"] == 0.9
 
 
 def test_multistart_widgets_write_back_to_nlsq_config(qtbot):
