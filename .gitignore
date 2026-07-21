@@ -1,5 +1,5 @@
 # ============================================================================
-# Python Package .gitignore - Optimized for rheojax
+# Python Package .gitignore - RheoJAX
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -13,7 +13,7 @@ __pycache__/
 *.dll
 
 # ----------------------------------------------------------------------------
-# Distribution / Packaging
+# Distribution & Packaging
 # ----------------------------------------------------------------------------
 .Python
 build/
@@ -65,7 +65,7 @@ cover/
 .benchmarks/
 
 # ----------------------------------------------------------------------------
-# Virtual Environments
+# Virtual Environments & Dependency Managers
 # ----------------------------------------------------------------------------
 .env
 .envrc
@@ -77,81 +77,49 @@ env.bak/
 venv.bak/
 .conda/
 conda-env/
-
-# ----------------------------------------------------------------------------
-# Dependency Management
-# ----------------------------------------------------------------------------
-# Pipenv
 Pipfile.lock
-
-# UV
-
-
-# Poetry
 poetry.lock
-
-# PDM
 pdm.lock
 .pdm-python
 .pdm-build/
-
-# Pixi
 .pixi/
 pixi.lock
-
-# PEP 582
 __pypackages__/
 
 # ----------------------------------------------------------------------------
 # Jupyter Notebooks
 # ----------------------------------------------------------------------------
-.ipynb_checkpoints
-*.ipynb_checkpoints/
-*/.ipynb_checkpoints/*
+.ipynb_checkpoints/
 
 # ----------------------------------------------------------------------------
-# Documentation
+# Documentation & Builds
 # ----------------------------------------------------------------------------
-# Sphinx build artifacts
 docs/_build/
 docs/build/
 doc/build/
 .doctrees/
 *.doctree
-
-# Sphinx generated files
 docs/source/_autosummary/
 docs/source/_generated/
 docs/source/api/generated/
 docs/superpowers
-
-# MkDocs
 /site
 
 # ----------------------------------------------------------------------------
-# Scientific Computing & Data
+# Data, Artifacts & Cache
 # ----------------------------------------------------------------------------
-# Data files (adjust as needed)
 *.h5
 *.hdf5
 *.mat
 *.npy
 *.npz
-# Uncomment if you want to ignore large data files:
-# *.csv
-# *.xlsx
-# *.pkl
-# *.pickle
-
-# Plots and figures (uncomment if generated)
-# *.png
-# *.jpg
-# *.pdf
 figures/
 plots/
 output/
 outputs/
 results/
+examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx
+docs/reference/*.pdf
 
 # ----------------------------------------------------------------------------
 # Type Checkers & Linters
@@ -168,32 +136,20 @@ dmypy.json
 # ----------------------------------------------------------------------------
 # IDEs & Editors
 # ----------------------------------------------------------------------------
-# PyCharm
 .idea/
-
-# VSCode
 .vscode/
 *.code-workspace
-
-# Spyder
 .spyderproject
 .spyproject
-
-# Rope
 .ropeproject
-
-# Vim
 *.swp
 *.swo
-*~
-
-# Emacs
 *~
 \#*\#
 .\#*
 
 # ----------------------------------------------------------------------------
-# AI-Powered Development Tools
+# AI Agents & Tooling Scratch Directories
 # ----------------------------------------------------------------------------
 .agent/
 .agents/
@@ -205,134 +161,87 @@ dmypy.json
 .specify/
 .codex/
 .gemini/
-agent-os/
-specs/
 .cursor/
 .cursorignore
 .cursorindexingignore
+.clinerules/
+.windsurf/
+.reports/
+.impeccable/
+.superpowers/
+.investigation/
+.claude-flow/
+agent-os/
+three-brain-out/
+specs/
 AGENTS.md
-# CLAUDE.md
+CLAUDE.md
 GEMINI.md
 .claude-progress.md
+.research-log.jsonl
+.remember/
+rheojax_qa_report.md
+.serena
+
+# ----------------------------------------------------------------------------
+# Graphify Working State
+# ----------------------------------------------------------------------------
+graphify-out/cache/
+graphify-out/.graphify_*.json
+graphify-out/.graphify_*.txt
+graphify-out/.obsidian/
+graphify-out/_COMMUNITY_*.md
+
+# ----------------------------------------------------------------------------
+# Web & Node Dependencies
+# ----------------------------------------------------------------------------
+node_modules/
+package.json
+package-lock.json
 
 # ----------------------------------------------------------------------------
 # Operating System
 # ----------------------------------------------------------------------------
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
-
-# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-
-# Linux
 .directory
 
 # ----------------------------------------------------------------------------
-# Logs & Temporary Files
+# Logs, Profiling & Temp Files
 # ----------------------------------------------------------------------------
 *.log
 *.tmp
 *.temp
 .cache/
 _run_logs/
-
-# ----------------------------------------------------------------------------
-# Profiling
-# ----------------------------------------------------------------------------
 *.prof
 *.lprof
 .prof/
-
-# ----------------------------------------------------------------------------
-# Cython
-# ----------------------------------------------------------------------------
 cython_debug/
 *.c
 *.cpp
-# Uncomment if you have Cython source files to keep:
-# !src/**/*.c
-# !src/**/*.cpp
 
 # ----------------------------------------------------------------------------
-# Miscellaneous
+# Environment & Backup Files
 # ----------------------------------------------------------------------------
-# IPython
 profile_default/
 ipython_config.py
-
-# Jupyter
 .jupyter/
-
-# Environment variables
 .env.local
 .env.*.local
-
-# Backup files
 *.bak
 *.backup
-*~
-
-# Archive files (optional)
-# *.tar.gz
-# *.zip
 
 # ----------------------------------------------------------------------------
-# Code Review & Analysis Artifacts (temporary)
+# Code Review & Analysis Artifacts
 # ----------------------------------------------------------------------------
 commit_*_review.json
 commit_*_breaking_changes.json
 git_workflow_summary_*.md
 code_quality_fixes_summary.md
-
-# ----------------------------------------------------------------------------
-# Temporary / Work-in-Progress Directories
-# ----------------------------------------------------------------------------
 fix-imports/
-
-# ----------------------------------------------------------------------------
-# User Specific / Personal
-# ----------------------------------------------------------------------------
-.serena
-examples/data/ikh/PNAS_DigitalRheometerTwin_Dataset.xlsx
-docs/reference/*.pdf
-.remember/
-rheojax_qa_report.md
-# Graphify semantic cache (ephemeral build artifacts)
-graphify-out/cache/
-
-# Claude session scratch files in docs
-docs/.claude-progress.md
-
-# Graphify internal working state files
-graphify-out/.graphify_*.json
-graphify-out/.graphify_*.txt
-graphify-out/.obsidian/
-graphify-out/_COMMUNITY_*.md
-graphify-out/cost.json
-graphify-out/manifest.json
-.research-log.jsonl
-
-# Three-brain output
-three-brain-out/
-
-# Superpowers brainstorming visual companion
-.superpowers/
-
-# Agent investigation scratch dirs
-.investigation/
-.claude-flow
-.claude-flow/
-node_modules/
-package.json
-package-lock.json
-.clinerules/
-.windsurf/
-.reports/
-.impeccable
-.impeccable/
-
