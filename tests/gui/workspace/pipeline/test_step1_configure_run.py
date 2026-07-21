@@ -100,3 +100,47 @@ def test_is_ready_false_when_a_step_has_incomplete_config(qtbot):
     step.add_step("fit", {})  # incomplete -- no model_name
     step.set_selected_dataset_ids(["d1"])
     assert step.is_ready() is False
+
+
+def test_remove_step_requires_confirmation(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    state = AppState()
+    step = PipelineConfigureRunStep(state.pipeline, state.library)
+    qtbot.addWidget(step)
+    step.add_step("export", {"path": "out.csv"})
+    step._step_list.setCurrentRow(0)
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.No
+    )
+    step._on_remove_step_clicked()
+    assert len(state.pipeline.steps) == 1  # cancelled -- step still there
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes
+    )
+    step._on_remove_step_clicked()
+    assert len(state.pipeline.steps) == 0
+
+
+def test_move_step_up_and_down_swaps_state_order(qtbot):
+    state = AppState()
+    step = PipelineConfigureRunStep(state.pipeline, state.library)
+    qtbot.addWidget(step)
+    step.add_step("export", {"path": "a.csv"})
+    step.add_step("export", {"path": "b.csv"})
+    assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]
+
+    step._step_list.setCurrentRow(1)
+    step._on_move_step_up_clicked()
+    assert [s.config["path"] for s in state.pipeline.steps] == ["b.csv", "a.csv"]
+    assert step._step_list.item(0).text().startswith("export: {'path': 'b.csv'")
+
+    step._on_move_step_down_clicked()
+    assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]
+
+    # Boundary rows are no-ops, not errors.
+    step._step_list.setCurrentRow(0)
+    step._on_move_step_up_clicked()
+    assert [s.config["path"] for s in state.pipeline.steps] == ["a.csv", "b.csv"]

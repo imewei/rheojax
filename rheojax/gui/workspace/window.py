@@ -1047,6 +1047,22 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         self._state.project.dirty = True
 
     def _on_dataset_preview_requested(self, dataset_id: str) -> None:
+        from PySide6.QtCore import Qt as _Qt
+        from PySide6.QtWidgets import QApplication
+
+        # This still runs synchronously on the GUI thread (a full move to
+        # PreviewWorker's background thread is a larger change than this
+        # audit pass covers) -- an override cursor is the minimum feedback
+        # so a slow load/validate on a large dataset doesn't look hung.
+        # ponytail: synchronous load; move to jobs/preview_worker.py if
+        # preview latency on large datasets becomes a real complaint.
+        QApplication.setOverrideCursor(_Qt.CursorShape.WaitCursor)
+        try:
+            self._load_and_show_dataset_preview(dataset_id)
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _load_and_show_dataset_preview(self, dataset_id: str) -> None:
         from rheojax.gui.compat import _is_qobject_alive
         from rheojax.gui.dialogs.dataset_preview import DatasetPreviewDialog
         from rheojax.gui.services.data_service import DataService
@@ -1259,11 +1275,17 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         # otherwise be garbage-collected mid-run and drop the signal. Keyed
         # by job_id so a second concurrent import can't evict the first.
         self._active_import_workers[job_id] = worker
+        # ImportWorker has no progress signal, so this is indeterminate
+        # (maximum=0) rather than a real percentage -- but it's the only
+        # feedback the user got before this, which was none at all.
+        self.statusBar().show_progress(0, 0, f"Importing {len(file_paths)} file(s)...")
         QThreadPool.globalInstance().start(worker)
 
     def _on_import_completed(self, datasets: list, job_id: str | None = None) -> None:
         self._state.active_jobs.by_id.pop(job_id, None)
         self._active_import_workers.pop(job_id, None)
+        if not self._active_import_workers:
+            self.statusBar().hide_progress()
         import hashlib
         import uuid
         from collections import Counter
@@ -1334,6 +1356,8 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
     ) -> None:
         self._state.active_jobs.by_id.pop(job_id, None)
         self._active_import_workers.pop(job_id, None)
+        if not self._active_import_workers:
+            self.statusBar().hide_progress()
         from PySide6.QtWidgets import QDialog, QMessageBox
 
         # Root cause: this import path has no column-mapping step, so a CSV

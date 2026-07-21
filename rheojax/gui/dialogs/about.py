@@ -18,6 +18,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     QWidget,
 )
+from rheojax.gui.resources.styles.tokens import Typography, themed
 from rheojax.logging import get_logger
 
 logger = get_logger(__name__)
@@ -73,7 +74,7 @@ class AboutDialog(QDialog):
         # App name
         app_name = QLabel("RheoJAX")
         app_name_font = QFont()
-        app_name_font.setPointSize(24)
+        app_name_font.setPointSize(Typography.SIZE_HEADING)
         app_name_font.setBold(True)
         app_name.setFont(app_name_font)
         app_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -82,7 +83,7 @@ class AboutDialog(QDialog):
         # Version
         version_label = QLabel(f"Version {__version__}")
         version_font = QFont()
-        version_font.setPointSize(12)
+        version_font.setPointSize(Typography.SIZE_BASE)
         version_label.setFont(version_font)
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_layout.addWidget(version_label)
@@ -106,7 +107,7 @@ class AboutDialog(QDialog):
         info_browser.setOpenExternalLinks(False)
         info_browser.anchorClicked.connect(self._on_link_clicked)
 
-        info_html = """
+        info_html = f"""
 <html>
 <body>
 <h3>Key Features</h3>
@@ -148,7 +149,7 @@ Copyright (c) 2024 Wei Chen
 <b>Institution:</b> Argonne National Laboratory
 </p>
 
-<p style="font-size: 10px; color: #666;">
+<p style="font-size: 10px; color: {themed("TEXT_MUTED")};">
 Built with Python 3.12+, JAX, NumPyro, and Qt6
 </p>
 </body>

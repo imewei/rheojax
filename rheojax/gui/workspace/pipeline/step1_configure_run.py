@@ -18,9 +18,11 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QHBoxLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -86,6 +88,13 @@ class PipelineConfigureRunStep(QWidget):
             )
         self._remove_step_btn = QPushButton("Remove Selected Step", self)
         self._remove_step_btn.clicked.connect(self._on_remove_step_clicked)
+        self._move_up_btn = QPushButton("Move Up", self)
+        self._move_up_btn.clicked.connect(self._on_move_step_up_clicked)
+        self._move_down_btn = QPushButton("Move Down", self)
+        self._move_down_btn.clicked.connect(self._on_move_step_down_clicked)
+        step_actions_layout = QHBoxLayout()
+        step_actions_layout.addWidget(self._move_up_btn)
+        step_actions_layout.addWidget(self._move_down_btn)
 
         self._dataset_list = QListWidget(self)
         self._dataset_list.setSelectionMode(
@@ -110,6 +119,7 @@ class PipelineConfigureRunStep(QWidget):
         layout.addWidget(self._add_step_btn)
         layout.addWidget(self._step_list)
         layout.addWidget(self._remove_step_btn)
+        layout.addLayout(step_actions_layout)
         layout.addWidget(self._dataset_list)
         layout.addWidget(self._run_all_btn)
 
@@ -148,9 +158,40 @@ class PipelineConfigureRunStep(QWidget):
         row = self._step_list.currentRow()
         if row < 0:
             return
+        choice = QMessageBox.question(
+            self,
+            "Remove Step",
+            "Remove this step? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
         self._step_list.takeItem(row)
         del self._state.steps[row]
         self.edited.emit()
+
+    def _swap_steps(self, row: int, other_row: int) -> None:
+        steps = self._state.steps
+        steps[row], steps[other_row] = steps[other_row], steps[row]
+        for r in (row, other_row):
+            self._step_list.item(r).setText(
+                f"{steps[r].step_type}: {steps[r].config}"
+            )
+        self._step_list.setCurrentRow(other_row)
+        self.edited.emit()
+
+    def _on_move_step_up_clicked(self) -> None:
+        row = self._step_list.currentRow()
+        if row <= 0:
+            return
+        self._swap_steps(row, row - 1)
+
+    def _on_move_step_down_clicked(self) -> None:
+        row = self._step_list.currentRow()
+        if row < 0 or row >= self._step_list.count() - 1:
+            return
+        self._swap_steps(row, row + 1)
 
     def refresh(self) -> None:
         """Rebuild the dataset list from the library (call on library changes)."""

@@ -39,6 +39,13 @@ def test_apply_refuses_invalid_prior(qtbot):
 
     assert editor.get_prior("a") == default_prior
     assert emitted == []
+    # Rejection must be visible at Apply-time, not just logged -- the preview
+    # pane's own error text can be stale/unnoticed by the time Apply is clicked.
+    # isHidden() reflects this widget's own show()/hide() state regardless of
+    # whether the (unshown, qtbot-parented-only) editor's ancestor chain is
+    # visible -- isVisible() would need editor.show() to mean anything here.
+    assert not editor._apply_error_label.isHidden()
+    assert "Not applied" in editor._apply_error_label.text()
 
 
 def test_to_numpyro_priors_converts_editor_shape(qtbot):

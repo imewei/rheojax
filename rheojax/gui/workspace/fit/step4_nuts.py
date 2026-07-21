@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Callable
 
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QLabel,
+    QProgressBar,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -148,6 +152,20 @@ class NutsStep(QWidget):
         self._chains = QSpinBox(self)
         self._chains.setRange(1, 16)
         self._chains.setValue(nuts_cfg.num_chains)
+        settings_form = QFormLayout()
+        settings_form.addRow("Warmup:", self._warmup)
+        settings_form.addRow("Samples:", self._samples)
+        settings_form.addRow("Chains:", self._chains)
+
+        # Seed/target-accept/max-tree-depth are changed far less often than
+        # warmup/samples/chains -- tucked behind a "⚙ Sampler Options" dialog,
+        # mirroring step3_nlsq.py's identical "⚙ Fit Options" progressive-
+        # disclosure pattern instead of showing all 6 settings flat. The
+        # dialog and its widgets are built once up front (not lazily per
+        # click, unlike FittingOptionsDialog) so self._seed/_target/
+        # _max_tree_depth stay live, directly-settable attributes for
+        # existing callers/tests that drive them without ever opening the
+        # dialog.
         self._seed = QSpinBox(self)
         self._seed.setRange(0, 2**31 - 1)
         self._seed.setValue(nuts_cfg.seed)
@@ -159,13 +177,21 @@ class NutsStep(QWidget):
         self._max_tree_depth.setRange(0, 20)
         self._max_tree_depth.setValue(nuts_cfg.max_tree_depth or 0)
         self._max_tree_depth.setSpecialValueText("default")
-        settings_form = QFormLayout()
-        settings_form.addRow("Warmup:", self._warmup)
-        settings_form.addRow("Samples:", self._samples)
-        settings_form.addRow("Chains:", self._chains)
-        settings_form.addRow("Seed:", self._seed)
-        settings_form.addRow("Target accept:", self._target)
-        settings_form.addRow("Max tree depth:", self._max_tree_depth)
+        self._sampler_dialog = QDialog(self)
+        self._sampler_dialog.setWindowTitle("Sampler Options")
+        dialog_form = QFormLayout()
+        dialog_form.addRow("Seed:", self._seed)
+        dialog_form.addRow("Target accept:", self._target)
+        dialog_form.addRow("Max tree depth:", self._max_tree_depth)
+        dialog_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        dialog_buttons.rejected.connect(self._sampler_dialog.reject)
+        dialog_buttons.accepted.connect(self._sampler_dialog.accept)
+        dialog_layout = QVBoxLayout(self._sampler_dialog)
+        dialog_layout.addLayout(dialog_form)
+        dialog_layout.addWidget(dialog_buttons)
+        self._options_btn = QPushButton("⚙ Sampler Options", self)
+        self._options_btn.setAccessibleName("Sampler Options")
+        self._options_btn.clicked.connect(self._sampler_dialog.exec)
 
         self._skip_btn = QPushButton("Skip NUTS", self)
         self._run_btn = QPushButton("▶ Sample", self)
@@ -177,17 +203,39 @@ class NutsStep(QWidget):
         self._cancel_btn = QPushButton("Cancel", self)
         self._cancel_btn.setVisible(False)
         self._cancel_btn.clicked.connect(self._on_cancel_clicked)
+        # NUTS is inherently slow (minutes, not seconds) and previously gave
+        # no feedback beyond a disabled button -- run_bayesian_isolated has
+        # no reliable per-iteration percent (NumPyro NUTS doesn't support a
+        # progress callback the way NLSQ does), so indeterminate + elapsed
+        # time is the honest fix rather than a fake percentage.
+        self._progress_bar = QProgressBar(self)
+        self._progress_bar.setRange(0, 0)  # indeterminate/busy
+        self._progress_bar.setVisible(False)
+        self._elapsed_label = QLabel("", self)
+        self._elapsed_label.setVisible(False)
+        self._elapsed_timer = QTimer(self)
+        self._elapsed_timer.setInterval(1000)
+        self._elapsed_timer.timeout.connect(self._on_elapsed_tick)
+        self._run_start_time = 0.0
         self._result = QLabel("", self)
         lay = QVBoxLayout(self)
         set_panel_margins(lay)
         lay.addWidget(self._banner)
         lay.addWidget(self._priors_editor)
         lay.addLayout(settings_form)
-        for w in (self._skip_btn, self._run_btn, self._cancel_btn, self._result):
+        lay.addWidget(self._options_btn)
+        for w in (
+            self._skip_btn,
+            self._run_btn,
+            self._cancel_btn,
+            self._progress_bar,
+            self._elapsed_label,
+            self._result,
+        ):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
         self._skip_btn.clicked.connect(self.skip)
-        self._run_btn.clicked.connect(self.run)
+        self._run_btn.clicked.connect(self._on_sample_clicked)
         for spin in (
             self._warmup,
             self._samples,
@@ -197,6 +245,10 @@ class NutsStep(QWidget):
         ):
             spin.valueChanged.connect(self._on_settings_changed)
         self._target.valueChanged.connect(self._on_settings_changed)
+
+    def _on_elapsed_tick(self) -> None:
+        elapsed = time.monotonic() - self._run_start_time
+        self._elapsed_label.setText(f"Sampling... ({elapsed:.0f}s elapsed)")
 
     def _on_settings_changed(self, *_args: object) -> None:
         cfg = self._state.nuts_config
@@ -261,6 +313,36 @@ class NutsStep(QWidget):
         self.edited.emit()
         self.finished.emit()
 
+    def _on_sample_clicked(self) -> None:
+        """Button-only consent gate in front of run().
+
+        NUTS is inherently slow regardless of the configured chains/samples,
+        so this always confirms before starting -- kept as a separate
+        handler (rather than inside run() itself) so direct/test callers of
+        run() are unaffected. ponytail: always-confirm rather than a
+        workload-size threshold -- the audit explicitly allows either, and
+        there's no calibration data here to turn iteration counts into a
+        wall-clock estimate.
+        """
+        from rheojax.gui.compat import QMessageBox
+
+        warmup, samples, chains = (
+            self._warmup.value(),
+            self._samples.value(),
+            self._chains.value(),
+        )
+        choice = QMessageBox.question(
+            self,
+            "Start NUTS sampling?",
+            f"This will run {chains} chain(s) x {warmup + samples} "
+            f"iterations ({chains * (warmup + samples)} total draws) and "
+            "may take a while. Start sampling?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice == QMessageBox.StandardButton.Yes:
+            self.run()
+
     def run(self) -> None:
         self._skipped = False
         cfg = {
@@ -289,6 +371,11 @@ class NutsStep(QWidget):
         # f"{data_ref}:nuts" exactly -- see NlsqStep.run()'s matching comment.
         self._current_job_id = f"{self._state.data_ref}:nuts"
         self._cancel_btn.setVisible(self._active_jobs is not None)
+        self._run_start_time = time.monotonic()
+        self._progress_bar.setVisible(True)
+        self._elapsed_label.setVisible(True)
+        self._elapsed_label.setText("Sampling... (0s elapsed)")
+        self._elapsed_timer.start()
         # See NlsqStep.run()'s matching comment: discard a result that no
         # longer corresponds to the current selection if state moved on
         # while this run was in flight.
@@ -339,6 +426,9 @@ class NutsStep(QWidget):
             self._skip_btn.setEnabled(True)
             self._cancel_btn.setVisible(False)
             self._current_job_id = None
+            self._elapsed_timer.stop()
+            self._progress_bar.setVisible(False)
+            self._elapsed_label.setVisible(False)
 
     def is_ready(self) -> bool:
         return self._skipped or self._state.nuts_result is not None

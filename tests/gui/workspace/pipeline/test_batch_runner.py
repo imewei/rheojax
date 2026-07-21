@@ -224,10 +224,16 @@ def test_batch_runner_emits_finished_with_failed_record_on_fatal_precondition_er
     assert started == [
         "d1"
     ]  # fatal precondition error stops the batch -- d2 never started
-    assert len(records) == 1
+    assert len(records) == 2
     assert records[0]["status"] == "failed"
     assert "subprocess" in records[0]["error"]
     assert records[0]["step_results"] == {}
+    # d2 never ran (never got dataset_run_started), but must still get an explicit
+    # "skipped" record -- not silent absence -- so it's distinguishable from
+    # "not yet attempted" when reviewing job_history afterwards.
+    assert records[1]["dataset_id"] == "d2"
+    assert records[1]["status"] == "skipped"
+    assert records[1]["step_results"] == {}
 
 
 def test_batch_runner_transform_step_record_round_trips_output_as_rheodata(

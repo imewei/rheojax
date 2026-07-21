@@ -21,7 +21,7 @@ from rheojax.gui.compat import (
     QVBoxLayout,
     Signal,
 )
-from rheojax.gui.resources.styles.tokens import Spacing
+from rheojax.gui.resources.styles.tokens import Spacing, themed
 from rheojax.gui.utils.layout_helpers import set_toolbar_margins, set_zero_margins
 from rheojax.gui.widgets.base_arviz_widget import BaseArviZWidget
 from rheojax.gui.widgets.dropdown import RheoComboBox
@@ -171,7 +171,7 @@ class ArvizCanvas(BaseArviZWidget):
             "No diagnostics yet. Run Bayesian inference to view plots."
         )
         self._status_label.setAlignment(Qt.AlignCenter)
-        self._status_label.setStyleSheet("color: #94A3B8; padding: 6px;")
+        self._status_label.setStyleSheet(f"color: {themed('TEXT_MUTED')}; padding: 6px;")
         layout.addWidget(self._status_label)
 
     def _connect_signals(self) -> None:

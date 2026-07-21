@@ -141,7 +141,9 @@ class BayesianOptionsDialog(QDialog):
         warmstart_status = (
             "available" if self._nlsq_result_available else "not available"
         )
-        warmstart_color = "#2e7d32" if self._nlsq_result_available else "#c62828"
+        warmstart_color = (
+            themed("SUCCESS") if self._nlsq_result_available else themed("ERROR")
+        )
         self._warmstart_indicator = QLabel(
             f"NLSQ warm-start: <b><span style='color:{warmstart_color};'>"
             f"{warmstart_status}</span></b>"
@@ -246,6 +248,13 @@ class BayesianOptionsDialog(QDialog):
         self.priors_edit.setMinimumHeight(120)
         self.priors_edit.textChanged.connect(self._on_priors_changed)
         priors_layout.addWidget(self.priors_edit)
+        self._priors_error_label = QLabel("")
+        self._priors_error_label.setWordWrap(True)
+        self._priors_error_label.setStyleSheet(
+            f"color: {themed('ERROR')}; font-size: {Typography.SIZE_SM}pt;"
+        )
+        self._priors_error_label.hide()
+        priors_layout.addWidget(self._priors_error_label)
         self.priors_group.setLayout(priors_layout)
         layout.addWidget(self.priors_group)
 
@@ -348,10 +357,25 @@ class BayesianOptionsDialog(QDialog):
             value=value / 100.0,
         )
 
+    def _validate_priors_json(self) -> str | None:
+        """Validate the priors text field; return an error message, or None if valid."""
+        priors_text = self.priors_edit.toPlainText().strip()
+        if not priors_text:
+            return None
+        try:
+            json.loads(priors_text)
+        except Exception as exc:
+            return str(exc)
+        return None
+
     def _on_priors_changed(self) -> None:
-        """Handle priors text change."""
-        # Get text to validate (value used only for logging context)
-        _ = self.priors_edit.toPlainText().strip()
+        """Handle priors text change: validate as-you-type, same check as Accept."""
+        error = self._validate_priors_json()
+        if error:
+            self._priors_error_label.setText(f"Invalid JSON: {error}")
+            self._priors_error_label.show()
+        else:
+            self._priors_error_label.hide()
         logger.debug(
             "Option changed",
             dialog=self.__class__.__name__,
@@ -372,23 +396,20 @@ class BayesianOptionsDialog(QDialog):
 
     def _on_accepted(self) -> None:
         """Handle dialog accepted."""
-        priors_text = self.priors_edit.toPlainText().strip()
-        if priors_text:
-            try:
-                json.loads(priors_text)
-            except Exception as exc:
-                logger.error(
-                    "Failed to parse priors JSON",
-                    dialog=self.__class__.__name__,
-                    exc_info=True,
-                )
-                QMessageBox.warning(
-                    self,
-                    "Invalid Priors JSON",
-                    f"The priors field contains invalid JSON and could not be "
-                    f"applied:\n\n{exc}\n\nPlease fix it or clear the field.",
-                )
-                return
+        error = self._validate_priors_json()
+        if error:
+            logger.error(
+                "Failed to parse priors JSON",
+                dialog=self.__class__.__name__,
+                error=error,
+            )
+            QMessageBox.warning(
+                self,
+                "Invalid Priors JSON",
+                f"The priors field contains invalid JSON and could not be "
+                f"applied:\n\n{error}\n\nPlease fix it or clear the field.",
+            )
+            return
 
         logger.debug("Options applied", dialog=self.__class__.__name__)
         self.accept()
