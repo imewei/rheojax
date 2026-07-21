@@ -175,7 +175,6 @@ agent-os/
 three-brain-out/
 specs/
 AGENTS.md
-CLAUDE.md
 GEMINI.md
 .claude-progress.md
 .research-log.jsonl
@@ -191,6 +190,7 @@ graphify-out/.graphify_*.json
 graphify-out/.graphify_*.txt
 graphify-out/.obsidian/
 graphify-out/_COMMUNITY_*.md
+
 
 # ----------------------------------------------------------------------------
 # Web & Node Dependencies
