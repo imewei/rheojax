@@ -205,10 +205,10 @@ class NutsStep(QWidget):
         ):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
-        # Explicit tab order for the settings form: without it, keyboard/
-        # screen-reader users get whatever order Qt infers from widget
-        # creation, which doesn't reliably match the visual top-to-bottom
-        # layout above.
+        # Explicit tab order for the settings form. Qt's default (inferred
+        # from construction order) already matches the visual layout above
+        # today -- this pins that against silently drifting the next time
+        # a field is added or reordered, rather than fixing a live bug.
         self.setTabOrder(self._warmup, self._samples)
         self.setTabOrder(self._samples, self._chains)
         self.setTabOrder(self._chains, self._seed)

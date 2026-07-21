@@ -46,6 +46,15 @@ def _default_fit_fn(
 
 class NlsqStep(QWidget):
     edited = Signal()
+    # Mirrors ProtocolModelStep's edited/config_edited split: `edited` means
+    # nlsq_result itself changed (fit_controller.py registers it with
+    # changed="nlsq_result", which cascades-clears nuts_result and relocks
+    # downstream). Multi-start is a setting for the NEXT run, not a result
+    # change -- emitting `edited` for it would silently wipe an existing
+    # NUTS result every time the user toggles the checkbox. config_edited
+    # only marks the project dirty (window.py's generic hasattr(body,
+    # "config_edited") wiring) without touching the cascade.
+    config_edited = Signal()
     finished = Signal()
 
     def __init__(
@@ -121,6 +130,13 @@ class NlsqStep(QWidget):
         cfg = self._state.nlsq_config
         cfg.multi_start = self._ms_enabled.isChecked()
         cfg.n_starts = self._ms_count.value()
+        # Multi-start is now persisted into FitState.nlsq_config (see
+        # __init__'s seeding comment), which project_codec serializes into
+        # fit.json -- without this emit, window.py's dirty-tracking never
+        # sees the edit, so New/Open/Close would silently discard an
+        # un-rerun multi-start change with no unsaved-changes prompt.
+        # config_edited, not edited -- see the class-level comment on why.
+        self.config_edited.emit()
 
     def _on_cancel_clicked(self) -> None:
         if self._active_jobs is None or self._current_job_id is None:

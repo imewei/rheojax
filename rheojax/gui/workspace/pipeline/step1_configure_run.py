@@ -145,8 +145,9 @@ class PipelineConfigureRunStep(QWidget):
         # getSaveFileName rather than getOpenFileName -- this picks a
         # destination path (with the OS's native overwrite confirmation),
         # not an existing file to read. "{id}" in the returned path is a
-        # per-dataset placeholder execute() substitutes at run time, not a
-        # literal file the dialog needs to resolve.
+        # per-dataset placeholder BatchRunner._substitute_dataset_id()
+        # replaces before execute() runs, not a literal file the dialog
+        # needs to resolve.
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Choose export output path",
