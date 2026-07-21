@@ -6,11 +6,15 @@ from rheojax.gui.utils.layout_helpers import set_zero_margins
 
 
 class InspectorPanel(QWidget):
-    # ponytail: set_tab_widget() has no caller anywhere in the app, so all
-    # three tabs stay empty placeholders. Populating them for real requires
-    # designing what each tab shows per active mode/step (a params view
-    # synced to the current FitState/TransformState, a priors editor, a log
-    # viewer) -- a feature to design deliberately, not a one-line wiring fix.
+    # ponytail: unmounted -- WorkspaceWindow no longer constructs or shows
+    # this class (it was permanently empty chrome: set_tab_widget() has no
+    # caller anywhere in the app, so all three tabs stayed empty
+    # placeholders). Kept as a tested, standalone widget rather than deleted
+    # outright, since populating it for real requires designing what each
+    # tab shows per active mode/step (a params view synced to the current
+    # FitState/TransformState, a priors editor, a log viewer) -- a feature
+    # to design deliberately, not a one-line wiring fix. Re-mount it (see
+    # git history for the removed window.py wiring) once that design lands.
     _TABS = ["params", "priors", "log"]
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -22,11 +26,12 @@ class InspectorPanel(QWidget):
         lay = QVBoxLayout(self)
         set_zero_margins(lay)
         lay.addWidget(self._tabs)
-        # The parent splitter has no explicit setSizes(), so it squeezes this
-        # panel to whatever space is left over -- without a floor, the tab
-        # bar's own labels (e.g. "log") get pushed behind the overflow
-        # scroll button. Bound to the tab bar's current sizeHint rather than
-        # a fixed pixel value so it stays correct at any font size/DPI.
+        # If/when re-mounted in a splitter without an explicit setSizes(),
+        # the splitter squeezes this panel to whatever space is left over --
+        # without a floor, the tab bar's own labels (e.g. "log") get pushed
+        # behind the overflow scroll button. Bound to the tab bar's current
+        # sizeHint rather than a fixed pixel value so it stays correct at
+        # any font size/DPI.
         self.setMinimumWidth(self._tabs.tabBar().sizeHint().width())
 
     def tab_names(self) -> list[str]:

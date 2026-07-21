@@ -343,3 +343,13 @@ def test_open_command_palette_cancelled_invokes_nothing(qtbot, monkeypatch):
     monkeypatch.setattr(win, "_on_save", lambda: calls.append(1))
     win._open_command_palette()
     assert calls == []
+
+
+def test_splitter_has_no_inspector_panel(qtbot):
+    """Regression guard: InspectorPanel was permanently empty chrome (its
+    set_tab_widget() had no caller) and was removed from the splitter. This
+    catches an accidental re-add without the design work that would make it
+    non-empty."""
+    win = _win(qtbot)
+    assert win._splitter.count() == 2  # rail + canvas only
+    assert not hasattr(win, "_inspector")
