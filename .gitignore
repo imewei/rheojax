@@ -198,6 +198,9 @@ dmypy.json
 .agent/
 .agents/
 .claude/
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/quality-gate.sh
 .code/
 .specify/
 .codex/
@@ -208,7 +211,7 @@ specs/
 .cursorignore
 .cursorindexingignore
 AGENTS.md
-CLAUDE.md
+# CLAUDE.md
 GEMINI.md
 .claude-progress.md
 
@@ -310,6 +313,8 @@ graphify-out/.graphify_*.json
 graphify-out/.graphify_*.txt
 graphify-out/.obsidian/
 graphify-out/_COMMUNITY_*.md
+graphify-out/cost.json
+graphify-out/manifest.json
 .research-log.jsonl
 
 # Three-brain output
@@ -328,4 +333,6 @@ package-lock.json
 .clinerules/
 .windsurf/
 .reports/
+.impeccable
+.impeccable/
 
