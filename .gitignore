@@ -157,6 +157,7 @@ dmypy.json
 !.claude/settings.json
 !.claude/hooks/
 !.claude/hooks/*
+.claude/worktrees/
 .code/
 .specify/
 .codex/
