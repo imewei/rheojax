@@ -248,11 +248,16 @@ class NutsStep(QWidget):
         # a field is added or reordered, rather than fixing a live bug.
         self.setTabOrder(self._warmup, self._samples)
         self.setTabOrder(self._samples, self._chains)
-        self.setTabOrder(self._chains, self._seed)
-        self.setTabOrder(self._seed, self._target)
-        self.setTabOrder(self._target, self._max_tree_depth)
-        self.setTabOrder(self._max_tree_depth, self._skip_btn)
+        self.setTabOrder(self._chains, self._options_btn)
+        self.setTabOrder(self._options_btn, self._skip_btn)
         self.setTabOrder(self._skip_btn, self._run_btn)
+        # _seed/_target/_max_tree_depth live in self._sampler_dialog (a
+        # separate top-level window, since dialog_form was added to
+        # dialog_layout), not in self -- setTabOrder requires both widgets
+        # share a window, so these pairs can't cross into self's chain
+        # above (the receiver below is cosmetic; Qt keys off the args).
+        self._sampler_dialog.setTabOrder(self._seed, self._target)
+        self._sampler_dialog.setTabOrder(self._target, self._max_tree_depth)
         self._skip_btn.clicked.connect(self.skip)
         self._run_btn.clicked.connect(self._on_sample_clicked)
         for spin in (
