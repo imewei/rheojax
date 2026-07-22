@@ -254,7 +254,8 @@ class NutsStep(QWidget):
         # _seed/_target/_max_tree_depth live in self._sampler_dialog (a
         # separate top-level window, since dialog_form was added to
         # dialog_layout), not in self -- setTabOrder requires both widgets
-        # share a window, so their chain must run on the dialog itself.
+        # share a window, so these pairs can't cross into self's chain
+        # above (the receiver below is cosmetic; Qt keys off the args).
         self._sampler_dialog.setTabOrder(self._seed, self._target)
         self._sampler_dialog.setTabOrder(self._target, self._max_tree_depth)
         self._skip_btn.clicked.connect(self.skip)
