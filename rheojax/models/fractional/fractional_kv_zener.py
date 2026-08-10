@@ -220,8 +220,12 @@ class FractionalKelvinVoigtZener(BaseModel):
         alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
 
         tau_safe = tau + epsilon
-        # Compute transition function
-        z = -jnp.power(t / tau_safe, alpha_safe)
+        # Relaxation uses the modulus-rescaled timescale, not the creep
+        # retardation time directly: tau_sigma = tau * (Gk/(Ge+Gk))^(1/alpha),
+        # which reduces to the classical Zener result eta/(Ge+Gk) at alpha=1
+        # (creep retardation time eta/Gk rescaled by Gk/(Ge+Gk)).
+        tau_relax = tau_safe * jnp.power(Gk / (Ge + Gk + epsilon), 1.0 / alpha_safe)
+        z = -jnp.power(t / tau_relax, alpha_safe)
         ml_term = mittag_leffler_e(z, alpha=alpha_safe)
         # Short time modulus
         G_short = Ge

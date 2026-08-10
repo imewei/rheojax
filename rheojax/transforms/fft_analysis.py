@@ -232,11 +232,6 @@ class FFTAnalysis(BaseTransform):
                 logger.debug("Taking real part of complex signal")
                 y = jnp.real(y)
 
-            # Detrend if requested
-            if self.detrend:
-                logger.debug("Applying detrending")
-                y = self._detrend_data(y)
-
             # Compute frequencies and check spacing before windowing/FFT
             # R8-FFT-001: use median diff for robust dt estimation (handles log-spaced time)
             dt_values = np.diff(np.asarray(t))
@@ -266,6 +261,15 @@ class FFTAnalysis(BaseTransform):
                 y = jnp.interp(t_uniform, t_np, y_np)
                 t = jnp.array(t_uniform)
                 dt = float(t_uniform[1] - t_uniform[0])
+
+            # Detrend after resampling: a physically linear trend in time is
+            # only linear in sample index once the axis is uniform, so
+            # detrending before resampling would leave a residual trend in
+            # the (originally nonuniform) signal that leaks into the spectrum.
+            if self.detrend:
+                logger.debug("Applying detrending")
+                y = self._detrend_data(y)
+
             # R9-FFT-002: recompute n after resampling so rfftfreq and window
             # length stay consistent with the (possibly resampled) y array.
             n = len(y)

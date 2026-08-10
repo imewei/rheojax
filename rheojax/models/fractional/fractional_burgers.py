@@ -52,8 +52,6 @@ from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
-jax_gamma = jax.scipy.special.gamma
-
 from rheojax.core.base import BaseModel
 from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
@@ -186,9 +184,8 @@ class FractionalBurgersModel(BaseModel):
         eta1_safe = eta1 + epsilon
         # Instantaneous compliance (elastic response)
         J_instant = Jg
-        # Fractional viscous flow term: t^α / (η_1 * Γ(1+α))
-        gamma_term = jax_gamma(1.0 + alpha_safe)
-        J_flow = jnp.power(t, alpha_safe) / (eta1_safe * gamma_term)
+        # Newtonian viscous flow term (Maxwell dashpot, eta1 is Pa·s): t / eta1
+        J_flow = t / eta1_safe
         # Retardation term: J_k * (1 - E_α(-(t/τ_k)^α))
         z = -jnp.power(t / tau_k_safe, alpha_safe)
         ml_term = mittag_leffler_e(z, alpha=alpha_safe)
@@ -317,12 +314,8 @@ class FractionalBurgersModel(BaseModel):
         eta1_safe = eta1 + epsilon
         # Instantaneous compliance
         J_inst = Jg
-        # Fractional viscous term: (iω)^(-α) / (η_1 * Γ(1-α))
-        omega_neg_alpha = jnp.power(omega, -alpha_safe)
-        phase = -jnp.pi * alpha_safe / 2.0
-        i_omega_neg_alpha = omega_neg_alpha * (jnp.cos(phase) + 1j * jnp.sin(phase))
-        gamma_term = jax_gamma(1.0 - alpha_safe)
-        J_flow = i_omega_neg_alpha / (eta1_safe * gamma_term)
+        # Newtonian viscous term (Maxwell dashpot, eta1 is Pa·s): 1 / (i*omega*eta1)
+        J_flow = -1j / (omega * eta1_safe)
         # Retardation term: J_k / (1 + (iωτ_k)^α)
         omega_tau_alpha = jnp.power(omega * tau_k_safe, alpha_safe)
         phase_alpha = jnp.pi * alpha_safe / 2.0

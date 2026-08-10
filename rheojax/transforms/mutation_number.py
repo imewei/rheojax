@@ -298,6 +298,14 @@ class MutationNumber(BaseTransform):
         if not isinstance(G_t, jnp.ndarray):
             G_t = jnp.array(G_t)
 
+        # Sort (t, G_t) together once, here, so every downstream consumer
+        # (G_0, equilibrium-tail estimation, extrapolation, integration)
+        # agrees on chronological order instead of each reordering — or
+        # not reordering — independently.
+        sort_idx = jnp.argsort(t)
+        t = t[sort_idx]
+        G_t = G_t[sort_idx]
+
         # Handle complex data
         if jnp.iscomplexobj(G_t):
             logger.debug("Converting complex modulus to real part")

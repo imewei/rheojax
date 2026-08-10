@@ -7,9 +7,10 @@ viscoelastic behavior to terminal flow.
 Mathematical Description:
     Relaxation Modulus: G(t) = c_α t^(-α) E_{1-α,1-α}(-t^(1-α)/τ)
     Complex Modulus: G*(ω) = c_α (iω)^α (iωτ)^(1-α) / (1 + (iωτ)^(1-α))
-    Creep Compliance: J(t) = (1/c_α) t^α E_{1+α,1+α}(-(t/τ)^(1-α))
+    Creep Compliance: J(t) = t^α / (c_α Γ(1+α)) + t/η
+        (series-element compliances add exactly under a step stress)
 
-where τ = η / c_α^(1/(1-α)) is a characteristic relaxation time.
+where τ = (η / c_α)^(1/(1-α)) is a characteristic relaxation time.
 
 Parameters:
     c_alpha (float): Material constant (Pa·s^α), bounds [1e-3, 1e9]
@@ -33,6 +34,7 @@ from rheojax.models.fractional.fractional_mixin import FRACTIONAL_ORDER_BOUNDS
 
 jax, jnp = safe_import_jax()
 
+jax_gamma = jax.scipy.special.gamma
 
 import numpy as np
 
@@ -145,7 +147,8 @@ class FractionalMaxwellGel(BaseModel):
             # tau^(1-alpha) = eta / c_alpha
             # tau = (eta / c_alpha)^(1/(1-alpha))
 
-            assert eta is not None and c_alpha is not None
+            if eta is None or c_alpha is None:
+                raise ValueError("eta and c_alpha must not be None")
             exponent = 1.0 / (1.0 - alpha + epsilon)
             base = eta / c_alpha
 
@@ -199,7 +202,10 @@ class FractionalMaxwellGel(BaseModel):
     ) -> jnp.ndarray:
         """Predict creep compliance J(t) using JAX.
 
-        J(t) = (1/c_α) t^α E_{1+α,1+α}(-(t/τ)^(1-α))
+        Series SpringPot + dashpot: creep compliances of series elements
+        add exactly (both elements carry the same stress), independent of
+        any Mittag-Leffler crossover term:
+            J(t) = t^α / (c_α Γ(1+α)) + t / η
         """
         # Add small epsilon to prevent issues
         epsilon = 1e-12
@@ -210,21 +216,14 @@ class FractionalMaxwellGel(BaseModel):
         # Compute safe values
         t_safe = jnp.maximum(t, epsilon)
 
-        # Compute argument for Mittag-Leffler function
-        # z = - (t/τ)^(1-α) = - t^(1-alpha) * (c_alpha/eta)
-        beta_exp = 1.0 - alpha_safe
-        z = -jnp.power(t_safe, beta_exp) * (c_alpha / eta)
+        # SpringPot creep compliance: t^alpha / (c_alpha * Gamma(1+alpha))
+        J_springpot = jnp.power(t_safe, alpha_safe) / (
+            c_alpha * jax_gamma(1.0 + alpha_safe)
+        )
+        # Dashpot creep compliance: t / eta
+        J_dashpot = t_safe / eta
 
-        # Compute E_{1+α,1+α}(z)
-        ml_alpha = 1.0 + alpha_safe
-        ml_beta = 1.0 + alpha_safe
-        ml_value = mittag_leffler_e2(z, alpha=ml_alpha, beta=ml_beta)
-
-        # Compute J(t)
-        # J(t) = (1/c_alpha) * t^alpha * E(...)
-        J_t = (1.0 / c_alpha) * jnp.power(t_safe, alpha_safe) * ml_value
-
-        # Monotonicity enforced by physical parameter bounds, not in NUTS path
+        J_t = J_springpot + J_dashpot
         return J_t
 
     @staticmethod
@@ -395,7 +394,10 @@ class FractionalMaxwellGel(BaseModel):
                 c_alpha_val = self.parameters.get_value("c_alpha")
                 alpha_val = self.parameters.get_value("alpha")
                 eta_val = self.parameters.get_value("eta")
-                assert c_alpha_val is not None and alpha_val is not None
+                if c_alpha_val is None or alpha_val is None:
+                    raise ValueError(
+                        "c_alpha and alpha must not be None after optimization"
+                    )
                 tau_val = self._compute_tau(c_alpha_val, alpha_val)
 
                 ctx["c_alpha"] = c_alpha_val

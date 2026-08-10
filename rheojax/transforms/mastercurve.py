@@ -192,7 +192,15 @@ class Mastercurve(BaseTransform):
         """
         # WLF equation: log(a_T) = -C1(T-T_ref)/(C2+(T-T_ref))
         denominator = C2 + (T - T_ref)
-        if abs(float(denominator)) < 1e-12:
+        # Pole validation only when the value is concrete: float(denominator)
+        # fails both for vector T (multi-element array) and under jax.jit
+        # (traced value, ConcretizationTypeError). Skip validation for those
+        # cases rather than crash — the division below still handles them.
+        try:
+            denom_value = np.asarray(denominator, dtype=float)
+        except Exception:
+            denom_value = None
+        if denom_value is not None and np.any(np.abs(denom_value) < 1e-12):
             raise ValueError(
                 f"WLF shift factor is undefined at T={T} K: T - T_ref "
                 f"coincides with the WLF pole (T_ref - C2 = {T_ref - C2} K)."
@@ -750,9 +758,11 @@ class Mastercurve(BaseTransform):
         if self.vertical_shift:
             # For temperature-dependent modulus: G(T) ~ rho(T) * T
             # Vertical shift factor: b_T = rho(T) * T / (rho(T_ref) * T_ref)
-            # Simplified: b_T = T / T_ref
+            # Simplified: b_T = T / T_ref. To collapse G(T) onto the
+            # reference curve, divide out the T-dependence (not multiply):
+            # G_reduced = G(T) / b_T.
             b_T = T / self.T_ref
-            y_shifted = y_shifted * b_T
+            y_shifted = y_shifted / b_T
 
         # Create metadata
         new_metadata = _meta_ts.copy()
@@ -928,8 +938,10 @@ class Mastercurve(BaseTransform):
             # Apply vertical shift if requested
             y_shifted = data.y
             if self.vertical_shift:
+                # Divide out the T-dependence to collapse onto the reference
+                # curve (see single-dataset path above for the derivation).
                 b_T = T / self.T_ref
-                y_shifted = y_shifted * b_T
+                y_shifted = y_shifted / b_T
 
             # Create metadata — use THIS dataset's metadata (not the loop variable
             # _dmeta which leaks from the temperature-extraction loop above and

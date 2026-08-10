@@ -26,6 +26,7 @@ from rheojax.core.base import BaseTransform
 from rheojax.core.data import RheoData
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.registry import TransformRegistry
+from rheojax.io.readers._utils import normalize_units
 from rheojax.logging import get_logger
 from rheojax.utils.prony import compute_r_squared
 
@@ -98,6 +99,14 @@ class PronyConversion(BaseTransform):
         t = np.asarray(data.x)
         G_t = np.asarray(data.y)
 
+        # Normalize to seconds before fitting/generating omega — the Prony
+        # kernel exp(-t/tau) and the ω ∈ [1/t_max, 1/t_min] range below are
+        # only correct in seconds, else non-second input (e.g. "min") biases
+        # the fitted tau_i and mislabels the resulting rad/s axis.
+        input_x_units = data.x_units
+        if input_x_units:
+            t, _ = normalize_units(t, input_x_units)
+
         # Determine number of modes
         n_modes = (
             self.n_modes if self.n_modes is not None else max(5, min(len(t) // 5, 20))
@@ -140,6 +149,7 @@ class PronyConversion(BaseTransform):
                 "test_mode": "oscillation",
                 "source_transform": "prony_conversion",
                 "n_modes": len(G_i),
+                "input_x_units": input_x_units,
             },
         )
         return result_data, {"prony_result": self._prony_result}
@@ -148,6 +158,13 @@ class PronyConversion(BaseTransform):
         """G'(ω), G''(ω) → G(t) via Prony fit to dynamic moduli."""
         omega = np.asarray(data.x)
         y = np.asarray(data.y)
+
+        # Normalize to rad/s before fitting/deriving t_out — the Prony
+        # kernel omega*tau below assumes rad/s, so Hz input would bias the
+        # fitted tau_i and the resulting relaxation times by a factor of 2*pi.
+        input_x_units = data.x_units
+        if input_x_units:
+            omega, _ = normalize_units(omega, input_x_units)
 
         if np.iscomplexobj(y):
             G_prime = y.real
@@ -169,9 +186,7 @@ class PronyConversion(BaseTransform):
         G_i, tau_i, G_e = _fit_prony_oscillation(
             omega, G_prime, G_double_prime, n_modes
         )
-        G_prime_pred, G_double_prime_pred = _prony_to_frequency(
-            G_i, tau_i, G_e, omega
-        )
+        G_prime_pred, G_double_prime_pred = _prony_to_frequency(G_i, tau_i, G_e, omega)
         r_squared = compute_r_squared(
             np.concatenate([G_prime, G_double_prime]),
             np.concatenate([G_prime_pred, G_double_prime_pred]),
@@ -206,6 +221,7 @@ class PronyConversion(BaseTransform):
                 "test_mode": "relaxation",
                 "source_transform": "prony_conversion",
                 "n_modes": len(G_i),
+                "input_x_units": input_x_units,
             },
         )
         return result_data, {"prony_result": self._prony_result}
@@ -324,13 +340,19 @@ def _fit_prony_oscillation(
     # filtering): drop non-positive omega before taking 1/omega. Otherwise an
     # omega=0 entry makes 1/omega non-finite, poisoning tau_i with inf/NaN
     # which propagates into an all-NaN NNLS kernel matrix below.
-    omega_positive = omega[omega > 0]
-    if len(omega_positive) == 0:
+    positive_mask = omega > 0
+    if not np.any(positive_mask):
         raise ValueError(
             "Prony fitting requires at least one positive frequency value."
         )
-    omega_min = float(np.min(omega_positive))
-    omega_max = float(np.max(omega_positive))
+    # Filter omega together with G_prime/G_double_prime — a zero/negative
+    # frequency row must not enter the NNLS kernel below even though it's
+    # correctly excluded from the tau_i range computation.
+    omega = omega[positive_mask]
+    G_prime = G_prime[positive_mask]
+    G_double_prime = G_double_prime[positive_mask]
+    omega_min = float(np.min(omega))
+    omega_max = float(np.max(omega))
 
     # Same n+2 / drop-edges approach as _fit_prony_relaxation: modes at exactly
     # 1/omega_max and 1/omega_min are at the boundary of the informative range

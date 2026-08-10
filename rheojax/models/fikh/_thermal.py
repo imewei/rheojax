@@ -246,7 +246,7 @@ def update_thermal_parameters(
 
     # Temperature-dependent modulus (optional)
     G_ref = params.get("G", 1e3)
-    G_T = arrhenius_modulus(G_ref, T, T_ref, E_G) if E_G != 0.0 else G_ref
+    G_T = arrhenius_modulus(G_ref, T, T_ref, E_G)
 
     # Temperature-dependent yield stress base
     sigma_y0 = params.get("sigma_y0", 10.0)
