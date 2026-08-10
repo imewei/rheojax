@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
+import pickle  # noqa: S403, B403
 import threading
 import traceback
 import weakref
@@ -33,8 +34,8 @@ def _atexit_kill_pools() -> None:
     for pool in list(_live_pools):
         try:
             pool._force_kill_workers()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to kill pool workers at exit: %s", e)
 
 
 def _warmup_jax(_unused=None):
@@ -93,10 +94,10 @@ def _worker_loop(
                             f"Result serialization failed: {put_exc}\n{tb_truncated}",
                         )
                     )
-                except Exception:
+                except Exception as queue_exc:
                     # Queue itself is broken — log and continue the worker loop
                     # so the process doesn't die silently.
-                    pass
+                    logger.debug("Result queue is broken: %s", queue_exc)
         except Exception as exc:
             tb = traceback.format_exc()
             # Truncate traceback to prevent unbounded payload size
@@ -223,6 +224,20 @@ class PersistentProcessPool:
         The function must be module-level (picklable on spawn context).
         Returns a PoolFuture that can be awaited for the result.
         """
+        # PARALLEL-005: mp.Queue.put() enqueues locally and returns immediately;
+        # the actual pickling happens later in the queue's internal feeder
+        # thread, where a pickling failure is only printed to stderr and the
+        # task is silently dropped -- the caller would then block until
+        # future.result(timeout=...) raises an opaque TimeoutError. Fail fast
+        # here instead, before the task ever reaches the queue.
+        try:
+            pickle.dumps((fn, args, kwargs))
+        except Exception as exc:
+            raise TypeError(
+                f"Task is not picklable (must be a module-level function with "
+                f"picklable args/kwargs, not a lambda or closure): {exc}"
+            ) from exc
+
         with self._lock:
             if self._shutdown:
                 raise RuntimeError("Cannot submit to a pool that has been shut down")
@@ -352,6 +367,11 @@ class PersistentProcessPool:
     def __del__(self) -> None:
         """Safety net: kill worker processes if pool is garbage-collected without shutdown."""
         if not self._shutdown:
+            # Stop the collector thread's poll loop too -- without this it
+            # keeps calling self._result_queue.get(timeout=1.0) forever,
+            # leaking a live thread for the remainder of the process for
+            # every pool that is GC'd instead of explicitly shut down.
+            self._shutdown = True
             self._force_kill_workers()
 
     def _force_kill_workers(self) -> None:

@@ -101,18 +101,18 @@ class TestPipelineInitialization:
     def test_init_empty(self):
         """Test initialization without data."""
         pipeline = Pipeline()
-        assert pipeline.data is None
-        assert len(pipeline.steps) == 0
-        assert len(pipeline.history) == 0
-        assert pipeline._last_model is None
+        assert pipeline.data is None  # nosec B101
+        assert len(pipeline.steps) == 0  # nosec B101
+        assert len(pipeline.history) == 0  # nosec B101
+        assert pipeline._last_model is None  # nosec B101
 
     @pytest.mark.smoke
     def test_init_with_data(self, sample_data):
         """Test initialization with data."""
         pipeline = Pipeline(data=sample_data)
-        assert pipeline.data is not None
-        assert np.array_equal(pipeline.data.x, sample_data.x)
-        assert np.array_equal(pipeline.data.y, sample_data.y)
+        assert pipeline.data is not None  # nosec B101
+        assert np.array_equal(pipeline.data.x, sample_data.x)  # nosec B101
+        assert np.array_equal(pipeline.data.y, sample_data.y)  # nosec B101
 
 
 class TestPipelineDataLoading:
@@ -124,10 +124,10 @@ class TestPipelineDataLoading:
         pipeline = Pipeline()
         pipeline.load(temp_csv_file, format="csv", x_col="time", y_col="stress")
 
-        assert pipeline.data is not None
-        assert len(pipeline.data.x) > 0
-        assert len(pipeline.history) == 1
-        assert pipeline.history[0][0] == "load"
+        assert pipeline.data is not None  # nosec B101
+        assert len(pipeline.data.x) > 0  # nosec B101
+        assert len(pipeline.history) == 1  # nosec B101
+        assert pipeline.history[0][0] == "load"  # nosec B101
 
     @pytest.mark.smoke
     def test_load_nonexistent_file(self):
@@ -141,7 +141,7 @@ class TestPipelineDataLoading:
         """Test automatic format detection."""
         pipeline = Pipeline()
         pipeline.load(temp_csv_file, format="auto", x_col="time", y_col="stress")
-        assert pipeline.data is not None
+        assert pipeline.data is not None  # nosec B101
 
 
 class TestPipelineTransforms:
@@ -155,10 +155,10 @@ class TestPipelineTransforms:
 
         pipeline.transform("mock_transform")
 
-        assert pipeline.data is not None
-        assert np.allclose(pipeline.data.y, original_y * 2.0)
-        assert len(pipeline.history) == 1
-        assert pipeline.history[0][0] == "transform"
+        assert pipeline.data is not None  # nosec B101
+        assert np.allclose(pipeline.data.y, original_y * 2.0)  # nosec B101
+        assert len(pipeline.history) == 1  # nosec B101
+        assert pipeline.history[0][0] == "transform"  # nosec B101
 
     @pytest.mark.smoke
     def test_transform_without_data(self):
@@ -174,7 +174,7 @@ class TestPipelineTransforms:
         transform = MockTransform()
 
         pipeline.transform(transform)
-        assert pipeline.data is not None
+        assert pipeline.data is not None  # nosec B101
 
 
 class TestPipelineModelFitting:
@@ -185,10 +185,10 @@ class TestPipelineModelFitting:
         pipeline = Pipeline(data=sample_data)
         pipeline.fit("mock_model")
 
-        assert pipeline._last_model is not None
-        assert len(pipeline.steps) == 1
-        assert pipeline.steps[0][0] == "fit"
-        assert len(pipeline.history) == 1
+        assert pipeline._last_model is not None  # nosec B101
+        assert len(pipeline.steps) == 1  # nosec B101
+        assert pipeline.steps[0][0] == "fit"  # nosec B101
+        assert len(pipeline.history) == 1  # nosec B101
 
     def test_fit_without_data(self):
         """Test fit without data raises error."""
@@ -202,8 +202,8 @@ class TestPipelineModelFitting:
         model = MockModel()
 
         pipeline.fit(model)
-        assert pipeline._last_model is not None
-        assert isinstance(pipeline._last_model, MockModel)
+        assert pipeline._last_model is not None  # nosec B101
+        assert isinstance(pipeline._last_model, MockModel)  # nosec B101
 
 
 class TestPipelinePredictions:
@@ -216,9 +216,9 @@ class TestPipelinePredictions:
 
         predictions = pipeline.predict()
 
-        assert isinstance(predictions, RheoData)
-        assert len(predictions.x) == len(sample_data.x)
-        assert predictions.metadata["type"] == "prediction"
+        assert isinstance(predictions, RheoData)  # nosec B101
+        assert len(predictions.x) == len(sample_data.x)  # nosec B101
+        assert predictions.metadata["type"] == "prediction"  # nosec B101
 
     def test_predict_without_fit(self, sample_data):
         """Test predict without fit raises error."""
@@ -234,7 +234,7 @@ class TestPipelinePredictions:
         custom_x = np.linspace(0, 5, 25)
         predictions = pipeline.predict(X=custom_x)
 
-        assert len(predictions.x) == 25
+        assert len(predictions.x) == 25  # nosec B101
 
 
 class TestPipelineMethodChaining:
@@ -248,9 +248,9 @@ class TestPipelineMethodChaining:
             .fit("mock_model")
         )
 
-        assert pipeline.data is not None
-        assert pipeline._last_model is not None
-        assert len(pipeline.history) == 2
+        assert pipeline.data is not None  # nosec B101
+        assert pipeline._last_model is not None  # nosec B101
+        assert len(pipeline.history) == 2  # nosec B101
 
     @pytest.mark.skipif(not HAS_H5PY, reason="h5py not installed")
     def test_full_chain(self, temp_csv_file):
@@ -267,7 +267,7 @@ class TestPipelineMethodChaining:
                 .save(output_path)
             )
 
-            assert len(pipeline.history) == 4  # load, transform, fit, save
+            assert len(pipeline.history) == 4  # nosec B101 - load/transform/fit/save
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
@@ -283,9 +283,9 @@ class TestPipelineHistory:
         pipeline.fit("mock_model")
 
         history = pipeline.get_history()
-        assert len(history) == 2
-        assert history[0][0] == "transform"
-        assert history[1][0] == "fit"
+        assert len(history) == 2  # nosec B101
+        assert history[0][0] == "transform"  # nosec B101
+        assert history[1][0] == "fit"  # nosec B101
 
     def test_get_history_copy(self, sample_data):
         """Test that get_history returns a copy."""
@@ -295,8 +295,8 @@ class TestPipelineHistory:
         history1 = pipeline.get_history()
         history2 = pipeline.get_history()
 
-        assert history1 is not history2
-        assert history1 == history2
+        assert history1 is not history2  # nosec B101
+        assert history1 == history2  # nosec B101
 
 
 class TestPipelineUtilities:
@@ -307,8 +307,8 @@ class TestPipelineUtilities:
         pipeline = Pipeline(data=sample_data)
         result = pipeline.get_result()
 
-        assert isinstance(result, RheoData)
-        assert np.array_equal(result.x, sample_data.x)
+        assert isinstance(result, RheoData)  # nosec B101
+        assert np.array_equal(result.x, sample_data.x)  # nosec B101
 
     def test_get_result_without_data(self):
         """Test get_result without data raises error."""
@@ -322,7 +322,7 @@ class TestPipelineUtilities:
         pipeline.fit("mock_model")
 
         model = pipeline.get_last_model()
-        assert isinstance(model, MockModel)
+        assert isinstance(model, MockModel)  # nosec B101
 
     def test_get_all_models(self, sample_data):
         """Test get_all_models method."""
@@ -330,8 +330,8 @@ class TestPipelineUtilities:
         pipeline.fit("mock_model")
 
         models = pipeline.get_all_models()
-        assert len(models) == 1
-        assert isinstance(models[0], MockModel)
+        assert len(models) == 1  # nosec B101
+        assert isinstance(models[0], MockModel)  # nosec B101
 
     def test_clone(self, sample_data):
         """Test pipeline cloning."""
@@ -340,9 +340,35 @@ class TestPipelineUtilities:
 
         pipeline2 = pipeline1.clone()
 
-        assert pipeline2 is not pipeline1
-        assert pipeline2.data is not pipeline1.data
-        assert len(pipeline2.history) == len(pipeline1.history)
+        assert pipeline2 is not pipeline1  # nosec B101
+        assert pipeline2.data is not pipeline1.data  # nosec B101
+        assert len(pipeline2.history) == len(pipeline1.history)  # nosec B101
+
+    def test_clone_preserves_full_state_and_identity(self, sample_data):
+        """clone() must copy every attribute reset() enumerates, and the
+        clone's steps[-1][1] must still be the same object as its
+        _last_model (as it is in the original pipeline)."""
+        pipeline1 = Pipeline(data=sample_data)
+        pipeline1.fit("mock_model")
+
+        # Simulate cached results without running expensive NUTS/plotting.
+        pipeline1._last_bayesian_result = object()
+        pipeline1._diagnostic_results = object()
+        pipeline1._last_comparison = object()
+        pipeline1._transform_results["mock_transform"] = ("cached", None)
+        pipeline1._last_transform_name = "mock_transform"
+        pipeline1.predictions["prediction"] = object()
+
+        pipeline2 = pipeline1.clone()
+
+        assert pipeline2.steps[-1][1] is pipeline2._last_model  # nosec B101
+
+        assert pipeline2._last_bayesian_result is not None  # nosec B101
+        assert pipeline2._diagnostic_results is not None  # nosec B101
+        assert pipeline2._last_comparison is not None  # nosec B101
+        assert pipeline2._last_transform_name == "mock_transform"  # nosec B101
+        assert "mock_transform" in pipeline2._transform_results  # nosec B101
+        assert "prediction" in pipeline2.predictions  # nosec B101
 
     def test_reset(self, sample_data):
         """Test pipeline reset."""
@@ -351,10 +377,10 @@ class TestPipelineUtilities:
 
         pipeline.reset()
 
-        assert pipeline.data is None
-        assert len(pipeline.steps) == 0
-        assert len(pipeline.history) == 0
-        assert pipeline._last_model is None
+        assert pipeline.data is None  # nosec B101
+        assert len(pipeline.steps) == 0  # nosec B101
+        assert len(pipeline.history) == 0  # nosec B101
+        assert pipeline._last_model is None  # nosec B101
 
     def test_repr(self, sample_data):
         """Test string representation."""
@@ -362,9 +388,9 @@ class TestPipelineUtilities:
         pipeline.fit("mock_model")
 
         repr_str = repr(pipeline)
-        assert "Pipeline" in repr_str
-        assert "has_data=True" in repr_str
-        assert "has_model=True" in repr_str
+        assert "Pipeline" in repr_str  # nosec B101
+        assert "has_data=True" in repr_str  # nosec B101
+        assert "has_model=True" in repr_str  # nosec B101
 
     def test_get_fit_result(self, sample_data):
         """Test get_fit_result method (characterization: was only exercised
@@ -374,9 +400,9 @@ class TestPipelineUtilities:
 
         fit_result = pipeline.get_fit_result()
 
-        assert fit_result is not None
-        assert hasattr(fit_result, "params")
-        assert set(fit_result.params.keys()) == {"a", "b"}
+        assert fit_result is not None  # nosec B101
+        assert hasattr(fit_result, "params")  # nosec B101
+        assert set(fit_result.params.keys()) == {"a", "b"}  # nosec B101
 
     def test_get_fit_result_without_fit_raises(self, sample_data):
         """get_fit_result must raise before any model has been fitted."""
@@ -395,9 +421,9 @@ class TestPipelinePlotting:
         # Don't show plot in tests
         result = pipeline.plot(show=False)
 
-        assert result is pipeline  # Check chaining
-        assert len(pipeline.history) == 1
-        assert pipeline.history[0][0] == "plot"
+        assert result is pipeline  # nosec B101 - check chaining
+        assert len(pipeline.history) == 1  # nosec B101
+        assert pipeline.history[0][0] == "plot"  # nosec B101
 
     def test_plot_without_data(self):
         """Test plot without data raises error."""
@@ -419,9 +445,9 @@ class TestPipelineSaving:
             pipeline = Pipeline(data=sample_data)
             pipeline.save(output_path, format="hdf5")
 
-            assert os.path.exists(output_path)
-            assert len(pipeline.history) == 1
-            assert pipeline.history[0][0] == "save"
+            assert os.path.exists(output_path)  # nosec B101
+            assert len(pipeline.history) == 1  # nosec B101
+            assert pipeline.history[0][0] == "save"  # nosec B101
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
@@ -450,7 +476,7 @@ class TestPipelineFitBayesian:
 
         mock_model.fit_bayesian.assert_called_once()
         _, kwargs = mock_model.fit_bayesian.call_args
-        assert "warm_start" not in kwargs
+        assert "warm_start" not in kwargs  # nosec B101
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +527,7 @@ class TestPipelineLoadFormats:
         with patch("rheojax.io.load_excel", return_value=sample_data) as m:
             pipeline.load("dummy.xlsx", format="excel")
         m.assert_called_once()
-        assert pipeline.data is sample_data
+        assert pipeline.data is sample_data  # nosec B101
 
     def test_load_hdf5_branch(self, sample_data):
         from unittest.mock import patch
@@ -527,7 +553,7 @@ class TestPipelineLoadFormats:
         pipeline = Pipeline()
         with patch("rheojax.io.load_trios", return_value=[sample_data]):
             pipeline.load("dummy.txt", format="trios")
-        assert pipeline.data is sample_data
+        assert pipeline.data is sample_data  # nosec B101
 
     def test_load_trios_multiple_segments_warns(self, sample_data):
         from unittest.mock import patch
@@ -539,7 +565,7 @@ class TestPipelineLoadFormats:
         with patch("rheojax.io.load_trios", return_value=[sample_data, seg2]):
             with pytest.warns(UserWarning, match="Using first segment"):
                 pipeline.load("dummy.txt", format="trios")
-        assert pipeline.data is sample_data
+        assert pipeline.data is sample_data  # nosec B101
 
     def test_load_attaches_test_mode(self, sample_data):
         from unittest.mock import patch
@@ -547,7 +573,7 @@ class TestPipelineLoadFormats:
         pipeline = Pipeline()
         with patch("rheojax.io.load_excel", return_value=sample_data):
             pipeline.load("dummy.xlsx", format="excel", test_mode="relaxation")
-        assert pipeline.data.metadata["test_mode"] == "relaxation"
+        assert pipeline.data.metadata["test_mode"] == "relaxation"  # nosec B101
 
 
 class TestPipelineTransformBranches:
@@ -563,7 +589,7 @@ class TestPipelineTransformBranches:
         pipeline = Pipeline(data=sample_data)
         original_y = sample_data.y.copy()
         pipeline.transform(TupleTransform())
-        assert np.allclose(pipeline.data.y, original_y * 2.0)
+        assert np.allclose(pipeline.data.y, original_y * 2.0)  # nosec B101
 
     def test_transform_error_propagates(self, sample_data):
         pipeline = Pipeline(data=sample_data)
@@ -578,7 +604,7 @@ class TestPipelineFitBranches:
         pipeline = Pipeline(data=sample_data)
         pipeline.fit(ScoreRaisingModel())
         # History stores (op, name, score); score should be NaN
-        assert np.isnan(pipeline.history[-1][2])
+        assert np.isnan(pipeline.history[-1][2])  # nosec B101
 
     def test_fit_error_propagates(self, sample_data):
         pipeline = Pipeline(data=sample_data)
@@ -609,7 +635,7 @@ class TestPipelinePredictBranches:
         pipeline = Pipeline(data=sample_data)
         pipeline.fit("mock_model")
         preds = pipeline.predict(X=jnp.asarray(sample_data.x))
-        assert len(preds.x) == len(sample_data.x)
+        assert len(preds.x) == len(sample_data.x)  # nosec B101
 
 
 class TestPipelineSaveBranches:
@@ -624,10 +650,10 @@ class TestPipelineSaveBranches:
             pipeline.save("out.xlsx", format="excel")
         m.assert_called_once()
         payload = m.call_args[0][0]
-        assert "parameters" in payload
-        assert payload["parameters"]["model"] == "MockModel"
+        assert "parameters" in payload  # nosec B101
+        assert payload["parameters"]["model"] == "MockModel"  # nosec B101
         # Fitted params were also stamped into data metadata (hdf5 path)
-        assert pipeline.data.metadata["fitted_model"] == "MockModel"
+        assert pipeline.data.metadata["fitted_model"] == "MockModel"  # nosec B101
 
     def test_save_csv_real(self, sample_data):
         import tempfile
@@ -640,8 +666,8 @@ class TestPipelineSaveBranches:
             import pandas as pd
 
             df = pd.read_csv(path)
-            assert list(df.columns) == ["x", "y"]
-            assert len(df) == len(sample_data.x)
+            assert list(df.columns) == ["x", "y"]  # nosec B101
+            assert len(df) == len(sample_data.x)  # nosec B101
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -663,7 +689,7 @@ class TestPipelineSaveBranches:
             import pandas as pd
 
             df = pd.read_csv(path)
-            assert set(df.columns) == {"x", "y_real", "y_imag"}
+            assert set(df.columns) == {"x", "y_real", "y_imag"}  # nosec B101
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -681,7 +707,7 @@ class TestPipelineSaveBranches:
             import pandas as pd
 
             df = pd.read_csv(path)
-            assert set(df.columns) == {"x", "y_0", "y_1"}
+            assert set(df.columns) == {"x", "y_0", "y_1"}  # nosec B101
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -708,7 +734,7 @@ class TestPipelineSaveFigure:
         with patch("rheojax.visualization.plotter.save_figure") as m:
             pipeline.save_figure("out.pdf")
         m.assert_called_once()
-        assert pipeline.history[-1][0] == "save_figure"
+        assert pipeline.history[-1][0] == "save_figure"  # nosec B101
 
 
 class TestPipelineFitBayesianBranches:
@@ -749,9 +775,9 @@ class TestPipelineFitBayesianBranches:
         pipeline.fit_bayesian(warm_start=False, seed=3)
 
         _, kwargs = model.fit_bayesian.call_args
-        assert "initial_values" in kwargs
+        assert "initial_values" in kwargs  # nosec B101
         # MockModel bounds are (0, 10) → arithmetic midpoint 5.0
-        assert kwargs["initial_values"]["a"] == pytest.approx(5.0)
+        assert kwargs["initial_values"]["a"] == pytest.approx(5.0)  # nosec B101
 
     def test_fit_bayesian_error_propagates(self, sample_data):
         from unittest.mock import MagicMock
@@ -787,7 +813,7 @@ class TestPipelineBayesianPlots:
         ):
             pipeline.plot_bayesian(show=False, show_nlsq_overlay=True)
         fake_plotter.plot_bayesian.assert_called_once()
-        assert pipeline.history[-1][0] == "plot_bayesian"
+        assert pipeline.history[-1][0] == "plot_bayesian"  # nosec B101
 
     def test_plot_diagnostics_no_result_raises(self, sample_data):
         pipeline = Pipeline(data=sample_data)
@@ -807,8 +833,8 @@ class TestPipelineBayesianPlots:
         ) as gen:
             pipeline.plot_diagnostics(output_dir=None)
         gen.assert_called_once()
-        assert pipeline._current_figure is fake_fig
-        assert pipeline.history[-1][0] == "plot_diagnostics"
+        assert pipeline._current_figure is fake_fig  # nosec B101
+        assert pipeline.history[-1][0] == "plot_diagnostics"  # nosec B101
 
 
 class TestPipelineGetFittedParameters:
@@ -823,8 +849,8 @@ class TestPipelineGetFittedParameters:
         pipeline = Pipeline(data=sample_data)
         pipeline.fit("mock_model")
         params = pipeline.get_fitted_parameters()
-        assert set(params.keys()) == {"a", "b"}
-        assert all(isinstance(v, float) for v in params.values())
+        assert set(params.keys()) == {"a", "b"}  # nosec B101
+        assert all(isinstance(v, float) for v in params.values())  # nosec B101
 
     def test_none_value_raises(self):
         from unittest.mock import MagicMock
@@ -867,9 +893,9 @@ class TestPipelineCompareModels:
             pipeline.compare_models(["mock_model", "mock_model"])
         cmp.assert_called_once()
         # test_mode propagated from metadata into the call
-        assert cmp.call_args.kwargs["test_mode"] == "relaxation"
-        assert pipeline._last_model is best
-        assert pipeline.steps[-1][0] == "compare_models"
+        assert cmp.call_args.kwargs["test_mode"] == "relaxation"  # nosec B101
+        assert pipeline._last_model is best  # nosec B101
+        assert pipeline.steps[-1][0] == "compare_models"  # nosec B101
 
     def test_best_model_missing_fitted_warns(self, sample_data):
         from unittest.mock import patch
@@ -883,13 +909,11 @@ class TestPipelineCompareModels:
             results = [_R()]
 
         pipeline = Pipeline(data=sample_data)
-        with patch(
-            "rheojax.utils.model_selection.compare_models", return_value=_Cmp()
-        ):
+        with patch("rheojax.utils.model_selection.compare_models", return_value=_Cmp()):
             pipeline.compare_models(["mock_model"])
         # No fitted model attached → _last_model stays None
-        assert pipeline._last_model is None
-        assert pipeline._last_comparison is not None
+        assert pipeline._last_model is None  # nosec B101
+        assert pipeline._last_comparison is not None  # nosec B101
 
 
 class TestPipelinePlotPrediction:
@@ -902,5 +926,5 @@ class TestPipelinePlotPrediction:
             pipeline.plot(show=False, include_prediction=True)
         except (RuntimeError, MemoryError) as exc:
             pytest.skip(f"matplotlib render unavailable: {exc}")
-        assert pipeline._current_figure is not None
-        assert pipeline.history[-1][0] == "plot"
+        assert pipeline._current_figure is not None  # nosec B101
+        assert pipeline.history[-1][0] == "plot"  # nosec B101

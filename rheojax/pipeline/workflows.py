@@ -366,8 +366,12 @@ def _fit_model_in_subprocess(
                 y_for_ss = np.abs(y_data) if np.iscomplexobj(y_data) else y_data
                 ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
                 r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
-            aic = float(nlsq_result.aic) if nlsq_result.aic is not None else float("inf")
-            bic = float(nlsq_result.bic) if nlsq_result.bic is not None else float("inf")
+            aic = (
+                float(nlsq_result.aic) if nlsq_result.aic is not None else float("inf")
+            )
+            bic = (
+                float(nlsq_result.bic) if nlsq_result.bic is not None else float("inf")
+            )
         else:
             rmse = float(np.sqrt(np.mean(residuals**2)))
 
@@ -651,16 +655,26 @@ class ModelComparisonPipeline(Pipeline):
                             ("fit_compare", model_name, str(result["r_squared"]))
                         )
                     else:
+                        error_msg = result.get("error", "unknown")
                         logger.error(
                             "Parallel fit failed",
                             model=model_name,
-                            error=result.get("error", "unknown"),
+                            error=error_msg,
+                        )
+                        warnings.warn(
+                            f"Failed to fit model {model_name} in parallel: "
+                            f"{error_msg}",
+                            stacklevel=2,
                         )
                 except Exception as e:
                     logger.error(
                         "Parallel fit exception",
                         model=model_name,
                         error=str(e),
+                    )
+                    warnings.warn(
+                        f"Failed to fit model {model_name} in parallel: {e}",
+                        stacklevel=2,
                     )
 
     def get_best_model(self, metric: str = "rmse", minimize: bool = True) -> str:

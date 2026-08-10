@@ -18,7 +18,7 @@ class TestParallelLoad:
         from rheojax.parallel.api import parallel_load
 
         results = parallel_load([])
-        assert results == []
+        assert results == []  # nosec B101
 
     def test_parallel_load_returns_list_of_rheodata(self, tmp_path):
         from rheojax.parallel.api import parallel_load
@@ -29,10 +29,10 @@ class TestParallelLoad:
             f.write_text("time,stress\n0.1,100\n1.0,50\n10.0,10\n")
         files = sorted(tmp_path.glob("*.csv"))
         results = parallel_load(files, x_col="time", y_col="stress")
-        assert len(results) == 3
+        assert len(results) == 3  # nosec B101
         for r in results:
-            assert hasattr(r, "x")
-            assert hasattr(r, "y")
+            assert hasattr(r, "x")  # nosec B101
+            assert hasattr(r, "y")  # nosec B101
 
     def test_parallel_load_sequential_fallback(self, tmp_path):
         from rheojax.parallel.api import parallel_load
@@ -43,7 +43,7 @@ class TestParallelLoad:
         files = sorted(tmp_path.glob("*.csv"))
         with patch.dict("os.environ", {"RHEOJAX_SEQUENTIAL": "1"}):
             results = parallel_load(files, x_col="time", y_col="stress")
-        assert len(results) == 2
+        assert len(results) == 2  # nosec B101
 
 
 class TestParallelMap:
@@ -55,16 +55,62 @@ class TestParallelMap:
 
         with patch.dict("os.environ", {"RHEOJAX_SEQUENTIAL": "1"}):
             results = list(parallel_map(_test_add_one, [1, 2, 3]))
-            assert sorted(results) == [2, 3, 4]
+            assert sorted(results) == [2, 3, 4]  # nosec B101
 
     def test_parallel_map_with_workers(self):
         from rheojax.parallel.api import parallel_map
 
         results = list(parallel_map(_test_add_one, range(10), n_workers=2))
-        assert sorted(results) == list(range(1, 11))
+        assert sorted(results) == list(range(1, 11))  # nosec B101
 
     def test_parallel_map_empty(self):
         from rheojax.parallel.api import parallel_map
 
         results = list(parallel_map(_test_add_one, []))
-        assert results == []
+        assert results == []  # nosec B101
+
+    def test_parallel_map_thread_isolation(self):
+        """RHEOJAX_WORKER_ISOLATION=thread must route through a
+        ThreadPoolExecutor, not subprocesses. A closure over a local
+        variable is unpicklable (subprocess submit() would reject it) but
+        works fine in threads -- proving which path actually ran."""
+        from rheojax.parallel.api import parallel_map
+
+        factor = 3
+
+        def _mul_by_factor(x):
+            return x * factor
+
+        with patch.dict("os.environ", {"RHEOJAX_WORKER_ISOLATION": "thread"}):
+            results = list(parallel_map(_mul_by_factor, [1, 2, 3]))
+        assert sorted(results) == [3, 6, 9]  # nosec B101
+
+    def test_parallel_map_forwards_warm_pool_config(self):
+        """configure(warm_pool=True) / RHEOJAX_WARM_POOL=1 must actually
+        reach PersistentProcessPool -- previously parallel_map() ignored
+        get_parallel_config()["warm_pool"] entirely."""
+        from rheojax.parallel import configure
+        from rheojax.parallel.api import parallel_map
+
+        captured = {}
+
+        class _FakePool:
+            def __init__(self, n_workers=None, warm_pool=False):
+                captured["warm_pool"] = warm_pool
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def map(self, fn, items, timeout=None):
+                return [fn(i) for i in items]
+
+        try:
+            configure(warm_pool=True)
+            with patch("rheojax.parallel.pool.PersistentProcessPool", _FakePool):
+                list(parallel_map(_test_add_one, [1, 2]))
+            assert captured["warm_pool"] is True  # nosec B101
+        finally:
+            configure()

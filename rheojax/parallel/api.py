@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from rheojax.parallel.config import get_default_workers, is_sequential_mode
+from rheojax.parallel.config import get_parallel_config, is_sequential_mode
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,11 @@ def parallel_map(
     """Execute a function over items using process-based parallelism.
 
     Each invocation runs in a separate subprocess with its own JIT cache.
-    Falls back to sequential when RHEOJAX_SEQUENTIAL=1.
+    Falls back to sequential when RHEOJAX_SEQUENTIAL=1. When
+    RHEOJAX_WORKER_ISOLATION=thread (or configure(isolation="thread")) is
+    set, runs in a ThreadPoolExecutor instead of subprocesses -- useful in
+    GUI/notebook environments where spawning subprocesses conflicts with an
+    existing event loop.
 
     Parameters
     ----------
@@ -94,8 +98,17 @@ def parallel_map(
             yield fn(item)
         return
 
+    cfg = get_parallel_config()
+    n = n_workers or cfg["n_workers"]
+
+    if cfg["isolation"] == "thread":
+        with ThreadPoolExecutor(max_workers=n) as executor:
+            futures = [executor.submit(fn, item) for item in items_list]
+            for f in futures:
+                yield f.result(timeout=timeout)
+        return
+
     from rheojax.parallel.pool import PersistentProcessPool
 
-    n = n_workers or get_default_workers()
-    with PersistentProcessPool(n_workers=n) as pool:
+    with PersistentProcessPool(n_workers=n, warm_pool=cfg["warm_pool"]) as pool:
         yield from pool.map(fn, items_list, timeout=timeout)

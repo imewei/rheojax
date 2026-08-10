@@ -14,6 +14,7 @@ Example:
 from __future__ import annotations
 
 import copy
+import hashlib
 import warnings
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -435,6 +436,15 @@ class BatchPipeline:
         fit_kwargs_replay: dict[str, Any] = {}
         for step_action, step_obj in self.template_pipeline.steps:
             if step_action in ("fit", "fit_nlsq"):
+                if metrics.get("transform_replay_failed"):
+                    # A prior transform step failed and left pipeline.data
+                    # unprocessed; fitting against it would silently produce
+                    # fit-quality metrics for the wrong data. Skip instead.
+                    logger.warning(
+                        "Skipping fit step — prior transform replay failed",
+                        filepath=str(path),
+                    )
+                    continue
                 model_cls = type(step_obj)
                 new_model = model_cls()
                 X = np.asarray(pipeline.data.x)
@@ -574,8 +584,15 @@ class BatchPipeline:
                     _fmt = export_config.get("format", "directory")
                     per_file_out = None
                     if _out_path:
-                        # Create per-file output subdirectory to avoid collisions
-                        per_file_out = Path(_out_path) / path.stem
+                        # Per-file output subdirectory keyed on stem + a hash of
+                        # the full resolved path, not the bare stem -- two input
+                        # files with the same basename in different directories
+                        # (e.g. recursive process_directory()) would otherwise
+                        # collide and silently overwrite each other's export.
+                        _path_hash = hashlib.sha1(
+                            str(path.resolve()).encode(), usedforsecurity=False
+                        ).hexdigest()[:8]
+                        per_file_out = Path(_out_path) / f"{path.stem}_{_path_hash}"
                         pipeline.export(
                             str(per_file_out),
                             format=_fmt,
@@ -804,6 +821,30 @@ class BatchPipeline:
                 r_squared_values.append(metrics["r_squared"])
             if "rmse" in metrics:
                 rmse_values.append(metrics["rmse"])
+
+        # One degenerate fit (NaN/inf r_squared or rmse, e.g. from a divergent
+        # model) would otherwise poison the whole batch's mean/std/min/max
+        # with NaN. Filter and log how many were excluded rather than
+        # silently aggregating garbage.
+        n_r_squared_total = len(r_squared_values)
+        r_squared_values = [v for v in r_squared_values if np.isfinite(v)]
+        n_r_squared_excluded = n_r_squared_total - len(r_squared_values)
+        if n_r_squared_excluded:
+            logger.warning(
+                "Excluding non-finite r_squared values from statistics",
+                n_excluded=n_r_squared_excluded,
+                n_total=n_r_squared_total,
+            )
+
+        n_rmse_total = len(rmse_values)
+        rmse_values = [v for v in rmse_values if np.isfinite(v)]
+        n_rmse_excluded = n_rmse_total - len(rmse_values)
+        if n_rmse_excluded:
+            logger.warning(
+                "Excluding non-finite rmse values from statistics",
+                n_excluded=n_rmse_excluded,
+                n_total=n_rmse_total,
+            )
 
         stats = {
             "total_files": len(self.results),

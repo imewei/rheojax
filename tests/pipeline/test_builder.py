@@ -69,12 +69,12 @@ class TestPipelineBuilderInitialization:
     def test_init(self):
         """Test builder initialization."""
         builder = PipelineBuilder()
-        assert len(builder.steps) == 0
+        assert len(builder.steps) == 0  # nosec B101
 
     def test_empty_builder_len(self):
         """Test length of empty builder."""
         builder = PipelineBuilder()
-        assert len(builder) == 0
+        assert len(builder) == 0  # nosec B101
 
 
 class TestPipelineBuilderSteps:
@@ -85,48 +85,48 @@ class TestPipelineBuilderSteps:
         builder = PipelineBuilder()
         builder.add_load_step(temp_csv_file, format="csv", x_col="x", y_col="y")
 
-        assert len(builder) == 1
-        assert builder.steps[0][0] == "load"
-        assert builder.steps[0][1]["file_path"] == temp_csv_file
+        assert len(builder) == 1  # nosec B101
+        assert builder.steps[0][0] == "load"  # nosec B101
+        assert builder.steps[0][1]["file_path"] == temp_csv_file  # nosec B101
 
     def test_add_transform_step(self):
         """Test adding transform step."""
         builder = PipelineBuilder()
         builder.add_transform_step("smooth", window_size=5)
 
-        assert len(builder) == 1
-        assert builder.steps[0][0] == "transform"
-        assert builder.steps[0][1]["name"] == "smooth"
-        assert builder.steps[0][1]["window_size"] == 5
+        assert len(builder) == 1  # nosec B101
+        assert builder.steps[0][0] == "transform"  # nosec B101
+        assert builder.steps[0][1]["name"] == "smooth"  # nosec B101
+        assert builder.steps[0][1]["window_size"] == 5  # nosec B101
 
     def test_add_fit_step(self):
         """Test adding fit step."""
         builder = PipelineBuilder()
         builder.add_fit_step("builder_test_model", method="L-BFGS-B")
 
-        assert len(builder) == 1
-        assert builder.steps[0][0] == "fit"
-        assert builder.steps[0][1]["model"] == "builder_test_model"
-        assert builder.steps[0][1]["method"] == "L-BFGS-B"
+        assert len(builder) == 1  # nosec B101
+        assert builder.steps[0][0] == "fit"  # nosec B101
+        assert builder.steps[0][1]["model"] == "builder_test_model"  # nosec B101
+        assert builder.steps[0][1]["method"] == "L-BFGS-B"  # nosec B101
 
     def test_add_plot_step(self):
         """Test adding plot step."""
         builder = PipelineBuilder()
         builder.add_plot_step(style="publication", show=False)
 
-        assert len(builder) == 1
-        assert builder.steps[0][0] == "plot"
-        assert builder.steps[0][1]["style"] == "publication"
-        assert builder.steps[0][1]["show"] is False
+        assert len(builder) == 1  # nosec B101
+        assert builder.steps[0][0] == "plot"  # nosec B101
+        assert builder.steps[0][1]["style"] == "publication"  # nosec B101
+        assert builder.steps[0][1]["show"] is False  # nosec B101
 
     def test_add_save_step(self):
         """Test adding save step."""
         builder = PipelineBuilder()
         builder.add_save_step("output.hdf5", format="hdf5")
 
-        assert len(builder) == 1
-        assert builder.steps[0][0] == "save"
-        assert builder.steps[0][1]["file_path"] == "output.hdf5"
+        assert len(builder) == 1  # nosec B101
+        assert builder.steps[0][0] == "save"  # nosec B101
+        assert builder.steps[0][1]["file_path"] == "output.hdf5"  # nosec B101
 
 
 class TestPipelineBuilderChaining:
@@ -141,10 +141,10 @@ class TestPipelineBuilderChaining:
             .add_plot_step()
         )
 
-        assert len(builder) == 3
-        assert builder.steps[0][0] == "load"
-        assert builder.steps[1][0] == "fit"
-        assert builder.steps[2][0] == "plot"
+        assert len(builder) == 3  # nosec B101
+        assert builder.steps[0][0] == "load"  # nosec B101
+        assert builder.steps[1][0] == "fit"  # nosec B101
+        assert builder.steps[2][0] == "plot"  # nosec B101
 
 
 class TestPipelineBuilderValidation:
@@ -174,7 +174,7 @@ class TestPipelineBuilderValidation:
         )
 
         pipeline = builder.build()
-        assert isinstance(pipeline, Pipeline)
+        assert isinstance(pipeline, Pipeline)  # nosec B101
 
     def test_skip_validation(self, temp_csv_file):
         """Test building without validation."""
@@ -183,7 +183,7 @@ class TestPipelineBuilderValidation:
 
         # Should not raise when validate=False
         pipeline = builder.build(validate=False)
-        assert isinstance(pipeline, Pipeline)
+        assert isinstance(pipeline, Pipeline)  # nosec B101
 
 
 class TestPipelineBuilderExecution:
@@ -199,8 +199,23 @@ class TestPipelineBuilderExecution:
 
         pipeline = builder.build()
 
-        assert pipeline.data is not None
-        assert pipeline._last_model is not None
+        assert pipeline.data is not None  # nosec B101
+        assert pipeline._last_model is not None  # nosec B101
+
+    def test_build_and_execute_with_predict_step(self, temp_csv_file):
+        """add_predict_step must actually generate and store a prediction,
+        not silently no-op it while still accepting store_as."""
+        builder = (
+            PipelineBuilder()
+            .add_load_step(temp_csv_file, format="csv", x_col="x", y_col="y")
+            .add_fit_step("builder_test_model")
+            .add_predict_step(store_as="prediction")
+        )
+
+        pipeline = builder.build()
+
+        assert "prediction" in pipeline.predictions  # nosec B101
+        assert pipeline.predictions["prediction"] is not None  # nosec B101
 
     @pytest.mark.skipif(
         not _h5py_available,
@@ -243,9 +258,9 @@ class TestPipelineBuilderUtilities:
         )
 
         steps = builder.get_steps()
-        assert len(steps) == 2
-        assert steps[0][0] == "load"
-        assert steps[1][0] == "fit"
+        assert len(steps) == 2  # nosec B101
+        assert steps[0][0] == "load"  # nosec B101
+        assert steps[1][0] == "fit"  # nosec B101
 
     def test_get_steps_copy(self, temp_csv_file):
         """Test that get_steps returns a copy."""
@@ -254,8 +269,8 @@ class TestPipelineBuilderUtilities:
         steps1 = builder.get_steps()
         steps2 = builder.get_steps()
 
-        assert steps1 is not steps2
-        assert steps1 == steps2
+        assert steps1 is not steps2  # nosec B101
+        assert steps1 == steps2  # nosec B101
 
     def test_clear(self, temp_csv_file):
         """Test clearing builder."""

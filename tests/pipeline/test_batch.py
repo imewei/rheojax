@@ -3,6 +3,7 @@
 This module tests batch processing of multiple datasets with the same pipeline.
 """
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -86,16 +87,16 @@ class TestBatchPipelineInitialization:
     def test_init_empty(self):
         """Test initialization without template."""
         batch = BatchPipeline()
-        assert batch.template_pipeline is None
-        assert len(batch.results) == 0
-        assert len(batch.errors) == 0
+        assert batch.template_pipeline is None  # nosec B101
+        assert len(batch.results) == 0  # nosec B101
+        assert len(batch.errors) == 0  # nosec B101
 
     def test_init_with_template(self):
         """Test initialization with template pipeline."""
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        assert batch.template_pipeline is template
+        assert batch.template_pipeline is template  # nosec B101
 
     def test_set_template(self):
         """Test setting template after initialization."""
@@ -103,7 +104,7 @@ class TestBatchPipelineInitialization:
         template = Pipeline()
 
         batch.set_template(template)
-        assert batch.template_pipeline is template
+        assert batch.template_pipeline is template  # nosec B101
 
 
 class TestBatchProcessing:
@@ -117,10 +118,8 @@ class TestBatchProcessing:
 
         batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
-        # Note: Results might be empty if template execution is simplified
-        # This tests the interface, not full execution
-        assert len(batch.results) >= 0
-        assert len(batch.errors) >= 0
+        assert len(batch.errors) == 0  # nosec B101
+        assert len(batch.results) == len(temp_csv_files)  # nosec B101
 
     def test_process_files_without_template(self, temp_csv_files):
         """Test that processing without template raises error."""
@@ -142,9 +141,9 @@ class TestBatchProcessing:
             y_col="y",
         )
 
-        # At least some files should be found
+        assert len(batch.errors) == 0  # nosec B101
         total_processed = len(batch.results) + len(batch.errors)
-        assert total_processed >= 0
+        assert total_processed == 3  # nosec B101
 
     def test_process_directory_not_found(self):
         """Test processing non-existent directory."""
@@ -175,7 +174,7 @@ class TestBatchResults:
         batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         results = batch.get_results()
-        assert isinstance(results, list)
+        assert isinstance(results, list)  # nosec B101
 
     def test_get_results_copy(self, temp_csv_files):
         """Test that get_results returns a copy."""
@@ -187,7 +186,7 @@ class TestBatchResults:
         results1 = batch.get_results()
         results2 = batch.get_results()
 
-        assert results1 is not results2
+        assert results1 is not results2  # nosec B101
 
     def test_get_errors(self, temp_csv_files):
         """Test getting errors."""
@@ -200,7 +199,7 @@ class TestBatchResults:
         )
 
         errors = batch.get_errors()
-        assert isinstance(errors, list)
+        assert isinstance(errors, list)  # nosec B101
 
     def test_get_summary_dataframe(self, temp_csv_files):
         """Test getting summary DataFrame."""
@@ -210,7 +209,7 @@ class TestBatchResults:
         batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         df = batch.get_summary_dataframe()
-        assert df is not None
+        assert df is not None  # nosec B101
         # DataFrame might be empty if no results processed
 
 
@@ -222,8 +221,8 @@ class TestBatchStatistics:
         batch = BatchPipeline()
         stats = batch.get_statistics()
 
-        assert isinstance(stats, dict)
-        assert len(stats) == 0
+        assert isinstance(stats, dict)  # nosec B101
+        assert len(stats) == 0  # nosec B101
 
     def test_get_statistics_with_results(self, temp_csv_files):
         """Test statistics with results."""
@@ -233,7 +232,7 @@ class TestBatchStatistics:
         batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
         stats = batch.get_statistics()
-        assert isinstance(stats, dict)
+        assert isinstance(stats, dict)  # nosec B101
 
     def test_length(self, temp_csv_files):
         """Test batch length."""
@@ -242,7 +241,7 @@ class TestBatchStatistics:
 
         batch.process_files(temp_csv_files, format="csv", x_col="x", y_col="y")
 
-        assert len(batch) == len(batch.results)
+        assert len(batch) == len(batch.results)  # nosec B101
 
 
 class TestBatchFiltering:
@@ -260,7 +259,7 @@ class TestBatchFiltering:
         # Filter to keep only results with certain criteria
         batch.apply_filter(lambda p, d, m: True)  # Keep all
 
-        assert len(batch.results) == initial_count
+        assert len(batch.results) == initial_count  # nosec B101
 
     def test_filter_removes_results(self, temp_csv_files):
         """Test that filter can remove results."""
@@ -272,7 +271,7 @@ class TestBatchFiltering:
         # Filter to remove all
         batch.apply_filter(lambda p, d, m: False)
 
-        assert len(batch.results) == 0
+        assert len(batch.results) == 0  # nosec B101
 
 
 class TestBatchUtilities:
@@ -287,17 +286,17 @@ class TestBatchUtilities:
 
         batch.clear()
 
-        assert len(batch.results) == 0
-        assert len(batch.errors) == 0
+        assert len(batch.results) == 0  # nosec B101
+        assert len(batch.errors) == 0  # nosec B101
 
     def test_repr(self):
         """Test string representation."""
         batch = BatchPipeline()
         repr_str = repr(batch)
 
-        assert "BatchPipeline" in repr_str
-        assert "results=0" in repr_str
-        assert "errors=0" in repr_str
+        assert "BatchPipeline" in repr_str  # nosec B101
+        assert "results=0" in repr_str  # nosec B101
+        assert "errors=0" in repr_str  # nosec B101
 
 
 class TestBatchExport:
@@ -316,9 +315,8 @@ class TestBatchExport:
         try:
             # This might fail if no pandas-excel support
             # Just test the interface
-            batch.export_summary(output_path, format="excel")
-        except Exception:
-            pass  # Expected if openpyxl not installed
+            with contextlib.suppress(Exception):
+                batch.export_summary(output_path, format="excel")
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
@@ -368,7 +366,7 @@ class TestBatchExport:
             header = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
             name_col = header.index("file_name") + 1
             file_name_value = ws.cell(row=2, column=name_col).value
-            assert file_name_value.startswith("'"), (
+            assert file_name_value.startswith("'"), (  # nosec B101
                 f"file_name cell must be neutralized, got: {file_name_value!r}"
             )
         finally:
@@ -391,7 +389,7 @@ class TestBatchExport:
         try:
             batch.export_summary(output_path, format="csv")
             content = Path(output_path).read_text()
-            assert "'=HYPERLINK" in content, (
+            assert "'=HYPERLINK" in content, (  # nosec B101
                 f"file_name must be neutralized in CSV output, got: {content!r}"
             )
         finally:

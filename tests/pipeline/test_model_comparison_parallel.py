@@ -20,7 +20,7 @@ class TestModelComparisonParallel:
         mc = ModelComparisonPipeline(models=["maxwell", "zener"])
         # Should accept parallel parameter
         mc.run(relaxation_data, parallel=False, test_mode="relaxation")
-        assert len(mc.results) == 2
+        assert len(mc.results) == 2  # nosec B101
 
     def test_parallel_matches_sequential(self, relaxation_data):
         from rheojax.pipeline.workflows import ModelComparisonPipeline
@@ -32,13 +32,13 @@ class TestModelComparisonParallel:
         mc_par.run(relaxation_data, parallel=True, n_workers=2, test_mode="relaxation")
 
         # Both should find results for both models
-        assert set(mc_seq.results.keys()) == set(mc_par.results.keys())
+        assert set(mc_seq.results.keys()) == set(mc_par.results.keys())  # nosec B101
 
         # Metrics should be numerically close
         for model in mc_seq.results:
             seq_r2 = mc_seq.results[model].get("r_squared", 0)
             par_r2 = mc_par.results[model].get("r_squared", 0)
-            assert abs(seq_r2 - par_r2) < 0.05, (
+            assert abs(seq_r2 - par_r2) < 0.05, (  # nosec B101
                 f"Model {model}: R-squared mismatch seq={seq_r2:.4f} vs par={par_r2:.4f}"
             )
 
@@ -47,22 +47,35 @@ class TestModelComparisonParallel:
             # exactly like the sequential path, not fall back to a manually
             # recomputed value. A loose r_squared check alone doesn't catch a
             # regression here because r_squared computation is unaffected.
-            assert mc_seq.results[model]["rmse"] == pytest.approx(
+            assert mc_seq.results[model]["rmse"] == pytest.approx(  # nosec B101
                 mc_par.results[model]["rmse"], rel=1e-6
             ), f"Model {model}: rmse mismatch between sequential and parallel paths"
-            assert mc_seq.results[model]["aic"] == pytest.approx(
+            assert mc_seq.results[model]["aic"] == pytest.approx(  # nosec B101
                 mc_par.results[model]["aic"], rel=1e-6
             ), f"Model {model}: aic mismatch between sequential and parallel paths"
-            assert mc_seq.results[model]["bic"] == pytest.approx(
+            assert mc_seq.results[model]["bic"] == pytest.approx(  # nosec B101
                 mc_par.results[model]["bic"], rel=1e-6
             ), f"Model {model}: bic mismatch between sequential and parallel paths"
 
         # The actual regression this fix prevents: ranking by a metric must
         # not depend on the parallel flag. r_squared alone wouldn't have
         # caught the original bug since aic/bic were the ones diverging.
-        assert mc_seq.get_best_model(metric="aic") == mc_par.get_best_model(
+        assert mc_seq.get_best_model(metric="aic") == mc_par.get_best_model(  # nosec B101
             metric="aic"
         ), "get_best_model(metric='aic') disagrees between sequential and parallel runs"
+
+    def test_parallel_failure_emits_warning_and_excludes_model(self, relaxation_data):
+        """A failing model in parallel mode must warn, like the sequential
+        path does, instead of silently vanishing from results with only a
+        log line no caller is guaranteed to see."""
+        from rheojax.pipeline.workflows import ModelComparisonPipeline
+
+        mc = ModelComparisonPipeline(models=["maxwell", "nonexistent_model_xyz"])
+        with pytest.warns(UserWarning, match="Failed to fit model"):
+            mc.run(relaxation_data, parallel=True, n_workers=2, test_mode="relaxation")
+
+        assert "maxwell" in mc.results  # nosec B101
+        assert "nonexistent_model_xyz" not in mc.results  # nosec B101
 
     def test_parallel_single_model_fallback(self, relaxation_data):
         """With only 1 model, parallel=True should not use pool."""
@@ -70,4 +83,4 @@ class TestModelComparisonParallel:
 
         mc = ModelComparisonPipeline(models=["maxwell"])
         mc.run(relaxation_data, parallel=True, test_mode="relaxation")
-        assert "maxwell" in mc.results
+        assert "maxwell" in mc.results  # nosec B101
