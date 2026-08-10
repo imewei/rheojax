@@ -839,6 +839,7 @@ def fit_relaxation_prony_series(
     n_modes: int = _PRONY_N_MODES,
     lam_decades: float = _PRONY_LAM_DECADES,
     smooth_lambda: float = _PRONY_SMOOTH_LAMBDA,
+    liquid: bool = False,
 ) -> ArrayLike:
     """Relaxation modulus ``G(t)`` from a target complex modulus ``G*(w)``.
 
@@ -864,6 +865,17 @@ def fit_relaxation_prony_series(
         lam_decades: Half-width (decades) of the log-spaced relaxation-time grid.
         smooth_lambda: Second-difference smoothness penalty weight on the mode
             spectrum.
+        liquid: If True, the equilibrium-modulus term ``G_e`` is dropped from
+            the fit entirely (fixed at 0) instead of merely clamped ``>= 0``.
+            A finite fixed ``omega`` grid only samples a limited window
+            around ``anchor_time``, so for a model that is a liquid (no
+            elastic plateau; G(t) -> 0 as t -> infinity) the unconstrained
+            least-squares solve can assign a spurious nonzero ``G_e`` that
+            best-fits that window but makes G(t) plateau at a nonzero floor
+            instead of decaying -- only visible once t moves well past the
+            fitted window. Set True for any caller whose closed-form creep
+            compliance has an unbounded viscous-flow term (t/eta), which is
+            definitionally a liquid.
 
     Returns:
         Relaxation modulus G(t), same shape as t.
@@ -874,12 +886,20 @@ def fit_relaxation_prony_series(
     tau = _anchored_log_grid(anchor_time, lam_decades, n_modes)
     wt2 = (omega[:, None] * tau[None, :]) ** 2
     n_omega = omega.shape[0]
-    ones_col = jnp.ones((n_omega, 1))
-    zeros_col = jnp.zeros((n_omega, 1))
-    A_p = jnp.concatenate([ones_col, wt2 / (1.0 + wt2)], axis=1)
-    A_pp = jnp.concatenate(
-        [zeros_col, (omega[:, None] * tau[None, :]) / (1.0 + wt2)], axis=1
-    )
+    mode_p = wt2 / (1.0 + wt2)
+    mode_pp = (omega[:, None] * tau[None, :]) / (1.0 + wt2)
+    if liquid:
+        A_p = mode_p
+        A_pp = mode_pp
+        n_coef = n_modes
+        col_offset = 0
+    else:
+        ones_col = jnp.ones((n_omega, 1))
+        zeros_col = jnp.zeros((n_omega, 1))
+        A_p = jnp.concatenate([ones_col, mode_p], axis=1)
+        A_pp = jnp.concatenate([zeros_col, mode_pp], axis=1)
+        n_coef = n_modes + 1
+        col_offset = 1
     A = jnp.concatenate([A_p, A_pp], axis=0)
     b = jnp.concatenate([G_prime, G_double_prime])
     weight = 1.0 / jnp.clip(
@@ -888,15 +908,17 @@ def fit_relaxation_prony_series(
     A_weighted = A * weight[:, None]
     b_weighted = b * weight
 
-    n_coef = n_modes + 1
     smooth_block = jnp.zeros((n_modes - 2, n_coef))
-    smooth_block = smooth_block.at[:, 1 : 1 + n_modes].set(
+    smooth_block = smooth_block.at[:, col_offset : col_offset + n_modes].set(
         jnp.asarray(_second_difference_operator(n_modes))
     )
     coef = _regularized_weighted_lstsq(
         A_weighted, b_weighted, smooth_block, smooth_lambda
     )
-    G_e, g_i = coef[0], coef[1:]
+    if liquid:
+        G_e, g_i = 0.0, coef
+    else:
+        G_e, g_i = coef[0], coef[1:]
 
     t_col = t[..., None]
     return G_e + jnp.sum(g_i * jnp.exp(-t_col / tau), axis=-1)

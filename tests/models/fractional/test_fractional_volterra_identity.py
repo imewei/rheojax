@@ -126,3 +126,20 @@ class TestFractionalVolterraIdentity:
         for t in _MIDDLE_DECADE_TIMES:
             ratio = _convolution_ratio(G_fn, J_fn, t)
             assert ratio == pytest.approx(1.0, abs=0.05), f"Burgers t={t}: {ratio}"
+
+    def test_burgers_relaxation_decays_to_zero(self):
+        """Burgers is a liquid (creep has an unbounded t/eta1 flow term), so
+        G(t) -> 0 as t -> infinity. The Prony fit's equilibrium-modulus term
+        must be pinned to 0 (liquid=True in fit_relaxation_prony_series), not
+        merely clamped >= 0 -- an unconstrained least-squares solve over the
+        fit's finite omega window can otherwise assign a spurious nonzero
+        floor that best-fits that window but never decays, which the
+        convolution-identity check above (restricted to the tested "middle
+        decades") does not directly catch. See PR #110 review."""
+        Jg, eta1, Jk, alpha, tau_k = 1e-3, 50.0, 5e-3, 0.5, 1.0
+        G_fn = lambda t: FractionalBurgersModel._predict_relaxation(  # noqa: E731
+            t, Jg, eta1, Jk, alpha, tau_k
+        )
+        G_near = float(G_fn(jnp.asarray([10.0]))[0])
+        G_far = float(G_fn(jnp.asarray([1e6]))[0])
+        assert G_far < 0.01 * G_near, f"G(1e6)={G_far} should be << G(10)={G_near}"

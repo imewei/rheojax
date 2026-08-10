@@ -204,7 +204,7 @@ class FractionalZenerSolidLiquid(BaseModel):
         alpha: float,
         tau: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t), exactly Volterra-consistent with G(t).
+        """Predict creep compliance J(t), Volterra-consistent with G(t) to fit accuracy.
 
         FZSL's relaxation modulus G(t) (and G*(w)) above are exact closed
         forms, but the LVE creep compliance J(t) has no elementary Laplace

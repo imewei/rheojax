@@ -225,7 +225,7 @@ class FractionalJeffreysModel(BaseModel):
         alpha: float,
         tau1: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t), exactly Volterra-consistent with G(t).
+        """Predict creep compliance J(t), Volterra-consistent with G(t) to fit accuracy.
 
         Jeffreys' relaxation modulus G(t) (and G*(w)) above are the exact
         Laplace inverse of this model's own complex modulus, but the LVE

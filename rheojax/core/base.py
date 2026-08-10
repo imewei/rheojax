@@ -864,13 +864,21 @@ class BaseModel(BayesianMixin, ABC):
             # ROTATION/FLOW_CURVE, X is shear rate: real rheometer sweeps
             # (up/down hysteresis loops, unsorted rate lists) are legitimately
             # non-monotonic there, so the check must not reject them.
-            _effective_mode = (
-                test_mode
-                if test_mode is not None
-                else getattr(self, "_test_mode", None)
+            #
+            # Deliberately NOT falling back to self._test_mode here (unlike
+            # _predict()'s own dispatch below): self._test_mode is persistent
+            # instance state set by a prior fit()/predict(test_mode=...) call
+            # and is never scoped to a single predict() call. Trusting it for
+            # this decision let any later predict() call on an already-fitted
+            # multi-protocol model -- with X of any meaning, not just shear
+            # rate -- silently skip the monotonicity guard. Only an explicit
+            # test_mode resolved for *this* call (kwarg or RheoData-declared,
+            # already captured in `test_mode` above) or the closed flow-only
+            # family below may skip it.
+            _effective_mode_value = getattr(test_mode, "value", test_mode)
+            _effective_mode_str = (
+                str(_effective_mode_value).lower() if test_mode is not None else ""
             )
-            _effective_mode_value = getattr(_effective_mode, "value", _effective_mode)
-            _effective_mode_str = str(_effective_mode_value).lower()
             # rheojax.models.flow.* is a dedicated shear-rate-only family
             # (Bingham, Cross, Carreau, CarreauYasuda, HerschelBulkley,
             # PowerLaw) whose _predict() never reads test_mode at all, so a

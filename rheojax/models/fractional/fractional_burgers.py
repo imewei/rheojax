@@ -209,7 +209,7 @@ class FractionalBurgersModel(BaseModel):
         alpha: float,
         tau_k: float,
     ) -> jnp.ndarray:
-        """Predict relaxation modulus G(t), exactly Volterra-consistent with J(t).
+        """Predict relaxation modulus G(t), Volterra-consistent with J(t) to fit accuracy.
 
         FBM's creep compliance J(t) above is exact (a sum of the three
         series-mechanism compliances: glassy spring, Maxwell dashpot, and
@@ -260,8 +260,17 @@ class FractionalBurgersModel(BaseModel):
         G_star = FractionalBurgersModel._predict_oscillation(
             omega, Jg, eta1, Jk, alpha, tau_k
         )
+        # Burgers is a liquid (creep has an unbounded t/eta1 flow term, so
+        # J(t) -> infinity and G(t) -> 0 as t -> infinity): pin the fit's
+        # equilibrium modulus to 0 rather than let least squares assign a
+        # spurious nonzero floor that only best-fits the finite omega window.
         G_t = fit_relaxation_prony_series(
-            G_star[..., 0], G_star[..., 1], omega, t, anchor_time=anchor_time
+            G_star[..., 0],
+            G_star[..., 1],
+            omega,
+            t,
+            anchor_time=anchor_time,
+            liquid=True,
         )
         return G_t
 

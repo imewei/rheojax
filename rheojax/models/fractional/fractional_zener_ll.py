@@ -265,7 +265,7 @@ class FractionalZenerLiquidLiquid(BaseModel):
         gamma: float,
         tau: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t), exactly Volterra-consistent with G(t).
+        """Predict creep compliance J(t), Volterra-consistent with G(t) to fit accuracy.
 
         FZLL's relaxation modulus G(t) (and G*(w)) above are the exact term-
         by-term inverse Laplace transform of this model's own complex
