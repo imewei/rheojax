@@ -936,15 +936,15 @@ def plot_variant_comparison(
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
                 )
-
-            y_pred = np.asarray(y_pred).flatten()
-
-            if protocol in ("flow_curve", "relaxation", "creep", "saos"):
-                ax.loglog(x_data, y_pred, "-", color=color, lw=2.5, label=label)
-            else:
-                ax.plot(x_data, y_pred, "-", color=color, lw=2.5, label=label)
-        except Exception:
+        except (ValueError, TypeError, AttributeError, RuntimeError):
             continue
+
+        y_pred = np.asarray(y_pred).flatten()
+
+        if protocol in ("flow_curve", "relaxation", "creep", "saos"):
+            ax.loglog(x_data, y_pred, "-", color=color, lw=2.5, label=label)
+        else:
+            ax.plot(x_data, y_pred, "-", color=color, lw=2.5, label=label)
 
     ax.set_xlabel(_get_xlabel(protocol), fontsize=12)
     ax.set_ylabel(_get_ylabel(protocol), fontsize=12)
@@ -1012,15 +1012,15 @@ def plot_bell_nu_sweep(
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
                 )
-
-            y_pred = np.asarray(y_pred).flatten()
-
-            if protocol in ("flow_curve", "relaxation", "saos"):
-                ax.loglog(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
-            else:
-                ax.plot(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
-        except Exception:
+        except (ValueError, TypeError, AttributeError, RuntimeError):
             continue
+
+        y_pred = np.asarray(y_pred).flatten()
+
+        if protocol in ("flow_curve", "relaxation", "saos"):
+            ax.loglog(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
+        else:
+            ax.plot(x_data, y_pred, "-", color=color, lw=2, label=f"nu = {nu}")
 
     model.parameters.set_value("nu", original_nu)
 

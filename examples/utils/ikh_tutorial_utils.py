@@ -570,10 +570,9 @@ def save_ikh_results(
     # Save NLSQ point estimates
     nlsq_params = {}
     for name in param_names:
-        try:
-            nlsq_params[name] = float(model.parameters.get_value(name))
-        except (KeyError, AttributeError, TypeError):
-            pass
+        value = model.parameters.get_value(name)
+        if value is not None:
+            nlsq_params[name] = float(value)
 
     with open(output_dir / f"nlsq_params_{protocol}.json", "w") as f:
         json.dump(nlsq_params, f, indent=2)

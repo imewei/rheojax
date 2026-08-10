@@ -331,6 +331,18 @@ def posterior_predictive_saos(
             G_prime_all.append(G_p_arr)
             G_double_prime_all.append(G_pp_arr)
 
+    n_dropped = len(indices) - len(G_prime_all)
+    if n_dropped:
+        import warnings
+
+        warnings.warn(
+            f"posterior_predictive_saos: dropped {n_dropped}/{len(indices)} "
+            "posterior draws with non-finite predictions; the credible band "
+            "is computed from the remaining draws only and may understate "
+            "true uncertainty.",
+            stacklevel=2,
+        )
+
     return np.array(G_prime_all), np.array(G_double_prime_all)
 
 
@@ -370,6 +382,18 @@ def posterior_predictive_1d(
         y_pred_arr = np.array(y_pred)
         if np.all(np.isfinite(y_pred_arr)):
             draws.append(y_pred_arr)
+
+    n_dropped = len(indices) - len(draws)
+    if n_dropped:
+        import warnings
+
+        warnings.warn(
+            f"posterior_predictive_1d: dropped {n_dropped}/{len(indices)} "
+            "posterior draws with non-finite predictions; the credible band "
+            "is computed from the remaining draws only and may understate "
+            "true uncertainty.",
+            stacklevel=2,
+        )
 
     return np.array(draws)
 

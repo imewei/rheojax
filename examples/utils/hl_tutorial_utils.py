@@ -223,7 +223,7 @@ def load_polymer_creep(temp: int = 145) -> tuple[np.ndarray, np.ndarray]:
             f"Expected at: examples/data/creep/polymers/creep_ps{temp}_data.csv"
         )
 
-    raw = np.loadtxt(data_path, delimiter=",", skiprows=1)
+    raw = np.loadtxt(data_path, delimiter="\t", skiprows=1)
     time = raw[:, 0]
     compliance = raw[:, 1]
 
@@ -299,10 +299,16 @@ def generate_hl_synthetic(
         G_prime = np.real(G_star_clean)
         G_double_prime = np.imag(G_star_clean)
 
-        # Add noise
-        noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
+        # Add noise (np.abs() on the scale only, not the data: the HL kernel's
+        # G'' can be negative for some parameter regimes, and a negative mean
+        # would otherwise raise ValueError: scale < 0 in rng.normal)
+        noise_p = rng.normal(
+            0, noise_level * np.mean(np.abs(G_prime)), size=G_prime.shape
+        )
         noise_pp = rng.normal(
-            0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
+            0,
+            noise_level * np.mean(np.abs(G_double_prime)),
+            size=G_double_prime.shape,
         )
 
         G_star = np.column_stack([G_prime + noise_p, G_double_prime + noise_pp])
