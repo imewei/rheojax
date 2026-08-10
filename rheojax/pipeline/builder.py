@@ -289,13 +289,10 @@ class PipelineBuilder:
                 model_name = kwargs.pop("model")
                 pipeline.fit(model_name, **kwargs)
             elif step_type == "predict":
-                # Store prediction but don't break chain
-                kwargs.pop("store_as", None)  # Remove for now
-                # Predictions are implicit in pipeline
-                logger.warning(
-                    "Predict step is a no-op — predictions are generated "
-                    "automatically during fit/bayesian steps"
-                )
+                store_as = kwargs.pop("store_as", None)
+                prediction = pipeline.predict(**kwargs)
+                if store_as is not None:
+                    pipeline.predictions[store_as] = prediction
             elif step_type == "bayesian":
                 # Delegate to Pipeline.fit_bayesian which handles
                 # warm_start, test_mode propagation, and result caching
@@ -332,6 +329,7 @@ class PipelineBuilder:
             elif step_type in [
                 "transform",
                 "fit",
+                "predict",
                 "plot",
                 "save",
                 "bayesian",

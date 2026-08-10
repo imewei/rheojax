@@ -66,6 +66,7 @@ class _PipelineState:
         _current_figure: Any
         _diagnostic_results: Any
         _last_comparison: Any
+        predictions: dict[str, RheoData]
         _id: str
 
         def predict(
@@ -307,9 +308,7 @@ class _PipelineIO(_PipelineState):
                 else:
                     raise ValueError(f"Unknown format: {format}")
 
-                ctx["n_points"] = (
-                    len(self.data.x) if self.data.x is not None else 0
-                )
+                ctx["n_points"] = len(self.data.x) if self.data.x is not None else 0
             except Exception as e:
                 logger.error(
                     "Failed to save data",
@@ -641,7 +640,7 @@ class _PipelinePlotting(_PipelineState):
         fit_result = self.get_fit_result()
         plotter = FitPlotter()
 
-        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        # np.asarray converts JAX arrays to a host-backed numpy array (a copy)
         X = np.asarray(self.data.x)
         y = np.asarray(self.data.y)
 
@@ -712,7 +711,7 @@ class _PipelinePlotting(_PipelineState):
         from rheojax.visualization.fit_plotter import FitPlotter
 
         plotter = FitPlotter()
-        # np.asarray is zero-copy for CPU-backed arrays (JAX or numpy)
+        # np.asarray converts JAX arrays to a host-backed numpy array (a copy)
         X = np.asarray(self.data.x)
         y = np.asarray(self.data.y)
 
@@ -907,6 +906,7 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
         self._current_figure: Any = None
         self._diagnostic_results: Any = None
         self._last_comparison: Any = None
+        self.predictions: dict[str, RheoData] = {}
         self._id = str(uuid.uuid4())[:8]
         logger.debug(
             "Pipeline initialized",
@@ -1056,7 +1056,7 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
         X = self.data.x
         y = self.data.y
 
-        # Convert to numpy for fitting — np.asarray is zero-copy for CPU arrays
+        # Convert to numpy for fitting (np.asarray copies JAX arrays to host)
         if _is_jax_array(X):
             X = np.asarray(X)
         if _is_jax_array(y):
@@ -1133,7 +1133,7 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
                 raise ValueError("No data available for prediction.")
             X = np.asarray(self.data.x)
 
-        # Convert to numpy for prediction — np.asarray is zero-copy for CPU arrays
+        # Convert to numpy for prediction (np.asarray copies JAX arrays to host)
         if _is_jax_array(X):
             X = np.asarray(X)
 
@@ -1499,11 +1499,21 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
             >>> pipeline2 = pipeline.clone()
         """
         new_pipeline = Pipeline(data=self.data.copy() if self.data else None)
-        new_pipeline.steps = copy.deepcopy(self.steps)
-        new_pipeline.history = self.history.copy()
-        new_pipeline._last_model = (
-            copy.deepcopy(self._last_model) if self._last_model is not None else None
+        # Single deepcopy call so steps[-1][1] and _last_model -- which
+        # reference the same model object in the original pipeline -- keep
+        # that identity in the clone too (deepcopy's memo dedupes shared
+        # references within one call).
+        new_pipeline.steps, new_pipeline._last_model = copy.deepcopy(
+            (self.steps, self._last_model)
         )
+        new_pipeline.history = self.history.copy()
+        new_pipeline._last_fit_result = copy.deepcopy(self._last_fit_result)
+        new_pipeline._last_bayesian_result = copy.deepcopy(self._last_bayesian_result)
+        new_pipeline._transform_results = copy.deepcopy(self._transform_results)
+        new_pipeline._last_transform_name = self._last_transform_name
+        new_pipeline._diagnostic_results = copy.deepcopy(self._diagnostic_results)
+        new_pipeline._last_comparison = copy.deepcopy(self._last_comparison)
+        new_pipeline.predictions = copy.deepcopy(self.predictions)
         logger.debug(
             "Pipeline cloned",
             original_id=self._id,
@@ -1532,6 +1542,7 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
         self._current_figure = None
         self._diagnostic_results = None
         self._last_comparison = None
+        self.predictions = {}
         return self
 
     def __repr__(self) -> str:

@@ -30,8 +30,8 @@ class TestPersistentProcessPool:
         from rheojax.parallel.pool import PersistentProcessPool
 
         pool = PersistentProcessPool(n_workers=2)
-        assert pool.n_workers == 2
-        assert pool.is_alive()
+        assert pool.n_workers == 2  # nosec B101
+        assert pool.is_alive()  # nosec B101
         pool.shutdown()
 
     def test_submit_and_get_result(self):
@@ -41,7 +41,7 @@ class TestPersistentProcessPool:
         try:
             future = pool.submit(_add_one, 41)
             result = future.result(timeout=10)
-            assert result == 42
+            assert result == 42  # nosec B101
         finally:
             pool.shutdown()
 
@@ -52,7 +52,7 @@ class TestPersistentProcessPool:
         try:
             futures = [pool.submit(_add_one, i) for i in range(10)]
             results = sorted(f.result(timeout=10) for f in futures)
-            assert results == list(range(1, 11))
+            assert results == list(range(1, 11))  # nosec B101
         finally:
             pool.shutdown()
 
@@ -71,8 +71,10 @@ class TestPersistentProcessPool:
             elapsed = time.perf_counter() - start
             # 4 tasks x 0.5s each, 2 workers -> ~1.0s, not 2.0s
             # Allow generous margin for CI environments
-            assert elapsed < 3.0, f"Expected parallel speedup, got {elapsed:.1f}s"
-            assert sorted(results) == [1, 2, 3, 4]
+            assert elapsed < 3.0, (  # nosec B101
+                f"Expected parallel speedup, got {elapsed:.1f}s"
+            )
+            assert sorted(results) == [1, 2, 3, 4]  # nosec B101
         finally:
             pool.shutdown()
 
@@ -87,12 +89,25 @@ class TestPersistentProcessPool:
         finally:
             pool.shutdown()
 
+    def test_submit_rejects_unpicklable_fn(self):
+        """A lambda can't be pickled onto a spawn worker -- submit() must
+        fail fast with TypeError instead of silently dropping the task and
+        letting future.result() hang until timeout."""
+        from rheojax.parallel.pool import PersistentProcessPool
+
+        pool = PersistentProcessPool(n_workers=1)
+        try:
+            with pytest.raises(TypeError, match="not picklable"):
+                pool.submit(lambda x: x + 1, 1)
+        finally:
+            pool.shutdown()
+
     def test_shutdown_terminates_workers(self):
         from rheojax.parallel.pool import PersistentProcessPool
 
         pool = PersistentProcessPool(n_workers=2)
         pool.shutdown(timeout=5)
-        assert not pool.is_alive()
+        assert not pool.is_alive()  # nosec B101
 
     def test_pool_rejects_after_shutdown(self):
         from rheojax.parallel.pool import PersistentProcessPool
@@ -127,8 +142,8 @@ class TestPersistentProcessPool:
             pool._task_queue.put = wrapped_put
 
             future = pool.submit(_add_one, 1)
-            assert future.result(timeout=10) == 2
-            assert observed_locked == [True], (
+            assert future.result(timeout=10) == 2  # nosec B101
+            assert observed_locked == [True], (  # nosec B101
                 "submit() must call task_queue.put() while holding self._lock"
             )
         finally:
@@ -177,8 +192,8 @@ class TestPersistentProcessPool:
         stop.set()
         t.join(timeout=10)
 
-        assert not t.is_alive(), "submit loop thread failed to stop"
-        assert unexpected == [], (
+        assert not t.is_alive(), "submit loop thread failed to stop"  # nosec B101
+        assert unexpected == [], (  # nosec B101
             f"Unexpected exception type(s) escaped submit() during concurrent "
             f"shutdown: {unexpected!r}"
         )
@@ -188,15 +203,15 @@ class TestPersistentProcessPool:
 
         with PersistentProcessPool(n_workers=1) as pool:
             result = pool.submit(_add_one, 99).result(timeout=10)
-            assert result == 100
-        assert not pool.is_alive()
+            assert result == 100  # nosec B101
+        assert not pool.is_alive()  # nosec B101
 
     def test_map_convenience(self):
         from rheojax.parallel.pool import PersistentProcessPool
 
         with PersistentProcessPool(n_workers=2) as pool:
             results = list(pool.map(_add_one, range(5), timeout=10))
-            assert sorted(results) == [1, 2, 3, 4, 5]
+            assert sorted(results) == [1, 2, 3, 4, 5]  # nosec B101
 
     def test_shutdown_poisons_pending_futures(self):
         """Futures submitted but not completed before shutdown get an error."""

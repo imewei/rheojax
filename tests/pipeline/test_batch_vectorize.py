@@ -106,7 +106,9 @@ class TestBatchVectorization:
             y_col="y",
         )
 
-        assert len(batch.results) + len(batch.errors) == len(temp_variable_length_files)
+        assert (  # nosec B101
+            len(batch.results) + len(batch.errors) == len(temp_variable_length_files)
+        )
 
     def test_variable_length_dataset_handling(self, temp_variable_length_files):
         """Test handling of variable-length datasets with padding/masking."""
@@ -120,8 +122,9 @@ class TestBatchVectorization:
             y_col="y",
         )
 
+        assert len(batch.errors) == 0  # nosec B101
         results = batch.get_results()
-        assert len(results) >= 0
+        assert len(results) == len(temp_variable_length_files)  # nosec B101
 
     @pytest.mark.benchmark
     def test_multi_dataset_benchmark(self, temp_batch_files):
@@ -138,7 +141,7 @@ class TestBatchVectorization:
         )
         time_seq = time.time() - start_seq
 
-        assert time_seq > 0
+        assert time_seq > 0  # nosec B101
         print(f"\nSequential time for {len(temp_batch_files)} files: {time_seq:.4f}s")
 
     def test_parallel_io_structural(self, temp_batch_files):
@@ -166,9 +169,9 @@ class TestBatchVectorization:
         # Structural checks: both should produce same number of results
         seq_results = batch_seq.get_results()
         par_results = batch_par.get_results()
-        assert len(seq_results) == len(par_results)
-        assert len(seq_results) + len(batch_seq.get_errors()) == 8
-        assert len(par_results) + len(batch_par.get_errors()) == 8
+        assert len(seq_results) == len(par_results)  # nosec B101
+        assert len(seq_results) + len(batch_seq.get_errors()) == 8  # nosec B101
+        assert len(par_results) + len(batch_par.get_errors()) == 8  # nosec B101
 
     def test_error_handling_preserves_file_level_errors(self, temp_batch_files):
         """Test that error handling preserves file-level granularity."""
@@ -185,10 +188,10 @@ class TestBatchVectorization:
         )
 
         errors = batch.get_errors()
-        assert len(errors) >= 1
+        assert len(errors) >= 1  # nosec B101
 
         results = batch.get_results()
-        assert len(results) >= 3
+        assert len(results) >= 3  # nosec B101
 
     def test_backward_compatibility_batch_vectorize_false(self, temp_batch_files):
         """Test backward compatibility with batch_vectorize=False (default)."""
@@ -202,7 +205,7 @@ class TestBatchVectorization:
             y_col="y",
         )
 
-        assert len(batch.results) + len(batch.errors) == 5
+        assert len(batch.results) + len(batch.errors) == 5  # nosec B101
 
     def test_stack_datasets_padding(self):
         """Test _stack_datasets helper with padding for variable lengths."""
@@ -215,7 +218,7 @@ class TestBatchVectorization:
             (jnp.array([1.0, 2.0]), jnp.array([2.0, 4.0])),
         ]
 
-        assert len(datasets) == 3
+        assert len(datasets) == 3  # nosec B101
 
     def test_vmap_model_fitting(self):
         """Test that model fitting can be vmapped over datasets."""
@@ -227,7 +230,7 @@ class TestBatchVectorization:
         model.fit(X, y)
         slope = model.parameters.get_value("slope")
 
-        assert abs(slope - 2.0) < 0.1
+        assert abs(slope - 2.0) < 0.1  # nosec B101
 
 
 @pytest.mark.smoke
@@ -235,21 +238,25 @@ class TestBatchVectorizationSmoke:
     """Smoke tests for batch vectorization (quick validation)."""
 
     def test_batch_vectorize_parameter_exists(self):
-        """Test that batch processing handles empty file list."""
+        """Test that batch processing handles empty file list as a no-op."""
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        try:
-            batch.process_files([])
-        except ValueError:
-            pass
+        batch.process_files([])
+
+        if batch.results != []:
+            raise AssertionError(f"Expected empty results, got {batch.results}")
+        if batch.errors != []:
+            raise AssertionError(f"Expected empty errors, got {batch.errors}")
 
     def test_n_workers_parameter_exists(self):
-        """Test that n_workers parameter is accepted."""
+        """Test that n_workers parameter is accepted for an empty file list."""
         template = Pipeline()
         batch = BatchPipeline(template)
 
-        try:
-            batch.process_files([], n_workers=4)
-        except ValueError:
-            pass
+        batch.process_files([], n_workers=4)
+
+        if batch.results != []:
+            raise AssertionError(f"Expected empty results, got {batch.results}")
+        if batch.errors != []:
+            raise AssertionError(f"Expected empty errors, got {batch.errors}")

@@ -83,7 +83,8 @@ def test_pipeline_fit_rejects_removed_kwargs_before_model(
     with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         Pipeline(data=shear_data).fit(model, **{removed_key: value})
 
-    assert _SpyModel.fit_calls == []
+    if _SpyModel.fit_calls != []:
+        raise AssertionError(f"model.fit was reached: {_SpyModel.fit_calls}")
 
 
 def test_pipeline_fit_preserves_supported_kwargs(shear_data):
@@ -93,9 +94,10 @@ def test_pipeline_fit_preserves_supported_kwargs(shear_data):
         _SpyModel(), method="scipy", test_mode="creep", max_iter=17
     )
 
-    assert _SpyModel.fit_calls == [
+    if _SpyModel.fit_calls != [
         {"method": "scipy", "test_mode": "creep", "max_iter": 17}
-    ]
+    ]:
+        raise AssertionError(f"unexpected fit kwargs: {_SpyModel.fit_calls}")
 
 
 @pytest.mark.parametrize(("removed_key", "value"), REMOVED_KWARGS)
@@ -109,7 +111,10 @@ def test_pipeline_bayesian_rejects_removed_kwargs_before_model(
     with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
         pipeline.fit_bayesian(**{removed_key: value})
 
-    assert _SpyModel.bayesian_calls == []
+    if _SpyModel.bayesian_calls != []:
+        raise AssertionError(
+            f"model.fit_bayesian was reached: {_SpyModel.bayesian_calls}"
+        )
 
 
 def test_pipeline_bayesian_preserves_sampling_and_test_mode(shear_data):
@@ -125,7 +130,7 @@ def test_pipeline_bayesian_preserves_sampling_and_test_mode(shear_data):
         target_accept_prob=0.91,
     )
 
-    assert _SpyModel.bayesian_calls == [
+    if _SpyModel.bayesian_calls != [
         {
             "test_mode": "relaxation",
             "seed": 7,
@@ -134,7 +139,10 @@ def test_pipeline_bayesian_preserves_sampling_and_test_mode(shear_data):
             "num_chains": 2,
             "target_accept_prob": 0.91,
         }
-    ]
+    ]:
+        raise AssertionError(
+            f"unexpected fit_bayesian kwargs: {_SpyModel.bayesian_calls}"
+        )
 
 
 @pytest.mark.parametrize(
@@ -158,8 +166,10 @@ def test_specialized_bayesian_pipeline_rejects_before_model(
             pipeline._last_model = model
             pipeline.fit_bayesian(**{removed_key: value})
 
-    assert _SpyModel.fit_calls == []
-    assert _SpyModel.bayesian_calls == []
+    if _SpyModel.fit_calls != [] or _SpyModel.bayesian_calls != []:
+        raise AssertionError(
+            f"model was reached: {_SpyModel.fit_calls}, {_SpyModel.bayesian_calls}"
+        )
 
 
 @pytest.mark.parametrize(("removed_key", "value"), REMOVED_KWARGS)
@@ -175,7 +185,8 @@ def test_model_comparison_rejects_removed_kwargs_before_model(
         with pytest.raises(TypeError, match=rf"{removed_key}.*shear-only"):
             ModelComparisonPipeline(["spy"]).run(shear_data, **{removed_key: value})
 
-    assert _SpyModel.fit_calls == []
+    if _SpyModel.fit_calls != []:
+        raise AssertionError(f"model.fit was reached: {_SpyModel.fit_calls}")
 
 
 def test_model_comparison_preserves_supported_kwargs(shear_data):
@@ -187,9 +198,10 @@ def test_model_comparison_preserves_supported_kwargs(shear_data):
     ):
         ModelComparisonPipeline(["spy"]).run(shear_data, method="scipy", max_iter=23)
 
-    assert _SpyModel.fit_calls == [
+    if _SpyModel.fit_calls != [
         {"test_mode": "relaxation", "method": "scipy", "max_iter": 23}
-    ]
+    ]:
+        raise AssertionError(f"unexpected fit kwargs: {_SpyModel.fit_calls}")
 
 
 @pytest.mark.parametrize(("removed_key", "value"), REMOVED_KWARGS)
@@ -207,7 +219,8 @@ def test_batch_fit_replay_rejects_removed_kwargs_before_model(
             tmp_path / "input.csv", preloaded_data=shear_data
         )
 
-    assert _SpyModel.fit_calls == []
+    if _SpyModel.fit_calls != []:
+        raise AssertionError(f"model.fit was reached: {_SpyModel.fit_calls}")
 
 
 def test_batch_replay_preserves_fit_bayesian_and_export_fields(
@@ -246,10 +259,11 @@ def test_batch_replay_preserves_fit_bayesian_and_export_fields(
         tmp_path / "input.csv", preloaded_data=shear_data
     )
 
-    assert _SpyModel.fit_calls == [
+    if _SpyModel.fit_calls != [
         {"test_mode": "creep", "method": "scipy", "max_iter": 29}
-    ]
-    assert _SpyModel.bayesian_calls == [
+    ]:
+        raise AssertionError(f"unexpected fit kwargs: {_SpyModel.fit_calls}")
+    if _SpyModel.bayesian_calls != [
         {
             "test_mode": "creep",
             "num_warmup": 5,
@@ -258,6 +272,26 @@ def test_batch_replay_preserves_fit_bayesian_and_export_fields(
             "seed": 3,
             "target_accept_prob": 0.92,
         }
-    ]
-    assert export_calls == [(output_root / "input", "json", {})]
-    assert metrics["export_path"] == str(output_root / "input")
+    ]:
+        raise AssertionError(
+            f"unexpected fit_bayesian kwargs: {_SpyModel.bayesian_calls}"
+        )
+    # Per-file export dir is now "{stem}_{hash}" (not the bare stem) so that
+    # same-basename files from different directories don't collide -- assert
+    # on the structural pieces the batch pipeline promises instead of an
+    # exact hardcoded name.
+    if len(export_calls) != 1:
+        raise AssertionError(f"expected exactly one export call: {export_calls}")
+    export_path, export_format, export_kwargs = export_calls[0]
+    if export_path.parent != output_root:
+        raise AssertionError(f"export dir is not under {output_root}: {export_path}")
+    if not export_path.name.startswith("input_"):
+        raise AssertionError(f"export dir name lacks stem prefix: {export_path.name}")
+    if export_format != "json":
+        raise AssertionError(f"unexpected export format: {export_format}")
+    if export_kwargs != {}:
+        raise AssertionError(f"unexpected export kwargs: {export_kwargs}")
+    if metrics["export_path"] != str(export_path):
+        raise AssertionError(
+            f"metrics export_path mismatch: {metrics['export_path']} != {export_path}"
+        )
