@@ -253,13 +253,7 @@ def load_emulsion_flow_curve(
     """
     valid = [0.69, 0.70, 0.72, 0.74, 0.76, 0.80]
     closest = min(valid, key=lambda x: abs(x - phi))
-    fname = f"{closest:.2f}".rstrip("0").rstrip(".")
-    # Handle 0.70 → "0.7" and 0.80 → "0.8" filename format
-    fpath = _resolve(f"flow/emulsions/{fname}.csv")
-
-    if not fpath.exists():
-        # Try exact two-decimal format
-        fpath = _resolve(f"flow/emulsions/{closest:.2f}.csv")
+    fpath = _resolve(f"flow/emulsions/{closest:.2f}.csv")
 
     df = pd.read_csv(fpath)
     gamma_dot = df.iloc[:, 0].values.astype(float)

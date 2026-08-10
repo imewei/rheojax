@@ -445,11 +445,20 @@ def load_multi_technique() -> dict[str, ProtocolData]:
             if not line or line.startswith("["):
                 break
             vals = line.split("\t")
-            try:
-                row = [float(v) for v in vals]
-                rows.append(row)
-            except ValueError:
+            if len(vals) != len(headers):
                 continue
+            # Columns like "Date and time" / "Termination reason" are
+            # non-numeric text; coerce them to NaN instead of dropping the
+            # whole row, otherwise every row in a TRIOS export is discarded
+            # (all export rows carry a timestamp column) and this returns an
+            # empty dict for every step.
+            row = []
+            for v in vals:
+                try:
+                    row.append(float(v))
+                except ValueError:
+                    row.append(np.nan)
+            rows.append(row)
 
         if not rows:
             continue
@@ -825,7 +834,7 @@ def plot_ppc(
             y_draw = model.predict(x, test_mode=data.protocol, **data.protocol_kwargs)
             ppc_curves.append(np.asarray(y_draw))
         except Exception:
-            continue
+            pass
 
     # Restore
     for p, v in orig_vals.items():
