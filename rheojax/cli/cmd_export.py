@@ -7,7 +7,7 @@ stdin.
 Usage:
     rheojax export analysis.h5 --output export/ --format directory
     rheojax export analysis.h5 --output bundle.xlsx --format excel
-    rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
+    rheojax load data.csv --json | rheojax export - --output ./out
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ Examples:
   # Export to Excel workbook
   rheojax export analysis.h5 --output summary.xlsx --format excel
 
-  # Pipe fit results directly into export
-  rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
+  # Pipe a loaded data envelope directly into export
+  rheojax load data.csv --json | rheojax export - --output ./out
         """,
     )
 
@@ -53,8 +53,7 @@ Examples:
         "input",
         type=str,
         help=(
-            "HDF5 file from a previous run, "
-            "or '-' to read a JSON envelope from stdin"
+            "HDF5 file from a previous run, or '-' to read a JSON envelope from stdin"
         ),
     )
     parser.add_argument(
@@ -102,8 +101,17 @@ def _build_pipeline_from_envelope(envelope: dict):
 
     from rheojax.core.data import RheoData
 
-    x = np.array(envelope.get("x", []))
-    y_payload = envelope.get("y", {})
+    if envelope.get("envelope_type") != "data" or not isinstance(
+        envelope.get("data"), dict
+    ):
+        raise ValueError(
+            "Envelope does not contain a 'data' payload (envelope_type="
+            f"{envelope.get('envelope_type')!r}). Pipe from 'rheojax load --json'."
+        )
+
+    payload = envelope["data"]
+    x = np.array(payload.get("x", []))
+    y_payload = payload.get("y", {})
     if isinstance(y_payload, dict) and y_payload.get("complex"):
         y = np.array(y_payload["real"]) + 1j * np.array(y_payload["imag"])
     elif isinstance(y_payload, dict):
@@ -130,7 +138,7 @@ def _build_pipeline_from_envelope(envelope: dict):
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
             "Could not construct a Pipeline from the stdin envelope. "
-            "Pipe from 'rheojax fit --json' or provide an HDF5 file."
+            "Pipe from 'rheojax load --json' or provide an HDF5 file."
         ) from exc
 
 

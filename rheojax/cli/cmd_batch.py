@@ -287,7 +287,13 @@ def main(args: list[str] | None = None) -> int:
         )
         return 1
 
-    print(f"Found {len(files)} file(s) matching '{parsed.pattern}'")
+    # Under --json, stdout must carry only the final JSON array (see below) --
+    # route all progress prose to stderr so a downstream JSON consumer never
+    # sees it interleaved with the payload.
+    _progress_stream = sys.stderr if parsed.json_output else sys.stdout
+    print(
+        f"Found {len(files)} file(s) matching '{parsed.pattern}'", file=_progress_stream
+    )
 
     # Trigger model registration
     import rheojax.models  # noqa: F401 — trigger registration
@@ -312,7 +318,7 @@ def main(args: list[str] | None = None) -> int:
 
     for i, file_path in enumerate(files, 1):
         prefix = f"[{i}/{len(files)}] {file_path.name}"
-        print(f"{prefix} ...", end=" ", flush=True)
+        print(f"{prefix} ...", end=" ", flush=True, file=_progress_stream)
 
         try:
             result = _fit_single(
@@ -323,7 +329,7 @@ def main(args: list[str] | None = None) -> int:
                 fit_kwargs,
             )
             t = result.get("fit_time_seconds", "?")
-            print(f"OK ({t}s)")
+            print(f"OK ({t}s)", file=_progress_stream)
             logger.info("Batch file fitted", file=str(file_path), time=t)
         except Exception as e:
             result = {
@@ -331,7 +337,7 @@ def main(args: list[str] | None = None) -> int:
                 "status": "error",
                 "error": str(e),
             }
-            print(f"FAILED: {e}")
+            print(f"FAILED: {e}", file=_progress_stream)
             logger.error("Batch file failed", file=str(file_path), error=str(e))
 
         all_results.append(result)
@@ -351,7 +357,7 @@ def main(args: list[str] | None = None) -> int:
         if result["status"] != "success" and not parsed.continue_on_error:
             break
 
-    print()
+    print(file=_progress_stream)
 
     # Output
     if parsed.json_output:

@@ -94,6 +94,24 @@ class TestMainInfo:
         # Should print something version-like
         assert any(char.isdigit() for char in captured.out)
 
+    @pytest.mark.unit
+    def test_main_info_help_exits_0(self, capsys):
+        # Regression: show_info() used to ignore its args entirely, so
+        # `rheojax info --help` silently ran show_info() instead of printing
+        # argparse help and exiting.
+        with pytest.raises(SystemExit) as exc_info:
+            main(["info", "--help"])
+        assert exc_info.value.code == 0
+
+    @pytest.mark.unit
+    def test_main_info_unknown_flag_errors(self, capsys):
+        # Regression: `rheojax info --bogus-flag` used to silently run
+        # show_info() and return 0 instead of an argparse "unrecognized
+        # arguments" error.
+        with pytest.raises(SystemExit) as exc_info:
+            main(["info", "--bogus-flag"])
+        assert exc_info.value.code != 0
+
 
 class TestMainInventory:
     @pytest.mark.unit

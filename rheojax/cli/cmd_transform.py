@@ -139,23 +139,24 @@ def _load_from_envelope(text: str):
         raise ValueError(
             f"Expected a JSON object from stdin, got {type(envelope).__name__}"
         )
-    if "x" not in envelope:
+    payload = envelope.get("data")
+    if not isinstance(payload, dict) or "x" not in payload:
         raise ValueError(
-            "JSON envelope is missing required 'x' key. "
-            "Pipe from 'rheojax fit --json' or 'rheojax load --json'."
+            "JSON envelope is missing a 'data' object with an 'x' key. "
+            "Pipe from 'rheojax load --json'."
         )
 
     from rheojax.core.data import RheoData
 
-    x = np.array(envelope["x"])
-    y_payload = envelope.get("y", {})
+    x = np.array(payload["x"])
+    y_payload = payload.get("y", {})
     if isinstance(y_payload, dict) and y_payload.get("complex"):
         y = np.array(y_payload["real"]) + 1j * np.array(y_payload["imag"])
     elif isinstance(y_payload, dict):
         if "values" not in y_payload:
             raise ValueError(
                 "JSON envelope 'y' dict has neither 'complex' nor 'values' key. "
-                "Pipe from 'rheojax load --json' or 'rheojax fit --json'."
+                "Pipe from 'rheojax load --json'."
             )
         y = np.array(y_payload["values"])
     else:
