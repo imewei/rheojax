@@ -1,16 +1,16 @@
-# Graph Report - rheojax  (2026-08-10)
+# Graph Report - foamy-inventing-hickey  (2026-08-10)
 
 ## Corpus Check
 - 814 files · ~1,823,441 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 24476 nodes · 49051 edges · 840 communities (734 shown, 106 thin omitted)
+- 24476 nodes · 49051 edges · 856 communities (744 shown, 112 thin omitted)
 - Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 4623 edges (avg confidence: 0.59)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `44aef5bf`
+- Built from commit: `a38cc281`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -28,7 +28,7 @@
 - LatticeEPM
 - test_fractional_initializers.py
 - VLBLocal
-- BatchPipeline
+- Pipeline
 - FluidityLocal
 - Maxwell
 - FitState
@@ -38,7 +38,7 @@
 - test_csv.py
 - load_csv
 - TransformService
-- .get_instance
+- core/bayesian.py
 - Gp
 - test_trios_chunked_integrity.py
 - hvnm/_kernels_diffrax.py
@@ -75,7 +75,7 @@
 - Any
 - ModelComparisonPipeline
 - prony_decompose_memory
-- FitOrchestrator
+- .execute
 - check_model_compatibility
 - EPMBase
 - DatasetRef
@@ -85,7 +85,7 @@
 - TestElementMinimization
 - smoke
 - ITTMCTBase
-- ModelComparison
+- _make_fit_result
 - smoke
 - AboutDialog
 - .predict_rheo
@@ -103,9 +103,9 @@
 - FitResult
 - TensorialEPM
 - load_trios_json
-- Carreau
+- .predict_rheo
 - test_registry_consistency.py
-- VLB Model Equation Verification
+- TestNLSQ066Features
 - MLIKH
 - ArvizCanvas
 - SGRGeneric
@@ -133,26 +133,26 @@
 - test_multi_file.py
 - io/test_validation.py
 - compute_l1_coefficients
-- test_priors.py
+- MutationNumber
 - PipelineConfig
 - CarreauYasuda
 - .model_function
 - WorkflowController
 - run_analyze
-- PriorsEditor
+- NutsStep
 - test_column_mapping.py
 - FIKH
 - anton_paar.py
 - ._inverse_transform
 - ndarray
 - smoke
-- rheojax/utils/__init__.py
+- physics_checks.py
 - load_anton_paar
 - ndarray
 - test_lattice_epm.py
 - core/test_validation.py
 - test_numpyro_model_builder.py
-- test_auto_p0.py
+- VLB Model Equation Verification
 - TestFluidityLocalFitting
 - test_fit_plotter.py
 - txt.py
@@ -170,7 +170,7 @@
 - DMTNonlocal
 - Properties
 - rheojax/logging/__init__.py
-- slow
+- _linear_data
 - Mastercurve
 - TestFrameworkSmoke
 - test_dataset_preview.py
@@ -184,13 +184,13 @@
 - TNTCates
 - TNTLoopBridge
 - test_sgr_parity.py
-- _ensure_all_registered
+- get_default_workers
 - bootstrap_ci
 - gui/main.py
 - Complete Guide to Data Transforms (doc)
 - test_io_fixes.py
 - smoke
-- HebraudLequeux
+- hebraud_lequeux.py
 - HVNMLocal
 - test_sgr_generic.py
 - HVMLocal
@@ -233,7 +233,7 @@
 - _subprocess_entry
 - ParameterFormBuilder
 - Background Job System - Implementation Summary
-- ProtocolModelStep
+- smoke
 - create_least_squares_objective
 - test_multi_species.py
 - parse_rheocompass_intervals
@@ -264,7 +264,7 @@
 - GiesekusMultiMode
 - ._process_file
 - NotAKnotCubicSpline
-- check_wide_frequency_range
+- detect_data_range_decades
 - test_bayesian_mode_aware.py
 - Hybrid Vitrimer Model (HVM) -- Literature Review & Equations
 - create_parser
@@ -276,13 +276,13 @@
 - tnt/test_single_mode.py
 - BayesianPipeline
 - DMTLocal
-- auto_p0
+- auto_p0.py
 - smoke
 - Capability Matrix
 - Fractional Viscoelastic Models: Equation Verification Report
 - TestIconProvider
 - cmd_transform.py
-- test_anton_paar.py
+- TestRelaxationLoading
 - LibraryRail
 - load_trios_chunked
 - ._predict_from_params
@@ -302,7 +302,7 @@
 - test_csv_detection.py
 - TestFluidityNonlocalFitDispatch
 - smoke
-- smoke
+- TestFitResultSerialization
 - fitted_pipeline
 - ExportOptionsDialog
 - Background Job System
@@ -323,7 +323,7 @@
 - ndarray
 - plot_lissajous
 - _t_grid
-- TestHebraudLequeux
+- HebraudLequeux
 - 1. Dullaert-Mewis Model (2006) -- Literature Equations
 - create_parser
 - TestMIKH
@@ -332,18 +332,18 @@
 - ._get_cycle_mask
 - PreprocessingResult
 - TestLAOSAnalysis
-- ndarray
+- ModelComparison
 - TestHVNMInterphase
 - fixture
-- TestVLBBellPhysics
-- FractionalZenerSolidSolid
+- TestBaseModelEdgeCases
+- ._fit
 - smoke
 - create_global_parser
 - TestBinghamPredictions
-- .step
+- test_nlsq_numpyro_workflow.py
 - VLBBase
 - TestHLModelFunction
-- TestDeviceMemoryOptimization
+- .residuals
 - Transforms API reference
 - get_jax_info
 - ColumnMapperDialog
@@ -380,7 +380,7 @@
 - .predict_rheo
 - .predict_rheo
 - test_trios_chunked.py
-- test_generalized_maxwell.py
+- ModelInfo
 - ._get_mode_arrays
 - ._get_mode_arrays
 - TestThermodynamicConsistency
@@ -398,7 +398,7 @@
 - ._predict
 - VLBNonlocal
 - get_gpu_info
-- TestHLValidation
+- ._clip_to_bounds
 - TestHVNMSAOS
 - ._transform
 - test_sticky_rouse.py
@@ -411,7 +411,7 @@
 - TestLogOperation
 - TestThixotropy
 - test_flow_curve_matches_scalar_epm
-- .create_mastercurve
+- TestCarreauPredictions
 - mct_kernels.py
 - smoke
 - generate_test_data.py
@@ -420,7 +420,7 @@
 - TestLoggerMethods
 - load_trios
 - TestDMTLocalCreep
-- _linear_data
+- test_get_parameter_bounds_missing_bounds_raises
 - Fitting Strategies and Troubleshooting (doc)
 - TestHVMStartup
 - TestHVMRelaxation
@@ -450,7 +450,7 @@
 - TestRheoDataNoneGuards
 - TestRheoData2DYContract
 - test_window_file_menu.py
-- TestFluidityLocalOscillation
+- Carreau
 - test_identifiability.py
 - TestHVNMStartup
 - TestHVNMRelaxation
@@ -461,8 +461,8 @@
 - Giesekus Model Mathematical Verification Report
 - TestShearBandingMetrics
 - _enable_compilation_cache
-- TestParameterManagement
-- CancelWorkerRunnable
+- TestDiffraxCompilation
+- test_closure_captures_test_mode_not_global_state
 - GiesekusBase
 - TestISMOscillationAnalytic
 - check_gpu_availability
@@ -471,7 +471,7 @@
 - TestShearBandingDetection
 - TestRheoDataSerialization
 - TestPhysicalConsistency
-- detect_data_range_decades
+- TestGMMModelFunction
 - TestGetLogger
 - ndarray
 - TestMaxwellBasics
@@ -480,8 +480,8 @@
 - .initialize
 - fixture
 - test_parameter_table_validation.py
-- TestMetadataExtraction
-- TestMultiInterval
+- .compute_uncertainty
+- smoke
 - TestFluidityLocalSmoke
 - smoke
 - TestStartupSimulation
@@ -489,7 +489,7 @@
 - TestHVMLAOS
 - TestPlasticityAlpha
 - TestITTMCTSchematicInitialization
-- TestGMMRelaxationMode
+- test_generalized_maxwell.py
 - TestGMMSteadyShearMode
 - TestCreepSimulation
 - TestGMMDiagnosticsAndPriors
@@ -522,7 +522,7 @@
 - get_system_cuda_version
 - partial
 - differentiate_rate_from_strain
-- smoke
+- TestYieldStressCoupling
 - TestHVNMFlowCurve
 - save_fit_result_npz
 - get_gpu_memory_info
@@ -536,7 +536,7 @@
 - TestPowerLawPredictions
 - gui/conftest.py
 - .test_export_10k_points_under_5_seconds
-- TestRotationalLoading
+- TestModelComparison
 - TestISMInitialization
 - TestErrorHandling
 - TestDMTLocalRelaxation
@@ -546,7 +546,7 @@
 - TestISMCreepVolterra
 - TestNonlocalCreep
 - TestIntegration
-- TestEuropeanDecimalSeparator
+- test_anton_paar.py
 - TestPercusYevickSk
 - TestDMTLocalFlowCurve
 - TestHVNMCreep
@@ -566,11 +566,11 @@
 - TestBayesianInterface
 - TestNonAffineVariant
 - TestSAOS
-- TestModelFunction
+- TestCreepLoading
 - TestLAOSSimulation
 - TestLAOSSimulation
 - smoke
-- TestStartupSimulation
+- TestOscillatoryLoading
 - TestSAOS
 - TestBayesianInterface
 - TestDerivedProperties
@@ -603,16 +603,16 @@
 - PowerLaw
 - _parse_segment
 - print_device_summary
-- test_cross_model_consistency
+- TestSteadyShearAnalytical
 - creep_multi_decade_data
 - .fit_bayesian
 - _read_segment_chunked
 - given
-- .model_function
+- TestFlowCurve
 - ._fit
 - TestWidgetLifecycleSafety
 - TestUpperConvected
-- TestFluidityEvolution
+- smoke
 - TestHerschelBulkleyViscosity
 - .format_with_icon
 - detect_delimiter
@@ -624,24 +624,24 @@
 - TestRegistry
 - convert_units
 - TestHelperMethods
-- TestLAOSKwargsRegression
+- TestBayesianInterface
 - saramito/test_physics.py
-- TestAutoP0WarningEmission
+- TestRelaxationSimulation
 - TestSoftmaxPenalty
-- TestPlotResiduals
+- test_import.py
 - TestMLIKHProtocolFitting
 - test_dmt.py
 - TestEquilibriumStructure
 - TestFitOscillation
-- TestPublicationQuality
-- VLB (Vernerey-Long-Brighenti) model family
+- TestBayesianEdgeCases
+- TestEdgeCases
 - test_fikh.py
 - TestGMMBayesianPipelineBugs
 - TestConvergenceClassification
 - _detect_test_type
 - ._epm_step
 - fikh/_kernels.py
-- ._fit
+- TestFIKHTestModeValidation
 - .__init__
 - TestLAOSSimulation
 - TestVLBNonlocalBanding
@@ -662,7 +662,7 @@
 - ._setup_parameters
 - .__init__
 - yield_from_displacement_stress
-- TestRelaxation
+- TestCarreauNumericalStability
 - ndarray
 - TestMLIKHSAOSFrequencyFit
 - TestSGRModelComparison
@@ -675,7 +675,7 @@
 - SPP Parity Status (MATLAB SPPplus v2.1 / R oreo / RheoJAX)
 - Eshelby propagator (stress redistribution kernel)
 - TestStartupFitting
-- Data Format Reference (doc)
+- TNT (Transient Network Theory) model family
 - _LazyModule
 - TestCreepFitting
 - TestVLBLocalLAOS
@@ -692,14 +692,30 @@
 - test_credible_intervals_import_error_fallback
 - test_fit_bayesian_log_space_rejects_complex
 - io/conftest.py
+- TestStressTensorProduct
 - TestLogFormat
 - TestLogFit
+- TestStickerFloorPhysics
 - TestUnpackResult
 - .test_initialization
 - Bingham
+- _prep_run_nuts_args
 - .test_initialization
+- .test_initialization
+- SGR (Soft Glassy Rheology) model family
+- TestUpperConvectedDerivative
+- TestEnhancedErrorMessaging
+- TestNLSQGradientValidation
+- TestPlotFrequencyDomain
+- TestUncertaintyBand
+- .__init__
 - giesekus/_kernels.py
+- ._fit
+- TestODERHS
 - TestModeEnum
+- .test_multimode_saos
+- .__init__
+- ._fit
 - TestVLBNonlocalFene
 - TestPlotPair
 - TestPlotForest
@@ -708,7 +724,7 @@
 - TestPlotRank
 - TestPlotESS
 - TestPublicAPI
-- TestMaxwellANSYSCreep
+- TestFractionalZenerANSYS
 - TestModuliEvolutionSingleAxes
 - Domain Docs guidance
 - invalidate_downstream() cascade function
@@ -875,7 +891,7 @@
 - **WorkspaceWindow three-mode wizard (fit/transform/pipeline) sole GUI shell** — rheojax_gui_workspace_window_workspacewindow, rheojax_gui_workspace_fit_fit_controller, rheojax_gui_workspace_transform_transform_controller, rheojax_gui_workspace_pipeline_controller [EXTRACTED 0.95]
 - **NLSQ→NUTS warm-start Bayesian fitting flow** — rheojax_core_fit_orchestrator_fitorchestrator, rheojax_core_numpyro_model_builder, rheojax_core_bayesian_bayesianmixin, rheojax_models_multimode_generalized_maxwell_generalizedmaxwell [EXTRACTED 0.90]
 
-## Communities (840 total, 106 thin omitted)
+## Communities (856 total, 112 thin omitted)
 
 ### Community 0 - "mittag_leffler_e"
 Cohesion: 0.03
@@ -887,11 +903,11 @@ Nodes (16): Tests for GiesekusSingleMode model. Tests cover: - Instantiation and
 
 ### Community 2 - "RheoData"
 Cohesion: 0.00
-Nodes (454): IntegrationMethod, cli/_envelope.py — JSON envelope format, JSON envelope pipe pattern (rationale), Initialize and validate RheoData., Validate data for common issues., Get storage modulus label. Always returns "G'" (shear)., JAX-native container for rheological data with NumPy/JAX array support. This…, Get loss modulus label. Always returns 'G"' (shear). (+446 more)
+Nodes (415): cli/_envelope.py — JSON envelope format, JSON envelope pipe pattern (rationale), Initialize and validate RheoData., Validate data for common issues., Get storage modulus label. Always returns "G'" (shear)., JAX-native container for rheological data with NumPy/JAX array support. This…, Get loss modulus label. Always returns 'G"' (shear)., RheoData (+407 more)
 
 ### Community 3 - "SGRConventional"
 Cohesion: 0.01
-Nodes (129): Array, jit, ndarray, register, JIT-compiled relaxation prediction: G(t). Computes relaxation modulus with…, JIT-compiled creep prediction: J(t). Computes creep compliance as approximate…, JIT-compiled steady shear prediction: eta(gamma_dot). Computes viscosity as…, Predict based on fitted test mode. Routes to appropriate prediction method… (+121 more)
+Nodes (123): Array, jit, ndarray, register, JIT-compiled relaxation prediction: G(t). Computes relaxation modulus with…, JIT-compiled creep prediction: J(t). Computes creep compliance as approximate…, JIT-compiled steady shear prediction: eta(gamma_dot). Computes viscosity as…, Predict based on fitted test mode. Routes to appropriate prediction method… (+115 more)
 
 ### Community 4 - "auto_load"
 Cohesion: 0.02
@@ -899,7 +915,7 @@ Nodes (111): RheoJaxFormatError, Raised when no reader can parse a file. Subclas
 
 ### Community 5 - "nlsq_optimize"
 Cohesion: 0.01
-Nodes (216): Any, Computed diagnostics dict (compatibility with worker BayesianResult)., Fit to steady-state flow curve σ(γ̇). Uses NLSQ to optimize parameters to match…, Fit model to data. Parameters ---------- x : array-like Independent variable y…, Fit model to data using protocol-aware optimization. Parameters ---------- x :…, Fit power-law model: y = a*x^b + e using NLSQ. Parameters ---------- x :…, _attach_y_data_from_objective(), attach_y_data_to_result() (+208 more)
+Nodes (191): Number of data points used in the fit., Any, Computed diagnostics dict (compatibility with worker BayesianResult)., Fit to steady-state flow curve σ(γ̇). Uses NLSQ to optimize parameters to match…, Fit model parameters to data. Args: X: Independent variable (time or frequency)…, Fit model to data. Parameters ---------- x : array-like Independent variable y…, Fit model to data using protocol-aware optimization. Parameters ---------- x :…, Fit power-law model: y = a*x^b + e using NLSQ. Parameters ---------- x :… (+183 more)
 
 ### Community 6 - "AppState"
 Cohesion: 0.03
@@ -910,8 +926,8 @@ Cohesion: 0.02
 Nodes (141): BayesianResult, FitResult, Alias for mcmc_time (compatibility with worker BayesianResult)., Canonical result from NLSQ point estimation fit. Single source of truth for fit…, Result from Bayesian NUTS inference., BayesianWorker, BayesianWorkerSignals, Any (+133 more)
 
 ### Community 8 - "GiesekusSingleMode"
-Cohesion: 0.05
-Nodes (32): GiesekusSingleMode, ndarray, register, Internal LAOS simulation for model_function., Simulate Large-Amplitude Oscillatory Shear (LAOS). The Giesekus model produces…, Extract Fourier harmonics from LAOS stress response. The nonlinear stress…, Compute stress overshoot ratio in startup flow. The overshoot ratio is defined…, Get effective relaxation spectrum G(t). Note: For single-mode Giesekus, this is… (+24 more)
+Cohesion: 0.06
+Nodes (26): GiesekusSingleMode, ndarray, register, Internal LAOS simulation for model_function., Simulate Large-Amplitude Oscillatory Shear (LAOS). The Giesekus model produces…, Extract Fourier harmonics from LAOS stress response. The nonlinear stress…, Compute stress overshoot ratio in startup flow. The overshoot ratio is defined…, Get effective relaxation spectrum G(t). Note: For single-mode Giesekus, this is… (+18 more)
 
 ### Community 9 - "window.py"
 Cohesion: 0.01
@@ -929,21 +945,21 @@ Nodes (108): BaseInitializer, ABC, Base initializer abstract class for fractiona
 Cohesion: 0.01
 Nodes (112): ndarray, register, Single transient network VLB model (2 params: G0, k_d). Implements the VLB…, Initialize single-network VLB model., Initialize ParameterSet with VLB local parameters. Parameters: - G0: Network…, Get network modulus G0 (Pa)., Get dissociation rate k_d (1/s)., Get relaxation time t_R = 1/k_d (s). (+104 more)
 
-### Community 13 - "BatchPipeline"
-Cohesion: 0.02
-Nodes (79): BatchPipeline, Apply pipeline to multiple datasets. This class enables batch processing of…, Initialize batch pipeline. Args: template_pipeline: Template Pipeline to clone…, Clone pipeline for independent execution. SYS-07: Lightweight structural clone…, Set template pipeline. Args: pipeline: Pipeline to use as template Returns:…, Clear all results and errors. Returns: self for method chaining, Get number of processed results., String representation. (+71 more)
+### Community 13 - "Pipeline"
+Cohesion: 0.01
+Nodes (156): _build_pipeline_from_envelope(), main(), CLI subcommand for exporting pipeline analysis results. Wraps AnalysisExporter…, Export pipeline results to the chosen format., Construct a minimal Pipeline populated with envelope data for export., _apply_test_mode_metadata(), Pipeline, RheoData (+148 more)
 
 ### Community 14 - "FluidityLocal"
 Cohesion: 0.03
-Nodes (49): fluidity_local_steady_state(), Compute steady-state flow curve for Local Fluidity model. At steady state: f_ss…, FluidityLocal, Any, ndarray, register, Initialize Local Fluidity Model., Fit steady-state Herschel-Bulkley flow curve. At steady state the kernel… (+41 more)
+Nodes (56): fluidity_local_steady_state(), Compute steady-state flow curve for Local Fluidity model. At steady state: f_ss…, FluidityLocal, Any, ndarray, register, Initialize Local Fluidity Model., Fit steady-state Herschel-Bulkley flow curve. At steady state the kernel… (+48 more)
 
 ### Community 15 - "Maxwell"
-Cohesion: 0.02
-Nodes (78): Maxwell, register, Fit Maxwell model to data. Args: X: RheoData object or independent variable…, Estimate G0 and eta from relaxation data for faster convergence., Maxwell viscoelastic model (spring and dashpot in series). The Maxwell model is…, Get characteristic relaxation time tau = eta/G0. Returns: Relaxation time in…, String representation of Maxwell model., Initialize Maxwell model with default parameters. (+70 more)
+Cohesion: 0.04
+Nodes (71): NLSQ→NUTS warm-start Bayesian workflow (rationale), FitOrchestrator, Orchestrates the full fit() workflow on behalf of BaseModel., PostFitValidator, Runs post-fit physics checks and uncertainty quantification., Maxwell, register, Fit Maxwell model to data. Args: X: RheoData object or independent variable… (+63 more)
 
 ### Community 16 - "FitState"
-Cohesion: 0.02
-Nodes (121): FitState, _make_sample_fn(), Build the real sample_fn NutsStep.run() calls., NlsqStep, QWidget, Sync the result label to current state. Called both after a run and whenever an…, _diagnostics_verdict(), NutsStep (+113 more)
+Cohesion: 0.03
+Nodes (90): FitState, _constructor_params(), _grouped_models(), _make_config_widget(), _model_tooltip(), ProtocolModelStep, Any, QWidget (+82 more)
 
 ### Community 17 - "test_fractional_mixin.py"
 Cohesion: 0.07
@@ -951,7 +967,7 @@ Nodes (32): FractionalModelMixin, ndarray, TestMode, Convert class name to modul
 
 ### Community 18 - "ParameterSet"
 Cohesion: 0.01
-Nodes (180): Initialize base model., Parameter, ParameterConstraint, ParameterOptimizer, ParameterSet, Any, Return an iterator over Parameter objects (dict-like interface). Returns:…, Return an iterator over (name, Parameter) tuples (dict-like interface).… (+172 more)
+Nodes (166): Initialize base model., _coerce_array(), Parameter, ParameterConstraint, ParameterOptimizer, ParameterSet, Any, ArrayLike (+158 more)
 
 ### Community 19 - "PipelineExecutionService"
 Cohesion: 0.03
@@ -969,9 +985,9 @@ Nodes (100): complexfloating, Index, _get_column_data(), _get_column_header(), l
 Cohesion: 0.04
 Nodes (55): Data Service =========== Service for loading, validating, and managing…, Any, RheoData, Validate data for transform. Parameters ---------- name : str Transform name…, Get configurable parameters for transform. Parameters ---------- name : str…, Service for rheological transform operations. Transforms: - Mastercurve (TTS…, Return display metadata for all transforms. Returns ------- list[dict] Each…, Apply transform and return new data. Parameters ---------- name : str Transform… (+47 more)
 
-### Community 23 - ".get_instance"
-Cohesion: 0.03
-Nodes (29): Get the singleton registry instance. Returns: The global Registry instance, Initialize Bayesian service., Save and clear registry before each test., Restore registry state after each test., Save and clear registry before each test., Save and clear registry before each test., Restore registry state after each test., Restore registry state after each test. (+21 more)
+### Community 23 - "core/bayesian.py"
+Cohesion: 0.04
+Nodes (43): compute_bfmi(), compute_diagnostics(), compute_per_param_diagnostic(), _import_numpyro_diagnostics(), MCMC, ndarray, Bayesian convergence diagnostics: R-hat, ESS, divergence counting. This module…, Compute the worst-chain E-BFMI (energy Bayesian fraction of missing info).… (+35 more)
 
 ### Community 24 - "Gp"
 Cohesion: 0.03
@@ -999,15 +1015,15 @@ Nodes (39): Any, DataFrame, TRIOS JSON DataSet dataclass. This module provides t
 
 ### Community 30 - "ModelRegistry"
 Cohesion: 0.01
-Nodes (497): BaseModel, BaseTransform, ABC, Abstract base class for all data transforms. This class defines the standard…, Initialize base transform., Transform multiple datasets sequentially. Applies the transform to each dataset…, String representation of transform., Abstract base class for all rheological models. This class defines the standard… (+489 more)
+Nodes (472): BaseModel, BaseTransform, ABC, Abstract base class for all data transforms. This class defines the standard…, Initialize base transform., Transform multiple datasets sequentially. Applies the transform to each dataset…, String representation of transform., Abstract base class for all rheological models. This class defines the standard… (+464 more)
 
 ### Community 31 - "smoke"
 Cohesion: 0.04
 Nodes (33): fixture, smoke, Test FIKH model predictions., Create isothermal FIKH model., Create thermal FIKH model., Test startup prediction produces valid output., Test startup shows stress overshoot characteristic of EVP., Test steady-state flow curve prediction. (+25 more)
 
 ### Community 32 - "FractionalMaxwellModel"
-Cohesion: 0.06
-Nodes (21): FractionalMaxwellModel, register, Fractional Maxwell Model: fractional differential equation with two orders.…, Initialize Fractional Maxwell Model., Test complex modulus., Test power-law scaling ~ ω^α at low frequency., Test that alpha and beta have independent effects., Test model initialization. (+13 more)
+Cohesion: 0.04
+Nodes (60): Emitted when auto_p0 estimation partially fails. Some parameters may have been…, RheoJaxInitWarning, FractionalMaxwellModel, register, Fractional Maxwell Model: fractional differential equation with two orders.…, Initialize Fractional Maxwell Model., FractionalZenerSolidSolid, register (+52 more)
 
 ### Community 33 - "STZConventional"
 Cohesion: 0.02
@@ -1071,7 +1087,7 @@ Nodes (45): QStatusBar, Return True if the active theme is dark., QWidget, Clear
 
 ### Community 48 - "ValueError"
 Cohesion: 0.02
-Nodes (85): Check if value satisfies the constraint. Args: value: Value to validate…, Editing a completed step bumps revision and re-locks everything downstream., Fit SpringPot model to data. Args: X: RheoData object or independent variable…, Get characteristic time scale for the material. For SpringPot, there's no…, Get characteristic relaxation time tau = eta/G_m. Returns: Relaxation time in…, Get characteristic retardation time for creep. Theory: tau_c = eta * (G_e +…, String representation of Zener model., Report which parameters are identifiable for a given protocol. Fluidity models… (+77 more)
+Nodes (96): NoReturn, Check if value satisfies the constraint. Args: value: Value to validate…, Editing a completed step bumps revision and re-locks everything downstream., Fit SpringPot model to data. Args: X: RheoData object or independent variable…, Get characteristic time scale for the material. For SpringPot, there's no…, Get characteristic relaxation time tau = eta/G_m. Returns: Relaxation time in…, Get characteristic retardation time for creep. Theory: tau_c = eta * (G_e +…, String representation of Zener model. (+88 more)
 
 ### Community 49 - "Zener"
 Cohesion: 0.04
@@ -1114,12 +1130,12 @@ Cohesion: 0.02
 Nodes (114): Distribution, Sequence of Physical Processes (SPP) models. Contains models for LAOS (Large…, ndarray, register, Fit SPP yield stress model to data. The fitting strategy depends on the test…, Fit to amplitude sweep data (oscillation mode). Uses power-law scaling: σ(γ_0)…, Fit to steady shear flow curve (rotation mode). Uses Herschel-Bulkley-like…, Create NumPyro-friendly priors for model parameters. Uses physically-motivated… (+106 more)
 
 ### Community 59 - "prony_decompose_memory"
-Cohesion: 0.06
-Nodes (35): prony_decompose_memory(), _prony_leastsq_robust(), _prony_log_spacing(), _prony_multistart(), _prony_residuals(), _prony_smart_init(), ndarray, Decompose memory kernel into Prony series. Fit the memory kernel m(t) to a sum… (+27 more)
+Cohesion: 0.09
+Nodes (26): prony_decompose_memory(), _prony_leastsq_robust(), _prony_log_spacing(), _prony_multistart(), _prony_residuals(), _prony_smart_init(), ndarray, Decompose memory kernel into Prony series. Fit the memory kernel m(t) to a sum… (+18 more)
 
-### Community 60 - "FitOrchestrator"
-Cohesion: 0.07
-Nodes (51): NLSQ→NUTS warm-start Bayesian workflow (rationale), FitOrchestrator, Any, ArrayLike, Extract arrays and test_mode from RheoData., Validate shape/NaN/monotonicity on the unpacked fit arrays. Constructs a…, Sort X (and y in lockstep) into strictly ascending order. No-op if X is already…, Remove optimization-only kwargs so they don't leak to model_function. (+43 more)
+### Community 60 - ".execute"
+Cohesion: 0.12
+Nodes (11): Any, ArrayLike, Extract arrays and test_mode from RheoData., Validate shape/NaN/monotonicity on the unpacked fit arrays. Constructs a…, Sort X (and y in lockstep) into strictly ascending order. No-op if X is already…, Remove optimization-only kwargs so they don't leak to model_function., Compute R-squared (DEBUG only) and log fit completion., Construct a FitResult, attaching uncertainty if available. (+3 more)
 
 ### Community 61 - "check_model_compatibility"
 Cohesion: 0.04
@@ -1130,8 +1146,8 @@ Cohesion: 0.05
 Nodes (48): EPMBase, _jit_creep_kernel(), _jit_flow_curve_batch(), _jit_flow_curve_single(), _jit_oscillation_kernel(), _jit_relaxation_kernel(), _jit_startup_kernel(), Array (+40 more)
 
 ### Community 63 - "DatasetRef"
-Cohesion: 0.06
-Nodes (54): DatasetRef, pipeline_inputs_from_library(), §11 boundary: feed the legacy pipeline from the new Dataset Library. Resolves…, build_fit_controller(), _fit_fn_body(), _make_fit_fn(), _make_progress_reporter(), _r2_sort_key() (+46 more)
+Cohesion: 0.04
+Nodes (72): DatasetRef, pipeline_inputs_from_library(), §11 boundary: feed the legacy pipeline from the new Dataset Library. Resolves…, build_fit_controller(), _fit_fn_body(), _make_fit_fn(), _make_progress_reporter(), _make_sample_fn() (+64 more)
 
 ### Community 64 - "._predict"
 Cohesion: 0.18
@@ -1157,13 +1173,13 @@ Nodes (21): smoke, Tests for FitPlotter.plot_nlsq()., Scalar NLSQ fit without re
 Cohesion: 0.06
 Nodes (27): ITTMCTBase, Any, ndarray, Initialize ITT-MCT base model. Parameters ---------- integration_method :…, Initialize model parameters. Subclasses must implement this to add parameters…, Compute equilibrium (quiescent) correlator Φ_eq(t). Parameters ---------- t :…, Compute memory kernel m(Φ) from correlator values. Parameters ---------- phi :…, Internal fit implementation. Parameters ---------- X : np.ndarray Independent… (+19 more)
 
-### Community 70 - "ModelComparison"
-Cohesion: 0.04
-Nodes (43): ModelComparison, ModelInfo, Structured fit results, model info, and model comparison. This module provides:…, Bar plot of Akaike weights. Args: ax: Optional matplotlib axes. **kwargs:…, Plot the fit result (2-panel: fit + residuals). Args: ax: Optional matplotlib…, Aggregated information about a registered model. Combines ``PluginInfo`` from…, Construct ModelInfo by inspecting a registered model. Temporarily instantiates…, # NOTE: fit_bayesian is defined unconditionally on BaseModel, so (+35 more)
+### Community 70 - "_make_fit_result"
+Cohesion: 0.11
+Nodes (13): _make_fit_result(), _make_optimization_result(), FitResult, smoke, Tests for FitResult, ModelInfo, and ModelComparison (Phase 1). Tests cover: -…, Tests for summary and formatting methods., Smoke tests for plotting., Create a realistic OptimizationResult for testing. (+5 more)
 
 ### Community 71 - "smoke"
-Cohesion: 0.04
-Nodes (30): smoke, Test direct predict_flow_curve method., Test flow curve with viscosity and N1., Test viscosity decreases with shear rate., Test SAOS prediction., Test G' = G'' at crossover frequency., Test N1 and N2 predictions., Test predicted N₂/N₁ ≈ -α/2 at low Wi. (+22 more)
+Cohesion: 0.05
+Nodes (24): smoke, Test SAOS prediction., Test G' = G'' at crossover frequency., Test N1 and N2 predictions., Test predicted N₂/N₁ ≈ -α/2 at low Wi., Tests for startup flow simulation., Test startup simulation runs., Test stress overshoot in startup. (+16 more)
 
 ### Community 72 - "AboutDialog"
 Cohesion: 0.08
@@ -1202,8 +1218,8 @@ Cohesion: 0.07
 Nodes (48): compute_complex_modulus_from_correlator(), compute_adaptive_t_max(), FlowCurveParams, _make_batched_solver(), make_flow_curve_vector_field(), make_flow_curve_with_stress_vector_field(), jit, NamedTuple (+40 more)
 
 ### Community 81 - "BayesianMixin"
-Cohesion: 0.03
-Nodes (75): BayesianMixin, compute_bfmi(), compute_diagnostics(), compute_per_param_diagnostic(), _import_numpyro_diagnostics(), MCMC, ndarray, Bayesian convergence diagnostics: R-hat, ESS, divergence counting. This module… (+67 more)
+Cohesion: 0.04
+Nodes (58): BayesianMixin, Any, Array, BayesianResult, MCMC, ndarray, RheoData, TestMode (+50 more)
 
 ### Community 82 - "test_fikh_thermal.py"
 Cohesion: 0.05
@@ -1215,11 +1231,11 @@ Nodes (28): _loop_bridge_creep_ode_rhs(), _loop_bridge_laos_ode_rhs(), _loop_bri
 
 ### Community 84 - "FFTAnalysis"
 Cohesion: 0.06
-Nodes (29): FFTAnalysis, register, Transform time-domain rheological data to frequency domain using FFT. This…, Initialize FFT Analysis transform. Parameters ---------- window : WindowType…, Tests for batch transform vectorization., TestBatchFFT, smoke, PSD scale must correct for window power loss (sum(w**2)), not just n.… (+21 more)
+Nodes (27): FFTAnalysis, register, Transform time-domain rheological data to frequency domain using FFT. This…, Tests for batch transform vectorization., TestBatchFFT, smoke, PSD scale must correct for window power loss (sum(w**2)), not just n.…, One-sided PSD must double the last bin for odd-length signals too. Regression… (+19 more)
 
 ### Community 85 - "FitResult"
-Cohesion: 0.04
-Nodes (37): Exception, Build a :class:`FitResult` that records a failed fit attempt., FitResult, Any, ndarray, Return a saved statistic from load(), if one was persisted., Coefficient of determination (R²), delegated to OptimizationResult., Adjusted R², delegated to OptimizationResult. (+29 more)
+Cohesion: 0.06
+Nodes (20): Exception, Build a :class:`FitResult` that records a failed fit attempt., FitResult, Return a saved statistic from load(), if one was persisted., Coefficient of determination (R²), delegated to OptimizationResult., Adjusted R², delegated to OptimizationResult., Root mean squared error, delegated to OptimizationResult., Mean absolute error, delegated to OptimizationResult. (+12 more)
 
 ### Community 86 - "TensorialEPM"
 Cohesion: 0.05
@@ -1229,17 +1245,17 @@ Nodes (66): Elasto-Plastic Models (EPM) for amorphous solids., register, Check i
 Cohesion: 0.09
 Nodes (28): _default_y_units(), _load_schema(), load_trios_json(), parse_trios_json(), Any, Path, RheoData, Low-level JSON parser returning TRIOSExperiment and metadata. Args: filepath:… (+20 more)
 
-### Community 88 - "Carreau"
-Cohesion: 0.04
-Nodes (36): Carreau, jit, ndarray, register, RheoData, TestMode, Fit Carreau parameters to data. Computes a heuristic initial guess from…, Predict viscosity for given shear rates. Args: X: Shear rate data (γ̇) Returns:… (+28 more)
+### Community 88 - ".predict_rheo"
+Cohesion: 0.17
+Nodes (10): jit, ndarray, RheoData, TestMode, Predict viscosity for given shear rates. Args: X: Shear rate data (γ̇) Returns:…, Model function for Bayesian inference. This method is required by BayesianMixin…, Compute viscosity using Carreau model. Args: gamma_dot: Shear rate (s^-1) eta0:…, Compute shear stress using Carreau model. Args: gamma_dot: Shear rate (s^-1)… (+2 more)
 
 ### Community 89 - "test_registry_consistency.py"
 Cohesion: 0.08
 Nodes (24): find_test_mode_patterns(), get_implementation_evidence(), get_predict_source(), has_predict_method(), filterwarnings, parametrize, smoke, Registry consistency tests using static analysis. This module uses… (+16 more)
 
-### Community 90 - "VLB Model Equation Verification"
-Cohesion: 0.05
-Nodes (40): 10. Creep Compliance, 11. Bell Model Force-Dependent Dissociation, 12. FENE-P Finite Extensibility, 1. Distribution Tensor Evolution Equation, 2. Cauchy Stress, 3. Free Energy, 4. Dissipation, 5. Simple Shear Flow Components (+32 more)
+### Community 90 - "TestNLSQ066Features"
+Cohesion: 0.03
+Nodes (38): fixture, smoke, Test that float64 precision is maintained throughout optimization., Test convergence for simple optimization problem., Test that nlsq_optimize() updates ParameterSet with optimal values., Test NLSQ optimizer implementation., Test NLSQ optimizer handles tight bounds correctly., Test nlsq_optimize() function signature and parameter handling. (+30 more)
 
 ### Community 91 - "MLIKH"
 Cohesion: 0.09
@@ -1310,8 +1326,8 @@ Cohesion: 0.10
 Nodes (36): _apply_style(), _ensure_numpy(), _modulus_labels(), Ensure data is a NumPy array for plotting. Args: data: Input data array…, Return shear storage, loss, and generic modulus labels., Apply plotting style and return style parameters. Args: style: Style name…, Any, Axes (+28 more)
 
 ### Community 108 - "GUI Menu Reference (doc)"
-Cohesion: 0.06
-Nodes (48): Complexity ladder: classical -> fractional -> multi-mode, GUI Models menu (53 actions, 20 family submenus), GUI Transforms menu (11 transform actions), WorkspaceWindow GUI shell class, Model Families Overview (doc), GUI Menu Reference (doc), DMT (de Souza Mendes-Thompson) model family, EPM (Elasto-Plastic) model family (+40 more)
+Cohesion: 0.05
+Nodes (53): Complexity ladder: classical -> fractional -> multi-mode, GUI Models menu (53 actions, 20 family submenus), GUI Transforms menu (11 transform actions), WorkspaceWindow GUI shell class, Model Families Overview (doc), GUI Menu Reference (doc), DMT (de Souza Mendes-Thompson) model family, EPM (Elasto-Plastic) model family (+45 more)
 
 ### Community 109 - "DataService"
 Cohesion: 0.03
@@ -1349,13 +1365,13 @@ Nodes (29): LoaderReport, Run protocol-aware quality checks on loaded rheologica
 Cohesion: 0.06
 Nodes (28): compute_l1_coefficients(), Compute L1 scheme coefficients for Caputo derivative. The L1 scheme…, smoke, Test derivative of linear function., Test α → 1 approaches integer derivative., Test history buffer operations., Test buffer creation., Test multi-dimensional buffer creation. (+20 more)
 
-### Community 118 - "test_priors.py"
-Cohesion: 0.08
-Nodes (34): adapt_prior(), map_centered_priors(), Prior format conversion utilities. Converts between PriorsEditor's…, Convert one PriorsEditor entry to the ``prior_dict_to_dist`` format. Parameters…, Build LogNormal priors centered on MAP values plus a HalfNormal sigma prior.…, Tests for rheojax.gui.foundation.priors., Negative MAP value gets a Normal prior, not LogNormal. Regression: LogNormal's…, Empty MAP estimate → only sigma key. (+26 more)
+### Community 118 - "MutationNumber"
+Cohesion: 0.06
+Nodes (27): IntegrationMethod, MutationNumber, register, Validate relaxation data and prepare arrays. Parameters ---------- rheo_data :…, Calculate mutation number from relaxation modulus data. The mutation number (Δ)…, Initialize Mutation Number transform. Parameters ---------- integration_method…, smoke, integration_method='cumulative' must raise, not silently behave like 'trapz'… (+19 more)
 
 ### Community 119 - "PipelineConfig"
 Cohesion: 0.10
-Nodes (27): Print a human-readable summary of a pipeline config., run_show(), load_config(), PipelineConfig, Path, YAML pipeline config schema definition and validation. A pipeline config YAML…, Validated representation of a YAML pipeline config file. Attributes: version:…, Load and validate a YAML pipeline config file. Args: path: Filesystem path to… (+19 more)
+Nodes (28): load_config(), PipelineConfig, Path, YAML pipeline config schema definition and validation. A pipeline config YAML…, Validated representation of a YAML pipeline config file. Attributes: version:…, Load and validate a YAML pipeline config file. Args: path: Filesystem path to…, Validate a :class:`PipelineConfig`, returning error messages. An empty list…, validate_config() (+20 more)
 
 ### Community 120 - "CarreauYasuda"
 Cohesion: 0.06
@@ -1373,17 +1389,17 @@ Nodes (35): QSize, QStackedWidget, FitController, Step, TransformController, Wor
 Cohesion: 0.08
 Nodes (34): _add_analyze_args(), _add_batch_args(), create_parser(), main(), ArgumentParser, Namespace, Path, SPP (Sequence of Physical Processes) CLI commands. This module provides… (+26 more)
 
-### Community 124 - "PriorsEditor"
-Cohesion: 0.06
-Nodes (30): PriorsEditor, Any, ndarray, QWidget, Connect internal signals., Set model parameters to configure priors for. Parameters ---------- parameters…, Rebuild the parameter table., Handle table selection change. (+22 more)
+### Community 124 - "NutsStep"
+Cohesion: 0.02
+Nodes (104): adapt_prior(), map_centered_priors(), Prior format conversion utilities. Converts between PriorsEditor's…, Convert one PriorsEditor entry to the ``prior_dict_to_dist`` format. Parameters…, Build LogNormal priors centered on MAP values plus a HalfNormal sigma prior.…, PriorsEditor, Any, ndarray (+96 more)
 
 ### Community 125 - "test_column_mapping.py"
 Cohesion: 0.10
 Nodes (48): CanonicalField, match_column(), match_columns(), Consolidated canonical column field registry for all I/O readers. Merges…, Canonical field descriptor for a rheological measurement column., Match a column header string to a CanonicalField. Uses…, Match a list of column headers to canonical fields. Parameters ----------…, File readers for rheological data formats. This module provides readers for… (+40 more)
 
 ### Community 126 - "FIKH"
-Cohesion: 0.03
-Nodes (53): FIKH, Any, ArrayLike, ndarray, register, Initialize FIKH model. Args: include_thermal: Enable thermokinematic coupling…, Fit model parameters using protocol-aware optimization. Args: X: Input data…, Fit to steady-state flow curve data. (+45 more)
+Cohesion: 0.04
+Nodes (48): FIKH, Any, ArrayLike, ndarray, register, Initialize FIKH model. Args: include_thermal: Enable thermokinematic coupling…, Fit model parameters using protocol-aware optimization. Args: X: Input data…, Fit to steady-state flow curve data. (+40 more)
 
 ### Community 127 - "anton_paar.py"
 Cohesion: 0.11
@@ -1394,20 +1410,20 @@ Cohesion: 0.40
 Nodes (3): Internal inverse transform implementation. Args: data: Transformed data…, Apply inverse transformation. Args: data: Transformed data (RheoData) Returns:…, Apply inverse transforms in reverse order. Args: data: Transformed data…
 
 ### Community 129 - "ndarray"
-Cohesion: 0.08
-Nodes (23): Number of data points used in the fit., Fit model parameters to data. Args: X: Independent variable (time or frequency)…, ndarray, Fit GMM to creep compliance data. Args: t: Time array J_t: Creep compliance…, Fit GMM to data using NLSQ optimization. Args: X: Independent variable (time or…, Fit GMM to steady-shear viscosity data. For a linear viscoelastic model,…, Fit GMM to startup flow (stress growth) data. The stress growth coefficient…, Fit GMM to LAOS data. For a linear viscoelastic model, LAOS = SAOS (no… (+15 more)
+Cohesion: 0.19
+Nodes (10): ndarray, Fit GMM to creep compliance data. Args: t: Time array J_t: Creep compliance…, Fit GMM to data using NLSQ optimization. Args: X: Independent variable (time or…, Fit GMM to steady-shear viscosity data. For a linear viscoelastic model,…, Fit GMM to startup flow (stress growth) data. The stress growth coefficient…, Fit GMM to LAOS data. For a linear viscoelastic model, LAOS = SAOS (no…, NLSQ wrapper for consistent fitting across modes. Args: objective: Residual…, Fit GMM to relaxation modulus data. Args: t: Time array E_t: Relaxation modulus… (+2 more)
 
 ### Community 130 - "smoke"
 Cohesion: 0.05
 Nodes (35): fitted_maxwell(), fitted_maxwell_oscillation(), _maxwell_data(), _maxwell_oscillation_data(), fixture, ndarray, slow, smoke (+27 more)
 
-### Community 131 - "rheojax/utils/__init__.py"
-Cohesion: 0.05
-Nodes (48): Emitted for post-fit physics violations. Examples: negative moduli, fractional…, RheoJaxPhysicsWarning, Utility functions for the rheojax package. This module provides: - Mittag-…, _build_param_map(), _check_chebyshev_e1(), check_fit_physics(), _check_fractional_orders(), _check_plausibility() (+40 more)
+### Community 131 - "physics_checks.py"
+Cohesion: 0.07
+Nodes (38): Emitted for post-fit physics violations. Examples: negative moduli, fractional…, RheoJaxPhysicsWarning, _build_param_map(), _check_chebyshev_e1(), check_fit_physics(), _check_fractional_orders(), _check_plausibility(), _check_positive_moduli() (+30 more)
 
 ### Community 132 - "load_anton_paar"
 Cohesion: 0.05
-Nodes (29): load_anton_paar(), Load RheoCompass CSV export file and return RheoData object(s). Handles…, Test time values are correctly extracted., Test compliance values are correctly extracted., T019: Test compliance calculated when J(t) column missing., Tests for oscillatory test loading (US3: T028-T030)., T028: Test oscillatory loading returns complex G*., Test complex modulus G* = G' + i*G'' is computed. (+21 more)
+Nodes (29): load_anton_paar(), Load RheoCompass CSV export file and return RheoData object(s). Handles…, Tests for test type auto-detection (US5: T035-T040)., T035: Test auto-detection identifies creep., T036: Test auto-detection identifies relaxation., T037: Test auto-detection identifies oscillation., T038: Test auto-detection identifies rotation., T039: Test explicit test_mode overrides auto-detection. (+21 more)
 
 ### Community 133 - "ndarray"
 Cohesion: 0.07
@@ -1418,16 +1434,16 @@ Cohesion: 0.08
 Nodes (36): slow, smoke, unit, Tests for Lattice EPM model., metadata['stress'] must drive the creep controller even when y is zero.…, Creep prediction must be insensitive to data spacing (controller substep).…, Test LatticeEPM initialization and parameter defaults., Round-trip: fit EPM to its own creep simulation, recover R² > 0.9. Regression:… (+28 more)
 
 ### Community 135 - "core/test_validation.py"
-Cohesion: 0.09
-Nodes (24): Any, ArrayLike, UserWarning, Emitted when uncertainty computation (hessian/bootstrap) fails to run.…, Run physics validation and emit warnings for violations. Args: model: Fitted…, Compute post-fit uncertainty estimates. Args: model: Fitted BaseModel instance.…, RheoJaxUncertaintyWarning, Validate a predict() input array at the public API boundary. Checks for NaNs… (+16 more)
+Cohesion: 0.16
+Nodes (15): UserWarning, Emitted when uncertainty computation (hessian/bootstrap) fails to run.…, RheoJaxUncertaintyWarning, Validate a predict() input array at the public API boundary. Checks for NaNs…, validate_predict_input(), parametrize, Tests for lightweight shared option validation., Empty arrays must not silently skip validation (CRITICAL fix). (+7 more)
 
 ### Community 136 - "test_numpyro_model_builder.py"
-Cohesion: 0.06
-Nodes (58): Convert a prior specification dict to a NumPyro distribution. Delegates to…, build_numpyro_model(), _import_numpyro(), prior_dict_to_dist(), Any, TestMode, NumPyro probabilistic model builder for Bayesian inference. This module…, Build the NumPyro probabilistic model function. Returns a callable model… (+50 more)
+Cohesion: 0.07
+Nodes (56): build_numpyro_model(), _import_numpyro(), prior_dict_to_dist(), Any, TestMode, NumPyro probabilistic model builder for Bayesian inference. This module…, Build the NumPyro probabilistic model function. Returns a callable model…, Lazy-import NumPyro and its submodules. (+48 more)
 
-### Community 137 - "test_auto_p0.py"
-Cohesion: 0.10
-Nodes (25): Emitted when auto_p0 estimation partially fails. Some parameters may have been…, RheoJaxInitWarning, _assert_p0_valid(), _flow_curve(), _maxwell_oscillation(), _maxwell_relaxation(), smoke, Tests for auto_p0 smart parameter initialization. Coverage across model… (+17 more)
+### Community 137 - "VLB Model Equation Verification"
+Cohesion: 0.05
+Nodes (40): 10. Creep Compliance, 11. Bell Model Force-Dependent Dissociation, 12. FENE-P Finite Extensibility, 1. Distribution Tensor Evolution Equation, 2. Cauchy Stress, 3. Free Energy, 4. Dissipation, 5. Simple Shear Flow Components (+32 more)
 
 ### Community 138 - "TestFluidityLocalFitting"
 Cohesion: 0.06
@@ -1497,9 +1513,9 @@ Nodes (43): DataSet, Experiment, Results, type, description, type, properties, r
 Cohesion: 0.06
 Nodes (48): _apply_config(), configure_logging(), get_config(), is_configured(), LogConfig, LogFormat, Enum, RheoJAX Logging Configuration. Centralized configuration management for the… (+40 more)
 
-### Community 155 - "slow"
-Cohesion: 0.11
-Nodes (20): _prep_run_nuts_args(), slow, A genuine caller-supplied initial_values (no prior .fit()) must select the…, Without has_explicit_warm_start, cold-start defaults apply even though…, If init_to_value(values=...) raises during construction (a distinct failure…, A run with clean R-hat (<1.01), zero divergences, and diagnostics_valid=True…, precompile_bayesian compiles, caches, and restores absent _test_mode., precompile_bayesian accepts RheoData and default (None) inputs. (+12 more)
+### Community 155 - "_linear_data"
+Cohesion: 0.10
+Nodes (24): _linear_data(), slow, A callable bayesian_parameter_bounds override rewrites the bounds dict., A typo'd/stale key in initial_values must raise, not be silently dropped (which…, likelihood_space other than linear/log raises (after protocol pop)., Plain-array X with y=None raises before any sampling., A run with clean R-hat (<1.01), zero divergences, and diagnostics_valid=True…, precompile_bayesian must reject NaN/Inf input the same way fit_bayesian does:… (+16 more)
 
 ### Community 156 - "Mastercurve"
 Cohesion: 0.01
@@ -1542,8 +1558,8 @@ Cohesion: 0.12
 Nodes (14): Any, Figure, Path, RheoData, Export figure to file. Parameters ---------- fig : Figure Matplotlib figure…, Convert metadata values to JSON-serializable types., Export posterior samples. Parameters ---------- result : BayesianResult…, Write NUTS posterior samples to NetCDF via ArviZ InferenceData. `result` uses… (+6 more)
 
 ### Community 166 - "TNTCates"
-Cohesion: 0.08
-Nodes (15): register, Cates living polymer (wormlike micelle) model. Implements the Cates theory for…, Return string representation., Initialize Cates living polymer model., Initialize ParameterSet with Cates parameters. Parameters: - G_0: Plateau…, Map data-scale estimates to Cates-specific parameter names. Cates uses (G_0,…, Get plateau modulus G₀ (Pa)., Get reptation time τ_rep (s). (+7 more)
+Cohesion: 0.09
+Nodes (13): register, Cates living polymer (wormlike micelle) model. Implements the Cates theory for…, Return string representation., Initialize Cates living polymer model., Initialize ParameterSet with Cates parameters. Parameters: - G_0: Plateau…, Get plateau modulus G₀ (Pa)., Get reptation time τ_rep (s)., Get breaking time τ_break (s). (+5 more)
 
 ### Community 167 - "TNTLoopBridge"
 Cohesion: 0.08
@@ -1553,9 +1569,9 @@ Nodes (16): register, Loop-bridge kinetics model for telechelic polymer networks
 Cohesion: 0.07
 Nodes (30): laos_params(), fixture, smoke, Parity tests: SGRGeneric vs SGRConventional feature comparison. This module…, Test banded flow prediction matches between models., Parity tests for LAOS analysis., Test I3/I1 harmonic ratio matches within 2% tolerance., Test fundamental amplitude I1 matches between models. (+22 more)
 
-### Community 169 - "_ensure_all_registered"
-Cohesion: 0.07
-Nodes (33): _ensure_all_registered(), Eagerly import all model submodules to trigger @ModelRegistry.register…, parallel_map(), Public API for parallel execution. High-level convenience functions that hide…, Execute a function over items using process-based parallelism. Each invocation…, get_default_workers(), is_sequential_mode(), Adaptive parallelism configuration. Auto-detects optimal worker count based on… (+25 more)
+### Community 169 - "get_default_workers"
+Cohesion: 0.10
+Nodes (21): parallel_map(), Public API for parallel execution. High-level convenience functions that hide…, Execute a function over items using process-based parallelism. Each invocation…, get_default_workers(), is_sequential_mode(), Adaptive parallelism configuration. Auto-detects optimal worker count based on…, Optimal worker count for the current system. Priority: sequential mode (returns…, Check if all parallelism is disabled. Automatically enabled when running under… (+13 more)
 
 ### Community 170 - "bootstrap_ci"
 Cohesion: 0.11
@@ -1566,8 +1582,8 @@ Cohesion: 0.08
 Nodes (32): CompletedProcess, QIcon, main(), RheoJAX GUI Package ================== Qt-based graphical user interface for…, Launch the RheoJAX GUI application. This is a convenience wrapper that imports…, check_dependencies(), _create_workspace_window(), main() (+24 more)
 
 ### Community 172 - "Complete Guide to Data Transforms (doc)"
-Cohesion: 0.10
-Nodes (33): Arrhenius shift-factor equation, Cox-Merz rule, Mutation Number theory (structural time-dependence), Prony series representation, SGR noise temperature x, Shear banding / coexistence plateau, Sequence of Physical Processes (SPP) framework, Strain-Rate Frequency Superposition (SRFS) theory (+25 more)
+Cohesion: 0.09
+Nodes (37): Arrhenius shift-factor equation, Cox-Merz rule, Creep test mode, Flow curve (steady shear) test mode, LAOS (Large Amplitude Oscillatory Shear) test mode, Mutation Number theory (structural time-dependence), Oscillation (SAOS) test mode, Prony series representation (+29 more)
 
 ### Community 173 - "test_io_fixes.py"
 Cohesion: 0.04
@@ -1577,9 +1593,9 @@ Nodes (55): BytesIO, _create_parameters_dataframe(), _create_predictions_datafra
 Cohesion: 0.05
 Nodes (25): Get list of all registered model names. Returns: List of model names, List all registered model names (discovery). Returns: List of registered model…, FractionalMaxwellGel, register, Prefer conservative NUTS settings for the stiff Mittag-Leffler kernel., Fractional Maxwell Gel model: SpringPot in series with dashpot. This model…, Initialize Fractional Maxwell Gel model., Test listing models when none registered. (+17 more)
 
-### Community 175 - "HebraudLequeux"
-Cohesion: 0.04
-Nodes (77): HebraudLequeux, Any, ndarray, register, Hébraud–Lequeux (HL) Model implementation. This module implements the…, Model function for Bayesian inference (NumPyro NUTS). Args: X: Input array…, Return the phase state based on alpha., Get grid parameters based on current or provided sigma_c. (+69 more)
+### Community 175 - "hebraud_lequeux.py"
+Cohesion: 0.06
+Nodes (59): Any, ndarray, Hébraud–Lequeux (HL) Model implementation. This module implements the…, Model function for Bayesian inference (NumPyro NUTS). Args: X: Input array…, Get grid parameters based on current or provided sigma_c., Compute adaptive dt and n_steps to cap scan length. The CFL sub-stepping inside…, Fit HL model parameters to data. Args: X: Independent variable (shear rate,…, Fit flow curve using derivative-free optimization. The HL PDE solver has sharp… (+51 more)
 
 ### Community 176 - "HVNMLocal"
 Cohesion: 0.04
@@ -1627,7 +1643,7 @@ Nodes (38): FitState.control_vars unwired field vs ModelService _PROTOCOL_KWARGS
 
 ### Community 187 - "TestAdvancedNotebooks"
 Cohesion: 0.06
-Nodes (19): gpu, Test advanced workflow notebooks (custom models, batch processing, GPU, etc.), Test advanced workflow notebooks (Phase 4)., Verify multi-technique fitting notebook exists., Execute multi-technique fitting notebook without errors., Validate parameter consistency across test modes., Verify batch processing notebook exists., Execute batch processing notebook without errors. (+11 more)
+Nodes (18): gpu, Test advanced workflow notebooks (custom models, batch processing, GPU, etc.), Test advanced workflow notebooks (Phase 4)., Verify multi-technique fitting notebook exists., Execute multi-technique fitting notebook without errors., Validate parameter consistency across test modes., Execute batch processing notebook without errors., Validate batch aggregation statistics. (+10 more)
 
 ### Community 188 - "test_hvm.py"
 Cohesion: 0.05
@@ -1638,8 +1654,8 @@ Cohesion: 0.03
 Nodes (37): HVNMBase, ndarray, setter, Whether diffusion mode is active., Interphase reinforcement ratio G_I/G_E., Interfacial TST attempt frequency (1/s)., Interfacial activation energy (J/mol)., Interfacial activation volume (m^3/mol). (+29 more)
 
 ### Community 190 - "GeneralizedMaxwell"
-Cohesion: 0.08
-Nodes (15): GeneralizedMaxwell, register, Extract diagnostics from NLSQ OptimizationResult. Args: nlsq_result:…, Classify NLSQ convergence quality. Args: diagnostics: Dictionary from…, Construct Bayesian priors based on NLSQ convergence classification. Args:…, Get discrete relaxation spectrum (G_i, τ_i). Returns: Dictionary with 'G_inf',…, Get element minimization diagnostics. Returns: Dictionary with .n_initial.,…, Extract Fourier harmonics from LAOS stress signal. For linear model, only I_1… (+7 more)
+Cohesion: 0.07
+Nodes (21): GeneralizedMaxwell, register, Extract diagnostics from NLSQ OptimizationResult. Args: nlsq_result:…, Classify NLSQ convergence quality. Args: diagnostics: Dictionary from…, Construct Bayesian priors based on NLSQ convergence classification. Args:…, Get discrete relaxation spectrum (G_i, τ_i). Returns: Dictionary with 'G_inf',…, Get element minimization diagnostics. Returns: Dictionary with .n_initial.,…, Extract Fourier harmonics from LAOS stress signal. For linear model, only I_1… (+13 more)
 
 ### Community 191 - "LVEEnvelope"
 Cohesion: 0.07
@@ -1666,8 +1682,8 @@ Cohesion: 0.08
 Nodes (22): ProtocolDataFactory, Any, ndarray, parametrize, smoke, Factory for generating minimal valid test data for each protocol type. Each…, Generate minimal test data for a given protocol. Args: protocol: The Protocol…, Try to predict, handling different test_mode dispatch patterns. Some models… (+14 more)
 
 ### Community 197 - "get_template"
-Cohesion: 0.06
-Nodes (35): get_template(), list_templates(), Path, YAML pipeline templates for ``rheojax pipeline init``. Each template is a…, Return the YAML string for a named template. Args: name: Template identifier…, Return metadata for all available templates. Returns: List of dicts, each with…, Write a named template YAML to *output_path*. Args: name: Template identifier.…, write_template() (+27 more)
+Cohesion: 0.11
+Nodes (18): get_template(), list_templates(), Path, YAML pipeline templates for ``rheojax pipeline init``. Each template is a…, Return the YAML string for a named template. Args: name: Template identifier…, Return metadata for all available templates. Returns: List of dicts, each with…, Write a named template YAML to *output_path*. Args: name: Template identifier.…, write_template() (+10 more)
 
 ### Community 198 - ".model_function"
 Cohesion: 0.20
@@ -1722,8 +1738,8 @@ Cohesion: 0.07
 Nodes (24): Unit tests for BayesianMixin internal helpers and orchestration wiring. These…, Tier-2 fallback: _last_fit_kwargs['test_mode'] used when _test_mode absent., A plain string test_mode is normalized to the TestMode enum., A model-provided _validate_test_mode hook handles special strings., A non-array y (Python list) is coerced without error (real branch)., Empty complex y takes the zero-scale branch without dividing by zero., A model claiming fitted_ with a None value logs a warning but proceeds., A GUI-supported Parameter.prior dict (normal) is honored via the same… (+16 more)
 
 ### Community 211 - "TestOptimizationResultStatistics"
-Cohesion: 0.07
-Nodes (17): Create OptimizationResult from NLSQ result dictionary. Args: nlsq_result:…, fixture, OptimizationResult.from_nlsq extraction branches., Test OptimizationResult statistical properties (NLSQ 0.6.0 compatibility)., Create an OptimizationResult with residuals and y_data for testing., Test R² computation from residuals and y_data., Test adjusted R² computation., Test RMSE computation. (+9 more)
+Cohesion: 0.08
+Nodes (14): fixture, Test OptimizationResult statistical properties (NLSQ 0.6.0 compatibility)., Create an OptimizationResult with residuals and y_data for testing., Test R² computation from residuals and y_data., Test adjusted R² computation., Test RMSE computation., Test MAE computation., Test AIC computation. (+6 more)
 
 ### Community 212 - "sgr_population_balance.py"
 Cohesion: 0.11
@@ -1749,13 +1765,13 @@ Nodes (20): ParameterFormBuilder, Any, QWidget, Read current values from all wid
 Cohesion: 0.07
 Nodes (29): 1. `cancellation.py` (139 lines), 1. Thread Safety, 2. JAX Integration, 2. `worker_pool.py` (284 lines), 3. Error Handling, 3. `fit_worker.py` (294 lines), 4. `bayesian_worker.py` (360 lines), 4. Progress Tracking (+21 more)
 
-### Community 218 - "ProtocolModelStep"
-Cohesion: 0.10
-Nodes (20): _constructor_params(), _grouped_models(), _make_config_widget(), _model_tooltip(), ProtocolModelStep, Any, QWidget, Test/programmatic helper: apply a config dict to the widgets, then commit it. (+12 more)
+### Community 218 - "smoke"
+Cohesion: 0.11
+Nodes (14): _config_from_yaml(), smoke, Defaults from the config are merged into each step's kwargs., CLI --override flag correctly mutates config., Schema validation catches structural errors., Parse a YAML string into a PipelineConfig (in-memory, no file)., Verify yaml.safe_load rejects Python object tags. These are regression tests…, !!python/object tags must not instantiate arbitrary objects. (+6 more)
 
 ### Community 219 - "create_least_squares_objective"
-Cohesion: 0.10
-Nodes (12): Fit EPM parameters to data using NLSQ with smooth yielding. This method uses…, Fit Fluidity model to data. Args: X: Independent variable (time, frequency, or…, Fit transient response. Args: t: Time array (s) y: Response data (stress for…, Fit SAOS data. For small amplitude, uses linear viscoelastic approximation.…, Fit LAOS data using full ODE integration. Args: t: Time array (s) sigma: Stress…, create_least_squares_objective(), Create residual function for NLSQ least-squares fitting. IMPORTANT: This now…, Residual-format dispatch branches in create_least_squares_objective. (+4 more)
+Cohesion: 0.07
+Nodes (18): Fit EPM parameters to data using NLSQ with smooth yielding. This method uses…, Fit Fluidity model to data. Args: X: Independent variable (time, frequency, or…, Fit transient response. Args: t: Time array (s) y: Response data (stress for…, Fit SAOS data. For small amplitude, uses linear viscoelastic approximation.…, Fit LAOS data using full ODE integration. Args: t: Time array (s) sigma: Stress…, Determine material phase regime from noise temperature x. The SGR model…, Fit SGR model to data using NLSQ optimization. Routes to appropriate fitting…, Fit SGR to relaxation modulus data (relaxation mode). Uses NLSQ-accelerated… (+10 more)
 
 ### Community 220 - "test_multi_species.py"
 Cohesion: 0.09
@@ -1826,8 +1842,8 @@ Cohesion: 0.03
 Nodes (44): fixture, smoke, Comprehensive tests for Fractional Zener Family and Advanced Fractional Models…, Test parameter initialization., Test relaxation modulus., Test creep compliance., Test complex modulus., Tests for FZLL model. (+36 more)
 
 ### Community 237 - "ArrayLike"
-Cohesion: 0.15
-Nodes (10): ArrayLike, RuntimeError, Self, Compute model score (R² by default). Args: X: Input features y: True target…, Standard NLSQ fitting pipeline for models with a stateless model_fn. Handles:…, Check model-data compatibility and return result. Args: X: Input data y: Target…, Enhance optimization error with compatibility information. Args: error:…, Fit the model to data using NLSQ optimization. This method uses NLSQ (GPU-… (+2 more)
+Cohesion: 0.13
+Nodes (11): ArrayLike, RuntimeError, Self, Compute model score (R² by default). Args: X: Input features y: True target…, Standard NLSQ fitting pipeline for models with a stateless model_fn. Handles:…, Auto-detect optimization strategy based on data range. Args: X: Input data…, Check model-data compatibility and return result. Args: X: Input data y: Target…, Enhance optimization error with compatibility information. Args: error:… (+3 more)
 
 ### Community 238 - "run_bayesian_isolated"
 Cohesion: 0.04
@@ -1862,8 +1878,8 @@ Cohesion: 0.09
 Nodes (20): CoxMerz, Any, register, RheoData, Cox-Merz rule validation. Compares |η*(ω)| from oscillation data with η(γ̇)…, Apply Cox-Merz comparison. Args: data: List of two RheoData objects: [0] =…, smoke, Tests for CoxMerz transform. (+12 more)
 
 ### Community 246 - "GiesekusMultiMode"
-Cohesion: 0.08
-Nodes (14): GiesekusMultiMode, register, Initialize multi-mode Giesekus model. Parameters ---------- n_modes : int,…, Initialize ParameterSet with multi-mode parameters. Creates parameters: -…, Get solvent viscosity η_s (Pa·s)., Get zero-shear viscosity η₀ = η_s + Σ η_p,i (Pa·s)., Get parameters for a specific mode. Parameters ---------- mode_idx : int Mode…, Set parameters for a specific mode. Parameters ---------- mode_idx : int Mode… (+6 more)
+Cohesion: 0.03
+Nodes (47): GiesekusMultiMode, ndarray, register, Get solvent viscosity η_s (Pa·s)., Get zero-shear viscosity η₀ = η_s + Σ η_p,i (Pa·s)., Get parameters for a specific mode. Parameters ---------- mode_idx : int Mode…, Set parameters for a specific mode. Parameters ---------- mode_idx : int Mode…, Get all mode parameters as JAX arrays. Uses vectorized extraction via… (+39 more)
 
 ### Community 247 - "._process_file"
 Cohesion: 0.11
@@ -1873,9 +1889,9 @@ Nodes (15): Any, DataFrame, Exception, Path, RheoData, Process all files in dire
 Cohesion: 0.06
 Nodes (31): CubicSpline, _BoundDerivative, _hermite_eval(), local_cubic_eval(), _local_cubic_slopes(), _not_a_knot_slopes(), NotAKnotCubicSpline, Pure-JAX cubic spline interpolation, replacing interpax. interpax pins… (+23 more)
 
-### Community 249 - "check_wide_frequency_range"
-Cohesion: 0.16
-Nodes (13): check_monotonicity(), check_nan_inf(), check_wide_frequency_range(), ndarray, Data quality and range detection utilities. This module provides utilities for…, Suggest optimization strategy based on data characteristics. Analyzes data…, Check for NaN/Inf values and return a diagnostic dictionary. Args: data: Array…, Check whether an array is approximately monotonic. An array is considered… (+5 more)
+### Community 249 - "detect_data_range_decades"
+Cohesion: 0.12
+Nodes (18): check_monotonicity(), check_nan_inf(), check_wide_frequency_range(), detect_data_range_decades(), ndarray, Data quality and range detection utilities. This module provides utilities for…, Suggest optimization strategy based on data characteristics. Analyzes data…, Detect the range of data in decades (log10 scale). Args: x: Data array (e.g.,… (+10 more)
 
 ### Community 250 - "test_bayesian_mode_aware.py"
 Cohesion: 0.12
@@ -1921,9 +1937,9 @@ Nodes (45): BayesianPipeline, Any, DataFrame, Reset pipeline to initial state. C
 Cohesion: 0.07
 Nodes (32): DMTLocal, ndarray, register, Predict creep strain., Initialize DMTLocal model., Fit to SAOS data G*(ω) = G'(ω) + jG''(ω). Requires include_elasticity=True.…, Fit model to data. Dispatches to protocol-specific fitting method based on…, Predict complex modulus. (+24 more)
 
-### Community 261 - "auto_p0"
+### Community 261 - "auto_p0.py"
 Cohesion: 0.10
-Nodes (40): E402 ruff exemption for mittag_leffler.py/initialization/*.py/transforms/*.py (import order must follow safe_import_jax) (rationale), auto_p0(), _bounds_midpoint(), _clamp_to_bounds(), _compute_data_features(), _est_eta_0(), _est_modulus(), _est_prony_modulus() (+32 more)
+Nodes (38): E402 ruff exemption for mittag_leffler.py/initialization/*.py/transforms/*.py (import order must follow safe_import_jax) (rationale), _bounds_midpoint(), _clamp_to_bounds(), _compute_data_features(), _est_eta_0(), _est_modulus(), _est_prony_modulus(), _est_prony_tau() (+30 more)
 
 ### Community 262 - "smoke"
 Cohesion: 0.13
@@ -1945,9 +1961,9 @@ Nodes (12): Test status icons are ASCII strings without emoji., Test file type i
 Cohesion: 0.12
 Nodes (18): create_parser(), _load_from_envelope(), _load_from_file(), main(), _parse_params(), ArgumentParser, CLI subcommand for applying rheological transforms. Wraps TransformRegistry to…, Parse a list of 'key=value' strings into a dict with numeric conversion. (+10 more)
 
-### Community 267 - "test_anton_paar.py"
-Cohesion: 0.09
-Nodes (14): Tests for RheoCompass CSV parser (Anton Paar). This module tests the full…, Tests for relaxation test loading (US2: T020-T021)., T020: Test relaxation loading returns correct structure., Test relaxation modulus values are correctly extracted., T021: Test G(t) calculated when column missing., Tests for edge cases (T070-T074)., T071: Test bracket [unit] notation., T071: Test parentheses (unit) notation. (+6 more)
+### Community 267 - "TestRelaxationLoading"
+Cohesion: 0.25
+Nodes (5): Tests for relaxation test loading (US2: T020-T021)., T020: Test relaxation loading returns correct structure., Test relaxation modulus values are correctly extracted., T021: Test G(t) calculated when column missing., TestRelaxationLoading
 
 ### Community 268 - "LibraryRail"
 Cohesion: 0.18
@@ -1979,7 +1995,7 @@ Nodes (24): AIC/BIC information criteria for model comparison, Automatic model-d
 
 ### Community 275 - "cmd_pipeline.py"
 Cohesion: 0.10
-Nodes (22): cli/_yaml_runner.py, cli/_yaml_schema.py, create_parser(), main(), ArgumentParser, Namespace, CLI subcommand for pipeline management (init, validate, show). Provides…, Write a template YAML pipeline config. (+14 more)
+Nodes (24): cli/_yaml_runner.py, cli/_yaml_schema.py, create_parser(), main(), ArgumentParser, Namespace, CLI subcommand for pipeline management (init, validate, show). Provides…, Write a template YAML pipeline config. (+16 more)
 
 ### Community 276 - "RheoJAX GUI Package"
 Cohesion: 0.11
@@ -2025,9 +2041,9 @@ Nodes (13): Cover the _fit() test_mode dispatch and its error branches. These ca
 Cohesion: 0.10
 Nodes (14): smoke, Tests for dynamic noise temperature x(t) evolution., Test SGRGeneric(dynamic_x=True) enables 3D state., Test _poisson_bracket_3d() returns antisymmetric L., Test _friction_matrix_3d() returns symmetric M., Test 3D friction matrix is block-diagonal (M_13 = M_23 = 0)., Test 3D friction matrix is positive semi-definite., Test free_energy_gradient() includes dF/dx = -S. (+6 more)
 
-### Community 287 - "smoke"
-Cohesion: 0.10
-Nodes (11): smoke, Test SAOS prediction., Test SAOS is sum of Maxwell modes., Test flow curve prediction., Test flow curve via predict() method., Test model instantiates with default 3 modes., Test discrete spectrum retrieval., Test instantiation with custom number of modes. (+3 more)
+### Community 287 - "TestFitResultSerialization"
+Cohesion: 0.11
+Nodes (10): Load a fit result from a file. Args: path: Path to a ``.json``, ``.npz``,…, Loading a .npz saved before params_units/metadata were persisted must fall back…, FitResult wrapping an OptimizationResult with _use_log_residuals=True. Mirrors…, load() must return the persisted stats, not recompute them from raw (linear-…, plot()'s residual panel must not silently ignore _use_log_residuals=True and…, Test to_dict and save/load., TestFitResultSerialization, Tests for save/load round-trips. (+2 more)
 
 ### Community 288 - "fitted_pipeline"
 Cohesion: 0.40
@@ -2047,7 +2063,7 @@ Nodes (10): Any, LogRecord, Format a value for log output. Args: value: Value to
 
 ### Community 292 - "VLBVariant"
 Cohesion: 0.02
-Nodes (79): BreakageType, ndarray, register, StressType, Predict SAOS moduli (Maxwell, analytical). In the linear regime, Bell reduces…, VLB with Bell breakage, FENE-P stress, and/or temperature dependence. This is…, Predict steady-state first normal stress difference N1. For Bell breakage, this…, Simulate startup shear. Parameters ---------- t : np.ndarray Time array (s)… (+71 more)
+Nodes (90): BreakageType, ndarray, register, StressType, Predict SAOS moduli (Maxwell, analytical). In the linear regime, Bell reduces…, VLB with Bell breakage, FENE-P stress, and/or temperature dependence. This is…, Predict steady-state first normal stress difference N1. For Bell breakage, this…, Simulate startup shear. Parameters ---------- t : np.ndarray Time array (s)… (+82 more)
 
 ### Community 293 - "TestMittagLefflerConvergence"
 Cohesion: 0.11
@@ -2082,8 +2098,8 @@ Cohesion: 0.09
 Nodes (12): Test stretch_creation breakage variant adds kappa., Test Bell + FENE combined variant has correct parameters., Tests for model instantiation and parameters., Test model instantiates with default parameters., Test parameters can be set., Test derived properties are computed correctly., Test Weissenberg and Deborah number computations., Test constant breakage model has exactly 3 parameters. (+4 more)
 
 ### Community 302 - "TestBasicNotebooks"
-Cohesion: 0.09
-Nodes (13): _extract_fitted_parameters(), Extract fitted model parameters from notebook output. Parameters ---------- nb…, Test basic model fitting notebooks (Maxwell, Zener, SpringPot, etc.), Test Zener model fitting notebook executes without errors., Validate Zener model fitted parameters match expected values., Validate Bayesian inference convergence for Zener model., Test SpringPot model fitting notebook executes without errors., Validate SpringPot alpha parameter is in valid range [0, 1]. (+5 more)
+Cohesion: 0.08
+Nodes (14): _extract_fitted_parameters(), Extract fitted model parameters from notebook output. Parameters ---------- nb…, Test basic model fitting notebooks (Maxwell, Zener, SpringPot, etc.), Verify basic notebooks directory exists and has expected structure., Test Zener model fitting notebook executes without errors., Validate Zener model fitted parameters match expected values., Validate Bayesian inference convergence for Zener model., Test SpringPot model fitting notebook executes without errors. (+6 more)
 
 ### Community 303 - "ThemeDemo"
 Cohesion: 0.13
@@ -2105,9 +2121,9 @@ Nodes (19): _ensure_matplotlib(), _get_figure(), plot_cole_cole(), plot_harmonic
 Cohesion: 0.24
 Nodes (5): ndarray, Small (101-point) log-linear time grid covering early + late transient., Direct regression tests for the four fluidity models. Each test constructs a…, _t_grid(), TestFluidityPredictWithoutFit
 
-### Community 308 - "TestHebraudLequeux"
-Cohesion: 0.08
-Nodes (14): slow, Test that grid adapts to large sigma_c., Test model_function for Bayesian inference compatibility., Test model initialization and parameter defaults., Test phase classification., SAOS/oscillation fit + predict path (exercises _fit_oscillation)., Test steady shear flow curve prediction., (M, 2) [G', G''] input format is accepted by _fit_oscillation. (+6 more)
+### Community 308 - "HebraudLequeux"
+Cohesion: 0.03
+Nodes (38): HebraudLequeux, register, Return the phase state based on alpha., Hébraud–Lequeux (HL) Model for Soft Glassy Materials. The HL model (1998) is a…, Initialize Hébraud–Lequeux Model., fixture, slow, Test that grid adapts to large sigma_c. (+30 more)
 
 ### Community 309 - "1. Dullaert-Mewis Model (2006) -- Literature Equations"
 Cohesion: 0.10
@@ -2137,9 +2153,9 @@ Nodes (18): _preprocess_creep(), _preprocess_flow_curve(), _preprocess_laos(), _
 Cohesion: 0.11
 Nodes (10): Tests for Large Amplitude Oscillatory Shear (LAOS) analysis., Test simulate_laos() returns correct shapes., Test that LAOS output is periodic., Test extract_laos_harmonics() returns required keys., Test that harmonic amplitudes are physically reasonable., Test compute_chebyshev_coefficients() returns required keys., Test Chebyshev coefficients are physically reasonable., Test get_lissajous_curve() output shape and normalization. (+2 more)
 
-### Community 317 - "ndarray"
-Cohesion: 0.17
-Nodes (9): ndarray, Get all mode parameters as JAX arrays. Uses vectorized extraction via…, Internal SAOS prediction., Predict SAOS storage and loss moduli. Parameters ---------- omega : np.ndarray…, Internal flow curve prediction (steady shear). For multi-mode Giesekus, we sum…, Predict steady shear stress. Parameters ---------- gamma_dot : np.ndarray Shear…, Simulate startup flow at constant shear rate. Parameters ---------- t :…, Get discrete relaxation spectrum. Returns ------- tuple[np.ndarray, np.ndarray]… (+1 more)
+### Community 317 - "ModelComparison"
+Cohesion: 0.11
+Nodes (13): ModelComparison, Structured fit results, model info, and model comparison. This module provides:…, Bar plot of Akaike weights. Args: ax: Optional matplotlib axes. **kwargs:…, Plot the fit result (2-panel: fit + residuals). Args: ax: Optional matplotlib…, # NOTE: fit_bayesian is defined unconditionally on BaseModel, so, Comparison of multiple model fit results. Ranks models by an information…, Compute rankings and Akaike weights from results., Return model names sorted by rank (best first). (+5 more)
 
 ### Community 318 - "TestHVNMInterphase"
 Cohesion: 0.12
@@ -2149,13 +2165,13 @@ Nodes (7): Test interphase physics and NP geometry., Verify Guth-Gold formula at
 Cohesion: 0.12
 Nodes (13): epm_flow_curve_data(), epm_oscillation_data(), epm_relaxation_data(), epm_startup_data(), fixture, Generate synthetic EPM oscillation data (stress vs time)., Create a small LatticeEPM for fast testing., Create a small LatticeEPM for fast testing. (+5 more)
 
-### Community 320 - "TestVLBBellPhysics"
-Cohesion: 0.10
-Nodes (11): Test Bell breakage physics: force-dependent k_d., Bell gives shear-thinning: eta(gamma_dot) decreasing., Bell with nu=0 recovers constant k_d (Newtonian)., Bell startup shows stress overshoot at high Wi., Bell N1 deviates from quadratic at high shear rates., Bell LAOS produces nonzero higher harmonics (I3/I1 > 0)., Bell relaxation from pre-sheared state decays to zero., At Wi → 0, viscosity approaches eta_0 = G0/k_d_0. (+3 more)
+### Community 320 - "TestBaseModelEdgeCases"
+Cohesion: 0.09
+Nodes (13): smoke, predict() must not raise TypeError on a 0-d array input. np.array(5.0) has…, Edge case tests using Maxwell as a concrete model., Predict before fit should use default parameters., Fit with single data point should still work or raise gracefully., Predict with empty array should return empty or raise., Fit with mismatched X and y lengths should raise., Fit with NaN data should raise or handle gracefully. (+5 more)
 
-### Community 321 - "FractionalZenerSolidSolid"
-Cohesion: 0.06
-Nodes (31): _compute_relaxation_compatibility(), FractionalZenerSolidSolid, jit, ndarray, register, Initialize Fractional Zener Solid-Solid model., Predict relaxation modulus G(t) using JAX. G(t) = G_e + G_m * E_α(-(t/τ_α)^α), Predict relaxation modulus G(t). Wrapper for JIT-compiled implementation. (+23 more)
+### Community 321 - "._fit"
+Cohesion: 0.11
+Nodes (16): _compute_relaxation_compatibility(), jit, ndarray, Predict relaxation modulus G(t) using JAX. G(t) = G_e + G_m * E_α(-(t/τ_α)^α), Predict relaxation modulus G(t). Wrapper for JIT-compiled implementation., Predict creep compliance J(t) using JAX. Exact Laplace inverse of the model's…, Predict creep compliance J(t). Wrapper for JIT-compiled implementation., Predict complex modulus G*(ω) using JAX. G*(ω) = G_e + G_m / (1 + (iωτ_α)^(-α)) (+8 more)
 
 ### Community 322 - "smoke"
 Cohesion: 0.13
@@ -2169,9 +2185,9 @@ Nodes (19): create_parser(), ArgumentParser, CLI subcommand for NLSQ model fitti
 Cohesion: 0.15
 Nodes (7): Test that this is Herschel-Bulkley with n=1., Test basic stress prediction: σ = σ_y + η_p γ̇., Test that stress is zero below yield threshold., Test that σ_y = 0 reduces to Newtonian., Test apparent viscosity prediction., Test that stress grows linearly above yield., TestBinghamPredictions
 
-### Community 325 - ".step"
-Cohesion: 0.18
-Nodes (10): _coerce_array(), ArrayLike, ndarray, Get current parameter values., Evaluate objective at given values. Args: values: Parameter values Returns:…, Compute gradient of objective. Args: values: Parameter values Returns: Gradient…, Check if constraints are satisfied. Args: values: Parameter values Returns:…, Perform one optimization step. Args: values: Current parameter values… (+2 more)
+### Community 325 - "test_nlsq_numpyro_workflow.py"
+Cohesion: 0.10
+Nodes (20): smoke, Integration tests for complete NLSQ → NUTS workflow. This module tests the end-…, Test that warm-start from NLSQ converges faster than cold start. Note: This is…, Test complete NLSQ → NUTS workflow on Maxwell model with convergence checks., Test that 95% credible intervals contain true parameter values., Test that BayesianResult is stored in model for later access., Test that all models automatically gain fit_bayesian() method. Note: This is a…, Test NLSQ → NUTS workflow robustness to outliers in data. (+12 more)
 
 ### Community 326 - "VLBBase"
 Cohesion: 0.06
@@ -2181,9 +2197,9 @@ Nodes (22): Base class for HVM (Hybrid Vitrimer Model). Provides shared infrastr
 Cohesion: 0.18
 Nodes (6): Direct exercise of model_function protocol branches (Bayesian path). These…, Empty X falls back to _fit_data_metadata t_max for n_steps., Explicit protocol kwargs take precedence over _last_fit_kwargs (_kw)., _predict rejects an unrecognized stored test_mode., Flow-curve Bayesian path falls back when the primary solve raises., TestHLModelFunction
 
-### Community 328 - "TestDeviceMemoryOptimization"
-Cohesion: 0.20
-Nodes (6): Test 3: Profile device transfers in pipeline workflow., Test 4: Measure end-to-end pipeline speedup., Test 6: Backward compatibility with NumPy inputs., Test suite for device memory optimization., Test 1: Data remains as JAX arrays throughout pipeline stages., TestDeviceMemoryOptimization
+### Community 328 - ".residuals"
+Cohesion: 0.11
+Nodes (10): Any, ndarray, Residual vector from the fit., Parameter covariance matrix from the Jacobian., Parameter confidence intervals (95%) as {name: (lower, upper)}., Parameter confidence intervals from the covariance matrix. Args: alpha:…, Prediction intervals for new x values. Args: x_new: New input array (or None…, Human-readable summary of the fit result. Returns: Multi-line string with model… (+2 more)
 
 ### Community 329 - "Transforms API reference"
 Cohesion: 0.13
@@ -2329,9 +2345,9 @@ Nodes (11): jit, ndarray, RheoData, TestMode, Predict stress for given shear rat
 Cohesion: 0.13
 Nodes (10): slow, Tests for TRIOS chunked reading functionality. This module tests memory-…, Test backward compatibility with existing load_trios., Test that load_trios accepts chunk_size parameter., Test that generator properly cleans up file handles., Memory profiling and performance tests., Simulate memory-efficient reading of large file. This test verifies the chunked…, Test chunked reading with model fitting workflow. (+2 more)
 
-### Community 365 - "test_generalized_maxwell.py"
+### Community 365 - "ModelInfo"
 Cohesion: 0.13
-Nodes (8): Tests for Generalized Maxwell Model (GMM). Test coverage: - Task Group 1.2: GMM…, Test GMM LAOS protocol (linear model = SAOS response)., LAOS fit on linear model reproduces the oscillation fit., simulate_laos returns consistent t, strain, stress arrays., Linear GMM LAOS response has negligible I_3/I_1 (no nonlinearity)., Test log-residual and warm-start (initial_params) fitting branches., TestGMMLaosMode, TestGMMResidualModes
+Nodes (12): ModelInfo, Aggregated information about a registered model. Combines ``PluginInfo`` from…, Construct ModelInfo by inspecting a registered model. Temporarily instantiates…, smoke, Test summary and display methods., aicc must return None (matching every sibling stat property's undefined-value…, Test ModelInfo.from_registry., TestFitResultSummary (+4 more)
 
 ### Community 366 - "._get_mode_arrays"
 Cohesion: 0.12
@@ -2370,8 +2386,8 @@ Cohesion: 0.21
 Nodes (12): dynamic_x_model(), fluid_model(), glass_model(), model(), fixture, Extended tests for SGRGeneric model with advanced features. This module…, Create a basic SGRGeneric model with default parameters., Create SGRGeneric model in glass regime (x < 1). (+4 more)
 
 ### Community 375 - "npz_writer.py"
-Cohesion: 0.16
-Nodes (10): _build_pipeline_from_envelope(), main(), CLI subcommand for exporting pipeline analysis results. Wraps AnalysisExporter…, Export pipeline results to the chosen format., Construct a minimal Pipeline populated with envelope data for export., NumpyJSONEncoder, Any, Shared JSON encoder for numpy/JAX types. Used by both analysis_exporter and… (+2 more)
+Cohesion: 0.29
+Nodes (5): NumpyJSONEncoder, Any, Shared JSON encoder for numpy/JAX types. Used by both analysis_exporter and…, JSON encoder that handles numpy/JAX scalar and array types. Handles: - numpy…, NumPy .npz writer/reader for RheoData objects.
 
 ### Community 376 - "TestModelFunctionCompleteness"
 Cohesion: 0.12
@@ -2401,9 +2417,9 @@ Nodes (13): register, Cooperativity length xi = sqrt(D_mu / k_d_0). This sets th
 Cohesion: 0.31
 Nodes (4): get_gpu_info(), Detect GPU name and SM version. Returns ------- tuple[str | None, float | None]…, Branch coverage for get_gpu_info via mocked nvidia-smi., TestGetGpuInfo
 
-### Community 383 - "TestHLValidation"
-Cohesion: 0.14
-Nodes (6): Validation / error-path coverage for the HL fitting dispatcher., fit() with no test_mode raises (dispatcher guard)., Unknown test_mode is rejected by the dispatcher., _predict guards against a missing test_mode., SAOS fit rejects G* that is neither complex nor (M, 2)., TestHLValidation
+### Community 383 - "._clip_to_bounds"
+Cohesion: 0.13
+Nodes (9): jit, ndarray, Seed HB parameters (tau_y, K, n_flow) from flow-curve data. Estimates a…, Clip a seed value to the named parameter's bounds. Shared by both flow-curve…, SAOS prediction using linear viscoelastic approximation. In the linear limit…, ndarray, Initialize parameters from SAOS data. Uses the crossover frequency and modulus…, Initialize parameters from viscosity vs shear rate data. Uses the zero-shear… (+1 more)
 
 ### Community 384 - "TestHVNMSAOS"
 Cohesion: 0.13
@@ -2453,9 +2469,9 @@ Nodes (8): Tests for thixotropic stress transients., Test enable_thixotropy() ac
 Cohesion: 0.20
 Nodes (14): slow, validation, Validate that N₁ stays small without applied normal stress. For simple shear…, Validate that tensorial shear stress matches scalar LatticeEPM within…, Validate that G(t) relaxation matches scalar EPM behavior. Stress relaxation…, Validate linear elastic response for small strains (γ₀ << 1). For small strain,…, Validate that a single yielding site creates quadrupolar stress decay ~1/r².…, Validate steady-state shear stress scaling σ_xy ~ γ̇ in flowing regime. For… (+6 more)
 
-### Community 396 - ".create_mastercurve"
-Cohesion: 0.21
-Nodes (8): NoReturn, RheoData, Compute SRFS shift factor from SGR theory. For SGR materials, the shift factor…, Apply SRFS shift to a single dataset. Parameters ---------- data : RheoData…, Apply SRFS transformation. Parameters ---------- data : RheoData or list of…, Raise the appropriate error when x/tau0 are not supplied. auto_shift=True is…, Apply SRFS transformation (public interface). Parameters ---------- data :…, Create SRFS master curve from multiple flow curve datasets. Parameters…
+### Community 396 - "TestCarreauPredictions"
+Cohesion: 0.14
+Nodes (8): Test stress prediction: σ = η(γ̇) * γ̇., Test Newtonian limit when λ → 0., Test Newtonian limit when n = 1., Test predictions for Carreau model., Test Newtonian plateau at low shear rates., Test power-law behavior at high shear rates., Test smooth transition in middle shear rates., TestCarreauPredictions
 
 ### Community 397 - "mct_kernels.py"
 Cohesion: 0.05
@@ -2488,10 +2504,6 @@ Nodes (13): _count_txt_segments(), _detect_txt_encoding(), _extract_metadata(), 
 ### Community 404 - "TestDMTLocalCreep"
 Cohesion: 0.14
 Nodes (8): Test creep simulations., Test creep simulation runs., Strain should accumulate during creep., Creep below yield stress should be very slow., Maxwell creep should have initial elastic strain γ_e(0) = σ₀/G., As structure breaks down (λ decreases), elastic modulus decreases, so elastic…, Compare viscous and Maxwell creep initial behavior., TestDMTLocalCreep
-
-### Community 405 - "_linear_data"
-Cohesion: 0.15
-Nodes (13): _linear_data(), A parameter with bounds=None raises ValueError., A callable bayesian_parameter_bounds override rewrites the bounds dict., A typo'd/stale key in initial_values must raise, not be silently dropped (which…, likelihood_space other than linear/log raises (after protocol pop)., Plain-array X with y=None raises before any sampling., precompile_bayesian must reject NaN/Inf input the same way fit_bayesian does:…, test_fit_bayesian_invalid_likelihood_space() (+5 more)
 
 ### Community 406 - "Fitting Strategies and Troubleshooting (doc)"
 Cohesion: 0.23
@@ -2605,9 +2617,9 @@ Nodes (6): RheoData's own accessors (is_complex/y_real/y_imag/modulus/phase/…,
 Cohesion: 0.29
 Nodes (12): test_maybe_confirm_unsaved_clean_state_proceeds_without_dialog(), test_maybe_confirm_unsaved_discard_still_proceeds(), test_maybe_confirm_unsaved_save_blocked_by_active_jobs_warns_and_aborts(), test_maybe_confirm_unsaved_save_cancelled_does_not_proceed(), test_maybe_confirm_unsaved_save_success_proceeds(), test_on_close_reaches_confirmed_close_after_discarding_unsaved_changes(), test_on_open_shows_critical_dialog_on_value_error(), test_on_save_as_holds_active_jobs_lock_during_save() (+4 more)
 
-### Community 435 - "TestFluidityLocalOscillation"
-Cohesion: 0.17
-Nodes (7): Tests for FluidityLocal oscillation protocols., Test SAOS prediction returns [G', G''] shape., Test SAOS shows Maxwell-like behavior., Test LAOS simulation returns valid output., TC-014: At small amplitude, I_3/I_1 should be very small., Test harmonic extraction from LAOS., TestFluidityLocalOscillation
+### Community 435 - "Carreau"
+Cohesion: 0.15
+Nodes (8): Carreau, register, Carreau model for non-Newtonian flow (ROTATION only). The Carreau model…, String representation., Initialize Carreau model., Test fitting with synthetic data., Regression test: fit() must run NLSQ, not just the heuristic guess. The…, Test against Carreau formula directly.
 
 ### Community 436 - "test_identifiability.py"
 Cohesion: 0.06
@@ -2649,17 +2661,17 @@ Nodes (7): Tests for shear banding detection., Test CV is low for uniform profil
 Cohesion: 0.21
 Nodes (8): _enable_compilation_cache(), Any, Enable JAX persistent compilation cache for cross-session speedup. Persists XLA…, If the config-based API raises (e.g. older JAX), fall back to the experimental…, pathlib.Path.home() raises RuntimeError when $HOME is unset and the UID has no…, Tests for _enable_compilation_cache()., jax_persistent_cache_min_compile_time_secs defaults to 1.0s in the installed…, TestEnableCompilationCache
 
-### Community 446 - "TestParameterManagement"
-Cohesion: 0.17
-Nodes (7): Test getting all mode parameters as arrays., Test total zero-shear viscosity., Tests for per-mode parameter management., Test getting mode parameters., Test setting mode parameters., Test error for out-of-bounds mode index., TestParameterManagement
+### Community 446 - "TestDiffraxCompilation"
+Cohesion: 0.21
+Nodes (9): fixture, slow, timeout, Tests for diffrax JIT compilation performance., Create ITTMCTSchematic model for testing., Test that JIT compilation happens on first call., Test that precompile() method triggers compilation., Test that precompile() reduces the effective first-call time. (+1 more)
 
-### Community 447 - "CancelWorkerRunnable"
-Cohesion: 0.23
-Nodes (7): CancelWorkerRunnable, Any, QRunnable, Dispatches a worker's .cancel() off the GUI thread.…, _FakeWorker, test_cancel_worker_runnable_calls_cancel(), test_cancel_worker_runnable_runs_via_threadpool()
+### Community 447 - "test_closure_captures_test_mode_not_global_state"
+Cohesion: 0.17
+Nodes (12): smoke, unit, Test backward compatibility: default test_mode inference from RheoData.…, Test model_function uses correct mode throughout MCMC sampling. Verifies that…, Test creep mode produces correct posteriors. This test will FAIL in v0.3.1 if…, Test that model_function closure captures test_mode, not global state. This is…, Test explicit test_mode parameter overrides RheoData inference. Verifies that…, test_backward_compatibility_default_inference_from_rheodata() (+4 more)
 
 ### Community 448 - "GiesekusBase"
-Cohesion: 0.04
-Nodes (30): jit, ndarray, Seed HB parameters (tau_y, K, n_flow) from flow-curve data. Estimates a…, Clip a seed value to the named parameter's bounds. Shared by both flow-curve…, SAOS prediction using linear viscoelastic approximation. In the linear limit…, GiesekusBase, ndarray, Initialize Giesekus base model. (+22 more)
+Cohesion: 0.05
+Nodes (21): GiesekusBase, Initialize Giesekus base model., Initialize ParameterSet with Giesekus parameters. The Giesekus model has 4…, Get polymer viscosity η_p (Pa·s)., Get relaxation time λ (s)., Get solvent viscosity η_s (Pa·s)., Get zero-shear viscosity η₀ = η_p + η_s (Pa·s)., Get elastic modulus G = η_p/λ (Pa). (+13 more)
 
 ### Community 449 - "TestISMOscillationAnalytic"
 Cohesion: 0.17
@@ -2689,9 +2701,9 @@ Nodes (7): Test serialization/deserialization., Test conversion to dictionary., 
 Cohesion: 0.17
 Nodes (7): Tests for physical correctness and consistency., Test equilibrium conformation tensor is identity., Test stress is positive for positive shear rate., Test conformation tensor stays positive definite during startup., Test N₁ > 0 and N₂ = 0 for upper-convected (ξ=0)., Test relaxation stress stays positive., TestPhysicalConsistency
 
-### Community 456 - "detect_data_range_decades"
-Cohesion: 0.24
-Nodes (6): Auto-detect optimization strategy based on data range. Args: X: Input data…, detect_data_range_decades(), Detect the range of data in decades (log10 scale). Args: x: Data array (e.g.,…, smoke, Tests for detect_data_range_decades., TestDetectDataRangeDecades
+### Community 456 - "TestGMMModelFunction"
+Cohesion: 0.29
+Nodes (3): Test model_function() routing used by Bayesian inference., Regression: model_function() previously only recognized…, TestGMMModelFunction
 
 ### Community 457 - "TestGetLogger"
 Cohesion: 0.17
@@ -2725,21 +2737,21 @@ Nodes (10): creep_data(), flow_curve_data(), fixture, Generate synthetic stress 
 Cohesion: 0.33
 Nodes (8): Get result name from properties if present., _make_table(), Regression test: invalid parameter values/bounds must not emit signals. Guards…, test_get_parameters_skips_invalid_rows(), test_invalid_bounds_are_not_emitted(), test_invalid_value_is_not_emitted(), test_narrowing_bounds_below_current_value_invalidates_it(), test_valid_value_and_bounds_are_emitted()
 
-### Community 465 - "TestMetadataExtraction"
-Cohesion: 0.20
-Nodes (6): Tests for metadata extraction (US6: T046-T049)., T046: Test geometry extraction., T047: Test gap and diameter extraction., T048: Test temperature extraction., T049: Test normal force column preserved in metadata., TestMetadataExtraction
+### Community 465 - ".compute_uncertainty"
+Cohesion: 0.18
+Nodes (9): Any, ArrayLike, Run physics validation and emit warnings for violations. Args: model: Fitted…, Compute post-fit uncertainty estimates. Args: model: Fitted BaseModel instance.…, A bug in check_fit_physics must not silently defeat check_physics=True., A bug in hessian_ci must not silently return None with no visible signal., test_check_physics_surfaces_failure_via_warning_and_log(), test_compute_uncertainty_rejects_unknown_method() (+1 more)
 
-### Community 466 - "TestMultiInterval"
-Cohesion: 0.20
-Nodes (6): Tests for multi-interval handling (T061-T064)., T061: Single-interval file returns RheoData (not list)., T062: Multi-interval file returns list when return_all=True., T063: Test interval parameter selects specific interval., T064: Test progress_callback invoked., TestMultiInterval
+### Community 466 - "smoke"
+Cohesion: 0.18
+Nodes (6): smoke, precompile() should return compilation time as a float., precompile() should not alter model parameters., precompile() should accept custom X and y arrays., An unfitted model should remain unfitted after precompile()., precompile() must not clobber a real fit's stored NLSQ result.
 
 ### Community 467 - "TestFluidityLocalSmoke"
 Cohesion: 0.18
 Nodes (7): smoke, Smoke tests for basic FluidityLocal functionality., Test FluidityLocal can be instantiated., Test FluidityLocal is registered correctly., Test expected parameters are present., Test parameter bounds are valid (lower < upper)., TestFluidityLocalSmoke
 
 ### Community 468 - "smoke"
-Cohesion: 0.06
-Nodes (24): smoke, Tests for steady-state analytical solutions., Test viscosity approaches η₀ at low Wi. Note: The quartic solver has numerical…, Test viscosity decreases with shear rate., Test α=0 gives constant viscosity (UCM limit)., Test vectorized stress prediction., Tests for normal stress differences., Test N₂/N₁ → -α/2 at low Wi (zero-shear limit). (+16 more)
+Cohesion: 0.11
+Nodes (14): smoke, Tests for normal stress differences., Test N₂/N₁ → -α/2 at low Wi (zero-shear limit)., Test that exact N₂/N₁ deviates from -α/2 at high Wi., Test N₁ > 0 (first normal stress is always positive)., Test N₂ < 0 (second normal stress is always negative)., Test N₂ → 0 as α → 0 (UCM limit)., Tests for small-amplitude oscillatory shear predictions. (+6 more)
 
 ### Community 469 - "TestStartupSimulation"
 Cohesion: 0.20
@@ -2761,9 +2773,9 @@ Nodes (6): Test α is bounded [0, 1]., Tests for Saramito plasticity function., 
 Cohesion: 0.08
 Nodes (17): smoke, Tests for model initialization., Test default initialization creates fluid state., Test initialization with separation parameter., Tests for static model function (Bayesian compatibility)., Test model_function raises NotImplementedError (Bayesian not supported)., Test that model_function raises NotImplementedError and preserves params., Test initialization with direct v2 value. (+9 more)
 
-### Community 474 - "TestGMMRelaxationMode"
-Cohesion: 0.17
-Nodes (7): Element minimization should reduce N from initial to optimal., Fit quality (R²) should be high for multi-mode relaxation data., Test GMM relaxation mode prediction and fitting., GMM with N=1 should recover total modulus and relaxation time. Individual G_inf…, Internal-variable update should produce exponential decay., Two-step NLSQ fitting should converge and produce positive moduli., TestGMMRelaxationMode
+### Community 474 - "test_generalized_maxwell.py"
+Cohesion: 0.09
+Nodes (13): Tests for Generalized Maxwell Model (GMM). Test coverage: - Task Group 1.2: GMM…, Element minimization should reduce N from initial to optimal., Fit quality (R²) should be high for multi-mode relaxation data., Test GMM relaxation mode prediction and fitting., GMM with N=1 should recover total modulus and relaxation time. Individual G_inf…, Internal-variable update should produce exponential decay., Test GMM LAOS protocol (linear model = SAOS response)., LAOS fit on linear model reproduces the oscillation fit. (+5 more)
 
 ### Community 475 - "TestGMMSteadyShearMode"
 Cohesion: 0.15
@@ -2889,9 +2901,9 @@ Nodes (10): compute_phase_offset(), harmonic_reconstruction(), partial, Reconstr
 Cohesion: 0.20
 Nodes (10): differentiate_rate_from_strain(), numerical_derivative_periodic(), Compute 1st, 2nd, and 3rd derivatives assuming periodic signal (MATLAB "looped"…, Compute strain rate from strain via numerical differentiation. Provides a…, Test periodic differentiation on a complete period., Test strain rate differentiation from strain., 8-point wrapped derivative should track analytic cosine for sine strain., test_differentiate_rate_from_strain() (+2 more)
 
-### Community 507 - "smoke"
-Cohesion: 0.25
-Nodes (6): smoke, Test fluidity decreases (ages) at rest., Tests for dynamic yield stress coupling., Test constant yield stress with zero coupling., Test increased yield stress at low fluidity., TestYieldStressCoupling
+### Community 507 - "TestYieldStressCoupling"
+Cohesion: 0.33
+Nodes (4): Tests for dynamic yield stress coupling., Test constant yield stress with zero coupling., Test increased yield stress at low fluidity., TestYieldStressCoupling
 
 ### Community 508 - "TestHVNMFlowCurve"
 Cohesion: 0.18
@@ -2945,10 +2957,6 @@ Nodes (48): Clear all collected metrics., contains_emoji(), emoji_checker(), _ge
 Cohesion: 0.32
 Nodes (6): benchmark, slow, Performance regression tests for CI. Run with: pytest…, SC-004: Load time <2s for 10,000 points., Export 10k points should complete in <5s., TestPerformance
 
-### Community 521 - "TestRotationalLoading"
-Cohesion: 0.25
-Nodes (5): Tests for rotational/flow test loading (US4: T055-T057)., T055: Test rotational loading returns correct structure., T056: Test shear rate ordering preserved., T057: Test y_col allows selecting alternative column., TestRotationalLoading
-
 ### Community 522 - "TestISMInitialization"
 Cohesion: 0.20
 Nodes (6): Tests for ISM model initialization., Test default initialization., Test initialization with volume fraction., Test initialization with custom k-grid size., Test glass transition detection based on phi., TestISMInitialization
@@ -2985,9 +2993,9 @@ Nodes (16): smoke, Test creep returns spatial fluidity field., Tests for nonloca
 Cohesion: 0.25
 Nodes (5): Integration tests for complete workflows., Test loading creep data for model fitting., Test frequency sweep returns complex G* for model fitting., Test multi-interval data for mastercurve analysis., TestIntegration
 
-### Community 531 - "TestEuropeanDecimalSeparator"
-Cohesion: 0.25
-Nodes (5): Tests for European locale decimal separator handling (T074)., Test parsing with comma as decimal separator (European format)., A combined value+unit temperature header using a comma decimal separator (e.g.…, Test parsing relaxation data with European comma decimal format., TestEuropeanDecimalSeparator
+### Community 531 - "test_anton_paar.py"
+Cohesion: 0.09
+Nodes (14): Tests for RheoCompass CSV parser (Anton Paar). This module tests the full…, Regression tests for _filter_nonfinite fixes (blank cells, all-NaN)., A single unparseable cell drops that row; metadata stays aligned. Regression…, One unparseable interval is skipped; valid intervals still load., An interval where every row is non-finite must not silently become an empty,…, Tests for encoding detection (T011)., Test UTF-8 encoded file is parsed correctly., Tests for European locale decimal separator handling (T074). (+6 more)
 
 ### Community 532 - "TestPercusYevickSk"
 Cohesion: 0.20
@@ -3065,9 +3073,9 @@ Nodes (6): Tests for non-affine chain slip via Gordon-Schowalter derivative., No
 Cohesion: 0.20
 Nodes (6): Tests for SAOS predictions., Test SAOS prediction., Test |G*| prediction via test_mode='oscillation'., Test terminal regime scaling: G' ~ ω², G'' ~ ω., Test SAOS matches effective Maxwell model with G_eff = f_B_eq·G., TestSAOS
 
-### Community 551 - "TestModelFunction"
-Cohesion: 0.25
-Nodes (5): Tests for model_function (Bayesian interface)., Test model_function for SAOS., Test model_function output matches predict_saos for oscillation. Divergence…, Test model_function output matches predict for flow_curve., TestModelFunction
+### Community 551 - "TestCreepLoading"
+Cohesion: 0.20
+Nodes (6): Test time values are correctly extracted., Test compliance values are correctly extracted., T019: Test compliance calculated when J(t) column missing., Tests for creep test loading (US1: T018-T019)., T018: Test creep loading returns correct structure., TestCreepLoading
 
 ### Community 552 - "TestLAOSSimulation"
 Cohesion: 0.25
@@ -3078,20 +3086,20 @@ Cohesion: 0.20
 Nodes (6): Tests for LAOS simulation., Test LAOS simulation runs., Test LAOS response is periodic after transient., Small-amplitude LAOS should match SAOS (linear limit)., Test LAOS harmonic extraction., TestLAOSSimulation
 
 ### Community 554 - "smoke"
-Cohesion: 0.08
-Nodes (18): smoke, Tests for sticker floor constraint: tau_eff_k = max(tau_R_k, tau_s)., Test effective times are τ_R_k + τ_s (Leibler-Rubinstein-Colby 1991)., When tau_s > tau_R_k, sticker contribution dominates., When tau_s ≪ all tau_R_k, model reduces to multi-mode Maxwell., Tests for flow curve (steady shear) predictions., Test flow curve prediction returns correct shape., Test flow curve stress is positive. (+10 more)
+Cohesion: 0.10
+Nodes (14): smoke, Tests for flow curve (steady shear) predictions., Test flow curve prediction returns correct shape., Test flow curve stress is positive., Test flow curve stress is finite., Test flow curve approaches Newtonian behavior at low shear rates. At low Wi, σ…, Tests for startup flow simulation., Test startup simulation runs without error. (+6 more)
 
-### Community 555 - "TestStartupSimulation"
+### Community 555 - "TestOscillatoryLoading"
 Cohesion: 0.20
-Nodes (6): Tests for startup flow simulation., Test startup simulation runs without error., Test startup returns correct shape., Test startup stress is finite., Test startup approaches steady-state stress. At long times, σ(t) → σ_ss = η₀·γ̇…, TestStartupSimulation
+Nodes (6): Tests for oscillatory test loading (US3: T028-T030)., T028: Test oscillatory loading returns complex G*., Test complex modulus G* = G' + i*G'' is computed., T030: Test G'/G'' accessible via properties., T029: Test Hz to rad/s conversion., TestOscillatoryLoading
 
 ### Community 556 - "TestSAOS"
 Cohesion: 0.25
 Nodes (5): Tests for SAOS predictions., Test SAOS prediction., Test |G*| prediction via test_mode='oscillation'., Test terminal regime scaling: G' ~ ω², G'' ~ ω., TestSAOS
 
 ### Community 557 - "TestBayesianInterface"
-Cohesion: 0.20
-Nodes (6): Tests for BayesianMixin compatibility., Test model_function for flow curve., Test model_function for SAOS., Test model_function params match ParameterSet order. Parameter order: [G_0,…, Test model_function with default 3 modes (8 params)., TestBayesianInterface
+Cohesion: 0.25
+Nodes (5): Tests for BayesianMixin compatibility., Test model_function for flow curve., Test model_function for SAOS., Test model_function with default 3 modes (8 params)., TestBayesianInterface
 
 ### Community 558 - "TestDerivedProperties"
 Cohesion: 0.20
@@ -3213,9 +3221,9 @@ Nodes (7): _create_rheodata_chunk(), _infer_domain_and_mode(), _parse_segment(),
 Cohesion: 0.38
 Nodes (4): print_device_summary(), Print a summary of available compute devices. Displays: - JAX version -…, print_device_summary GPU / CPU / no-JAX branches., TestPrintDeviceSummary
 
-### Community 588 - "test_cross_model_consistency"
-Cohesion: 0.29
-Nodes (7): integration, Test that Maxwell and GMM models produce consistent behavior. Validates: -…, Test basic GMM fitting with single mode (equivalent to Maxwell). Validates: -…, Test GMM fitting with multiple modes on multi-exponential data. Validates: -…, test_cross_model_consistency(), test_gmm_multi_mode_fitting(), test_gmm_single_mode_fitting()
+### Community 588 - "TestSteadyShearAnalytical"
+Cohesion: 0.20
+Nodes (6): Tests for steady-state analytical solutions., Test viscosity approaches η₀ at low Wi. Note: The quartic solver has numerical…, Test viscosity decreases with shear rate., Test α=0 gives constant viscosity (UCM limit)., Test vectorized stress prediction., TestSteadyShearAnalytical
 
 ### Community 589 - "creep_multi_decade_data"
 Cohesion: 0.29
@@ -3233,9 +3241,9 @@ Nodes (6): _extract_step_temperature(), _parse_segment_header(), Extract tempera
 Cohesion: 0.04
 Nodes (53): given, settings, Property-based tests for SGR (Soft Glassy Rheology) models using Hypothesis.…, Trap distribution rho(E) >= 0 for all E >= 0., Trap distribution rho(E) <= 1 for all E >= 0., Trap distribution rho(E) = 0 for E < 0., Equilibrium modulus G0(x) > 0 for all x > 0., Equilibrium modulus G0(x) is finite for all valid x. (+45 more)
 
-### Community 593 - ".model_function"
-Cohesion: 0.33
-Nodes (3): Predict response. Parameters ---------- x : array-like Independent variable…, NumPyro/BayesianMixin model function. Parameters ---------- X : array-like…, Internal startup simulation.
+### Community 593 - "TestFlowCurve"
+Cohesion: 0.20
+Nodes (6): Test direct predict_flow_curve method., Test flow curve with viscosity and N1., Test viscosity decreases with shear rate., Tests for flow curve (steady shear) predictions., Test flow curve prediction via predict()., TestFlowCurve
 
 ### Community 594 - "._fit"
 Cohesion: 0.33
@@ -3249,9 +3257,9 @@ Nodes (4): Tests for widget creation/destruction safety., Test rapid creation an
 Cohesion: 0.33
 Nodes (4): Tests for upper-convected derivative., Test convective terms in simple shear., Test zero convective terms at zero rate., TestUpperConvected
 
-### Community 597 - "TestFluidityEvolution"
-Cohesion: 0.33
-Nodes (4): Tests for fluidity evolution kernel., Test fluidity increases under flow., Test df/dt ≈ 0 at f = f_age with no flow. Note: With FS-008 (driving floor…, TestFluidityEvolution
+### Community 597 - "smoke"
+Cohesion: 0.25
+Nodes (6): smoke, Tests for fluidity evolution kernel., Test fluidity decreases (ages) at rest., Test fluidity increases under flow., Test df/dt ≈ 0 at f = f_age with no flow. Note: With FS-008 (driving floor…, TestFluidityEvolution
 
 ### Community 598 - "TestHerschelBulkleyViscosity"
 Cohesion: 0.33
@@ -3297,25 +3305,25 @@ Nodes (8): convert_units(), Convert data between common rheological units. Param
 Cohesion: 0.33
 Nodes (4): Tests for helper and analysis methods., Test critical stress getter., Test overshoot ratio calculation., TestHelperMethods
 
-### Community 609 - "TestLAOSKwargsRegression"
-Cohesion: 0.33
-Nodes (4): Regression tests for F-TNT-001: LAOS branch must use kwargs, not self._., Test that model_function LAOS branch respects kwargs over self._., Test that kwargs-passed gamma_0/omega actually override self._., TestLAOSKwargsRegression
+### Community 609 - "TestBayesianInterface"
+Cohesion: 0.20
+Nodes (6): Tests for BayesianMixin compatibility., Test model_function for BayesianMixin., Test model_function for SAOS., Test model_function output matches predict for flow_curve. Divergence means…, Test model_function output matches predict_saos for oscillation., TestBayesianInterface
 
 ### Community 610 - "saramito/test_physics.py"
 Cohesion: 0.04
 Nodes (35): fixture, smoke, Physics validation tests for Fluidity-Saramito EVP models. Tests verify key…, Test overshoot increases with waiting time (TC-019). The simulate_startup…, Test normal stress difference scaling., Create model for normal stress tests., Test N₁ > 0 (Weissenberg effect)., Test N₁ increases with shear rate. (+27 more)
 
-### Community 611 - "TestAutoP0WarningEmission"
-Cohesion: 0.33
-Nodes (4): Test that auto_p0 emits warnings for failed estimations., auto_p0 with pathological data should emit warnings, not crash., Constant data provides no features — should warn gracefully., TestAutoP0WarningEmission
+### Community 611 - "TestRelaxationSimulation"
+Cohesion: 0.20
+Nodes (6): Tests for stress relaxation simulation., Test relaxation simulation runs without error., Test relaxation returns correct shape., Test relaxation stress is finite., Test stress decays during relaxation., TestRelaxationSimulation
 
 ### Community 612 - "TestSoftmaxPenalty"
 Cohesion: 0.33
 Nodes (4): Test softmax_penalty() for constrained optimization., Negative Eᵢ should increase penalty significantly., Penalty should be differentiable with JAX., TestSoftmaxPenalty
 
-### Community 613 - "TestPlotResiduals"
-Cohesion: 0.33
-Nodes (4): Test residual plotting functions., Test plotting residuals., Test plotting data with predictions and residuals., TestPlotResiduals
+### Community 613 - "test_import.py"
+Cohesion: 0.20
+Nodes (9): Basic import test for the rheojax package., Test that rheojax package can be imported., Test that all submodules can be imported., Test version information structure., Test that Python version is 3.12 or higher., test_python_version(), test_rheojax_import(), test_submodule_imports() (+1 more)
 
 ### Community 614 - "TestMLIKHProtocolFitting"
 Cohesion: 0.09
@@ -3333,13 +3341,13 @@ Nodes (5): Test equilibrium structure calculations., λ_eq should approach 0 at 
 Cohesion: 0.25
 Nodes (5): Tests for _fit_oscillation implementation., _fit_oscillation returns self for fluent API., _fit_oscillation accepts (N,2) input [G', G'']., Fitted model should reproduce SAOS moduli., TestFitOscillation
 
-### Community 618 - "TestPublicationQuality"
-Cohesion: 0.33
-Nodes (4): Test publication-quality output., Test that publication-quality settings are applied., Test default style settings., TestPublicationQuality
+### Community 618 - "TestBayesianEdgeCases"
+Cohesion: 0.22
+Nodes (6): slow, Bayesian inference edge cases using Maxwell model., fit_bayesian with num_chains=1 should complete (degenerate R-hat)., Posterior samples should have shape (num_chains * num_samples,) per param., Bayesian with very short warmup should complete., TestBayesianEdgeCases
 
-### Community 619 - "VLB (Vernerey-Long-Brighenti) model family"
-Cohesion: 0.40
-Nodes (5): VLB (Vernerey-Long-Brighenti) model family, VLB Local model, VLB MultiNetwork model, VLB Nonlocal model, VLB Variant model (Bell/FENE)
+### Community 619 - "TestEdgeCases"
+Cohesion: 0.25
+Nodes (5): Tests for edge cases (T070-T074)., T071: Test bracket [unit] notation., T071: Test parentheses (unit) notation., T072: Test Unicode characters in headers., TestEdgeCases
 
 ### Community 620 - "test_fikh.py"
 Cohesion: 0.06
@@ -3365,9 +3373,9 @@ Nodes (3): Array, Perform one scalar EPM time step. Delegates to the `epm_step` 
 Cohesion: 0.09
 Nodes (35): Update history buffer with new value using ring buffer pattern. Shifts buffer…, update_history_buffer(), Precompile JIT kernels for faster subsequent predictions. Triggers JAX JIT…, fikh_flow_curve_steady_state(), fikh_return_step_isothermal(), fikh_return_step_thermal(), fikh_scan_kernel_isothermal(), fikh_scan_kernel_thermal() (+27 more)
 
-### Community 626 - "._fit"
-Cohesion: 0.40
-Nodes (3): ArrayLike, Fit model parameters to data. Args: X: Time/Strain input. y: Stress output…, Helper to extract time and strain from inputs. Args: X: RheoData, or [time,…
+### Community 626 - "TestFIKHTestModeValidation"
+Cohesion: 0.25
+Nodes (5): Test test_mode validation and handling., Test all valid test modes are accepted., Test invalid test mode raises error., Test LAOS mode maps to STARTUP (return mapping) internally., TestFIKHTestModeValidation
 
 ### Community 627 - ".__init__"
 Cohesion: 0.40
@@ -3425,9 +3433,9 @@ Nodes (7): Model Hierarchy (BaseModel + BayesianMixin subclass tree), Registry P
 Cohesion: 0.50
 Nodes (4): Extract yield stresses from displacement stress curve (SPP methodology). This…, yield_from_displacement_stress(), Test yield extraction from displacement stress., test_yield_from_displacement_stress_basic()
 
-### Community 647 - "TestRelaxation"
+### Community 647 - "TestCarreauNumericalStability"
 Cohesion: 0.25
-Nodes (5): Tests for stress relaxation physics., Test stress decays to zero during relaxation., Test Giesekus relaxes faster than pure exponential. The quadratic τ·τ term…, Test τ_xy(0+) is the polymer-only steady stress, not total. With η_s > 0, the…, TestRelaxation
+Nodes (5): Test numerical stability of Carreau model., Test with extreme shear rates., Test behavior at zero shear rate., Test with negative shear rates., TestCarreauNumericalStability
 
 ### Community 648 - "ndarray"
 Cohesion: 0.29
@@ -3477,9 +3485,9 @@ Nodes (6): Effective kernel K̂(q) = Ĝ(q) - μ, EPMParams dataclass (JAX param 
 Cohesion: 0.50
 Nodes (3): Tests for startup transient protocol., Test trajectory is stored for plotting., TestStartupFitting
 
-### Community 660 - "Data Format Reference (doc)"
-Cohesion: 0.12
-Nodes (16): Creep test mode, Flow curve (steady shear) test mode, LAOS (Large Amplitude Oscillatory Shear) test mode, Oscillation (SAOS) test mode, Relaxation test mode, RheoData data container, Startup (transient shear) test mode, TestModeEnum (8 test-mode protocols) (+8 more)
+### Community 660 - "TNT (Transient Network Theory) model family"
+Cohesion: 0.33
+Nodes (6): TNT (Transient Network Theory) model family, TNT Cates model, TNT LoopBridge model, TNT MultiSpecies model, TNT SingleMode model, TNT StickyRouse model
 
 ### Community 662 - "TestCreepFitting"
 Cohesion: 0.50
@@ -3521,6 +3529,10 @@ Nodes (3): fixture, Reset logging configuration before and after each test., res
 Cohesion: 0.33
 Nodes (6): _io_test_gc(), fixture, Shared fixtures for tests/io/., Skip tests if rheocompass fixtures are not available., Free memory after each io test to prevent xdist worker OOM. Several io test…, rheocompass_fixtures()
 
+### Community 677 - "TestStressTensorProduct"
+Cohesion: 0.25
+Nodes (5): Tests for τ·τ computation., Test τ·τ for pure shear stress., Test τ·τ with normal stresses., Test τ·τ = 0 when τ = 0., TestStressTensorProduct
+
 ### Community 678 - "TestLogFormat"
 Cohesion: 0.33
 Nodes (4): Tests for LogFormat enum., Test that all expected formats exist., Test creating LogFormat from string., TestLogFormat
@@ -3528,6 +3540,10 @@ Nodes (4): Tests for LogFormat enum., Test that all expected formats exist., Tes
 ### Community 679 - "TestLogFit"
 Cohesion: 0.33
 Nodes (4): Tests for log_fit context manager., Test that fit-specific context is logged., Test that completion context is included., TestLogFit
+
+### Community 680 - "TestStickerFloorPhysics"
+Cohesion: 0.25
+Nodes (5): Tests for sticker floor constraint: tau_eff_k = max(tau_R_k, tau_s)., Test effective times are τ_R_k + τ_s (Leibler-Rubinstein-Colby 1991)., When tau_s > tau_R_k, sticker contribution dominates., When tau_s ≪ all tau_R_k, model reduces to multi-mode Maxwell., TestStickerFloorPhysics
 
 ### Community 681 - "TestUnpackResult"
 Cohesion: 0.29
@@ -3541,17 +3557,57 @@ Nodes (4): smoke, Test model initialization., Test parameter bounds., Test that 
 Cohesion: 0.13
 Nodes (9): Bingham, register, String representation., Bingham model for linear viscoplastic flow (ROTATION only). The Bingham model…, Initialize Bingham model., Test fitting with synthetic data., Test fitting with noisy data., Test yield stress consistency. (+1 more)
 
+### Community 684 - "_prep_run_nuts_args"
+Cohesion: 0.29
+Nodes (7): _prep_run_nuts_args(), A genuine caller-supplied initial_values (no prior .fit()) must select the…, Without has_explicit_warm_start, cold-start defaults apply even though…, If init_to_value(values=...) raises during construction (a distinct failure…, test_run_nuts_sampling_construction_failure_preserves_uniform_fallback_flag(), test_run_nuts_sampling_explicit_initial_values_gets_permissive_defaults(), test_run_nuts_sampling_no_explicit_warm_start_gets_conservative_defaults()
+
 ### Community 685 - ".test_initialization"
 Cohesion: 0.29
 Nodes (4): smoke, Test model initialization., Test parameter bounds., Test that model_function output matches predict.
 
+### Community 686 - ".test_initialization"
+Cohesion: 0.29
+Nodes (4): smoke, Test model initialization., Test parameter bounds., Test that model_function output matches predict.
+
+### Community 687 - "SGR (Soft Glassy Rheology) model family"
+Cohesion: 0.33
+Nodes (6): SGR (Soft Glassy Rheology) model family, SGR Conventional model, SGR GENERIC model, Fuereder & Ilg (2013) - Thermodynamically consistent SGR GENERIC, Sollich et al. (1997) - Rheology of soft glassy materials, Sollich (1998) - Soft glassy rheology trap model
+
+### Community 688 - "TestUpperConvectedDerivative"
+Cohesion: 0.33
+Nodes (4): Tests for upper-convected derivative terms., Test convective terms L·τ + τ·L^T., Test zero shear rate gives zero convective terms., TestUpperConvectedDerivative
+
+### Community 689 - "TestEnhancedErrorMessaging"
+Cohesion: 0.33
+Nodes (4): Tests for enhanced error messaging in model fitting., Test that FZSS with exponential data provides enhanced error., Test that check_compatibility parameter works., TestEnhancedErrorMessaging
+
+### Community 690 - "TestNLSQGradientValidation"
+Cohesion: 0.33
+Nodes (4): Test gradient computation and Jacobian accuracy., Test that JAX automatic differentiation produces accurate gradients., Test Jacobian computation for residual-based optimization., TestNLSQGradientValidation
+
+### Community 691 - "TestPlotFrequencyDomain"
+Cohesion: 0.33
+Nodes (4): Test frequency-domain plotting functions., Test plotting complex modulus (G' and G'')., Test plotting real modulus only., TestPlotFrequencyDomain
+
+### Community 692 - "TestUncertaintyBand"
+Cohesion: 0.33
+Nodes (4): Tests for compute_uncertainty_band and plot_fit_with_uncertainty., Test uncertainty band for a simple linear model., Test that complex model output returns None for bands., TestUncertaintyBand
+
 ### Community 694 - "giesekus/_kernels.py"
-Cohesion: 0.07
-Nodes (48): _compute_steady_dimensionless_stresses(), giesekus_complex_viscosity(), giesekus_creep_ode_rhs(), giesekus_multimode_ode_rhs(), giesekus_multimode_saos_moduli(), giesekus_ode_rhs(), giesekus_ode_rhs_laos(), giesekus_relaxation_ode_rhs() (+40 more)
+Cohesion: 0.11
+Nodes (37): _compute_steady_dimensionless_stresses(), giesekus_complex_viscosity(), giesekus_creep_ode_rhs(), giesekus_multimode_ode_rhs(), giesekus_multimode_saos_moduli(), giesekus_ode_rhs(), giesekus_ode_rhs_laos(), giesekus_relaxation_ode_rhs() (+29 more)
+
+### Community 696 - "TestODERHS"
+Cohesion: 0.50
+Nodes (3): Tests for ODE right-hand side functions., Test stress decays during relaxation., TestODERHS
 
 ### Community 697 - "TestModeEnum"
 Cohesion: 0.33
 Nodes (4): Test TestMode enumeration., Test TestMode enum values., Test converting string to TestMode., TestModeEnum
+
+### Community 698 - ".test_multimode_saos"
+Cohesion: 0.50
+Nodes (3): Tests for multi-mode Giesekus functions., Test multi-mode SAOS superposition., TestMultiModeExtensions
 
 ### Community 703 - "TestVLBNonlocalFene"
 Cohesion: 0.33
@@ -3585,9 +3641,9 @@ Nodes (4): Test plot_ess() method for effective sample size., Test that plot_ess
 Cohesion: 0.33
 Nodes (4): Verify the functions are importable from the package top-level., hessian_ci and bootstrap_ci must be importable from rheojax.utils., Direct import from rheojax.utils.uncertainty must work., TestPublicAPI
 
-### Community 713 - "TestMaxwellANSYSCreep"
-Cohesion: 0.12
-Nodes (12): validation, Validate Maxwell model against ANSYS creep reference., Test Maxwell fits ANSYS creep data correctly. Expected behavior on v0.3.1: May…, Test ANSYS creep predictions match Maxwell model., Test Prony series accuracy for multi-mode representation., Test single-mode Prony series (Maxwell). ANSYS single-mode: G(t) = G_0 *…, Test two-mode Prony series matching ANSYS reference. ANSYS two-mode: G(t) = Σᵢ…, Test parameter estimation accuracy vs ANSYS references. (+4 more)
+### Community 713 - "TestFractionalZenerANSYS"
+Cohesion: 0.08
+Nodes (17): slow, validation, Validate Maxwell model against ANSYS creep reference., Test Maxwell fits ANSYS creep data correctly. Expected behavior on v0.3.1: May…, Test ANSYS creep predictions match Maxwell model., Validate fractional models against ANSYS UD material reference., Test FZSS fits ANSYS fractional relaxation data., Test FZSS predictions match ANSYS behavior. (+9 more)
 
 ### Community 719 - "TestModuliEvolutionSingleAxes"
 Cohesion: 0.33
@@ -3643,7 +3699,7 @@ Nodes (19): slow, Tests for Giesekus Bayesian inference pipeline. Tests cover: -
 
 ### Community 756 - "giesekus/test_physics.py"
 Cohesion: 0.05
-Nodes (30): smoke, Physical validation tests for Giesekus model. Tests verify that the…, Tests for shear-thinning behavior., Test η(γ̇) is monotonically decreasing for α > 0., Test η approaches η₀ = η_p + η_s at low shear rates. Note: Numerical algorithm…, Test power-law thinning at high Wi. At high Wi, η ~ γ̇^(n-1) where n ≈ 0.5 for…, Tests for stress overshoot in startup flow., Test stress overshoot occurs in startup. (+22 more)
+Nodes (35): smoke, Physical validation tests for Giesekus model. Tests verify that the…, Tests for shear-thinning behavior., Test η(γ̇) is monotonically decreasing for α > 0., Test η approaches η₀ = η_p + η_s at low shear rates. Note: Numerical algorithm…, Test power-law thinning at high Wi. At high Wi, η ~ γ̇^(n-1) where n ≈ 0.5 for…, Tests for stress overshoot in startup flow., Test stress overshoot occurs in startup. (+27 more)
 
 ### Community 757 - "TestGMMBayesianPriorSafetyIntegration"
 Cohesion: 0.50
@@ -3662,8 +3718,8 @@ Cohesion: 0.50
 Nodes (3): Test behavior when ArviZ is not available., Test that plotting methods handle missing ArviZ gracefully., TestArviZAvailability
 
 ### Community 761 - "test_loop_bridge.py"
-Cohesion: 0.12
-Nodes (14): _cleanup_jit_caches(), fixture, slow, timeout, Tests for TNTLoopBridge model. Tests cover: - Instantiation and parameter…, Free JIT caches after each test to prevent xdist worker OOM. TNT loop_bridge…, Tests for model registry integration., Tests for model fitting. (+6 more)
+Cohesion: 0.09
+Nodes (18): _cleanup_jit_caches(), fixture, slow, timeout, Tests for TNTLoopBridge model. Tests cover: - Instantiation and parameter…, Free JIT caches after each test to prevent xdist worker OOM. TNT loop_bridge…, Tests for model registry integration., Tests for model fitting. (+10 more)
 
 ### Community 762 - "TestBayesianPipelineMultiChain"
 Cohesion: 0.50
@@ -3695,7 +3751,7 @@ Nodes (3): slow, timeout, test_hvm_demo_fits_overlap_generated_rheology_data()
 
 ### Community 783 - "make_tensorial_propagator_q"
 Cohesion: 0.09
-Nodes (21): Initialize the Tensorial EPM. Args: L: Lattice size (LxL grid). dt: Time step…, make_tensorial_propagator_q(), Create the tensorial Eshelby propagator in Fourier space for plane strain. The…, Test that the tensorial propagator has correct shape (3, 3, L, L//2+1)., Test that tensorial propagator application preserves zero mean., Test tensorial EPM step with pure elastic loading (no yielding)., Test tensorial EPM step with active plastic sites., Test that tensorial propagator is symmetric: G[i,j] == G[j,i]. (+13 more)
+Nodes (21): Initialize the Tensorial EPM. Args: L: Lattice size (LxL grid). dt: Time step…, make_tensorial_propagator_q(), Create the tensorial Eshelby propagator in Fourier space for plane strain. The…, Test that the tensorial propagator has correct shape (3, 3, L, L//2+1)., Test that tensorial propagator application preserves zero mean., Test tensorial EPM step with active plastic sites., Test that smooth yielding approximates hard yielding away from threshold., Test that tensorial propagator is symmetric: G[i,j] == G[j,i]. (+13 more)
 
 ### Community 861 - "TestLAOSSimulation"
 Cohesion: 0.20
@@ -3724,16 +3780,16 @@ Nodes (10): harmonic_reconstruction_full(), Full Fourier-based harmonic reconstr
 ## Knowledge Gaps
 - **608 isolated node(s):** `$schema`, `title`, `description`, `type`, `type` (+603 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **106 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **112 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `RheoData` connect `RheoData` to `MockBayesianModel`, `mittag_leffler_e`, `auto_load`, `AppState`, `TestPowerLawPredictions`, `.test_export_10k_points_under_5_seconds`, `TestRotationalLoading`, `LatticeEPM`, `TestErrorHandling`, `BatchPipeline`, `Maxwell`, `HerschelBulkley`, `TestIntegration`, `PipelineExecutionService`, `test_csv.py`, `load_csv`, `TransformService`, `TestEuropeanDecimalSeparator`, `test_trios_chunked_integrity.py`, `TRIOSDataSet`, `ModelRegistry`, `FractionalMaxwellModel`, `BayesianService`, `load_hdf5`, `ParameterState`, `tests/conftest.py`, `LinearModel`, `smoke`, `SmoothDerivative`, `TestInferenceDataConversion`, `Zener`, `SpringPot`, `safe_import_jax`, `TestPlotRheoData`, `test_project_codec.py`, `ModelComparisonPipeline`, `FitOrchestrator`, `EPMBase`, `TestBinghamRheoData`, `rheojax/visualization/__init__.py`, `json.py`, `ModelComparison`, `PowerLaw`, `_parse_segment`, `BayesianMixin`, `FFTAnalysis`, `FitResult`, `TensorialEPM`, `load_trios_json`, `Carreau`, `detect_delimiter`, `TestBinghamStability`, `TestHerschelBulkleyFitting`, `TestPowerLawRheoData`, `plot_model_fit`, `PronyConversion`, `TestGenericPlot`, `TestPlotResiduals`, `SpectrumInversion`, `TestMLIKHProtocolFitting`, `Cross`, `TestPublicationQuality`, `TransformPlotter`, `DataService`, `DataStep`, `ModelService`, `test_multi_file.py`, `io/test_validation.py`, `TestArviZIntegration`, `CarreauYasuda`, `TestPowerLawNumericalStability`, `sample_data`, `anton_paar.py`, `load_anton_paar`, `test_lattice_epm.py`, `TestSGRModelComparison`, `txt.py`, `TestPowerLawModelFunction`, `load_npz`, `_coerce_ndarray`, `Mastercurve`, `test_dataset_preview.py`, `save_intervals_to_excel`, `TestUnpackResult`, `Bingham`, `test_io_fixes.py`, `smoke`, `TestModeEnum`, `test_dmta_removal.py`, `LVEEnvelope`, `load_trios`, `TestPlotPair`, `TestPlotForest`, `TestPlotEnergy`, `TestPlotAutocorr`, `TestPlotRank`, `TestPlotESS`, `FractionalKelvinVoigt`, `.generate`, `TestMaxwellANSYSCreep`, `rheodata_from_dataset_state`, `test_bayesian_internals.py`, `parse_rheocompass_intervals`, `run_profiling.py`, `test_phase2_performance.py`, `run_bayesian_isolated`, `CoxMerz`, `TestArviZAvailability`, `TestBayesianPipelineMultiChain`, `test_bayesian_mode_aware.py`, `_SpyModel`, `BayesianPipeline`, `cmd_transform.py`, `test_anton_paar.py`, `load_trios_chunked`, `run_single_notebook_96h.py`, `TransformPipeline`, `fitted_pipeline`, `run_rheojax.py`, `.slice`, `TestRheoDataComplexProperties`, `main`, `_t_grid`, `TestHerschelBulkleyPredictions`, `FractionalZenerSolidSolid`, `TestBinghamPredictions`, `TestDeviceMemoryOptimization`, `TestParameterSet`, `TestZenerBasics`, `TestMonotonicityChecks`, `readers/_validation.py`, `test_trios_chunked.py`, `TestMIKHBayesian`, `npz_writer.py`, `detect_header_row`, `test_flow_curve_matches_scalar_epm`, `generate_test_data.py`, `load_trios`, `.shape`, `TestBayesianPipelinePlotPosterior`, `_FakeMCMC`, `TestRheoDataNoneGuards`, `TestRheoData2DYContract`, `_default_y_units`, `TestRheoDataSerialization`, `TestMaxwellBasics`, `TestMetadataExtraction`, `TestMultiInterval`, `TestTriosChunkedBasic`, `.to_dict`, `test_creep_protocol_adaptive`, `TestExportFormats`?**
+- **Why does `RheoData` connect `RheoData` to `MockBayesianModel`, `mittag_leffler_e`, `auto_load`, `AppState`, `TestPowerLawPredictions`, `.test_export_10k_points_under_5_seconds`, `LatticeEPM`, `TestErrorHandling`, `Pipeline`, `Maxwell`, `HerschelBulkley`, `TestIntegration`, `PipelineExecutionService`, `test_csv.py`, `load_csv`, `TransformService`, `core/bayesian.py`, `test_anton_paar.py`, `test_trios_chunked_integrity.py`, `TRIOSDataSet`, `ModelRegistry`, `FractionalMaxwellModel`, `BayesianService`, `load_hdf5`, `ParameterState`, `TestCreepLoading`, `tests/conftest.py`, `TestOscillatoryLoading`, `LinearModel`, `smoke`, `SmoothDerivative`, `TestInferenceDataConversion`, `Zener`, `SpringPot`, `safe_import_jax`, `TestPlotRheoData`, `test_project_codec.py`, `ModelComparisonPipeline`, `.execute`, `EPMBase`, `TestBinghamRheoData`, `rheojax/visualization/__init__.py`, `json.py`, `PowerLaw`, `_parse_segment`, `BayesianMixin`, `FFTAnalysis`, `FitResult`, `TensorialEPM`, `load_trios_json`, `detect_delimiter`, `TestBinghamStability`, `TestHerschelBulkleyFitting`, `TestPowerLawRheoData`, `plot_model_fit`, `PronyConversion`, `TestGenericPlot`, `SpectrumInversion`, `TestMLIKHProtocolFitting`, `Cross`, `TransformPlotter`, `TestEdgeCases`, `DataService`, `DataStep`, `ModelService`, `test_multi_file.py`, `io/test_validation.py`, `MutationNumber`, `TestArviZIntegration`, `CarreauYasuda`, `TestPowerLawNumericalStability`, `sample_data`, `anton_paar.py`, `load_anton_paar`, `test_lattice_epm.py`, `TestCarreauNumericalStability`, `TestSGRModelComparison`, `txt.py`, `TestPowerLawModelFunction`, `load_npz`, `_coerce_ndarray`, `Mastercurve`, `test_dataset_preview.py`, `save_intervals_to_excel`, `TestUnpackResult`, `Bingham`, `test_io_fixes.py`, `smoke`, `TestPlotFrequencyDomain`, `TestUncertaintyBand`, `TestModeEnum`, `test_dmta_removal.py`, `LVEEnvelope`, `load_trios`, `TestPlotPair`, `TestPlotForest`, `TestPlotEnergy`, `TestPlotAutocorr`, `TestPlotRank`, `TestPlotESS`, `FractionalKelvinVoigt`, `.generate`, `TestFractionalZenerANSYS`, `rheodata_from_dataset_state`, `test_bayesian_internals.py`, `parse_rheocompass_intervals`, `run_profiling.py`, `test_phase2_performance.py`, `run_bayesian_isolated`, `CoxMerz`, `TestArviZAvailability`, `TestBayesianPipelineMultiChain`, `test_bayesian_mode_aware.py`, `_SpyModel`, `BayesianPipeline`, `cmd_transform.py`, `TestRelaxationLoading`, `load_trios_chunked`, `run_single_notebook_96h.py`, `TransformPipeline`, `fitted_pipeline`, `run_rheojax.py`, `.slice`, `TestRheoDataComplexProperties`, `main`, `_t_grid`, `TestHerschelBulkleyPredictions`, `ModelComparison`, `TestBinghamPredictions`, `TestParameterSet`, `TestZenerBasics`, `TestMonotonicityChecks`, `readers/_validation.py`, `test_trios_chunked.py`, `ModelInfo`, `TestMIKHBayesian`, `npz_writer.py`, `detect_header_row`, `test_flow_curve_matches_scalar_epm`, `TestCarreauPredictions`, `generate_test_data.py`, `load_trios`, `.shape`, `TestBayesianPipelinePlotPosterior`, `_FakeMCMC`, `TestRheoDataNoneGuards`, `TestRheoData2DYContract`, `Carreau`, `test_closure_captures_test_mode_not_global_state`, `_default_y_units`, `TestRheoDataSerialization`, `TestMaxwellBasics`, `TestTriosChunkedBasic`, `.to_dict`, `test_creep_protocol_adaptive`, `TestExportFormats`?**
   _High betweenness centrality (0.204) - this node is a cross-community bridge._
-- **Why does `ModelRegistry` connect `ModelRegistry` to `giesekus/test_single_mode.py`, `RheoData`, `SGRConventional`, `CancellationError`, `GiesekusSingleMode`, `LatticeEPM`, `VLBLocal`, `TestDMTLocalLAOS`, `FluidityLocal`, `Maxwell`, `FitState`, `HerschelBulkley`, `TestDMTLocalRelaxation`, `TestDMTNonlocal`, `BatchPipeline`, `TestDMTLocalFlowCurve`, `TestHVNMCreep`, `TestDMTLocalSAOS`, `hvnm/_kernels_diffrax.py`, `TestFitPredictRoundtrip`, `TestStartupSimulation`, `test_cates.py`, `TestStartupSimulation`, `TestCreepSimulation`, `FractionalMaxwellModel`, `STZConventional`, `TestBayesianInterface`, `BayesianService`, `TestLAOSSimulation`, `ParameterState`, `ITTMCTIsotropic`, `TestModelFunction`, `TestLAOSSimulation`, `TestSAOS`, `tests/conftest.py`, `PipelineBuilder`, `TestSAOS`, `TestBayesianInterface`, `TestLAOSSimulation`, `TestBayesianInterface`, `ValueError`, `Zener`, `ITTMCTSchematic`, `SpringPot`, `safe_import_jax`, `TestRelaxationSimulation`, `TestDerivedProperties`, `TestVLBLocalStartup`, `FluidityNonlocal`, `TestVLBCrossProtocol`, `ModelComparisonPipeline`, `TestLAOSSimulation`, `TestSAOS`, `TestFluidityNonlocalShearBandingDefaults`, `FluiditySaramitoNonlocal`, `ModelComparison`, `smoke`, `PowerLaw`, `ParameterTable`, `schematic.py`, `BayesianMixin`, `FitResult`, `TensorialEPM`, `Carreau`, `test_registry_consistency.py`, `MLIKH`, `SGRGeneric`, `TestRegistry`, `PipelineConfigureRunStep`, `TestHelperMethods`, `TestLAOSKwargsRegression`, `FMLIKH`, `test_dmt.py`, `TestEquilibriumStructure`, `Cross`, `TestFitOscillation`, `DataStep`, `ModelService`, `TestLAOSSimulation`, `CarreauYasuda`, `FIKH`, `TestSGRModelComparison`, `TestFluidityLocalFitting`, `fluidity/test_nonlocal.py`, `_yaml_runner.py`, `TestStartupFitting`, `TestCreepFitting`, `TestVLBLocalLAOS`, `DMTNonlocal`, `TestVLBLocalExtension`, `TNTSingleMode`, `TNTCates`, `TNTLoopBridge`, `_ensure_all_registered`, `Bingham`, `smoke`, `HebraudLequeux`, `HVNMLocal`, `test_sgr_generic.py`, `HVMLocal`, `TestModeEnum`, `test_dmta_removal.py`, `test_hvm.py`, `GeneralizedMaxwell`, `TestCreepSimulation`, `.generate`, `FractionalKelvinVoigt`, `hvm/_kernels_diffrax.py`, `TNTStickyRouse`, `TestNonAffineVariant`, `ProtocolModelStep`, `dmt/local.py`, `test_multi_species.py`, `smoke`, `FractionalZenerLiquidLiquid`, `TestStartupSimulation`, `cmd_batch.py`, `GiesekusMultiMode`, `test_loop_bridge.py`, `FractionalBurgersModel`, `FractionalJeffreysModel`, `tnt/test_single_mode.py`, `BayesianPipeline`, `DMTLocal`, `FractionalKelvinVoigtZener`, `FractionalPoyntingThomson`, `TestInstantiation`, `TestFluidityNonlocalFitDispatch`, `VLBVariant`, `MIKH`, `main`, `TestInstantiation`, `_t_grid`, `TestHVNMLimitingCases`, `TestHVNMInterphase`, `TestVLBBellPhysics`, `FractionalZenerSolidSolid`, `create_global_parser`, `TestDeviceMemoryOptimization`, `TestZenerBasics`, `TNTMultiSpecies`, `TestInstantiation`, `smoke`, `TestComposedVariants`, `TestLAOSSimulation`, `FractionalZenerSolidLiquid`, `TestMonotonicityChecks`, `vlb/_kernels.py`, `TestPhysicalConsistency`, `TestFlowCurve`, `TestRelaxationSimulation`, `TestDMTBayesian`, `TestFluidityNonlocalModelFunction`, `TestModelFunctionCompleteness`, `TestVLBUtilities`, `VLBNonlocal`, `TestHVNMSAOS`, `test_sticky_rouse.py`, `test_multi_mode.py`, `TestDMTLocalCreep`, `TestHVMStartup`, `TestHVMRelaxation`, `TestHVMCreep`, `TestFluidityNonlocalSmoke`, `TestPhysicalConsistency`, `smoke`, `TestFluidityLocalOscillation`, `TestHVNMStartup`, `TestHVNMRelaxation`, `TestInstantiation`, `TestParameterManagement`, `TestPhysicalConsistency`, `TestMaxwellBasics`, `TestDMTLocalStartup`, `smoke`, `TestFluidityLocalSmoke`, `TestStartupSimulation`, `TestHVMLAOS`, `TestCreepSimulation`, `TestInstantiation`, `smoke`, `TestFlowCurve`, `TestPhysicalConsistency`, `TestStartupSimulation`, `TestBayesianInterface`, `smoke`, `TestFlowCurve`, `TestCreepSimulation`, `TestCreepSimulation`, `TestHVNMFlowCurve`?**
+- **Why does `ModelRegistry` connect `ModelRegistry` to `giesekus/test_single_mode.py`, `RheoData`, `SGRConventional`, `CancellationError`, `GiesekusSingleMode`, `LatticeEPM`, `VLBLocal`, `Pipeline`, `FluidityLocal`, `Maxwell`, `FitState`, `HerschelBulkley`, `TestDMTLocalLAOS`, `TestDMTLocalRelaxation`, `TestDMTNonlocal`, `TestDMTLocalFlowCurve`, `TestHVNMCreep`, `TestDMTLocalSAOS`, `hvnm/_kernels_diffrax.py`, `TestFitPredictRoundtrip`, `TestStartupSimulation`, `test_cates.py`, `TestStartupSimulation`, `TestCreepSimulation`, `FractionalMaxwellModel`, `STZConventional`, `TestBayesianInterface`, `BayesianService`, `TestLAOSSimulation`, `ParameterState`, `ITTMCTIsotropic`, `TestSAOS`, `TestLAOSSimulation`, `TestBayesianInterface`, `tests/conftest.py`, `PipelineBuilder`, `TestSAOS`, `TestLAOSSimulation`, `TestNonAffineVariant`, `TestBayesianInterface`, `ValueError`, `Zener`, `ITTMCTSchematic`, `SpringPot`, `safe_import_jax`, `TestRelaxationSimulation`, `TestDerivedProperties`, `TestVLBLocalStartup`, `FluidityNonlocal`, `TestVLBCrossProtocol`, `ModelComparisonPipeline`, `TestLAOSSimulation`, `TestSAOS`, `TestFluidityNonlocalShearBandingDefaults`, `FluiditySaramitoNonlocal`, `smoke`, `PowerLaw`, `ParameterTable`, `schematic.py`, `TestFlowCurve`, `BayesianMixin`, `FitResult`, `TensorialEPM`, `test_registry_consistency.py`, `MLIKH`, `SGRGeneric`, `TestRegistry`, `PipelineConfigureRunStep`, `TestHelperMethods`, `TestBayesianInterface`, `TestRelaxationSimulation`, `FMLIKH`, `test_dmt.py`, `TestEquilibriumStructure`, `Cross`, `TestFitOscillation`, `DataStep`, `ModelService`, `TestLAOSSimulation`, `CarreauYasuda`, `FIKH`, `TestSGRModelComparison`, `TestFluidityLocalFitting`, `fluidity/test_nonlocal.py`, `_yaml_runner.py`, `TestStartupFitting`, `TestCreepFitting`, `TestVLBLocalLAOS`, `DMTNonlocal`, `TestVLBLocalExtension`, `TNTSingleMode`, `TNTCates`, `TNTLoopBridge`, `TestStickerFloorPhysics`, `get_default_workers`, `Bingham`, `smoke`, `hebraud_lequeux.py`, `HVNMLocal`, `test_sgr_generic.py`, `HVMLocal`, `TestModeEnum`, `test_dmta_removal.py`, `test_hvm.py`, `GeneralizedMaxwell`, `TestCreepSimulation`, `.generate`, `FractionalKelvinVoigt`, `hvm/_kernels_diffrax.py`, `TNTStickyRouse`, `dmt/local.py`, `test_multi_species.py`, `smoke`, `FractionalZenerLiquidLiquid`, `cmd_batch.py`, `GiesekusMultiMode`, `test_loop_bridge.py`, `FractionalBurgersModel`, `FractionalJeffreysModel`, `tnt/test_single_mode.py`, `BayesianPipeline`, `DMTLocal`, `FractionalKelvinVoigtZener`, `FractionalPoyntingThomson`, `TestInstantiation`, `TestFluidityNonlocalFitDispatch`, `TestFitResultSerialization`, `VLBVariant`, `MIKH`, `main`, `TestInstantiation`, `_t_grid`, `HebraudLequeux`, `TestHVNMLimitingCases`, `ModelComparison`, `TestHVNMInterphase`, `create_global_parser`, `TestZenerBasics`, `TNTMultiSpecies`, `TestInstantiation`, `smoke`, `TestComposedVariants`, `TestLAOSSimulation`, `FractionalZenerSolidLiquid`, `TestMonotonicityChecks`, `vlb/_kernels.py`, `TestPhysicalConsistency`, `TestFlowCurve`, `TestRelaxationSimulation`, `ModelInfo`, `TestDMTBayesian`, `TestFluidityNonlocalModelFunction`, `TestModelFunctionCompleteness`, `TestVLBUtilities`, `VLBNonlocal`, `TestHVNMSAOS`, `test_sticky_rouse.py`, `test_multi_mode.py`, `TestDMTLocalCreep`, `TestHVMStartup`, `TestHVMRelaxation`, `TestHVMCreep`, `TestFluidityNonlocalSmoke`, `TestPhysicalConsistency`, `smoke`, `Carreau`, `TestHVNMStartup`, `TestHVNMRelaxation`, `TestInstantiation`, `TestPhysicalConsistency`, `TestMaxwellBasics`, `TestDMTLocalStartup`, `smoke`, `TestFluidityLocalSmoke`, `TestStartupSimulation`, `TestHVMLAOS`, `TestCreepSimulation`, `TestInstantiation`, `smoke`, `TestFlowCurve`, `TestPhysicalConsistency`, `TestStartupSimulation`, `TestBayesianInterface`, `smoke`, `TestFlowCurve`, `TestCreepSimulation`, `TestCreepSimulation`, `TestHVNMFlowCurve`?**
   _High betweenness centrality (0.175) - this node is a cross-community bridge._
-- **Why does `get_logger()` connect `safe_import_jax` to `mittag_leffler_e`, `RheoData`, `Provenance`, `auto_load`, `auto_p0`, `nlsq_optimize`, `CancellationError`, `test_numpyro_model_builder.py`, `window.py`, `cmd_transform.py`, `test_fractional_initializers.py`, `txt.py`, `mct_kernels.py`, `_yaml_runner.py`, `Envelope`, `FitState`, `BaseArviZWidget`, `cmd_pipeline.py`, `PipelineExecutionService`, `load_csv`, `TransformService`, `io/__init__.py`, `rheojax/utils/__init__.py`, `rheojax/logging/__init__.py`, `IconProvider`, `DatasetLibrary`, `TRIOSDataSet`, `ModelRegistry`, `BayesianService`, `load_hdf5`, `bootstrap_ci`, `gui/main.py`, `main`, `smoke`, `test_io_fixes.py`, `HebraudLequeux`, `_WindowChrome`, `device.py`, `plot_lissajous`, `create_parser`, `test_logging_integration.py`, `PreprocessingResult`, `check_model_compatibility`, `EPMBase`, `rheojax/visualization/__init__.py`, `json.py`, `create_global_parser`, `get_template`, `ModelComparison`, `TestGetLogger`, `preview_worker.py`, `rheodata_from_dataset_state`, `ParameterTable`, `schematic.py`, `BayesianMixin`, `Config`, `sgr_population_balance.py`, `dmt/local.py`, `create_least_squares_objective`, `spp_kernels.py`, `npz_writer.py`, `epm_plots.py`, `readers/_validation.py`, `main`, `RheoJAXLogger`, `TransformPlotter`, `run_bayesian_isolated`, `main`, `cmd_batch.py`, `test_multi_file.py`, `PipelineConfig`, `check_wide_frequency_range`, `run_analyze`, `test_column_mapping.py`, `anton_paar.py`?**
+- **Why does `get_logger()` connect `safe_import_jax` to `mittag_leffler_e`, `RheoData`, `Provenance`, `auto_load`, `auto_p0.py`, `nlsq_optimize`, `CancellationError`, `test_numpyro_model_builder.py`, `window.py`, `cmd_transform.py`, `test_fractional_initializers.py`, `txt.py`, `Pipeline`, `mct_kernels.py`, `_yaml_runner.py`, `Envelope`, `BaseArviZWidget`, `cmd_pipeline.py`, `PipelineExecutionService`, `load_csv`, `TransformService`, `core/bayesian.py`, `io/__init__.py`, `physics_checks.py`, `rheojax/logging/__init__.py`, `IconProvider`, `DatasetLibrary`, `TRIOSDataSet`, `ModelRegistry`, `BayesianService`, `load_hdf5`, `bootstrap_ci`, `gui/main.py`, `main`, `smoke`, `test_io_fixes.py`, `hebraud_lequeux.py`, `_WindowChrome`, `device.py`, `plot_lissajous`, `create_parser`, `test_logging_integration.py`, `PreprocessingResult`, `ModelComparison`, `EPMBase`, `check_model_compatibility`, `rheojax/visualization/__init__.py`, `json.py`, `create_global_parser`, `get_template`, `TestGetLogger`, `preview_worker.py`, `rheodata_from_dataset_state`, `ParameterTable`, `schematic.py`, `Config`, `sgr_population_balance.py`, `dmt/local.py`, `create_least_squares_objective`, `spp_kernels.py`, `npz_writer.py`, `epm_plots.py`, `readers/_validation.py`, `main`, `RheoJAXLogger`, `TransformPlotter`, `run_bayesian_isolated`, `main`, `cmd_batch.py`, `test_multi_file.py`, `PipelineConfig`, `detect_data_range_decades`, `run_analyze`, `NutsStep`, `test_column_mapping.py`, `anton_paar.py`?**
   _High betweenness centrality (0.107) - this node is a cross-community bridge._
 - **Are the 493 inferred relationships involving `RheoData` (e.g. with `BaseModel` and `BaseTransform`) actually correct?**
   _`RheoData` has 493 INFERRED edges - model-reasoned connections that need verification._
