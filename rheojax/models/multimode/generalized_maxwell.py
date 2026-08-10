@@ -366,9 +366,7 @@ class GeneralizedMaxwell(BaseModel):
         # even a clean converged one where the Jacobian (already computed
         # above) makes it directly computable.
         if result.jac is not None and result.residuals is not None:
-            result.pcov = compute_covariance_from_jacobian(
-                result.jac, result.residuals
-            )
+            result.pcov = compute_covariance_from_jacobian(result.jac, result.residuals)
 
         # Prefer the explicit y_data argument; fall back to one stashed on
         # the objective itself by the caller, then on self (set by the
@@ -1596,7 +1594,6 @@ class GeneralizedMaxwell(BaseModel):
         # Apply step stress σ₀, solve for ε(t), compute J(t) = ε(t)/σ₀
 
         n_steps = len(t)
-        n_modes = len(E_i)
 
         # Initialize arrays
         epsilon = jnp.zeros(n_steps)
@@ -1637,9 +1634,14 @@ class GeneralizedMaxwell(BaseModel):
 
             return (eps_new, sig_i_new), eps_new
 
-        # Initialize
-        eps_init = 0.0
-        sig_i_init = jnp.zeros(n_modes)
+        # Initialize with the instantaneous elastic response to the step stress.
+        # The first scan step integrates [0, t[0]] as a single interval, so
+        # starting from eps=0 spreads the t=0 strain jump across that interval
+        # as a linear ramp. On a log-spaced grid t[0] never shrinks with N, so
+        # that first-step error is frozen and does NOT vanish under refinement.
+        E_glassy = E_inf + jnp.sum(E_i)
+        eps_init = sigma_0 / E_glassy
+        sig_i_init = E_i * eps_init
 
         # Scan over time steps
         _, epsilon = jax.lax.scan(update_step, (eps_init, sig_i_init), (t, dt))

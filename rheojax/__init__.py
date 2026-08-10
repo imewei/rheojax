@@ -22,12 +22,19 @@ Float64 Precision Enforcement:
 """
 
 # Runtime version check (must be first)
+import contextlib
 import sys
 
 # CRITICAL: Import NLSQ before JAX
 # Required for GPU-accelerated optimization
 try:
-    import nlsq  # noqa: F401
+    # nlsq calls its own check_gpu_availability() at import time, which prints
+    # a ~14-line GPU banner to stdout. That lands ahead of any command's real
+    # output and corrupts the CLI's documented `--json` envelope pipes
+    # (`rheojax load ... --json | rheojax transform ...`). It is diagnostic
+    # text, so send it to stderr; stdout stays reserved for data.
+    with contextlib.redirect_stdout(sys.stderr):
+        import nlsq  # noqa: F401
 except ImportError as e:
     raise ImportError(
         "NLSQ is required for RheoJAX but not installed.\n"

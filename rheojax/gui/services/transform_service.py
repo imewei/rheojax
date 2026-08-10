@@ -117,7 +117,7 @@ class TransformService:
         Parameters
         ----------
         name : str
-            Transform name
+            Registry key (e.g. ``fft_analysis``) or legacy alias (e.g. ``fft``).
 
         Returns
         -------
@@ -125,6 +125,13 @@ class TransformService:
             Parameter specifications with defaults and descriptions
         """
         logger.debug("Getting transform parameters", transform=name)
+        # params_map is keyed on the legacy dispatch names, but callers pass the
+        # registry key (step1_pick populates from TransformRegistry). Without
+        # this, fft_analysis/smooth_derivative/spp_decomposer returned {} and
+        # step2_slots skipped both the parameter form and its config seeding --
+        # every SPP run silently used omega=1.0/gamma_0=1.0 regardless of the
+        # experiment. Mirrors apply_transform()/validate_transform_input().
+        name = _LEGACY_MAP.get(name, name)
         params_map = {
             "mastercurve": {
                 "reference_temp": {
@@ -275,6 +282,14 @@ class TransformService:
                     "label": "Method",
                     "description": "Differentiation method",
                 },
+                # ponytail: `mode` and `validate_window` are declared here (and
+                # `mode`'s presence is pinned by test_derivative_has_mode) but
+                # apply_transform()'s derivative branch never reads either, and
+                # SmoothDerivative.__init__ accepts neither -- so both render as
+                # no-op controls now that get_transform_params() resolves
+                # `smooth_derivative`. Honouring them needs a SmoothDerivative
+                # signature change (a feature); deleting them breaks a test that
+                # asserts the opposite. Left for a human to decide.
                 "mode": {
                     "type": "choice",
                     "choices": ["mirror", "nearest", "constant", "wrap"],

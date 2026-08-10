@@ -13,7 +13,59 @@ from rheojax.cli._envelope import (
     Envelope,
     create_data_envelope,
     create_fit_envelope,
+    decode_data_payload,
 )
+
+
+class TestProducerConsumerSeam:
+    """create_data_envelope() output must be readable by decode_data_payload().
+
+    The `load --json | transform` and `| export` pipes broke because the
+    producer nested x/y under "data" while both consumers read them from the
+    top level, and complex y was stringified by the JSON encoder.
+    """
+
+    @pytest.mark.smoke
+    def test_real_y_round_trips(self):
+        x = np.linspace(0.1, 1.0, 5)
+        y = np.array([100.0, 90.0, 82.0, 75.0, 70.0])
+        raw = json.loads(create_data_envelope(x, y).to_json())
+
+        dx, dy, _ = decode_data_payload(raw)
+        assert np.allclose(dx, x)
+        assert np.allclose(dy, y)
+
+    @pytest.mark.smoke
+    def test_complex_y_round_trips(self):
+        x = np.array([1.0, 10.0])
+        y = np.array([100.0 + 5.0j, 90.0 + 20.0j])
+        raw = json.loads(create_data_envelope(x, y).to_json())
+
+        _, dy, _ = decode_data_payload(raw)
+        assert np.iscomplexobj(dy)
+        assert np.allclose(dy, y)
+
+    @pytest.mark.unit
+    def test_metadata_survives(self):
+        raw = json.loads(
+            create_data_envelope(
+                [1.0], [2.0], metadata={"test_mode": "creep"}
+            ).to_json()
+        )
+        assert decode_data_payload(raw)[2]["test_mode"] == "creep"
+
+    @pytest.mark.unit
+    def test_rejects_envelope_without_data_section(self):
+        raw = json.loads(
+            Envelope(rheojax_version="0.1.0", envelope_type="fit_result").to_json()
+        )
+        with pytest.raises(ValueError, match="no 'data' section"):
+            decode_data_payload(raw)
+
+    @pytest.mark.unit
+    def test_rejects_non_mapping(self):
+        with pytest.raises(ValueError, match="Expected a JSON object"):
+            decode_data_payload([1, 2, 3])
 
 
 class TestEnvelopeRoundTrip:

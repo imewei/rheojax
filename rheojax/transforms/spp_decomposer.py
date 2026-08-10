@@ -193,6 +193,13 @@ class SPPDecomposer(BaseTransform):
             raise ValueError(f"omega must be positive, got {omega}")
         if gamma_0 <= 0:
             raise ValueError(f"gamma_0 must be positive, got {gamma_0}")
+        # Zero/negative values here do not raise downstream — they silently
+        # collapse the analysis (sigma_dy -> ~0, I3/I1 -> 0, G'/G'' -> 0) and
+        # the degenerate numbers get reported as a successful fit.
+        if n_harmonics < 1:
+            raise ValueError(f"n_harmonics must be >= 1, got {n_harmonics}")
+        if step_size < 1:
+            raise ValueError(f"step_size must be >= 1, got {step_size}")
         self.omega = float(omega)
         self.gamma_0 = float(gamma_0)
         self.gamma_dot_0 = self.omega * self.gamma_0  # Rate amplitude

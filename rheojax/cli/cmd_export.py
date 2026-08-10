@@ -53,8 +53,7 @@ Examples:
         "input",
         type=str,
         help=(
-            "HDF5 file from a previous run, "
-            "or '-' to read a JSON envelope from stdin"
+            "HDF5 file from a previous run, or '-' to read a JSON envelope from stdin"
         ),
     )
     parser.add_argument(
@@ -98,26 +97,10 @@ Examples:
 def _build_pipeline_from_envelope(envelope: dict):
     """Construct a minimal Pipeline populated with envelope data for export."""
 
-    import numpy as np
-
+    from rheojax.cli._envelope import decode_data_payload
     from rheojax.core.data import RheoData
 
-    x = np.array(envelope.get("x", []))
-    y_payload = envelope.get("y", {})
-    if isinstance(y_payload, dict) and y_payload.get("complex"):
-        y = np.array(y_payload["real"]) + 1j * np.array(y_payload["imag"])
-    elif isinstance(y_payload, dict):
-        y = np.array(y_payload.get("values", []))
-    else:
-        y = np.array(y_payload)
-
-    metadata = envelope.get("metadata", {})
-    test_mode = envelope.get("test_mode")
-    if test_mode is None:
-        test_mode = metadata.get("test_mode")
-    if test_mode is not None:
-        metadata["test_mode"] = test_mode
-
+    x, y, metadata = decode_data_payload(envelope)
     data = RheoData(x=x, y=y, metadata=metadata)
 
     try:
@@ -125,7 +108,7 @@ def _build_pipeline_from_envelope(envelope: dict):
 
         pipe = Pipeline()
         pipe._data = data  # type: ignore[attr-defined]
-        pipe._source = envelope.get("source", "stdin")  # type: ignore[attr-defined]
+        pipe._source = metadata.get("source", "stdin")  # type: ignore[attr-defined]
         return pipe
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(

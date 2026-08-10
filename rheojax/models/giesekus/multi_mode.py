@@ -497,7 +497,7 @@ class GiesekusMultiMode(BaseModel):
             # Return components for fitting to [G', G''] data
             return jnp.column_stack([G_prime, G_double_prime])
 
-        elif mode in ["flow_curve", "steady_shear", "rotation"]:
+        elif mode in ["flow", "flow_curve", "steady_shear", "rotation"]:
             return self._predict_flow_curve_internal(
                 X_jax, eta_p_modes, lambda_modes, alpha_modes, eta_s
             )

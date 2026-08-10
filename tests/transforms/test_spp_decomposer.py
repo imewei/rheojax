@@ -333,6 +333,26 @@ def test_invalid_cycle_range_raises():
         decomposer.transform(data)
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "field"),
+    [
+        ({"n_harmonics": 0}, "n_harmonics"),
+        ({"n_harmonics": -3}, "n_harmonics"),
+        ({"step_size": 0}, "step_size"),
+        ({"step_size": -1}, "step_size"),
+    ],
+)
+def test_degenerate_harmonic_and_step_size_raise(kwargs, field):
+    """Regression: non-positive n_harmonics/step_size must raise at construction.
+
+    Unguarded they do not fail anywhere downstream — they silently collapse
+    the analysis (sigma_dy -> ~0, I3/I1 -> 0) and the degenerate numbers get
+    written out and reported as a successful fit.
+    """
+    with pytest.raises(ValueError, match=field):
+        SPPDecomposer(omega=1.0, gamma_0=1.0, **kwargs)
+
+
 def test_scrambled_time_raises_instead_of_silent_corruption():
     """Regression: unsorted/non-uniform time must raise, not silently produce
     finite-but-wrong output from FFT/derivative kernels that assume ordered,

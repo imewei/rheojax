@@ -256,6 +256,14 @@ def interpolate_sk(
     if extrapolation == "constant":
         sk_interp = np.where(k_target < k_min, sk_data[0], sk_interp)
         sk_interp = np.where(k_target > k_max, sk_data[-1], sk_interp)
+    elif extrapolation != "error":
+        # "linear" was documented but never implemented; it (and any typo)
+        # silently fell through to the CubicSpline's cubic extrapolation,
+        # which diverges far outside the data range.
+        raise ValueError(
+            f"Unsupported extrapolation={extrapolation!r}. "
+            "Supported values are 'constant' and 'error'."
+        )
 
     # Ensure S(k) > 0
     sk_interp = np.maximum(sk_interp, 1e-10)

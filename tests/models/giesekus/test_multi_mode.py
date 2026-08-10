@@ -459,3 +459,68 @@ class TestParameterSetRoundtrip:
 
         np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
         np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)
+
+
+class TestFlowModeAlias:
+    """Regression: test_mode='flow' must return steady-shear stress.
+
+    'flow' is a first-class test-mode string here (BaseModel.predict's
+    docstring, the GUI data service, utils/initialization/auto_p0), but the
+    multi-mode dispatch listed only flow_curve/steady_shear/rotation. 'flow'
+    fell through to the unknown-mode branch and silently returned oscillation
+    [G', G''] instead of stress, while the single-mode sibling's unknown-mode
+    branch happened to fall back to steady shear.
+    """
+
+    @staticmethod
+    def _stress(model, gamma_dot, mode):
+        from rheojax.core.data import RheoData
+
+        data = RheoData(x=gamma_dot, y=np.zeros_like(gamma_dot), domain="time")
+        data.metadata["test_mode"] = mode
+        return np.asarray(model.predict(data))
+
+    @staticmethod
+    def _configure_multi(model):
+        for name, value in {
+            "eta_s": 0.1,
+            "eta_p_0": 10.0,
+            "lambda_0": 1.0,
+            "alpha_0": 0.3,
+        }.items():
+            model.parameters.set_value(name, value)
+        return model
+
+    @pytest.mark.smoke
+    def test_flow_alias_matches_flow_curve(self):
+        model = self._configure_multi(GiesekusMultiMode(1))
+        gamma_dot = np.logspace(-2, 2, 12)
+
+        via_alias = self._stress(model, gamma_dot, "flow")
+        via_canonical = self._stress(model, gamma_dot, "flow_curve")
+
+        assert via_alias.shape == gamma_dot.shape
+        np.testing.assert_allclose(via_alias, via_canonical, rtol=1e-12)
+
+    @pytest.mark.smoke
+    def test_flow_alias_matches_single_mode_sibling(self):
+        from rheojax.models.giesekus import GiesekusSingleMode
+
+        multi = self._configure_multi(GiesekusMultiMode(1))
+
+        single = GiesekusSingleMode()
+        for name, value in {
+            "eta_p": 10.0,
+            "lambda_1": 1.0,
+            "alpha": 0.3,
+            "eta_s": 0.1,
+            "beta_cc": 1.0,
+        }.items():
+            single.parameters.set_value(name, value)
+
+        gamma_dot = np.logspace(-2, 2, 12)
+        np.testing.assert_allclose(
+            self._stress(multi, gamma_dot, "flow"),
+            self._stress(single, gamma_dot, "flow"),
+            rtol=1e-10,
+        )

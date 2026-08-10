@@ -309,6 +309,7 @@ def main(args: list[str] | None = None) -> int:
 
     # Process files sequentially
     all_results: list[dict] = []
+    written_stems: set[str] = set()
 
     for i, file_path in enumerate(files, 1):
         prefix = f"[{i}/{len(files)}] {file_path.name}"
@@ -342,9 +343,22 @@ def main(args: list[str] | None = None) -> int:
             try:
                 from rheojax.io.json_encoder import NumpyJSONEncoder
 
+                # Only guard collisions *within this run* — overwriting a
+                # previous run's output is normal when re-running a batch.
+                if file_path.stem in written_stems:
+                    raise FileExistsError(
+                        f"{out_file}: two input files share the basename "
+                        f"'{file_path.stem}'"
+                    )
                 out_file.write_text(json.dumps(result, indent=2, cls=NumpyJSONEncoder))
+                written_stems.add(file_path.stem)
             except Exception as e:
-                logger.warning(
+                # The requested output was not produced, so this file did not
+                # succeed — otherwise the run exits 0 having written nothing.
+                result["status"] = "error"
+                result["error"] = f"Could not save result file: {e}"
+                print(f"  Could not save result: {e}", file=sys.stderr)
+                logger.error(
                     "Could not save result file", file=str(out_file), error=str(e)
                 )
 

@@ -145,9 +145,7 @@ class _WindowChrome:
             theme_action.setCheckable(True)
         self._theme_light_action.triggered.connect(lambda: self._apply_theme("light"))
         self._theme_dark_action.triggered.connect(lambda: self._apply_theme("dark"))
-        self._theme_system_action.triggered.connect(
-            lambda: self._apply_theme("system")
-        )
+        self._theme_system_action.triggered.connect(lambda: self._apply_theme("system"))
         theme_menu.addAction(self._theme_light_action)
         theme_menu.addAction(self._theme_dark_action)
         theme_menu.addAction(self._theme_system_action)
@@ -265,7 +263,9 @@ class _WindowChrome:
                 if scheme == _Qt.ColorScheme.Light:
                     return "light"
         except Exception:
-            pass
+            logger.debug(
+                "Failed to detect OS color scheme via QStyleHints", exc_info=True
+            )
         palette = app.palette()
         window_color = palette.color(palette.ColorRole.Window)
         luminance = (
@@ -509,9 +509,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         self._notifier.changed.connect(self._transform_slots_step.refresh)
         self._notifier.changed.connect(self._pipeline_bodies[0].refresh)
         self._rail.import_requested.connect(self._on_import_requested)
-        self._rail.dataset_preview_requested.connect(
-            self._on_dataset_preview_requested
-        )
+        self._rail.dataset_preview_requested.connect(self._on_dataset_preview_requested)
         self._rail.dataset_selected.connect(self._on_rail_dataset_selected)
         self._rail.dataset_delete_requested.connect(self._on_dataset_delete_requested)
         self._canvas = StepperCanvas(self._controllers[self._mode], self)
@@ -750,7 +748,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
                 ),
             ):
                 return
-        except (ValueError, FileNotFoundError, OSError) as exc:
+        except (ValueError, FileNotFoundError, OSError, TypeError) as exc:
             QMessageBox.critical(self, "Save Failed", str(exc))
             return
         self._state.project.dirty = False
@@ -770,7 +768,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
                     "save", on_unblocked=lambda: save_project_v2(self._state, path)
                 ):
                     return
-            except (ValueError, FileNotFoundError, OSError) as exc:
+            except (ValueError, FileNotFoundError, OSError, TypeError) as exc:
                 QMessageBox.critical(self, "Save Failed", str(exc))
                 return
             self._state.project.path = path
@@ -946,9 +944,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         self.log_dock.append_record(logging.INFO, f"Step {step_id} completed")
 
     def _on_pipeline_step_failed(self, step_id: str, error: str) -> None:
-        self.log_dock.append_record(
-            logging.ERROR, f"Step {step_id} failed: {error}"
-        )
+        self.log_dock.append_record(logging.ERROR, f"Step {step_id} failed: {error}")
 
     def _on_pipeline_step_phase_started(self, step_id: str, phase: str) -> None:
         self.log_dock.append_record(
@@ -1415,7 +1411,7 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
                 float64_enabled=info.get("float64_enabled", False),
             )
         except Exception:
-            pass
+            logger.debug("Failed to update JAX status", exc_info=True)
 
     def fit_bodies(self) -> list[QWidget]:
         return self._fit_bodies

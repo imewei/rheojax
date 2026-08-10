@@ -295,9 +295,21 @@ def check_nan_inf(
         True
     """
     flat = np.asarray(data).ravel()
+    if len(flat) == 0:
+        # An empty array has nothing finite in it, so reporting it as
+        # perfectly clean (which max(len, 1) would do) lets a zero-length
+        # array pass the quality gate as valid data.
+        logger.info("Data quality issue detected: empty array", label=label)
+        return {
+            "label": label,
+            "n_nan": 0,
+            "n_inf": 0,
+            "has_issues": True,
+            "fraction_clean": 0.0,
+        }
     n_nan = int(np.sum(np.isnan(flat)))
     n_inf = int(np.sum(np.isinf(flat)))
-    total = max(len(flat), 1)
+    total = len(flat)
     result = {
         "label": label,
         "n_nan": n_nan,
@@ -356,8 +368,17 @@ def check_monotonicity(
     frac_inc = n_inc / n_total
     frac_dec = n_dec / n_total
 
-    if frac_inc >= threshold:
+    if n_inc == 0 and n_dec == 0:
+        # Every step is zero. A constant array is weakly monotonic, but the
+        # counting above credits zero-diffs to neither tally, so it would
+        # otherwise fall through to 'mixed' with fraction 0.0.
         result: dict[str, object] = {
+            "is_monotonic": True,
+            "direction": "constant",
+            "fraction": 1.0,
+        }
+    elif frac_inc >= threshold:
+        result = {
             "is_monotonic": True,
             "direction": "increasing",
             "fraction": frac_inc,

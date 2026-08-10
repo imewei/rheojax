@@ -183,13 +183,6 @@ def run_validate(args: argparse.Namespace) -> int:
         load_config(args.config)
         # load_config raises ValueError with all error messages if validation
         # fails, so reaching this line means the config is valid.
-    except ImportError:
-        print(
-            "Error: YAML schema validator not available. "
-            "Ensure 'rheojax.cli._yaml_schema' is installed.",
-            file=sys.stderr,
-        )
-        return 1
     except Exception as e:
         print(f"Error loading config '{args.config}': {e}", file=sys.stderr)
         logger.error("Config load failed", config=str(args.config))

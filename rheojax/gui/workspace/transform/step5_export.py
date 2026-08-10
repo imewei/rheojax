@@ -80,7 +80,18 @@ class TransformExportStep(QWidget):
         job_id = f"export:{uuid.uuid4().hex}"
         if self._active_jobs is not None:
             self._active_jobs.by_id[job_id] = {}
-        worker = ExportWorker(lambda _progress: self.export_bundle(directory))
+        # Snapshot provenance on the GUI thread. export_bundle() runs on the
+        # ExportWorker thread and provenance() copies TransformState.slots /
+        # .config, which step2_slots.py mutates *in place* from the GUI thread
+        # (fill/_on_single_slot_changed insert and delete keys). Navigating back
+        # to the Slots step mid-export would resize a dict while dict() iterates
+        # it -> "dictionary changed size during iteration", failing the export.
+        # Same reasoning as transform_controller._make_run_fn's slots/config
+        # snapshot.
+        provenance = self.provenance()
+        worker = ExportWorker(
+            lambda _progress: self.export_bundle(directory, provenance=provenance)
+        )
         worker.signals.completed.connect(
             lambda _result, jid=job_id: self._on_export_finished(directory, jid)
         )
@@ -122,7 +133,9 @@ class TransformExportStep(QWidget):
             "config": dict(self._state.config),
         }
 
-    def export_bundle(self, directory: Path | str) -> dict[str, Path]:
+    def export_bundle(
+        self, directory: Path | str, provenance: dict | None = None
+    ) -> dict[str, Path]:
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         written: dict[str, Path] = {}
@@ -141,7 +154,13 @@ class TransformExportStep(QWidget):
             written["result"] = result_path
 
         provenance_path = directory / "provenance.json"
-        provenance_path.write_text(json.dumps(self.provenance(), default=str, indent=2))
+        provenance_path.write_text(
+            json.dumps(
+                self.provenance() if provenance is None else provenance,
+                default=str,
+                indent=2,
+            )
+        )
         written["provenance"] = provenance_path
 
         return written

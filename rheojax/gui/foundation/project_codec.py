@@ -48,7 +48,9 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
         return {
             k: _write_walk(
                 v,
-                f"{key_path}/{_escape_hdf5_key(k)}" if key_path else _escape_hdf5_key(k),
+                f"{key_path}/{_escape_hdf5_key(k)}"
+                if key_path
+                else _escape_hdf5_key(k),
                 hf,
                 out,
             )
@@ -71,7 +73,9 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
 def write_result_arrays(path: Path, result: dict[str, Any]) -> dict[str, Any]:
     path = Path(path)
     with h5py.File(path, "w") as hf:
-        return {k: _write_walk(v, _escape_hdf5_key(k), hf, {}) for k, v in result.items()}
+        return {
+            k: _write_walk(v, _escape_hdf5_key(k), hf, {}) for k, v in result.items()
+        }
 
 
 def _read_walk(node: Any, hf: h5py.File) -> Any:
@@ -396,14 +400,29 @@ def load_project_v2(path: Path):
                 f"Archive's total uncompressed size exceeds {_MAX_TOTAL_BYTES} bytes"
             )
 
+        # Every other malformed-archive condition raises ValueError, which is
+        # what both callers catch. Without these two guards, an archive missing
+        # a required member (empty zip, truncated download, any .zip renamed
+        # .rheojax) fell out of zf.read() as a bare KeyError and escaped those
+        # handlers as an unhandled-slot traceback instead of an "Open Failed"
+        # dialog. Each guard sits immediately before its own read so the version
+        # check still takes precedence over a missing manifest.
+        if "metadata.json" not in seen_names:
+            raise ValueError("Archive is missing required member: metadata.json")
+
         metadata = json.loads(zf.read("metadata.json"))
         if metadata.get("version") != _ARCHIVE_VERSION:
             raise ValueError(
                 f"Unsupported project version {metadata.get('version')!r}, expected {_ARCHIVE_VERSION!r}"
             )
 
+        if "manifest.json" not in seen_names:
+            raise ValueError("Archive is missing required member: manifest.json")
+
         manifest = json.loads(zf.read("manifest.json"))
-        checksums = manifest["members"]
+        checksums = manifest.get("members")
+        if not isinstance(checksums, dict):
+            raise ValueError("Archive manifest.json has no valid 'members' mapping")
         # manifest.json can't hash itself (chicken-and-egg -- its own content includes
         # every OTHER member's hash), but metadata.json IS written and hashed before
         # manifest.json at save time, so it belongs in this set, not skipped alongside it.

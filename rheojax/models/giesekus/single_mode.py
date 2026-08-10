@@ -351,7 +351,7 @@ class GiesekusSingleMode(GiesekusBase):
         )
         X_jax = jnp.asarray(X, dtype=jnp.float64)
 
-        if mode in ["flow_curve", "steady_shear", "rotation"]:
+        if mode in ["flow", "flow_curve", "steady_shear", "rotation"]:
             return giesekus_steady_shear_stress_vec(
                 X_jax, eta_p, lambda_1, alpha, eta_s
             )
