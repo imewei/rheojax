@@ -520,6 +520,16 @@ class BatchPipeline:
                     metrics["transform_replay_failed"] = True
 
             elif step_action == "fit_bayesian":
+                if metrics.get("transform_replay_failed"):
+                    # Same reasoning as the fit/fit_nlsq guard above: a
+                    # prior transform failure left pipeline.data unprocessed,
+                    # so running NUTS against it would silently produce a
+                    # posterior labeled as if it came from transformed data.
+                    logger.warning(
+                        "Skipping fit_bayesian step — prior transform replay failed",
+                        filepath=str(path),
+                    )
+                    continue
                 # Replay Bayesian inference on the newly fitted model.
                 if pipeline._last_model is None:
                     logger.warning(
@@ -576,6 +586,17 @@ class BatchPipeline:
                     metrics["bayesian_replay_failed"] = True
 
             elif step_action == "export":
+                if metrics.get("transform_replay_failed"):
+                    # Writing an export file that looks successful (with a
+                    # populated metrics["export_path"]) while pipeline.data
+                    # is still pre-transform would be the same silent
+                    # wrong-data bug the fit/fit_bayesian guards close,
+                    # except landing on disk instead of only in memory.
+                    logger.warning(
+                        "Skipping export step — prior transform replay failed",
+                        filepath=str(path),
+                    )
+                    continue
                 # Replay export step for each processed file.
                 export_config = step_obj if isinstance(step_obj, dict) else {}
                 reject_removed_options(export_config)
@@ -585,12 +606,17 @@ class BatchPipeline:
                     per_file_out = None
                     if _out_path:
                         # Per-file output subdirectory keyed on stem + a hash of
-                        # the full resolved path, not the bare stem -- two input
+                        # the path as given (not the bare stem) -- two input
                         # files with the same basename in different directories
                         # (e.g. recursive process_directory()) would otherwise
                         # collide and silently overwrite each other's export.
+                        # Hash str(path), not path.resolve(): resolving to an
+                        # absolute path would bake this machine's directory
+                        # structure into the export name, so the same batch
+                        # run on a different checkout/mount/CI runner would
+                        # produce different (non-reproducible) output paths.
                         _path_hash = hashlib.sha1(
-                            str(path.resolve()).encode(), usedforsecurity=False
+                            str(path).encode(), usedforsecurity=False
                         ).hexdigest()[:8]
                         per_file_out = Path(_out_path) / f"{path.stem}_{_path_hash}"
                         pipeline.export(

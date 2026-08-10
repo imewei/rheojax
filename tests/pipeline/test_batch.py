@@ -234,6 +234,54 @@ class TestBatchStatistics:
         stats = batch.get_statistics()
         assert isinstance(stats, dict)  # nosec B101
 
+    def test_get_statistics_filters_non_finite_values(self):
+        """One divergent fit (NaN/inf r_squared or rmse) must not poison
+        the aggregate stats for the whole batch."""
+        batch = BatchPipeline()
+        data = RheoData(x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]))
+        batch.results = [
+            (Path("a.csv"), data, {"r_squared": 0.9, "rmse": 1.0}),
+            (Path("b.csv"), data, {"r_squared": 0.8, "rmse": 2.0}),
+            (Path("c.csv"), data, {"r_squared": float("nan"), "rmse": 1.5}),
+            (Path("d.csv"), data, {"r_squared": 0.7, "rmse": float("inf")}),
+        ]
+
+        stats = batch.get_statistics()
+
+        assert np.isfinite(stats["mean_r_squared"])  # nosec B101
+        assert np.isfinite(stats["mean_rmse"])  # nosec B101
+        assert stats["mean_r_squared"] == pytest.approx((0.9 + 0.8 + 0.7) / 3)  # nosec B101
+        assert stats["mean_rmse"] == pytest.approx((1.0 + 2.0 + 1.5) / 3)  # nosec B101
+
+    def test_export_path_distinct_for_same_stem_different_dirs(
+        self, tmp_path, monkeypatch
+    ):
+        """Two files with the same stem but different parent directories
+        must get distinct export subdirectories -- the actual collision
+        scenario the hash-suffix naming fix targets, not just its shape."""
+        export_calls = []
+
+        def _record_export(self, output_path, format="auto", **kwargs):
+            export_calls.append(Path(output_path))
+            return self
+
+        monkeypatch.setattr(Pipeline, "export", _record_export)
+
+        data = RheoData(x=np.array([1.0, 2.0]), y=np.array([1.0, 2.0]))
+        template = Pipeline()
+        template.steps = [
+            ("export", {"output_path": str(tmp_path / "exports"), "format": "json"}),
+        ]
+        batch = BatchPipeline(template)
+
+        batch._process_file(Path("dir_a") / "input.csv", preloaded_data=data)
+        batch._process_file(Path("dir_b") / "input.csv", preloaded_data=data)
+
+        assert len(export_calls) == 2  # nosec B101
+        assert export_calls[0] != export_calls[1], (  # nosec B101
+            f"same-stem files from different directories collided: {export_calls}"
+        )
+
     def test_length(self, temp_csv_files):
         """Test batch length."""
         template = Pipeline()
@@ -395,3 +443,47 @@ class TestBatchExport:
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
+
+
+class _FailingTransform:
+    """Transform whose replay always fails, to exercise the
+    transform_replay_failed skip-guard on downstream steps."""
+
+    stateless = True
+
+    def transform(self, data):
+        raise RuntimeError("intentional transform failure")
+
+
+class TestBatchTransformReplayFailureSkipsDownstream:
+    """A failed transform replay must not let fit/fit_bayesian/export run
+    against silently-unprocessed data (rheojax/pipeline/batch.py's
+    transform_replay_failed guard, extended to all three step types)."""
+
+    def test_transform_failure_skips_fit_bayesian_and_export(self, tmp_path):
+        data = RheoData(
+            x=np.linspace(0.1, 10, 20), y=np.linspace(1, 20, 20), validate=False
+        )
+        template = Pipeline()
+        template.steps = [
+            ("transform", _FailingTransform()),
+            ("fit", BatchTestModel()),
+            ("fit_bayesian", BatchTestModel()),
+            (
+                "export",
+                {"output_path": str(tmp_path / "exports"), "format": "json"},
+            ),
+        ]
+
+        batch = BatchPipeline(template)
+        _result, metrics = batch._process_file(
+            tmp_path / "input.csv", preloaded_data=data
+        )
+
+        assert metrics["transform_replay_failed"] is True  # nosec B101
+        assert "r_squared" not in metrics  # nosec B101
+        assert "rmse" not in metrics  # nosec B101
+        assert "bayesian_completed" not in metrics  # nosec B101
+        assert "export_path" not in metrics  # nosec B101
+        # Nothing should have been written to disk for the skipped export.
+        assert not (tmp_path / "exports").exists()  # nosec B101

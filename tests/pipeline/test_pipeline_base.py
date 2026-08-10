@@ -7,6 +7,7 @@ data loading, transforms, model fitting, and output generation.
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -354,18 +355,30 @@ class TestPipelineUtilities:
         # Simulate cached results without running expensive NUTS/plotting.
         pipeline1._last_bayesian_result = object()
         pipeline1._diagnostic_results = object()
-        pipeline1._last_comparison = object()
         pipeline1._transform_results["mock_transform"] = ("cached", None)
         pipeline1._last_transform_name = "mock_transform"
         pipeline1.predictions["prediction"] = object()
 
+        # compare_models() sets _last_comparison.results[best]._fitted_model
+        # to the *same object* as _last_model (base.py:1448-1451) -- a
+        # sentinel object() can't catch clone() breaking that identity, so
+        # build a stand-in with the real shared reference.
+        fitted_result = SimpleNamespace(
+            model_name="mock_model", _fitted_model=pipeline1._last_model
+        )
+        pipeline1._last_comparison = SimpleNamespace(
+            best_model="mock_model", results=[fitted_result]
+        )
+
         pipeline2 = pipeline1.clone()
 
         assert pipeline2.steps[-1][1] is pipeline2._last_model  # nosec B101
+        assert (
+            pipeline2._last_comparison.results[0]._fitted_model is pipeline2._last_model
+        )  # nosec B101
 
         assert pipeline2._last_bayesian_result is not None  # nosec B101
         assert pipeline2._diagnostic_results is not None  # nosec B101
-        assert pipeline2._last_comparison is not None  # nosec B101
         assert pipeline2._last_transform_name == "mock_transform"  # nosec B101
         assert "mock_transform" in pipeline2._transform_results  # nosec B101
         assert "prediction" in pipeline2.predictions  # nosec B101

@@ -661,6 +661,11 @@ class ModelComparisonPipeline(Pipeline):
                             model=model_name,
                             error=error_msg,
                         )
+                        # logger.error alone is invisible unless logging is
+                        # configured; warn too so a failed model isn't just
+                        # silently missing from self.results (matches the
+                        # sequential path's warnings.warn a few lines above
+                        # in the non-parallel branch of run()).
                         warnings.warn(
                             f"Failed to fit model {model_name} in parallel: "
                             f"{error_msg}",
