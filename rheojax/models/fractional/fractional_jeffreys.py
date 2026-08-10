@@ -64,6 +64,10 @@ from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.logging import get_logger, log_fit
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
+from rheojax.utils.prony import (
+    fit_creep_retardation_series,
+    oscillation_grid_for_interconversion,
+)
 
 # Module logger
 logger = get_logger(__name__)
@@ -221,9 +225,19 @@ class FractionalJeffreysModel(BaseModel):
         alpha: float,
         tau1: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t).
+        """Predict creep compliance J(t), exactly Volterra-consistent with G(t).
 
-        For Jeffreys model, creep shows unbounded flow behavior.
+        Jeffreys' relaxation modulus G(t) (and G*(w)) above are the exact
+        Laplace inverse of this model's own complex modulus, but the LVE
+        creep compliance J(t) has no elementary closed form. This recovers
+        J(t) by fitting a fixed-grid retardation series against the exact
+        complex compliance J*(w) = 1/G*(w) and evaluating it in time -- see
+        rheojax.utils.prony.fit_creep_retardation_series for the method
+        (Park & Schapery 1999) and rheojax project memory
+        project_fractional_creep_heuristic_blends.md for why this replaced
+        a heuristic short/long-time exponential-crossover blend that made
+        the creep/relaxation pair inconsistent (convolution identity
+        int_0^t G(tau)J(t-tau)dtau = t scored ~0.27x instead of 1).
 
         Parameters
         ----------
@@ -243,31 +257,16 @@ class FractionalJeffreysModel(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Add small epsilon to prevent issues
         epsilon = 1e-12
-
-        # Clip alpha to safe range (works with JAX tracers)
-        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-
         tau1_safe = tau1 + epsilon
-        eta1_safe = eta1 + epsilon
-        eta2_safe = eta2 + epsilon
-        # For liquid-like behavior: J(t) ~ t/η_eff at long times
-        # Effective viscosity combines both dashpots
-        eta_eff = (eta1_safe * eta2_safe) / (eta1_safe + eta2_safe)
-        # Short time: elastic-like response
-        # Approximate using SpringPot behavior
-        J_short = (
-            jnp.power(t, alpha_safe)
-            * jax_gamma(1.0 + alpha_safe)
-            / (eta1_safe * tau1_safe**alpha_safe)
-        )
-        # Long time: Newtonian flow
-        J_long = t / eta_eff
-        # Crossover around tau1
-        weight = 1.0 - jnp.exp(-t / tau1_safe)
-        J_t = J_short * (1.0 - weight) + J_long * weight
 
+        omega = oscillation_grid_for_interconversion(tau1_safe)
+        G_star = FractionalJeffreysModel._predict_oscillation(
+            omega, eta1, eta2, alpha, tau1
+        )
+        J_t = fit_creep_retardation_series(
+            G_star[..., 0], G_star[..., 1], omega, t, anchor_time=tau1_safe
+        )
         return J_t
 
     @staticmethod

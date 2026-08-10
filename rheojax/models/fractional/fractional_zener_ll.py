@@ -56,6 +56,10 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
+from rheojax.utils.prony import (
+    fit_creep_retardation_series,
+    oscillation_grid_for_interconversion,
+)
 
 logger = get_logger(__name__)
 
@@ -261,41 +265,31 @@ class FractionalZenerLiquidLiquid(BaseModel):
         gamma: float,
         tau: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t).
+        """Predict creep compliance J(t), exactly Volterra-consistent with G(t).
 
-        Note: Analytical creep compliance is complex for FZLL.
-        This provides a numerical approximation. The short-time term uses
-        the exact compliance of the isolated fractional-Maxwell branch
-        (c1, alpha, beta, tau) -- see FractionalMaxwellModel for the
-        derivation -- so beta has a real effect instead of being dropped.
+        FZLL's relaxation modulus G(t) (and G*(w)) above are the exact term-
+        by-term inverse Laplace transform of this model's own complex
+        modulus, but the LVE creep compliance J(t) has no elementary closed
+        form for a parallel (dashpot || fractional-Maxwell) combination.
+        This recovers J(t) by fitting a fixed-grid retardation series
+        against the exact complex compliance J*(w) = 1/G*(w) and evaluating
+        it in time -- see rheojax.utils.prony.fit_creep_retardation_series
+        for the method (Park & Schapery 1999) and rheojax project memory
+        project_fractional_creep_heuristic_blends.md for why this replaced
+        a heuristic tanh blend (invented avg_order=(alpha+gamma)/2) that
+        violated the LVE convolution identity
+        int_0^t G(tau)J(t-tau)dtau = t by ~2.14x.
         """
         epsilon = 1e-12
-        # Clip fractional orders using JAX operations (tracer-safe)
-        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-        beta_safe = jnp.clip(beta, epsilon, 1.0 - epsilon)
-        gamma_safe = jnp.clip(gamma, epsilon, 1.0 - epsilon)
         tau_safe = tau + epsilon
-        t_safe = jnp.maximum(t, epsilon)
 
-        # Compute average order
-        avg_order = (alpha_safe + gamma_safe) / 2.0
-
-        # Short time behavior: exact isolated branch-1 compliance
-        # J1(t) = (1/c1) [t^alpha/Gamma(1+alpha) + tau^beta * t^(alpha-beta)/Gamma(1+alpha-beta)]
-        J_short = (1.0 / (c1 + epsilon)) * (
-            jnp.power(t_safe, alpha_safe) / jax_gamma(1.0 + alpha_safe)
-            + jnp.power(tau_safe, beta_safe)
-            * jnp.power(t_safe, alpha_safe - beta_safe)
-            / jax_gamma(1.0 + alpha_safe - beta_safe)
+        omega = oscillation_grid_for_interconversion(tau_safe)
+        G_star = FractionalZenerLiquidLiquid._predict_oscillation(
+            omega, c1, c2, alpha, beta, gamma, tau
         )
-
-        # Long time behavior (unbounded growth for liquid)
-        J_long = jnp.power(t_safe, avg_order) / (c2 + epsilon)
-
-        # Crossover
-        weight = jnp.tanh(t_safe / tau_safe)
-        J_t = J_short * (1.0 - weight) + J_long * weight
-
+        J_t = fit_creep_retardation_series(
+            G_star[..., 0], G_star[..., 1], omega, t, anchor_time=tau_safe
+        )
         return J_t
 
     def _initialize_relaxation_parameters(self, X, y) -> bool:

@@ -57,6 +57,10 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e
+from rheojax.utils.prony import (
+    fit_relaxation_prony_series,
+    oscillation_grid_for_interconversion,
+)
 
 logger = get_logger(__name__)
 
@@ -205,19 +209,21 @@ class FractionalBurgersModel(BaseModel):
         alpha: float,
         tau_k: float,
     ) -> jnp.ndarray:
-        """Predict relaxation modulus G(t).
+        """Predict relaxation modulus G(t), exactly Volterra-consistent with J(t).
 
-        Note: Analytical relaxation modulus requires numerical inversion.
-        This provides an approximation that blends two Mittag-Leffler decay
-        stages so every parameter has a non-zero effect on the output:
-
-        - Stage 1 interpolates from the instantaneous modulus G_inst = 1/Jg
-          down to the retarded plateau G_plateau = 1/(Jg + Jk) over the
-          Kelvin-Voigt retardation timescale tau_k (same construction used
-          by the sibling FractionalKelvinVoigtZener model).
-        - Stage 2 multiplies in a Mittag-Leffler decay governed by the
-          Maxwell-arm timescale tau_M = eta1 * Jg, driving G(t) -> 0 as
-          t -> infinity (Burgers is a liquid: the Maxwell dashpot flows).
+        FBM's creep compliance J(t) above is exact (a sum of the three
+        series-mechanism compliances: glassy spring, Maxwell dashpot, and
+        fractional Kelvin-Voigt retardation -- compliances add directly for
+        elements in series), and G* = 1/J* is an exact LVE identity, so
+        G*(w) = 1/J*(w) is exact too (see _predict_oscillation below, which
+        already computes it this way). But G(t) itself has no elementary
+        Laplace inverse. This recovers G(t) by fitting a fixed-grid Prony
+        series against the exact G*(w) and evaluating it in time -- see
+        rheojax.utils.prony.fit_relaxation_prony_series for the method
+        (Park & Schapery 1999) and rheojax project memory
+        project_fractional_creep_heuristic_blends.md for why this replaced
+        a heuristic two-Mittag-Leffler-stage blend that violated the LVE
+        convolution identity int_0^t G(tau)J(t-tau)dtau = t by ~16.7x.
 
         Parameters
         ----------
@@ -239,33 +245,24 @@ class FractionalBurgersModel(BaseModel):
         jnp.ndarray
             Relaxation modulus G(t) (Pa)
         """
-        # Add small epsilon to prevent issues
         epsilon = 1e-12
-
-        # Clip alpha to safe range (works with JAX tracers)
-        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-
         tau_k_safe = tau_k + epsilon
-        # P2-FRAC-004: Guard t=0 — power(0/tau, -alpha_safe) = +inf when alpha>0.
-        t_safe = jnp.maximum(t, 1e-30)
-
         Jg_safe = Jg + epsilon
         eta1_safe = eta1 + epsilon
-
-        # Stage 1: retardation (uses Jg, Jk, tau_k, alpha)
-        G_inst = 1.0 / Jg_safe
-        G_plateau = 1.0 / (Jg_safe + Jk)
-        z_retard = -jnp.power(t_safe / tau_k_safe, alpha_safe)
-        ml_retard = mittag_leffler_e(z_retard, alpha=alpha_safe)
-        G_retarded = G_plateau + (G_inst - G_plateau) * ml_retard
-
-        # Stage 2: viscous flow decay from the Maxwell arm (uses eta1)
+        # Second characteristic time: Maxwell-arm flow decay, tau_M = eta1*Jg.
         tau_M = eta1_safe * Jg_safe + epsilon
-        z_flow = -jnp.power(t_safe / tau_M, alpha_safe)
-        ml_flow = mittag_leffler_e(z_flow, alpha=alpha_safe)
+        # Geometric-mean anchor brackets both timescales the target G*(w)
+        # depends on (retardation tau_k and flow tau_M can differ by orders
+        # of magnitude).
+        anchor_time = jnp.sqrt(tau_k_safe * tau_M)
 
-        G_t = G_retarded * ml_flow
-
+        omega = oscillation_grid_for_interconversion(anchor_time)
+        G_star = FractionalBurgersModel._predict_oscillation(
+            omega, Jg, eta1, Jk, alpha, tau_k
+        )
+        G_t = fit_relaxation_prony_series(
+            G_star[..., 0], G_star[..., 1], omega, t, anchor_time=anchor_time
+        )
         return G_t
 
     @staticmethod

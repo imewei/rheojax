@@ -377,7 +377,9 @@ class BaseModel(BayesianMixin, ABC):
             protocol=test_mode,
             params={
                 name: (
-                    v if (v := self.parameters.get_value(name)) is not None else float("nan")
+                    v
+                    if (v := self.parameters.get_value(name)) is not None
+                    else float("nan")
                 )
                 for name in self.parameters.keys()
             },
@@ -806,7 +808,9 @@ class BaseModel(BayesianMixin, ABC):
         reject_removed_options(kwargs)
         _shape = getattr(X, "shape", None)
         x_shape = (
-            _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+            _shape
+            if _shape is not None
+            else (len(X) if hasattr(X, "__len__") else (1,))
         )
         logger.debug(
             "Predict called",
@@ -856,7 +860,35 @@ class BaseModel(BayesianMixin, ABC):
             # I/O boundary validation (CLAUDE.md #3): catch NaN/non-monotonic
             # input here, eagerly on the host, before it reaches _predict()'s
             # ODE solvers where it would otherwise silently produce garbage.
-            validate_predict_input(X, name="X")
+            # Monotonicity only applies to a true time/frequency axis. For
+            # ROTATION/FLOW_CURVE, X is shear rate: real rheometer sweeps
+            # (up/down hysteresis loops, unsorted rate lists) are legitimately
+            # non-monotonic there, so the check must not reject them.
+            _effective_mode = (
+                test_mode
+                if test_mode is not None
+                else getattr(self, "_test_mode", None)
+            )
+            _effective_mode_value = getattr(_effective_mode, "value", _effective_mode)
+            _effective_mode_str = str(_effective_mode_value).lower()
+            # rheojax.models.flow.* is a dedicated shear-rate-only family
+            # (Bingham, Cross, Carreau, CarreauYasuda, HerschelBulkley,
+            # PowerLaw) whose _predict() never reads test_mode at all, so a
+            # never-fitted instance (predict() called before fit(), no
+            # test_mode kwarg) has no _test_mode to resolve above. Their
+            # module boundary is the reliable signal there, not instance
+            # state — this is a small, closed family (see rheojax/models/CLAUDE.md).
+            _is_flow_only_model = type(self).__module__.startswith(
+                "rheojax.models.flow."
+            )
+            validate_predict_input(
+                X,
+                name="X",
+                check_monotonic=(
+                    _effective_mode_str not in ("rotation", "flow_curve")
+                    and not _is_flow_only_model
+                ),
+            )
 
             # ADR-004: All _predict() signatures now accept **kwargs,
             # so we can call directly without try/except/retry.
@@ -898,7 +930,9 @@ class BaseModel(BayesianMixin, ABC):
         """
         _shape = getattr(X, "shape", None)
         data_shape = (
-            _shape if _shape is not None else (len(X) if hasattr(X, "__len__") else (1,))
+            _shape
+            if _shape is not None
+            else (len(X) if hasattr(X, "__len__") else (1,))
         )
         logger.debug(
             "fit_predict called",

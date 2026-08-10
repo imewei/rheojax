@@ -676,3 +676,244 @@ def warm_start_from_n_modes(params_n: ArrayLike, n_target: int) -> ArrayLike:
         E_inf=E_inf,
     )
     return params_target
+
+
+# ---------------------------------------------------------------------------
+# JIT-safe G<->J interconversion via a fixed-grid Prony/retardation fit
+# ---------------------------------------------------------------------------
+#
+# The linear-viscoelastic convolution identity int_0^t G(tau) J(t-tau) dtau = t
+# (equivalently G*(w) * J*(w) = 1/(iw)^2 in the frequency domain, i.e.
+# J*(w) = 1/G*(w)) ties relaxation modulus and creep compliance together
+# exactly. When only one side has a closed form (e.g. a fractional model's
+# G(t) is a Mittag-Leffler expression but its J(t) has no elementary Laplace
+# inverse), the other side can be recovered to good accuracy by fitting a
+# fixed-shape Prony/retardation series against the *exact* complex response
+# G*(w) = 1/J*(w) and evaluating that series in time -- all pure array
+# algebra (jnp.linalg.lstsq), so it stays JIT/grad-safe inside a
+# @jax.jit-decorated model prediction closure. See Park & Schapery (1999)
+# for the underlying interconversion theory this specializes.
+#
+# The (tau_i) grid is anchored on the model's own characteristic timescale
+# (a traced parameter, e.g. a relaxation time) rather than a universal
+# absolute range, so the fit tracks wherever NLSQ/NUTS currently place that
+# parameter. A second-difference smoothness penalty on the mode-strength
+# spectrum is essential, not optional: naive unregularized least squares
+# over a wide fixed tau grid is severely ill-conditioned (a classical
+# multi-exponential fitting pathology) and a plain solve-then-clamp-to-zero
+# post-hoc non-negativity fix produces badly biased fits. The smoothness
+# prior reflects that the true underlying relaxation/retardation spectrum of
+# a fractional (power-law) element is itself smooth in log-tau.
+
+_PRONY_N_MODES = 120
+_PRONY_LAM_DECADES = 6.0
+_PRONY_OMEGA_POINTS = 60
+_PRONY_OMEGA_DECADES = 4.0
+_PRONY_SMOOTH_LAMBDA = 0.01
+
+
+def _second_difference_operator(n_modes: int) -> np.ndarray:
+    """(n_modes - 2, n_modes) discrete second-difference operator (static, numpy)."""
+    D = np.zeros((n_modes - 2, n_modes))
+    idx = np.arange(n_modes - 2)
+    D[idx, idx] = 1.0
+    D[idx, idx + 1] = -2.0
+    D[idx, idx + 2] = 1.0
+    return D
+
+
+def _anchored_log_grid(anchor: ArrayLike, decades: float, n_points: int) -> ArrayLike:
+    """``n_points`` log-spaced values centered on ``anchor`` (traced-safe)."""
+    exponents = jnp.linspace(-decades, decades, n_points)
+    return anchor * jnp.power(10.0, exponents)
+
+
+def _regularized_weighted_lstsq(
+    A: ArrayLike, b: ArrayLike, smooth_block: ArrayLike, smooth_lambda: float
+) -> ArrayLike:
+    """Solve ``[A; smooth_lambda*smooth_block] x ~ [b; 0]`` and clamp ``x >= 0``.
+
+    ``A``/``b`` must already be weighted (e.g. by ``1/|target|``) by the
+    caller -- both fit_creep_retardation_series and fit_relaxation_prony_series
+    apply relative weighting since the fitted quantities span many decades.
+    """
+    n_penalty = smooth_block.shape[0]
+    A_reg = jnp.concatenate([A, smooth_lambda * smooth_block], axis=0)
+    b_reg = jnp.concatenate([b, jnp.zeros(n_penalty)])
+    coef, _residuals, _rank, _sv = jnp.linalg.lstsq(A_reg, b_reg, rcond=None)
+    return jnp.maximum(coef, 0.0)
+
+
+def fit_creep_retardation_series(
+    G_prime: ArrayLike,
+    G_double_prime: ArrayLike,
+    omega: ArrayLike,
+    t: ArrayLike,
+    anchor_time: ArrayLike,
+    n_modes: int = _PRONY_N_MODES,
+    lam_decades: float = _PRONY_LAM_DECADES,
+    smooth_lambda: float = _PRONY_SMOOTH_LAMBDA,
+) -> ArrayLike:
+    """Creep compliance ``J(t)`` exactly Volterra-consistent with a given ``G*(w)``.
+
+    Fits a retardation series ``J(t) = Jg + sum_k j_k*(1 - exp(-t/lam_k)) + t/eta0``
+    against the complex compliance ``J*(w) = 1/G*(w)`` on a fixed log-spaced
+    ``lam_k`` grid anchored on ``anchor_time`` (e.g. the model's own
+    relaxation/retardation time parameter), via weighted + smoothness-
+    regularized linear least squares. ``Jg``, ``j_k``, and ``1/eta0`` are all
+    clamped non-negative post-solve; a purely elastic/purely-retarded model
+    drives the irrelevant term to ~0 on its own (no branching needed).
+
+    Use this to recover ``J(t)`` for a model whose ``G(t)``/``G*(w)`` are
+    exact but whose creep compliance has no elementary closed form (the
+    Prabhakar-function case). Call with ``G_prime``/``G_double_prime`` taken
+    from the model's own (already-exact) ``_predict_oscillation`` evaluated
+    at the ``omega`` grid this function expects -- see
+    :func:`oscillation_grid_for_interconversion`.
+
+    Args:
+        G_prime: Storage modulus G'(omega) on the internal omega grid, shape (n_omega,).
+        G_double_prime: Loss modulus G''(omega) on the internal omega grid, shape (n_omega,).
+        omega: The internal angular-frequency grid used to evaluate G'/G'' above
+            (from :func:`oscillation_grid_for_interconversion`), shape (n_omega,).
+        t: Query times (s), any shape.
+        anchor_time: Scalar characteristic time (s) centering the internal
+            retardation-time grid.
+        n_modes: Number of retardation modes.
+        lam_decades: Half-width (decades) of the log-spaced retardation-time grid.
+        smooth_lambda: Second-difference smoothness penalty weight on the mode
+            spectrum.
+
+    Returns:
+        Creep compliance J(t), same shape as t.
+
+    References:
+        Park, S. W., & Schapery, R. A. (1999). Int. J. Solids Structures 36(11), 1653-1675.
+    """
+    lam = _anchored_log_grid(anchor_time, lam_decades, n_modes)
+    G_star = G_prime + 1j * G_double_prime
+    J_star = 1.0 / G_star
+    J_p = jnp.real(J_star)
+    J_pp = -jnp.imag(J_star)  # Ferry convention J* = J' - iJ'' => J'' = -Im(J*)
+
+    wl2 = (omega[:, None] * lam[None, :]) ** 2
+    n_omega = omega.shape[0]
+    ones_col = jnp.ones((n_omega, 1))
+    zeros_col = jnp.zeros((n_omega, 1))
+    A_p = jnp.concatenate([ones_col, 1.0 / (1.0 + wl2), zeros_col], axis=1)
+    A_pp = jnp.concatenate(
+        [
+            zeros_col,
+            (omega[:, None] * lam[None, :]) / (1.0 + wl2),
+            (1.0 / omega)[:, None],
+        ],
+        axis=1,
+    )
+    A = jnp.concatenate([A_p, A_pp], axis=0)
+    b = jnp.concatenate([J_p, J_pp])
+    weight = 1.0 / jnp.clip(jnp.concatenate([jnp.abs(J_p), jnp.abs(J_pp)]), 1e-300)
+    A_weighted = A * weight[:, None]
+    b_weighted = b * weight
+
+    n_coef = n_modes + 2
+    smooth_block = jnp.zeros((n_modes - 2, n_coef))
+    smooth_block = smooth_block.at[:, 1 : 1 + n_modes].set(
+        jnp.asarray(_second_difference_operator(n_modes))
+    )
+    coef = _regularized_weighted_lstsq(
+        A_weighted, b_weighted, smooth_block, smooth_lambda
+    )
+    Jg, j_k, inv_eta0 = coef[0], coef[1 : 1 + n_modes], coef[-1]
+
+    t_col = t[..., None]
+    retardation = jnp.sum(j_k * (1.0 - jnp.exp(-t_col / lam)), axis=-1)
+    return Jg + retardation + inv_eta0 * t
+
+
+def fit_relaxation_prony_series(
+    G_prime: ArrayLike,
+    G_double_prime: ArrayLike,
+    omega: ArrayLike,
+    t: ArrayLike,
+    anchor_time: ArrayLike,
+    n_modes: int = _PRONY_N_MODES,
+    lam_decades: float = _PRONY_LAM_DECADES,
+    smooth_lambda: float = _PRONY_SMOOTH_LAMBDA,
+) -> ArrayLike:
+    """Relaxation modulus ``G(t)`` from a target complex modulus ``G*(w)``.
+
+    Companion to :func:`fit_creep_retardation_series` for the opposite
+    direction: fits a Prony series ``G(t) = G_e + sum_i g_i*exp(-t/tau_i)``
+    against ``G_prime``/``G_double_prime`` directly (no compliance inversion
+    needed) on a fixed log-spaced ``tau_i`` grid anchored on ``anchor_time``.
+
+    Use this to recover ``G(t)`` for a model whose creep compliance ``J(t)``
+    is exact but whose relaxation modulus has no elementary closed form.
+    ``G_prime``/``G_double_prime`` are the model's own exact complex modulus
+    evaluated at the ``omega`` grid this function expects -- see
+    :func:`oscillation_grid_for_interconversion`.
+
+    Args:
+        G_prime: Storage modulus G'(omega) on the internal omega grid, shape (n_omega,).
+        G_double_prime: Loss modulus G''(omega) on the internal omega grid, shape (n_omega,).
+        omega: The internal angular-frequency grid used to evaluate G'/G'' above.
+        t: Query times (s), any shape.
+        anchor_time: Scalar characteristic time (s) centering the internal
+            relaxation-time grid.
+        n_modes: Number of Prony modes.
+        lam_decades: Half-width (decades) of the log-spaced relaxation-time grid.
+        smooth_lambda: Second-difference smoothness penalty weight on the mode
+            spectrum.
+
+    Returns:
+        Relaxation modulus G(t), same shape as t.
+
+    References:
+        Park, S. W., & Schapery, R. A. (1999). Int. J. Solids Structures 36(11), 1653-1675.
+    """
+    tau = _anchored_log_grid(anchor_time, lam_decades, n_modes)
+    wt2 = (omega[:, None] * tau[None, :]) ** 2
+    n_omega = omega.shape[0]
+    ones_col = jnp.ones((n_omega, 1))
+    zeros_col = jnp.zeros((n_omega, 1))
+    A_p = jnp.concatenate([ones_col, wt2 / (1.0 + wt2)], axis=1)
+    A_pp = jnp.concatenate(
+        [zeros_col, (omega[:, None] * tau[None, :]) / (1.0 + wt2)], axis=1
+    )
+    A = jnp.concatenate([A_p, A_pp], axis=0)
+    b = jnp.concatenate([G_prime, G_double_prime])
+    weight = 1.0 / jnp.clip(
+        jnp.concatenate([jnp.abs(G_prime), jnp.abs(G_double_prime)]), 1e-300
+    )
+    A_weighted = A * weight[:, None]
+    b_weighted = b * weight
+
+    n_coef = n_modes + 1
+    smooth_block = jnp.zeros((n_modes - 2, n_coef))
+    smooth_block = smooth_block.at[:, 1 : 1 + n_modes].set(
+        jnp.asarray(_second_difference_operator(n_modes))
+    )
+    coef = _regularized_weighted_lstsq(
+        A_weighted, b_weighted, smooth_block, smooth_lambda
+    )
+    G_e, g_i = coef[0], coef[1:]
+
+    t_col = t[..., None]
+    return G_e + jnp.sum(g_i * jnp.exp(-t_col / tau), axis=-1)
+
+
+def oscillation_grid_for_interconversion(
+    anchor_time: ArrayLike,
+    n_points: int = _PRONY_OMEGA_POINTS,
+    decades: float = _PRONY_OMEGA_DECADES,
+) -> ArrayLike:
+    """Fixed log-spaced angular-frequency grid for the interconversion fits above.
+
+    Anchored on ``1/anchor_time`` with a narrower decade span than the
+    ``lam``/``tau`` mode grid the fit functions build internally (the mode
+    grid needs extra overhang beyond the sampled frequency range to
+    represent boundary behavior well -- the same "fit N+2 modes, drop the
+    edges" logic ``rheojax.transforms.prony_conversion`` uses, applied as a
+    range mismatch here instead).
+    """
+    return _anchored_log_grid(1.0 / anchor_time, decades, n_points)
