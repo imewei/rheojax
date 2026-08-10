@@ -483,8 +483,8 @@ def _preprocess_flow_curve(
     try:
         eta_0 = estimate_eta0(gamma_dot, sigma=sigma_real)
         diagnostics["eta_0"] = eta_0
-    except (ValueError, ZeroDivisionError):
-        pass
+    except (ValueError, ZeroDivisionError) as exc:
+        warnings_list.append(f"Zero-shear viscosity estimate failed: {exc}")
 
     return PreprocessingResult(
         X=gamma_dot,
@@ -635,6 +635,12 @@ def _preprocess_laos(
                 "harmonic_ratio_I3_I1": harmonic_ratio,
             }
             diagnostics["ewoldt_classification"] = ewoldt
+        else:
+            warnings_list.append(
+                f"LAOS harmonic analysis skipped: 3rd harmonic (bin {3 * k_fund}) "
+                f"exceeds the spectrum ({len(magnitudes)} bins); record needs "
+                ">6 samples per cycle for Q0/Ewoldt classification."
+            )
 
     return PreprocessingResult(
         X=t,

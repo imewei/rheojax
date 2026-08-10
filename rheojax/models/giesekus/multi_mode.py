@@ -517,11 +517,10 @@ class GiesekusMultiMode(BaseModel):
             )
 
         else:
-            logger.warning(f"Unknown test_mode '{mode}', using oscillation")
-            G_prime, G_double_prime = self._predict_saos_internal(
-                X_jax, eta_p_modes, lambda_modes, eta_s
+            raise ValueError(
+                f"Unknown test_mode '{mode}'. Supported modes: flow, flow_curve, "
+                "steady_shear, rotation, oscillation, startup, relaxation, creep, laos."
             )
-            return jnp.column_stack([G_prime, G_double_prime])
 
     # =========================================================================
     # Analytical Predictions

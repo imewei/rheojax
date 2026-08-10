@@ -15,6 +15,7 @@ import pandas as pd
 
 from rheojax.core.data import RheoData
 from rheojax.io import auto_load
+from rheojax.io.readers._utils import normalize_temperature
 from rheojax.io.readers.csv_reader import detect_csv_delimiter
 from rheojax.logging import get_logger
 
@@ -1227,7 +1228,13 @@ class DataService:
         Returns
         -------
         float or None
+            Temperature in **Kelvin** (see ``_extract_temperature_from_filename``
+            for why: ``Mastercurve``'s WLF/Arrhenius shift factors expect K).
+            The unit is inferred from a ``[C]``/``(K)``/``°F``-style suffix on
+            the matched column header, defaulting to Celsius when absent.
         """
+        import re
+
         import numpy as np
         import pandas as pd
 
@@ -1256,7 +1263,13 @@ class DataService:
             vals = pd.to_numeric(df[matched], errors="coerce").dropna().values
             if len(vals) == 0:
                 return None
-            return float(np.median(vals))
+            raw_value = float(np.median(vals))
+
+            unit_match = re.search(
+                r"[\[(]\s*°?([CKFckf])\s*[\])]|°([CKFckf])\b", str(matched)
+            )
+            unit = (unit_match.group(1) or unit_match.group(2)) if unit_match else "C"
+            return normalize_temperature(raw_value, unit=unit)
         except Exception:
             logger.debug(
                 "Temperature extraction failed",

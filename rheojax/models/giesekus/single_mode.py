@@ -212,7 +212,7 @@ class GiesekusSingleMode(GiesekusBase):
         self._omega_laos = kwargs.get("omega")
 
         # Smart initialization based on protocol
-        if test_mode in ["flow_curve", "steady_shear", "rotation"]:
+        if test_mode in ["flow", "flow_curve", "steady_shear", "rotation"]:
             # Estimate from flow curve shape
             eta_est = y_jax / jnp.maximum(x_jax, 1e-10)
             self.parameters.set_value("eta_p", float(jnp.mean(eta_est[:3])))
@@ -427,9 +427,9 @@ class GiesekusSingleMode(GiesekusBase):
             return tau_xy + eta_s * gamma_dot_t
 
         else:
-            logger.warning(f"Unknown test_mode '{mode}', defaulting to flow_curve")
-            return giesekus_steady_shear_stress_vec(
-                X_jax, eta_p, lambda_1, alpha, eta_s
+            raise ValueError(
+                f"Unknown test_mode '{mode}'. Supported modes: flow, flow_curve, "
+                "steady_shear, rotation, oscillation, startup, relaxation, creep, laos."
             )
 
     # =========================================================================

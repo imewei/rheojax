@@ -403,6 +403,18 @@ class TestModelFunction:
 
         np.testing.assert_allclose(mf_result, predict_result, rtol=1e-6)
 
+    @pytest.mark.unit
+    def test_model_function_unknown_test_mode_raises(self):
+        """An unrecognized test_mode must raise, not silently substitute
+        oscillation predictions for whatever protocol was actually asked
+        for (the project's no-silent-data-loss principle)."""
+        model = GiesekusMultiMode(n_modes=2)
+        params = jnp.array([5.0, 100.0, 10.0, 0.3, 50.0, 1.0, 0.2])
+        x = jnp.logspace(-1, 1, 10)
+
+        with pytest.raises(ValueError, match="Unknown test_mode"):
+            model.model_function(x, params, test_mode="not_a_real_mode")
+
 
 class TestParameterSetRoundtrip:
     """Tests for ParameterSet→model_function roundtrip (the actual NUTS path).

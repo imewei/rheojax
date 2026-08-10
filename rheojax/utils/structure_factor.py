@@ -217,7 +217,7 @@ def interpolate_sk(
     k_target : np.ndarray
         Wave vectors at which interpolated S(k) is needed
     extrapolation : str, default "constant"
-        Extrapolation method: "constant", "linear", or "error"
+        Extrapolation method: "constant" or "error"
 
     Returns
     -------
@@ -227,7 +227,8 @@ def interpolate_sk(
     Raises
     ------
     ValueError
-        If extrapolation="error" and k_target extends beyond k_data range
+        If extrapolation="error" and k_target extends beyond k_data range,
+        or if extrapolation is neither "constant" nor "error"
     """
     k_data = np.asarray(k_data)
     sk_data = np.asarray(sk_data)

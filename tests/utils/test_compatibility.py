@@ -174,6 +174,28 @@ class TestModelCompatibility:
         # Maxwell should be compatible or at least not strongly incompatible
         assert compatibility["compatible"] or compatibility["confidence"] < 0.5
 
+    def test_fkv_with_liquid_like_relaxation_incompatible(self):
+        """FKV vs liquid-like *relaxation* data must be flagged incompatible.
+
+        Regression for the _SOLID_LIKE/_LIQUID_LIKE membership fix:
+        _detect_from_relaxation only ever emits VISCOELASTIC_SOLID /
+        VISCOELASTIC_LIQUID / GEL (never the bare SOLID/LIQUID members
+        _detect_from_oscillation emits), so a compatibility rule written as
+        `material_type == MaterialType.LIQUID` never fires on relaxation
+        data. This exercises exactly that relaxation-sourced path.
+        """
+        t = np.logspace(-2, 2, 50)
+        G_t = 1e5 * np.exp(-t / 1.0)  # full decay -> VISCOELASTIC_LIQUID
+
+        model = FractionalKelvinVoigt()
+        compatibility = check_model_compatibility(
+            model, t=t, G_t=G_t, test_mode="relaxation"
+        )
+
+        assert not compatibility["compatible"]
+        assert len(compatibility["warnings"]) > 0
+        assert "FractionalMaxwellLiquid" in compatibility["recommendations"]
+
     def test_maxwell_with_power_law_incompatible(self):
         """Test that Maxwell is incompatible with power-law decay."""
         t = np.logspace(-2, 2, 50)

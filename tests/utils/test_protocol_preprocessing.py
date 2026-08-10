@@ -512,12 +512,13 @@ class TestPreprocessFlowCurve:
         assert "yield_stress_estimate" not in result.diagnostics
         assert any("undetermined" in w for w in result.warnings)
 
-    def test_empty_input_eta0_failure_swallowed(self):
-        """Empty arrays: slope block skipped, estimate_eta0 raises and is caught."""
+    def test_empty_input_eta0_failure_reported(self):
+        """Empty arrays: slope block skipped, estimate_eta0 raises -- the
+        failure must be surfaced in warnings, not swallowed silently."""
         result = preprocess_for_protocol(np.array([]), np.array([]), "flow_curve")
         assert "eta_0" not in result.diagnostics
         assert result.diagnostics == {}
-        assert result.warnings == []
+        assert any("Zero-shear viscosity estimate failed" in w for w in result.warnings)
 
 
 # ---------------------------------------------------------------------------

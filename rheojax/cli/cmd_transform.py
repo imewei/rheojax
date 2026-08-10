@@ -241,6 +241,10 @@ def main(args: list[str] | None = None) -> int:
     in_shape = np.asarray(data.x).shape
     try:
         result = transform.transform(data)
+        # Some transforms (prony_conversion, spectrum_inversion) return
+        # (RheoData, extras_dict); take the RheoData for x/y/metadata output.
+        if isinstance(result, tuple):
+            result = result[0]
         logger.info("Transform applied", name=parsed.transform_name)
     except Exception as e:
         print(

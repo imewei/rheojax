@@ -411,6 +411,8 @@ def load_project_v2(path: Path):
             raise ValueError("Archive is missing required member: metadata.json")
 
         metadata = json.loads(zf.read("metadata.json"))
+        if not isinstance(metadata, dict):
+            raise ValueError("Archive metadata.json is not a JSON object")
         if metadata.get("version") != _ARCHIVE_VERSION:
             raise ValueError(
                 f"Unsupported project version {metadata.get('version')!r}, expected {_ARCHIVE_VERSION!r}"
@@ -420,8 +422,12 @@ def load_project_v2(path: Path):
             raise ValueError("Archive is missing required member: manifest.json")
 
         manifest = json.loads(zf.read("manifest.json"))
+        if not isinstance(manifest, dict):
+            raise ValueError("Archive manifest.json is not a JSON object")
         checksums = manifest.get("members")
-        if not isinstance(checksums, dict):
+        if not isinstance(checksums, dict) or not all(
+            isinstance(entry, dict) for entry in checksums.values()
+        ):
             raise ValueError("Archive manifest.json has no valid 'members' mapping")
         # manifest.json can't hash itself (chicken-and-egg -- its own content includes
         # every OTHER member's hash), but metadata.json IS written and hashed before
