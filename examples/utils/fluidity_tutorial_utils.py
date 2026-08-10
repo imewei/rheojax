@@ -413,7 +413,7 @@ def save_fluidity_results(
     for name in param_names:
         try:
             nlsq_params[name] = float(model.parameters.get_value(name))
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, TypeError):
             pass
 
     with open(output_dir / f"nlsq_params_{protocol}.json", "w") as f:
