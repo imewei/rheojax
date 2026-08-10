@@ -64,6 +64,14 @@ def _write_walk(value: Any, key_path: str, hf: h5py.File, out: dict | list) -> A
         }
     if isinstance(value, list):
         return [_write_walk(v, f"{key_path}/{i}", hf, out) for i, v in enumerate(value)]
+    # Transform extras (unlike nlsq/nuts results) may carry a transform's own
+    # @dataclass result type (e.g. CoxMerzResult, PronyResult) or a JAX array
+    # rather than a plain dict/np.ndarray -- unwrap both into the same
+    # dict/np.ndarray universe above instead of hard-failing Save.
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return _write_walk(dataclasses.asdict(value), key_path, hf, out)
+    if hasattr(value, "__array__"):
+        return _write_walk(np.asarray(value), key_path, hf, out)
     raise TypeError(
         f"write_result_arrays: unsupported value type {type(value).__name__!r} at "
         f"{key_path or '<root>'} -- not one of str/int/float/bool/None/np.ndarray/dict/list/tuple"
@@ -91,6 +99,15 @@ def _read_walk(node: Any, hf: h5py.File) -> Any:
 
 
 def read_result_arrays(path: Path, json_shape: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(json_shape, dict):
+        # A missing/null/malformed "*_meta" sibling in a hand-edited or
+        # corrupted archive would otherwise surface as an unhandled
+        # AttributeError deep in .items() below, bypassing every caller's
+        # ValueError/OSError "load failed" dialog.
+        raise ValueError(
+            f"read_result_arrays: expected a dict for json_shape, got "
+            f"{type(json_shape).__name__} -- archive metadata is missing or corrupt"
+        )
     path = Path(path)
     with h5py.File(path, "r") as hf:
         return {k: _read_walk(v, hf) for k, v in json_shape.items()}
@@ -519,15 +536,19 @@ def load_project_v2(path: Path):
             result_refs = transform_dict.pop("result_refs", {}) or {}
             extras_ref = transform_dict.pop("result_extras_ref", None)
             extras_meta = transform_dict.pop("result_extras_meta", None)
+            # Pre-fix archives (or a run with no extras) stored a plain
+            # JSON-safe dict directly under "result_extras" -- pop it
+            # unconditionally so a stray legacy key never survives into
+            # TransformState(**transform_dict) below (that dataclass has no
+            # "result_extras" field, so a leftover key would raise TypeError).
+            legacy_extras = transform_dict.pop("result_extras", {}) or {}
             if extras_ref is not None:
                 result_extras = (
                     _restore_result_dict(extras_ref, extras_meta, "transform_results")
                     or {}
                 )
             else:
-                # Pre-fix archives (or a run with no extras) stored a
-                # plain JSON-safe dict directly under "result_extras".
-                result_extras = transform_dict.pop("result_extras", {}) or {}
+                result_extras = legacy_extras
             restored_result: dict | None = None
             if any(result_refs.values()) or result_extras:
                 restored_result = dict(result_extras)

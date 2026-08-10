@@ -138,7 +138,7 @@ def _build_pipeline_from_envelope(envelope: dict):
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
             "Could not construct a Pipeline from the stdin envelope. "
-            "Pipe from 'rheojax fit --json' or provide an HDF5 file."
+            "Pipe from 'rheojax load --json' or provide an HDF5 file."
         ) from exc
 
 

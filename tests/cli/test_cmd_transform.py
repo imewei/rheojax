@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import argparse
 
+import numpy as np
 import pytest
 
-from rheojax.cli.cmd_transform import create_parser, main
+from rheojax.cli.cmd_transform import _load_from_envelope, create_parser, main
 
 
 class TestCreateParser:
@@ -74,3 +75,22 @@ class TestMainErrors:
         csv_file.write_text("time,stress\n0.1,100\n0.2,90\n")
         result = main(["totally_unknown_transform_xyz", "--input", str(csv_file)])
         assert result == 1
+
+
+class TestLoadFromEnvelope:
+    @pytest.mark.unit
+    def test_accepts_a_real_create_data_envelope_payload(self):
+        # Regression: _load_from_envelope used to read envelope["x"] directly,
+        # but rheojax load --json (create_data_envelope) nests the payload under
+        # envelope["data"]["x"], so every real pipe from `rheojax load --json`
+        # raised "missing required 'x' key" before the fix.
+        from rheojax.cli._envelope import create_data_envelope
+
+        envelope_json = create_data_envelope(
+            [0.1, 0.2, 0.3], [10.0, 9.0, 8.0], metadata={"test_mode": "relaxation"}
+        ).to_json()
+
+        data = _load_from_envelope(envelope_json)
+
+        np.testing.assert_array_equal(data.x, [0.1, 0.2, 0.3])
+        np.testing.assert_array_equal(data.y, [10.0, 9.0, 8.0])

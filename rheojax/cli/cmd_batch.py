@@ -287,6 +287,9 @@ def main(args: list[str] | None = None) -> int:
         )
         return 1
 
+    # Under --json, stdout must carry only the final JSON array (see below) --
+    # route all progress prose to stderr so a downstream JSON consumer never
+    # sees it interleaved with the payload.
     _progress_stream = sys.stderr if parsed.json_output else sys.stdout
     print(
         f"Found {len(files)} file(s) matching '{parsed.pattern}'", file=_progress_stream

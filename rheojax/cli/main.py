@@ -172,7 +172,7 @@ For command-specific help:
 
 def show_info(args: list[str] | None = None) -> int:
     """Display package information."""
-    argparse.ArgumentParser(prog="rheojax info").parse_args(args)
+    argparse.ArgumentParser(prog="rheojax info").parse_args(args or [])
 
     logger.info("Running CLI command", command="info")
 

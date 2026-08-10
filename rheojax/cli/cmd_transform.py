@@ -156,7 +156,7 @@ def _load_from_envelope(text: str):
         if "values" not in y_payload:
             raise ValueError(
                 "JSON envelope 'y' dict has neither 'complex' nor 'values' key. "
-                "Pipe from 'rheojax load --json' or 'rheojax fit --json'."
+                "Pipe from 'rheojax load --json'."
             )
         y = np.array(y_payload["values"])
     else:
