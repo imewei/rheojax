@@ -125,61 +125,66 @@ class Registry:
         """
         plugin_enum, registry = self._registry_for(plugin_type)
 
-        # Check if already registered
-        if name in registry and not force:
-            raise ValueError(
-                f"Plugin '{name}' is already registered as a {plugin_enum.value}"
-            )
-        elif name in registry and force:
-            logger.warning(
-                "Overwriting existing registration",
-                name=name,
-                plugin_type=plugin_enum.value,
-            )
+        # Hold the singleton lock across the whole check-and-insert sequence
+        # so two concurrent register() calls can't both pass the duplicate
+        # check and then silently overwrite one another.
+        with self._lock:
+            # Check if already registered
+            if name in registry and not force:
+                raise ValueError(
+                    f"Plugin '{name}' is already registered as a {plugin_enum.value}"
+                )
+            elif name in registry and force:
+                logger.warning(
+                    "Overwriting existing registration",
+                    name=name,
+                    plugin_type=plugin_enum.value,
+                )
 
-        # Validate interface if requested
-        if validate:
-            self._validate_plugin(plugin_class, plugin_enum)
+            # Validate interface if requested
+            if validate:
+                self._validate_plugin(plugin_class, plugin_enum)
 
-        # Normalize protocols
-        normalized_protocols = []
-        if protocols:
-            for p in protocols:
-                if isinstance(p, str):
+            # Normalize protocols
+            normalized_protocols = []
+            if protocols:
+                for p in protocols:
+                    if isinstance(p, str):
+                        try:
+                            normalized_protocols.append(Protocol(p))
+                        except ValueError as exc:
+                            raise ValueError(
+                                f"Invalid protocol '{p}' for plugin '{name}'"
+                            ) from exc
+                    elif isinstance(p, Protocol):  # type: ignore[unreachable]
+                        normalized_protocols.append(p)
+
+            # Normalize transform_type
+            normalized_transform_type = None
+            if transform_type:
+                if isinstance(transform_type, str):
                     try:
-                        normalized_protocols.append(Protocol(p))
+                        normalized_transform_type = TransformType(transform_type)
                     except ValueError as exc:
                         raise ValueError(
-                            f"Invalid protocol '{p}' for plugin '{name}'"
+                            f"Invalid transform_type '{transform_type}' for plugin '{name}'"
                         ) from exc
-                elif isinstance(p, Protocol):  # type: ignore[unreachable]
-                    normalized_protocols.append(p)
+                elif isinstance(transform_type, TransformType):  # type: ignore[unreachable]
+                    normalized_transform_type = transform_type
 
-        # Normalize transform_type
-        normalized_transform_type = None
-        if transform_type:
-            if isinstance(transform_type, str):
-                try:
-                    normalized_transform_type = TransformType(transform_type)
-                except ValueError as exc:
-                    raise ValueError(
-                        f"Invalid transform_type '{transform_type}' for plugin '{name}'"
-                    ) from exc
-            elif isinstance(transform_type, TransformType):  # type: ignore[unreachable]
-                normalized_transform_type = transform_type
+            # Create plugin info. metadata is copied so external mutation of
+            # the caller's dict after registration can't change it here.
+            info = PluginInfo(
+                name=name,
+                plugin_class=plugin_class,
+                plugin_type=plugin_enum,
+                metadata=dict(metadata) if metadata else {},
+                protocols=normalized_protocols,
+                transform_type=normalized_transform_type,
+            )
 
-        # Create plugin info
-        info = PluginInfo(
-            name=name,
-            plugin_class=plugin_class,
-            plugin_type=plugin_enum,
-            metadata=metadata or {},
-            protocols=normalized_protocols,
-            transform_type=normalized_transform_type,
-        )
-
-        # Register the plugin
-        registry[name] = info
+            # Register the plugin
+            registry[name] = info
 
     def _validate_plugin(self, plugin_class: type, plugin_type: PluginType):
         """Validate that a plugin implements the required interface.
@@ -411,7 +416,9 @@ class Registry:
                 if protocol:
                     try:
                         target_proto = (
-                            Protocol(protocol) if isinstance(protocol, str) else protocol
+                            Protocol(protocol)
+                            if isinstance(protocol, str)
+                            else protocol
                         )
                     except ValueError:
                         # Unrecognized protocol string: no model can match it.

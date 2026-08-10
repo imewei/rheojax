@@ -172,7 +172,9 @@ _UNIT_EXTRACTION_PATTERN = re.compile(r"^(.*?)[\[(](.*?)[\])]")
 # Maps source units to (target_unit, conversion_factor)
 UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     "hz": ("rad/s", 2 * math.pi),
-    "1/hz": ("rad/s", 2 * math.pi),
+    # "1/hz" denotes a period (1/frequency), i.e. seconds — not a frequency
+    # itself. Converting it to rad/s would be dimensionally wrong.
+    "1/hz": ("s", 1.0),
     "ms": ("s", 0.001),
     "min": ("s", 60.0),
     "mins": ("s", 60.0),
@@ -483,6 +485,11 @@ def _parse_single_interval(
         for p in parts:
             p = p.strip()
             if not p:
+                # An empty tab-separated field is still a column position —
+                # skipping it entirely (rather than recording it as missing)
+                # would shift every subsequent field in this row left by one,
+                # misaligning them against column_headers.
+                row_values.append(float("nan"))
                 continue
             # IO-R6-001: Normalize decimal separator safely.
             # Try parsing as-is first (handles both "0.5" and "1000.5").
@@ -1008,7 +1015,9 @@ def _extract_temperature_metadata(
                 # Accept both '.' and ',' as the decimal separator -- EU-locale
                 # RheoCompass exports write e.g. "25,7 °C" (see the identical
                 # fix in trios/common.py's segment_to_rheodata).
-                inline_match = re.match(r"^(-?\d+[.,]?\d*)\s*(.*)$", str(raw_value).strip())
+                inline_match = re.match(
+                    r"^(-?\d+[.,]?\d*)\s*(.*)$", str(raw_value).strip()
+                )
                 if inline_match and inline_match.group(2):
                     raw_value = inline_match.group(1).replace(",", ".")
                     raw_unit = inline_match.group(2).strip()
@@ -1111,8 +1120,7 @@ def _filter_nonfinite(
         )
     if len(valid_idx) == 0:
         raise ValueError(
-            f"Interval {interval}: all rows are non-finite; "
-            f"0 of {len(x)} points usable"
+            f"Interval {interval}: all rows are non-finite; 0 of {len(x)} points usable"
         )
     return np.take(x, valid_idx), np.take(y, valid_idx), valid_idx
 

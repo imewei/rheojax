@@ -268,8 +268,10 @@ TRIOS_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
     # Frequency
     "hz": ("rad/s", 2 * math.pi),
     "Hz": ("rad/s", 2 * math.pi),
-    "1/hz": ("rad/s", 2 * math.pi),
-    "1/Hz": ("rad/s", 2 * math.pi),
+    # "1/hz" denotes a period (1/frequency), i.e. seconds — not a frequency
+    # itself. Converting it to rad/s would be dimensionally wrong.
+    "1/hz": ("s", 1.0),
+    "1/Hz": ("s", 1.0),
     "Rad/s": ("rad/s", 1.0),
     "rad/S": ("rad/s", 1.0),
     # Time

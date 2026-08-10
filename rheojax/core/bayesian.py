@@ -281,8 +281,17 @@ class BayesianMixin:
         # objects (pattern established in optimization.py).
         if not (isinstance(y_array, np.ndarray) or hasattr(y_array, "devices")):
             y_array = np.asarray(y_array)
-        is_complex = jnp.iscomplexobj(y_array)
-        logger.debug("Data is complex", is_complex=bool(is_complex))
+        # (N, 2) real/imag-columns convention (G', G'') is treated as complex
+        # oscillation data below — same component-wise real/imag likelihood
+        # numpyro_model_builder already applies for complex-dtype input,
+        # instead of silently falling through to the ordinary-real branch.
+        is_dual_column = (
+            not jnp.iscomplexobj(y_array)
+            and getattr(y_array, "ndim", 1) == 2
+            and y_array.shape[-1] == 2
+        )
+        is_complex = bool(jnp.iscomplexobj(y_array) or is_dual_column)
+        logger.debug("Data is complex", is_complex=is_complex)
 
         scale_info: dict[str, float | None] = {
             "data_scale": None,
@@ -293,7 +302,15 @@ class BayesianMixin:
         if is_complex:
             # Single conversion to JAX, then compute real/imag components
             # Avoids redundant CPU→JAX conversion (10-20% overhead reduction)
-            y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
+            if is_dual_column:
+                # (N, 2) columns are [G', G''] — combine into a complex
+                # array rather than casting the 2D real array directly
+                # (which would keep shape (N, 2) with zero imaginary part).
+                y_complex = jnp.asarray(
+                    y_array[:, 0], dtype=jnp.float64
+                ) + 1j * jnp.asarray(y_array[:, 1], dtype=jnp.float64)
+            else:
+                y_complex = jnp.asarray(y_array, dtype=jnp.complex128)
             if y_complex.dtype != jnp.complex128:
                 logger.warning(
                     "complex128 downcast detected — GPU may not support float64 complex. "
@@ -517,9 +534,7 @@ class BayesianMixin:
                 # constructed from the same bounds and can never be out of
                 # range), so gate on raw_value to avoid false positives there.
                 if raw_value is not None and np.isfinite(raw_value):
-                    clamped_params.append(
-                        f"{name}={original!r} -> {value!r}"
-                    )
+                    clamped_params.append(f"{name}={original!r} -> {value!r}")
             return float(value)
 
         warm_start: dict[str, float] = {}
@@ -1180,8 +1195,7 @@ class BayesianMixin:
                     num_chains=num_chains,
                     nuts_kwargs={"progress_bar": False, "target_accept_prob": 0.5},
                     seed=0,
-                    has_explicit_warm_start=hasattr(self, "fitted_")
-                    and self.fitted_,
+                    has_explicit_warm_start=hasattr(self, "fitted_") and self.fitted_,
                 )
             except Exception as e:
                 logger.warning(

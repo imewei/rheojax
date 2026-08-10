@@ -80,16 +80,41 @@ def _coerce_float(value: Any) -> float | None:
         return None
 
 
+def _non_finite_float(value: Any) -> float | None:
+    """Return value as a float if it's a genuine but non-finite number
+    (NaN/inf), or None if it isn't numeric at all.
+
+    Distinguishes "not a number at all" (unconvertible/None — nothing to
+    report) from "a number but non-finite" (NaN/inf — a real physics
+    violation: the fit diverged).
+    """
+    if value is None:
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isfinite(f) else f
+
+
 def _build_param_map(
     model: Any, result: FitResult | None
-) -> dict[str, tuple[float, tuple[float, float] | None]]:
-    """Return ``{name: (value, bounds)}`` from the model and optional result.
+) -> tuple[
+    dict[str, tuple[float, tuple[float, float] | None]], list[tuple[str, float]]
+]:
+    """Return ``({name: (value, bounds)}, [(name, non_finite_value), ...])``.
 
     The result's ``params`` dict takes precedence for values so that the
     freshest fitted values are always checked.  Bounds come from the model's
     ParameterSet because ``FitResult.params`` does not carry them.
+
+    Non-finite (NaN/inf) values are excluded from ``param_map`` — the bound
+    comparisons in the individual checkers assume finite floats — but are
+    collected separately so the caller can still surface them as violations
+    instead of a diverged fit silently passing every check.
     """
     param_map: dict[str, tuple[float, tuple[float, float] | None]] = {}
+    non_finite: list[tuple[str, float]] = []
 
     # Collect from the model's ParameterSet first.
     try:
@@ -98,6 +123,9 @@ def _build_param_map(
             p: Parameter = ps[name]
             value = _coerce_float(p.value)
             if value is None:
+                nf = _non_finite_float(p.value)
+                if nf is not None:
+                    non_finite.append((name, nf))
                 continue
             bounds = p.bounds  # tuple[float, float] | None
             param_map[name] = (value, bounds)
@@ -113,6 +141,9 @@ def _build_param_map(
             for name, raw_value in result.params.items():
                 value = _coerce_float(raw_value)
                 if value is None:
+                    nf = _non_finite_float(raw_value)
+                    if nf is not None:
+                        non_finite.append((name, nf))
                     continue
                 bounds = param_map.get(name, (None, None))[1]
                 param_map[name] = (value, bounds)
@@ -122,7 +153,7 @@ def _build_param_map(
                 result_type=type(result).__name__,
             )
 
-    return param_map
+    return param_map, non_finite
 
 
 # ---------------------------------------------------------------------------
@@ -513,16 +544,30 @@ def check_fit_physics(
     model_name = type(model).__name__
     logger.debug("Starting physics validation", model=model_name)
 
-    param_map = _build_param_map(model, result)
+    param_map, non_finite_params = _build_param_map(model, result)
+
+    all_violations: list[PhysicsViolation] = [
+        PhysicsViolation(
+            parameter=name,
+            value=value,
+            check="finite_value",
+            message=(
+                f"Parameter '{name}' fitted to a non-finite value ({value}); "
+                "the fit likely diverged."
+            ),
+            severity="error",
+        )
+        for name, value in non_finite_params
+    ]
 
     if not param_map:
         logger.debug(
-            "No parameters found for physics validation; returning empty list",
+            "No finite parameters found for physics validation; returning "
+            "only non-finite-value violations (if any)",
             model=model_name,
         )
-        return []
+        return all_violations
 
-    all_violations: list[PhysicsViolation] = []
     for checker in _CHECKERS:
         try:
             found = checker(param_map)

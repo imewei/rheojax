@@ -899,11 +899,16 @@ def power_law_fit(
     sum_xx = jnp.sum(log_rate_valid**2)
     sum_xy = jnp.sum(log_rate_valid * log_stress_valid)
 
-    # Linear regression solution
+    # Linear regression solution. Guard the denominator BEFORE dividing
+    # (not just select the result after) — jnp.where evaluates both
+    # branches' gradients, and 0/denom's gradient is 0/0 = NaN when
+    # denom == 0 (e.g. constant strain_rate), which poisons the selected
+    # branch's gradient even though its value is discarded.
     denom = n_valid * sum_xx - sum_x**2
+    denom_safe = jnp.where(denom > 1e-10, denom, 1.0)
     n_exponent = jnp.where(
         denom > 1e-10,
-        (n_valid * sum_xy - sum_x * sum_y) / denom,
+        (n_valid * sum_xy - sum_x * sum_y) / denom_safe,
         1.0,
     )
     log_K = jnp.where(

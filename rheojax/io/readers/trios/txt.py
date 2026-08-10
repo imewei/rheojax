@@ -88,6 +88,16 @@ def _detect_txt_encoding(filepath: Path) -> str:
     return "latin-1"  # guaranteed fallback (never raises on 8-bit data)
 
 
+def _count_txt_segments(filepath: Path, encoding: str) -> int:
+    """Count ``[step]`` markers in a TRIOS TXT file (i.e. its segment count)."""
+    n_segments = 0
+    with open(filepath, encoding=encoding, errors="replace") as f:
+        for line in f:
+            if re.match(r"\[step\]", line, re.IGNORECASE):
+                n_segments += 1
+    return n_segments
+
+
 def _read_file_with_encoding_cascade(filepath: Path) -> str:
     """Read entire TXT file using the best detected encoding."""
     encoding = _detect_txt_encoding(filepath)
@@ -314,6 +324,23 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
             # Delegate to chunked reader with default chunk size
             # Aggregate chunks on-the-fly to avoid keeping all in memory
             progress_callback = kwargs.pop("progress_callback", None)
+
+            # R11-TXT-001/002: auto-chunk always uses segment_index=0, unlike
+            # the non-chunked path above which returns ALL segments by
+            # default for multi-segment files (see the `return_all` check at
+            # the end of this function). Without this warning a >5MB
+            # multi-segment file would silently lose every segment past the
+            # first the moment it crosses the auto-chunk size threshold.
+            _seg_count = _count_txt_segments(filepath, _detect_txt_encoding(filepath))
+            if _seg_count > 1:
+                logger.warning(
+                    "Multiple segments detected in a file large enough to "
+                    "auto-chunk; only segment 0 will be returned. Pass "
+                    "auto_chunk=False (or chunk_size + segment_index="
+                    "<n> explicitly) to access other segments.",
+                    filepath=str(filepath),
+                    num_segments=_seg_count,
+                )
 
             x_parts = []
             y_parts = []

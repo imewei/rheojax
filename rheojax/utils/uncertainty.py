@@ -269,6 +269,16 @@ def hessian_ci(
                 except np.linalg.LinAlgError as exc:
                     raise ValueError(f"Hessian inversion failed: {exc}") from exc
 
+                # loss_fn = 0.5 * RSS, so its Hessian is the Gauss-Newton
+                # J^T J and pcov = (J^T J)^-1 is only a *shape* covariance —
+                # it must be scaled by the residual variance RSS/dof to match
+                # compute_covariance_from_jacobian's convention, else CIs are
+                # wrong by a factor of the (generally non-unit) noise variance.
+                rss = 2.0 * float(loss_fn(params_jax))
+                dof = n - k
+                if dof > 0:
+                    pcov = pcov * (rss / dof)
+
                 if not np.all(np.isfinite(pcov)):
                     raise ValueError(
                         "Inverted Hessian contains non-finite values — "

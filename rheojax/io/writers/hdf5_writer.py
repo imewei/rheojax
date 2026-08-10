@@ -443,9 +443,7 @@ def load_fit_result_hdf5(filepath: str | Path) -> Any:
             )
 
         model_name = _safe_decode_hdf5_string(f.attrs.get("model_name", ""))
-        model_class_name = _safe_decode_hdf5_string(
-            f.attrs.get("model_class_name", "")
-        )
+        model_class_name = _safe_decode_hdf5_string(f.attrs.get("model_class_name", ""))
         protocol = _safe_decode_hdf5_string(f.attrs.get("protocol", "")) or None
         n_params = int(f.attrs["n_params"])
 
@@ -621,7 +619,7 @@ def load_hdf5(filepath: str | Path) -> RheoData:
             )
 
 
-_MAX_HDF5_STRING_LEN = 4096  # Limit string attributes from untrusted HDF5 files
+_MAX_HDF5_STRING_LEN = 1_000_000  # Generous cap on string attributes from HDF5 files
 
 
 def _normalize_hdf5_geometry_marker(value: Any) -> str | None:
@@ -645,16 +643,21 @@ def _normalize_hdf5_geometry_marker(value: Any) -> str | None:
 def _safe_decode_hdf5_string(
     value: bytes | str, max_len: int = _MAX_HDF5_STRING_LEN
 ) -> str:
-    """Decode and truncate a string value read from HDF5 attributes."""
+    """Decode a string value read from HDF5 attributes.
+
+    Rejects (rather than silently truncating) strings past max_len: this
+    project's integrity principle is no silent data loss, so an oversize
+    attribute — most likely a corrupt or hostile file, since RheoJAX's own
+    writer never produces metadata this large — must fail loudly instead of
+    round-tripping as quietly-corrupted data.
+    """
     if isinstance(value, bytes):
         value = value.decode("utf-8", errors="replace")
     if len(value) > max_len:
-        logger.warning(
-            "HDF5 string attribute truncated",
-            original_len=len(value),
-            max_len=max_len,
+        raise ValueError(
+            f"HDF5 string attribute exceeds max length ({len(value)} > "
+            f"{max_len} chars); refusing to silently truncate it."
         )
-        value = value[:max_len]
     return value
 
 

@@ -81,6 +81,19 @@ def validate_prony_parameters(
     E_i_arr = np.asarray(E_i)
     tau_i_arr = np.asarray(tau_i)
 
+    # Check for NaN/inf first — sign comparisons like `E_inf < 0` are always
+    # False for NaN, so non-finite values would otherwise silently pass every
+    # check below.
+    if not np.isfinite(E_inf):
+        logger.debug("Prony validation failed: non-finite E_inf", E_inf=E_inf)
+        return False, f"E_inf must be finite, got {E_inf}"
+    if not np.all(np.isfinite(E_i_arr)):
+        logger.debug("Prony validation failed: non-finite E_i")
+        return False, "All E_i must be finite"
+    if not np.all(np.isfinite(tau_i_arr)):
+        logger.debug("Prony validation failed: non-finite tau_i")
+        return False, "All tau_i must be finite"
+
     # Check E_inf non-negative
     if E_inf < 0:
         logger.debug(
@@ -287,11 +300,15 @@ def compute_r_squared(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     y_true_arr = np.asarray(y_true)
     y_pred_arr = np.asarray(y_pred)
 
-    # Residual sum of squares
-    ss_res = np.sum((y_true_arr - y_pred_arr) ** 2)
+    # Residual sum of squares. abs()**2 (not plain **2) so complex data
+    # (e.g. G* = G' + iG'') is scored by squared magnitude of the residual
+    # instead of squaring the complex difference itself, which produces a
+    # complex sum whose imaginary part gets silently discarded by float().
+    # For real data abs(x)**2 == x**2 exactly, so this is a no-op change.
+    ss_res = np.sum(np.abs(y_true_arr - y_pred_arr) ** 2)
 
     # Total sum of squares
-    ss_tot = np.sum((y_true_arr - np.mean(y_true_arr)) ** 2)
+    ss_tot = np.sum(np.abs(y_true_arr - np.mean(y_true_arr)) ** 2)
 
     # Handle edge case where all y_true are identical (R² undefined)
     if ss_tot == 0.0:

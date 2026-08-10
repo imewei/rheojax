@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import re
 import tempfile
@@ -130,6 +131,7 @@ def save_excel(
         except OSError:
             os.unlink(tmp_path)
             raise
+        plot_buffers: list[io.BytesIO] = []
         try:
             with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
                 # Write parameters sheet
@@ -182,13 +184,19 @@ def save_excel(
                         "Embedding plots",
                         num_plots=len(results["plots"]),
                     )
-                    _embed_plots(writer, results["plots"])
+                    plot_buffers = _embed_plots(writer, results["plots"])
                     sheets_written.extend(
                         [f"Plot_{name[:25]}" for name in results["plots"].keys()]
                     )
                     logger.debug(
                         "Plots embedded", plot_names=list(results["plots"].keys())
                     )
+            # openpyxl's Image keeps a reference to its BytesIO buffer rather
+            # than copying it, so the buffers must outlive the `with` block
+            # above (where the workbook is actually serialized) — only close
+            # them now that the save is complete.
+            for buf in plot_buffers:
+                buf.close()
 
             os.replace(tmp_path, str(filepath))
             tmp_path = None  # type: ignore[assignment]  # prevent cleanup
@@ -334,7 +342,7 @@ def _create_residuals_dataframe(residuals: np.ndarray) -> Any:
     )
 
 
-def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
+def _embed_plots(writer: Any, plots: dict[str, Any]) -> list[io.BytesIO]:
     """Embed plots in Excel workbook.
 
     Args:
@@ -342,10 +350,17 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
         plots: Dictionary of plot names and matplotlib figures
 
     Note:
-        Requires openpyxl and matplotlib.
-    """
-    import io
+        Requires openpyxl and matplotlib. openpyxl.drawing.image.Image keeps
+        a reference to its BytesIO buffer rather than copying it — the
+        buffer must stay open until the workbook is actually saved (i.e.
+        until the caller's ``with pd.ExcelWriter(...)`` block exits), so
+        the caller is responsible for closing the returned buffers *after*
+        that block exits.
 
+    Returns:
+        The open BytesIO buffers backing each embedded image, for the
+        caller to close once the workbook has been saved.
+    """
     try:
         from openpyxl.drawing.image import Image as XLImage
     except ImportError:
@@ -354,9 +369,10 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
             "Install openpyxl with: pip install openpyxl",
             reason="ImportError",
         )
-        return
+        return []
 
     workbook = writer.book
+    buffers: list[io.BytesIO] = []
 
     for plot_name, fig in plots.items():
         # Create sheet for this plot
@@ -372,20 +388,20 @@ def _embed_plots(writer: Any, plots: dict[str, Any]) -> None:
             workbook.create_sheet(sheet_name)
         sheet = workbook[sheet_name]
 
-        # Save figure to bytes buffer
+        # Save figure to bytes buffer. NOT closed here — see docstring.
         buf = io.BytesIO()
-        try:
-            fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-            buf.seek(0)
-            logger.debug(
-                "Plot saved to buffer",
-                plot_name=plot_name,
-                buffer_size=buf.getbuffer().nbytes,
-            )
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+        buf.seek(0)
+        logger.debug(
+            "Plot saved to buffer",
+            plot_name=plot_name,
+            buffer_size=buf.getbuffer().nbytes,
+        )
 
-            # Create and add image to sheet
-            img = XLImage(buf)
-            img.anchor = "A1"
-            sheet.add_image(img)
-        finally:
-            buf.close()
+        # Create and add image to sheet
+        img = XLImage(buf)
+        img.anchor = "A1"
+        sheet.add_image(img)
+        buffers.append(buf)
+
+    return buffers

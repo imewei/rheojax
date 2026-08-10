@@ -69,7 +69,7 @@ def _check_dtype(arr: np.ndarray, name: str, *, allow_complex: bool = False) -> 
         raise ValueError(f"{name} data must be {kinds_desc}, got dtype {arr.dtype}")
 
 
-@dataclass
+@dataclass(eq=False)
 class RheoData:
     """JAX-native container for rheological data with NumPy/JAX array support.
 
@@ -186,6 +186,26 @@ class RheoData:
         if self.validate:
             self._validate_data()
 
+    def __eq__(self, other: object) -> bool:
+        """Array-aware equality.
+
+        The dataclass-generated __eq__ (disabled via eq=False above) compares
+        fields with plain `==`, which for x/y arrays returns an array rather
+        than a bool and crashes with the classic "truth value of an array
+        with more than one element is ambiguous" error. Compare arrays with
+        np.array_equal instead.
+        """
+        if not isinstance(other, RheoData):
+            return NotImplemented
+        return (
+            np.array_equal(_coerce_ndarray(self.x), _coerce_ndarray(other.x))
+            and np.array_equal(_coerce_ndarray(self.y), _coerce_ndarray(other.y))
+            and self.x_units == other.x_units
+            and self.y_units == other.y_units
+            and self.domain == other.domain
+            and self.metadata == other.metadata
+        )
+
     def __setattr__(self, name: str, value: object) -> None:
         """Invalidate JAX cache when x or y data is reassigned."""
         super().__setattr__(name, value)
@@ -270,6 +290,22 @@ class RheoData:
 
         # Check for negative values in frequency domain
         if self.domain == "frequency":
+            if isinstance(self.x, np.ndarray):
+                if np.any(self.x <= 0):
+                    logger.debug("x data contains non-positive frequency values")
+                    warnings.warn(
+                        "x data contains non-positive frequency values",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            elif isinstance(self.x, jnp.ndarray):
+                if bool(jnp.any(self.x <= 0)):
+                    logger.debug("x data contains non-positive frequency values")
+                    warnings.warn(
+                        "x data contains non-positive frequency values",
+                        UserWarning,
+                        stacklevel=2,
+                    )
             if isinstance(self.y, np.ndarray):
                 if np.any(np.real(self.y) < 0):
                     logger.debug("y data contains negative values in frequency domain")
@@ -862,6 +898,25 @@ class RheoData:
                 new_y_real = np.interp(new_x, x_for_interp, np.real(y_for_interp))
                 new_y_imag = np.interp(new_x, x_for_interp, np.imag(y_for_interp))
             new_y = new_y_real + 1j * new_y_imag
+        elif getattr(y_for_interp, "ndim", 1) == 2 and y_for_interp.shape[1] == 2:
+            # (N, 2) real/imag (DMTA/GMM G'/G'' convention): interpolate each
+            # column independently, same as the complex branch above.
+            if isinstance(x_for_interp, jnp.ndarray):
+                new_y = jnp.stack(
+                    [
+                        jnp.interp(new_x, x_for_interp, y_for_interp[:, 0]),
+                        jnp.interp(new_x, x_for_interp, y_for_interp[:, 1]),
+                    ],
+                    axis=1,
+                )
+            else:
+                new_y = np.stack(
+                    [
+                        np.interp(new_x, x_for_interp, y_for_interp[:, 0]),
+                        np.interp(new_x, x_for_interp, y_for_interp[:, 1]),
+                    ],
+                    axis=1,
+                )
         elif isinstance(x_for_interp, jnp.ndarray) or isinstance(
             y_for_interp, jnp.ndarray
         ):
@@ -902,9 +957,13 @@ class RheoData:
         if not use_log and x_array.size > 2 and np.all(x_array > 0):
             diffs = np.diff(x_array)
             log_diffs = np.diff(np.log(x_array))
-            linear_cv = np.std(diffs) / abs(np.mean(diffs)) if np.mean(diffs) != 0 else np.inf
+            linear_cv = (
+                np.std(diffs) / abs(np.mean(diffs)) if np.mean(diffs) != 0 else np.inf
+            )
             log_cv = (
-                np.std(log_diffs) / abs(np.mean(log_diffs)) if np.mean(log_diffs) != 0 else np.inf
+                np.std(log_diffs) / abs(np.mean(log_diffs))
+                if np.mean(log_diffs) != 0
+                else np.inf
             )
             use_log = log_cv < linear_cv
 
@@ -953,6 +1012,24 @@ class RheoData:
                 smoothed_real = np.convolve(np.real(y), kernel, mode="same")
                 smoothed_imag = np.convolve(np.imag(y), kernel, mode="same")
             smoothed_y = smoothed_real + 1j * smoothed_imag
+        elif getattr(y, "ndim", 1) == 2 and y.shape[1] == 2:
+            # (N, 2) real/imag convention: convolve each column independently.
+            if isinstance(y, jnp.ndarray):
+                smoothed_y = jnp.stack(
+                    [
+                        jnp.convolve(y[:, 0], kernel, mode="same"),
+                        jnp.convolve(y[:, 1], kernel, mode="same"),
+                    ],
+                    axis=1,
+                )
+            else:
+                smoothed_y = np.stack(
+                    [
+                        np.convolve(y[:, 0], kernel, mode="same"),
+                        np.convolve(y[:, 1], kernel, mode="same"),
+                    ],
+                    axis=1,
+                )
         elif isinstance(y, jnp.ndarray):
             # Use JAX convolution
             smoothed_y = jnp.convolve(y, kernel, mode="same")
@@ -983,12 +1060,18 @@ class RheoData:
         x, y = self.x, self.y
         if np.iscomplexobj(y):
             if isinstance(y, jnp.ndarray):
-                dy_dx = jnp.gradient(jnp.real(y), x) + 1j * jnp.gradient(
-                    jnp.imag(y), x
+                dy_dx = jnp.gradient(jnp.real(y), x) + 1j * jnp.gradient(jnp.imag(y), x)
+            else:
+                dy_dx = np.gradient(np.real(y), x) + 1j * np.gradient(np.imag(y), x)
+        elif getattr(y, "ndim", 1) == 2 and y.shape[1] == 2:
+            # (N, 2) real/imag convention: differentiate each column independently.
+            if isinstance(x, jnp.ndarray) or isinstance(y, jnp.ndarray):
+                dy_dx = jnp.stack(
+                    [jnp.gradient(y[:, 0], x), jnp.gradient(y[:, 1], x)], axis=1
                 )
             else:
-                dy_dx = np.gradient(np.real(y), x) + 1j * np.gradient(
-                    np.imag(y), x
+                dy_dx = np.stack(
+                    [np.gradient(y[:, 0], x), np.gradient(y[:, 1], x)], axis=1
                 )
         elif isinstance(x, jnp.ndarray) or isinstance(y, jnp.ndarray):
             dy_dx = jnp.gradient(y, x)
@@ -1027,19 +1110,33 @@ class RheoData:
         if self.x is None or self.y is None:
             raise ValueError("RheoData.integral() requires non-None x and y data")
         x, y = self.x, self.y
+        is_dual_column = getattr(y, "ndim", 1) == 2 and y.shape[1] == 2
         if isinstance(x, jnp.ndarray) or isinstance(y, jnp.ndarray):
             # JAX has no cumulative_trapezoid; compute manually via
             # trapezoidal rule: I[0]=0, I[k] = I[k-1] + (y[k-1]+y[k])/2 * dx[k]
             dx = jnp.diff(x)
+            if is_dual_column:
+                dx = dx[:, None]
             avg_y = (y[:-1] + y[1:]) / 2.0  # type: ignore[operator]
+            zero_row = jnp.zeros((1, 2) if is_dual_column else 1, dtype=y.dtype)
             integrated = jnp.concatenate(
-                [jnp.zeros(1, dtype=y.dtype), jnp.cumsum(avg_y * dx)]  # type: ignore[union-attr]
+                [zero_row, jnp.cumsum(avg_y * dx, axis=0 if is_dual_column else None)]  # type: ignore[union-attr]
             )
         else:
             # Use NumPy/SciPy cumulative trapezoid
             from scipy.integrate import cumulative_trapezoid
 
-            integrated = cumulative_trapezoid(y, x, initial=0)
+            if is_dual_column:
+                # (N, 2) real/imag convention: integrate each column independently.
+                integrated = np.stack(
+                    [
+                        cumulative_trapezoid(y[:, 0], x, initial=0),
+                        cumulative_trapezoid(y[:, 1], x, initial=0),
+                    ],
+                    axis=1,
+                )
+            else:
+                integrated = cumulative_trapezoid(y, x, initial=0)
 
         return RheoData(
             x=self.x,

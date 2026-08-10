@@ -343,10 +343,18 @@ def _atomic_text_write(filepath: Path, *, suffix: str = ".tmp", **open_kwargs):
     Yields the open file handle for the caller to write into. On success the
     temp file is atomically renamed onto *filepath* via ``os.replace``; on
     any exception the temp file is removed and the exception re-raised.
+
+    The temp filename is unique per call (via tempfile.mkstemp) rather than
+    a fixed ``filepath.with_suffix(suffix)`` — a fixed name would collide
+    between concurrent exports to the same target, letting one call's
+    cleanup delete or clobber another's in-progress write.
     """
-    tmp_path = filepath.with_suffix(suffix)
+    fd, tmp_path_str = tempfile.mkstemp(
+        dir=str(filepath.parent), prefix=f"{filepath.stem}.", suffix=suffix
+    )
+    tmp_path = Path(tmp_path_str)
     try:
-        with open(tmp_path, "w", **open_kwargs) as f:
+        with os.fdopen(fd, "w", **open_kwargs) as f:
             yield f
         os.replace(tmp_path, filepath)
     except Exception:

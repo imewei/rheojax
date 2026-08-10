@@ -658,11 +658,15 @@ def compute_covariance_from_jacobian(
             condition_number=float(s.max() / s.min()) if s.min() > 0 else float("inf"),
         )
 
-        # Filter near-zero singular values
+        # Filter near-zero singular values. A near-zero singular value marks
+        # an unidentifiable parameter combination (rank-deficient Jacobian) —
+        # its true variance is unbounded, not zero, so use inf rather than 0
+        # to avoid silently reporting perfect confidence in an unconstrained
+        # direction. inf propagates through pcov and is caught by the
+        # finite-check below, which returns None with a warning instead.
         threshold = np.finfo(np.float64).eps * max(m, n) * s[0]
-        # Use safe division to avoid RuntimeWarning: divide by zero
         s_safe = np.where(s > threshold, s, np.inf)
-        s_inv_sq = np.where(s > threshold, 1.0 / (s_safe**2), 0.0)
+        s_inv_sq = np.where(s > threshold, 1.0 / (s_safe**2), np.inf)
         n_filtered = np.sum(s <= threshold)
         if n_filtered > 0:
             logger.debug(

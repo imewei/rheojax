@@ -525,17 +525,17 @@ def check_file_for_unsupported_data(filepath: Path) -> None:
         try:
             import pandas as pd
 
-            xl = pd.ExcelFile(filepath)
-            for sheet in xl.sheet_names:
-                df = xl.parse(sheet, nrows=5)
-                # Check column headers
-                headers = list(df.columns)
-                # Also check values in first row if they might contain headers/metadata
-                for row_idx in range(min(len(df), 3)):
-                    headers.extend(
-                        [str(val) for val in df.iloc[row_idx] if pd.notna(val)]
-                    )
-                check_tensile_guard(headers, source=f"Excel sheet '{sheet}'")
+            with pd.ExcelFile(filepath) as xl:
+                for sheet in xl.sheet_names:
+                    df = xl.parse(sheet, nrows=5)
+                    # Check column headers
+                    headers = list(df.columns)
+                    # Also check values in first row if they might contain headers/metadata
+                    for row_idx in range(min(len(df), 3)):
+                        headers.extend(
+                            [str(val) for val in df.iloc[row_idx] if pd.notna(val)]
+                        )
+                    check_tensile_guard(headers, source=f"Excel sheet '{sheet}'")
         except Exception as e:
             if type(e).__name__ == "UnsupportedDataError" or isinstance(
                 e, UnsupportedDataError
@@ -770,7 +770,9 @@ def construct_complex_modulus(
 UNIFIED_UNIT_CONVERSIONS: dict[str, tuple[str, float | None]] = {
     # Frequency
     "hz": ("rad/s", 2 * np.pi),
-    "1/hz": ("rad/s", 2 * np.pi),
+    # "1/hz" denotes a period (1/frequency), i.e. seconds — not a frequency
+    # itself. Converting it to rad/s would be dimensionally wrong.
+    "1/hz": ("s", 1.0),
     # Time
     "ms": ("s", 0.001),
     "min": ("s", 60.0),

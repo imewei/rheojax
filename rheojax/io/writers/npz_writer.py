@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,29 @@ def _decode_str(arr: np.ndarray) -> str | None:
     """Decode a uint8 byte array back to a string (None if empty)."""
     s = arr.tobytes().decode("utf-8")
     return s if s else None
+
+
+def _atomic_savez(
+    filepath: Path, compressed: bool, arrays: dict[str, np.ndarray]
+) -> None:
+    """Write an npz archive atomically: temp file in the same directory,
+    then os.replace onto the destination, so a crash or concurrent writer
+    can never leave a truncated/corrupt file at `filepath`.
+    """
+    save_fn = np.savez_compressed if compressed else np.savez
+    fd, tmp_path_str = tempfile.mkstemp(dir=str(filepath.parent), suffix=".tmp.npz")
+    tmp_path: str | None = tmp_path_str
+    try:
+        os.close(fd)
+        save_fn(tmp_path, **arrays)  # type: ignore[arg-type]
+        os.replace(tmp_path, filepath)
+        tmp_path = None
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def save_npz(
@@ -66,8 +91,7 @@ def save_npz(
         "_initial_test_mode": _encode_str(data._explicit_test_mode),
     }
 
-    save_fn = np.savez_compressed if compressed else np.savez
-    save_fn(filepath, **arrays)  # type: ignore[arg-type]
+    _atomic_savez(filepath, compressed, arrays)
 
     logger.info(
         "Saved RheoData to npz",
@@ -142,8 +166,7 @@ def save_fit_result_npz(
     if stats:
         arrays["_stats"] = _encode_str(json.dumps(stats))
 
-    save_fn = np.savez_compressed if compressed else np.savez
-    save_fn(filepath, **arrays)  # type: ignore[arg-type]
+    _atomic_savez(filepath, compressed, arrays)
 
     logger.info(
         "Saved FitResult to npz",
@@ -190,9 +213,7 @@ def load_npz(filepath: str | Path) -> RheoData:
 
         # Parse metadata from UTF-8 bytes
         try:
-            metadata: dict = json.loads(
-                npz["_metadata_json"].tobytes().decode("utf-8")
-            )
+            metadata: dict = json.loads(npz["_metadata_json"].tobytes().decode("utf-8"))
         except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
             logger.warning("Could not parse metadata JSON from npz, using empty dict")
             metadata = {}

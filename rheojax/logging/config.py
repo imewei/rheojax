@@ -259,12 +259,10 @@ def _apply_config(config: LogConfig) -> None:
     root_logger = logging.getLogger("rheojax")
     root_logger.setLevel(logging.DEBUG)  # Allow all levels, filter at handler
 
-    # Remove existing handlers safely (uses the logging module's internal lock)
-    for h in list(root_logger.handlers):
-        root_logger.removeHandler(h)
-        h.close()
-
-    # Create and add handlers
+    # Build replacement handlers before touching the existing ones: if
+    # construction fails (e.g. bad log file path), the current handlers stay
+    # intact instead of already being removed, which would silently disable
+    # logging.
     handlers = create_handlers(config)
     log_format = (
         config.format
@@ -275,7 +273,15 @@ def _apply_config(config: LogConfig) -> None:
         formatter = get_formatter(log_format, colorize=config.colorize)
         handler.setFormatter(formatter)
         handler.setLevel(getattr(logging, config.level.upper(), logging.INFO))
+
+    # Atomically swap: remove old handlers, add new ones, then close the old.
+    old_handlers = list(root_logger.handlers)
+    for h in old_handlers:
+        root_logger.removeHandler(h)
+    for handler in handlers:
         root_logger.addHandler(handler)
+    for h in old_handlers:
+        h.close()
 
     # Configure subsystem loggers
     for subsystem, level in config.subsystem_levels.items():
@@ -306,14 +312,16 @@ def reset_config() -> None:
         _config = None
         _configured = False
 
-    # Clear cached loggers to prevent stale adapters
-    from rheojax.logging.logger import clear_logger_cache
+        # Clear cached loggers to prevent stale adapters
+        from rheojax.logging.logger import clear_logger_cache
 
-    clear_logger_cache()
+        clear_logger_cache()
 
-    # Reset root logger safely (uses the logging module's internal lock)
-    root_logger = logging.getLogger("rheojax")
-    for h in list(root_logger.handlers):
-        root_logger.removeHandler(h)
-        h.close()
-    root_logger.setLevel(logging.WARNING)
+        # Reset root logger safely (uses the logging module's internal lock).
+        # Kept under _config_lock so a concurrent configure_logging() can't
+        # install handlers between the state reset above and this removal.
+        root_logger = logging.getLogger("rheojax")
+        for h in list(root_logger.handlers):
+            root_logger.removeHandler(h)
+            h.close()
+        root_logger.setLevel(logging.WARNING)

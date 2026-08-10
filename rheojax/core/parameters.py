@@ -479,10 +479,17 @@ class Parameter:
     def __hash__(self) -> int:
         """Make Parameter hashable for use as dict keys.
 
+        Hashes on `name` only — `bounds` has a public setter (see the
+        `bounds` property) and would otherwise violate the requirement that
+        an object's hash stay constant while it is a dict/set key. Equal
+        objects (per __eq__, which also compares bounds/units) still hash
+        equal since they necessarily share the same name; unequal objects
+        may share a hash, which is a legal (if less discriminating) hash.
+
         Returns:
-            Hash based on immutable identity attributes only
+            Hash based on the parameter's immutable name.
         """
-        return hash((self.name, self.bounds, self.units))
+        return hash(self.name)
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another Parameter.
@@ -1469,7 +1476,9 @@ class ParameterOptimizer:
                 # Scale the step to the parameter's magnitude (standard
                 # relative finite-difference step) so it doesn't underflow
                 # to a no-op for large values (e.g. G0 ~ 1e5-1e9 Pa).
-                eps = max(1e-8, abs(values_array[i]) * math.sqrt(np.finfo(np.float64).eps))
+                eps = max(
+                    1e-8, abs(values_array[i]) * math.sqrt(np.finfo(np.float64).eps)
+                )
                 values_plus = values_array.copy()
                 values_plus[i] += eps
 

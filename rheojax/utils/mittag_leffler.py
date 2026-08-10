@@ -216,12 +216,19 @@ def _ml_asymptotic_pos(z, alpha, beta):
     for small alpha (< 0.5) at moderate z values.
     """
     inv_alpha = 1.0 / alpha
-    # Compute in log-space to avoid overflow
-    log_exponent = inv_alpha * jnp.log(jnp.maximum(z, 1e-30))
-    log_power = (1.0 - beta) * inv_alpha * jnp.log(jnp.maximum(z, 1e-30))
+    log_z = jnp.log(jnp.maximum(z, 1e-30))
+    # z_root = z^(1/alpha) is the argument of the exp() term itself (not its
+    # log) — the previous code added log(z^(1/alpha)) = log(z)/alpha into
+    # log_result, which computes z^((2-beta)/alpha) instead of
+    # z^((1-beta)/alpha) * exp(z^(1/alpha)), silently dropping the dominant
+    # exponential growth term.
+    z_root = jnp.exp(inv_alpha * log_z)
+    # Clip before the final exp() below to avoid overflow (float64 max
+    # exponent ~709), matching the original overflow-avoidance intent.
+    z_root_clipped = jnp.minimum(z_root, 700.0)
+    log_power = (1.0 - beta) * inv_alpha * log_z
     log_prefactor = jnp.log(inv_alpha) + log_power
-    # Cap the total log-result at 709 (exp(709) ≈ 8.2e307, near float64 max)
-    log_result = log_prefactor + log_exponent
+    log_result = log_prefactor + z_root_clipped
     log_result = jnp.minimum(log_result, 709.0)
     return jnp.exp(log_result)
 
