@@ -293,20 +293,11 @@ def generate_hl_synthetic(
         omega_max = kwargs.get("omega_max", 100.0)
         omega = np.logspace(np.log10(omega_min), np.log10(omega_max), n_points)
 
-        # For SAOS, we predict G* (complex modulus)
-        # HL doesn't have a direct SAOS prediction in the current API,
-        # so we generate simplified synthetic data based on HL physics
-        alpha = params.get("alpha", 0.3)
-        tau = params.get("tau", 1.0)
-        sigma_c = params.get("sigma_c", 1.0)
-
-        # Simplified HL SAOS response (elastic plateau modulated by alpha)
-        G0 = sigma_c  # Approximate elastic modulus
-        omega_tau = omega * tau
-
-        # G' ~ G0 * (omega*tau)^2 / (1 + (omega*tau)^2) but modified by alpha
-        G_prime = G0 * (omega_tau ** (2 * alpha)) / (1 + omega_tau ** (2 * alpha))
-        G_double_prime = G0 * omega_tau**alpha / (1 + omega_tau ** (2 * alpha))
+        # HL has a direct SAOS prediction (population-balance PDE kernel);
+        # predict() accepts test_mode without requiring a prior fit() call.
+        G_star_clean = np.asarray(model.predict(omega, test_mode="saos"))
+        G_prime = np.real(G_star_clean)
+        G_double_prime = np.imag(G_star_clean)
 
         # Add noise
         noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
