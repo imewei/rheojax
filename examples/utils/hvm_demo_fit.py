@@ -234,7 +234,8 @@ def fit_hvm_demo_protocol(
             if cost < best_cost:
                 best_cost = cost
                 best_model = trial
-        assert best_model is not None
+        if best_model is None:
+            raise ValueError("No model found during hyperparameter search")
         fit_model = best_model
     else:
         fit_model = _build_seeded_model()
@@ -253,7 +254,11 @@ def fit_hvm_demo_protocol(
         x_fit=x_fit,
         y_fit=y_fit,
         y_data_fit=y_data_fit,
-        r_squared=_r_squared(y_data, y_data_fit, log_space=protocol != "startup"),
+        r_squared=_r_squared(
+            np.abs(y_data) if protocol == "oscillation" else y_data,
+            np.abs(y_data_fit) if protocol == "oscillation" else y_data_fit,
+            log_space=protocol != "startup",
+        ),
         fit_model=fit_model,
         true_model=true_model,
         predict_kwargs=predict_kwargs,

@@ -324,12 +324,24 @@ def posterior_predictive_saos(
         for p in param_names:
             if p in posterior:
                 model.parameters.set_value(p, float(np.array(posterior[p])[idx]))
-        try:
-            G_p, G_pp = model.predict_saos(omega, return_components=True)
-            G_prime_all.append(np.array(G_p))
-            G_double_prime_all.append(np.array(G_pp))
-        except Exception:
-            continue
+        G_p, G_pp = model.predict_saos(omega, return_components=True)
+        G_p_arr = np.array(G_p)
+        G_pp_arr = np.array(G_pp)
+        if np.all(np.isfinite(G_p_arr)) and np.all(np.isfinite(G_pp_arr)):
+            G_prime_all.append(G_p_arr)
+            G_double_prime_all.append(G_pp_arr)
+
+    n_dropped = len(indices) - len(G_prime_all)
+    if n_dropped:
+        import warnings
+
+        warnings.warn(
+            f"posterior_predictive_saos: dropped {n_dropped}/{len(indices)} "
+            "posterior draws with non-finite predictions; the credible band "
+            "is computed from the remaining draws only and may understate "
+            "true uncertainty.",
+            stacklevel=2,
+        )
 
     return np.array(G_prime_all), np.array(G_double_prime_all)
 
@@ -366,11 +378,22 @@ def posterior_predictive_1d(
         for p in param_names:
             if p in posterior:
                 model.parameters.set_value(p, float(np.array(posterior[p])[idx]))
-        try:
-            y_pred = model.predict(x, test_mode=test_mode, **predict_kwargs)
-            draws.append(np.array(y_pred))
-        except Exception:
-            continue
+        y_pred = model.predict(x, test_mode=test_mode, **predict_kwargs)
+        y_pred_arr = np.array(y_pred)
+        if np.all(np.isfinite(y_pred_arr)):
+            draws.append(y_pred_arr)
+
+    n_dropped = len(indices) - len(draws)
+    if n_dropped:
+        import warnings
+
+        warnings.warn(
+            f"posterior_predictive_1d: dropped {n_dropped}/{len(indices)} "
+            "posterior draws with non-finite predictions; the credible band "
+            "is computed from the remaining draws only and may understate "
+            "true uncertainty.",
+            stacklevel=2,
+        )
 
     return np.array(draws)
 
@@ -399,6 +422,8 @@ def plot_trace_and_forest(
     """
     import arviz as az
 
+    from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
+
     idata = result.to_inference_data()
 
     # Scale figure height to fit all parameters (2 subplots per param for trace)
@@ -406,10 +431,14 @@ def plot_trace_and_forest(
     trace_h = max(figsize_trace[1], 2.0 * n)
     forest_h = max(figsize_forest[1], 1.2 * n)
 
+    # ArviZ 1.x: figsize goes through figure_kwargs, not a direct kwarg; the
+    # return value is a PlotCollection, not an ndarray of Axes.
     axes = az.plot_trace(
-        idata, var_names=param_names, figsize=(figsize_trace[0], trace_h)
+        idata,
+        var_names=param_names,
+        figure_kwargs={"figsize": (figsize_trace[0], trace_h)},
     )
-    fig_trace = axes.ravel()[0].figure
+    fig_trace = arviz_figure(axes)
     fig_trace.suptitle("HVM Trace Plots", fontsize=14, y=1.02)
     fig_trace.tight_layout(rect=[0, 0, 1, 0.98])
 
@@ -417,10 +446,14 @@ def plot_trace_and_forest(
         idata,
         var_names=param_names,
         combined=True,
-        hdi_prob=0.95,
-        figsize=(figsize_forest[0], forest_h),
+        **arviz_plot_kwargs(
+            az,
+            "plot_forest",
+            hdi_prob=0.95,
+            figure_kwargs={"figsize": (figsize_forest[0], forest_h)},
+        ),
     )
-    fig_forest = axes.ravel()[0].figure
+    fig_forest = arviz_figure(axes)
     fig_forest.tight_layout()
 
     return fig_trace, fig_forest

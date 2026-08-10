@@ -444,7 +444,9 @@ def generate_synthetic_saos(
             G_p = coeffs[0]
             G_pp = coeffs[1]
 
-        except Exception:
+        except Exception as exc:
+            import warnings
+
             # Fallback: use Maxwell model approximation
             try:
                 # For FMLIKH, sum the Maxwell responses
@@ -465,10 +467,21 @@ def generate_synthetic_saos(
                     wt = w * tau
                     G_p = G * wt**2 / (1 + wt**2)
                     G_pp = G * wt / (1 + wt**2)
+                warnings.warn(
+                    f"SAOS simulation failed at omega={w:.4g} ({exc!r}); "
+                    "using linear Maxwell approximation instead of the real "
+                    "FIKH/FMLIKH nonlinear response.",
+                    stacklevel=2,
+                )
             except Exception:
                 # Last resort: use reasonable defaults
                 G_p = 1000.0 * (w**0.5)
                 G_pp = 100.0 * w
+                warnings.warn(
+                    f"SAOS simulation and Maxwell fallback both failed at "
+                    f"omega={w:.4g}; using placeholder values, not model output.",
+                    stacklevel=2,
+                )
 
         G_prime_list.append(max(G_p, 1e-10))
         G_double_prime_list.append(max(G_pp, 1e-10))
