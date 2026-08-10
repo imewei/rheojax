@@ -7,7 +7,7 @@ Usage:
     rheojax load data.csv
     rheojax load data.trios --test-mode oscillation
     rheojax load data.csv --x-col time --y-col G_t --json
-    rheojax load data.csv --y-cols "G_prime,G_double_prime" | rheojax fit --model maxwell
+    rheojax load data.csv --json | rheojax transform mastercurve --json
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ Examples:
   # Load complex oscillation data (G', G'')
   rheojax load data.csv --y-cols "G_prime,G_double_prime" --test-mode oscillation
 
-  # Output JSON envelope for piping
-  rheojax load data.trios --json | rheojax fit --model maxwell --json
+  # Output JSON envelope for piping to transform/export
+  rheojax load data.trios --json | rheojax transform mastercurve --json
 
   # Auto-detect from TRIOS file
   rheojax load sweep.trios
@@ -132,6 +132,8 @@ def main(args: list[str] | None = None) -> int:
 
     # Build load kwargs
     load_kwargs: dict = {}
+    if parsed.file_format is not None:
+        load_kwargs["format"] = parsed.file_format
     if parsed.x_col is not None:
         load_kwargs["x_col"] = parsed.x_col
     if parsed.y_col is not None:

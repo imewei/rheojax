@@ -170,8 +170,10 @@ For command-specific help:
     return parser
 
 
-def show_info() -> int:
+def show_info(args: list[str] | None = None) -> int:
     """Display package information."""
+    argparse.ArgumentParser(prog="rheojax info").parse_args(args)
+
     logger.info("Running CLI command", command="info")
 
     import rheojax
@@ -393,7 +395,7 @@ def main(args: list[str] | None = None) -> int:
 
     elif command == "info":
         try:
-            return show_info()
+            return show_info(args[1:])
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             logger.error("info command failed", error=str(e), exc_info=True)

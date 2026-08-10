@@ -245,7 +245,10 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
         assert input_ref is not None and output_ref is not None
         assert f"transform_results/{input_ref}.hdf5" in names
         assert f"transform_results/{output_ref}.hdf5" in names
-        assert transform["result_extras"] == {"warnings": ["clipped 2 points"]}
+        extras_ref = transform["result_extras_ref"]
+        assert extras_ref is not None
+        assert f"transform_results/{extras_ref}.hdf5" in names
+        assert transform["result_extras_meta"] == {"warnings": ["clipped 2 points"]}
 
         pipeline = json.loads(zf.read("pipeline.json"))
         assert pipeline["name"] == "batch-a"
