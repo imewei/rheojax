@@ -1499,20 +1499,24 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
             >>> pipeline2 = pipeline.clone()
         """
         new_pipeline = Pipeline(data=self.data.copy() if self.data else None)
-        # Single deepcopy call so steps[-1][1] and _last_model -- which
-        # reference the same model object in the original pipeline -- keep
-        # that identity in the clone too (deepcopy's memo dedupes shared
-        # references within one call).
-        new_pipeline.steps, new_pipeline._last_model = copy.deepcopy(
-            (self.steps, self._last_model)
-        )
+        # Single deepcopy call so steps[-1][1], _last_model, and (after
+        # compare_models()) _last_comparison.results[best]._fitted_model --
+        # which all reference the same model object in the original
+        # pipeline -- keep that identity in the clone too (deepcopy's memo
+        # dedupes shared references within one call; deepcopy-ing any of
+        # these separately produces independent copies that silently
+        # diverge from each other).
+        (
+            new_pipeline.steps,
+            new_pipeline._last_model,
+            new_pipeline._last_comparison,
+        ) = copy.deepcopy((self.steps, self._last_model, self._last_comparison))
         new_pipeline.history = self.history.copy()
         new_pipeline._last_fit_result = copy.deepcopy(self._last_fit_result)
         new_pipeline._last_bayesian_result = copy.deepcopy(self._last_bayesian_result)
         new_pipeline._transform_results = copy.deepcopy(self._transform_results)
         new_pipeline._last_transform_name = self._last_transform_name
         new_pipeline._diagnostic_results = copy.deepcopy(self._diagnostic_results)
-        new_pipeline._last_comparison = copy.deepcopy(self._last_comparison)
         new_pipeline.predictions = copy.deepcopy(self.predictions)
         logger.debug(
             "Pipeline cloned",

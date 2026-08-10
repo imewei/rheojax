@@ -102,6 +102,38 @@ class TestPersistentProcessPool:
         finally:
             pool.shutdown()
 
+    def test_del_without_shutdown_stops_collector_thread(self):
+        """Dropping a pool without calling shutdown() must eventually stop
+        its background collector thread. A bound-method Thread target
+        (`target=self._collect_results`) keeps the pool alive via
+        threading's internal registry for as long as the thread runs,
+        which makes __del__ itself unreachable -- the weakref-based
+        collector this guards against regressing to exists specifically
+        to break that cycle."""
+        import gc
+
+        from rheojax.parallel.pool import PersistentProcessPool
+
+        baseline = threading.active_count()
+        pool = PersistentProcessPool(n_workers=1)
+        if threading.active_count() != baseline + 1:
+            raise AssertionError(
+                f"Expected {baseline + 1} active threads, got {threading.active_count()}"
+            )
+
+        del pool
+        gc.collect()
+
+        deadline = time.time() + 5.0
+        while time.time() < deadline and threading.active_count() != baseline:
+            time.sleep(0.1)
+
+        if threading.active_count() != baseline:
+            raise AssertionError(
+                "collector thread leaked after the pool was garbage-collected "
+                "without an explicit shutdown()"
+            )
+
     def test_shutdown_terminates_workers(self):
         from rheojax.parallel.pool import PersistentProcessPool
 

@@ -102,10 +102,31 @@ def parallel_map(
     n = n_workers or cfg["n_workers"]
 
     if cfg["isolation"] == "thread":
-        with ThreadPoolExecutor(max_workers=n) as executor:
+        # Not a `with` block: ThreadPoolExecutor.__exit__ calls
+        # shutdown(wait=True), which blocks until *every* submitted task
+        # finishes -- so a timeout on one future, or the caller abandoning
+        # this generator early, would still block for however long the
+        # slowest remaining task takes. shutdown(wait=False,
+        # cancel_futures=True) in `finally` cancels not-yet-started tasks
+        # and returns immediately regardless of why we're leaving.
+        executor = ThreadPoolExecutor(max_workers=n)
+        try:
             futures = [executor.submit(fn, item) for item in items_list]
             for f in futures:
-                yield f.result(timeout=timeout)
+                try:
+                    yield f.result(timeout=timeout)
+                except TimeoutError:
+                    raise
+                except Exception as exc:
+                    # Match PoolFuture.result()'s contract (pool.py) so a
+                    # task failure raises the same exception type
+                    # regardless of which isolation mode is active --
+                    # otherwise `except SomeSpecificError:` around
+                    # parallel_map() would work under one isolation mode
+                    # and silently fail to catch under the other.
+                    raise RuntimeError(str(exc)) from exc
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
         return
 
     from rheojax.parallel.pool import PersistentProcessPool

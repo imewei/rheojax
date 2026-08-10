@@ -10,7 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
-import pickle  # noqa: S403, B403
+import pickle  # noqa: B403, S403
 import threading
 import traceback
 import weakref
@@ -61,7 +61,12 @@ def _worker_loop(
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
-    Receives (task_id, fn, args, kwargs) from task_queue.
+    Receives (task_id, payload) from task_queue, where payload is the
+    pre-pickled bytes of (fn, args, kwargs) -- submit() already pickled it
+    once for its picklability precheck, so the wire format carries those
+    bytes directly instead of the raw tuple. mp.Queue.put() still pickles
+    whatever we hand it, but pickling a `bytes` object is cheap (near a
+    memcpy), so this avoids serializing (fn, args, kwargs) a second time.
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
     Exits when it receives the shutdown sentinel.
     """
@@ -74,7 +79,11 @@ def _worker_loop(
         if task == shutdown_sentinel:
             break
 
-        task_id, fn, args, kwargs = task
+        task_id, payload = task
+        # Payload originates from this same process's PersistentProcessPool
+        # (pool.py:submit()'s picklability precheck), never from an
+        # external/untrusted source, so pickle.loads() here is safe.
+        fn, args, kwargs = pickle.loads(payload)  # noqa: S301, B301
         try:
             result = fn(*args, **kwargs)
             try:
@@ -103,6 +112,58 @@ def _worker_loop(
             # Truncate traceback to prevent unbounded payload size
             tb_truncated = tb[:4096] if len(tb) > 4096 else tb
             result_queue.put((task_id, "error", f"{exc}\n{tb_truncated}"))
+
+
+def _collect_results(pool_ref: weakref.ref) -> None:
+    """Background thread that routes worker results to their PoolFutures.
+
+    Takes a weakref to the pool and re-dereferences it on every iteration
+    -- rather than closing over `self` or holding one local `pool`
+    variable for the whole loop -- so this thread never holds a strong
+    reference to the pool while blocked in queue.get(). A held strong ref
+    for the loop's duration would reproduce the same problem this weakref
+    indirection exists to avoid: the pool becomes unreachable to GC (and
+    __del__ becomes unreachable) for as long as the thread is alive.
+
+    SYS-03: Poll interval raised to 1.0s (was 0.1s) to reduce CPU burn
+    from busy-waiting.  JAX tasks are long-running (seconds to minutes),
+    so 1 Hz polling adds negligible latency while cutting thread wake-ups
+    by 10x.  shutdown() joins this thread with a 1.0s budget, which is
+    already accounted for in the existing join timeout.
+    """
+    import queue as _queue
+
+    while True:
+        pool = pool_ref()
+        if pool is None or pool._shutdown:
+            return
+        result_queue = pool._result_queue
+        del pool  # Drop the strong ref before blocking on queue.get().
+
+        try:
+            msg = result_queue.get(timeout=1.0)
+        except (_queue.Empty, EOFError, OSError):
+            # Empty: normal timeout, no results pending
+            # EOFError/OSError: queue closed during shutdown
+            continue
+
+        task_id, status, payload = msg
+
+        pool = pool_ref()
+        if pool is None:
+            return
+        with pool._lock:
+            future = pool._futures.pop(task_id, None)
+        del pool
+
+        if future is None:
+            logger.warning("Result for unknown task_id=%d", task_id)
+            continue
+
+        if status == "ok":
+            future._set_result(payload)
+        else:
+            future._set_error(payload)
 
 
 class PoolFuture:
@@ -178,9 +239,15 @@ class PersistentProcessPool:
             p.start()
             self._workers.append(p)
 
-        # Start result collector thread
+        # Start result collector thread. Pass a weakref, not a bound method:
+        # threading.Thread(target=self._collect_results) would make the
+        # Thread object (held alive by threading's internal registry for as
+        # long as the OS thread runs) hold a strong reference back to this
+        # pool via the bound method's __self__, which makes __del__
+        # unreachable for the entire time the thread is alive -- exactly
+        # the case its safety-net cleanup exists to handle.
         self._result_thread = threading.Thread(
-            target=self._collect_results, daemon=True
+            target=_collect_results, args=(weakref.ref(self),), daemon=True
         )
         self._result_thread.start()
 
@@ -229,9 +296,12 @@ class PersistentProcessPool:
         # thread, where a pickling failure is only printed to stderr and the
         # task is silently dropped -- the caller would then block until
         # future.result(timeout=...) raises an opaque TimeoutError. Fail fast
-        # here instead, before the task ever reaches the queue.
+        # here instead, before the task ever reaches the queue. We keep the
+        # resulting bytes and put those on the queue (see _worker_loop)
+        # rather than the raw tuple, so this precheck doesn't pickle
+        # (fn, args, kwargs) a second time on top of what put() would do.
         try:
-            pickle.dumps((fn, args, kwargs))
+            payload = pickle.dumps((fn, args, kwargs))
         except Exception as exc:
             raise TypeError(
                 f"Task is not picklable (must be a module-level function with "
@@ -251,7 +321,7 @@ class PersistentProcessPool:
             # where a concurrent shutdown() could close the queue between the
             # check and the put(). self._task_queue has no maxsize (unbounded
             # mp.Queue), so put() does not block here.
-            self._task_queue.put((task_id, fn, args, kwargs))
+            self._task_queue.put((task_id, payload))
 
         return future
 
@@ -332,37 +402,6 @@ class PersistentProcessPool:
                 pass
 
         logger.debug("PersistentProcessPool shut down")
-
-    def _collect_results(self) -> None:
-        """Background thread that routes results to futures.
-
-        SYS-03: Poll interval raised to 1.0s (was 0.1s) to reduce CPU burn
-        from busy-waiting.  JAX tasks are long-running (seconds to minutes),
-        so 1 Hz polling adds negligible latency while cutting thread wake-ups
-        by 10x.  shutdown() joins this thread with a 1.0s budget, which is
-        already accounted for in the existing join timeout.
-        """
-        import queue as _queue
-
-        while not self._shutdown:
-            try:
-                msg = self._result_queue.get(timeout=1.0)
-            except (_queue.Empty, EOFError, OSError):
-                # Empty: normal timeout, no results pending
-                # EOFError/OSError: queue closed during shutdown
-                continue
-
-            task_id, status, payload = msg
-            with self._lock:
-                future = self._futures.pop(task_id, None)
-            if future is None:
-                logger.warning("Result for unknown task_id=%d", task_id)
-                continue
-
-            if status == "ok":
-                future._set_result(payload)
-            else:
-                future._set_error(payload)
 
     def __del__(self) -> None:
         """Safety net: kill worker processes if pool is garbage-collected without shutdown."""
