@@ -53,6 +53,10 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.utils.mittag_leffler import mittag_leffler_e2
+from rheojax.utils.prony import (
+    fit_creep_retardation_series,
+    oscillation_grid_for_interconversion,
+)
 
 # Module logger
 logger = get_logger(__name__)
@@ -200,10 +204,19 @@ class FractionalZenerSolidLiquid(BaseModel):
         alpha: float,
         tau: float,
     ) -> jnp.ndarray:
-        """Predict creep compliance J(t).
+        """Predict creep compliance J(t), Volterra-consistent with G(t) to fit accuracy.
 
-        Note: Analytical creep compliance for FZSL is complex.
-        This uses numerical approximation based on inverse relationship.
+        FZSL's relaxation modulus G(t) (and G*(w)) above are exact closed
+        forms, but the LVE creep compliance J(t) has no elementary Laplace
+        inverse (it involves a Prabhakar three-parameter Mittag-Leffler
+        function). This recovers J(t) by fitting a fixed-grid retardation
+        series against the exact complex compliance J*(w) = 1/G*(w) and
+        evaluating it in time -- see
+        rheojax.utils.prony.fit_creep_retardation_series for the method
+        (Park & Schapery 1999) and rheojax project memory
+        project_fractional_creep_heuristic_blends.md for why this replaced
+        a heuristic sigmoid blend that violated the LVE convolution
+        identity int_0^t G(tau)J(t-tau)dtau = t by up to ~17%.
 
         Parameters
         ----------
@@ -223,28 +236,16 @@ class FractionalZenerSolidLiquid(BaseModel):
         jnp.ndarray
             Creep compliance J(t) (1/Pa)
         """
-        # Add small epsilon to prevent issues
         epsilon = 1e-12
+        tau_safe = tau + epsilon
 
-        # Clip alpha to safe range (works with JAX tracers)
-        alpha_safe = jnp.clip(alpha, epsilon, 1.0 - epsilon)
-
-        # For equilibrium: J(∞) = 1/G_e
-        # Approximate creep using inverse relaxation at long times
-        J_eq = 1.0 / (Ge + epsilon)
-        # Short time: dominated by SpringPot
-        # J(t) ≈ t^α / c_α for small t
-        J_short = jnp.power(t, alpha_safe) / (c_alpha + epsilon)
-        # Use smooth, monotonic interpolation
-        # Sigmoid-based transition to ensure monotonicity
-        # Map time to sigmoid argument with characteristic scale tau
-        x = jnp.log10(t / tau + epsilon) / 2.0  # Log-scale transition
-        sigmoid_weight = 1.0 / (1.0 + jnp.exp(-x))
-        # Ensure J_short <= J_eq at transition by scaling
-        J_short_scaled = jnp.minimum(J_short, J_eq * 0.9)
-        # Monotonic blend: start from J_short, approach J_eq
-        J_t = J_short_scaled * (1.0 - sigmoid_weight) + J_eq * sigmoid_weight
-
+        omega = oscillation_grid_for_interconversion(tau_safe)
+        G_star = FractionalZenerSolidLiquid._predict_oscillation(
+            omega, Ge, c_alpha, alpha, tau
+        )
+        J_t = fit_creep_retardation_series(
+            G_star[..., 0], G_star[..., 1], omega, t, anchor_time=tau_safe
+        )
         return J_t
 
     @staticmethod

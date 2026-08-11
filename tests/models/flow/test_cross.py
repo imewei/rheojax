@@ -111,6 +111,23 @@ class TestCrossPredictions:
 
         np.testing.assert_allclose(viscosity, 50.0, rtol=0.01)
 
+    def test_negative_shear_rates(self):
+        """Test with negative shear rates."""
+        model = Cross()
+        model.parameters.set_value("eta0", 100.0)
+        model.parameters.set_value("eta_inf", 1.0)
+        model.parameters.set_value("lambda_", 1.0)
+        model.parameters.set_value("m", 1.0)
+
+        gamma_dot_pos = np.array([1.0, 10.0, 100.0])
+        gamma_dot_neg = -gamma_dot_pos
+
+        viscosity_pos = model.predict(gamma_dot_pos)
+        viscosity_neg = model.predict(gamma_dot_neg)
+
+        # Should be identical (using absolute value)
+        np.testing.assert_allclose(viscosity_pos, viscosity_neg, rtol=1e-6)
+
 
 class TestCrossRheoData:
     """Test with RheoData."""
