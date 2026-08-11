@@ -936,7 +936,7 @@ def plot_variant_comparison(
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
                 )
-        except Exception:
+        except (ValueError, TypeError, AttributeError, RuntimeError):
             continue
 
         y_pred = np.asarray(y_pred).flatten()
@@ -1012,7 +1012,7 @@ def plot_bell_nu_sweep(
                 y_pred = np.asarray(
                     model.predict(x_data, test_mode=protocol, **predict_kwargs)
                 )
-        except Exception:
+        except (ValueError, TypeError, AttributeError, RuntimeError):
             continue
 
         y_pred = np.asarray(y_pred).flatten()
@@ -1517,13 +1517,13 @@ def save_tnt_results(
     if param_names is None:
         param_names = list(model.parameters.keys())
 
-    # Save NLSQ point estimates
+    # Save NLSQ point estimates. get_value() returns None (not KeyError) for
+    # a name that isn't on this model's ParameterSet, so check explicitly.
     nlsq_params = {}
     for name in param_names:
-        try:
-            nlsq_params[name] = float(model.parameters.get_value(name))
-        except (KeyError, AttributeError):
-            pass
+        value = model.parameters.get_value(name)
+        if value is not None:
+            nlsq_params[name] = float(value)
 
     with open(output_dir / f"nlsq_params_{protocol}.json", "w") as f:
         json.dump(nlsq_params, f, indent=2)
@@ -1773,19 +1773,14 @@ def print_parameter_comparison(
     print("-" * 75)
 
     for name in param_names:
-        try:
-            nlsq_val = model.parameters.get_value(name)
-            if name not in posterior:
-                continue
-            samples = posterior[name]
-            median = float(np.median(samples))
-            lo = float(np.percentile(samples, 2.5))
-            hi = float(np.percentile(samples, 97.5))
-            print(
-                f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]"
-            )
-        except (KeyError, AttributeError):
-            pass
+        nlsq_val = model.parameters.get_value(name)
+        if nlsq_val is None or name not in posterior:
+            continue
+        samples = posterior[name]
+        median = float(np.median(samples))
+        lo = float(np.percentile(samples, 2.5))
+        hi = float(np.percentile(samples, 97.5))
+        print(f"{name:>15s}  {nlsq_val:12.4g}  {median:12.4g}  [{lo:.4g}, {hi:.4g}]")
 
 
 def compute_fit_quality(y_data: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:

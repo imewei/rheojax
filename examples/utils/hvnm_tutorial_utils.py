@@ -13,6 +13,7 @@ Data Sources (all local):
 
 import json
 import os
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -445,11 +446,20 @@ def load_multi_technique() -> dict[str, ProtocolData]:
             if not line or line.startswith("["):
                 break
             vals = line.split("\t")
-            try:
-                row = [float(v) for v in vals]
-                rows.append(row)
-            except ValueError:
+            if len(vals) != len(headers):
                 continue
+            # Columns like "Date and time" / "Termination reason" are
+            # non-numeric text; coerce them to NaN instead of dropping the
+            # whole row, otherwise every row in a TRIOS export is discarded
+            # (all export rows carry a timestamp column) and this returns an
+            # empty dict for every step.
+            row = []
+            for v in vals:
+                try:
+                    row.append(float(v))
+                except ValueError:
+                    row.append(np.nan)
+            rows.append(row)
 
         if not rows:
             continue
@@ -470,6 +480,21 @@ def load_multi_technique() -> dict[str, ProtocolData]:
             strain_pct = arr[:, strain_idx]
             G_prime = arr[:, Gp_idx] * 1e6  # MPa -> Pa
             G_double_prime = arr[:, Gdp_idx] * 1e6
+
+            valid = np.isfinite(strain_pct) & np.isfinite(G_prime)
+            valid &= np.isfinite(G_double_prime)
+            if not valid.all():
+                warnings.warn(
+                    f"load_multi_technique: dropping {int((~valid).sum())} "
+                    f"row(s) with non-numeric strain/modulus values in "
+                    f"{step_name!r}",
+                    stacklevel=2,
+                )
+                strain_pct, G_prime, G_double_prime = (
+                    strain_pct[valid],
+                    G_prime[valid],
+                    G_double_prime[valid],
+                )
 
             result["amplitude_sweep"] = ProtocolData(
                 protocol="amplitude_sweep",
@@ -818,14 +843,30 @@ def plot_ppc(
     orig_vals = {p: model.parameters.get_value(p) for p in param_names}
 
     ppc_curves = []
+    n_dropped = 0
     for idx in draw_indices:
         for p in param_names:
             model.parameters.set_value(p, float(np.array(posterior[p])[idx]))
         try:
-            y_draw = model.predict(x, test_mode=data.protocol, **data.protocol_kwargs)
-            ppc_curves.append(np.asarray(y_draw))
+            y_draw = np.asarray(
+                model.predict(x, test_mode=data.protocol, **data.protocol_kwargs)
+            )
         except Exception:
+            n_dropped += 1
             continue
+        if np.all(np.isfinite(y_draw)):
+            ppc_curves.append(y_draw)
+        else:
+            n_dropped += 1
+
+    if n_dropped:
+        warnings.warn(
+            f"plot_ppc: dropped {n_dropped}/{len(draw_indices)} posterior draws "
+            "(prediction raised or produced non-finite values); the plotted "
+            "credible band is computed from the remaining draws only and may "
+            "understate true uncertainty.",
+            stacklevel=2,
+        )
 
     # Restore
     for p, v in orig_vals.items():
@@ -889,10 +930,16 @@ def plot_trace_and_forest(
     """
     import arviz as az
 
+    from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
+
     idata = result.to_inference_data()
 
-    axes = az.plot_trace(idata, var_names=param_names, figsize=figsize_trace)
-    fig_trace = axes.ravel()[0].figure
+    # ArviZ 1.x: figsize goes through figure_kwargs, not a direct kwarg; the
+    # return value is a PlotCollection, not an ndarray of Axes.
+    axes = az.plot_trace(
+        idata, var_names=param_names, figure_kwargs={"figsize": figsize_trace}
+    )
+    fig_trace = arviz_figure(axes)
     fig_trace.suptitle("Trace Plots", fontsize=14, y=1.02)
     plt.tight_layout()
 
@@ -900,10 +947,11 @@ def plot_trace_and_forest(
         idata,
         var_names=param_names,
         combined=True,
-        hdi_prob=0.95,
-        figsize=figsize_forest,
+        **arviz_plot_kwargs(
+            az, "plot_forest", hdi_prob=0.95, figure_kwargs={"figsize": figsize_forest}
+        ),
     )
-    fig_forest = axes.ravel()[0].figure
+    fig_forest = arviz_figure(axes)
     plt.tight_layout()
 
     return fig_trace, fig_forest

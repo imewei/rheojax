@@ -74,7 +74,7 @@ def load_polystyrene_oscillation(
             f"Expected at: examples/data/oscillation/polystyrene/oscillation_ps{temp}_data.csv"
         )
 
-    raw = np.loadtxt(data_path, delimiter=",", skiprows=1)
+    raw = np.loadtxt(data_path, delimiter="\t", skiprows=1)
     omega = raw[:, 0]
     G_prime = raw[:, 1]
     G_double_prime = raw[:, 2]
@@ -102,7 +102,7 @@ def load_mucus_creep() -> tuple[np.ndarray, np.ndarray]:
             "Expected at: examples/data/creep/biological/creep_mucus_data.csv"
         )
 
-    raw = np.loadtxt(data_path, delimiter=",", skiprows=1)
+    raw = np.loadtxt(data_path, delimiter="\t", skiprows=1)
     time = raw[:, 0]
     strain = raw[:, 1]
 
@@ -137,7 +137,7 @@ def load_polymer_relaxation(name: str = "ps145") -> tuple[np.ndarray, np.ndarray
             f"Expected at: examples/data/relaxation/polymers/stressrelaxation_{name}_data.csv"
         )
 
-    raw = np.loadtxt(data_path, delimiter=",", skiprows=1)
+    raw = np.loadtxt(data_path, delimiter="\t", skiprows=1)
     time = raw[:, 0]
     G_t = raw[:, 1]
 
@@ -271,7 +271,9 @@ def generate_synthetic_startup(
 
     # Add noise
     rng = np.random.default_rng(seed)
-    noise = rng.normal(0, noise_level * np.mean(stress_clean), size=stress_clean.shape)
+    noise = rng.normal(
+        0, noise_level * np.mean(np.abs(stress_clean)), size=stress_clean.shape
+    )
     stress = stress_clean + noise
 
     return time, stress

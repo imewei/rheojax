@@ -587,21 +587,24 @@ def plot_trace_and_forest(
     """
     import arviz as az
 
+    from rheojax.core.arviz_utils import arviz_figure, arviz_plot_kwargs
+
     idata = result.to_inference_data()
 
-    axes = az.plot_trace(idata, var_names=param_names, figsize=figsize_trace)
-    fig_trace = axes.ravel()[0].figure
+    trace_result = az.plot_trace(idata, var_names=param_names)
+    fig_trace = arviz_figure(trace_result)
+    fig_trace.set_size_inches(*figsize_trace)
     fig_trace.suptitle("Trace Plots", fontsize=14, y=1.02)
     plt.tight_layout()
 
-    axes = az.plot_forest(
+    forest_result = az.plot_forest(
         idata,
-        var_names=param_names,
-        combined=True,
-        hdi_prob=0.95,
-        figsize=figsize_forest,
+        **arviz_plot_kwargs(
+            az, "plot_forest", var_names=param_names, combined=True, hdi_prob=0.95
+        ),
     )
-    fig_forest = axes.ravel()[0].figure
+    fig_forest = arviz_figure(forest_result)
+    fig_forest.set_size_inches(*figsize_forest)
     plt.tight_layout()
 
     return fig_trace, fig_forest

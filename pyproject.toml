@@ -321,6 +321,11 @@ ignore = [
 "examples/**/*.ipynb" = ["B", "C", "E", "F", "W", "I", "UP"]  # Example notebooks: suppress all lint rules (syntax errors from shell/magic cells)
 "docs/source/conf.py" = ["F401"]  # Sphinx config checks imports for availability
 
+[tool.bandit]
+# Mirrors the ruff S101 ignore above: pytest requires bare `assert` statements,
+# and production code uses assert for internal invariants, not I/O validation.
+skips = ["B101"]
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = false  # Allow Any returns for JAX arrays

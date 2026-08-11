@@ -30,21 +30,29 @@ def reject_removed_options(options: Mapping[str, object]) -> None:
     )
 
 
-def validate_predict_input(X: object, *, name: str = "X") -> None:
+def validate_predict_input(
+    X: object, *, name: str = "X", check_monotonic: bool = True
+) -> None:
     """Validate a predict() input array at the public API boundary.
 
-    Checks for NaNs and, for a 1-D axis (time/frequency), monotonic
-    non-decreasing ordering. Runs as a host-side NumPy check (eager, not
-    inside JIT) so it raises a clear error before bad data ever reaches an
-    ODE solver, where a NaN silently produces garbage instead of an error.
+    Checks for NaNs and, for a 1-D axis, monotonic non-decreasing ordering.
+    Runs as a host-side NumPy check (eager, not inside JIT) so it raises a
+    clear error before bad data ever reaches an ODE solver, where a NaN
+    silently produces garbage instead of an error.
 
     Args:
         X: Input array-like (NumPy or JAX array).
         name: Name used in the raised error message.
+        check_monotonic: Whether to enforce non-decreasing ordering. Only
+            true time/frequency axes (relaxation, creep, oscillation,
+            startup) need this; a steady-state flow-curve/rotation axis is
+            shear rate, not time, and real rheometer sweeps (up/down loops,
+            unsorted rate lists) are legitimately non-monotonic there.
+            Callers pass ``False`` for those test modes.
 
     Raises:
-        ValueError: If X contains NaN, is empty, or if a 1-D X is not
-            monotonically non-decreasing.
+        ValueError: If X contains NaN, is empty, or (when check_monotonic)
+            if a 1-D X is not monotonically non-decreasing.
     """
     arr = np.asarray(X)
     if arr.size == 0:
@@ -53,7 +61,12 @@ def validate_predict_input(X: object, *, name: str = "X") -> None:
         raise ValueError(
             f"{name} contains NaN value(s); check input data for missing/invalid entries."
         )
-    if arr.ndim == 1 and arr.size > 1 and np.issubdtype(arr.dtype, np.number):
+    if (
+        check_monotonic
+        and arr.ndim == 1
+        and arr.size > 1
+        and np.issubdtype(arr.dtype, np.number)
+    ):
         if np.any(np.diff(arr) < 0):
             raise ValueError(
                 f"{name} must be monotonically non-decreasing (e.g. a time/frequency axis)."

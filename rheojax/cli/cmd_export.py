@@ -7,7 +7,7 @@ stdin.
 Usage:
     rheojax export analysis.h5 --output export/ --format directory
     rheojax export analysis.h5 --output bundle.xlsx --format excel
-    rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
+    rheojax load data.csv --json | rheojax export - --output ./out
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ Examples:
   # Export to Excel workbook
   rheojax export analysis.h5 --output summary.xlsx --format excel
 
-  # Pipe fit results directly into export
-  rheojax fit data.csv --model maxwell --json | rheojax export - --output ./out
+  # Pipe a loaded data envelope directly into export
+  rheojax load data.csv --json | rheojax export - --output ./out
         """,
     )
 
@@ -113,7 +113,7 @@ def _build_pipeline_from_envelope(envelope: dict):
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
             "Could not construct a Pipeline from the stdin envelope. "
-            "Pipe from 'rheojax fit --json' or provide an HDF5 file."
+            "Pipe from 'rheojax load --json' or provide an HDF5 file."
         ) from exc
 
 

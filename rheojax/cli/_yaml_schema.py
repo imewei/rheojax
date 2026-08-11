@@ -311,7 +311,7 @@ def validate_config(config: PipelineConfig) -> list[str]:
                             transform=transform_name,
                             available=registered,
                         )
-                except Exception:
+                except (ImportError, AttributeError):
                     pass  # Registry not available at validation time
 
         if step_type == "fit":
@@ -320,7 +320,7 @@ def validate_config(config: PipelineConfig) -> list[str]:
         # Validate Bayesian sampling parameter ranges to prevent OOM.
         if step_type == "bayesian":
             for key, (lo, hi) in BAYESIAN_PARAM_LIMITS.items():
-                val = step.get(key)
+                val = effective.get(key)
                 if val is not None:
                     try:
                         ival = int(val)

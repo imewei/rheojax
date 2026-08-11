@@ -5,7 +5,7 @@ keeping this module as a thin argument-parsing wrapper.
 
 Usage:
     rheojax run pipeline.yaml
-    rheojax run pipeline.yaml --override model=springpot --override max_iter=2000
+    rheojax run pipeline.yaml --override defaults.model=springpot --override defaults.max_iter=2000
     rheojax run pipeline.yaml --dry-run
 """
 
@@ -39,10 +39,10 @@ Examples:
   rheojax run my_pipeline.yaml
 
   # Override a config value at runtime
-  rheojax run my_pipeline.yaml --override model=springpot
+  rheojax run my_pipeline.yaml --override defaults.model=springpot
 
   # Override multiple values
-  rheojax run pipeline.yaml --override model=maxwell --override max_iter=5000
+  rheojax run pipeline.yaml --override defaults.model=maxwell --override defaults.max_iter=5000
 
   # Preview without executing
   rheojax run pipeline.yaml --dry-run
@@ -63,8 +63,9 @@ Examples:
         default=[],
         metavar="KEY=VALUE",
         help=(
-            "Override a config key at runtime, e.g. --override model=maxwell "
-            "(repeatable, dot-notation supported: steps.0.model=maxwell)"
+            "Override a config key at runtime, e.g. --override defaults.model=maxwell "
+            "(repeatable; path must start with 'defaults.' or 'steps.<index>.', "
+            "e.g. steps.0.model=maxwell)"
         ),
     )
     parser.add_argument(

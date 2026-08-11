@@ -110,6 +110,46 @@ def test_unsupported_leaf_type_raises_type_error(tmp_path):
         write_result_arrays(path, {"bad": Unsupported()})
 
 
+def test_dataclass_and_array_like_extras_roundtrip(tmp_path):
+    # Transform extras (unlike nlsq/nuts results) may hold a transform's own
+    # @dataclass result type (e.g. CoxMerzResult) or a non-ndarray array-like
+    # (e.g. a JAX array) rather than a plain dict/np.ndarray -- both used to
+    # hard-fail with TypeError before _write_walk learned to unwrap them.
+    import dataclasses
+
+    @dataclasses.dataclass
+    class FakeResult:
+        shift_factors: np.ndarray
+        label: str
+
+    class ArrayLike:
+        def __array__(self):
+            return np.array([7.0, 8.0])
+
+    path = tmp_path / "extras_result.hdf5"
+    result = {
+        "cox_merz_result": FakeResult(np.array([1.0, 2.0]), "ok"),
+        "raw": ArrayLike(),
+    }
+    json_shape = write_result_arrays(path, result)
+    restored = read_result_arrays(path, json_shape)
+    np.testing.assert_array_equal(
+        restored["cox_merz_result"]["shift_factors"], [1.0, 2.0]
+    )
+    assert restored["cox_merz_result"]["label"] == "ok"
+    np.testing.assert_array_equal(restored["raw"], [7.0, 8.0])
+
+
+def test_read_result_arrays_rejects_non_dict_json_shape(tmp_path):
+    # A missing/null "*_meta" sibling in a hand-edited or corrupted archive
+    # used to surface as an unhandled AttributeError inside .items() below,
+    # bypassing every caller's "load failed" ValueError/OSError handling.
+    path = tmp_path / "empty.hdf5"
+    write_result_arrays(path, {})
+    with pytest.raises(ValueError, match="expected a dict"):
+        read_result_arrays(path, None)
+
+
 def _dataset_ref(id_):
     return DatasetRef(
         id=id_,
@@ -245,7 +285,10 @@ def test_save_project_v2_multi_dataset_multi_slice_archive(tmp_path):
         assert input_ref is not None and output_ref is not None
         assert f"transform_results/{input_ref}.hdf5" in names
         assert f"transform_results/{output_ref}.hdf5" in names
-        assert transform["result_extras"] == {"warnings": ["clipped 2 points"]}
+        extras_ref = transform["result_extras_ref"]
+        assert extras_ref is not None
+        assert f"transform_results/{extras_ref}.hdf5" in names
+        assert transform["result_extras_meta"] == {"warnings": ["clipped 2 points"]}
 
         pipeline = json.loads(zf.read("pipeline.json"))
         assert pipeline["name"] == "batch-a"
@@ -335,6 +378,40 @@ def test_round_trip_full_state(tmp_path):
     assert loaded.transform.result["protocol_type"] == "oscillation"
     np.testing.assert_array_equal(loaded.transform.result["input"].x, payload.x)
     np.testing.assert_array_equal(loaded.transform.result["output"].x, payload.x)
+
+
+def test_transform_result_extras_array_value_round_trips(tmp_path):
+    """The actual bug this fix addresses: transform.result extras (e.g.
+    TransformWorker's tr.extras -- FFT harmonics, mastercurve shift factors) may hold
+    a numpy array, which plain json.dumps() cannot serialize. Before the fix,
+    transform_dict["result_extras"] embedded raw_extras directly and save_project_v2
+    crashed on any array-valued extras key. test_round_trip_full_state's extras only
+    covered a JSON-safe str value ("protocol_type"), and
+    test_save_project_v2_multi_dataset_multi_slice_archive's extras only covered a
+    JSON-safe list-of-str ("warnings") and never calls load_project_v2 at all -- so
+    neither exercised the array code path this test targets."""
+    state = AppState()
+    state.transform = TransformState(
+        transform_key="fft_analysis",
+        result={
+            "input": RheoData(
+                x=[1.0, 2.0], y=[3.0, 4.0], initial_test_mode="oscillation"
+            ),
+            "output": RheoData(
+                x=[1.0, 2.0], y=[5.0, 6.0], initial_test_mode="oscillation"
+            ),
+            "harmonics": np.array([1.0, 2.0, 3.0, 4.0]),
+        },
+    )
+
+    path = tmp_path / "project.rheojax"
+    save_project_v2(state, path)
+    loaded = load_project_v2(path)
+
+    harmonics = loaded.transform.result["harmonics"]
+    assert isinstance(harmonics, np.ndarray)
+    assert harmonics.dtype == np.array([1.0, 2.0, 3.0, 4.0]).dtype
+    np.testing.assert_array_equal(harmonics, np.array([1.0, 2.0, 3.0, 4.0]))
 
 
 def test_save_project_with_list_valued_transform_input_does_not_crash(tmp_path):

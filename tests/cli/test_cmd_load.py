@@ -124,3 +124,34 @@ class TestMainWithCsv:
         captured = capsys.readouterr()
         parsed = json.loads(captured.out.strip())
         assert isinstance(parsed, dict)
+
+    @pytest.mark.unit
+    def test_main_format_flag_is_forwarded_to_auto_load(self, csv_file, monkeypatch):
+        # Regression: --format was parsed into parsed.file_format but never
+        # added to load_kwargs, so auto_load() always ran its own
+        # extension-based format sniffing and --format was silently a no-op.
+        from rheojax.io import auto_load as real_auto_load
+
+        received_kwargs: dict = {}
+
+        def spy_auto_load(path, **kwargs):
+            received_kwargs.update(kwargs)
+            return real_auto_load(path, **kwargs)
+
+        monkeypatch.setattr("rheojax.io.auto_load", spy_auto_load)
+
+        result = main(
+            [
+                str(csv_file),
+                "--format",
+                "csv",
+                "--x-col",
+                "time",
+                "--y-col",
+                "stress",
+                "--test-mode",
+                "relaxation",
+            ]
+        )
+        assert result == 0
+        assert received_kwargs.get("format") == "csv"

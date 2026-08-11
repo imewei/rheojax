@@ -223,7 +223,7 @@ def load_polymer_creep(temp: int = 145) -> tuple[np.ndarray, np.ndarray]:
             f"Expected at: examples/data/creep/polymers/creep_ps{temp}_data.csv"
         )
 
-    raw = np.loadtxt(data_path, delimiter=",", skiprows=1)
+    raw = np.loadtxt(data_path, delimiter="\t", skiprows=1)
     time = raw[:, 0]
     compliance = raw[:, 1]
 
@@ -293,25 +293,22 @@ def generate_hl_synthetic(
         omega_max = kwargs.get("omega_max", 100.0)
         omega = np.logspace(np.log10(omega_min), np.log10(omega_max), n_points)
 
-        # For SAOS, we predict G* (complex modulus)
-        # HL doesn't have a direct SAOS prediction in the current API,
-        # so we generate simplified synthetic data based on HL physics
-        alpha = params.get("alpha", 0.3)
-        tau = params.get("tau", 1.0)
-        sigma_c = params.get("sigma_c", 1.0)
+        # HL has a direct SAOS prediction (population-balance PDE kernel);
+        # predict() accepts test_mode without requiring a prior fit() call.
+        G_star_clean = np.asarray(model.predict(omega, test_mode="saos"))
+        G_prime = np.real(G_star_clean)
+        G_double_prime = np.imag(G_star_clean)
 
-        # Simplified HL SAOS response (elastic plateau modulated by alpha)
-        G0 = sigma_c  # Approximate elastic modulus
-        omega_tau = omega * tau
-
-        # G' ~ G0 * (omega*tau)^2 / (1 + (omega*tau)^2) but modified by alpha
-        G_prime = G0 * (omega_tau ** (2 * alpha)) / (1 + omega_tau ** (2 * alpha))
-        G_double_prime = G0 * omega_tau**alpha / (1 + omega_tau ** (2 * alpha))
-
-        # Add noise
-        noise_p = rng.normal(0, noise_level * np.mean(G_prime), size=G_prime.shape)
+        # Add noise (np.abs() on the scale only, not the data: the HL kernel's
+        # G'' can be negative for some parameter regimes, and a negative mean
+        # would otherwise raise ValueError: scale < 0 in rng.normal)
+        noise_p = rng.normal(
+            0, noise_level * np.mean(np.abs(G_prime)), size=G_prime.shape
+        )
         noise_pp = rng.normal(
-            0, noise_level * np.mean(G_double_prime), size=G_double_prime.shape
+            0,
+            noise_level * np.mean(np.abs(G_double_prime)),
+            size=G_double_prime.shape,
         )
 
         G_star = np.column_stack([G_prime + noise_p, G_double_prime + noise_pp])

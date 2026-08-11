@@ -570,10 +570,9 @@ def save_ikh_results(
     # Save NLSQ point estimates
     nlsq_params = {}
     for name in param_names:
-        try:
-            nlsq_params[name] = float(model.parameters.get_value(name))
-        except (KeyError, AttributeError):
-            pass
+        value = model.parameters.get_value(name)
+        if value is not None:
+            nlsq_params[name] = float(value)
 
     with open(output_dir / f"nlsq_params_{protocol}.json", "w") as f:
         json.dump(nlsq_params, f, indent=2)
@@ -856,11 +855,14 @@ def compute_armstrong_frederick_backstress(
 ) -> np.ndarray:
     """Compute kinematic hardening backstress evolution.
 
-    The Armstrong-Frederick rule:
-    dα/dε_p = (2/3)C - γ_dyn * α * sign(dε_p)
+    rheojax's MIKH kernel (rheojax/models/ikh/_kernels.py) uses the 1D shear
+    Armstrong-Frederick rule dα/dt = C·γ̇ᵖ - γ_dyn·|α|^(m-1)·α·|γ̇ᵖ| (no
+    deviatoric 2/3 factor, unlike the classical multiaxial von Mises
+    convention). For the model's default exponent m=1 and monotonic loading:
+    dα/dε_p = C - γ_dyn * α
 
     For monotonic loading with ε_p starting from 0:
-    α = (2C/3γ_dyn) * (1 - exp(-γ_dyn * ε_p))
+    α = (C/γ_dyn) * (1 - exp(-γ_dyn * ε_p))
 
     Args:
         strain_plastic: Plastic strain array.
@@ -868,10 +870,10 @@ def compute_armstrong_frederick_backstress(
         gamma_dyn: Dynamic recovery parameter.
 
     Returns:
-        Backstress array (Pa).
+        Backstress array (Pa). Valid for AF exponent m=1 (rheojax default).
     """
     eps_p = np.abs(strain_plastic)
-    saturation = 2 * C / (3 * gamma_dyn)
+    saturation = C / gamma_dyn
     return saturation * (1 - np.exp(-gamma_dyn * eps_p))
 
 

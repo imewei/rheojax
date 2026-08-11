@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 import pytest
 
@@ -91,3 +92,43 @@ class TestMainErrors:
             ]
         )
         assert result == 1
+
+
+class TestMainJsonOutput:
+    @pytest.mark.unit
+    def test_json_stdout_is_valid_json_with_no_extra_text(self, tmp_path, capsys):
+        # Regression: progress lines ("Found N file(s)...", "[i/n] ... OK") used
+        # to print to stdout unconditionally, so `rheojax batch --json` interleaved
+        # them with the final json.dumps(all_results), making stdout unparseable
+        # for a downstream `| jq` or `| rheojax ...` consumer.
+        csv_file = tmp_path / "sample.csv"
+        csv_file.write_text(
+            "time,stress\n"
+            "0.1,4.756\n"
+            "0.5,3.894\n"
+            "1.0,3.033\n"
+            "2.0,1.839\n"
+            "3.0,1.115\n"
+            "4.0,0.677\n"
+            "5.0,0.410\n"
+        )
+
+        result = main(
+            [
+                str(tmp_path / "*.csv"),
+                "--model",
+                "maxwell",
+                "--test-mode",
+                "relaxation",
+                "--max-iter",
+                "50",
+                "--json",
+            ]
+        )
+
+        captured = capsys.readouterr()
+        assert result == 0
+        parsed = json.loads(captured.out)
+        assert isinstance(parsed, list)
+        assert len(parsed) == 1
+        assert parsed[0]["status"] == "success"

@@ -1450,3 +1450,37 @@ class TestPredictInputValidation:
         model = self._make_model()
         with pytest.raises(ValueError, match="monotonic"):
             model.predict(np.array([1.0, 3.0, 2.0]))
+
+    def _make_mode_aware_model(self):
+        class ModeAwareDummyModel(BaseModel):
+            def _fit(self, X, y, **kwargs):
+                return self
+
+            def _predict(self, X, **kwargs):
+                return X
+
+        return ModeAwareDummyModel()
+
+    def test_predict_does_not_skip_monotonicity_via_stale_test_mode(self):
+        """Regression: a prior fit()/predict(test_mode=...) call must not leak
+        into a later, unrelated predict() call. self._test_mode is persistent
+        instance state, not scoped to a single call -- trusting it here let
+        any predict() call on an already-configured multi-protocol model
+        silently skip the monotonicity guard, regardless of what the new X
+        actually represents (see PR #110 review)."""
+        model = self._make_mode_aware_model()
+        model._test_mode = "flow_curve"  # simulates a prior fit(test_mode='flow_curve')
+        with pytest.raises(ValueError, match="monotonic"):
+            model.predict(np.array([1.0, 3.0, 2.0]))
+
+    def test_predict_skips_monotonicity_for_explicit_flow_curve_this_call(self):
+        """The skip must still work when test_mode is resolved for *this*
+        call (kwarg), which is the legitimate, intended path."""
+        model = self._make_mode_aware_model()
+        result = model.predict(np.array([1.0, 3.0, 2.0]), test_mode="flow_curve")
+        np.testing.assert_array_equal(result, np.array([1.0, 3.0, 2.0]))
+
+    def test_predict_skips_monotonicity_for_explicit_rotation_this_call(self):
+        model = self._make_mode_aware_model()
+        result = model.predict(np.array([1.0, 3.0, 2.0]), test_mode="rotation")
+        np.testing.assert_array_equal(result, np.array([1.0, 3.0, 2.0]))

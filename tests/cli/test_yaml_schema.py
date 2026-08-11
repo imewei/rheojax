@@ -115,6 +115,26 @@ class TestValidateConfig:
         assert any("num_chains" in e and "between" in e for e in errors)
 
     @pytest.mark.unit
+    def test_bayesian_defaults_num_samples_out_of_range_is_error(self):
+        # Regression: the OOM guard used to read step.get(key), which misses
+        # limits set only via config.defaults (and merged into the step's
+        # effective kwargs at execution time by _yaml_runner.config_to_builder).
+        # A pipeline with no step-local num_samples override, but an unsafe
+        # defaults.num_samples, used to pass validation and then OOM at runtime.
+        config = PipelineConfig(
+            version="1",
+            name="Pipeline",
+            defaults={"num_samples": 999_999},
+            steps=[
+                {"type": "load", "file": "data.csv"},
+                {"type": "fit", "model": "maxwell"},
+                {"type": "bayesian"},
+            ],
+        )
+        errors = validate_config(config)
+        assert any("num_samples" in e and "between" in e for e in errors)
+
+    @pytest.mark.unit
     def test_bayesian_valid_params_pass(self):
         config = PipelineConfig(
             version="1",
@@ -231,7 +251,7 @@ class TestPathSafety:
             name="P",
             steps=[
                 {"type": "load", "file": "data.csv"},
-                {"type": "export", "output": "/tmp/evil"},
+                {"type": "export", "output": "/etc/evil"},
             ],
         )
         errors = validate_config(config)
