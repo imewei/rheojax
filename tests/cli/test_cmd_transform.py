@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 import numpy as np
 import pytest
@@ -75,6 +76,40 @@ class TestMainErrors:
         csv_file.write_text("time,stress\n0.1,100\n0.2,90\n")
         result = main(["totally_unknown_transform_xyz", "--input", str(csv_file)])
         assert result == 1
+
+
+class TestMainJsonOutputForTupleReturningTransforms:
+    """PronyConversion and SpectrumInversion's _transform returns
+    (RheoData, extras_dict), not a bare RheoData. Before the fix,
+    `hasattr(result, "x")` was False on that tuple, so --json silently
+    wrote {"data": {"x": [], "y": []}} and exited 0 instead of surfacing
+    real (or a failure) output."""
+
+    @pytest.mark.unit
+    def test_prony_conversion_json_output_is_not_empty(self, tmp_path, capsys):
+        csv_file = tmp_path / "relax.csv"
+        t = [0.01 * (1.3**i) for i in range(30)]
+        g = [1e5 * pow(2.718281828, -ti) + 1e3 for ti in t]
+        rows = "\n".join(f"{ti},{gi}" for ti, gi in zip(t, g))
+        csv_file.write_text(f"time,G_t\n{rows}\n")
+
+        result = main(
+            [
+                "prony_conversion",
+                "--input",
+                str(csv_file),
+                "--x-col",
+                "time",
+                "--y-col",
+                "G_t",
+                "--json",
+            ]
+        )
+
+        assert result == 0
+        envelope = json.loads(capsys.readouterr().out)
+        assert len(envelope["data"]["x"]) > 0
+        assert len(envelope["data"]["y"]) > 0
 
 
 class TestLoadFromEnvelope:

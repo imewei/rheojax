@@ -1041,3 +1041,38 @@ class TestGMMResidualModes:
         )
         pred = model.predict(omega)
         assert np.all(np.isfinite(pred))
+
+
+class TestCreepElasticJump:
+    """Regression: creep must include the t=0 instantaneous elastic response.
+
+    The scan integrates [0, t[0]] as a single step. Starting from eps=0 spread
+    the step-stress strain jump across that interval as a linear ramp, so on a
+    log-spaced grid (where t[0] never shrinks with N) the error was frozen and
+    did not vanish under refinement.
+    """
+
+    def test_single_mode_creep_matches_maxwell_closed_form(self):
+        G0, eta = 1000.0, 500.0
+        tau = eta / G0
+        model = GeneralizedMaxwell(1)
+        model.parameters.set_value("G_inf", 0.0)
+        model.parameters.set_value("G_1", G0)
+        model.parameters.set_value("tau_1", tau)
+
+        t = np.logspace(-2, 2, 30)
+        J = np.asarray(model._predict_creep(t), dtype=float)
+
+        # Maxwell fluid: J(t) = 1/G0 + t/eta  (exact for a 1-mode Prony creep)
+        np.testing.assert_allclose(J, 1.0 / G0 + t / eta, rtol=1e-10)
+
+    def test_creep_glassy_limit_is_inverse_instantaneous_modulus(self):
+        E_inf, Es, taus = 200.0, [1000.0, 500.0], [0.01, 0.1]
+        model = GeneralizedMaxwell(2)
+        model.parameters.set_value("G_inf", E_inf)
+        for i, (E, tt) in enumerate(zip(Es, taus), start=1):
+            model.parameters.set_value(f"G_{i}", E)
+            model.parameters.set_value(f"tau_{i}", tt)
+
+        J = np.asarray(model._predict_creep(np.array([1e-12])), dtype=float)
+        assert J[0] == pytest.approx(1.0 / (E_inf + sum(Es)), rel=1e-6)

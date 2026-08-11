@@ -34,12 +34,31 @@ def test_param_form_edit_updates_config_and_emits_edited(qtbot):
 
 
 def test_no_param_form_for_transform_without_configurable_params(qtbot):
-    st = TransformState(transform_key="fft_analysis")
+    # Uses an unregistered key rather than a real one: every registered
+    # transform declares configurable params. This previously passed with
+    # "fft_analysis" only because get_transform_params() skipped the
+    # registry-key -> legacy-key normalization and returned {} for it, which
+    # also meant FFT/SPP/derivative rendered no parameter UI at all. The
+    # behaviour under test is the empty-params guard, not that any particular
+    # transform lacks params.
+    st = TransformState(transform_key="not_a_registered_transform")
     step = SlotsStep(st, DatasetLibrary())
     qtbot.addWidget(step)
 
     assert step._param_form is None
     assert st.config == {}
+
+
+def test_param_form_renders_for_registry_key_not_just_legacy_alias(qtbot):
+    # Regression guard for the normalization bug above: the picker writes the
+    # registry key ("fft_analysis"), while the param spec table is keyed on the
+    # legacy dispatch name ("fft"). Both must resolve to the same spec.
+    st = TransformState(transform_key="fft_analysis")
+    step = SlotsStep(st, DatasetLibrary())
+    qtbot.addWidget(step)
+
+    assert step._param_form is not None
+    assert st.config["direction"] == "forward"
 
 
 def test_edited_param_value_survives_a_refresh_triggered_by_list_slot_edit(qtbot):

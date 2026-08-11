@@ -311,7 +311,16 @@ def _fit_prony_relaxation(
     A = np.exp(-t[:, None] / tau_i[None, :])
 
     # Solve non-negative least squares: G(t) - G_e ≈ A @ G_i
-    b = np.maximum(G_t - G_e, 0.0)
+    b = G_t - G_e
+    neg_mask = b < 0
+    if np.any(neg_mask):
+        n_neg = int(np.sum(neg_mask))
+        warnings.warn(
+            f"Prony fit: {n_neg} negative target values clipped to zero "
+            "(noisy data or overestimated G_e).",
+            stacklevel=2,
+        )
+    b = np.maximum(b, 0.0)
     G_i, _ = nnls(A, b)
 
     return G_i, tau_i, G_e

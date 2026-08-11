@@ -191,6 +191,19 @@ def _add_batch_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _check_decomposer_args(args: Namespace) -> str | None:
+    """Return an error message if SPPDecomposer sizing args are degenerate.
+
+    SPPDecomposer accepts these unguarded, and zero/negative values produce
+    silently meaningless moduli rather than an error.
+    """
+    if args.n_harmonics < 1:
+        return f"Error: --n-harmonics must be >= 1, got {args.n_harmonics}"
+    if args.step_size < 1:
+        return f"Error: --step-size must be >= 1, got {args.step_size}"
+    return None
+
+
 def run_analyze(args: Namespace) -> int:
     """Run SPP analysis on a single file."""
     import numpy as np
@@ -206,6 +219,9 @@ def run_analyze(args: Namespace) -> int:
         return 1
     if args.gamma_0 <= 0:
         print("Error: --gamma-0 must be positive", file=sys.stderr)
+        return 1
+    if err := _check_decomposer_args(args):
+        print(err, file=sys.stderr)
         return 1
 
     logger.info(
@@ -408,6 +424,9 @@ def run_batch(args: Namespace) -> int:
 
     if args.omega <= 0:
         print("Error: --omega must be positive", file=sys.stderr)
+        return 1
+    if err := _check_decomposer_args(args):
+        print(err, file=sys.stderr)
         return 1
 
     input_dir = args.input_dir

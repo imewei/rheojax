@@ -15,6 +15,7 @@ import pandas as pd
 
 from rheojax.core.data import RheoData
 from rheojax.io import auto_load
+from rheojax.io.readers._utils import normalize_temperature
 from rheojax.io.readers.csv_reader import detect_csv_delimiter
 from rheojax.logging import get_logger
 
@@ -1227,7 +1228,13 @@ class DataService:
         Returns
         -------
         float or None
+            Temperature in **Kelvin** (see ``_extract_temperature_from_filename``
+            for why: ``Mastercurve``'s WLF/Arrhenius shift factors expect K).
+            The unit is inferred from a ``[C]``/``(K)``/``°F``-style suffix on
+            the matched column header, defaulting to Celsius when absent.
         """
+        import re
+
         import numpy as np
         import pandas as pd
 
@@ -1235,9 +1242,7 @@ class DataService:
         try:
             if suffix in {".csv", ".txt", ".dat", ".tsv"}:
                 delimiter = detect_csv_delimiter(file_path)
-                df = pd.read_csv(
-                    str(file_path), sep=delimiter, nrows=200, comment="#"
-                )
+                df = pd.read_csv(str(file_path), sep=delimiter, nrows=200, comment="#")
             elif suffix in {".xlsx", ".xls"}:
                 df = pd.read_excel(str(file_path), nrows=200)
             else:
@@ -1258,7 +1263,13 @@ class DataService:
             vals = pd.to_numeric(df[matched], errors="coerce").dropna().values
             if len(vals) == 0:
                 return None
-            return float(np.median(vals))
+            raw_value = float(np.median(vals))
+
+            unit_match = re.search(
+                r"[\[(]\s*°?([CKFckf])\s*[\])]|°([CKFckf])\b", str(matched)
+            )
+            unit = (unit_match.group(1) or unit_match.group(2)) if unit_match else "C"
+            return normalize_temperature(raw_value, unit=unit)
         except Exception:
             logger.debug(
                 "Temperature extraction failed",
@@ -1273,22 +1284,29 @@ class DataService:
         """Extract temperature from a filename like ``foam_dma_-5C.csv``.
 
         Recognises patterns such as ``_-5C``, ``_60C``, ``_25.5C``,
-        ``_-10°C``, or a bare trailing number like ``ttw_70``.
+        ``_-10°C``, ``_298K``.
+
+        A unit marker is required. A bare trailing number (``run_3``,
+        ``sample_20240115``) is *not* a temperature -- matching it fabricated
+        metadata out of replicate indices and dates, and its unit would be
+        unknowable even when the number really was a temperature.
 
         Returns
         -------
         float or None
-            Extracted temperature in °C, or ``None`` if no match.
+            Extracted temperature in **Kelvin** -- the unit every reader
+            canonicalises ``metadata["temperature"]`` to (see
+            ``io/readers/_utils.py``) and the unit ``Mastercurve``'s WLF/
+            Arrhenius shift factors expect. Returning °C here made
+            ``get_shift_factor`` evaluate ~273 K below the intended point.
+            ``None`` if no match.
         """
         import re
 
         stem = file_path.stem
-        # Pattern 1: number followed by C or °C (e.g., _-5C, _25.5°C)
-        m = re.search(r"[-_](-?\d+(?:\.\d+)?)\s*°?[Cc](?:\b|$)", stem)
+        # Number followed by an explicit C/°C or K unit (e.g. _-5C, _25.5°C, _298K)
+        m = re.search(r"[-_](-?\d+(?:\.\d+)?)\s*(°?[Cc]|[Kk])(?:\b|$)", stem)
         if m:
-            return float(m.group(1))
-        # Pattern 2: trailing number after separator (e.g., ttw_70)
-        m = re.search(r"[-_](-?\d+(?:\.\d+)?)$", stem)
-        if m:
-            return float(m.group(1))
+            value = float(m.group(1))
+            return value if m.group(2).upper() == "K" else value + 273.15
         return None

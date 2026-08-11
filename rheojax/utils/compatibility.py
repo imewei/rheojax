@@ -44,6 +44,15 @@ class MaterialType(Enum):
     UNKNOWN = "unknown"
 
 
+# The two detectors below emit disjoint vocabularies — _detect_from_relaxation
+# returns the VISCOELASTIC_* / GEL members, _detect_from_oscillation returns
+# SOLID / LIQUID. Compatibility rules must therefore test membership of the
+# solid-like or liquid-like family rather than a single enum member, or every
+# rule silently stops firing for one of the two data sources.
+_SOLID_LIKE = frozenset({MaterialType.SOLID, MaterialType.VISCOELASTIC_SOLID})
+_LIQUID_LIKE = frozenset({MaterialType.LIQUID, MaterialType.VISCOELASTIC_LIQUID})
+
+
 def detect_decay_type(t: np.ndarray, G_t: np.ndarray) -> DecayType:
     """Detect the type of relaxation decay from time-domain data.
 
@@ -388,15 +397,20 @@ def check_model_compatibility(
         material_type = detect_material_type(t=t, G_t=G_t)
     elif test_mode == "oscillation" and omega is not None and G_star is not None:
         material_type = detect_material_type(omega=omega, G_star=G_star)
-    elif test_mode is not None and test_mode not in ("relaxation", "oscillation"):
+    else:
         # COMPAT-002: Compatibility checking only supports relaxation and
         # oscillation data.  For other test_modes (flow_curve, startup, creep,
         # laos), we return an uninformative result.  Log a warning so callers
         # are not silently misled into thinking a full compatibility check ran.
+        # This also covers test_mode=None and the case where a supported
+        # test_mode was passed without its data arrays: neither detector ran,
+        # so every rule below would compare against UNKNOWN and report a
+        # vacuous compatible=True.
         logger.warning(
-            "check_model_compatibility: test_mode=%r is not supported for "
-            "compatibility analysis (only 'relaxation' and 'oscillation' are "
-            "implemented). Returning default compatible=True with low confidence.",
+            "check_model_compatibility: no material/decay detection ran for "
+            "test_mode=%r (only 'relaxation' and 'oscillation' are implemented, "
+            "and each needs its data arrays supplied). Returning default "
+            "compatible=True with low confidence.",
             test_mode,
         )
         # R7-COMPAT-001: Return early for unsupported test modes.
@@ -436,7 +450,7 @@ def check_model_compatibility(
         elif decay_type == DecayType.POWER_LAW:
             compatible = True
             confidence = 0.8
-        elif material_type == MaterialType.VISCOELASTIC_LIQUID:
+        elif material_type in _LIQUID_LIKE:
             compatible = False
             confidence = 0.7
             warnings.append(
@@ -448,7 +462,7 @@ def check_model_compatibility(
     # Fractional Maxwell Liquid (FML)
     elif "FractionalMaxwellLiquid" in model_name or model_name == "FML":
         # FML expects liquid-like behavior (no equilibrium modulus)
-        if material_type == MaterialType.SOLID:
+        if material_type in _SOLID_LIKE:
             compatible = False
             confidence = 0.8
             warnings.append(
@@ -498,7 +512,7 @@ def check_model_compatibility(
     # Fractional Kelvin-Voigt
     elif "FractionalKelvinVoigt" in model_name and "Zener" not in model_name:
         # FKV expects solid-like behavior
-        if material_type == MaterialType.VISCOELASTIC_LIQUID:
+        if material_type in _LIQUID_LIKE:
             compatible = False
             confidence = 0.75
             warnings.append(

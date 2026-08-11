@@ -392,9 +392,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         workspace_window = _create_workspace_window()
     except Exception as e:
-        logger.error(
-            "Failed to create workspace window", error=str(e), exc_info=True
-        )
+        logger.error("Failed to create workspace window", error=str(e), exc_info=True)
         print(f"ERROR: Failed to create workspace window: {e}", file=sys.stderr)
         return 1
 
@@ -411,14 +409,14 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("RheoJAX GUI workspace shell ready", version=__version__)
 
     if args.project:
+        from zipfile import BadZipFile
+
         from rheojax.gui.foundation.project_codec import load_project_v2
 
         try:
             loaded_state = load_project_v2(args.project)
-        except (ValueError, FileNotFoundError) as e:
-            logger.error(
-                "Failed to load project", path=str(args.project), error=str(e)
-            )
+        except (ValueError, FileNotFoundError, OSError, BadZipFile) as e:
+            logger.error("Failed to load project", path=str(args.project), error=str(e))
             print(f"ERROR: Failed to load project: {e}", file=sys.stderr)
             return 1
         workspace_window._rebuild(loaded_state)

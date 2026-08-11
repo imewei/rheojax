@@ -217,7 +217,7 @@ def interpolate_sk(
     k_target : np.ndarray
         Wave vectors at which interpolated S(k) is needed
     extrapolation : str, default "constant"
-        Extrapolation method: "constant", "linear", or "error"
+        Extrapolation method: "constant" or "error"
 
     Returns
     -------
@@ -227,7 +227,8 @@ def interpolate_sk(
     Raises
     ------
     ValueError
-        If extrapolation="error" and k_target extends beyond k_data range
+        If extrapolation="error" and k_target extends beyond k_data range,
+        or if extrapolation is neither "constant" nor "error"
     """
     k_data = np.asarray(k_data)
     sk_data = np.asarray(sk_data)
@@ -256,6 +257,14 @@ def interpolate_sk(
     if extrapolation == "constant":
         sk_interp = np.where(k_target < k_min, sk_data[0], sk_interp)
         sk_interp = np.where(k_target > k_max, sk_data[-1], sk_interp)
+    elif extrapolation != "error":
+        # "linear" was documented but never implemented; it (and any typo)
+        # silently fell through to the CubicSpline's cubic extrapolation,
+        # which diverges far outside the data range.
+        raise ValueError(
+            f"Unsupported extrapolation={extrapolation!r}. "
+            "Supported values are 'constant' and 'error'."
+        )
 
     # Ensure S(k) > 0
     sk_interp = np.maximum(sk_interp, 1e-10)

@@ -503,6 +503,18 @@ class TestBayesianInterface:
         np.testing.assert_allclose(mf_result[:, 0], G_prime, rtol=1e-6)
         np.testing.assert_allclose(mf_result[:, 1], G_double_prime, rtol=1e-6)
 
+    @pytest.mark.unit
+    def test_model_function_unknown_test_mode_raises(self):
+        """An unrecognized test_mode must raise, not silently substitute
+        flow-curve predictions for whatever protocol was actually asked
+        for (the project's no-silent-data-loss principle)."""
+        model = GiesekusSingleMode()
+        params = jnp.array([100.0, 1.0, 0.3, 0.0, 1.0])
+        X = jnp.logspace(-2, 2, 10)
+
+        with pytest.raises(ValueError, match="Unknown test_mode"):
+            model.model_function(X, params, test_mode="not_a_real_mode")
+
 
 class TestParameterSetRoundtrip:
     """Tests for ParameterSet→model_function roundtrip (the actual NUTS path).
@@ -673,6 +685,43 @@ class TestFitting:
         )
 
         assert r2 > 0.95
+
+    @pytest.mark.smoke
+    def test_fit_flow_alias_gets_same_eta_p_seed_as_flow_curve(self, monkeypatch):
+        """The 'flow' alias must reach the same eta_p smart-init branch as
+        'flow_curve' -- otherwise fit(test_mode="flow") silently loses its
+        NLSQ warm start relative to the canonical mode name.
+
+        Compares the seed value *before* NLSQ optimization runs (by
+        intercepting nlsq_optimize) rather than the post-fit converged
+        value, since two independent optimizer runs converging to the
+        same minimum says nothing about whether they started from the
+        same warm start.
+        """
+        import rheojax.utils.optimization as optimization_module
+
+        seeds: dict[str, float] = {}
+
+        def fake_nlsq_optimize(objective, parameters, **kwargs):
+            seeds[current_mode[0]] = float(parameters.get_value("eta_p"))
+            raise RuntimeError("stop-before-optimize")
+
+        # single_mode.py imports nlsq_optimize inside _fit() (deferred import),
+        # so patch it at the source module -- patching the giesekus module
+        # attribute wouldn't exist yet to patch.
+        monkeypatch.setattr(optimization_module, "nlsq_optimize", fake_nlsq_optimize)
+
+        gamma_dot = np.logspace(-1, 2, 20)
+        sigma = 150.0 * gamma_dot  # eta_p ~ 150
+        current_mode: list[str | None] = [None]
+
+        for mode in ("flow", "flow_curve"):
+            current_mode[0] = mode
+            model = GiesekusSingleMode()
+            with pytest.raises(RuntimeError, match="stop-before-optimize"):
+                model._fit(gamma_dot, sigma, test_mode=mode)
+
+        assert seeds["flow"] == pytest.approx(seeds["flow_curve"])
 
     @pytest.mark.slow
     def test_fit_saos(self):

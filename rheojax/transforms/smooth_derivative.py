@@ -228,7 +228,11 @@ class SmoothDerivative(BaseTransform):
 
         # Check if uniformly spaced
         dx = np.diff(x_np)
-        is_uniform = np.allclose(dx, dx[0], rtol=1e-5)
+        # atol=0.0: uniformity is a purely relative property. NumPy's default
+        # atol=1e-8 dominates the tolerance whenever the sampling interval is
+        # itself near or below 1e-8 (high-rate LAOS capture), declaring visibly
+        # non-uniform spacing "uniform" and handing savgol a wrong `delta`.
+        is_uniform = np.allclose(dx, dx[0], rtol=1e-5, atol=0.0)
 
         if is_uniform:
             # Use scipy's savgol_filter directly

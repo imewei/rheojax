@@ -422,33 +422,53 @@ def _preprocess_flow_curve(
 
     sigma_real = np.real(sigma) if np.iscomplexobj(sigma) else sigma
 
+    # Every diagnostic below reads "low rates" as the leading elements and
+    # treats a falling sigma as non-monotonic, so it assumes ascending
+    # gamma_dot. High-to-low rate sweeps are a standard rheometer protocol
+    # and would otherwise report a real yield stress as absent and flag a
+    # monotone flow curve as shear-banding. Sort a working copy; X/y are
+    # still returned in the caller's original order (diagnostics-only contract).
+    order = np.argsort(gamma_dot, kind="stable")
+    gd_sorted = np.asarray(gamma_dot)[order]
+    sigma_sorted = np.asarray(sigma_real)[order]
+
     # Yield stress detection via log-log slope
     if len(gamma_dot) > 5:
-        log_gd = np.log10(np.maximum(gamma_dot, 1e-30))
-        log_s = np.log10(np.maximum(sigma_real, 1e-30))
+        log_gd = np.log10(np.maximum(gd_sorted, 1e-30))
+        log_s = np.log10(np.maximum(sigma_sorted, 1e-30))
         d_log_gd = np.diff(log_gd)
         # Guard against duplicate shear rates (d_log_gd=0 → division by zero)
         valid_gd = np.abs(d_log_gd) > 1e-30
         if np.any(valid_gd):
             slopes = np.diff(log_s)[valid_gd] / d_log_gd[valid_gd]
-        else:
-            slopes = np.array([0.0])
-        min_slope = float(np.min(slopes))
-        diagnostics["min_log_slope"] = min_slope
+            diagnostics["min_log_slope"] = float(np.min(slopes))
 
-        # Yield stress: plateau at low rates (slope → 0)
-        low_idx = max(1, len(gamma_dot) // 5)
-        low_slope = float(np.mean(slopes[:low_idx]))
-        diagnostics["low_rate_slope"] = low_slope
-        if low_slope < 0.1:
-            sigma_y_est = float(np.mean(sigma_real[:low_idx]))
-            diagnostics["yield_stress_estimate"] = sigma_y_est
-            diagnostics["has_yield_stress"] = True
+            # Yield stress: plateau at low rates (slope → 0)
+            low_idx = max(1, len(gamma_dot) // 5)
+            low_slope = float(np.mean(slopes[:low_idx]))
+            diagnostics["low_rate_slope"] = low_slope
+            if low_slope < 0.1:
+                sigma_y_est = float(np.mean(sigma_sorted[:low_idx]))
+                diagnostics["yield_stress_estimate"] = sigma_y_est
+                diagnostics["has_yield_stress"] = True
+            else:
+                diagnostics["has_yield_stress"] = False
         else:
-            diagnostics["has_yield_stress"] = False
+            # Every shear-rate step is degenerate, so no slope exists.
+            # Substituting a fabricated slope of 0.0 here would satisfy the
+            # `low_slope < 0.1` test below and assert a yield stress that the
+            # data never showed. Report the slope as undetermined instead.
+            slopes = None
+            diagnostics["min_log_slope"] = None
+            diagnostics["low_rate_slope"] = None
+            diagnostics["has_yield_stress"] = None
+            warnings_list.append(
+                "All shear-rate steps are duplicates: log-log slope is "
+                "undetermined, so yield-stress detection was skipped."
+            )
 
         # Shear banding: non-monotonic flow curve
-        n_decreasing = int(np.sum(np.diff(sigma_real) < 0))
+        n_decreasing = int(np.sum(np.diff(sigma_sorted) < 0))
         diagnostics["n_stress_decreases"] = n_decreasing
         if n_decreasing > 0:
             diagnostics["shear_banding_flag"] = True
@@ -463,8 +483,8 @@ def _preprocess_flow_curve(
     try:
         eta_0 = estimate_eta0(gamma_dot, sigma=sigma_real)
         diagnostics["eta_0"] = eta_0
-    except (ValueError, ZeroDivisionError):
-        pass
+    except (ValueError, ZeroDivisionError) as exc:
+        warnings_list.append(f"Zero-shear viscosity estimate failed: {exc}")
 
     return PreprocessingResult(
         X=gamma_dot,
@@ -553,11 +573,16 @@ def _preprocess_laos(
         fft_vals = np.fft.rfft(response_real)
         magnitudes = np.abs(fft_vals)
 
-        # Odd harmonics: indices 1, 3, 5, … correspond to ω, 3ω, 5ω
-        # I₁ = magnitudes[1], I₃ = magnitudes[3]
-        if len(magnitudes) > 3 and magnitudes[1] > 0:
-            I1 = float(magnitudes[1])
-            I3 = float(magnitudes[3])
+        # The fundamental sits at FFT bin k = (number of cycles in the record),
+        # not at bin 1 — bin 1 is one cycle per record. Locating it as the
+        # dominant non-DC bin (I₁ >> I₃ in any physical LAOS response) keeps
+        # multi-cycle records, the normal case, from reading I₁/I₃ out of
+        # leakage bins. Odd harmonics then live at k, 3k, 5k, …
+        k_fund = int(np.argmax(magnitudes[1:])) + 1
+        diagnostics["fundamental_bin"] = k_fund
+        if len(magnitudes) > 3 * k_fund and magnitudes[k_fund] > 0:
+            I1 = float(magnitudes[k_fund])
+            I3 = float(magnitudes[3 * k_fund])
             harmonic_ratio = I3 / I1  # I₃/I₁
 
             # Q₀ = (I₃/I₁) / γ₀²  (Ewoldt et al. 2008, eq. 9)
@@ -588,10 +613,10 @@ def _preprocess_laos(
             # part corresponds to the viscous (loss) component.
             # e_n = Re[σ̂_n] / (G' amplitude)  →  ratio e₃/e₁ = Re[σ̂₃]/Re[σ̂₁]
             # v_n = Im[σ̂_n]                   →  ratio v₃/v₁ = Im[σ̂₃]/Im[σ̂₁]
-            re1 = float(fft_vals[1].real)
-            re3 = float(fft_vals[3].real) if len(fft_vals) > 3 else 0.0
-            im1 = float(fft_vals[1].imag)
-            im3 = float(fft_vals[3].imag) if len(fft_vals) > 3 else 0.0
+            re1 = float(fft_vals[k_fund].real)
+            re3 = float(fft_vals[3 * k_fund].real)
+            im1 = float(fft_vals[k_fund].imag)
+            im3 = float(fft_vals[3 * k_fund].imag)
 
             e3_e1 = (re3 / re1) if abs(re1) > 1e-30 else 0.0
             v3_v1 = (im3 / im1) if abs(im1) > 1e-30 else 0.0
@@ -610,6 +635,12 @@ def _preprocess_laos(
                 "harmonic_ratio_I3_I1": harmonic_ratio,
             }
             diagnostics["ewoldt_classification"] = ewoldt
+        else:
+            warnings_list.append(
+                f"LAOS harmonic analysis skipped: 3rd harmonic (bin {3 * k_fund}) "
+                f"exceeds the spectrum ({len(magnitudes)} bins); record needs "
+                ">6 samples per cycle for Q0/Ewoldt classification."
+            )
 
     return PreprocessingResult(
         X=t,

@@ -16,6 +16,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from rheojax.io.json_encoder import NumpyJSONEncoder
 from rheojax.logging import get_logger
 
@@ -168,6 +170,56 @@ class Envelope:
 
 
 # ------------------------------------------------------------------
+# Payload decoding
+# ------------------------------------------------------------------
+
+
+def decode_data_payload(
+    raw: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Extract ``(x, y, metadata)`` from a decoded ``"data"`` envelope.
+
+    Args:
+        raw: Result of ``json.loads()`` on an envelope produced by
+            :func:`create_data_envelope`.
+
+    Returns:
+        Tuple of x array, y array (complex when the payload encodes one),
+        and the envelope metadata dict.
+
+    Raises:
+        ValueError: If *raw* is not an envelope carrying a data payload.
+
+    Example:
+        >>> x, y, meta = decode_data_payload(json.loads(envelope_json))
+    """
+    if not isinstance(raw, dict):
+        raise ValueError(f"Expected a JSON object, got {type(raw).__name__}.")
+
+    payload = raw.get("data")
+    if not isinstance(payload, dict) or "x" not in payload:
+        raise ValueError(
+            "JSON envelope has no 'data' section containing an 'x' key. "
+            "Pipe from 'rheojax load --json' or 'rheojax transform --json'."
+        )
+
+    x = np.asarray(payload["x"])
+
+    y_payload = payload.get("y", [])
+    if isinstance(y_payload, dict):
+        if not y_payload.get("complex"):
+            raise ValueError(
+                "JSON envelope 'y' payload is a mapping but is not flagged "
+                "'complex'; cannot decode."
+            )
+        y = np.asarray(y_payload["real"]) + 1j * np.asarray(y_payload["imag"])
+    else:
+        y = np.asarray(y_payload)
+
+    return x, y, dict(raw.get("metadata") or {})
+
+
+# ------------------------------------------------------------------
 # Factory helpers
 # ------------------------------------------------------------------
 
@@ -193,12 +245,17 @@ def create_data_envelope(
         >>> env = create_data_envelope(np.linspace(0, 1, 10), np.ones(10))
     """
 
-    def _coerce(arr: Any) -> list:
-        if hasattr(arr, "tolist"):
-            return arr.tolist()
-        if hasattr(arr, "__iter__"):
-            return list(arr)
-        return arr
+    def _coerce(arr: Any) -> Any:
+        a = np.asarray(arr)
+        if np.iscomplexobj(a):
+            # Python complex is not JSON-serialisable and NumpyJSONEncoder
+            # stringifies it, so split into real/imag before encoding.
+            return {
+                "complex": True,
+                "real": a.real.tolist(),
+                "imag": a.imag.tolist(),
+            }
+        return a.tolist()
 
     return Envelope(
         rheojax_version=_get_version(),

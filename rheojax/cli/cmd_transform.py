@@ -132,43 +132,16 @@ def _parse_params(param_list: list[str]) -> dict:
 
 
 def _load_from_envelope(text: str):
-    """Reconstruct a minimal RheoData-like object from a JSON envelope."""
-    envelope = json.loads(text)
-
-    if not isinstance(envelope, dict):
-        raise ValueError(
-            f"Expected a JSON object from stdin, got {type(envelope).__name__}"
-        )
-    payload = envelope.get("data")
-    if not isinstance(payload, dict) or "x" not in payload:
-        raise ValueError(
-            "JSON envelope is missing a 'data' object with an 'x' key. "
-            "Pipe from 'rheojax load --json'."
-        )
-
+    """Reconstruct a RheoData object from a JSON envelope."""
+    from rheojax.cli._envelope import decode_data_payload
     from rheojax.core.data import RheoData
 
-    x = np.array(payload["x"])
-    y_payload = payload.get("y", {})
-    if isinstance(y_payload, dict) and y_payload.get("complex"):
-        y = np.array(y_payload["real"]) + 1j * np.array(y_payload["imag"])
-    elif isinstance(y_payload, dict):
-        if "values" not in y_payload:
-            raise ValueError(
-                "JSON envelope 'y' dict has neither 'complex' nor 'values' key. "
-                "Pipe from 'rheojax load --json'."
-            )
-        y = np.array(y_payload["values"])
-    else:
-        y = np.array(y_payload)
+    try:
+        envelope = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid envelope JSON: {exc}") from exc
 
-    metadata = envelope.get("metadata", {})
-    test_mode = envelope.get("test_mode")
-    if test_mode is None:
-        test_mode = metadata.get("test_mode")
-    if test_mode is not None:
-        metadata["test_mode"] = test_mode
-
+    x, y, metadata = decode_data_payload(envelope)
     return RheoData(x=x, y=y, metadata=metadata)
 
 
@@ -268,6 +241,10 @@ def main(args: list[str] | None = None) -> int:
     in_shape = np.asarray(data.x).shape
     try:
         result = transform.transform(data)
+        # Some transforms (prony_conversion, spectrum_inversion) return
+        # (RheoData, extras_dict); take the RheoData for x/y/metadata output.
+        if isinstance(result, tuple):
+            result = result[0]
         logger.info("Transform applied", name=parsed.transform_name)
     except Exception as e:
         print(

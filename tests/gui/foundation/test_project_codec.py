@@ -544,6 +544,41 @@ def test_load_rejects_wrong_version(tmp_path):
         load_project_v2(path)
 
 
+def test_load_rejects_non_dict_metadata_json(tmp_path):
+    """A malformed archive (e.g. a plain zip renamed .rheojax) whose
+    metadata.json parses to a JSON array must raise ValueError, not
+    AttributeError from an unguarded .get() on a list."""
+    path = tmp_path / "bad_metadata.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps(["not", "a", "dict"]))
+    with pytest.raises(ValueError, match="metadata.json"):
+        load_project_v2(path)
+
+
+def test_load_rejects_non_dict_manifest_json(tmp_path):
+    path = tmp_path / "bad_manifest.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        zf.writestr("manifest.json", json.dumps(["not", "a", "dict"]))
+    with pytest.raises(ValueError, match="manifest.json"):
+        load_project_v2(path)
+
+
+def test_load_rejects_non_dict_manifest_member_entry(tmp_path):
+    """Each manifest['members'] value must itself be a dict with a
+    'sha256' key -- a manifest entry like {"metadata.json": "abc123"}
+    (string, not {"sha256": "abc123"}) must raise ValueError, not
+    AttributeError from checksums[name].get('sha256')."""
+    path = tmp_path / "bad_member_entry.rheojax"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("metadata.json", json.dumps({"version": "2.0", "timestamp": "x"}))
+        zf.writestr(
+            "manifest.json", json.dumps({"members": {"metadata.json": "abc123"}})
+        )
+    with pytest.raises(ValueError, match="valid 'members' mapping"):
+        load_project_v2(path)
+
+
 def test_load_rejects_duplicate_zip_entries(tmp_path):
     path = tmp_path / "dup.rheojax"
     with zipfile.ZipFile(path, "w") as zf:

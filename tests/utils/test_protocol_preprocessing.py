@@ -226,9 +226,7 @@ class TestPreprocessForProtocol:
 
     def test_input_coerced_to_float(self):
         """Integer X is coerced to float64."""
-        result = preprocess_for_protocol(
-            np.arange(30), np.ones(30), "not_a_protocol"
-        )
+        result = preprocess_for_protocol(np.arange(30), np.ones(30), "not_a_protocol")
         assert result.X.dtype == np.float64
 
 
@@ -434,9 +432,7 @@ class TestPreprocessFlowCurve:
         sigma = 10.0 * gamma_dot
         result = preprocess_for_protocol(gamma_dot, sigma, "flow_curve")
         assert result.diagnostics["has_yield_stress"] is False
-        np.testing.assert_allclose(
-            result.diagnostics["low_rate_slope"], 1.0, atol=0.05
-        )
+        np.testing.assert_allclose(result.diagnostics["low_rate_slope"], 1.0, atol=0.05)
 
     def test_shear_banding_flag(self):
         """Non-monotonic stress flags shear banding + warning."""
@@ -472,23 +468,57 @@ class TestPreprocessFlowCurve:
         assert np.iscomplexobj(result.y)
         assert np.isfinite(result.diagnostics["min_log_slope"])
 
-    def test_all_duplicate_shear_rates_zero_slope(self):
-        """All-duplicate gamma_dot -> no valid log-slopes -> slopes fall back to 0."""
+    def test_descending_sweep_matches_ascending(self):
+        """High-to-low rate sweeps give the same diagnostics as low-to-high.
+
+        Descending sweeps are a standard rheometer protocol, but every
+        diagnostic reads "low rates" as the leading elements and treats a
+        falling sigma as non-monotonic, so an unsorted descending sweep
+        reported a real yield stress as absent and flagged a monotone flow
+        curve as shear-banding.
+        """
+        gamma_dot = np.logspace(-2, 2, 40)
+        sigma = 10.0 + 2.0 * gamma_dot**0.5  # yield stress 10 Pa, monotone
+
+        asc = preprocess_for_protocol(gamma_dot, sigma, "flow_curve")
+        desc = preprocess_for_protocol(gamma_dot[::-1], sigma[::-1], "flow_curve")
+
+        assert asc.diagnostics["has_yield_stress"] is True
+        assert desc.diagnostics["has_yield_stress"] is True
+        assert desc.diagnostics["shear_banding_flag"] is False
+        np.testing.assert_allclose(
+            desc.diagnostics["low_rate_slope"], asc.diagnostics["low_rate_slope"]
+        )
+        np.testing.assert_allclose(
+            desc.diagnostics["yield_stress_estimate"],
+            asc.diagnostics["yield_stress_estimate"],
+        )
+        # diagnostics-only contract: returned data keeps the caller's order
+        np.testing.assert_allclose(desc.X, gamma_dot[::-1])
+
+    def test_all_duplicate_shear_rates_slope_undetermined(self):
+        """All-duplicate gamma_dot -> no valid log-slopes -> slope undetermined.
+
+        A fabricated slope of 0.0 would satisfy the `low_slope < 0.1` plateau
+        test and assert a yield stress the data never showed, so the slope
+        diagnostics must report None and yield-stress detection must be skipped.
+        """
         gamma_dot = np.full(10, 3.0)
         sigma = np.full(10, 25.0)
         result = preprocess_for_protocol(gamma_dot, sigma, "flow_curve")
-        np.testing.assert_allclose(result.diagnostics["min_log_slope"], 0.0)
-        # zero slope reads as a low-rate plateau -> yield stress flagged
-        assert result.diagnostics["has_yield_stress"] is True
+        assert result.diagnostics["min_log_slope"] is None
+        assert result.diagnostics["low_rate_slope"] is None
+        assert result.diagnostics["has_yield_stress"] is None
+        assert "yield_stress_estimate" not in result.diagnostics
+        assert any("undetermined" in w for w in result.warnings)
 
-    def test_empty_input_eta0_failure_swallowed(self):
-        """Empty arrays: slope block skipped, estimate_eta0 raises and is caught."""
-        result = preprocess_for_protocol(
-            np.array([]), np.array([]), "flow_curve"
-        )
+    def test_empty_input_eta0_failure_reported(self):
+        """Empty arrays: slope block skipped, estimate_eta0 raises -- the
+        failure must be surfaced in warnings, not swallowed silently."""
+        result = preprocess_for_protocol(np.array([]), np.array([]), "flow_curve")
         assert "eta_0" not in result.diagnostics
         assert result.diagnostics == {}
-        assert result.warnings == []
+        assert any("Zero-shear viscosity estimate failed" in w for w in result.warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -555,6 +585,23 @@ class TestPreprocessLaos:
         assert result.diagnostics["n_points"] == t.shape[0]
         assert "response_range" in result.diagnostics
         assert result.diagnostics["estimated_cycles"] >= 1
+
+    def test_harmonic_ratio_recovered_multi_cycle(self):
+        """I3/I1 is read from the true fundamental bin, not from bin 1.
+
+        A record holding N oscillation cycles puts the fundamental at FFT bin
+        N and the third harmonic at bin 3N. Hardcoding bins 1 and 3 reads
+        leakage/noise instead, which reported I3/I1 = 3.15 for this signal.
+        """
+        n_cycles = 5
+        t = np.linspace(0.0, 1.0, 2048, endpoint=False)
+        response = np.sin(2 * np.pi * n_cycles * t) + 0.1 * np.sin(
+            2 * np.pi * 3 * n_cycles * t
+        )
+        result = preprocess_for_protocol(t, response, "laos")
+        assert result.diagnostics["fundamental_bin"] == n_cycles
+        ew = result.diagnostics["ewoldt_classification"]
+        np.testing.assert_allclose(ew["harmonic_ratio_I3_I1"], 0.1, rtol=1e-3)
 
     def test_missing_gamma0_warns_and_raw_ratio(self):
         """Without gamma_0, Q0 is the raw ratio and a warning is emitted."""

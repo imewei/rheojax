@@ -6,7 +6,7 @@ when they have GPU hardware available but are using CPU-only JAX.
 
 from __future__ import annotations
 
-import subprocess
+import subprocess  # nosec B404  # noqa: S404
 from typing import Any
 
 from rheojax.logging import get_logger
@@ -25,7 +25,7 @@ def get_system_cuda_version() -> tuple[str | None, int | None]:
     """
     logger.debug("Detecting system CUDA version via nvcc")
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec: B603,B607
             ["nvcc", "--version"],
             capture_output=True,
             text=True,
@@ -65,7 +65,7 @@ def get_gpu_info() -> tuple[str | None, float | None]:
         Example: ("NVIDIA GeForce RTX 4090", 8.9)
     """
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec: B603,B607
             ["nvidia-smi", "--query-gpu=name,compute_cap", "--format=csv,noheader"],
             capture_output=True,
             text=True,
@@ -359,7 +359,7 @@ def get_gpu_memory_info() -> dict:
     ...     print(f"GPU Memory: {info['used_mb']}/{info['total_mb']} MB")
     """
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec: B603,B607
             [
                 "nvidia-smi",
                 "--query-gpu=memory.total,memory.used,memory.free,utilization.gpu",

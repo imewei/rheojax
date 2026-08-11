@@ -97,35 +97,10 @@ Examples:
 def _build_pipeline_from_envelope(envelope: dict):
     """Construct a minimal Pipeline populated with envelope data for export."""
 
-    import numpy as np
-
+    from rheojax.cli._envelope import decode_data_payload
     from rheojax.core.data import RheoData
 
-    if envelope.get("envelope_type") != "data" or not isinstance(
-        envelope.get("data"), dict
-    ):
-        raise ValueError(
-            "Envelope does not contain a 'data' payload (envelope_type="
-            f"{envelope.get('envelope_type')!r}). Pipe from 'rheojax load --json'."
-        )
-
-    payload = envelope["data"]
-    x = np.array(payload.get("x", []))
-    y_payload = payload.get("y", {})
-    if isinstance(y_payload, dict) and y_payload.get("complex"):
-        y = np.array(y_payload["real"]) + 1j * np.array(y_payload["imag"])
-    elif isinstance(y_payload, dict):
-        y = np.array(y_payload.get("values", []))
-    else:
-        y = np.array(y_payload)
-
-    metadata = envelope.get("metadata", {})
-    test_mode = envelope.get("test_mode")
-    if test_mode is None:
-        test_mode = metadata.get("test_mode")
-    if test_mode is not None:
-        metadata["test_mode"] = test_mode
-
+    x, y, metadata = decode_data_payload(envelope)
     data = RheoData(x=x, y=y, metadata=metadata)
 
     try:
@@ -133,7 +108,7 @@ def _build_pipeline_from_envelope(envelope: dict):
 
         pipe = Pipeline()
         pipe._data = data  # type: ignore[attr-defined]
-        pipe._source = envelope.get("source", "stdin")  # type: ignore[attr-defined]
+        pipe._source = metadata.get("source", "stdin")  # type: ignore[attr-defined]
         return pipe
     except (ImportError, AttributeError) as exc:
         raise RuntimeError(
