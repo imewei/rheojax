@@ -974,12 +974,23 @@ class HVNMLocal(HVNMBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"laos", "startup", "relaxation", "creep"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        # BaseModel.fit()'s top-level `method` param defaults to "nlsq" and is
+        # always forwarded here by FitOrchestrator, so kwargs["method"] is
+        # never absent — .get(..., _default_method) never fires. "nlsq" isn't
+        # a valid nlsq_optimize() method value; treat it (and anything else
+        # unrecognized) as unset so the protocol-aware default applies.
+        _method_kwarg = kwargs.get("method")
+        _nlsq_method = (
+            _method_kwarg
+            if _method_kwarg in ("auto", "trf", "lm", "scipy")
+            else _default_method
+        )
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_nlsq_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 
@@ -1224,9 +1235,7 @@ class HVNMLocal(HVNMBase):
                 )
             )(ys)
             gamma_step_sign = jnp.where(gamma_step < 0, -1.0, 1.0)
-            return stress / (
-                gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30)
-            )
+            return stress / (gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30))
 
         elif mode == "creep":
             if sigma_applied is None:

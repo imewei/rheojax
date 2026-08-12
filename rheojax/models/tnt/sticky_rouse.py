@@ -550,7 +550,14 @@ class TNTStickyRouse(TNTBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
-        method = kwargs.get("method", _default_method)
+        # See rheojax/models/hvnm/local.py for why kwargs.get("method", ...)
+        # never fires: FitOrchestrator always forwards method="nlsq".
+        _method_kwarg = kwargs.get("method")
+        method = (
+            _method_kwarg
+            if _method_kwarg in ("auto", "trf", "lm", "scipy")
+            else _default_method
+        )
 
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)

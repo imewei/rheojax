@@ -768,12 +768,20 @@ class TNTLoopBridge(TNTBase):
         # oscillation is linearized analytical; all other protocols use ODE.
         _ode_protocols = {"flow_curve", "startup", "relaxation", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        # See rheojax/models/hvnm/local.py for why kwargs.get("method", ...)
+        # never fires: FitOrchestrator always forwards method="nlsq".
+        _method_kwarg = kwargs.get("method")
+        _nlsq_method = (
+            _method_kwarg
+            if _method_kwarg in ("auto", "trf", "lm", "scipy")
+            else _default_method
+        )
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_nlsq_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 
