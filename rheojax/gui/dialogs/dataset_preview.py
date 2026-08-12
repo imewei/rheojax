@@ -138,6 +138,8 @@ class DatasetPreviewDialog(QDialog):
         # set_dataset()/the no-data path reset it back to empty as normal.
         # Until then, columnCount()==1 with headerData(0)=="" (not the true
         # 0-column x=None state) — required for the workaround, not a bug.
+        # Drop this placeholder-section trick if a future PySide6 release
+        # reports the correct resize mode on a zero-section header.
         self._model.set_data(np.array([]), np.array([]), "", [])
 
         layout = QVBoxLayout(self)

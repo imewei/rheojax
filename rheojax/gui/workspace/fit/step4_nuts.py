@@ -408,8 +408,11 @@ class NutsStep(QWidget):
             try:
                 result = self._sample_fn(priors, warm_start, cfg)
             except NotImplementedError:
-                # ponytail: real sampler wiring is out of scope here (tracked separately);
-                # this guard only keeps an unwired Sample button from crashing the Qt slot.
+                # ponytail: stale-by-construction guard -- fit_controller._make_sample_fn
+                # is real and build_fit_controller() always injects it, so this only
+                # fires if NutsStep is ever constructed without a sample_fn (skipping
+                # build_fit_controller). Delete this branch if that direct-construction
+                # path is ever made structurally impossible (e.g. sample_fn required).
                 self._result.setText("NUTS sampler is not wired up yet.")
                 if self._state.revision == revision_at_start:
                     self._state.nuts_result = None

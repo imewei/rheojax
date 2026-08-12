@@ -30,6 +30,9 @@ from rheojax.transforms import (
 logger = get_logger(__name__)
 
 # ponytail: map unified registry keys → legacy dispatch keys used by if/elif chain
+# (3 call sites: apply_transform(), get_transform_params(), get_transform_slots()).
+# Delete this table and its 3 lookups once the if/elif dispatch chains below are
+# migrated to switch on the unified registry keys directly.
 _LEGACY_MAP: dict[str, str] = {
     "fft_analysis": "fft",
     "smooth_derivative": "derivative",
@@ -287,9 +290,11 @@ class TransformService:
                 # apply_transform()'s derivative branch never reads either, and
                 # SmoothDerivative.__init__ accepts neither -- so both render as
                 # no-op controls now that get_transform_params() resolves
-                # `smooth_derivative`. Honouring them needs a SmoothDerivative
-                # signature change (a feature); deleting them breaks a test that
-                # asserts the opposite. Left for a human to decide.
+                # `smooth_derivative`. Two ways out: (a) give SmoothDerivative a
+                # real mode/validate_window signature and wire apply_transform()
+                # to pass them through, or (b) delete both param specs and update
+                # test_derivative_has_mode to assert their absence instead. Pick
+                # one the next time SmoothDerivative's behavior is touched.
                 "mode": {
                     "type": "choice",
                     "choices": ["mirror", "nearest", "constant", "wrap"],
