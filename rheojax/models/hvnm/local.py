@@ -61,6 +61,7 @@ from rheojax.models.hvnm._kernels_diffrax import (
     hvnm_solve_relaxation,
     hvnm_solve_startup,
 )
+from rheojax.utils.optimization import resolve_nlsq_method
 
 jax, jnp = safe_import_jax()
 
@@ -974,17 +975,7 @@ class HVNMLocal(HVNMBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"laos", "startup", "relaxation", "creep"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
-        # BaseModel.fit()'s top-level `method` param defaults to "nlsq" and is
-        # always forwarded here by FitOrchestrator, so kwargs["method"] is
-        # never absent — .get(..., _default_method) never fires. "nlsq" isn't
-        # a valid nlsq_optimize() method value; treat it (and anything else
-        # unrecognized) as unset so the protocol-aware default applies.
-        _method_kwarg = kwargs.get("method")
-        _nlsq_method = (
-            _method_kwarg
-            if _method_kwarg in ("auto", "trf", "lm", "scipy")
-            else _default_method
-        )
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,

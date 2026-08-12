@@ -319,6 +319,7 @@ class VLBMultiNetwork(VLBBase):
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
+            resolve_nlsq_method,
         )
 
         _kw_mode = kwargs.get("test_mode")
@@ -390,14 +391,7 @@ class VLBMultiNetwork(VLBBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
-        # See rheojax/models/hvnm/local.py for why kwargs.get("method", ...)
-        # never fires: FitOrchestrator always forwards method="nlsq".
-        _method_kwarg = kwargs.get("method")
-        _nlsq_method = (
-            _method_kwarg
-            if _method_kwarg in ("auto", "trf", "lm", "scipy")
-            else _default_method
-        )
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,

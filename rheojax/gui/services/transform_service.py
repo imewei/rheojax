@@ -30,7 +30,7 @@ from rheojax.transforms import (
 logger = get_logger(__name__)
 
 # ponytail: map unified registry keys → legacy dispatch keys used by if/elif chain
-# (3 call sites: apply_transform(), get_transform_params(), get_transform_slots()).
+# (3 call sites: apply_transform(), get_transform_params(), validate_transform_input()).
 # Delete this table and its 3 lookups once the if/elif dispatch chains below are
 # migrated to switch on the unified registry keys directly.
 _LEGACY_MAP: dict[str, str] = {

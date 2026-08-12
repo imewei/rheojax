@@ -80,6 +80,40 @@ _RHEOJAX_RESERVED_KWARGS: frozenset[str] = frozenset(
     }
 )
 
+# Values nlsq_optimize()'s method= accepts (see its docstring).
+_NLSQ_VALID_METHODS = frozenset({"auto", "trf", "lm", "scipy"})
+
+
+def resolve_nlsq_method(kwargs: dict, default: str) -> str:
+    """Resolve the ``method`` kwarg forwarded to ``nlsq_optimize``.
+
+    ``FitOrchestrator`` always forwards ``method="nlsq"`` (its own default),
+    so a plain ``kwargs.get("method", default)`` never falls through to
+    ``default`` even when the caller never asked for a specific method. This
+    normalizes that: an explicit, recognized method wins; anything else
+    (missing, ``"nlsq"``, or an unrecognized/typo'd value) falls back to
+    ``default``, which callers set per-protocol (e.g. "scipy" for ODE
+    protocols that are incompatible with NLSQ's forward-mode AD).
+
+    Args:
+        kwargs: The model's ``fit(**kwargs)`` keyword arguments.
+        default: Method to use when no valid method was explicitly requested.
+
+    Returns:
+        A method string valid for ``nlsq_optimize``.
+    """
+    requested = kwargs.get("method")
+    if requested in _NLSQ_VALID_METHODS:
+        return requested
+    if requested is not None:
+        logger.debug(
+            "Ignoring unrecognized method=%r (valid: %s); using default %r",
+            requested,
+            sorted(_NLSQ_VALID_METHODS),
+            default,
+        )
+    return default
+
 
 def make_fd_differentiable(
     fn: Callable,

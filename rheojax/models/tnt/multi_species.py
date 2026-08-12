@@ -67,6 +67,7 @@ import logging
 import numpy as np
 
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+from rheojax.utils.optimization import resolve_nlsq_method
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
@@ -452,14 +453,7 @@ class TNTMultiSpecies(TNTBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
-        # See rheojax/models/hvnm/local.py for why kwargs.get("method", ...)
-        # never fires: FitOrchestrator always forwards method="nlsq".
-        _method_kwarg = kwargs.get("method")
-        _nlsq_method = (
-            _method_kwarg
-            if _method_kwarg in ("auto", "trf", "lm", "scipy")
-            else _default_method
-        )
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,
