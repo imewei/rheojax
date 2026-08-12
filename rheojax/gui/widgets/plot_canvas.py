@@ -187,7 +187,10 @@ class PlotCanvas(QWidget):
         # the trigger instead of catching it (tests/conftest.py forces
         # QT_QPA_PLATFORM=offscreen before any QApplication exists, so
         # devicePixelRatio is always an integer); that isn't available to a real
-        # interactive display, so this remains a known residual risk.
+        # interactive display, so this remains a known residual risk. No fix is
+        # possible on our side; there is no internal upgrade path. Re-evaluate
+        # only if a future matplotlib/FreeType release fixes the underlying
+        # raster-overflow bug (watch matplotlib's FreeType-related changelog).
         try:
             self.canvas.draw()
         except Exception as e:

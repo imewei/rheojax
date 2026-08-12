@@ -45,7 +45,7 @@ _MAX_STEPS_LAOS = 16_000_000
 # FL-006: kwargs to pop before forwarding to nlsq_optimize.
 # Start from the central set and add model-specific extras so the two
 # never drift apart (see _RHEOJAX_RESERVED_KWARGS in optimization.py).
-from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS
+from rheojax.utils.optimization import _RHEOJAX_RESERVED_KWARGS, resolve_nlsq_method
 
 _NLSQ_RESERVED = _RHEOJAX_RESERVED_KWARGS | {
     "use_log_residuals",
@@ -456,7 +456,7 @@ class FluidityNonlocal(FluidityBase):
         # Keep "method" so it reaches nlsq_optimize. Transient protocols use
         # a diffrax ODE (custom_vjp) — default to scipy if caller didn't pick.
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
-        nlsq_kwargs.setdefault("method", "scipy")
+        nlsq_kwargs["method"] = resolve_nlsq_method(nlsq_kwargs, "scipy")
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity transient fit warning: {result.message}")
@@ -842,7 +842,7 @@ class FluidityNonlocal(FluidityBase):
         # Keep "method" so it reaches nlsq_optimize. LAOS uses a diffrax ODE
         # (custom_vjp) — default to scipy if caller didn't pick a method.
         nlsq_kwargs = {k: v for k, v in kwargs.items() if k not in _NLSQ_RESERVED_ODE}
-        nlsq_kwargs.setdefault("method", "scipy")
+        nlsq_kwargs["method"] = resolve_nlsq_method(nlsq_kwargs, "scipy")
         result = nlsq_optimize(objective, self.parameters, **nlsq_kwargs)
         if not result.success:
             logger.warning(f"Fluidity LAOS fit warning: {result.message}")

@@ -80,7 +80,10 @@ def arviz_plot_kwargs(
     """
     # ponytail: arviz param is now unused (0.x/1.x version dispatch was
     # removed -- only 1.x is supported) but kept for signature stability
-    # across the 8+ existing call sites that already pass it.
+    # across the 8+ existing call sites that already pass it. Drop the
+    # param and update every call site (plot_service.py, arviz_canvas.py,
+    # pipeline/bayesian.py, visualization/fit_plotter.py, tests) in one
+    # coordinated PR next time this function's signature changes anyway.
 
     normalized = dict(kwargs)
 

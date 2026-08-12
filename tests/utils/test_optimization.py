@@ -10,7 +10,11 @@ import pytest
 
 from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import ParameterSet
-from rheojax.utils.optimization import OptimizationResult, nlsq_optimize
+from rheojax.utils.optimization import (
+    OptimizationResult,
+    nlsq_optimize,
+    resolve_nlsq_method,
+)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -1011,9 +1015,7 @@ class TestRunScipyLeastSquaresComplex:
 
         x0 = np.array([0.0])
         bounds = (np.array([-10.0]), np.array([10.0]))
-        result = _run_scipy_least_squares(
-            objective, x0, bounds, 1e-8, 1e-8, 1e-8, 100
-        )
+        result = _run_scipy_least_squares(objective, x0, bounds, 1e-8, 1e-8, 1e-8, 100)
         # Optimum balances the two components -> v[0] near 2.0
         assert np.isfinite(result.x[0])
         np.testing.assert_allclose(result.x[0], 2.0, atol=1e-3)
@@ -1115,7 +1117,9 @@ class TestStatisticalPropertyBranches:
         """2N residuals + real y_data + use_log path (871-872)."""
         y = np.array([10.0, 100.0, 1000.0])
         resid = np.full(6, 0.01)  # 2N real residuals
-        r = OptimizationResult(x=np.array([1.0, 2.0]), fun=0.0, residuals=resid, y_data=y)
+        r = OptimizationResult(
+            x=np.array([1.0, 2.0]), fun=0.0, residuals=resid, y_data=y
+        )
         r._use_log_residuals = True
         r2 = r.r_squared
         assert r2 is not None and r2 <= 1.0
@@ -1133,7 +1137,9 @@ class TestStatisticalPropertyBranches:
         """2N residuals + complex y_data + use_log path."""
         y = np.array([10.0 + 1j * 5.0, 100.0 + 1j * 50.0, 1000.0 + 1j * 500.0])
         resid = np.full(6, 0.01)  # 2N real residuals
-        r = OptimizationResult(x=np.array([1.0, 2.0]), fun=0.0, residuals=resid, y_data=y)
+        r = OptimizationResult(
+            x=np.array([1.0, 2.0]), fun=0.0, residuals=resid, y_data=y
+        )
         r._use_log_residuals = True
         r2 = r.r_squared
         assert r2 is not None and r2 <= 1.0
@@ -1184,9 +1190,7 @@ class TestStatisticalPropertyBranches:
 
     def test_aic_complex_residuals(self):
         resid = np.array([0.1, -0.1, 0.2, 0.05]) + 0j
-        r = OptimizationResult(
-            x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4
-        )
+        r = OptimizationResult(x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4)
         assert np.isfinite(r.aic)
 
     def test_aic_zero_n_returns_none(self):
@@ -1195,9 +1199,7 @@ class TestStatisticalPropertyBranches:
 
     def test_bic_complex_residuals(self):
         resid = np.array([0.1, -0.1, 0.2, 0.05]) + 0j
-        r = OptimizationResult(
-            x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4
-        )
+        r = OptimizationResult(x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4)
         assert np.isfinite(r.bic)
 
     def test_bic_zero_n_returns_none(self):
@@ -1208,9 +1210,7 @@ class TestStatisticalPropertyBranches:
         """Normalization weights un-normalize residuals for AIC/BIC (987, 1025)."""
         resid = np.array([0.1, -0.1, 0.2, 0.05])
         weights = np.array([1.0, 2.0, 0.5, 4.0])
-        r = OptimizationResult(
-            x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4
-        )
+        r = OptimizationResult(x=np.array([1.0]), fun=0.0, residuals=resid, n_data=4)
         r._normalization_weights = weights
         assert np.isfinite(r.aic)
         assert np.isfinite(r.bic)
@@ -1362,7 +1362,9 @@ class TestFromNlsqBranches:
             "success": True,
         }
         result = OptimizationResult.from_nlsq(nlsq_dict)
-        np.testing.assert_allclose(result.fun, np.sum(nlsq_dict["fun"] ** 2), rtol=1e-12)
+        np.testing.assert_allclose(
+            result.fun, np.sum(nlsq_dict["fun"] ** 2), rtol=1e-12
+        )
 
     def test_scalar_residuals_reshaped(self):
         nlsq_dict = {"x": np.array([1.0]), "cost": 0.25, "success": True}
@@ -1822,3 +1824,76 @@ class TestNlsqCurveFitBranches:
         )
         assert "fallback" in result.message
         np.testing.assert_allclose(result.x[0], 2.0, rtol=0.15)
+
+
+class TestResolveNlsqMethod:
+    """Tests for resolve_nlsq_method(), the shared method-kwarg resolver.
+
+    Regression coverage for PR #111: FitOrchestrator always forwards
+    method="nlsq" to _fit(**kwargs), so a plain kwargs.get("method", default)
+    (or dict.setdefault("method", default)) never falls through to the
+    caller's protocol-aware default. resolve_nlsq_method() must treat a
+    missing method, "nlsq", and any other unrecognized value identically:
+    fall back to the given default.
+    """
+
+    def test_no_method_kwarg_uses_default(self):
+        assert resolve_nlsq_method({}, "scipy") == "scipy"
+
+    def test_nlsq_sentinel_uses_default(self):
+        # This is the exact bug: FitOrchestrator's own default value.
+        assert resolve_nlsq_method({"method": "nlsq"}, "scipy") == "scipy"
+
+    def test_unrecognized_method_uses_default(self):
+        assert resolve_nlsq_method({"method": "not_a_method"}, "auto") == "auto"
+
+    @pytest.mark.parametrize("method", ["auto", "trf", "lm", "scipy"])
+    def test_explicit_valid_method_is_honored(self, method):
+        assert resolve_nlsq_method({"method": method}, "auto") == method
+        assert resolve_nlsq_method({"method": method}, "scipy") == method
+
+    def test_other_kwargs_ignored(self):
+        kwargs = {"test_mode": "relaxation", "max_iter": 500, "method": "lm"}
+        assert resolve_nlsq_method(kwargs, "scipy") == "lm"
+
+    def test_unrecognized_method_logs_debug(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="rheojax.utils.optimization"):
+            resolve_nlsq_method({"method": "bogus"}, "scipy")
+        assert any("bogus" in r.message for r in caplog.records)
+
+    def test_missing_method_does_not_log(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="rheojax.utils.optimization"):
+            resolve_nlsq_method({}, "scipy")
+        assert caplog.records == []
+
+
+class TestNlsqMethodResolutionSiteGuard:
+    """Structural guard against the PR #111 regression recurring elsewhere.
+
+    The bug: `nlsq_kwargs.setdefault("method", "scipy")` never fires because
+    FitOrchestrator always forwards method="nlsq" in kwargs already. Any
+    future ODE-protocol fit path must resolve `method` via
+    `resolve_nlsq_method()`, not `dict.setdefault("method", ...)`.
+    """
+
+    def test_no_model_uses_setdefault_method_pattern(self):
+        import pathlib
+        import re
+
+        models_dir = pathlib.Path(__file__).resolve().parents[2] / "rheojax" / "models"
+        pattern = re.compile(r'\.setdefault\(\s*["\']method["\']')
+        offenders = []
+        for path in models_dir.rglob("*.py"):
+            text = path.read_text()
+            if pattern.search(text):
+                offenders.append(str(path.relative_to(models_dir)))
+        assert not offenders, (
+            "Found dict.setdefault('method', ...) in model fit code — this "
+            "pattern never fires because FitOrchestrator always forwards "
+            f"method='nlsq'. Use resolve_nlsq_method() instead. Offenders: "
+            f"{offenders}"
+        )

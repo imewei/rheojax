@@ -441,7 +441,7 @@ def hvnm_interphase_stress(
     float
         Interphase network shear stress (Pa)
     """
-    del X_I  # ponytail: kept in signature, see docstring Note
+    del X_I  # unused; kept in signature for API uniformity, see docstring Note
     return (1.0 - D_int) * G_I_eff * (mu_I_xy - mu_I_nat_xy)
 
 
@@ -496,7 +496,7 @@ def hvnm_total_stress_shear(
     float
         Total shear stress (Pa)
     """
-    del X_I  # ponytail: kept in signature, see docstring Note
+    del X_I  # unused; kept in signature for API uniformity, see docstring Note
     sigma_P = (1.0 - D) * G_P * X_phi * gamma
     sigma_E = G_E * (mu_E_xy - mu_E_nat_xy)
     sigma_D = G_D * mu_D_xy
@@ -543,7 +543,7 @@ def hvnm_total_normal_stress_1(
     float
         First normal stress difference N1 (Pa)
     """
-    del X_I  # ponytail: kept in signature, see docstring Note
+    del X_I  # unused; kept in signature for API uniformity, see docstring Note
     N1_E = G_E * ((mu_E_xx - mu_E_nat_xx) - (mu_E_yy - mu_E_nat_yy))
     N1_D = G_D * (mu_D_xx - mu_D_yy)
     N1_I = (1.0 - D_int) * G_I_eff * ((mu_I_xx - mu_I_nat_xx) - (mu_I_yy - mu_I_nat_yy))

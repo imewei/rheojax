@@ -67,6 +67,7 @@ import logging
 import numpy as np
 
 from rheojax.core.jax_config import lazy_import, safe_import_jax
+from rheojax.utils.optimization import resolve_nlsq_method
 
 diffrax = lazy_import("diffrax")
 from rheojax.core.parameters import ParameterSet
@@ -452,12 +453,13 @@ class TNTMultiSpecies(TNTBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_nlsq_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 

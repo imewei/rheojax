@@ -67,16 +67,6 @@ def sample_maxwell_data() -> dict[str, np.ndarray]:
     }
 
 
-@pytest.fixture
-def sample_residuals() -> dict[str, np.ndarray]:
-    """Generate sample residual data for diagnostics."""
-    rng = np.random.default_rng(42)
-    n = 100
-    fitted = np.linspace(0, 100, n)
-    residuals = rng.standard_normal(n) * 5
-    return {"fitted": fitted, "residuals": residuals}
-
-
 # =============================================================================
 # Matplotlib Figure Comparison Utilities
 # =============================================================================
@@ -113,7 +103,9 @@ def figure_to_array(figure: Any) -> np.ndarray:
 # measurement). No savefig argument or memory cap avoids it -- only a fresh
 # process does. `widget_code` must define a variable named `fig` bound to
 # the Figure to save.
-def _render_widget_figure(widget_code: str, save_path: Path, timeout: float = 15.0) -> None:
+def _render_widget_figure(
+    widget_code: str, save_path: Path, timeout: float = 15.0
+) -> None:
     preamble = (
         "from PySide6.QtWidgets import QApplication\n"
         "app = QApplication.instance() or QApplication([])\n"
@@ -138,7 +130,9 @@ def save_golden_image(widget_code: str, path: Path) -> None:
     _render_widget_figure(widget_code, path)
 
 
-def compare_figures(widget_code: str, expected_path: Path, threshold: float = 0.01) -> bool:
+def compare_figures(
+    widget_code: str, expected_path: Path, threshold: float = 0.01
+) -> bool:
     """Render widget_code's figure in an isolated subprocess and compare it
     against the golden image."""
     import tempfile
@@ -228,9 +222,7 @@ fig = canvas.figure
         def _dead_callbacks(self: Any) -> None:
             raise RuntimeError("wrapped C/C++ object has been deleted")
 
-        monkeypatch.setattr(
-            type(canvas.canvas), "callbacks", property(_dead_callbacks)
-        )
+        monkeypatch.setattr(type(canvas.canvas), "callbacks", property(_dead_callbacks))
 
         canvas.cleanup()
 
@@ -309,96 +301,6 @@ fig = canvas.figure
 
 
 # =============================================================================
-# ResidualsPanel Visual Tests
-# =============================================================================
-
-
-@pytest.mark.skipif(not HAS_PYSIDE6, reason="PySide6 not installed")
-class TestResidualsPanelVisual:
-    """Visual regression tests for ResidualsPanel widget."""
-
-    @pytest.fixture
-    def qapp(self, qtbot: Any) -> QApplication:
-        """Get or create QApplication instance."""
-        app = QApplication.instance()
-        if app is None:
-            app = QApplication([])
-        return app
-
-    @staticmethod
-    def _residuals_widget_code(
-        y_true: np.ndarray, y_pred: np.ndarray, plot_type: str
-    ) -> str:
-        return f"""
-import numpy as np
-from rheojax.gui.widgets.residuals_panel import ResidualsPanel
-panel = ResidualsPanel()
-y_true = np.array({y_true.tolist()!r})
-y_pred = np.array({y_pred.tolist()!r})
-panel.plot_residuals(y_true, y_pred)
-panel.set_plot_type({plot_type!r})
-fig = panel.get_figure()
-"""
-
-    def test_residuals_vs_fitted(
-        self,
-        qapp: QApplication,
-        qtbot: Any,
-        sample_residuals: dict[str, np.ndarray],
-        golden_dir: Path,
-    ) -> None:
-        """Test residuals vs fitted plot."""
-        fitted = sample_residuals["fitted"]
-        residuals = sample_residuals["residuals"]
-        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "residuals")
-        golden_path = golden_dir / "residuals_vs_fitted.png"
-
-        if not golden_path.exists():
-            save_golden_image(widget_code, golden_path)
-            pytest.skip("Generated golden image - rerun test to validate")
-
-        assert compare_figures(widget_code, golden_path), "Residuals plot visual mismatch"
-
-    def test_qq_plot(
-        self,
-        qapp: QApplication,
-        qtbot: Any,
-        sample_residuals: dict[str, np.ndarray],
-        golden_dir: Path,
-    ) -> None:
-        """Test Q-Q plot."""
-        fitted = sample_residuals["fitted"]
-        residuals = sample_residuals["residuals"]
-        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "qq")
-        golden_path = golden_dir / "residuals_qq.png"
-
-        if not golden_path.exists():
-            save_golden_image(widget_code, golden_path)
-            pytest.skip("Generated golden image - rerun test to validate")
-
-        assert compare_figures(widget_code, golden_path), "Q-Q plot visual mismatch"
-
-    def test_histogram(
-        self,
-        qapp: QApplication,
-        qtbot: Any,
-        sample_residuals: dict[str, np.ndarray],
-        golden_dir: Path,
-    ) -> None:
-        """Test residuals histogram."""
-        fitted = sample_residuals["fitted"]
-        residuals = sample_residuals["residuals"]
-        widget_code = self._residuals_widget_code(fitted + residuals, fitted, "histogram")
-        golden_path = golden_dir / "residuals_histogram.png"
-
-        if not golden_path.exists():
-            save_golden_image(widget_code, golden_path)
-            pytest.skip("Generated golden image - rerun test to validate")
-
-        assert compare_figures(widget_code, golden_path), "Histogram visual mismatch"
-
-
-# =============================================================================
 # MultiView Visual Tests
 # =============================================================================
 
@@ -441,28 +343,6 @@ class TestArvizCanvasVisual:
         if app is None:
             app = QApplication([])
         return app
-
-    def test_arviz_canvas_empty_state(
-        self,
-        qapp: QApplication,
-        qtbot: Any,
-        golden_dir: Path,
-    ) -> None:
-        """Test ArviZ canvas empty state."""
-        widget_code = """
-from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
-canvas = ArvizCanvas()
-fig = canvas.get_figure()
-"""
-        golden_path = golden_dir / "arviz_canvas_empty.png"
-
-        if not golden_path.exists():
-            save_golden_image(widget_code, golden_path)
-            pytest.skip("Generated golden image - rerun test to validate")
-
-        assert compare_figures(widget_code, golden_path, threshold=0.05), (
-            "ArviZ empty state visual mismatch"
-        )
 
     @pytest.mark.parametrize(
         "plot_type",

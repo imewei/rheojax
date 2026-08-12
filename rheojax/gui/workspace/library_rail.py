@@ -105,7 +105,9 @@ class LibraryRail(QWidget):
         # PySide6 6.11's bound-method lookup for QMenu.exec bypasses class-level
         # Python monkeypatching, so patching Qt's own class silently falls through
         # to the real (blocking) exec(). Patching this plain-Python method instead
-        # behaves like normal Python attribute lookup.
+        # behaves like normal Python attribute lookup. Drop this seam and patch
+        # QMenu.exec directly again if a future PySide6 release restores normal
+        # class-level monkeypatching for it.
         return menu.exec(global_pos)
 
     def count(self) -> int:

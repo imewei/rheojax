@@ -173,8 +173,8 @@ class Maxwell(BaseModel):
                 tail_vals = y_np[-tail:]
                 offset = float(np.median(tail_vals))
                 tail_noise = float(np.std(tail_vals))
-                # ponytail: only treat the tail median as an instrument baseline
-                # (and subtract it) when it is statistically indistinguishable
+                # Only treat the tail median as an instrument baseline (and
+                # subtract it) when it is statistically indistinguishable
                 # from zero relative to the tail's own noise floor. If the tail
                 # carries a real, noise-exceeding offset, the observation window
                 # simply hasn't fully relaxed (G(t)->0 is the documented model);

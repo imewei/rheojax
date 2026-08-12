@@ -514,10 +514,10 @@ def _try_csv(filepath: Path, **kwargs) -> RheoData:
             # unambiguous 2-column case, re-read positionally instead of
             # failing (or worse, letting a manual column-mapping retry
             # consume that first row as a header and silently drop it).
-            # ponytail: files with >2 columns and no header still fall
-            # through to "could not auto-detect" below rather than guessing
-            # which pair of columns the user wants — avoids silently
-            # discarding the other columns' data.
+            # Files with >2 columns and no header still fall through to
+            # "could not auto-detect" below rather than guessing which pair
+            # of columns the user wants — avoids silently discarding the
+            # other columns' data.
             # Only applies when the caller supplied NEITHER x_col nor y_col/
             # y_cols -- same VIS-AUTO-001 rule as below: a caller-supplied
             # column specifier must never be silently overwritten by a guess.

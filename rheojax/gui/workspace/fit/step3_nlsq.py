@@ -314,8 +314,11 @@ class NlsqStep(QWidget):
                     options=fit_options,
                 )
             except NotImplementedError:
-                # ponytail: real solver wiring is out of scope here (tracked separately);
-                # this guard only keeps an unwired Run button from crashing the Qt slot.
+                # ponytail: stale-by-construction guard -- fit_controller._make_fit_fn
+                # is real and build_fit_controller() always injects it, so this only
+                # fires if NlsqStep is ever constructed without a fit_fn (skipping
+                # build_fit_controller). Delete this branch if that direct-construction
+                # path is ever made structurally impossible (e.g. fit_fn required).
                 self._result.setText("NLSQ solver is not wired up yet.")
                 # A first-ever failure with nlsq_result already None needs no
                 # change -- is_ready() already reads that as not-ready. Only

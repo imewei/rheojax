@@ -29,7 +29,14 @@ from rheojax.logging import get_logger
 logger = get_logger(__name__)
 
 _ARVIZ_PLOTS = [
-    "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+    "pair",
+    "forest",
+    "energy",
+    "autocorr",
+    "rank",
+    "ess",
+    "trace",
+    "posterior",
 ]
 
 
@@ -339,9 +346,9 @@ class VisualizeStep(QWidget):
             page.deleteLater()
         self._arviz_canvases.clear()
         self._names.remove("Diagnostics")
-        # ponytail: drop dangling references so a later refresh() (before
-        # deleteLater's deferred Qt cleanup actually runs) can't touch a
-        # widget whose parent tab no longer exists.
+        # Drop dangling references so a later refresh() (before deleteLater's
+        # deferred Qt cleanup actually runs) can't touch a widget whose
+        # parent tab no longer exists.
         for attr in (
             "_badge_label",
             "_rhat_label",

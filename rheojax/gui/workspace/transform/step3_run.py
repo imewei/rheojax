@@ -53,8 +53,11 @@ class RunStep(QWidget):
                 self._state.transform_key, self._state.slots, self._state.config
             )
         except NotImplementedError:
-            # ponytail: real worker wiring is out of scope here (tracked separately);
-            # this guard only keeps an unwired Run button from crashing the Qt slot.
+            # ponytail: stale-by-construction guard -- transform_controller._make_run_fn
+            # is real and build_transform_controller() always injects it, so this only
+            # fires if RunStep is ever constructed without a run_fn (skipping
+            # build_transform_controller). Delete this branch if that direct-construction
+            # path is ever made structurally impossible (e.g. run_fn required).
             self._status.setText("Transform worker is not wired up yet.")
             return
         except Exception as exc:

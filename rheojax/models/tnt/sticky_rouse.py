@@ -114,7 +114,11 @@ from rheojax.models.tnt._kernels import (
     tnt_multimode_relaxation_vec,
     tnt_multimode_saos_moduli_vec,
 )
-from rheojax.utils.optimization import create_least_squares_objective, nlsq_optimize
+from rheojax.utils.optimization import (
+    create_least_squares_objective,
+    nlsq_optimize,
+    resolve_nlsq_method,
+)
 
 jax, jnp = safe_import_jax()
 
@@ -550,7 +554,7 @@ class TNTStickyRouse(TNTBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
-        method = kwargs.get("method", _default_method)
+        method = resolve_nlsq_method(kwargs, _default_method)
 
         # Convert to JAX arrays
         x_jax = jnp.asarray(X, dtype=jnp.float64)

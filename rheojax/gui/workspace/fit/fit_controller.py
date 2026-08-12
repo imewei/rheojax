@@ -233,14 +233,16 @@ def _fit_fn_body(
     status_bar=None,
 ):
     rheo_data = library.load_payload(data_ref)
-    # ponytail: Step 1's protocol combo uses the same vocabulary as
+    # ponytail: relies on Step 1's protocol combo using the same vocabulary as
     # Protocol.value ("flow_curve"/"creep"/"relaxation"/"startup"/
     # "oscillation"/"laos"), which is exactly what ModelService.fit()'s
-    # test_mode expects. Previously this was hardcoded to None, which
-    # fell through to data.metadata.get("test_mode", "oscillation") on
-    # an empty metadata dict (metadata was never forwarded either) --
-    # every real fit silently ran as "oscillation" no matter what
-    # protocol the user picked.
+    # test_mode expects -- no validation enforces that match. Previously this
+    # was hardcoded to None, which fell through to
+    # data.metadata.get("test_mode", "oscillation") on an empty metadata dict
+    # (metadata was never forwarded either) -- every real fit silently ran as
+    # "oscillation" no matter what protocol the user picked. If Step 1's combo
+    # options and Protocol.value ever diverge, add explicit validation here
+    # rather than relying on the vocabularies staying in sync by convention.
     test_mode = fit_state.protocol
     metadata = getattr(rheo_data, "metadata", None)
     ms = multi_start or {}
@@ -275,18 +277,20 @@ def _fit_fn_body(
         progress_queue = multiprocessing.Queue()
         try:
             result = _run_on_thread(
-                lambda start_params=start_params, progress_queue=progress_queue: run_fit_isolated(
-                    model_key,
-                    rheo_data.x,
-                    rheo_data.y,
-                    test_mode=test_mode,
-                    initial_params=start_params or {},
-                    options=options or {},
-                    progress_queue=progress_queue,
-                    cancel_event=cancel_event,
-                    dataset_id=data_ref,
-                    model_config=model_config,
-                    metadata=metadata,
+                lambda start_params=start_params, progress_queue=progress_queue: (
+                    run_fit_isolated(
+                        model_key,
+                        rheo_data.x,
+                        rheo_data.y,
+                        test_mode=test_mode,
+                        initial_params=start_params or {},
+                        options=options or {},
+                        progress_queue=progress_queue,
+                        cancel_event=cancel_event,
+                        dataset_id=data_ref,
+                        model_config=model_config,
+                        metadata=metadata,
+                    )
                 ),
                 progress_queue=progress_queue,
                 on_progress=_make_progress_reporter(
@@ -311,7 +315,9 @@ def _fit_fn_body(
     # FitResult-normalization branch uses `res.params`). Alias it here
     # so NUTS warm-start/priors don't silently see an empty dict. Only
     # the winning restart needs this — comparisons above use r_squared,
-    # which is present under either key.
+    # which is present under either key. Drop this alias if NlsqStep/
+    # NutsStep and their tests are ever migrated to read "parameters"
+    # directly instead of "params".
     if isinstance(best, dict) and "params" not in best and "parameters" in best:
         best = {**best, "params": best["parameters"]}
     # run_fit_isolated never returns "x"/"y" (only "x_fit"/"y_fit") -- but

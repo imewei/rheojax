@@ -61,6 +61,7 @@ from rheojax.models.hvnm._kernels_diffrax import (
     hvnm_solve_relaxation,
     hvnm_solve_startup,
 )
+from rheojax.utils.optimization import resolve_nlsq_method
 
 jax, jnp = safe_import_jax()
 
@@ -974,12 +975,13 @@ class HVNMLocal(HVNMBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"laos", "startup", "relaxation", "creep"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_nlsq_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 
@@ -1224,9 +1226,7 @@ class HVNMLocal(HVNMBase):
                 )
             )(ys)
             gamma_step_sign = jnp.where(gamma_step < 0, -1.0, 1.0)
-            return stress / (
-                gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30)
-            )
+            return stress / (gamma_step_sign * jnp.maximum(jnp.abs(gamma_step), 1e-30))
 
         elif mode == "creep":
             if sigma_applied is None:

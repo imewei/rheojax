@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 from rheojax.gui.workspace.controller import WorkflowController
 
-# ponytail: Qt.AutoConnection (the connect() default) resolves to Direct for
+# Qt.AutoConnection (the connect() default) resolves to Direct for
 # same-thread emission and Queued for cross-thread emission, so it already
 # guarantees GUI-thread delivery when PipelineBatchRunner emits from a worker
 # thread. An explicit QueuedConnection would always defer to the next event

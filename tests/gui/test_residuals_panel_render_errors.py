@@ -30,3 +30,52 @@ def test_refresh_plot_survives_canvas_draw_failure(qtbot, monkeypatch):
     )  # must not raise
 
     assert "render error" in panel._empty_label.text().lower()
+
+
+@pytest.mark.parametrize("plot_type", ["qq", "histogram"])
+def test_set_plot_type_renders_without_error(qtbot, plot_type):
+    """Functional (non-golden-image) coverage for the qq/histogram dispatch
+    branches: PR #111 dropped the pixel-comparison goldens for these plot
+    types as environment-fragile, but no replacement asserted the dispatch
+    itself still runs without hitting the error-label fallback path.
+
+    Per the project's established FreeType-skip convention (this host's
+    matplotlib/FreeType glyph rasterizer can corrupt after enough Figure
+    churn in-process, independent of this widget's code — see
+    test_visual_regression.py's `_render_widget_figure` docstring), a render
+    failure whose message matches that known signature is skipped rather
+    than failed; any other failure is a real regression.
+    """
+    panel = ResidualsPanel()
+    qtbot.addWidget(panel)
+
+    rng = np.random.default_rng(0)
+    observed = np.linspace(1.0, 10.0, 30)
+    predicted = observed + rng.normal(0, 0.1, size=30)
+
+    panel.set_plot_type(plot_type)
+    panel.plot_residuals(observed, predicted, observed)
+
+    if not panel._empty_label.isHidden():
+        error_text = panel._empty_label.text()
+        if "FT_Render_Glyph" in error_text or "raster overflow" in error_text:
+            pytest.skip(f"Known host FreeType rendering limitation: {error_text}")
+        pytest.fail(
+            f"Unexpected render error for plot_type={plot_type!r}: {error_text}"
+        )
+
+
+def test_arviz_canvas_get_figure_on_empty_state_does_not_raise(qtbot):
+    """Functional (non-golden-image) coverage for ArvizCanvas with no
+    inference data set: PR #111 dropped the golden-image empty-state test
+    as font-metric-sensitive without a replacement asserting get_figure()
+    itself stays safe to call before any data is loaded.
+    """
+    from rheojax.gui.widgets.arviz_canvas import ArvizCanvas
+
+    canvas = ArvizCanvas()
+    qtbot.addWidget(canvas)
+
+    figure = canvas.get_figure()  # must not raise
+
+    assert figure is not None

@@ -371,6 +371,7 @@ class TNTCates(TNTBase):
         from rheojax.utils.optimization import (
             create_least_squares_objective,
             nlsq_optimize,
+            resolve_nlsq_method,
         )
 
         _kw_mode = kwargs.get("test_mode")
@@ -440,12 +441,13 @@ class TNTCates(TNTBase):
         # NLSQ forward-mode AD. Default to scipy to avoid failed attempt overhead.
         _ode_protocols = {"startup", "creep", "laos"}
         _default_method = "scipy" if test_mode in _ode_protocols else "auto"
+        _nlsq_method = resolve_nlsq_method(kwargs, _default_method)
 
         result = nlsq_optimize(
             objective,
             self.parameters,
             use_jax=kwargs.get("use_jax", True),
-            method=kwargs.get("method", _default_method),
+            method=_nlsq_method,
             max_iter=kwargs.get("max_iter", 2000),
         )
 
