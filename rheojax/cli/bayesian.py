@@ -167,32 +167,18 @@ def main(args: list[str] | None = None) -> int:
 
     # Load data
     try:
-        from rheojax.io import auto_load
+        # CLI-BAY-NOTE-001: load_and_flatten() prints its multi-segment note
+        # to stderr so that stdout contains only the result output (JSON or
+        # table). Printing to stdout would corrupt JSON output when parsed
+        # programmatically.
+        from rheojax.cli._common import load_and_flatten
 
-        load_kwargs: dict = {}
-        if parsed.x_col is not None:
-            load_kwargs["x_col"] = parsed.x_col
-        if parsed.y_col is not None:
-            load_kwargs["y_col"] = parsed.y_col
-        if parsed.y_cols is not None:
-            load_kwargs["y_cols"] = [c.strip() for c in parsed.y_cols.split(",")]
-
-        data = auto_load(str(parsed.input_file), **load_kwargs)
-
-        # Handle multi-segment data (use first segment)
-        if isinstance(data, list):
-            if not data:
-                print("Error: No data segments found in file", file=sys.stderr)
-                return 1
-            # CLI-BAY-NOTE-001: Print informational notes to stderr so that
-            # stdout contains only the result output (JSON or table).
-            # Printing to stdout would corrupt JSON output when parsed
-            # programmatically.
-            print(
-                f"Note: File contains {len(data)} segments, using first segment",
-                file=sys.stderr,
-            )
-            data = data[0]
+        data = load_and_flatten(
+            str(parsed.input_file),
+            x_col=parsed.x_col,
+            y_col=parsed.y_col,
+            y_cols=parsed.y_cols,
+        )
 
         logger.debug("Data loaded", shape=str(data.x.shape))
 

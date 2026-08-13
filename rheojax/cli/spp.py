@@ -208,7 +208,6 @@ def run_analyze(args: Namespace) -> int:
     """Run SPP analysis on a single file."""
     import numpy as np
 
-    from rheojax.io import auto_load as load_data
     from rheojax.logging import get_logger
     from rheojax.transforms.spp_decomposer import SPPDecomposer
 
@@ -247,27 +246,22 @@ def run_analyze(args: Namespace) -> int:
     # Load data
     try:
         logger.debug("Loading data file", file=str(args.input_file))
-        load_kwargs: dict = {}
-        if args.x_col is not None:
-            load_kwargs["x_col"] = args.x_col
-        if args.y_col is not None:
-            load_kwargs["y_col"] = args.y_col
-        loaded = load_data(str(args.input_file), **load_kwargs)
-        # Handle potential list return (take first dataset if list)
-        if isinstance(loaded, list):
-            if not loaded:
-                raise ValueError("File was parsed but returned no datasets")
-            rheo_data = loaded[0]
-        else:
-            rheo_data = loaded
+        from rheojax.cli._common import load_and_flatten
+
+        rheo_data = load_and_flatten(
+            str(args.input_file),
+            x_col=args.x_col,
+            y_col=args.y_col,
+            warn_on_multi_segment=False,
+        )
         logger.debug("Data loaded successfully", data_points=len(rheo_data.x))
 
         if args.strain_col is not None:
-            strain_kwargs = dict(load_kwargs)
-            strain_kwargs["y_col"] = args.strain_col
-            strain_loaded = load_data(str(args.input_file), **strain_kwargs)
-            strain_data = (
-                strain_loaded[0] if isinstance(strain_loaded, list) else strain_loaded
+            strain_data = load_and_flatten(
+                str(args.input_file),
+                x_col=args.x_col,
+                y_col=args.strain_col,
+                warn_on_multi_segment=False,
             )
             rheo_data.metadata["strain"] = np.asarray(strain_data.y)
     except Exception as e:
