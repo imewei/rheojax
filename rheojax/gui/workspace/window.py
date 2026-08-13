@@ -379,32 +379,46 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
         # elsewhere in this file) rather than building new progress UI.
         # QueuedConnection: PipelineExecutionService documents that it runs
         # off the GUI thread, same as phase_worker_ready above.
+        _qc = Qt.ConnectionType.QueuedConnection
+        _log = self._log_pipeline_event
         self._pipeline_service.pipeline_started.connect(
-            self._on_pipeline_started, Qt.ConnectionType.QueuedConnection
+            lambda: _log(logging.INFO, "Pipeline run started"), _qc
         )
         self._pipeline_service.pipeline_completed.connect(
-            self._on_pipeline_completed, Qt.ConnectionType.QueuedConnection
+            lambda: _log(logging.INFO, "Pipeline run completed"), _qc
         )
         self._pipeline_service.pipeline_failed.connect(
-            self._on_pipeline_failed, Qt.ConnectionType.QueuedConnection
+            lambda error: _log(logging.ERROR, f"Pipeline run failed: {error}"), _qc
         )
         self._pipeline_service.step_started.connect(
-            self._on_pipeline_step_started, Qt.ConnectionType.QueuedConnection
+            lambda step_id: _log(logging.INFO, f"Step {step_id} started"), _qc
         )
         self._pipeline_service.step_completed.connect(
-            self._on_pipeline_step_completed, Qt.ConnectionType.QueuedConnection
+            lambda step_id: _log(logging.INFO, f"Step {step_id} completed"), _qc
         )
         self._pipeline_service.step_failed.connect(
-            self._on_pipeline_step_failed, Qt.ConnectionType.QueuedConnection
+            lambda step_id, error: _log(
+                logging.ERROR, f"Step {step_id} failed: {error}"
+            ),
+            _qc,
         )
         self._pipeline_service.step_phase_started.connect(
-            self._on_pipeline_step_phase_started, Qt.ConnectionType.QueuedConnection
+            lambda step_id, phase: _log(
+                logging.INFO, f"Step {step_id}: {phase} phase started"
+            ),
+            _qc,
         )
         self._pipeline_service.step_phase_completed.connect(
-            self._on_pipeline_step_phase_completed, Qt.ConnectionType.QueuedConnection
+            lambda step_id, phase: _log(
+                logging.INFO, f"Step {step_id}: {phase} phase completed"
+            ),
+            _qc,
         )
         self._pipeline_service.step_phase_failed.connect(
-            self._on_pipeline_step_phase_failed, Qt.ConnectionType.QueuedConnection
+            lambda step_id, phase, error: _log(
+                logging.ERROR, f"Step {step_id}: {phase} phase failed: {error}"
+            ),
+            _qc,
         )
 
         self._build_workspace(app_state)
@@ -928,40 +942,8 @@ class WorkspaceWindow(QMainWindow, _WindowChrome):
             if job is not None:
                 job["worker"] = worker
 
-    def _on_pipeline_started(self) -> None:
-        self.log_dock.append_record(logging.INFO, "Pipeline run started")
-
-    def _on_pipeline_completed(self) -> None:
-        self.log_dock.append_record(logging.INFO, "Pipeline run completed")
-
-    def _on_pipeline_failed(self, error: str) -> None:
-        self.log_dock.append_record(logging.ERROR, f"Pipeline run failed: {error}")
-
-    def _on_pipeline_step_started(self, step_id: str) -> None:
-        self.log_dock.append_record(logging.INFO, f"Step {step_id} started")
-
-    def _on_pipeline_step_completed(self, step_id: str) -> None:
-        self.log_dock.append_record(logging.INFO, f"Step {step_id} completed")
-
-    def _on_pipeline_step_failed(self, step_id: str, error: str) -> None:
-        self.log_dock.append_record(logging.ERROR, f"Step {step_id} failed: {error}")
-
-    def _on_pipeline_step_phase_started(self, step_id: str, phase: str) -> None:
-        self.log_dock.append_record(
-            logging.INFO, f"Step {step_id}: {phase} phase started"
-        )
-
-    def _on_pipeline_step_phase_completed(self, step_id: str, phase: str) -> None:
-        self.log_dock.append_record(
-            logging.INFO, f"Step {step_id}: {phase} phase completed"
-        )
-
-    def _on_pipeline_step_phase_failed(
-        self, step_id: str, phase: str, error: str
-    ) -> None:
-        self.log_dock.append_record(
-            logging.ERROR, f"Step {step_id}: {phase} phase failed: {error}"
-        )
+    def _log_pipeline_event(self, level: int, message: str) -> None:
+        self.log_dock.append_record(level, message)
 
     def _maybe_confirm_unsaved_changes(self, proceed) -> None:
         if not self._state.project.dirty:
