@@ -52,9 +52,9 @@ Qt（PySide6）图形界面，提供交互式数据加载/可视化、模型拟�
 - **启动 GUI 会得到哪个窗口？** 只有 `WorkspaceWindow`（三步向导：fit/transform/pipeline）。遗留 `RheoJAXMainWindow` 及 `--legacy`/`--workspace` 标志已在 `[Unreleased]` 版本中作为 BREAKING CHANGE 移除；传入这些标志会得到 argparse "unrecognized arguments" 错误。
 - **为什么拟合逻辑不直接写在 Widget 里？** 架构要求 View（PySide6 widget/dialog）与业务逻辑解耦；数值/拟合逻辑经 `gui/services/*Service` 调用 `rheojax.core`/`rheojax.pipeline`，长时间任务再委托给 `gui/jobs/*Worker` 在后台线程/子进程执行，避免阻塞 Qt 事件循环。
 
-## 相关文件清单（115 个源文件，按子包）
+## 相关文件清单（99 个源文件，按子包）
 
-`dialogs/`(9), `foundation/`(11，含状态容器 `state.py` 与失效级联 `invalidation.py`——无独立 `state/` 目录), `jobs/`(13), `resources/`(+`styles/`), `services/`(8), `utils/`(10), `widgets/`(11), `workspace/`(+`fit/`, `pipeline/`, `transform/`)(29), `compat.py`, `main.py`, `__init__.py`
+`dialogs/`(9), `foundation/`(11，含状态容器 `state.py` 与失效级联 `invalidation.py`——无独立 `state/` 目录), `jobs/`(13), `resources/`(+`styles/`)(5), `services/`(8), `utils/`(10), `widgets/`(11), `workspace/`(+`fit/`, `pipeline/`, `transform/`)(29), `compat.py`, `main.py`, `__init__.py`
 
 ## 变更记录 (Changelog)
 

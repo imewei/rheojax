@@ -1,10 +1,11 @@
 """Shared helpers for CLI subcommands.
 
 load_and_flatten() was independently reimplemented (with small wording and
-behavior drift) in fit.py, bayesian.py, cmd_load.py, cmd_transform.py, and
-cmd_batch.py. This module is the single copy the single-file subcommands
-route through; cmd_batch.py keeps its own variant since batch processing
-needs per-file logging rather than a printed stderr note.
+behavior drift) in fit.py, bayesian.py, cmd_load.py, cmd_transform.py,
+spp.py, and cmd_batch.py. This module is the single copy the single-file
+subcommands (including spp.py's two auto_load call sites) route through;
+cmd_batch.py keeps its own variant since batch processing needs per-file
+logging rather than a printed stderr note.
 """
 
 from __future__ import annotations

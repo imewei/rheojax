@@ -1035,13 +1035,14 @@ use multi-start optimization:
 
 .. code-block:: python
 
-   from rheojax.utils.optimization import nlsq_optimize_global
+   from rheojax.utils.optimization import nlsq_optimize
 
-   # Global search for challenging parameter landscapes
-   result = nlsq_optimize_global(
+   # Global search for challenging parameter landscapes. Bounds come from
+   # initial_params (a ParameterSet) itself, not a separate argument.
+   result = nlsq_optimize(
        objective_fn,
        initial_params,
-       bounds=param_bounds
+       workflow="auto_global",
    )
 
 Bayesian Inference with MCMC

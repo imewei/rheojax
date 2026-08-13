@@ -187,7 +187,6 @@ def main(args: list[str] | None = None) -> int:
                 x_col=parsed.x_col,
                 y_col=parsed.y_col,
                 y_cols=parsed.y_cols,
-                warn_on_multi_segment=False,
             )
             logger.debug("Loaded data from file", input=parsed.input)
         except Exception as e:

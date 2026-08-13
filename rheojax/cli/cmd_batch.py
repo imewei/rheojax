@@ -332,9 +332,13 @@ def main(args: list[str] | None = None) -> int:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=max(1, parsed.workers)) as executor:
+            # Preloading all N files is the deliberate cost of --parallel
+            # (bounded by --workers); the plain sequential path below stays
+            # lazy instead, to preserve one-dataset-at-a-time peak memory and
+            # --no-continue-on-error's original fail-fast behavior.
             loaded_outcomes = list(executor.map(_try_load, files))
     else:
-        loaded_outcomes = [_try_load(fp) for fp in files]
+        loaded_outcomes = (_try_load(fp) for fp in files)
 
     all_results: list[dict] = []
     written_stems: set[str] = set()

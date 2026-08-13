@@ -84,7 +84,7 @@ graph TD
 | io | `rheojax/io/` | 文件读写（TRIOS/Anton Paar/CSV/Excel/HDF5）+ SPP 导出 | 27 / 23 | [CLAUDE.md](./rheojax/io/CLAUDE.md) |
 | pipeline | `rheojax/pipeline/` | 流式拟合/变换工作流 API | 6 / 16 | [CLAUDE.md](./rheojax/pipeline/CLAUDE.md) |
 | cli | `rheojax/cli/` | `rheojax`/`rj` 命令行工具 | 17 / 17 | [CLAUDE.md](./rheojax/cli/CLAUDE.md) |
-| gui | `rheojax/gui/` | PySide6 桌面应用（`rheojax-gui`） | 115 / 119+ | [CLAUDE.md](./rheojax/gui/CLAUDE.md) |
+| gui | `rheojax/gui/` | PySide6 桌面应用（`rheojax-gui`） | 99 / 119+ | [CLAUDE.md](./rheojax/gui/CLAUDE.md) |
 | utils | `rheojax/utils/` | 数值工具、优化、初始化、不确定度量化 | 33 / 30 | [CLAUDE.md](./rheojax/utils/CLAUDE.md) |
 | parallel | `rheojax/parallel/` | 进程池并行执行 | 4 / 8 | [CLAUDE.md](./rheojax/parallel/CLAUDE.md) |
 | logging | `rheojax/logging/` | 结构化日志配置 | 6 / 4 | [CLAUDE.md](./rheojax/logging/CLAUDE.md) |
