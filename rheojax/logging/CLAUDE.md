@@ -11,6 +11,7 @@
 - `rheojax/logging/__init__.py` 汇总全部公共 API；典型用法：
   ```python
   from rheojax.logging import configure_logging, get_logger
+
   configure_logging(level="INFO")
   logger = get_logger(__name__)
   logger.info("Starting analysis", model="Maxwell")

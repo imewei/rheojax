@@ -49,9 +49,7 @@ def _trace_model(numpyro_model, X, y):
 
 def test_prior_dict_to_dist_gamma():
     """GUI-configured Gamma priors must not be silently dropped (P0)."""
-    d = prior_dict_to_dist(
-        {"type": "gamma", "concentration": 2.0, "rate": 1.0}, dist
-    )
+    d = prior_dict_to_dist({"type": "gamma", "concentration": 2.0, "rate": 1.0}, dist)
     assert d is not None
     assert isinstance(d, dist.Gamma)
     assert float(d.concentration) == pytest.approx(2.0)
@@ -305,7 +303,11 @@ def test_finite_check_guard_poisons_gradient_at_singularity():
     model = _FakeModel({"theta": (-1.0, 1.0)})
     model.model_function = _singular_model_function
     numpyro_model = build_numpyro_model(
-        model, ["theta"], {"theta": (-1.0, 1.0)}, TestMode.RELAXATION, False,
+        model,
+        ["theta"],
+        {"theta": (-1.0, 1.0)},
+        TestMode.RELAXATION,
+        False,
         {"n_points": 5},
     )
     X = jnp.linspace(0.1, 1.0, 5)
@@ -325,7 +327,11 @@ def test_nan_safe_grad_reeval_opt_in_fixes_gradient_at_singularity():
     model.model_function = _singular_model_function
     model._bayesian_nan_safe_grad_reeval = True
     numpyro_model = build_numpyro_model(
-        model, ["theta"], {"theta": (-1.0, 1.0)}, TestMode.RELAXATION, False,
+        model,
+        ["theta"],
+        {"theta": (-1.0, 1.0)},
+        TestMode.RELAXATION,
+        False,
         {"n_points": 5},
     )
     X = jnp.linspace(0.1, 1.0, 5)

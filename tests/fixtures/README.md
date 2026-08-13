@@ -53,18 +53,19 @@ Additional sizes can be generated using `generate_trios_files_batch()`.
 
 ```python
 # Generate TRIOS files programmatically
-from tests.fixtures.generate_test_data import generate_synthetic_trios_file, generate_trios_files_batch
+from tests.fixtures.generate_test_data import (
+    generate_synthetic_trios_file,
+    generate_trios_files_batch,
+)
 
 # Single file
 trios_file = generate_synthetic_trios_file(
-    target_size_mb=10.0,
-    output_path="tests/fixtures/trios_large.txt"
+    target_size_mb=10.0, output_path="tests/fixtures/trios_large.txt"
 )
 
 # Batch generation
 files = generate_trios_files_batch(
-    sizes_mb=[1, 5, 10, 50, 100],
-    output_dir="tests/fixtures/"
+    sizes_mb=[1, 5, 10, 50, 100], output_dir="tests/fixtures/"
 )
 for size_mb, path in files.items():
     print(f"Generated {size_mb} MB file: {path}")
@@ -85,23 +86,17 @@ t, G_t = generate_relaxation_reference_data(
     num_points=1000,
     model_type="maxwell",
     noise_level=0.01,  # 1% Gaussian noise
-    seed=42
+    seed=42,
 )
 
 # Creep mode (Maxwell model)
 t, J_t = generate_creep_reference_data(
-    num_points=500,
-    model_type="fractional_zener",
-    noise_level=0.02,
-    seed=42
+    num_points=500, model_type="fractional_zener", noise_level=0.02, seed=42
 )
 
 # Oscillation mode (Maxwell model)
 omega, G_star = generate_oscillation_reference_data(
-    num_points=800,
-    model_type="maxwell",
-    noise_level=0.01,
-    seed=42
+    num_points=800, model_type="maxwell", noise_level=0.01, seed=42
 )
 ```
 
@@ -117,10 +112,7 @@ from tests.fixtures.generate_test_data import (
 
 # Relaxation data
 rheo_relax = create_rheo_data_relaxation(
-    model_type="maxwell",
-    num_points=1000,
-    noise_level=0.01,
-    seed=42
+    model_type="maxwell", num_points=1000, noise_level=0.01, seed=42
 )
 print(f"Domain: {rheo_relax.domain}")  # 'time'
 print(f"Material: {rheo_relax.metadata.get('material_name')}")
@@ -140,14 +132,13 @@ rheo_osc = create_rheo_data_oscillation(model_type="fractional_zener")
 import pytest
 from tests.fixtures.generate_test_data import create_rheo_data_relaxation
 
+
 @pytest.mark.validation
 @pytest.mark.parametrize("model_type", ["maxwell", "fractional_zener"])
 def test_bayesian_relaxation_mode(model_type):
     # Create synthetic reference data
     rheo_data = create_rheo_data_relaxation(
-        model_type=model_type,
-        num_points=1000,
-        noise_level=0.01
+        model_type=model_type, num_points=1000, noise_level=0.01
     )
 
     # Fit model and perform Bayesian inference
@@ -155,9 +146,9 @@ def test_bayesian_relaxation_mode(model_type):
     result = model.fit_bayesian(rheo_data, num_samples=2000)
 
     # Validate MCMC diagnostics
-    assert result.diagnostics['r_hat'] < 1.01
-    assert result.diagnostics['ess'] > 400
-    assert result.diagnostics['divergences'] < 0.01
+    assert result.diagnostics["r_hat"] < 1.01
+    assert result.diagnostics["ess"] > 400
+    assert result.diagnostics["divergences"] < 0.01
 
     # Validate posterior accuracy vs pyRheo reference
     assert posterior_within_tolerance(result, reference_data=rheo_data, tol=0.05)
@@ -316,7 +307,7 @@ Expected due to TRIOS format overhead. Use `points_per_mb` parameter to adjust:
 # Generate larger file
 generate_synthetic_trios_file(
     target_size_mb=10,
-    points_per_mb=10000  # Doubled from default 5000
+    points_per_mb=10000,  # Doubled from default 5000
 )
 ```
 

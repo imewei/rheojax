@@ -89,7 +89,9 @@ def test_save_to_library_reruns_at_same_revision_overwrite(qtbot):
     assert lib.get(id2).origin == "derived"
 
 
-def test_on_export_clicked_reports_failure_instead_of_raising(qtbot, monkeypatch, tmp_path):
+def test_on_export_clicked_reports_failure_instead_of_raising(
+    qtbot, monkeypatch, tmp_path
+):
     """Regression: _on_export_clicked called export_bundle() unguarded, so an
     unwritable directory or export failure propagated uncaught out of the Qt
     slot instead of updating the status label with an error."""
@@ -195,7 +197,9 @@ def test_save_button_confirm_gate_blocks_on_non_converged_cancel(qtbot, monkeypa
     monkeypatch.setattr(QMessageBox, "question", fake_question)
 
     emitted = {"called": False}
-    step.dataset_commit_requested.connect(lambda *a: emitted.__setitem__("called", True))
+    step.dataset_commit_requested.connect(
+        lambda *a: emitted.__setitem__("called", True)
+    )
 
     step._save_btn.click()
 
@@ -236,7 +240,9 @@ def test_export_button_confirm_gate_blocks_on_non_converged_cancel(
     step = ExportStep(st, lib)
     qtbot.addWidget(step)
 
-    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Cancel
+    )
     dir_dialog_called = {"called": False}
     monkeypatch.setattr(
         QFileDialog,

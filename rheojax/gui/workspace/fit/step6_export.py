@@ -58,7 +58,12 @@ class ExportStep(QWidget):
         set_panel_margins(lay)
         bundle_caption = QLabel("Export bundle")
         bundle_caption.setStyleSheet(field_label_style())
-        for w in (bundle_caption, self._save_btn, self._export_btn, self._export_status):
+        for w in (
+            bundle_caption,
+            self._save_btn,
+            self._export_btn,
+            self._export_status,
+        ):
             lay.addWidget(w)
         lay.addStretch()  # see step1_protocol_model.py's addStretch() comment
         self._save_btn.clicked.connect(self._on_save_clicked)

@@ -199,9 +199,7 @@ class FluidityBase(BaseModel):
 
         # Clip seeds to bounds before applying so set_value() does not
         # raise on edge cases (e.g. data well below the lower bound).
-        self.parameters.set_value(
-            "tau_y", self._clip_to_bounds("tau_y", tau_y_seed)
-        )
+        self.parameters.set_value("tau_y", self._clip_to_bounds("tau_y", tau_y_seed))
         self.parameters.set_value("K", self._clip_to_bounds("K", max(K_seed, 1e-3)))
         self.parameters.set_value("n_flow", self._clip_to_bounds("n_flow", n_seed))
 

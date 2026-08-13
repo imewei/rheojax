@@ -69,7 +69,9 @@ class TestSafeImportJax:
 class TestEnableCompilationCache:
     """Tests for _enable_compilation_cache()."""
 
-    def test_sets_min_compile_time_secs_below_default_threshold(self, monkeypatch, tmp_path):
+    def test_sets_min_compile_time_secs_below_default_threshold(
+        self, monkeypatch, tmp_path
+    ):
         """jax_persistent_cache_min_compile_time_secs defaults to 1.0s in the
         installed JAX, which silently skips persisting sub-second rheology
         model compiles. It must be explicitly lowered."""
@@ -84,9 +86,7 @@ class TestEnableCompilationCache:
         fake_jax = MagicMock()
         _enable_compilation_cache(fake_jax)
 
-        calls = dict(
-            call.args for call in fake_jax.config.update.call_args_list
-        )
+        calls = dict(call.args for call in fake_jax.config.update.call_args_list)
         assert calls["jax_compilation_cache_dir"] == str(
             tmp_path / ".cache" / "rheojax" / "jax_cache"
         )
@@ -103,7 +103,9 @@ class TestEnableCompilationCache:
         _enable_compilation_cache(fake_jax)
         fake_jax.config.update.assert_not_called()
 
-    def test_falls_back_to_experimental_api_on_attribute_error(self, monkeypatch, tmp_path):
+    def test_falls_back_to_experimental_api_on_attribute_error(
+        self, monkeypatch, tmp_path
+    ):
         """If the config-based API raises (e.g. older JAX), fall back to the
         experimental compilation_cache module instead of crashing."""
         import pathlib
@@ -179,7 +181,9 @@ class TestLazyImport:
 
         fake_module = MagicMock()
         fake_module.some_method.return_value = 42
-        monkeypatch.setattr(importlib, "import_module", MagicMock(return_value=fake_module))
+        monkeypatch.setattr(
+            importlib, "import_module", MagicMock(return_value=fake_module)
+        )
 
         proxy = lazy_import("some.fake.module")
         assert proxy.some_method() == 42
@@ -206,7 +210,9 @@ class TestLazyImport:
         from rheojax.core.jax_config import lazy_import
 
         fake_module = MagicMock()
-        monkeypatch.setattr(importlib, "import_module", MagicMock(return_value=fake_module))
+        monkeypatch.setattr(
+            importlib, "import_module", MagicMock(return_value=fake_module)
+        )
 
         proxy = lazy_import("some.fake.module")
         assert "loaded=False" in repr(proxy)

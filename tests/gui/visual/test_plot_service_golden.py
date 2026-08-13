@@ -118,7 +118,7 @@ def _generate_fit_plot(path: Path) -> None:
     """Render the fit plot in an isolated subprocess and save it to ``path``."""
     full_code = (
         _FIT_PLOT_CODE
-        + f'\nfig.savefig({str(path)!r}, dpi=150)\n'
+        + f"\nfig.savefig({str(path)!r}, dpi=150)\n"
         + 'print("RENDER_OK")\n'
     )
     result = run_gui_code_subprocess(full_code, timeout=30.0)

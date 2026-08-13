@@ -906,7 +906,9 @@ class ITTMCTBase(BaseModel):
         # nonlinear fit to re-converge from a cold start on every residual
         # evaluation (the dominant cost of a Schematic model.fit() call).
         warm_g, warm_tau = (
-            self._prony_warm_start if self._prony_warm_start is not None else (None, None)
+            self._prony_warm_start
+            if self._prony_warm_start is not None
+            else (None, None)
         )
         self._prony_amplitudes, self._prony_times = prony_decompose_memory(
             t, m_t, n_modes=self.n_prony_modes, g_init=warm_g, tau_init=warm_tau

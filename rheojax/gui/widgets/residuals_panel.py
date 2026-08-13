@@ -389,7 +389,10 @@ class ResidualsPanel(QWidget):
                 fitted = np.arange(len(residuals))
 
             sc = ax.scatter(
-                fitted, residuals, alpha=0.6, edgecolors="none",
+                fitted,
+                residuals,
+                alpha=0.6,
+                edgecolors="none",
                 label=label if multi else None,
             )
 
@@ -476,7 +479,9 @@ class ResidualsPanel(QWidget):
 
         if multi:
             ax.legend()
-        ax.set_title("Normal Q-Q Plot" if stats is not None else "Q-Q Plot (simplified)")
+        ax.set_title(
+            "Normal Q-Q Plot" if stats is not None else "Q-Q Plot (simplified)"
+        )
 
     def _plot_histogram(self) -> None:
         """Plot histogram of residuals."""
@@ -535,7 +540,10 @@ class ResidualsPanel(QWidget):
             sqrt_abs_res = np.sqrt(np.abs(residuals))
 
             sc = ax.scatter(
-                fitted, sqrt_abs_res, alpha=0.6, edgecolors="none",
+                fitted,
+                sqrt_abs_res,
+                alpha=0.6,
+                edgecolors="none",
                 label=label if multi else None,
             )
 
@@ -581,7 +589,10 @@ class ResidualsPanel(QWidget):
                 else np.arange(len(residuals))
             )
             ax.scatter(
-                x, residuals, alpha=0.6, edgecolors="none",
+                x,
+                residuals,
+                alpha=0.6,
+                edgecolors="none",
                 label=label if multi else None,
             )
 

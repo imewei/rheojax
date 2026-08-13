@@ -71,9 +71,7 @@ class TestSpectrumInversionTikhonov:
         omega, G_star, _ = self._make_single_mode_data()
         data = RheoData(x=omega, y=G_star)
         lam = 1e-6
-        transform = SpectrumInversion(
-            method="tikhonov", n_tau=80, regularization=lam
-        )
+        transform = SpectrumInversion(method="tikhonov", n_tau=80, regularization=lam)
         result, _ = transform.transform(data)
         H_nnls = np.asarray(result.y)
         tau = np.asarray(result.x)
@@ -89,8 +87,7 @@ class TestSpectrumInversionTikhonov:
         ATb = A.T @ b
         H_unconstrained = np.linalg.solve(ATA + lam**2 * L.T @ L, ATb)
         assert np.any(H_unconstrained < 0), (
-            "test setup must produce a negative lobe for this to be a "
-            "meaningful check"
+            "test setup must produce a negative lobe for this to be a meaningful check"
         )
         H_naive = np.maximum(H_unconstrained, 0.0)
 
@@ -167,9 +164,7 @@ class TestSpectrumInversionTikhonov:
         d_ln_tau = A[0, :]
 
         assert np.isclose(d_ln_tau[0], d_ln_tau[-1])
-        assert np.isclose(
-            np.sum(d_ln_tau), np.log(tau[-1] / tau[0]), rtol=1e-9
-        )
+        assert np.isclose(np.sum(d_ln_tau), np.log(tau[-1] / tau[0]), rtol=1e-9)
 
     def test_nan_input_raises_validation_error(self):
         """NaN in x must raise a clear validation error instead of silently

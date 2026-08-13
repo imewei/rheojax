@@ -657,9 +657,7 @@ class TestRegistryCompatibility:
         assert set(both) == {"mymodel", "mytransform"}
 
         # Scoped calls must not leak across namespaces.
-        models_only = registry.find_compatible(
-            domain="x", plugin_type=PluginType.MODEL
-        )
+        models_only = registry.find_compatible(domain="x", plugin_type=PluginType.MODEL)
         assert models_only == ["mymodel"]
 
         transforms_only = registry.find_compatible(

@@ -162,9 +162,7 @@ class TestFFTAnalysis:
         ref_freqs, ref_psd = periodogram(signal, fs=fs, window="boxcar", detrend=False)
 
         np.testing.assert_allclose(np.array(psd_data.x), ref_freqs, atol=1e-9)
-        np.testing.assert_allclose(
-            np.array(psd_data.y), ref_psd, rtol=1e-6, atol=1e-12
-        )
+        np.testing.assert_allclose(np.array(psd_data.y), ref_psd, rtol=1e-6, atol=1e-12)
 
     def test_psd_normalize_noop_warns(self, caplog):
         """normalize=True must not be silently ignored when return_psd=True."""

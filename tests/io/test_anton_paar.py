@@ -579,9 +579,10 @@ Interval data:\tTime\tShear Stress\tShear Strain
         filepath = tmp_path / "one_bad_interval.csv"
         filepath.write_text(content)
 
-        with caplog.at_level(
-            "WARNING", logger="rheojax.io.readers.anton_paar"
-        ), pytest.warns(UserWarning, match="Could not auto-detect"):
+        with (
+            caplog.at_level("WARNING", logger="rheojax.io.readers.anton_paar"),
+            pytest.warns(UserWarning, match="Could not auto-detect"),
+        ):
             data_list = load_anton_paar(filepath, return_all=True)
 
         assert isinstance(data_list, list)
@@ -725,7 +726,7 @@ class TestExcelExport:
         data = RheoData(
             x=np.array([1.0, 2.0, 3.0]),
             y=np.array([1.0, 2.0, 3.0]),
-            x_units="=HYPERLINK(\"http://evil\",\"click\")",
+            x_units='=HYPERLINK("http://evil","click")',
             metadata={
                 "global_metadata": {
                     "=cmd|'/C calc'!A1": "+2+3",
@@ -747,9 +748,7 @@ class TestExcelExport:
         assert global_row[prop_col - 1].value == "'=cmd|'/C calc'!A1"
         assert global_row[value_col - 1].value == "'+2+3"
 
-        units_row = next(
-            r for r in rows if "X Units" in str(r[prop_col - 1].value)
-        )
+        units_row = next(r for r in rows if "X Units" in str(r[prop_col - 1].value))
         assert units_row[value_col - 1].value.startswith("'"), (
             f"X Units cell must be neutralized, got: {units_row[value_col - 1].value!r}"
         )

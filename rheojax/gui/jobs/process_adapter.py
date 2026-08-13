@@ -99,7 +99,9 @@ def _subprocess_entry(
             result_queue.put(
                 {
                     "type": "failed",
-                    "error": result.get("error") or result.get("message") or "Work failed",
+                    "error": result.get("error")
+                    or result.get("message")
+                    or "Work failed",
                     "traceback": "",
                 }
             )

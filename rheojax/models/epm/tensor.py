@@ -208,9 +208,7 @@ class TensorialEPM(EPMBase):
         # Bayesian fitting changes `nu`) has made the cached propagator stale
         # and recompute it — see the property docstring.
         self._propagator_nu_cache = nu
-        self._propagator_q_norm_cache = make_tensorial_propagator_q(
-            L, nu=nu, mu=1.0
-        )
+        self._propagator_q_norm_cache = make_tensorial_propagator_q(L, nu=nu, mu=1.0)
 
     @property
     def _propagator_q_norm(self) -> jax.Array:

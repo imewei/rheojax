@@ -500,8 +500,7 @@ class GiesekusBase(BaseModel):
         sigma_plateau_est = eta[-1] * gamma_dot[-1]
         if sigma_plateau_est > 1e-30 and lambda_est > 1e-30:
             alpha_est = np.clip(
-                eta_0_est**2
-                / (sigma_plateau_est**2 * lambda_est**2 + eta_0_est**2),
+                eta_0_est**2 / (sigma_plateau_est**2 * lambda_est**2 + eta_0_est**2),
                 0.0,
                 0.5,
             )

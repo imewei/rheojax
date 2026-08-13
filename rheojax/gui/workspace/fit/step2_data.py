@@ -186,9 +186,7 @@ class DataStep(QWidget):
             self._guard.setText("")
             self._quantity_guard.setText("")
             self._set_errors([])
-            had_selection = (
-                self._state.data_ref is not None or self._state.column_map
-            )
+            had_selection = self._state.data_ref is not None or self._state.column_map
             if had_selection:
                 self._state.data_ref = None
                 self._state.column_map = {}
@@ -314,9 +312,7 @@ class DataStep(QWidget):
         actual = self._actual_y_quantity()
         expected = self._contract.y_quantity
         formula = "σ = η·γ̇" if expected == "stress" else "η = σ/γ̇"
-        return (
-            f"⚠ y data is {actual}, model expects {expected} → convert ({formula})"
-        )
+        return f"⚠ y data is {actual}, model expects {expected} → convert ({formula})"
 
     def apply_quantity_conversion(self) -> None:
         """Convert loaded y data between stress (Pa) and viscosity (Pa·s).

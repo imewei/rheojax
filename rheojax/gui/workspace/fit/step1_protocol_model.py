@@ -191,7 +191,9 @@ class ProtocolModelStep(QWidget):
                     tooltip = _model_tooltip(name)
                     if tooltip:
                         self._model.setItemData(
-                            self._model.count() - 1, tooltip, Qt.ItemDataRole.ToolTipRole
+                            self._model.count() - 1,
+                            tooltip,
+                            Qt.ItemDataRole.ToolTipRole,
                         )
         self._model.blockSignals(False)
         self._on_model(self._model.currentData())

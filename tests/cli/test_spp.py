@@ -219,9 +219,7 @@ class TestRunAnalyze:
         out_without = tmp_path / "without_strain.csv"
 
         rc_with = run_analyze(
-            _analyze_ns(
-                input_file=csv, output=out_with, strain_col="strain_measured"
-            )
+            _analyze_ns(input_file=csv, output=out_with, strain_col="strain_measured")
         )
         rc_without = run_analyze(_analyze_ns(input_file=csv, output=out_without))
 

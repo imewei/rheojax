@@ -71,9 +71,7 @@ class DatasetLibrary:
 
     def datasets_of_type(self, protocol_type: str) -> list[DatasetRef]:
         with self._lock:
-            return [
-                r for r in self._by_id.values() if r.protocol_type == protocol_type
-            ]
+            return [r for r in self._by_id.values() if r.protocol_type == protocol_type]
 
     def store_payload(self, id: str, data: Any) -> None:
         with self._lock:

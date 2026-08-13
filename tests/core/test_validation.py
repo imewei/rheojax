@@ -52,9 +52,7 @@ def test_check_physics_surfaces_failure_via_warning_and_log(monkeypatch, caplog)
     def _boom(model):
         raise AttributeError("model missing expected field")
 
-    monkeypatch.setattr(
-        "rheojax.utils.physics_checks.check_fit_physics", _boom
-    )
+    monkeypatch.setattr("rheojax.utils.physics_checks.check_fit_physics", _boom)
 
     with caplog.at_level("WARNING", logger="rheojax.core.post_fit_validator"):
         with pytest.warns(RheoJaxPhysicsWarning, match="check_physics failed to run"):

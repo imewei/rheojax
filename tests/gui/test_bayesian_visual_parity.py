@@ -30,7 +30,7 @@ def test_bayesian_ppd_plot_hash():
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         png_path = Path(f.name)
 
-    render_code = f'''
+    render_code = f"""
 import csv
 import matplotlib
 matplotlib.use("Agg")
@@ -67,7 +67,7 @@ assert len(ax.collections) >= 1, "Expected at least 1 fill_between collection"
 fig.savefig({str(png_path)!r}, format="png")
 plt.close(fig)
 print("RENDER_OK")
-'''
+"""
 
     try:
         result = run_gui_code_subprocess(render_code, timeout=30.0)
@@ -76,7 +76,9 @@ print("RENDER_OK")
             f"signal={result.signal_name}):\nSTDOUT:\n{result.stdout}\n"
             f"STDERR:\n{result.stderr}"
         )
-        assert png_path.stat().st_size > 1000, "PNG output too small — plot likely empty"
+        assert png_path.stat().st_size > 1000, (
+            "PNG output too small — plot likely empty"
+        )
     finally:
         png_path.unlink(missing_ok=True)
 

@@ -17,9 +17,11 @@
 用法示例（见 `__init__.py` 顶部 docstring）：
 ```python
 from rheojax.models import Maxwell, FractionalZenerSolidLiquid, PowerLaw
+
 model = Maxwell()
 from rheojax.core.registry import ModelRegistry
-model = ModelRegistry.create('maxwell')
+
+model = ModelRegistry.create("maxwell")
 models = ModelRegistry.list_models()
 ```
 每个模型公开：`fit()`（NLSQ）、`predict()`、继承自 `BayesianMixin` 的 `fit_bayesian()`/`sample_prior()`/`get_credible_intervals()`。多模式模型（GeneralizedMaxwell、TNT、VLB 系列）额外支持 warm-start 与元素数自动优化。

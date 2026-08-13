@@ -234,9 +234,7 @@ class TestMastercurve:
             metadata={"temperature": 273.15},
         )
 
-        mc = Mastercurve(
-            reference_temp=298.15, method="arrhenius", E_a=50000.0
-        )
+        mc = Mastercurve(reference_temp=298.15, method="arrhenius", E_a=50000.0)
         a_T = mc.get_shift_factor(273.15)
         assert a_T > 1.0  # sanity: below T_ref should slow down (aT > 1)
 
@@ -266,16 +264,12 @@ class TestMastercurve:
         data_ref = RheoData(
             x=x_ref, y=y, domain="time", metadata={"temperature": 298.15}
         )
-        data_i = RheoData(
-            x=x_i, y=y, domain="time", metadata={"temperature": 273.15}
-        )
+        data_i = RheoData(x=x_i, y=y, domain="time", metadata={"temperature": 273.15})
 
         mc = Mastercurve(reference_temp=298.15, auto_shift=True)
         shifted = mc.create_mastercurve([data_i, data_ref], merge=False)
 
-        shifted_i = next(
-            d for d in shifted if d.metadata["temperature"] == 273.15
-        )
+        shifted_i = next(d for d in shifted if d.metadata["temperature"] == 273.15)
         aT_i = shifted_i.metadata["horizontal_shift"]
         ratio = float(np.asarray(shifted_i.x)[0] / np.asarray(data_i.x)[0])
 

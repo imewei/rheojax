@@ -236,7 +236,9 @@ def solve_fractional_lambda_explicit(
 
         # Past contribution (memory term)
         if len(b_trunc) > 1:
-            memory_correction = jnp.dot(b_trunc[1:], diffs_reversed[1:]) / gamma_1_plus_alpha
+            memory_correction = (
+                jnp.dot(b_trunc[1:], diffs_reversed[1:]) / gamma_1_plus_alpha
+            )
         else:
             memory_correction = 0.0
 

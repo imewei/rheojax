@@ -190,8 +190,7 @@ class FittingOptionsDialog(QDialog):
         self.ftol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
         self.ftol_spin.setAccessibleName("Function tolerance")
         self.ftol_spin.setAccessibleDescription(
-            "Convergence tolerance on the objective function value, "
-            "1e-15 to 1e-3."
+            "Convergence tolerance on the objective function value, 1e-15 to 1e-3."
         )
         self.ftol_spin.valueChanged.connect(
             lambda v: self._on_option_changed("ftol", v)
@@ -207,8 +206,7 @@ class FittingOptionsDialog(QDialog):
         self.xtol_spin.setStepType(QDoubleSpinBox.StepType.AdaptiveDecimalStepType)
         self.xtol_spin.setAccessibleName("Parameter tolerance")
         self.xtol_spin.setAccessibleDescription(
-            "Convergence tolerance on the parameter update step, "
-            "1e-15 to 1e-3."
+            "Convergence tolerance on the parameter update step, 1e-15 to 1e-3."
         )
         self.xtol_spin.valueChanged.connect(
             lambda v: self._on_option_changed("xtol", v)

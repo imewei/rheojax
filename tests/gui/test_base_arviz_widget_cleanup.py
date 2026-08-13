@@ -12,7 +12,9 @@ class _DeadCanvas:
 
     @property
     def callbacks(self):
-        raise RuntimeError("wrapped C/C++ object of type FigureCanvasQTAgg has been deleted")
+        raise RuntimeError(
+            "wrapped C/C++ object of type FigureCanvasQTAgg has been deleted"
+        )
 
 
 def test_cleanup_closes_figures_when_canvas_is_dead(qapp):

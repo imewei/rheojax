@@ -46,7 +46,9 @@ class InspectorPanel(QWidget):
         label = QLabel(text)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         label.setWordWrap(True)
-        label.setStyleSheet(f"QLabel {{ color: {themed('TEXT_MUTED')}; font-style: italic; }}")
+        label.setStyleSheet(
+            f"QLabel {{ color: {themed('TEXT_MUTED')}; font-style: italic; }}"
+        )
         wrapper = QWidget(self)
         lay = QVBoxLayout(wrapper)
         lay.addWidget(label)

@@ -410,7 +410,9 @@ class FluiditySaramitoLocal(FluiditySaramitoBase):
                     float(1 - ss_res / ss_tot) if ss_tot > 0 else None
                 )
             except Exception as e:
-                logger.debug("Fallback R² computation failed for Saramito transient fit: %s", e)
+                logger.debug(
+                    "Fallback R² computation failed for Saramito transient fit: %s", e
+                )
         if not result.success:
             logger.warning(f"Saramito transient fit warning: {result.message}")
 

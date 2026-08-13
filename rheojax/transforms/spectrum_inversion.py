@@ -361,9 +361,7 @@ def _select_lambda_gcv(A: np.ndarray, b: np.ndarray, L: np.ndarray) -> float:
             res_norm_sq = float(np.sum((A @ H_lam - b) ** 2))
             return res_norm_sq / trace_I_minus_M**2
 
-    opt = minimize_scalar(
-        gcv_score, bounds=(log_lam_lo, log_lam_hi), method="bounded"
-    )
+    opt = minimize_scalar(gcv_score, bounds=(log_lam_lo, log_lam_hi), method="bounded")
 
     if not np.isfinite(opt.fun):
         # All candidates the optimizer tried were infinite (e.g. degenerate

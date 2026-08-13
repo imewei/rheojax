@@ -148,7 +148,9 @@ class TestPipelineExecutionService:
 
     def test_execute_step_unknown_type_raises(self, service):
         """_execute_step must raise ValueError for an unknown step type."""
-        bad_step = PipelineStepConfig(id="bad-id", step_type="not_a_real_type", config={})
+        bad_step = PipelineStepConfig(
+            id="bad-id", step_type="not_a_real_type", config={}
+        )
         with pytest.raises(ValueError, match="Unknown step type"):
             service._execute_step(bad_step, {})
 

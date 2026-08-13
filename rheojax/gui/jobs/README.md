@@ -72,17 +72,17 @@ pool = WorkerPool(max_threads=4)
 
 # Connect signals
 pool.job_started.connect(lambda job_id: print(f"Job {job_id} started"))
-pool.job_progress.connect(lambda job_id, curr, total, msg:
-    print(f"{job_id}: {curr}/{total} - {msg}"))
-pool.job_completed.connect(lambda job_id, result:
-    print(f"Job {job_id} completed: {result}"))
-pool.job_failed.connect(lambda job_id, error:
-    print(f"Job {job_id} failed: {error}"))
-pool.job_cancelled.connect(lambda job_id:
-    print(f"Job {job_id} cancelled"))
+pool.job_progress.connect(
+    lambda job_id, curr, total, msg: print(f"{job_id}: {curr}/{total} - {msg}")
+)
+pool.job_completed.connect(
+    lambda job_id, result: print(f"Job {job_id} completed: {result}")
+)
+pool.job_failed.connect(lambda job_id, error: print(f"Job {job_id} failed: {error}"))
+pool.job_cancelled.connect(lambda job_id: print(f"Job {job_id} cancelled"))
 
 # Submit worker
-worker = FitWorker(model_name='maxwell', data=rheo_data)
+worker = FitWorker(model_name="maxwell", data=rheo_data)
 job_id = pool.submit(worker)
 
 # Cancel if needed
@@ -113,16 +113,16 @@ from rheojax.gui.jobs import FitWorker, FitResult, CancellationToken
 from rheojax.core.data import RheoData
 
 # Prepare data
-rheo_data = RheoData(x=time, y=stress, test_mode='relaxation')
+rheo_data = RheoData(x=time, y=stress, test_mode="relaxation")
 
 # Create worker
 token = CancellationToken()
 worker = FitWorker(
-    model_name='maxwell',
+    model_name="maxwell",
     data=rheo_data,
-    initial_params={'G0': 1e6, 'tau': 1.0},
-    options={'max_iter': 5000, 'ftol': 1e-8},
-    cancel_token=token
+    initial_params={"G0": 1e6, "tau": 1.0},
+    options={"max_iter": 5000, "ftol": 1e-8},
+    cancel_token=token,
 )
 
 # Connect signals
@@ -132,12 +132,8 @@ worker.signals.progress.connect(
 worker.signals.completed.connect(
     lambda result: print(f"Fit completed: R²={result.r_squared:.4f}")
 )
-worker.signals.failed.connect(
-    lambda error: print(f"Fit failed: {error}")
-)
-worker.signals.cancelled.connect(
-    lambda: print("Fit cancelled")
-)
+worker.signals.failed.connect(lambda error: print(f"Fit failed: {error}"))
+worker.signals.cancelled.connect(lambda: print("Fit cancelled"))
 
 # Submit to pool
 job_id = pool.submit(worker)
@@ -164,24 +160,22 @@ from rheojax.gui.jobs import BayesianWorker, BayesianResult
 
 # Create worker (with NLSQ warm-start)
 worker = BayesianWorker(
-    model_name='maxwell',
+    model_name="maxwell",
     data=rheo_data,
     num_warmup=1000,
     num_samples=2000,
     num_chains=4,
-    warm_start={'G0': 1e6, 'tau': 1.0},  # From NLSQ fit
+    warm_start={"G0": 1e6, "tau": 1.0},  # From NLSQ fit
     priors={},  # Optional custom priors
     seed=42,
-    cancel_token=token
+    cancel_token=token,
 )
 
 # Connect signals
 worker.signals.progress.connect(
     lambda chain, sample, total: print(f"Chain {chain}: {sample}/{total}")
 )
-worker.signals.stage_changed.connect(
-    lambda stage: print(f"Stage: {stage}")
-)
+worker.signals.stage_changed.connect(lambda stage: print(f"Stage: {stage}"))
 worker.signals.divergence_detected.connect(
     lambda count: print(f"Warning: {count} divergences detected")
 )
@@ -212,6 +206,7 @@ from PySide6.QtWidgets import QMainWindow, QPushButton, QProgressBar, QLabel
 from rheojax.gui.jobs import WorkerPool, FitWorker, BayesianWorker
 from rheojax.core.data import RheoData
 import numpy as np
+
 
 class RheoAnalysisWindow(QMainWindow):
     def __init__(self):
@@ -247,16 +242,12 @@ class RheoAnalysisWindow(QMainWindow):
         """Start NLSQ fitting in background."""
         # Load data
         rheo_data = RheoData(
-            x=self.time_data,
-            y=self.stress_data,
-            test_mode='relaxation'
+            x=self.time_data, y=self.stress_data, test_mode="relaxation"
         )
 
         # Create worker
         worker = FitWorker(
-            model_name='maxwell',
-            data=rheo_data,
-            options={'max_iter': 5000}
+            model_name="maxwell", data=rheo_data, options={"max_iter": 5000}
         )
 
         # Connect worker signals
@@ -273,8 +264,7 @@ class RheoAnalysisWindow(QMainWindow):
         """Handle NLSQ fit completion."""
         self.fit_result = result
         self.status_label.setText(
-            f"Fit completed: R²={result.r_squared:.4f}, "
-            f"Time={result.fit_time:.2f}s"
+            f"Fit completed: R²={result.r_squared:.4f}, Time={result.fit_time:.2f}s"
         )
 
         # Enable Bayesian inference with warm-start
@@ -289,20 +279,18 @@ class RheoAnalysisWindow(QMainWindow):
 
         # Load data
         rheo_data = RheoData(
-            x=self.time_data,
-            y=self.stress_data,
-            test_mode='relaxation'
+            x=self.time_data, y=self.stress_data, test_mode="relaxation"
         )
 
         # Create worker with warm-start
         worker = BayesianWorker(
-            model_name='maxwell',
+            model_name="maxwell",
             data=rheo_data,
             num_warmup=1000,
             num_samples=2000,
             num_chains=4,
             warm_start=self.fit_result.parameters,  # Use NLSQ result
-            seed=42
+            seed=42,
         )
 
         # Connect worker signals
@@ -311,9 +299,7 @@ class RheoAnalysisWindow(QMainWindow):
             lambda stage: self.status_label.setText(f"Stage: {stage}")
         )
         worker.signals.divergence_detected.connect(
-            lambda count: self.status_label.setText(
-                f"Warning: {count} divergences"
-            )
+            lambda count: self.status_label.setText(f"Warning: {count} divergences")
         )
         worker.signals.completed.connect(self.on_bayesian_completed)
 
@@ -330,11 +316,13 @@ class RheoAnalysisWindow(QMainWindow):
 
         # Display diagnostics
         for param_name, samples in result.posterior_samples.items():
-            r_hat = result.diagnostics['r_hat'][param_name]
-            ess = result.diagnostics['ess'][param_name]
+            r_hat = result.diagnostics["r_hat"][param_name]
+            ess = result.diagnostics["ess"][param_name]
             ci_lower, ci_upper = result.credible_intervals[param_name]
-            print(f"{param_name}: R-hat={r_hat:.4f}, ESS={ess:.0f}, "
-                  f"95% CI=[{ci_lower:.2e}, {ci_upper:.2e}]")
+            print(
+                f"{param_name}: R-hat={r_hat:.4f}, ESS={ess:.0f}, "
+                f"95% CI=[{ci_lower:.2e}, {ci_upper:.2e}]"
+            )
 
         self.bayesian_button.setEnabled(True)
 
@@ -394,6 +382,7 @@ class RheoAnalysisWindow(QMainWindow):
 
 ```python
 from rheojax.core.jax_config import safe_import_jax
+
 jax, jnp = safe_import_jax()  # Enforces float64
 ```
 
@@ -403,6 +392,7 @@ jax, jnp = safe_import_jax()  # Enforces float64
 def run(self):
     # Import inside run() to avoid JAX initialization issues
     from rheojax.models import ModelRegistry
+
     model_class = ModelRegistry.get(self._model_name)
     model = model_class()
     # ... rest of implementation
@@ -421,15 +411,16 @@ def long_operation(self):
 
 ```python
 # Step 1: NLSQ fit (fast)
-fit_worker = FitWorker(model_name='maxwell', data=rheo_data)
+fit_worker = FitWorker(model_name="maxwell", data=rheo_data)
 pool.submit(fit_worker)
+
 
 # Step 2: Bayesian with warm-start (2-5x faster convergence)
 def on_fit_completed(result):
     bayesian_worker = BayesianWorker(
-        model_name='maxwell',
+        model_name="maxwell",
         data=rheo_data,
-        warm_start=result.parameters  # Use NLSQ result
+        warm_start=result.parameters,  # Use NLSQ result
     )
     pool.submit(bayesian_worker)
 ```
@@ -437,8 +428,8 @@ def on_fit_completed(result):
 ### 5. Handle Errors Gracefully
 
 ```python
-worker.signals.failed.connect(lambda error:
-    QMessageBox.critical(self, "Error", f"Operation failed: {error}")
+worker.signals.failed.connect(
+    lambda error: QMessageBox.critical(self, "Error", f"Operation failed: {error}")
 )
 ```
 
@@ -485,6 +476,7 @@ pip install PySide6
 Check model name spelling:
 ```python
 from rheojax.models import ModelRegistry
+
 print(ModelRegistry.list())  # Show available models
 ```
 
@@ -504,6 +496,6 @@ Use NLSQ warm-start and increase warmup:
 BayesianWorker(
     warm_start=fit_result.parameters,  # NLSQ result
     num_warmup=2000,  # Increase from 1000
-    num_samples=2000
+    num_samples=2000,
 )
 ```

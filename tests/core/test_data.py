@@ -1087,7 +1087,8 @@ class TestRheoDataDomainConversion:
 
     def test_to_frequency_already_frequency_warns(self):
         data = RheoData(
-            x=np.array([0.1, 1.0, 10.0]), y=np.array([1.0, 2.0, 3.0]),
+            x=np.array([0.1, 1.0, 10.0]),
+            y=np.array([1.0, 2.0, 3.0]),
             domain="frequency",
         )
         with pytest.warns(UserWarning, match="already in frequency"):
@@ -1107,7 +1108,8 @@ class TestRheoDataDomainConversion:
 
     def test_to_time_from_frequency_not_implemented(self):
         data = RheoData(
-            x=np.array([0.1, 1.0, 10.0]), y=np.array([1.0, 2.0, 3.0]),
+            x=np.array([0.1, 1.0, 10.0]),
+            y=np.array([1.0, 2.0, 3.0]),
             domain="frequency",
         )
         with pytest.raises(NotImplementedError):
@@ -1119,8 +1121,10 @@ class TestRheoDataDomainConversion:
         both conversion methods must fall through to NotImplementedError
         instead of the '!=' bug that made them both claim success."""
         data = RheoData(
-            x=np.array([0.0]), y=np.array([1.0]),
-            domain="scalar", validate=False,
+            x=np.array([0.0]),
+            y=np.array([1.0]),
+            domain="scalar",
+            validate=False,
         )
         with pytest.raises(NotImplementedError):
             data.to_frequency_domain()
@@ -1291,7 +1295,8 @@ class TestRheoData2DYContract:
         on every accessor for the same underlying G'/G'' values."""
         x = np.array([1.0, 2.0, 3.0])
         two_d = RheoData(
-            x=x, y=np.column_stack([[3.0, 6.0, 1.0], [4.0, 8.0, 0.0]]),
+            x=x,
+            y=np.column_stack([[3.0, 6.0, 1.0], [4.0, 8.0, 0.0]]),
             domain="frequency",
         )
         complex_ = RheoData(

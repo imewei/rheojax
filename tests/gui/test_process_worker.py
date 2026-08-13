@@ -492,9 +492,9 @@ class TestRunFitIsolated:
             )
 
         assert result["success"]
-        assert not any(
-            "Callback raised exception" in str(w.message) for w in caught
-        ), "progress_callback raised inside nlsq -- kwarg signature mismatch"
+        assert not any("Callback raised exception" in str(w.message) for w in caught), (
+            "progress_callback raised inside nlsq -- kwarg signature mismatch"
+        )
 
         messages = []
         while not progress_queue.empty():

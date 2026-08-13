@@ -415,7 +415,9 @@ def _no_blocking_message_boxes(monkeypatch):
     )
     for name in ("information", "warning", "critical"):
         monkeypatch.setattr(
-            QMessageBox, name, staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
+            QMessageBox,
+            name,
+            staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok),
         )
 
 

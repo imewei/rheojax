@@ -88,11 +88,11 @@ class FitResult:
 **Usage:**
 ```python
 worker = FitWorker(
-    model_name='maxwell',
+    model_name="maxwell",
     data=rheo_data,
-    initial_params={'G0': 1e6, 'tau': 1.0},
-    options={'max_iter': 5000},
-    cancel_token=token
+    initial_params={"G0": 1e6, "tau": 1.0},
+    options={"max_iter": 5000},
+    cancel_token=token,
 )
 job_id = pool.submit(worker)
 ```
@@ -136,15 +136,15 @@ class BayesianResult:
 **Usage:**
 ```python
 worker = BayesianWorker(
-    model_name='maxwell',
+    model_name="maxwell",
     data=rheo_data,
     num_warmup=1000,
     num_samples=2000,
     num_chains=4,
-    warm_start={'G0': 1e6, 'tau': 1.0},  # From NLSQ
+    warm_start={"G0": 1e6, "tau": 1.0},  # From NLSQ
     priors={},
     seed=42,
-    cancel_token=token
+    cancel_token=token,
 )
 job_id = pool.submit(worker)
 ```
@@ -207,6 +207,7 @@ Test suite demonstrating functionality:
 **safe_import_jax() Pattern:**
 ```python
 from rheojax.core.jax_config import safe_import_jax
+
 jax, jnp = safe_import_jax()  # Enforces float64
 ```
 
@@ -215,6 +216,7 @@ jax, jnp = safe_import_jax()  # Enforces float64
 def run(self):
     # Import inside run() to avoid JAX issues
     from rheojax.models import ModelRegistry
+
     model = ModelRegistry.get(self._model_name)()
 ```
 
@@ -261,15 +263,16 @@ def progress_callback(stage, chain, iteration, total):
 **Recommended Pattern:**
 ```python
 # Step 1: NLSQ (fast, 5-270x speedup)
-fit_worker = FitWorker(model_name='maxwell', data=rheo_data)
+fit_worker = FitWorker(model_name="maxwell", data=rheo_data)
 pool.submit(fit_worker)
+
 
 # Step 2: Bayesian with warm-start (2-5x faster convergence)
 def on_fit_completed(result):
     bayesian_worker = BayesianWorker(
-        model_name='maxwell',
+        model_name="maxwell",
         data=rheo_data,
-        warm_start=result.parameters  # Critical for performance
+        warm_start=result.parameters,  # Critical for performance
     )
     pool.submit(bayesian_worker)
 ```
@@ -367,6 +370,7 @@ All tests pass successfully:
 from PySide6.QtWidgets import QMainWindow
 from rheojax.gui.jobs import WorkerPool, FitWorker
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -374,7 +378,7 @@ class MainWindow(QMainWindow):
         self.pool.job_completed.connect(self.on_job_completed)
 
     def start_fit(self):
-        worker = FitWorker(model_name='maxwell', data=self.data)
+        worker = FitWorker(model_name="maxwell", data=self.data)
         self.job_id = self.pool.submit(worker)
 
     def on_job_completed(self, job_id, result):

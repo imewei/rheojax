@@ -191,7 +191,9 @@ class StatusBar(QStatusBar):
         else:
             self.float64_label.setText("Float64: [X]")
             color = themed("WARNING")
-        self.float64_label.setStyleSheet(f"QLabel {{ padding: 0 10px; color: {color}; }}")
+        self.float64_label.setStyleSheet(
+            f"QLabel {{ padding: 0 10px; color: {color}; }}"
+        )
 
     def update_memory(self, used_mb: float, total_mb: float) -> None:
         """Update memory usage indicator.

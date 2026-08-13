@@ -93,9 +93,7 @@ def test_pipeline_run_requested_passes_step_list_copies_not_live_refs(
     qtbot.addWidget(win)
     win.set_mode("pipeline")
     pipeline_body = win._pipeline_bodies[0]
-    pipeline_body.add_step(
-        "export", {"path": "out.csv", "format": "csv"}
-    )
+    pipeline_body.add_step("export", {"path": "out.csv", "format": "csv"})
     pipeline_body.set_selected_dataset_ids(["d1"])
 
     started_runners = []

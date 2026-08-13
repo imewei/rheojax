@@ -96,7 +96,11 @@ def _compute_y_band(
         try:
             y_pred = np.asarray(
                 model_service.predict(
-                    model_name, params, x, test_mode=test_mode, model_kwargs=model_kwargs
+                    model_name,
+                    params,
+                    x,
+                    test_mode=test_mode,
+                    model_kwargs=model_kwargs,
                 )
             )
         except Exception as exc:
@@ -107,11 +111,7 @@ def _compute_y_band(
                 error=str(exc),
             )
             continue
-        if (
-            y_pred.ndim == 2
-            and y_pred.shape[1] == 2
-            and y_pred.shape[0] == len(x)
-        ):
+        if y_pred.ndim == 2 and y_pred.shape[1] == 2 and y_pred.shape[0] == len(x):
             y_pred = y_pred[:, 0] + 1j * y_pred[:, 1]
         if y_pred.shape == x.shape:
             y_draws.append(y_pred)

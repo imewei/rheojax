@@ -465,9 +465,7 @@ class TestBayesianPipelinePlotPosterior:
 
     def test_plot_posterior_single_param_with_kwargs(self, fitted_pipeline):
         result = _run_or_skip(
-            lambda: fitted_pipeline.plot_posterior(
-                "a", show=False, bins=15, alpha=0.5
-            )
+            lambda: fitted_pipeline.plot_posterior("a", show=False, bins=15, alpha=0.5)
         )
 
         assert result is fitted_pipeline

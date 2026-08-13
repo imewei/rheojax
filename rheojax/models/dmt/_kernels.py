@@ -447,7 +447,9 @@ def steady_stress_herschel_bulkley(
     # HB stress (without Papanastasiou regularization for steady state).
     # Multiply by sign(gamma_dot) so sigma(-gamma_dot) = -sigma(gamma_dot),
     # matching simple-shear odd symmetry (as steady_stress_exponential does).
-    return sign * (tau_y + K * jnp.power(gamma_dot_abs, n_flow) + eta_inf * gamma_dot_abs)
+    return sign * (
+        tau_y + K * jnp.power(gamma_dot_abs, n_flow) + eta_inf * gamma_dot_abs
+    )
 
 
 # =============================================================================

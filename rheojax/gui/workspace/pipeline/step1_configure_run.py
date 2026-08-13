@@ -91,9 +91,7 @@ class PipelineConfigureRunStep(QWidget):
         # isn't, so _on_remove_step_clicked's row-index lookup desyncs from
         # the real list and deletes the wrong step.
         for step in self._state.steps:
-            self._step_list.addItem(
-                QListWidgetItem(f"{step.step_type}: {step.config}")
-            )
+            self._step_list.addItem(QListWidgetItem(f"{step.step_type}: {step.config}"))
         self._remove_step_btn = QPushButton("Remove Selected Step", self)
         self._remove_step_btn.clicked.connect(self._on_remove_step_clicked)
         self._move_up_btn = QPushButton("Move Up", self)
@@ -202,9 +200,7 @@ class PipelineConfigureRunStep(QWidget):
         steps = self._state.steps
         steps[row], steps[other_row] = steps[other_row], steps[row]
         for r in (row, other_row):
-            self._step_list.item(r).setText(
-                f"{steps[r].step_type}: {steps[r].config}"
-            )
+            self._step_list.item(r).setText(f"{steps[r].step_type}: {steps[r].config}")
         self._step_list.setCurrentRow(other_row)
         self.edited.emit()
 

@@ -54,7 +54,9 @@ class StubModel:
             raise RuntimeError("nlsq boom")
         return self
 
-    def fit_bayesian(self, x, y, *, test_mode, num_warmup, num_samples, num_chains, seed):
+    def fit_bayesian(
+        self, x, y, *, test_mode, num_warmup, num_samples, num_chains, seed
+    ):
         self.bayesian_kwargs = {
             "test_mode": test_mode,
             "num_warmup": num_warmup,
@@ -77,7 +79,9 @@ def data_file(tmp_path):
 def rheo_data():
     x = np.linspace(0.1, 5.0, 10)
     y = 5.0 * np.exp(-0.5 * x)
-    return RheoData(x=x, y=y, domain="time", initial_test_mode="relaxation", validate=False)
+    return RheoData(
+        x=x, y=y, domain="time", initial_test_mode="relaxation", validate=False
+    )
 
 
 @pytest.fixture
@@ -192,8 +196,11 @@ class TestDataLoading:
     def test_nan_in_x_returns_1(self, data_file, wired, capsys):
         x = np.array([0.1, np.nan, 0.3])
         wired["data"] = RheoData(
-            x=x, y=np.array([1.0, 2.0, 3.0]), domain="time",
-            initial_test_mode="relaxation", validate=False,
+            x=x,
+            y=np.array([1.0, 2.0, 3.0]),
+            domain="time",
+            initial_test_mode="relaxation",
+            validate=False,
         )
         result = main([str(data_file), "--model", "maxwell", "-t", "relaxation"])
         assert result == 1
@@ -203,8 +210,11 @@ class TestDataLoading:
     def test_nan_in_y_returns_1(self, data_file, wired, capsys):
         y = np.array([1.0, np.inf, 3.0])
         wired["data"] = RheoData(
-            x=np.array([0.1, 0.2, 0.3]), y=y, domain="time",
-            initial_test_mode="relaxation", validate=False,
+            x=np.array([0.1, 0.2, 0.3]),
+            y=y,
+            domain="time",
+            initial_test_mode="relaxation",
+            validate=False,
         )
         result = main([str(data_file), "--model", "maxwell", "-t", "relaxation"])
         assert result == 1
@@ -214,8 +224,11 @@ class TestDataLoading:
     def test_nan_in_complex_y_returns_1(self, data_file, wired, capsys):
         y = np.array([1 + 1j, complex(np.nan, 0.0), 3 + 0j])
         wired["data"] = RheoData(
-            x=np.array([0.1, 0.2, 0.3]), y=y, domain="frequency",
-            initial_test_mode="oscillation", validate=False,
+            x=np.array([0.1, 0.2, 0.3]),
+            y=y,
+            domain="frequency",
+            initial_test_mode="oscillation",
+            validate=False,
         )
         result = main([str(data_file), "--model", "maxwell", "-t", "oscillation"])
         assert result == 1
@@ -229,7 +242,9 @@ class TestDataLoading:
 
 class TestModelAndTestMode:
     @pytest.mark.unit
-    def test_model_create_failure_returns_1(self, data_file, monkeypatch, rheo_data, capsys):
+    def test_model_create_failure_returns_1(
+        self, data_file, monkeypatch, rheo_data, capsys
+    ):
         monkeypatch.setattr("rheojax.io.auto_load", lambda path, **k: rheo_data)
 
         def raise_key(name):
@@ -270,15 +285,21 @@ class TestModelAndTestMode:
 class TestWarmStart:
     @pytest.mark.unit
     def test_warm_start_calls_fit(self, data_file, wired):
-        result = main([str(data_file), "--model", "maxwell", "-t", "relaxation", "--warm-start"])
+        result = main(
+            [str(data_file), "--model", "maxwell", "-t", "relaxation", "--warm-start"]
+        )
         assert result == 0
         assert wired["model"].fit_called is True
 
     @pytest.mark.unit
-    def test_warm_start_failure_resets_state_and_continues(self, data_file, wired, capsys):
+    def test_warm_start_failure_resets_state_and_continues(
+        self, data_file, wired, capsys
+    ):
         model = StubModel(fit_raises=True)
         wired["model"] = model
-        result = main([str(data_file), "--model", "maxwell", "-t", "relaxation", "--warm-start"])
+        result = main(
+            [str(data_file), "--model", "maxwell", "-t", "relaxation", "--warm-start"]
+        )
         assert result == 0
         # Partially-mutated state must be reset after a failed fit.
         assert model._last_fit_kwargs == {}
@@ -295,10 +316,23 @@ class TestWarmStart:
 class TestInferenceAndOutput:
     @pytest.mark.unit
     def test_forwards_sampling_params(self, data_file, wired):
-        result = main([
-            str(data_file), "--model", "maxwell", "-t", "relaxation",
-            "--warmup", "3", "--samples", "5", "--chains", "2", "--seed", "7",
-        ])
+        result = main(
+            [
+                str(data_file),
+                "--model",
+                "maxwell",
+                "-t",
+                "relaxation",
+                "--warmup",
+                "3",
+                "--samples",
+                "5",
+                "--chains",
+                "2",
+                "--seed",
+                "7",
+            ]
+        )
         assert result == 0
         kw = wired["model"].bayesian_kwargs
         assert kw == {
@@ -331,7 +365,9 @@ class TestInferenceAndOutput:
 
     @pytest.mark.smoke
     def test_json_output(self, data_file, wired, capsys):
-        result = main([str(data_file), "--model", "maxwell", "-t", "relaxation", "--json"])
+        result = main(
+            [str(data_file), "--model", "maxwell", "-t", "relaxation", "--json"]
+        )
         assert result == 0
         payload = json.loads(capsys.readouterr().out)
         assert payload["model"] == "maxwell"
@@ -343,10 +379,18 @@ class TestInferenceAndOutput:
     @pytest.mark.unit
     def test_output_written_to_file(self, data_file, wired, tmp_path, capsys):
         out_file = tmp_path / "result.json"
-        result = main([
-            str(data_file), "--model", "maxwell", "-t", "relaxation",
-            "--json", "-o", str(out_file),
-        ])
+        result = main(
+            [
+                str(data_file),
+                "--model",
+                "maxwell",
+                "-t",
+                "relaxation",
+                "--json",
+                "-o",
+                str(out_file),
+            ]
+        )
         assert result == 0
         assert "Results written to" in capsys.readouterr().err
         payload = json.loads(out_file.read_text())
@@ -355,8 +399,16 @@ class TestInferenceAndOutput:
     @pytest.mark.unit
     def test_output_write_failure_returns_1(self, data_file, wired, tmp_path, capsys):
         bad = tmp_path / "missing_dir" / "result.txt"
-        result = main([
-            str(data_file), "--model", "maxwell", "-t", "relaxation", "-o", str(bad),
-        ])
+        result = main(
+            [
+                str(data_file),
+                "--model",
+                "maxwell",
+                "-t",
+                "relaxation",
+                "-o",
+                str(bad),
+            ]
+        )
         assert result == 1
         assert "Error writing to" in capsys.readouterr().err

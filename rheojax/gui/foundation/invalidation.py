@@ -45,7 +45,9 @@ def invalidate_downstream(fit: FitState, changed: str) -> FitState:
     return replace(fit, revision=fit.revision + 1, **updates)
 
 
-def apply_cascade(live_state, cascade_table: dict, clear_table: dict, changed: str) -> None:
+def apply_cascade(
+    live_state, cascade_table: dict, clear_table: dict, changed: str
+) -> None:
     """Clear *live_state*'s downstream fields for *changed* and bump revision.
 
     Step-widget bodies hold a direct reference to the live FitState/

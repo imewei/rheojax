@@ -23,7 +23,9 @@ jax, jnp = safe_import_jax()
 
 def _param_dict(model):
     """Return the model's current parameters as a name->value dict."""
-    return dict(zip(model.parameters.keys(), model.parameters.get_values(), strict=True))
+    return dict(
+        zip(model.parameters.keys(), model.parameters.get_values(), strict=True)
+    )
 
 
 # ============================================================================
@@ -162,7 +164,9 @@ class TestMLIKHModelFunction:
         # High-viscosity approximation => Maxwell term of G'' ~ 0, leaving
         # only the eta_inf*omega solvent contribution.
         eta_inf = float(model.parameters.get_value("eta_inf"))
-        np.testing.assert_allclose(out_arr[:, 1], eta_inf * np.asarray(omega), atol=1e-3)
+        np.testing.assert_allclose(
+            out_arr[:, 1], eta_inf * np.asarray(omega), atol=1e-3
+        )
 
     def test_oscillation_weighted_sum(self):
         """Oscillation dispatch for the weighted-sum global-G branch."""

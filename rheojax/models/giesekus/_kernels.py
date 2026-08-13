@@ -629,9 +629,9 @@ def giesekus_complex_viscosity(
     # G*(0) = 0 too (Maxwell limit), so G_star_mag/omega is 0/0 at ω=0.
     # The correct zero-shear limit is |η*(0)| = η_p + η_s.
     eta_star_mag = jnp.where(
-        jnp.abs(omega) < 1e-30, eta_p + eta_s, G_star_mag / jnp.where(
-            jnp.abs(omega) < 1e-30, 1.0, omega
-        )
+        jnp.abs(omega) < 1e-30,
+        eta_p + eta_s,
+        G_star_mag / jnp.where(jnp.abs(omega) < 1e-30, 1.0, omega),
     )
 
     # Phase angle: tan(δ) = G''/G'

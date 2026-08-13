@@ -68,9 +68,7 @@ def test_on_save_as_shows_status_message(qtbot, monkeypatch, tmp_path):
     path = str(tmp_path / "proj.rheojax")
     from PySide6.QtWidgets import QFileDialog
 
-    monkeypatch.setattr(
-        QFileDialog, "getSaveFileName", lambda *a, **k: (path, "")
-    )
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (path, ""))
     win._on_save_as()
     assert win.statusBar().message_label.text() == "Project saved"
 
@@ -90,9 +88,7 @@ def test_on_open_shows_status_message(qtbot, monkeypatch, tmp_path):
     from rheojax.gui.foundation.project_codec import save_project_v2
 
     save_project_v2(win._state, path)
-    monkeypatch.setattr(
-        QFileDialog, "getOpenFileName", lambda *a, **k: (path, "")
-    )
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: (path, ""))
     win._on_open()
     assert win.statusBar().message_label.text() == "Project opened"
 

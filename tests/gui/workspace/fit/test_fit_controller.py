@@ -8,7 +8,10 @@ pytest.importorskip("PySide6")
 import rheojax.models  # noqa
 from rheojax.gui.foundation.library import DatasetRef
 from rheojax.gui.foundation.state import AppState
-from rheojax.gui.workspace.fit.fit_controller import _run_on_thread, build_fit_controller
+from rheojax.gui.workspace.fit.fit_controller import (
+    _run_on_thread,
+    build_fit_controller,
+)
 from rheojax.gui.workspace.window import WorkspaceWindow
 
 

@@ -159,8 +159,9 @@ def oscillation_maxwell_data():
     # scales identifiable without perturbing G0/eta recovery.
     _rng = np.random.default_rng(0)
     G_star = G_star * (
-        1.0 + 0.01 * (_rng.standard_normal(G_star.shape)
-                      + 1j * _rng.standard_normal(G_star.shape))
+        1.0
+        + 0.01
+        * (_rng.standard_normal(G_star.shape) + 1j * _rng.standard_normal(G_star.shape))
     )
 
     metadata = {

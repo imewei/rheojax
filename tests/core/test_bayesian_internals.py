@@ -417,9 +417,7 @@ def test_fit_bayesian_rejects_unrecognized_initial_values_key():
     model = LinearModel()
     X, y = _linear_data()
     with pytest.raises(ValueError, match="unrecognized parameter"):
-        model.fit_bayesian(
-            X, y, test_mode="relaxation", initial_values={"aa": 2.0}
-        )
+        model.fit_bayesian(X, y, test_mode="relaxation", initial_values={"aa": 2.0})
 
 
 # ---------------------------------------------------------------------------
@@ -703,8 +701,11 @@ def test_compute_per_param_diagnostic_delegates():
     rng = np.random.default_rng(3)
     samples = {"a": rng.normal(0, 1, 400), "b": rng.normal(2, 1, 400)}
     result, ok = BayesianMixin._compute_per_param_diagnostic(
-        samples, num_chains=2, num_samples=200,
-        diagnostic_fn=effective_sample_size, label="ESS",
+        samples,
+        num_chains=2,
+        num_samples=200,
+        diagnostic_fn=effective_sample_size,
+        label="ESS",
     )
     assert set(result) == {"a", "b"}
     assert all(np.isfinite(v) for v in result.values())
@@ -748,7 +749,9 @@ def test_process_mcmc_results_grouped_path():
     flat = {k: v.reshape(-1) for k, v in grouped.items()}
     mcmc = _FakeMCMC(flat, grouped=grouped)
 
-    result = model._process_mcmc_results(mcmc, ["a", "b"], num_samples=100, num_chains=2)
+    result = model._process_mcmc_results(
+        mcmc, ["a", "b"], num_samples=100, num_chains=2
+    )
     assert isinstance(result, BayesianResult)
     assert set(result.posterior_samples) == {"a", "b", "sigma"}
     # Summary has the consolidated quantile fields.
@@ -768,7 +771,9 @@ def test_process_mcmc_results_group_by_chain_fallback():
     flat = {"a": rng.normal(2.0, 0.1, 200), "b": rng.normal(1.0, 0.1, 200)}
     mcmc = _FakeMCMC(flat, grouped=None, group_raises=True)
 
-    result = model._process_mcmc_results(mcmc, ["a", "b"], num_samples=200, num_chains=1)
+    result = model._process_mcmc_results(
+        mcmc, ["a", "b"], num_samples=200, num_chains=1
+    )
     assert set(result.posterior_samples) == {"a", "b"}
     assert result.diagnostics["init_strategy"] == "uniform_fallback"
     assert result.diagnostics["warm_start_failed"] is True
@@ -804,7 +809,9 @@ def test_process_mcmc_results_nonfinite_draws_defaults_zero_when_absent():
     rng = np.random.default_rng(12)
     flat = {"a": rng.normal(2.0, 0.1, 100), "b": rng.normal(1.0, 0.1, 100)}
     mcmc = _FakeMCMC(flat, grouped=None, group_raises=True)
-    result = model._process_mcmc_results(mcmc, ["a", "b"], num_samples=100, num_chains=1)
+    result = model._process_mcmc_results(
+        mcmc, ["a", "b"], num_samples=100, num_chains=1
+    )
     assert result.diagnostics["nonfinite_draws"] == 0
 
 
@@ -831,7 +838,9 @@ def test_fit_bayesian_invalid_likelihood_space():
     X, y = _linear_data()
     with pytest.raises(ValueError, match="likelihood_space must be"):
         # strain=... exercises the protocol-kwarg pop before the validation.
-        model.fit_bayesian(X, y, test_mode="relaxation", likelihood_space="bad", strain=1.0)
+        model.fit_bayesian(
+            X, y, test_mode="relaxation", likelihood_space="bad", strain=1.0
+        )
 
 
 def test_fit_bayesian_missing_y_raises():
@@ -925,8 +934,9 @@ def test_precompile_bayesian_success_and_restore():
     t = model.precompile_bayesian(X, y, test_mode="relaxation", num_chains=1)
     assert isinstance(t, float) and t >= 0.0
     # Cache populated for the (mode, is_complex) key.
-    assert getattr(model, "_precompiled_models", {}).get(("TestMode.relaxation", False)) \
-        or any(k[0].endswith("relaxation") for k in model._precompiled_models)
+    assert getattr(model, "_precompiled_models", {}).get(
+        ("TestMode.relaxation", False)
+    ) or any(k[0].endswith("relaxation") for k in model._precompiled_models)
     # _test_mode was absent before and must be restored to absent afterwards.
     assert not hasattr(model, "_test_mode")
 

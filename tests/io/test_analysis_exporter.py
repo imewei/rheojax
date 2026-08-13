@@ -363,7 +363,7 @@ class TestAnalysisExporterExcel:
         """
         import pandas as pd
 
-        sample_data.metadata["test_mode"] = "=HYPERLINK(\"http://evil\",\"click\")"
+        sample_data.metadata["test_mode"] = '=HYPERLINK("http://evil","click")'
         pipeline = Pipeline(data=sample_data)
         pipeline.fit(_ExportTestModel())
 

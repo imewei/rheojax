@@ -112,6 +112,7 @@ uv sync
 
 ```python
 from rheojax.gui import main
+
 main()
 ```
 
@@ -127,11 +128,11 @@ from rheojax.gui.services import DataService, ModelService
 
 # Load data
 data_service = DataService()
-rheo_data = data_service.load_file('data.csv')
+rheo_data = data_service.load_file("data.csv")
 
 # Fit model
 model_service = ModelService()
-model = model_service.fit_model('maxwell', rheo_data, test_mode='relaxation')
+model = model_service.fit_model("maxwell", rheo_data, test_mode="relaxation")
 ```
 
 ## Development Status

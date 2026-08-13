@@ -14,7 +14,14 @@
 ## 对外接口
 
 ```python
-from rheojax.transforms import FFTAnalysis, Mastercurve, SRFS, SPPDecomposer, spp_analyze
+from rheojax.transforms import (
+    FFTAnalysis,
+    Mastercurve,
+    SRFS,
+    SPPDecomposer,
+    spp_analyze,
+)
+
 result = FFTAnalysis().transform(data)
 ```
 

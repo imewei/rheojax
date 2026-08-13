@@ -23,7 +23,14 @@ def test_diagnostics_tab_added_by_refresh(qtbot):
     v.refresh()  # controller calls this on NutsStep.finished
     assert "Diagnostics" in v.tab_names()
     assert v.arviz_plots() == [
-        "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+        "pair",
+        "forest",
+        "energy",
+        "autocorr",
+        "rank",
+        "ess",
+        "trace",
+        "posterior",
     ]
 
 
@@ -75,7 +82,14 @@ def test_diagnostics_builds_with_real_nuts_result(qtbot):
 
     assert "Diagnostics" in v.tab_names()
     assert v.arviz_plots() == [
-        "pair", "forest", "energy", "autocorr", "rank", "ess", "trace", "posterior"
+        "pair",
+        "forest",
+        "energy",
+        "autocorr",
+        "rank",
+        "ess",
+        "trace",
+        "posterior",
     ]
 
 

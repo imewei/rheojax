@@ -597,9 +597,9 @@ def test_tensorial_epm_overstress_matches_analytical_hb_flow_curve():
 
     # Analytical expected values for n_fluid=2, σ_c=1, τ_pl_shear=1:
     sqrt3 = _np.sqrt(3.0)
-    expected = 1.0 / sqrt3 + (1.0 / sqrt3) * sqrt3 ** (1.0 / 2.0) * (
-        gdot * 1.0
-    ) ** (1.0 / 2.0)
+    expected = 1.0 / sqrt3 + (1.0 / sqrt3) * sqrt3 ** (1.0 / 2.0) * (gdot * 1.0) ** (
+        1.0 / 2.0
+    )
     # Expected ≈ [0.8176, 1.3372, 2.9800]
 
     _np.testing.assert_allclose(

@@ -167,6 +167,7 @@ Example for validation tests (Task Group 2):
 import pytest
 from tests.fixtures.generate_test_data import create_rheo_data_relaxation
 
+
 @pytest.mark.validation
 def test_maxwell_relaxation_bayesian():
     # Load reference data

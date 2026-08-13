@@ -180,9 +180,7 @@ class TestInferenceDataConversion:
         except ImportError:
             pytest.skip("ArviZ not installed")
 
-        idata = fitted_pipeline._bayesian_result.to_inference_data(
-            log_likelihood=True
-        )
+        idata = fitted_pipeline._bayesian_result.to_inference_data(log_likelihood=True)
 
         assert hasattr(idata, "log_likelihood")
 

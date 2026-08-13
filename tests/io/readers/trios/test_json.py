@@ -44,7 +44,10 @@ def _result(columns, values, *, props=None):
     return {"Properties": props or {}, "DataSet": [_dataset(columns, values)]}
 
 
-RELAX_COLUMNS = [{"name": "Time", "unit": "s"}, {"name": "Relaxation modulus", "unit": "Pa"}]
+RELAX_COLUMNS = [
+    {"name": "Time", "unit": "s"},
+    {"name": "Relaxation modulus", "unit": "Pa"},
+]
 RELAX_VALUES = [[0.1, 1000.0], [0.2, 800.0], [0.3, 600.0]]
 
 OSC_COLUMNS = [
@@ -203,9 +206,7 @@ class TestLoadComplexModulus:
         path = _write_json(tmp_path, "osc.json", obj)
         data = load_trios_json(path)
         assert np.iscomplexobj(data.y)
-        np.testing.assert_allclose(
-            data.y, [1000 + 500j, 1200 + 600j, 1400 + 700j]
-        )
+        np.testing.assert_allclose(data.y, [1000 + 500j, 1200 + 600j, 1400 + 700j])
         assert data.metadata["test_mode"] == "oscillation"
         assert data.x_units == "rad/s"
 

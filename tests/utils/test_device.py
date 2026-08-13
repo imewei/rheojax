@@ -81,7 +81,9 @@ class TestGetSystemCudaVersion:
 
     def test_parses_release_line(self):
         out = "nvcc: NVIDIA (R) Cuda compiler\nCuda compilation tools, release 12.6, V12.6.77\n"
-        with mock.patch.object(device.subprocess, "run", return_value=_FakeProc(0, out)):
+        with mock.patch.object(
+            device.subprocess, "run", return_value=_FakeProc(0, out)
+        ):
             version, major = get_system_cuda_version()
         assert version == "12.6"
         assert major == 12
@@ -103,11 +105,15 @@ class TestGetSystemCudaVersion:
     def test_unparseable_version_returns_none(self):
         # "release X.Y" -> int("X") raises ValueError, caught and logged.
         out = "Cuda compilation tools, release X.Y, Vbogus\n"
-        with mock.patch.object(device.subprocess, "run", return_value=_FakeProc(0, out)):
+        with mock.patch.object(
+            device.subprocess, "run", return_value=_FakeProc(0, out)
+        ):
             assert get_system_cuda_version() == (None, None)
 
     def test_generic_exception_returns_none(self):
-        with mock.patch.object(device.subprocess, "run", side_effect=RuntimeError("boom")):
+        with mock.patch.object(
+            device.subprocess, "run", side_effect=RuntimeError("boom")
+        ):
             assert get_system_cuda_version() == (None, None)
 
 
@@ -125,12 +131,16 @@ class TestGetGpuInfo:
         assert sm == pytest.approx(8.9)
 
     def test_empty_stdout_returns_none(self):
-        with mock.patch.object(device.subprocess, "run", return_value=_FakeProc(0, "  \n")):
+        with mock.patch.object(
+            device.subprocess, "run", return_value=_FakeProc(0, "  \n")
+        ):
             assert get_gpu_info() == (None, None)
 
     def test_timeout_returns_none(self):
         with mock.patch.object(
-            device.subprocess, "run", side_effect=subprocess.TimeoutExpired("nvidia-smi", 5)
+            device.subprocess,
+            "run",
+            side_effect=subprocess.TimeoutExpired("nvidia-smi", 5),
         ):
             assert get_gpu_info() == (None, None)
 
@@ -145,7 +155,9 @@ class TestGetGpuInfo:
             assert get_gpu_info() == (None, None)
 
     def test_generic_exception_returns_none(self):
-        with mock.patch.object(device.subprocess, "run", side_effect=RuntimeError("boom")):
+        with mock.patch.object(
+            device.subprocess, "run", side_effect=RuntimeError("boom")
+        ):
             assert get_gpu_info() == (None, None)
 
 
@@ -239,8 +251,12 @@ class TestCheckGpuAvailability:
         fake = _fake_jax(["cuda:0"], backend="gpu")
         with (
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
-            mock.patch.object(device, "check_plugin_conflicts", return_value=["some issue"]),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
+            mock.patch.object(
+                device, "check_plugin_conflicts", return_value=["some issue"]
+            ),
             mock.patch(
                 "rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)
             ),
@@ -251,7 +267,9 @@ class TestCheckGpuAvailability:
         fake = _fake_jax(["cpu:0"], backend="cpu")
         with (
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
             mock.patch.object(device, "check_plugin_conflicts", return_value=[]),
             mock.patch.object(device, "get_recommended_package", return_value=None),
             mock.patch(
@@ -266,7 +284,9 @@ class TestCheckGpuAvailability:
         fake = _fake_jax(["cpu:0"], backend="cpu")
         with (
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
             mock.patch(
                 "rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)
             ),
@@ -278,7 +298,9 @@ class TestCheckGpuAvailability:
     def test_jax_import_error_returns_false(self):
         with (
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
             mock.patch(
                 "rheojax.core.jax_config.safe_import_jax", side_effect=ImportError
             ),
@@ -288,9 +310,12 @@ class TestCheckGpuAvailability:
     def test_generic_exception_returns_false(self):
         with (
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
             mock.patch(
-                "rheojax.core.jax_config.safe_import_jax", side_effect=RuntimeError("boom")
+                "rheojax.core.jax_config.safe_import_jax",
+                side_effect=RuntimeError("boom"),
             ),
         ):
             assert check_gpu_availability() is False
@@ -302,7 +327,9 @@ class TestPrintGpuWarning:
     def test_prints_issues_and_package(self, capsys):
         fake = _fake_jax(["cpu:0"], backend="cpu")
         with (
-            mock.patch.object(device, "check_plugin_conflicts", return_value=["conflict A"]),
+            mock.patch.object(
+                device, "check_plugin_conflicts", return_value=["conflict A"]
+            ),
             mock.patch.object(
                 device, "get_recommended_package", return_value="jax[cuda12-local]"
             ),
@@ -334,9 +361,13 @@ class TestGetDeviceInfo:
     def test_populates_from_fake_jax(self):
         fake = _fake_jax(["cuda:0", "cuda:1"], backend="gpu", version="0.8.0")
         with (
-            mock.patch("rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)),
+            mock.patch(
+                "rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)
+            ),
             mock.patch.object(device, "get_gpu_info", return_value=("GPU", 8.9)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=("12.6", 12)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=("12.6", 12)
+            ),
             mock.patch.object(
                 device, "get_recommended_package", return_value="jax[cuda12-local]"
             ),
@@ -353,9 +384,13 @@ class TestGetDeviceInfo:
 
     def test_jax_import_error_leaves_jax_fields_none(self):
         with (
-            mock.patch("rheojax.core.jax_config.safe_import_jax", side_effect=ImportError),
+            mock.patch(
+                "rheojax.core.jax_config.safe_import_jax", side_effect=ImportError
+            ),
             mock.patch.object(device, "get_gpu_info", return_value=(None, None)),
-            mock.patch.object(device, "get_system_cuda_version", return_value=(None, None)),
+            mock.patch.object(
+                device, "get_system_cuda_version", return_value=(None, None)
+            ),
             mock.patch.object(device, "get_recommended_package", return_value=None),
             mock.patch.object(device, "check_plugin_conflicts", return_value=[]),
         ):
@@ -371,7 +406,9 @@ class TestGetGpuMemoryInfo:
 
     def test_parses_memory_fields(self):
         with mock.patch.object(
-            device.subprocess, "run", return_value=_FakeProc(0, "16384, 2048, 14336, 25\n")
+            device.subprocess,
+            "run",
+            return_value=_FakeProc(0, "16384, 2048, 14336, 25\n"),
         ):
             info = get_gpu_memory_info()
         assert info == {
@@ -402,7 +439,9 @@ class TestPrintDeviceSummary:
     def test_gpu_branch_reports_memory(self, capsys):
         fake = _fake_jax(["cuda:0"], backend="gpu")
         with (
-            mock.patch("rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)),
+            mock.patch(
+                "rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)
+            ),
             mock.patch.object(
                 device,
                 "get_gpu_memory_info",
@@ -422,8 +461,12 @@ class TestPrintDeviceSummary:
     def test_cpu_branch_calls_availability_check(self, capsys):
         fake = _fake_jax(["cpu:0"], backend="cpu")
         with (
-            mock.patch("rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)),
-            mock.patch.object(device, "check_gpu_availability", return_value=False) as chk,
+            mock.patch(
+                "rheojax.core.jax_config.safe_import_jax", return_value=(fake, None)
+            ),
+            mock.patch.object(
+                device, "check_gpu_availability", return_value=False
+            ) as chk,
         ):
             print_device_summary()
         assert "Using: CPU-only" in capsys.readouterr().out

@@ -455,9 +455,7 @@ class TestBFMI:
         mcmc_b = _MockMCMC(np.stack([nan_chain, good_chain]))
         bfmi_b = compute_bfmi(mcmc_b, num_chains=2)
 
-        expected = float(
-            np.mean(np.diff(good_chain) ** 2) / np.var(good_chain)
-        )
+        expected = float(np.mean(np.diff(good_chain) ** 2) / np.var(good_chain))
         assert bfmi_a == pytest.approx(expected)
         assert bfmi_b == pytest.approx(expected)
 
@@ -537,9 +535,7 @@ class TestBFMI:
             for chain in (chain_a, chain_b)
         )
         # Flattened (wrong) single-chain value for comparison — must NOT match.
-        wrong = float(
-            np.mean(np.diff(flat_energy) ** 2) / np.var(flat_energy)
-        )
+        wrong = float(np.mean(np.diff(flat_energy) ** 2) / np.var(flat_energy))
         assert bfmi == pytest.approx(expected)
         assert bfmi != pytest.approx(wrong)
 

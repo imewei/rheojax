@@ -28,8 +28,6 @@ def test_inference_data_from_dict_uses_grouped_arviz_1_api() -> None:
     )
 
 
-
-
 def test_plot_pair_kwargs_map_arviz_1_divergences_and_marginal() -> None:
     current_arviz = SimpleNamespace(__version__="1.1.0")
 

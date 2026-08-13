@@ -30,9 +30,7 @@ def test_invalid_value_is_not_emitted(qapp):
 def test_invalid_bounds_are_not_emitted(qapp):
     table = _make_table(qapp)
     emitted = []
-    table.bounds_changed.connect(
-        lambda name, lo, hi: emitted.append((name, lo, hi))
-    )
+    table.bounds_changed.connect(lambda name, lo, hi: emitted.append((name, lo, hi)))
 
     table.item(0, 3).setText("inf")  # non-finite max
     table.item(0, 2).setText("20")  # min > max (inverted)

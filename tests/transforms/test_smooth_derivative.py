@@ -268,9 +268,7 @@ class TestSmoothDerivative:
             dy_dx = deriv.transform(data)
 
         assert jnp.all(jnp.isfinite(dy_dx.y))
-        assert any(
-            "non-uniform" in record.message.lower() for record in caplog.records
-        )
+        assert any("non-uniform" in record.message.lower() for record in caplog.records)
 
     def test_finite_diff_duplicate_x_raises(self):
         """Regression: duplicate x silently injected NaN instead of raising (defect #2)."""

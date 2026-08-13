@@ -266,7 +266,9 @@ class TestEuDecimal:
         )
         path = _write(tmp_path, "eu.csv", content)
         trios = parse_trios_csv(path, decimal_separator=",", delimiter="\t")
-        np.testing.assert_allclose(trios.primary_table.df["Time"].values, [0.1, 0.2, 0.3])
+        np.testing.assert_allclose(
+            trios.primary_table.df["Time"].values, [0.1, 0.2, 0.3]
+        )
         np.testing.assert_allclose(
             trios.primary_table.df["Stress"].values, [1000.5, 2000.5, 3000.5]
         )
@@ -351,9 +353,7 @@ class TestMultiTable:
         trios = parse_trios_csv(path)
         # Both step sections parsed — no silent loss after the first [step].
         assert len(trios.tables) == 2
-        np.testing.assert_allclose(
-            trios.tables[1].df["Time"].values, [0.4, 0.5, 0.6]
-        )
+        np.testing.assert_allclose(trios.tables[1].df["Time"].values, [0.4, 0.5, 0.6])
 
     def test_load_returns_all_segments(self, tmp_path):
         path = _write(tmp_path, "multi.csv", self.MULTI)
@@ -376,9 +376,7 @@ class TestLoadComplexModulus:
         data = load_trios_csv(path)
         assert isinstance(data, RheoData)
         assert np.iscomplexobj(data.y)
-        np.testing.assert_allclose(
-            data.y, [1000 + 500j, 1200 + 600j, 1400 + 700j]
-        )
+        np.testing.assert_allclose(data.y, [1000 + 500j, 1200 + 600j, 1400 + 700j])
         assert data.y_units == "Pa"
 
     def test_hz_converted_to_rad_per_s(self, tmp_path):
@@ -407,9 +405,7 @@ class TestNanFilteringGuards:
         for step in (1, 2, 3):
             for _ in range(2):
                 stress = "" if step in empty_steps else str(step * 100)
-                rows.append(
-                    f"data point {n}\t{step}\t{n * 0.1:.1f}\t{stress}\t25"
-                )
+                rows.append(f"data point {n}\t{step}\t{n * 0.1:.1f}\t{stress}\t25")
                 n += 1
         return (
             "Number of points\t6\n"

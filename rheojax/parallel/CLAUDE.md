@@ -17,7 +17,8 @@
 
 ```python
 from rheojax.parallel import configure, parallel_load, parallel_map
-datasets = parallel_load(['data1.csv', 'data2.csv'], x_col='time', y_col='stress')
+
+datasets = parallel_load(["data1.csv", "data2.csv"], x_col="time", y_col="stress")
 results = list(parallel_map(fit_func, items, n_workers=4))
 configure(n_workers=4, warm_pool=True)
 ```

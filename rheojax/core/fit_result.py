@@ -574,9 +574,7 @@ class FitResult:
                 ),
             )
 
-        persisted_stats = {
-            key: d[key] for key in _STAT_KEYS if d.get(key) is not None
-        }
+        persisted_stats = {key: d[key] for key in _STAT_KEYS if d.get(key) is not None}
 
         return cls(
             model_name=d["model_name"],
@@ -656,9 +654,7 @@ class FitResult:
                 ),
             )
 
-        persisted_stats = {
-            key: float(data[key]) for key in _STAT_KEYS if key in data
-        }
+        persisted_stats = {key: float(data[key]) for key in _STAT_KEYS if key in data}
 
         # Backward-compatible: .npz files saved before params_units/metadata
         # were persisted (see _save_npz) fall back to {} rather than KeyError.

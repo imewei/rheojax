@@ -160,8 +160,7 @@ class ColumnMapperDialog(QDialog):
         self.y2_combo = RheoComboBox(placeholder="None (optional)")
         self.y2_combo.setAccessibleName("Y2 axis column (optional)")
         self.y2_combo.setAccessibleDescription(
-            "Optional. Select a secondary response column (e.g. loss "
-            "modulus G'')."
+            "Optional. Select a secondary response column (e.g. loss modulus G'')."
         )
         self.y2_combo.currentTextChanged.connect(
             lambda value: logger.debug(

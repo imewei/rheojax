@@ -601,9 +601,7 @@ def make_ml_ikh_creep_ode_rhs_per_mode(n_modes):
         # Per-mode stress evolution under the shared strain rate
         d_sigmas = G_safe_arr * (d_gamma - gamma_dot_p_arr) - visc_arr
 
-        return jnp.concatenate(
-            [jnp.array([d_gamma]), d_sigmas, d_alphas, d_lambdas]
-        )
+        return jnp.concatenate([jnp.array([d_gamma]), d_sigmas, d_alphas, d_lambdas])
 
     return _ode_rhs
 

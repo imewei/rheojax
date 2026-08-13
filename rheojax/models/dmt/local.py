@@ -1017,7 +1017,9 @@ class DMTLocal(DMTBase):
                     gamma_v_new = gamma_v + dt * gamma_dot_v
                     # Elastic strain evaluated at lam_new so (gamma_total,
                     # lam_new) are reported at the same time index.
-                    G_new = elastic_modulus(lam_new, param_dict["G0"], param_dict["m_G"])
+                    G_new = elastic_modulus(
+                        lam_new, param_dict["G0"], param_dict["m_G"]
+                    )
                     gamma_e_new = sigma_0 / jnp.maximum(G_new, 1e-10)
                     gamma_total = gamma_e_new + gamma_v_new
                     return (lam_new, gamma_v_new, lam), gamma_total

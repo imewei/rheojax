@@ -415,9 +415,7 @@ class ParameterTable(QTableWidget):
 
                 # In bounds - check if modified
                 if param_name in self._original_values:
-                    is_modified = (
-                        abs(value - self._original_values[param_name]) > 1e-10
-                    )
+                    is_modified = abs(value - self._original_values[param_name]) > 1e-10
                     if is_modified:
                         # Modified - bold
                         font = item.font()

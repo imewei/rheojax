@@ -424,9 +424,7 @@ data point 1	1.0	100
         failed on every flow-curve CSV imported without manual column
         mapping."""
         csv_file = tmp_path / "flow_curve.csv"
-        csv_file.write_text(
-            "Shear Rate,Viscosity\n1.0,100.0\n10.0,80.0\n100.0,60.0\n"
-        )
+        csv_file.write_text("Shear Rate,Viscosity\n1.0,100.0\n10.0,80.0\n100.0,60.0\n")
 
         data = auto_load(str(csv_file))
 
