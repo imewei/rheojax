@@ -1270,7 +1270,18 @@ class BayesianMixin:
             seed: Random seed for reproducibility. If None, uses seed=0 for
                 deterministic results. Set to different values for independent runs.
             **nuts_kwargs: Additional arguments passed to NUTS sampler
-                (e.g., target_accept_prob, chain_method)
+                (e.g., target_accept_prob, chain_method), with two carve-outs
+                popped before anything reaches NUTS:
+                - likelihood_space: 'linear' (default) or 'log'. Use 'log'
+                  when the observable spans several decades (e.g. a flow
+                  curve), where linear-space noise is dominated by the
+                  largest points and biases the posterior toward the top
+                  decade.
+                - Protocol-specific kwargs, forwarded to model_function
+                  instead of NUTS: strain, sigma_0, sigma_applied, gamma_0,
+                  gamma_dot, omega, n_cycles, gdot, t_wait, lam_init, lam_0,
+                  sigma_init, omega_laos, plus non-underscore aliases
+                  gamma0, sigma0, stress_target.
 
         Returns:
             BayesianResult containing posterior_samples, summary, diagnostics.

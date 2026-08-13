@@ -654,6 +654,53 @@ class BayesianPipeline(Pipeline):
         logger.debug("Converting Bayesian result to InferenceData")
         return self._bayesian_result.to_inference_data()
 
+    @staticmethod
+    def _require_arviz(plot_name: str, required: tuple[str, ...]):
+        """Import arviz or raise a consistent, plot-specific ImportError."""
+        try:
+            return import_arviz(required=required)
+        except ImportError as exc:
+            logger.error(f"ArviZ not installed for {plot_name} plot", exc_info=True)
+            raise ImportError(
+                f"ArviZ is required for {plot_name} plots. "
+                "Install it with: pip install arviz"
+            ) from exc
+
+    @staticmethod
+    def _filter_degenerate_var_names(idata, var_names, plot_name: str):
+        """Drop near-zero-spread parameters, which crash ArviZ's KDE.
+
+        Only applies when var_names is None (caller wants "all" parameters).
+        Returns (var_names, skip) -- skip=True means every parameter is
+        degenerate and the caller should skip plotting entirely.
+        """
+        if (
+            var_names is not None
+            or not hasattr(idata, "posterior")
+            or idata.posterior is None
+        ):
+            return var_names, False
+        all_vars = list(idata.posterior.data_vars)
+        var_names = [
+            v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
+        ]
+        if not var_names:
+            logger.warning(
+                f"All posterior parameters are degenerate, skipping {plot_name} plot"
+            )
+            return var_names, True
+        return var_names, False
+
+    def _finalize_plot(self, axes, show: bool):
+        """Extract the figure from ArviZ axes, store it, and optionally show it."""
+        import matplotlib.pyplot as plt
+
+        fig = arviz_figure(axes)
+        self._current_figure = fig
+        if show:
+            plt.show()
+        return fig
+
     def plot_pair(
         self,
         var_names: list[str] | None = None,
@@ -711,36 +758,12 @@ class BayesianPipeline(Pipeline):
             divergences=divergences,
         )
 
-        try:
-            az = import_arviz(required=("plot_pair",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for pair plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for pair plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("pair", ("plot_pair",))
         idata = self._get_inference_data()
+        var_names, skip = self._filter_degenerate_var_names(idata, var_names, "pair")
+        if skip:
+            return self
 
-        # Filter degenerate parameters to prevent ArviZ KDE crashes
-        import numpy as np
-
-        if (
-            var_names is None
-            and hasattr(idata, "posterior")
-            and idata.posterior is not None
-        ):
-            all_vars = list(idata.posterior.data_vars)
-            var_names = [
-                v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
-            ]
-            if not var_names:
-                logger.warning(
-                    "All posterior parameters are degenerate, skipping pair plot"
-                )
-                return self
-
-        # Create pair plot
         axes = az.plot_pair(
             idata,
             **arviz_plot_kwargs(
@@ -752,17 +775,7 @@ class BayesianPipeline(Pipeline):
                 **plot_kwargs,
             ),
         )
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_pair", var_names if var_names else "all"))
         return self
@@ -822,36 +835,12 @@ class BayesianPipeline(Pipeline):
             hdi_prob=hdi_prob,
         )
 
-        try:
-            az = import_arviz(required=("plot_forest",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for forest plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for forest plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("forest", ("plot_forest",))
         idata = self._get_inference_data()
+        var_names, skip = self._filter_degenerate_var_names(idata, var_names, "forest")
+        if skip:
+            return self
 
-        # Filter degenerate parameters to prevent ArviZ KDE crashes
-        import numpy as np
-
-        if (
-            var_names is None
-            and hasattr(idata, "posterior")
-            and idata.posterior is not None
-        ):
-            all_vars = list(idata.posterior.data_vars)
-            var_names = [
-                v for v in all_vars if np.ptp(idata.posterior[v].values.ravel()) > 1e-10
-            ]
-            if not var_names:
-                logger.warning(
-                    "All posterior parameters are degenerate, skipping forest plot"
-                )
-                return self
-
-        # Create forest plot
         axes = az.plot_forest(
             idata,
             **arviz_plot_kwargs(
@@ -863,17 +852,7 @@ class BayesianPipeline(Pipeline):
                 **plot_kwargs,
             ),
         )
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_forest", var_names if var_names else "all"))
         return self
@@ -914,15 +893,7 @@ class BayesianPipeline(Pipeline):
         """
         logger.debug("Creating energy plot")
 
-        try:
-            az = import_arviz(required=("plot_energy",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for energy plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for energy plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("energy", ("plot_energy",))
         idata = self._get_inference_data()
 
         sample_stats = getattr(idata, "sample_stats", None)
@@ -934,19 +905,8 @@ class BayesianPipeline(Pipeline):
                 "fields are available for conversion to ArviZ."
             )
 
-        # Create energy plot
         axes = az.plot_energy(idata, **plot_kwargs)
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_energy", None))
         return self
@@ -1003,18 +963,9 @@ class BayesianPipeline(Pipeline):
             combined=combined,
         )
 
-        try:
-            az = import_arviz(required=("plot_autocorr",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for autocorrelation plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for autocorrelation plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("autocorrelation", ("plot_autocorr",))
         idata = self._get_inference_data()
 
-        # Create autocorrelation plot
         axes = az.plot_autocorr(
             idata,
             **arviz_plot_kwargs(
@@ -1025,17 +976,7 @@ class BayesianPipeline(Pipeline):
                 **plot_kwargs,
             ),
         )
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_autocorr", var_names if var_names else "all"))
         return self
@@ -1085,34 +1026,15 @@ class BayesianPipeline(Pipeline):
         """
         logger.debug("Creating rank plot", var_names=var_names)
 
-        try:
-            az = import_arviz(required=("plot_rank",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for rank plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for rank plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("rank", ("plot_rank",))
         idata = self._get_inference_data()
 
-        # Create rank plot
         axes = az.plot_rank(
             idata,
             var_names=var_names,
             **plot_kwargs,
         )
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_rank", var_names if var_names else "all"))
         return self
@@ -1170,35 +1092,16 @@ class BayesianPipeline(Pipeline):
             kind=kind,
         )
 
-        try:
-            az = import_arviz(required=("plot_ess",))
-        except ImportError as exc:
-            logger.error("ArviZ not installed for ESS plot", exc_info=True)
-            raise ImportError(
-                "ArviZ is required for ESS plots. Install it with: pip install arviz"
-            ) from exc
-
-        # Get InferenceData
+        az = self._require_arviz("ESS", ("plot_ess",))
         idata = self._get_inference_data()
 
-        # Create ESS plot
         axes = az.plot_ess(
             idata,
             var_names=var_names,
             kind=kind,
             **plot_kwargs,
         )
-
-        # Extract figure from axes
-        import matplotlib.pyplot as plt
-
-        fig = arviz_figure(axes)
-
-        # Store figure for save_figure() method
-        self._current_figure = fig
-
-        if show:
-            plt.show()
+        self._finalize_plot(axes, show)
 
         self.history.append(("plot_ess", var_names if var_names else "all"))
         return self

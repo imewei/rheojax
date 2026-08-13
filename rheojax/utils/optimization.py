@@ -2205,47 +2205,6 @@ def nlsq_multistart_optimize(
     return best_result
 
 
-def nlsq_optimize_global(
-    objective: Callable[[np.ndarray], float | np.ndarray],
-    parameters: ParameterSet,
-    **kwargs,
-) -> OptimizationResult:
-    """Global optimization using NLSQ 0.6.6 workflow='auto_global'.
-
-    Convenience function for global optimization that explores parameter space
-    more thoroughly using the NLSQ 0.6.6 global optimization workflow.
-
-    Args:
-        objective: Objective function to minimize. Takes parameter values as
-            array and returns scalar or residual vector.
-        parameters: ParameterSet with initial values and bounds
-        **kwargs: Additional arguments passed to nlsq_optimize
-
-    Returns:
-        OptimizationResult with optimal parameters from global search
-
-    Example:
-        >>> from rheojax.core.parameters import ParameterSet
-        >>> params = ParameterSet()
-        >>> params.add("a", value=1.0, bounds=(0, 10))
-        >>> params.add("b", value=1.0, bounds=(0, 10))
-        >>>
-        >>> result = nlsq_optimize_global(objective, params)
-        >>> print(f"Global optimum: {result.x}")
-
-    Notes:
-        - Uses workflow='auto_global' for bounds-aware global exploration
-        - More thorough but slower than standard local optimization
-        - Useful for multi-modal objective functions
-    """
-    return nlsq_optimize(
-        objective,
-        parameters,
-        workflow="auto_global",
-        **kwargs,
-    )
-
-
 def nlsq_curve_fit(
     model_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
     x_data: np.ndarray,

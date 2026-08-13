@@ -821,32 +821,6 @@ class TestNLSQ066CurveFit:
         assert hasattr(result, "_x_data")
 
 
-class TestNLSQ066GlobalOptimization:
-    """Tests for NLSQ 0.6.6 global optimization."""
-
-    @pytest.mark.smoke
-    def test_nlsq_optimize_global_import(self):
-        """Test nlsq_optimize_global can be imported."""
-        from rheojax.utils.optimization import nlsq_optimize_global
-
-        assert callable(nlsq_optimize_global)
-
-    def test_nlsq_optimize_global_basic(self):
-        """Test nlsq_optimize_global basic functionality."""
-        from rheojax.utils.optimization import nlsq_optimize_global
-
-        params = ParameterSet()
-        params.add(name="x", value=1.0, bounds=(0.0, 10.0))
-
-        def objective(values):
-            return (values[0] - 5.0) ** 2
-
-        result = nlsq_optimize_global(objective, params)
-
-        assert result.success
-        assert abs(result.x[0] - 5.0) < 0.5
-
-
 class TestNLSQ066BackwardCompatibility:
     """Ensure existing code works unchanged with NLSQ 0.6.6."""
 

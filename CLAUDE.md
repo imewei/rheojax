@@ -27,7 +27,7 @@ RheoJAX 是一个 JAX 加速的统一流变学分析框架，将 53 个流变本
 - **`rheojax/io/`** — TRIOS/Anton Paar/CSV/Excel 读取器、HDF5/Excel/NPZ 写入器、SPP MATLAB 兼容导出、格式自动检测。
 - **`rheojax/pipeline/`** — 流式 API（`Pipeline`、`BayesianPipeline`）、预置工作流（主曲线、模型比较、创变换）、`PipelineBuilder`、批处理 `BatchPipeline`。
 - **`rheojax/cli/`** — `rheojax`/`rj` 命令行入口，子命令：fit/bayesian/spp/load/transform/export/run/pipeline/batch/info/inventory。YAML 流水线运行器与信封（envelope）JSON I/O。
-- **`rheojax/gui/`** — PySide6 桌面应用（`rheojax-gui`/`rj-gui`），Redux 风格状态管理（`gui/state/`）、服务层（`gui/services/`）对接 rheojax API、后台 Worker（`gui/jobs/`）、`WorkspaceWindow`（唯一外壳，三步向导：fit/transform/pipeline）。
+- **`rheojax/gui/`** — PySide6 桌面应用（`rheojax-gui`/`rj-gui`），dataclass 状态容器（`gui/foundation/state.py`，非 Redux，无独立 store/reducer 分层）、服务层（`gui/services/`）对接 rheojax API、后台 Worker（`gui/jobs/`）、`WorkspaceWindow`（唯一外壳，三步向导：fit/transform/pipeline）。
 - **`rheojax/utils/`** — Mittag-Leffler 函数、Prony 级数、优化辅助（NLSQ 封装）、物理合理性检查、不确定度量化（bootstrap/Hessian CI）、GPU 设备检测、模型初始化启发式（`utils/initialization/`）。
 - **`rheojax/parallel/`** — 进程级并行池（拟合/贝叶斯/批处理），线程仅用于 I/O；环境变量 `RHEOJAX_PARALLEL_WORKERS`/`RHEOJAX_SEQUENTIAL` 控制。
 - **`rheojax/logging/`** — 结构化日志（context/formatters/handlers），供 core/cli/gui 统一使用。
@@ -84,7 +84,7 @@ graph TD
 | io | `rheojax/io/` | 文件读写（TRIOS/Anton Paar/CSV/Excel/HDF5）+ SPP 导出 | 27 / 23 | [CLAUDE.md](./rheojax/io/CLAUDE.md) |
 | pipeline | `rheojax/pipeline/` | 流式拟合/变换工作流 API | 6 / 16 | [CLAUDE.md](./rheojax/pipeline/CLAUDE.md) |
 | cli | `rheojax/cli/` | `rheojax`/`rj` 命令行工具 | 17 / 17 | [CLAUDE.md](./rheojax/cli/CLAUDE.md) |
-| gui | `rheojax/gui/` | PySide6 桌面应用（`rheojax-gui`） | 115 / 119+ | [CLAUDE.md](./rheojax/gui/CLAUDE.md) |
+| gui | `rheojax/gui/` | PySide6 桌面应用（`rheojax-gui`） | 99 / 119+ | [CLAUDE.md](./rheojax/gui/CLAUDE.md) |
 | utils | `rheojax/utils/` | 数值工具、优化、初始化、不确定度量化 | 33 / 30 | [CLAUDE.md](./rheojax/utils/CLAUDE.md) |
 | parallel | `rheojax/parallel/` | 进程池并行执行 | 4 / 8 | [CLAUDE.md](./rheojax/parallel/CLAUDE.md) |
 | logging | `rheojax/logging/` | 结构化日志配置 | 6 / 4 | [CLAUDE.md](./rheojax/logging/CLAUDE.md) |

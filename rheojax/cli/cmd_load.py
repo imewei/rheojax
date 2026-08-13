@@ -130,38 +130,17 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error: File not found: {parsed.input_file}", file=sys.stderr)
         return 1
 
-    # Build load kwargs
-    load_kwargs: dict = {}
-    if parsed.file_format is not None:
-        load_kwargs["format"] = parsed.file_format
-    if parsed.x_col is not None:
-        load_kwargs["x_col"] = parsed.x_col
-    if parsed.y_col is not None:
-        load_kwargs["y_col"] = parsed.y_col
-    if parsed.y_cols is not None:
-        load_kwargs["y_cols"] = [c.strip() for c in parsed.y_cols.split(",")]
-
     # Load data
     try:
-        from rheojax.io import auto_load
+        from rheojax.cli._common import load_and_flatten
 
-        data = auto_load(str(parsed.input_file), **load_kwargs)
-
-        # Handle multi-segment data — use first segment with a warning
-        if isinstance(data, list):
-            if not data:
-                print("Error: No data segments found in file", file=sys.stderr)
-                return 1
-            if len(data) > 1:
-                print(
-                    f"Warning: File contains {len(data)} segments; using first segment.",
-                    file=sys.stderr,
-                )
-                logger.warning(
-                    "Multi-segment file: using first segment",
-                    n_segments=len(data),
-                )
-            data = data[0]
+        data = load_and_flatten(
+            str(parsed.input_file),
+            x_col=parsed.x_col,
+            y_col=parsed.y_col,
+            y_cols=parsed.y_cols,
+            file_format=parsed.file_format,
+        )
 
     except Exception as e:
         print(f"Error loading data: {e}", file=sys.stderr)

@@ -96,7 +96,5 @@ class TestBuildPipelineFromEnvelope:
 
         pipe = _build_pipeline_from_envelope(envelope)
 
-        # Same private-attribute access _build_pipeline_from_envelope itself
-        # uses (cmd_export.py: `pipe._data = data  # type: ignore[attr-defined]`).
-        np.testing.assert_array_equal(pipe._data.x, [0.1, 0.2, 0.3])  # type: ignore[attr-defined]
-        np.testing.assert_array_equal(pipe._data.y, [10.0, 9.0, 8.0])  # type: ignore[attr-defined]
+        np.testing.assert_array_equal(pipe.data.x, [0.1, 0.2, 0.3])
+        np.testing.assert_array_equal(pipe.data.y, [10.0, 9.0, 8.0])

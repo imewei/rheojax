@@ -4,7 +4,7 @@
 
 ## 模块职责
 
-Qt（PySide6）图形界面，提供交互式数据加载/可视化、模型拟合（实时参数更新）、贝叶斯推断（ArviZ 诊断）、变换流水线（主曲线/FFT/SRFS）、多视图绘图与出版级导出、GPU 加速状态监控。架构为 Redux 风格状态管理（Qt 信号驱动）+ 服务层（对接 rheojax 核心 API）+ 后台 Worker（长时间计算不阻塞 UI）。
+Qt（PySide6）图形界面，提供交互式数据加载/可视化、模型拟合（实时参数更新）、贝叶斯推断（ArviZ 诊断）、变换流水线（主曲线/FFT/SRFS）、多视图绘图与出版级导出、GPU 加速状态监控。架构为 dataclass 状态容器（Qt 信号驱动，非 Redux）+ 服务层（对接 rheojax 核心 API）+ 后台 Worker（长时间计算不阻塞 UI）。
 
 ## 入口与启动
 
@@ -15,7 +15,7 @@ Qt（PySide6）图形界面，提供交互式数据加载/可视化、模型拟�
 
 ## 对外接口
 
-- **状态管理**（`gui/state/`）：`store.py`（中心 store）、`actions.py`、`selectors.py`、`signals.py`、`reducers/`（按域拆分：`fitting_reducers`, `project_reducers`, `model_reducers`, `ui_reducers`, `pipeline_reducers`, `data_reducers`, `bayesian_reducers`）。
+- **状态管理**（`gui/foundation/state.py`）：非 Redux——一组 `@dataclass` 状态容器（`FitState`, `TransformState`, `DatasetState`, `FitResult`, `BayesianResult` 等），由控制器直接持有并按引用传给子部件，无独立 store/action/reducer 分层。跨状态失效级联在 `gui/foundation/invalidation.py` 中处理：`invalidate_downstream` 用 `dataclasses.replace()` 构造新实例（不可变），但 `apply_cascade` 因部件直接持有旧实例引用，改为 `setattr` 循环原地修改（可变），两种模式并存，是该层最值得关注的技术债（详见 seam 审计 2026-08-13）。
 - **服务层**（`gui/services/`）：`data_service.py`, `export_service.py`, `bayesian_service.py`, `pipeline_execution_service.py`, `transform_service.py`, `plot_service.py`, `model_service.py` — 封装对 `rheojax.core`/`rheojax.pipeline`/`rheojax.io` 的调用，是 GUI 与核心库之间的唯一桥梁。
 - **后台 Worker**（`gui/jobs/`）：`fit_worker.py`, `bayesian_worker.py`, `import_worker.py`, `export_worker.py`, `transform_worker.py`, `preview_worker.py`, `worker_pool.py`, `cancellation.py`, `subprocess_fit.py`/`subprocess_bayesian.py`（子进程隔离执行）, `process_adapter.py`, `_cleanup.py`。
 - **Foundation**（`gui/foundation/`）：`state.py`（`AppState`/`FitState`/`NlsqConfig`/`NutsConfig` 等 dataclass）、`contract.py`（协议必需字段声明）、`library.py`（`DatasetLibrary`）、`notifier.py`（`DatasetLibraryNotifier`）、`pipeline_bridge.py`、`project_codec.py`（项目保存/加载序列化）、`priors.py`、`import_service.py`、`metrics.py`、`invalidation.py`（缓存失效级联）。
@@ -52,9 +52,9 @@ Qt（PySide6）图形界面，提供交互式数据加载/可视化、模型拟�
 - **启动 GUI 会得到哪个窗口？** 只有 `WorkspaceWindow`（三步向导：fit/transform/pipeline）。遗留 `RheoJAXMainWindow` 及 `--legacy`/`--workspace` 标志已在 `[Unreleased]` 版本中作为 BREAKING CHANGE 移除；传入这些标志会得到 argparse "unrecognized arguments" 错误。
 - **为什么拟合逻辑不直接写在 Widget 里？** 架构要求 View（PySide6 widget/dialog）与业务逻辑解耦；数值/拟合逻辑经 `gui/services/*Service` 调用 `rheojax.core`/`rheojax.pipeline`，长时间任务再委托给 `gui/jobs/*Worker` 在后台线程/子进程执行，避免阻塞 Qt 事件循环。
 
-## 相关文件清单（115 个源文件，按子包）
+## 相关文件清单（99 个源文件，按子包）
 
-`dialogs/`(10), `foundation/`(11), `jobs/`(13), `resources/`(+`styles/`)(5), `services/`(7), `state/`(+`reducers/`)(13), `utils/`(9), `widgets/`(9), `workspace/`(+`fit/`, `pipeline/`, `transform/`)(28), `compat.py`, `main.py`, `__init__.py`
+`dialogs/`(9), `foundation/`(11，含状态容器 `state.py` 与失效级联 `invalidation.py`——无独立 `state/` 目录), `jobs/`(13), `resources/`(+`styles/`)(5), `services/`(8), `utils/`(10), `widgets/`(11), `workspace/`(+`fit/`, `pipeline/`, `transform/`)(29), `compat.py`, `main.py`, `__init__.py`
 
 ## 变更记录 (Changelog)
 

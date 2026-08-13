@@ -145,33 +145,6 @@ def _load_from_envelope(text: str):
     return RheoData(x=x, y=y, metadata=metadata)
 
 
-def _load_from_file(input_path: str, x_col, y_col, y_cols):
-    """Load data from a file using auto_load."""
-    from rheojax.io import auto_load
-
-    load_kwargs: dict = {}
-    if x_col is not None:
-        load_kwargs["x_col"] = x_col
-    if y_col is not None:
-        load_kwargs["y_col"] = y_col
-    if y_cols is not None:
-        load_kwargs["y_cols"] = [c.strip() for c in y_cols.split(",")]
-
-    data = auto_load(input_path, **load_kwargs)
-
-    if isinstance(data, list):
-        if not data:
-            raise ValueError("File contained no data segments")
-        if len(data) > 1:
-            print(
-                f"Warning: File contains {len(data)} segments; using first segment.",
-                file=sys.stderr,
-            )
-        data = data[0]
-
-    return data
-
-
 def main(args: list[str] | None = None) -> int:
     """Apply a transform to data and print results or a JSON envelope."""
     parser = create_parser()
@@ -207,8 +180,13 @@ def main(args: list[str] | None = None) -> int:
             return 1
     elif parsed.input is not None:
         try:
-            data = _load_from_file(
-                parsed.input, parsed.x_col, parsed.y_col, parsed.y_cols
+            from rheojax.cli._common import load_and_flatten
+
+            data = load_and_flatten(
+                parsed.input,
+                x_col=parsed.x_col,
+                y_col=parsed.y_col,
+                y_cols=parsed.y_cols,
             )
             logger.debug("Loaded data from file", input=parsed.input)
         except Exception as e:
