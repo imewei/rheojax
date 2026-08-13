@@ -106,11 +106,8 @@ def _build_pipeline_from_envelope(envelope: dict):
     try:
         from rheojax.pipeline import Pipeline
 
-        pipe = Pipeline()
-        pipe._data = data  # type: ignore[attr-defined]
-        pipe._source = metadata.get("source", "stdin")  # type: ignore[attr-defined]
-        return pipe
-    except (ImportError, AttributeError) as exc:
+        return Pipeline(data=data)
+    except ImportError as exc:
         raise RuntimeError(
             "Could not construct a Pipeline from the stdin envelope. "
             "Pipe from 'rheojax load --json' or provide an HDF5 file."

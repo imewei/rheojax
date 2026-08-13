@@ -156,9 +156,11 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     if not np.iscomplexobj(y_true) and not np.iscomplexobj(y_pred):
         ss_res = np.sum((y_true - y_pred) ** 2)
         ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
-        # R11-METRICS-001: Handle constant data (ss_tot == 0) without returning -1e30
+        # R11-METRICS-001: Handle constant data (ss_tot == 0). Convention matches
+        # compute_fit_quality(): 1.0 on a perfect fit, 0.0 (not a magic -1.0)
+        # otherwise, since R2 is genuinely undefined here rather than "bad".
         if ss_tot == 0.0:
-            return 1.0 if ss_res == 0.0 else -1.0
+            return 1.0 if ss_res == 0.0 else 0.0
         return 1.0 - ss_res / float(ss_tot)
 
     ss_res_real = np.sum((np.real(y_true) - np.real(y_pred)) ** 2)
@@ -167,13 +169,13 @@ def r2_complex_components(y_true: ArrayLike, y_pred: ArrayLike) -> float:
     ss_res_imag = np.sum((np.imag(y_true) - np.imag(y_pred)) ** 2)
     ss_tot_imag = np.sum((np.imag(y_true) - np.mean(np.imag(y_true))) ** 2)
 
-    # R11-METRICS-001: Handle constant data per component
+    # R11-METRICS-001: Handle constant data per component (see convention note above)
     if ss_tot_real == 0.0:
-        r2_real = 1.0 if ss_res_real == 0.0 else -1.0
+        r2_real = 1.0 if ss_res_real == 0.0 else 0.0
     else:
         r2_real = 1.0 - ss_res_real / float(ss_tot_real)
     if ss_tot_imag == 0.0:
-        r2_imag = 1.0 if ss_res_imag == 0.0 else -1.0
+        r2_imag = 1.0 if ss_res_imag == 0.0 else 0.0
     else:
         r2_imag = 1.0 - ss_res_imag / float(ss_tot_imag)
 

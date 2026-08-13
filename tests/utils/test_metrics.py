@@ -51,6 +51,14 @@ class TestComputeFitQuality:
         metrics = compute_fit_quality(y_true, y_pred)
         assert metrics["R2"] == 1.0
 
+    def test_constant_data_imperfect_fit(self):
+        # ss_tot == 0 (constant y_true) but the prediction misses it: R2 is
+        # genuinely undefined here, so the convention is 0.0, not a magic -1.0.
+        y_true = np.array([5.0, 5.0, 5.0])
+        y_pred = np.array([5.0, 4.0, 5.0])
+        metrics = compute_fit_quality(y_true, y_pred)
+        assert metrics["R2"] == 0.0
+
 
 @pytest.mark.smoke
 class TestR2Complex:
@@ -80,3 +88,14 @@ class TestR2ComplexComponents:
         y = np.array([1.0, 2.0, 3.0])
         result = r2_complex_components(y, y)
         assert result == 1.0
+
+    def test_constant_real_data_imperfect_fit(self):
+        # Same zero-variance convention as compute_fit_quality: 0.0, not -1.0.
+        y_true = np.array([5.0, 5.0, 5.0])
+        y_pred = np.array([5.0, 4.0, 5.0])
+        assert r2_complex_components(y_true, y_pred) == 0.0
+
+    def test_constant_complex_data_imperfect_fit(self):
+        y_true = np.array([2 + 5j, 2 + 5j, 2 + 5j])
+        y_pred = np.array([2 + 5j, 1 + 4j, 2 + 5j])
+        assert r2_complex_components(y_true, y_pred) == 0.0

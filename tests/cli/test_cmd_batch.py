@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import pytest
 
@@ -132,3 +133,50 @@ class TestMainJsonOutput:
         assert isinstance(parsed, list)
         assert len(parsed) == 1
         assert parsed[0]["status"] == "success"
+
+
+class TestMainParallel:
+    @pytest.mark.unit
+    def test_parallel_load_preserves_file_order_and_succeeds(self, tmp_path, capsys):
+        # --parallel used to be a documented no-op. It now loads files
+        # concurrently (I/O only) while still fitting sequentially (JAX JIT
+        # is not thread-safe) — this pins both that it actually runs and
+        # that results stay in glob order despite out-of-order completion.
+        relaxation_csv = (
+            "time,stress\n"
+            "0.1,4.756\n"
+            "0.5,3.894\n"
+            "1.0,3.033\n"
+            "2.0,1.839\n"
+            "3.0,1.115\n"
+            "4.0,0.677\n"
+            "5.0,0.410\n"
+        )
+        for name in ("a_sample.csv", "b_sample.csv", "c_sample.csv"):
+            (tmp_path / name).write_text(relaxation_csv)
+
+        result = main(
+            [
+                str(tmp_path / "*.csv"),
+                "--model",
+                "maxwell",
+                "--test-mode",
+                "relaxation",
+                "--max-iter",
+                "50",
+                "--parallel",
+                "--workers",
+                "3",
+                "--json",
+            ]
+        )
+
+        captured = capsys.readouterr()
+        assert result == 0
+        parsed = json.loads(captured.out)
+        assert [Path(r["file"]).name for r in parsed] == [
+            "a_sample.csv",
+            "b_sample.csv",
+            "c_sample.csv",
+        ]
+        assert all(r["status"] == "success" for r in parsed)

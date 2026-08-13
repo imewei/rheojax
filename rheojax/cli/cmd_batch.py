@@ -49,7 +49,7 @@ Examples:
   rheojax batch "data/*.csv" --model maxwell --test-mode relaxation \\
       --output-dir results/ --json
 
-  # Process in parallel (future; currently sequential)
+  # Load files concurrently, then fit each sequentially
   rheojax batch "data/*.csv" --model maxwell --parallel
         """,
     )
@@ -107,13 +107,14 @@ Examples:
     parser.add_argument(
         "--parallel",
         action="store_true",
-        help="Enable parallel processing (currently sequential; reserved for future use)",
+        help="Load files concurrently before fitting (I/O only — JAX JIT is not "
+        "thread-safe, so each file is still fit sequentially)",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=4,
-        help="Number of parallel workers (default: 4; no-op until --parallel is implemented)",
+        help="Number of parallel load workers when --parallel is set (default: 4)",
     )
     parser.add_argument(
         "--json",
@@ -132,23 +133,20 @@ Examples:
     return parser
 
 
-def _fit_single(
+def _load_and_validate(
     file_path: Path,
-    model_name: str,
     test_mode_override: str | None,
     load_kwargs: dict,
-    fit_kwargs: dict,
-) -> dict:
-    """Load, fit, and return a result dict for a single file.
+):
+    """Load a single file and resolve+validate its test mode.
 
-    Returns a dict with keys: file, status, parameters, test_mode,
-    fit_time_seconds, and optionally error.
+    I/O-only and thread-safe (no JAX calls) — this is the phase that is
+    safe to run concurrently under ``--parallel``.
+
+    Returns (data, test_mode).
     """
     from rheojax.io import auto_load
 
-    result: dict = {"file": str(file_path), "status": "error"}
-
-    # Load
     data = auto_load(str(file_path), **load_kwargs)
     if isinstance(data, list):
         if not data:
@@ -190,12 +188,27 @@ def _fit_single(
                 "Use --y-cols to specify storage and loss modulus columns."
             )
 
-    # Create model (registration happens at import time in main)
+    return data, test_mode
+
+
+def _fit_loaded(
+    file_path: Path,
+    data,
+    test_mode: str,
+    model_name: str,
+    fit_kwargs: dict,
+) -> dict:
+    """Fit an already-loaded, already-validated dataset.
+
+    JAX JIT is not thread-safe across concurrent calls, so this phase
+    always runs sequentially regardless of ``--parallel``.
+    """
     from rheojax.core.registry import ModelRegistry
+
+    result: dict = {"file": str(file_path), "status": "error"}
 
     model = ModelRegistry.create(model_name)
 
-    # Fit
     effective_fit_kwargs = {**fit_kwargs, "test_mode": test_mode}
     start = time.perf_counter()
     model.fit(data.x, data.y, **effective_fit_kwargs)
@@ -265,12 +278,6 @@ def main(args: list[str] | None = None) -> int:
         print(f"Error: --max-iter must be >= 1, got {parsed.max_iter}", file=sys.stderr)
         return 1
 
-    if parsed.parallel:
-        print(
-            "Note: --parallel is reserved for future use; running sequentially.",
-            file=sys.stderr,
-        )
-
     # Resolve glob
     import glob as _glob
 
@@ -313,22 +320,36 @@ def main(args: list[str] | None = None) -> int:
     if parsed.output_dir is not None:
         parsed.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process files sequentially
+    # Load phase: concurrent I/O when --parallel, sequential otherwise. Fit
+    # phase below always runs sequentially — JAX JIT is not thread-safe.
+    def _try_load(fp: Path):
+        try:
+            return _load_and_validate(fp, parsed.test_mode, load_kwargs)
+        except Exception as e:
+            return e
+
+    if parsed.parallel and len(files) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=max(1, parsed.workers)) as executor:
+            loaded_outcomes = list(executor.map(_try_load, files))
+    else:
+        loaded_outcomes = [_try_load(fp) for fp in files]
+
     all_results: list[dict] = []
     written_stems: set[str] = set()
 
-    for i, file_path in enumerate(files, 1):
+    for i, (file_path, outcome) in enumerate(
+        zip(files, loaded_outcomes, strict=True), 1
+    ):
         prefix = f"[{i}/{len(files)}] {file_path.name}"
         print(f"{prefix} ...", end=" ", flush=True, file=_progress_stream)
 
         try:
-            result = _fit_single(
-                file_path,
-                parsed.model,
-                parsed.test_mode,
-                load_kwargs,
-                fit_kwargs,
-            )
+            if isinstance(outcome, Exception):
+                raise outcome
+            data, test_mode = outcome
+            result = _fit_loaded(file_path, data, test_mode, parsed.model, fit_kwargs)
             t = result.get("fit_time_seconds", "?")
             print(f"OK ({t}s)", file=_progress_stream)
             logger.info("Batch file fitted", file=str(file_path), time=t)
