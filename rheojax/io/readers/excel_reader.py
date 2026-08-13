@@ -22,6 +22,12 @@ from rheojax.io.readers._utils import (
     normalize_units,
     validate_transform,
 )
+from rheojax.io.readers._utils import (
+    get_column_data as _get_column_data,
+)
+from rheojax.io.readers._utils import (
+    get_column_header as _get_column_header,
+)
 from rheojax.io.readers.csv_reader import _to_float
 from rheojax.logging import get_logger
 
@@ -404,17 +410,3 @@ def load_excel(
         metadata=final_metadata,
         validate=True,
     )
-
-
-def _get_column_header(df, col: str | int) -> str:
-    """Get column header string from DataFrame."""
-    if isinstance(col, str):
-        return col
-    return str(df.columns[col])
-
-
-def _get_column_data(df, col: str | int):
-    """Get column data from DataFrame."""
-    if isinstance(col, str):
-        return df[col].values
-    return df.iloc[:, col].values

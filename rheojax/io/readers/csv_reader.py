@@ -24,6 +24,12 @@ from rheojax.io.readers._utils import (
     normalize_units,
     validate_transform,
 )
+from rheojax.io.readers._utils import (
+    get_column_data as _get_column_data,
+)
+from rheojax.io.readers._utils import (
+    get_column_header as _get_column_header,
+)
 from rheojax.logging import get_logger, log_io
 
 logger = get_logger(__name__)
@@ -161,173 +167,17 @@ def load_csv(
             f"Valid options: {sorted(VALID_TRANSFORMS)}"
         )
 
-    # Auto-detect delimiter if not specified
-    if delimiter is None:
-        delimiter = detect_csv_delimiter(filepath)
-        logger.debug("Auto-detected delimiter", delimiter=repr(delimiter))
-
-    # Choose encoding: explicit parameter > BOM/byte sniffing > default
-    if encoding is not None:
-        default_encoding = encoding
-        logger.debug("Using explicit encoding", encoding=encoding)
-    else:
-        default_encoding = "utf-8-sig"
-        try:
-            with open(filepath, "rb") as f:
-                head_bytes = f.read(4)
-            if (
-                b"\xff\xfe" in head_bytes
-                or b"\xfe\xff" in head_bytes
-                or b"\x00" in head_bytes
-            ):
-                default_encoding = "utf-16"
-            logger.debug("Auto-detected encoding", encoding=default_encoding)
-        except FileNotFoundError:
-            raise
-
-    # Build list of columns to load (memory optimization for wide files)
-    # Only use usecols when all column specifiers are strings (not indices)
-    # Skip when column_mapping is provided — file columns differ from target names
-    usecols = None
-    if column_mapping is not None:
-        pass  # Cannot use usecols with column_mapping (file has pre-rename names)
-    elif isinstance(x_col, str):
-        cols_needed = [x_col]
-        if y_col is not None and isinstance(y_col, str):
-            cols_needed.append(y_col)
-        elif y_cols is not None:
-            cols_needed.extend([c for c in y_cols if isinstance(c, str)])
-        # Only set usecols if all columns are strings
-        if len(cols_needed) == (1 + (1 if y_col is not None else len(y_cols or []))):
-            usecols = cols_needed
-
-    # Auto-detect comment preamble: if file starts with '#' lines and user
-    # hasn't explicitly set a comment character, pass comment='#' to pandas.
-    # Skip this when the requested columns already carry a literal '#'
-    # prefix (e.g. auto-detected from a raw "#time,stress" header): that
-    # means the '#' is part of the header itself, not a preamble marker,
-    # and stripping it here would make usecols/header disagree.
-    comment_char = kwargs.pop("comment", None)
-    has_hash_column = any(
-        isinstance(c, str) and c.startswith("#") for c in (usecols or [])
-    )
-    if comment_char is None and header == 0 and not has_hash_column:
-        try:
-            with open(filepath, encoding=default_encoding, errors="replace") as _f:
-                first_line = _f.readline()
-            if first_line.startswith("#"):
-                comment_char = "#"
-                logger.debug("Auto-detected '#' comment preamble")
-        except (OSError, UnicodeDecodeError):
-            logger.debug("Could not peek at file for comment detection")
-
-    # Read CSV file with tolerant encoding/dialect handling.
-    # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
-    # so that silent corruption is caught and logged before falling back.
-    read_kwargs = dict(
-        sep=delimiter,
+    df, used_encoding, default_encoding = _read_csv_dataframe(
+        filepath,
+        x_col=x_col,
+        y_col=y_col,
+        y_cols=y_cols,
+        column_mapping=column_mapping,
+        delimiter=delimiter,
+        encoding=encoding,
         header=header,
-        encoding=default_encoding,
-        encoding_errors="replace",
-        engine="python",
-        usecols=usecols,
-        comment=comment_char,
         **kwargs,
     )
-    tried_utf16 = False
-
-    used_encoding = default_encoding
-
-    with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
-        try:
-            # Try strict encoding first to detect corruption early
-            logger.debug(
-                "Reading CSV file (strict encoding)", encoding=default_encoding
-            )
-            df = pd.read_csv(filepath, **{**read_kwargs, "encoding_errors": "strict"})
-        except UnicodeDecodeError:
-            # Strict failed — fall back to replacement characters with a warning
-            logger.warning(
-                "Encoding errors in CSV file — using replacement characters",
-                filepath=str(filepath),
-                encoding=default_encoding,
-            )
-            try:
-                df = pd.read_csv(filepath, **read_kwargs)
-            except UnicodeDecodeError:
-                read_kwargs["encoding"] = "utf-16le"
-                tried_utf16 = True
-                logger.info(
-                    "Encoding fallback triggered",
-                    filepath=str(filepath),
-                    from_encoding=default_encoding,
-                    to_encoding="utf-16le",
-                )
-                df = pd.read_csv(filepath, **read_kwargs)
-                used_encoding = "utf-16le"
-        except Exception as e:
-            # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
-            if not tried_utf16:
-                try:
-                    read_kwargs["encoding"] = "utf-16le"
-                    logger.info(
-                        "Encoding fallback triggered",
-                        filepath=str(filepath),
-                        from_encoding=default_encoding,
-                        to_encoding="utf-16le",
-                    )
-                    df = pd.read_csv(filepath, **read_kwargs)
-                    used_encoding = "utf-16le"
-                except Exception:
-                    logger.error(
-                        "Failed to parse CSV file",
-                        filepath=str(filepath),
-                        tried_encodings=[default_encoding, "utf-16le"],
-                        exc_info=True,
-                    )
-                    raise ValueError(f"Failed to parse CSV file: {e}") from e
-            else:
-                logger.error(
-                    "Failed to parse CSV file",
-                    filepath=str(filepath),
-                    tried_encodings=[default_encoding, "utf-16le"],
-                    exc_info=True,
-                )
-                raise ValueError(f"Failed to parse CSV file: {e}") from e
-
-        # VIS-CSV-001: Check for encoding replacement artifacts without
-        # materialising .astype(str) twice per column. Cache col_str and reuse
-        # it for both the detection pass and the numeric-corruption check.
-        affected_cols: list[str] = []
-        for col in df.columns:
-            col_str = df[col].astype(str)  # single materialisation per column
-            if col_str.str.contains("\ufffd", na=False).any():
-                affected_cols.append(col)
-                # Reuse col_str — no second astype(str) needed
-                sample = col_str.str.replace("\ufffd", "", regex=False)
-                if sample.str.match(r"^[\d.eE+\-,]*\d[\d.eE+\-,]*$", na=False).any():
-                    raise ValueError(
-                        f"Encoding corruption detected in numeric column '{col}'. "
-                        f"The file may need to be re-exported with UTF-8 encoding. "
-                        f"Affected file: {filepath}"
-                    )
-        if affected_cols:
-            logger.warning(
-                "Encoding replacement characters (\\ufffd) detected in CSV file — "
-                "some values may be corrupted",
-                filepath=str(filepath),
-                affected_columns=affected_cols,
-            )
-
-        io_ctx["rows"] = len(df)
-        io_ctx["columns"] = len(df.columns)
-        io_ctx["encoding"] = used_encoding
-        logger.debug(
-            "CSV file read successfully",
-            n_rows=len(df),
-            n_cols=len(df.columns),
-            encoding=used_encoding,
-        )
 
     # Guard: check for tensile/E* columns/units/mode. Must run on the
     # original file headers (before column_mapping renaming) — otherwise
@@ -530,18 +380,193 @@ def load_csv(
     )
 
 
-def _get_column_header(df: pd.DataFrame, col: str | int) -> str:
-    """Get column header string from DataFrame."""
-    if isinstance(col, str):
-        return col
-    return str(df.columns[col])
+def _read_csv_dataframe(
+    filepath: Path,
+    *,
+    x_col: str | int,
+    y_col: str | int | None,
+    y_cols: list[str | int] | None,
+    column_mapping: dict[str, str] | None,
+    delimiter: str | None,
+    encoding: str | None,
+    header: int | None,
+    **kwargs,
+) -> tuple[pd.DataFrame, str, str]:
+    """Read a CSV/text file into a DataFrame with delimiter/encoding/comment
+    auto-detection, tolerant UTF-16 fallback, and corruption checks.
 
+    Returns:
+        (df, used_encoding, default_encoding)
+    """
+    # Auto-detect delimiter if not specified
+    if delimiter is None:
+        delimiter = detect_csv_delimiter(filepath)
+        logger.debug("Auto-detected delimiter", delimiter=repr(delimiter))
 
-def _get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
-    """Get column data from DataFrame."""
-    if isinstance(col, str):
-        return df[col].values
-    return df.iloc[:, col].values
+    # Choose encoding: explicit parameter > BOM/byte sniffing > default
+    if encoding is not None:
+        default_encoding = encoding
+        logger.debug("Using explicit encoding", encoding=encoding)
+    else:
+        default_encoding = "utf-8-sig"
+        try:
+            with open(filepath, "rb") as f:
+                head_bytes = f.read(4)
+            if (
+                b"\xff\xfe" in head_bytes
+                or b"\xfe\xff" in head_bytes
+                or b"\x00" in head_bytes
+            ):
+                default_encoding = "utf-16"
+            logger.debug("Auto-detected encoding", encoding=default_encoding)
+        except FileNotFoundError:
+            raise
+
+    # Build list of columns to load (memory optimization for wide files)
+    # Only use usecols when all column specifiers are strings (not indices)
+    # Skip when column_mapping is provided — file columns differ from target names
+    usecols = None
+    if column_mapping is not None:
+        pass  # Cannot use usecols with column_mapping (file has pre-rename names)
+    elif isinstance(x_col, str):
+        cols_needed = [x_col]
+        if y_col is not None and isinstance(y_col, str):
+            cols_needed.append(y_col)
+        elif y_cols is not None:
+            cols_needed.extend([c for c in y_cols if isinstance(c, str)])
+        # Only set usecols if all columns are strings
+        if len(cols_needed) == (1 + (1 if y_col is not None else len(y_cols or []))):
+            usecols = cols_needed
+
+    # Auto-detect comment preamble: if file starts with '#' lines and user
+    # hasn't explicitly set a comment character, pass comment='#' to pandas.
+    # Skip this when the requested columns already carry a literal '#'
+    # prefix (e.g. auto-detected from a raw "#time,stress" header): that
+    # means the '#' is part of the header itself, not a preamble marker,
+    # and stripping it here would make usecols/header disagree.
+    comment_char = kwargs.pop("comment", None)
+    has_hash_column = any(
+        isinstance(c, str) and c.startswith("#") for c in (usecols or [])
+    )
+    if comment_char is None and header == 0 and not has_hash_column:
+        try:
+            with open(filepath, encoding=default_encoding, errors="replace") as _f:
+                first_line = _f.readline()
+            if first_line.startswith("#"):
+                comment_char = "#"
+                logger.debug("Auto-detected '#' comment preamble")
+        except (OSError, UnicodeDecodeError):
+            logger.debug("Could not peek at file for comment detection")
+
+    # Read CSV file with tolerant encoding/dialect handling.
+    # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
+    # so that silent corruption is caught and logged before falling back.
+    read_kwargs = dict(
+        sep=delimiter,
+        header=header,
+        encoding=default_encoding,
+        encoding_errors="replace",
+        engine="python",
+        usecols=usecols,
+        comment=comment_char,
+        **kwargs,
+    )
+    tried_utf16 = False
+
+    used_encoding = default_encoding
+
+    with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
+        try:
+            # Try strict encoding first to detect corruption early
+            logger.debug(
+                "Reading CSV file (strict encoding)", encoding=default_encoding
+            )
+            df = pd.read_csv(filepath, **{**read_kwargs, "encoding_errors": "strict"})
+        except UnicodeDecodeError:
+            # Strict failed — fall back to replacement characters with a warning
+            logger.warning(
+                "Encoding errors in CSV file — using replacement characters",
+                filepath=str(filepath),
+                encoding=default_encoding,
+            )
+            try:
+                df = pd.read_csv(filepath, **read_kwargs)
+            except UnicodeDecodeError:
+                read_kwargs["encoding"] = "utf-16le"
+                tried_utf16 = True
+                logger.info(
+                    "Encoding fallback triggered",
+                    filepath=str(filepath),
+                    from_encoding=default_encoding,
+                    to_encoding="utf-16le",
+                )
+                df = pd.read_csv(filepath, **read_kwargs)
+                used_encoding = "utf-16le"
+        except Exception as e:
+            # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
+            if not tried_utf16:
+                try:
+                    read_kwargs["encoding"] = "utf-16le"
+                    logger.info(
+                        "Encoding fallback triggered",
+                        filepath=str(filepath),
+                        from_encoding=default_encoding,
+                        to_encoding="utf-16le",
+                    )
+                    df = pd.read_csv(filepath, **read_kwargs)
+                    used_encoding = "utf-16le"
+                except Exception:
+                    logger.error(
+                        "Failed to parse CSV file",
+                        filepath=str(filepath),
+                        tried_encodings=[default_encoding, "utf-16le"],
+                        exc_info=True,
+                    )
+                    raise ValueError(f"Failed to parse CSV file: {e}") from e
+            else:
+                logger.error(
+                    "Failed to parse CSV file",
+                    filepath=str(filepath),
+                    tried_encodings=[default_encoding, "utf-16le"],
+                    exc_info=True,
+                )
+                raise ValueError(f"Failed to parse CSV file: {e}") from e
+
+        # VIS-CSV-001: Check for encoding replacement artifacts without
+        # materialising .astype(str) twice per column. Cache col_str and reuse
+        # it for both the detection pass and the numeric-corruption check.
+        affected_cols: list[str] = []
+        for col in df.columns:
+            col_str = df[col].astype(str)  # single materialisation per column
+            if col_str.str.contains("\ufffd", na=False).any():
+                affected_cols.append(col)
+                # Reuse col_str — no second astype(str) needed
+                sample = col_str.str.replace("\ufffd", "", regex=False)
+                if sample.str.match(r"^[\d.eE+\-,]*\d[\d.eE+\-,]*$", na=False).any():
+                    raise ValueError(
+                        f"Encoding corruption detected in numeric column '{col}'. "
+                        f"The file may need to be re-exported with UTF-8 encoding. "
+                        f"Affected file: {filepath}"
+                    )
+        if affected_cols:
+            logger.warning(
+                "Encoding replacement characters (\\ufffd) detected in CSV file — "
+                "some values may be corrupted",
+                filepath=str(filepath),
+                affected_columns=affected_cols,
+            )
+
+        io_ctx["rows"] = len(df)
+        io_ctx["columns"] = len(df.columns)
+        io_ctx["encoding"] = used_encoding
+        logger.debug(
+            "CSV file read successfully",
+            n_rows=len(df),
+            n_cols=len(df.columns),
+            encoding=used_encoding,
+        )
+
+    return df, used_encoding, default_encoding
 
 
 def _looks_like_eu_thousands(val: str) -> bool:
