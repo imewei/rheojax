@@ -29,7 +29,7 @@ from rheojax.core.inventory import Protocol
 from rheojax.core.parameters import ParameterSet
 from rheojax.core.registry import ModelRegistry
 from rheojax.core.test_modes import TestMode, detect_test_mode
-from rheojax.logging import get_logger, log_fit
+from rheojax.logging import get_logger
 
 # Module logger
 logger = get_logger(__name__)
@@ -114,10 +114,6 @@ class Maxwell(BaseModel):
         Returns:
             self for method chaining
         """
-        from rheojax.utils.optimization import (
-            create_least_squares_objective,
-            nlsq_optimize,
-        )
 
         # Handle RheoData input
         def _to_array(values):
@@ -125,6 +121,11 @@ class Maxwell(BaseModel):
             if np.iscomplexobj(arr):
                 return arr.astype(np.complex128)
             return arr.astype(float)
+
+        # Popped (not just read) so it isn't also present in **kwargs when
+        # forwarded to _standard_nlsq_fit below, which takes test_mode as an
+        # explicit keyword and would otherwise collide with it.
+        supplied_mode = kwargs.pop("test_mode", None)
 
         if isinstance(X, RheoData):
             rheo_data = X
@@ -134,7 +135,6 @@ class Maxwell(BaseModel):
         else:
             x_np = np.asarray(X, dtype=float)
             y_np = _to_array(y)
-            supplied_mode = kwargs.get("test_mode")
             if supplied_mode is None and np.iscomplexobj(y_np):
                 test_mode = TestMode.OSCILLATION
             else:
@@ -148,169 +148,87 @@ class Maxwell(BaseModel):
             except KeyError:
                 test_mode = TestMode.RELAXATION
 
-        # Determine test_mode string for logging
-        test_mode_str = test_mode.name if hasattr(test_mode, "name") else str(test_mode)
+        # Store test mode for model_function
+        self._test_mode = test_mode
+        self._relaxation_offset = 0.0
 
-        with log_fit(
-            logger,
-            self.__class__.__name__,
-            data_shape=x_np.shape,
-            test_mode=test_mode_str,
-        ) as ctx:
-            logger.debug(
-                "Processing input data",
-                x_range=(float(x_np.min()), float(x_np.max())),
-                y_range=(float(np.real(y_np).min()), float(np.real(y_np).max())),
-                is_complex=np.iscomplexobj(y_np),
-            )
-
-            # Store test mode for model_function
-            self._test_mode = test_mode
-            self._relaxation_offset = 0.0
-
-            if test_mode == TestMode.RELAXATION:
-                tail = max(3, y_np.size // 6)
-                tail_vals = y_np[-tail:]
-                offset = float(np.median(tail_vals))
-                tail_noise = float(np.std(tail_vals))
-                # Only treat the tail median as an instrument baseline (and
-                # subtract it) when it is statistically indistinguishable
-                # from zero relative to the tail's own noise floor. If the tail
-                # carries a real, noise-exceeding offset, the observation window
-                # simply hasn't fully relaxed (G(t)->0 is the documented model);
-                # subtracting it would silently bias G0/eta, so leave the data
-                # untouched and warn instead.
-                noise_scale = tail_noise / np.sqrt(tail) if tail_noise > 0 else 0.0
-                offset_is_noise = abs(offset) <= 3.0 * noise_scale
-                if offset_is_noise:
-                    y_np = y_np - offset
-                    self._relaxation_offset = offset
-                    # Store in _last_fit_kwargs for Bayesian pipeline forwarding
-                    self._last_fit_kwargs["_relaxation_offset"] = offset
-                    logger.debug(
-                        "Applied relaxation offset correction",
-                        offset=offset,
-                        tail_points=tail,
-                    )
-                else:
-                    logger.warning(
-                        "Relaxation data tail has not decayed to zero within "
-                        "noise; fitting G0*exp(-t/tau) without baseline "
-                        "subtraction (data may not span the full decay).",
-                        tail_median=offset,
-                        tail_noise=tail_noise,
-                    )
-
-            x_data = jnp.array(x_np)
-            y_data = jnp.array(y_np)
-
-            # Provide simple heuristics for relaxation data to improve deterministic fits
-            if test_mode == TestMode.RELAXATION:
-                init_success = self._initialize_relaxation_parameters(x_data, y_data)
+        if test_mode == TestMode.RELAXATION:
+            tail = max(3, y_np.size // 6)
+            tail_vals = y_np[-tail:]
+            offset = float(np.median(tail_vals))
+            tail_noise = float(np.std(tail_vals))
+            # Only treat the tail median as an instrument baseline (and
+            # subtract it) when it is statistically indistinguishable
+            # from zero relative to the tail's own noise floor. If the tail
+            # carries a real, noise-exceeding offset, the observation window
+            # simply hasn't fully relaxed (G(t)->0 is the documented model);
+            # subtracting it would silently bias G0/eta, so leave the data
+            # untouched and warn instead.
+            noise_scale = tail_noise / np.sqrt(tail) if tail_noise > 0 else 0.0
+            offset_is_noise = abs(offset) <= 3.0 * noise_scale
+            if offset_is_noise:
+                y_np = y_np - offset
+                self._relaxation_offset = offset
+                # Store in _last_fit_kwargs for Bayesian pipeline forwarding
+                self._last_fit_kwargs["_relaxation_offset"] = offset
                 logger.debug(
-                    "Relaxation parameter initialization",
-                    success=init_success,
-                    G0_init=self.parameters.get_value("G0"),
-                    eta_init=self.parameters.get_value("eta"),
+                    "Applied relaxation offset correction",
+                    offset=offset,
+                    tail_points=tail,
+                )
+            else:
+                logger.warning(
+                    "Relaxation data tail has not decayed to zero within "
+                    "noise; fitting G0*exp(-t/tau) without baseline "
+                    "subtraction (data may not span the full decay).",
+                    tail_median=offset,
+                    tail_noise=tail_noise,
                 )
 
-            # Create objective function with stateless predictions
-            def model_fn(x, params):
-                """Model function for optimization (stateless)."""
-                G0, eta = params[0], params[1]
-
-                # Direct prediction based on test mode (stateless)
-                if test_mode == TestMode.RELAXATION:
-                    return self._predict_relaxation(x, G0, eta)
-                elif test_mode == TestMode.CREEP:
-                    return self._predict_creep(x, G0, eta)
-                elif test_mode == TestMode.OSCILLATION:
-                    return self._predict_oscillation(x, G0, eta)
-                elif test_mode in (TestMode.ROTATION, TestMode.FLOW_CURVE):
-                    return self._predict_rotation(x, G0, eta)
-                else:
-                    raise ValueError(f"Unsupported test mode: {test_mode}")
-
-            # Honor use_log_residuals from kwargs (set by BaseModel auto-detect
-            # or passed explicitly) so wide-range relaxation/master-curve data
-            # is fit with equal weight per decade.
-            use_log_residuals = kwargs.get("use_log_residuals", False)
-            objective = create_least_squares_objective(
-                model_fn,
-                x_data,
-                y_data,
-                normalize=True,
-                use_log_residuals=use_log_residuals,
+        # Provide simple heuristics for relaxation data to improve deterministic fits
+        if test_mode == TestMode.RELAXATION:
+            init_success = self._initialize_relaxation_parameters(
+                jnp.array(x_np), jnp.array(y_np)
             )
-
             logger.debug(
-                "Starting NLSQ optimization",
-                method=kwargs.get("method", "auto"),
-                max_iter=kwargs.get("max_iter", 1000),
-                use_jax=kwargs.get("use_jax", True),
+                "Relaxation parameter initialization",
+                success=init_success,
+                G0_init=self.parameters.get_value("G0"),
+                eta_init=self.parameters.get_value("eta"),
             )
 
-            # Optimize
-            try:
-                result = nlsq_optimize(
-                    objective,
-                    self.parameters,
-                    use_jax=kwargs.get("use_jax", True),
-                    method=kwargs.get("method", "auto"),
-                    max_iter=kwargs.get("max_iter", 1000),
-                )
-            except Exception as e:
-                logger.error(
-                    "NLSQ optimization raised exception",
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    exc_info=True,
-                )
-                raise
+        # Create objective function with stateless predictions
+        def model_fn(x, params):
+            """Model function for optimization (stateless)."""
+            G0, eta = params[0], params[1]
+            # self._test_mode is set above, before this is invoked by the optimizer.
+            tm = self._test_mode
 
-            # Validate optimization succeeded
-            if not result.success:
-                if not np.isfinite(result.fun) or result.fun > 1e6 * len(x_np):
-                    logger.error(
-                        "Optimization failed",
-                        message=result.message,
-                        iterations=getattr(result, "nit", None),
-                    )
-                    raise RuntimeError(
-                        f"Optimization failed: {result.message}. "
-                        f"Try adjusting initial values, bounds, or max_iter."
-                    )
-                else:
-                    logger.warning(
-                        "Optimization did not fully converge",
-                        message=result.message,
-                        model=self.__class__.__name__,
-                    )
+            # Direct prediction based on test mode (stateless)
+            if tm == TestMode.RELAXATION:
+                return self._predict_relaxation(x, G0, eta)
+            elif tm == TestMode.CREEP:
+                return self._predict_creep(x, G0, eta)
+            elif tm == TestMode.OSCILLATION:
+                return self._predict_oscillation(x, G0, eta)
+            elif tm in (TestMode.ROTATION, TestMode.FLOW_CURVE):
+                return self._predict_rotation(x, G0, eta)
+            else:
+                raise ValueError(f"Unsupported test mode: {tm}")
 
-            self._nlsq_result = result
-            self.fitted_ = True
-
-            # Log fitted parameters and result metrics
-            G0_fitted = self.parameters.get_value("G0")
-            eta_fitted = self.parameters.get_value("eta")
-            tau_fitted = eta_fitted / G0_fitted
-
-            ctx["G0"] = G0_fitted
-            ctx["eta"] = eta_fitted
-            ctx["tau"] = tau_fitted
-            ctx["iterations"] = getattr(result, "nit", None)
-            ctx["cost"] = getattr(result, "fun", None)
-
-            logger.debug(
-                "Optimization completed successfully",
-                G0=G0_fitted,
-                eta=eta_fitted,
-                tau=tau_fitted,
-                iterations=getattr(result, "nit", None),
-                final_cost=getattr(result, "fun", None),
-            )
-
-        return self
+        # Delegate objective build -> optimize -> validate -> fitted_ bookkeeping
+        # to the shared pipeline (BaseModel._standard_nlsq_fit). test_mode is
+        # already resolved above (incl. the relaxation baseline-offset
+        # correction folded into y_np), so pass it explicitly rather than
+        # letting _standard_nlsq_fit re-resolve it from raw X/y.
+        return self._standard_nlsq_fit(
+            x_np,
+            y_np,
+            model_fn,
+            test_mode=test_mode,
+            normalize=True,
+            **kwargs,
+        )
 
     def _initialize_relaxation_parameters(self, X, y) -> bool:
         """Estimate G0 and eta from relaxation data for faster convergence."""
