@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   auto-merge:
@@ -30,7 +31,15 @@ jobs:
 
     - name: Label major updates for manual review
       if: steps.metadata.outputs.update-type == 'version-update:semver-major'
-      run: gh pr edit "$PR_URL" --add-label "major-update,needs-review"
+      run: |
+        # Labels aren't guaranteed to exist (e.g. after a repo reset) —
+        # create them idempotently before applying, so this step is
+        # self-healing instead of hard-failing on a missing label.
+        gh label create "major-update" --color "B60205" \
+          --description "Major dependency version bump" --force
+        gh label create "needs-review" --color "FBCA04" \
+          --description "Needs manual review before merge" --force
+        gh pr edit "$PR_URL" --add-label "major-update,needs-review"
       env:
         PR_URL: ${{ github.event.pull_request.html_url }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
