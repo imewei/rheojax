@@ -85,7 +85,7 @@ Once trusted publishing is configured, publishing is automatic:
 4. **Automatic workflow execution**:
    - When the release is published, `release.yml` workflow triggers automatically
    - Runs full test suite on Python 3.12 and 3.13 across Ubuntu, macOS, and Windows
-   - Runs linting (Black, Ruff, MyPy)
+   - Runs linting (Ruff format check, Ruff lint)
    - Builds documentation
    - Builds package distributions (sdist and wheel)
    - Verifies version matches the git tag

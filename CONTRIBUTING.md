@@ -67,7 +67,7 @@ uv run pytest tests/core/test_data.py
 make format && make quick
 
 # Or run individually:
-uv run black rheojax tests
+uv run ruff format --check rheojax tests
 uv run ruff check rheojax tests
 uv run mypy rheojax --ignore-missing-imports --no-strict-optional
 ```
@@ -91,8 +91,7 @@ Then create a pull request on GitHub.
 
 ## Code Style Guidelines
 
-- We use [Black](https://github.com/psf/black) for code formatting
-- We use [Ruff](https://github.com/charliermarsh/ruff) for linting
+- We use [Ruff](https://github.com/astral-sh/ruff) for formatting (`ruff format`) and linting
 - Maximum line length is 88 characters
 - Use type hints where possible
 - Write descriptive docstrings for all public functions and classes

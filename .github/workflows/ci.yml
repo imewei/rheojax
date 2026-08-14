@@ -37,6 +37,10 @@ jobs:
     - name: Install dependencies
       run: uv sync --frozen
 
+    # Kept in sync with the identical lint job in release.yml — release.yml
+    # deliberately duplicates this instead of `uses:` calling this workflow,
+    # since that would drag its full OS/Python matrix + docs/build/audit
+    # jobs into every tag push.
     - name: Run Ruff format check
       run: uv run ruff format --check rheojax tests
 
@@ -82,7 +86,7 @@ jobs:
     - name: Check maintainability index (min B-rating)
       run: |
         echo "Checking maintainability index..."
-        LOW_MI=$(uv run radon mi rheojax -s 2>/dev/null | grep -E '\- [CD]' | grep -c "^" || echo "0")
+        LOW_MI=$(uv run radon mi rheojax -s 2>/dev/null | grep -cE '\- [CD]' || true)
         echo "Found $LOW_MI files with low maintainability"
         if [ "$LOW_MI" -gt 10 ]; then
           echo "::error::Too many low-maintainability files ($LOW_MI > 10)"
@@ -141,7 +145,7 @@ jobs:
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
-        uv run pytest -n 4 -v --timeout=120 --dist=loadscope \
+        uv run pytest -n 4 -v --timeout=120 \
           --cov=rheojax --cov-report=xml --cov-report=term-missing \
           -m "smoke"
 

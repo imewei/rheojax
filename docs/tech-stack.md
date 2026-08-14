@@ -116,8 +116,7 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **black** | >=26.1.0 | Code formatting (line-length=88) |
-| **ruff** | >=0.15.0 | Linting (E, W, F, I, C, B, UP, S rules) |
+| **ruff** | >=0.15.0 | Formatting (line-length=88) + linting (E, W, F, I, C, B, UP, S rules) |
 | **mypy** | >=1.19.1 | Static type checking (strict equality) |
 | **pre-commit** | | Git hook management |
 
@@ -156,8 +155,8 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 | `make test-ci` | `pytest -m smoke` | CI gate (matches GitHub Actions) |
 | `make test-ci-full` | `pytest -m "not slow..."` | Extended CI (~4714 tests) |
 | `make test-coverage` | `pytest --cov-report=html` | Coverage with HTML report |
-| `make format` | `black . && ruff --fix` | Auto-format + lint fix |
-| `make quick` | `black + ruff + smoke` | Fast quality check |
+| `make format` | `ruff format && ruff check --fix` | Auto-format + lint fix |
+| `make quick` | `ruff format + ruff check + smoke` | Fast quality check |
 | `make lint` | `ruff check .` | Lint only |
 | `make type` | `mypy .` | Type checking |
 | `make docs` | `sphinx-build docs docs/_build` | Build HTML docs |
