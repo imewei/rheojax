@@ -10,7 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
-import pickle  # noqa: S403 nosec B403
+import pickle  # noqa: S403, B403 nosec B403
 import threading
 import traceback
 import weakref
@@ -83,8 +83,7 @@ def _worker_loop(
         # Payload originates from this same process's PersistentProcessPool
         # (pool.py:submit()'s picklability precheck), never from an
         # external/untrusted source, so pickle.loads() here is safe.
-        # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
-        fn, args, kwargs = pickle.loads(payload)  # noqa: S301 nosec B301
+        fn, args, kwargs = pickle.loads(payload)  # noqa: S301, B301 nosec B301 nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
         try:
             result = fn(*args, **kwargs)
             try:
