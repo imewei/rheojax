@@ -5,7 +5,11 @@ All notable changes to RheoJAX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-08-14
+
+### Changed
+- **BREAKING:** Removed the legacy `RheoJAXMainWindow` GUI shell and the deprecated `--legacy`/`--workspace` CLI flags. The workspace shell (`WorkspaceWindow`) has been the default since 0.x and is now the only GUI entry point. Migration: drop `--legacy`/`--workspace` from any scripts invoking `rheojax-gui`; both flags now produce an argparse "unrecognized arguments" error. All CLI capabilities the legacy shell exposed (`--project`, `--import`/`--protocol`, `--maximized`) are already fully supported on the default (and now only) workspace path.
+- **BREAKING (0.7.0):** RheoJAX is now shear-only. Removed DMTA — `DeformationMode`, the `deformation_mode`/`poisson_ratio` parameters, `modulus_conversion`/`POISSON_PRESETS`, and tensile `modulus_type`. Migration: convert tensile data to shear externally before loading; remove `deformation_mode`/`poisson_ratio` from calls, CLI flags, and YAML configs.
 
 ### Fixed
 - **Fixed** `rheojax export` (`cmd_export.py::_build_pipeline_from_envelope`) set nonexistent `pipe._data`/`pipe._source` attributes instead of constructing `Pipeline(data=data)`, so exports built from a piped envelope (`rheojax load --json | rheojax export -`) always saw an empty `pipeline.data`.
@@ -16,14 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Removed** `rheojax.utils.optimization.nlsq_optimize_global`, a 4-line pass-through to `nlsq_optimize(..., workflow="auto_global")` with no production callers and no public export. Call `nlsq_optimize(objective, parameters, workflow="auto_global", ...)` directly.
-
-### Changed
-- **BREAKING:** Removed the legacy `RheoJAXMainWindow` GUI shell and the deprecated `--legacy`/`--workspace` CLI flags. The workspace shell (`WorkspaceWindow`) has been the default since 0.x and is now the only GUI entry point. Migration: drop `--legacy`/`--workspace` from any scripts invoking `rheojax-gui`; both flags now produce an argparse "unrecognized arguments" error. All CLI capabilities the legacy shell exposed (`--project`, `--import`/`--protocol`, `--maximized`) are already fully supported on the default (and now only) workspace path.
-
-## [0.7.0] - 2026-06-29
-
-### Changed
-- **BREAKING (0.7.0):** RheoJAX is now shear-only. Removed DMTA — `DeformationMode`, the `deformation_mode`/`poisson_ratio` parameters, `modulus_conversion`/`POISSON_PRESETS`, and tensile `modulus_type`. Migration: convert tensile data to shear externally before loading; remove `deformation_mode`/`poisson_ratio` from calls, CLI flags, and YAML configs.
 
 ### Added — Herschel-Bulkley-Capable EPM Kernels (scalar and tensorial)
 
@@ -795,6 +791,7 @@ Refactored the smart initialization system to use the Template Method design pat
 
 Previous releases documented in git history.
 
+[0.7.0]: https://github.com/imewei/rheojax/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/imewei/rheojax/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/imewei/rheojax/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/imewei/rheojax/compare/v0.4.0...v0.5.0
