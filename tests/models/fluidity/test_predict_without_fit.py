@@ -529,8 +529,19 @@ _CREEP_AMPLITUDE_CASES: dict[str, float] = {
 }
 
 
-@pytest.mark.smoke
-@pytest.mark.parametrize("model_name", list(_CREEP_AMPLITUDE_CASES))
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        pytest.param("mikh", marks=pytest.mark.smoke),
+        # ml_ikh excluded from smoke: on a GPU-enabled jaxlib install this
+        # JIT-compiles in 76-98s serially (vs ~1-2s on CPU-only jaxlib) and
+        # reliably exceeds the 120s smoke budget under -n4 xdist workers
+        # contending for the same physical GPU (reproduced identically
+        # across separate full `make verify` runs). Still covered by the
+        # full (non-smoke) suite.
+        "ml_ikh",
+    ],
+)
 def test_ikh_creep_predict_without_fit_scaled(model_name):
     """Creep for IKH-family models at a stress scaled to their own yield.
 

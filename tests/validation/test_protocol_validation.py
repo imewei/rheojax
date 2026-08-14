@@ -102,6 +102,19 @@ _KNOWN_SLOW_PREDICT = {
     ("stz_conventional", "laos"),
     ("stz_conventional", "relaxation"),
     ("stz_conventional", "startup"),
+    # Multi-mode/ODE-heavy models on a GPU-enabled jaxlib install: confirmed
+    # via `-n0` isolated timing to take 20-98s each (vs ~1-2s on CPU-only
+    # jaxlib) — already close to the 120s budget serially, and reliably
+    # pushed over it when 4 xdist workers each open a CUDA context on the
+    # same physical GPU (contention, not host desktop load — reproduced
+    # identically across separate full `make verify` runs).
+    ("giesekus", "creep"),
+    ("giesekus_single", "creep"),
+    ("ml_ikh", "creep"),
+    ("tnt", "creep"),
+    ("tnt_single_mode", "creep"),
+    ("tnt_cates", "creep"),
+    ("fluidity_nonlocal", "laos"),
 }
 
 
