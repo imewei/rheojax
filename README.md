@@ -916,7 +916,7 @@ main()
 - **Export**: Save results, figures, and reports in multiple formats
 - **Project Save/Load**: Store and restore complete analysis projects (.rheojax format)
 
-See [GUI Reference Guide](https://rheojax.readthedocs.io/user_guide/06_gui/index.html) for detailed documentation.
+See [GUI Reference Guide](https://rheojax.readthedocs.io/en/latest/user_guide/06_gui/index.html) for detailed documentation.
 
 ## Documentation
 
@@ -924,33 +924,33 @@ Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
 
 ### Key Topics
 
-- [Getting Started](https://rheojax.readthedocs.io/user_guide/getting_started.html) - Installation and basic usage
-- [Core Concepts](https://rheojax.readthedocs.io/user_guide/core_concepts.html) - RheoData, Parameters, Test Modes
-- [Bayesian Inference](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
-- [SGR Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/sgr_analysis.html) - Soft Glassy Rheology framework
-- [SPP Analysis](https://rheojax.readthedocs.io/user_guide/03_advanced_topics/spp_analysis.html) - Sequence of Physical Processes for LAOS
-- [GUI Reference](https://rheojax.readthedocs.io/user_guide/06_gui/index.html) - Graphical user interface
-- [Pipeline API](https://rheojax.readthedocs.io/user_guide/pipeline_api.html) - High-level workflows
-- [I/O Guide](https://rheojax.readthedocs.io/user_guide/io_guide.html) - Reading and writing data
-- [Visualization Guide](https://rheojax.readthedocs.io/user_guide/visualization_guide.html) - Creating plots
-- [API Reference](https://rheojax.readthedocs.io/api_reference.html) - API documentation
+- [Getting Started](https://rheojax.readthedocs.io/en/latest/quickstart.html) - Installation and basic usage
+- [Core Concepts](https://rheojax.readthedocs.io/en/latest/user_guide/01_fundamentals/index.html) - RheoData, Parameters, Test Modes
+- [Bayesian Inference](https://rheojax.readthedocs.io/en/latest/user_guide/03_advanced_topics/bayesian_inference.html) - NLSQ → NUTS workflow, ArviZ diagnostics
+- [SGR Analysis](https://rheojax.readthedocs.io/en/latest/user_guide/03_advanced_topics/sgr_analysis.html) - Soft Glassy Rheology framework
+- [SPP Analysis](https://rheojax.readthedocs.io/en/latest/user_guide/03_advanced_topics/spp_analysis.html) - Sequence of Physical Processes for LAOS
+- [GUI Reference](https://rheojax.readthedocs.io/en/latest/user_guide/06_gui/index.html) - Graphical user interface
+- [Pipeline API](https://rheojax.readthedocs.io/en/latest/user_guide/04_practical_guides/pipeline_api.html) - High-level workflows
+- [I/O Guide](https://rheojax.readthedocs.io/en/latest/user_guide/04_practical_guides/data_io.html) - Reading and writing data
+- [Visualization Guide](https://rheojax.readthedocs.io/en/latest/user_guide/04_practical_guides/visualization.html) - Creating plots
+- [API Reference](https://rheojax.readthedocs.io/en/latest/api_reference.html) - API documentation
 
 ### Model Handbooks
 
-- [SGR Models](https://rheojax.readthedocs.io/models/sgr/sgr_conventional.html) - SGR Conventional and GENERIC models
-- [STZ Models](https://rheojax.readthedocs.io/models/stz/stz_conventional.html) - Shear Transformation Zone (Langer 2008)
-- [EPM Models](https://rheojax.readthedocs.io/models/epm/lattice_epm.html) - Elasto-Plastic lattice and tensorial models
-- [Fluidity Models](https://rheojax.readthedocs.io/models/fluidity/fluidity_local.html) - Local and nonlocal cooperative flow
-- [Fluidity-Saramito Models](https://rheojax.readthedocs.io/models/fluidity/saramito.html) - Tensorial EVP with thixotropy
-- [IKH Models](https://rheojax.readthedocs.io/models/ikh/index.html) - MIKH and ML-IKH for thixotropic EVP materials
-- [SPP Models](https://rheojax.readthedocs.io/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
-- [Giesekus Models](https://rheojax.readthedocs.io/models/giesekus/index.html) - Nonlinear viscoelastic polymer solutions
-- [DMT Models](https://rheojax.readthedocs.io/models/dmt/index.html) - de Souza Mendes-Thompson thixotropic models
-- [ITT-MCT Models](https://rheojax.readthedocs.io/models/itt_mct/index.html) - Mode-Coupling Theory for dense colloids
-- [TNT Models](https://rheojax.readthedocs.io/models/tnt/index.html) - Transient network theory (5 variants)
-- [VLB Models](https://rheojax.readthedocs.io/models/vlb/index.html) - Vernerey-Long-Brighenti transient networks
-- [HVM Models](https://rheojax.readthedocs.io/models/hvm/index.html) - Hybrid Vitrimer Model
-- [HVNM Models](https://rheojax.readthedocs.io/models/hvnm/index.html) - Hybrid Vitrimer Nanocomposite Model
+- [SGR Models](https://rheojax.readthedocs.io/en/latest/models/sgr/sgr_conventional.html) - SGR Conventional and GENERIC models
+- [STZ Models](https://rheojax.readthedocs.io/en/latest/models/stz/stz_conventional.html) - Shear Transformation Zone (Langer 2008)
+- [EPM Models](https://rheojax.readthedocs.io/en/latest/models/epm/lattice_epm.html) - Elasto-Plastic lattice and tensorial models
+- [Fluidity Models](https://rheojax.readthedocs.io/en/latest/models/fluidity/fluidity_local.html) - Local and nonlocal cooperative flow
+- [Fluidity-Saramito Models](https://rheojax.readthedocs.io/en/latest/models/fluidity/saramito_evp.html) - Tensorial EVP with thixotropy
+- [IKH Models](https://rheojax.readthedocs.io/en/latest/models/ikh/index.html) - MIKH and ML-IKH for thixotropic EVP materials
+- [SPP Models](https://rheojax.readthedocs.io/en/latest/models/spp/spp_decomposer.html) - SPP Decomposer and Yield Stress models
+- [Giesekus Models](https://rheojax.readthedocs.io/en/latest/models/giesekus/index.html) - Nonlinear viscoelastic polymer solutions
+- [DMT Models](https://rheojax.readthedocs.io/en/latest/models/dmt/index.html) - de Souza Mendes-Thompson thixotropic models
+- [ITT-MCT Models](https://rheojax.readthedocs.io/en/latest/models/itt_mct/index.html) - Mode-Coupling Theory for dense colloids
+- [TNT Models](https://rheojax.readthedocs.io/en/latest/models/tnt/index.html) - Transient network theory (5 variants)
+- [VLB Models](https://rheojax.readthedocs.io/en/latest/models/vlb/index.html) - Vernerey-Long-Brighenti transient networks
+- [HVM Models](https://rheojax.readthedocs.io/en/latest/models/hvm/index.html) - Hybrid Vitrimer Model
+- [HVNM Models](https://rheojax.readthedocs.io/en/latest/models/hvnm/index.html) - Hybrid Vitrimer Nanocomposite Model
 
 ## Performance
 
@@ -1027,7 +1027,7 @@ If you use rheojax in your research, please cite:
 Built on open-source software:
 
 - [JAX](https://github.com/google/jax) for automatic differentiation and acceleration
-- [NLSQ](https://github.com/rdyro/nlsq) for GPU-accelerated nonlinear least squares
+- [NLSQ](https://github.com/imewei/NLSQ) for GPU-accelerated nonlinear least squares
 - [NumPyro](https://github.com/pyro-ppl/numpyro) for probabilistic programming
 - [ArviZ](https://github.com/arviz-devs/arviz) for Bayesian visualization
 - [NumPy](https://numpy.org/) and [SciPy](https://scipy.org/) for numerical computing
@@ -1036,7 +1036,6 @@ Built on open-source software:
 ## Support
 
 - Documentation: [https://rheojax.readthedocs.io](https://rheojax.readthedocs.io)
-- Discussions: [GitHub Discussions](https://github.com/imewei/rheojax/discussions)
 - Issues: [GitHub Issues](https://github.com/imewei/rheojax/issues)
 - Email: wchen@anl.gov
 
