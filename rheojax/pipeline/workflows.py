@@ -227,13 +227,11 @@ class MastercurvePipeline(Pipeline):
 
         # For simplicity, concatenate all data
         # In practice, this would be more sophisticated
-        all_x = np.concatenate([np.array(d.x) for d in datasets])
-        all_y = np.concatenate([np.array(d.y) for d in datasets])
+        xs = [np.asarray(d.x) for d in datasets]
+        all_x = np.concatenate(xs)
+        all_y = np.concatenate([np.asarray(d.y) for d in datasets])
         all_temps = np.concatenate(
-            [
-                np.full(len(np.array(d.x)), temp)
-                for d, temp in zip(datasets, temperatures, strict=True)
-            ]
+            [np.full(len(x), temp) for x, temp in zip(xs, temperatures, strict=True)]
         )
 
         return RheoData(
@@ -490,6 +488,10 @@ class ModelComparisonPipeline(Pipeline):
             )
             return self
 
+        # y is loop-invariant; the complex->magnitude conversion is reused by
+        # every model iteration below instead of being recomputed per model.
+        y_mag = np.abs(y) if np.iscomplexobj(y) else y
+
         for model_name in self.models:
             model_start = time.perf_counter()
             try:
@@ -514,7 +516,7 @@ class ModelComparisonPipeline(Pipeline):
                 # Calculate metrics using magnitude (real values).
                 # For complex y (oscillation data), compare magnitudes to
                 # avoid complex residuals that produce wrong RMSE.
-                y_for_residuals = np.abs(y) if np.iscomplexobj(y) else y
+                y_for_residuals = y_mag
                 residuals = y_for_residuals - y_pred_magnitude
 
                 # Try to use NLSQ result properties (NLSQ 0.6.0 CurveFitResult compatible)
@@ -533,7 +535,7 @@ class ModelComparisonPipeline(Pipeline):
                         r_squared = nlsq_result.r_squared
                     else:
                         ss_res = float(np.sum(residuals**2))
-                        y_for_ss = np.abs(y) if np.iscomplexobj(y) else y
+                        y_for_ss = y_mag
                         ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
                         r_squared = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
                     aic = nlsq_result.aic if nlsq_result.aic is not None else np.inf
@@ -565,7 +567,7 @@ class ModelComparisonPipeline(Pipeline):
                         bic = np.inf
 
                 # Calculate relative RMSE
-                mean_abs_y = np.mean(np.abs(y))
+                mean_abs_y = np.mean(np.abs(y_mag))
                 rel_rmse = rmse / mean_abs_y if mean_abs_y > 1e-15 else np.inf
 
                 # Store results
@@ -895,11 +897,12 @@ class FrequencyToTimePipeline(Pipeline):
             self for method chaining
         """
         self.data = frequency_data
+        omega = np.asarray(frequency_data.x)
 
         logger.info(
             "Starting frequency to time conversion",
             n_points=n_points,
-            input_points=len(np.array(frequency_data.x)),
+            input_points=len(omega),
         )
         start_time = time.perf_counter()
 
@@ -910,8 +913,8 @@ class FrequencyToTimePipeline(Pipeline):
             # Generate time points
             if time_range is None:
                 # Auto-generate from frequency range
-                w_min = np.min(np.array(frequency_data.x))
-                w_max = np.max(np.array(frequency_data.x))
+                w_min = np.min(omega)
+                w_max = np.max(omega)
                 if w_min <= 0 or w_max <= 0:
                     raise ValueError(
                         "Frequency data must be positive for time conversion"
@@ -925,8 +928,7 @@ class FrequencyToTimePipeline(Pipeline):
 
             # Simplified conversion using inverse Fourier transform approximation
             # In practice, this would use proper numerical FFT
-            omega = np.array(frequency_data.x)
-            G_star = np.array(frequency_data.y)
+            G_star = np.asarray(frequency_data.y)
 
             # Placeholder: proper implementation would use FFT
             # For now, use simple numerical integration

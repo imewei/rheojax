@@ -273,8 +273,8 @@ class _PipelineIO(_PipelineState):
                         fit_quality["domain"] = self.data.domain
 
                     excel_payload: dict[str, Any] = {
-                        "x": np.array(self.data.x),
-                        "predictions": np.array(self.data.y),
+                        "x": np.asarray(self.data.x),
+                        "predictions": np.asarray(self.data.y),
                     }
                     if parameters:
                         excel_payload["parameters"] = parameters
@@ -287,8 +287,8 @@ class _PipelineIO(_PipelineState):
                     # columns; 2D y is split into numbered columns.
                     import pandas as pd
 
-                    x_arr = np.array(self.data.x)
-                    y_arr = np.array(self.data.y)
+                    x_arr = np.asarray(self.data.x)
+                    y_arr = np.asarray(self.data.y)
                     if np.iscomplexobj(y_arr):
                         df = pd.DataFrame(
                             {
@@ -1085,7 +1085,19 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
                 self._last_fit_result = None  # Lazily built by get_fit_result()
                 self.steps.append(("fit", model_obj))
                 try:
-                    score = model_obj.score(X, y)
+                    # Reuse the NLSQ result's r_squared (already computed
+                    # during fit) instead of calling score(), which would
+                    # re-run predict() a second time. Falls back to score()
+                    # when no NLSQ result is available (e.g. non-NLSQ fits).
+                    nlsq_result = (
+                        model_obj.get_nlsq_result()
+                        if hasattr(model_obj, "get_nlsq_result")
+                        else None
+                    )
+                    if nlsq_result is not None and nlsq_result.r_squared is not None:
+                        score = nlsq_result.r_squared
+                    else:
+                        score = model_obj.score(X, y)
                 except Exception:
                     score = float("nan")
                 ctx["r_squared"] = score

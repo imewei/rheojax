@@ -1471,6 +1471,7 @@ class ParameterOptimizer:
             values_array = _coerce_array(values).astype(np.float64)
             n = len(values_array)
             grad = np.zeros(n)
+            f = self.evaluate(values_array)
 
             for i in range(n):
                 # Scale the step to the parameter's magnitude (standard
@@ -1483,15 +1484,18 @@ class ParameterOptimizer:
                 values_plus[i] += eps
 
                 f_plus = self.evaluate(values_plus)
-                f = self.evaluate(values_array)
 
                 grad[i] = (f_plus - f) / eps
 
             return grad
         else:
-            # JAX automatic differentiation
-            grad_fn = jax.grad(self.objective)
-            return np.array(grad_fn(jnp.array(values)))
+            # JAX automatic differentiation. Cache the traced gradient
+            # function keyed by self.objective identity so repeated calls
+            # don't re-trace/re-JIT on every invocation.
+            if getattr(self, "_grad_fn_objective", None) is not self.objective:
+                self._grad_fn = jax.grad(self.objective)
+                self._grad_fn_objective = self.objective
+            return np.array(self._grad_fn(jnp.array(values)))
 
     def add_constraint(self, constraint: Callable):
         """Add optimization constraint.

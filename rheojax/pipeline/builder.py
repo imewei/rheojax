@@ -384,26 +384,25 @@ class PipelineBuilder:
         except ImportError:
             pass
 
+        available_models = ModelRegistry.list_models()
+        available_transforms = TransformRegistry.list_transforms()
+
         for step_type, step_kwargs in self.steps:
             if step_type == "fit":
                 model_name = step_kwargs.get("model")
-                if model_name:
-                    available = ModelRegistry.list_models()
-                    if model_name not in available:
-                        raise ValueError(
-                            f"Model '{model_name}' not found in registry. "
-                            f"Available: {available}"
-                        )
+                if model_name and model_name not in available_models:
+                    raise ValueError(
+                        f"Model '{model_name}' not found in registry. "
+                        f"Available: {available_models}"
+                    )
 
             elif step_type == "transform":
                 transform_name = step_kwargs.get("name")
-                if transform_name:
-                    available = TransformRegistry.list_transforms()
-                    if transform_name not in available:
-                        raise ValueError(
-                            f"Transform '{transform_name}' not found in registry. "
-                            f"Available: {available}"
-                        )
+                if transform_name and transform_name not in available_transforms:
+                    raise ValueError(
+                        f"Transform '{transform_name}' not found in registry. "
+                        f"Available: {available_transforms}"
+                    )
 
     def clear(self) -> PipelineBuilder:
         """Clear all steps.

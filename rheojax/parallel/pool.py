@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
+import os
 import pickle  # noqa: S403  # nosec B403
 import threading
 import traceback
@@ -58,6 +59,7 @@ def _worker_loop(
     result_queue: mp.Queue,
     worker_id: int,
     shutdown_sentinel: object,
+    n_workers: int = 1,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
@@ -70,6 +72,22 @@ def _worker_loop(
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
     Exits when it receives the shutdown sentinel.
     """
+    # Each worker is a separate process; without a cap, every worker's
+    # BLAS/XLA backend sizes its thread pool to the full host core count,
+    # so n_workers processes oversubscribe the host by ~n_workers x. Cap
+    # per-worker threads to a fair share, mirroring tests/conftest.py's
+    # xdist fix. setdefault()/os.environ so an explicit user override wins,
+    # and this runs before any JAX/BLAS import in this fresh subprocess.
+    _threads_per_worker = str(max(1, (os.cpu_count() or 1) // max(1, n_workers)))
+    for _thread_env_var in (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
+        os.environ.setdefault(_thread_env_var, _threads_per_worker)
+    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
+
     while True:
         try:
             task = task_queue.get()
@@ -233,7 +251,13 @@ class PersistentProcessPool:
         for i in range(self._n_workers):
             p = self._ctx.Process(
                 target=_worker_loop,
-                args=(self._task_queue, self._result_queue, i, self._shutdown_sentinel),
+                args=(
+                    self._task_queue,
+                    self._result_queue,
+                    i,
+                    self._shutdown_sentinel,
+                    self._n_workers,
+                ),
                 daemon=True,
             )
             p.start()

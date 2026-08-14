@@ -919,9 +919,7 @@ class TensorialEPM(EPMBase):
         # _model_flow_curve / _model_startup / ... in base.py. Those methods
         # now branch on stress.ndim to extract σ_xy correctly from the
         # tensorial (3, L, L) stress field.
-        import jax.numpy as _jnp
-
-        y_arr = _jnp.asarray(y)
+        y_arr = jnp.asarray(y)
         if y_arr.ndim > 1:
             raise NotImplementedError(
                 f"TensorialEPM currently supports shear-only fitting "

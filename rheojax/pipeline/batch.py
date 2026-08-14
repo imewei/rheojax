@@ -659,14 +659,19 @@ class BatchPipeline:
                 model=model.__class__.__name__,
                 data_shape=X.shape,
             ) as ctx:
-                metrics["r_squared"] = model.score(X, y)
+                # Predict once and derive R²/RMSE from it (avoid calling
+                # model.score(), which would re-run predict() a second time).
+                y_pred = model.predict(X)
+                residuals = np.asarray(y) - np.asarray(y_pred)
+                y_for_ss = np.abs(y) if np.iscomplexobj(y) else y
+                ss_res = float(np.sum(np.abs(residuals) ** 2))
+                ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
+                metrics["r_squared"] = (1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
                 metrics["parameters"] = model.get_params()
                 metrics["model"] = model.__class__.__name__
 
                 # Calculate RMSE
                 # R8-PIPE-005: handle complex oscillation data in RMSE
-                y_pred = model.predict(X)
-                residuals = np.asarray(y) - np.asarray(y_pred)
                 metrics["rmse"] = float(np.sqrt(np.mean(np.abs(residuals) ** 2)))
 
                 ctx["r_squared"] = metrics["r_squared"]
