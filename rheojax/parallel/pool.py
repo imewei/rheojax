@@ -10,7 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
-import pickle  # noqa: B403, S403
+import pickle  # noqa: S403  # nosec B403
 import threading
 import traceback
 import weakref
@@ -83,7 +83,7 @@ def _worker_loop(
         # Payload originates from this same process's PersistentProcessPool
         # (pool.py:submit()'s picklability precheck), never from an
         # external/untrusted source, so pickle.loads() here is safe.
-        fn, args, kwargs = pickle.loads(payload)  # noqa: S301, B301
+        fn, args, kwargs = pickle.loads(payload)  # noqa: S301  # nosec B301  # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
         try:
             result = fn(*args, **kwargs)
             try:
@@ -301,7 +301,10 @@ class PersistentProcessPool:
         # rather than the raw tuple, so this precheck doesn't pickle
         # (fn, args, kwargs) a second time on top of what put() would do.
         try:
-            payload = pickle.dumps((fn, args, kwargs))
+            # Pickling our own (fn, args, kwargs) tuple to send to a worker
+            # spawned by this same PersistentProcessPool -- never untrusted
+            # external data, so pickle.dumps() here is safe.
+            payload = pickle.dumps((fn, args, kwargs))  # noqa: S301  # nosec B301  # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
         except Exception as exc:
             raise TypeError(
                 f"Task is not picklable (must be a module-level function with "
