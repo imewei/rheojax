@@ -1018,7 +1018,7 @@ If you use rheojax in your research, please cite:
   year = {2024-2026},
   author = {Wei Chen},
   url = {https://github.com/imewei/rheojax},
-  version = {0.6.1}
+  version = {0.7.0}
 }
 ```
 
