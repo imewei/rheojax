@@ -8,9 +8,36 @@ This module provides:
 - Registry fixtures for model/transform discovery testing
 """
 
+import os
+
+# Cap each xdist worker's BLAS/Eigen/XLA thread pool *before* numpy, nlsq, or
+# JAX are imported (their native backends read these vars once, at import
+# time, and ignore later changes). This must be the first thing this module
+# does: `from rheojax.core.data import RheoData` below runs rheojax/__init__
+# as a side effect, which eagerly imports both nlsq and jax — so the cap has
+# to land above every import, not just above the JAX ones. With -n auto,
+# each xdist worker process independently sizes its pool to the full core
+# count, so N workers oversubscribe the host by ~N x. That starves CPU-heavy
+# NUTS/Bayesian tests past their pytest-timeout budgets; it also slows NLSQ
+# fits, though not reliably enough to make their wall-clock perf-budget
+# assertions safe under xdist (see test_performance_f9.py, which skips those
+# under xdist regardless of this cap). Serial runs (PYTEST_XDIST_WORKER
+# unset) are unaffected. setdefault()/env-append so an explicit override
+# still wins.
+if "PYTEST_XDIST_WORKER" in os.environ:
+    _worker_count = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1"))
+    _threads_per_worker = str(max(1, (os.cpu_count() or 1) // _worker_count))
+    for _thread_env_var in (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
+        os.environ.setdefault(_thread_env_var, _threads_per_worker)
+    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
+
 import json
 import logging
-import os
 import tempfile
 from pathlib import Path
 
@@ -22,6 +49,8 @@ from rheojax.core.jax_config import safe_import_jax
 from rheojax.core.parameters import Parameter, ParameterSet
 from rheojax.core.test_modes import TestMode
 
+_logger = logging.getLogger(__name__)
+
 # Force deterministic, display-independent Qt rendering *before* any test
 # creates a QApplication (only one can exist per process, so whichever test
 # runs first in an xdist worker otherwise decides the platform for the rest
@@ -32,25 +61,6 @@ from rheojax.core.test_modes import TestMode
 # (`FT_Render_Glyph ... error 0x62: raster overflow`) in golden-image /
 # visual-regression tests. setdefault() so an explicit override still wins.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-# Cap each xdist worker's BLAS/Eigen thread pool *before* JAX initializes
-# its CPU backend. With -n auto, each worker process independently sizes
-# its pool to the full core count, so N workers oversubscribe the host by
-# ~N x (observed: 20 workers x ~20 threads on a 20-core box). That starves
-# CPU-heavy NUTS/Bayesian tests past their pytest-timeout budgets and slows
-# NLSQ fits enough to miss their perf-budget assertions. Serial runs
-# (PYTEST_XDIST_WORKER unset) are unaffected. setdefault() so an explicit
-# override still wins.
-if "PYTEST_XDIST_WORKER" in os.environ:
-    _worker_count = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1"))
-    _threads_per_worker = str(max(1, (os.cpu_count() or 1) // _worker_count))
-    for _thread_env_var in (
-        "OMP_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-    ):
-        os.environ.setdefault(_thread_env_var, _threads_per_worker)
 
 # Safe JAX import (enforces float64)
 jax, jnp = safe_import_jax()
@@ -756,7 +766,7 @@ def reset_jax_config():
     try:
         jax.clear_caches()
     except Exception as e:
-        logging.debug("Failed to clear JAX caches during test teardown: %s", e)
+        _logger.warning("Failed to clear JAX caches during test teardown: %s", e)
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -787,7 +797,7 @@ def pytest_sessionfinish(session, exitstatus):
     try:
         jax.clear_caches()
     except Exception as e:
-        logging.debug("Failed to clear JAX caches during session finish: %s", e)
+        _logger.warning("Failed to clear JAX caches during session finish: %s", e)
 
     # Kill any remaining child processes spawned by this worker
     try:
