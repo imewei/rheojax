@@ -245,7 +245,7 @@ def get_column_header(df: pd.DataFrame, col: str | int) -> str:
     return str(df.columns[col])
 
 
-def get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
+def get_column_data(df: pd.DataFrame, col: str | int) -> NDArray:
     """Get column data from DataFrame."""
     if isinstance(col, str):
         return df[col].values

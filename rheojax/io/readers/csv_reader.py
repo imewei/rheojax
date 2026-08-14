@@ -20,15 +20,11 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    get_column_data,
+    get_column_header,
     infer_y_unit_from_name,
     normalize_units,
     validate_transform,
-)
-from rheojax.io.readers._utils import (
-    get_column_data as _get_column_data,
-)
-from rheojax.io.readers._utils import (
-    get_column_header as _get_column_header,
 )
 from rheojax.logging import get_logger, log_io
 
@@ -191,11 +187,11 @@ def load_csv(
         logger.debug("Applied column_mapping", mapping=column_mapping)
 
     # Get column headers for detection
-    x_header = _get_column_header(df, x_col)
+    x_header = get_column_header(df, x_col)
 
     # Extract x data
     try:
-        x_data = _get_column_data(df, x_col)
+        x_data = get_column_data(df, x_col)
     except (KeyError, IndexError) as e:
         logger.error("X column not found", x_col=x_col, exc_info=True)
         raise KeyError(f"X column not found: {e}") from e
@@ -206,10 +202,10 @@ def load_csv(
     if is_complex:
         if y_cols is None:  # pragma: no cover — guarded by is_complex
             raise ValueError("y_cols must not be None for complex data")
-        y_headers = [_get_column_header(df, col) for col in y_cols]
+        y_headers = [get_column_header(df, col) for col in y_cols]
         try:
-            g_prime_data = _get_column_data(df, y_cols[0])
-            g_double_prime_data = _get_column_data(df, y_cols[1])
+            g_prime_data = get_column_data(df, y_cols[0])
+            g_double_prime_data = get_column_data(df, y_cols[1])
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -223,9 +219,9 @@ def load_csv(
     else:
         if y_col is None:  # pragma: no cover — guarded by is_complex
             raise ValueError("y_col must not be None for real data")
-        y_headers = [_get_column_header(df, y_col)]
+        y_headers = [get_column_header(df, y_col)]
         try:
-            y_data = _get_column_data(df, y_col)
+            y_data = get_column_data(df, y_col)
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -395,8 +391,25 @@ def _read_csv_dataframe(
     """Read a CSV/text file into a DataFrame with delimiter/encoding/comment
     auto-detection, tolerant UTF-16 fallback, and corruption checks.
 
+    Args:
+        filepath: Path to the CSV/text file (already confirmed to exist).
+        x_col, y_col, y_cols, column_mapping: Only used to decide whether
+            ``usecols`` can be safely passed to ``pandas.read_csv`` (memory
+            optimization for wide files) -- all column specifiers must be
+            strings and ``column_mapping`` must be None.
+        delimiter: Column delimiter (auto-detected via detect_csv_delimiter
+            if None).
+        encoding: File encoding (BOM/byte-sniffed if None).
+        header: Row number for column headers (None if no header).
+        **kwargs: Additional arguments forwarded to pandas.read_csv.
+
     Returns:
-        (df, used_encoding, default_encoding)
+        (df, used_encoding, default_encoding) -- used_encoding differs from
+        default_encoding only when the UTF-16 fallback path was triggered.
+
+    Raises:
+        ValueError: If the file cannot be parsed under any tried encoding,
+            or if numeric-column encoding corruption is detected.
     """
     # Auto-detect delimiter if not specified
     if delimiter is None:
