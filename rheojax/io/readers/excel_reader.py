@@ -18,6 +18,8 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    get_column_data,
+    get_column_header,
     infer_y_unit_from_name,
     normalize_units,
     validate_transform,
@@ -216,11 +218,11 @@ def load_excel(
         logger.debug("Applied column_mapping", mapping=column_mapping)
 
     # Get column headers for detection
-    x_header = _get_column_header(df, x_col)
+    x_header = get_column_header(df, x_col)
 
     # Extract x data
     try:
-        x_data = _get_column_data(df, x_col)
+        x_data = get_column_data(df, x_col)
     except (KeyError, IndexError) as e:
         logger.error("X column not found", x_col=x_col, exc_info=True)
         raise KeyError(f"X column not found: {e}") from e
@@ -231,10 +233,10 @@ def load_excel(
     if is_complex:
         if y_cols is None:  # pragma: no cover — guarded by is_complex
             raise ValueError("y_cols must not be None for complex data")
-        y_headers = [_get_column_header(df, col) for col in y_cols]
+        y_headers = [get_column_header(df, col) for col in y_cols]
         try:
-            g_prime_data = _get_column_data(df, y_cols[0])
-            g_double_prime_data = _get_column_data(df, y_cols[1])
+            g_prime_data = get_column_data(df, y_cols[0])
+            g_double_prime_data = get_column_data(df, y_cols[1])
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_cols=y_cols, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -249,9 +251,9 @@ def load_excel(
     else:
         if y_col is None:  # pragma: no cover — guarded by is_complex
             raise ValueError("y_col must not be None for real data")
-        y_headers = [_get_column_header(df, y_col)]
+        y_headers = [get_column_header(df, y_col)]
         try:
-            y_data = _get_column_data(df, y_col)
+            y_data = get_column_data(df, y_col)
         except (KeyError, IndexError) as e:
             logger.error("Y column not found", y_col=y_col, exc_info=True)
             raise KeyError(f"Y column not found: {e}") from e
@@ -404,17 +406,3 @@ def load_excel(
         metadata=final_metadata,
         validate=True,
     )
-
-
-def _get_column_header(df, col: str | int) -> str:
-    """Get column header string from DataFrame."""
-    if isinstance(col, str):
-        return col
-    return str(df.columns[col])
-
-
-def _get_column_data(df, col: str | int):
-    """Get column data from DataFrame."""
-    if isinstance(col, str):
-        return df[col].values
-    return df.iloc[:, col].values

@@ -41,6 +41,8 @@ __all__ = [
     "normalize_units",
     "normalize_temperature",
     "find_column_by_pattern",
+    "get_column_header",
+    "get_column_data",
 ]
 
 # =============================================================================
@@ -234,6 +236,20 @@ def find_column_by_pattern(
     if len(substring_matches) == 1:
         return substring_matches[0]
     return None
+
+
+def get_column_header(df: pd.DataFrame, col: str | int) -> str:
+    """Get column header string from DataFrame."""
+    if isinstance(col, str):
+        return col
+    return str(df.columns[col])
+
+
+def get_column_data(df: pd.DataFrame, col: str | int) -> NDArray:
+    """Get column data from DataFrame."""
+    if isinstance(col, str):
+        return df[col].values
+    return df.iloc[:, col].values
 
 
 # =============================================================================

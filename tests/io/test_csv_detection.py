@@ -147,3 +147,64 @@ def test_load_csv_percent_strain_normalized_to_fraction(tmp_path: Path):
 
     assert data.y_units == "dimensionless"
     np.testing.assert_allclose(data.y, [0.05, 0.10])
+
+
+def test_load_csv_unparseable_file_raises_value_error(tmp_path: Path):
+    """A structurally malformed CSV (unterminated quote) must fail through
+    _read_csv_dataframe's generic `except Exception` branch: the first
+    strict-encoding read raises pandas.errors.ParserError, the utf-16le
+    retry also fails (garbled headers), and the function must give up with
+    a ValueError rather than letting the ParserError or the retry's
+    unrelated ValueError propagate raw."""
+    csv_path = tmp_path / "malformed.csv"
+    _write(csv_path, 'time,stress\n1,"5.5\n2,6.0\n')
+
+    with pytest.raises(ValueError, match="Failed to parse CSV file"):
+        load_csv(csv_path, x_col="time", y_col="stress")
+
+
+def test_read_csv_dataframe_corrupted_numeric_column_raises(tmp_path: Path):
+    """VIS-CSV-001: a replacement character (U+FFFD) inside a value that
+    otherwise looks numeric must raise -- silently keeping corrupted
+    numeric data would poison a downstream fit."""
+    from rheojax.io.readers.csv_reader import _read_csv_dataframe
+
+    csv_path = tmp_path / "corrupt_numeric.csv"
+    csv_path.write_bytes(b"time,stress\n1.0,5\xff5\n2.0,6.0\n")
+
+    with pytest.raises(
+        ValueError, match="Encoding corruption detected in numeric column"
+    ):
+        _read_csv_dataframe(
+            csv_path,
+            x_col="time",
+            y_col="stress",
+            y_cols=None,
+            column_mapping=None,
+            delimiter=None,
+            encoding=None,
+            header=0,
+        )
+
+
+def test_read_csv_dataframe_corrupted_non_numeric_column_warns_only(tmp_path: Path):
+    """VIS-CSV-001: a replacement character inside a non-numeric-looking
+    value (e.g. a text label) must not raise -- only numeric columns are
+    treated as corruption, since text-mode data is expected to carry all
+    kinds of arbitrary characters."""
+    from rheojax.io.readers.csv_reader import _read_csv_dataframe
+
+    csv_path = tmp_path / "corrupt_label.csv"
+    csv_path.write_bytes(b"time,label\n1.0,ab\xffcd\n2.0,xyz\n")
+
+    df, used_encoding, default_encoding = _read_csv_dataframe(
+        csv_path,
+        x_col="time",
+        y_col="label",
+        y_cols=None,
+        column_mapping=None,
+        delimiter=None,
+        encoding=None,
+        header=0,
+    )
+    assert "�" in df["label"].iloc[0]

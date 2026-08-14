@@ -20,6 +20,8 @@ from rheojax.io.readers._utils import (
     detect_domain,
     detect_test_mode_from_columns,
     extract_unit_from_header,
+    get_column_data,
+    get_column_header,
     infer_y_unit_from_name,
     normalize_units,
     validate_transform,
@@ -161,6 +163,254 @@ def load_csv(
             f"Valid options: {sorted(VALID_TRANSFORMS)}"
         )
 
+    df, used_encoding, default_encoding = _read_csv_dataframe(
+        filepath,
+        x_col=x_col,
+        y_col=y_col,
+        y_cols=y_cols,
+        column_mapping=column_mapping,
+        delimiter=delimiter,
+        encoding=encoding,
+        header=header,
+        **kwargs,
+    )
+
+    # Guard: check for tensile/E* columns/units/mode. Must run on the
+    # original file headers (before column_mapping renaming) — otherwise
+    # renaming a tensile column (e.g. "E'" -> "modulus") would silently
+    # bypass the safety check.
+    check_tensile_guard(df.columns, units=y_units)
+
+    # Apply column renaming if provided
+    if column_mapping is not None:
+        df = df.rename(columns=column_mapping)
+        logger.debug("Applied column_mapping", mapping=column_mapping)
+
+    # Get column headers for detection
+    x_header = get_column_header(df, x_col)
+
+    # Extract x data
+    try:
+        x_data = get_column_data(df, x_col)
+    except (KeyError, IndexError) as e:
+        logger.error("X column not found", x_col=x_col, exc_info=True)
+        raise KeyError(f"X column not found: {e}") from e
+
+    # Extract y data (single column or complex modulus)
+    is_complex = y_cols is not None
+    y_data: np.ndarray
+    if is_complex:
+        if y_cols is None:  # pragma: no cover — guarded by is_complex
+            raise ValueError("y_cols must not be None for complex data")
+        y_headers = [get_column_header(df, col) for col in y_cols]
+        try:
+            g_prime_data = get_column_data(df, y_cols[0])
+            g_double_prime_data = get_column_data(df, y_cols[1])
+        except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_cols=y_cols, exc_info=True)
+            raise KeyError(f"Y column not found: {e}") from e
+        # Run both columns through the same locale-aware decimal detection as
+        # the single y_col path (_to_float) before casting to complex, so
+        # European decimal-comma files (e.g. "1000,5") don't crash here.
+        g_prime_data = _to_float(g_prime_data)
+        g_double_prime_data = _to_float(g_double_prime_data)
+        y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
+        logger.debug("Constructed complex modulus from G' and G''")
+    else:
+        if y_col is None:  # pragma: no cover — guarded by is_complex
+            raise ValueError("y_col must not be None for real data")
+        y_headers = [get_column_header(df, y_col)]
+        try:
+            y_data = get_column_data(df, y_col)
+        except (KeyError, IndexError) as e:
+            logger.error("Y column not found", y_col=y_col, exc_info=True)
+            raise KeyError(f"Y column not found: {e}") from e
+
+    # Convert to numpy arrays and handle NaN
+    x_data = _to_float(x_data)
+    if not is_complex:
+        y_data = _to_float(y_data)
+
+    # Remove non-finite values (NaN and ±inf) in single pass.
+    # np.isfinite covers both, preventing RheoData's isfinite check from
+    # raising a confusing ValueError on instrument artefacts.
+    if is_complex:
+        valid_idx = np.flatnonzero(
+            np.isfinite(x_data) & np.isfinite(y_data.real) & np.isfinite(y_data.imag)
+        )
+    else:
+        valid_idx = np.flatnonzero(np.isfinite(x_data) & np.isfinite(y_data))
+    n_dropped = len(x_data) - len(valid_idx)
+    if n_dropped > 0:
+        logger.warning(
+            "Dropped non-finite (NaN/Inf) rows during loading",
+            n_dropped=n_dropped,
+            n_total=len(x_data),
+        )
+    x_data = np.take(x_data, valid_idx)
+    if y_data.ndim > 1:
+        y_data = y_data[valid_idx]
+    else:
+        y_data = np.take(y_data, valid_idx)
+
+    if len(x_data) == 0:
+        logger.error(
+            "No valid data points after removing NaN values", filepath=str(filepath)
+        )
+        raise ValueError("No valid data points after removing NaN values")
+
+    logger.debug("Data points after NaN removal", n_points=len(x_data))
+
+    # Auto-extract units from headers if not provided, normalizing the
+    # extracted unit (and the numeric data) to SI via UNIFIED_UNIT_CONVERSIONS —
+    # matching the anton_paar.py/trios readers' behavior. Units passed
+    # explicitly by the caller are trusted as-is and left unconverted.
+    if x_units is None:
+        _, extracted_x_units = extract_unit_from_header(x_header)
+        if extracted_x_units is not None:
+            x_data, x_units = normalize_units(x_data, extracted_x_units)
+        else:
+            x_units = extracted_x_units
+    if y_units is None:
+        # Use first y column header for units
+        _, extracted_y_units = extract_unit_from_header(y_headers[0])
+        if extracted_y_units is None:
+            # No bracketed unit (e.g. header is just "Viscosity" or "Stress")
+            # -- infer from the name itself so a flow-curve viscosity column
+            # never gets silently treated as stress (or vice versa) downstream.
+            extracted_y_units = infer_y_unit_from_name(y_headers[0])
+        if extracted_y_units is not None:
+            if is_complex:
+                real_part, y_units = normalize_units(y_data.real, extracted_y_units)
+                imag_part, _ = normalize_units(y_data.imag, extracted_y_units)
+                y_data = real_part + 1j * imag_part
+            else:
+                y_data, y_units = normalize_units(
+                    np.asarray(y_data, dtype=np.float64), extracted_y_units
+                )
+        else:
+            y_units = extracted_y_units
+
+    # Auto-detect domain if not provided
+    if domain is None:
+        domain = detect_domain(x_header, x_units, y_headers)
+        logger.debug("Auto-detected domain", domain=domain)
+
+    # Auto-detect test mode if not provided
+    detected_test_mode = None
+    if test_mode is None:
+        detected_test_mode = detect_test_mode_from_columns(
+            x_header, y_headers, x_units, y_units
+        )
+        # If y_cols provided, default to oscillation
+        if detected_test_mode is None and is_complex:
+            detected_test_mode = "oscillation"
+        logger.debug("Auto-detected test mode", test_mode=detected_test_mode)
+    else:
+        detected_test_mode = test_mode.lower()
+
+    # Build source metadata (includes encoding provenance for debugging)
+    source_metadata = {
+        "source_file": filepath.name,
+        "file_type": "csv" if filepath.suffix.lower() in {".csv", ""} else "txt",
+        "x_column": x_col,
+        "y_column": y_cols if is_complex else y_col,
+        "encoding": used_encoding,
+    }
+    if used_encoding != default_encoding:
+        source_metadata["encoding_fallback"] = True
+
+    # Merge with user metadata
+    final_metadata: dict[str, Any] = {**source_metadata}
+    if metadata:
+        reject_removed_options(metadata)
+        final_metadata.update(metadata)
+
+    # Add temperature if provided
+    if temperature is not None:
+        final_metadata["temperature"] = temperature
+
+    # Store protocol metadata
+    if strain_amplitude is not None:
+        final_metadata["gamma_0"] = strain_amplitude
+    if angular_frequency is not None:
+        final_metadata["omega"] = angular_frequency
+    if applied_stress is not None:
+        final_metadata["sigma_applied"] = applied_stress
+    if shear_rate is not None:
+        final_metadata["gamma_dot"] = shear_rate
+    if reference_gamma_dot is not None:
+        final_metadata["reference_gamma_dot"] = reference_gamma_dot
+
+    # Add intended_transform if provided
+    if intended_transform is not None:
+        final_metadata["intended_transform"] = intended_transform.lower()
+
+        # Validate transform requirements and emit warnings
+        warning_messages = validate_transform(
+            intended_transform,
+            domain,
+            final_metadata,
+            detected_test_mode,
+        )
+        for msg in warning_messages:
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+    logger.info(
+        "File parsed",
+        filepath=str(filepath),
+        n_records=len(x_data),
+        test_mode=detected_test_mode,
+        domain=domain,
+    )
+
+    return RheoData(
+        x=x_data,
+        y=y_data,
+        x_units=x_units,
+        y_units=y_units,
+        domain=domain,
+        initial_test_mode=detected_test_mode,
+        metadata=final_metadata,
+        validate=True,
+    )
+
+
+def _read_csv_dataframe(
+    filepath: Path,
+    *,
+    x_col: str | int,
+    y_col: str | int | None,
+    y_cols: list[str | int] | None,
+    column_mapping: dict[str, str] | None,
+    delimiter: str | None,
+    encoding: str | None,
+    header: int | None,
+    **kwargs,
+) -> tuple[pd.DataFrame, str, str]:
+    """Read a CSV/text file into a DataFrame with delimiter/encoding/comment
+    auto-detection, tolerant UTF-16 fallback, and corruption checks.
+
+    Args:
+        filepath: Path to the CSV/text file (already confirmed to exist).
+        x_col, y_col, y_cols, column_mapping: Only used to decide whether
+            ``usecols`` can be safely passed to ``pandas.read_csv`` (memory
+            optimization for wide files) -- all column specifiers must be
+            strings and ``column_mapping`` must be None.
+        delimiter: Column delimiter (auto-detected via detect_csv_delimiter
+            if None).
+        encoding: File encoding (BOM/byte-sniffed if None).
+        header: Row number for column headers (None if no header).
+        **kwargs: Additional arguments forwarded to pandas.read_csv.
+
+    Returns:
+        (df, used_encoding, default_encoding) -- used_encoding differs from
+        default_encoding only when the UTF-16 fallback path was triggered.
+
+    Raises:
+        ValueError: If the file cannot be parsed under any tried encoding,
+            or if numeric-column encoding corruption is detected.
+    """
     # Auto-detect delimiter if not specified
     if delimiter is None:
         delimiter = detect_csv_delimiter(filepath)
@@ -329,219 +579,7 @@ def load_csv(
             encoding=used_encoding,
         )
 
-    # Guard: check for tensile/E* columns/units/mode. Must run on the
-    # original file headers (before column_mapping renaming) — otherwise
-    # renaming a tensile column (e.g. "E'" -> "modulus") would silently
-    # bypass the safety check.
-    check_tensile_guard(df.columns, units=y_units)
-
-    # Apply column renaming if provided
-    if column_mapping is not None:
-        df = df.rename(columns=column_mapping)
-        logger.debug("Applied column_mapping", mapping=column_mapping)
-
-    # Get column headers for detection
-    x_header = _get_column_header(df, x_col)
-
-    # Extract x data
-    try:
-        x_data = _get_column_data(df, x_col)
-    except (KeyError, IndexError) as e:
-        logger.error("X column not found", x_col=x_col, exc_info=True)
-        raise KeyError(f"X column not found: {e}") from e
-
-    # Extract y data (single column or complex modulus)
-    is_complex = y_cols is not None
-    y_data: np.ndarray
-    if is_complex:
-        if y_cols is None:  # pragma: no cover — guarded by is_complex
-            raise ValueError("y_cols must not be None for complex data")
-        y_headers = [_get_column_header(df, col) for col in y_cols]
-        try:
-            g_prime_data = _get_column_data(df, y_cols[0])
-            g_double_prime_data = _get_column_data(df, y_cols[1])
-        except (KeyError, IndexError) as e:
-            logger.error("Y column not found", y_cols=y_cols, exc_info=True)
-            raise KeyError(f"Y column not found: {e}") from e
-        # Run both columns through the same locale-aware decimal detection as
-        # the single y_col path (_to_float) before casting to complex, so
-        # European decimal-comma files (e.g. "1000,5") don't crash here.
-        g_prime_data = _to_float(g_prime_data)
-        g_double_prime_data = _to_float(g_double_prime_data)
-        y_data = construct_complex_modulus(g_prime_data, g_double_prime_data)
-        logger.debug("Constructed complex modulus from G' and G''")
-    else:
-        if y_col is None:  # pragma: no cover — guarded by is_complex
-            raise ValueError("y_col must not be None for real data")
-        y_headers = [_get_column_header(df, y_col)]
-        try:
-            y_data = _get_column_data(df, y_col)
-        except (KeyError, IndexError) as e:
-            logger.error("Y column not found", y_col=y_col, exc_info=True)
-            raise KeyError(f"Y column not found: {e}") from e
-
-    # Convert to numpy arrays and handle NaN
-    x_data = _to_float(x_data)
-    if not is_complex:
-        y_data = _to_float(y_data)
-
-    # Remove non-finite values (NaN and ±inf) in single pass.
-    # np.isfinite covers both, preventing RheoData's isfinite check from
-    # raising a confusing ValueError on instrument artefacts.
-    if is_complex:
-        valid_idx = np.flatnonzero(
-            np.isfinite(x_data) & np.isfinite(y_data.real) & np.isfinite(y_data.imag)
-        )
-    else:
-        valid_idx = np.flatnonzero(np.isfinite(x_data) & np.isfinite(y_data))
-    n_dropped = len(x_data) - len(valid_idx)
-    if n_dropped > 0:
-        logger.warning(
-            "Dropped non-finite (NaN/Inf) rows during loading",
-            n_dropped=n_dropped,
-            n_total=len(x_data),
-        )
-    x_data = np.take(x_data, valid_idx)
-    if y_data.ndim > 1:
-        y_data = y_data[valid_idx]
-    else:
-        y_data = np.take(y_data, valid_idx)
-
-    if len(x_data) == 0:
-        logger.error(
-            "No valid data points after removing NaN values", filepath=str(filepath)
-        )
-        raise ValueError("No valid data points after removing NaN values")
-
-    logger.debug("Data points after NaN removal", n_points=len(x_data))
-
-    # Auto-extract units from headers if not provided, normalizing the
-    # extracted unit (and the numeric data) to SI via UNIFIED_UNIT_CONVERSIONS —
-    # matching the anton_paar.py/trios readers' behavior. Units passed
-    # explicitly by the caller are trusted as-is and left unconverted.
-    if x_units is None:
-        _, extracted_x_units = extract_unit_from_header(x_header)
-        if extracted_x_units is not None:
-            x_data, x_units = normalize_units(x_data, extracted_x_units)
-        else:
-            x_units = extracted_x_units
-    if y_units is None:
-        # Use first y column header for units
-        _, extracted_y_units = extract_unit_from_header(y_headers[0])
-        if extracted_y_units is None:
-            # No bracketed unit (e.g. header is just "Viscosity" or "Stress")
-            # -- infer from the name itself so a flow-curve viscosity column
-            # never gets silently treated as stress (or vice versa) downstream.
-            extracted_y_units = infer_y_unit_from_name(y_headers[0])
-        if extracted_y_units is not None:
-            if is_complex:
-                real_part, y_units = normalize_units(y_data.real, extracted_y_units)
-                imag_part, _ = normalize_units(y_data.imag, extracted_y_units)
-                y_data = real_part + 1j * imag_part
-            else:
-                y_data, y_units = normalize_units(
-                    np.asarray(y_data, dtype=np.float64), extracted_y_units
-                )
-        else:
-            y_units = extracted_y_units
-
-    # Auto-detect domain if not provided
-    if domain is None:
-        domain = detect_domain(x_header, x_units, y_headers)
-        logger.debug("Auto-detected domain", domain=domain)
-
-    # Auto-detect test mode if not provided
-    detected_test_mode = None
-    if test_mode is None:
-        detected_test_mode = detect_test_mode_from_columns(
-            x_header, y_headers, x_units, y_units
-        )
-        # If y_cols provided, default to oscillation
-        if detected_test_mode is None and is_complex:
-            detected_test_mode = "oscillation"
-        logger.debug("Auto-detected test mode", test_mode=detected_test_mode)
-    else:
-        detected_test_mode = test_mode.lower()
-
-    # Build source metadata (includes encoding provenance for debugging)
-    source_metadata = {
-        "source_file": filepath.name,
-        "file_type": "csv" if filepath.suffix.lower() in {".csv", ""} else "txt",
-        "x_column": x_col,
-        "y_column": y_cols if is_complex else y_col,
-        "encoding": used_encoding,
-    }
-    if used_encoding != default_encoding:
-        source_metadata["encoding_fallback"] = True
-
-    # Merge with user metadata
-    final_metadata: dict[str, Any] = {**source_metadata}
-    if metadata:
-        reject_removed_options(metadata)
-        final_metadata.update(metadata)
-
-    # Add temperature if provided
-    if temperature is not None:
-        final_metadata["temperature"] = temperature
-
-    # Store protocol metadata
-    if strain_amplitude is not None:
-        final_metadata["gamma_0"] = strain_amplitude
-    if angular_frequency is not None:
-        final_metadata["omega"] = angular_frequency
-    if applied_stress is not None:
-        final_metadata["sigma_applied"] = applied_stress
-    if shear_rate is not None:
-        final_metadata["gamma_dot"] = shear_rate
-    if reference_gamma_dot is not None:
-        final_metadata["reference_gamma_dot"] = reference_gamma_dot
-
-    # Add intended_transform if provided
-    if intended_transform is not None:
-        final_metadata["intended_transform"] = intended_transform.lower()
-
-        # Validate transform requirements and emit warnings
-        warning_messages = validate_transform(
-            intended_transform,
-            domain,
-            final_metadata,
-            detected_test_mode,
-        )
-        for msg in warning_messages:
-            warnings.warn(msg, UserWarning, stacklevel=2)
-
-    logger.info(
-        "File parsed",
-        filepath=str(filepath),
-        n_records=len(x_data),
-        test_mode=detected_test_mode,
-        domain=domain,
-    )
-
-    return RheoData(
-        x=x_data,
-        y=y_data,
-        x_units=x_units,
-        y_units=y_units,
-        domain=domain,
-        initial_test_mode=detected_test_mode,
-        metadata=final_metadata,
-        validate=True,
-    )
-
-
-def _get_column_header(df: pd.DataFrame, col: str | int) -> str:
-    """Get column header string from DataFrame."""
-    if isinstance(col, str):
-        return col
-    return str(df.columns[col])
-
-
-def _get_column_data(df: pd.DataFrame, col: str | int) -> np.ndarray:
-    """Get column data from DataFrame."""
-    if isinstance(col, str):
-        return df[col].values
-    return df.iloc[:, col].values
+    return df, used_encoding, default_encoding
 
 
 def _looks_like_eu_thousands(val: str) -> bool:
