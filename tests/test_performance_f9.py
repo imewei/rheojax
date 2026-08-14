@@ -4,6 +4,7 @@ Tests that NLSQ fits complete within 2s for N ≤ 1000 on CPU,
 and that JIT compilation overhead does not exceed 10s.
 """
 
+import os
 import time
 
 import numpy as np
@@ -11,6 +12,19 @@ import pytest
 
 NLSQ_TIME_LIMIT = 2.0  # seconds
 JIT_TIME_LIMIT = 10.0  # seconds
+
+# These assertions time a single fit against a 2.0s wall-clock budget with no
+# slack for host contention. Under xdist (-n auto), sibling workers running
+# unrelated tests compete for the same cores and reliably push elapsed time
+# past the budget even though the fit itself isn't slower (observed exceeding
+# budget by 8-46% across runs on a loaded multi-core dev host; magnitude
+# scales with core count and worker count, not reproducible as a fixed
+# number). Wall-clock SLA assertions can't be made contention-safe by tuning
+# thread counts (see tests/conftest.py's xdist thread cap, which targets the
+# NUTS/Bayesian timeouts, not this), so skip under xdist rather than loosen
+# the budget; run serially (`pytest -p no:xdist` or `-n0`) for an accurate
+# measurement.
+_under_xdist = "PYTEST_XDIST_WORKER" in os.environ
 
 
 def _maxwell_data(n=500):
@@ -32,6 +46,12 @@ def _maxwell_osc_data(n=500):
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    _under_xdist,
+    reason="Wall-clock NLSQ budget assertions are unreliable under xdist "
+    "parallel execution (sibling workers contend for CPU); run serially "
+    "(`make test`, or `pytest -n0`) to measure",
+)
 class TestNLSQPerformance:
     """NLSQ fits must complete in < 2s for N ≤ 1000."""
 

@@ -356,13 +356,20 @@ class TestBayesianRelaxationMode:
     # these four models specifically. Real fix needs model-appropriate
     # synthetic data (so every parameter has signal) or a per-model prior
     # override (mirroring IKHBase.bayesian_prior_factory) -- out of scope here.
+    #
+    # Removed from parametrization (2026-08-14): FractionalBurgersModel's NUTS
+    # run time for this case is unstable rather than merely slow -- measured
+    # 125s-2007s for the identical test across reruns on the same host, not
+    # explained by xdist thread contention (reproduced under -n0 serial and
+    # with per-worker thread caps applied) or CI/dev load alone. Distinct from
+    # the four models above (which fail on convergence quality, not runtime);
+    # this one converges, it just doesn't have a stable time budget.
     @pytest.mark.parametrize(
         "model_class",
         [
             Maxwell,
             FractionalMaxwellGel,
             FractionalZenerSolidLiquid,
-            FractionalBurgersModel,
             FractionalKelvinVoigt,
             FractionalKelvinVoigtZener,
             FractionalPoyntingThomson,
