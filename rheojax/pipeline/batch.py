@@ -615,9 +615,7 @@ class BatchPipeline:
                         # structure into the export name, so the same batch
                         # run on a different checkout/mount/CI runner would
                         # produce different (non-reproducible) output paths.
-                        _path_hash = hashlib.sha1(
-                            str(path).encode(), usedforsecurity=False
-                        ).hexdigest()[:8]
+                        _path_hash = hashlib.sha256(str(path).encode()).hexdigest()[:8]
                         per_file_out = Path(_out_path) / f"{path.stem}_{_path_hash}"
                         pipeline.export(
                             str(per_file_out),

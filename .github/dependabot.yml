@@ -12,6 +12,8 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "deps"
+    cooldown:
+      default-days: 7
     # Ignore major version bumps for critical dependencies — these need manual migration
     ignore:
       - dependency-name: "pandas"
@@ -84,6 +86,8 @@ updates:
       - "ci"
     commit-message:
       prefix: "ci"
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:
