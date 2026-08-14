@@ -484,66 +484,64 @@ def _read_csv_dataframe(
         comment=comment_char,
         **kwargs,
     )
-    tried_utf16 = False
-
     used_encoding = default_encoding
 
     with log_io(logger, "read", filepath=str(filepath)) as io_ctx:
+        logger.debug("Reading CSV file (strict encoding)", encoding=default_encoding)
         try:
             # Try strict encoding first to detect corruption early
-            logger.debug(
-                "Reading CSV file (strict encoding)", encoding=default_encoding
-            )
             df = pd.read_csv(filepath, **{**read_kwargs, "encoding_errors": "strict"})
-        except UnicodeDecodeError:
-            # Strict failed — fall back to replacement characters with a warning
-            logger.warning(
-                "Encoding errors in CSV file — using replacement characters",
-                filepath=str(filepath),
-                encoding=default_encoding,
-            )
-            try:
-                df = pd.read_csv(filepath, **read_kwargs)
-            except UnicodeDecodeError:
-                read_kwargs["encoding"] = "utf-16le"
-                tried_utf16 = True
-                logger.info(
-                    "Encoding fallback triggered",
+        except Exception as strict_exc:
+            # Build the fallback plan: retry with replacement characters at the
+            # same encoding only if strict decoding itself failed (only a
+            # decode error is something "replace" mode can fix); always try
+            # utf-16le as the last resort. Every candidate is read through the
+            # SAME try/except below, so no exception -- regardless of type or
+            # which attempt raises it -- can escape this function unhandled
+            # and unlogged (see #115: a previous nested-try version let a
+            # non-UnicodeDecodeError failure from an inner retry propagate
+            # raw, since a sibling `except` cannot catch an exception raised
+            # inside another `except` block of the same `try` statement).
+            fallback_attempts: list[tuple[str, dict]] = []
+            if isinstance(strict_exc, UnicodeDecodeError):
+                logger.warning(
+                    "Encoding errors in CSV file — using replacement characters",
                     filepath=str(filepath),
-                    from_encoding=default_encoding,
-                    to_encoding="utf-16le",
+                    encoding=default_encoding,
                 )
-                df = pd.read_csv(filepath, **read_kwargs)
-                used_encoding = "utf-16le"
-        except Exception as e:
-            # If UTF-8 path failed and we haven't tried utf-16, attempt before giving up
-            if not tried_utf16:
-                try:
-                    read_kwargs["encoding"] = "utf-16le"
+                fallback_attempts.append((default_encoding, dict(read_kwargs)))
+            fallback_attempts.append(
+                ("utf-16le", {**read_kwargs, "encoding": "utf-16le"})
+            )
+
+            df = None
+            last_exc: Exception = strict_exc
+            tried_encodings = [default_encoding]
+            for candidate_encoding, candidate_kwargs in fallback_attempts:
+                if candidate_encoding not in tried_encodings:
+                    tried_encodings.append(candidate_encoding)
+                if candidate_encoding == "utf-16le":
                     logger.info(
                         "Encoding fallback triggered",
                         filepath=str(filepath),
                         from_encoding=default_encoding,
                         to_encoding="utf-16le",
                     )
-                    df = pd.read_csv(filepath, **read_kwargs)
-                    used_encoding = "utf-16le"
-                except Exception:
-                    logger.error(
-                        "Failed to parse CSV file",
-                        filepath=str(filepath),
-                        tried_encodings=[default_encoding, "utf-16le"],
-                        exc_info=True,
-                    )
-                    raise ValueError(f"Failed to parse CSV file: {e}") from e
-            else:
+                try:
+                    df = pd.read_csv(filepath, **candidate_kwargs)
+                    used_encoding = candidate_encoding
+                    break
+                except Exception as candidate_exc:
+                    last_exc = candidate_exc
+
+            if df is None:
                 logger.error(
                     "Failed to parse CSV file",
                     filepath=str(filepath),
-                    tried_encodings=[default_encoding, "utf-16le"],
+                    tried_encodings=tried_encodings,
                     exc_info=True,
                 )
-                raise ValueError(f"Failed to parse CSV file: {e}") from e
+                raise ValueError(f"Failed to parse CSV file: {last_exc}") from last_exc
 
         # VIS-CSV-001: Check for encoding replacement artifacts without
         # materialising .astype(str) twice per column. Cache col_str and reuse

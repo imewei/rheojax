@@ -208,3 +208,42 @@ def test_read_csv_dataframe_corrupted_non_numeric_column_warns_only(tmp_path: Pa
         header=0,
     )
     assert "�" in df["label"].iloc[0]
+
+
+def test_read_csv_dataframe_nested_retry_failure_is_wrapped(tmp_path: Path):
+    """Regression test for #115.
+
+    A file with BOTH an invalid encoding byte (so the strict-mode read
+    raises UnicodeDecodeError, entering the replacement-character retry
+    path) AND a structurally malformed row (an unterminated quote, so the
+    replace-mode retry raises pandas.errors.ParserError instead of
+    succeeding or raising another UnicodeDecodeError) used to escape
+    _read_csv_dataframe completely unhandled and unlogged: a sibling
+    `except Exception` cannot catch an exception raised inside another
+    `except` block of the same `try` statement, so the ParserError
+    propagated raw past every handler in the function.
+
+    Note pandas.errors.ParserError subclasses ValueError, so a naive
+    ``pytest.raises(ValueError)`` would pass even with the bug present --
+    this test asserts the *exact* exception type and message prefix to
+    distinguish "our deliberately wrapped ValueError" from "an unrelated
+    ValueError subclass that leaked out unwrapped".
+    """
+    from rheojax.io.readers.csv_reader import _read_csv_dataframe
+
+    csv_path = tmp_path / "corrupt_and_malformed.csv"
+    csv_path.write_bytes(b'time,label\n1.0,"ab\xffcd\n2.0,xyz\n')
+
+    with pytest.raises(ValueError, match="Failed to parse CSV file") as exc_info:
+        _read_csv_dataframe(
+            csv_path,
+            x_col="time",
+            y_col="label",
+            y_cols=None,
+            column_mapping=None,
+            delimiter=None,
+            encoding=None,
+            header=0,
+        )
+
+    assert type(exc_info.value) is ValueError
