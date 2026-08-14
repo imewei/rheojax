@@ -137,12 +137,50 @@ autodoc_default_options = {
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "jax": ("https://jax.readthedocs.io/en/latest/", None),
+    "jax": ("https://docs.jax.dev/en/latest/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "numpyro": ("https://num.pyro.ai/en/stable/", None),
     "arviz": ("https://python.arviz.org/en/stable/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
 }
+
+# -- Options for linkcheck builder --------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-the-linkcheck-builder
+#
+# Academic publisher/DOI hosts below return 403/405 to any non-browser client
+# (Cloudflare/Akamai bot challenges) even for valid, resolvable citations --
+# confirmed by testing with a real browser User-Agent, which still gets 403.
+# These are not broken links; linkcheck just cannot pass their bot filters.
+linkcheck_ignore = [
+    r"^https://(dx\.)?doi\.org/10\.1002/",  # Wiley
+    r"^https://onlinelibrary\.wiley\.com/",
+    r"^https://(dx\.)?doi\.org/10\.1021/",  # ACS
+    r"^https://pubs\.acs\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1039/",  # Royal Society of Chemistry
+    r"^https://pubs\.rsc\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1063/",  # AIP
+    r"^https://(dx\.)?doi\.org/10\.1122/",  # AIP / Journal of Rheology
+    r"^https://pubs\.aip\.org/",
+    r"^https://sor\.scitation\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1098/",  # Royal Society Publishing
+    r"^https://royalsocietypublishing\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1115/",  # ASME
+    r"^https://asmedigitalcollection\.asme\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1051/",  # EDP Sciences
+    r"^https://publications\.edpsciences\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1093/",  # Oxford Academic
+    r"^https://academic\.oup\.com/",
+    r"^https://(dx\.)?doi\.org/10\.1137/",  # SIAM
+    r"^https://epubs\.siam\.org/",
+    r"^https://(dx\.)?doi\.org/10\.1177/",  # SAGE
+    r"^https://journals\.sagepub\.com/",
+    r"^https://(dx\.)?doi\.org/10\.1155/",  # Hindawi (Wiley-hosted)
+    r"^https://dspace\.mit\.edu/",
+    r"^https://(pmc\.)?ncbi\.nlm\.nih\.gov/",
+    r"^https://www\.mdpi\.com/",
+    r"^https://www\.researchgate\.net/",
+    r"^https://www\.sciencedirect\.com/",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
