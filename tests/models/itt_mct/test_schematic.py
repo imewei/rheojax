@@ -1234,6 +1234,7 @@ class TestPrecompile:
         assert compile_time >= 0.0
 
 
+@pytest.mark.slow
 class TestPrecompileProtocols:
     def test_default_still_warms_only_flow_curve(self, monkeypatch):
         """protocols=None preserves today's behavior exactly -- zero
