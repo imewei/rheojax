@@ -17,6 +17,7 @@ diffrax = pytest.importorskip("diffrax")
 
 from rheojax.models.itt_mct._kernels_diffrax import (
     solve_equilibrium_correlator_trajectory,
+    solve_relaxation_trajectory,
     solve_startup_trajectory,
 )
 
@@ -86,3 +87,53 @@ class TestStartupTrajectory:
         # assert real physical growth given G_inf=1e6, gamma_dot=1.0.
         assert sigma[-1] > 10.0
         assert sigma[-1] > sigma[0]
+
+
+class TestRelaxationTrajectory:
+    def test_correlator_decays_and_is_bounded(self):
+        n_modes = 10
+        tau = jnp.logspace(-2, 2, n_modes)
+        g = jnp.ones(n_modes) / n_modes
+        t = jnp.linspace(0.01, 100.0, 30)
+
+        phi = solve_relaxation_trajectory(
+            t,
+            gamma_pre=0.01,
+            v1=0.0,
+            v2=3.0,
+            Gamma=1.0,
+            gamma_c=0.1,
+            G_inf=1e6,
+            g=g,
+            tau=tau,
+            n_modes=n_modes,
+        )
+
+        assert phi.shape == (30,)
+        assert np.all(np.isfinite(phi))
+        assert np.all(phi >= 0.0) and np.all(phi <= 1.0)
+        assert phi[0] >= phi[-1]  # decays (or stays flat) over time
+
+    def test_returns_correlator_not_stress(self):
+        """Regression guard: this function must return Phi(t), not sigma(t)
+        — the caller in schematic.py reconstructs sigma algebraically."""
+        n_modes = 5
+        tau = jnp.logspace(-1, 1, n_modes)
+        g = jnp.ones(n_modes) / n_modes
+        t = jnp.array([0.01, 1.0, 10.0])
+
+        phi = solve_relaxation_trajectory(
+            t,
+            gamma_pre=0.01,
+            v1=0.0,
+            v2=3.0,
+            Gamma=1.0,
+            gamma_c=0.1,
+            G_inf=1e6,
+            g=g,
+            tau=tau,
+            n_modes=n_modes,
+        )
+
+        # Phi is O(1) (dimensionless correlator), not O(G_inf) (stress-scale).
+        assert np.all(np.abs(np.array(phi)) <= 1.0)

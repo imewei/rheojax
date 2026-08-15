@@ -38,6 +38,7 @@ diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._kernels import (
     f12_equilibrium_correlator_rhs,
+    f12_volterra_relaxation_rhs,
     f12_volterra_startup_rhs,
     strain_decorrelation,
 )
@@ -266,6 +267,107 @@ def solve_startup_trajectory(
 
     sigma = ys[:, -1]
     return jnp.where(failed, jnp.nan, sigma)
+
+
+class RelaxationParams(NamedTuple):
+    """Parameters for stress-relaxation ODE integration."""
+
+    gamma_pre: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+def make_relaxation_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for stress relaxation, reusing
+    f12_volterra_relaxation_rhs unchanged. State is [Phi, K_1..K_n, sigma]
+    (n+2) -- the sigma slot is solved but never read; the caller
+    reconstructs stress algebraically from Phi to avoid a round-off
+    drift-to-negative bug the scipy path is already fixed to avoid."""
+
+    def vector_field(
+        t: float, state: jnp.ndarray, args: RelaxationParams
+    ) -> jnp.ndarray:
+        return f12_volterra_relaxation_rhs(
+            state,
+            t,
+            args.gamma_pre,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_relaxation_trajectory(
+    t_array: jnp.ndarray,
+    gamma_pre: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve for the relaxation correlator Phi(t) using diffrax.
+
+    Returns Phi(t_array) clipped to [0, 1] -- NOT sigma. Callers must
+    reconstruct sigma(t) = G_inf * gamma_pre * Phi(t)**2 themselves.
+    NaN-filled on failure.
+    """
+    vector_field = make_relaxation_vector_field(n_modes, use_lorentzian, memory_form)
+
+    if use_lorentzian:
+        h_pre = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
+    else:
+        h_pre = jnp.exp(-((gamma_pre / gamma_c) ** 2))
+
+    params = RelaxationParams(
+        gamma_pre=gamma_pre,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    # State: [Phi, K_1..K_n, sigma] (n+2). sigma(0) is set to match the
+    # scipy IC but is never read by this function's return value.
+    state0 = jnp.zeros(2 + n_modes)
+    state0 = state0.at[0].set(h_pre)
+    state0 = state0.at[1 + n_modes].set(G_inf * gamma_pre * h_pre * h_pre)
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    phi = jnp.clip(ys[:, 0], 0.0, 1.0)
+    return jnp.where(failed, jnp.nan, phi)
 
 
 # =============================================================================
