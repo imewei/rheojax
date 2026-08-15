@@ -64,6 +64,7 @@ try:
         solve_creep_trajectory,
         solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
+        solve_laos_trajectory,
         solve_relaxation_trajectory,
         solve_startup_trajectory,
     )
@@ -75,6 +76,10 @@ except ImportError:
     def precompile_flow_curve_solver(*args, **kwargs):  # type: ignore[misc]
         """Stub when diffrax not available."""
         return 0.0
+
+    def solve_laos_trajectory(*args, **kwargs):  # type: ignore[misc]
+        """Stub when diffrax not available."""
+        return np.full((len(args[0]),), np.nan)
 
 
 jax, jnp = safe_import_jax()
@@ -1445,9 +1450,72 @@ class ITTMCTSchematic(ITTMCTBase):
         t: np.ndarray,
         gamma_0: float = 0.1,
         omega: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Predict LAOS stress response.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_laos_diffrax(t, gamma_0, omega)
+        return self._predict_laos_scipy(t, gamma_0=gamma_0, omega=omega)
+
+    def _predict_laos_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_0: float,
+        omega: float,
+    ) -> np.ndarray:
+        """Fast LAOS prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes()
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        sigma = solve_laos_trajectory(
+            jnp.asarray(t),
+            gamma_0,
+            omega,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        sigma_arr = np.array(sigma)
+        if np.any(np.isnan(sigma_arr)):
+            return self._predict_laos_scipy(t, gamma_0=gamma_0, omega=omega)
+
+        return sigma_arr
+
+    def _predict_laos_scipy(
+        self,
+        t: np.ndarray,
+        gamma_0: float = 0.1,
+        omega: float = 1.0,
+    ) -> np.ndarray:
+        """Predict LAOS stress response using scipy.
 
         Parameters
         ----------

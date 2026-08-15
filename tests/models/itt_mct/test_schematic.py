@@ -1086,6 +1086,61 @@ class TestLAOSDetailed:
 
 
 @pytest.mark.slow
+class TestLAOSDiffrax:
+    def test_predict_laos_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_laos already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it --
+        assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_laos).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = 1.0
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0.0, 2 * period, 20)
+        sigma_default = model.predict(t, test_mode="laos", gamma_0=0.1, omega=omega)
+        sigma_explicit = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = 1.0
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0.0, 2 * period, 40)
+
+        sigma_scipy = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.0, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_laos_trajectory", fake_solve)
+
+        sigma = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=1.0, use_diffrax=True
+        )
+
+        assert np.all(np.isfinite(sigma))
+
+
+@pytest.mark.slow
 class TestPrecompile:
     """Diffrax solver precompilation entry point."""
 
