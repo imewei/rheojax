@@ -148,12 +148,12 @@ Install with: `make install-jax-gpu` (auto-detects CUDA version) or `uv sync --e
 | `make install` | `uv sync` | Editable install |
 | `make install-dev` | `uv sync --all-extras` | + development deps |
 | `make install-jax-gpu` | Auto-detect CUDA | GPU JAX backend |
-| `make test` | `pytest` | Full test suite (~6415 tests) |
-| `make test-smoke` | `pytest -m smoke` | Critical tests (~2051, CI gate) |
-| `make test-fast` | `pytest -m "not slow..."` | Exclude slow Bayesian (~4714) |
+| `make test` | `pytest` | Full test suite (~6825 tests) |
+| `make test-smoke` | `pytest -m smoke` | Critical tests (~2037, CI gate) |
+| `make test-fast` | `pytest -m "not slow"` | Exclude slow Bayesian (~6527) |
 | `make test-parallel` | `pytest -n $XDIST_WORKERS` | Parallel (default 4 workers) |
 | `make test-ci` | `pytest -m smoke` | CI gate (matches GitHub Actions) |
-| `make test-ci-full` | `pytest -m "not slow..."` | Extended CI (~4714 tests) |
+| `make test-ci-full` | `pytest -m "not slow and not validation and not benchmark and not notebook_comprehensive"` | Extended CI (~6490 tests) |
 | `make test-coverage` | `pytest --cov-report=html` | Coverage with HTML report |
 | `make format` | `ruff format && ruff check --fix` | Auto-format + lint fix |
 | `make quick` | `ruff format + ruff check + smoke` | Fast quality check |

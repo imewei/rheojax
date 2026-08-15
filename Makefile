@@ -158,13 +158,13 @@ help:
 	@echo ""
 	@echo "$(BOLD)$(GREEN)TESTING$(RESET)"
 	@echo "  $(CYAN)test$(RESET)                   Run all tests (full suite with fast MCMC, ~50-60min)"
-	@echo "  $(CYAN)test-smoke$(RESET)             Run smoke tests (105 critical tests, ~30s-2min)"
+	@echo "  $(CYAN)test-smoke$(RESET)             Run smoke tests (~2037 critical tests, ~30s-2min)"
 	@echo "  $(CYAN)test-fast$(RESET)              Run tests excluding slow Bayesian tests (~15-25min)"
-	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, 105 smoke tests)"
-	@echo "  $(CYAN)test-ci-full$(RESET)           Run full CI suite (1069 tests, pre-v0.2.1 behavior)"
+	@echo "  $(CYAN)test-ci$(RESET)                Run CI test suite (matches GitHub Actions, ~2037 smoke tests)"
+	@echo "  $(CYAN)test-ci-full$(RESET)           Run full CI suite (~6490 tests, pre-v0.2.1 behavior)"
 	@echo "  $(CYAN)test-validation$(RESET)        Run with production MCMC (PYTEST_FULL_VALIDATION=1, ~90min)"
 	@echo "  $(CYAN)test-parallel$(RESET)          Run all tests in parallel (2-4x faster)"
-	@echo "  $(CYAN)test-all-parallel$(RESET)      Run full test suite in parallel (~1245 tests)"
+	@echo "  $(CYAN)test-all-parallel$(RESET)      Run full test suite in parallel (~6825 tests)"
 	@echo "  $(CYAN)test-parallel-fast$(RESET)     Run fast tests in parallel"
 	@echo "  $(CYAN)test-coverage$(RESET)          Run tests with coverage report"
 	@echo "  $(CYAN)test-coverage-parallel$(RESET) Run coverage with parallel execution"
@@ -402,7 +402,7 @@ test:
 	$(RUN_CMD) $(PYTEST)
 
 test-smoke:
-	@echo "$(BOLD)$(BLUE)Running smoke tests (105 critical tests, ~30s-2min)...$(RESET)"
+	@echo "$(BOLD)$(BLUE)Running smoke tests (~2037 critical tests, ~30s-2min)...$(RESET)"
 	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "smoke"
 	@echo "$(BOLD)$(GREEN)✓ Smoke tests passed!$(RESET)"
 
@@ -416,7 +416,7 @@ test-parallel:
 	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS)
 
 test-all-parallel:
-	@echo "$(BOLD)$(BLUE)Running full test suite in parallel (~1245 tests)...$(RESET)"
+	@echo "$(BOLD)$(BLUE)Running full test suite in parallel (~6825 tests)...$(RESET)"
 	@echo "$(BOLD)Note:$(RESET) Includes all tests (slow Bayesian, integration, etc.)"
 	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS)
 	@echo "$(BOLD)$(GREEN)✓ Full test suite passed!$(RESET)"
@@ -427,7 +427,7 @@ test-parallel-fast:
 
 test-ci:
 	@echo "$(BOLD)$(BLUE)Running CI test suite (matches GitHub Actions)...$(RESET)"
-	@echo "$(BOLD)Tests:$(RESET) 105 smoke tests, ~30s-2min"
+	@echo "$(BOLD)Tests:$(RESET) ~2037 smoke tests, ~30s-2min"
 	@echo "$(BOLD)Note:$(RESET) GitHub CI now runs smoke tests only for fast feedback"
 	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "smoke"
 	@echo "$(BOLD)$(GREEN)✓ CI test suite passed!$(RESET)"
@@ -435,7 +435,7 @@ test-ci:
 test-ci-full:
 	@echo "$(BOLD)$(BLUE)Running full CI test suite (pre-v0.2.1 behavior)...$(RESET)"
 	@echo "$(BOLD)Excludes:$(RESET) slow, validation, benchmark, notebook_comprehensive"
-	@echo "$(BOLD)Tests:$(RESET) ~1069/1154 tests, ~5-10 minutes"
+	@echo "$(BOLD)Tests:$(RESET) ~6490/6825 tests, ~5-10 minutes"
 	$(RUN_CMD) $(PYTEST) -n $(XDIST_WORKERS) -m "not slow and not validation and not benchmark and not notebook_comprehensive"
 	@echo "$(BOLD)$(GREEN)✓ Full CI test suite passed!$(RESET)"
 
