@@ -1209,7 +1209,8 @@ def _process_remaining_rows(
     # computed once here rather than via a per-row convert_units() call
     # (dict lookup + branch + warnings.warn stack-walk on every row).
     if is_complex:
-        assert y_units2_orig is not None  # noqa: S101 (guarded by caller)
+        if y_units2_orig is None:  # pragma: no cover - guarded by caller
+            raise ValueError("y_col2 and y_units2 required for complex data")
         factor_real = float(convert_units(1.0, y_units_orig, y_units))
         factor_imag = float(convert_units(1.0, y_units2_orig, y_units))
         # A bad unit-table entry would otherwise silently zero/sign-flip
