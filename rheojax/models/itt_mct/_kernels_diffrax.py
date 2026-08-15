@@ -29,6 +29,7 @@ References
 - Patrick Kidger (2021) "On Neural Differential Equations", arXiv:2202.02435
 """
 
+import functools
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -74,6 +75,7 @@ class FlowCurveParams(NamedTuple):
     tau: jnp.ndarray  # Prony times
 
 
+@functools.partial(jax.jit, static_argnums=(0, 6))
 def _solve_trajectory(
     vector_field: Callable,
     state0: jnp.ndarray,
@@ -89,6 +91,12 @@ def _solve_trajectory(
     many shear rates and only needs the final state, SaveAt(t1=True)).
     These sites solve one condition per call and need the full
     trajectory at the caller's t_eval array.
+
+    JIT-compiled with `vector_field` and `max_steps` static: repeat
+    calls with the same vector-field closure (see the `make_*_vector_field`
+    factories' `lru_cache`, which keeps closure identity stable across
+    calls) and the same t_array shape reuse the compiled trace instead
+    of retracing every call.
 
     Returns
     -------
@@ -135,6 +143,7 @@ class EquilibriumCorrelatorParams(NamedTuple):
     tau: jnp.ndarray
 
 
+@functools.cache
 def make_equilibrium_correlator_vector_field(n_modes: int) -> Callable:
     """Create diffrax-compatible vector field for the equilibrium correlator.
 
@@ -198,6 +207,7 @@ class StartupParams(NamedTuple):
     tau: jnp.ndarray
 
 
+@functools.cache
 def make_startup_vector_field(
     n_modes: int,
     use_lorentzian: bool = False,
@@ -284,6 +294,7 @@ class RelaxationParams(NamedTuple):
     tau: jnp.ndarray
 
 
+@functools.cache
 def make_relaxation_vector_field(
     n_modes: int,
     use_lorentzian: bool = False,
@@ -385,6 +396,7 @@ class CreepParams(NamedTuple):
     tau: jnp.ndarray
 
 
+@functools.cache
 def make_creep_vector_field(
     n_modes: int,
     use_lorentzian: bool = False,
@@ -1010,6 +1022,7 @@ class LaosParams(NamedTuple):
     tau: jnp.ndarray
 
 
+@functools.cache
 def make_laos_vector_field(
     n_modes: int,
     use_lorentzian: bool = False,
@@ -1101,12 +1114,17 @@ def is_diffrax_available() -> bool:
 
 
 def clear_solver_cache():
-    """Clear the cached batched solvers.
+    """Clear the cached batched solvers and vector-field closures.
 
     Useful if parameters change and you want to force recompilation.
     """
     global _BATCHED_SOLVER_CACHE
     _BATCHED_SOLVER_CACHE.clear()
+    make_equilibrium_correlator_vector_field.cache_clear()
+    make_startup_vector_field.cache_clear()
+    make_relaxation_vector_field.cache_clear()
+    make_creep_vector_field.cache_clear()
+    make_laos_vector_field.cache_clear()
     logger.debug("Cleared diffrax solver cache")
 
 
