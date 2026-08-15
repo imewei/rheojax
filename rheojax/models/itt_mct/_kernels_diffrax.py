@@ -36,7 +36,10 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
-from rheojax.models.itt_mct._kernels import strain_decorrelation
+from rheojax.models.itt_mct._kernels import (
+    f12_equilibrium_correlator_rhs,
+    strain_decorrelation,
+)
 
 jax, jnp = safe_import_jax()
 
@@ -65,6 +68,117 @@ class FlowCurveParams(NamedTuple):
     G_inf: float  # High-frequency modulus
     g: jnp.ndarray  # Prony amplitudes
     tau: jnp.ndarray  # Prony times
+
+
+def _solve_trajectory(
+    vector_field: Callable,
+    state0: jnp.ndarray,
+    params: NamedTuple,
+    t_array: jnp.ndarray,
+    rtol: float,
+    atol: float,
+    max_steps: int,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Shared diffrax trajectory-solve helper for SaveAt(ts=...) sites.
+
+    Used by every ITT-MCT protocol except flow curve (which vmaps over
+    many shear rates and only needs the final state, SaveAt(t1=True)).
+    These sites solve one condition per call and need the full
+    trajectory at the caller's t_eval array.
+
+    Returns
+    -------
+    ys : jnp.ndarray, shape (len(t_array), state_dim)
+        Full state trajectory at the requested times.
+    failed : jnp.ndarray (scalar bool)
+        True if the solver did not report success, or the output
+        contains NaN. Callers use this to trigger a whole-call scipy
+        fallback (see the migration spec's "Fallback strategy" section).
+    """
+    t_array = jnp.asarray(t_array)
+    term = diffrax.ODETerm(vector_field)
+    solver = diffrax.Tsit5()
+    stepsize_controller = diffrax.PIDController(rtol=rtol, atol=atol)
+
+    solution = diffrax.diffeqsolve(
+        term,
+        solver,
+        t0=0.0,
+        t1=jnp.max(t_array),
+        dt0=0.01,
+        y0=state0,
+        args=params,
+        stepsize_controller=stepsize_controller,
+        saveat=diffrax.SaveAt(ts=t_array),
+        max_steps=max_steps,
+        throw=False,
+    )
+
+    solver_ok = solution.result == diffrax.RESULTS.successful
+    has_nan = jnp.any(jnp.isnan(solution.ys))
+    failed = (~solver_ok) | has_nan
+
+    return solution.ys, failed
+
+
+class EquilibriumCorrelatorParams(NamedTuple):
+    """Parameters for the equilibrium (quiescent) correlator ODE."""
+
+    v1: float
+    v2: float
+    Gamma: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+def make_equilibrium_correlator_vector_field(n_modes: int) -> Callable:
+    """Create diffrax-compatible vector field for the equilibrium correlator.
+
+    Reuses f12_equilibrium_correlator_rhs unchanged — only the argument
+    order changes, from scipy's (state, t, *args) to diffrax's
+    (t, state, args).
+    """
+
+    def vector_field(
+        t: float, state: jnp.ndarray, args: EquilibriumCorrelatorParams
+    ) -> jnp.ndarray:
+        return f12_equilibrium_correlator_rhs(
+            state, t, args.v1, args.v2, args.Gamma, args.g, args.tau, n_modes
+        )
+
+    return vector_field
+
+
+def solve_equilibrium_correlator_trajectory(
+    t_array: jnp.ndarray,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    rtol: float = 1e-8,
+    atol: float = 1e-10,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve the equilibrium correlator Phi_eq(t) using diffrax.
+
+    Returns Phi_eq at t_array, clipped to [0, 1]. Returns an all-NaN
+    array (same shape as t_array) if the solve fails — callers retry
+    the whole call via the scipy path in that case.
+    """
+    vector_field = make_equilibrium_correlator_vector_field(n_modes)
+    params = EquilibriumCorrelatorParams(v1=v1, v2=v2, Gamma=Gamma, g=g, tau=tau)
+
+    state0 = jnp.zeros(1 + n_modes)
+    state0 = state0.at[0].set(1.0)  # Phi(0) = 1
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    phi = jnp.clip(ys[:, 0], 0.0, 1.0)
+    return jnp.where(failed, jnp.nan, phi)
 
 
 # =============================================================================
