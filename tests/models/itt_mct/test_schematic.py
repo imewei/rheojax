@@ -1232,3 +1232,143 @@ class TestPrecompile:
         compile_time = model.precompile()
         assert isinstance(compile_time, float)
         assert compile_time >= 0.0
+
+
+class TestPrecompileProtocols:
+    def test_default_still_warms_only_flow_curve(self, monkeypatch):
+        """protocols=None preserves today's behavior exactly -- zero
+        change to existing callers' warm-up cost."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"flow_curve": False, "startup": False}
+
+        def fake_flow_curve_precompile(*args, **kwargs):
+            called["flow_curve"] = True
+            return 0.1
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "precompile_flow_curve_solver", fake_flow_curve_precompile
+        )
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile()
+
+        assert called["flow_curve"] is True
+        assert called["startup"] is False
+
+    def test_explicit_protocols_warms_requested_ones(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"startup": False, "creep": False}
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        def fake_creep_solve(*args, **kwargs):
+            called["creep"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+        monkeypatch.setattr(schematic_mod, "solve_creep_trajectory", fake_creep_solve)
+
+        model.precompile(protocols=["startup"])
+
+        assert called["startup"] is True
+        assert called["creep"] is False
+
+    def test_protocols_all_warms_everything(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        # Compute real Prony modes before mocking solve_equilibrium_correlator_trajectory
+        # below -- initialize_prony_modes() depends on that same solver internally
+        # for a fresh model, so mocking it first would corrupt the Prony fit
+        # rather than exercise the protocols="all" warm-up path under test.
+        model.initialize_prony_modes()
+        called = {
+            name: False
+            for name in (
+                "flow_curve",
+                "equilibrium_correlator",
+                "startup",
+                "creep",
+                "relaxation",
+                "laos",
+            )
+        }
+
+        def make_fake(name, return_shape_fn):
+            def fake(*args, **kwargs):
+                called[name] = True
+                return return_shape_fn()
+
+            return fake
+
+        monkeypatch.setattr(
+            schematic_mod,
+            "precompile_flow_curve_solver",
+            make_fake("flow_curve", lambda: 0.1),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_equilibrium_correlator_trajectory",
+            make_fake("equilibrium_correlator", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_startup_trajectory",
+            make_fake("startup", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_creep_trajectory",
+            make_fake("creep", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_relaxation_trajectory",
+            make_fake("relaxation", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_laos_trajectory",
+            make_fake("laos", lambda: jnp.array([0.0])),
+        )
+
+        model.precompile(protocols="all")
+
+        assert all(called.values()), called
+
+    def test_x_shapes_the_dummy_trajectory(self, monkeypatch):
+        """X's length must reach the warmed solver, not the hardcoded
+        5-point default -- otherwise a caller who precompiles with their
+        real (differently-sized) data still eats a cold JIT compile on
+        the first real predict()/fit() call, since SaveAt(ts=t_array)
+        retraces on array length."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        seen = {"t_len": None}
+
+        def fake_startup_solve(t_array, *args, **kwargs):
+            seen["t_len"] = len(t_array)
+            return jnp.zeros(len(t_array))
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile(protocols=["startup"], X=np.linspace(0.0, 10.0, 42))
+
+        assert seen["t_len"] == 42

@@ -31,6 +31,7 @@ Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
 
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 import numpy as np
@@ -1678,18 +1679,38 @@ class ITTMCTSchematic(ITTMCTBase):
         test_mode: str = "relaxation",
         X=None,
         y=None,
+        protocols: list[str] | str | None = None,
         **kwargs,
     ) -> float:
-        """Pre-compile the diffrax ODE solver for fast subsequent calls.
+        """Pre-compile diffrax ODE solvers for fast subsequent calls.
 
         Triggers JIT compilation with dummy data so the first real prediction
         doesn't incur the compilation cost. Useful when predictable timing
         is important (e.g., in interactive applications or benchmarks).
 
+        Parameters
+        ----------
+        X : array-like, optional
+            Representative time array to warm the diffrax solvers with.
+            When provided, its length is used for the dummy t_array
+            passed to each warmed protocol's solve_X_trajectory, so the
+            JIT trace matches the shape real predict()/fit() calls will
+            actually use (SaveAt(ts=t_array) retraces on array length).
+            When None (default), a fixed 5-point dummy array is used,
+            matching today's flow-curve-only precompile() behavior.
+        protocols : list[str] | str | None, default None
+            Which protocols to warm beyond flow curve. None (default)
+            preserves today's behavior -- flow curve only, zero change
+            to existing callers' warm-up cost. Pass e.g.
+            ["startup", "creep"] to opt into warming others, or "all" to
+            warm every protocol. Valid names: "equilibrium_correlator",
+            "startup", "creep", "relaxation", "laos".
+
         Returns
         -------
         float
-            Compilation time in seconds (0.0 if diffrax not available)
+            Total compilation time in seconds across all warmed
+            protocols (0.0 if diffrax not available).
 
         Examples
         --------
@@ -1701,25 +1722,130 @@ class ITTMCTSchematic(ITTMCTBase):
 
         Notes
         -----
-        First call to flow curve prediction triggers JIT compilation which
-        can take 30-90 seconds. This method triggers that compilation upfront.
-
-        Only affects diffrax-based flow curve solver. Other protocols
-        (oscillation, startup, etc.) use scipy and don't need precompilation.
+        First call to each protocol's diffrax path triggers JIT
+        compilation, which can take tens of seconds. This method triggers
+        that compilation upfront so later predict()/fit() calls are fast
+        from the start.
         """
         if not _HAS_DIFFRAX:
             logger.warning("diffrax not available, precompilation skipped")
             return 0.0
 
-        # Initialize Prony modes if needed
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
-        return precompile_flow_curve_solver(
+        total_time = precompile_flow_curve_solver(
             n_modes=self.n_prony_modes,
             use_lorentzian=self._use_lorentzian,
             memory_form=self._memory_form,
         )
+
+        all_protocols: tuple[str, ...] = (
+            "equilibrium_correlator",
+            "startup",
+            "creep",
+            "relaxation",
+            "laos",
+        )
+        requested: tuple[str, ...]
+        if protocols == "all":
+            requested = all_protocols
+        elif protocols is None:
+            requested = ()
+        else:
+            requested = tuple(protocols)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+        t_dummy = jnp.logspace(-2, 1, 5) if X is None else jnp.asarray(X)
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        for name in requested:
+            start_time = time.time()
+            if name == "equilibrium_correlator":
+                result = solve_equilibrium_correlator_trajectory(
+                    t_dummy, v1, v2, Gamma, g, tau, self.n_prony_modes
+                )
+            elif name == "startup":
+                result = solve_startup_trajectory(
+                    t_dummy,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "creep":
+                result = solve_creep_trajectory(
+                    t_dummy,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "relaxation":
+                result = solve_relaxation_trajectory(
+                    t_dummy,
+                    0.01,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "laos":
+                result = solve_laos_trajectory(
+                    t_dummy,
+                    0.1,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            else:
+                raise ValueError(
+                    f"Unknown protocol {name!r} for precompile(); expected one "
+                    f"of {all_protocols}"
+                )
+            jax.block_until_ready(result)
+            total_time += time.time() - start_time
+
+        return total_time
 
     def _check_prony_cache(self) -> None:
         """Invalidate Prony cache if physics parameters changed.
