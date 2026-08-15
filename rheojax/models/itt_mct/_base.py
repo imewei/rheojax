@@ -352,6 +352,7 @@ class ITTMCTBase(BaseModel):
         self,
         gamma_dot: np.ndarray,
         sigma: np.ndarray,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to steady-state flow curve data.
@@ -384,7 +385,7 @@ class ITTMCTBase(BaseModel):
             params_clipped = np.clip(np.asarray(params), lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_flow_curve(gamma_dot)
+            y_pred = self._predict_flow_curve(gamma_dot, use_diffrax=use_diffrax)
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -405,6 +406,7 @@ class ITTMCTBase(BaseModel):
         self,
         omega: np.ndarray,
         G_star: np.ndarray,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to SAOS (G', G'') data.
@@ -455,7 +457,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            G_pred = self._predict_oscillation(omega, return_components=True)
+            G_pred = self._predict_oscillation(
+                omega, return_components=True, use_diffrax=use_diffrax
+            )
             if fit_components:
                 y_pred = np.concatenate([G_pred[:, 0], G_pred[:, 1]])
             else:
@@ -484,6 +488,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         sigma: np.ndarray,
         gamma_dot: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to startup flow data (stress growth).
@@ -518,7 +523,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_startup(t, gamma_dot=gamma_dot)
+            y_pred = self._predict_startup(
+                t, gamma_dot=gamma_dot, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -541,6 +548,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         J: np.ndarray,
         sigma_applied: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to creep compliance data.
@@ -575,7 +583,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_creep(t, sigma_applied=sigma_applied)
+            y_pred = self._predict_creep(
+                t, sigma_applied=sigma_applied, use_diffrax=use_diffrax
+            )
             return J - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -598,6 +608,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         sigma: np.ndarray,
         gamma_pre: float = 0.01,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to stress relaxation data.
@@ -632,7 +643,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_relaxation(t, gamma_pre=gamma_pre)
+            y_pred = self._predict_relaxation(
+                t, gamma_pre=gamma_pre, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -656,6 +669,7 @@ class ITTMCTBase(BaseModel):
         sigma: np.ndarray,
         gamma_0: float = 0.1,
         omega: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to LAOS data.
@@ -692,7 +706,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_laos(t, gamma_0=gamma_0, omega=omega)
+            y_pred = self._predict_laos(
+                t, gamma_0=gamma_0, omega=omega, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is

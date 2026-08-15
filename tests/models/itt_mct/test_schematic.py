@@ -1140,6 +1140,89 @@ class TestLAOSDiffrax:
         assert np.all(np.isfinite(sigma))
 
 
+class TestFitUseDiffraxForwarding:
+    """model.fit(..., use_diffrax=False) must actually reach _predict_X
+    during NLSQ residual evaluation, for every protocol."""
+
+    def test_fit_flow_curve_forwards_use_diffrax(self, monkeypatch):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        gamma_dot = np.array([1.0, 10.0])
+        sigma = np.array([1e5, 1e6])
+
+        seen = {"use_diffrax": "not called"}
+        original = model._predict_flow_curve
+
+        def spy(gd, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(gd, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_flow_curve", spy)
+        model.fit(
+            gamma_dot, sigma, test_mode="flow_curve", use_diffrax=False, max_iter=2
+        )
+
+        assert seen["use_diffrax"] is False
+
+    @pytest.mark.parametrize(
+        ("test_mode", "x", "y", "extra_kwargs"),
+        [
+            ("startup", np.linspace(0.01, 10.0, 5), np.ones(5), {"gamma_dot": 1.0}),
+            (
+                "creep",
+                np.linspace(0.01, 10.0, 5),
+                np.ones(5) * 1e-6,
+                {"sigma_applied": 1.0},
+            ),
+            ("relaxation", np.linspace(0.01, 10.0, 5), np.ones(5), {"gamma_pre": 0.01}),
+            (
+                "laos",
+                np.linspace(0.0, 10.0, 5),
+                np.ones(5),
+                {"gamma_0": 0.1, "omega": 1.0},
+            ),
+        ],
+    )
+    def test_fit_protocol_forwards_use_diffrax(
+        self, test_mode, x, y, extra_kwargs, monkeypatch
+    ):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        predict_method_name = f"_predict_{test_mode}"
+        original = getattr(model, predict_method_name)
+
+        seen = {"use_diffrax": "not called"}
+
+        def spy(*args, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(*args, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, predict_method_name, spy)
+        model.fit(
+            x, y, test_mode=test_mode, use_diffrax=False, max_iter=2, **extra_kwargs
+        )
+
+        assert seen["use_diffrax"] is False
+
+    def test_fit_oscillation_forwards_use_diffrax(self, monkeypatch):
+        """_fit_oscillation is the 6th closure -- easy to miss since it's
+        not one of the 5 new diffrax-kernel protocols, but it depends on
+        _predict_oscillation, which gained use_diffrax in Task 2."""
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = np.logspace(-1, 1, 5)
+        G_star = np.ones(5) * 1e5 + 1j * np.ones(5) * 1e4
+
+        original = model._predict_oscillation
+        seen = {"use_diffrax": "not called"}
+
+        def spy(*args, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(*args, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_oscillation", spy)
+        model.fit(omega, G_star, test_mode="oscillation", use_diffrax=False, max_iter=2)
+
+        assert seen["use_diffrax"] is False
+
+
 @pytest.mark.slow
 class TestPrecompile:
     """Diffrax solver precompilation entry point."""
