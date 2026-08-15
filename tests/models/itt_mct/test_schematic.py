@@ -896,6 +896,68 @@ class TestCreepDetailed:
         assert J[-1] > J[0]
 
 
+@pytest.mark.slow
+class TestCreepDiffrax:
+    def test_predict_creep_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_creep already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it --
+        assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_creep).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 20)
+        J_default = model.predict(t, test_mode="creep", sigma_applied=1.0)
+        J_explicit = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=True
+        )
+        np.testing.assert_allclose(J_default, J_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 30)
+
+        J_scipy = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=False
+        )
+        J_diffrax = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(J_diffrax, J_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_glass_state_stability(self):
+        """Real (not monkeypatched) glass-state case: whichever backend
+        is used, output must be finite -- exercises the actual NaN
+        fallback path if diffrax genuinely fails here, without asserting
+        it must fail (that would be flaky; see test_nan_fallback_calls_scipy
+        for the deterministic version)."""
+        model = ITTMCTSchematic(epsilon=0.1)
+        t = np.linspace(0.01, 50.0, 30)
+
+        J = model.predict(t, test_mode="creep", sigma_applied=1.0, use_diffrax=True)
+
+        assert np.all(np.isfinite(J))
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_creep_trajectory", fake_solve)
+
+        J = model.predict(t, test_mode="creep", sigma_applied=1.0, use_diffrax=True)
+
+        assert np.all(np.isfinite(J))
+
+
 class TestRelaxationDetailed:
     """Stress relaxation: step-strain IC and glass residual."""
 

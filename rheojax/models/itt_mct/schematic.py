@@ -61,6 +61,7 @@ try:
     from rheojax.models.itt_mct._kernels_diffrax import (
         is_diffrax_available,
         precompile_flow_curve_solver,
+        solve_creep_trajectory,
         solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
         solve_relaxation_trajectory,
@@ -1109,6 +1110,69 @@ class ITTMCTSchematic(ITTMCTBase):
         return sigma
 
     def _predict_creep(
+        self,
+        t: np.ndarray,
+        sigma_applied: float = 1.0,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict creep compliance J(t).
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_creep_diffrax(t, sigma_applied)
+        return self._predict_creep_scipy(t, sigma_applied=sigma_applied)
+
+    def _predict_creep_diffrax(
+        self,
+        t: np.ndarray,
+        sigma_applied: float,
+    ) -> np.ndarray:
+        """Fast creep prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails -- most likely of
+        the 5 new sites to actually need this, since creep is the
+        stiffest near the glass transition."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes()
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        gamma = solve_creep_trajectory(
+            jnp.asarray(t),
+            sigma_applied,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        gamma_arr = np.array(gamma)
+        if np.any(np.isnan(gamma_arr)):
+            return self._predict_creep_scipy(t, sigma_applied=sigma_applied)
+
+        return gamma_arr / sigma_applied
+
+    def _predict_creep_scipy(
         self,
         t: np.ndarray,
         sigma_applied: float = 1.0,
