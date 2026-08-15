@@ -151,6 +151,7 @@ class ITTMCTBase(BaseModel):
     def _compute_equilibrium_correlator(
         self,
         t: jnp.ndarray,
+        use_diffrax: bool | None = None,
     ) -> jnp.ndarray:
         """Compute equilibrium (quiescent) correlator Φ_eq(t).
 
@@ -158,6 +159,11 @@ class ITTMCTBase(BaseModel):
         ----------
         t : jnp.ndarray
             Time array
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False), where the
+            subclass implements a diffrax fast path. If None (default),
+            uses diffrax when available. Subclasses without a diffrax
+            path accept and ignore this parameter.
 
         Returns
         -------
@@ -891,6 +897,7 @@ class ITTMCTBase(BaseModel):
         self,
         t_max: float = 1000.0,
         n_points: int = 1000,
+        use_diffrax: bool | None = None,
     ) -> None:
         """Initialize Prony modes for Volterra integration.
 
@@ -903,13 +910,19 @@ class ITTMCTBase(BaseModel):
             Maximum time for correlator computation
         n_points : int, default 1000
             Number of time points
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) for the
+            equilibrium correlator solve. If None (default), uses
+            diffrax when available.
         """
         from rheojax.utils.mct_kernels import prony_decompose_memory
 
         # Compute equilibrium correlator on fine time grid
         t = np.logspace(-3, np.log10(t_max), n_points)
         t_jax = jnp.array(t)
-        phi_eq = np.array(self._compute_equilibrium_correlator(t_jax))
+        phi_eq = np.array(
+            self._compute_equilibrium_correlator(t_jax, use_diffrax=use_diffrax)
+        )
 
         # Compute memory kernel from correlator
         m_t = np.array(self._compute_memory_kernel(jnp.array(phi_eq)))

@@ -424,6 +424,10 @@ class ITTMCTSchematic(ITTMCTBase):
         v2 = self.parameters.get_value("v2")
         Gamma = self.parameters.get_value("Gamma")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+
         t_arr = jnp.asarray(t)
         t_max = float(jnp.max(t_arr))
 
@@ -822,7 +826,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1004,9 +1008,15 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=True)
 
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
@@ -1068,7 +1078,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1150,9 +1160,15 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=True)
 
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
@@ -1214,7 +1230,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1307,9 +1323,15 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=True)
 
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
@@ -1372,7 +1394,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1481,9 +1503,15 @@ class ITTMCTSchematic(ITTMCTBase):
         gamma_c = self.parameters.get_value("gamma_c")
         G_inf = self.parameters.get_value("G_inf")
 
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=True)
 
         g = jnp.array(self._prony_amplitudes)
         tau = jnp.array(self._prony_times)
@@ -1548,7 +1576,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None

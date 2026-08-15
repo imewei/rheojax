@@ -1140,6 +1140,7 @@ class TestLAOSDiffrax:
         assert np.all(np.isfinite(sigma))
 
 
+@pytest.mark.slow
 class TestFitUseDiffraxForwarding:
     """model.fit(..., use_diffrax=False) must actually reach _predict_X
     during NLSQ residual evaluation, for every protocol."""
