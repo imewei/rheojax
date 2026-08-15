@@ -29,6 +29,7 @@ References
 - Patrick Kidger (2021) "On Neural Differential Equations", arXiv:2202.02435
 """
 
+import functools
 from collections.abc import Callable
 from typing import NamedTuple
 
@@ -36,7 +37,14 @@ from rheojax.core.jax_config import lazy_import, safe_import_jax
 
 diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
-from rheojax.models.itt_mct._kernels import strain_decorrelation
+from rheojax.models.itt_mct._kernels import (
+    f12_equilibrium_correlator_rhs,
+    f12_volterra_creep_rhs,
+    f12_volterra_laos_rhs,
+    f12_volterra_relaxation_rhs,
+    f12_volterra_startup_rhs,
+    strain_decorrelation,
+)
 
 jax, jnp = safe_import_jax()
 
@@ -65,6 +73,429 @@ class FlowCurveParams(NamedTuple):
     G_inf: float  # High-frequency modulus
     g: jnp.ndarray  # Prony amplitudes
     tau: jnp.ndarray  # Prony times
+
+
+@functools.partial(jax.jit, static_argnums=(0, 6))
+def _solve_trajectory(
+    vector_field: Callable,
+    state0: jnp.ndarray,
+    params: NamedTuple,
+    t_array: jnp.ndarray,
+    rtol: float,
+    atol: float,
+    max_steps: int,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Shared diffrax trajectory-solve helper for SaveAt(ts=...) sites.
+
+    Used by every ITT-MCT protocol except flow curve (which vmaps over
+    many shear rates and only needs the final state, SaveAt(t1=True)).
+    These sites solve one condition per call and need the full
+    trajectory at the caller's t_eval array.
+
+    JIT-compiled with `vector_field` and `max_steps` static: repeat
+    calls with the same vector-field closure (see the `make_*_vector_field`
+    factories' `lru_cache`, which keeps closure identity stable across
+    calls) and the same t_array shape reuse the compiled trace instead
+    of retracing every call.
+
+    Returns
+    -------
+    ys : jnp.ndarray, shape (len(t_array), state_dim)
+        Full state trajectory at the requested times.
+    failed : jnp.ndarray (scalar bool)
+        True if the solver did not report success, or the output
+        contains NaN. Callers use this to trigger a whole-call scipy
+        fallback (see the migration spec's "Fallback strategy" section).
+    """
+    t_array = jnp.asarray(t_array)
+    term = diffrax.ODETerm(vector_field)
+    solver = diffrax.Tsit5()
+    stepsize_controller = diffrax.PIDController(rtol=rtol, atol=atol)
+
+    solution = diffrax.diffeqsolve(
+        term,
+        solver,
+        t0=0.0,
+        t1=jnp.max(t_array),
+        dt0=0.01,
+        y0=state0,
+        args=params,
+        stepsize_controller=stepsize_controller,
+        saveat=diffrax.SaveAt(ts=t_array),
+        max_steps=max_steps,
+        throw=False,
+    )
+
+    solver_ok = solution.result == diffrax.RESULTS.successful
+    has_nan = jnp.any(jnp.isnan(solution.ys))
+    failed = (~solver_ok) | has_nan
+
+    return solution.ys, failed
+
+
+class EquilibriumCorrelatorParams(NamedTuple):
+    """Parameters for the equilibrium (quiescent) correlator ODE."""
+
+    v1: float
+    v2: float
+    Gamma: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+@functools.cache
+def make_equilibrium_correlator_vector_field(n_modes: int) -> Callable:
+    """Create diffrax-compatible vector field for the equilibrium correlator.
+
+    Reuses f12_equilibrium_correlator_rhs unchanged — only the argument
+    order changes, from scipy's (state, t, *args) to diffrax's
+    (t, state, args).
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring).
+    """
+
+    def vector_field(
+        t: float, state: jnp.ndarray, args: EquilibriumCorrelatorParams
+    ) -> jnp.ndarray:
+        return f12_equilibrium_correlator_rhs(
+            state, t, args.v1, args.v2, args.Gamma, args.g, args.tau, n_modes
+        )
+
+    return vector_field
+
+
+def solve_equilibrium_correlator_trajectory(
+    t_array: jnp.ndarray,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    rtol: float = 1e-8,
+    atol: float = 1e-10,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve the equilibrium correlator Phi_eq(t) using diffrax.
+
+    Returns Phi_eq at t_array, clipped to [0, 1]. Returns an all-NaN
+    array (same shape as t_array) if the solve fails — callers retry
+    the whole call via the scipy path in that case.
+    """
+    vector_field = make_equilibrium_correlator_vector_field(n_modes)
+    params = EquilibriumCorrelatorParams(v1=v1, v2=v2, Gamma=Gamma, g=g, tau=tau)
+
+    state0 = jnp.zeros(1 + n_modes)
+    state0 = state0.at[0].set(1.0)  # Phi(0) = 1
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    phi = jnp.clip(ys[:, 0], 0.0, 1.0)
+    return jnp.where(failed, jnp.nan, phi)
+
+
+class StartupParams(NamedTuple):
+    """Parameters for startup-flow ODE integration."""
+
+    gamma_dot: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+@functools.cache
+def make_startup_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for startup flow, reusing
+    f12_volterra_startup_rhs unchanged.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
+
+    def vector_field(t: float, state: jnp.ndarray, args: StartupParams) -> jnp.ndarray:
+        return f12_volterra_startup_rhs(
+            state,
+            t,
+            args.gamma_dot,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_startup_trajectory(
+    t_array: jnp.ndarray,
+    gamma_dot: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve startup-flow stress growth sigma(t) using diffrax.
+
+    State: [Phi, K_1..K_n, gamma, sigma]. Returns sigma(t_array),
+    NaN-filled on failure.
+    """
+    vector_field = make_startup_vector_field(n_modes, use_lorentzian, memory_form)
+    params = StartupParams(
+        gamma_dot=gamma_dot,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    state0 = jnp.zeros(3 + n_modes)
+    state0 = state0.at[0].set(1.0)  # Phi(0) = 1
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    sigma = ys[:, -1]
+    return jnp.where(failed, jnp.nan, sigma)
+
+
+class RelaxationParams(NamedTuple):
+    """Parameters for stress-relaxation ODE integration."""
+
+    gamma_pre: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+@functools.cache
+def make_relaxation_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for stress relaxation, reusing
+    f12_volterra_relaxation_rhs unchanged. State is [Phi, K_1..K_n, sigma]
+    (n+2) -- the sigma slot is solved but never read; the caller
+    reconstructs stress algebraically from Phi to avoid a round-off
+    drift-to-negative bug the scipy path is already fixed to avoid.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
+
+    def vector_field(
+        t: float, state: jnp.ndarray, args: RelaxationParams
+    ) -> jnp.ndarray:
+        return f12_volterra_relaxation_rhs(
+            state,
+            t,
+            args.gamma_pre,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_relaxation_trajectory(
+    t_array: jnp.ndarray,
+    gamma_pre: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve for the relaxation correlator Phi(t) using diffrax.
+
+    Returns Phi(t_array) clipped to [0, 1] -- NOT sigma. Callers must
+    reconstruct sigma(t) = G_inf * gamma_pre * Phi(t)**2 themselves.
+    NaN-filled on failure.
+    """
+    vector_field = make_relaxation_vector_field(n_modes, use_lorentzian, memory_form)
+
+    if use_lorentzian:
+        h_pre = 1.0 / (1.0 + (gamma_pre / gamma_c) ** 2)
+    else:
+        h_pre = jnp.exp(-((gamma_pre / gamma_c) ** 2))
+
+    params = RelaxationParams(
+        gamma_pre=gamma_pre,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    # State: [Phi, K_1..K_n, sigma] (n+2). sigma(0) is set to match the
+    # scipy IC but is never read by this function's return value.
+    state0 = jnp.zeros(2 + n_modes)
+    state0 = state0.at[0].set(h_pre)
+    state0 = state0.at[1 + n_modes].set(G_inf * gamma_pre * h_pre * h_pre)
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    phi = jnp.clip(ys[:, 0], 0.0, 1.0)
+    return jnp.where(failed, jnp.nan, phi)
+
+
+class CreepParams(NamedTuple):
+    """Parameters for creep-compliance ODE integration."""
+
+    sigma_applied: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+@functools.cache
+def make_creep_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for creep compliance, reusing
+    f12_volterra_creep_rhs unchanged.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
+
+    def vector_field(t: float, state: jnp.ndarray, args: CreepParams) -> jnp.ndarray:
+        return f12_volterra_creep_rhs(
+            state,
+            t,
+            args.sigma_applied,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_creep_trajectory(
+    t_array: jnp.ndarray,
+    sigma_applied: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve creep strain gamma(t) using diffrax.
+
+    State: [Phi, K_1..K_n, gamma, gamma_dot]. Returns gamma(t_array) --
+    callers compute J = gamma / sigma_applied. NaN-filled on failure.
+
+    Creep is the stiffest of the 5 new sites (gamma_dot relaxes toward
+    an implicit target derived from sigma_applied / G_current, producing
+    sharp transients near the glass transition) -- most likely of the 5
+    to need the whole-call scipy fallback in practice.
+    """
+    vector_field = make_creep_vector_field(n_modes, use_lorentzian, memory_form)
+    params = CreepParams(
+        sigma_applied=sigma_applied,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    # State: [Phi, K_1..K_n, gamma, gamma_dot]. gamma(0) = elastic jump
+    # sigma_applied/G_inf; gamma_dot(0) = 0 (rate starts from rest).
+    state0 = jnp.zeros(3 + n_modes)
+    state0 = state0.at[0].set(1.0)
+    state0 = state0.at[1 + n_modes].set(sigma_applied / G_inf)
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    gamma = ys[:, -2]
+    return jnp.where(failed, jnp.nan, gamma)
 
 
 # =============================================================================
@@ -597,6 +1028,104 @@ def solve_flow_curve_batch(
     return solver(gamma_dot_array, v1, v2, Gamma, gamma_c, G_inf, g, tau)
 
 
+class LaosParams(NamedTuple):
+    """Parameters for LAOS ODE integration."""
+
+    gamma_0: float
+    omega: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+@functools.cache
+def make_laos_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for LAOS, reusing
+    f12_volterra_laos_rhs unchanged. The oscillatory driving
+    (gamma_0 * sin(omega * t)) is already explicit in the RHS's t
+    argument -- diffrax handles it natively, no special-casing needed.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
+
+    def vector_field(t: float, state: jnp.ndarray, args: LaosParams) -> jnp.ndarray:
+        return f12_volterra_laos_rhs(
+            state,
+            t,
+            args.gamma_0,
+            args.omega,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_laos_trajectory(
+    t_array: jnp.ndarray,
+    gamma_0: float,
+    omega: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve LAOS stress response sigma(t) using diffrax.
+
+    State: [Phi, K_1..K_n, gamma_acc, sigma]. Returns sigma(t_array),
+    NaN-filled on failure.
+    """
+    vector_field = make_laos_vector_field(n_modes, use_lorentzian, memory_form)
+    params = LaosParams(
+        gamma_0=gamma_0,
+        omega=omega,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    state0 = jnp.zeros(3 + n_modes)
+    state0 = state0.at[0].set(1.0)  # Phi(0) = 1
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    sigma = ys[:, -1]
+    return jnp.where(failed, jnp.nan, sigma)
+
+
 # =============================================================================
 # Convenience Functions
 # =============================================================================
@@ -610,12 +1139,17 @@ def is_diffrax_available() -> bool:
 
 
 def clear_solver_cache():
-    """Clear the cached batched solvers.
+    """Clear the cached batched solvers and vector-field closures.
 
     Useful if parameters change and you want to force recompilation.
     """
     global _BATCHED_SOLVER_CACHE
     _BATCHED_SOLVER_CACHE.clear()
+    make_equilibrium_correlator_vector_field.cache_clear()
+    make_startup_vector_field.cache_clear()
+    make_relaxation_vector_field.cache_clear()
+    make_creep_vector_field.cache_clear()
+    make_laos_vector_field.cache_clear()
     logger.debug("Cleared diffrax solver cache")
 
 

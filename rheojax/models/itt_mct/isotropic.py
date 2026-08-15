@@ -312,8 +312,12 @@ class ITTMCTIsotropic(ITTMCTBase):
     def _compute_equilibrium_correlator(
         self,
         t: jnp.ndarray,
+        use_diffrax: bool | None = None,
     ) -> jnp.ndarray:
         """Compute equilibrium k-resolved correlator Φ(k,t) via Volterra ODE.
+
+        use_diffrax is accepted for interface compatibility with
+        ITTMCTBase; this model has no diffrax path and always uses scipy.
 
         Solves the MCT Volterra integral equation:
 

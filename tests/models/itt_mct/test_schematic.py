@@ -10,7 +10,10 @@ Tests cover:
 import numpy as np
 import pytest
 
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.itt_mct import ITTMCTSchematic
+
+jax, jnp = safe_import_jax()
 
 
 class TestITTMCTSchematicInitialization:
@@ -484,8 +487,83 @@ class TestConstructionValidation:
         )
 
 
+class TestSteadyStateStressRefactor:
+    """t_max bugfix + rename regression coverage (no diffrax variant)."""
+
+    def test_default_t_max_uses_max_not_min(self):
+        """Old formula: min(tau_bare, tau_shear) collapsed the yield plateau
+        at low gamma_dot. New formula: max(tau_bare, tau_shear), matching
+        compute_adaptive_t_max in _kernels_diffrax.py.
+        """
+        from rheojax.models.itt_mct.schematic import _default_steady_state_t_max
+
+        Gamma = 1.0  # tau_bare = 1.0
+        gamma_c = 0.1
+        gamma_dot = 0.001  # tau_shear = 0.1 / 0.001 = 100.0
+
+        t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
+
+        # max(1.0, 100.0) * 50 = 5000, clipped to new upper bound 1000.
+        assert t_max == pytest.approx(1000.0)
+
+    def test_default_t_max_respects_lower_bound(self):
+        from rheojax.models.itt_mct.schematic import _default_steady_state_t_max
+
+        Gamma = 1000.0  # tau_bare = 0.001
+        gamma_c = 0.1
+        gamma_dot = 1000.0  # tau_shear = 0.1 / 1000 = 0.0001
+
+        t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
+
+        # max(0.001, 0.0001) * 50 = 0.05, clipped up to the 10.0 floor.
+        assert t_max == pytest.approx(10.0)
+
+    def test_compute_steady_state_stress_scipy_exists(self):
+        """The rename landed: the scipy-only method has the new name."""
+        model = ITTMCTSchematic(epsilon=-0.05)
+        assert hasattr(model, "_compute_steady_state_stress_scipy")
+        sigma = model._compute_steady_state_stress_scipy(5.0)
+        assert np.isfinite(sigma)
+        assert sigma > 0.0
+
+    def test_flow_curve_scipy_path_still_works_after_rename(self):
+        """_predict_flow_curve_scipy's call site was updated correctly."""
+        model = ITTMCTSchematic(epsilon=-0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=False)
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0.0)
+
+    def test_flow_curve_diffrax_nan_fallback_still_works_after_rename(
+        self, monkeypatch
+    ):
+        """_predict_flow_curve_diffrax's NaN-fallback call site was updated.
+
+        Deterministic (monkeypatched), not glass-state-triggered: a real
+        glass-state input isn't guaranteed to make diffrax fail, which
+        would leave this call site unexercised (see the spec's
+        "Deterministic fallback tests" guidance).
+        """
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+
+        def fake_solve_flow_curve_batch(gamma_dot_array, *args, **kwargs):
+            import jax.numpy as jnp
+
+            return jnp.full(gamma_dot_array.shape, jnp.nan)
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_flow_curve_batch", fake_solve_flow_curve_batch
+        )
+
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=True)
+        assert np.all(np.isfinite(sigma))
+
+
 class TestSteadyStateStressConvergence:
-    """_compute_steady_state_stress must not silently trust a non-converged solve_ivp."""
+    """_compute_steady_state_stress_scipy must not silently trust a non-converged solve_ivp."""
 
     def test_raises_when_solver_never_converges(self, monkeypatch):
         """If solve_ivp reports success=False on every attempt (LSODA and the
@@ -495,7 +573,7 @@ class TestSteadyStateStressConvergence:
         # Pre-warm the Prony-mode cache with a real (unpatched) solve so the
         # mock below only intercepts the steady-state ODE under test, not
         # the unrelated solve_ivp call inside initialize_prony_modes().
-        model._compute_steady_state_stress(0.5)
+        model._compute_steady_state_stress_scipy(0.5)
 
         class _FailedSol:
             success = False
@@ -509,7 +587,7 @@ class TestSteadyStateStressConvergence:
         )
 
         with pytest.raises(RuntimeError, match="failed to converge"):
-            model._compute_steady_state_stress(1.0)
+            model._compute_steady_state_stress_scipy(1.0)
 
 
 class TestEquilibriumCorrelator:
@@ -542,6 +620,99 @@ class TestEquilibriumCorrelator:
             )
         )
         assert glass[-1] >= fluid[-1]
+
+
+@pytest.mark.slow
+class TestEquilibriumCorrelatorDiffrax:
+    """Diffrax equilibrium-correlator path (first call triggers JIT).
+
+    Note on the TDD red step: `_compute_equilibrium_correlator` currently
+    takes only `self, t` (no `**kwargs`), so every test below that passes
+    `use_diffrax=...` genuinely raises `TypeError` until Step 10 adds the
+    parameter -- a real red step, unlike `_predict_oscillation` below
+    (which already has `**kwargs` and needs a different check; see
+    `test_predict_oscillation_accepts_use_diffrax`).
+    """
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 30)
+
+        phi_scipy = model._compute_equilibrium_correlator(t, use_diffrax=False)
+        phi_diffrax = model._compute_equilibrium_correlator(t, use_diffrax=True)
+
+        np.testing.assert_allclose(
+            np.array(phi_diffrax), np.array(phi_scipy), rtol=1e-3, atol=1e-6
+        )
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 20)
+        phi_default = model._compute_equilibrium_correlator(t)
+        phi_explicit = model._compute_equilibrium_correlator(t, use_diffrax=True)
+        np.testing.assert_allclose(np.array(phi_default), np.array(phi_explicit))
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        """Deterministic fallback test: force the diffrax helper to
+        return NaN and assert the scipy path is used instead (not a
+        glass-state test, which isn't guaranteed to trigger a failure).
+        """
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_equilibrium_correlator_trajectory", fake_solve
+        )
+
+        calls = []
+        original_scipy = model._compute_equilibrium_correlator_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_compute_equilibrium_correlator_scipy", spy_scipy)
+
+        phi = model._compute_equilibrium_correlator(t, use_diffrax=True)
+
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
+        assert np.all(np.isfinite(np.array(phi)))
+
+    def test_predict_oscillation_accepts_use_diffrax(self):
+        """Genuine TDD red step for the oscillation forwarding: unlike
+        _compute_equilibrium_correlator (no **kwargs), _predict_oscillation
+        already accepts **kwargs today, so calling it with use_diffrax=...
+        does NOT raise before Step 11 -- it silently swallows the kwarg
+        and both backends end up computing via whatever
+        _compute_equilibrium_correlator's own default resolves to, making
+        a naive before/after parity assertion pass even without Step 11.
+        Assert the signature explicitly instead."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=0.05)
+        assert "use_diffrax" in inspect.signature(model._predict_oscillation).parameters
+
+    def test_oscillation_speedup_side_effect_still_correct(self):
+        """_predict_oscillation depends on _compute_equilibrium_correlator
+        internally — confirm its output is unaffected by the diffrax path
+        existing (dispatch defaults to diffrax, but physics must match)."""
+        model_scipy = ITTMCTSchematic(epsilon=0.05)
+        model_diffrax = ITTMCTSchematic(epsilon=0.05)
+        omega = np.logspace(-2, 2, 15)
+
+        G_star_scipy = model_scipy._predict_oscillation(
+            omega, use_diffrax=False, return_components=True
+        )
+        G_star_diffrax = model_diffrax._predict_oscillation(
+            omega, use_diffrax=True, return_components=True
+        )
+
+        np.testing.assert_allclose(G_star_diffrax, G_star_scipy, rtol=1e-3, atol=1e-6)
 
 
 class TestFlowCurveScipy:
@@ -592,7 +763,7 @@ class TestFlowCurveScipy:
         model = ITTMCTSchematic(
             epsilon=0.05, decorrelation_form="lorentzian", memory_form="full"
         )
-        sigma = model._compute_steady_state_stress(5.0)
+        sigma = model._compute_steady_state_stress_scipy(5.0)
         assert np.isfinite(sigma)
         assert sigma > 0.0
 
@@ -666,6 +837,67 @@ class TestStartupDetailed:
         assert np.all(np.isfinite(sigma))
 
 
+@pytest.mark.slow
+class TestStartupDiffrax:
+    def test_predict_startup_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_startup already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it
+        (not raise) both before and after the real implementation --
+        assert the signature explicitly instead of relying on a
+        behavioral test to fail for the right reason."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_startup).parameters
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 30)
+
+        sigma_scipy = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 20)
+        sigma_default = model.predict(t, test_mode="startup", gamma_dot=1.0)
+        sigma_explicit = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_startup_trajectory", fake_solve)
+
+        calls = []
+        original_scipy = model._predict_startup_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_startup_scipy", spy_scipy)
+
+        sigma = model.predict(t, test_mode="startup", gamma_dot=1.0, use_diffrax=True)
+
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
+        assert np.all(np.isfinite(sigma))
+
+
 class TestCreepDetailed:
     """Creep compliance: elastic-jump IC and monotonicity."""
 
@@ -682,6 +914,78 @@ class TestCreepDetailed:
         np.testing.assert_allclose(J[0], 1.0 / G_inf, rtol=1e-6)
         # Fluid compliance grows with time.
         assert J[-1] > J[0]
+
+
+@pytest.mark.slow
+class TestCreepDiffrax:
+    def test_predict_creep_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_creep already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it --
+        assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_creep).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 20)
+        J_default = model.predict(t, test_mode="creep", sigma_applied=1.0)
+        J_explicit = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=True
+        )
+        np.testing.assert_allclose(J_default, J_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 30)
+
+        J_scipy = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=False
+        )
+        J_diffrax = model.predict(
+            t, test_mode="creep", sigma_applied=1.0, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(J_diffrax, J_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_glass_state_stability(self):
+        """Real (not monkeypatched) glass-state case: whichever backend
+        is used, output must be finite -- exercises the actual NaN
+        fallback path if diffrax genuinely fails here, without asserting
+        it must fail (that would be flaky; see test_nan_fallback_calls_scipy
+        for the deterministic version)."""
+        model = ITTMCTSchematic(epsilon=0.1)
+        t = np.linspace(0.01, 50.0, 30)
+
+        J = model.predict(t, test_mode="creep", sigma_applied=1.0, use_diffrax=True)
+
+        assert np.all(np.isfinite(J))
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_creep_trajectory", fake_solve)
+
+        calls = []
+        original_scipy = model._predict_creep_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_creep_scipy", spy_scipy)
+
+        J = model.predict(t, test_mode="creep", sigma_applied=1.0, use_diffrax=True)
+
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
+        assert np.all(np.isfinite(J))
 
 
 class TestRelaxationDetailed:
@@ -717,6 +1021,86 @@ class TestRelaxationDetailed:
         assert sigma[-1] > 0.0
 
 
+@pytest.mark.slow
+class TestRelaxationDiffrax:
+    def test_predict_relaxation_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_relaxation already accepts
+        **kwargs today, so a bare use_diffrax=... call would silently
+        swallow it -- assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_relaxation).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 100.0, 20)
+        sigma_default = model.predict(t, test_mode="relaxation", gamma_pre=0.01)
+        sigma_explicit = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 100.0, 30)
+
+        sigma_scipy = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_stress_never_negative_glass_and_fluid(self):
+        """Regression guard: the algebraic reconstruction (sigma =
+        G_inf*gamma_pre*clip(phi,0,1)**2) must never go negative, in
+        either backend -- this is exactly the bug the scipy path's
+        algebraic-reconstruction fix already solved."""
+        t = np.logspace(-2, 3, 50)
+        for epsilon in (-0.1, 0.1):
+            model = ITTMCTSchematic(epsilon=epsilon)
+            sigma_scipy = model.predict(
+                t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=False
+            )
+            sigma_diffrax = model.predict(
+                t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+            )
+            assert np.all(sigma_scipy >= 0.0), f"scipy negative at epsilon={epsilon}"
+            assert np.all(sigma_diffrax >= 0.0), (
+                f"diffrax negative at epsilon={epsilon}"
+            )
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_relaxation_trajectory", fake_solve)
+
+        calls = []
+        original_scipy = model._predict_relaxation_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_relaxation_scipy", spy_scipy)
+
+        sigma = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
+        assert np.all(np.isfinite(sigma))
+
+
 class TestLAOSDetailed:
     """LAOS response and harmonic extraction."""
 
@@ -742,6 +1126,183 @@ class TestLAOSDetailed:
 
 
 @pytest.mark.slow
+class TestLAOSDiffrax:
+    def test_predict_laos_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_laos already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it --
+        assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_laos).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = 1.0
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0.0, 2 * period, 20)
+        sigma_default = model.predict(t, test_mode="laos", gamma_0=0.1, omega=omega)
+        sigma_explicit = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = 1.0
+        period = 2.0 * np.pi / omega
+        t = np.linspace(0.0, 2 * period, 40)
+
+        sigma_scipy = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=omega, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.0, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_laos_trajectory", fake_solve)
+
+        calls = []
+        original_scipy = model._predict_laos_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_laos_scipy", spy_scipy)
+
+        sigma = model.predict(
+            t, test_mode="laos", gamma_0=0.1, omega=1.0, use_diffrax=True
+        )
+
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
+        assert np.all(np.isfinite(sigma))
+
+
+class TestVectorFieldFactoryCacheIdentity:
+    """The 5 make_*_vector_field factories are @functools.cache-wrapped
+    so _solve_trajectory's @jax.jit (which treats the closure as a
+    static arg) reuses its compiled trace across calls instead of
+    retracing every call. If that caching is ever accidentally
+    removed, this is the only test that would catch it -- everything
+    else stays correct (just slower), since a fresh closure retraces
+    rather than errors. No diffrax solve is triggered here, so this
+    runs fast even in the smoke tier."""
+
+    def test_factories_return_identical_closure_for_same_config(self):
+        from rheojax.models.itt_mct._kernels_diffrax import (
+            make_creep_vector_field,
+            make_equilibrium_correlator_vector_field,
+            make_laos_vector_field,
+            make_relaxation_vector_field,
+            make_startup_vector_field,
+        )
+
+        assert make_equilibrium_correlator_vector_field(
+            5
+        ) is make_equilibrium_correlator_vector_field(5)
+        assert make_startup_vector_field(5) is make_startup_vector_field(5)
+        assert make_relaxation_vector_field(5) is make_relaxation_vector_field(5)
+        assert make_creep_vector_field(5) is make_creep_vector_field(5)
+        assert make_laos_vector_field(5) is make_laos_vector_field(5)
+
+
+@pytest.mark.slow
+class TestFitUseDiffraxForwarding:
+    """model.fit(..., use_diffrax=False) must actually reach _predict_X
+    during NLSQ residual evaluation, for every protocol."""
+
+    def test_fit_flow_curve_forwards_use_diffrax(self, monkeypatch):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        gamma_dot = np.array([1.0, 10.0])
+        sigma = np.array([1e5, 1e6])
+
+        seen = {"use_diffrax": "not called"}
+        original = model._predict_flow_curve
+
+        def spy(gd, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(gd, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_flow_curve", spy)
+        model.fit(
+            gamma_dot, sigma, test_mode="flow_curve", use_diffrax=False, max_iter=2
+        )
+
+        assert seen["use_diffrax"] is False
+
+    @pytest.mark.parametrize(
+        ("test_mode", "x", "y", "extra_kwargs"),
+        [
+            ("startup", np.linspace(0.01, 10.0, 5), np.ones(5), {"gamma_dot": 1.0}),
+            (
+                "creep",
+                np.linspace(0.01, 10.0, 5),
+                np.ones(5) * 1e-6,
+                {"sigma_applied": 1.0},
+            ),
+            ("relaxation", np.linspace(0.01, 10.0, 5), np.ones(5), {"gamma_pre": 0.01}),
+            (
+                "laos",
+                np.linspace(0.0, 10.0, 5),
+                np.ones(5),
+                {"gamma_0": 0.1, "omega": 1.0},
+            ),
+        ],
+    )
+    def test_fit_protocol_forwards_use_diffrax(
+        self, test_mode, x, y, extra_kwargs, monkeypatch
+    ):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        predict_method_name = f"_predict_{test_mode}"
+        original = getattr(model, predict_method_name)
+
+        seen = {"use_diffrax": "not called"}
+
+        def spy(*args, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(*args, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, predict_method_name, spy)
+        model.fit(
+            x, y, test_mode=test_mode, use_diffrax=False, max_iter=2, **extra_kwargs
+        )
+
+        assert seen["use_diffrax"] is False
+
+    def test_fit_oscillation_forwards_use_diffrax(self, monkeypatch):
+        """_fit_oscillation is the 6th closure -- easy to miss since it's
+        not one of the 5 new diffrax-kernel protocols, but it depends on
+        _predict_oscillation, which gained use_diffrax in Task 2."""
+        model = ITTMCTSchematic(epsilon=-0.1)
+        omega = np.logspace(-1, 1, 5)
+        G_star = np.ones(5) * 1e5 + 1j * np.ones(5) * 1e4
+
+        original = model._predict_oscillation
+        seen = {"use_diffrax": "not called"}
+
+        def spy(*args, use_diffrax=None, **kwargs):
+            seen["use_diffrax"] = use_diffrax
+            return original(*args, use_diffrax=use_diffrax, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_oscillation", spy)
+        model.fit(omega, G_star, test_mode="oscillation", use_diffrax=False, max_iter=2)
+
+        assert seen["use_diffrax"] is False
+
+
+@pytest.mark.slow
 class TestPrecompile:
     """Diffrax solver precompilation entry point."""
 
@@ -750,3 +1311,168 @@ class TestPrecompile:
         compile_time = model.precompile()
         assert isinstance(compile_time, float)
         assert compile_time >= 0.0
+
+
+@pytest.mark.slow
+class TestPrecompileProtocols:
+    def test_default_still_warms_only_flow_curve(self, monkeypatch):
+        """protocols=None preserves today's behavior exactly -- zero
+        change to existing callers' warm-up cost."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"flow_curve": False, "startup": False}
+
+        def fake_flow_curve_precompile(*args, **kwargs):
+            called["flow_curve"] = True
+            return 0.1
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "precompile_flow_curve_solver", fake_flow_curve_precompile
+        )
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile()
+
+        assert called["flow_curve"] is True
+        assert called["startup"] is False
+
+    def test_explicit_protocols_warms_requested_ones(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"startup": False, "creep": False}
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        def fake_creep_solve(*args, **kwargs):
+            called["creep"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+        monkeypatch.setattr(schematic_mod, "solve_creep_trajectory", fake_creep_solve)
+
+        model.precompile(protocols=["startup"])
+
+        assert called["startup"] is True
+        assert called["creep"] is False
+
+    def test_single_protocol_as_bare_string_not_exploded_into_characters(
+        self, monkeypatch
+    ):
+        """protocols: list[str] | str | None accepts a single protocol
+        name as a bare string per its docstring. tuple("startup") would
+        wrongly explode it into ('s','t','a','r','t','u','p'), raising
+        ValueError("Unknown protocol 's' ...")."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"startup": False}
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile(protocols="startup")
+
+        assert called["startup"] is True
+
+    def test_protocols_all_warms_everything(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        # Compute real Prony modes before mocking solve_equilibrium_correlator_trajectory
+        # below -- initialize_prony_modes() depends on that same solver internally
+        # for a fresh model, so mocking it first would corrupt the Prony fit
+        # rather than exercise the protocols="all" warm-up path under test.
+        model.initialize_prony_modes()
+        called = {
+            name: False
+            for name in (
+                "flow_curve",
+                "equilibrium_correlator",
+                "startup",
+                "creep",
+                "relaxation",
+                "laos",
+            )
+        }
+
+        def make_fake(name, return_shape_fn):
+            def fake(*args, **kwargs):
+                called[name] = True
+                return return_shape_fn()
+
+            return fake
+
+        monkeypatch.setattr(
+            schematic_mod,
+            "precompile_flow_curve_solver",
+            make_fake("flow_curve", lambda: 0.1),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_equilibrium_correlator_trajectory",
+            make_fake("equilibrium_correlator", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_startup_trajectory",
+            make_fake("startup", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_creep_trajectory",
+            make_fake("creep", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_relaxation_trajectory",
+            make_fake("relaxation", lambda: jnp.array([0.0])),
+        )
+        monkeypatch.setattr(
+            schematic_mod,
+            "solve_laos_trajectory",
+            make_fake("laos", lambda: jnp.array([0.0])),
+        )
+
+        model.precompile(protocols="all")
+
+        assert all(called.values()), called
+
+    def test_x_shapes_the_dummy_trajectory(self, monkeypatch):
+        """X's length must reach the warmed solver, not the hardcoded
+        5-point default -- otherwise a caller who precompiles with their
+        real (differently-sized) data still eats a cold JIT compile on
+        the first real predict()/fit() call, since SaveAt(ts=t_array)
+        retraces on array length."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        seen = {"t_len": None}
+
+        def fake_startup_solve(t_array, *args, **kwargs):
+            seen["t_len"] = len(t_array)
+            return jnp.zeros(len(t_array))
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile(protocols=["startup"], X=np.linspace(0.0, 10.0, 42))
+
+        assert seen["t_len"] == 42

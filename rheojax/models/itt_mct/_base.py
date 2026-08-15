@@ -151,6 +151,7 @@ class ITTMCTBase(BaseModel):
     def _compute_equilibrium_correlator(
         self,
         t: jnp.ndarray,
+        use_diffrax: bool | None = None,
     ) -> jnp.ndarray:
         """Compute equilibrium (quiescent) correlator Φ_eq(t).
 
@@ -158,6 +159,11 @@ class ITTMCTBase(BaseModel):
         ----------
         t : jnp.ndarray
             Time array
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False), where the
+            subclass implements a diffrax fast path. If None (default),
+            uses diffrax when available. Subclasses without a diffrax
+            path accept and ignore this parameter.
 
         Returns
         -------
@@ -352,6 +358,7 @@ class ITTMCTBase(BaseModel):
         self,
         gamma_dot: np.ndarray,
         sigma: np.ndarray,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to steady-state flow curve data.
@@ -362,6 +369,9 @@ class ITTMCTBase(BaseModel):
             Shear rate array (1/s)
         sigma : np.ndarray
             Steady-state stress array (Pa)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -384,7 +394,7 @@ class ITTMCTBase(BaseModel):
             params_clipped = np.clip(np.asarray(params), lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_flow_curve(gamma_dot)
+            y_pred = self._predict_flow_curve(gamma_dot, use_diffrax=use_diffrax)
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -405,6 +415,7 @@ class ITTMCTBase(BaseModel):
         self,
         omega: np.ndarray,
         G_star: np.ndarray,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to SAOS (G', G'') data.
@@ -416,6 +427,9 @@ class ITTMCTBase(BaseModel):
         G_star : np.ndarray
             Complex modulus. Accepts complex G* = G' + iG'',
             (n, 2) array [G', G''], or 1D real |G*| magnitude.
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -455,7 +469,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            G_pred = self._predict_oscillation(omega, return_components=True)
+            G_pred = self._predict_oscillation(
+                omega, return_components=True, use_diffrax=use_diffrax
+            )
             if fit_components:
                 y_pred = np.concatenate([G_pred[:, 0], G_pred[:, 1]])
             else:
@@ -485,6 +501,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         sigma: np.ndarray,
         gamma_dot: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to startup flow data (stress growth).
@@ -497,6 +514,9 @@ class ITTMCTBase(BaseModel):
             Stress response σ(t) (Pa)
         gamma_dot : float, default 1.0
             Applied shear rate (1/s)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -519,7 +539,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_startup(t, gamma_dot=gamma_dot)
+            y_pred = self._predict_startup(
+                t, gamma_dot=gamma_dot, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -543,6 +565,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         J: np.ndarray,
         sigma_applied: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to creep compliance data.
@@ -555,6 +578,9 @@ class ITTMCTBase(BaseModel):
             Creep compliance J(t) = γ(t)/σ₀ (1/Pa)
         sigma_applied : float, default 1.0
             Applied stress (Pa)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -577,7 +603,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_creep(t, sigma_applied=sigma_applied)
+            y_pred = self._predict_creep(
+                t, sigma_applied=sigma_applied, use_diffrax=use_diffrax
+            )
             return J - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -601,6 +629,7 @@ class ITTMCTBase(BaseModel):
         t: np.ndarray,
         sigma: np.ndarray,
         gamma_pre: float = 0.01,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to stress relaxation data.
@@ -613,6 +642,9 @@ class ITTMCTBase(BaseModel):
             Relaxing stress σ(t) (Pa)
         gamma_pre : float, default 0.01
             Pre-shear strain before relaxation
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -635,7 +667,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_relaxation(t, gamma_pre=gamma_pre)
+            y_pred = self._predict_relaxation(
+                t, gamma_pre=gamma_pre, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -660,6 +694,7 @@ class ITTMCTBase(BaseModel):
         sigma: np.ndarray,
         gamma_0: float = 0.1,
         omega: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> ITTMCTBase:
         """Fit to LAOS data.
@@ -674,6 +709,9 @@ class ITTMCTBase(BaseModel):
             Strain amplitude
         omega : float, default 1.0
             Angular frequency (rad/s)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -696,7 +734,9 @@ class ITTMCTBase(BaseModel):
             params_clipped = jnp.clip(params, lower, upper)
             param_dict = dict(zip(param_names, params_clipped, strict=True))
             self.parameters.set_values(param_dict)
-            y_pred = self._predict_laos(t, gamma_0=gamma_0, omega=omega)
+            y_pred = self._predict_laos(
+                t, gamma_0=gamma_0, omega=omega, use_diffrax=use_diffrax
+            )
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
@@ -880,6 +920,7 @@ class ITTMCTBase(BaseModel):
         self,
         t_max: float = 1000.0,
         n_points: int = 1000,
+        use_diffrax: bool | None = None,
     ) -> None:
         """Initialize Prony modes for Volterra integration.
 
@@ -892,13 +933,19 @@ class ITTMCTBase(BaseModel):
             Maximum time for correlator computation
         n_points : int, default 1000
             Number of time points
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) for the
+            equilibrium correlator solve. If None (default), uses
+            diffrax when available.
         """
         from rheojax.utils.mct_kernels import prony_decompose_memory
 
         # Compute equilibrium correlator on fine time grid
         t = np.logspace(-3, np.log10(t_max), n_points)
         t_jax = jnp.array(t)
-        phi_eq = np.array(self._compute_equilibrium_correlator(t_jax))
+        phi_eq = np.array(
+            self._compute_equilibrium_correlator(t_jax, use_diffrax=use_diffrax)
+        )
 
         # Compute memory kernel from correlator
         m_t = np.array(self._compute_memory_kernel(jnp.array(phi_eq)))

@@ -1,0 +1,10 @@
+coverage:
+  status:
+    patch:
+      default:
+        # CI's coverage-uploading job runs `pytest -m smoke` only (a small
+        # curated fast tier, see .github/workflows/ci.yml), so most new code
+        # in any PR is never exercised by that specific run even when it is
+        # thoroughly covered by the full suite. Patch coverage is reported
+        # for visibility but must not fail the PR check on that basis.
+        informational: true

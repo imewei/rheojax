@@ -31,6 +31,7 @@ Fuchs M. & Cates M.E. (2002) Phys. Rev. Lett. 89, 248304
 
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 import numpy as np
@@ -61,7 +62,12 @@ try:
     from rheojax.models.itt_mct._kernels_diffrax import (
         is_diffrax_available,
         precompile_flow_curve_solver,
+        solve_creep_trajectory,
+        solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
+        solve_laos_trajectory,
+        solve_relaxation_trajectory,
+        solve_startup_trajectory,
     )
 
     _HAS_DIFFRAX = is_diffrax_available()
@@ -72,10 +78,32 @@ except ImportError:
         """Stub when diffrax not available."""
         return 0.0
 
+    def solve_laos_trajectory(*args, **kwargs):  # type: ignore[misc]
+        """Stub when diffrax not available."""
+        return np.full((len(args[0]),), np.nan)
+
 
 jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
+
+
+def _default_steady_state_t_max(
+    gamma_dot: float, Gamma: float, gamma_c: float
+) -> float:
+    """Adaptive integration horizon for _compute_steady_state_stress_scipy.
+
+    Uses tau_eff = max(tau_bare, tau_shear) so strain has time to
+    accumulate to O(gamma_c) before the integration window closes at low
+    gamma_dot. Matches compute_adaptive_t_max in _kernels_diffrax.py
+    (min() here previously locked t_max to tau_bare at low gamma_dot,
+    starving strain accumulation and collapsing the yield-stress plateau).
+    """
+    tau_bare = 1.0 / Gamma
+    tau_shear = gamma_c / max(gamma_dot, 1e-10)
+    tau_eff = max(tau_bare, tau_shear)
+    t_max = 50.0 * tau_eff
+    return max(10.0, min(t_max, 1000.0))
 
 
 @ModelRegistry.register(
@@ -372,6 +400,59 @@ class ITTMCTSchematic(ITTMCTBase):
     def _compute_equilibrium_correlator(
         self,
         t: jnp.ndarray,
+        use_diffrax: bool | None = None,
+    ) -> jnp.ndarray:
+        """Compute equilibrium (quiescent) correlator Phi_eq(t).
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure. See _compute_equilibrium_correlator_scipy
+        and _compute_equilibrium_correlator_diffrax for the two backends.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._compute_equilibrium_correlator_diffrax(t)
+        return self._compute_equilibrium_correlator_scipy(t)
+
+    def _compute_equilibrium_correlator_diffrax(
+        self,
+        t: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """Fast equilibrium correlator using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails."""
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+
+        t_arr = jnp.asarray(t)
+        t_max = float(jnp.max(t_arr))
+
+        if self._prony_amplitudes is None:
+            tau_modes = np.logspace(-3, np.log10(t_max), self.n_prony_modes)
+            g_modes = tau_modes ** (-0.3)
+            g_modes /= g_modes.sum()
+            self._prony_amplitudes = g_modes
+            self._prony_times = tau_modes
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        phi = solve_equilibrium_correlator_trajectory(
+            t_arr, v1, v2, Gamma, g, tau, self.n_prony_modes
+        )
+
+        if np.any(np.isnan(np.array(phi))):
+            return self._compute_equilibrium_correlator_scipy(t)
+
+        return phi
+
+    def _compute_equilibrium_correlator_scipy(
+        self,
+        t: jnp.ndarray,
     ) -> jnp.ndarray:
         """Compute equilibrium (quiescent) correlator Φ_eq(t).
 
@@ -539,18 +620,18 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        # Determine which solver to use
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
         # Invalidate Prony cache if physics params changed, then init
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=should_use_diffrax)
 
         g = self._prony_amplitudes
         tau = self._prony_times
         assert g is not None
         assert tau is not None
-
-        # Determine which solver to use
-        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
 
         if should_use_diffrax and _HAS_DIFFRAX:
             return self._predict_flow_curve_diffrax(
@@ -646,7 +727,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 nan_rates = gamma_dot_nonzero[nan_mask]
                 for j, gd in enumerate(nan_rates):
                     sigma_arr[np.where(nan_mask)[0][j]] = (
-                        self._compute_steady_state_stress(float(gd))
+                        self._compute_steady_state_stress_scipy(float(gd))
                     )
 
             sigma[mask_nonzero] = sigma_arr
@@ -697,11 +778,11 @@ class ITTMCTSchematic(ITTMCTBase):
                     sigma[i] = 0.0
             else:
                 # Integrate to steady state
-                sigma[i] = self._compute_steady_state_stress(gd)
+                sigma[i] = self._compute_steady_state_stress_scipy(gd)
 
         return sigma
 
-    def _compute_steady_state_stress(
+    def _compute_steady_state_stress_scipy(
         self,
         gamma_dot: float,
         t_max: float | None = None,
@@ -745,7 +826,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -754,11 +835,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         # Adaptive integration time
         if t_max is None:
-            tau_bare = 1.0 / Gamma
-            tau_shear = gamma_c / max(gamma_dot, 1e-10)
-            tau_eff = min(tau_bare, tau_shear)
-            t_max = 50.0 * tau_eff
-            t_max = max(10.0, min(t_max, 500.0))
+            t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
 
         # Initial state: [Φ, K₁..K_n, γ, σ_integral]
         state0 = np.zeros(3 + self.n_prony_modes)
@@ -844,6 +921,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         omega: np.ndarray,
         return_components: bool = False,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Predict linear viscoelastic moduli G*(ω).
@@ -870,7 +948,7 @@ class ITTMCTSchematic(ITTMCTBase):
         # modes → misses glass plateau → G'(ω) shows ω² instead of plateau.
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=use_diffrax)
 
         # Need equilibrium correlator over sufficient time range
         omega_min = omega.min()
@@ -878,7 +956,9 @@ class ITTMCTSchematic(ITTMCTBase):
         t = np.logspace(-4, np.log10(t_max), 2000)
 
         # Compute equilibrium correlator (uses refined Prony modes)
-        phi_eq = np.array(self._compute_equilibrium_correlator(jnp.array(t)))
+        phi_eq = np.array(
+            self._compute_equilibrium_correlator(jnp.array(t), use_diffrax=use_diffrax)
+        )
 
         # Compute G*(ω) via Fourier transform
         G_prime, G_double_prime = compute_complex_modulus_from_correlator(
@@ -896,6 +976,73 @@ class ITTMCTSchematic(ITTMCTBase):
         return G_prime + 1j * G_double_prime
 
     def _predict_startup(
+        self,
+        t: np.ndarray,
+        gamma_dot: float = 1.0,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict stress growth in startup flow.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_startup_diffrax(t, gamma_dot)
+        return self._predict_startup_scipy(t, gamma_dot=gamma_dot)
+
+    def _predict_startup_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_dot: float,
+    ) -> np.ndarray:
+        """Fast startup-flow prediction using diffrax. Falls back to
+        scipy (whole-call retry) if the diffrax solve fails."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes(use_diffrax=True)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        sigma = solve_startup_trajectory(
+            jnp.asarray(t),
+            gamma_dot,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        sigma_arr = np.array(sigma)
+        if np.any(np.isnan(sigma_arr)):
+            return self._predict_startup_scipy(t, gamma_dot=gamma_dot)
+
+        return sigma_arr
+
+    def _predict_startup_scipy(
         self,
         t: np.ndarray,
         gamma_dot: float = 1.0,
@@ -931,7 +1078,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -982,6 +1129,75 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         t: np.ndarray,
         sigma_applied: float = 1.0,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict creep compliance J(t).
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_creep_diffrax(t, sigma_applied)
+        return self._predict_creep_scipy(t, sigma_applied=sigma_applied)
+
+    def _predict_creep_diffrax(
+        self,
+        t: np.ndarray,
+        sigma_applied: float,
+    ) -> np.ndarray:
+        """Fast creep prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails -- most likely of
+        the 5 new sites to actually need this, since creep is the
+        stiffest near the glass transition."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes(use_diffrax=True)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        gamma = solve_creep_trajectory(
+            jnp.asarray(t),
+            sigma_applied,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        gamma_arr = np.array(gamma)
+        if np.any(np.isnan(gamma_arr)):
+            return self._predict_creep_scipy(t, sigma_applied=sigma_applied)
+
+        return gamma_arr / sigma_applied
+
+    def _predict_creep_scipy(
+        self,
+        t: np.ndarray,
+        sigma_applied: float = 1.0,
         **kwargs,
     ) -> np.ndarray:
         """Predict creep compliance J(t).
@@ -1014,7 +1230,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1072,6 +1288,80 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         t: np.ndarray,
         gamma_pre: float = 0.01,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict stress relaxation after flow cessation.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_relaxation_diffrax(t, gamma_pre)
+        return self._predict_relaxation_scipy(t, gamma_pre=gamma_pre)
+
+    def _predict_relaxation_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_pre: float,
+    ) -> np.ndarray:
+        """Fast relaxation prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails.
+
+        Stress is reconstructed algebraically from the correlator
+        trajectory (sigma = G_inf * gamma_pre * Phi**2), matching the
+        scipy path exactly -- see solve_relaxation_trajectory's docstring
+        for why this must not read an ODE-integrated sigma state.
+        """
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes(use_diffrax=True)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        phi = solve_relaxation_trajectory(
+            jnp.asarray(t),
+            gamma_pre,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        phi_arr = np.array(phi)
+        if np.any(np.isnan(phi_arr)):
+            return self._predict_relaxation_scipy(t, gamma_pre=gamma_pre)
+
+        phi_clipped = np.clip(phi_arr, 0.0, 1.0)
+        return G_inf * gamma_pre * phi_clipped * phi_clipped
+
+    def _predict_relaxation_scipy(
+        self,
+        t: np.ndarray,
+        gamma_pre: float = 0.01,
         **kwargs,
     ) -> np.ndarray:
         """Predict stress relaxation after flow cessation.
@@ -1104,7 +1394,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1183,9 +1473,78 @@ class ITTMCTSchematic(ITTMCTBase):
         t: np.ndarray,
         gamma_0: float = 0.1,
         omega: float = 1.0,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Predict LAOS stress response.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_laos_diffrax(t, gamma_0, omega)
+        return self._predict_laos_scipy(t, gamma_0=gamma_0, omega=omega)
+
+    def _predict_laos_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_0: float,
+        omega: float,
+    ) -> np.ndarray:
+        """Fast LAOS prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes(use_diffrax=True)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        sigma = solve_laos_trajectory(
+            jnp.asarray(t),
+            gamma_0,
+            omega,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        sigma_arr = np.array(sigma)
+        if np.any(np.isnan(sigma_arr)):
+            return self._predict_laos_scipy(t, gamma_0=gamma_0, omega=omega)
+
+        return sigma_arr
+
+    def _predict_laos_scipy(
+        self,
+        t: np.ndarray,
+        gamma_0: float = 0.1,
+        omega: float = 1.0,
+    ) -> np.ndarray:
+        """Predict LAOS stress response using scipy.
 
         Parameters
         ----------
@@ -1217,7 +1576,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=False)
 
         assert self._prony_amplitudes is not None
         assert self._prony_times is not None
@@ -1348,18 +1707,38 @@ class ITTMCTSchematic(ITTMCTBase):
         test_mode: str = "relaxation",
         X=None,
         y=None,
+        protocols: list[str] | str | None = None,
         **kwargs,
     ) -> float:
-        """Pre-compile the diffrax ODE solver for fast subsequent calls.
+        """Pre-compile diffrax ODE solvers for fast subsequent calls.
 
         Triggers JIT compilation with dummy data so the first real prediction
         doesn't incur the compilation cost. Useful when predictable timing
         is important (e.g., in interactive applications or benchmarks).
 
+        Parameters
+        ----------
+        X : array-like, optional
+            Representative time array to warm the diffrax solvers with.
+            When provided, its length is used for the dummy t_array
+            passed to each warmed protocol's solve_X_trajectory, so the
+            JIT trace matches the shape real predict()/fit() calls will
+            actually use (SaveAt(ts=t_array) retraces on array length).
+            When None (default), a fixed 5-point dummy array is used,
+            matching today's flow-curve-only precompile() behavior.
+        protocols : list[str] | str | None, default None
+            Which protocols to warm beyond flow curve. None (default)
+            preserves today's behavior -- flow curve only, zero change
+            to existing callers' warm-up cost. Pass e.g.
+            ["startup", "creep"] to opt into warming others, or "all" to
+            warm every protocol. Valid names: "equilibrium_correlator",
+            "startup", "creep", "relaxation", "laos".
+
         Returns
         -------
         float
-            Compilation time in seconds (0.0 if diffrax not available)
+            Total compilation time in seconds across all warmed
+            protocols (0.0 if diffrax not available).
 
         Examples
         --------
@@ -1371,25 +1750,132 @@ class ITTMCTSchematic(ITTMCTBase):
 
         Notes
         -----
-        First call to flow curve prediction triggers JIT compilation which
-        can take 30-90 seconds. This method triggers that compilation upfront.
-
-        Only affects diffrax-based flow curve solver. Other protocols
-        (oscillation, startup, etc.) use scipy and don't need precompilation.
+        First call to each protocol's diffrax path triggers JIT
+        compilation, which can take tens of seconds. This method triggers
+        that compilation upfront so later predict()/fit() calls are fast
+        from the start.
         """
         if not _HAS_DIFFRAX:
             logger.warning("diffrax not available, precompilation skipped")
             return 0.0
 
-        # Initialize Prony modes if needed
+        self._check_prony_cache()
         if self._prony_amplitudes is None:
             self.initialize_prony_modes()
 
-        return precompile_flow_curve_solver(
+        total_time = precompile_flow_curve_solver(
             n_modes=self.n_prony_modes,
             use_lorentzian=self._use_lorentzian,
             memory_form=self._memory_form,
         )
+
+        all_protocols: tuple[str, ...] = (
+            "equilibrium_correlator",
+            "startup",
+            "creep",
+            "relaxation",
+            "laos",
+        )
+        requested: tuple[str, ...]
+        if protocols == "all":
+            requested = all_protocols
+        elif protocols is None:
+            requested = ()
+        elif isinstance(protocols, str):
+            requested = (protocols,)
+        else:
+            requested = tuple(protocols)
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+        t_dummy = jnp.logspace(-2, 1, 5) if X is None else jnp.asarray(X)
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+        assert v1 is not None
+        assert v2 is not None
+        assert Gamma is not None
+        assert gamma_c is not None
+        assert G_inf is not None
+
+        for name in requested:
+            start_time = time.time()
+            if name == "equilibrium_correlator":
+                result = solve_equilibrium_correlator_trajectory(
+                    t_dummy, v1, v2, Gamma, g, tau, self.n_prony_modes
+                )
+            elif name == "startup":
+                result = solve_startup_trajectory(
+                    t_dummy,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "creep":
+                result = solve_creep_trajectory(
+                    t_dummy,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "relaxation":
+                result = solve_relaxation_trajectory(
+                    t_dummy,
+                    0.01,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            elif name == "laos":
+                result = solve_laos_trajectory(
+                    t_dummy,
+                    0.1,
+                    1.0,
+                    v1,
+                    v2,
+                    Gamma,
+                    gamma_c,
+                    G_inf,
+                    g,
+                    tau,
+                    self.n_prony_modes,
+                    self._use_lorentzian,
+                    memory_form=self._memory_form,
+                )
+            else:
+                raise ValueError(
+                    f"Unknown protocol {name!r} for precompile(); expected one "
+                    f"of {all_protocols}"
+                )
+            jax.block_until_ready(result)
+            total_time += time.time() - start_time
+
+        return total_time
 
     def _check_prony_cache(self) -> None:
         """Invalidate Prony cache if physics parameters changed.
