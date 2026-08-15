@@ -247,3 +247,37 @@ def test_read_csv_dataframe_nested_retry_failure_is_wrapped(tmp_path: Path):
         )
 
     assert type(exc_info.value) is ValueError
+
+
+def test_load_csv_whitespace_delimiter_uses_python_engine(tmp_path: Path):
+    """PR #127 made the C parser engine the default (engine="c") for
+    single-char delimiters, falling back to engine="python" only for
+    regex delimiters. The r"\\s+" whitespace fallback in _detect_delimiter
+    is the only multi-char delimiter this reader ever produces, so this is
+    the sole path that exercises the python-engine branch -- previously
+    untested (flagged by pr-test-analyzer during PR #127's review).
+    """
+    from rheojax.io.readers.csv_reader import _detect_delimiter
+
+    txt_path = tmp_path / "whitespace.txt"
+    _write(txt_path, "x        y\n1.0      10.0\n2.0      20.0\n3.0      30.0\n")
+
+    # Confirm this file actually exercises the multi-char regex path.
+    assert _detect_delimiter(txt_path) == r"\s+"
+
+    data = load_csv(txt_path, x_col="x", y_col="y", delimiter=None)
+    np.testing.assert_allclose(data.x, [1.0, 2.0, 3.0], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [10.0, 20.0, 30.0], rtol=1e-10)
+
+
+def test_load_csv_single_char_delimiter_uses_c_engine(tmp_path: Path):
+    """Companion to the whitespace-delimiter test above: confirms the
+    common single-char-delimiter case still resolves to the fast C engine
+    (the actual optimization PR #127 introduced) and parses correctly.
+    """
+    csv_path = tmp_path / "comma.csv"
+    _write(csv_path, "x,y\n1.0,10.0\n2.0,20.0\n3.0,30.0\n")
+
+    data = load_csv(csv_path, x_col="x", y_col="y", delimiter=None)
+    np.testing.assert_allclose(data.x, [1.0, 2.0, 3.0], rtol=1e-10)
+    np.testing.assert_allclose(data.y, [10.0, 20.0, 30.0], rtol=1e-10)

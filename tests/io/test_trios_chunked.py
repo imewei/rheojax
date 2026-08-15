@@ -625,3 +625,87 @@ class TestTriosChunkedMemoryProfile:
 
         # Mean stress should decrease (relaxation)
         assert chunk_results[0] > chunk_results[-1]
+
+
+class TestTriosChunkedUnitConversion:
+    """Regression coverage for the per-segment unit-conversion factor hoist.
+
+    PR #127 replaced a per-row convert_units() call (in
+    _process_complex_row(), inside _process_remaining_rows()) with a
+    factor computed once per segment and multiplied per row. Every prior
+    test used Pa/Pa units, i.e. an identity factor of 1.0, which can't
+    distinguish a correct multiplicative hoist from a broken one (flagged
+    by pr-test-analyzer during PR #127's review). These tests use kPa,
+    a real non-trivial factor (1000x), across a row count (15) that
+    exceeds the 10-row vectorized sample-array path
+    (_read_sample_rows/_process_sample_array_complex), so rows 11-15
+    exercise the hoisted-factor per-row loop specifically, not just the
+    sample-array conversion.
+    """
+
+    def test_chunked_kpa_conversion_matches_sample_and_per_row_paths(self, tmp_path):
+        lines = [
+            "Filename\ttest.txt",
+            "Instrument serial number\t4010-1234",
+            "",
+            "[step]",
+            "Number of points\t15",
+            "Variables\tTime\tStorage modulus\tLoss modulus",
+            "\ts\tkPa\tkPa",
+        ]
+        for i in range(15):
+            lines.append(
+                f"data point {i + 1}\t{i * 0.1:.2f}\t{(i + 1) * 1.0}\t{(i + 1) * 0.5}"
+            )
+        test_file = tmp_path / "kpa_oscillation.txt"
+        test_file.write_text("\n".join(lines) + "\n")
+
+        # chunk_size=100 forces all 15 rows into a single yielded chunk, so
+        # rows 1-10 (sample array) and 11-15 (hoisted-factor per-row loop)
+        # are both present in the same assertion.
+        chunks = list(load_trios_chunked(str(test_file), chunk_size=100))
+        assert len(chunks) == 1
+        chunk = chunks[0]
+
+        assert np.iscomplexobj(chunk.y)
+        expected_real = np.array([(i + 1) * 1000.0 for i in range(15)])
+        expected_imag = np.array([(i + 1) * 500.0 for i in range(15)])
+        np.testing.assert_allclose(chunk.y.real, expected_real, rtol=1e-10)
+        np.testing.assert_allclose(chunk.y.imag, expected_imag, rtol=1e-10)
+
+        # y_units is standardized to "Pa" after conversion (txt.py:1101),
+        # regardless of the kPa source unit.
+        assert chunk.y_units == "Pa"
+
+    def test_chunked_kpa_conversion_splits_across_chunk_boundary(self, tmp_path):
+        """Same kPa conversion, but with chunk_size small enough that the
+        sample-array rows and the hoisted-factor per-row-loop rows land in
+        DIFFERENT yielded chunks -- proving the per-segment factor is
+        computed once and reused correctly across chunk boundaries, not
+        recomputed per chunk from a possibly-stale unit string.
+        """
+        lines = [
+            "Filename\ttest.txt",
+            "Instrument serial number\t4010-1234",
+            "",
+            "[step]",
+            "Number of points\t15",
+            "Variables\tTime\tStorage modulus\tLoss modulus",
+            "\ts\tkPa\tkPa",
+        ]
+        for i in range(15):
+            lines.append(
+                f"data point {i + 1}\t{i * 0.1:.2f}\t{(i + 1) * 1.0}\t{(i + 1) * 0.5}"
+            )
+        test_file = tmp_path / "kpa_oscillation_chunked.txt"
+        test_file.write_text("\n".join(lines) + "\n")
+
+        chunks = list(load_trios_chunked(str(test_file), chunk_size=5))
+        assert len(chunks) >= 2
+
+        all_real = np.concatenate([c.y.real for c in chunks])
+        all_imag = np.concatenate([c.y.imag for c in chunks])
+        expected_real = np.array([(i + 1) * 1000.0 for i in range(15)])
+        expected_imag = np.array([(i + 1) * 500.0 for i in range(15)])
+        np.testing.assert_allclose(all_real, expected_real, rtol=1e-10)
+        np.testing.assert_allclose(all_imag, expected_imag, rtol=1e-10)
